@@ -32,7 +32,7 @@ public func readLine(strippingNewline: Bool = true) -> String? {
   if readBytes == -1 {
     return nil
   }
-  _sanityCheck(readBytes >= 0,
+  _internalInvariant(readBytes >= 0,
     "unexpected return value from swift_stdlib_readLine_stdin")
   if readBytes == 0 {
     return ""
@@ -64,9 +64,8 @@ public func readLine(strippingNewline: Bool = true) -> String? {
       }
     }
   }
-  let result = String._fromUTF8(
-    UnsafeBufferPointer(start: linePtr, count: readBytes),
-    repair: true)!
+  let result = String._fromUTF8Repairing(
+    UnsafeBufferPointer(start: linePtr, count: readBytes)).0
   _swift_stdlib_free(linePtr)
   return result
 }

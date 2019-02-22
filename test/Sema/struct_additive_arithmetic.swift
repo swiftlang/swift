@@ -10,6 +10,10 @@ func testAdditiveArithmetic<T : AdditiveArithmetic>(
   x -= x - zero
 }
 
+struct Empty : AdditiveArithmetic {}
+var empty = Empty()
+testAdditiveArithmetic(&empty)
+
 struct Int2: AdditiveArithmetic {
   var a: Int
   var b: Int
@@ -58,4 +62,22 @@ func testGenericContext<T, U, V>() -> A<T>.B<U, V>.GenericContextNested {
     A<T>.B<U, V>.GenericContextNested(nested: nested, float: 1, uint8: 1)
   testAdditiveArithmetic(&genericNested)
   return genericNested
+}
+
+// Test extension.
+struct Extended {
+  var x: Int
+}
+extension Extended : Equatable, AdditiveArithmetic {}
+
+// Test extension of generic type.
+struct GenericExtended<T> {
+  var x: T
+}
+extension GenericExtended : Equatable, AdditiveArithmetic where T : AdditiveArithmetic {}
+
+// Test initializer that is not a memberwise initializer because of stored property name vs parameter label mismatch.
+struct HasCustomNonMemberwiseInitializer<T : AdditiveArithmetic>: AdditiveArithmetic {
+  var value: T
+  init(randomLabel value: T) { self.value = value }
 }

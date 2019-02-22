@@ -165,7 +165,6 @@ static FuncDecl *createFuncOrAccessor(ASTContext &ctx, SourceLoc funcLoc,
     return AccessorDecl::create(ctx, funcLoc,
                                 /*accessorKeywordLoc*/ SourceLoc(),
                                 accessorInfo->Kind,
-                                AddressorKind::NotAddressor,
                                 accessorInfo->Storage,
                                 /*StaticLoc*/SourceLoc(),
                                 StaticSpellingKind::None,
@@ -505,7 +504,6 @@ static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
                      /*FuncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      AccessorKind::Get,
-                     AddressorKind::NotAddressor,
                      rawValueDecl,
                      /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::None,
@@ -586,7 +584,6 @@ static AccessorDecl *makeStructRawValueGetter(
                      /*FuncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      AccessorKind::Get,
-                     AddressorKind::NotAddressor,
                      computedVar,
                      /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::None,
@@ -652,7 +649,6 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
                      /*FuncLoc=*/importedFieldDecl->getLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      AccessorKind::Get,
-                     AddressorKind::NotAddressor,
                      importedFieldDecl,
                      /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::None,
@@ -689,7 +685,6 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
                      /*FuncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      AccessorKind::Set,
-                     AddressorKind::NotAddressor,
                      importedFieldDecl,
                      /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::None,
@@ -1555,7 +1550,6 @@ buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
                      /*FuncLoc=*/loc,
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      AccessorKind::Get,
-                     AddressorKind::NotAddressor,
                      subscript,
                      /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::None,
@@ -1612,7 +1606,6 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
                      /*FuncLoc=*/setter->getLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      AccessorKind::Set,
-                     AddressorKind::NotAddressor,
                      subscript,
                      /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::None,
@@ -1784,7 +1777,6 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
                      /*FuncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      AccessorKind::Get,
-                     AddressorKind::NotAddressor,
                      errorDomainPropertyDecl,
                      /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::None,
@@ -7048,7 +7040,7 @@ void SwiftDeclConverter::importInheritedConstructors(
 
   auto curObjCClass = cast<clang::ObjCInterfaceDecl>(classDecl->getClangDecl());
 
-  auto inheritConstructors = [&](ArrayRef<ValueDecl *> members,
+  auto inheritConstructors = [&](TinyPtrVector<ValueDecl *> members,
                                  Optional<CtorInitializerKind> kind) {
     const auto &languageVersion =
         Impl.SwiftContext.LangOpts.EffectiveLanguageVersion;
@@ -7796,9 +7788,8 @@ void ClangImporter::Implementation::finishNormalConformance(
   (void)unused;
 
   auto *proto = conformance->getProtocol();
-  PrettyStackTraceType trace(SwiftContext, "completing conformance for",
-                             conformance->getType());
-  PrettyStackTraceDecl traceTo("... to", proto);
+  PrettyStackTraceConformance trace(SwiftContext, "completing import of",
+                                    conformance);
 
   if (!proto->isRequirementSignatureComputed())
     proto->computeRequirementSignature();
@@ -8185,7 +8176,6 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                      /*FuncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      AccessorKind::Get,
-                     AddressorKind::NotAddressor,
                      var,
                      /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::None,

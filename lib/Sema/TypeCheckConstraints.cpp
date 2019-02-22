@@ -1055,10 +1055,17 @@ namespace {
 
           if (isa<TupleExpr>(parent) || isa<ParenExpr>(parent)) {
             auto call = parents.find(parent);
-            if (call != parents.end() &&
-                (isa<ApplyExpr>(call->getSecond()) ||
-                 isa<UnresolvedMemberExpr>(call->getSecond())))
-              return finish(true, expr);
+            if (call != parents.end()) {
+              if (isa<ApplyExpr>(call->getSecond()) ||
+                  isa<UnresolvedMemberExpr>(call->getSecond()))
+                return finish(true, expr);
+
+              if (isa<SubscriptExpr>(call->getSecond())) {
+                TC.diagnose(expr->getStartLoc(),
+                            diag::cannot_pass_inout_arg_to_subscript);
+                return finish(false, nullptr);
+              }
+            }
           }
         }
 
@@ -1967,12 +1974,11 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
          "Purpose for conversion type was not specified");
 
   // Take a look at the conversion type to check to make sure it is sensible.
-  if (convertType.getType()) {
+  if (auto type = convertType.getType()) {
     // If we're asked to convert to an UnresolvedType, then ignore the request.
     // This happens when CSDiags nukes a type.
-    if (convertType.getType()->is<UnresolvedType>() ||
-        (convertType.getType()->is<MetatypeType>() &&
-         convertType.getType()->hasUnresolvedType())) {
+    if (type->is<UnresolvedType>() ||
+        (type->is<MetatypeType>() && type->hasUnresolvedType())) {
       convertType = TypeLoc();
       convertTypePurpose = CTP_Unused;
     }
@@ -2063,6 +2069,41 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 
   expr = result;
   return cs.getType(expr);
+}
+
+Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
+                                            DeclContext *DC, Type paramType,
+                                            bool isAutoClosure, bool canFail) {
+  assert(paramType && !paramType->hasError());
+
+  if (isAutoClosure) {
+    class AutoClosureListener : public ExprTypeCheckListener {
+      DeclContext *DC;
+      FunctionType *ParamType;
+
+    public:
+      AutoClosureListener(DeclContext *DC, FunctionType *paramType)
+          : DC(DC), ParamType(paramType) {}
+
+      Expr *appliedSolution(constraints::Solution &solution,
+                            Expr *expr) override {
+        auto &cs = solution.getConstraintSystem();
+        auto *closure = cs.TC.buildAutoClosureExpr(DC, expr, ParamType);
+        cs.cacheExprTypes(closure);
+        return closure;
+      }
+    };
+
+    auto *fnType = paramType->castTo<FunctionType>();
+    AutoClosureListener listener(DC, fnType);
+    return typeCheckExpression(defaultValue, DC,
+                               TypeLoc::withoutLoc(fnType->getResult()),
+                               canFail ? CTP_DefaultParameter : CTP_CannotFail,
+                               TypeCheckExprOptions(), &listener);
+  }
+
+  return typeCheckExpression(defaultValue, DC, TypeLoc::withoutLoc(paramType),
+                             canFail ? CTP_DefaultParameter : CTP_CannotFail);
 }
 
 Type TypeChecker::
@@ -2179,57 +2220,26 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
   }
 }
 
-bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
-  FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-completion-seq", expr);
+static FunctionType *
+getTypeOfCompletionOperatorImpl(TypeChecker &TC, DeclContext *DC, Expr *expr,
+                                ConcreteDeclRef &referencedDecl) {
+  ASTContext &Context = TC.Context;
+
+  FrontendStatsTracer StatsTracer(Context.Stats,
+                                  "typecheck-completion-operator", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
+  ConstraintSystemOptions options;
+  options |= ConstraintSystemFlags::SuppressDiagnostics;
+  options |= ConstraintSystemFlags::ReusePrecheckedType;
+
   // Construct a constraint system from this expression.
-  ConstraintSystem CS(*this, DC, ConstraintSystemFlags::SuppressDiagnostics);
+  ConstraintSystem CS(TC, DC, options);
+  expr = CS.generateConstraints(expr);
+  if (!expr)
+    return nullptr;
 
-  auto *SE = cast<SequenceExpr>(expr);
-  assert(SE->getNumElements() >= 3);
-  auto *op = SE->getElement(SE->getNumElements() - 2);
-  auto *CCE = cast<CodeCompletionExpr>(SE->getElements().back());
-
-  // Resolve the op.
-  op = resolveDeclRefExpr(cast<UnresolvedDeclRefExpr>(op), DC);
-  SE->setElement(SE->getNumElements() - 2, op);
-
-  // Fold the sequence.
-  expr = foldSequence(SE, DC);
-
-  // Find the code-completion expression and operator again.
-  Expr *exprAsBinOp = nullptr;
-  while (true) {
-    Expr *RHS;
-    if (auto *binExpr = dyn_cast<BinaryExpr>(expr))
-      RHS = binExpr->getArg()->getElement(1);
-    else if (auto *assignExpr = dyn_cast<AssignExpr>(expr))
-      RHS = assignExpr->getSrc();
-    else if (auto *ifExpr = dyn_cast<IfExpr>(expr))
-      RHS = ifExpr->getElseExpr();
-    else
-      break;
-
-    if (RHS == CCE) {
-      exprAsBinOp = expr;
-      break;
-    }
-    expr = RHS;
-  }
-  if (!exprAsBinOp)
-    return true;
-
-  // Ensure the output expression is up to date.
-  assert(exprAsBinOp == expr && isa<BinaryExpr>(expr) && "found wrong expr?");
-
-  if (auto generated = CS.generateConstraints(expr)) {
-    expr = generated;
-  } else {
-    return true;
-  }
-
-  if (getLangOpts().DebugConstraintSolver) {
+  if (TC.getLangOpts().DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Initial constraints for the given expression---\n";
     expr->dump(log);
@@ -2240,72 +2250,100 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
   if (CS.solve(expr, viable, FreeTypeVariableBinding::Disallow))
-    return true;
+    return nullptr;
 
   auto &solution = viable[0];
-  if (getLangOpts().DebugConstraintSolver) {
+  if (TC.getLangOpts().DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Solution---\n";
     solution.dump(log);
   }
 
-  auto &solutionCS = solution.getConstraintSystem();
-  expr->setType(solution.simplifyType(solutionCS.getType(expr)));
-  auto completionType = solution.simplifyType(solutionCS.getType(CCE));
-  CCE->setType(completionType);
-  return false;
+  // Fill the results.
+  Expr *opExpr = cast<ApplyExpr>(expr)->getFn();
+  referencedDecl =
+      solution.resolveLocatorToDecl(CS.getConstraintLocator(opExpr));
+
+  // Return '(ArgType[, ArgType]) -> ResultType' as a function type.
+  // We don't use the type of the operator expression because we want the types
+  // of the *arguments* instead of the types of the parameters.
+  Expr *argsExpr = cast<ApplyExpr>(expr)->getArg();
+  SmallVector<FunctionType::Param, 2> argTypes;
+  if (auto *PE = dyn_cast<ParenExpr>(argsExpr)) {
+    argTypes.emplace_back(solution.simplifyType(CS.getType(PE->getSubExpr())));
+  } else if (auto *TE = dyn_cast<TupleExpr>(argsExpr)) {
+    for (auto arg : TE->getElements())
+      argTypes.emplace_back(solution.simplifyType(CS.getType(arg)));
+  }
+
+  return FunctionType::get(argTypes, solution.simplifyType(CS.getType(expr)));
 }
 
-bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc) {
-  FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr-shallow", expr);
-  PrettyStackTraceExpr stackTrace(Context, "shallow type-checking", expr);
+/// \brief Return the type of operator function for specified LHS, or a null
+/// \c Type on error.
+FunctionType *
+TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
+                                         Identifier opName, DeclRefKind refKind,
+                                         ConcreteDeclRef &referencedDecl) {
 
-  // Construct a constraint system from this expression.
-  ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
-  if (auto generatedExpr = cs.generateConstraintsShallow(expr))
-    expr = generatedExpr;
-  else
-    return true;
+  // For the infix operator, find the actual LHS from pre-folded LHS.
+  if (refKind == DeclRefKind::BinaryOperator)
+    LHS = findLHS(DC, LHS, opName);
 
-  if (getLangOpts().DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    log << "---Initial constraints for the given expression---\n";
-    expr->dump(log);
-    log << "\n";
-    cs.print(log);
+  if (!LHS)
+    return nullptr;
+
+  auto LHSTy = LHS->getType();
+
+  // FIXME: 'UnresolvedType' still might be typechecked by an operator.
+  if (!LHSTy || LHSTy->is<UnresolvedType>())
+    return nullptr;
+
+  // Meta types and function types cannot be a operand of operator expressions.
+  if (LHSTy->is<MetatypeType>() || LHSTy->is<AnyFunctionType>())
+    return nullptr;
+
+  auto Loc = LHS->getEndLoc();
+
+  // Build temporary expression to typecheck.
+  // We allocate these expressions on the stack because we know they can't
+  // escape and there isn't a better way to allocate scratch Expr nodes.
+  UnresolvedDeclRefExpr UDRE(opName, refKind, DeclNameLoc(Loc));
+  auto *opExpr = resolveDeclRefExpr(&UDRE, DC);
+
+  switch (refKind) {
+
+  case DeclRefKind::PostfixOperator: {
+    // (postfix_unary_expr
+    //   (declref_expr name=<opName>)
+    //   (paren_expr
+    //     (<LHS>)))
+    ParenExpr Args(SourceLoc(), LHS, SourceLoc(),
+                   /*hasTrailingClosure=*/false);
+    PostfixUnaryExpr postfixExpr(opExpr, &Args);
+    return getTypeOfCompletionOperatorImpl(*this, DC, &postfixExpr,
+                                           referencedDecl);
   }
 
-  // Attempt to solve the constraint system.
-  SmallVector<Solution, 4> viable;
-  if ((cs.solve(expr, viable) || viable.size() != 1) &&
-      cs.salvage(viable, expr)) {
-    return true;
+  case DeclRefKind::BinaryOperator: {
+    // (binary_expr
+    //   (declref_expr name=<opName>)
+    //   (tuple_expr
+    //     (<LHS>)
+    //     (code_completion_expr)))
+    CodeCompletionExpr dummyRHS(Loc);
+    auto Args = TupleExpr::create(
+        Context, SourceLoc(), {LHS, &dummyRHS}, {}, {}, SourceLoc(),
+        /*hasTrailingClosure=*/false, /*isImplicit=*/true);
+    BinaryExpr binaryExpr(opExpr, Args, /*isImplicit=*/true);
+
+    return getTypeOfCompletionOperatorImpl(*this, DC, &binaryExpr,
+                                           referencedDecl);
   }
 
-  auto &solution = viable[0];
-  if (getLangOpts().DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    log << "---Solution---\n";
-    solution.dump(log);
+  default:
+    llvm_unreachable("Invalid DeclRefKind for operator completion");
   }
-
-  // Apply the solution to the expression.
-  auto result = cs.applySolutionShallow(solution, expr, 
-                                        /*suppressDiagnostics=*/false);
-  if (!result) {
-    // Failure already diagnosed, above, as part of applying the solution.
-    return true;
-  }
-
-  if (getLangOpts().DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    log << "---Type-checked expression---\n";
-    result->dump(log);
-    log << "\n";
-  }
-
-  expr = result;
-  return false;
 }
 
 bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,

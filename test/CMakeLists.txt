@@ -264,7 +264,7 @@ foreach(SDK ${SWIFT_SDKS})
       endif()
       if(SWIFT_ENABLE_TENSORFLOW_GPU)
         list(APPEND LIT_ARGS
-            "--param" "swift_tensorflow_gpu=true")
+            "--param" "swift_tensorflow_gpu")
       endif()
 
       execute_process(COMMAND

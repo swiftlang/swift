@@ -16,8 +16,18 @@
 // to link.
 #if defined(swiftCore_EXPORTS)
 namespace llvm {
+#if defined(_WIN32)
+extern void report_bad_alloc_error(const char *Reason, bool GenCrashDiag);
+void _report_bad_alloc_error(const char *Reason, bool GenCrashDiag) {}
+#if defined(_WIN64)
+#pragma comment(linker, "/alternatename:?report_bad_alloc_error@llvm@@YAXPEBD_N@Z=?_report_bad_alloc_error@llvm@@YAXPEBD_N@Z")
+#else
+#pragma comment(linker, "/alternatename:?report_bad_alloc_error@llvm@@YAXPBD_N@Z=?_report_bad_alloc_error@llvm@@YAXPBD_N@Z")
+#endif
+#else
 void __attribute__((__weak__, __visibility__("hidden")))
 report_bad_alloc_error(const char *Reason, bool GenCrashDiag) {}
+#endif
 } // end namespace llvm
 #endif
 

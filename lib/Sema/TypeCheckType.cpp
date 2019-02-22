@@ -1721,6 +1721,9 @@ namespace {
     Type buildProtocolType(ProtocolTypeRepr *repr,
                            Type instanceType,
                            Optional<MetatypeRepresentation> storedRepr);
+
+    // SWIFT_ENABLE_TENSORFLOW
+    bool isDifferentiableType(Type ty);
   };
 } // end anonymous namespace
 
@@ -1941,7 +1944,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     TAK_convention, TAK_noreturn, TAK_pseudogeneric,
     TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape, TAK_autoclosure,
     // SWIFT_ENABLE_TENSORFLOW
-    TAK_escaping, TAK_autodiff, TAK_yield_once, TAK_yield_many
+    TAK_escaping, TAK_autodiff, TAK_differentiable, TAK_yield_once, TAK_yield_many
   };
 
   auto checkUnsupportedAttr = [&](TypeAttrKind attr) {
@@ -2044,7 +2047,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     SILFunctionType::ExtInfo extInfo(rep, attrs.has(TAK_pseudogeneric),
                                      // SWIFT_ENABLE_TENSORFLOW
                                      attrs.has(TAK_noescape),
-                                     attrs.has(TAK_autodiff));
+                                     attrs.has(TAK_autodiff) || attrs.has(TAK_differentiable));
 
     ty = resolveSILFunctionType(fnRepr, options, coroutineKind,
                                 extInfo, calleeConvention,
@@ -2102,11 +2105,10 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
     // Resolve the function type directly with these attributes.
     FunctionType::ExtInfo extInfo(rep,
-                                  attrs.has(TAK_autoclosure),
                                   attrs.has(TAK_noescape),
                                   // SWIFT_ENABLE_TENSORFLOW
                                   fnRepr->throws(),
-                                  attrs.has(TAK_autodiff));
+                                  attrs.has(TAK_autodiff) || attrs.has(TAK_differentiable));
 
     ty = resolveASTFunctionType(fnRepr, options, extInfo);
     if (!ty || ty->hasError()) return ty;
@@ -2265,6 +2267,10 @@ bool TypeResolver::resolveASTFunctionTypeParams(
       variadic = true;
     }
 
+    bool autoclosure = false;
+    if (auto *ATR = dyn_cast<AttributedTypeRepr>(eltTypeRepr))
+      autoclosure = ATR->getAttrs().has(TAK_autoclosure);
+
     Type ty = resolveType(eltTypeRepr, thisElementOptions);
     if (!ty) return true;
 
@@ -2318,9 +2324,19 @@ bool TypeResolver::resolveASTFunctionTypeParams(
       }
     }
 
+    if (isDifferentiable &&
+        resolution.getStage() != TypeResolutionStage::Structural) {
+      if (!nondiff && !isDifferentiableType(ty)) {
+        diagnose(eltTypeRepr->getLoc(),
+                 diag::autodiff_attr_argument_not_differentiable)
+            .fixItInsert(eltTypeRepr->getLoc(), "@nondiff ");
+      }
+    }
+
     // SWIFT_ENABLE_TENSORFLOW
     ParameterTypeFlags paramFlags =
-        ParameterTypeFlags::fromParameterType(ty, variadic, ownership, nondiff);
+        ParameterTypeFlags::fromParameterType(ty, variadic, autoclosure,
+                                              ownership, nondiff);
     elements.emplace_back(ty, Identifier(), paramFlags);
   }
 
@@ -2396,7 +2412,31 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
     break;
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  // If the function is marked as `@differentiable`, the result must be a
+  // differentiable type.
+  if (extInfo.isDifferentiable() &&
+      resolution.getStage() != TypeResolutionStage::Structural) {
+    if (!isDifferentiableType(outputTy)) {
+      diagnose(repr->getResultTypeRepr()->getLoc(),
+               diag::autodiff_attr_result_not_differentiable)
+          .highlight(repr->getResultTypeRepr()->getSourceRange());
+    }
+  }
+
   return fnTy;
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+bool TypeResolver::isDifferentiableType(Type ty) {
+  if (resolution.getStage() != TypeResolutionStage::Contextual) {
+    ty = DC->mapTypeIntoContext(ty);
+  }
+  return ty
+      ->getAutoDiffAssociatedVectorSpace(
+          AutoDiffAssociatedVectorSpaceKind::Tangent,
+          LookUpConformanceInModule(DC->getParentModule()))
+      .hasValue();
 }
 
 Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
@@ -3334,6 +3374,17 @@ public:
       });
     }
   }
+
+  void visitRequirements(ArrayRef<RequirementRepr> reqts) {
+    for (auto reqt : reqts) {
+      if (reqt.getKind() == RequirementReprKind::SameType) {
+        if (auto *repr = reqt.getFirstTypeLoc().getTypeRepr())
+          repr->walk(*this);
+        if (auto *repr = reqt.getSecondTypeLoc().getTypeRepr())
+          repr->walk(*this);
+      }
+    }
+  }
 };
 
 } // end anonymous namespace
@@ -3342,12 +3393,22 @@ void TypeChecker::checkUnsupportedProtocolType(Decl *decl) {
   if (!decl || decl->isInvalid())
     return;
 
-  // Type declarations are okay.
-  if (isa<TypeDecl>(decl))
-    return;
+  if (auto *protocolDecl = dyn_cast<ProtocolDecl>(decl))
+    checkUnsupportedProtocolType(protocolDecl->getTrailingWhereClause());
+  else if (auto *genericDecl = dyn_cast<GenericTypeDecl>(decl))
+    checkUnsupportedProtocolType(genericDecl->getGenericParams());
+  else if (auto *assocType = dyn_cast<AssociatedTypeDecl>(decl))
+    checkUnsupportedProtocolType(assocType->getTrailingWhereClause());
+  else if (auto *extDecl = dyn_cast<ExtensionDecl>(decl))
+    checkUnsupportedProtocolType(extDecl->getTrailingWhereClause());
+  else if (auto *subscriptDecl = dyn_cast<SubscriptDecl>(decl))
+    checkUnsupportedProtocolType(subscriptDecl->getGenericParams());
+  else if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
+    if (!isa<AccessorDecl>(funcDecl))
+      checkUnsupportedProtocolType(funcDecl->getGenericParams());
+  }
 
-  // Extensions are okay.
-  if (isa<ExtensionDecl>(decl))
+  if (isa<TypeDecl>(decl) || isa<ExtensionDecl>(decl))
     return;
 
   UnsupportedProtocolVisitor visitor(*this, /*checkStatements=*/false);
@@ -3360,4 +3421,20 @@ void TypeChecker::checkUnsupportedProtocolType(Stmt *stmt) {
 
   UnsupportedProtocolVisitor visitor(*this, /*checkStatements=*/true);
   stmt->walk(visitor);
+}
+
+void TypeChecker::checkUnsupportedProtocolType(TrailingWhereClause *whereClause) {
+  if (whereClause == nullptr)
+    return;
+
+  UnsupportedProtocolVisitor visitor(*this, /*checkStatements=*/false);
+  visitor.visitRequirements(whereClause->getRequirements());
+}
+
+void TypeChecker::checkUnsupportedProtocolType(GenericParamList *genericParams) {
+  if (genericParams  == nullptr)
+    return;
+
+  UnsupportedProtocolVisitor visitor(*this, /*checkStatements=*/false);
+  visitor.visitRequirements(genericParams->getRequirements());
 }

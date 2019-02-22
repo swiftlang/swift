@@ -385,7 +385,17 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   if (F.hasClangNode())
     clangNodeOwnerID = S.addDeclRef(F.getClangNodeOwner());
 
+  IdentifierID replacedFunctionID = 0;
+  if (auto *fun = F.getDynamicallyReplacedFunction()) {
+    addReferencedSILFunction(fun, true);
+    replacedFunctionID = S.addUniquedStringRef(fun->getName());
+  }
+  else if (F.hasObjCReplacement()) {
+    replacedFunctionID =
+        S.addUniquedStringRef(F.getObjCReplacement().str());
+  }
   unsigned numSpecAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
+  unsigned numDiffAttrs = NoBody ? 0 : F.getDifferentiableAttrs().size();
   SILFunctionLayout::emitRecord(
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
       (unsigned)F.isTransparent(), (unsigned)F.isSerialized(),
@@ -393,10 +403,10 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isGlobalInit(), (unsigned)F.getInlineStrategy(),
       (unsigned)F.getOptimizationMode(), (unsigned)F.getEffectsKind(),
       // SWIFT_ENABLE_TENSORFLOW
-      (unsigned)numSpecAttrs,
-      (unsigned)F.getDifferentiableAttrs().size(),
+      (unsigned)numSpecAttrs, (unsigned)numDiffAttrs,
       (unsigned)F.hasQualifiedOwnership(),
-      F.isWeakLinked(), FnID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
+      F.isWeakLinked(), (unsigned)F.isDynamicallyReplaceable(), FnID,
+      replacedFunctionID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
 
   if (NoBody)
     return;
@@ -414,29 +424,25 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   for (auto *DA : F.getDifferentiableAttrs()) {
     unsigned differentiableAttrAbbrCode =
         SILAbbrCodes[SILDifferentiableAttrLayout::Code];
-    auto &indices = DA->getIndices();
+
+    if (F.getModule().getStage() == SILStage::Canonical)
+      assert(DA->hasJVP() && DA->hasVJP() &&
+             "JVP and VJP must exist in canonical SIL");
+
+    auto &paramIndices = DA->getIndices();
     SmallVector<bool, 4> parameters;
-    for (unsigned i = 0; i < indices.parameters.size(); i++)
-      parameters.push_back(indices.parameters[i]);
+    for (unsigned i : indices(paramIndices.parameters))
+      parameters.push_back(paramIndices.parameters[i]);
+
     SILDifferentiableAttrLayout::emitRecord(
         Out, ScratchRecord, differentiableAttrAbbrCode,
-        DA->hasPrimal()
-            ? S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getPrimalName()))
-            : IdentifierID(),
-        DA->hasAdjoint()
-            ? S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getAdjointName()))
-            : IdentifierID(),
-        DA->isAdjointPrimitive(),
-        // TODO: Once we add synthesis for JVP and VJP, serialized
-        // [differentiable] attrs should always have JVP and VJP, so we should
-        // be able to eliminate these checks.
         DA->hasJVP()
             ? S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getJVPName()))
             : IdentifierID(),
         DA->hasVJP()
             ? S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getVJPName()))
             : IdentifierID(),
-        indices.source, parameters);
+        paramIndices.source, parameters);
     S.writeGenericRequirements(DA->getRequirements(), SILAbbrCodes);
   }
 
@@ -1367,6 +1373,34 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // Use SILOneOperandLayout to specify the function type and the function
     // name (IdentifierID).
     const FunctionRefInst *FRI = cast<FunctionRefInst>(&SI);
+    SILFunction *ReferencedFunction = FRI->getReferencedFunction();
+    unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
+    SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
+        (unsigned)SI.getKind(), 0,
+        S.addTypeRef(FRI->getType().getASTType()),
+        (unsigned)FRI->getType().getCategory(),
+        addSILFunctionRef(ReferencedFunction));
+
+    break;
+  }
+  case SILInstructionKind::DynamicFunctionRefInst: {
+    // Use SILOneOperandLayout to specify the function type and the function
+    // name (IdentifierID).
+    const auto *FRI = cast<DynamicFunctionRefInst>(&SI);
+    SILFunction *ReferencedFunction = FRI->getReferencedFunction();
+    unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
+    SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
+        (unsigned)SI.getKind(), 0,
+        S.addTypeRef(FRI->getType().getASTType()),
+        (unsigned)FRI->getType().getCategory(),
+        addSILFunctionRef(ReferencedFunction));
+
+    break;
+  }
+  case SILInstructionKind::PreviousDynamicFunctionRefInst: {
+    // Use SILOneOperandLayout to specify the function type and the function
+    // name (IdentifierID).
+    const auto *FRI = cast<PreviousDynamicFunctionRefInst>(&SI);
     SILFunction *ReferencedFunction = FRI->getReferencedFunction();
     unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
     SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -2477,6 +2511,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // decl blocks and sil blocks.
   registerSILAbbr<decls_block::AbstractProtocolConformanceLayout>();
   registerSILAbbr<decls_block::NormalProtocolConformanceLayout>();
+  registerSILAbbr<decls_block::SelfProtocolConformanceLayout>();
   registerSILAbbr<decls_block::SpecializedProtocolConformanceLayout>();
   registerSILAbbr<decls_block::InheritedProtocolConformanceLayout>();
   registerSILAbbr<decls_block::NormalProtocolConformanceIdLayout>();

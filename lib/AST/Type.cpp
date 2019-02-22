@@ -4089,6 +4089,20 @@ Type TypeBase::openAnyExistentialType(ArchetypeType *&opened) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
+// Makes a function with the same generic signature and extinfo as `copy`, but
+// with `params` parameters and `retTy` return type.
+static AnyFunctionType *
+makeFunctionType(AnyFunctionType *copy, ArrayRef<AnyFunctionType::Param> params,
+                 Type retTy, GenericSignature *genericSignature) {
+  if (!genericSignature)
+    if (auto *genericFunctionType = copy->getAs<GenericFunctionType>())
+      genericSignature = genericFunctionType->getGenericSignature();
+  if (genericSignature)
+    return GenericFunctionType::get(genericSignature, params, retTy,
+                                    copy->getExtInfo());
+  return FunctionType::get(params, retTy, copy->getExtInfo());
+}
+
 Optional<VectorSpace> TypeBase::getAutoDiffAssociatedVectorSpace(
     AutoDiffAssociatedVectorSpaceKind kind,
     LookupConformanceFn lookupConformance) {
@@ -4104,11 +4118,19 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedVectorSpace(
     return vs;
   };
 
-  // Builtins floats are their own Tangent/Cotangent.
-  if (auto *builtinFloat = getAs<BuiltinFloatType>())
-    return cache(VectorSpace::getBuiltinFloat(builtinFloat));
+  // Functions' tangent/cotangent is the same function except the innermost
+  // return type being replaced by its tangent/cotangent.
+  if (auto *fnTy = getAs<AnyFunctionType>()) {
+    auto resultSpace = fnTy->getResult()->getAutoDiffAssociatedVectorSpace(
+        kind, lookupConformance);
+    if (!resultSpace)
+      return cache(None);
+    return VectorSpace::getFunction(
+        makeFunctionType(fnTy, fnTy->getParams(), resultSpace->getType(),
+                         fnTy->getOptGenericSignature()));
+  }
 
-  // Tuples' Tangent/Cotangent is a tuple of each element's Tangent/Cotangent.
+  // Tuples' tangent/cotangent is a tuple of each element's Tangent/Cotangent.
   if (auto *tupleTy = getAs<TupleType>()) {
     SmallVector<TupleTypeElt, 8> newElts;
     for (auto elt : tupleTy->getElements()) {
@@ -4125,8 +4147,8 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedVectorSpace(
   // Find the TangentVector/CotangentVector associated type on the
   // Differentiable protocol.
   auto *differentiableProtocol =
-      ctx.getProtocol(KnownProtocolKind::Differentiable);
-  assert(differentiableProtocol && "could not find Differentiable protocol");
+      ctx.getProtocol(KnownProtocolKind::__Differentiable);
+  assert(differentiableProtocol && "Could not find __Differentiable protocol");
   Identifier associatedTypeIdentifier;
   switch (kind) {
   case AutoDiffAssociatedVectorSpaceKind::Tangent:
@@ -4150,85 +4172,6 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedVectorSpace(
 
   // There is no associated vector space.
   return cache(None);
-}
-
-// Makes a function with the same generic signature and extinfo as `copy`, but
-// with `params` parameters and `retTy` return type.
-static AnyFunctionType *
-makeFunctionType(AnyFunctionType *copy, ArrayRef<AnyFunctionType::Param> params,
-                 Type retTy, GenericSignature *whereClauseGenSig) {
-  auto genericSignature = whereClauseGenSig;
-  if (!genericSignature)
-    if (auto *genericFunctionType = copy->getAs<GenericFunctionType>())
-      genericSignature = genericFunctionType->getGenericSignature();
-  if (genericSignature)
-    return GenericFunctionType::get(genericSignature, params, retTy,
-                                    copy->getExtInfo());
-  return FunctionType::get(params, retTy, copy->getExtInfo());
-}
-
-AnyFunctionType *AnyFunctionType::getAutoDiffAdjointFunctionType(
-    AutoDiffParameterIndices *indices, const TupleType *primalResultTy,
-    LookupConformanceFn lookupConformance, bool isMethod,
-    GenericSignature *whereClauseGenSig) {
-  assert(!indices->isEmpty() && "there must be at least one wrt index");
-
-  // Compute the return type of the adjoint.
-  SmallVector<TupleTypeElt, 8> retElts;
-  SmallVector<Type, 8> wrtParamTypes;
-  indices->getSubsetParameterTypes(this, wrtParamTypes);
-  for (auto wrtParamType : wrtParamTypes)
-    retElts.push_back(wrtParamType->getAutoDiffAssociatedVectorSpace(
-        AutoDiffAssociatedVectorSpaceKind::Cotangent, lookupConformance)
-            ->getType());
-
-  // If collected `retElts` has only 1 element, use that element as adjoint's
-  // return type. Otherwise, make a tuple out of `retElts` as adjoint's return
-  // type.
-  Type retTy = retElts.size() > 1 ? TupleType::get(retElts, getASTContext())
-                                  : retElts[0].getType();
-
-  // If this is a method, unwrap the function type so that we can see the
-  // non-self parameters.
-  AnyFunctionType *unwrapped = this;
-  if (isMethod)
-    unwrapped = unwrapped->getResult()->castTo<AnyFunctionType>();
-
-  // Compute the adjoint parameters.
-  SmallVector<AnyFunctionType::Param, 8> adjointParams;
-
-  // The first parameter is the seed, which is in the cotangent space of the
-  // original return type.
-  adjointParams.push_back(
-      AnyFunctionType::Param(
-          unwrapped->getResult()->getAutoDiffAssociatedVectorSpace(
-              AutoDiffAssociatedVectorSpaceKind::Cotangent, lookupConformance)
-                  ->getType()));
-
-  // If the primal exists, the checkpoints type is the primal result type.
-  if (primalResultTy) {
-    auto checkpointsTy = primalResultTy->getElement(0).getType();
-    adjointParams.push_back(AnyFunctionType::Param(checkpointsTy));
-  }
-
-  // The original result has the same type as the original return type.
-  adjointParams.push_back(AnyFunctionType::Param(unwrapped->getResult()));
-
-  // The last parameters are the parameters of the original function.
-  for (auto &param : unwrapped->getParams())
-    adjointParams.push_back(param);
-
-  // Build the adjoint type.
-  AnyFunctionType *adjoint =
-      makeFunctionType(unwrapped, adjointParams, retTy,
-      isMethod ? nullptr : whereClauseGenSig);
-
-  // If this is a method, wrap the adjoint type in an additional "(Self) ->"
-  // curry level.
-  if (isMethod)
-    adjoint = makeFunctionType(this, getParams(), adjoint, whereClauseGenSig);
-
-  return adjoint;
 }
 
 AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(

@@ -23,35 +23,36 @@
 
 namespace swift {
 
-class AutoDiffParameter {
+class ParsedAutoDiffParameter {
 public:
-  enum class Kind { Index, Self };
+  enum class Kind { Named, Self };
 
 private:
   SourceLoc Loc;
   Kind Kind;
   union Value {
-    struct { unsigned Index; }; // Index
+    struct { Identifier Name; }; // Index
     struct {};                  // Self
-    Value(unsigned index) : Index(index) {}
+    Value(Identifier name) : Name(name) {}
     Value() {}
   } V;
 
 public:
-  AutoDiffParameter(SourceLoc loc, enum Kind kind, Value value)
+  ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, Value value)
     : Loc(loc), Kind(kind), V(value) {}
 
-  static AutoDiffParameter getIndexParameter(SourceLoc loc, unsigned index) {
-    return { loc, Kind::Index, index };
+  static ParsedAutoDiffParameter getNamedParameter(SourceLoc loc,
+                                                   Identifier name) {
+    return { loc, Kind::Named, name };
   }
 
-  static AutoDiffParameter getSelfParameter(SourceLoc loc) {
+  static ParsedAutoDiffParameter getSelfParameter(SourceLoc loc) {
     return { loc, Kind::Self, {} };
   }
 
-  unsigned getIndex() const {
-    assert(Kind == Kind::Index);
-    return V.Index;
+  Identifier getName() const {
+    assert(Kind == Kind::Named);
+    return V.Name;
   }
 
   enum Kind getKind() const {
@@ -62,10 +63,12 @@ public:
     return Loc;
   }
 
-  bool isEqual(const AutoDiffParameter &other) const {
-    if (getKind() == other.getKind() && getKind() == Kind::Index)
-      return getIndex() == other.getIndex();
-    return getKind() == other.getKind() && getKind() == Kind::Self;
+  bool isEqual(const ParsedAutoDiffParameter &other) const {
+    if (getKind() != other.getKind())
+      return false;
+    if (getKind() == Kind::Named)
+      return getName() == other.getName();
+    return getKind() == Kind::Self;
   }
 };
 
@@ -88,6 +91,7 @@ class Type;
 class AutoDiffParameterIndices : public llvm::FoldingSetNode {
   friend AutoDiffParameterIndicesBuilder;
 
+public:
   /// Bits corresponding to parameters in the set are "on", and bits
   /// corresponding to parameters not in the set are "off".
   ///
@@ -109,11 +113,12 @@ class AutoDiffParameterIndices : public llvm::FoldingSetNode {
   ///
   const llvm::SmallBitVector parameters;
 
-  AutoDiffParameterIndices(llvm::SmallBitVector parameters)
-      : parameters(parameters) {}
-
   static AutoDiffParameterIndices *get(llvm::SmallBitVector parameters,
                                        ASTContext &C);
+
+private:
+  AutoDiffParameterIndices(const llvm::SmallBitVector &parameters)
+      : parameters(parameters) {}
 
 public:
   /// Allocates and initializes an `AutoDiffParameterIndices` corresponding to
@@ -230,7 +235,7 @@ struct SILAutoDiffIndices {
       : source(source), parameters(parameters) {}
 
   /// Creates a set of AD indices from the given source index and an array of
-  /// parameter indices. Elements in `parameters` must be acending integers.
+  /// parameter indices. Elements in `parameters` must be ascending integers.
   /*implicit*/ SILAutoDiffIndices(unsigned source,
                                   ArrayRef<unsigned> parameters);
 
@@ -288,7 +293,7 @@ struct AutoDiffAssociatedFunctionKind {
 class AutoDiffAssociatedFunctionIdentifier : public llvm::FoldingSetNode {
   const AutoDiffAssociatedFunctionKind kind;
   const unsigned differentiationOrder;
-  AutoDiffParameterIndices * const parameterIndices;
+  AutoDiffParameterIndices *const parameterIndices;
 
   AutoDiffAssociatedFunctionIdentifier(
       AutoDiffAssociatedFunctionKind kind, unsigned differentiationOrder,
@@ -356,27 +361,27 @@ class VectorSpace {
 public:
   /// A tangent space kind.
   enum class Kind {
-    /// `Builtin.FP<...>`.
-    BuiltinFloat,
-    /// A type that conforms to `VectorNumeric`.
+    /// A type that conforms to `AdditiveArithmetic`.
     Vector,
     /// A product of vector spaces as a tuple.
     Tuple,
+    /// A function type whose innermost result conforms to `AdditiveArithmetic`.
+    Function
   };
 
 private:
   Kind kind;
   union Value {
-    // Builtin float
-    BuiltinFloatType *builtinFPType;
     // Vector
     Type vectorType;
     // Tuple
     TupleType *tupleType;
+    // Function
+    AnyFunctionType *functionType;
 
-    Value(BuiltinFloatType *builtinFP) : builtinFPType(builtinFP) {}
     Value(Type vectorType) : vectorType(vectorType) {}
     Value(TupleType *tupleType) : tupleType(tupleType) {}
+    Value(AnyFunctionType *functionType) : functionType(functionType) {}
   } value;
 
   VectorSpace(Kind kind, Value value)
@@ -385,25 +390,20 @@ private:
 public:
   VectorSpace() = delete;
 
-  static VectorSpace getBuiltinFloat(BuiltinFloatType *builtinFP) {
-    return {Kind::BuiltinFloat, builtinFP};
-  }
   static VectorSpace getVector(Type vectorType) {
     return {Kind::Vector, vectorType};
   }
   static VectorSpace getTuple(TupleType *tupleTy) {
     return {Kind::Tuple, tupleTy};
   }
+  static VectorSpace getFunction(AnyFunctionType *fnTy) {
+    return {Kind::Function, fnTy};
+  }
 
-  bool isBuiltinFloat() const { return kind == Kind::BuiltinFloat; }
   bool isVector() const { return kind == Kind::Vector; }
   bool isTuple() const { return kind == Kind::Tuple; }
 
   Kind getKind() const { return kind; }
-  BuiltinFloatType *getBuiltinFloat() const {
-    assert(kind == Kind::BuiltinFloat);
-    return value.builtinFPType;
-  }
   Type getVector() const {
     assert(kind == Kind::Vector);
     return value.vectorType;
@@ -411,6 +411,10 @@ public:
   TupleType *getTuple() const {
     assert(kind == Kind::Tuple);
     return value.tupleType;
+  }
+  AnyFunctionType *getFunction() const {
+    assert(kind == Kind::Function);
+    return value.functionType;
   }
 
   Type getType() const;

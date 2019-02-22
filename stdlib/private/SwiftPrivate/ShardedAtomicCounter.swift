@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Swift
 import SwiftShims
 
 public func _stdlib_getHardwareConcurrency() -> Int {

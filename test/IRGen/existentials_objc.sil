@@ -186,7 +186,7 @@ protocol TestP : AnyObject {}
 class NSObject {}
 
 class TestC {
-  @sil_stored unowned final let t: @sil_unowned NSObject & TestP
+  @_hasStorage unowned final let t: @sil_unowned NSObject & TestP
   init(t: NSObject & TestP)
 }
 

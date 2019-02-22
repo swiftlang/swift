@@ -75,22 +75,8 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
     return canDeriveVectorNumeric(Nominal, DC);
 
   // SWIFT_ENABLE_TENSORFLOW
-  if (*knownProtocol == KnownProtocolKind::Differentiable)
+  if (*knownProtocol == KnownProtocolKind::__Differentiable)
     return canDeriveDifferentiable(Nominal, DC);
-
-  // SWIFT_ENABLE_TENSORFLOW
-  // The only requirement for deriving Parameterized is that there exist some
-  // stored properties marked with @TFParameter. The `Parameters` struct can
-  // always be derived, even if parameters have different types.
-  if (*knownProtocol == KnownProtocolKind::Parameterized) {
-    SmallVector<VarDecl *, 8> params;
-    Nominal->getAllTFParameters(params);
-    return !params.empty();
-  }
-
-  // SWIFT_ENABLE_TENSORFLOW
-  if (*knownProtocol == KnownProtocolKind::ParameterGroup)
-    return canDeriveParameterGroup(Nominal);
 
   if (auto *enumDecl = dyn_cast<EnumDecl>(Nominal)) {
     switch (*knownProtocol) {
@@ -233,10 +219,10 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       return getRequirement(KnownProtocolKind::KeyPathIterable);
 
     // SWIFT_ENABLE_TENSORFLOW
-    // Parameterized.allParameters
-    if (name.isSimpleName(ctx.Id_allParameters))
-      return getRequirement(KnownProtocolKind::Parameterized);
-    
+    // Differentiable.allDifferentiableVariables
+    if (name.isSimpleName(ctx.Id_allDifferentiableVariables))
+      return getRequirement(KnownProtocolKind::__Differentiable);
+
     return nullptr;
   }
 
@@ -285,7 +271,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       auto argumentNames = name.getArgumentNames();
       if (argumentNames.size() == 1 &&
           argumentNames[0] == ctx.getIdentifier("along")) {
-        return getRequirement(KnownProtocolKind::Differentiable);
+        return getRequirement(KnownProtocolKind::__Differentiable);
       }
     }
 
@@ -296,19 +282,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       auto argumentNames = name.getArgumentNames();
       if (argumentNames.size() == 1 &&
           argumentNames[0] == ctx.getIdentifier("from")) {
-        return getRequirement(KnownProtocolKind::Differentiable);
-      }
-    }
-
-    // SWIFT_ENABLE_TENSORFLOW
-    // ParameterGroup.update(withGradients:_:)
-    if (name.isCompoundName() &&
-        name.getBaseName() == ctx.getIdentifier("update")) {
-      auto argumentNames = name.getArgumentNames();
-      if (argumentNames.size() == 2 &&
-          argumentNames[0] == ctx.getIdentifier("withGradients") &&
-          argumentNames[1].empty()) {
-        return getRequirement(KnownProtocolKind::ParameterGroup);
+        return getRequirement(KnownProtocolKind::__Differentiable);
       }
     }
 
@@ -354,19 +328,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     // SWIFT_ENABLE_TENSORFLOW
     // Differentiable.TangentVector
     // Differentiable.CotangentVector
+    // Differentiable.AllDifferentiableVariables
     if (name.isSimpleName(ctx.Id_TangentVector) ||
-        name.isSimpleName(ctx.Id_CotangentVector))
-      return getRequirement(KnownProtocolKind::Differentiable);
-
-    // SWIFT_ENABLE_TENSORFLOW
-    // Parameterized.Parameters
-    if (name.isSimpleName(ctx.Id_Parameters))
-      return getRequirement(KnownProtocolKind::Parameterized);
-
-    // SWIFT_ENABLE_TENSORFLOW
-    // ParameterGroup.Parameter
-    if (name.isSimpleName(ctx.Id_Parameter))
-      return getRequirement(KnownProtocolKind::ParameterGroup);
+        name.isSimpleName(ctx.Id_CotangentVector) ||
+        name.isSimpleName(ctx.Id_AllDifferentiableVariables))
+      return getRequirement(KnownProtocolKind::__Differentiable);
 
     // SWIFT_ENABLE_TENSORFLOW
     // VectorNumeric.Scalar
@@ -415,7 +381,7 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   
   auto getterDecl = AccessorDecl::create(C,
     /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
-    AccessorKind::Get, AddressorKind::NotAddressor, property,
+    AccessorKind::Get, property,
     /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
     /*GenericParams=*/nullptr, params,
@@ -463,9 +429,8 @@ DerivedConformance::declareDerivedPropertySetter(TypeChecker &tc,
 
   auto setterDecl = AccessorDecl::create(C,
     /*FuncLoc*/ SourceLoc(), /*AccessorKeywordLoc*/ SourceLoc(),
-    AccessorKind::Set, AddressorKind::NotAddressor, property,
-    /*StaticLoc*/ SourceLoc(), StaticSpellingKind::None,
-    /*Throws*/ false, /*ThrowsLoc*/ SourceLoc(),
+    AccessorKind::Set, property, /*StaticLoc*/ SourceLoc(),
+    StaticSpellingKind::None, /*Throws*/ false, /*ThrowsLoc*/ SourceLoc(),
     /*GenericParams*/ nullptr, params, TypeLoc(), parentDC);
   setterDecl->setImplicit();
   setterDecl->setStatic(isStatic);
@@ -476,6 +441,10 @@ DerivedConformance::declareDerivedPropertySetter(TypeChecker &tc,
   if (isFinal && parentDC->getSelfClassDecl() &&
       !setterDecl->isFinal())
     setterDecl->getAttrs().add(new (C) FinalAttr(/*Implicit*/ true));
+
+  // Compute the interface type of the setter.
+  if (auto env = parentDC->getGenericEnvironmentOfContext())
+    setterDecl->setGenericEnvironment(env);
   setterDecl->computeType();
   setterDecl->copyFormalAccessFrom(property);
   setterDecl->setValidationToChecked();

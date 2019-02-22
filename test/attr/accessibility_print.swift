@@ -365,12 +365,12 @@ public class PublicInitBase {
 
 // CHECK-LABEL: public{{(\*/)?}} class PublicInitInheritor : PublicInitBase {
 public class PublicInitInheritor : PublicInitBase {
-  // CHECK: {{^}} public init()
-  // CHECK: {{^}} fileprivate init(other: PublicInitBase)
+  // CHECK: {{^}} override public init()
+  // CHECK: {{^}} override fileprivate init(other: PublicInitBase)
 } // CHECK: {{^[}]}}
 
 // CHECK-LABEL: {{(/\*)?private(\*/)?}} class PublicInitPrivateInheritor : PublicInitBase {
 private class PublicInitPrivateInheritor : PublicInitBase {
-  // CHECK: {{^}} internal init()
-  // CHECK: {{^}} fileprivate init(other: PublicInitBase)
+  // CHECK: {{^}} override internal init()
+  // CHECK: {{^}} override fileprivate init(other: PublicInitBase)
 } // CHECK: {{^[}]}}

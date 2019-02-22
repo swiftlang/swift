@@ -13,7 +13,7 @@
 //  Types that are bridged to Objective-C need to manage an object
 //  that may be either some native class or the @objc Cocoa
 //  equivalent.  _BridgeStorage discriminates between these two
-//  possibilities and stores a few extra bits when the stored type is
+//  possibilities and stores a single extra bit when the stored type is
 //  native.  It is assumed that the @objc class instance may in fact
 //  be a tagged pointer, and thus no extra bits may be available.
 //
@@ -22,15 +22,12 @@ import SwiftShims
 
 @_fixed_layout
 @usableFromInline
-internal struct _BridgeStorage<
-  NativeClass: AnyObject,
-  ObjCClass: AnyObject
-> {
+internal struct _BridgeStorage<NativeClass: AnyObject> {
   @usableFromInline
   internal typealias Native = NativeClass
 
   @usableFromInline
-  internal typealias ObjC = ObjCClass
+  internal typealias ObjC = AnyObject
 
   // rawValue is passed inout to _isUnique.  Although its value
   // is unchanged, it must appear mutable to the optimizer.
@@ -43,7 +40,7 @@ internal struct _BridgeStorage<
     // Note: Some platforms provide more than one spare bit, but the minimum is
     // a single bit.
 
-    _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
+    _internalInvariant(_usesNativeSwiftReferenceCounting(NativeClass.self))
 
     rawValue = _makeNativeBridgeObject(
       native,
@@ -53,14 +50,14 @@ internal struct _BridgeStorage<
   @inlinable
   @inline(__always)
   internal init(objC: ObjC) {
-    _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
+    _internalInvariant(_usesNativeSwiftReferenceCounting(NativeClass.self))
     rawValue = _makeObjCBridgeObject(objC)
   }
 
   @inlinable
   @inline(__always)
   internal init(native: Native) {
-    _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
+    _internalInvariant(_usesNativeSwiftReferenceCounting(NativeClass.self))
     rawValue = Builtin.reinterpretCast(native)
   }
 
@@ -113,7 +110,7 @@ internal struct _BridgeStorage<
   @inlinable
   internal var nativeInstance: Native {
     @inline(__always) get {
-      _sanityCheck(isNative)
+      _internalInvariant(isNative)
       return Builtin.castReferenceFromBridgeObject(rawValue)
     }
   }
@@ -121,8 +118,8 @@ internal struct _BridgeStorage<
   @inlinable
   internal var unflaggedNativeInstance: Native {
     @inline(__always) get {
-      _sanityCheck(isNative)
-      _sanityCheck(_nonPointerBits(rawValue) == 0)
+      _internalInvariant(isNative)
+      _internalInvariant(_nonPointerBits(rawValue) == 0)
       return Builtin.reinterpretCast(rawValue)
     }
   }
@@ -130,14 +127,14 @@ internal struct _BridgeStorage<
   @inlinable
   @inline(__always)
   internal mutating func isUniquelyReferencedUnflaggedNative() -> Bool {
-    _sanityCheck(isNative)
+    _internalInvariant(isNative)
     return _isUnique_native(&rawValue)
   }
 
   @inlinable
   internal var objCInstance: ObjC {
     @inline(__always) get {
-      _sanityCheck(isObjC)
+      _internalInvariant(isObjC)
       return Builtin.castReferenceFromBridgeObject(rawValue)
     }
   }

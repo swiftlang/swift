@@ -17,7 +17,10 @@
 // RUN: %target-build-swift -typecheck -disable-bridging-pch  -driver-print-jobs -import-objc-header %S/Inputs/bridging-header.h %s 2>&1 | %FileCheck %s -check-prefix=NOPCHJOB
 // NOPCHJOB: {{.*}}swift -frontend {{.*}} -import-objc-header {{.*}}Inputs/bridging-header.h
 
-// RUN: echo "{\"\": {\"swift-dependencies\": \"master.swiftdeps\"}}" > %t.json
+// RUN: %target-build-swift -typecheck -driver-print-jobs -index-store-path %t/idx -import-objc-header %S/Inputs/bridging-header.h %s 2>&1 | %FileCheck %s -check-prefix=INDEXSTORE
+// INDEXSTORE: {{.*}}swift -frontend {{.*}} -index-store-path {{.*}}/idx -emit-pch -o {{.*}}bridging-header-{{.*}}.pch
+
+// RUN: echo "{\"\": {\"swift-dependencies\": \"%t/master.swiftdeps\"}, \"%s\": {\"swift-dependencies\": \"%t/bridging-header.swiftdeps\"}}" > %t.json
 // RUN: %target-build-swift -typecheck -incremental -enable-bridging-pch -output-file-map %t.json -import-objc-header %S/Inputs/bridging-header.h %s
 
 // RUN: mkdir %t/tmp

@@ -40,7 +40,6 @@ public func g() {
 // CHECK-NO-OPT-DAG: declare dllimport void @swift_deallocObject(%swift.refcounted*, i32, i32)
 // CHECK-NO-OPT-DAG: declare dllimport void @swift_release(%swift.refcounted*)
 // CHECK-NO-OPT-DAG: declare dllimport %swift.refcounted* @swift_retain(%swift.refcounted* returned)
-// CHECK-NO-OPT-DAG: @"$s9dllexport1cCN" = external dllimport global %swift.type
 // CHECK-NO-OPT-DAG: @"$s9dllexport1pMp" = external dllimport global %swift.protocol
 // CHECK-NO-OPT-DAG: @"$sytN" = external dllimport global %swift.full_type
 // CHECK-NO-OPT-DAG: @"$sBoWV" = external dllimport global i8*
@@ -51,7 +50,6 @@ public func g() {
 
 // CHECK-OPT-DAG: declare dllimport %swift.refcounted* @swift_retain(%swift.refcounted* returned) local_unnamed_addr
 // CHECK-OPT-DAG: @"$sBoWV" = external dllimport global i8*
-// CHECK-OPT-DAG: @"$s9dllexport1cCN" = external dllimport global %swift.type
 // CHECK-OPT-DAG: @"__imp_$s9dllexport1pMp" = external externally_initialized constant %swift.protocol*
 // CHECK-OPT-DAG: declare dllimport swiftcc i8* @"$s9dllexport2ciAA1cCvau"()
 // CHECK-OPT-DAG: declare dllimport swiftcc %swift.metadata_response @"$s9dllexport1cCMa"(i32)

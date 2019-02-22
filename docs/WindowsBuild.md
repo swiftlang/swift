@@ -114,7 +114,6 @@ cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64/"
 - Optionally, you can omit building compiler-rt by removing all lines referring
   to `compiler-rt` below, which should give faster build times.
 ```cmd
-mklink /J "%swift_source_dir%/llvm/tools/clang" "%swift_source_dir%/clang"
 mklink /J "%swift_source_dir%/llvm/tools/compiler-rt" "%swift_source_dir%/compiler-rt"
 mkdir "%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"
 pushd "%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"
@@ -125,8 +124,10 @@ cmake -G "Ninja"^
  -DLLVM_INCLUDE_DOCS=TRUE^
  -DLLVM_TOOL_COMPILER_RT_BUILD=TRUE^
  -DLLVM_BUILD_EXTERNAL_COMPILER_RT=TRUE^
+ -DLLVM_ENABLE_PROJECTS=clang^
  -DLLVM_LIT_ARGS=-sv^
  -DLLVM_TARGETS_TO_BUILD=X86^
+ -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc^
  "%swift_source_dir%/llvm"
 popd
 cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"

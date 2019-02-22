@@ -107,9 +107,9 @@ static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedIDResolved
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedIDUnresolvedIndirectPointer
   = 0x00000002U;
 
-extern void *(swift_keyPathGenericWitnessTable[]);
+extern const void *_Nonnull (swift_keyPathGenericWitnessTable[]);
 
-static inline void *__swift_keyPathGenericWitnessTable_addr(void) {
+static inline const void *_Nonnull __swift_keyPathGenericWitnessTable_addr(void) {
   return swift_keyPathGenericWitnessTable;
 }
 

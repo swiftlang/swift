@@ -6,7 +6,7 @@
 // FIXME: END -enable-source-import hackaround
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -typecheck %s -verify
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) %s -dump-ast -verify 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) %s -dump-ast -verify | %FileCheck %s
 
 // REQUIRES: objc_interop
 

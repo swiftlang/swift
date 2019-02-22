@@ -114,88 +114,101 @@ reflect(object: obj)
 // CHECK-64: Type reference:
 // CHECK-64: (class reflect_multiple_types.TestClass)
 
-// CHECK-64: Type info:
-// CHECK-64-NEXT: (class_instance size=177 alignment=8 stride=184 num_extra_inhabitants=0
+// CHECK-64-LABEL: Type info:
+// CHECK-64-NEXT: (class_instance size=185 alignment=8 stride=192 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:   (field name=t00 offset=16
-// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=1
+// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
 // (unstable implementation details omitted)
 // CHECK-64:   (field name=t01 offset=24
-// CHECK-64-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=254
+// CHECK-64-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=254 bitwise_takable=1
 // CHECK-64-NEXT:       (field name=_value offset=0
-// CHECK-64-NEXT:         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=254))))
+// CHECK-64-NEXT:         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=254 bitwise_takable=1))))
+
 // CHECK-64-NEXT:   (field name=t02 offset=32
-// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
-// CHECK-64-NEXT:       (field name=_representation offset=0
-// CHECK-64-NEXT:         (multi_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=0
-// CHECK-64-NEXT:           (field name=smallUTF16 offset=0
-// CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))
-// CHECK-64-NEXT:           (field name=large offset=0
-// CHECK-64-NEXT:             (reference kind=strong refcounting=native))))))
-// CHECK-64-NEXT:   (field name=t03 offset=40
-// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=1
+// CHECK-64-NEXT:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:       (field name=_str offset=0
+// CHECK-64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:           (field name=_guts offset=0
+// CHECK-64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:               (field name=_object offset=0
+// CHECK-64-NEXT:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:                   (field name=_countAndFlags offset=0
+// CHECK-64-NEXT:                     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64-NEXT:                       (field name=_storage offset=0
+// CHECK-64-NEXT:                         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64-NEXT:                           (field name=_value offset=0
+// CHECK-64-NEXT:                             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))))
+// CHECK-64-NEXT:                   (field name=_object offset=8
+// CHECK-64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))))
+
+// CHECK-64-NEXT:   (field name=t03 offset=48
+// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
 // (unstable implementation details omitted)
-// CHECK-64:   (field name=t04 offset=48
-// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
+// CHECK-64:   (field name=t04 offset=56
+// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:       (field name=_value offset=0
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0))))
-// CHECK-64-NEXT:   (field name=t05 offset=56
-// CHECK-64-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-64-NEXT:   (field name=t05 offset=64
+// CHECK-64-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:       (field name=_value offset=0
-// CHECK-64-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0))))
-// CHECK-64-NEXT:   (field name=t06 offset=64
-// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
+// CHECK-64-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-64-NEXT:   (field name=t06 offset=72
+// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:       (field name=_value offset=0
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0))))
-// CHECK-64-NEXT:   (field name=t07 offset=72
-// CHECK-64-NEXT:     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-64-NEXT:   (field name=t07 offset=80
+// CHECK-64-NEXT:     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:       (field name=_value offset=0
-// CHECK-64-NEXT:         (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0))))
-// CHECK-64-NEXT:   (field name=t08 offset=76
-// CHECK-64-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
+// CHECK-64-NEXT:         (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-64-NEXT:   (field name=t08 offset=84
+// CHECK-64-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:       (field name=_value offset=0
-// CHECK-64-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0))))
-// CHECK-64-NEXT:   (field name=t09 offset=80
-// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
+// CHECK-64-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-64-NEXT:   (field name=t09 offset=88
+// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:       (field name=_value offset=0
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0))))
-// CHECK-64-NEXT:   (field name=t10 offset=88
-// CHECK-64-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-64-NEXT:   (field name=t10 offset=96
+// CHECK-64-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:       (field name=_value offset=0
-// CHECK-64-NEXT:         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0))))
-// CHECK-64-NEXT:   (field name=t11 offset=96
+// CHECK-64-NEXT:         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-64-NEXT:   (field name=t11 offset=104
 // CHECK-64-NEXT:     (reference kind=strong refcounting=unknown))
-// CHECK-64-NEXT:   (field name=t12 offset=104
+// CHECK-64-NEXT:   (field name=t12 offset=112
 // CHECK-64-NEXT:     (reference kind=strong refcounting=unknown))
-// CHECK-64-NEXT:   (field name=t13 offset=112
+// CHECK-64-NEXT:   (field name=t13 offset=120
 // CHECK-64-NEXT:     (reference kind=strong refcounting=unknown))
-// CHECK-64-NEXT:   (field name=t14 offset=120
+// CHECK-64-NEXT:   (field name=t14 offset=128
 // CHECK-64-NEXT:     (reference kind=strong refcounting=unknown))
-// CHECK-64-NEXT:   (field name=t15 offset=128
-// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=1
+// CHECK-64-NEXT:   (field name=t15 offset=136
+// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+
 // (unstable implementation details omitted)
-// CHECK-64:   (field name=t16 offset=136
-// CHECK-64-NEXT:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=1
+
+// CHECK-64:   (field name=t16 offset=144
+// CHECK-64-NEXT:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
 // (unstable implementation details omitted)
-// CHECK-64:   (field name=t17 offset=152
-// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
+
+// CHECK-64:   (field name=t17 offset=160
+// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:       (field name=_value offset=0
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0))))
-// CHECK-64-NEXT:   (field name=t18 offset=160
-// CHECK-64-NEXT:     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-64-NEXT:   (field name=t18 offset=168
+// CHECK-64-NEXT:     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:       (field name=_value offset=0
-// CHECK-64-NEXT:         (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0))))
-// CHECK-64-NEXT:   (field name=t19 offset=164
-// CHECK-64-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
+// CHECK-64-NEXT:         (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-64-NEXT:   (field name=t19 offset=172
+// CHECK-64-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:       (field name=_value offset=0
-// CHECK-64-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0))))
-// CHECK-64-NEXT:   (field name=t20 offset=168
-// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
+// CHECK-64-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-64-NEXT:   (field name=t20 offset=176
+// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:       (field name=_value offset=0
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0))))
-// CHECK-64-NEXT:   (field name=t21 offset=176
-// CHECK-64-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-64-NEXT:   (field name=t21 offset=184
+// CHECK-64-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:       (field name=_value offset=0
-// CHECK-64-NEXT:         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0)))))
+// CHECK-64-NEXT:         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1)))))
 
 // CHECK-32: Reflecting an object.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
@@ -203,53 +216,49 @@ reflect(object: obj)
 // CHECK-32: (class reflect_multiple_types.TestClass)
 
 // CHECK-32: Type info:
-// CHECK-32-NEXT: (class_instance size=121 alignment=8 stride=128 num_extra_inhabitants=0
+// CHECK-32-NEXT: (class_instance size=121 alignment=8 stride=128 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:   (field name=t00 offset=8
-// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=1
+// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
 // (unstable implementation details omitted)
 // CHECK-32:   (field name=t01 offset=12
-// CHECK-32-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=254
+// CHECK-32-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=254 bitwise_takable=1
 // CHECK-32-NEXT:       (field name=_value offset=0
-// CHECK-32-NEXT:         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=254))))
+// CHECK-32-NEXT:         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=254 bitwise_takable=1))))
 // CHECK-32-NEXT:   (field name=t02 offset=16
-// CHECK-32-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
-// CHECK-32-NEXT:       (field name=_representation offset=0
-// CHECK-32-NEXT:         (multi_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=0
-// CHECK-32-NEXT:           (field name=smallUTF16 offset=0
-// CHECK-32-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))
-// CHECK-32-NEXT:           (field name=large offset=0
-// CHECK-32-NEXT:             (reference kind=strong refcounting=native))))))
-// CHECK-32-NEXT:   (field name=t03 offset=24
-// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=1
+// CHECK-32-NEXT:     (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK-32-NEXT:       (field name=_str offset=0
+// (unstable implementation details omitted)
+// CHECK-32:   (field name=t03 offset=28
+// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
 // (unstable implementation details omitted)
 // CHECK-32:   (field name=t04 offset=32
-// CHECK-32-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
+// CHECK-32-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:       (field name=_value offset=0
-// CHECK-32-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0))))
+// CHECK-32-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK-32-NEXT:   (field name=t05 offset=40
-// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
+// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:       (field name=_value offset=0
-// CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0))))
+// CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK-32-NEXT:   (field name=t06 offset=44
-// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
+// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:       (field name=_value offset=0
-// CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0))))
+// CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK-32-NEXT:   (field name=t07 offset=48
-// CHECK-32-NEXT:     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
+// CHECK-32-NEXT:     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:       (field name=_value offset=0
-// CHECK-32-NEXT:         (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0))))
+// CHECK-32-NEXT:         (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK-32-NEXT:   (field name=t08 offset=52
-// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
+// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:       (field name=_value offset=0
-// CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0))))
+// CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK-32-NEXT:   (field name=t09 offset=56
-// CHECK-32-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
+// CHECK-32-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:       (field name=_value offset=0
-// CHECK-32-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0))))
+// CHECK-32-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK-32-NEXT:   (field name=t10 offset=64
-// CHECK-32-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0
+// CHECK-32-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:       (field name=_value offset=0
-// CHECK-32-NEXT:         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0))))
+// CHECK-32-NEXT:         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK-32-NEXT:   (field name=t11 offset=68
 // CHECK-32-NEXT:     (reference kind=strong refcounting=unknown))
 // CHECK-32-NEXT:   (field name=t12 offset=72
@@ -259,31 +268,31 @@ reflect(object: obj)
 // CHECK-32-NEXT:   (field name=t14 offset=80
 // CHECK-32-NEXT:     (reference kind=strong refcounting=unknown))
 // CHECK-32-NEXT:   (field name=t15 offset=84
-// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=1
+// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
 // (unstable implementation details omitted)
 // CHECK-32:   (field name=t16 offset=88
-// CHECK-32-NEXT:     (struct size=12 alignment=4 stride=12 num_extra_inhabitants=4092
+// CHECK-32-NEXT:     (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
 // (unstable implementation details omitted)
 // CHECK-32:   (field name=t17 offset=100
-// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
+// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:       (field name=_value offset=0
-// CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0))))
+// CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK-32-NEXT:   (field name=t18 offset=104
-// CHECK-32-NEXT:     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
+// CHECK-32-NEXT:     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:       (field name=_value offset=0
-// CHECK-32-NEXT:         (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0))))
+// CHECK-32-NEXT:         (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK-32-NEXT:   (field name=t19 offset=108
-// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
+// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:       (field name=_value offset=0
-// CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0))))
+// CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK-32-NEXT:   (field name=t20 offset=112
-// CHECK-32-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
+// CHECK-32-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:       (field name=_value offset=0
-// CHECK-32-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0))))
+// CHECK-32-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK-32-NEXT:   (field name=t21 offset=120
-// CHECK-32-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0
+// CHECK-32-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:       (field name=_value offset=0
-// CHECK-32-NEXT:         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0)))))
+// CHECK-32-NEXT:         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1)))))
 
 doneReflecting()
 

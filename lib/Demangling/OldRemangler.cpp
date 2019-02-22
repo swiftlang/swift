@@ -586,7 +586,7 @@ void Remangler::mangleSpecializationPassID(Node *node) {
   Out << node->getIndex();
 }
 
-void Remangler::mangleSpecializationIsFragile(Node *node) {
+void Remangler::mangleIsSerialized(Node *node) {
   Out << "q";
 }
 
@@ -678,6 +678,34 @@ void Remangler::mangleFunctionSignatureSpecializationParamKind(Node *node) {
 
 void Remangler::mangleRetroactiveConformance(Node *node) {
   unreachable("Retroactive conformances aren't in the old mangling");
+}
+
+void Remangler::mangleProtocolConformanceRef(Node *node) {
+  unreachable("Protocol conformance references aren't in the old mangling");
+}
+
+void Remangler::mangleConcreteProtocolConformance(Node *node) {
+  unreachable("Concrete conformances aren't in the old mangling");
+}
+
+void Remangler::mangleAnyProtocolConformanceList(Node *node) {
+  unreachable("Conformance lists aren't in the old mangling");
+}
+
+void Remangler::mangleDependentAssociatedConformance(Node *node) {
+  unreachable("Dependent associated conformances aren't in the old mangling");
+}
+
+void Remangler::mangleDependentProtocolConformanceRoot(Node *node) {
+  unreachable("Dependent conformances aren't in the old mangling");
+}
+
+void Remangler::mangleDependentProtocolConformanceInherited(Node *node) {
+  unreachable("Dependent conformances aren't in the old mangling");
+}
+
+void Remangler::mangleDependentProtocolConformanceAssociated(Node *node) {
+  unreachable("Dependent conformances aren't in the old mangling");
 }
 
 void Remangler::mangleProtocolConformance(Node *node) {
@@ -790,6 +818,11 @@ void Remangler::mangleProtocolConformanceDescriptor(Node *node) {
   mangleProtocolConformance(node->begin()[0]);
 }
 
+void Remangler::mangleProtocolSelfConformanceDescriptor(Node *node) {
+  Out << "MS";
+  mangleProtocol(node->begin()[0]);
+}
+
 void Remangler::manglePartialApplyForwarder(Node *node) {
   Out << "PA__T";
   mangleSingleChildNode(node); // global
@@ -802,6 +835,18 @@ void Remangler::manglePartialApplyObjCForwarder(Node *node) {
 
 void Remangler::mangleMergedFunction(Node *node) {
   Out << "Tm";
+}
+
+void Remangler::mangleDynamicallyReplaceableFunctionImpl(Node *node) {
+  Out << "TI";
+}
+
+void Remangler::mangleDynamicallyReplaceableFunctionKey(Node *node) {
+  Out << "Tx";
+}
+
+void Remangler::mangleDynamicallyReplaceableFunctionVar(Node *node) {
+  Out << "TX";
 }
 
 void Remangler::mangleDirectness(Node *node) {
@@ -843,6 +888,11 @@ void Remangler::mangleFieldOffset(Node *node) {
 void Remangler::mangleEnumCase(Node *node) {
   Out << "WC";
   mangleSingleChildNode(node); // enum case
+}
+
+void Remangler::mangleProtocolSelfConformanceWitnessTable(Node *node) {
+  Out << "WS";
+  mangleSingleChildNode(node); // protocol
 }
 
 void Remangler::mangleProtocolWitnessTable(Node *node) {
@@ -919,6 +969,11 @@ void Remangler::mangleReabstractionThunk(Node *node) {
   Out << "Tr";
   if (node->getNumChildren() == 3) Out << 'G';
   mangleChildNodes(node); // generic signature?, type, type
+}
+
+void Remangler::mangleProtocolSelfConformanceWitness(Node *node) {
+  Out << "TS";
+  mangleSingleChildNode(node); // entity
 }
 
 void Remangler::mangleProtocolWitness(Node *node) {
@@ -1165,6 +1220,20 @@ void Remangler::mangleNamedAndTypedEntity(Node *node, char basicKind,
 void Remangler::mangleEntityContext(Node *node, EntityContext &ctx) {
   // Remember that we're mangling a context.
   EntityContext::ManglingContextRAII raii(ctx);
+
+  // Deal with bound generic types.
+  switch (node->getKind()) {
+    case Node::Kind::BoundGenericStructure:
+    case Node::Kind::BoundGenericEnum:
+    case Node::Kind::BoundGenericClass:
+    case Node::Kind::BoundGenericOtherNominalType:
+    case Node::Kind::BoundGenericTypeAlias:
+      mangleAnyNominalType(node, ctx);
+      return;
+
+    default:
+      break;
+  }
 
   switch (node->getKind()) {
 #define NODE(ID)                                \
@@ -1676,6 +1745,7 @@ void Remangler::mangleExtension(Node *node, EntityContext &ctx) {
   if (node->getNumChildren() == 3) {
     mangleDependentGenericSignature(node->begin()[2]); // generic sig
   }
+
   mangleEntityContext(node->begin()[1], ctx); // context
 }
 

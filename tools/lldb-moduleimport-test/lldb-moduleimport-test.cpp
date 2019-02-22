@@ -181,30 +181,38 @@ int main(int argc, char **argv) {
   INITIALIZE_LLVM();
 
   // Command line handling.
-  llvm::cl::list<std::string> InputNames(
-    llvm::cl::Positional, llvm::cl::desc("compiled_swift_file1.o ..."),
-    llvm::cl::OneOrMore);
+  using namespace llvm::cl;
+  static OptionCategory Visible("Specific Options");
+  HideUnrelatedOptions({&Visible});
 
-  llvm::cl::opt<bool> DumpModule(
-    "dump-module", llvm::cl::desc(
-      "Dump the imported module after checking it imports just fine"));
+  list<std::string> InputNames(Positional, desc("compiled_swift_file1.o ..."),
+                               OneOrMore, cat(Visible));
 
-  llvm::cl::opt<bool> Verbose(
-      "verbose", llvm::cl::desc("Dump informations on the loaded module"));
+  opt<bool> DumpModule(
+      "dump-module",
+      desc("Dump the imported module after checking it imports just fine"),
+      cat(Visible));
 
-  llvm::cl::opt<std::string> ModuleCachePath(
-    "module-cache-path", llvm::cl::desc("Clang module cache path"));
+  opt<bool> Verbose("verbose", desc("Dump informations on the loaded module"),
+                    cat(Visible));
 
-  llvm::cl::opt<std::string> DumpDeclFromMangled(
-      "decl-from-mangled", llvm::cl::desc("dump decl from mangled names list"));
+  opt<std::string> ModuleCachePath(
+      "module-cache-path", desc("Clang module cache path"), cat(Visible));
 
-  llvm::cl::opt<std::string> DumpTypeFromMangled(
-      "type-from-mangled", llvm::cl::desc("dump type from mangled names list"));
+  opt<std::string> DumpDeclFromMangled(
+      "decl-from-mangled", desc("dump decl from mangled names list"),
+      cat(Visible));
 
-  llvm::cl::opt<std::string> ResourceDir("resource-dir",
-      llvm::cl::desc("The directory that holds the compiler resource files"));
+  opt<std::string> DumpTypeFromMangled(
+      "type-from-mangled", desc("dump type from mangled names list"),
+      cat(Visible));
 
-  llvm::cl::ParseCommandLineOptions(argc, argv);
+  opt<std::string> ResourceDir(
+      "resource-dir",
+      desc("The directory that holds the compiler resource files"),
+      cat(Visible));
+
+  ParseCommandLineOptions(argc, argv);
   // Unregister our options so they don't interfere with the command line
   // parsing in CodeGen/BackendUtil.cpp.
   ModuleCachePath.removeArgument();

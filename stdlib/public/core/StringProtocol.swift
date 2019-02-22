@@ -17,19 +17,25 @@
 public protocol StringProtocol
   : BidirectionalCollection,
   TextOutputStream, TextOutputStreamable,
-  LosslessStringConvertible, ExpressibleByStringLiteral,
+  LosslessStringConvertible, ExpressibleByStringInterpolation,
   Hashable, Comparable
-  where Iterator.Element == Character, SubSequence : StringProtocol {
-
+  where Iterator.Element == Character,
+        Index == String.Index,
+        SubSequence : StringProtocol,
+        StringInterpolation == DefaultStringInterpolation
+{
   associatedtype UTF8View : /*Bidirectional*/Collection
-  where UTF8View.Element == UInt8 // Unicode.UTF8.CodeUnit
+  where UTF8View.Element == UInt8, // Unicode.UTF8.CodeUnit
+        UTF8View.Index == Index
 
   associatedtype UTF16View : BidirectionalCollection
-  where UTF16View.Element == UInt16 // Unicode.UTF16.CodeUnit
+  where UTF16View.Element == UInt16, // Unicode.UTF16.CodeUnit
+        UTF16View.Index == Index
 
   associatedtype UnicodeScalarView : BidirectionalCollection
-  where UnicodeScalarView.Element == Unicode.Scalar
-  
+  where UnicodeScalarView.Element == Unicode.Scalar,
+        UnicodeScalarView.Index == Index
+
   associatedtype SubSequence = Substring
 
   var utf8: UTF8View { get }
@@ -111,75 +117,60 @@ public protocol StringProtocol
     encodedAs targetEncoding: Encoding.Type,
     _ body: (UnsafePointer<Encoding.CodeUnit>) throws -> Result
   ) rethrows -> Result
-
-  /// The entire String onto whose slice this view is a projection.
-  var _wholeString : String { get }
-  /// The range of storage offsets of this view in `_wholeString`.
-  var _encodedOffsetRange : Range<Int> { get }
 }
 
 extension StringProtocol {
-  public var _wholeString: String {
-    return String(self)
-  }
-
-  public var _encodedOffsetRange: Range<Int> {
-    return 0 ..< numericCast(self.utf16.count)
-  }
-}
-
-/// A protocol that provides fast access to a known representation of String.
-///
-/// Can be used to specialize generic functions that would otherwise end up
-/// doing grapheme breaking to vend individual characters.
-@usableFromInline // FIXME(sil-serialize-all)
-internal protocol _SwiftStringView {
-  /// A `String`, having the same contents as `self`, that may be unsuitable for
-  /// long-term storage.
-  var _ephemeralContent : String { get }
-
-  /// A `String`, having the same contents as `self`, that is suitable for
-  /// long-term storage.
+  // TODO(String performance): Make a _SharedString for non-smol Substrings
   //
-  // FIXME: Remove once _StringGuts has append(contentsOf:).
-  var _persistentContent : String { get }
+  // TODO(String performance): Provide a closure-based call with stack-allocated
+  // _SharedString for non-smol Substrings
+  //
+  public // @SPI(NSStringAPI.swift)
+  var _ephemeralString: String {
+    @_specialize(where Self == String)
+    @_specialize(where Self == Substring)
+    get { return String(self) }
+  }
 
-  /// The entire String onto whose slice this view is a projection.
-  var _wholeString : String { get }
-  /// The range of storage offsets of this view in `_wholeString`.
-  var _encodedOffsetRange : Range<Int> { get }
-}
-
-extension _SwiftStringView {
-  @inlinable // FIXME(sil-serialize-all)
-  internal var _ephemeralContent : String { return _persistentContent }
-}
-
-extension StringProtocol {
-  @inlinable // FIXME(sil-serialize-all)
-  public // Used in the Foundation overlay
-  var _ephemeralString : String {
-    if _fastPath(self is _SwiftStringView) {
-      return (self as! _SwiftStringView)._ephemeralContent
+  @inlinable // Eliminate for String, Substring
+  internal var _gutsSlice: _StringGutsSlice {
+    @_specialize(where Self == String)
+    @_specialize(where Self == Substring)
+    @inline(__always) get {
+      if let str = self as? String {
+        return _StringGutsSlice(str._guts)
+      }
+      if let subStr = self as? Substring {
+        return _StringGutsSlice(subStr._wholeGuts, subStr._offsetRange)
+      }
+      return _StringGutsSlice(String(self)._guts)
     }
-    return String(self)
+  }
+
+  @inlinable
+  internal var _offsetRange: Range<Int> {
+    @inline(__always) get {
+      let start = startIndex
+      let end = endIndex
+      _internalInvariant(start.transcodedOffset == 0 && end.transcodedOffset == 0)
+      return Range(uncheckedBounds: (start.encodedOffset, end.encodedOffset))
+    }
+  }
+
+  @inlinable
+  internal var _wholeGuts: _StringGuts {
+    @_specialize(where Self == String)
+    @_specialize(where Self == Substring)
+    @inline(__always) get {
+      if let str = self as? String {
+        return str._guts
+      }
+      if let subStr = self as? Substring {
+        return subStr._wholeGuts
+      }
+      return String(self)._guts
+    }
   }
 }
 
-extension String : _SwiftStringView {
-  @inlinable // FIXME(sil-serialize-all)
-  internal var _persistentContent : String {
-    return self
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public var _wholeString : String {
-    return self
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public var _encodedOffsetRange : Range<Int> {
-    return 0..<_guts.count
-  }
-}
 

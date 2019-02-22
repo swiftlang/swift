@@ -236,6 +236,13 @@ public:
     OS << ')';
   }
 
+  void visitObjCProtocolTypeRef(const ObjCProtocolTypeRef *OC) {
+    printHeader("objective_c_protocol");
+    if (!OC->getName().empty())
+      printField("name", OC->getName());
+    OS << ')';
+  }
+
 #define REF_STORAGE(Name, name, ...) \
   void visit##Name##StorageTypeRef(const Name##StorageTypeRef *US) { \
     printHeader(#name "_storage"); \
@@ -332,6 +339,10 @@ struct TypeRefIsConcrete
   }
 
   bool visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
+    return true;
+  }
+
+  bool visitObjCProtocolTypeRef(const ObjCProtocolTypeRef *OC) {
     return true;
   }
   
@@ -514,6 +525,10 @@ public:
     return OC;
   }
 
+  const TypeRef *visitObjCProtocolTypeRef(const ObjCProtocolTypeRef *OP) {
+    return OP;
+  }
+
 #define REF_STORAGE(Name, name, ...) \
   const TypeRef *visit##Name##StorageTypeRef(const Name##StorageTypeRef *US) { \
     return US; \
@@ -657,19 +672,21 @@ public:
       SubstBase = Superclass;
     }
 
+    auto Protocol = std::make_pair(DM->getProtocol(), false);
+
     // We didn't find the member type, so return something to let the
     // caller know we're dealing with incomplete metadata.
     if (TypeWitness == nullptr)
       return Builder.createDependentMemberType(DM->getMember(),
                                                SubstBase,
-                                               DM->getProtocol());
+                                               Protocol);
 
     // Likewise if we can't get the substitution map.
     auto SubstMap = SubstBase->getSubstMap();
     if (!SubstMap)
       return Builder.createDependentMemberType(DM->getMember(),
                                                SubstBase,
-                                               DM->getProtocol());
+                                               Protocol);
 
     // Apply base type substitutions to get the fully-substituted nested type.
     auto *Subst = TypeWitness->subst(Builder, *SubstMap);
@@ -684,6 +701,10 @@ public:
 
   const TypeRef *visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
     return OC;
+  }
+
+  const TypeRef *visitObjCProtocolTypeRef(const ObjCProtocolTypeRef *OP) {
+    return OP;
   }
 
 #define REF_STORAGE(Name, name, ...) \

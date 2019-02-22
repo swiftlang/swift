@@ -529,7 +529,7 @@ bb0(%0 : @owned $DerivedClassWithIVars, %i : @trivial $Builtin.Int32):
 
 
 struct MyStruct3 {
-  @sil_stored var c: C
+  @_hasStorage var c: C
 }
 sil @selfinit_mystruct3 : $@convention(thin) () -> @owned MyStruct3
 

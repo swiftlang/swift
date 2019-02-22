@@ -9,7 +9,7 @@ import Swift
 
 // sizeof(TestClass) = 16 bytes header + 1 byte = 17 bytes
 class TestClass {
-  @sil_stored var a : Int8
+  @_hasStorage var a : Int8
   init()
 }
 

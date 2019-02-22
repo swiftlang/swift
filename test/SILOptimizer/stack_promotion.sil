@@ -7,20 +7,20 @@ import Swift
 import SwiftShims
 
 class XX {
-	@sil_stored var x: Int32
+	@_hasStorage var x: Int32
 
 	init()
 }
 
 class YY {
-	@sil_stored var xx: XX
+	@_hasStorage var xx: XX
 
 	init(newx: XX)
 }
 
 class DummyArrayStorage<Element> {
-  @sil_stored var count : Int
-  @sil_stored var capacity : Int
+  @_hasStorage var count : Int
+  @_hasStorage var capacity : Int
   init()
 }
 

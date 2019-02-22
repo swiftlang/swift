@@ -471,26 +471,6 @@ var nsStringCanaryCount = 0
   }
 }
 
-RuntimeFoundationWrappers.test("_stdlib_NSStringLowercaseString/NoLeak") {
-  nsStringCanaryCount = 0
-  autoreleasepool {
-    let a = NSStringCanary()
-    expectEqual(1, nsStringCanaryCount)
-    _stdlib_NSStringLowercaseString(a)
-  }
-  expectEqual(0, nsStringCanaryCount)
-}
-
-RuntimeFoundationWrappers.test("_stdlib_NSStringUppercaseString/NoLeak") {
-  nsStringCanaryCount = 0
-  autoreleasepool {
-    let a = NSStringCanary()
-    expectEqual(1, nsStringCanaryCount)
-    _stdlib_NSStringUppercaseString(a)
-  }
-  expectEqual(0, nsStringCanaryCount)
-}
-
 RuntimeFoundationWrappers.test("_stdlib_CFStringCreateCopy/NoLeak") {
   nsStringCanaryCount = 0
   autoreleasepool {
@@ -780,10 +760,9 @@ RuntimeClassNamesTestSuite.test("private class nested in same-type-constrained e
   let util = base.asInner
 
   let clas = unsafeBitCast(type(of: util), to: NSObject.self)
-  // Name should look like _TtC1aP.*Inner
   let desc = clas.description
-  expectEqual("_TtGC1a", desc.prefix(7))
-  expectEqual("Data_", desc.suffix(5))
+  expectEqual("_TtCE1a", desc.prefix(7))
+  expectEqual("Inner", desc.suffix(5))
 }
 
 runAllTests()

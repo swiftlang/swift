@@ -5,9 +5,6 @@ public struct Vector : AdditiveArithmetic, VectorNumeric, Differentiable {
   public var x: Float
   public var y: Float
 
-  public typealias TangentVector = Vector
-  public typealias Scalar = Float
-
   public static var zero: Vector {
     return Vector(0)
   }
@@ -17,12 +14,12 @@ public struct Vector : AdditiveArithmetic, VectorNumeric, Differentiable {
     self.y = scalar
   }
 
-  @differentiable(adjoint: fakeAdj)
+  @differentiable(vjp: fakeVJP)
   public static func + (lhs: Vector, rhs: Vector) -> Vector {
     abort()
   }
 
-  @differentiable(adjoint: fakeAdj)
+  @differentiable(vjp: fakeVJP)
   public static func - (lhs: Vector, rhs: Vector) -> Vector {
     abort()
   }
@@ -31,7 +28,7 @@ public struct Vector : AdditiveArithmetic, VectorNumeric, Differentiable {
     abort()
   }
 
-  public static func fakeAdj(seed: Vector, y: Vector, lhs: Vector, rhs: Vector) -> (Vector, Vector) {
+  public static func fakeVJP(lhs: Vector, rhs: Vector) -> (Vector, (Vector) -> (Vector, Vector)) {
     abort()
   }
 }
@@ -51,3 +48,24 @@ public func test1() -> Vector {
 // CHECK: [[CLOSURE_THICK:%.*]] = thin_to_thick_function [[CLOSURE]] : $@convention(thin) (Vector) -> Float to $@callee_guaranteed (Vector) -> Float
 // CHECK: [[CLOSURE_THICK_NOESC:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE_THICK]] : $@callee_guaranteed (Vector) -> Float to $@noescape @callee_guaranteed (Vector) -> Float
 // CHECK: autodiff_function [wrt 0] [order 1] [[CLOSURE_THICK_NOESC]] : $@noescape @callee_guaranteed (Vector) -> Float
+
+
+// TF-189: `TF189` is a non-trivial type but `TF189.AllDifferentiableVariables` is trivial.
+// Should pass verification.
+@_fixed_layout
+public class NonTrivial {}
+@_fixed_layout
+public struct TF189: Differentiable {
+  @noDerivative public let x: Double
+  @noDerivative public let nonTrivial: NonTrivial
+
+  func foo(input: Vector) -> Vector {
+    return self.pullback(at: input) { m, x in
+      m.applied(to: x)
+    }(.zero).1
+  }
+
+  func applied(to input: Vector) -> Vector {
+    return input
+  }
+}

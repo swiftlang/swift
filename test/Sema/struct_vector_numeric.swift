@@ -65,11 +65,31 @@ func testGenericContext<T, U, V>() -> A<T>.B<U, V>.GenericContextNested {
   return genericNested
 }
 
+// Test extension.
+struct Extended {
+  var x: Float
+}
+extension Extended : Equatable, AdditiveArithmetic, VectorNumeric {}
+
+// Test extension of generic type.
+struct GenericExtended<T> {
+  var x: T
+}
+extension GenericExtended : Equatable, AdditiveArithmetic, VectorNumeric where T : VectorNumeric {}
+
 // Test errors.
+
+struct Empty : VectorNumeric {} // expected-error {{type 'Empty' does not conform to protocol 'VectorNumeric'}}
 
 // Test type whose members conform to `VectorNumeric`
 // but have different `Scalar` associated type.
 struct InvalidMixedScalar: VectorNumeric { // expected-error {{type 'InvalidMixedScalar' does not conform to protocol 'VectorNumeric'}}
   var float: Float
   var double: Double
+}
+
+// Test initializer that is not a memberwise initializer because of stored property name vs parameter label mismatch.
+struct HasCustomNonMemberwiseInitializer<T : VectorNumeric>: VectorNumeric {
+  var value: T
+  init(randomLabel value: T) { self.value = value }
 }

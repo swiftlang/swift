@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -dump-ast %s 2>&1 | %FileCheck --strict-whitespace %s
+// RUN: %target-swift-frontend -dump-ast %s | %FileCheck --strict-whitespace %s
 
 import Swift
 

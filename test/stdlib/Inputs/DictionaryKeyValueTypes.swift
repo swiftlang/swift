@@ -1,4 +1,5 @@
 import Swift
+import SwiftPrivate
 import StdlibUnittest
 
 func acceptsAnySet<T : Hashable>(_ s: Set<T>) {}

@@ -1564,7 +1564,6 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     FunctionType::Param arg(escapeClosure);
     auto bodyClosure = FunctionType::get(arg, result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
-                              /*autoclosure*/ false,
                               /*noescape*/ true,
                               // SWIFT_ENABLE_TENSORFLOW
                               /*throws*/ true,
@@ -1576,7 +1575,6 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     
     refType = FunctionType::get(args, result,
       FunctionType::ExtInfo(FunctionType::Representation::Swift,
-                            /*autoclosure*/ false,
                             /*noescape*/ false,
                             // SWIFT_ENABLE_TENSORFLOW
                             /*throws*/ true,
@@ -1599,7 +1597,6 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     FunctionType::Param bodyArgs[] = {FunctionType::Param(openedTy)};
     auto bodyClosure = FunctionType::get(bodyArgs, result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
-                              /*autoclosure*/ false,
                               /*noescape*/ true,
                               // SWIFT_ENABLE_TENSORFLOW
                               /*throws*/ true,
@@ -1610,7 +1607,6 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     };
     refType = FunctionType::get(args, result,
       FunctionType::ExtInfo(FunctionType::Representation::Swift,
-                            /*autoclosure*/ false,
                             /*noescape*/ false,
                             // SWIFT_ENABLE_TENSORFLOW
                             /*throws*/ true,
@@ -2049,6 +2045,21 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     log << "---Attempting to salvage and emit diagnostics---\n";
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  if (DC->getParentModule()->getNameStr().startswith("__lldb_expr") &&
+      viable.size() > 1) {
+    // TODO(https://bugs.swift.org/browse/SR-9814):
+    // If in LLDB repl mode, patch up the solution if we have ambiguity.
+    //
+    // This is a *temporary* short-term hack that simply returns the last
+    // solution.  It seems to work for now and returns the lastly added
+    // definition during the repl session. However, this is extremely brittle and
+    // is not expected to work correctly all the time.
+    viable[0] = std::move(viable.back());
+    viable.erase(viable.begin() + 1, viable.end());
+    return false;
+  }
+
   // Attempt to solve again, capturing all states that come from our attempts to
   // select overloads or bind type variables.
   //
@@ -2371,4 +2382,24 @@ Expr *constraints::simplifyLocatorToAnchor(ConstraintSystem &cs,
     return nullptr;
 
   return locator->getAnchor();
+}
+
+Expr *constraints::getArgumentExpr(Expr *expr, unsigned index) {
+  Expr *argExpr = nullptr;
+  if (auto *AE = dyn_cast<ApplyExpr>(expr))
+    argExpr = AE->getArg();
+  else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(expr))
+    argExpr = UME->getArgument();
+  else if (auto *SE = dyn_cast<SubscriptExpr>(expr))
+    argExpr = SE->getIndex();
+  else
+    return nullptr;
+
+  if (auto *PE = dyn_cast<ParenExpr>(argExpr)) {
+    assert(index == 0);
+    return PE->getSubExpr();
+  }
+
+  assert(isa<TupleExpr>(argExpr));
+  return cast<TupleExpr>(argExpr)->getElement(index);
 }

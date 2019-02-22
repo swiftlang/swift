@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 5
 
 // Simple case.
 var fn : @autoclosure () -> Int = 4  // expected-error {{'@autoclosure' may only be used on parameters}}  expected-error {{cannot convert value of type 'Int' to specified type '() -> Int'}}
@@ -167,11 +167,70 @@ func variadicAutoclosure(_ fn: @autoclosure () -> ()...) {
 // These are all arguably invalid; the autoclosure should have to be called.
 // But as long as we allow them, we shouldn't crash.
 func passNonThrowingToNonThrowingAC(_ fn: @autoclosure () -> Int) {
-  takesAutoclosure(fn)
+  takesAutoclosure(fn) // expected-error {{add () to forward @autoclosure parameter}} {{22-22=()}}
 }
 func passNonThrowingToThrowingAC(_ fn: @autoclosure () -> Int) {
-  takesThrowingAutoclosure(fn)
+  takesThrowingAutoclosure(fn) // expected-error {{add () to forward @autoclosure parameter}} {{30-30=()}}
 }
 func passThrowingToThrowingAC(_ fn: @autoclosure () throws -> Int) {
-  takesThrowingAutoclosure(fn)
+  takesThrowingAutoclosure(fn) // expected-error {{add () to forward @autoclosure parameter}} {{30-30=()}}
+}
+
+func passAutoClosureToSubscriptAndMember(_ fn: @autoclosure () -> Int) {
+  struct S {
+    func bar(_: Int, _ fun: @autoclosure () -> Int) {}
+
+    subscript(_ fn: @autoclosure () -> Int) -> Int { return fn() }
+
+    static func foo(_ fn: @autoclosure () -> Int) {}
+  }
+
+  let s = S()
+  let _ = s.bar(42, fn) // expected-error {{add () to forward @autoclosure parameter}} {{23-23=()}}
+  let _ = s[fn] // expected-error {{add () to forward @autoclosure parameter}} {{15-15=()}}
+  let _ = S.foo(fn) // expected-error {{add () to forward @autoclosure parameter}} {{19-19=()}}
+}
+
+func passAutoClosureToEnumCase(_ fn: @autoclosure () -> Int) {
+  enum E {
+    case baz(@autoclosure () -> Int)
+  }
+
+  let _: E = .baz(42) // Ok
+  let _: E = .baz(fn) // expected-error {{add () to forward @autoclosure parameter}} {{21-21=()}}
+}
+
+// rdar://problem/20591571 - Various type inference problems with @autoclosure
+func rdar_20591571() {
+  func foo(_ g: @autoclosure () -> Int) {
+    typealias G = ()->Int
+    let _ = unsafeBitCast(g, to: G.self) // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
+  }
+
+  func id<T>(_: T) -> T {}
+  func same<T>(_: T, _: T) {}
+
+  func takesAnAutoclosure(_ fn: @autoclosure () -> Int, _ efn: @escaping @autoclosure () -> Int) {
+  // expected-note@-1 2{{parameter 'fn' is implicitly non-escaping}}
+
+    var _ = fn // expected-error {{non-escaping parameter 'fn' may only be called}}
+    let _ = fn // expected-error {{non-escaping parameter 'fn' may only be called}}
+
+    var _ = efn
+    let _ = efn
+
+    _ = id(fn)          // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
+    _ = same(fn, { 3 }) // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
+    _ = same({ 3 }, fn) // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
+
+    withoutActuallyEscaping(fn) { _ in }              // Ok
+    withoutActuallyEscaping(fn) { (_: () -> Int) in } // Ok
+  }
+}
+
+// rdar://problem/30906031 - [SR-4188]: withoutActuallyEscaping doesn't accept an @autoclosure argument
+func rdar_30906031(in arr: [Int], fn: @autoclosure () -> Int) -> Bool {
+  return withoutActuallyEscaping(fn) { escapableF in // Ok
+    arr.lazy.filter { $0 >= escapableF() }.isEmpty
+  }
 }

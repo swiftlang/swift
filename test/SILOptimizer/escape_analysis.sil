@@ -21,13 +21,13 @@ class Derived : X {
 }
 
 class Y {
-  @sil_stored var x: X
+  @_hasStorage var x: X
 
   init(newx: X)
 }
 
 class Z {
-  @sil_stored var x: X
+  @_hasStorage var x: X
   init(newx: X)
   deinit
 }
@@ -52,7 +52,7 @@ enum PointerEnum2 {
 }
 
 class LinkedNode {
-  @sil_stored var next: LinkedNode;
+  @_hasStorage var next: LinkedNode;
 
   init(_ n: LinkedNode)
 }

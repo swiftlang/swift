@@ -24,7 +24,7 @@ private let ctypes = Python.import("ctypes")
 /// A type that can be initialized from a `numpy.ndarray` instance represented
 /// as a `PythonObject`.
 public protocol ConvertibleFromNumpyArray {
-  init?(numpyArray: PythonObject)
+  init?(numpy: PythonObject)
 }
 
 /// A type that is bitwise compatible with one or more NumPy scalar types.
@@ -93,7 +93,7 @@ extension Double : NumpyScalarCompatible {
 
 extension Array : ConvertibleFromNumpyArray
   where Element : NumpyScalarCompatible {
-  public init?(numpyArray: PythonObject) {
+  public init?(numpy numpyArray: PythonObject) {
     // Check if input is a `numpy.ndarray` instance.
     guard Python.isinstance(numpyArray, np.ndarray) == true else {
       return nil

@@ -222,8 +222,35 @@ bb0(%0 : $*τ_0_1, %1: $S):
   return %9 : $@callee_owned () -> ()
 }
 
+public class Empty<T> {}
+
+sil private @inner_closure : $@convention(thin) <T> (Empty<T>) -> @owned Empty<T> {
+bb0(%0 : $Empty<T>):
+  return %0 : $Empty<T>
+}
+
+sil hidden @returns_closure : $@convention(thin) <T> (Empty<T>) -> (@owned Empty<T>, @callee_guaranteed @owned (Empty<T>) -> @owned Empty<T>) {
+bb0(%0 : $Empty<T>):
+  %1 = function_ref @inner_closure : $@convention(thin) <τ_0_0> (Empty<τ_0_0>) -> @owned Empty<τ_0_0>
+  %2 = partial_apply [callee_guaranteed] %1<T>() : $@convention(thin) <τ_0_0> (Empty<τ_0_0>) -> @owned Empty<τ_0_0>
+  %5 = tuple (%0 : $Empty<T>, %2 : $@callee_guaranteed (Empty<T>) -> @owned Empty<T>)
+  return %5 : $(Empty<T>, @callee_guaranteed (Empty<T>) -> @owned Empty<T>)
+}
+
+sil hidden @specializes_closure_returning_closure : $@convention(thin) () -> @callee_guaranteed (Empty<S>) -> (@owned Empty<S>, @owned @callee_guaranteed (Empty<S>) -> @owned Empty<S>) {
+bb0:
+  %0 = function_ref @returns_closure : $@convention(thin) <τ_0_0> (Empty<τ_0_0>) -> (@owned Empty<τ_0_0>, @owned @callee_guaranteed (Empty<τ_0_0>) -> @owned Empty<τ_0_0>)
+  %1 = partial_apply [callee_guaranteed] %0<S>() : $@convention(thin) <τ_0_0> (Empty<τ_0_0>) -> (@owned Empty<τ_0_0>, @owned @callee_guaranteed (Empty<τ_0_0>) -> @owned Empty<τ_0_0>)
+  return %1 : $@callee_guaranteed (Empty<S>) -> (@owned Empty<S>, @owned @callee_guaranteed (Empty<S>) -> @owned Empty<S>)
+}
+
+// CHECK-LABEL: define hidden swiftcc { i8*, %swift.refcounted* } @specializes_closure_returning_closure() #0 {
+// CHECK: entry:
+// CHECK: ret { i8*, %swift.refcounted* } { i8* bitcast ({ %{{.*}}Empty{{.*}}*, i8*, %swift.refcounted* } (%{{.*}}Empty{{.*}}*, %swift.refcounted*)* @"{{.*}}returns_closure{{.*}}" to i8*), %swift.refcounted* null }
+
 sil_vtable WeakBox {}
 sil_vtable C {}
 sil_vtable D {}
 sil_vtable E {}
+sil_vtable Empty {}
 sil_witness_table C: P module main {}

@@ -35,6 +35,13 @@ namespace swift {
     StringRef ModuleLinkName;
     ArrayRef<std::string> ExtraClangOptions;
 
+    struct FileDependency {
+      uint64_t Size;
+      uint64_t Hash;
+      std::string Path;
+    };
+    ArrayRef<FileDependency> Dependencies;
+
     bool AutolinkForceLoad = false;
     bool EnableNestedTypeLookupTable = false;
     bool SerializeAllSIL = false;

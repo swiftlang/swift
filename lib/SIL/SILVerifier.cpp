@@ -1238,7 +1238,7 @@ public:
         adfi->getOriginalFunction()->getType().getAs<SILFunctionType>();
     require(origTy, "The original function must have a function type");
     require(!origTy->isDifferentiable(),
-            "The original function must not be @autodiff");
+            "The original function must not be @differentiable");
     if (F.getModule().getStage() == SILStage::Canonical ||
         adfi->hasAssociatedFunctions()) {
       for (auto order : range(1, adfi->getDifferentiationOrder() + 1)) {
@@ -1246,7 +1246,7 @@ public:
         auto jvpType = pair.first->getType().getAs<SILFunctionType>();
         require(jvpType, "The JVP function must have a function type");
         require(!jvpType->isDifferentiable(),
-                "The JVP function must not be @autodiff");
+                "The JVP function must not be @differentiable");
         auto expectedJVPType = origTy->getAutoDiffAssociatedFunctionType(
             adfi->getParameterIndices(), /*resultIndex*/ 0, order,
             AutoDiffAssociatedFunctionKind::JVP, F.getModule(),
@@ -1255,7 +1255,7 @@ public:
         auto vjpType = pair.second->getType().getAs<SILFunctionType>();
         require(vjpType, "The VJP function must have a function type");
         require(!vjpType->isDifferentiable(),
-                "The VJP function must not be @autodiff");
+                "The VJP function must not be @differentiable");
         auto expectedVJPType = origTy->getAutoDiffAssociatedFunctionType(
             adfi->getParameterIndices(), /*resultIndex*/ 0, order,
             AutoDiffAssociatedFunctionKind::VJP, F.getModule(),
@@ -1277,7 +1277,7 @@ public:
     auto fnTy = adfei->getFunctionOperand()->getType().getAs<SILFunctionType>();
     require(fnTy, "The function operand must have a function type");
     require(fnTy->isDifferentiable(),
-            "The function operand must be an '@autodiff' function");
+            "The function operand must be an '@differentiable' function");
   }
 
   void verifyLLVMIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID) {
@@ -1530,7 +1530,8 @@ public:
     }
   }
 
-  void checkFunctionRefInst(FunctionRefInst *FRI) {
+  
+  void checkFunctionRefBaseInst(FunctionRefBaseInst *FRI) {
     auto fnType = requireObjectType(SILFunctionType, FRI,
                                     "result of function_ref");
     require(!fnType->getExtInfo().hasContext(),
@@ -1540,6 +1541,22 @@ public:
     // we may not have linked everything yet.
 
     SILFunction *RefF = FRI->getReferencedFunction();
+
+    if (isa<FunctionRefInst>(FRI))
+      require(
+          !RefF->isDynamicallyReplaceable(),
+          "function_ref cannot reference a [dynamically_replaceable] function");
+    else if (isa<PreviousDynamicFunctionRefInst>(FRI)) {
+      require(!RefF->isDynamicallyReplaceable(),
+              "previous_function_ref cannot reference a "
+              "[dynamically_replaceable] function");
+      require(RefF->getDynamicallyReplacedFunction(),
+              "previous_function_ref must reference a "
+              "[dynamic_replacement_for:...] function");
+    } else if (isa<DynamicFunctionRefInst>(FRI))
+      require(RefF->isDynamicallyReplaceable(),
+              "dynamic_function_ref cannot reference a "
+              "[dynamically_replaceable] function");
 
     // In canonical SIL, direct reference to a shared_external declaration
     // is an error; we should have deserialized a body. In raw SIL, we may
@@ -1564,6 +1581,18 @@ public:
     }
 
     verifySILFunctionType(fnType);
+  }
+
+  void checkFunctionRefInst(FunctionRefInst *FRI) {
+    checkFunctionRefBaseInst(FRI);
+  }
+
+  void checkDynamicFunctionRefInst(DynamicFunctionRefInst *FRI) {
+    checkFunctionRefBaseInst(FRI);
+  }
+
+  void checkPreviousDynamicFunctionRefInst(PreviousDynamicFunctionRefInst *FRI) {
+    checkFunctionRefBaseInst(FRI);
   }
 
   void checkAllocGlobalInst(AllocGlobalInst *AGI) {
@@ -4566,8 +4595,7 @@ public:
 
   /// SWIFT_ENABLE_TENSORFLOW
   /// Verify the [differentiable] attribute.
-  void verifyDifferentiableAttr(SILFunction *F,
-                                       SILDifferentiableAttr &Attr) {
+  void verifyDifferentiableAttr(SILFunction *F, SILDifferentiableAttr &Attr) {
     std::function<unsigned(Type)> countParams;
     countParams = [&](Type type) -> unsigned {
       auto *fnTy = type->getAs<SILFunctionType>();
@@ -4582,6 +4610,10 @@ public:
     // Parameter indices must be specified.
     require(!Attr.getIndices().parameters.empty(),
             "Parameter indices cannot be empty");
+    // JVP and VJP must be specified in canonical SIL.
+    if (F->getModule().getStage() == SILStage::Canonical)
+      require(!Attr.getJVPName().empty() && !Attr.getVJPName().empty(),
+              "JVP and VJP must be specified in canonical SIL");
     // Verify if specified parameter indices are valid.
     auto numParams = countParams(F->getLoweredFunctionType());
     int lastIndex = -1;
@@ -5299,7 +5331,7 @@ void SILModule::verify() const {
 
   // Check all witness tables.
   LLVM_DEBUG(llvm::dbgs() <<"*** Checking witness tables for duplicates ***\n");
-  llvm::DenseSet<NormalProtocolConformance*> wtableConformances;
+  llvm::DenseSet<RootProtocolConformance*> wtableConformances;
   for (const SILWitnessTable &wt : getWitnessTables()) {
     LLVM_DEBUG(llvm::dbgs() << "Witness Table:\n"; wt.dump());
     auto conformance = wt.getConformance();

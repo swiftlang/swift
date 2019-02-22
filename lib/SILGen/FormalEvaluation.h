@@ -139,6 +139,10 @@ public:
   stable_iterator stable_begin() { return stabilize(begin()); }
   iterator find(stable_iterator iter) { return stack.find(iter); }
 
+  FormalAccess &findAndAdvance(stable_iterator &stable) {
+    return stack.findAndAdvance(stable);
+  }
+
   template <class U, class... ArgTypes> void push(ArgTypes &&... args) {
     stack.push<U>(std::forward<ArgTypes>(args)...);
   }
@@ -236,12 +240,7 @@ private:
 #ifndef NDEBUG
 inline void
 FormalEvaluationContext::checkCleanupDeactivation(CleanupHandle handle) {
-  // Start at the innermost scope depth.  Note that we pop scopes off the
-  // stack before we start emitting their cleanups.
-  if (!innermostScope) return;
-  assert(!innermostScope->isPopped());
-  for (auto i = find(*innermostScope->savedDepth), e = end(); i != e; ++i) {
-    auto &access = *i;
+  for (auto &access : *this) {
     assert((access.isFinished() || access.getCleanup() != handle) &&
            "popping active formal-evaluation cleanup");
   }

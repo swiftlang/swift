@@ -17,9 +17,53 @@
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
+
+/// Does the given coroutine make any stack allocations that are live across
+/// its yields?
+static bool allocatesStackAcrossYields(SILFunction *F) {
+  assert(F->getLoweredFunctionType()->isCoroutine());
+
+  return hasStackDifferencesAt(&F->getEntryBlock()->front(),
+                               [](SILInstruction *i) -> InstructionMatchResult {
+    if (isa<YieldInst>(i)) {
+      return {
+        /*matches*/ true,
+        /*halt*/ i->getFunction()->getLoweredFunctionType()->getCoroutineKind()
+                       == SILCoroutineKind::YieldOnce
+      };
+    }
+
+    // Otherwise, search until the end of the function.
+    return { false, false };
+  });
+}
+
+static bool isEndOfApply(SILInstruction *i, BeginApplyInst *beginApply) {
+  if (auto endApply = dyn_cast<EndApplyInst>(i)) {
+    return endApply->getBeginApply() == beginApply;
+  } else if (auto abortApply = dyn_cast<AbortApplyInst>(i)) {
+    return abortApply->getBeginApply() == beginApply;
+  } else {
+    return false;
+  }
+}
+
+/// Are there any stack differences from the given begin_apply to any
+/// corresponding end_apply/abort_apply?
+static bool hasStackDifferencesAtEnds(BeginApplyInst *apply) {
+  return hasStackDifferencesAt(apply, [apply](SILInstruction *i)
+                                                     -> InstructionMatchResult {
+    // Search for ends of the original apply.  We can stop searching
+    // at these points.
+    if (isEndOfApply(i, apply))
+      return { true, true };
+    return { false, false };
+  });
+}
 
 static bool canInlineBeginApply(BeginApplyInst *BA) {
   // Don't inline if we have multiple resumption sites (i.e. end_apply or
@@ -62,6 +106,9 @@ static bool canInlineBeginApply(BeginApplyInst *BA) {
 }
 
 bool SILInliner::canInlineApplySite(FullApplySite apply) {
+  if (!apply.canOptimize())
+    return false;
+
   if (auto BA = dyn_cast<BeginApplyInst>(apply))
     return canInlineBeginApply(BA);
 
@@ -75,6 +122,7 @@ class BeginApplySite {
   SILBuilder *Builder;
   BeginApplyInst *BeginApply;
   bool HasYield = false;
+  bool NeedsStackCorrection;
 
   EndApplyInst *EndApply = nullptr;
   SILBasicBlock *EndApplyBB = nullptr;
@@ -86,15 +134,31 @@ class BeginApplySite {
 
 public:
   BeginApplySite(BeginApplyInst *BeginApply, SILLocation Loc,
-                 SILBuilder *Builder)
-      : Loc(Loc), Builder(Builder), BeginApply(BeginApply) {}
+                 SILBuilder *Builder, bool NeedsStackCorrection)
+      : Loc(Loc), Builder(Builder), BeginApply(BeginApply),
+        NeedsStackCorrection(NeedsStackCorrection) {}
 
   static Optional<BeginApplySite> get(FullApplySite AI, SILLocation Loc,
                                       SILBuilder *Builder) {
     auto *BeginApply = dyn_cast<BeginApplyInst>(AI);
     if (!BeginApply)
       return None;
-    return BeginApplySite(BeginApply, Loc, Builder);
+
+    // We need stack correction if there are both:
+    //   - stack allocations in the callee that are live across the yield and
+    //   - stack differences in the caller from the begin_apply to any
+    //     end_apply or abort_apply.
+    // In these cases, naive cloning will cause the allocations to become
+    // improperly nested.
+    //
+    // We need to compute this here before we do any splitting in the parent
+    // function.
+    bool NeedsStackCorrection = false;
+    if (allocatesStackAcrossYields(BeginApply->getReferencedFunction()) &&
+        hasStackDifferencesAtEnds(BeginApply))
+      NeedsStackCorrection = true;
+
+    return BeginApplySite(BeginApply, Loc, Builder, NeedsStackCorrection);
   }
 
   void preprocess(SILBasicBlock *returnToBB) {
@@ -222,6 +286,11 @@ public:
       AbortApply->eraseFromParent();
 
     assert(!BeginApply->hasUsesOfAnyResult());
+
+    // Correct the stack if necessary.
+    if (NeedsStackCorrection) {
+      StackNesting().correctStackNesting(BeginApply->getFunction());
+    }
   }
 };
 } // namespace swift
@@ -620,6 +689,8 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::EndBorrowInst:
   case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::PreviousDynamicFunctionRefInst:
+  case SILInstructionKind::DynamicFunctionRefInst:
   case SILInstructionKind::FunctionRefInst:
   case SILInstructionKind::AllocGlobalInst:
   case SILInstructionKind::GlobalAddrInst:

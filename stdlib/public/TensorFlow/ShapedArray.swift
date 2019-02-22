@@ -120,21 +120,20 @@ extension TensorBuffer {
   }
 
   func withUnsafeBufferPointer<R>(
-    _ body: (inout UnsafeBufferPointer<Scalar>) throws -> R
+    _ body: (UnsafeBufferPointer<Scalar>) throws -> R
   ) rethrows -> R {
     switch allocation {
     case let .native(box):
       return try box.array.withUnsafeBufferPointer { bufferPtr in
-        var bufferPtr = bufferPtr
-        return try body(&bufferPtr)
+        return try body(bufferPtr)
       }
     case let .tensorFlow(cTensor):
       let startAddress = TF_TensorData(cTensor)
         .assumingMemoryBound(to: Scalar.self)
-      var bufferPointer = UnsafeBufferPointer(
+      let bufferPointer = UnsafeBufferPointer(
         start: startAddress, count: count
       )
-      return try body(&bufferPointer)
+      return try body(bufferPointer)
     }
   }
 }
@@ -486,8 +485,8 @@ public extension ShapedArray {
   func withUnsafeBufferPointer<Result>(
     _ body: (UnsafeBufferPointer<Scalar>) throws -> Result
   ) rethrows -> Result {
-    return try buffer.withUnsafeMutableBufferPointer { ptr in
-      try body(UnsafeBufferPointer(ptr))
+    return try buffer.withUnsafeBufferPointer { ptr in
+      try body(ptr)
     }
   }
 
@@ -501,7 +500,7 @@ public extension ShapedArray {
   }
 }
 
-/// Tensor conversion
+/// Tensor conversion.
 extension ShapedArray where Scalar : TensorFlowScalar {
   var byteCount: Int {
     return MemoryLayout<Scalar>.stride * scalarCount
@@ -532,14 +531,14 @@ extension ShapedArray where Scalar : TensorFlowScalar {
   }
 }
 
-/// Tensor conversion
+/// Tensor conversion.
 public extension Tensor {
   init(_ array: ShapedArray<Scalar>) {
     self.init(handle: array.makeTensorHandle())
   }
 }
 
-/// Array literal conversion
+/// Array literal conversion.
 extension ShapedArray : ExpressibleByArrayLiteral
   where Scalar : TensorFlowScalar {
   public typealias ArrayLiteralElement = TensorElementLiteral<Scalar>
@@ -549,14 +548,22 @@ extension ShapedArray : ExpressibleByArrayLiteral
   }
 }
 
-/// Equatable conformance
+/// Equatable conformance.
 extension ShapedArray : Equatable where Scalar : Equatable {
   public static func == (lhs: ShapedArray, rhs: ShapedArray) -> Bool {
     return lhs._isEqual(to: rhs)
   }
 }
 
-/// String conversion
+/// Hashable conformance.
+extension ShapedArray : Hashable where Scalar : Hashable {
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(shape)
+    hasher.combine(scalars)
+  }
+}
+
+/// String conversion.
 extension ShapedArray : CustomStringConvertible {
   /// A textual representation of this `ShapedArray`.
   public var description: String {
@@ -700,7 +707,7 @@ public extension ShapedArraySlice {
   }
 }
 
-/// Slice initializers
+/// Slice initializers.
 public extension ShapedArraySlice {
   init(shape: [Int], scalars: [Scalar]) {
     self.init(base: ShapedArray(shape: shape, scalars: scalars))
@@ -865,14 +872,14 @@ extension ShapedArraySlice : RandomAccessCollection, MutableCollection {
   }
 }
 
-/// Tensor conversion
+/// Tensor conversion.
 public extension ShapedArraySlice where Scalar : TensorFlowScalar {
   init(_ tensor: Tensor<Scalar>) {
     self.init(base: tensor.array)
   }
 }
 
-/// Array literal conversion
+/// Array literal conversion.
 extension ShapedArraySlice : ExpressibleByArrayLiteral
   where Scalar : TensorFlowScalar {
   public typealias ArrayLiteralElement = TensorElementLiteral<Scalar>
@@ -882,14 +889,22 @@ extension ShapedArraySlice : ExpressibleByArrayLiteral
   }
 }
 
-/// Equatable conformance
+/// Equatable conformance.
 extension ShapedArraySlice : Equatable where Scalar : Equatable {
   public static func == (lhs: ShapedArraySlice, rhs: ShapedArraySlice) -> Bool {
     return lhs._isEqual(to: rhs)
   }
 }
 
-/// String conversion
+/// Hashable conformance.
+extension ShapedArraySlice : Hashable where Scalar : Hashable {
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(shape)
+    hasher.combine(scalars)
+  }
+}
+
+/// String conversion.
 extension ShapedArraySlice : CustomStringConvertible {
   /// A textual representation of this `ShapedArraySlice`.
   public var description: String {
@@ -897,7 +912,7 @@ extension ShapedArraySlice : CustomStringConvertible {
   }
 }
 
-/// Xcode Playground display conversion
+/// Xcode Playground display conversion.
 extension ShapedArraySlice : CustomPlaygroundDisplayConvertible {
   public var playgroundDescription: Any {
     return description

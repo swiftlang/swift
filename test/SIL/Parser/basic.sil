@@ -9,7 +9,7 @@ import Swift
 sil_global private @globalinit_token0 : $Builtin.Word
 
 class TestArrayStorage {
-  @sil_stored var count: Int32
+  @_hasStorage var count: Int32
   init()
 }
 
@@ -1622,7 +1622,7 @@ bb0(%0 : $(Builtin.NativeObject, Builtin.Int32), %1 : $TestArray2):
 }
 
 class A {
-  @sil_stored var property: Any { get set }
+  @_hasStorage var property: Any { get set }
   deinit
   init()
 }
@@ -1677,6 +1677,20 @@ bb0(%0 : $A):
   dealloc_stack %1 : $*Any
   %20 = tuple ()
   return %20 : $()
+}
+
+// CHECK-LABEL: sil [dynamically_replacable] @test_dynamically_replaceable
+sil [dynamically_replacable] @test_dynamically_replaceable : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-LABEL: sil [dynamic_replacement_for "test_dynamically_replaceable"] @test_dynamic_replacement_for
+sil [dynamic_replacement_for "test_dynamically_replaceable"] @test_dynamic_replacement_for : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
 }
 
 struct EmptyStruct {}

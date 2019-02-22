@@ -576,7 +576,8 @@ public:
     SILOptFunctionBuilder FB(parentTransform);
     auto resultFn = FB.getOrCreateFunction(
         srcFn.getLocation(), resultFnName, SILLinkage::Private, newFnType,
-        /*What's this*/ IsBare, IsNotTransparent, IsNotSerialized);
+        /*What's this*/ IsBare, IsNotTransparent, IsNotSerialized,
+        IsNotDynamic);
 
     DevicePartitionCloner PC(srcFn, deviceInfo, deviceId,
                              instByDevice.getInstsForDevice(deviceId),

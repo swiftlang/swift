@@ -175,3 +175,20 @@ func foo() {
     func foo() -> Element.AssocType {}
   }
 }
+
+// Deeply nested
+protocol P6 {
+  associatedtype Assoc1
+  associatedtype Assoc2
+}
+
+struct A<T, U, V> {
+  struct B<W, X, Y> {
+    struct C<Z: P6> {
+    }
+  }
+}
+
+extension A.B.C where T == V, X == Z.Assoc2 {
+  func f() { }
+}

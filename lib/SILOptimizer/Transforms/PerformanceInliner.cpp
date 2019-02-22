@@ -652,6 +652,10 @@ addToBBCounts(llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap,
   }
 }
 
+static bool isInlineAlwaysCallSite(SILFunction *Callee) {
+  return Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent();
+}
+
 static void
 calculateBBWeights(SILFunction *Caller, DominanceInfo *DT,
                    llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap) {
@@ -787,6 +791,23 @@ void SILPerformanceInliner::collectAppliesToInline(
 
       auto *Callee = getEligibleFunction(AI, WhatToInline);
       if (Callee) {
+        // Check if we have an always_inline or transparent function. If we do,
+        // just add it to our final Applies list and continue.
+        if (isInlineAlwaysCallSite(Callee)) {
+          NumCallerBlocks += Callee->size();
+          Applies.push_back(AI);
+          continue;
+        }
+
+        // Next make sure that we do not have more blocks than our overall
+        // caller block limit at this point. In such a case, we continue. This
+        // will ensure that any further non inline always functions are skipped,
+        // but we /do/ inline any inline_always functions remaining.
+        if (NumCallerBlocks > OverallCallerBlockLimit)
+          continue;
+
+        // Otherwise, calculate our block weights and determine if we want to
+        // inline this.
         if (!BlockWeight.isValid())
           BlockWeight = SPA->getWeight(block, Weight(0, 0));
 
@@ -798,8 +819,6 @@ void SILPerformanceInliner::collectAppliesToInline(
           InitialCandidates.push_back(AI);
       }
     }
-    if (NumCallerBlocks > OverallCallerBlockLimit)
-      break;
 
     domOrder.pushChildrenIf(block, [&] (SILBasicBlock *child) {
       if (CBI.isSlowPath(block, child)) {

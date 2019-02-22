@@ -285,12 +285,12 @@ void AutoDiffParameterIndicesBuilder::setParameter(unsigned paramIndex) {
 
 Type VectorSpace::getType() const {
   switch (kind) {
-  case Kind::BuiltinFloat:
-    return value.builtinFPType;
   case Kind::Vector:
     return value.vectorType;
   case Kind::Tuple:
     return value.tupleType;
+  case Kind::Function:
+    return value.functionType;
   }
 }
 

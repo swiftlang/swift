@@ -37,6 +37,12 @@ struct ComplexNested : KeyPathIterable, Equatable {
   var dictionary: [String : Simple]
 }
 
+// TF-123: Test type with `@differentiable` function stored property.
+struct TF_123<Scalar : TensorFlowScalar & Differentiable & FloatingPoint> : KeyPathIterable {
+  let activation1: @differentiable (Float) -> Float
+  let activation2: @differentiable (Tensor<Scalar>) -> Tensor<Scalar>
+}
+
 KeyPathIterableTests.test("Simple") {
   var x = Simple(w: 1, b: 2)
   expectEqual([\Simple.w, \Simple.b], x.allKeyPaths)
@@ -137,12 +143,12 @@ KeyPathIterableTests.test("ComplexNested") {
                \ComplexNested.array[1].w,
                \ComplexNested.array[1].b,
                \ComplexNested.dictionary,
-               \ComplexNested.dictionary["foo"]!,
-               \ComplexNested.dictionary["foo"]!.w,
-               \ComplexNested.dictionary["foo"]!.b,
                \ComplexNested.dictionary["bar"]!,
                \ComplexNested.dictionary["bar"]!.w,
-               \ComplexNested.dictionary["bar"]!.b],
+               \ComplexNested.dictionary["bar"]!.b,
+               \ComplexNested.dictionary["foo"]!,
+               \ComplexNested.dictionary["foo"]!.w,
+               \ComplexNested.dictionary["foo"]!.b],
               x.recursivelyAllKeyPaths)
   expectEqual([\ComplexNested.float,
                \ComplexNested.simple.w,
@@ -151,16 +157,16 @@ KeyPathIterableTests.test("ComplexNested") {
                \ComplexNested.array[0].b,
                \ComplexNested.array[1].w,
                \ComplexNested.array[1].b,
-               \ComplexNested.dictionary["foo"]!.w,
-               \ComplexNested.dictionary["foo"]!.b,
                \ComplexNested.dictionary["bar"]!.w,
-               \ComplexNested.dictionary["bar"]!.b],
+               \ComplexNested.dictionary["bar"]!.b,
+               \ComplexNested.dictionary["foo"]!.w,
+               \ComplexNested.dictionary["foo"]!.b],
               x.recursivelyAllKeyPaths(to: Float.self))
   expectEqual([\ComplexNested.float,
-               \ComplexNested.dictionary["foo"]!.w,
-               \ComplexNested.dictionary["foo"]!.b,
                \ComplexNested.dictionary["bar"]!.w,
-               \ComplexNested.dictionary["bar"]!.b],
+               \ComplexNested.dictionary["bar"]!.b,
+               \ComplexNested.dictionary["foo"]!.w,
+               \ComplexNested.dictionary["foo"]!.b],
               x.recursivelyAllWritableKeyPaths(to: Float.self))
 
   for kp in x.recursivelyAllWritableKeyPaths(to: Float.self) {

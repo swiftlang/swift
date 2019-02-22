@@ -307,6 +307,8 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
 }
 
 // Build a demangled type tree for a type.
+//
+// FIXME: This should use MetadataReader.h.
 Demangle::NodePointer
 swift::_swift_buildDemanglingForMetadata(const Metadata *type,
                                          Demangle::Demangler &Dem) {

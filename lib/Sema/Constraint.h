@@ -97,6 +97,12 @@ enum class ConstraintKind : char {
   /// function type is expected to become a function type. Note, we
   /// do not require the function type attributes to match.
   ApplicableFunction,
+  /// \brief The first type is a function type whose input is the value passed
+  /// to the function and whose output is a type variable describing the output.
+  /// The second type is either a `@dynamicCallable` nominal type or the
+  /// function type of a `dynamicallyCall` method defined on a
+  /// `@dynamicCallable` nominal type.
+  DynamicCallableApplicableFunction,
   /// \brief The first type is the type of the dynamicType member of the
   /// second type.
   DynamicTypeOf,
@@ -472,6 +478,7 @@ public:
     case ConstraintKind::CheckedCast:
     case ConstraintKind::SelfObjectOfProtocol:
     case ConstraintKind::ApplicableFunction:
+    case ConstraintKind::DynamicCallableApplicableFunction:
     case ConstraintKind::BindOverload:
     case ConstraintKind::OptionalObject:
       return ConstraintClassification::Relational;

@@ -261,7 +261,7 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
   SILOptFunctionBuilder FuncBuilder(*this);
   SILFunction *NewF = FuncBuilder.createFunction(
       SILLinkage::Shared, Name, NewFTy, GenericEnv, OrigF->getLocation(),
-      OrigF->isBare(), OrigF->isTransparent(), Serialized,
+      OrigF->isBare(), OrigF->isTransparent(), Serialized, IsNotDynamic,
       OrigF->getEntryCount(), OrigF->isThunk(), OrigF->getClassSubclassScope(),
       OrigF->getInlineStrategy(), OrigF->getEffectsKind(),
       /*InsertBefore*/ OrigF, OrigF->getDebugScope());

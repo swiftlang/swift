@@ -56,8 +56,11 @@ static objc_hook_getImageName defaultGetImageNameFromClass = nullptr;
 /// Get the image name corresponding to a Swift class, accounting for
 /// dynamically-initialized class metadata. Returns NO for ObjC classes.
 static BOOL
-getImageNameFromSwiftClass(Class _Nonnull objcClass,
+getImageNameFromSwiftClass(Class _Nullable objcClass,
                            const char * _Nullable * _Nonnull outImageName) {
+  if (objcClass == Nil)
+    return NO;
+  
   auto *classAsMetadata = reinterpret_cast<const ClassMetadata *>(objcClass);
 
   // Is this a Swift class?

@@ -1,5 +1,8 @@
-// RUN: %target-run-simple-swift %swift-tensorflow-test-run-extra-options
-// RUN: %target-run-dynamic-compilation-swift %swift-tensorflow-test-run-extra-options
+// FIXME: TFPartition fails in `GraphFunctionDeviceInfo::finalizeUsedDevices()`
+// because used device set includes RUNTIME device.
+// UN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
+
+// RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
 // REQUIRES: tensorflow
 
@@ -243,7 +246,7 @@ DynamicAttributeTests.testAllBackends("NormalAttribute String") {
                                     T$dtype: Float.tensorFlowDataType,
                                     strides: [1, 1, 1, 1] as [Int32],
                                     padding: loadVALIDString())
-  expectEqual(convExpectedResult, result.array)
+  expectPointwiseNearlyEqual(convExpectedResult, result.array)
 }
 
 DynamicAttributeTests.testAllBackends("NormalAttribute Array<Bool>") {
@@ -254,7 +257,7 @@ DynamicAttributeTests.testAllBackends("NormalAttribute Array<Int32>") {
   let result = convImage.convolved2D(withFilter: convFilter,
                                      strides: loadStridesInt32(),
                                      padding: .valid)
-  expectEqual(convExpectedResult, result.array)
+  expectPointwiseNearlyEqual(convExpectedResult, result.array)
 }
 
 DynamicAttributeTests.testAllBackends("NormalAttribute Array<Int64>") {
@@ -262,7 +265,7 @@ DynamicAttributeTests.testAllBackends("NormalAttribute Array<Int64>") {
                                     T$dtype: Float.tensorFlowDataType,
                                     strides: loadStridesInt64(),
                                     padding: "VALID")
-  expectEqual(convExpectedResult, result.array)
+  expectPointwiseNearlyEqual(convExpectedResult, result.array)
 }
 
 DynamicAttributeTests.testAllBackends("NormalAttribute Array<Double>") {

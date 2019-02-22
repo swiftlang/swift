@@ -5442,8 +5442,8 @@ autodiff_function
     with {%1 : $(T) -> (T) -> T, %2 : $(T) -> (T) -> T}
 
 Bundles a function with its associated differentiation functions up to a
-specified differentiation order into an ``@autodiff`` function. There are 2
-associated functions per differentiation order: a Jacobian-vector products
+specified differentiation order into an ``@differentiable`` function. There are
+2 associated functions per differentiation order: a Jacobian-vector products
 (JVP) function and a vector-Jacobian products (VJP) function.
 
 ``[wrt ...]`` specifies parameter indices that the original function is
@@ -5477,13 +5477,13 @@ autodiff_function_extract
   sil-autodiff-function-differentiation-order ::= '[' 'order' [0-9]+ ']'
 
 
-  autodiff_function_extract [original] %0 : $@autodiff (T) -> T
-  autodiff_function_extract [jvp] [order 1] %0 : $@autodiff (T) -> T
-  autodiff_function_extract [vjp] [order 1] %0 : $@autodiff (T) -> T
+  autodiff_function_extract [original] %0 : $@differentiable (T) -> T
+  autodiff_function_extract [jvp] [order 1] %0 : $@differentiable (T) -> T
+  autodiff_function_extract [vjp] [order 1] %0 : $@differentiable (T) -> T
 
 Extracts the original function or an associated function from the given
-``@autodiff`` function at a specific differentiation order. It must be provided
-with an extractee: ``[original]``, ``[jvp]`` or ``[vjp]``.
+``@differentiable`` function at a specific differentiation order. It must be
+provided with an extractee: ``[original]``, ``[jvp]`` or ``[vjp]``.
 
 .. SWIFT_ENABLE_TENSORFLOW
 

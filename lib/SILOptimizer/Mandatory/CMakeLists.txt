@@ -4,6 +4,8 @@ silopt_register_sources(
   AddressLowering.cpp
   ConstantPropagation.cpp
   DefiniteInitialization.cpp
+  # SWIFT_ENABLE_TENSORFLOW
+  Differentiation.cpp
   DIMemoryUseCollectorOwnership.cpp
   DataflowDiagnostics.cpp
   DiagnoseInfiniteRecursion.cpp
@@ -19,7 +21,6 @@ silopt_register_sources(
   RawSILInstLowering.cpp
   MandatoryOptUtils.cpp
   # SWIFT_ENABLE_TENSORFLOW
-  TFDifferentiation.cpp
   TFCanonicalizeCFG.cpp
   TFConstExpr.cpp
   TFDeabstraction.cpp

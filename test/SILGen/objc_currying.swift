@@ -65,8 +65,8 @@ func curry_bridged(_ x: CurryTest) -> (String?) -> String? {
 // CHECK:   [[BRIDGING_FUNC:%.*]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
 // CHECK:   [[BORROWED_STRING:%.*]] = begin_borrow [[STRING]]
 // CHECK:   [[NSSTRING:%.*]] = apply [[BRIDGING_FUNC]]([[BORROWED_STRING]])
-// CHECK:   [[OPT_NSSTRING:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[NSSTRING]] : $NSString
 // CHECK:   end_borrow [[BORROWED_STRING]]
+// CHECK:   [[OPT_NSSTRING:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[NSSTRING]] : $NSString
 // CHECK:   destroy_value [[STRING]]
 // CHECK:   br bb3([[OPT_NSSTRING]] : $Optional<NSString>)
 

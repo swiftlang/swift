@@ -23,6 +23,7 @@ struct _StringRepresentation {
     case _cocoa(object: AnyObject)
     case _native(object: AnyObject)
     case _immortal(address: UInt)
+    // TODO: shared native
   }
   public var _form: _Form
 
@@ -37,27 +38,36 @@ struct _StringRepresentation {
 
 extension String {
   public // @testable
-  func _classify() -> _StringRepresentation {
+  func _classify() -> _StringRepresentation { return _guts._classify() }
+}
+
+extension _StringGuts {
+  internal func _classify() -> _StringRepresentation {
     var result = _StringRepresentation(
-      _isASCII: _guts._isASCIIOrSmallASCII,
-      _count: _guts.count,
-      _capacity: _guts.capacity,
+      _isASCII: self.isASCII,
+      _count: self.count,
+      _capacity: nativeCapacity ?? 0,
       _form: ._small
     )
-    if _guts._isSmall {
+    if self.isSmall {
+      result._capacity = _SmallString.capacity
       return result
     }
-    if _guts._isNative {
-      result._form = ._native(object: _guts._owner!)
+    if _object.largeIsCocoa {
+      result._form = ._cocoa(object: _object.cocoaObject)
       return result
     }
-    if _guts._isCocoa {
-      result._form = ._cocoa(object: _guts._owner!)
-      return result
-    }
-    if _guts._isUnmanaged {
+
+    // TODO: shared native
+    _internalInvariant(_object.providesFastUTF8)
+    _internalInvariant(_object.largeFastIsNative)
+    if _object.isImmortal {
       result._form = ._immortal(
-        address: UInt(bitPattern: _guts._unmanagedRawStart))
+        address: UInt(bitPattern: _object.nativeUTF8Start))
+      return result
+    }
+    if _object.hasNativeStorage {
+      result._form = ._native(object: _object.nativeStorage)
       return result
     }
     fatalError()

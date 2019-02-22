@@ -167,8 +167,9 @@ using Metadata = TargetMetadata<InProcess>;
 /// The result of requesting type metadata.  Generally the return value of
 /// a function.
 ///
-/// For performance, functions returning this type should use SWIFT_CC so
-/// that the components are returned as separate values.
+/// For performance and ABI matching across Swift/C++, functions returning
+/// this type must use SWIFT_CC so that the components are returned as separate
+/// values.
 struct MetadataResponse {
   /// The requested metadata.
   const Metadata *Value;
@@ -624,10 +625,26 @@ public:
     getValueWitnesses()->_asEVWT()->destructiveInjectEnumTag(value, tag, this);
   }
 
+  size_t vw_size() const {
+    return getValueWitnesses()->getSize();
+  }
+
+  size_t vw_alignment() const {
+    return getValueWitnesses()->getAlignment();
+  }
+
+  size_t vw_stride() const {
+    return getValueWitnesses()->getStride();
+  }
+
   /// Allocate an out-of-line buffer if values of this type don't fit in the
   /// ValueBuffer.
   /// NOTE: This is not a box for copy-on-write existentials.
   OpaqueValue *allocateBufferIn(ValueBuffer *buffer) const;
+
+  /// Get the address of the memory previously allocated in the ValueBuffer.
+  /// NOTE: This is not a box for copy-on-write existentials.
+  OpaqueValue *projectBufferFrom(ValueBuffer *buffer) const;
 
   /// Deallocate an out-of-line buffer stored in 'buffer' if values of this type
   /// are not stored inline in the ValueBuffer.
@@ -2066,10 +2083,10 @@ public:
   const TargetTypeContextDescriptor<Runtime> *
   getTypeContextDescriptor() const {
     switch (getTypeKind()) {
-    case TypeReferenceKind::DirectNominalTypeDescriptor:
+    case TypeReferenceKind::DirectTypeDescriptor:
       return DirectNominalTypeDescriptor.getPointer();
 
-    case TypeReferenceKind::IndirectNominalTypeDescriptor:
+    case TypeReferenceKind::IndirectTypeDescriptor:
       return *IndirectNominalTypeDescriptor.getPointer();
 
     // These types (and any others we might add to TypeReferenceKind
@@ -2155,14 +2172,14 @@ public:
 template <typename Runtime>
 struct TargetTypeReference {
   union {
-    /// A direct reference to a nominal type descriptor.
-    RelativeDirectPointer<TargetTypeContextDescriptor<Runtime>>
-      DirectNominalTypeDescriptor;
+    /// A direct reference to a TypeContextDescriptor or ProtocolDescriptor.
+    RelativeDirectPointer<TargetContextDescriptor<Runtime>>
+      DirectTypeDescriptor;
 
-    /// An indirect reference to a nominal type descriptor.
+    /// An indirect reference to a TypeContextDescriptor or ProtocolDescriptor.
     RelativeDirectPointer<
-        ConstTargetMetadataPointer<Runtime, TargetTypeContextDescriptor>>
-      IndirectNominalTypeDescriptor;
+        ConstTargetMetadataPointer<Runtime, TargetContextDescriptor>>
+      IndirectTypeDescriptor;
 
     /// An indirect reference to an Objective-C class.
     RelativeDirectPointer<
@@ -2174,14 +2191,14 @@ struct TargetTypeReference {
       DirectObjCClassName;
   };
 
-  const TargetTypeContextDescriptor<Runtime> *
-  getTypeContextDescriptor(TypeReferenceKind kind) const {
+  const TargetContextDescriptor<Runtime> *
+  getTypeDescriptor(TypeReferenceKind kind) const {
     switch (kind) {
-    case TypeReferenceKind::DirectNominalTypeDescriptor:
-      return DirectNominalTypeDescriptor;
+    case TypeReferenceKind::DirectTypeDescriptor:
+      return DirectTypeDescriptor;
 
-    case TypeReferenceKind::IndirectNominalTypeDescriptor:
-      return *IndirectNominalTypeDescriptor;
+    case TypeReferenceKind::IndirectTypeDescriptor:
+      return *IndirectTypeDescriptor;
 
     case TypeReferenceKind::DirectObjCClassName:
     case TypeReferenceKind::IndirectObjCClass:
@@ -2288,8 +2305,8 @@ public:
     return TypeRef.getIndirectObjCClass(getTypeKind());
   }
   
-  const TargetTypeContextDescriptor<Runtime> *getTypeContextDescriptor() const {
-    return TypeRef.getTypeContextDescriptor(getTypeKind());
+  const TargetContextDescriptor<Runtime> *getTypeDescriptor() const {
+    return TypeRef.getTypeDescriptor(getTypeKind());
   }
 
   /// Retrieve the context of a retroactive conformance.
@@ -2501,137 +2518,13 @@ struct TargetGenericContextDescriptorHeader {
 using GenericContextDescriptorHeader =
   TargetGenericContextDescriptorHeader<InProcess>;
 
-/// A reference to a generic parameter that is the subject of a requirement.
-/// This can refer either directly to a generic parameter or to a path to an
-/// associated type.
-template<typename Runtime>
-class TargetGenericParamRef {
-  union {
-    /// The word of storage, whose low bit indicates whether there is an
-    /// associated type path stored out-of-line and whose upper bits describe
-    /// the generic parameter at root of the path.
-    uint32_t Word;
-
-    /// This is the associated type path stored out-of-line. The \c bool
-    /// is used for masking purposes and is otherwise unused; instead, check
-    /// the low bit of \c Word.
-    RelativeDirectPointerIntPair<const void, bool> AssociatedTypePath;
-  };
-
-public:
-  /// Index of the parameter being referenced. 0 is the first generic parameter
-  /// of the root of the context hierarchy, and subsequent parameters are
-  /// numbered breadth-first from there.
-  unsigned getRootParamIndex() const {
-    // If there is no path, retrieve the index directly.
-    if ((Word & 0x01) == 0) return Word >> 1;
-
-    // Otherwise, the index is at the start of the associated type path.
-    return *reinterpret_cast<const unsigned *>(AssociatedTypePath.getPointer());
-  }
-  
-  /// A reference to an associated type along the reference path.
-  struct AssociatedTypeRef {
-    /// The protocol the associated type belongs to.
-    RelativeIndirectablePointer<TargetProtocolDescriptor<Runtime>,
-                                /*nullable*/ false> Protocol;
-    /// A reference to the associated type descriptor within the protocol.
-    RelativeIndirectablePointer<TargetProtocolRequirement<Runtime>,
-                                /*nullable*/ false> Requirement;
-  };
-  
-  /// A forward iterator that walks through the associated type path, which is
-  /// a zero-terminated array of AssociatedTypeRefs.
-  class AssociatedTypeIterator {
-    const void *addr;
-    
-    explicit AssociatedTypeIterator(const void *startAddr) : addr(startAddr) {}
-    
-    bool isEnd() const {
-      if (addr == nullptr)
-        return true;
-      unsigned word;
-      memcpy(&word, addr, sizeof(unsigned));
-      if (word == 0)
-        return true;
-      return false;
-    }
-
-    template <class> friend class TargetGenericParamRef;
-
-  public:
-    AssociatedTypeIterator() : addr(nullptr) {}
-
-    using iterator_category = std::forward_iterator_tag;
-    using value_type = AssociatedTypeRef;
-    using difference_type = std::ptrdiff_t;
-    using pointer = const AssociatedTypeRef *;
-    using reference = const AssociatedTypeRef &;
-    
-    bool operator==(AssociatedTypeIterator i) const {
-      // Iterators are same if they both point at the same place, or are both
-      // at the end (either by being initialized as an end iterator with a
-      // null address, or by being advanced to the null terminator of an
-      // associated type list).
-      if (addr == i.addr)
-        return true;
-      
-      if (isEnd() && i.isEnd())
-        return true;
-      
-      return false;
-    }
-    
-    bool operator!=(AssociatedTypeIterator i) const {
-      return !(*this == i);
-    }
-    
-    reference operator*() const {
-      return *reinterpret_cast<pointer>(addr);
-    }
-    pointer operator->() const {
-      return reinterpret_cast<pointer>(addr);
-    }
-    
-    AssociatedTypeIterator &operator++() {
-      addr = reinterpret_cast<const char*>(addr) + sizeof(AssociatedTypeRef);
-      return *this;
-    }
-    
-    AssociatedTypeIterator operator++(int) {
-      auto copy = *this;
-      ++*this;
-      return copy;
-    }
-  };
-  
-  /// Iterators for going through the associated type path from the root param.
-  AssociatedTypeIterator begin() const {
-    if (Word & 0x01) {
-      // The associated types start after the first word, which holds the
-      // root param index.
-      return AssociatedTypeIterator(
-        reinterpret_cast<const char*>(AssociatedTypePath.getPointer()) +
-                                        sizeof(unsigned));
-    } else {
-      // This is a direct param reference, so there are no associated types.
-      return end();
-    }
-  }
-  
-  AssociatedTypeIterator end() const {
-    return AssociatedTypeIterator{};
-  }
-};
-
-using GenericParamRef = TargetGenericParamRef<InProcess>;
-
 template<typename Runtime>
 class TargetGenericRequirementDescriptor {
 public:
   GenericRequirementFlags Flags;
-  /// The generic parameter or associated type that's constrained.
-  TargetGenericParamRef<Runtime> Param;
+
+  /// The type that's constrained, described as a mangled name.
+  RelativeDirectPointer<const char, /*nullable*/ false> Param;
 
 private:
   union {
@@ -2667,9 +2560,10 @@ public:
     return getFlags().getKind();
   }
 
-  /// Retrieve the generic parameter that is the subject of this requirement.
-  const TargetGenericParamRef<Runtime> &getParam() const {
-    return Param;
+  /// Retrieve the generic parameter that is the subject of this requirement,
+  /// as a mangled type name.
+  StringRef getParam() const {
+    return swift::Demangle::makeSymbolicMangledNameStringRef(Param.get());
   }
 
   /// Retrieve the protocol for a Protocol requirement.
@@ -2716,6 +2610,57 @@ public:
 };
 using GenericRequirementDescriptor =
   TargetGenericRequirementDescriptor<InProcess>;
+
+template<typename Runtime>
+class TargetGenericEnvironment
+    : public swift::ABI::TrailingObjects<TargetGenericEnvironment<Runtime>,
+               uint16_t, GenericParamDescriptor,
+               TargetGenericRequirementDescriptor<Runtime>> {
+  using GenericRequirementDescriptor =
+    TargetGenericRequirementDescriptor<Runtime>;
+  using TrailingObjects =
+     swift::ABI::TrailingObjects<TargetGenericEnvironment<Runtime>,
+       uint16_t, GenericParamDescriptor, GenericRequirementDescriptor>;
+  friend TrailingObjects;
+
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+
+  size_t numTrailingObjects(OverloadToken<uint16_t>) const {
+    return Flags.getNumGenericParameterLevels();
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericParamDescriptor>) const {
+    return getGenericParameterCounts().back();
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericRequirementDescriptor>) const {
+    return Flags.getNumGenericRequirements();
+  }
+
+  GenericEnvironmentFlags Flags;
+
+public:
+  /// Retrieve the cumulative generic parameter counts at each level of genericity.
+  ArrayRef<uint16_t> getGenericParameterCounts() const {
+    return ArrayRef<uint16_t>(this->template getTrailingObjects<uint16_t>(),
+                              Flags.getNumGenericParameterLevels());
+  }
+
+  /// Retrieve the generic parameters descriptors.
+  ArrayRef<GenericParamDescriptor> getGenericParameters() const {
+    return ArrayRef<GenericParamDescriptor>(
+             this->template getTrailingObjects<GenericParamDescriptor>(),
+             getGenericParameterCounts().back());
+  }
+
+  /// Retrieve the generic requirements.
+  ArrayRef<GenericRequirementDescriptor> getGenericRequirements() const {
+    return ArrayRef<GenericRequirementDescriptor>(
+             this->template getTrailingObjects<GenericRequirementDescriptor>(),
+             Flags.getNumGenericRequirements());
+  }
+};
 
 /// CRTP class for a context descriptor that includes trailing generic
 /// context description.
@@ -4229,6 +4174,80 @@ TargetTypeContextDescriptor<Runtime>::getSingletonMetadataInitialization() const
     swift_runtime_unreachable("Not a enum, struct or class type descriptor.");
   }
 }
+
+/// An entry in the chain of dynamic replacement functions.
+struct DynamicReplacementChainEntry {
+  void *implementationFunction;
+  DynamicReplacementChainEntry *next;
+};
+
+/// A record describing the root of dynamic replacements for a function.
+struct DynamicReplacementKey {
+  RelativeDirectPointer<DynamicReplacementChainEntry, false> root;
+  uint32_t flags;
+};
+
+/// A record describing a dynamic function replacement.
+class DynamicReplacementDescriptor {
+  RelativeIndirectablePointer<DynamicReplacementKey, false> replacedFunctionKey;
+  RelativeDirectPointer<void, false> replacementFunction;
+  RelativeDirectPointer<DynamicReplacementChainEntry, false> chainEntry;
+  uint32_t flags;
+
+  enum : uint32_t { EnableChainingMask = 0x1 };
+
+public:
+  /// Enable this replacement by changing the function's replacement chain's
+  /// root entry.
+  /// This replacement must be done while holding a global lock that guards this
+  /// function's chain. Currently this is done by holding the
+  /// \p DynamicReplacementLock.
+  void enableReplacement() const;
+
+  /// Disable this replacement by changing the function's replacement chain's
+  /// root entry.
+  /// This replacement must be done while holding a global lock that guards this
+  /// function's chain. Currently this is done by holding the
+  /// \p DynamicReplacementLock.
+  void disableReplacement() const;
+
+  uint32_t getFlags() const { return flags; }
+
+  bool shouldChain() const { return (flags & EnableChainingMask); }
+};
+
+/// A collection of dynamic replacement records.
+class DynamicReplacementScope
+    : private swift::ABI::TrailingObjects<DynamicReplacementScope,
+                                          DynamicReplacementDescriptor> {
+
+  uint32_t flags;
+  uint32_t numReplacements;
+
+  using TrailingObjects =
+      swift::ABI::TrailingObjects<DynamicReplacementScope,
+                                  DynamicReplacementDescriptor>;
+  friend TrailingObjects;
+
+  ArrayRef<DynamicReplacementDescriptor> getReplacementDescriptors() const {
+    return {this->template getTrailingObjects<DynamicReplacementDescriptor>(),
+            numReplacements};
+  }
+
+public:
+  void enable() const {
+    for (auto &descriptor : getReplacementDescriptors()) {
+      descriptor.enableReplacement();
+    }
+  }
+
+  void disable() const {
+    for (auto &descriptor : getReplacementDescriptors()) {
+      descriptor.disableReplacement();
+    }
+  }
+  uint32_t getFlags() { return flags; }
+};
 
 } // end namespace swift
 

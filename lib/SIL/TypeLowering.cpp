@@ -152,20 +152,15 @@ namespace {
     RecursiveProperties getDifferentiableSILFunctionTypeRecursiveProperties(
         CanSILFunctionType type) {
       assert(type->isDifferentiable());
-      auto extInfo = type->getExtInfo();
-      auto nondiffExtInfo = extInfo.withDifferentiable(false);
-      auto origTy = type->getWithExtInfo(nondiffExtInfo);
-      // TODO: Use the parameter indices and diff order in the @autodiff
-      // function type.
+      auto origTy = type->getWithoutDifferentiability();
       auto jvpTy = origTy->getAutoDiffAssociatedFunctionType(
-          SmallBitVector(type->getNumParameters(), true), /*resultIndex*/ 0,
+          type->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
           /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::JVP, M,
           LookUpConformanceInModule(M.getSwiftModule()));
       auto vjpTy = origTy->getAutoDiffAssociatedFunctionType(
-          SmallBitVector(type->getNumParameters(), true), /*resultIndex*/ 0,
+          type->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
           /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::VJP, M,
           LookUpConformanceInModule(M.getSwiftModule()));
-
       RecursiveProperties props;
       props.addSubobject(classifyType(origTy, M, Sig, Expansion));
       props.addSubobject(classifyType(jvpTy, M, Sig, Expansion));
@@ -239,7 +234,7 @@ namespace {
       case AnyFunctionType::Representation::Block:
         // SWIFT_ENABLE_TENSORFLOW
         // TODO: Are there cases where we have to lower this differently when it
-        // is @autodiff?
+        // is @differentiable?
         return asImpl().handleReference(type);
 
       // SWIFT_ENABLE_TENSORFLOW
@@ -1061,7 +1056,8 @@ namespace {
 
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
-      if (isa<FunctionRefInst>(value))
+      if (isa<FunctionRefInst>(value) || isa<DynamicFunctionRefInst>(value) ||
+          isa<PreviousDynamicFunctionRefInst>(value))
         return value;
 
       if (B.getFunction().hasQualifiedOwnership())
@@ -1732,7 +1728,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
                                                      ValueDecl *VD,
                                                      DeclContext *DC,
                                                      unsigned DefaultArgIndex) {
-  auto resultTy = getDefaultArgumentInfo(VD, DefaultArgIndex).second;
+  auto resultTy = getParameterAt(VD, DefaultArgIndex)->getInterfaceType();
   assert(resultTy && "Didn't find default argument?");
 
   // The result type might be written in terms of type parameters

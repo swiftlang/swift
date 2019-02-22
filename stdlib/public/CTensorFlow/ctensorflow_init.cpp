@@ -6,14 +6,23 @@
 #include "tensorflow/core/platform/init_main.h"
 
 #include <assert.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
 
 extern "C" {
 
+void handle_sigint(int signal) {
+  printf("Caught interrupt signal, exiting...\n");
+  exit(1);
+}
+
 void InitTensorFlowRuntime(unsigned char enable_debug_logging,
                            int verbose_level) {
+  // Install a signal handler to ensure we exit when interrupted.
+  signal(SIGINT, handle_sigint);
+
   // Synthesize argc and argv
   char arg0[] = "dummyProgramName";
   std::vector<char*> my_argv;
@@ -157,15 +166,6 @@ void *swift_tfc_CreateScalarStringTensor(char *val, int32_t valLen,
   (void)TF_StringEncode(val, valLen, dataStart, totalSize, status);
 
   return tensor;
-}
-
-void swift_tfc_TFE_Execute(void *op, void **retvals, int32_t *num_retvals,
-                           void *status) {
-  int int_num_retvals = *num_retvals;
-  TFE_Execute(reinterpret_cast<TFE_Op *>(op),
-              reinterpret_cast<TFE_TensorHandle **>(retvals), &int_num_retvals,
-              reinterpret_cast<TF_Status *>(status));
-  *num_retvals = int_num_retvals;
 }
 
 }  // extern "C"

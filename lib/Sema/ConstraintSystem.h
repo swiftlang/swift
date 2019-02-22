@@ -823,6 +823,10 @@ enum class ConstraintSystemFlags {
   /// system is not applied to the expression AST, but the ConstraintSystem is
   /// left in-tact.
   AllowUnresolvedTypeVariables = 0x10,
+
+  /// If set, constraint system always reuses type of pre-typechecked
+  /// expression, and doesn't dig into its subexpressions.
+  ReusePrecheckedType = 0x20,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -906,19 +910,25 @@ struct MemberLookupResult {
   }
   
 };
-  
-  
-// SWIFT_ENABLE_TENSORFLOW
+
 /// \brief Stores the required methods for @dynamicCallable types.
 struct DynamicCallableMethods {
-  FuncDecl *argumentsMethod = nullptr;
-  FuncDecl *keywordArgumentsMethod = nullptr;
+  llvm::DenseSet<FuncDecl *> argumentsMethods;
+  llvm::DenseSet<FuncDecl *> keywordArgumentsMethods;
+
+  void addArgumentsMethod(FuncDecl *method) {
+    argumentsMethods.insert(method);
+  }
+
+  void addKeywordArgumentsMethod(FuncDecl *method) {
+    keywordArgumentsMethods.insert(method);
+  }
 
   /// \brief Returns true if type defines either of the @dynamicCallable
   /// required methods. Returns false iff type does not satisfy @dynamicCallable
   /// requirements.
   bool isValid() const {
-    return argumentsMethod || keywordArgumentsMethod;
+    return !argumentsMethods.empty() || !keywordArgumentsMethods.empty();
   }
 };
 
@@ -1075,15 +1085,13 @@ public:
   /// The locators of \c Defaultable constraints whose defaults were used.
   SmallVector<ConstraintLocator *, 8> DefaultedConstraints;
 
-  // SWIFT_ENABLE_TENSORFLOW
   /// A cache that stores the @dynamicCallable required methods implemented by
   /// types.
   llvm::DenseMap<CanType, DynamicCallableMethods> DynamicCallableCache;
 
-  /// This is a cache that keeps track of whether a given type is known (or not)
-  /// to be a @dynamicMemberLookup type.
-  ///
-  llvm::DenseMap<CanType, bool> IsDynamicMemberLookupCache;
+  /// A cache that stores whether types are valid @dynamicMemberLookup types.
+  llvm::DenseMap<CanType, bool> DynamicMemberLookupCache;
+
 private:
   /// \brief Describe the candidate expression for partial solving.
   /// This class used by shrink & solve methods which apply
@@ -1775,15 +1783,19 @@ public:
 public:
 
   /// \brief Whether we should attempt to fix problems.
-  bool shouldAttemptFixes() {
+  bool shouldAttemptFixes() const {
     if (!(Options & ConstraintSystemFlags::AllowFixes))
       return false;
 
     return !solverState || solverState->recordFixes;
   }
 
-  bool shouldSuppressDiagnostics() {
+  bool shouldSuppressDiagnostics() const {
     return Options.contains(ConstraintSystemFlags::SuppressDiagnostics);
+  }
+
+  bool shouldReusePrecheckedType() const {
+    return Options.contains(ConstraintSystemFlags::ReusePrecheckedType);
   }
 
   /// \brief Log and record the application of the fix. Return true iff any
@@ -2316,12 +2328,6 @@ public:
   /// \returns a possibly-sanitized expression, or null if an error occurred.
   Expr *generateConstraints(Expr *E);
 
-  /// \brief Generate constraints for the given top-level expression,
-  /// assuming that its children are already type-checked.
-  ///
-  /// \returns a possibly-sanitized expression, or null if an error occurred.
-  Expr *generateConstraintsShallow(Expr *E);
-
   /// \brief Generate constraints for binding the given pattern to the
   /// value of the given expression.
   ///
@@ -2674,6 +2680,13 @@ private:
                                       TypeMatchOptions flags,
                                       ConstraintLocatorBuilder locator);
 
+  /// \brief Attempt to simplify the DynamicCallableApplicableFunction constraint.
+  SolutionKind simplifyDynamicCallableApplicableFnConstraint(
+                                      Type type1,
+                                      Type type2,
+                                      TypeMatchOptions flags,
+                                      ConstraintLocatorBuilder locator);
+
   /// \brief Attempt to simplify the given DynamicTypeOf constraint.
   SolutionKind simplifyDynamicTypeOfConstraint(
                                          Type type1, Type type2,
@@ -2811,8 +2824,7 @@ private:
   };
 
   struct PotentialBindings {
-    using BindingScore =
-        std::tuple<bool, bool, bool, bool, unsigned char, unsigned int>;
+    using BindingScore = std::tuple<bool, bool, bool, bool, unsigned char, int>;
 
     TypeVariableType *TypeVar;
 
@@ -2824,6 +2836,12 @@ private:
 
     /// Whether the bindings of this type involve other type variables.
     bool InvolvesTypeVariables = false;
+
+    /// Whether the bindings represent (potentially) incomplete set,
+    /// there is no way to say with absolute certainty if that's the
+    /// case, but that could happen when certain constraints like
+    /// `bind param` are present in the system.
+    bool PotentiallyIncomplete = false;
 
     /// Whether this type variable has literal bindings.
     LiteralBindingKind LiteralBinding = LiteralBindingKind::None;
@@ -2869,9 +2887,14 @@ private:
       if (formBindingScore(y) < formBindingScore(x))
         return false;
 
-      // If the only difference is default types,
+      // If there is a difference in number of default types,
       // prioritize bindings with fewer of them.
-      return x.NumDefaultableBindings < y.NumDefaultableBindings;
+      if (x.NumDefaultableBindings != y.NumDefaultableBindings)
+        return x.NumDefaultableBindings < y.NumDefaultableBindings;
+
+      // As a last resort, let's check if the bindings are
+      // potentially incomplete, and if so, let's de-prioritize them.
+      return x.PotentiallyIncomplete < y.PotentiallyIncomplete;
     }
 
     void foundLiteralBinding(ProtocolDecl *proto) {
@@ -2904,6 +2927,8 @@ private:
     void dump(llvm::raw_ostream &out,
               unsigned indent = 0) const LLVM_ATTRIBUTE_USED {
       out.indent(indent);
+      if (PotentiallyIncomplete)
+        out << "potentially_incomplete ";
       if (FullyBound)
         out << "fully_bound ";
       if (SubtypeOfExistentialType)
@@ -3141,11 +3166,6 @@ public:
                       Type convertType, bool discardedExpr,
                       bool skipClosures);
 
-  /// \brief Apply a given solution to the expression to the top-level
-  /// expression, producing a fully type-checked expression.
-  Expr *applySolutionShallow(const Solution &solution, Expr *expr,
-                             bool suppressDiagnostics);
-  
   /// \brief Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully
   /// resolved before any others.
@@ -3445,6 +3465,13 @@ void simplifyLocator(Expr *&anchor,
 /// \returns the anchor expression if it fully describes the locator, or
 /// null otherwise.
 Expr *simplifyLocatorToAnchor(ConstraintSystem &cs, ConstraintLocator *locator);
+
+/// Retrieve argument at specified index from given expression.
+/// The expression could be "application", "subscript" or "member" call.
+///
+/// \returns argument expression or `nullptr` if given "base" expression
+/// wasn't of one of the kinds listed above.
+Expr *getArgumentExpr(Expr *expr, unsigned index);
 
 class DisjunctionChoice {
   unsigned Index;

@@ -7,7 +7,7 @@ import resilient_global
 
 public struct MyEmptyStruct {}
 
-// CHECK-LABEL: sil_global @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvp : $MyEmptyStruct
+// CHECK-LABEL: sil_global private @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvp : $MyEmptyStruct
 
 public var myEmptyGlobal = MyEmptyStruct()
 
@@ -21,7 +21,7 @@ public var myEmptyGlobal = MyEmptyStruct()
 // CHECK:         global_addr @$s17global_resilience13myEmptyGlobalAA02MyD6StructVv
 // CHECK:         return
 
-// Synthesized getter and setter for our resilient global variable
+// Synthesized accessors for our resilient global variable
 
 // CHECK-LABEL: sil @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvg
 // CHECK:         function_ref @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvau
@@ -30,6 +30,12 @@ public var myEmptyGlobal = MyEmptyStruct()
 // CHECK-LABEL: sil @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvs
 // CHECK:         function_ref @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvau
 // CHECK:         return
+
+// CHECK-LABEL: sil @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvM
+// CHECK:         function_ref @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvau
+// CHECK:         begin_access [modify] [dynamic]
+// CHECK:         yield
+// CHECK:         end_access
 
 // Mutable addressor for fixed-layout global
 
@@ -64,6 +70,19 @@ public func getMyEmptyGlobal() -> MyEmptyStruct {
 // CHECK:         return
 public func getEmptyGlobal() -> EmptyResilientStruct {
   return emptyGlobal
+}
+
+// CHECK-LABEL: sil @$s17global_resilience17modifyEmptyGlobalyyF
+// CHECK:         [[MODIFY:%.*]] = function_ref @$s16resilient_global11emptyGlobalAA20EmptyResilientStructVvM
+// CHECK-NEXT:    ([[ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[MODIFY]]()
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[FN:%.*]] = function_ref @$s16resilient_global20EmptyResilientStructV6mutateyyF
+// CHECK-NEXT:    apply [[FN]]([[ADDR]])
+// CHECK-NEXT:    end_apply [[TOKEN]]
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+public func modifyEmptyGlobal() {
+  emptyGlobal.mutate()
 }
 
 // Accessing fixed-layout global from a different resilience domain --

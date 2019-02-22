@@ -70,7 +70,7 @@ struct HashableConformanceEntry {
 // FIXME(performance): consider merging this cache into the regular
 // protocol conformance cache.
 static ConcurrentMap<HashableConformanceEntry, /*Destructor*/ false>
-HashableConformances;
+  HashableConformances;
 
 template<bool KnownToConformToHashable>
 LLVM_ATTRIBUTE_ALWAYS_INLINE
@@ -80,16 +80,18 @@ static const Metadata *findHashableBaseTypeImpl(const Metadata *type) {
           HashableConformances.find(HashableConformanceKey{type})) {
     return entry->baseTypeThatConformsToHashable;
   }
-  if (!KnownToConformToHashable &&
-      !swift_conformsToProtocol(type, &HashableProtocolDescriptor)) {
+
+  auto witnessTable =
+    swift_conformsToProtocol(type, &HashableProtocolDescriptor);
+  if (!KnownToConformToHashable && !witnessTable) {
     // Don't cache the negative response because we don't invalidate
     // this cache when a new conformance is loaded dynamically.
     return nullptr;
   }
   // By this point, `type` is known to conform to `Hashable`.
-
+  const auto *conformance = witnessTable->Description;
   const Metadata *baseTypeThatConformsToHashable =
-    findConformingSuperclass(type, &HashableProtocolDescriptor);
+    findConformingSuperclass(type, conformance);
   HashableConformances.getOrInsert(HashableConformanceKey{type},
                                    baseTypeThatConformsToHashable);
   return baseTypeThatConformsToHashable;

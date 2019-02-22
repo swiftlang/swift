@@ -12,7 +12,7 @@ import Library
 // TOO-NEW: :[[@LINE-2]]:8: error: module file was created by a newer version of the compiler: {{.*}}too-new/Library.swiftmodule{{$}}
 
 // Update this line when the compiler version changes.
-// LANGUAGE: :[[@LINE-5]]:8: error: module compiled with Swift X.Y cannot be imported by the Swift 4.{{.+}} compiler: {{.*}}too-{{old|new}}-language/Library.swiftmodule{{$}}
+// LANGUAGE: :[[@LINE-5]]:8: error: module compiled with Swift X.Y cannot be imported by the Swift 5.{{.+}} compiler: {{.*}}too-{{old|new}}-language/Library.swiftmodule{{$}}
 
 // Compiler thinks that the module is empty in all cases.
 // CHECK: :[[@LINE+1]]:1: error: module 'Library' has no member named 'foo'

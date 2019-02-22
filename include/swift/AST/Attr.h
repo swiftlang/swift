@@ -46,6 +46,8 @@ class ASTPrinter;
 class ASTContext;
 struct PrintOptions;
 class Decl;
+class AbstractFunctionDecl;
+class FuncDecl;
 class ClassDecl;
 class FuncDecl;
 class GenericFunctionType;
@@ -206,6 +208,12 @@ protected:
       /// Whether the @objc was inferred using Swift 3's deprecated inference
       /// rules.
       Swift3Inferred : 1
+    );
+
+    SWIFT_INLINE_BITFIELD(DynamicReplacementAttr, DeclAttribute, 1,
+      /// Whether this attribute has location information that trails the main
+      /// record, which contains the locations of the parentheses and any names.
+      HasTrailingLocationInfo : 1
     );
 
     SWIFT_INLINE_BITFIELD(AbstractAccessControlAttr, DeclAttribute, 3,
@@ -896,6 +904,96 @@ public:
   }
 };
 
+class PrivateImportAttr final
+: public DeclAttribute {
+  StringRef SourceFile;
+
+  PrivateImportAttr(SourceLoc atLoc, SourceRange baseRange,
+                    StringRef sourceFile, SourceRange parentRange);
+
+public:
+  static PrivateImportAttr *create(ASTContext &Ctxt, SourceLoc AtLoc,
+                                   SourceLoc PrivateLoc, SourceLoc LParenLoc,
+                                   StringRef sourceFile, SourceLoc RParenLoc);
+
+  StringRef getSourceFile() const {
+    return SourceFile;
+  }
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_PrivateImport;
+  }
+};
+
+/// The @_dynamicReplacement(for:) attribute.
+class DynamicReplacementAttr final
+    : public DeclAttribute,
+      private llvm::TrailingObjects<DynamicReplacementAttr, SourceLoc> {
+  friend TrailingObjects;
+
+  DeclName ReplacedFunctionName;
+  AbstractFunctionDecl *ReplacedFunction;
+
+  /// Create an @_dynamicReplacement(for:) attribute written in the source.
+  DynamicReplacementAttr(SourceLoc atLoc, SourceRange baseRange,
+                         DeclName replacedFunctionName, SourceRange parenRange);
+
+  explicit DynamicReplacementAttr(DeclName name)
+      : DeclAttribute(DAK_DynamicReplacement, SourceLoc(), SourceRange(),
+                      /*Implicit=*/false),
+        ReplacedFunctionName(name), ReplacedFunction(nullptr) {
+    Bits.DynamicReplacementAttr.HasTrailingLocationInfo = false;
+  }
+
+  /// Retrieve the trailing location information.
+  MutableArrayRef<SourceLoc> getTrailingLocations() {
+    assert(Bits.DynamicReplacementAttr.HasTrailingLocationInfo);
+    unsigned length = 2;
+    return {getTrailingObjects<SourceLoc>(), length};
+  }
+
+  /// Retrieve the trailing location information.
+  ArrayRef<SourceLoc> getTrailingLocations() const {
+    assert(Bits.DynamicReplacementAttr.HasTrailingLocationInfo);
+    unsigned length = 2; // lParens, rParens
+    return {getTrailingObjects<SourceLoc>(), length};
+  }
+
+public:
+  static DynamicReplacementAttr *
+  create(ASTContext &Context, SourceLoc AtLoc, SourceLoc DynReplLoc,
+         SourceLoc LParenLoc, DeclName replacedFunction, SourceLoc RParenLoc);
+
+  static DynamicReplacementAttr *create(ASTContext &ctx,
+                                        DeclName replacedFunction);
+
+  static DynamicReplacementAttr *create(ASTContext &ctx,
+                                        DeclName replacedFunction,
+                                        AbstractFunctionDecl *replacedFuncDecl);
+
+  DeclName getReplacedFunctionName() const {
+    return ReplacedFunctionName;
+  }
+
+  AbstractFunctionDecl *getReplacedFunction() const {
+    return ReplacedFunction;
+  }
+
+  void setReplacedFunction(AbstractFunctionDecl *f) {
+    assert(ReplacedFunction == nullptr);
+    ReplacedFunction = f;
+  }
+
+  /// Retrieve the location of the opening parentheses, if there is one.
+  SourceLoc getLParenLoc() const;
+
+  /// Retrieve the location of the closing parentheses, if there is one.
+  SourceLoc getRParenLoc() const;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_DynamicReplacement;
+  }
+};
+
 /// Represents any sort of access control modifier.
 class AbstractAccessControlAttr : public DeclAttribute {
 protected:
@@ -1300,55 +1398,40 @@ public:
   }
 };
 
-/// SWIFT_ENABLE_TENSORFLOW
-/// Attribute that marks a function differentiable and optionally specifies
-/// custom associated autodiff functions: 'primal', 'adjoint', 'jvp', and
-/// 'vjp'.
+// SWIFT_ENABLE_TENSORFLOW
+struct DeclNameWithLoc {
+  DeclName Name;
+  DeclNameLoc Loc;
+};
+
+// SWIFT_ENABLE_TENSORFLOW
+/// Attribute that marks a function as differentiable and optionally specifies
+/// custom associated derivative functions: 'jvp' and 'vjp'.
 ///
-/// Note: 'primal' and 'adjoint' are legacy functions that we will keep around
-/// until we have fully switched to 'jvp' and 'vjp'.
-///
-/// Note: 'jvp' and 'vjp' are not fully supported yet. In particular, the core
-/// AD pass does not use them. We are incrementally adding support for them.
-///
-/// For example:
-///   @differentiable(reverse, adjoint: foo(_:_:seed:) where T : FloatingPoint)
-///   @differentiable(reverse, wrt: (self, .0, .1), adjoint: bar(_:_:_:seed:))
+/// Examples:
+///   @differentiable(jvp: jvpFoo where T : FloatingPoint)
+///   @differentiable(wrt: (self, .0, .1), jvp: jvpFoo)
 class DifferentiableAttr final
     : public DeclAttribute,
-      private llvm::TrailingObjects<DifferentiableAttr, AutoDiffParameter> {
-public:
-  struct DeclNameWithLoc {
-    DeclName Name;
-    DeclNameLoc Loc;
-  };
-private:
+      private llvm::TrailingObjects<DifferentiableAttr,
+                                    ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
   /// The number of parameters specified in 'wrt:'.
-  unsigned NumParameters;
-  /// The primal function.
-  Optional<DeclNameWithLoc> Primal;
-  /// The adjoint function.
-  Optional<DeclNameWithLoc> Adjoint;
+  unsigned NumParsedParameters = 0;
   /// The JVP function.
   Optional<DeclNameWithLoc> JVP;
   /// The VJP function.
   Optional<DeclNameWithLoc> VJP;
-  /// The primal function (optional), to be resolved by the type checker if
-  /// specified.
-  FuncDecl *PrimalFunction = nullptr;
-  /// The adjoint function (optional), to be resolved by the type checker if
-  /// specified.
-  FuncDecl *AdjointFunction = nullptr;
   /// The JVP function (optional), to be resolved by the type checker if
   /// specified.
   FuncDecl *JVPFunction = nullptr;
   /// The VJP function (optional), to be resolved by the type checker if
   /// specified.
   FuncDecl *VJPFunction = nullptr;
-  /// Checked parameter indices, to be resolved by the type checker.
-  AutoDiffParameterIndices *CheckedParameterIndices = nullptr;
+  /// The differentiation parameters' indices, to be resolved by the type
+  /// checker.
+  AutoDiffParameterIndices *ParameterIndices = nullptr;
   /// The trailing where clause, if it exists.
   TrailingWhereClause *WhereClause = nullptr;
   /// The requirements for autodiff associated functions. Resolved by the type
@@ -1359,18 +1442,14 @@ private:
 
   explicit DifferentiableAttr(ASTContext &context, bool implicit,
                               SourceLoc atLoc, SourceRange baseRange,
-                              ArrayRef<AutoDiffParameter> parameters,
-                              Optional<DeclNameWithLoc> primal,
-                              Optional<DeclNameWithLoc> adjoint,
+                              ArrayRef<ParsedAutoDiffParameter> parameters,
                               Optional<DeclNameWithLoc> jvp,
                               Optional<DeclNameWithLoc> vjp,
                               TrailingWhereClause *clause);
 
   explicit DifferentiableAttr(ASTContext &context, bool implicit,
                               SourceLoc atLoc, SourceRange baseRange,
-                              ArrayRef<AutoDiffParameter> parameters,
-                              Optional<DeclNameWithLoc> primal,
-                              Optional<DeclNameWithLoc> adjoint,
+                              AutoDiffParameterIndices *indices,
                               Optional<DeclNameWithLoc> jvp,
                               Optional<DeclNameWithLoc> vjp,
                               ArrayRef<Requirement> requirements);
@@ -1378,44 +1457,38 @@ private:
 public:
   static DifferentiableAttr *create(ASTContext &context, bool implicit,
                                     SourceLoc atLoc, SourceRange baseRange,
-                                    ArrayRef<AutoDiffParameter> parameters,
-                                    Optional<DeclNameWithLoc> primal,
-                                    Optional<DeclNameWithLoc> adjoint,
+                                    ArrayRef<ParsedAutoDiffParameter> params,
                                     Optional<DeclNameWithLoc> jvp,
                                     Optional<DeclNameWithLoc> vjp,
                                     TrailingWhereClause *clause);
 
   static DifferentiableAttr *create(ASTContext &context, bool implicit,
                                     SourceLoc atLoc, SourceRange baseRange,
-                                    ArrayRef<AutoDiffParameter> parameters,
-                                    Optional<DeclNameWithLoc> primal,
-                                    Optional<DeclNameWithLoc> adjoint,
+                                    AutoDiffParameterIndices *indices,
                                     Optional<DeclNameWithLoc> jvp,
                                     Optional<DeclNameWithLoc> vjp,
                                     ArrayRef<Requirement> requirements);
 
-  Optional<DeclNameWithLoc> getPrimal() const { return Primal; }
-  Optional<DeclNameWithLoc> getAdjoint() const { return Adjoint; }
   Optional<DeclNameWithLoc> getJVP() const { return JVP; }
   Optional<DeclNameWithLoc> getVJP() const { return VJP; }
 
-  AutoDiffParameterIndices *getCheckedParameterIndices() const {
-    return CheckedParameterIndices;
+  AutoDiffParameterIndices *getParameterIndices() const {
+    return ParameterIndices;
   }
-  void setCheckedParameterIndices(AutoDiffParameterIndices *pi) {
-    CheckedParameterIndices = pi;
+  void setParameterIndices(AutoDiffParameterIndices *pi) {
+    ParameterIndices = pi;
   }
 
-  /// The differentiation parameters, i.e. the list of parameters specified in
-  /// 'wrt:'.
-  ArrayRef<AutoDiffParameter> getParameters() const {
-    return { getTrailingObjects<AutoDiffParameter>(), NumParameters };
+  /// The parsed differentiation parameters, i.e. the list of parameters
+  /// specified in 'wrt:'.
+  ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
+    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
   }
-  MutableArrayRef<AutoDiffParameter> getParameters() {
-    return { getTrailingObjects<AutoDiffParameter>(), NumParameters };
+  MutableArrayRef<ParsedAutoDiffParameter> getParsedParameters() {
+    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
   }
-  size_t numTrailingObjects(OverloadToken<AutoDiffParameter>) const {
-    return NumParameters;
+  size_t numTrailingObjects(OverloadToken<ParsedAutoDiffParameter>) const {
+    return NumParsedParameters;
  }
 
   TrailingWhereClause *getWhereClause() const { return WhereClause; }
@@ -1424,17 +1497,50 @@ public:
   MutableArrayRef<Requirement> getRequirements() { return Requirements; }
   void setRequirements(ASTContext &context, ArrayRef<Requirement> requirements);
 
-  FuncDecl *getPrimalFunction() const { return PrimalFunction; }
-  void setPrimalFunction(FuncDecl *decl) { PrimalFunction = decl; }
-  FuncDecl *getAdjointFunction() const { return AdjointFunction; }
-  void setAdjointFunction(FuncDecl *decl) { AdjointFunction = decl; }
   FuncDecl *getJVPFunction() const { return JVPFunction; }
   void setJVPFunction(FuncDecl *decl) { JVPFunction = decl; }
   FuncDecl *getVJPFunction() const { return VJPFunction; }
   void setVJPFunction(FuncDecl *decl) { VJPFunction = decl; }
 
+  bool parametersMatch(const DifferentiableAttr &other) const {
+    assert(ParameterIndices && other.ParameterIndices);
+    return ParameterIndices->parameters == other.ParameterIndices->parameters;
+  }
+
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Differentiable;
+  }
+};
+
+// SWIFT_ENABLE_TENSORFLOW
+/// Attribute that registers a function as a derivative of another function.
+///
+/// Examples:
+///   @differentiating(sin(_:_:))
+///   @differentiating(+)
+class DifferentiatingAttr final : public DeclAttribute {
+private:
+  /// The original function name.
+  DeclNameWithLoc Original;
+  /// The original function, resolved by the type checker.
+  FuncDecl *OriginalFunction = nullptr;
+
+  explicit DifferentiatingAttr(ASTContext &context, bool implicit,
+                               SourceLoc atLoc, SourceRange baseRange,
+                               DeclNameWithLoc original);
+
+public:
+  static DifferentiatingAttr *create(ASTContext &context, bool implicit,
+                                     SourceLoc atLoc, SourceRange baseRange,
+                                     DeclNameWithLoc original);
+
+  DeclNameWithLoc getOriginal() const { return Original; }
+
+  FuncDecl *getOriginalFunction() const { return OriginalFunction; }
+  void setOriginalFunction(FuncDecl *decl) { OriginalFunction = decl; }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Differentiating;
   }
 };
 

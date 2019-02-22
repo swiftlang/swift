@@ -1,9 +1,0 @@
-// RUN: %scale-test --invert-result --begin 5 --end 20 --step 1 --select NumLeafScopes %s
-// REQUIRES: OS=macosx
-// REQUIRES: asserts
-
-_ = [
-%for i in range(0, N):
-  (0,  [1]),
-%end
-]

@@ -227,8 +227,8 @@ void AccessSummaryAnalysis::processPartialApply(FunctionInfo *callerInfo,
 
   // Make sure the partial_apply is not calling the result of another
   // partial_apply.
-  assert(isa<FunctionRefInst>(apply->getCallee()) &&
-         "Noescape partial apply of non-functionref?");
+  assert(isa<FunctionRefBaseInst>(apply->getCallee())
+         && "Noescape partial apply of non-functionref?");
 
   assert(llvm::all_of(apply->getUses(),
                       hasExpectedUsesOfNoEscapePartialApply) &&

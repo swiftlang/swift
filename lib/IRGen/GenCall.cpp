@@ -1744,9 +1744,11 @@ void CallEmission::emitYieldsToExplosion(Explosion &out) {
     }
 
     // Otherwise, it's direct.  Remap.
-    auto temp = schema.getDirectSchema().mapFromNative(IGF.IGM, IGF,
-                                                       rawYieldComponents,
-                                                       schema.getSILType());
+    const auto &directSchema = schema.getDirectSchema();
+    Explosion eltValues;
+    rawYieldComponents.transferInto(eltValues, directSchema.size());
+    auto temp = directSchema.mapFromNative(IGF.IGM, IGF, eltValues,
+                                           schema.getSILType());
 
     auto &yieldTI = cast<LoadableTypeInfo>(schema.getTypeInfo());
     emitCastToSubstSchema(IGF, temp, yieldTI.getSchema(), out);

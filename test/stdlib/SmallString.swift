@@ -15,19 +15,15 @@ var SmallStringTests = TestSuite("SmallStringTests")
 
 extension String: Error {}
 
-func verifySmallString(_ small: _SmallUTF8String, _ input: String) {
-  expectEqual(_SmallUTF8String.capacity, small.count + small.unusedCapacity)
+func verifySmallString(_ small: _SmallString, _ input: String) {
+  expectEqual(_SmallString.capacity, small.count + small.unusedCapacity)
   let tiny = Array(input.utf8)
   expectEqual(tiny.count, small.count)
   for (lhs, rhs) in zip(tiny, small) {
     expectEqual(lhs, rhs)
   }
-  small.withTranscodedUTF16CodeUnits {
-    let codeUnits = Array(input.utf16)
-    expectEqualSequence(codeUnits, $0)
-  }
 
-  let smallFromUTF16 = _SmallUTF8String(Array(input.utf16))
+  let smallFromUTF16 = _SmallString(Array(input.utf16))
   expectNotNil(smallFromUTF16)
   expectEqualSequence(small, smallFromUTF16!)
 
@@ -41,25 +37,54 @@ func verifySmallString(_ small: _SmallUTF8String, _ input: String) {
       }
     }
   }
+
+  // Test RAC and Mutable
+  var copy = small
+  for i in 0..<small.count / 2 {
+    let tmp = copy[i]
+    copy[i] = copy[copy.count - 1 - i]
+    copy[copy.count - 1 - i] = tmp
+  }
+  expectEqualSequence(small.reversed(), copy)
 }
 
 // Testing helper inits
-extension _SmallUTF8String {
+extension _SmallString {
   init?(_ codeUnits: Array<UInt8>) {
     guard let smol = codeUnits.withUnsafeBufferPointer({
-      return _SmallUTF8String($0)
+      return _SmallString($0)
     }) else {
       return nil
     }
     self = smol
   }
   init?(_ codeUnits: Array<UInt16>) {
-    guard let smol = codeUnits.withUnsafeBufferPointer({
-      return _SmallUTF8String($0)
-    }) else {
+    let str = codeUnits.withUnsafeBufferPointer {
+      return String._uncheckedFromUTF16($0)
+    }
+    if !str._guts.isSmall {
       return nil
     }
-    self = smol
+    self.init(str._guts._object)
+  }
+  init?(_cocoaString ns: NSString) {
+    guard _isObjCTaggedPointer(ns) else { return nil }
+    self.init(taggedCocoa: ns)
+  }
+
+  func _appending(_ other: _SmallString) -> _SmallString? {
+    return _SmallString(self, appending: other)
+  }
+  func _repeated(_ n: Int) -> _SmallString? {
+    var base = self
+    let toAppend = self
+    for _ in 0..<(n &- 1) {
+      guard let s = _SmallString(
+        base, appending: toAppend)
+      else { return nil }
+      base = s
+    }
+    return base
   }
 }
 
@@ -67,13 +92,13 @@ SmallStringTests.test("FitsInSmall") {
   func runTest(_ input: String) throws {
     let tiny = Array(input.utf8)
     // Constructed from UTF-8 code units
-    guard let small = _SmallUTF8String(tiny) else {
+    guard let small = _SmallString(tiny) else {
       throw "Didn't fit"
     }
     verifySmallString(small, input)
 
     // Constructed from UTF-16 code units
-    guard let fromUTF16Small = _SmallUTF8String(Array(input.utf16)) else {
+    guard let fromUTF16Small = _SmallString(Array(input.utf16)) else {
         throw "Failed from utf-16"
     }
     verifySmallString(fromUTF16Small, input)
@@ -81,9 +106,9 @@ SmallStringTests.test("FitsInSmall") {
 
   // Pass tests
   //
-  // TODO(UTF-8 SSO): expectDoesNotThrow({ try runTest("ab😇c") })
+  expectDoesNotThrow({ try runTest("ab😇c") })
   expectDoesNotThrow({ try runTest("0123456789abcde") })
-  // TODO(UTF-8 SSO): expectDoesNotThrow({ try runTest("👨‍👦") })
+  expectDoesNotThrow({ try runTest("👨‍👦") })
   expectDoesNotThrow({ try runTest("") })
 
   // Fail tests
@@ -103,12 +128,12 @@ SmallStringTests.test("FitsInSmall") {
 
 SmallStringTests.test("Bridging") {
   // Test bridging retains small string form
-  func bridge(_ small: _SmallUTF8String) -> String {
-    return _bridgeToCocoa(small) as! String
+  func bridge(_ small: _SmallString) -> String {
+    return String(_StringGuts(small))._bridgeToObjectiveCImpl() as! String
   }
   func runTestSmall(_ input: String) throws {
     // Constructed through CF
-    guard let fromCocoaSmall = _SmallUTF8String(
+    guard let fromCocoaSmall = _SmallString(
       _cocoaString: input as NSString
     ) else {
         throw "Didn't fit"
@@ -120,14 +145,15 @@ SmallStringTests.test("Bridging") {
   // Pass tests
   //
   expectDoesNotThrow({ try runTestSmall("abc") })
-  expectDoesNotThrow({ try runTestSmall("0123456789abcde") })
-  expectDoesNotThrow({ try runTestSmall("\u{0}") })
-  // TODO(UTF-8 SSO): expectDoesNotThrow({ try runTestSmall("👨‍👦") })
-  expectDoesNotThrow({ try runTestSmall("") })
-  // TODO(UTF-8 SSO): expectDoesNotThrow({ try runTestSmall("👨‍👦abcd") })
+  expectDoesNotThrow({ try runTestSmall("defghijk") })
+  expectDoesNotThrow({ try runTestSmall("aaaaaaaaaaa") })
 
   // Fail tests
   //
+  expectThrows("Didn't fit", { try runTestSmall("\u{0}") })
+  expectThrows("Didn't fit", { try runTestSmall("0123456789abcde") })
+  expectThrows("Didn't fit", { try runTestSmall("👨‍👦abcd") })
+  expectThrows("Didn't fit", { try runTestSmall("👨‍👦") })
   expectThrows("Didn't fit", { try runTestSmall("👨‍👩‍👦") })
   expectThrows("Didn't fit", { try runTestSmall("👨‍👦abcde") })
 }
@@ -152,7 +178,7 @@ SmallStringTests.test("Append, repeating") {
     "789012345678901",
     ]
   let smallstrings = strings.compactMap {
-    _SmallUTF8String(Array($0.utf8))
+    _SmallString(Array($0.utf8))
   }
   expectEqual(strings.count, smallstrings.count)
   for (small, str) in zip(smallstrings, strings) {
@@ -163,7 +189,7 @@ SmallStringTests.test("Append, repeating") {
     for j in i..<smallstrings.count {
       let lhs = smallstrings[i]
       let rhs = smallstrings[j]
-      if lhs.count + rhs.count > _SmallUTF8String.capacity {
+      if lhs.count + rhs.count > _SmallString.capacity {
         continue
       }
       verifySmallString(lhs._appending(rhs)!, (strings[i] + strings[j]))

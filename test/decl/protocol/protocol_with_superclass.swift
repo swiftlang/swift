@@ -294,6 +294,12 @@ protocol RefinedProtocol : BaseClass {
   func takesT(_: T)
 }
 
+func takesBaseProtocol(_: BaseProtocol) {}
+
+func passesRefinedProtocol(_ r: RefinedProtocol) {
+  takesBaseProtocol(r)
+}
+
 class RefinedClass : BaseClass, RefinedProtocol {
   func takesT(_: T) {
     _ = T.self

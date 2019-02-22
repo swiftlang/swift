@@ -386,11 +386,11 @@ public:
 };
 
 class ProtocolCompositionTypeRef final : public TypeRef {
-  std::vector<const NominalTypeRef *> Protocols;
+  std::vector<const TypeRef *> Protocols;
   const TypeRef *Superclass;
   bool HasExplicitAnyObject;
 
-  static TypeRefID Profile(std::vector<const NominalTypeRef *> Protocols,
+  static TypeRefID Profile(std::vector<const TypeRef *> Protocols,
                            const TypeRef *Superclass,
                            bool HasExplicitAnyObject) {
     TypeRefID ID;
@@ -403,7 +403,7 @@ class ProtocolCompositionTypeRef final : public TypeRef {
   }
 
 public:
-  ProtocolCompositionTypeRef(std::vector<const NominalTypeRef *> Protocols,
+  ProtocolCompositionTypeRef(std::vector<const TypeRef *> Protocols,
                              const TypeRef *Superclass,
                              bool HasExplicitAnyObject)
     : TypeRef(TypeRefKind::ProtocolComposition),
@@ -412,13 +412,14 @@ public:
 
   template <typename Allocator>
   static const ProtocolCompositionTypeRef *
-  create(Allocator &A, std::vector<const NominalTypeRef *> Protocols,
+  create(Allocator &A, std::vector<const TypeRef *> Protocols,
          const TypeRef *Superclass, bool HasExplicitAnyObject) {
     FIND_OR_CREATE_TYPEREF(A, ProtocolCompositionTypeRef, Protocols,
                            Superclass, HasExplicitAnyObject);
   }
 
-  const std::vector<const NominalTypeRef *> &getProtocols() const {
+  // These are either NominalTypeRef or ObjCProtocolTypeRef.
+  const std::vector<const TypeRef *> &getProtocols() const {
     return Protocols;
   }
 
@@ -630,6 +631,36 @@ public:
 
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::ObjCClass;
+  }
+};
+
+class ObjCProtocolTypeRef final : public TypeRef {
+  std::string Name;
+  static const ObjCProtocolTypeRef *UnnamedSingleton;
+
+  static TypeRefID Profile(const std::string &Name) {
+    TypeRefID ID;
+    ID.addString(Name);
+    return ID;
+  }
+public:
+  ObjCProtocolTypeRef(const std::string &Name)
+    : TypeRef(TypeRefKind::ObjCProtocol), Name(Name) {}
+
+  static const ObjCProtocolTypeRef *getUnnamed();
+
+  template <typename Allocator>
+  static const ObjCProtocolTypeRef *create(Allocator &A,
+                                           const std::string &Name) {
+    FIND_OR_CREATE_TYPEREF(A, ObjCProtocolTypeRef, Name);
+  }
+
+  const std::string &getName() const {
+    return Name;
+  }
+
+  static bool classof(const TypeRef *TR) {
+    return TR->getKind() == TypeRefKind::ObjCProtocol;
   }
 };
 

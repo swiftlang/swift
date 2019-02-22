@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s
+// RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s
 
 // This file contains tests that used to be in ./diagnostics.swift that produced
 // expected errors in the deabstraction pass, which prevented partitioning from

@@ -21,7 +21,8 @@ public let SubstringTest = [
   BenchmarkInfo(name: "LessSubstringSubstringGenericComparable", runFunction: run_LessSubstringSubstringGenericComparable, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "StringFromLongWholeSubstring", runFunction: run_StringFromLongWholeSubstring, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "StringFromLongWholeSubstringGeneric", runFunction: run_StringFromLongWholeSubstringGeneric, tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "SubstringComparable", runFunction: run_SubstringComparable, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "SubstringComparable", runFunction: run_SubstringComparable, tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(_comparison) }),
   BenchmarkInfo(name: "SubstringEqualString", runFunction: run_SubstringEqualString, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "SubstringEquatable", runFunction: run_SubstringEquatable, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "SubstringFromLongString", runFunction: run_SubstringFromLongString, tags: [.validation, .api, .String]),
@@ -79,7 +80,7 @@ private func equivalentWithDistinctBuffers() -> (String, Substring) {
   var s0 = longWide
   withUnsafeMutablePointer(to: &s0) { blackHole($0) }
   s0 += "!"
-  
+
   // These two should be equal but with distinct buffers, both refcounted.
   let a = Substring(s0).dropFirst()
   let b = String(a)
@@ -226,12 +227,13 @@ public func run_SubstringEqualString(_ N: Int) {
   CheckResults(count == 2*N*500)
 }
 
+let _substrings = "pen,pineapple,apple,pen,✒️,🍍,🍏,✒️".split(separator: ",")
+let _comparison = _substrings + ["PPAP"]
+
 @inline(never)
 public func run_SubstringComparable(_ N: Int) {
-	var string = "pen,pineapple,apple,pen"
-	string += ",✒️,🍍,🍏,✒️"
-	let substrings = string.split(separator: ",")
-	let comparison = substrings + ["PPAP"]
+	let substrings = _substrings // without this alias, there was 25% slowdown
+	let comparison = _comparison // due to increased retain/release traffic 🤷‍‍
 	var count = 0
 	for _ in 1...N*500 {
 		if substrings.lexicographicallyPrecedes(comparison) {

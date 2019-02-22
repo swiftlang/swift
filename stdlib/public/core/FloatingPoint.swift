@@ -1722,6 +1722,7 @@ extension FloatingPoint {
   /// - If `x` is `leastNonzeroMagnitude`, then `x.nextDown` is `0.0`.
   /// - If `x` is zero, then `x.nextDown` is `-leastNonzeroMagnitude`.
   /// - If `x` is `-greatestFiniteMagnitude`, then `x.nextDown` is `-infinity`.
+  @inlinable // FIXME(inline-always)
   public var nextDown: Self {
     @inline(__always)
     get {
@@ -1760,6 +1761,7 @@ extension FloatingPoint {
   /// - Parameter other: The value to use when dividing this value.
   /// - Returns: The remainder of this value divided by `other` using
   ///   truncating division.
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public func truncatingRemainder(dividingBy other: Self) -> Self {
     var lhs = self
@@ -1799,6 +1801,7 @@ extension FloatingPoint {
   ///
   /// - Parameter other: The value to use when dividing this value.
   /// - Returns: The remainder of this value divided by `other`.
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public func remainder(dividingBy other: Self) -> Self {
     var lhs = self
@@ -1822,7 +1825,7 @@ extension FloatingPoint {
   /// - Returns: The square root of the value.
   @_transparent
   // SWIFT_ENABLE_TENSORFLOW
-  @differentiable(wrt: (self), adjoint: _adjointSquareRoot
+  @differentiable(wrt: self, vjp: _vjpSquareRoot
                   where Self : Differentiable, Self == Self.CotangentVector)
   public func squareRoot( ) -> Self {
     var lhs = self
@@ -1845,7 +1848,7 @@ extension FloatingPoint {
   /// - Returns: The product of `lhs` and `rhs`, added to this value.
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(wrt: (self, .0, .1), adjoint: _adjointAddingProduct
+  @differentiable(wrt: (self, lhs, rhs), vjp: _vjpAddingProduct
                   where Self : Differentiable, Self == Self.CotangentVector)
   public func addingProduct(_ lhs: Self, _ rhs: Self) -> Self {
     var addend = self
@@ -2025,22 +2028,21 @@ extension FloatingPoint {
 /// SWIFT_ENABLE_TENSORFLOW
 extension FloatingPoint where Self : Differentiable,
                               Self == Self.CotangentVector {
-  /// The adjoint of `addingProduct`. Returns the gradient of `addingProduct`
-  /// with respect to `self`, `lhs` and `rhs`.
+  /// The vector-Jacobian product function of `addingProduct`. Returns the
+  /// original result and pullback of `addingProduct` with respect to `self`,
+  /// `lhs` and `rhs`.
   @inlinable
-  func _adjointAddingProduct(
-    _ adjoint: Self,
-    _ originalValue: Self,
+  func _vjpAddingProduct(
     _ lhs: Self, _ rhs: Self
-  ) -> (Self, Self, Self) {
-    return (1, rhs, lhs)
+  ) -> (Self, (Self) -> (Self, Self, Self)) {
+    return (addingProduct(lhs, rhs), { _ in (1, rhs, lhs) })
   }
 
-  /// The adjoint of `squareRoot`. Returns the gradient of `squareRoot` with
-  /// respect to `self`.
+  /// The vector-Jacobian product function of `squareRoot`. Returns the original
+  /// result and pullback of `squareRoot` with respect to `self`.
   @inlinable // FIXME(sil-serialize-all)
-  func _adjointSquareRoot(_ adjoint: Self, _ originalValue: Self) -> Self {
-    return 2 * self * adjoint
+  func _vjpSquareRoot() -> (Self, (Self) -> Self) {
+    return (squareRoot(), { v in 2 * self * v })
   }
 }
 

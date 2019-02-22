@@ -103,3 +103,38 @@ struct Outer {
 typealias X = Struct1<Pub & Bar>
 _ = Struct1<Pub & Bar>.self
 
+typealias BadAlias<T> = T
+where T : HasAssoc, T.Assoc == HasAssoc
+// expected-error@-1 {{protocol 'HasAssoc' can only be used as a generic constraint because it has Self or associated type requirements}}
+
+struct BadStruct<T>
+where T : HasAssoc,
+      T.Assoc == HasAssoc {}
+// expected-error@-1 {{protocol 'HasAssoc' can only be used as a generic constraint because it has Self or associated type requirements}}
+
+protocol BadProtocol where T == HasAssoc {
+  // expected-error@-1 {{protocol 'HasAssoc' can only be used as a generic constraint because it has Self or associated type requirements}}
+  associatedtype T
+
+  associatedtype U : HasAssoc
+    where U.Assoc == HasAssoc
+  // expected-error@-1 {{protocol 'HasAssoc' can only be used as a generic constraint because it has Self or associated type requirements}}
+}
+
+extension HasAssoc where Assoc == HasAssoc {}
+// expected-error@-1 {{protocol 'HasAssoc' can only be used as a generic constraint because it has Self or associated type requirements}}
+
+func badFunction<T>(_: T)
+where T : HasAssoc,
+      T.Assoc == HasAssoc {}
+// expected-error@-1 {{protocol 'HasAssoc' can only be used as a generic constraint because it has Self or associated type requirements}}
+
+struct BadSubscript {
+  subscript<T>(_: T) -> Int
+  where T : HasAssoc,
+        T.Assoc == HasAssoc {
+    // expected-error@-1 {{protocol 'HasAssoc' can only be used as a generic constraint because it has Self or associated type requirements}}
+    get {}
+    set {}
+  }
+}

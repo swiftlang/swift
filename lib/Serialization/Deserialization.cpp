@@ -473,6 +473,14 @@ ProtocolConformanceRef ModuleFile::readConformance(
     return ProtocolConformanceRef(proto);
   }
 
+  case SELF_PROTOCOL_CONFORMANCE: {
+    DeclID protoID;
+    SelfProtocolConformanceLayout::readRecord(scratch, protoID);
+    auto proto = cast<ProtocolDecl>(getDecl(protoID));
+    auto conformance = getContext().getSelfConformance(proto);
+    return ProtocolConformanceRef(conformance);
+  }
+
   case SPECIALIZED_PROTOCOL_CONFORMANCE: {
     TypeID conformingTypeID;
     SubstitutionMapID substitutionMapID;
@@ -652,39 +660,19 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
   unsigned kind = DeclTypeCursor.readRecord(next.ID, scratch, &blobData);
   if (kind != GENERIC_PARAM_LIST)
     return nullptr;
+  lastRecordOffset.reset();
 
   SmallVector<GenericTypeParamDecl *, 8> params;
 
-  while (true) {
-    lastRecordOffset.reset();
-    bool shouldContinue = true;
-
-    auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-    if (entry.Kind != llvm::BitstreamEntry::Record)
-      break;
-
-    scratch.clear();
-    unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch,
-                                                  &blobData);
-    switch (recordID) {
-    case GENERIC_PARAM: {
-      DeclID paramDeclID;
-      GenericParamLayout::readRecord(scratch, paramDeclID);
-      auto genericParam = cast<GenericTypeParamDecl>(getDecl(paramDeclID));
-      params.push_back(genericParam);
-      break;
-    }
-    default:
-      // This record is not part of the GenericParamList.
-      shouldContinue = false;
-      break;
-    }
-
-    if (!shouldContinue)
-      break;
+  ArrayRef<uint64_t> paramIDs;
+  GenericParamListLayout::readRecord(scratch, paramIDs);
+  for (DeclID nextParamID : paramIDs) {
+    auto genericParam = cast<GenericTypeParamDecl>(getDecl(nextParamID));
+    params.push_back(genericParam);
   }
 
-  // Don't create empty generic parameter lists.
+  // Don't create empty generic parameter lists. (This should never happen in
+  // practice, but it doesn't hurt to be defensive.)
   if (params.empty())
     return nullptr;
 
@@ -2047,22 +2035,6 @@ getActualOptionalTypeKind(uint8_t raw) {
   return None;
 }
 
-static Optional<swift::AddressorKind>
-getActualAddressorKind(uint8_t raw) {
-  switch (serialization::AddressorKind(raw)) {
-  case serialization::AddressorKind::NotAddressor:
-    return swift::AddressorKind::NotAddressor;
-  case serialization::AddressorKind::Unsafe:
-    return swift::AddressorKind::Unsafe;
-  case serialization::AddressorKind::Owning:
-    return swift::AddressorKind::Owning;
-  case serialization::AddressorKind::NativeOwning:
-    return swift::AddressorKind::NativeOwning;
-  }
-
-  return None;
-}
-
 static Optional<swift::SelfAccessKind>
 getActualSelfAccessKind(uint8_t raw) {
   switch (serialization::SelfAccessKind(raw)) {
@@ -2258,6 +2230,15 @@ ModuleFile::getDeclChecked(DeclID DID) {
   return deserialized;
 }
 
+template <typename DERIVED>
+static bool attributeChainContains(DeclAttribute *attr) {
+  DeclAttributes tempAttrs;
+  tempAttrs.setRawAttributeChain(attr);
+  static_assert(std::is_trivially_destructible<DeclAttributes>::value,
+                "must not try to destroy the attribute chain");
+  return tempAttrs.hasAttribute<DERIVED>();
+}
+
 Expected<Decl *>
 ModuleFile::getDeclCheckedImpl(DeclID DID) {
   if (DID == 0)
@@ -2334,9 +2315,33 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     }
   };
 
+  class FilenameForPrivateRAII {
+    Serialized<Decl *> &declOrOffset;
+
+  public:
+    Identifier filename;
+
+    FilenameForPrivateRAII(Serialized<Decl *> &decl) : declOrOffset(decl) {}
+    ~FilenameForPrivateRAII() {
+      if (filename.empty())
+        return;
+      if (!declOrOffset.isComplete())
+        return;
+      auto *valueDecl = dyn_cast<ValueDecl>(declOrOffset.get());
+      if (!valueDecl)
+        return;
+      auto *loadedFile = dyn_cast<LoadedFile>(
+          valueDecl->getDeclContext()->getModuleScopeContext());
+      if (!loadedFile)
+        return;
+      loadedFile->addFilenameForPrivateDecl(valueDecl, filename);
+    }
+  };
+
   PrivateDiscriminatorRAII privateDiscriminatorRAII{*this, declOrOffset};
   LocalDiscriminatorRAII localDiscriminatorRAII(declOrOffset);
   DeserializingEntityRAII deserializingEntity(*this);
+  FilenameForPrivateRAII filenameForPrivate(declOrOffset);
 
   // Local function that handles the "inherited" list for a type.
   auto handleInherited
@@ -2544,68 +2549,86 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       // SWIFT_ENABLE_TENSORFLOW
       case decls_block::Differentiable_DECL_ATTR: {
         bool isImplicit;
-        uint64_t primalNameId;
-        DeclID primalDeclId;
-        uint64_t adjointNameId;
-        DeclID adjointDeclId;
         uint64_t jvpNameId;
         DeclID jvpDeclId;
         uint64_t vjpNameId;
         DeclID vjpDeclId;
-        ArrayRef<uint64_t> paramValues;
+        ArrayRef<uint64_t> parameters;
         SmallVector<Requirement, 4> requirements;
 
         serialization::decls_block::DifferentiableDeclAttrLayout::readRecord(
-            scratch, isImplicit, primalNameId, primalDeclId, adjointNameId,
-            adjointDeclId, jvpNameId, jvpDeclId, vjpNameId, vjpDeclId,
-            paramValues);
+            scratch, isImplicit, jvpNameId, jvpDeclId, vjpNameId, vjpDeclId,
+            parameters);
 
-        using FuncSpecifier = DifferentiableAttr::DeclNameWithLoc;
-        Optional<FuncSpecifier> primal;
-        FuncDecl *primalDecl = nullptr;
-        if (primalNameId != 0 && primalDeclId != 0) {
-          primal = { getIdentifier(primalNameId), DeclNameLoc() };
-          primalDecl = cast<FuncDecl>(getDecl(primalDeclId));
-        }
-        Optional<FuncSpecifier> adjoint;
-        FuncDecl *adjointDecl = nullptr;
-        if (adjointNameId != 0 && adjointDeclId != 0) {
-          adjoint = { getIdentifier(adjointNameId), DeclNameLoc() };
-          adjointDecl = cast<FuncDecl>(getDecl(adjointDeclId));
-        }
-        Optional<FuncSpecifier> jvp;
+        Optional<DeclNameWithLoc> jvp;
         FuncDecl *jvpDecl = nullptr;
         if (jvpNameId != 0 && jvpDeclId != 0) {
           jvp = { getIdentifier(jvpNameId), DeclNameLoc() };
           jvpDecl = cast<FuncDecl>(getDecl(jvpDeclId));
         }
-        Optional<FuncSpecifier> vjp;
+        Optional<DeclNameWithLoc> vjp;
         FuncDecl *vjpDecl = nullptr;
         if (vjpNameId != 0 && vjpDeclId != 0) {
           vjp = { getIdentifier(vjpNameId), DeclNameLoc() };
           vjpDecl = cast<FuncDecl>(getDecl(vjpDeclId));
         }
 
-        SmallVector<AutoDiffParameter, 4> parameters;
-        SourceLoc loc;
-        for (auto paramValue : paramValues) {
-          auto parameter = paramValue & 0x01
-            ? AutoDiffParameter::getSelfParameter(loc)
-            : AutoDiffParameter::getIndexParameter(loc, paramValue >> 1);
-          parameters.push_back(parameter);
-        }
-        // TODO: Deserialize CheckedParameterIndices.
+        llvm::SmallBitVector parametersBitVector(parameters.size());
+        for (unsigned i : indices(parameters))
+          parametersBitVector[i] = parameters[i];
+        auto *indices = AutoDiffParameterIndices::get(parametersBitVector, ctx);
+
         readGenericRequirements(requirements, DeclTypeCursor);
 
         auto diffAttr =
-          DifferentiableAttr::create(ctx, isImplicit, loc, SourceRange(),
-                                     parameters, primal, adjoint, jvp, vjp,
-                                     requirements);
-        diffAttr->setPrimalFunction(primalDecl);
-        diffAttr->setAdjointFunction(adjointDecl);
+            DifferentiableAttr::create(ctx, isImplicit, SourceLoc(),
+                                       SourceRange(), indices, jvp, vjp,
+                                       requirements);
         diffAttr->setJVPFunction(jvpDecl);
         diffAttr->setVJPFunction(vjpDecl);
         Attr = diffAttr;
+        break;
+      }
+
+      // SWIFT_ENABLE_TENSORFLOW
+      case decls_block::Differentiating_DECL_ATTR: {
+        bool isImplicit;
+        uint64_t origNameId;
+        DeclID origDeclId;
+
+        serialization::decls_block::DifferentiatingDeclAttrLayout::readRecord(
+            scratch, isImplicit, origNameId, origDeclId);
+
+        DeclNameWithLoc origName = {getIdentifier(origNameId), DeclNameLoc()};
+        FuncDecl *origDecl = cast<FuncDecl>(getDecl(origDeclId));
+        auto diffAttr = DifferentiatingAttr::create(
+            ctx, isImplicit, SourceLoc(), SourceRange(), origName);
+        diffAttr->setOriginalFunction(origDecl);
+        Attr = diffAttr;
+        break;
+      }
+
+      case decls_block::DynamicReplacement_DECL_ATTR: {
+        bool isImplicit;
+        uint64_t numArgs;
+        ArrayRef<uint64_t> rawPieceIDs;
+        DeclID replacedFunID;
+        serialization::decls_block::DynamicReplacementDeclAttrLayout::
+            readRecord(scratch, isImplicit, replacedFunID, numArgs, rawPieceIDs);
+
+        auto replacedFunDecl = getDeclChecked(replacedFunID);
+        if (!replacedFunDecl)
+          return replacedFunDecl.takeError();
+        auto baseName = getDeclBaseName(rawPieceIDs[0]);
+        SmallVector<Identifier, 4> pieces;
+        for (auto pieceID : rawPieceIDs.slice(1))
+          pieces.push_back(getIdentifier(pieceID));
+
+        assert(numArgs != 0);
+        assert(!isImplicit && "Need to update for implicit");
+        Attr = DynamicReplacementAttr::create(
+            ctx, DeclName(ctx, baseName, ArrayRef<Identifier>(pieces)),
+            cast<AbstractFunctionDecl>(*replacedFunDecl));
         break;
       }
 
@@ -2640,6 +2663,10 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       unsigned discriminator;
       decls_block::LocalDiscriminatorLayout::readRecord(scratch, discriminator);
       localDiscriminatorRAII.discriminator = discriminator;
+    } else if (recordID == decls_block::FILENAME_FOR_PRIVATE) {
+      IdentifierID filenameID;
+      decls_block::FilenameForPrivateLayout::readRecord(scratch, filenameID);
+      filenameForPrivate.filename = getIdentifier(filenameID);
     } else {
       break;
     }
@@ -2718,7 +2745,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
                                                         index);
 
     // Always create GenericTypeParamDecls in the associated module;
-    // maybeReadGenericParams() will reparent them.
+    // the real context will reparent them.
     auto DC = getAssociatedModule();
     auto genericParam = createDecl<GenericTypeParamDecl>(DC,
                                                          getIdentifier(nameID),
@@ -2944,8 +2971,15 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       ctor->setStubImplementation(true);
     if (initKind.hasValue())
       ctor->setInitKind(initKind.getValue());
-    ctor->setOverriddenDecl(cast_or_null<ConstructorDecl>(overridden.get()));
     ctor->setNeedsNewVTableEntry(needsNewVTableEntry);
+
+    ctor->setOverriddenDecl(cast_or_null<ConstructorDecl>(overridden.get()));
+    if (auto *overridden = ctor->getOverriddenDecl()) {
+      if (!attributeChainContains<RequiredAttr>(DAttrs) ||
+          !overridden->isRequired()) {
+        AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
+      }
+    }
 
     if (auto defaultArgumentResilienceExpansion = getActualResilienceExpansion(
             rawDefaultArgumentResilienceExpansion)) {
@@ -3081,12 +3115,13 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     unsigned rawSpecifier;
     TypeID interfaceTypeID;
     bool isVariadic;
+    bool isAutoClosure;
     uint8_t rawDefaultArg;
 
     decls_block::ParamLayout::readRecord(scratch, argNameID, paramNameID,
                                          contextID, rawSpecifier,
                                          interfaceTypeID, isVariadic,
-                                         rawDefaultArg);
+                                         isAutoClosure, rawDefaultArg);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -3117,6 +3152,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
     param->setInterfaceType(paramTy);
     param->setVariadic(isVariadic);
+    param->setAutoClosure(isAutoClosure);
 
     // Decode the default argument kind.
     // FIXME: Default argument expression, if available.
@@ -3136,7 +3172,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     bool isImplicit;
     bool isStatic;
     uint8_t rawStaticSpelling, rawAccessLevel, rawMutModifier;
-    uint8_t rawAccessorKind, rawAddressorKind;
+    uint8_t rawAccessorKind;
     bool isObjC, hasDynamicSelf, hasForcedStaticDispatch, throws;
     unsigned numNameComponentsBiased;
     GenericEnvironmentID genericEnvID;
@@ -3170,7 +3206,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
                                           resultInterfaceTypeID,
                                           overriddenID,
                                           accessorStorageDeclID,
-                                          rawAccessorKind, rawAddressorKind,
+                                          rawAccessorKind,
                                           rawAccessLevel,
                                           needsNewVTableEntry,
                                           rawDefaultArgumentResilienceExpansion,
@@ -3184,7 +3220,6 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     // Parse the accessor-specific fields.
     AbstractStorageDecl *storage = nullptr;
     AccessorKind accessorKind;
-    AddressorKind addressorKind;
     if (isAccessor) {
       auto storageResult = getDeclChecked(accessorStorageDeclID);
       if (!storageResult ||
@@ -3197,13 +3232,6 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
       if (auto accessorKindResult = getActualAccessorKind(rawAccessorKind)) {
         accessorKind = *accessorKindResult;
-      } else {
-        error();
-        return nullptr;
-      }
-
-      if (auto addressorKindResult = getActualAddressorKind(rawAddressorKind)) {
-        addressorKind = *addressorKindResult;
       } else {
         error();
         return nullptr;
@@ -3280,7 +3308,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     } else {
       fn = AccessorDecl::createDeserialized(
         ctx, /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
-        accessorKind, addressorKind, storage,
+        accessorKind, storage,
         /*StaticLoc=*/SourceLoc(), staticSpelling.getValue(),
         /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
         genericParams, DC);
@@ -3980,9 +4008,12 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     // Generic parameter lists are written from outermost to innermost.
     // Keep reading until we run out of generic parameter lists.
     GenericParamList *outerParams = nullptr;
-    while (auto *genericParams = maybeReadGenericParams(DC, outerParams))
+    while (auto *genericParams = maybeReadGenericParams(DC, outerParams)) {
+      // We do this repeatedly to set up the correct DeclContexts for the
+      // GenericTypeParamDecls in the list.
+      extension->setGenericParams(genericParams);
       outerParams = genericParams;
-    extension->setGenericParams(outerParams);
+    }
 
     configureGenericEnvironment(extension, genericEnvID);
 
@@ -4205,6 +4236,21 @@ Optional<swift::ParameterConvention> getActualParameterConvention(uint8_t raw) {
 #undef CASE
   }
   return None;
+}
+
+/// Translate from the serialization SILParameterDifferentiability enumerators,
+/// which are guaranteed to be stable, to the AST ones.
+static Optional<swift::SILParameterDifferentiability>
+getActualSILParameterDifferentiability(uint8_t raw) {
+  switch (serialization::SILParameterDifferentiability(raw)) {
+#define CASE(ID)                                                               \
+  case serialization::SILParameterDifferentiability::ID:                       \
+    return swift::SILParameterDifferentiability::ID;
+  CASE(DifferentiableOrNotApplicable)
+  CASE(NotDifferentiable)
+  }
+  return None;
+#undef CASE
 }
 
 /// Translate from the serialization ResultConvention enumerators,
@@ -4468,14 +4514,12 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     uint8_t rawRepresentation;
 
     // SWIFT_ENABLE_TENSORFLOW
-    bool autoClosure = false, noescape = false, throws = false,
-         differentiable = false;
+    bool noescape = false, throws = false, differentiable = false;
     GenericSignature *genericSig = nullptr;
 
     if (recordID == decls_block::FUNCTION_TYPE) {
       decls_block::FunctionTypeLayout::readRecord(scratch, resultID,
                                                   rawRepresentation,
-                                                  autoClosure,
                                                   noescape,
                                                   // SWIFT_ENABLE_TENSORFLOW
                                                   throws,
@@ -4498,7 +4542,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       return nullptr;
     }
 
-    auto info = FunctionType::ExtInfo(*representation, autoClosure, noescape,
+    auto info = FunctionType::ExtInfo(*representation, noescape,
                                       // SWIFT_ENABLE_TENSORFLOW
                                       throws, differentiable);
 
@@ -4884,8 +4928,10 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       return nullptr;
     }
 
-    auto processParameter = [&](TypeID typeID, uint64_t rawConvention)
-                                  -> llvm::Expected<SILParameterInfo> {
+    // SWIFT_ENABLE_TENSORFLOW
+    auto processParameter =
+        [&](TypeID typeID, uint64_t rawConvention,
+            uint64_t rawParamDiff) -> llvm::Expected<SILParameterInfo> {
       auto convention = getActualParameterConvention(rawConvention);
       if (!convention) {
         error();
@@ -4894,7 +4940,20 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       auto type = getTypeChecked(typeID);
       if (!type)
         return type.takeError();
-      return SILParameterInfo(type.get()->getCanonicalType(), *convention);
+      // SWIFT_ENABLE_TENSORFLOW
+      auto paramDiff =
+          swift::SILParameterDifferentiability::DifferentiableOrNotApplicable;
+      if (differentiable) {
+        auto paramDiffOpt =
+            getActualSILParameterDifferentiability(rawParamDiff);
+        if (!paramDiffOpt) {
+          error();
+          llvm_unreachable("an error is a fatal exit at this point");
+        }
+        paramDiff = *paramDiffOpt;
+      }
+      return SILParameterInfo(type.get()->getCanonicalType(), *convention,
+                              paramDiff);
     };
 
     auto processYield = [&](TypeID typeID, uint64_t rawConvention)
@@ -4924,8 +4983,11 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     };
 
     // Bounds check.  FIXME: overflow
-    if (2 * numParams + 2 * numResults + 2 * unsigned(hasErrorResult)
-          > variableData.size()) {
+    // SWIFT_ENABLE_TENSORFLOW
+    unsigned entriesPerParam = differentiable ? 3 : 2;
+    if (entriesPerParam * numParams + 2 * numResults +
+            2 * unsigned(hasErrorResult) >
+        variableData.size()) {
       error();
       return nullptr;
     }
@@ -4938,7 +5000,11 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     for (unsigned i = 0; i != numParams; ++i) {
       auto typeID = variableData[nextVariableDataIndex++];
       auto rawConvention = variableData[nextVariableDataIndex++];
-      auto param = processParameter(typeID, rawConvention);
+      // SWIFT_ENABLE_TENSORFLOW
+      uint64_t paramDiff = 0;
+      if (differentiable)
+        paramDiff = variableData[nextVariableDataIndex++];
+      auto param = processParameter(typeID, rawConvention, paramDiff);
       if (!param)
         return param.takeError();
       allParams.push_back(param.get());
@@ -5239,10 +5305,9 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   using namespace decls_block;
 
   PrettyStackTraceModuleFile traceModule("While reading from", *this);
-  PrettyStackTraceType trace(getAssociatedModule()->getASTContext(),
-                             "finishing conformance for",
-                             conformance->getType());
-  PrettyStackTraceDecl traceTo("... to", conformance->getProtocol());
+  PrettyStackTraceConformance trace(getAssociatedModule()->getASTContext(),
+                                    "finishing conformance for",
+                                    conformance);
   ++NumNormalProtocolConformancesCompleted;
 
   assert(conformance->isComplete());

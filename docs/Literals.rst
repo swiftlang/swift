@@ -136,8 +136,7 @@ to jump through.
 The default array literal type is always Array, and the default dictionary
 literal type is always Dictionary.
 
-String interpolations are a bit different: they try to individually convert
-each element of the interpolation to the type that adopts
-_ExpressibleByStringInterpolation, then calls the variadic
-``convertFromStringInterpolation`` to put them all together. The default type
+String interpolations are a bit different: they create an instance of 
+``T.StringInterpolation`` and append each segment to it, then initialize
+an instance of ``T`` with that instance. The default type
 for an interpolated literal without context is also ``StringLiteralType``.

@@ -18,6 +18,7 @@ ATTRIBUTE_NODES = [
     #                | specialize-attr-spec-list
     #                | implements-attr-arguments
     #                | differentiable-attr-arguments
+    #                | named-attribute-string-argument
     #              )? ')'?
     Node('Attribute', kind='Syntax',
          description='''
@@ -46,6 +47,8 @@ ATTRIBUTE_NODES = [
                        # SWIFT_ENABLE_TENSORFLOW
                        Child('DifferentiableArguments',
                              kind='DifferentiableAttributeArguments'),
+                       Child('NamedAttributeString',
+                             kind='NamedAttributeStringArgument'),
                    ], description='''
                    The arguments of the attribute. In case the attribute  \
                    takes multiple arguments, they are gather in the \
@@ -99,7 +102,38 @@ ATTRIBUTE_NODES = [
                    A trailing comma if this argument is followed by another one
                    '''),
          ]),
-
+    # The argument of '@_dynamic_replacement(for:)' or '@_private(sourceFile:)'
+    # named-attribute-string-arg -> 'name': string-literal
+    Node('NamedAttributeStringArgument', kind='Syntax',
+         description='''
+         The argument for the `@_dynamic_replacement` or `@_private` \
+         attribute of the form `for: "function()"` or `sourceFile: \
+         "Src.swift"`
+         ''',
+         children=[
+             Child('NameTok', kind='Token',
+                   description='The label of the argument'),
+             Child('Colon', kind='ColonToken',
+                   description='The colon separating the label and the value'),
+             Child('StringOrDeclname', kind='Syntax', node_choices=[
+                 Child('String', kind='StringLiteralToken'),
+                 Child('Declname', kind='DeclName'),
+             ]),
+         ]),
+    Node('DeclName', kind='Syntax', children=[
+         Child('DeclBaseName', kind='Syntax', description='''
+               The base name of the protocol\'s requirement.
+               ''',
+               node_choices=[
+                   Child('Identifier', kind='IdentifierToken'),
+                   Child('Operator', kind='PrefixOperatorToken'),
+               ]),
+         Child('DeclNameArguments', kind='DeclNameArguments',
+               is_optional=True, description='''
+               The argument labels of the protocol\'s requirement if it \
+               is a function requirement.
+               '''),
+         ]),
     # The argument of '@_implements(...)'
     # implements-attr-arguments -> simple-type-identifier ',' 
     #                              (identifier | operator) decl-name-arguments
@@ -151,7 +185,7 @@ ATTRIBUTE_NODES = [
          differentiation parameter list and associated functions.
          ''',
          children=[
-             Child('DiffParams', kind='DifferentiableAttributeDiffParams',
+             Child('DiffParams', kind='DifferentiableAttributeDiffParamsClause',
                    is_optional=True),
              Child('MaybePrimal', kind='DifferentiableAttributeFuncSpecifier',
                    is_optional=True),
@@ -164,10 +198,12 @@ ATTRIBUTE_NODES = [
              Child('WhereClause', kind='GenericWhereClause', is_optional=True),
          ]),
 
-    # differentiable-attr-parameters ->
-    #     'wrt' ':' '(' differentiation-parameter-list ')' ','?
-    Node('DifferentiableAttributeDiffParams', kind='Syntax',
-         description='The parameters to differentiate with respect to.',
+    # differentiable-attr-parameters-clause ->
+    #     'wrt' ':'
+    #     (differentiable-attr-diff-params | differentiable-attr-diff-param)
+    #     ','?
+    Node('DifferentiableAttributeDiffParamsClause', kind='Syntax',
+         description='The clause containing the differentiation parameters.',
          traits=['WithTrailingComma'],
          children=[
              Child('WrtLabel', kind='IdentifierToken',
@@ -175,11 +211,25 @@ ATTRIBUTE_NODES = [
              Child('Colon', kind='ColonToken', description='''
                    The colon separating "wrt" and the parameter list.
                    '''),
+             Child('Parameters', kind='Syntax',
+                   node_choices=[
+                       Child('Parameter',
+                             kind='DifferentiableAttributeDiffParam'),
+                       Child('ParameterList',
+                             kind='DifferentiableAttributeDiffParams'),
+                   ]),
+             Child('TrailingComma', kind='CommaToken', is_optional=True),
+         ]),
+
+    # differentiable-attr-diff-params ->
+    #     '(' differentiable-attr-diff-param-list ')'
+    Node('DifferentiableAttributeDiffParams', kind='Syntax',
+         description='The differentiation parameters.',
+         children=[
              Child('LeftParen', kind='LeftParenToken'),
              Child('DiffParams', kind='DifferentiableAttributeDiffParamList',
                    description='The parameters for differentiation.'),
              Child('RightParen', kind='RightParenToken'),
-             Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
 
     # differentiable-attr-diff-param-list ->
@@ -188,45 +238,34 @@ ATTRIBUTE_NODES = [
          element='DifferentiableAttributeDiffParam'),
 
     # differentiable-attr-diff-param ->
-    #     ('self' | differentiation-index-parameter) ','?
+    #     ('self' | identifer) ','?
     Node('DifferentiableAttributeDiffParam', kind='Syntax',
          description='''
-         A differentiation parameter: either the "self" identifier or a period \
-         followed by an unsigned integer (e.g. `.0`).
+         A differentiation parameter: either the "self" identifier or a \
+         function parameter name.
          ''',
          traits=['WithTrailingComma'],
          children=[
              Child('Parameter', kind='Syntax',
                    node_choices=[
                        Child('Self', kind='SelfToken'),
-                       Child('Index', kind='DifferentiationIndexParam'),
+                       Child('Name', kind='IdentifierToken'),
                    ]),
              Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
 
-    # differentiation-index-param -> '.' integer-literal
-    Node('DifferentiationIndexParam', kind='Syntax',
-         description='''
-         A differentiation index parameter: a period followed by an unsigned \
-         integer (e.g. `.0`)
-         ''',
-         children=[
-             Child('PrefixPeriod', kind='PrefixPeriodToken'),
-             Child('IntegerLiteral', kind='IntegerLiteralToken'),
-         ]),
-
     # differentiation-func-specifier ->
-    #     ('primal' | 'adjoint' | 'jvp' | 'vjp') ':' decl-name ','?
+    #     ('jvp' | 'vjp') ':' decl-name ','?
     # decl-name -> (identifier | operator) decl-name-arguments?
     Node('DifferentiableAttributeFuncSpecifier', kind='Syntax',
          description='''
          A function specifier, consisting of an identifier, colon, and a \
-         function declaration name (e.g. `vjp: foo(_:_:)`.
+         function declaration name (e.g. `vjp: foo(_:_:)`).
          ''',
          traits=['WithTrailingComma'],
          children=[
              Child('Label', kind='IdentifierToken',
-                   text_choices=['primal', 'adjoint', 'jvp', 'vjp']),
+                   text_choices=['jvp', 'vjp']),
              Child('Colon', kind='ColonToken'),
              Child('DeclBaseName', kind='Syntax', description='''
                    The base name of the referenced function.

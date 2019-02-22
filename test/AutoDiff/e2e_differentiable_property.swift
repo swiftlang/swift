@@ -73,14 +73,31 @@ E2EDifferentiablePropertyTests.test("stored property") {
   expectEqual(expectedGrad, actualGrad)
 }
 
+struct GenericMemberWrapper<T : Differentiable> : Differentiable {
+  // Stored property.
+  @differentiable(vjp: vjpX)
+  var x: T
+
+  func vjpX() -> (T, (T.CotangentVector) -> GenericMemberWrapper.CotangentVector) {
+    return (x, { CotangentVector(x: $0) })
+  }
+}
+
+E2EDifferentiablePropertyTests.test("generic stored property") {
+  let actualGrad = gradient(at: GenericMemberWrapper<Float>(x: 1)) { point in
+    return 2 * point.x
+  }
+  let expectedGrad = GenericMemberWrapper<Float>.CotangentVector(x: 2)
+  expectEqual(expectedGrad, actualGrad)
+}
+
+@_fieldwiseDifferentiable
 struct ProductSpaceSelfTangent : VectorNumeric {
   let x, y: Float
 }
 
 extension ProductSpaceSelfTangent : Differentiable {
-  @_fieldwiseProductSpace
   typealias TangentVector = ProductSpaceSelfTangent
-  @_fieldwiseProductSpace
   typealias CotangentVector = ProductSpaceSelfTangent
 }
 
@@ -101,14 +118,13 @@ extension ProductSpaceOtherTangentTangentSpace : Differentiable {
   typealias CotangentVector = ProductSpaceOtherTangentTangentSpace
 }
 
+@_fieldwiseDifferentiable
 struct ProductSpaceOtherTangent {
   let x, y: Float
 }
 
 extension ProductSpaceOtherTangent : Differentiable {
-  @_fieldwiseProductSpace
   typealias TangentVector = ProductSpaceOtherTangentTangentSpace
-  @_fieldwiseProductSpace
   typealias CotangentVector = ProductSpaceOtherTangentTangentSpace
   func moved(along: ProductSpaceOtherTangentTangentSpace) -> ProductSpaceOtherTangent {
     return ProductSpaceOtherTangent(x: x + along.x, y: y + along.y)

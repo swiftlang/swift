@@ -12,162 +12,71 @@
 
 import SwiftShims
 
-extension _StringGuts {
-  @inline(__always)
-  @inlinable
-  public func _bitwiseEqualTo(_ other: _StringGuts) -> Bool {
-    return self.rawBits == other.rawBits
-  }
-
-  @inlinable
-  internal static func isEqual(
-    _ left: _StringGuts, to right: _StringGuts
-  ) -> Bool {
-    // Bitwise equality implies string equality
-    if left._bitwiseEqualTo(right) {
-      return true
-    }
-    if left._isSmall && right._isSmall {
-      // TODO: Ensure normality when adding UTF-8 support
-      _sanityCheck(left._isASCIIOrSmallASCII && right._isASCIIOrSmallASCII,
-        "Need to ensure normality")
-
-      // Equal small strings should be bitwise equal if ASCII
-      return false
-    }
-    return compare(left, to: right) == 0
-  }
-
-  @inlinable
-  internal static func isEqual(
-    _ left: _StringGuts, _ leftRange: Range<Int>,
-    to right: _StringGuts, _ rightRange: Range<Int>
-  ) -> Bool {
-    // Bitwise equality implies string equality
-    if left._bitwiseEqualTo(right) && leftRange == rightRange {
-      return true
-    }
-    return compare(left, leftRange, to: right, rightRange) == 0
-  }
-
-  @inlinable
-  internal static func isLess(
-    _ left: _StringGuts, than right: _StringGuts
-  ) -> Bool {
-    // Bitwise equality implies string equality
-    if left._bitwiseEqualTo(right) {
-      return false
-    }
-    if left._isSmall && right._isSmall {
-      // Small strings compare lexicographically if ASCII
-      return left._smallUTF8String._compare(right._smallUTF8String) == .less
-    }
-    return compare(left, to: right) == -1
-  }
-
-  @inlinable
-  internal static func isLess(
-    _ left: _StringGuts, _ leftRange: Range<Int>,
-    than right: _StringGuts, _ rightRange: Range<Int>
-  ) -> Bool {
-    // Bitwise equality implies string equality
-    if left._bitwiseEqualTo(right) && leftRange == rightRange {
-      return false
-    }
-    return compare(left, leftRange, to: right, rightRange) == -1
-  }
-
-  @inlinable
-  internal static func compare(
-    _ left: _StringGuts, _ leftRange: Range<Int>,
-    to right: _StringGuts, _ rightRange: Range<Int>
-  ) -> Int {
-    defer { _fixLifetime(left) }
-    defer { _fixLifetime(right) }
-
-    if left.isASCII && right.isASCII {
-      let leftASCII = left._unmanagedASCIIView[leftRange]
-      let rightASCII = right._unmanagedASCIIView[rightRange]
-      let result = leftASCII.compareASCII(to: rightASCII)
-      return result
-    }
-
-    let leftBits = left.rawBits
-    let rightBits = right.rawBits
-
-    return _compareUnicode(leftBits, leftRange, rightBits, rightRange)
-  }
-
-  @inlinable
-  internal static func compare(
-    _ left: _StringGuts, to right: _StringGuts
-  ) -> Int {
-    defer { _fixLifetime(left) }
-    defer { _fixLifetime(right) }
-
-    if left.isASCII && right.isASCII {
-      let leftASCII = left._unmanagedASCIIView
-      let rightASCII = right._unmanagedASCIIView
-      let result = leftASCII.compareASCII(to: rightASCII)
-      return result
-    }
-
-    let leftBits = left.rawBits
-    let rightBits = right.rawBits
-
-    return _compareUnicode(leftBits, rightBits)
-  }
-}
-
 extension StringProtocol {
-  @inlinable // FIXME(sil-serialize-all)
-  public static func ==<S: StringProtocol>(lhs: Self, rhs: S) -> Bool {
-    return _StringGuts.isEqual(
-      lhs._wholeString._guts, lhs._encodedOffsetRange,
-      to: rhs._wholeString._guts, rhs._encodedOffsetRange)
+  @inlinable
+  @_specialize(where Self == String, RHS == String)
+  @_specialize(where Self == String, RHS == Substring)
+  @_specialize(where Self == Substring, RHS == String)
+  @_specialize(where Self == Substring, RHS == Substring)
+  @_effects(readonly)
+  public static func == <RHS: StringProtocol>(lhs: Self, rhs: RHS) -> Bool {
+    return _stringCompare(
+      lhs._wholeGuts, lhs._offsetRange,
+      rhs._wholeGuts, rhs._offsetRange,
+      expecting: .equal)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  public static func !=<S: StringProtocol>(lhs: Self, rhs: S) -> Bool {
+  @inlinable @inline(__always) // forward to other operator
+  @_effects(readonly)
+  public static func != <RHS: StringProtocol>(lhs: Self, rhs: RHS) -> Bool {
     return !(lhs == rhs)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  public static func < <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
-    return _StringGuts.isLess(
-      lhs._wholeString._guts, lhs._encodedOffsetRange,
-      than: rhs._wholeString._guts, rhs._encodedOffsetRange)
+  @inlinable
+  @_specialize(where Self == String, RHS == String)
+  @_specialize(where Self == String, RHS == Substring)
+  @_specialize(where Self == Substring, RHS == String)
+  @_specialize(where Self == Substring, RHS == Substring)
+  @_effects(readonly)
+  public static func < <RHS: StringProtocol>(lhs: Self, rhs: RHS) -> Bool {
+    return _stringCompare(
+      lhs._wholeGuts, lhs._offsetRange,
+      rhs._wholeGuts, rhs._offsetRange,
+      expecting: .less)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  public static func > <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
+  @inlinable @inline(__always) // forward to other operator
+  @_effects(readonly)
+  public static func > <RHS: StringProtocol>(lhs: Self, rhs: RHS) -> Bool {
     return rhs < lhs
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  public static func <= <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
+  @inlinable @inline(__always) // forward to other operator
+  @_effects(readonly)
+  public static func <= <RHS: StringProtocol>(lhs: Self, rhs: RHS) -> Bool {
     return !(rhs < lhs)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  public static func >= <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
+  @inlinable @inline(__always) // forward to other operator
+  @_effects(readonly)
+  public static func >= <RHS: StringProtocol>(lhs: Self, rhs: RHS) -> Bool {
     return !(lhs < rhs)
   }
 }
 
 extension String : Equatable {
-  // FIXME: Why do I need this? If I drop it, I get "ambiguous use of operator"
-  @inlinable // FIXME(sil-serialize-all)
-  public static func ==(lhs: String, rhs: String) -> Bool {
-    return _StringGuts.isEqual(lhs._guts, to: rhs._guts)
+  @inlinable @inline(__always) // For the bitwise comparision
+  @_effects(readonly)
+  public static func == (lhs: String, rhs: String) -> Bool {
+    return _stringCompare(lhs._guts, rhs._guts, expecting: .equal)
   }
 }
 
 extension String : Comparable {
-  // FIXME: Why do I need this? If I drop it, I get "ambiguous use of operator"
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable @inline(__always) // For the bitwise comparision
+  @_effects(readonly)
   public static func < (lhs: String, rhs: String) -> Bool {
-    return _StringGuts.isLess(lhs._guts, than: rhs._guts)
+    return _stringCompare(lhs._guts, rhs._guts, expecting: .less)
   }
 }
 

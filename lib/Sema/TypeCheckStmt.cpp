@@ -505,7 +505,8 @@ public:
       Type contextType = yieldType;
       if (yieldResults[i].isInOut()) {
         contextTypePurpose = CTP_YieldByReference;
-        contextType = LValueType::get(contextType);
+        if (!contextType->hasError())
+          contextType = LValueType::get(contextType);
 
         // Check that the yielded expression is a &.
         if ((inout = dyn_cast<InOutExpr>(exprToCheck))) {
@@ -552,6 +553,13 @@ public:
     TS->setSubExpr(E);
     
     return TS;
+  }
+
+  Stmt *visitPoundAssertStmt(PoundAssertStmt *PA) {
+    Expr *C = PA->getCondition();
+    TC.typeCheckCondition(C, DC);
+    PA->setCondition(C);
+    return PA;
   }
     
   Stmt *visitDeferStmt(DeferStmt *DS) {
@@ -1515,12 +1523,12 @@ void TypeChecker::checkDefaultArguments(ParameterList *params,
       continue;
 
     Expr *e = param->getDefaultValue();
-    auto initContext = param->getDefaultArgumentInitContext();
+    auto *initContext = param->getDefaultArgumentInitContext();
 
-    // Type-check the initializer, then flag that we did so.
-    auto resultTy = typeCheckExpression(
-        e, initContext, TypeLoc::withoutLoc(param->getType()),
-        CTP_DefaultParameter);
+    auto resultTy =
+        typeCheckParameterDefault(e, initContext, param->getType(),
+                                  /*isAutoClosure=*/param->isAutoClosure());
+
     if (resultTy) {
       param->setDefaultValue(e);
     } else {
@@ -1838,6 +1846,17 @@ bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
   bool HadError = StmtChecker(*this, closure).typeCheckBody(body);
   if (body) {
     closure->setBody(body, closure->hasSingleExpressionBody());
+  }
+  return HadError;
+}
+
+bool TypeChecker::typeCheckTapBody(TapExpr *expr, DeclContext *DC) {
+  // We intentionally use typeCheckStmt instead of typeCheckBody here
+  // because we want to contextualize TapExprs with the body they're in.
+  BraceStmt *body = expr->getBody();
+  bool HadError = StmtChecker(*this, DC).typeCheckStmt(body);
+  if (body) {
+    expr->setBody(body);
   }
   return HadError;
 }

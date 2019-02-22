@@ -16,6 +16,13 @@
 using namespace swift;
 using namespace swift::syntax;
 
+void SyntaxParsingCache::addEdit(size_t Start, size_t End,
+                                 size_t ReplacementLength) {
+  assert((Edits.empty() || Edits.back().End <= Start) &&
+         "'Start' must be greater than or equal to 'End' of the previous edit");
+  Edits.emplace_back(Start, End, ReplacementLength);
+}
+
 bool SyntaxParsingCache::nodeCanBeReused(const Syntax &Node, size_t NodeStart,
                                          size_t Position,
                                          SyntaxKind Kind) const {
@@ -80,23 +87,31 @@ llvm::Optional<Syntax> SyntaxParsingCache::lookUpFrom(const Syntax &Node,
   return llvm::None;
 }
 
-size_t SyntaxParsingCache::translateToPreEditPosition(
-    size_t PostEditPosition, llvm::SmallVector<SourceEdit, 4> Edits) {
+Optional<size_t>
+SyntaxParsingCache::translateToPreEditPosition(size_t PostEditPosition,
+                                               ArrayRef<SourceEdit> Edits) {
   size_t Position = PostEditPosition;
-  for (auto I = Edits.begin(), E = Edits.end(); I != E; ++I) {
-    auto Edit = *I;
-    if (Edit.End + Edit.ReplacementLength - Edit.originalLength() <= Position) {
-      Position = Position - Edit.ReplacementLength + Edit.originalLength();
-    }
+  for (auto &Edit : Edits) {
+    if (Edit.Start > Position)
+      // Remaining edits doesn't affect the position. (Edits are sorted)
+      break;
+    if (Edit.Start + Edit.ReplacementLength > Position)
+      // This is a position inserted by the edit, and thus doesn't exist in the
+      // pre-edit version of the file.
+      return None;
+
+    Position = Position - Edit.ReplacementLength + Edit.originalLength();
   }
   return Position;
 }
 
 llvm::Optional<Syntax> SyntaxParsingCache::lookUp(size_t NewPosition,
                                                   SyntaxKind Kind) {
-  size_t OldPosition = translateToPreEditPosition(NewPosition, Edits);
+  Optional<size_t> OldPosition = translateToPreEditPosition(NewPosition, Edits);
+  if (!OldPosition.hasValue())
+    return None;
 
-  auto Node = lookUpFrom(OldSyntaxTree, /*NodeStart=*/0, OldPosition, Kind);
+  auto Node = lookUpFrom(OldSyntaxTree, /*NodeStart=*/0, *OldPosition, Kind);
   if (Node.hasValue()) {
     ReusedNodeIds.insert(Node->getId());
   }

@@ -133,6 +133,9 @@ def print_clang_stats : Flag<["-"], "print-clang-stats">,
 
 def serialize_debugging_options : Flag<["-"], "serialize-debugging-options">,
   HelpText<"Always serialize options for debugging (default: only for apps)">;
+def no_serialize_debugging_options :
+  Flag<["-"], "no-serialize-debugging-options">,
+  HelpText<"Never serialize options for debugging (default: only for apps)">;
 
 def autolink_library : Separate<["-"], "autolink-library">,
   HelpText<"Add dependent library">, Flags<[FrontendOption]>;
@@ -304,8 +307,8 @@ def enable_sil_ownership : Flag<["-"], "enable-sil-ownership">,
 def disable_guaranteed_normal_arguments : Flag<["-"], "disable-guaranteed-normal-arguments">,
   HelpText<"If set to true, all normal parameters (except to inits/setters) will be passed at +1">;
 
-def disable_mandatory_semantic_arc_opts : Flag<["-"], "disable-mandatory-semantic-arc-opts">,
-  HelpText<"Disable the mandatory semantic arc optimizer">;
+def enable_mandatory_semantic_arc_opts : Flag<["-"], "enable-mandatory-semantic-arc-opts">,
+  HelpText<"Enable the mandatory semantic arc optimizer">;
 
 def assume_parsing_unqualified_ownership_sil : Flag<["-"], "assume-parsing-unqualified-ownership-sil">,
   HelpText<"Assume unqualified SIL ownership when parsing SIL">;
@@ -318,6 +321,10 @@ def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
   
 def enable_large_loadable_types : Flag<["-"], "enable-large-loadable-types">,
   HelpText<"Enable Large Loadable types IRGen pass">;
+
+def enable_experimental_static_assert :
+  Flag<["-"], "enable-experimental-static-assert">,
+  HelpText<"Enable experimental #assert">;
 
 def enable_experimental_property_behaviors :
   Flag<["-"], "enable-experimental-property-behaviors">,
@@ -353,6 +360,15 @@ def disable_swift3_objc_inference :
   Flag<["-"], "disable-swift3-objc-inference">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable Swift 3's @objc inference rules for NSObject-derived classes and 'dynamic' members (emulates Swift 4 behavior)">;
+
+def enable_implicit_dynamic : Flag<["-"], "enable-implicit-dynamic">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Add 'dynamic' to all declarations">;
+
+def enable_dynamic_replacement_chaining :
+  Flag<["-"], "enable-dynamic-replacement-chaining">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Enable chaining of dynamic replacements">;
 
 def enable_nskeyedarchiver_diagnostics :
   Flag<["-"], "enable-nskeyedarchiver-diagnostics">,
@@ -530,9 +546,6 @@ def enable_verify_exclusivity : Flag<["-"], "enable-verify-exclusivity">,
 
 def disable_verify_exclusivity : Flag<["-"], "disable-verify-exclusivity">,
   HelpText<"Diable verification of access markers used to enforce exclusivity.">;
-
-def enable_key_path_resilience : Flag<["-"], "enable-key-path-resilience">,
-  HelpText<"Enable key path resilience.">;
 
 def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
   Flags<[FrontendOption]>,

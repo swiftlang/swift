@@ -147,6 +147,14 @@ public:
     FOREACH_IMPL_RETURN(getReferencedFunction());
   }
 
+  /// Should we optimize this call.
+  /// Calls to (previous_)dynamic_function_ref have a dynamic target function so
+  /// we should not optimize them.
+  bool canOptimize() const {
+    return !DynamicFunctionRefInst::classof(getCallee()) &&
+      !PreviousDynamicFunctionRefInst::classof(getCallee());
+  }
+
   /// Return the type.
   SILType getType() const { return getSubstCalleeConv().getSILResultType(); }
 

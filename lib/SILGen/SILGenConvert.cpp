@@ -930,6 +930,8 @@ SILGenFunction::emitOpenExistential(
        ArchetypeType *openedArchetype,
        SILType loweredOpenedType,
        AccessKind accessKind) {
+  assert(isInFormalEvaluationScope());
+
   // Open the existential value into the opened archetype value.
   bool isUnique = true;
   bool canConsume;

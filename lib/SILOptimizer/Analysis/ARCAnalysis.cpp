@@ -87,11 +87,6 @@ bool swift::mayDecrementRefCount(SILInstruction *User,
   return true;
 }
 
-bool swift::mayCheckRefCount(SILInstruction *User) {
-  return isa<IsUniqueInst>(User) ||
-         isa<IsEscapingClosureInst>(User);
-}
-
 //===----------------------------------------------------------------------===//
 //                                Use Analysis
 //===----------------------------------------------------------------------===//
@@ -136,6 +131,8 @@ bool swift::canNeverUseValues(SILInstruction *Inst) {
   switch (Inst->getKind()) {
   // These instructions do not use other values.
   case SILInstructionKind::FunctionRefInst:
+  case SILInstructionKind::DynamicFunctionRefInst:
+  case SILInstructionKind::PreviousDynamicFunctionRefInst:
   case SILInstructionKind::IntegerLiteralInst:
   case SILInstructionKind::FloatLiteralInst:
   case SILInstructionKind::StringLiteralInst:

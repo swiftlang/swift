@@ -130,7 +130,7 @@ bb0(%x : $Builtin.Int64):
 }
 
 class IntClass {
-  @sil_stored var value: Builtin.Int32 { get set }
+  @_hasStorage var value: Builtin.Int32 { get set }
   init(value: Builtin.Int32)
   @objc deinit
 }

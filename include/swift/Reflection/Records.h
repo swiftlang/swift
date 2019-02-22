@@ -402,9 +402,22 @@ class BuiltinTypeDescriptor {
 
 public:
   uint32_t Size;
-  uint32_t Alignment;
+
+  // - Least significant 16 bits are the alignment.
+  // - Bit 16 is 'bitwise takable'.
+  // - Remaining bits are reserved.
+  uint32_t AlignmentAndFlags;
+
   uint32_t Stride;
   uint32_t NumExtraInhabitants;
+
+  bool isBitwiseTakable() const {
+    return (AlignmentAndFlags >> 16) & 1;
+  }
+
+  uint32_t getAlignment() const {
+    return AlignmentAndFlags & 0xffff;
+  }
 
   bool hasMangledTypeName() const {
     return TypeName;

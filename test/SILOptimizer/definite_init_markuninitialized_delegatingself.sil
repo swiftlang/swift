@@ -79,7 +79,7 @@ bb0(%0 : @trivial $*MyStruct2, %1 : @trivial $@thin MyStruct2.Type):
 
 // <rdar://problem/20608881> DI miscompiles this testcase into a memory leak
 struct MyStruct3 {
-  @sil_stored var c: C
+  @_hasStorage var c: C
 }
 sil @selfinit_mystruct3 : $@convention(thin) () -> @owned MyStruct3
 

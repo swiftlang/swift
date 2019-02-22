@@ -2083,38 +2083,8 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
     }
   }
 
-  // Try to resolve the witness via explicit definitions.
-  switch (resolveWitnessViaLookup(requirement)) {
-  case ResolveWitnessResult::Success:
-    return;
-
-  case ResolveWitnessResult::ExplicitFailed:
-    Conformance->setInvalid();
-    recordInvalidWitness(requirement);
-    return;
-
-  case ResolveWitnessResult::Missing:
-    // Continue trying below.
-    break;
-  }
-
-  // Try to resolve the witness via derivation.
-  switch (resolveWitnessViaDerivation(requirement)) {
-  case ResolveWitnessResult::Success:
-    return;
-
-  case ResolveWitnessResult::ExplicitFailed:
-    Conformance->setInvalid();
-    recordInvalidWitness(requirement);
-    return;
-
-  case ResolveWitnessResult::Missing:
-    // Continue trying below.
-    break;
-  }
-
-  // Try to resolve the witness via defaults.
-  switch (resolveWitnessViaDefault(requirement)) {
+  // Try to resolve the witness.
+  switch (resolveWitnessTryingAllStrategies(requirement)) {
   case ResolveWitnessResult::Success:
     return;
 
@@ -2125,6 +2095,5 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
 
   case ResolveWitnessResult::Missing:
     llvm_unreachable("Should have failed");
-    break;
   }
 }

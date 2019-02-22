@@ -29,7 +29,7 @@ struct ParseableInterfaceOptions {
   std::string ParseableInterfaceFlags;
 };
 
-llvm::Regex getSwiftInterfaceToolsVersionRegex();
+llvm::Regex getSwiftInterfaceFormatVersionRegex();
 llvm::Regex getSwiftInterfaceModuleFlagsRegex();
 
 /// Emit a stable, parseable interface for \p M, which can be used by a client
@@ -49,6 +49,11 @@ bool emitParseableInterface(raw_ostream &out,
                             ParseableInterfaceOptions const &Opts,
                             ModuleDecl *M);
 
+/// Extract the specified-or-defaulted -module-cache-path that winds up in
+/// the clang importer, for reuse as the .swiftmodule cache path when
+/// building a ParseableInterfaceModuleLoader.
+std::string
+getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 
 /// A ModuleLoader that runs a subordinate \c CompilerInvocation and \c
 /// CompilerInstance to convert .swiftinterface files to .swiftmodule
@@ -66,8 +71,7 @@ class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
   void
   configureSubInvocationAndOutputPaths(CompilerInvocation &SubInvocation,
                                        StringRef InPath,
-                                       llvm::SmallString<128> &OutPath,
-                                       llvm::SmallString<128> &DepPath);
+                                       llvm::SmallString<128> &OutPath);
 
   std::error_code
   openModuleFiles(StringRef DirName, StringRef ModuleFilename,

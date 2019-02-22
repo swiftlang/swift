@@ -172,6 +172,13 @@ static inline bool isReadAccessResultOwned(SGFAccessKind kind) {
   return uint8_t(kind) >= uint8_t(SGFAccessKind::OwnedAddressRead);
 }
 
+/// Given a read access kind, does it require an address result?
+static inline bool isReadAccessResultAddress(SGFAccessKind kind) {
+  assert(isReadAccess(kind));
+  return kind == SGFAccessKind::BorrowedAddressRead ||
+         kind == SGFAccessKind::OwnedAddressRead;
+}
+
 /// Return an address-preferring version of the given access kind.
 static inline SGFAccessKind getAddressAccessKind(SGFAccessKind kind) {
   switch (kind) {
@@ -1152,9 +1159,11 @@ public:
   SILValue emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant) {
     return emitGlobalFunctionRef(loc, constant, getConstantInfo(constant));
   }
-  SILValue emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
-                                 SILConstantInfo constantInfo);
-  
+  SILValue
+  emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
+                        SILConstantInfo constantInfo,
+                        bool callPreviousDynamicReplaceableImpl = false);
+
   /// Returns a reference to a function value that dynamically dispatches
   /// the function in a runtime-modifiable way.
   ManagedValue emitDynamicMethodRef(SILLocation loc, SILDeclRef constant,
@@ -1222,16 +1231,18 @@ public:
 
   RValue emitGetAccessor(SILLocation loc, SILDeclRef getter,
                          SubstitutionMap substitutions,
-                         ArgumentSource &&optionalSelfValue,
-                         bool isSuper, bool isDirectAccessorUse,
-                         PreparedArguments &&optionalSubscripts, SGFContext C);
+                         ArgumentSource &&optionalSelfValue, bool isSuper,
+                         bool isDirectAccessorUse,
+                         PreparedArguments &&optionalSubscripts, SGFContext C,
+                         bool isOnSelfParameter);
 
   void emitSetAccessor(SILLocation loc, SILDeclRef setter,
                        SubstitutionMap substitutions,
                        ArgumentSource &&optionalSelfValue,
                        bool isSuper, bool isDirectAccessorUse,
                        PreparedArguments &&optionalSubscripts,
-                       ArgumentSource &&value);
+                       ArgumentSource &&value,
+                       bool isOnSelfParameter);
 
   bool maybeEmitMaterializeForSetThunk(ProtocolConformanceRef conformance,
                                        SILLinkage linkage,
@@ -1241,21 +1252,19 @@ public:
                                        AccessorDecl *witness,
                                        SubstitutionMap witnessSubs);
 
-  std::pair<ManagedValue,ManagedValue>
-  emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
-                        SubstitutionMap substitutions,
-                        ArgumentSource &&optionalSelfValue,
-                        bool isSuper, bool isDirectAccessorUse,
-                        PreparedArguments &&optionalSubscripts,
-                        SILType addressType);
+  ManagedValue emitAddressorAccessor(
+      SILLocation loc, SILDeclRef addressor, SubstitutionMap substitutions,
+      ArgumentSource &&optionalSelfValue, bool isSuper,
+      bool isDirectAccessorUse, PreparedArguments &&optionalSubscripts,
+      SILType addressType, bool isOnSelfParameter);
 
-  CleanupHandle
-  emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
-                        SubstitutionMap substitutions,
-                        ArgumentSource &&optionalSelfValue,
-                        bool isSuper, bool isDirectAccessorUse,
-                        PreparedArguments &&optionalSubscripts,
-                        SmallVectorImpl<ManagedValue> &yields);
+  CleanupHandle emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
+                                      SubstitutionMap substitutions,
+                                      ArgumentSource &&optionalSelfValue,
+                                      bool isSuper, bool isDirectAccessorUse,
+                                      PreparedArguments &&optionalSubscripts,
+                                      SmallVectorImpl<ManagedValue> &yields,
+                                      bool isOnSelfParameter);
 
   RValue emitApplyConversionFunction(SILLocation loc,
                                      Expr *funcExpr,
@@ -1462,16 +1471,21 @@ public:
                                      ArrayRef<ManagedValue> args,
                                      SGFContext ctx);
 
+  CleanupHandle emitBeginApply(SILLocation loc, ManagedValue fn,
+                               SubstitutionMap subs, ArrayRef<ManagedValue> args,
+                               CanSILFunctionType substFnType,
+                               ApplyOptions options,
+                               SmallVectorImpl<ManagedValue> &yields);
+
   SILValue emitApplyWithRethrow(SILLocation loc, SILValue fn,
                                 SILType substFnType,
                                 SubstitutionMap subs,
                                 ArrayRef<SILValue> args);
 
-  SILValue emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
-                                     SILType substFnType,
-                                     SubstitutionMap subs,
-                                     ArrayRef<SILValue> args,
-                                     SmallVectorImpl<SILValue> &yields);
+  std::pair<SILValue, CleanupHandle>
+  emitBeginApplyWithRethrow(SILLocation loc, SILValue fn, SILType substFnType,
+                            SubstitutionMap subs, ArrayRef<SILValue> args,
+                            SmallVectorImpl<SILValue> &yields);
   void emitEndApplyWithRethrow(SILLocation loc, SILValue token);
 
   /// Emit a literal that applies the various initializers.

@@ -148,16 +148,12 @@ public:
     if (auto *DA = func->getAttrs().getAttribute<DifferentiableAttr>()) {
       asDerived().addMethod(funcDeclRef.asAutoDiffAssociatedFunction(
           AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::JVP,
-              /*differentiationOrder*/ 1,
-              DA->getCheckedParameterIndices(),
-              func->getASTContext())));
+              AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
+              DA->getParameterIndices(), func->getASTContext())));
       asDerived().addMethod(funcDeclRef.asAutoDiffAssociatedFunction(
           AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::VJP,
-              /*differentiationOrder*/ 1,
-              DA->getCheckedParameterIndices(),
-              func->getASTContext())));
+              AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
+              DA->getParameterIndices(), func->getASTContext())));
     }
   }
 

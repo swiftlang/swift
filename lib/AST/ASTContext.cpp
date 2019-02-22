@@ -335,6 +335,9 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
     /// The set of normal protocol conformances.
     llvm::FoldingSet<NormalProtocolConformance> NormalConformances;
 
+    // The set of self protocol conformances.
+    llvm::DenseMap<ProtocolDecl*, SelfProtocolConformance*> SelfConformances;
+
     /// The set of specialized protocol conformances.
     llvm::FoldingSet<SpecializedProtocolConformance> SpecializedConformances;
 
@@ -448,7 +451,8 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
 };
 
 ASTContext::Implementation::Implementation()
-    : IdentifierTable(Allocator), TheSyntaxArena(new SyntaxArena()) {}
+    : IdentifierTable(Allocator),
+      TheSyntaxArena(new syntax::SyntaxArena()) {}
 ASTContext::Implementation::~Implementation() {
   delete Resolver;
 
@@ -978,8 +982,6 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
     M = getLoadedModule(Id_CoreFoundation);
     break;
   // SWIFT_ENABLE_TENSORFLOW
-  case KnownProtocolKind::ParameterGroup:
-  case KnownProtocolKind::Parameterized:
   case KnownProtocolKind::TensorArrayProtocol:
   case KnownProtocolKind::TensorGroup:
   case KnownProtocolKind::TensorFlowDataTypeCompatible:
@@ -1988,6 +1990,19 @@ ASTContext::getConformance(Type conformingType,
   return result;
 }
 
+/// Produce a self-conformance for the given protocol.
+SelfProtocolConformance *
+ASTContext::getSelfConformance(ProtocolDecl *protocol) {
+  auto &selfConformances =
+    getImpl().getArena(AllocationArena::Permanent).SelfConformances;
+  auto &entry = selfConformances[protocol];
+  if (!entry) {
+    entry = new (*this, AllocationArena::Permanent)
+      SelfProtocolConformance(protocol->getDeclaredInterfaceType());
+  }
+  return entry;
+}
+
 /// If one of the ancestor conformances already has a matching type, use
 /// that instead.
 static ProtocolConformance *collapseSpecializedConformance(
@@ -2003,6 +2018,7 @@ static ProtocolConformance *collapseSpecializedConformance(
 
     case ProtocolConformanceKind::Normal:
     case ProtocolConformanceKind::Inherited:
+    case ProtocolConformanceKind::Self:
       // If the conformance matches, return it.
       if (conformance->getType()->isEqual(type)) {
         for (auto subConformance : substitutions.getConformances())
@@ -3826,7 +3842,7 @@ void AnyFunctionType::decomposeInput(
     result.emplace_back(type->getInOutObjectType(), Identifier(),
                         ParameterTypeFlags::fromParameterType(
                           // SWIFT_ENABLE_TENSORFLOW
-                          type, false, ValueOwnership::Default,
+                          type, false, false, ValueOwnership::Default,
                           /*nonDifferentiable*/ false));
     return;
   }
@@ -4176,6 +4192,15 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
              "Cannot return an @noescape function type");
     }
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Make sure that NotDifferentiable parameters only exist on differentiable
+  // functions.
+  if (!ext.isDifferentiable())
+    for (auto param : getParameters())
+      assert(param.getDifferentiability() ==
+                 SILParameterDifferentiability::DifferentiableOrNotApplicable &&
+             "non-differentiable function has NotDifferentiable parameter");
 #endif
 }
 

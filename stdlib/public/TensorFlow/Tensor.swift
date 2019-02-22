@@ -23,6 +23,8 @@ import Glibc
 #endif
 import CTensorFlow
 
+infix operator .== : ComparisonPrecedence
+
 //===----------------------------------------------------------------------===//
 // Tensor
 //===----------------------------------------------------------------------===//
@@ -610,158 +612,6 @@ public extension Tensor where Scalar : Numeric {
 }
 
 //===----------------------------------------------------------------------===//
-// Random initialization
-//===----------------------------------------------------------------------===//
-
-public extension Tensor where Scalar == Int32 {
-  /// Creates a tensor with the specified shape, randomly sampling scalar values
-  /// from a discrete uniform distribution.
-  ///
-  /// - Parameters:
-  ///   - shape: The dimensions of the tensor.
-  ///   - generator: Random number generator to use.
-  ///
-  @inlinable @inline(__always)
-  init<G: RandomNumberGenerator>(randomStandardUniform shape: TensorShape,
-                                 generator: inout G) {
-    self = Tensor(
-      handle: _TFHoistable {
-        let dist = UniformIntegerDistribution<Scalar>()
-        var scalars: [Scalar] = []
-        for _ in 0 ..< shape.contiguousSize {
-          scalars.append(dist.next(using: &generator))
-        }
-        return _TFTensorFromScalars(scalars, shape: shape.dimensions)
-      }
-    ).toAccelerator()
-  }
-
-  /// Creates a tensor with the specified shape, randomly sampling scalar values
-  /// from a discrete uniform distribution, using the default random number
-  /// generator.
-  ///
-  /// - Parameters:
-  ///   - shape: The dimensions of the tensor.
-  ///
-  // FIXME: Simply call above init() function when Hoistable closures capture
-  // mutating references correctly
-  @inlinable @inline(__always)
-  init(randomStandardUniform shape: TensorShape) {
-    self = Tensor(
-      handle: _TFHoistable {
-        let dist = UniformIntegerDistribution<Scalar>()
-        var scalars: [Scalar] = []
-        for _ in 0 ..< shape.contiguousSize {
-          scalars.append(dist.next(using: &ARC4RandomNumberGenerator.global))
-        }
-        return _TFTensorFromScalars(scalars, shape: shape.dimensions)
-      }
-    ).toAccelerator()
-  }
-
-}
-
-public extension Tensor where Scalar : BinaryFloatingPoint,
-                              Scalar.RawSignificand : FixedWidthInteger {
-  /// Creates a tensor with the specified shape, randomly sampling scalar values
-  /// from a uniform distribution between 0 and 1.
-  ///
-  /// - Parameters:
-  ///   - shape: The dimensions of the tensor.
-  ///   - generator: Random number generator to use.
-  ///
-  @inlinable @inline(__always)
-  init<G: RandomNumberGenerator>(randomUniform shape: TensorShape,
-                                 generator: inout G) {
-    self = Tensor(
-      handle: _TFHoistable {
-        let dist = UniformFloatingPointDistribution<Scalar>()
-        var scalars: [Scalar] = []
-        for _ in 0 ..< shape.contiguousSize {
-          scalars.append(dist.next(using: &generator))
-        }
-        return _TFTensorFromScalars(scalars, shape: shape.dimensions)
-      }
-    ).toAccelerator()
-  }
-
-  /// Creates a tensor with the specified shape, randomly sampling scalar values
-  /// from a uniform distribution between 0 and 1, using the default random
-  /// number generator.
-  ///
-  /// - Parameters:
-  ///   - shape: The dimensions of the tensor.
-  ///
-  // FIXME: Simply call above init() function when Hoistable closures capture
-  // mutating references correctly
-  @inlinable @inline(__always)
-  init(randomUniform shape: TensorShape) {
-    self = Tensor(
-      handle: _TFHoistable {
-        let dist = UniformFloatingPointDistribution<Scalar>()
-        var scalars: [Scalar] = []
-        for _ in 0 ..< shape.contiguousSize {
-          scalars.append(dist.next(using: &ARC4RandomNumberGenerator.global))
-        }
-        return _TFTensorFromScalars(scalars, shape: shape.dimensions)
-      }
-    ).toAccelerator()
-  }
-
-  /// Creates a tensor with the specified shape, randomly sampling scalar values
-  /// from a normal distribution.
-  ///
-  /// - Parameters:
-  ///   - shape: The dimensions of the tensor.
-  ///   - mean: The mean of the distribution.
-  ///   - stddev: The standard deviation of the distribution.
-  ///   - generator: Random number generator to use.
-  ///
-  @inlinable @inline(__always)
-  init<G: RandomNumberGenerator>(randomNormal shape: TensorShape,
-                                 mean: Scalar = 0,
-                                 stddev: Scalar = 1,
-                                 generator: inout G) {
-    self = Tensor(
-      handle: _TFHoistable {
-        let dist = NormalDistribution<Scalar>(
-          mean: mean, standardDeviation: stddev)
-        var scalars: [Scalar] = []
-        for _ in 0 ..< shape.contiguousSize {
-          scalars.append(dist.next(using: &generator))
-        }
-        return _TFTensorFromScalars(scalars, shape: shape.dimensions)
-      }
-    ).toAccelerator()
-  }
-
-  /// Creates a tensor with the specified shape, randomly sampling scalar values
-  /// from a normal distribution, using the default random number generator.
-  ///
-  /// - Parameters:
-  ///   - shape: The dimensions of the tensor.
-  ///   - mean: The mean of the distribution.
-  ///   - stddev: The standard deviation of the distribution.
-  ///
-  // FIXME: Simply call above init() function when Hoistable closures capture
-  // mutating references correctly
-  @inlinable @inline(__always)
-  init(randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1) {
-    self = Tensor(
-      handle: _TFHoistable {
-        let dist = NormalDistribution<Scalar>(
-          mean: mean, standardDeviation: stddev)
-        var scalars: [Scalar] = []
-        for _ in 0 ..< shape.contiguousSize {
-          scalars.append(dist.next(using: &ARC4RandomNumberGenerator.global))
-        }
-        return _TFTensorFromScalars(scalars, shape: shape.dimensions)
-      }
-    ).toAccelerator()
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // Shape transformations
 //===----------------------------------------------------------------------===//
 
@@ -795,7 +645,7 @@ public extension Tensor {
   /// - Precondition: The number of scalars matches the new shape.
   @inlinable @inline(__always)
   @differentiable(
-    wrt: (self), adjoint: _adjointReshaped(seed:originalValue:toShape:)
+    wrt: self, vjp: _vjpReshaped(toShape:)
     where Scalar : Differentiable & FloatingPoint
   )
   func reshaped(toShape newShape: Tensor<Int32>) -> Tensor {
@@ -819,7 +669,7 @@ public extension Tensor {
   /// specified shape index.
   @inlinable @inline(__always)
   @differentiable(
-    wrt: (self), adjoint: _adjointExpandingShape(seed:originalValue:at:)
+    wrt: self, vjp: _vjpExpandingShape(at:)
     where Scalar : Differentiable & FloatingPoint
   )
   func expandingShape(at shapeIndex: Int32) -> Tensor {
@@ -930,6 +780,8 @@ public extension Tensor {
     @inline(__always)
     get {
       debugLog("Returning a host copy of array.")
+      internalConsistencyCheck(toHost().handle.isConcrete)
+
       // This is considered to be a well known way to produce a copy to the
       // host, so an "implicit copy to host" warning should not be produced.
       return toHost().handle.makeHostCopy()

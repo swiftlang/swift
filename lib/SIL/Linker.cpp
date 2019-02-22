@@ -173,6 +173,16 @@ void SILLinkerVisitor::visitFunctionRefInst(FunctionRefInst *FRI) {
   maybeAddFunctionToWorklist(FRI->getReferencedFunction());
 }
 
+void SILLinkerVisitor::visitDynamicFunctionRefInst(
+    DynamicFunctionRefInst *FRI) {
+  maybeAddFunctionToWorklist(FRI->getReferencedFunction());
+}
+
+void SILLinkerVisitor::visitPreviousDynamicFunctionRefInst(
+    PreviousDynamicFunctionRefInst *FRI) {
+  maybeAddFunctionToWorklist(FRI->getReferencedFunction());
+}
+
 // Eagerly visiting all used conformances leads to a large blowup
 // in the amount of SIL we read in. For optimization purposes we can defer
 // reading in most conformances until we need them for devirtualization.

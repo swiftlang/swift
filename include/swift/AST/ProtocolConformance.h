@@ -35,6 +35,7 @@ class ASTContext;
 class DiagnosticEngine;
 class GenericParamList;
 class NormalProtocolConformance;
+class RootProtocolConformance;
 class ProtocolConformance;
 class ModuleDecl;
 class SubstitutableType;
@@ -58,6 +59,8 @@ enum class ProtocolConformanceKind {
   /// "Normal" conformance of a (possibly generic) nominal type, which
   /// contains complete mappings.
   Normal,
+  /// Self-conformance of a protocol to itself.
+  Self,
   /// Conformance for a specialization of a generic type, which projects the
   /// underlying generic conformance.
   Specialized,
@@ -259,6 +262,7 @@ public:
   SubstitutionMap getSubstitutions(ModuleDecl *M) const;
 
   /// Get the underlying normal conformance.
+  /// FIXME: remove uses of this.
   const NormalProtocolConformance *getRootNormalConformance() const;
 
   /// Get the underlying normal conformance.
@@ -266,6 +270,15 @@ public:
     return const_cast<NormalProtocolConformance *>(
              const_cast<const ProtocolConformance *>(this)
                ->getRootNormalConformance());
+  }
+
+  /// Get the underlying root conformance.
+  const RootProtocolConformance *getRootConformance() const;
+
+  /// Get the underlying root conformance.
+  RootProtocolConformance *getRootConformance() {
+    return const_cast<RootProtocolConformance *>(
+      const_cast<const ProtocolConformance *>(this)->getRootConformance());
   }
 
   /// Determine whether this protocol conformance is visible from the
@@ -322,6 +335,68 @@ public:
   void dump(llvm::raw_ostream &out, unsigned indent = 0) const;
 };
 
+/// A "root" protocol conformance states some sort of ground truth
+/// about the conforming type and the required protocol.  Either:
+///
+/// - the type is directly declared to conform to the protocol (a
+///   normal conformance) or
+/// - the protocol's existential type is known to conform to itself (a
+///   self-conformance).
+class RootProtocolConformance : public ProtocolConformance {
+protected:
+  RootProtocolConformance(ProtocolConformanceKind kind, Type conformingType)
+    : ProtocolConformance(kind, conformingType) {}
+
+public:
+  /// Retrieve the location of this conformance.
+  SourceLoc getLoc() const;
+
+  /// Is this a behavior conformance?
+  bool isBehaviorConformance() const;
+
+  bool isInvalid() const;
+
+  bool hasWitness(ValueDecl *requirement) const;
+  Witness getWitness(ValueDecl *requirement, LazyResolver *resolver) const;
+
+  /// Retrieve the witness corresponding to the given value requirement.
+  /// TODO: maybe this should return a Witness?
+  ConcreteDeclRef getWitnessDeclRef(ValueDecl *requirement,
+                                    LazyResolver *resolver) const;
+
+  /// Apply the given function object to each value witness within this
+  /// protocol conformance.
+  ///
+  /// The function object should accept a \c ValueDecl* for the requirement
+  /// followed by the \c Witness for the witness. Note that a generic
+  /// witness will only be specialized if the conformance came from the current
+  /// file.
+  template<typename F>
+  void forEachValueWitness(LazyResolver *resolver, F f) const {
+    const ProtocolDecl *protocol = getProtocol();
+    for (auto req : protocol->getMembers()) {
+      auto valueReq = dyn_cast<ValueDecl>(req);
+      if (!valueReq || isa<AssociatedTypeDecl>(valueReq) ||
+          valueReq->isInvalid())
+        continue;
+
+      if (!valueReq->isProtocolRequirement())
+        continue;
+
+      // If we don't have and cannot resolve witnesses, skip it.
+      if (!resolver && !hasWitness(valueReq))
+        continue;
+
+      f(valueReq, getWitness(valueReq, resolver));
+    }
+  }
+
+  static bool classof(const ProtocolConformance *conformance) {
+    return conformance->getKind() == ProtocolConformanceKind::Normal ||
+           conformance->getKind() == ProtocolConformanceKind::Self;
+  }
+};
+
 /// Normal protocol conformance, which involves mapping each of the protocol
 /// requirements to a witness.
 ///
@@ -337,7 +412,7 @@ public:
 /// Here, there is a normal protocol conformance for both \c A and \c B<T>,
 /// providing the witnesses \c A.foo and \c B<T>.foo, respectively, for the
 /// requirement \c foo.
-class NormalProtocolConformance : public ProtocolConformance,
+class NormalProtocolConformance : public RootProtocolConformance,
                                   public llvm::FoldingSetNode
 {
   /// \brief The protocol being conformed to and its current state.
@@ -406,7 +481,7 @@ class NormalProtocolConformance : public ProtocolConformance,
   NormalProtocolConformance(Type conformingType, ProtocolDecl *protocol,
                             SourceLoc loc, DeclContext *dc,
                             ProtocolConformanceState state)
-    : ProtocolConformance(ProtocolConformanceKind::Normal, conformingType),
+    : RootProtocolConformance(ProtocolConformanceKind::Normal, conformingType),
       ProtocolAndState(protocol, state), Loc(loc), ContextAndInvalid(dc, false)
   {
     assert(!conformingType->hasArchetype() &&
@@ -417,7 +492,7 @@ class NormalProtocolConformance : public ProtocolConformance,
                             ProtocolDecl *protocol,
                             SourceLoc loc, AbstractStorageDecl *behaviorStorage,
                             ProtocolConformanceState state)
-    : ProtocolConformance(ProtocolConformanceKind::Normal, conformingType),
+    : RootProtocolConformance(ProtocolConformanceKind::Normal, conformingType),
       ProtocolAndState(protocol, state), Loc(loc),
       ContextAndInvalid(behaviorStorage, false)
   {
@@ -549,6 +624,10 @@ public:
   /// modules, but in a manner that ensures that all copies are equivalent.
   bool isSynthesizedNonUnique() const;
 
+  /// Whether clients from outside the module can rely on the value witnesses
+  /// being consistent across versions of the framework.
+  bool isResilient() const;
+
   /// Retrieve the type witness and type decl (if one exists)
   /// for the given associated type.
   std::pair<Type, TypeDecl *>
@@ -575,8 +654,6 @@ public:
 
   /// Retrieve the value witness corresponding to the given requirement.
   Witness getWitness(ValueDecl *requirement, LazyResolver *resolver) const;
-  ConcreteDeclRef getWitnessDeclRef(ValueDecl *requirement,
-                                    LazyResolver *resolver) const;
 
   /// Determine whether the protocol conformance has a witness for the given
   /// requirement.
@@ -588,33 +665,6 @@ public:
 
   /// Set the witness for the given requirement.
   void setWitness(ValueDecl *requirement, Witness witness) const;
-
-  /// Apply the given function object to each value witness within this
-  /// protocol conformance.
-  ///
-  /// The function object should accept a \c ValueDecl* for the requirement
-  /// followed by the \c Witness for the witness. Note that a generic
-  /// witness will only be specialized if the conformance came from the current
-  /// file.
-  template<typename F>
-  void forEachValueWitness(LazyResolver *resolver, F f) const {
-    const ProtocolDecl *protocol = getProtocol();
-    for (auto req : protocol->getMembers()) {
-      auto valueReq = dyn_cast<ValueDecl>(req);
-      if (!valueReq || isa<AssociatedTypeDecl>(valueReq) ||
-          valueReq->isInvalid())
-        continue;
-
-      if (!valueReq->isProtocolRequirement())
-        continue;
-
-      // If we don't have and cannot resolve witnesses, skip it.
-      if (!resolver && !hasWitness(valueReq))
-        continue;
-
-      f(valueReq, getWitness(valueReq, resolver));
-    }
-  }
 
   /// Retrieve the protocol conformances that satisfy the requirements of the
   /// protocol, which line up with the conformance constraints in the
@@ -665,6 +715,104 @@ public:
     return conformance->getKind() == ProtocolConformanceKind::Normal;
   }
 };
+
+/// The conformance of a protocol to itself.
+///
+/// For now, we generally do not use this type in ProtocolConformanceRefs;
+/// it's only used to anchor structures relating to emitting witness tables
+/// for self-conformances.
+class SelfProtocolConformance : public RootProtocolConformance {
+  friend class ASTContext;
+
+  SelfProtocolConformance(Type conformingType)
+    : RootProtocolConformance(ProtocolConformanceKind::Self, conformingType) {
+  }
+
+public:
+  /// Get the protocol being conformed to.
+  ProtocolDecl *getProtocol() const {
+    return getType()->castTo<ProtocolType>()->getDecl();
+  }
+
+  /// Get the declaration context in which this conformance was declared.
+  DeclContext *getDeclContext() const {
+    return getProtocol();
+  }
+
+  /// Retrieve the location of this conformance.
+  SourceLoc getLoc() const {
+    return getProtocol()->getLoc();
+  }
+
+  ProtocolConformanceState getState() const {
+    return ProtocolConformanceState::Complete;
+  }
+
+  bool isInvalid() const {
+    return false;
+  }
+
+  ConformanceEntryKind getSourceKind() const {
+    return ConformanceEntryKind::Explicit; // FIXME?
+  }
+
+  NormalProtocolConformance *getImplyingConformance() const {
+    llvm_unreachable("never an implied conformance");
+  }
+
+  bool hasTypeWitness(AssociatedTypeDecl *assocType,
+                      LazyResolver *resolver) const {
+    llvm_unreachable("self-conformances never have associated types");
+  }
+
+  std::pair<Type, TypeDecl *>
+  getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
+                        LazyResolver *resolver,
+                        SubstOptions options) const {
+    llvm_unreachable("self-conformances never have associated types");
+  }
+
+  Type getTypeWitness(AssociatedTypeDecl *assocType,
+                      LazyResolver *resolver,
+                      SubstOptions options) const {
+    llvm_unreachable("self-conformances never have associated types");
+  }
+
+  bool usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
+    llvm_unreachable("self-conformances never have associated types");
+  }
+
+  ProtocolConformanceRef getAssociatedConformance(Type assocType,
+                                                  ProtocolDecl *protocol,
+                                                  LazyResolver *resolver) const{
+    llvm_unreachable("self-conformances never have associated types");
+  }
+
+  bool hasWitness(ValueDecl *requirement) const {
+    return true;
+  }
+  Witness getWitness(ValueDecl *requirement, LazyResolver *resolver) const;
+
+  Optional<ArrayRef<Requirement>> getConditionalRequirementsIfAvailable() const{
+    return ArrayRef<Requirement>();
+  }
+
+  /// Get any additional requirements that are required for this conformance to
+  /// be satisfied.
+  ArrayRef<Requirement> getConditionalRequirements() const {
+    return ArrayRef<Requirement>();
+  }
+
+  static bool classof(const ProtocolConformance *conformance) {
+    return conformance->getKind() == ProtocolConformanceKind::Self;
+  }
+};
+
+inline bool RootProtocolConformance::isBehaviorConformance() const {
+  if (auto normal = dyn_cast<NormalProtocolConformance>(this))
+    return normal->isBehaviorConformance();
+  return false;
+}
 
 /// Specialized protocol conformance, which projects a generic protocol
 /// conformance to one of the specializations of the generic type.
@@ -930,11 +1078,11 @@ public:
 };
 
 inline bool ProtocolConformance::isInvalid() const {
-  return getRootNormalConformance()->isInvalid();
+  return getRootConformance()->isInvalid();
 }
 
 inline bool ProtocolConformance::hasWitness(ValueDecl *requirement) const {
-  return getRootNormalConformance()->hasWitness(requirement);
+  return getRootConformance()->hasWitness(requirement);
 }
 
 } // end namespace swift

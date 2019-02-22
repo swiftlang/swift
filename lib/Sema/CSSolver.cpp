@@ -1550,6 +1550,7 @@ void ConstraintSystem::ArgumentInfoCollector::walk(Type argType) {
       case ConstraintKind::CheckedCast:
       case ConstraintKind::OpenedExistentialOf:
       case ConstraintKind::ApplicableFunction:
+      case ConstraintKind::DynamicCallableApplicableFunction:
       case ConstraintKind::BindOverload:
       case ConstraintKind::FunctionInput:
       case ConstraintKind::FunctionResult:
@@ -1750,6 +1751,9 @@ void ConstraintSystem::sortDesignatedTypes(
 
   for (auto *protocol : argInfo.getLiteralProtocols()) {
     auto defaultType = TC.getDefaultType(protocol, DC);
+    // ExpressibleByNilLiteral does not have a default type.
+    if (!defaultType)
+      continue;
     auto *nominal = defaultType->getAnyNominal();
     for (size_t i = nextType + 1; i < nominalTypes.size(); ++i) {
       if (nominal == nominalTypes[i]) {
@@ -1784,10 +1788,7 @@ void ConstraintSystem::partitionForDesignatedTypes(
     auto *funcDecl = cast<FuncDecl>(decl);
 
     auto *parentDC = funcDecl->getParent();
-    auto *parentDecl = parentDC->getAsDecl();
-
-    if (parentDC->isExtensionContext())
-      parentDecl = cast<ExtensionDecl>(parentDecl)->getExtendedNominal();
+    auto *parentDecl = parentDC->getSelfNominalTypeDecl();
 
     for (auto designatedTypeIndex : indices(designatedNominalTypes)) {
       auto *designatedNominal =
@@ -1797,7 +1798,7 @@ void ConstraintSystem::partitionForDesignatedTypes(
         continue;
 
       auto &constraints =
-          parentDC->isExtensionContext()
+          isa<ExtensionDecl>(parentDC)
               ? definedInExtensionOfDesignatedType[designatedTypeIndex]
               : definedInDesignatedType[designatedTypeIndex];
 
@@ -1841,8 +1842,7 @@ void ConstraintSystem::partitionDisjunction(
     PartitionBeginning.push_back(0);
   };
 
-  if (!getASTContext().isSwiftVersionAtLeast(5) ||
-      !TC.getLangOpts().SolverEnableOperatorDesignatedTypes ||
+  if (!TC.getLangOpts().SolverEnableOperatorDesignatedTypes ||
       !isOperatorBindOverload(Choices[0])) {
     originalOrdering();
     return;
@@ -1947,12 +1947,19 @@ Constraint *ConstraintSystem::selectDisjunction() {
   if (disjunctions.empty())
     return nullptr;
 
-  if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
-    return disjunction;
-
-  if (getASTContext().isSwiftVersionAtLeast(5))
+  // Attempt apply disjunctions first. When we have operators with
+  // designated types, this is important, because it allows us to
+  // select all the preferred operator overloads prior to other
+  // disjunctions that we may not be able to short-circuit, allowing
+  // us to eliminate behavior that is exponential in the number of
+  // operators in the expression.
+  if (getASTContext().isSwiftVersionAtLeast(5) ||
+      TC.getLangOpts().SolverEnableOperatorDesignatedTypes)
     if (auto *disjunction = selectApplyDisjunction())
       return disjunction;
+
+  if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
+    return disjunction;
 
   // Pick the disjunction with the smallest number of active choices.
   auto minDisjunction =

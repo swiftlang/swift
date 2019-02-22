@@ -54,7 +54,7 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
   SILGenFunctionBuilder builder(*this);
   auto F = builder.getOrCreateFunction(
       constant.getDecl(), name, SILLinkage::Shared, constantTy, IsBare,
-      IsTransparent, IsSerializable, ProfileCounter(), IsThunk);
+      IsTransparent, IsSerializable, IsNotDynamic, ProfileCounter(), IsThunk);
 
   if (F->empty()) {
     // Emit the thunk if we haven't yet.
@@ -76,14 +76,14 @@ SILGenFunction::emitDynamicMethodRef(SILLocation loc, SILDeclRef constant,
   if (constant.isForeignToNativeThunk()) {
     if (!SGM.hasFunction(constant))
       SGM.emitForeignToNativeThunk(constant);
-    return ManagedValue::forUnmanaged(
-        B.createFunctionRef(loc, SGM.getFunction(constant, NotForDefinition)));
+    return ManagedValue::forUnmanaged(B.createFunctionRefFor(
+        loc, SGM.getFunction(constant, NotForDefinition)));
   }
 
   // Otherwise, we need a dynamic dispatch thunk.
   SILFunction *F = SGM.getDynamicThunk(constant, constantTy);
 
-  return ManagedValue::forUnmanaged(B.createFunctionRef(loc, F));
+  return ManagedValue::forUnmanaged(B.createFunctionRefFor(loc, F));
 }
 
 static ManagedValue getNextUncurryLevelRef(SILGenFunction &SGF, SILLocation loc,
@@ -113,8 +113,9 @@ static ManagedValue getNextUncurryLevelRef(SILGenFunction &SGF, SILLocation loc,
   if (auto *func = dyn_cast<AbstractFunctionDecl>(vd)) {
     if (getMethodDispatch(func) == MethodDispatch::Class) {
       // Use the dynamic thunk if dynamic.
-      if (vd->isDynamic())
+      if (vd->isObjCDynamic()) {
         return SGF.emitDynamicMethodRef(loc, next, constantInfo.SILFnType);
+      }
 
       auto methodTy = SGF.SGM.Types.getConstantOverrideType(next);
       SILValue result =
@@ -208,52 +209,6 @@ void SILGenModule::emitCurryThunk(SILDeclRef constant) {
 
   SILGenFunction(*this, *f, SwiftModule).emitCurryThunk(constant);
   postEmitFunction(constant, f);
-
-  // SWIFT_ENABLE_TENSORFLOW
-  // If we emitted a curry thunk for a differentiable function, then also emit a
-  // curry thunk for its VJP and mark that as the VJP of the curry thunk.
-  auto *DA = fd->getAttrs().getAttribute<DifferentiableAttr>();
-  if (!DA)
-    return;
-
-  if (constant.autoDiffAssociatedFunctionIdentifier)
-    return;
-
-  // FIXME: When the underyling uncurried function is in a different module,
-  // `DA->getCheckedParameterIndices()` is `nullptr` so we can't generate the
-  // VJP of the curry thunk.
-  if (!DA->getCheckedParameterIndices())
-    return;
-
-  SmallVector<SILDeclRef, 2> assocFnConstants;
-  for (auto kind : {AutoDiffAssociatedFunctionKind::JVP,
-                    AutoDiffAssociatedFunctionKind::VJP}) {
-    auto *autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
-        kind, /*differentiationOrder*/ 1, DA->getCheckedParameterIndices(),
-        SwiftModule->getASTContext());
-    auto assocFnConstant =
-        constant.asAutoDiffAssociatedFunction(autoDiffFuncId);
-    emitCurryThunk(assocFnConstant);
-    assocFnConstants.push_back(assocFnConstant);
-  }
-
-  SmallVector<StringRef, 2> assocFnNames;
-  for (auto assocFnConstant : assocFnConstants)
-    assocFnNames.push_back(SwiftModule->getASTContext()
-                               .getIdentifier(assocFnConstant.mangle())
-                               .str());
-
-  auto loweredParamIndices = DA->getCheckedParameterIndices()->getLowered(
-      fd->getInterfaceType()->castTo<AnyFunctionType>());
-  auto *SILDA = SILDifferentiableAttr::create(
-      M, SILAutoDiffIndices(/*source*/ 0, loweredParamIndices),
-      /*requirements*/ DA->getRequirements(),
-      /*primalName*/ StringRef(),
-      /*adjointName*/ StringRef(),
-      /*adjointIsPrimitive*/ false,
-      /*jvpName*/ assocFnNames[0],
-      /*vjpName*/ assocFnNames[1]);
-  f->addDifferentiableAttr(SILDA);
 }
 
 void SILGenModule::emitForeignToNativeThunk(SILDeclRef thunk) {
@@ -286,9 +241,10 @@ void SILGenModule::emitNativeToForeignThunk(SILDeclRef thunk) {
   postEmitFunction(thunk, f);
 }
 
-SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
-                                               SILDeclRef constant,
-                                               SILConstantInfo constantInfo) {
+SILValue
+SILGenFunction::emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
+                                      SILConstantInfo constantInfo,
+                                      bool callPreviousDynamicReplaceableImpl) {
   assert(constantInfo == getConstantInfo(constant));
 
   // Builtins must be fully applied at the point of reference.
@@ -314,7 +270,10 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
 
   auto f = SGM.getFunction(constant, NotForDefinition);
   assert(f->getLoweredFunctionType() == constantInfo.SILFnType);
-  return B.createFunctionRef(loc, f);
+  if (callPreviousDynamicReplaceableImpl)
+    return B.createPreviousDynamicFunctionRef(loc, f);
+  else
+    return B.createFunctionRefFor(loc, f);
 }
 
 SILFunction *SILGenModule::
@@ -343,5 +302,5 @@ getOrCreateReabstractionThunk(CanSILFunctionType thunkType,
   SILGenFunctionBuilder builder(*this);
   return builder.getOrCreateSharedFunction(
       loc, name, thunkDeclType, IsBare, IsTransparent, IsSerializable,
-      ProfileCounter(), IsReabstractionThunk);
+      ProfileCounter(), IsReabstractionThunk, IsNotDynamic);
 }

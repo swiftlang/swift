@@ -3,10 +3,18 @@
 
 import StdlibUnittest
 import StdlibCollectionUnittest
+import SwiftShims // for swift_stdlib_random
 
 let RandomTests = TestSuite("Random")
 
 // _fill(bytes:)
+
+extension RandomNumberGenerator {
+  func _fill(bytes buffer: UnsafeMutableRawBufferPointer) {
+    guard let start = buffer.baseAddress else { return }
+    swift_stdlib_random(start, buffer.count)
+  }
+}
 
 RandomTests.test("_fill(bytes:)") {
   for count in [100, 1000] {

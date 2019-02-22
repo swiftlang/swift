@@ -124,12 +124,14 @@ extension PythonObject : CustomStringConvertible {
   }
 }
 
+#if !swift(>=5)
 // Make `PythonObject` show up nicely in the Xcode Playground results sidebar.
 extension PythonObject : CustomPlaygroundQuickLookable {
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(description)
   }
 }
+#endif
 
 // Mirror representation, used by debugger/REPL.
 extension PythonObject : CustomReflectable {
@@ -683,6 +685,18 @@ public struct PythonInterface {
 
   public subscript(dynamicMember name: String) -> PythonObject {
     return builtins[name]
+  }
+
+  // The Python runtime version.
+  // Equivalent to `sys.version` in Python.
+  public var version: PythonObject {
+    return self.import("sys").version
+  }
+
+  // The Python runtime version information.
+  // Equivalent to `sys.version_info` in Python.
+  public var versionInfo: PythonObject {
+    return self.import("sys").version_info
   }
 }
 

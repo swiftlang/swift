@@ -145,15 +145,20 @@ func testPostfixSpace(x: inout S) {
 
 // ===--- Infix operators
 
+precedencegroup S2PrecedenceGroup {
+  associativity: left
+  lowerThan: ComparisonPrecedence
+  higherThan: AssignmentPrecedence
+}
+precedencegroup S2AssignmentPrecedenceGroup {
+  associativity: none
+  lowerThan: ComparisonPrecedence
+  higherThan: AssignmentPrecedence
+}
+
 struct S2 {}
-infix operator ** {
-  associativity left
-  precedence 123
-}
-infix operator **= {
-  associativity none
-  precedence 123
-}
+infix operator ** : S2PrecedenceGroup
+infix operator **= : S2AssignmentPrecedenceGroup
 func +(x: S2, y: S2) -> S2 { return x }
 func **(x: S2, y: Int) -> S2 { return x }
 func **=(x: inout S2, y: Int) -> Void { return x }
@@ -364,13 +369,13 @@ func testExtInfix2(x: S4) {
   x + x == x + x#^EXT_INFIX_2^#
 }
 // S4_EXT_INFIX: Begin completions
-// S4_EXT_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  != {#Bool#}[#Bool#]
 // S4_EXT_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  + {#S4#}[#S4#]
-// S4_EXT_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  == {#Bool#}[#Bool#]
 // S4_EXT_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  && {#Bool#}[#Bool#]
 // S4_EXT_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  || {#Bool#}[#Bool#]
 // S4_EXT_INFIX: End completions
 
+// S4_EXT_INFIX-NEG-NOT: !=
+// S4_EXT_INFIX-NEG-NOT: ==
 // S4_EXT_INFIX_NEG-NOT: +++
 // S4_EXT_INFIX_NEG-NOT: &&&
 

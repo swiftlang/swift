@@ -2,7 +2,7 @@
 
 extension Collection {
   func foo() {
-    // CHECK: witness_method $Self.Indices, #Sequence.dropFirst!1
+    // CHECK: function_ref @$sSlsE9dropFirsty11SubSequenceQzSiF
     _ = zip(indices, indices.dropFirst(3))
   }
 }

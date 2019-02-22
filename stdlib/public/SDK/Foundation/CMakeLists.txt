@@ -14,7 +14,6 @@ add_swift_target_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES
   DateComponents.swift
   DateInterval.swift
   Decimal.swift
-  ExtraStringAPIs.swift
   FileManager.swift
   Foundation.swift
   IndexPath.swift

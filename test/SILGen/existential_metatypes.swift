@@ -3,7 +3,9 @@
 @_semantics("typechecker.type(of:)")
 public func type<T, Metatype>(of value: T) -> Metatype {}
 
-struct Value {}
+struct Value {
+  func method() {}
+}
 
 protocol P {
   init()
@@ -72,4 +74,19 @@ func existentialMetatypeVarProperty() -> Value {
   // CHECK:      open_existential_metatype [[T1]] :
   var type: P.Type = S.self
   return type.value
+}
+
+// rdar://45956703
+// CHECK-LABEL: sil hidden @$s21existential_metatypes31getterResultStaticStorageAccessyyF
+var _type: P.Type { get {return S.self } set {} }
+func getterResultStaticStorageAccess() {
+  // CHECK:      [[GET_TYPE:%.*]] = function_ref @$s21existential_metatypes5_typeAA1P_pXpvg
+  // CHECK-NEXT: [[TYPE:%.*]] = apply [[GET_TYPE]]() : $@convention(thin) () -> @thick P.Type
+  // CHECK-NEXT: [[OPEN:%.*]] = open_existential_metatype [[TYPE]] : $@thick P.Type to $@thick ([[ARCHETYPE:@opened(.*) P]]).Type
+  // CHECK-NEXT: [[GET_VALUE:%.*]] = witness_method $[[ARCHETYPE]], #P.value!getter
+  // CHECK-NEXT: [[VALUE:%.*]] = apply [[GET_VALUE]]<[[ARCHETYPE]]>([[OPEN]])
+  // CHECK-NEXT: // function_ref
+  // CHECK-NEXT: [[METHOD:%.*]] = function_ref @$s21existential_metatypes5ValueV6methodyyF
+  // CHECK-NEXT: apply [[METHOD]]([[VALUE]])
+  _type.value.method()
 }

@@ -41,9 +41,6 @@ void *swift_tfc_CreateFloatTensor(int32_t num_dims, int64_t *dims, float *vals,
 void *swift_tfc_CreateScalarStringTensor(char *val, int32_t valLen,
                                          TF_Status *status);
 
-void swift_tfc_TFE_Execute(void *op, void **retvals, int32_t *num_retvals,
-                           void *status);
-
 #ifdef __cplusplus
 } /* end extern "C" */
 #endif

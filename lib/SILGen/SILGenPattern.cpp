@@ -1566,41 +1566,42 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
   SGFContext ctx;
   if (requiresAddress) {
     init = SGF.emitTemporary(loc, srcAbstractTL);
-
-    // Okay, if all we need to do is drop the value in an address,
-    // this is easy.
-    if (!hasAbstraction) {
-      // TODO: Refactor this into a materialize method on CastConsumptionKind.
-      ManagedValue finalValue = src.getFinalManagedValue();
-      if (finalValue.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
-        finalValue = finalValue.copy(SGF, loc);
-      SGF.B.emitStoreValueOperation(loc, finalValue.forward(SGF),
-                                    init->getAddress(),
-                                    StoreOwnershipQualifier::Init);
-      init->finishInitialization(SGF);
-      // If we had borrow_always, we need to switch to copy_on_success since
-      // that is the address only variant of borrow_always.
-      auto consumption = src.getFinalConsumption();
-      if (consumption == CastConsumptionKind::BorrowAlways)
-        consumption = CastConsumptionKind::CopyOnSuccess;
-      ConsumableManagedValue result = {init->getManagedAddress(), consumption};
-      if (ArgUnforwarder::requiresUnforwarding(SGF, src))
-        borrowedValues.push_back(result);
-      return result;
-    }
-
     ctx = SGFContext(init.get());
   }
 
-  assert(hasAbstraction);
-  assert(src.getType().isObject() &&
-         "address-only type with abstraction difference?");
-
-  // Produce the value at +1.
   ManagedValue substValue = SGF.getManagedValue(loc, src);
-  ManagedValue origValue = 
-    SGF.emitSubstToOrigValue(loc, substValue, abstraction, sourceType);
-  return ConsumableManagedValue::forOwned(origValue);
+  ManagedValue finalValue;
+  if (hasAbstraction) {
+    assert(src.getType().isObject() &&
+           "address-only type with abstraction difference?");
+    // Produce the value at +1.
+    finalValue = SGF.emitSubstToOrigValue(loc, substValue,
+                                          abstraction, sourceType, ctx);
+  } else {
+    finalValue = substValue;
+  }
+
+  if (requiresAddress) {
+    if (finalValue.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
+      finalValue = finalValue.copy(SGF, loc);
+    SGF.B.emitStoreValueOperation(loc, finalValue.forward(SGF),
+                                  init->getAddress(),
+                                  StoreOwnershipQualifier::Init);
+    init->finishInitialization(SGF);
+
+    // If we had borrow_always, we need to switch to copy_on_success since
+    // that is the address only variant of borrow_always.
+    auto consumption = src.getFinalConsumption();
+    if (consumption == CastConsumptionKind::BorrowAlways)
+      consumption = CastConsumptionKind::CopyOnSuccess;
+    ConsumableManagedValue result = {init->getManagedAddress(), consumption};
+    if (ArgUnforwarder::requiresUnforwarding(SGF, src))
+      borrowedValues.push_back(result);
+
+    return result;
+  }
+
+  return ConsumableManagedValue::forOwned(finalValue);
 }
 
 /// Perform specialized dispatch for a sequence of IsPatterns.
@@ -2536,6 +2537,7 @@ public:
 static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
                                                   SILLocation loc,
                                                   ManagedValue value,
+                                                  Type subjectTy,
                                                   const EnumDecl *enumDecl) {
   ASTContext &ctx = SGF.getASTContext();
   auto diagnoseFailure = ctx.getDiagnoseUnexpectedEnumCaseValue(nullptr);
@@ -2549,10 +2551,9 @@ static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
   assert(value.getType().isTrivial(SGF.getModule()));
 
   // Get the enum type as an Any.Type value.
-  CanType switchedValueSwiftType = value.getType().getASTType();
   SILType metatypeType = SGF.getLoweredType(
-      CanMetatypeType::get(switchedValueSwiftType,
-                           MetatypeRepresentation::Thick));
+      AbstractionPattern::getOpaque(),
+      MetatypeType::get(subjectTy));
   SILValue metatype = SGF.B.createMetatype(loc, metatypeType);
 
   // Bitcast the enum value to its raw type. (This is only safe for @objc
@@ -2573,7 +2574,7 @@ static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
         assert(genericParam->getIndex() < 2);
         switch (genericParam->getIndex()) {
         case 0:
-          return switchedValueSwiftType;
+          return subjectTy;
 
         case 1:
           return enumDecl->getRawType();
@@ -2592,7 +2593,8 @@ static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
 
 static void emitDiagnoseOfUnexpectedEnumCase(SILGenFunction &SGF,
                                              SILLocation loc,
-                                             ManagedValue value) {
+                                             ManagedValue value,
+                                             Type subjectTy) {
   ASTContext &ctx = SGF.getASTContext();
   auto diagnoseFailure = ctx.getDiagnoseUnexpectedEnumCase(nullptr);
   if (!diagnoseFailure) {
@@ -2601,16 +2603,15 @@ static void emitDiagnoseOfUnexpectedEnumCase(SILGenFunction &SGF,
   }
 
   // Get the switched-upon value's type.
-  CanType switchedValueSwiftType = value.getType().getASTType();
   SILType metatypeType = SGF.getLoweredType(
-      CanMetatypeType::get(switchedValueSwiftType,
-                           MetatypeRepresentation::Thick));
+      AbstractionPattern::getOpaque(),
+      MetatypeType::get(subjectTy)->getCanonicalType());
   ManagedValue metatype = SGF.B.createValueMetatype(loc, metatypeType, value);
 
   auto diagnoseSignature = diagnoseFailure->getGenericSignature();
   auto genericArgsMap = SubstitutionMap::get(
       diagnoseSignature,
-      [&](SubstitutableType *type) -> Type { return switchedValueSwiftType; },
+      [&](SubstitutableType *type) -> Type { return subjectTy; },
       LookUpConformanceInSignature(*diagnoseSignature));
 
   SGF.emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, genericArgsMap,
@@ -2622,9 +2623,12 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   LLVM_DEBUG(llvm::dbgs() << "emitting switch stmt\n";
              S->dump(llvm::dbgs());
              llvm::dbgs() << '\n');
+
+  auto subjectTy = S->getSubjectExpr()->getType();
+
   // If the subject expression is uninhabited, we're already dead.
   // Emit an unreachable in place of the switch statement.
-  if (S->getSubjectExpr()->getType()->isStructurallyUninhabited()) {
+  if (subjectTy->isStructurallyUninhabited()) {
     emitIgnoredExpr(S->getSubjectExpr());
     B.createUnreachable(S);
     return;
@@ -2789,12 +2793,13 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
       if (singleEnumDecl->isObjC()) {
         emitDiagnoseOfUnexpectedEnumCaseValue(*this, location,
                                               subject.getFinalManagedValue(),
-                                              singleEnumDecl);
+                                              subjectTy, singleEnumDecl);
         return;
       }
     }
     emitDiagnoseOfUnexpectedEnumCase(*this, location,
-                                     subject.getFinalManagedValue());
+                                     subject.getFinalManagedValue(),
+                                     subjectTy);
   };
 
   // Set up an initial clause matrix.

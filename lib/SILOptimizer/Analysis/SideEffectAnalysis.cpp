@@ -353,6 +353,14 @@ bool FunctionSideEffects::setDefinedEffects(SILFunction *F) {
 // FunctionSideEffects object without visiting its body.
 bool FunctionSideEffects::summarizeFunction(SILFunction *F) {
   assert(ParamEffects.empty() && "Expect uninitialized effects.");
+
+  if (F->isDynamicallyReplaceable()) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "  -- is dynamically_replaceable " << F->getName() << '\n');
+    setWorstEffects();
+    return true;
+  }
+
   if (!F->empty())
     ParamEffects.resize(F->getArguments().size());
 

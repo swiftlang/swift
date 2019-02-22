@@ -78,6 +78,10 @@ public:
   /// Mark the given conformance as "used" from the given declaration context.
   virtual void markConformanceUsed(ProtocolConformanceRef conformance,
                                    DeclContext *dc) = 0;
+
+  /// Fill in the signature conformances of the given protocol conformance.
+  virtual void checkConformanceRequirements(
+                                    NormalProtocolConformance *conformance) = 0;
 };
 
 class LazyMemberLoader;

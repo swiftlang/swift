@@ -409,3 +409,31 @@ bb0:
   %v = tuple ()
   return %v : $()
 }
+
+sil @takeany :  $@convention(thin) (@in_guaranteed AnyP) -> ()
+
+// CHECK-LABEL: sil @testWitnessCopiedSelfWithIndirectResult2 : $@convention(thin) () -> () {
+// CHECK: [[IN:%[0-9]+]] = alloc_stack $AnyP
+// CHECK: [[EA:%[0-9]+]] = init_existential_addr [[IN]]
+// CHECK: [[OUT:%[0-9]+]] = alloc_stack $StructOfAnyP
+// CHECK: witness_method $StructOfAnyP, #AnyP.returnsSelf!1 : <Self where Self : AnyP> (Self) -> () -> @dynamic_self Self : $@convention(witness_method: AnyP) <τ_0_0 where τ_0_0 : AnyP> (@in_guaranteed τ_0_0) -> @out StructOfAnyP
+// CHECK: apply %{{.*}}<StructOfAnyP>([[OUT]], [[EA]]) : $@convention(witness_method: AnyP) <τ_0_0 where τ_0_0 : AnyP> (@in_guaranteed τ_0_0) -> @out StructOfAnyP
+// CHECK-LABEL: } // end sil function 'testWitnessCopiedSelfWithIndirectResult2'
+sil @testWitnessCopiedSelfWithIndirectResult2 : $() -> () {
+bb0:
+  %a0 = alloc_stack $AnyP
+  %ie0 = init_existential_addr %a0 : $*AnyP, $StructOfAnyP
+  %f1 = function_ref @takeany :  $@convention(thin) (@in_guaranteed AnyP) -> ()
+  %c1 = apply %f1(%a0) :  $@convention(thin) (@in_guaranteed AnyP) -> ()
+  %a1 = alloc_stack $AnyP
+  copy_addr %a0 to [initialization] %a1 : $*AnyP
+  %o0 = open_existential_addr immutable_access %a1 : $*AnyP to $*@opened("7C4DAF8E-D722-11E8-920A-D0817AD9F6DD") AnyP
+  %a2 = alloc_stack $StructOfAnyP
+  %w0 = witness_method $@opened("7C4DAF8E-D722-11E8-920A-D0817AD9F6DD") AnyP, #AnyP.returnsSelf!1 : <Self where Self : AnyP> (Self) -> () -> @dynamic_self Self, %o0 : $*@opened("7C4DAF8E-D722-11E8-920A-D0817AD9F6DD") AnyP : $@convention(witness_method: AnyP) <τ_0_0 where τ_0_0 : AnyP> (@in_guaranteed τ_0_0) -> @out StructOfAnyP
+  %c0 = apply %w0<@opened("7C4DAF8E-D722-11E8-920A-D0817AD9F6DD") AnyP>(%a2, %o0) : $@convention(witness_method: AnyP) <τ_0_0 where τ_0_0 : AnyP> (@in_guaranteed τ_0_0) -> @out StructOfAnyP
+  dealloc_stack %a2 : $*StructOfAnyP
+  dealloc_stack %a1 : $*AnyP
+  dealloc_stack %a0 : $*AnyP
+  %v = tuple ()
+  return %v : $()
+}

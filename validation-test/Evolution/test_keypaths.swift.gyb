@@ -3,7 +3,7 @@
 // RUN: %empty-directory(%t/rth)
 // RUN: env PYTHONPATH=%S/Inputs %gyb < %s > %t/test_keypaths.swift
 // RUN: env PYTHONPATH=%S/Inputs %gyb < %S/Inputs/keypaths.swift.gyb > %t/Inputs/keypaths.swift
-// RUN: %rth --target-build-swift "%target-build-swift" --target-run "%target-run" --t "%t/rth" --S "%t" --s "%t/test_keypaths.swift" --lib-prefix "lib" --lib-suffix ".%target-dylib-extension" --target-codesign "%target-codesign"
+// RUN: %rth --target-build-swift "%target-build-swift" --target-run "%target-run" --t "%t/rth" --S "%t" --s "%t/test_keypaths.swift" --lib-prefix "lib" --lib-suffix ".%target-dylib-extension" --target-codesign "%target-codesign" --no-symbol-diff
 
 // REQUIRES: executable_test
 

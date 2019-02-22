@@ -62,7 +62,7 @@ enum Optional<T> {
 }
 
 struct Unowned {
-  @sil_stored unowned let x: @sil_unowned Builtin.NativeObject
+  @_hasStorage unowned let x: @sil_unowned Builtin.NativeObject
 }
 
 sil @createS : $@convention(thin) () -> @owned S
@@ -265,7 +265,7 @@ bb3:
 }
 
 final class MyArrayBuffer {
-  @sil_stored var dummyElements: Int32
+  @_hasStorage var dummyElements: Int32
   init()
 }
 

@@ -245,6 +245,30 @@ class ConformsToSillyDefault : ClassWithDefault<Int>, SillyDefault {}
 // CHECK: class_method %1 : $ClassWithDefault<Int>, #ClassWithDefault.makeT!1 : <T> (ClassWithDefault<T>) -> () -> T, $@convention(method) <τ_0_0> (@guaranteed ClassWithDefault<τ_0_0>) -> @out τ_0_0
 // CHECK: return
 
+class BaseClass : BaseProto {}
+
+protocol RefinedProto where Self : BaseClass {}
+
+func takesBaseProtocol(_: BaseProto) {}
+
+func passesRefinedProtocol(_ r: RefinedProto) {
+  takesBaseProtocol(r)
+}
+
+// CHECK-LABEL: sil hidden @$s24protocol_with_superclass21passesRefinedProtocolyyAA0E5Proto_pF : $@convention(thin) (@guaranteed RefinedProto) -> ()
+// CHECK:     bb0(%0 : @guaranteed $RefinedProto):
+// CHECK:       [[OPENED:%.*]] = open_existential_ref %0 : $RefinedProto to $@opened("{{.*}}") RefinedProto
+// CHECK-NEXT:  [[BASE:%.*]] = alloc_stack $BaseProto
+// CHECK-NEXT:  [[BASE_PAYLOAD:%.*]] = init_existential_addr [[BASE]] : $*BaseProto, $@opened("{{.*}}") RefinedProto
+// CHECK-NEXT:  [[OPENED_COPY:%.*]] = copy_value [[OPENED]] : $@opened("{{.*}}") RefinedProto
+// CHECK-NEXT:  store [[OPENED_COPY]] to [init] [[BASE_PAYLOAD]] : $*@opened("{{.*}}") RefinedProto
+// CHECK:       [[FUNC:%.*]] = function_ref @$s24protocol_with_superclass17takesBaseProtocolyyAA0E5Proto_pF : $@convention(thin) (@in_guaranteed BaseProto) -> ()
+// CHECK-NEXT:  apply [[FUNC]]([[BASE]]) : $@convention(thin) (@in_guaranteed BaseProto) -> ()
+// CHECK-NEXT:  destroy_addr [[BASE]] : $*BaseProto
+// CHECK-NEXT:  dealloc_stack [[BASE]] : $*BaseProto
+// CHECK-NEXT:  [[RESULT:%.*]] = tuple ()
+// CHECK-NEXT:  return [[RESULT]] : $()
+
 // CHECK-LABEL: sil_witness_table hidden ConformsToSillyDefault: SillyDefault module protocol_with_superclass {
 // CHECK-NEXT: method #SillyDefault.makeT!1: <Self where Self : SillyDefault> (Self) -> () -> Int : @$s24protocol_with_superclass22ConformsToSillyDefaultCAA0fG0A2aDP5makeTSiyFTW
 // CHECK-NEXT: }

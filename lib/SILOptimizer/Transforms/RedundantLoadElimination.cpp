@@ -494,7 +494,9 @@ public:
              EpilogueARCFunctionInfo *EAFI, bool disableArrayLoads);
 
   RLEContext(const RLEContext &) = delete;
-  RLEContext(RLEContext &&) = default;
+  RLEContext(RLEContext &&) = delete;
+  RLEContext &operator=(const RLEContext &) = delete;
+  RLEContext &operator=(RLEContext &&) = delete;
   ~RLEContext() = default;
 
   /// Entry point to redundant load elimination.

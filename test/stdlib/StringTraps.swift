@@ -55,7 +55,7 @@ StringTraps.test("subscript(_:)/endIndex")
   _ = s[i]
 }
 
-StringTraps.test("UTF8ViewEndIndexSuccessor")
+StringTraps.test("UTF8ViewSubscript/endIndexSuccessor")
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
@@ -67,6 +67,7 @@ StringTraps.test("UTF8ViewEndIndexSuccessor")
   i = s.utf8.index(after: i)
   expectCrashLater()
   i = s.utf8.index(after: i)
+  _ = s.utf8[i]
 }
 
 StringTraps.test("UTF8ViewSubscript/endIndex")
@@ -136,6 +137,35 @@ StringTraps.test("UTF16ViewIndex/offsetCrash")
   expectCrashLater()
   let i = u16.index(u16.startIndex, offsetBy: 99)
   _ = s16.utf16[i]
+}
+
+StringTraps.test("UTF8ViewIndex/offsetLimited")
+  .code {
+  let sa = "foo"
+  let u8a = sa.utf8
+  let s8 = sa + "🤦🏻‍♀️"
+  let u8 = s8.utf8
+
+  let iaBegin = u8a.index(sa.startIndex, offsetBy: 99, limitedBy: sa.endIndex)
+  expectNil(iaBegin)
+  let iaEnd = u8a.index(sa.endIndex, offsetBy: 99, limitedBy: sa.endIndex)
+  expectNil(iaEnd)
+  let i8Begin = u8.index(u8.startIndex, offsetBy: 99, limitedBy: u8.endIndex)
+  expectNil(i8Begin)
+  let i8End = u8.index(u8.startIndex, offsetBy: 99, limitedBy: u8.endIndex)
+  expectNil(i8End)
+}
+
+StringTraps.test("UTF8ViewIndex/offsetCrash")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .code {
+  let s8 = "foo🤦🏻‍♀️"
+  let u8 = s8.utf8
+  expectCrashLater()
+  let i = u8.index(u8.startIndex, offsetBy: 99)
+  _ = s8.utf8[i]
 }
 
 runAllTests()

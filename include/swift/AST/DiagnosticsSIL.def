@@ -364,36 +364,58 @@ ERROR(pound_assert_failure,none,
 // Automatic differentiation diagnostics
 ERROR(autodiff_internal_swift_not_imported,none,
       "AD internal error: the Swift module is not imported", ())
-ERROR(autodiff_incomplete_differentiable_attr,none,
-      "incomplete `differentiable` attribute; it should specify either "
-      "both primal and adjoint or nothing", ())
-ERROR(autodiff_cannot_synthesize_primal_yet,none,
-      "automatic differentiation cannot synthesize primals yet; define the "
-      "primal function using a '@differentiable' attribute", ())
 ERROR(autodiff_unsupported_type,none,
       "differentiating '%0' is not supported yet", (Type))
 ERROR(autodiff_function_not_differentiable,none,
       "function is not differentiable", ())
-NOTE(autodiff_function_generic_functions_unsupported,none,
-     "differentiating generic functions is not supported yet", ())
+NOTE(autodiff_function_indirect_params_or_result_unsupported,none,
+     "differentiating functions with parameters or result of unknown size "
+     "is not supported yet", ())
+NOTE(autodiff_external_nondifferentiable_function,none,
+     "cannot differentiate an external function that has not been marked "
+     "'@differentiable'", ())
+NOTE(autodiff_global_let_closure_not_differentiable,none,
+     "global constant closure is not differentiable", ())
+NOTE(autodiff_cannot_differentiate_global_var_closures,none,
+     "cannot differentiate global mutable closures", ())
+NOTE(autodiff_cannot_differentiate_writes_to_global_variables,none,
+     "cannot differentiate writes to global variables", ())
+NOTE(autodiff_cannot_differentiate_writes_to_mutable_captures,none,
+     "cannot differentiate writes to mutable captures", ())
+NOTE(autodiff_protocol_member_not_differentiable,none,
+     "member is not differentiable because the corresponding protocol "
+     "requirement is not '@differentiable'", ())
+NOTE(autodiff_protocol_member_subset_indices_not_differentiable,none,
+     "member is differentiable only with respect to a smaller subset of "
+     "arguments", ())
+NOTE(autodiff_function_subset_indices_not_differentiable,none,
+     "function is differentiable only with respect to a smaller subset of "
+     "arguments", ())
+NOTE(autodiff_function_assoc_func_requirements_unmet,none,
+     "function call is not differentiable because generic requirements are not "
+     "met", ())
+NOTE(autodiff_opaque_function_not_differentiable,none,
+     "opaque non-'@differentiable' function is not differentiable", ())
 NOTE(autodiff_property_not_differentiable,none,
      "property is not differentiable", ())
 NOTE(autodiff_value_defined_here,none,
      "value defined here", ())
 NOTE(autodiff_when_differentiating_function_call,none,
      "when differentiating this function call", ())
+NOTE(autodiff_when_differentiating_function_definition,none,
+     "when differentiating this function definition", ())
 NOTE(autodiff_expression_is_not_differentiable,none,
      "expression is not differentiable", ())
 NOTE(autodiff_nested_function_call_multiple_return_active,none,
      "function call is being differentiated from multiple return values", ())
 NOTE(autodiff_control_flow_not_supported,none,
      "differentiating control flow is not supported yet", ())
+NOTE(autodiff_class_member_not_supported,none,
+     "differentiating class members is not supported yet", ())
 NOTE(autodiff_nested_not_supported,none,
      "nested differentiation is not supported yet", ())
-NOTE(autodiff_no_synthesized_primal_or_adjoint,none,
-     "function does not have primal or adjoint; define an adjoint (and "
-     "optionally, a primal) using a '@differentiable' attribute, or enable "
-     "'-differentiation-use-vjp' mode", ())
+NOTE(autodiff_missing_return,none,
+     "missing return for differentiation", ())
 
 ERROR(non_physical_addressof,none,
       "addressof only works with purely physical lvalues; "

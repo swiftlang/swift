@@ -20,7 +20,7 @@ public func publicFunction() {}
 private struct PrivateStruct {}
 // expected-note@-1 3{{struct 'PrivateStruct' is not '@usableFromInline' or public}}
 struct InternalStruct {}
-// expected-note@-1 4{{struct 'InternalStruct' is not '@usableFromInline' or public}}
+// expected-note@-1 3{{struct 'InternalStruct' is not '@usableFromInline' or public}}
 @usableFromInline struct VersionedStruct {
   @usableFromInline init() {}
 }
@@ -79,18 +79,6 @@ public struct Struct {
     // expected-error@-1 {{struct 'PrivateStruct' is private and cannot be referenced from an '@inlinable' function}}
   }
 
-  @inline(__always)
-  public func publicInlineAlwaysMethod(x: Any) {
-    struct Nested {}
-    // expected-error@-1 {{type 'Nested' cannot be nested inside an '@inline(__always)' function}}
-
-    switch x {
-      case is InternalStruct:
-      // expected-error@-1 {{struct 'InternalStruct' is internal and cannot be referenced from an '@inline(__always)' function}}
-        _ = ()
-    }
-  }
-
   private func privateMethod() {}
   // expected-note@-1 {{instance method 'privateMethod()' is not '@usableFromInline' or public}}
 
@@ -107,13 +95,6 @@ public struct Struct {
   func internalInlinableMethod() {
     struct Nested {}
     // expected-error@-1 {{type 'Nested' cannot be nested inside an '@inlinable' function}}
-  }
-
-  @inline(__always)
-  @usableFromInline
-  func versionedInlineAlwaysMethod() {
-    struct Nested {}
-    // expected-error@-1 {{type 'Nested' cannot be nested inside an '@inline(__always)' function}}
   }
 
   @_transparent

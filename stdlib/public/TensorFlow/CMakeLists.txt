@@ -30,6 +30,7 @@ list(APPEND swift_stdlib_compile_flags "-swift-version" "4")
 list(APPEND swift_stdlib_compile_flags "-force-single-frontend-invocation")
 # FIXME(SR-7972): Some tests fail when TensorFlow is optimized.
 list(APPEND swift_stdlib_compile_flags "-Onone")
+list(APPEND swift_stdlib_compile_flags "-DCOMPILING_TENSORFLOW_MODULE")
 
 set(SOURCES
   CompilerRuntime.swift
@@ -38,8 +39,6 @@ set(SOURCES
   DataTypes.swift
   Gradients.swift
   Ops.swift
-  Parameterized.swift
-  Random.swift
   ShapedArray.swift
   StringOps.swift
   StringTensor.swift
@@ -57,6 +56,14 @@ set(SOURCES
 # Copy TensorFlow bindings file, if it exists.
 if (TENSORFLOW_SWIFT_BINDINGS)
   list(APPEND SOURCES "${TENSORFLOW_SWIFT_BINDINGS}")
+endif()
+
+# Copy TensorFlow high-level API sources, if they exists.
+if (TENSORFLOW_SWIFT_APIS)
+  file(GLOB_RECURSE TENSORFLOW_SWIFT_API_SOURCES
+    "${TENSORFLOW_SWIFT_APIS}/Sources/*.swift")
+  message(STATUS "Using TensorFlow high-level APIs library.")
+  list(APPEND SOURCES "${TENSORFLOW_SWIFT_API_SOURCES}")
 endif()
 
 # When Python exists, NumpyConversion.swift imports it, so it must be

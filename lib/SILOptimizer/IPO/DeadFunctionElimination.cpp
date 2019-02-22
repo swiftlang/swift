@@ -44,14 +44,14 @@ protected:
   /// method.
   struct FuncImpl {
     FuncImpl(SILFunction *F, ClassDecl *Cl) : F(F), Impl(Cl) {}
-    FuncImpl(SILFunction *F, ProtocolConformance *C) : F(F), Impl(C) {}
+    FuncImpl(SILFunction *F, RootProtocolConformance *C) : F(F), Impl(C) {}
 
     /// The implementing function.
     SILFunction *F;
 
     /// This is a class decl if we are tracking a class_method (i.e. a vtable
     /// method) and a protocol conformance if we are tracking a witness_method.
-    PointerUnion<ClassDecl *, ProtocolConformance *> Impl;
+    PointerUnion<ClassDecl *, RootProtocolConformance*> Impl;
   };
 
   /// Stores which functions implement a vtable or witness table method.
@@ -79,7 +79,7 @@ protected:
     }
 
     /// Adds an implementation of the method in a specific conformance.
-    void addWitnessFunction(SILFunction *F, ProtocolConformance *Conf) {
+    void addWitnessFunction(SILFunction *F, RootProtocolConformance *Conf) {
       assert(isWitnessMethod);
       implementingFunctions.push_back(FuncImpl(F, Conf));
     }
@@ -321,7 +321,7 @@ protected:
       return;
     mi->methodIsCalled = true;
     for (FuncImpl &FImpl : mi->implementingFunctions) {
-      if (auto *Conf = FImpl.Impl.dyn_cast<ProtocolConformance *>()) {
+      if (auto Conf = FImpl.Impl.dyn_cast<RootProtocolConformance *>()) {
         SILWitnessTable *WT =
             Module->lookUpWitnessTable(Conf,
                                        /*deserializeLazily*/ false);
@@ -365,6 +365,10 @@ protected:
           MethodInfo *mi = getMethodInfo(funcDecl, /*isWitnessTable*/ false);
           ensureAliveClassMethod(mi, dyn_cast<FuncDecl>(funcDecl), MethodCl);
         } else if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
+          ensureAlive(FRI->getReferencedFunction());
+        } else if (auto *FRI = dyn_cast<DynamicFunctionRefInst>(&I)) {
+          ensureAlive(FRI->getReferencedFunction());
+        } else if (auto *FRI = dyn_cast<PreviousDynamicFunctionRefInst>(&I)) {
           ensureAlive(FRI->getReferencedFunction());
         } else if (auto *KPI = dyn_cast<KeyPathInst>(&I)) {
           for (auto &component : KPI->getPattern()->getComponents())
@@ -498,7 +502,7 @@ class DeadFunctionElimination : FunctionLivenessComputation {
 
     // Collect witness method implementations.
     for (SILWitnessTable &WT : Module->getWitnessTableList()) {
-      ProtocolConformance *Conf = WT.getConformance();
+      auto Conf = WT.getConformance();
       for (const SILWitnessTable::Entry &entry : WT.getEntries()) {
         if (entry.getKind() != SILWitnessTable::Method)
           continue;

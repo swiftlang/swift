@@ -131,6 +131,8 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   AbstractionPattern origSelfType(witness->getInterfaceType());
   origSelfType = origSelfType.getFunctionParamType(0);
 
+  ArgumentScope scope(SGF, loc);
+
   swiftValue = SGF.emitSubstToOrigValue(loc, swiftValue,
                                         origSelfType,
                                         swiftValueType,
@@ -158,6 +160,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
                         swiftValue.borrow(SGF, loc).getValue());
 
   auto bridgedMV = SGF.emitManagedRValueWithCleanup(bridgedValue);
+  bridgedMV = scope.popPreservingValue(bridgedMV);
 
   // The Objective-C value doesn't necessarily match the desired type.
   bridgedMV = emitUnabstractedCast(SGF, loc, bridgedMV,
@@ -598,8 +601,8 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   auto storage = emitTemporaryAllocation(loc, storageAddrTy);
   auto capture = B.createProjectBlockStorage(loc, storage);
   B.createStore(loc, fn, capture, StoreOwnershipQualifier::Init);
-  auto invokeFn = B.createFunctionRef(loc, thunk);
-  
+  auto invokeFn = B.createFunctionRefFor(loc, thunk);
+
   auto stackBlock = B.createInitBlockStorageHeader(loc, storage, invokeFn,
                               SILType::getPrimitiveObjectType(loweredBlockTy),
                                                    subs);
@@ -702,6 +705,8 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
   // some work by opening it.
   if (nativeType->isExistentialType()) {
     auto openedType = ArchetypeType::getOpened(nativeType);
+
+    FormalEvaluationScope scope(SGF);
 
     auto openedExistential = SGF.emitOpenExistential(
         loc, v, openedType, SGF.getLoweredType(openedType),
@@ -954,7 +959,7 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
   }
 
   // Create it in the current function.
-  auto thunkValue = B.createFunctionRef(loc, thunk);
+  auto thunkValue = B.createFunctionRefFor(loc, thunk);
   ManagedValue thunkedFn = B.createPartialApply(
       loc, thunkValue, SILType::getPrimitiveObjectType(substFnTy),
       interfaceSubs, block,
@@ -1428,7 +1433,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
       // If @objc was inferred based on the Swift 3 @objc inference rules, emit
       // a call to Builtin.swift3ImplicitObjCEntrypoint() to enable runtime
       // logging of the uses of such entrypoints.
-      if (attr->isSwift3Inferred() && !decl->isDynamic()) {
+      if (attr->isSwift3Inferred() && !decl->isObjCDynamic()) {
         // Get the starting source location of the declaration so we can say
         // exactly where to stick '@objc'.
         SourceLoc objcInsertionLoc =

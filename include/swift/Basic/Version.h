@@ -152,8 +152,8 @@ public:
 
   // List of backward-compatibility versions that we permit passing as
   // -swift-version <vers>
-  static std::array<StringRef, 4> getValidEffectiveVersions() {
-    return {{"3", "4", "4.2", "5"}};
+  static std::array<StringRef, 3> getValidEffectiveVersions() {
+    return {{"4", "4.2", "5"}};
   };
 };
 

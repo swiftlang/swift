@@ -117,6 +117,7 @@ private:
   void visitReturnStmt(ReturnStmt *) {}
   void visitYieldStmt(YieldStmt *) {}
   void visitThrowStmt(ThrowStmt *) {}
+  void visitPoundAssertStmt(PoundAssertStmt *) {}
   void visitDeferStmt(DeferStmt *DS) {
     // Nothing in the defer is visible.
   }

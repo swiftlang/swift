@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-module-level-graph=false -O -emit-sil %s -verify -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-module-level-graph=false -O -emit-sil %s -verify -enable-objc-interop -disable-objc-attr-requires-foundation-module -Xllvm -tf-dynamic-compilation=false | %FileCheck %s
 
 import TensorFlow
 

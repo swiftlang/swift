@@ -45,8 +45,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-extern "C" CFHashCode CFStringHashCString(const uint8_t *bytes, CFIndex len);
-
 using namespace swift;
 
 // NOTE: older runtimes called these _SwiftNativeNSXXXBase. The two must
@@ -130,14 +128,6 @@ swift_stdlib_compareNSStringDeterministicUnicodeCollationPtr(void *Lhs,
   // 'kCFCompareNonliteral' actually means "normalize to NFD".
   int Result = CFStringCompare((__bridge CFStringRef)lhs,
                                (__bridge CFStringRef)rhs, kCFCompareNonliteral);
-  return Result;
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
-size_t
-swift_stdlib_CFStringHashCString(const uint8_t *bytes, CFIndex len) {
-  CFHashCode Result = CFStringHashCString(bytes, len);
-
   return Result;
 }
 

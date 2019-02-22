@@ -21,7 +21,7 @@ categories = [
     ["CPP", re.compile('^(__Z|_+swift)')],
 
     # Objective-C
-    ["ObjC", re.compile('^[+-]\[')],
+    ["ObjC", re.compile(r'^[+-]\[')],
 
     # Swift
     ["Partial Apply", re.compile('^__(TPA|T0.*T[aA]$)')],
@@ -80,7 +80,7 @@ def read_sizes(sizes, file_name, function_details, group_by_prefix):
     architectures = subprocess.check_output(
         ["otool", "-V", "-f", file_name]).split("\n")
     arch = None
-    arch_pattern = re.compile('architecture ([\S]+)')
+    arch_pattern = re.compile(r'architecture ([\S]+)')
     for architecture in architectures:
         arch_match = arch_pattern.match(architecture)
         if arch_match:
@@ -115,10 +115,10 @@ def read_sizes(sizes, file_name, function_details, group_by_prefix):
     start_addr = None
     end_addr = None
 
-    section_pattern = re.compile(' +sectname ([\S]+)')
-    size_pattern = re.compile(' +size ([\da-fx]+)')
-    asmline_pattern = re.compile('^([0-9a-fA-F]+)\s')
-    label_pattern = re.compile('^((\-*\[[^\]]*\])|[^\/\s]+):$')
+    section_pattern = re.compile(r' +sectname ([\S]+)')
+    size_pattern = re.compile(r' +size ([\da-fx]+)')
+    asmline_pattern = re.compile(r'^([0-9a-fA-F]+)\s')
+    label_pattern = re.compile(r'^((\-*\[[^\]]*\])|[^\/\s]+):$')
 
     for line in content:
         asmline_match = asmline_pattern.match(line)

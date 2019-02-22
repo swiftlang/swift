@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -146,12 +146,9 @@ extension NSRange {
   }
   
   public init<R: RangeExpression, S: StringProtocol>(_ region: R, in target: S)
-  where R.Bound == S.Index, S.Index == String.Index {
+  where R.Bound == S.Index {
     let r = region.relative(to: target)
-    self = NSRange(
-      location: r.lowerBound.encodedOffset - target.startIndex.encodedOffset,
-      length: r.upperBound.encodedOffset - r.lowerBound.encodedOffset
-    )
+    self.init(target._toUTF16Offsets(r))
   }
 
   @available(swift, deprecated: 4, renamed: "Range.init(_:)")

@@ -179,37 +179,19 @@ struct ObedientNonMutatingMutableAddressor: HasNonMutatingMutableSubscript {
   }
 }
 
-// FIXME: Actually plumb the work to fix the grammar in these
-// diagnostics if/when we productize them.  ("a addressor")
-struct RedundantAddressors1 {
+struct RedundantAddressors {
   var owner : Builtin.NativeObject
   subscript(index: Int) -> Int {
     unsafeAddress { return someValidAddress() } // expected-note {{previous definition of addressor here}}
-    addressWithNativeOwner { return (someValidAddress(), owner)  } // expected-error {{subscript already has an addressor}}
+    unsafeAddress { return someValidAddress() } // expected-error {{subscript already has an addressor}}
   }
 }
 
-struct RedundantMutableAddressors1 {
+struct RedundantMutableAddressors {
   var owner : Builtin.NativeObject
   subscript(index: Int) -> Int {
     unsafeAddress { return someValidAddress() }
     unsafeMutableAddress { return someValidAddress() } // expected-note {{previous definition of mutable addressor here}}
-    mutableAddressWithNativeOwner { return (someValidAddress(), owner)  } // expected-error {{subscript already has a mutable addressor}}
-  }
-}
-struct RedundantMutableAddressors2 {
-  var owner : Builtin.NativeObject
-  subscript(index: Int) -> Int {
-    unsafeAddress { return someValidAddress() }
-    unsafeMutableAddress { return someValidAddress() } // expected-note {{previous definition of mutable addressor here}}
-    mutableAddressWithNativeOwner { return (someValidAddress(), owner)  } // expected-error {{subscript already has a mutable addressor}}
-  }
-}
-struct RedundantMutableAddressors3 {
-  var owner : Builtin.NativeObject
-  subscript(index: Int) -> Int {
-    unsafeAddress { return someValidAddress() }
-    unsafeMutableAddress { return someValidAddress() } // expected-note {{previous definition of mutable addressor here}}
-    mutableAddressWithNativeOwner { return (someValidAddress(), owner)  } // expected-error {{subscript already has a mutable addressor}}
+    unsafeMutableAddress { return someValidAddress() } // expected-error {{subscript already has a mutable addressor}}
   }
 }

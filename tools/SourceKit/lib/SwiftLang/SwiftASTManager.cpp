@@ -431,9 +431,12 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
                                              DiagnosticEngine &Diags,
                                              StringRef UnresolvedPrimaryFile,
                                              std::string &Error) {
-  SmallVector<const char *, 16> Args(OrigArgs.begin(), OrigArgs.end());
+  SmallVector<const char *, 16> Args;
+  // Make sure to put '-resource-dir' at the top to allow overriding it by
+  // the passed in arguments.
   Args.push_back("-resource-dir");
   Args.push_back(Impl.RuntimeResourcePath.c_str());
+  Args.append(OrigArgs.begin(), OrigArgs.end());
 
   bool HadError = driver::getSingleFrontendInvocationFromDriverArguments(
       Args, Diags, [&](ArrayRef<const char *> FrontendArgs) {

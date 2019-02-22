@@ -5,7 +5,7 @@ sil_stage canonical
 import Swift
 
 class A {
-   @sil_stored final var x: Int { get set }
+   @_hasStorage final var x: Int { get set }
    init(x: Int)
 }
 sil_vtable A {}

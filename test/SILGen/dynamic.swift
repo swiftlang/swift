@@ -444,13 +444,13 @@ public class Base {
 public class Sub : Base {
   // CHECK-LABEL: sil hidden @$s7dynamic3SubC1xSbvg : $@convention(method) (@guaranteed Sub) -> Bool {
   // CHECK: bb0([[SELF:%.*]] : @guaranteed $Sub):
-  // CHECK:     [[AUTOCLOSURE:%.*]] = function_ref @$s7dynamic3SubC1xSbvgSbyKXKfu_ : $@convention(thin) (@guaranteed Sub) -> (Bool, @error Error)
+  // CHECK:     [[AUTOCLOSURE:%.*]] = function_ref @$s7dynamic3SubC1xSbvgSbyKXEfu_ : $@convention(thin) (@guaranteed Sub) -> (Bool, @error Error)
   // CHECK:     [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:     = partial_apply [callee_guaranteed] [[AUTOCLOSURE]]([[SELF_COPY]])
   // CHECK:     return {{%.*}} : $Bool
   // CHECK: } // end sil function '$s7dynamic3SubC1xSbvg'
 
-  // CHECK-LABEL: sil private [transparent] @$s7dynamic3SubC1xSbvgSbyKXKfu_ : $@convention(thin) (@guaranteed Sub) -> (Bool, @error Error) {
+  // CHECK-LABEL: sil private [transparent] @$s7dynamic3SubC1xSbvgSbyKXEfu_ : $@convention(thin) (@guaranteed Sub) -> (Bool, @error Error) {
   // CHECK: bb0([[VALUE:%.*]] : @guaranteed $Sub):
   // CHECK:     [[VALUE_COPY:%.*]] = copy_value [[VALUE]]
   // CHECK:     [[CAST_VALUE_COPY:%.*]] = upcast [[VALUE_COPY]]
@@ -460,7 +460,7 @@ public class Sub : Base {
   // CHECK:     = apply [[SUPER]]([[BORROWED_CAST_VALUE_COPY]])
   // CHECK:     end_borrow [[BORROWED_CAST_VALUE_COPY]]
   // CHECK:     destroy_value [[CAST_VALUE_COPY]]
-  // CHECK: } // end sil function '$s7dynamic3SubC1xSbvgSbyKXKfu_'
+  // CHECK: } // end sil function '$s7dynamic3SubC1xSbvgSbyKXEfu_'
   override var x: Bool { return false || super.x }
 }
 

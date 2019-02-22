@@ -88,4 +88,11 @@ NSString *getDescription(OpaqueValue *value, const Metadata *type);
 
 #endif
 
+namespace swift {
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
+HeapObject *_swift_reallocObject(HeapObject *obj, size_t size);
+
+}
+
 #endif

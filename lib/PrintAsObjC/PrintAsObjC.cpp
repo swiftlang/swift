@@ -2733,6 +2733,10 @@ public:
   void writeImports(raw_ostream &out) {
     out << "#if __has_feature(modules)\n";
 
+    out << "#if __has_warning(\"-Watimport-in-framework-header\")\n"
+        << "#pragma clang diagnostic ignored \"-Watimport-in-framework-header\"\n"
+        << "#endif\n";
+
     // Sort alphabetically for determinism and consistency.
     SmallVector<ImportModuleTy, 8> sortedImports{imports.begin(),
                                                  imports.end()};

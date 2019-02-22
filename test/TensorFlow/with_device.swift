@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-use-device-stack -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-module-level-graph=false -emit-sil -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-use-device-stack -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-module-level-graph=false -emit-sil -verify %s | %FileCheck %s
 
 import TensorFlow
 

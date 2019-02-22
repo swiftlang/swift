@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 461; // Last change: delete differentiation mode
+const uint16_t SWIFTMODULE_VERSION_MINOR = 471; // Last change: add parameter differentiability to SILFunctionType serialization
 
 using DeclIDField = BCFixed<31>;
 
@@ -108,6 +108,7 @@ using CharOffsetField = BitOffsetField;
 
 using FileSizeField = BCVBR<16>;
 using FileModTimeField = BCVBR<16>;
+using FileHashField = BCVBR<16>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -273,6 +274,14 @@ enum class ParameterConvention : uint8_t {
 };
 using ParameterConventionField = BCFixed<4>;
 
+// SWIFT_ENABLE_TENSORFLOW
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class SILParameterDifferentiability : uint8_t {
+  DifferentiableOrNotApplicable,
+  NotDifferentiable,
+};
+
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
 enum class ResultConvention : uint8_t {
@@ -291,13 +300,6 @@ enum MetatypeRepresentation : uint8_t {
 };
 using MetatypeRepresentationField = BCFixed<2>;
 
-// These IDs must \em not be renumbered or reordered without incrementing
-// the module version.
-enum class AddressorKind : uint8_t {
-  NotAddressor, Unsafe, Owning, NativeOwning
-};
-using AddressorKindField = BCFixed<3>;
- 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
 enum class SelfAccessKind : uint8_t {
@@ -596,7 +598,8 @@ namespace options_block {
     XCC,
     IS_SIB,
     IS_TESTABLE,
-    RESILIENCE_STRATEGY
+    RESILIENCE_STRATEGY,
+    ARE_PRIVATE_IMPORTS_ENABLED
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -618,6 +621,10 @@ namespace options_block {
     IS_TESTABLE
   >;
 
+  using ArePrivateImportsEnabledLayout = BCRecordLayout<
+    ARE_PRIVATE_IMPORTS_ENABLED
+  >;
+
   using ResilienceStrategyLayout = BCRecordLayout<
     RESILIENCE_STRATEGY,
     BCFixed<2>
@@ -634,7 +641,8 @@ namespace input_block {
     IMPORTED_HEADER,
     IMPORTED_HEADER_CONTENTS,
     MODULE_FLAGS, // [unused]
-    SEARCH_PATH
+    SEARCH_PATH,
+    FILE_DEPENDENCY
   };
 
   using ImportedModuleLayout = BCRecordLayout<
@@ -657,7 +665,7 @@ namespace input_block {
     IMPORTED_HEADER,
     BCFixed<1>, // exported?
     FileSizeField, // file size (for validation)
-    FileModTimeField, // file mtime (for validation)
+    FileHashField, // file hash (for validation)
     BCBlob // file path
   >;
 
@@ -671,6 +679,13 @@ namespace input_block {
     BCFixed<1>, // framework?
     BCFixed<1>, // system?
     BCBlob      // path
+  >;
+
+  using FileDependencyLayout = BCRecordLayout<
+    FILE_DEPENDENCY,
+    FileSizeField,    // file size (for validation)
+    FileModTimeField, // file mtime (for validation)
+    BCBlob            // path
   >;
 }
 
@@ -735,7 +750,6 @@ namespace decls_block {
     FUNCTION_TYPE,
     TypeIDField, // output
     FunctionTypeRepresentationField, // representation
-    BCFixed<1>,  // auto-closure?
     BCFixed<1>,  // noescape?
     // SWIFT_ENABLE_TENSORFLOW
     BCFixed<1>,  // throws?
@@ -822,7 +836,9 @@ namespace decls_block {
     BCFixed<30>,           // number of yields
     BCFixed<30>,           // number of results
     GenericSignatureIDField, // generic signature
-    BCArray<TypeIDField>   // parameter types/conventions, alternating
+    // SWIFT_ENABLE_TENSORFLOW
+    BCArray<TypeIDField>   // for each parameter: type, convention, and (if
+                           // function is differentiable) differentiability,
                            // followed by result types/conventions, alternating
                            // followed by error result type/convention
     // Optionally a protocol conformance (for witness_methods)
@@ -1029,6 +1045,7 @@ namespace decls_block {
     VarDeclSpecifierField, // specifier
     TypeIDField,           // interface type
     BCFixed<1>,            // isVariadic?
+    BCFixed<1>,            // isAutoClosure?
     DefaultArgumentField,  // default argument kind
     BCBlob                 // default argument text
   >;
@@ -1080,7 +1097,6 @@ namespace decls_block {
     DeclIDField,  // overridden function
     DeclIDField,  // AccessorStorageDecl
     AccessorKindField, // accessor kind
-    AddressorKindField, // addressor kind
     AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot
     BCFixed<1>,   // default argument resilience expansion
@@ -1257,13 +1273,8 @@ namespace decls_block {
   >;
 
   using GenericParamListLayout = BCRecordLayout<
-    GENERIC_PARAM_LIST
-    // The actual parameters and requirements trail the record.
-  >;
-
-  using GenericParamLayout = BCRecordLayout<
-    GENERIC_PARAM,
-    DeclIDField // Typealias
+    GENERIC_PARAM_LIST,
+    BCArray<DeclIDField>        // the GenericTypeParamDecls
   >;
 
   using GenericSignatureLayout = BCRecordLayout<
@@ -1312,6 +1323,11 @@ namespace decls_block {
     BCVBR<2> // context-scoped discriminator counter
   >;
 
+  using FilenameForPrivateLayout = BCRecordLayout<
+    FILENAME_FOR_PRIVATE,
+    IdentifierIDField  // the file name, as an identifier
+  >;
+
   /// A placeholder for lack of concrete conformance information.
   using AbstractProtocolConformanceLayout = BCRecordLayout<
     ABSTRACT_PROTOCOL_CONFORMANCE,
@@ -1334,6 +1350,11 @@ namespace decls_block {
     // The array contains type witnesses, then value witnesses.
     // Requirement signature conformances follow, then the substitution records
     // for the associated types.
+  >;
+
+  using SelfProtocolConformanceLayout = BCRecordLayout<
+    SELF_PROTOCOL_CONFORMANCE,
+    DeclIDField // the protocol
   >;
 
   using SpecializedProtocolConformanceLayout = BCRecordLayout<
@@ -1516,6 +1537,7 @@ namespace decls_block {
     = BCRecordLayout<RestatedObjCConformance_DECL_ATTR>;
   using ClangImporterSynthesizedTypeDeclAttrLayout
     = BCRecordLayout<ClangImporterSynthesizedType_DECL_ATTR>;
+  using PrivateImportDeclAttrLayout = BCRecordLayout<PrivateImport_DECL_ATTR>;
 
   using InlineDeclAttrLayout = BCRecordLayout<
     Inline_DECL_ATTR,
@@ -1576,15 +1598,19 @@ namespace decls_block {
   using DifferentiableDeclAttrLayout = BCRecordLayout<
     Differentiable_DECL_ATTR,
     BCFixed<1>, // Implicit flag.
-    IdentifierIDField, // Primal name.
-    DeclIDField, // Primal function declaration.
-    IdentifierIDField, // Adjoint name.
-    DeclIDField, // Adjoint function declaration.
     IdentifierIDField, // JVP name.
     DeclIDField, // JVP function declaration.
     IdentifierIDField, // VJP name.
     DeclIDField, // VJP function declaration.
-    BCArray<BCFixed<32>> // Differentiation parameters.
+    BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
+  >;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  using DifferentiatingDeclAttrLayout = BCRecordLayout<
+    Differentiating_DECL_ATTR,
+    BCFixed<1>, // Implicit flag.
+    IdentifierIDField, // Original name.
+    DeclIDField // Original function declaration.
   >;
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) \
@@ -1593,6 +1619,14 @@ namespace decls_block {
     BCFixed<1> /* implicit flag */ \
   >;
 #include "swift/AST/Attr.def"
+
+  using DynamicReplacementDeclAttrLayout = BCRecordLayout<
+    DynamicReplacement_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    DeclIDField, // replaced function
+    BCVBR<4>,   // # of arguments (+1) or zero if no name
+    BCArray<IdentifierIDField>
+  >;
 
 }
 

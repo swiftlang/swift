@@ -2,9 +2,9 @@
 
 import Swift
 
-// CHECK: @sil_stored var orgx
+// CHECK: @_hasStorage var orgx
 class Rect {
-  @sil_stored var orgx: Double { get }
+  @_hasStorage var orgx: Double { get }
   init(orgx: Double)
 }
 

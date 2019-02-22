@@ -1,0 +1,55 @@
+
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -emit-module-path=%t/keypaths_external_other.swiftmodule -module-name=keypaths_external_other %S/Inputs/keypaths_external_other.swift
+// -- Convert <i32 0x...> constants to decimal constants that LLVM will print
+// RUN: %{python} %utils/chex.py < %s > %t/keypaths.sil
+// RUN: %target-swift-frontend -module-name keypaths -emit-ir %s -I %t | %FileCheck %t/keypaths.sil
+
+sil_stage canonical
+import Swift
+import keypaths_external_other
+
+sil @generic_external : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed A, @in_guaranteed B, @in_guaranteed A, @in_guaranteed B, @in_guaranteed A, @in_guaranteed B) -> () {
+entry(%0 : @trivial $*A, %1 : @trivial $*B, %2 : @trivial $*A, %3 : @trivial $*B, %4 : @trivial $*A, %5 : @trivial $*B):
+  %t = keypath $KeyPath<G<B>, B>, <Z> (
+    root $G<Z>;
+    gettable_property $Z,
+      id @g_x_get : $@convention(thin) <Z> (@in_guaranteed G<Z>) -> @out Z,
+      getter @g_x_get : $@convention(thin) <Z> (@in_guaranteed G<Z>) -> @out Z,
+      external #G.x<Z>
+  ) <B>
+
+  %u = keypath $KeyPath<G<A>, A>, <X: Hashable, Y: Hashable> (
+    root $G<Y>;
+    gettable_property $Y,
+      id @g_subscript_get : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed G<B>, UnsafeRawPointer) -> @out B,
+      getter @g_subscript_get : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed G<B>, UnsafeRawPointer) -> @out B,
+      indices [%$0 : $X : $*X],
+      indices_equals @s_equals : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer, UnsafeRawPointer) -> Bool,
+      indices_hash @s_hash : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer) -> Int,
+      external #G.subscript<Y, X>
+  ) <B, A> (%1)
+
+  return undef : $()
+}
+
+sil @g_x_get : $@convention(thin) <Z> (@in_guaranteed G<Z>) -> @out Z
+sil @g_subscript_get : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed G<B>, UnsafeRawPointer) ->
+@out B
+
+sil @s_equals : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer, UnsafeRawPointer) -> Bool
+sil @s_hash : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer) -> Int
+
+// -- %t
+// CHECK: [[KP_T:@keypath(\..*)?]] = private global <{ {{.*}} }> <{ {{.*}} i32 1, {{.*}} @"got.$s23keypaths_external_other1GV1xxvpMV"
+// CHECK-SAME:   @"symbolic x"
+//            -- computed get-only property, identified by indirect pointer
+// CHECK-SAME:   <i32 0x0208_0002>
+
+// -- %u
+// CHECK: [[KP_U:@keypath(\..*)?]] = private global <{ {{.*}} }> <{ {{.*}} i32 3, {{.*}} @"got.$s23keypaths_external_other1GVyxqd__cSHRd__luipMV"
+// CHECK-SAME:   @"symbolic q_"
+// CHECK-SAME:   @"symbolic x"
+// CHECK-SAME:   @"keypath_get_witness_table
+//            -- computed get-only property, identified by indirect pointer
+// CHECK-SAME:   <i32 0x0208_0002>

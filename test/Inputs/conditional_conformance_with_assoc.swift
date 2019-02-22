@@ -268,6 +268,6 @@ extension X: Sub where T: Sub, T.S == T {
 // CHECK:   [[XT_TYPE:%.*]] = bitcast %swift.type* %"X<T>" to %swift.type**
 // CHECK:   [[ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[XT_TYPE]], i64 2
 // CHECK:   [[T:%.*]] = load %swift.type*, %swift.type** [[ADDR]]
-// CHECK:   %T.Base = call swiftcc i8** {{.*}}(%swift.type* %T, %swift.type* %T, i8** {{.*}})
+// CHECK:   %T.Base = call swiftcc i8** @swift_getAssociatedConformanceWitness(i8** {{.*}}, %swift.type* %T, %swift.type* %T
 // CHECK:   ret void
 // CHECK: }

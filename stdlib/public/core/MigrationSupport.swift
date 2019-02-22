@@ -125,15 +125,13 @@ public typealias _BuiltinExtendedGraphemeClusterLiteralConvertible = _Expressibl
 public typealias ExtendedGraphemeClusterLiteralConvertible = ExpressibleByExtendedGraphemeClusterLiteral
 @available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByBuiltinStringLiteral")
 public typealias _BuiltinStringLiteralConvertible = _ExpressibleByBuiltinStringLiteral
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByBuiltinUTF16StringLiteral")
-public typealias _BuiltinUTF16StringLiteralConvertible = _ExpressibleByBuiltinUTF16StringLiteral
 @available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByStringLiteral")
 public typealias StringLiteralConvertible = ExpressibleByStringLiteral
 @available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByArrayLiteral")
 public typealias ArrayLiteralConvertible = ExpressibleByArrayLiteral
 @available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByDictionaryLiteral")
 public typealias DictionaryLiteralConvertible = ExpressibleByDictionaryLiteral
-@available(swift, deprecated: 3.0, obsoleted: 5.0, message: "it will be replaced or redesigned in Swift 4.0.  Instead of conforming to 'StringInterpolationConvertible', consider adding an 'init(_:String)'")
+@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByStringInterpolation")
 public typealias StringInterpolationConvertible = ExpressibleByStringInterpolation
 @available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByColorLiteral")
 public typealias _ColorLiteralConvertible = _ExpressibleByColorLiteral
@@ -356,22 +354,6 @@ extension LazySequenceProtocol {
   }
 }
 
-extension LazyMapCollection {
-  // This overload is needed to re-enable Swift 3 source compatibility related
-  // to a bugfix in ranking behavior of the constraint solver.
-  @available(swift, obsoleted: 4.0)
-  public static func + <
-    Other : LazyCollectionProtocol
-  >(lhs: LazyMapCollection, rhs: Other) -> [Element]
-  where Other.Element == Element {
-    var result: [Element] = []
-    result.reserveCapacity(numericCast(lhs.count + rhs.count))
-    result.append(contentsOf: lhs)
-    result.append(contentsOf: rhs)
-    return result
-  }
-}
-
 extension FloatingPoint {
   @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Please use the `abs(_:)` free function")
   public static func abs(_ x: Self) -> Self {
@@ -406,30 +388,6 @@ extension FixedWidthInteger {
     "Use operators or dividedReportingOverflow(by:) instead.")
   public func unsafeDivided(by other: Self) -> Self {
     fatalError("unavailable")
-  }
-}
-
-extension LazyCollectionProtocol {
-  /// Returns the non-`nil` results of mapping the given transformation over
-  /// this collection.
-  ///
-  /// Use this method to receive a collection of non-optional values when your
-  /// transformation produces an optional value.
-  ///
-  /// - Parameter transform: A closure that accepts an element of this
-  ///   collection as its argument and returns an optional value.
-  ///
-  /// - Complexity: O(1)
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "compactMap(_:)",
-    message: "Please use compactMap(_:) for the case where closure returns an optional value")
-  public func flatMap<ElementOfResult>(
-    _ transform: @escaping (Elements.Element) -> ElementOfResult?
-  ) -> LazyMapCollection<
-    LazyFilterCollection<
-      LazyMapCollection<Elements, ElementOfResult?>>,
-    ElementOfResult
-  > {
-    return self.map(transform).filter { $0 != nil }.map { $0! }
   }
 }
 
@@ -582,19 +540,14 @@ extension String.UTF8View {
 extension String {
   @available(swift, obsoleted: 4)
   public subscript(bounds: Range<Index>) -> String {
-    // TODO: Make unreachable when the Foundation overlay is off of Swift 3
     _boundsCheck(bounds)
-    return String(Substring(_slice: Slice(base: self, bounds: bounds)))
+    return String(self[bounds])
   }
 
   @available(swift, obsoleted: 4)
   public subscript(bounds: ClosedRange<Index>) -> String {
-    // TODO: Make unreachable when the Foundation overlay is off of Swift 3
-    let r = bounds.relative(to: self)
-    _boundsCheck(r)
-    return String(Substring(_slice: Slice(
-          base: self,
-          bounds: r)))
+    _boundsCheck(bounds)
+    return String(self[bounds])
   }
 }
 

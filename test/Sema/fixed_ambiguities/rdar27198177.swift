@@ -3,5 +3,5 @@
 
 let arr = ["A", "B", "C"]
 let lazy: LazyMapCollection = arr.lazy.map { $0 }
-// CHECK: function_ref @$ss22LazyCollectionProtocolPsE6filterys0a6FilterB0Vy8ElementsQzGSb7ElementQzcF
+// CHECK: function_ref @$ss20LazySequenceProtocolPsE6filterys0a6FilterB0Vy8ElementsQzGSb7ElementQzcF
 _ = lazy.filter { $0 > "A" }.count

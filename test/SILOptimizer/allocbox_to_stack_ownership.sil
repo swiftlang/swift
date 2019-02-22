@@ -533,7 +533,7 @@ struct Q : Count {
 }
 
 struct S<T : Count> {
-  @sil_stored var t: T
+  @_hasStorage var t: T
   var count: Int { get }
   func test(i: Int) -> Bool
   init(t: T)

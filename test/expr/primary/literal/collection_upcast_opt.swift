@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -dump-ast 2> %t.ast
+// RUN: %target-typecheck-verify-swift -dump-ast > %t.ast
 // RUN: %FileCheck %s < %t.ast
 
 // Verify that upcasts of array literals upcast the individual elements in place
@@ -15,7 +15,8 @@ struct TakesArray<T> {
 // CHECK: assign_expr
 // CHECK-NOT: collection_upcast_expr
 // CHECK: array_expr type='[(X) -> Void]'
-// CHECK-NEXT: function_conversion_expr implicit type='(X) -> Void'
+// CHECK: semantic_expr
+// CHECK: function_conversion_expr implicit type='(X) -> Void'
 // CHECK-NEXT: {{declref_expr.*x1}}
 // CHECK-NEXT: function_conversion_expr implicit type='(X) -> Void'
 // CHECK-NEXT: {{declref_expr.*x2}}

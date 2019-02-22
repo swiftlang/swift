@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -verify | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-static-assert -emit-sil %s -verify | %FileCheck %s
 
 // Checks that the constant evaluator does not load WellKnownFunctions. This
 // test is in its own file because other test code might load

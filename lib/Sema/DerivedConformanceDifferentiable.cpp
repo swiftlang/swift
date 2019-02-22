@@ -32,17 +32,6 @@
 
 using namespace swift;
 
-static Identifier
-getVectorSpaceIdentifier(AutoDiffAssociatedVectorSpaceKind kind,
-                         ASTContext &C) {
-  switch (kind) {
-  case AutoDiffAssociatedVectorSpaceKind::Tangent:
-    return C.Id_TangentVector;
-  case AutoDiffAssociatedVectorSpaceKind::Cotangent:
-    return C.Id_CotangentVector;
-  }
-}
-
 // Return the protocol requirement with the specified name.
 // TODO: Move function to shared place for use with other derived conformances.
 static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
@@ -53,7 +42,7 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
     return !isa<ProtocolDecl>(v->getDeclContext()) ||
            !v->isProtocolRequirement();
   });
-  assert(lookup.size() == 1 && "Ambiguous protocol requirement");
+  assert(lookup.size() <= 1 && "Ambiguous protocol requirement");
   return lookup.front();
 }
 
@@ -61,12 +50,71 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
 // differentiation, except the ones tagged `@noDerivative`.
 static void
 getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal,
+                                      DeclContext *DC,
                                       SmallVectorImpl<VarDecl *> &result) {
+  auto &C = nominal->getASTContext();
+  auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   for (auto *vd : nominal->getStoredProperties()) {
     if (vd->getAttrs().hasAttribute<NoDerivativeAttr>())
       continue;
+    if (!vd->hasInterfaceType())
+      C.getLazyResolver()->resolveDeclSignature(vd);
+    auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
+    if (!TypeChecker::conformsToProtocol(varType, diffableProto, nominal,
+                                         ConformanceCheckFlags::Used))
+      continue;
     result.push_back(vd);
   }
+}
+
+// Convert the given `ValueDecl` to a `StructDecl` if it is a `StructDecl` or a
+// `TypeDecl` with an underlying struct type. Otherwise, return `nullptr`.
+static StructDecl *convertToStructDecl(ValueDecl *v) {
+  if (auto structDecl = dyn_cast<StructDecl>(v))
+    return structDecl;
+  auto typeDecl = dyn_cast<TypeDecl>(v);
+  if (!typeDecl)
+    return nullptr;
+  return dyn_cast_or_null<StructDecl>(
+      typeDecl->getDeclaredInterfaceType()->getAnyNominal());
+}
+
+// Get the `Differentiable` protocol associated type for the given `VarDecl`.
+// TODO: Generalize and move function to shared place for use with other derived
+// conformances.
+static Type getAssociatedType(VarDecl *decl, DeclContext *DC, Identifier id) {
+  auto &C = decl->getASTContext();
+  auto *diffableProto = C.getProtocol(KnownProtocolKind::__Differentiable);
+  if (!decl->hasInterfaceType())
+    C.getLazyResolver()->resolveDeclSignature(decl);
+  auto varType = DC->mapTypeIntoContext(decl->getValueInterfaceType());
+  auto conf = TypeChecker::conformsToProtocol(varType, diffableProto, DC,
+                                              ConformanceCheckFlags::Used);
+  if (!conf)
+    return nullptr;
+  Type assocType = ProtocolConformanceRef::getTypeWitnessByName(
+      varType, *conf, id, C.getLazyResolver());
+  assert(assocType && "`Differentiable` protocol associated type not found");
+  return assocType;
+}
+
+// Get the `Differentiable` protocol associated struct for the given nominal
+// `DeclContext`. Asserts that the associated struct type exists.
+static StructDecl *getAssociatedStructDecl(DeclContext *DC, Identifier id) {
+  assert(DC->getSelfNominalTypeDecl() && "Must be a nominal `DeclContext`");
+  auto &C = DC->getASTContext();
+  auto *diffableProto = C.getProtocol(KnownProtocolKind::__Differentiable);
+  assert(diffableProto && "`Differentiable` protocol not found");
+  auto conf = TypeChecker::conformsToProtocol(DC->getSelfTypeInContext(),
+                                              diffableProto,
+                                              DC, ConformanceCheckFlags::Used);
+  assert(conf && "Nominal must conform to `Differentiable`");
+  Type assocType = ProtocolConformanceRef::getTypeWitnessByName(
+      DC->getSelfTypeInContext(), *conf, id, C.getLazyResolver());
+  assert(assocType && "`Differentiable` protocol associated type not found");
+  auto structDecl = dyn_cast<StructDecl>(assocType->getAnyNominal());
+  assert(structDecl && "Associated type must be a struct type");
+  return structDecl;
 }
 
 bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
@@ -80,26 +128,48 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
 
-  // Nominal type must not customize `TangentVector` or `CotangentVector` to
-  // anything other than `Self`.
+  // Nominal type must not customize `TangentVector`, `CotangentVector`, or
+  // `AllDifferentiableVariables` to anything other than `Self`.
   // Otherwise, synthesis is semantically unsupported.
   auto tangentDecls = nominal->lookupDirect(C.Id_TangentVector);
   auto cotangentDecls = nominal->lookupDirect(C.Id_CotangentVector);
-  auto isValidVectorSpaceCandidate = [&](ValueDecl *v) {
-    if (!v->hasInterfaceType())
-      lazyResolver->resolveDeclSignature(v);
-    if (!v->hasInterfaceType())
-      return false;
-    return v->isImplicit() ||
-           (v->getInterfaceType()->isEqual(nominal->getInterfaceType()) &&
-            TypeChecker::conformsToProtocol(nominal->getDeclaredInterfaceType(),
-                                            addArithProto, DC,
-                                            ConformanceCheckFlags::Used));
+  auto allDiffableVarsDecls =
+      nominal->lookupDirect(C.Id_AllDifferentiableVariables);
+  auto nominalTypeInContext =
+      DC->mapTypeIntoContext(nominal->getDeclaredInterfaceType());
+
+  auto isValidAssocTypeCandidate =
+      [&](ValueDecl *v, bool checkAdditiveArithmetic = false) -> StructDecl * {
+    // Valid candidate must be a struct or a typealias to a struct.
+    auto structDecl = convertToStructDecl(v);
+    if (!structDecl)
+      return nullptr;
+    // Valid candidate must either:
+    // - Be implicit (previously synthesized).
+    // - Equal nominal (and conform to `AdditiveArithmetic` if flag is true).
+    if (structDecl->isImplicit())
+      return structDecl;
+    if (structDecl == nominal) {
+      if (!checkAdditiveArithmetic)
+        return structDecl;
+      // Check conformance to `AdditiveArithmetic`.
+      if (TypeChecker::conformsToProtocol(nominalTypeInContext, addArithProto,
+                                          DC, ConformanceCheckFlags::Used))
+        return structDecl;
+    }
+    // Otherwise, candidate is invalid.
+    return nullptr;
   };
-  auto invalidTangentDecls =
-      llvm::partition(tangentDecls, isValidVectorSpaceCandidate);
+
+  auto invalidTangentDecls = llvm::partition(tangentDecls, [&](ValueDecl *v) {
+    return isValidAssocTypeCandidate(v, /*checkAdditiveArithmetic*/ true);
+  });
   auto invalidCotangentDecls =
-      llvm::partition(cotangentDecls, isValidVectorSpaceCandidate);
+      llvm::partition(cotangentDecls, [&](ValueDecl *v) {
+        return isValidAssocTypeCandidate(v, /*checkAdditiveArithmetic*/ true);
+      });
+  auto invalidAllDiffableVarsDecls =
+      llvm::partition(allDiffableVarsDecls, isValidAssocTypeCandidate);
 
   auto validTangentDeclCount =
       std::distance(tangentDecls.begin(), invalidTangentDecls);
@@ -109,100 +179,48 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
       std::distance(cotangentDecls.begin(), invalidCotangentDecls);
   auto invalidCotangentDeclCount =
       std::distance(invalidCotangentDecls, cotangentDecls.end());
+  auto validAllDiffableVarsDeclCount =
+      std::distance(allDiffableVarsDecls.begin(), invalidAllDiffableVarsDecls);
+  auto invalidAllDiffableVarsDeclCount =
+      std::distance(invalidAllDiffableVarsDecls, allDiffableVarsDecls.end());
 
-  // There cannot be any invalid vector space types.
-  // There can be at most one valid vector space type.
-  if (invalidTangentDeclCount != 0 || invalidCotangentDeclCount != 0 ||
-      validTangentDeclCount > 1 || validCotangentDeclCount > 1)
+  // There cannot be any invalid associated types. There can be at most one
+  // valid associated type.
+  if (invalidTangentDeclCount != 0 ||
+      invalidCotangentDeclCount != 0 ||
+      invalidAllDiffableVarsDeclCount != 0 ||
+      validTangentDeclCount > 1 ||
+      validCotangentDeclCount > 1 ||
+      validAllDiffableVarsDeclCount > 1)
     return false;
 
-  // All stored properties not marked with `@noDerivative` must conform to
-  // `Differentiable`.
+  // All stored properties not marked with `@noDerivative`:
+  // - Must conform to `Differentiable`.
+  // - Must not have any `let` stored properties with an initial value.
+  //   - This restriction may be lifted later with support for "true" memberwise
+  //     initializers that initialize all stored properties, including initial
+  //     value information.
   SmallVector<VarDecl *, 16> diffProperties;
-  getStoredPropertiesForDifferentiation(structDecl, diffProperties);
+  getStoredPropertiesForDifferentiation(structDecl, DC, diffProperties);
   return llvm::all_of(diffProperties, [&](VarDecl *v) {
-    if (!v->hasType())
-      lazyResolver->resolveDeclSignature(v);
-    if (!v->hasType())
+    if (v->isLet() && v->hasInitialValue())
       return false;
-    auto declType = v->getType()->hasArchetype()
-                        ? v->getType()
-                        : DC->mapTypeIntoContext(v->getType());
-    auto conf = TypeChecker::conformsToProtocol(declType, diffableProto, DC,
-                                                ConformanceCheckFlags::Used);
-    return (bool)conf;
+    if (!v->hasInterfaceType())
+      lazyResolver->resolveDeclSignature(v);
+    if (!v->hasInterfaceType())
+      return false;
+    auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
+    return (bool)TypeChecker::conformsToProtocol(varType, diffableProto, DC,
+                                                 ConformanceCheckFlags::Used);
   });
-}
-
-// Get the specified vector space associated type for the given declaration.
-// TODO: Generalize and move function to shared place for use with other derived
-// conformances.
-static Type getVectorSpaceType(VarDecl *decl, DeclContext *DC,
-                               AutoDiffAssociatedVectorSpaceKind kind) {
-  auto &C = decl->getASTContext();
-  auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
-  auto declType = decl->getType()->hasArchetype()
-                      ? decl->getType()
-                      : DC->mapTypeIntoContext(decl->getType());
-  C.getLazyResolver()->resolveDeclSignature(decl);
-  auto conf = TypeChecker::conformsToProtocol(declType, diffableProto, DC,
-                                              ConformanceCheckFlags::Used);
-  if (!conf)
-    return Type();
-  auto vectorSpaceId = getVectorSpaceIdentifier(kind, C);
-  Type vectorSpaceType = ProtocolConformanceRef::getTypeWitnessByName(
-      declType, *conf, vectorSpaceId, C.getLazyResolver());
-  assert(vectorSpaceType &&
-         "Differentiable protocol vector space type not found");
-  return vectorSpaceType;
-}
-
-// Attempt to find a vector space associated type for the given nominal type.
-static StructDecl *
-getVectorSpaceStructDecl(NominalTypeDecl *nominal,
-                         AutoDiffAssociatedVectorSpaceKind kind) {
-  auto module = nominal->getModuleContext();
-  auto lookupConformance = LookUpConformanceInModule(module);
-  auto vectorSpace =
-      nominal->getDeclaredInterfaceType()->getAutoDiffAssociatedVectorSpace(
-          kind, lookupConformance);
-  if (!vectorSpace)
-    return nullptr;
-  auto vectorSpaceStructDecl =
-      dyn_cast<StructDecl>(vectorSpace->getType()->getAnyNominal());
-  if (!vectorSpaceStructDecl)
-    return nullptr;
-  return vectorSpaceStructDecl;
-}
-
-// Get memberwise initializer for a nominal type.
-static ConstructorDecl *getMemberwiseInitializer(NominalTypeDecl *nominal) {
-  ConstructorDecl *memberwiseInitDecl = nullptr;
-  auto ctorDecls = nominal->lookupDirect(DeclBaseName::createConstructor());
-  for (auto decl : ctorDecls) {
-    auto ctorDecl = dyn_cast<ConstructorDecl>(decl);
-    if (!ctorDecl)
-      continue;
-    // Continue if:
-    // - Constructor is not a memberwise initializer.
-    // - Constructor is implicit and takes no arguments, and nominal has no
-    //   stored properties. This is ad-hoc and accepts empt struct
-    //   constructors generated via `TypeChecker::defineDefaultConstructor`.
-    if (!ctorDecl->isMemberwiseInitializer() &&
-        !(nominal->getStoredProperties().empty() && ctorDecl->isImplicit() &&
-          ctorDecl->getParameters()->size() == 0))
-      continue;
-    assert(!memberwiseInitDecl && "Memberwise initializer already found");
-    memberwiseInitDecl = ctorDecl;
-  }
-  return memberwiseInitDecl;
 }
 
 // Synthesize body for a `Differentiable` method requirement.
 static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
                                             Identifier methodName,
                                             Identifier methodParamLabel) {
-  auto *nominal = funcDecl->getDeclContext()->getSelfNominalTypeDecl();
+  auto *parentDC = funcDecl->getParent();
+  auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
 
   // Create memberwise initializer for the returned nominal type:
@@ -212,7 +230,7 @@ static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
   auto *retNominal = retNominalInterfaceType->getAnyNominal();
   auto retNominalType = funcDecl->mapTypeIntoContext(retNominalInterfaceType);
   auto *retNominalTypeExpr = TypeExpr::createImplicit(retNominalType, C);
-  auto *memberwiseInitDecl = getMemberwiseInitializer(retNominal);
+  auto *memberwiseInitDecl = retNominal->getEffectiveMemberwiseInitializer();
   assert(memberwiseInitDecl && "Memberwise initializer must exist");
   auto *initDRE =
       new (C) DeclRefExpr(memberwiseInitDecl, DeclNameLoc(), /*Implicit*/ true);
@@ -220,7 +238,7 @@ static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
   auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, retNominalTypeExpr);
 
   // Get method protocol requirement.
-  auto *diffProto = C.getProtocol(KnownProtocolKind::Differentiable);
+  auto *diffProto = C.getProtocol(KnownProtocolKind::__Differentiable);
   auto *methodReq = getProtocolRequirement(diffProto, methodName);
 
   // Get references to `self` and parameter declarations.
@@ -243,6 +261,11 @@ static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
     return;
   }
 
+  // Hash properties for differentiation into a set for fast lookup.
+  SmallVector<VarDecl *, 8> diffProps;
+  getStoredPropertiesForDifferentiation(nominal, parentDC, diffProps);
+  SmallPtrSet<VarDecl *, 8> diffPropsSet(diffProps.begin(), diffProps.end());
+
   // Create call expression applying a member method to a parameter member.
   // Format: `<member>.method(<parameter>.<member>)`.
   // Example: `x.moved(along: direction.x)`.
@@ -256,16 +279,16 @@ static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
       }
     }
     assert(selfMember && "Could not find corresponding self member");
-    // If member has `@noDerivative`, create direct reference to member.
-    if (retNominalMember->getAttrs().hasAttribute<NoDerivativeAttr>()) {
-      return new (C)
-          MemberRefExpr(selfDRE, SourceLoc(), selfMember, DeclNameLoc(),
-                        /*Implicit*/ true);
-    }
+    // If member is not for differentiation, create direct reference to member.
+    if (!diffPropsSet.count(selfMember))
+      return new (C) MemberRefExpr(selfDRE, SourceLoc(), selfMember,
+                                   DeclNameLoc(), /*Implicit*/ true);
     // Otherwise, construct member method call.
     auto module = nominal->getModuleContext();
-    auto confRef = module->lookupConformance(selfMember->getType(), diffProto);
-    assert(confRef && "Member does not conform to 'Differentiable'");
+    auto selfMemberType =
+        parentDC->mapTypeIntoContext(selfMember->getValueInterfaceType());
+    auto confRef = module->lookupConformance(selfMemberType, diffProto);
+    assert(confRef && "Member does not conform to `Differentiable`");
 
     // Get member type's method, e.g. `Member.moved(along:)`.
     // Use protocol requirement declaration for the method by default: this
@@ -274,9 +297,8 @@ static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
     // If conformance reference is concrete, then use concrete witness
     // declaration for the operator.
     if (confRef->isConcrete())
-      if (auto methodDecl =
-              confRef->getConcrete()->getWitnessDecl(methodReq, nullptr))
-        memberMethodDecl = methodDecl;
+      memberMethodDecl = confRef->getConcrete()->getWitnessDecl(
+          methodReq, C.getLazyResolver());
     assert(memberMethodDecl && "Member method declaration must exist");
     auto memberMethodDRE =
         new (C) DeclRefExpr(memberMethodDecl, DeclNameLoc(), /*Implicit*/ true);
@@ -312,7 +334,7 @@ static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
   // Create array of member method call expressions.
   llvm::SmallVector<Expr *, 2> memberMethodCallExprs;
   llvm::SmallVector<Identifier, 2> memberNames;
-  for (auto member : retNominal->getStoredProperties()) {
+  for (auto *member : retNominal->getStoredProperties()) {
     // Initialized `let` properties don't get an argument in memberwise
     // initializers.
     if (member->isLet() && member->getParentInitializer())
@@ -381,13 +403,16 @@ static ValueDecl *deriveDifferentiable_method(
   // Add memberwise initializer if necessary.
   auto returnNominal = returnType->getAnyNominal();
   assert(returnNominal && "Return type must be a nominal type");
-  if (!getMemberwiseInitializer(returnNominal)) {
+  if (!returnNominal->getEffectiveMemberwiseInitializer()) {
     // The implicit memberwise constructor must be explicitly created so that
     // it can called in `Differentiable` methods. Normally, the memberwise
     // constructor is synthesized during SILGen, which is too late.
     auto *initDecl = createImplicitConstructor(
         TC, returnNominal, ImplicitConstructorKind::Memberwise);
-    returnNominal->addMember(initDecl);
+    if (nominal == returnNominal)
+      derived.addMembersToConformanceContext(initDecl);
+    else
+      returnNominal->addMember(initDecl);
     C.addSynthesizedDecl(initDecl);
   }
 
@@ -396,14 +421,11 @@ static ValueDecl *deriveDifferentiable_method(
 
 // Synthesize the `moved(along:)` function declaration.
 static ValueDecl *deriveDifferentiable_moved(DerivedConformance &derived) {
-  auto nominal = derived.Nominal;
   auto &C = derived.TC.Context;
   auto parentDC = derived.getConformanceContext();
   auto selfInterfaceType = parentDC->getDeclaredInterfaceType();
 
-  StructDecl *tangentDecl = getVectorSpaceStructDecl(
-      nominal, AutoDiffAssociatedVectorSpaceKind::Tangent);
-  assert(tangentDecl && "'TangentVector' struct must exist");
+  auto *tangentDecl = getAssociatedStructDecl(parentDC, C.Id_TangentVector);
   auto tangentType = tangentDecl->getDeclaredInterfaceType();
 
   return deriveDifferentiable_method(
@@ -415,17 +437,13 @@ static ValueDecl *deriveDifferentiable_moved(DerivedConformance &derived) {
 // Synthesize the `tangentVector(from:)` function declaration.
 static ValueDecl *
 deriveDifferentiable_tangentVector(DerivedConformance &derived) {
-  auto nominal = derived.Nominal;
+  auto parentDC = derived.getConformanceContext();
   auto &C = derived.TC.Context;
 
-  StructDecl *tangentDecl = getVectorSpaceStructDecl(
-      nominal, AutoDiffAssociatedVectorSpaceKind::Tangent);
-  assert(tangentDecl && "'TangentVector' struct must exist");
+  auto *tangentDecl = getAssociatedStructDecl(parentDC, C.Id_TangentVector);
   auto tangentType = tangentDecl->getDeclaredInterfaceType();
 
-  StructDecl *cotangentDecl = getVectorSpaceStructDecl(
-      nominal, AutoDiffAssociatedVectorSpaceKind::Cotangent);
-  assert(cotangentDecl && "'CotangentVector' struct must exist");
+  auto *cotangentDecl = getAssociatedStructDecl(parentDC, C.Id_CotangentVector);
   auto cotangentType = cotangentDecl->getDeclaredInterfaceType();
 
   return deriveDifferentiable_method(
@@ -434,102 +452,336 @@ deriveDifferentiable_tangentVector(DerivedConformance &derived) {
       deriveBodyDifferentiable_tangentVector);
 }
 
-// Return associated vector space struct for a nominal type, if it exists.
-// If not, synthesize the vector space struct.
-static StructDecl *
-getOrSynthesizeVectorSpaceStruct(DerivedConformance &derived,
-                                 AutoDiffAssociatedVectorSpaceKind kind) {
+// Return the underlying `allDifferentiableVariables` of a VarDecl `x`.
+// If `x` conforms to `Differentiable`, return `allDifferentiableVariables`.
+// Otherwise, return `x`.
+static ValueDecl *getUnderlyingAllDiffableVariables(DeclContext *DC,
+                                                    VarDecl *varDecl) {
+  auto *module = DC->getParentModule();
+  auto &C = module->getASTContext();
+  auto *diffableProto = C.getProtocol(KnownProtocolKind::__Differentiable);
+  auto allDiffableVarsReq =
+      getProtocolRequirement(diffableProto, C.Id_allDifferentiableVariables);
+  if (!varDecl->hasInterfaceType())
+    C.getLazyResolver()->resolveDeclSignature(varDecl);
+  auto varType = DC->mapTypeIntoContext(varDecl->getValueInterfaceType());
+  auto confRef = module->lookupConformance(varType, diffableProto);
+  if (!confRef)
+    return varDecl;
+  // Use protocol requirement as a default for abstract conformances.
+  // If conformance is concrete, get concrete witness declaration instead.
+  ValueDecl *allDiffableVarsDecl = allDiffableVarsReq;
+  if (confRef->isConcrete())
+    allDiffableVarsDecl = confRef->getConcrete()->getWitnessDecl(
+        allDiffableVarsReq, C.getLazyResolver());
+  return allDiffableVarsDecl;
+}
+
+// Synthesize getter body for `allDifferentiableVariables` computed property.
+static void
+derivedBody_allDifferentiableVariablesGetter(AbstractFunctionDecl *getterDecl) {
+  auto *parentDC = getterDecl->getParent();
+  auto *nominal = parentDC->getSelfNominalTypeDecl();
+  auto &C = nominal->getASTContext();
+
+  auto *allDiffableVarsStruct =
+      getAssociatedStructDecl(parentDC, C.Id_AllDifferentiableVariables);
+  auto *allDiffableVarsInitDecl =
+      allDiffableVarsStruct->getEffectiveMemberwiseInitializer();
+  assert(allDiffableVarsInitDecl &&
+         "'AllDifferentiableVariables' memberwise initializer not found");
+
+  auto *selfDecl = getterDecl->getImplicitSelfDecl();
+  auto *selfDRE =
+      new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit*/ true);
+
+  auto *initDRE = new (C) DeclRefExpr(allDiffableVarsInitDecl, DeclNameLoc(),
+                                      /*Implicit*/ true);
+  initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
+
+  auto allDiffableVarsType = parentDC->mapTypeIntoContext(
+      allDiffableVarsStruct->getDeclaredInterfaceType());
+  Expr *baseExpr = TypeExpr::createImplicit(allDiffableVarsType, C);
+  auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, baseExpr);
+  initExpr->setThrows(false);
+  initExpr->setImplicit();
+
+  SmallVector<Expr *, 2> members;
+  SmallVector<Identifier, 2> memberNames;
+
+  llvm::DenseMap<Identifier, VarDecl *> diffPropertyMap;
+  SmallVector<VarDecl *, 8> diffProperties;
+  getStoredPropertiesForDifferentiation(nominal, parentDC, diffProperties);
+  for (auto *member : diffProperties)
+    diffPropertyMap[member->getName()] = member;
+
+  for (auto initParam : *allDiffableVarsInitDecl->getParameters()) {
+    auto member = diffPropertyMap[initParam->getName()];
+    Expr *memberExpr = new (C) MemberRefExpr(selfDRE, SourceLoc(), member,
+                                             DeclNameLoc(), /*Implicit*/ true);
+    member->setInterfaceType(member->getValueInterfaceType());
+    auto memberAllDiffableVarsDecl =
+        getUnderlyingAllDiffableVariables(parentDC, member);
+    if (member != memberAllDiffableVarsDecl) {
+      memberExpr = new (C) MemberRefExpr(memberExpr, SourceLoc(),
+                                         memberAllDiffableVarsDecl,
+                                         DeclNameLoc(), /*Implicit*/ true);
+    }
+    members.push_back(memberExpr);
+    memberNames.push_back(member->getName());
+  }
+  Expr *callExpr = CallExpr::createImplicit(C, initExpr, members, memberNames);
+
+  ASTNode returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr, true);
+  getterDecl->setBody(
+      BraceStmt::create(C, SourceLoc(), returnStmt, SourceLoc(), true));
+}
+
+// Synthesize setter body for `allDifferentiableVariables` computed property.
+static void
+derivedBody_allDifferentiableVariablesSetter(AbstractFunctionDecl *setterDecl) {
+  auto *parentDC = setterDecl->getParent();
+  auto *nominal = parentDC->getSelfNominalTypeDecl();
+  auto &C = nominal->getASTContext();
+
+  auto *selfDecl = setterDecl->getImplicitSelfDecl();
+  Expr *selfDRE =
+      new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit*/ true);
+
+  auto *allDiffableVarsStruct =
+      getAssociatedStructDecl(parentDC, C.Id_AllDifferentiableVariables);
+  auto *newValueDecl = setterDecl->getParameters()->get(0);
+  Expr *newValueDRE =
+      new (C) DeclRefExpr(newValueDecl, DeclNameLoc(), /*Implicit*/ true);
+
+  // Map `AllDifferentiableVariables` struct members to their names for
+  // efficient lookup.
+  llvm::DenseMap<Identifier, VarDecl *> diffPropertyMap;
+  for (auto member : allDiffableVarsStruct->getStoredProperties())
+    diffPropertyMap[member->getName()] = member;
+
+  SmallVector<ASTNode, 2> assignExprs;
+  SmallVector<VarDecl *, 8> diffProperties;
+  getStoredPropertiesForDifferentiation(nominal, parentDC, diffProperties);
+  for (auto *member : diffProperties) {
+    // Skip immutable members.
+    if (member->isLet())
+      continue;
+    // Create lhs: either `self.x` or `self.x.allDifferentiableVariables`.
+    auto lhsAllDiffableVars =
+         getUnderlyingAllDiffableVariables(parentDC, member);
+    Expr *lhs;
+    if (member == lhsAllDiffableVars) {
+      lhs = new (C) MemberRefExpr(selfDRE, SourceLoc(), member, DeclNameLoc(),
+                                  /*Implicit*/ true);
+    } else {
+      auto *paramDRE = new (C) MemberRefExpr(selfDRE, SourceLoc(), member,
+                                             DeclNameLoc(), /*Implicit*/ true);
+      lhs = new (C) MemberRefExpr(paramDRE, SourceLoc(), lhsAllDiffableVars,
+                                  DeclNameLoc(), /*Implicit*/ true);
+    }
+    // Create rhs: `newValue.x`.
+    auto *rhs = new (C) MemberRefExpr(newValueDRE, SourceLoc(),
+                                      diffPropertyMap[member->getName()],
+                                      DeclNameLoc(), /*Implicit*/ true);
+    // Create assign expression.
+    auto *assignExpr = new (C) AssignExpr(lhs, SourceLoc(), rhs,
+                                          /*Implicit*/ true);
+    assignExprs.push_back(assignExpr);
+  }
+
+  setterDecl->setBody(
+      BraceStmt::create(C, SourceLoc(), assignExprs, SourceLoc(), true));
+}
+
+// Synthesize `allDifferentiableVariables` computed property declaration.
+static ValueDecl *
+deriveDifferentiable_allDifferentiableVariables(DerivedConformance &derived) {
+  auto *parentDC = derived.getConformanceContext();
+  auto &TC = derived.TC;
+  auto &C = TC.Context;
+
+  // Get `AllDifferentiableVariables` struct.
+  auto allDiffableVarsStruct =
+      getAssociatedStructDecl(parentDC, C.Id_AllDifferentiableVariables);
+
+  auto returnInterfaceTy = allDiffableVarsStruct->getDeclaredInterfaceType();
+  auto returnTy = parentDC->mapTypeIntoContext(returnInterfaceTy);
+
+  VarDecl *allDiffableVarsDecl;
+  PatternBindingDecl *pbDecl;
+  std::tie(allDiffableVarsDecl, pbDecl) = derived.declareDerivedProperty(
+      C.Id_allDifferentiableVariables, returnInterfaceTy, returnTy,
+      /*isStatic*/ false, /*isFinal*/ true);
+
+  auto *getterDecl = derived.declareDerivedPropertyGetter(
+      derived.TC, allDiffableVarsDecl, returnTy);
+  getterDecl->setBodySynthesizer(&derivedBody_allDifferentiableVariablesGetter);
+
+  auto *setterDecl = derived.declareDerivedPropertySetter(
+      derived.TC, allDiffableVarsDecl, returnTy);
+  setterDecl->setBodySynthesizer(&derivedBody_allDifferentiableVariablesSetter);
+
+  allDiffableVarsDecl->setAccessors(StorageImplInfo::getMutableComputed(),
+                                    SourceLoc(), {getterDecl, setterDecl},
+                                    SourceLoc());
+
+  derived.addMembersToConformanceContext(
+      {getterDecl, setterDecl, allDiffableVarsDecl, pbDecl});
+
+  addExpectedOpaqueAccessorsToStorage(TC, allDiffableVarsDecl);
+  triggerAccessorSynthesis(TC, allDiffableVarsDecl);
+
+  return allDiffableVarsDecl;
+}
+
+// Return associated `TangentVector`, `CotangentVector`, or
+// `AllDifferentiableVariables` struct for a nominal type, if it exists.
+// If not, synthesize the struct. Also return a Boolean value that indicates
+// whether synthesis occurred.
+static std::pair<StructDecl *, bool>
+getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
+                                      Identifier id) {
   auto &TC = derived.TC;
   auto parentDC = derived.getConformanceContext();
   auto nominal = derived.Nominal;
   auto &C = nominal->getASTContext();
 
-  // If vector space struct already exists, return it.
-  auto vectorSpaceId = getVectorSpaceIdentifier(kind, C);
-  auto lookup = nominal->lookupDirect(vectorSpaceId);
-  assert(lookup.size() < 2);
+  assert(id == C.Id_TangentVector || id == C.Id_CotangentVector ||
+         id == C.Id_AllDifferentiableVariables);
+
+  // If the associated struct already exists, return it.
+  auto lookup = nominal->lookupDirect(id);
+  assert(lookup.size() < 2 &&
+         "Expected at most one associated type named member");
   if (lookup.size() == 1) {
-    auto structDecl = dyn_cast<StructDecl>(lookup.front());
+    auto *structDecl = convertToStructDecl(lookup.front());
     assert(structDecl && "Expected lookup result to be a struct");
-    return structDecl;
+    return {structDecl, false};
   }
 
-  // Otherwise, synthesize a new vector space struct, conforming to
-  // `Differentiable` and `AdditiveArithmetic`.
+  // Otherwise, synthesize a new struct. The struct must conform to
+  // `Differentiable`.
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   auto diffableType = TypeLoc::withoutLoc(diffableProto->getDeclaredType());
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   auto addArithType = TypeLoc::withoutLoc(addArithProto->getDeclaredType());
   auto *vecNumProto = C.getProtocol(KnownProtocolKind::VectorNumeric);
   auto vecNumType = TypeLoc::withoutLoc(vecNumProto->getDeclaredType());
-  TypeLoc inherited[2] {diffableType, addArithType};
+  auto *kpIterableProto = C.getProtocol(KnownProtocolKind::KeyPathIterable);
+  auto kpIterableType = TypeLoc::withoutLoc(kpIterableProto->getDeclaredType());
 
-  // Cache original members and their associated vector space types for later
-  // use.
+  SmallVector<TypeLoc, 3> inherited {diffableType};
+
+  // Cache original members and their associated types for later use.
   SmallVector<VarDecl *, 8> diffProperties;
-  getStoredPropertiesForDifferentiation(nominal, diffProperties);
+  getStoredPropertiesForDifferentiation(nominal, parentDC, diffProperties);
 
+  // If the associated type is `TangentVector` or `CotangentVector`, make it
+  // also conform to `AdditiveArithmetic`.
+  if (id == C.Id_TangentVector || id == C.Id_CotangentVector)
+    inherited.push_back(addArithType);
+
+  // Associated struct can derive `AdditiveArithmetic` if the associated types
+  // of all members conform to `AdditiveArithmetic`.
+  bool canDeriveAdditiveArithmetic =
+      llvm::all_of(diffProperties, [&](VarDecl *var) {
+        return TC.conformsToProtocol(getAssociatedType(var, parentDC, id),
+                                     addArithProto, parentDC,
+                                     ConformanceCheckFlags::Used);
+        });
+
+  // Associated struct can derive `VectorNumeric` if the associated types of all
+  // members conform to `VectorNumeric` and share the same scalar type.
+  Type sameScalarType;
+  bool canDeriveVectorNumeric =
+      canDeriveAdditiveArithmetic && !diffProperties.empty() && 
+      llvm::all_of(diffProperties, [&](VarDecl *var) {
+        auto conf = TC.conformsToProtocol(getAssociatedType(var, parentDC, id),
+                                          vecNumProto, nominal,
+                                          ConformanceCheckFlags::Used);
+        if (!conf)
+          return false;
+        Type scalarType = ProtocolConformanceRef::getTypeWitnessByName(
+            var->getType(), *conf, C.Id_Scalar, C.getLazyResolver());
+        if (!sameScalarType) {
+          sameScalarType = scalarType;
+          return true;
+        }
+        return scalarType->isEqual(sameScalarType);
+      });
+
+  // If the associated struct is `AllDifferentiableVariables`, conform it to:
+  // - `AdditiveArithmetic`, if all members of the parent conform to
+  //   `AdditiveArithmetic`.
+  // - `KeyPathIterable`, if the parent conforms to to `KeyPathIterable`.
+  if (id == C.Id_AllDifferentiableVariables) {
+    if (canDeriveAdditiveArithmetic)
+      inherited.push_back(addArithType);
+    if (TC.conformsToProtocol(nominal->getDeclaredInterfaceType(),
+                              kpIterableProto, parentDC,
+                              ConformanceCheckFlags::Used))
+      inherited.push_back(kpIterableType);
+  }
   // If all members also conform to `VectorNumeric` with the same `Scalar` type,
-  // make the vector space struct conform to `VectorNumeric` instead of just
+  // make the associated struct conform to `VectorNumeric` instead of just
   // `AdditiveArithmetic`.
-  auto canDeriveVectorNumericForVectorSpace =
-      !diffProperties.empty() && llvm::all_of(
-          diffProperties, [&](VarDecl *var) {
-            return TC.conformsToProtocol(getVectorSpaceType(var, nominal, kind),
-                                         vecNumProto, nominal,
-                                         ConformanceCheckFlags::Used);
-          });
-  if (canDeriveVectorNumericForVectorSpace)
-    inherited[1] = vecNumType;
+  if (canDeriveVectorNumeric)
+    inherited.push_back(vecNumType);
 
-  auto *structDecl = new (C) StructDecl(SourceLoc(), vectorSpaceId, SourceLoc(),
+  auto *structDecl = new (C) StructDecl(SourceLoc(), id, SourceLoc(),
                                         /*Inherited*/ C.AllocateCopy(inherited),
                                         /*GenericParams*/ {}, parentDC);
+  structDecl->getAttrs().add(
+      new (C) FieldwiseDifferentiableAttr(/*implicit*/ true));
   structDecl->setImplicit();
   structDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  structDecl->getAttrs().add(new (C)
-                                 FieldwiseProductSpaceAttr(/*Implicit*/ true));
 
-  // Add members to vector space struct.
+  // Add members to associated struct.
   for (auto *member : diffProperties) {
-    // Add this member's corresponding vector space to the parent's vector space
-    // struct.
+    // Add this member's corresponding associated type to the parent's
+    // associated struct.
     auto newMember = new (C) VarDecl(
         member->isStatic(), member->getSpecifier(), member->isCaptureList(),
         /*NameLoc*/ SourceLoc(), member->getName(), structDecl);
     // NOTE: `newMember` is not marked as implicit here, because that affects
     // memberwise initializer synthesis.
 
-    auto memberAssocType = getVectorSpaceType(member, nominal, kind);
+    auto memberAssocType = getAssociatedType(member, parentDC, id);
     auto memberAssocInterfaceType = memberAssocType->hasArchetype()
                                         ? memberAssocType->mapTypeOutOfContext()
                                         : memberAssocType;
     newMember->setInterfaceType(memberAssocInterfaceType);
-    newMember->setType(memberAssocType);
+    newMember->setType(parentDC->mapTypeIntoContext(memberAssocInterfaceType));
     structDecl->addMember(newMember);
     newMember->copyFormalAccessFrom(member, /*sourceIsParentContext*/ true);
     newMember->setValidationToChecked();
     newMember->setSetterAccess(member->getFormalAccess());
     C.addSynthesizedDecl(newMember);
 
-    // Now that this member is in the associated vector space, it should be
-    // marked `@differentiable` so that the differentiation transform will
-    // synthesize associated functions for it. We only add this to public
-    // stored properties, because their access outside the module will go
-    // through a call to the getter.
+    // Now that this member is in the associated type, it should be marked
+    // `@differentiable` so that the differentiation transform will synthesize
+    // associated functions for it. We only add this to public stored
+    // properties, because their access outside the module will go through a
+    // call to the getter.
     if (member->getEffectiveAccess() > AccessLevel::Internal &&
         !member->getAttrs().hasAttribute<DifferentiableAttr>()) {
       auto *diffableAttr = DifferentiableAttr::create(
-          C, /*implicit*/ true, SourceLoc(), SourceLoc(), {}, None, None, None,
+          C, /*implicit*/ true, SourceLoc(), SourceLoc(), {}, None,
           None, nullptr);
       member->getAttrs().add(diffableAttr);
       auto *getterType =
           member->getGetter()->getInterfaceType()->castTo<AnyFunctionType>();
       AutoDiffParameterIndicesBuilder builder(getterType);
       builder.setParameter(0);
-      diffableAttr->setCheckedParameterIndices(builder.build(C));
+      diffableAttr->setParameterIndices(builder.build(C));
     }
   }
+
+  // If nominal type has `@_fixed_layout` attribute, mark associated struct as
+  // `@_fixed_layout` as well.
+  if (nominal->getAttrs().hasAttribute<FixedLayoutAttr>())
+    structDecl->addFixedLayoutAttr();
 
   // The implicit memberwise constructor must be explicitly created so that it
   // can called in `AdditiveArithmetic` and `Differentiable` methods. Normally,
@@ -546,128 +798,292 @@ getOrSynthesizeVectorSpaceStruct(DerivedConformance &derived,
   derived.addMembersToConformanceContext({structDecl});
   C.addSynthesizedDecl(structDecl);
 
-  return structDecl;
+  return {structDecl, true};
 }
 
-// Synthesize a vector space associated type (either 'TangentVector' or
-// 'CotangentVector').
+// Add a typealias declaration with the given name and underlying target
+// struct type to the given source nominal declaration context.
+static void addAssociatedTypeAliasDecl(Identifier name,
+                                       DeclContext *sourceDC,
+                                       StructDecl *target,
+                                       TypeChecker &TC) {
+  auto &C = TC.Context;
+  auto nominal = sourceDC->getSelfNominalTypeDecl();
+  assert(nominal && "Expected `DeclContext` to be a nominal type");
+  auto lookup = nominal->lookupDirect(name);
+  assert(lookup.size() < 2 &&
+         "Expected at most one associated type named member");
+  // If implicit typealias with the given name already exists in source
+  // struct, return it.
+  if (lookup.size() == 1) {
+    auto existingAlias = dyn_cast<TypeAliasDecl>(lookup.front());
+    assert(existingAlias && existingAlias->isImplicit() &&
+           "Expected lookup result to be an implicit typealias");
+    return;
+  }
+  // Otherwise, create a new typealias.
+  auto aliasDecl = new (C)
+      TypeAliasDecl(SourceLoc(), SourceLoc(), name, SourceLoc(), {}, sourceDC);
+  aliasDecl->setUnderlyingType(target->getDeclaredInterfaceType());
+  aliasDecl->setImplicit();
+  if (auto env = sourceDC->getGenericEnvironmentOfContext())
+    aliasDecl->setGenericEnvironment(env);
+  cast<IterableDeclContext>(sourceDC->getAsDecl())->addMember(aliasDecl);
+  aliasDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
+  aliasDecl->setValidationToChecked();
+  TC.validateDecl(aliasDecl);
+  C.addSynthesizedDecl(aliasDecl);
+};
+
+// If any stored property in the nominal does not conform to `Differentiable`
+// but does not have an explicit `@noDerivative` attribute, emit a warning and
+// a fixit so that the user will make it explicit.
+static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
+                                                 NominalTypeDecl *nominal,
+                                                 DeclContext* DC) {
+  auto *diffableProto =
+      TC.Context.getProtocol(KnownProtocolKind::Differentiable);
+  for (auto *vd : nominal->getStoredProperties()) {
+    if (!vd->hasInterfaceType())
+      TC.resolveDeclSignature(vd);
+    auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
+    if (vd->getAttrs().hasAttribute<NoDerivativeAttr>() ||
+        TC.conformsToProtocol(varType, diffableProto, nominal,
+                              ConformanceCheckFlags::Used))
+      continue;
+    nominal->getAttrs().add(
+        new (TC.Context) NoDerivativeAttr(/*Implicit*/ true));
+    auto loc =
+        vd->getLoc().isValid() ? vd->getLoc() : DC->getAsDecl()->getLoc();
+    assert(loc.isValid() && "Expected valid source location");
+    TC.diagnose(loc, diag::differentiable_implicit_noderivative_fixit,
+                vd->getName())
+        .fixItInsert(vd->getAttributeInsertionLoc(/*forModifier*/ false),
+                     "@noDerivative ");
+  }
+}
+
+// Get or synthesize all associated struct types: `TangentVector`,
+// `CotangentVector`, and `AllDifferentiableVariables`.
+// Return the type corresponding to the given identifier.
 static Type
-deriveDifferentiable_VectorSpace(DerivedConformance &derived,
-                                 AutoDiffAssociatedVectorSpaceKind kind) {
+getOrSynthesizeAssociatedStructType(DerivedConformance &derived,
+                                    Identifier id) {
+  auto &TC = derived.TC;
+  auto *parentDC = derived.getConformanceContext();
+  auto *nominal = derived.Nominal;
+  auto &C = nominal->getASTContext();
+
+  // Get or synthesize `TangentVector`, `CotangentVector`, and
+  // `AllDifferentiableVariables` structs at once. Synthesizing all three
+  // structs at once is necessary in order to correctly set their mutually
+  // recursive associated types.
+  auto tangentStructSynthesis =
+      getOrSynthesizeSingleAssociatedStruct(derived, C.Id_TangentVector);
+  auto *tangentStruct = tangentStructSynthesis.first;
+  bool freshlySynthesized = tangentStructSynthesis.second;
+  if (!tangentStruct)
+    return nullptr;
+
+  auto cotangentStructSynthesis =
+      getOrSynthesizeSingleAssociatedStruct(derived, C.Id_CotangentVector);
+  auto *cotangentStruct = cotangentStructSynthesis.first;
+  if (!cotangentStruct)
+    return nullptr;
+  assert(freshlySynthesized == cotangentStructSynthesis.second);
+
+  auto allDiffableVarsStructSynthesis =
+      getOrSynthesizeSingleAssociatedStruct(derived,
+                                            C.Id_AllDifferentiableVariables);
+  auto *allDiffableVarsStruct = allDiffableVarsStructSynthesis.first;
+  if (!allDiffableVarsStruct)
+    return nullptr;
+  assert(freshlySynthesized == allDiffableVarsStructSynthesis.second);
+
+  // When all structs are freshly synthesized, we check emit warnings for
+  // implicit `@noDerivative` members. Checking for fresh synthesis is necessary
+  // because `getOrSynthesizeAssociatedStructType` will be called multiple times
+  // during synthesis.
+  if (freshlySynthesized)
+    checkAndDiagnoseImplicitNoDerivative(TC, nominal, parentDC);
+
+  // Add associated typealiases for structs.
+  addAssociatedTypeAliasDecl(C.Id_TangentVector,
+                             tangentStruct, tangentStruct, TC);
+  addAssociatedTypeAliasDecl(C.Id_TangentVector,
+                             cotangentStruct, cotangentStruct, TC);
+  addAssociatedTypeAliasDecl(C.Id_TangentVector,
+                             allDiffableVarsStruct, tangentStruct, TC);
+
+  addAssociatedTypeAliasDecl(C.Id_CotangentVector,
+                             tangentStruct, cotangentStruct, TC);
+  addAssociatedTypeAliasDecl(C.Id_CotangentVector,
+                             cotangentStruct, tangentStruct, TC);
+  addAssociatedTypeAliasDecl(C.Id_CotangentVector,
+                             allDiffableVarsStruct, cotangentStruct, TC);
+
+  addAssociatedTypeAliasDecl(C.Id_AllDifferentiableVariables,
+                             allDiffableVarsStruct, allDiffableVarsStruct, TC);
+  addAssociatedTypeAliasDecl(C.Id_AllDifferentiableVariables,
+                             tangentStruct, tangentStruct, TC);
+  addAssociatedTypeAliasDecl(C.Id_AllDifferentiableVariables,
+                             cotangentStruct, cotangentStruct, TC);
+
+  TC.validateDecl(tangentStruct);
+  TC.validateDecl(cotangentStruct);
+  TC.validateDecl(allDiffableVarsStruct);
+
+  // Sanity checks for synthesized structs.
+  assert(DerivedConformance::canDeriveAdditiveArithmetic(tangentStruct,
+                                                         parentDC) &&
+         "Should be able to derive `AdditiveArithmetic`");
+  assert(DerivedConformance::canDeriveAdditiveArithmetic(cotangentStruct,
+                                                         parentDC) &&
+         "Should be able to derive `AdditiveArithmetic`");
+  assert(DerivedConformance::canDeriveDifferentiable(
+      tangentStruct, parentDC) && "Should be able to derive `Differentiable`");
+  assert(DerivedConformance::canDeriveDifferentiable(
+      cotangentStruct, parentDC) &&
+          "Should be able to derive `Differentiable`");
+  assert(DerivedConformance::canDeriveDifferentiable(
+      allDiffableVarsStruct, parentDC) &&
+          "Should be able to derive `Differentiable`");
+
+  // Return the requested associated struct type.
+  StructDecl *requestedStructDecl = nullptr;
+  if (id == C.Id_TangentVector)
+    requestedStructDecl = tangentStruct;
+  else if (id == C.Id_CotangentVector)
+    requestedStructDecl = cotangentStruct;
+  else if (id == C.Id_AllDifferentiableVariables)
+    requestedStructDecl = allDiffableVarsStruct;
+  else
+    llvm_unreachable("Unknown `Differentiable` associated type identifier");
+  return parentDC->mapTypeIntoContext(
+      requestedStructDecl->getDeclaredInterfaceType());
+}
+
+// Synthesize an associated struct type (`TangentVector`, `CotangentVector`, or
+// `AllDifferentiableVariables`).
+static Type
+deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
+                                      Identifier id) {
   auto &TC = derived.TC;
   auto parentDC = derived.getConformanceContext();
   auto nominal = derived.Nominal;
   auto &C = nominal->getASTContext();
 
-  // Check if all members have vector space associated types equal to `Self`.
+  // Since associated types will be derived, we make this struct a fieldwise
+  // differentiable type.
+  if (!nominal->getAttrs().hasAttribute<FieldwiseDifferentiableAttr>())
+    nominal->getAttrs().add(
+        new (C) FieldwiseDifferentiableAttr(/*implicit*/ true));
+
+  // Prevent re-synthesis during repeated calls.
+  // FIXME: Investigate why this is necessary to prevent duplicate synthesis.
+  auto lookup = nominal->lookupDirect(id);
+  if (lookup.size() == 1)
+    if (auto *structDecl = convertToStructDecl(lookup.front()))
+      if (structDecl->isImplicit())
+        return structDecl->getDeclaredInterfaceType();
+
+  // Get all stored properties for differentation.
   SmallVector<VarDecl *, 16> diffProperties;
-  getStoredPropertiesForDifferentiation(nominal, diffProperties);
-  bool allMembersVectorSpaceEqualsSelf =
+  getStoredPropertiesForDifferentiation(nominal, parentDC, diffProperties);
+
+  // Check whether at least one `@noDerivative` stored property exists.
+  unsigned numStoredProperties =
+      std::distance(nominal->getStoredProperties().begin(),
+                    nominal->getStoredProperties().end());
+  bool hasNoDerivativeStoredProp = diffProperties.size() != numStoredProperties;
+
+  // Check conditions for returning `Self`.
+  // - No `@noDerivative` stored properties exist.
+  // - All stored properties must have specified associated type equal to
+  //   `Self`.
+  // - If associated type is `TangentVector` or `CotangentVector`, parent type
+  //   must also conform to `AdditiveArithmetic`.
+  bool allMembersAssocTypeEqualsSelf =
       llvm::all_of(diffProperties, [&](VarDecl *member) {
-        auto memberAssocType = getVectorSpaceType(member, nominal, kind);
+        auto memberAssocType = getAssociatedType(member, parentDC, id);
         return member->getType()->isEqual(memberAssocType);
       });
 
-  // Check if nominal type conforms to `AdditiveArithmetic`.
-  // This is important because nominal type must conform to `AdditiveArithmetic`
-  // in order to be a valid vector space type.
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   auto nominalConformsToAddArith =
-      TC.conformsToProtocol(nominal->getDeclaredInterfaceType(), addArithProto,
+      TC.conformsToProtocol(parentDC->getSelfTypeInContext(), addArithProto,
                             parentDC, ConformanceCheckFlags::Used);
+
   // Return `Self` if conditions are met.
-  if (allMembersVectorSpaceEqualsSelf && nominalConformsToAddArith) {
-    auto selfType =
-        parentDC->mapTypeIntoContext(nominal->getDeclaredInterfaceType());
-    auto *aliasDecl = new (C) TypeAliasDecl(
-        SourceLoc(), SourceLoc(), getVectorSpaceIdentifier(kind, C),
-        SourceLoc(), {}, nominal);
+  if (!hasNoDerivativeStoredProp &&
+      (id == C.Id_AllDifferentiableVariables ||
+       (allMembersAssocTypeEqualsSelf && nominalConformsToAddArith))) {
+    auto selfType = parentDC->getSelfTypeInContext();
+    auto *aliasDecl = new (C) TypeAliasDecl(SourceLoc(), SourceLoc(), id,
+                                            SourceLoc(), {}, parentDC);
     aliasDecl->setUnderlyingType(selfType);
     aliasDecl->setImplicit();
-    aliasDecl->getAttrs().add(
-        new (C) FieldwiseProductSpaceAttr(/*implicit*/ true));
-    nominal->addMember(aliasDecl);
     aliasDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
     aliasDecl->setValidationToChecked();
     TC.validateDecl(aliasDecl);
+    derived.addMembersToConformanceContext({aliasDecl});
     C.addSynthesizedDecl(aliasDecl);
     return selfType;
   }
 
-  // Get or synthesize both `TangentVector` and `CotangentVector` structs at
-  // once. Synthesizing both structs is necessary in order to correctly set
-  // their mutually recursive associated types.
-  auto tangentStruct = getOrSynthesizeVectorSpaceStruct(
-      derived, AutoDiffAssociatedVectorSpaceKind::Tangent);
-  auto cotangentStruct = getOrSynthesizeVectorSpaceStruct(
-      derived, AutoDiffAssociatedVectorSpaceKind::Cotangent);
+  // Otherwise, check if all stored properties have all `Differentiable`
+  // protocol associated types equal to each other:
+  // `TangentVector == CotangentVector == AllDifferentiableVariables`.
+  bool allMembersAssocTypesEqualsSelf =
+      llvm::all_of(diffProperties, [&](VarDecl *member) {
+        auto tangentType =
+            getAssociatedType(member, parentDC, C.Id_TangentVector);
+        auto cotangentType =
+            getAssociatedType(member, parentDC, C.Id_CotangentVector);
+        auto allDiffableVarsType =
+            getAssociatedType(member, parentDC, C.Id_AllDifferentiableVariables);
+        return tangentType->isEqual(cotangentType) &&
+            tangentType->isEqual(allDiffableVarsType);
+      });
 
-  // Add a typealias declaration with the given name and underlying target
-  // struct type to the source struct.
-  auto addVectorSpaceAliasDecl = [&](Identifier name, StructDecl *source,
-                                     StructDecl *target) {
-    auto lookup = source->lookupDirect(name);
-    assert(lookup.size() < 2 &&
-           "Expected at most one vector space named member");
-    // If implicit typealias with the given name already exists in source
-    // struct, return it.
-    if (lookup.size() == 1) {
-      auto existingAlias = dyn_cast<TypeAliasDecl>(lookup.front());
-      assert(existingAlias && existingAlias->isImplicit() &&
-             "Expected lookup result to be an implicit typealias");
-      return;
-    }
-
-    // Otherwise, create a new typealias.
-    auto aliasDecl = new (C)
-        TypeAliasDecl(SourceLoc(), SourceLoc(), name, SourceLoc(), {}, source);
-    aliasDecl->setUnderlyingType(target->getDeclaredInterfaceType());
-    aliasDecl->setImplicit();
-    aliasDecl->getAttrs().add(new (C)
-                                  FieldwiseProductSpaceAttr(/*Implicit*/ true));
-    if (auto env = source->getGenericEnvironmentOfContext())
-      aliasDecl->setGenericEnvironment(env);
-    source->addMember(aliasDecl);
-    aliasDecl->copyFormalAccessFrom(source, /*sourceIsParentContext*/ true);
-    aliasDecl->setValidationToChecked();
-    TC.validateDecl(aliasDecl);
-    C.addSynthesizedDecl(aliasDecl);
-  };
-
-  // Add vector space typealiases for both vector space structs.
-  addVectorSpaceAliasDecl(C.Id_TangentVector, tangentStruct, tangentStruct);
-  addVectorSpaceAliasDecl(C.Id_TangentVector, cotangentStruct, cotangentStruct);
-  addVectorSpaceAliasDecl(C.Id_CotangentVector, tangentStruct, cotangentStruct);
-  addVectorSpaceAliasDecl(C.Id_CotangentVector, cotangentStruct, tangentStruct);
-
-  TC.validateDecl(tangentStruct);
-  TC.validateDecl(cotangentStruct);
-
-  // TODO: Enable "canDeriveAdditiveArithmetic" assertions.
-  // Blocked by SR-9595 (bug regarding mututally recursive associated types).
-  /*
-  assert(
-      DerivedConformance::canDeriveAdditiveArithmetic(tangentStruct, nominal) &&
-      "Should be able to derive 'AdditiveArithmetic'");
-  assert(DerivedConformance::canDeriveAdditiveArithmetic(cotangentStruct,
-                                                         nominal) &&
-         "Should be able to derive 'AdditiveArithmetic'");
-  */
-  assert(DerivedConformance::canDeriveDifferentiable(tangentStruct, nominal) &&
-         "Should be able to derive 'Differentiable'");
-  assert(
-      DerivedConformance::canDeriveDifferentiable(cotangentStruct, nominal) &&
-      "Should be able to derive 'Differentiable'");
-
-  // Return the requested vector space struct type.
-  switch (kind) {
-  case AutoDiffAssociatedVectorSpaceKind::Tangent:
+  // If all stored properties (excluding ones with `@noDerivative`) have all
+  // `Differentiable` protocol associated types equal to `Self`, then get or
+  // synthesize `AllDifferentiableVariables` struct and let `TangentVector` and
+  // `CotangentVector` alias to it.
+  if (allMembersAssocTypesEqualsSelf) {
+    auto allDiffableVarsStructSynthesis = getOrSynthesizeSingleAssociatedStruct(
+        derived, C.Id_AllDifferentiableVariables);
+    auto allDiffableVarsStruct = allDiffableVarsStructSynthesis.first;
+    auto freshlySynthesized = allDiffableVarsStructSynthesis.second;
+    // `AllDifferentiableVariables` must conform to `AdditiveArithmetic`.
+    // This should be guaranteed.
+    assert(TC.conformsToProtocol(
+               allDiffableVarsStruct->getDeclaredTypeInContext(), addArithProto,
+               parentDC, ConformanceCheckFlags::Used) &&
+           "`AllDifferentiableVariables` must conform to `AdditiveArithmetic`");
+    // When the struct is freshly synthesized, we check emit warnings for
+    // implicit `@noDerivative` members. Checking for fresh synthesis is
+    // necessary because this code path will be executed called multiple times
+    // during synthesis.
+    if (freshlySynthesized)
+      checkAndDiagnoseImplicitNoDerivative(TC, nominal, parentDC);
+    addAssociatedTypeAliasDecl(C.Id_AllDifferentiableVariables,
+        allDiffableVarsStruct, allDiffableVarsStruct, TC);
+    addAssociatedTypeAliasDecl(C.Id_TangentVector,
+        allDiffableVarsStruct, allDiffableVarsStruct, TC);
+    addAssociatedTypeAliasDecl(C.Id_CotangentVector,
+        allDiffableVarsStruct, allDiffableVarsStruct, TC);
+    addAssociatedTypeAliasDecl(C.Id_TangentVector,
+        parentDC, allDiffableVarsStruct, TC);
+    addAssociatedTypeAliasDecl(C.Id_CotangentVector,
+        parentDC, allDiffableVarsStruct, TC);
+    TC.validateDecl(allDiffableVarsStruct);
     return parentDC->mapTypeIntoContext(
-        tangentStruct->getDeclaredInterfaceType());
-  case AutoDiffAssociatedVectorSpaceKind::Cotangent:
-    return parentDC->mapTypeIntoContext(
-        cotangentStruct->getDeclaredInterfaceType());
+        allDiffableVarsStruct->getDeclaredInterfaceType());
   }
+
+  // Otherwise, get or synthesize associated struct type.
+  return getOrSynthesizeAssociatedStructType(derived, id);
 }
 
 ValueDecl *DerivedConformance::deriveDifferentiable(ValueDecl *requirement) {
@@ -675,19 +1091,22 @@ ValueDecl *DerivedConformance::deriveDifferentiable(ValueDecl *requirement) {
     return deriveDifferentiable_moved(*this);
   if (requirement->getBaseName() == TC.Context.Id_tangentVector)
     return deriveDifferentiable_tangentVector(*this);
+  if (requirement->getBaseName() == TC.Context.Id_allDifferentiableVariables)
+    return deriveDifferentiable_allDifferentiableVariables(*this);
   TC.diagnose(requirement->getLoc(), diag::broken_differentiable_requirement);
   return nullptr;
 }
 
 Type DerivedConformance::deriveDifferentiable(AssociatedTypeDecl *requirement) {
-  if (requirement->getBaseName() == TC.Context.Id_TangentVector) {
-    return deriveDifferentiable_VectorSpace(
-        *this, AutoDiffAssociatedVectorSpaceKind::Tangent);
-  }
-  if (requirement->getBaseName() == TC.Context.Id_CotangentVector) {
-    return deriveDifferentiable_VectorSpace(
-        *this, AutoDiffAssociatedVectorSpaceKind::Cotangent);
-  }
+  if (requirement->getBaseName() == TC.Context.Id_TangentVector)
+    return deriveDifferentiable_AssociatedStruct(
+        *this, TC.Context.Id_TangentVector);
+  if (requirement->getBaseName() == TC.Context.Id_CotangentVector)
+    return deriveDifferentiable_AssociatedStruct(
+        *this, TC.Context.Id_CotangentVector);
+  if (requirement->getBaseName() == TC.Context.Id_AllDifferentiableVariables)
+    return deriveDifferentiable_AssociatedStruct(
+        *this, TC.Context.Id_AllDifferentiableVariables);
   TC.diagnose(requirement->getLoc(), diag::broken_differentiable_requirement);
   return nullptr;
 }

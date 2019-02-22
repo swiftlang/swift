@@ -296,6 +296,10 @@ bool swift::onlyAffectsRefCount(SILInstruction *user) {
   }
 }
 
+bool swift::mayCheckRefCount(SILInstruction *User) {
+  return isa<IsUniqueInst>(User) || isa<IsEscapingClosureInst>(User);
+}
+
 bool swift::isSanitizerInstrumentation(SILInstruction *Instruction) {
   auto *BI = dyn_cast<BuiltinInst>(Instruction);
   if (!BI)

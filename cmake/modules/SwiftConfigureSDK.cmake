@@ -277,19 +277,21 @@ macro(configure_sdk_windows name environment architectures)
     set(WinSDK${arch}UMDir "$ENV{UniversalCRTSdkDir}/Lib/$ENV{UCRTVersion}/um/${WinSDKArchitecture}")
     set(OverlayDirectory "${CMAKE_BINARY_DIR}/winsdk_lib_${arch}_symlinks")
 
-    file(MAKE_DIRECTORY ${OverlayDirectory})
+    if(NOT EXISTS "$ENV{UniversalCRTSdkDir}/Include/$ENV{UCRTVersion}/um/WINDOWS.H")
+      file(MAKE_DIRECTORY ${OverlayDirectory})
 
-    file(GLOB libraries RELATIVE "${WinSDK${arch}UMDir}" "${WinSDK${arch}UMDir}/*")
-    foreach(library ${libraries})
-      get_filename_component(name_we "${library}" NAME_WE)
-      get_filename_component(ext "${library}" EXT)
-      string(TOLOWER "${ext}" lowercase_ext)
-      set(lowercase_ext_symlink_name "${name_we}${lowercase_ext}")
-      if(NOT library STREQUAL lowercase_ext_symlink_name)
-        execute_process(COMMAND
-                        "${CMAKE_COMMAND}" -E create_symlink "${WinSDK${arch}UMDir}/${library}" "${OverlayDirectory}/${lowercase_ext_symlink_name}")
-      endif()
-    endforeach()
+      file(GLOB libraries RELATIVE "${WinSDK${arch}UMDir}" "${WinSDK${arch}UMDir}/*")
+      foreach(library ${libraries})
+        get_filename_component(name_we "${library}" NAME_WE)
+        get_filename_component(ext "${library}" EXT)
+        string(TOLOWER "${ext}" lowercase_ext)
+        set(lowercase_ext_symlink_name "${name_we}${lowercase_ext}")
+        if(NOT library STREQUAL lowercase_ext_symlink_name)
+          execute_process(COMMAND
+                          "${CMAKE_COMMAND}" -E create_symlink "${WinSDK${arch}UMDir}/${library}" "${OverlayDirectory}/${lowercase_ext_symlink_name}")
+        endif()
+      endforeach()
+    endif()
   endforeach()
 
   # Add this to the list of known SDKs.

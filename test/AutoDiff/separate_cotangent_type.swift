@@ -10,18 +10,17 @@ import Glibc
 
 var SeparateCotangentTypeTests = TestSuite("SeparateCotangentType")
 
+@_fieldwiseDifferentiable
 struct DifferentiableSubset : Differentiable {
-  @differentiable(wrt: (self))
+  @differentiable(wrt: self)
   var w: Float
-  @differentiable(wrt: (self))
+  @differentiable(wrt: self)
   var b: Float
   @noDerivative var flag: Bool
 
-  // @_fieldwiseProductSpace
+  @_fieldwiseDifferentiable
   struct TangentVector : Differentiable, VectorNumeric {
-    @_fieldwiseProductSpace
     typealias TangentVector = DifferentiableSubset.TangentVector
-    @_fieldwiseProductSpace
     typealias CotangentVector = DifferentiableSubset.CotangentVector
     var w: Float
     var b: Float
@@ -29,11 +28,9 @@ struct DifferentiableSubset : Differentiable {
       return TangentVector(w: cotan.w, b: cotan.b)
     }
   }
-  // @_fieldwiseProductSpace
+  @_fieldwiseDifferentiable
   struct CotangentVector : Differentiable, VectorNumeric {
-    @_fieldwiseProductSpace
     typealias TangentVector = DifferentiableSubset.CotangentVector
-    @_fieldwiseProductSpace
     typealias CotangentVector = DifferentiableSubset.TangentVector
     var w: Float
     var b: Float

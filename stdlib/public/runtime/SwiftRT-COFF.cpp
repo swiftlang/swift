@@ -42,6 +42,7 @@ DECLARE_SWIFT_SECTION(sw5tyrf)
 DECLARE_SWIFT_SECTION(sw5rfst)
 DECLARE_SWIFT_SECTION(sw5flmd)
 DECLARE_SWIFT_SECTION(sw5asty)
+DECLARE_SWIFT_SECTION(sw5repl)
 }
 
 namespace {
@@ -68,6 +69,7 @@ static void swift_image_constructor() {
       SWIFT_SECTION_RANGE(sw5rfst),
       SWIFT_SECTION_RANGE(sw5flmd),
       SWIFT_SECTION_RANGE(sw5asty),
+      SWIFT_SECTION_RANGE(sw5repl),
   };
 
 #undef SWIFT_SECTION_RANGE

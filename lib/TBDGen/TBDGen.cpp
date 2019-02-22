@@ -113,31 +113,34 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
     if (!needsWTable)
       continue;
 
-    // Only normal conformances get symbols; the others get any public symbols
-    // from their parent normal conformance.
-    auto normalConformance = dyn_cast<NormalProtocolConformance>(conformance);
-    if (!normalConformance)
+    // Only root conformances get symbols; the others get any public symbols
+    // from their parent conformances.
+    auto rootConformance = dyn_cast<RootProtocolConformance>(conformance);
+    if (!rootConformance) {
       continue;
+    }
 
-    addSymbol(LinkEntity::forDirectProtocolWitnessTable(normalConformance));
-    addSymbol(LinkEntity::forProtocolConformanceDescriptor(normalConformance));
+    addSymbol(LinkEntity::forProtocolWitnessTable(rootConformance));
+    addSymbol(LinkEntity::forProtocolConformanceDescriptor(rootConformance));
 
     // FIXME: the logic around visibility in extensions is confusing, and
     // sometimes witness thunks need to be manually made public.
 
     auto conformanceIsFixed = SILWitnessTable::conformanceIsSerialized(
-        normalConformance);
+        rootConformance);
     auto addSymbolIfNecessary = [&](ValueDecl *requirementDecl,
                                     ValueDecl *witnessDecl) {
       auto witnessLinkage = SILDeclRef(witnessDecl).getLinkage(ForDefinition);
       if (conformanceIsFixed &&
-          fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage)) {
+          (isa<SelfProtocolConformance>(rootConformance) ||
+           fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage))) {
         Mangle::ASTMangler Mangler;
         addSymbol(
-            Mangler.mangleWitnessThunk(normalConformance, requirementDecl));
+            Mangler.mangleWitnessThunk(rootConformance, requirementDecl));
       }
     };
-    normalConformance->forEachValueWitness(
+
+    rootConformance->forEachValueWitness(
         nullptr, [&](ValueDecl *valueReq, Witness witness) {
           auto witnessDecl = witness.getDecl();
           if (isa<AbstractFunctionDecl>(valueReq)) {
@@ -164,6 +167,17 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
 
   addSymbol(SILDeclRef(AFD));
 
+  // Add the global function pointer for a dynamically replaceable function.
+  if (AFD->isNativeDynamic()) {
+    addSymbol(LinkEntity::forDynamicallyReplaceableFunctionVariable(AFD));
+    addSymbol(LinkEntity::forDynamicallyReplaceableFunctionImpl(AFD));
+    addSymbol(LinkEntity::forDynamicallyReplaceableFunctionKey(AFD));
+  }
+  if (AFD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+    addSymbol(LinkEntity::forDynamicallyReplaceableFunctionVariable(AFD));
+    addSymbol(LinkEntity::forDynamicallyReplaceableFunctionImpl(AFD));
+  }
+
   if (AFD->getAttrs().hasAttribute<CDeclAttr>()) {
     // A @_cdecl("...") function has an extra symbol, with the name from the
     // attribute.
@@ -172,13 +186,20 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
 
   // SWIFT_ENABLE_TENSORFLOW
   // The AutoDiff pass creates an order-1 JVP and VJP for every function with a
-  // @differentiable attribute.
+  // `@differentiable` attribute.
   if (auto *DA = AFD->getAttrs().getAttribute<DifferentiableAttr>()) {
-    for (auto kind : {AutoDiffAssociatedFunctionKind::JVP,
-                      AutoDiffAssociatedFunctionKind::VJP}) {
+    // FIXME: When we get rid of `vjp:` and `jvp:` arguments in `@differentiable`,
+    // we will no longer need to see whether they are specified.
+    if (!DA->getJVP()) {
       auto *id = AutoDiffAssociatedFunctionIdentifier::get(
-          kind, /*differentiationOrder*/ 1, DA->getCheckedParameterIndices(),
-          AFD->getASTContext());
+          AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
+          DA->getParameterIndices(), AFD->getASTContext());
+      addSymbol(SILDeclRef(AFD).asAutoDiffAssociatedFunction(id));
+    }
+    if (!DA->getVJP()) {
+      auto *id = AutoDiffAssociatedFunctionIdentifier::get(
+          AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
+          DA->getParameterIndices(), AFD->getASTContext());
       addSymbol(SILDeclRef(AFD).asAutoDiffAssociatedFunction(id));
     }
   }
@@ -207,8 +228,7 @@ void TBDGenVisitor::visitAccessorDecl(AccessorDecl *AD) {
 
 void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   // Add the property descriptor if the decl needs it.
-  if (SwiftModule->getASTContext().LangOpts.EnableKeyPathResilience
-      && ASD->exportsPropertyDescriptor()) {
+  if (ASD->exportsPropertyDescriptor()) {
     addSymbol(LinkEntity::forPropertyDescriptor(ASD));
   }
 
@@ -219,27 +239,50 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
 }
 
 void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
-  // Non-global variables might have an explicit initializer symbol, in
-  // non-resilient modules.
-  if (VD->getAttrs().hasAttribute<HasInitialValueAttr>() &&
-      SwiftModule->getResilienceStrategy() == ResilienceStrategy::Default &&
-      !isGlobalOrStaticVar(VD)) {
-    auto declRef = SILDeclRef(VD, SILDeclRef::Kind::StoredPropertyInitializer);
-    // Stored property initializers for public properties are currently
-    // public.
-    addSymbol(declRef);
-  }
-
-  // statically/globally stored variables have some special handling.
-  if (VD->hasStorage() && isGlobalOrStaticVar(VD)) {
-    if (getDeclLinkage(VD) == FormalLinkage::PublicUnique) {
-      // The actual variable has a symbol.
-      Mangle::ASTMangler mangler;
-      addSymbol(mangler.mangleEntity(VD, false));
+  // Variables inside non-resilient modules have some additional symbols.
+  if (!VD->isResilient()) {
+    // Non-global variables might have an explicit initializer symbol, in
+    // non-resilient modules.
+    if (VD->getAttrs().hasAttribute<HasInitialValueAttr>() &&
+        !isGlobalOrStaticVar(VD)) {
+      auto declRef = SILDeclRef(VD, SILDeclRef::Kind::StoredPropertyInitializer);
+      // Stored property initializers for public properties are currently
+      // public.
+      addSymbol(declRef);
     }
 
-    if (VD->isLazilyInitializedGlobal())
-      addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
+    // statically/globally stored variables have some special handling.
+    if (VD->hasStorage() &&
+        isGlobalOrStaticVar(VD)) {
+      if (getDeclLinkage(VD) == FormalLinkage::PublicUnique) {
+        // The actual variable has a symbol.
+        Mangle::ASTMangler mangler;
+        addSymbol(mangler.mangleEntity(VD, false));
+      }
+
+      if (VD->isLazilyInitializedGlobal())
+        addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
+    }
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // The AutoDiff pass creates an order-1 JVP and VJP for every var with a
+  // `@differentiable` attribute.
+  if (auto *DA = VD->getAttrs().getAttribute<DifferentiableAttr>()) {
+    // FIXME: When we get rid of `vjp:` and `jvp:` arguments in `@differentiable`,
+    // we will no longer need to see whether they are specified.
+    if (!DA->getJVP()) {
+      auto *id = AutoDiffAssociatedFunctionIdentifier::get(
+          AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
+          DA->getParameterIndices(), VD->getASTContext());
+      addSymbol(SILDeclRef(VD->getGetter()).asAutoDiffAssociatedFunction(id));
+    }
+    if (!DA->getVJP()) {
+      auto *id = AutoDiffAssociatedFunctionIdentifier::get(
+          AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
+          DA->getParameterIndices(), VD->getASTContext());
+      addSymbol(SILDeclRef(VD->getGetter()).asAutoDiffAssociatedFunction(id));
+    }
   }
 
   visitAbstractStorageDecl(VD);
@@ -456,6 +499,9 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
           addAssociatedTypeDescriptor(assocType);
       }
     }
+
+    // Include the self-conformance.
+    addConformances(PD);
   }
 
 #ifndef NDEBUG

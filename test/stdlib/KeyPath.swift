@@ -768,6 +768,34 @@ keyPath.test("optional chaining component that needs generic instantiation") {
   Value6096<Int>().doSomething()
 }
 
+// Nested generics.
+protocol HasAssoc {
+  associatedtype A
+}
+
+struct Outer<T, U> {
+  struct Middle<V, W, X> {
+  }
+}
+
+extension Outer.Middle where V: HasAssoc, U == V.A, W == X {
+  struct Inner<Y: Hashable> {
+    func foo() ->  AnyKeyPath {
+      return \[Y?: [U]].values
+    }
+  }
+}
+
+extension Double: HasAssoc {
+  typealias A = Float
+}
+
+keyPath.test("nested generics") {
+  let nested = Outer<Int, Float>.Middle<Double, String, String>.Inner<UInt>()
+  let nestedKeyPath = nested.foo()
+  typealias DictType = [UInt? : [Float]]
+  expectTrue(nestedKeyPath is KeyPath<DictType, DictType.Values>)
+}
 
 runAllTests()
 

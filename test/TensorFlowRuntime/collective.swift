@@ -1,5 +1,5 @@
 // RUN: %target-run-use-device-stack-swift %swift-tensorflow-test-run-extra-options
-// RUN: %target-run-dynamic-compilation-swift %swift-tensorflow-test-run-extra-options
+// RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
 
@@ -28,7 +28,7 @@ CollectiveTests.testAllBackends("SingletonGroup") {
 //
 // TODO: To enable this test in eager mode, need to put each collective op (or
 // the enclosing graph function) in a separate swift thread.
-#if !TF_DYNAMIC_COMPILATION
+#if TF_NODYNAMIC_COMPILATION
 CollectiveTests.testAllBackends("GroupWithSize2") {
   // Need 2 or more CPU devices for this test.
   let x = Tensor<Float>(1.0)
@@ -61,7 +61,7 @@ CollectiveTests.testAllBackends("GroupWithSize2") {
   _hostOp(t)
   expectEqualWithScalarTensor(2, t)
 }
-#endif // TF_DYNAMIC_COMPILATION
+#endif // !TF_NODYNAMIC_COMPILATION
 
 CollectiveTests.testAllBackends("GroupWithSize2_threads") {
   // Need 2 or more CPU devices for this test.

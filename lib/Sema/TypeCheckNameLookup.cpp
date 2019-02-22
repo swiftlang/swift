@@ -602,6 +602,12 @@ static unsigned getCallEditDistance(DeclName writtenName,
   StringRef writtenBase = writtenName.getBaseName().userFacingName();
   StringRef correctedBase = correctedName.getBaseName().userFacingName();
 
+  // Don't typo-correct to a name with a leading underscore unless the typed
+  // name also begins with an underscore.
+  if (correctedBase.startswith("_") && !writtenBase.startswith("_")) {
+    return UnreasonableCallEditDistance;
+  }
+
   unsigned distance = writtenBase.edit_distance(correctedBase, maxEditDistance);
 
   // Bound the distance to UnreasonableCallEditDistance.

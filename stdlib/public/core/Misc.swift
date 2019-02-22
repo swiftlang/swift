@@ -51,7 +51,6 @@ public func _autorelease(_ x: AnyObject) {
 ///
 /// This function is primarily useful to call various runtime functions
 /// written in C++.
-@inlinable // FIXME(sil-serialize-all)
 internal func _withUninitializedString<R>(
   _ body: (UnsafeMutablePointer<String>) -> R
 ) -> (R, String) {
@@ -67,56 +66,35 @@ internal func _withUninitializedString<R>(
 // with type names that we are nested in.
 // But we can place it behind #if _runtime(_Native) and remove it from ABI on
 // Apple platforms, deferring discussions mentioned above.
-@inlinable // FIXME(sil-serialize-all)
 @_silgen_name("swift_getTypeName")
 public func _getTypeName(_ type: Any.Type, qualified: Bool)
   -> (UnsafePointer<UInt8>, Int)
 
 /// Returns the demangled qualified name of a metatype.
-@inlinable // FIXME(sil-serialize-all)
 public // @testable
 func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
   let (stringPtr, count) = _getTypeName(type, qualified: qualified)
-  return ._fromASCII(UnsafeBufferPointer(start: stringPtr, count: count))
+  return String._fromUTF8Repairing(
+    UnsafeBufferPointer(start: stringPtr, count: count)).0
 }
 
 /// Lookup a class given a name. Until the demangled encoding of type
 /// names is stabilized, this is limited to top-level class names (Foo.bar).
 public // SPI(Foundation)
 func _typeByName(_ name: String) -> Any.Type? {
-  return _typeByMangledName(name);
-}
-
-@_silgen_name("swift_getTypeByMangledName")
-internal func _getTypeByMangledName(
-  _ name: UnsafePointer<UInt8>,
-  _ nameLength: UInt,
-  _ numberOfLevels: UInt,
-  _ parametersPerLevel: UnsafePointer<UInt>,
-  _ substitutions: UnsafePointer<Any.Type>)
-  -> Any.Type?
-
-/// Lookup a class given a mangled name. This is a placeholder while we bring
-/// up this functionality.
-public  // TEMPORARY
-func _typeByMangledName(_ name: String,
-                        substitutions: [[Any.Type]] = []) -> Any.Type? {
-  // Map the substitutions to a flat representation that's easier to thread
-  // through to the runtime.
-  let numberOfLevels = UInt(substitutions.count)
-  var parametersPerLevel = [UInt]()
-  var flatSubstitutions = [Any.Type]()
-  for level in substitutions {
-    parametersPerLevel.append(UInt(level.count))
-    flatSubstitutions.append(contentsOf: level)
-  }
-
   let nameUTF8 = Array(name.utf8)
   return nameUTF8.withUnsafeBufferPointer { (nameUTF8) in
     return  _getTypeByMangledName(nameUTF8.baseAddress!,
                                   UInt(nameUTF8.endIndex),
-                                  numberOfLevels,
-                                  parametersPerLevel,
-                                  flatSubstitutions)
+                                  genericEnvironment: nil,
+                                  genericArguments: nil)
   }
 }
+
+@_silgen_name("swift_stdlib_getTypeByMangledName")
+internal func _getTypeByMangledName(
+  _ name: UnsafePointer<UInt8>,
+  _ nameLength: UInt,
+  genericEnvironment: UnsafeRawPointer?,
+  genericArguments: UnsafeRawPointer?)
+  -> Any.Type?

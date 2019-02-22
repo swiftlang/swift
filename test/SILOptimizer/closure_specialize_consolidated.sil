@@ -16,12 +16,12 @@ protocol Q {
 }
 
 public class C {
-  @sil_stored var c: C? { get set }
+  @_hasStorage var c: C? { get set }
   init()
 }
 
 public struct S: Q {
-  @sil_stored var c: C? { get set }
+  @_hasStorage var c: C? { get set }
   init(c: C?)
   init()
 }

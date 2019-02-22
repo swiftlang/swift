@@ -524,6 +524,10 @@ final class TestRunner {
     }
 
     test.tearDownFunction?()
+    if let lf = test.legacyFactor {
+      logVerbose("    Applying legacy factor: \(lf)")
+      samples = samples.map { $0 * lf }
+    }
 
     return BenchResults(samples, maxRSS: measureMemoryUsage())
   }

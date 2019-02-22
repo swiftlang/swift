@@ -407,23 +407,12 @@ struct UnknownObjectRetainableBox
 /// A box implementation class for BridgeObject.
 struct BridgeObjectBox :
     RetainableBoxBase<BridgeObjectBox, void*> {
-  // TODO: Enable the nil extra inhabitant.
-  static constexpr unsigned numExtraInhabitants = 1;
-      
   static void *retain(void *obj) {
     return swift_bridgeObjectRetain(obj);
   }
 
   static void release(void *obj) {
     swift_bridgeObjectRelease(obj);
-  }
-      
-  static void storeExtraInhabitant(void **dest, int index) {
-    *dest = nullptr;
-  }
-
-  static int getExtraInhabitantIndex(void* const *src) {
-    return *src == nullptr ? 0 : -1;
   }
 };
   

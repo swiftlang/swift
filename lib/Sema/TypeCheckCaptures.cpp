@@ -239,6 +239,14 @@ public:
   std::pair<bool, Expr *> walkToDeclRefExpr(DeclRefExpr *DRE) {
     auto *D = DRE->getDecl();
 
+    // HACK: $interpolation variables are seen as needing to be captured. 
+    // The good news is, we literally never need to capture them, so we 
+    // can safely ignore them.
+    // FIXME(TapExpr): This is probably caused by the scoping 
+    // algorithm's ignorance of TapExpr. We should fix that.
+    if (D->getBaseName() == D->getASTContext().Id_dollarInterpolation)
+      return { false, DRE };
+
     // Capture the generic parameters of the decl, unless it's a
     // local declaration in which case we will pick up generic
     // parameter references transitively.
@@ -408,10 +416,13 @@ public:
     // If this is a direct reference to underlying storage, then this is a
     // capture of the storage address - not a capture of the getter/setter.
     if (auto var = dyn_cast<VarDecl>(D)) {
+      auto *DC = AFR.getAsDeclContext();
       if (var->getAccessStrategy(DRE->getAccessSemantics(),
                                  var->supportsMutation()
-                                   ? AccessKind::ReadWrite : AccessKind::Read,
-                                 AFR.getAsDeclContext())
+                                   ? AccessKind::ReadWrite
+                                   : AccessKind::Read,
+                                 DC->getParentModule(),
+                                 DC->getResilienceExpansion())
           .getKind() == AccessStrategy::Storage)
         Flags |= CapturedValue::IsDirect;
     }

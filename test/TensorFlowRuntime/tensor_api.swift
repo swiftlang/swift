@@ -1,5 +1,8 @@
-// RUN: %target-run-simple-swift %swift-tensorflow-test-run-extra-options
-// RUN: %target-run-dynamic-compilation-swift %swift-tensorflow-test-run-extra-options
+// RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
+
+// SR-9737: hanging tests in GPE GPU mode
+// UN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
+
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
 //
@@ -28,6 +31,16 @@ TensorNonTPUTests.testAllBackends("SliceUpdate") {
   var t4 = Tensor<Bool>([[true, true, true], [false, false, false]])
   t4[0] = Tensor(shape: [3], repeating: false)
   expectEqual(ShapedArray(shape:[2, 3], repeating: false), t4.array)
+}
+
+TensorNonTPUTests.testAllBackends("BroadcastTensor") {
+  // 1 -> 2 x 3 x 4
+  let one = Tensor<Float>(1)
+  var target = Tensor<Float>(shape: [2, 3, 4], repeating: 0.0)
+  let broadcasted = one.broadcast(like: target)
+  expectEqual(Tensor(shape: [2, 3, 4], repeating: 1), broadcasted)
+  target .= Tensor(shape: [1, 3, 1], repeating: 1)
+  expectEqual(Tensor(shape: [2, 3, 4], repeating: 1), target)
 }
 
 runAllTests()

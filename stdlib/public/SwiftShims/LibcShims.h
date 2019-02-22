@@ -62,6 +62,14 @@ static inline void _swift_stdlib_free(void *ptr) {
   free(ptr);
 }
 
+// <unistd.h>
+SWIFT_RUNTIME_STDLIB_SPI
+__swift_ssize_t _swift_stdlib_read(int fd, void *buf, __swift_size_t nbyte);
+SWIFT_RUNTIME_STDLIB_SPI
+__swift_ssize_t _swift_stdlib_write(int fd, const void *buf, __swift_size_t nbyte);
+SWIFT_RUNTIME_STDLIB_SPI
+int _swift_stdlib_close(int fd);
+
 // String handling <string.h>
 SWIFT_READONLY
 static inline __swift_size_t _swift_stdlib_strlen(const char *s) {

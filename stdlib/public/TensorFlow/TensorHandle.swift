@@ -21,13 +21,13 @@ import CTensorFlow
 /// handles in the compiler.
 @_fixed_layout // required because the compiler accesses _cTensorHandle directly.
 public class _AnyTensorHandle {
-  /// The underlying `TF_TensorHandle *`.
+  /// The underlying `TFE_TensorHandle *`.
   ///
   /// - Note: The compiler knows that `_AnyTensorHandle` has a single stored
   /// property, and assumes that this is it. Changing the design of
   /// `TensorHandle` will require tweaking the compiler.
   public let _cTensorHandle: CTensorHandle
-  
+
   /// Private initializer from a `CTensorHandle`. Should only be called from
   /// `TensorHandle<Scalar>.init`.
   fileprivate init(base: CTensorHandle) {
@@ -45,7 +45,7 @@ public final class TensorHandle<Scalar> : _AnyTensorHandle
   public init(_owning cTensorHandle: CTensorHandle) {
     super.init(base: cTensorHandle)
   }
-  
+
   @usableFromInline
   convenience init(copyingFromCTensor cTensor: CTensor) {
     let status = TF_NewStatus()
@@ -78,7 +78,7 @@ public final class TensorHandle<Scalar> : _AnyTensorHandle
     bufferInitializer: (UnsafeMutableRawPointer) -> Void
   ) {
     let cTensor = TF_AllocateTensor(
-      Scalar.tensorFlowDataType.cDataType,
+      Scalar.tensorFlowDataType._cDataType,
       shape.map(Int64.init),
       Int32(shape.count),
       byteCount
@@ -87,6 +87,12 @@ public final class TensorHandle<Scalar> : _AnyTensorHandle
     bufferInitializer(TF_TensorData(cTensor))
     self.init(copyingFromCTensor: cTensor)
     TF_DeleteTensor(cTensor)
+  }
+
+  /// Return true if the underlying tensor is concrete (as opposed to being
+  /// symbolic).
+  public var isConcrete: Bool {
+    return TFE_TensorHandleIsConcrete(_cTensorHandle) != 0
   }
 }
 
@@ -119,6 +125,8 @@ internal extension TensorHandle {
   @usableFromInline
   @inline(never)
   func makeHostCopy() -> ShapedArray<Scalar> {
+    internalConsistencyCheck(isConcrete)
+    debugLog("Calling makeHostCopy() with c handle \(_cTensorHandle)")
     return ShapedArray(cTensorHandle: _cTensorHandle)
   }
 }
@@ -135,7 +143,7 @@ extension TensorHandle : TensorSendableReceivable {
     let context = _ExecutionContext.global
     let cTensorHandle = TFE_DequeueNamedTensorFromCtx(
       context.eagerContext, Int32(tensorID),
-      Scalar.tensorFlowDataType.cDataType, status)
+      Scalar.tensorFlowDataType._cDataType, status)
     checkOk(status)
     tensorHandle = TensorHandle<Scalar>(_owning: cTensorHandle!)
     if _RuntimeConfig.printsDebugLog {
@@ -166,7 +174,7 @@ extension TensorHandle : TensorSendableReceivable {
   static func scalar(_ scalar: Scalar) -> TensorHandle<Scalar> {
     debugLog("Creating a tensor from scalar \(scalar).")
     let cTensorHandle = _TFCCreateCTensorHandle(
-        scalar, Scalar.tensorFlowDataType.cDataType)
+        scalar, Scalar.tensorFlowDataType._cDataType)
     return TensorHandle<Scalar>(_owning: cTensorHandle)
   }
 }
@@ -175,9 +183,12 @@ internal extension ShapedArray where Scalar : _TensorFlowDataTypeCompatible {
   @usableFromInline
   @inline(never)
   init(cTensorHandle: CTensorHandle) {
+    internalConsistencyCheck(TFE_TensorHandleIsConcrete(cTensorHandle) != 0)
     let status = TF_NewStatus()
     let cTensor = TFE_TensorHandleResolve(cTensorHandle, status)
+    checkOk(status)
     TF_DeleteStatus(status)
+    internalConsistencyCheck(cTensor != nil)
     debugLog("# of dims is \(TF_NumDims(cTensor!))")
     debugLog("Returning a shaped array.")
     self.init(owning: cTensor!)
@@ -213,7 +224,7 @@ extension ResourceHandle : TensorSendableReceivable {
     checkOk(status)
     TF_DeleteStatus(status)
     debugLog("Done receiving resource tensor of id \(tensorID).")
-    return ResourceHandle(owning: cTensorHandle)    
+    return ResourceHandle(owning: cTensorHandle)
   }
 
   @inlinable
@@ -266,7 +277,7 @@ extension VariantHandle : TensorSendableReceivable {
     checkOk(status)
     TF_DeleteStatus(status)
     debugLog("Done receiving variant tensor of id \(tensorID).")
-    return VariantHandle(owning: cTensorHandle)    
+    return VariantHandle(owning: cTensorHandle)
   }
 
   @inlinable

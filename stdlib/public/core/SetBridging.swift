@@ -15,13 +15,15 @@
 import SwiftShims
 
 @_silgen_name("swift_stdlib_CFSetGetValues")
-@usableFromInline
 internal
-func _stdlib_CFSetGetValues(_ nss: _NSSet, _: UnsafeMutablePointer<AnyObject>)
+func _stdlib_CFSetGetValues(
+  _ nss: AnyObject,
+  _: UnsafeMutablePointer<AnyObject>)
 
 /// Equivalent to `NSSet.allObjects`, but does not leave objects on the
 /// autorelease pool.
-internal func _stdlib_NSSet_allObjects(_ nss: _NSSet) -> _BridgingBuffer {
+internal func _stdlib_NSSet_allObjects(_ object: AnyObject) -> _BridgingBuffer {
+  let nss = unsafeBitCast(object, to: _NSSet.self)
   let storage = _BridgingBuffer(nss.count)
   _stdlib_CFSetGetValues(nss, storage.baseAddress)
   return storage
@@ -29,11 +31,11 @@ internal func _stdlib_NSSet_allObjects(_ nss: _NSSet) -> _BridgingBuffer {
 
 extension _NativeSet { // Bridging
   @usableFromInline
-  internal __consuming func bridged() -> _NSSet {
+  internal __consuming func bridged() -> AnyObject {
     // We can zero-cost bridge if our keys are verbatim
     // or if we're the empty singleton.
 
-    // Temporary var for SOME type safety before a cast.
+    // Temporary var for SOME type safety.
     let nsSet: _NSSetCore
 
     if _storage === _RawSetStorage.empty || count == 0 {
@@ -47,7 +49,7 @@ extension _NativeSet { // Bridging
     // Cast from "minimal NSSet" to "NSSet"
     // Note that if you actually ask Swift for this cast, it will fail.
     // Never trust a shadow protocol!
-    return unsafeBitCast(nsSet, to: _NSSet.self)
+    return nsSet
   }
 }
 
@@ -63,11 +65,11 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
 
   @objc
   internal override required init() {
-    _sanityCheckFailure("don't call this designated initializer")
+    _internalInvariantFailure("don't call this designated initializer")
   }
 
   internal init(_ base: __owned _NativeSet<Element>) {
-    _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self))
+    _internalInvariant(_isBridgedVerbatimToObjectiveC(Element.self))
     self.base = base
     self.bridgedElements = nil
     self.nextBucket = base.hashTable.startBucket
@@ -76,7 +78,7 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
 
   @nonobjc
   internal init(_ deferred: __owned _SwiftDeferredNSSet<Element>) {
-    _sanityCheck(!_isBridgedVerbatimToObjectiveC(Element.self))
+    _internalInvariant(!_isBridgedVerbatimToObjectiveC(Element.self))
     self.base = deferred.native
     self.bridgedElements = deferred.bridgeElements()
     self.nextBucket = base.hashTable.startBucket
@@ -84,7 +86,7 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
   }
 
   private func bridgedElement(at bucket: _HashTable.Bucket) -> AnyObject {
-    _sanityCheck(base.hashTable.isOccupied(bucket))
+    _internalInvariant(base.hashTable.isOccupied(bucket))
     if let bridgedElements = self.bridgedElements {
       return bridgedElements[bucket]
     }
@@ -154,8 +156,8 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
   internal var native: _NativeSet<Element>
 
   internal init(_ native: __owned _NativeSet<Element>) {
-    _sanityCheck(native.count > 0)
-    _sanityCheck(!_isBridgedVerbatimToObjectiveC(Element.self))
+    _internalInvariant(native.count > 0)
+    _internalInvariant(!_isBridgedVerbatimToObjectiveC(Element.self))
     self.native = native
     super.init()
   }
@@ -206,7 +208,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
 
   @objc
   internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
-    _sanityCheckFailure("don't call this designated initializer")
+    _internalInvariantFailure("don't call this designated initializer")
   }
 
   @objc(copyWithZone:)
@@ -287,10 +289,10 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
 @_fixed_layout
 internal struct _CocoaSet {
   @usableFromInline
-  internal let object: _NSSet
+  internal let object: AnyObject
 
   @inlinable
-  internal init(_ object: __owned _NSSet) {
+  internal init(_ object: __owned AnyObject) {
     self.object = object
   }
 }
@@ -302,9 +304,10 @@ extension _CocoaSet {
     return index.element
   }
 
-  @inlinable
+  @usableFromInline
   internal func member(for element: AnyObject) -> AnyObject? {
-    return object.member(element)
+    let nss = unsafeBitCast(object, to: _NSSet.self)
+    return nss.member(element)
   }
 }
 
@@ -376,25 +379,27 @@ extension _CocoaSet: _SetBuffer {
         return Index(Index.Storage(self, allKeys), offset: i)
       }
     }
-    _sanityCheckFailure(
+    _internalInvariantFailure(
       "An NSSet member wasn't listed amongst its enumerated contents")
   }
 
-  @inlinable
+  @usableFromInline
   internal var count: Int {
-    return object.count
+    let nss = unsafeBitCast(object, to: _NSSet.self)
+    return nss.count
   }
 
-  @inlinable
+  @usableFromInline
   internal func contains(_ element: AnyObject) -> Bool {
-    return object.member(element) != nil
+    let nss = unsafeBitCast(object, to: _NSSet.self)
+    return nss.member(element) != nil
   }
 
   @usableFromInline // FIXME(cocoa-index): Make inlinable
   @_effects(releasenone)
   internal func element(at i: Index) -> AnyObject {
     let element: AnyObject? = i.element
-    _sanityCheck(element != nil, "Item not found in underlying NSSet")
+    _internalInvariant(element != nil, "Item not found in underlying NSSet")
     return element!
   }
 }
@@ -590,7 +595,7 @@ extension _CocoaSet.Iterator: IteratorProtocol {
 
 extension Set {
   @inlinable
-  public __consuming func _bridgeToObjectiveCImpl() -> _NSSetCore {
+  public __consuming func _bridgeToObjectiveCImpl() -> AnyObject {
     guard _variant.isNative else {
       return _variant.asCocoa.object
     }

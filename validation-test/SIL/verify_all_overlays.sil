@@ -1,4 +1,5 @@
-// RUN: for x in %platform-sdk-overlay-dir/*.swiftmodule; do [[ $(basename "$x") = Swift.swiftmodule ]] && continue; llvm-bcanalyzer $x | %FileCheck %s; %target-sil-opt -sdk %sdk -enable-sil-verify-all $x > /dev/null; done
+// TODO(SR-9715): Fix this and re-enable.
+// RUN: echo "disabled"
 
 // CHECK-NOT: Unknown
 

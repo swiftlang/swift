@@ -55,7 +55,17 @@ struct CallerAnalysis::ApplySiteFinderVisitor
   ~ApplySiteFinderVisitor();
 
   bool visitSILInstruction(SILInstruction *) { return false; }
-  bool visitFunctionRefInst(FunctionRefInst *fri);
+  bool visitFunctionRefInst(FunctionRefInst *fri) {
+    return visitFunctionRefBaseInst(fri);
+  }
+  bool visitDynamicFunctionRefInst(DynamicFunctionRefInst *fri) {
+    return visitFunctionRefBaseInst(fri);
+  }
+  bool
+  visitPreviousDynamicFunctionRefInst(PreviousDynamicFunctionRefInst *fri) {
+    return visitFunctionRefBaseInst(fri);
+  }
+  bool visitFunctionRefBaseInst(FunctionRefBaseInst *fri);
 
   void process();
   void processApplySites(ArrayRef<ApplySite> applySites);
@@ -100,8 +110,8 @@ CallerAnalysis::ApplySiteFinderVisitor::~ApplySiteFinderVisitor() {
 #endif
 }
 
-bool CallerAnalysis::ApplySiteFinderVisitor::visitFunctionRefInst(
-    FunctionRefInst *fri) {
+bool CallerAnalysis::ApplySiteFinderVisitor::visitFunctionRefBaseInst(
+    FunctionRefBaseInst *fri) {
   auto optResult = findLocalApplySites(fri);
   auto *calleeFn = fri->getReferencedFunction();
   FunctionInfo &calleeInfo = analysis->unsafeGetFunctionInfo(calleeFn);

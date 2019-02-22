@@ -147,14 +147,15 @@ struct X2: P2 {
   typealias A = X1
 }
 
-// Check for correct root generic parameters in the generic requirements of X3.
-// CHECK-LABEL: @"$sq_1A13generic_types2P2P_MXA" = linkonce_odr hidden constant
+// Check for correct generic parameters in the nominal type descriptor
+// CHECK-LABEL: @"$s13generic_types2X3VMn" =
 
 // Root: generic parameter 1
-// CHECK-SAME: i32 1
+// CHECK-SAME: @"symbolic q_"
 
-// Protocol P2
-// CHECK-SAME: $s13generic_types2P2Mp
+// U.A (via P2)
+// CHECK-SAME: @"symbolic 1A_____Qy_ 13generic_types2P2P
+
 struct X3<T, U> where U: P2, U.A: P1 { }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal %swift.type* @"$s13generic_types1ACMi"(%swift.type_descriptor*, i8**, i8*) {{.*}} {

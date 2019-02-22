@@ -604,6 +604,11 @@ namespace swift {
       return Result;
     }
 
+    /// \brief Return all \c DiagnosticConsumers.
+    ArrayRef<DiagnosticConsumer *> getConsumers() {
+      return Consumers;
+    }
+
     /// \brief Emit a diagnostic using a preformatted array of diagnostic
     /// arguments.
     ///

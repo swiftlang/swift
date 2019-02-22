@@ -1166,10 +1166,10 @@ namespace  {
 
     UNINTERESTING_ATTR(AccessControl)
     UNINTERESTING_ATTR(Alignment)
+    UNINTERESTING_ATTR(Borrowed)
     UNINTERESTING_ATTR(CDecl)
     UNINTERESTING_ATTR(Consuming)
     UNINTERESTING_ATTR(Dynamic)
-    // SWIFT_ENABLE_TENSORFLOW
     UNINTERESTING_ATTR(DynamicCallable)
     UNINTERESTING_ATTR(DynamicMemberLookup)
     UNINTERESTING_ATTR(SILGenName)
@@ -1212,13 +1212,15 @@ namespace  {
     UNINTERESTING_ATTR(SwiftNativeObjCRuntimeBase)
     UNINTERESTING_ATTR(ShowInInterface)
     UNINTERESTING_ATTR(Specialize)
+    UNINTERESTING_ATTR(DynamicReplacement)
+    UNINTERESTING_ATTR(PrivateImport)
 
     // SWIFT_ENABLE_TENSORFLOW
     UNINTERESTING_ATTR(Differentiable)
+    UNINTERESTING_ATTR(Differentiating)
     UNINTERESTING_ATTR(CompilerEvaluable)
     UNINTERESTING_ATTR(TensorFlowGraph)
-    UNINTERESTING_ATTR(TFParameter)
-    UNINTERESTING_ATTR(FieldwiseProductSpace)
+    UNINTERESTING_ATTR(FieldwiseDifferentiable)
     UNINTERESTING_ATTR(NoDerivative)
 
     // These can't appear on overridable declarations.
@@ -1230,7 +1232,7 @@ namespace  {
     UNINTERESTING_ATTR(SynthesizedProtocol)
     UNINTERESTING_ATTR(RequiresStoredPropertyInits)
     UNINTERESTING_ATTR(Transparent)
-    UNINTERESTING_ATTR(SILStored)
+    UNINTERESTING_ATTR(HasStorage)
     UNINTERESTING_ATTR(Testable)
 
     UNINTERESTING_ATTR(WarnUnqualifiedAccess)
@@ -1519,12 +1521,12 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   // Non-Objective-C declarations in extensions cannot override or
   // be overridden.
   if (!isAccessor &&
-      (base->getDeclContext()->isExtensionContext() ||
-       override->getDeclContext()->isExtensionContext()) &&
+      (isa<ExtensionDecl>(base->getDeclContext()) ||
+       isa<ExtensionDecl>(override->getDeclContext())) &&
       !base->isObjC()) {
     bool baseCanBeObjC = canBeRepresentedInObjC(base);
     diags.diagnose(override, diag::override_decl_extension, baseCanBeObjC,
-                   !base->getDeclContext()->isExtensionContext());
+                   !isa<ExtensionDecl>(base->getDeclContext()));
     if (baseCanBeObjC) {
       SourceLoc insertionLoc =
         override->getAttributeInsertionLoc(/*forModifier=*/false);
@@ -1567,9 +1569,8 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   if (auto *baseDecl = dyn_cast<ClassDecl>(base->getDeclContext())) {
     if (!isAccessor &&
         baseDecl->hasKnownSwiftImplementation() &&
-        !base->isDynamic() &&
-        override->getDeclContext()->isExtensionContext()) {
-      // For compatibility, only generate a warning in Swift 3
+        !base->isObjCDynamic() &&
+        isa<ExtensionDecl>(override->getDeclContext())) {
       diags.diagnose(override, diag::override_class_declaration_in_extension);
       diags.diagnose(base, diag::overridden_here);
     }
@@ -1785,21 +1786,15 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
       auto baseAccessor = baseASD->getAccessor(kind);
       if (!baseAccessor) continue;
 
-      switch (kind) {
-      case AccessorKind::Read:
-        if (baseASD->getReadCoroutine()->hasForcedStaticDispatch())
-          continue;
-        LLVM_FALLTHROUGH;
+      if (baseAccessor->hasForcedStaticDispatch())
+        continue;
 
+      switch (kind) {
       case AccessorKind::Get:
+      case AccessorKind::Read:
         break;
 
       case AccessorKind::Modify:
-        if (baseASD->getModifyCoroutine()->hasForcedStaticDispatch())
-          continue;
-
-        LLVM_FALLTHROUGH;
-
       case AccessorKind::Set:
         // For setter accessors, we need the base's setter to be
         // accessible from the overriding context, or it's not an override.

@@ -268,6 +268,8 @@ SYNTAX_TOKENS = [
                  serialization_code=72),
     PoundKeyword('PoundDsohandle', 'dsohandle', text='#dsohandle',
                  serialization_code=71),
+    PoundKeyword('PoundAssert', 'assert', text='#assert',
+                 serialization_code=117),
 
     PoundDirectiveKeyword('PoundSourceLocation', 'sourceLocation',
                           text='#sourceLocation', serialization_code=65),
@@ -330,11 +332,9 @@ SYNTAX_TOKENS = [
 
     # SWIFT_ENABLE_TENSORFLOW
     PoundObjectLiteral('PoundTensorFlowOp', 'tfop', text='#tfop',
-                       serialization_code=117,
+                       serialization_code=118,
                        description='TensorFlow operation',
                        protocol='ExpressibleByTensorFlowOp'),
-    PoundKeyword('PoundAssert', 'assert', text='#assert',
-                 serialization_code=119),
 ]
 
 SYNTAX_TOKEN_MAP = {token.name + 'Token': token for token in SYNTAX_TOKENS}

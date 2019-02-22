@@ -18,6 +18,8 @@
 #ifndef SWIFT_SEMA_PROTOCOL_H
 #define SWIFT_SEMA_PROTOCOL_H
 
+#include "TypeChecker.h"
+#include "swift/AST/AccessScope.h"
 #include "swift/AST/RequirementEnvironment.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
@@ -203,6 +205,10 @@ enum class MatchKind : uint8_t {
 
   /// The witness is explicitly @nonobjc but the requirement is @objc.
   NonObjC,
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// The @differentiable attribute does not match.
+  DifferentiableConflict,
 };
 
 /// Describes the kind of optional adjustment performed when
@@ -249,6 +255,9 @@ enum class CheckKind : unsigned {
   /// The witness is storage whose setter is less accessible than the
   /// requirement.
   AccessOfSetter,
+
+  /// The witness needs to be @usableFromInline.
+  UsableFromInline,
 
   /// The witness is less available than the requirement.
   Availability,
@@ -413,6 +422,8 @@ struct RequirementMatch {
     case MatchKind::RethrowsConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
+      // SWIFT_ENABLE_TENSORFLOW
+    case MatchKind::DifferentiableConflict:
       return false;
     }
 
@@ -441,6 +452,8 @@ struct RequirementMatch {
     case MatchKind::RethrowsConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
+      // SWIFT_ENABLE_TENSORFLOW
+    case MatchKind::DifferentiableConflict:
       return false;
     }
 
@@ -475,10 +488,23 @@ protected:
 
   RequirementEnvironmentCache ReqEnvironmentCache;
 
+  Optional<std::pair<AccessScope, bool>> RequiredAccessScopeAndUsableFromInline;
+
   WitnessChecker(TypeChecker &tc, ProtocolDecl *proto,
                  Type adoptee, DeclContext *dc);
 
   bool isMemberOperator(FuncDecl *decl, Type type);
+
+  AccessScope getRequiredAccessScope();
+
+  bool isUsableFromInlineRequired() {
+    if (!TC.getLangOpts().EnableAccessControl)
+      return false;
+
+    assert(RequiredAccessScopeAndUsableFromInline.hasValue() &&
+           "must check access first using getRequiredAccessScope");
+    return RequiredAccessScopeAndUsableFromInline.getValue().second;
+  }
 
   /// Gather the value witnesses for the given requirement.
   ///
@@ -501,8 +527,7 @@ protected:
                        unsigned &bestIdx,
                        bool &doNotDiagnoseMatches);
 
-  bool checkWitnessAccess(AccessScope &requiredAccessScope,
-                          ValueDecl *requirement,
+  bool checkWitnessAccess(ValueDecl *requirement,
                           ValueDecl *witness,
                           bool *isSetter);
 
@@ -510,8 +535,7 @@ protected:
                                 ValueDecl *witness,
                                 AvailabilityContext *requirementInfo);
 
-  RequirementCheck checkWitness(AccessScope requiredAccessScope,
-                                ValueDecl *requirement,
+  RequirementCheck checkWitness(ValueDecl *requirement,
                                 const RequirementMatch &match);
 };
 
@@ -616,6 +640,11 @@ class ConformanceChecker : public WitnessChecker {
   /// Resolve a (non-type) witness via default definition or optional.
   ResolveWitnessResult resolveWitnessViaDefault(ValueDecl *requirement);
 
+  /// Resolve a (non-type) witness by trying each standard strategy until one
+  /// of them produces a result.
+  ResolveWitnessResult
+  resolveWitnessTryingAllStrategies(ValueDecl *requirement);
+
   /// Attempt to resolve a type witness via member name lookup.
   ResolveWitnessResult resolveTypeWitnessViaLookup(
                          AssociatedTypeDecl *assocType);
@@ -661,6 +690,9 @@ public:
 
   /// Resolve all of the type witnesses.
   void resolveTypeWitnesses();
+
+  /// Resolve all of the non-type witnesses.
+  void resolveValueWitnesses();
 
   /// Resolve the witness for the given non-type requirement as
   /// directly as possible, only resolving other witnesses if

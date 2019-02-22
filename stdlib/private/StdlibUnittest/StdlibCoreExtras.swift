@@ -28,7 +28,7 @@ import Foundation
 //
 
 func findSubstring(_ haystack: Substring, _ needle: String) -> String.Index? {
-  return findSubstring(String(haystack._ephemeralContent), needle)
+  return findSubstring(haystack._ephemeralString, needle)
 }
 
 func findSubstring(_ string: String, _ substring: String) -> String.Index? {

@@ -290,13 +290,6 @@ extension StrideTo: Sequence {
   }
 
   @inlinable
-  public func _preprocessingPass<R>(
-    _ preprocess: () throws -> R
-  ) rethrows -> R? {
-    return try preprocess()
-  }
-
-  @inlinable
   public func _customContainsEquatableElement(
     _ element: Element
   ) -> Bool? {
@@ -502,13 +495,6 @@ extension StrideThrough: Sequence {
       count += 1
     }
     return count
-  }
-
-  @inlinable
-  public func _preprocessingPass<R>(
-    _ preprocess: () throws -> R
-  ) rethrows -> R? {
-    return try preprocess()
   }
 
   @inlinable

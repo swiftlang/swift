@@ -207,6 +207,9 @@ namespace swift {
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
 
+    /// \brief Enable experimental #assert feature.
+    bool EnableExperimentalStaticAssert = false;
+
     /// \brief Enable experimental property behavior feature.
     bool EnableExperimentalPropertyBehaviors = false;
 
@@ -238,9 +241,6 @@ namespace swift {
     /// This is for bootstrapping. It can't be in SILOptions because the
     /// TypeChecker uses it to set resolve the ParameterConvention.
     bool EnableSILOpaqueValues = false;
-    
-    /// Enables key path resilience.
-    bool EnableKeyPathResilience = true;
 
     /// If set to true, the diagnosis engine can assume the emitted diagnostics
     /// will be used in editor. This usually leads to more aggressive fixit.

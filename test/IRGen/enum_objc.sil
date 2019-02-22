@@ -129,4 +129,4 @@ x:
 }
 
 // Weak existentials allow extra inhabitants if not @objc, therefore StructWithWeakVar must emit:
-// CHECK: define linkonce_odr hidden void @"$s9enum_objc17StructWithWeakVarVwxs"
+// CHECK: define internal void @"$s9enum_objc17StructWithWeakVarVwxs"

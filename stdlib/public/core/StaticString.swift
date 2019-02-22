@@ -253,13 +253,7 @@ public struct StaticString
 
   /// A string representation of the static string.
   public var description: String {
-    return withUTF8Buffer { (buffer) in
-      if isASCII {
-        return String._fromASCII(buffer)
-      } else {
-        return String._fromWellFormedUTF8(buffer)
-      }
-    }
+    return withUTF8Buffer { String._uncheckedFromUTF8($0) }
   }
 
   /// A textual representation of the static string, suitable for debugging.

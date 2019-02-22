@@ -110,13 +110,16 @@ enum class TypeInfoKind : unsigned {
 class TypeInfo {
   TypeInfoKind Kind;
   unsigned Size, Alignment, Stride, NumExtraInhabitants;
+  bool BitwiseTakable;
 
 public:
   TypeInfo(TypeInfoKind Kind,
            unsigned Size, unsigned Alignment,
-           unsigned Stride, unsigned NumExtraInhabitants)
+           unsigned Stride, unsigned NumExtraInhabitants,
+           bool BitwiseTakable)
     : Kind(Kind), Size(Size), Alignment(Alignment), Stride(Stride),
-      NumExtraInhabitants(NumExtraInhabitants) {
+      NumExtraInhabitants(NumExtraInhabitants),
+      BitwiseTakable(BitwiseTakable) {
     assert(Alignment > 0);
   }
 
@@ -126,6 +129,7 @@ public:
   unsigned getAlignment() const { return Alignment; }
   unsigned getStride() const { return Stride; }
   unsigned getNumExtraInhabitants() const { return NumExtraInhabitants; }
+  bool isBitwiseTakable() const { return BitwiseTakable; }
 
   void dump() const;
   void dump(std::ostream &OS, unsigned Indent = 0) const;
@@ -162,9 +166,10 @@ class RecordTypeInfo : public TypeInfo {
 public:
   RecordTypeInfo(unsigned Size, unsigned Alignment,
                  unsigned Stride, unsigned NumExtraInhabitants,
+                 bool BitwiseTakable,
                  RecordKind SubKind, const std::vector<FieldInfo> &Fields)
     : TypeInfo(TypeInfoKind::Record, Size, Alignment, Stride,
-               NumExtraInhabitants),
+               NumExtraInhabitants, BitwiseTakable),
       SubKind(SubKind), Fields(Fields) {}
 
   RecordKind getRecordKind() const { return SubKind; }
@@ -185,9 +190,10 @@ class ReferenceTypeInfo : public TypeInfo {
 public:
   ReferenceTypeInfo(unsigned Size, unsigned Alignment,
                     unsigned Stride, unsigned NumExtraInhabitants,
-                    ReferenceKind SubKind, ReferenceCounting Refcounting)
+                    bool BitwiseTakable, ReferenceKind SubKind,
+                    ReferenceCounting Refcounting)
     : TypeInfo(TypeInfoKind::Reference, Size, Alignment, Stride,
-               NumExtraInhabitants),
+               NumExtraInhabitants, BitwiseTakable),
       SubKind(SubKind), Refcounting(Refcounting) {}
 
   ReferenceKind getReferenceKind() const {
@@ -286,6 +292,7 @@ private:
 class RecordTypeInfoBuilder {
   TypeConverter &TC;
   unsigned Size, Alignment, NumExtraInhabitants;
+  bool BitwiseTakable;
   RecordKind Kind;
   std::vector<FieldInfo> Fields;
   bool Empty;
@@ -294,14 +301,15 @@ class RecordTypeInfoBuilder {
 public:
   RecordTypeInfoBuilder(TypeConverter &TC, RecordKind Kind)
     : TC(TC), Size(0), Alignment(1), NumExtraInhabitants(0),
-      Kind(Kind), Empty(true), Invalid(false) {}
+      BitwiseTakable(true), Kind(Kind), Empty(true), Invalid(false) {}
 
   bool isInvalid() const {
     return Invalid;
   }
 
   unsigned addField(unsigned fieldSize, unsigned fieldAlignment,
-                    unsigned numExtraInhabitants);
+                    unsigned numExtraInhabitants,
+                    bool bitwiseTakable);
 
   // Add a field of a record type, such as a struct.
   void addField(const std::string &Name, const TypeRef *TR);

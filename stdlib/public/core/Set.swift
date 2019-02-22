@@ -187,8 +187,8 @@ public struct Set<Element: Hashable> {
   ///   is a reference type).
   @inlinable
   public // SPI(Foundation)
-  init(_immutableCocoaSet: __owned _NSSet) {
-    _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self),
+  init(_immutableCocoaSet: __owned AnyObject) {
+    _internalInvariant(_isBridgedVerbatimToObjectiveC(Element.self),
       "Set can be backed by NSSet _variant only when the member type can be bridged verbatim to Objective-C")
     self.init(_cocoa: _CocoaSet(_immutableCocoaSet))
   }
@@ -1518,7 +1518,7 @@ extension Set.Iterator {
         return nativeIterator
 #if _runtime(_ObjC)
       case .cocoa:
-        _sanityCheckFailure("internal error: does not contain a native index")
+        _internalInvariantFailure("internal error: does not contain a native index")
 #endif
       }
     }
@@ -1533,7 +1533,7 @@ extension Set.Iterator {
     get {
       switch _variant {
       case .native:
-        _sanityCheckFailure("internal error: does not contain a Cocoa index")
+        _internalInvariantFailure("internal error: does not contain a Cocoa index")
       case .cocoa(let cocoa):
         return cocoa
       }
@@ -1613,7 +1613,7 @@ extension Set {
   public // FIXME(reserveCapacity): Should be inlinable
   mutating func reserveCapacity(_ minimumCapacity: Int) {
     _variant.reserveCapacity(minimumCapacity)
-    _sanityCheck(self.capacity >= minimumCapacity)
+    _internalInvariant(self.capacity >= minimumCapacity)
   }
 }
 

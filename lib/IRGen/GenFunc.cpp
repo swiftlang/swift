@@ -77,6 +77,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
+#include "clang/AST/ASTContext.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -1247,7 +1248,21 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     // cast to the result type - it could be substituted.
     if (origConv.getSILResultType().hasTypeParameter()) {
       auto ResType = fwd->getReturnType();
-      callResult = subIGF.Builder.CreateBitCast(callResult, ResType);
+      // SWIFT_ENABLE_TENSORFLOW
+      if (auto *structType = dyn_cast<llvm::StructType>(ResType)) {
+        // Cast all struct elements to the desired type.
+        llvm::Value *castResult = llvm::UndefValue::get(structType);
+        for (auto i : range(structType->getStructNumElements())) {
+          auto desiredEltTy = structType->getElementType(i);
+          auto elt = subIGF.Builder.CreateExtractValue(callResult, {i});
+          auto castElt = subIGF.Builder.CreateBitCast(elt, desiredEltTy);
+          castResult =
+              subIGF.Builder.CreateInsertValue(castResult, castElt, {i});
+        }
+        callResult = castResult;
+      }
+      else
+        callResult = subIGF.Builder.CreateBitCast(callResult, ResType);
     }
     subIGF.Builder.CreateRet(callResult);
   }
@@ -1655,8 +1670,13 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   // Build the block descriptor.
   ConstantInitBuilder builder(IGF.IGM);
   auto descriptorFields = builder.beginStruct();
-  descriptorFields.addInt(IGF.IGM.IntPtrTy, 0);
-  descriptorFields.addInt(IGF.IGM.IntPtrTy,
+
+  const clang::ASTContext &ASTContext = IGF.IGM.getClangASTContext();
+  llvm::IntegerType *UnsignedLongTy =
+      llvm::IntegerType::get(IGF.IGM.LLVMContext,
+                             ASTContext.getTypeSize(ASTContext.UnsignedLongTy));
+  descriptorFields.addInt(UnsignedLongTy, 0);
+  descriptorFields.addInt(UnsignedLongTy,
                           storageTL.getFixedSize().getValue());
   
   if (!isPOD) {

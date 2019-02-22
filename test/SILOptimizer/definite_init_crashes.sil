@@ -85,13 +85,13 @@ protocol Error {}
 public struct MyErrorType : Error {}
 
 public struct NonTrivial {
-  @sil_stored let ptr: Builtin.NativeObject
+  @_hasStorage let ptr: Builtin.NativeObject
 }
 
 public struct AStruct {
-  @sil_stored public let name: NonTrivial
-  @sil_stored public let foobar: NonTrivial
-  @sil_stored public let protoType: Proto.Type
+  @_hasStorage public let name: NonTrivial
+  @_hasStorage public let foobar: NonTrivial
+  @_hasStorage public let protoType: Proto.Type
 }
 
 sil @mayThrow : $@convention(thin) () -> (@owned NonTrivial, @error Error)

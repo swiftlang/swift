@@ -343,7 +343,7 @@ class BenchmarkDoctor(object):
         setup, ratio = BenchmarkDoctor._setup_overhead(measurements)
         setup = 0 if ratio < 0.05 else setup
         runtime = min(
-            [(result.min - correction) for i_series in
+            [(result.samples.min - correction) for i_series in
              [BenchmarkDoctor._select(measurements, num_iters=i)
               for correction in [(setup / i) for i in [1, 2]]
               ] for result in i_series])
@@ -367,7 +367,8 @@ class BenchmarkDoctor(object):
     def _setup_overhead(measurements):
         select = BenchmarkDoctor._select
         ti1, ti2 = [float(min(mins)) for mins in
-                    [[result.min for result in i_series] for i_series in
+                    [[result.samples.min for result in i_series]
+                     for i_series in
                      [select(measurements, num_iters=i) for i in [1, 2]]]]
         setup = int(round(2.0 * (ti1 - ti2)))
         ratio = (setup / ti1) if ti1 > 0 else 0
@@ -439,8 +440,9 @@ class BenchmarkDoctor(object):
         Returns a dictionary with benchmark name and `PerformanceTestResult`s.
         """
         self.log.debug('Calibrating num-samples for {0}:'.format(benchmark))
-        r = self.driver.run(benchmark, num_samples=3, num_iters=1)  # calibrate
-        num_samples = self._adjusted_1s_samples(r.min)
+        r = self.driver.run(benchmark, num_samples=3, num_iters=1,
+                            verbose=True)  # calibrate
+        num_samples = self._adjusted_1s_samples(r.samples.min)
 
         def capped(s):
             return min(s, 2048)
@@ -449,7 +451,7 @@ class BenchmarkDoctor(object):
         opts = opts if isinstance(opts, list) else [opts]
         self.log.debug(
             'Runtime {0} μs yields {1} adjusted samples per second.'.format(
-                r.min, num_samples))
+                r.samples.min, num_samples))
         self.log.debug(
             'Measuring {0}, 5 x i1 ({1} samples), 5 x i2 ({2} samples)'.format(
                 benchmark, run_args[0][0], run_args[1][0]))

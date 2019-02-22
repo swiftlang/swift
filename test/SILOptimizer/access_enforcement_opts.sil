@@ -9,7 +9,7 @@ import c_layout
 
 
 struct X {
-  @sil_stored var i: Int64 { get set }
+  @_hasStorage var i: Int64 { get set }
   init(i: Int64)
   init()
 }
@@ -1332,7 +1332,7 @@ class RefElemClass {
 // CHECK-NEXT: [[REFY:%.*]] = ref_element_addr %0 : $RefElemClass, #RefElemClass.y
 // CHECK-NEXT: [[BEGINX:%.*]] = begin_access [modify] [dynamic] [[REFX]] : $*BitfieldOne
 // CHECK: end_access [[BEGINX]] : $*BitfieldOne
-// CHECK: [[BEGINY:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[REFY]] : $*Int32
+// CHECK: [[BEGINY:%.*]] = begin_access [modify] [dynamic] [[REFY]] : $*Int32
 // CHECK: [[BEGINX2:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[REFX]] : $*BitfieldOne
 // CHECK-NEXT: end_access [[BEGINX2]] : $*BitfieldOne
 // CHECK-NEXT: end_access [[BEGINY]] : $*Int32
@@ -1353,6 +1353,34 @@ bb0(%0 : $RefElemClass):
   %b2 = begin_access [modify] [dynamic] %y : $*Int32
   %b3 = begin_access [modify] [dynamic] %x : $*BitfieldOne
   end_access %b3 : $*BitfieldOne
+  end_access %b2 : $*Int32
+  %10 = tuple ()
+  return %10 : $()
+}
+
+class RefElemNoConflictClass {
+  var x : Int32
+  var y : Int32
+  init()
+}
+
+// Checks that we can detect not having a nested conflict in class when we are accessing
+// fields that do no alias
+// CHECK-LABEL: sil @ref_elem_no_alias : $@convention(thin) (RefElemNoConflictClass) -> () {
+// CHECK: [[REFX:%.*]] = ref_element_addr %0 : $RefElemNoConflictClass, #RefElemNoConflictClass.x
+// CHECK-NEXT: [[REFY:%.*]] = ref_element_addr %0 : $RefElemNoConflictClass, #RefElemNoConflictClass.y
+// CHECK: [[BEGINY:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[REFY]] : $*Int32
+// CHECK: [[BEGINX:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[REFX]] : $*Int32
+// CHECK-NEXT: end_access [[BEGINX]] : $*Int32
+// CHECK-NEXT: end_access [[BEGINY]] : $*Int32
+// CHECK-LABEL: } // end sil function 'ref_elem_no_alias'
+sil @ref_elem_no_alias : $@convention(thin) (RefElemNoConflictClass) -> () {
+bb0(%0 : $RefElemNoConflictClass):
+  %x = ref_element_addr %0 : $RefElemNoConflictClass, #RefElemNoConflictClass.x
+  %y = ref_element_addr %0 : $RefElemNoConflictClass, #RefElemNoConflictClass.y
+  %b2 = begin_access [modify] [dynamic] %y : $*Int32
+  %b3 = begin_access [modify] [dynamic] %x : $*Int32
+  end_access %b3 : $*Int32
   end_access %b2 : $*Int32
   %10 = tuple ()
   return %10 : $()
@@ -1487,4 +1515,43 @@ bb0:
   return %10 : $()
 }
 
+// public func testPhiArgs() {
+// Check that we can merge scopes with Phi args - avoiding a crash we've seen in the past
+//
+// CHECK-LABEL: sil @testPhiArgs : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK: cond_br {{.*}}, bb1, bb2
+// CHECK: bb1
+// CHECK: br bb3([[GLOBAL]] : $*X)
+// CHECK: bb2
+// CHECK: br bb3([[GLOBAL]] : $*X)
+// CHECK: bb3([[GLOBALPHI:%.*]] : $*X):
+// CHECK: [[BEGIN:%.*]] = begin_access [read] [dynamic] [[GLOBALPHI]] : $*X
+// CHECK-NEXT: load
+// CHECK-NEXT: load
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NOT: begin_access
+// CHECK-LABEL: } // end sil function 'testPhiArgs'
+sil @testPhiArgs : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %cond = integer_literal $Builtin.Int1, 1
+  cond_br %cond, bb1, bb2
+  
+bb1:
+  br bb3(%0 : $*X)
+  
+bb2:
+  br bb3(%0 : $*X)
+  
+bb3(%1 : $*X):
+  %2 = begin_access [read] [dynamic] %1 : $*X
+  %3 = load %2 : $*X
+  end_access %2 : $*X
+  %4 = begin_access [read] [dynamic] %0 : $*X
+  %5 = load %4 : $*X
+  end_access %4 : $*X
+  %10 = tuple ()
+  return %10 : $()
+}
 

@@ -13,12 +13,16 @@ import TestsUtils
 
 // Sort an array of strings using an explicit sort predicate.
 public let SortStrings = [
-  BenchmarkInfo(name: "SortSortedStrings", runFunction: run_SortSortedStrings, tags: [.validation, .api, .algorithm, .String]),
-  BenchmarkInfo(name: "SortStrings", runFunction: run_SortStrings, tags: [.validation, .api, .algorithm, .String]),
-  BenchmarkInfo(name: "SortStringsUnicode", runFunction: run_SortStringsUnicode, tags: [.validation, .api, .algorithm, .String]),
+  BenchmarkInfo(name: "SortSortedStrings", runFunction: run_SortSortedStrings, tags: [.validation, .api, .algorithm, .String],
+    setUpFunction: { blackHole(sortedWords) }),
+  BenchmarkInfo(name: "SortStrings", runFunction: run_SortStrings, tags: [.validation, .api, .algorithm, .String],
+    setUpFunction: { blackHole(words) }),
+  BenchmarkInfo(name: "SortStringsUnicode", runFunction: run_SortStringsUnicode, tags: [.validation, .api, .algorithm, .String],
+    setUpFunction: { blackHole(unicodeWords) }),
 ]
 
-var stringBenchmarkWords: [String] = [
+let sortedWords = words.sorted()
+let words: [String] = [
   "woodshed",
   "lakism",
   "gastroperiodynia",
@@ -1032,18 +1036,17 @@ func benchSortStrings(_ words: [String]) {
 
 public func run_SortStrings(_ N: Int) {
   for _ in 1...5*N {
-    benchSortStrings(stringBenchmarkWords)
+    benchSortStrings(words)
   }
 }
 
 public func run_SortSortedStrings(_ N: Int) {
-  let sortedBenchmarkWords = stringBenchmarkWords.sorted()
   for _ in 1...5*N {
-    benchSortStrings(sortedBenchmarkWords)
+    benchSortStrings(sortedWords)
   }
 }
 
-var stringBenchmarkWordsUnicode: [String] = [
+var unicodeWords: [String] = [
   "❄️woodshed",
   "❄️lakism",
   "❄️gastroperiodynia",
@@ -2048,6 +2051,6 @@ var stringBenchmarkWordsUnicode: [String] = [
 
 public func run_SortStringsUnicode(_ N: Int) {
   for _ in 1...5*N {
-    benchSortStrings(stringBenchmarkWordsUnicode)
+    benchSortStrings(unicodeWords)
   }
 }

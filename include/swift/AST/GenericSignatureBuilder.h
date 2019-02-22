@@ -626,8 +626,7 @@ public:
   /// where \c Dictionary requires that its key type be \c Hashable,
   /// the requirement \c K : Hashable is inferred from the parameter type,
   /// because the type \c Dictionary<K,V> cannot be formed without it.
-  void inferRequirements(ModuleDecl &module, ParameterList *params,
-                         GenericParamList *genericParams);
+  void inferRequirements(ModuleDecl &module, ParameterList *params);
 
   /// \brief Finalize the set of requirements and compute the generic
   /// signature.

@@ -264,7 +264,7 @@ ManagedValue SILGenBuilder::createInitExistentialRef(
 ManagedValue SILGenBuilder::createStructExtract(SILLocation loc,
                                                 ManagedValue base,
                                                 VarDecl *decl) {
-  ManagedValue borrowedBase = base.borrow(SGF, loc);
+  ManagedValue borrowedBase = base.formalAccessBorrow(SGF, loc);
   SILValue extract = createStructExtract(loc, borrowedBase.getValue(), decl);
   return ManagedValue::forUnmanaged(extract);
 }
@@ -273,7 +273,7 @@ ManagedValue SILGenBuilder::createRefElementAddr(SILLocation loc,
                                                  ManagedValue operand,
                                                  VarDecl *field,
                                                  SILType resultTy) {
-  operand = operand.borrow(SGF, loc);
+  operand = operand.formalAccessBorrow(SGF, loc);
   SILValue result = createRefElementAddr(loc, operand.getValue(), field);
   return ManagedValue::forUnmanaged(result);
 }
@@ -712,7 +712,7 @@ ManagedValue SILGenBuilder::createManagedOptionalNone(SILLocation loc,
 
 ManagedValue SILGenBuilder::createManagedFunctionRef(SILLocation loc,
                                                      SILFunction *f) {
-  return ManagedValue::forUnmanaged(createFunctionRef(loc, f));
+  return ManagedValue::forUnmanaged(createFunctionRefFor(loc, f));
 }
 
 ManagedValue SILGenBuilder::createTupleElementAddr(SILLocation Loc,
@@ -782,7 +782,7 @@ ManagedValue SILGenBuilder::createOpenExistentialRef(SILLocation loc,
 ManagedValue SILGenBuilder::createOpenExistentialValue(SILLocation loc,
                                                        ManagedValue original,
                                                        SILType type) {
-  ManagedValue borrowedExistential = original.borrow(SGF, loc);
+  ManagedValue borrowedExistential = original.formalAccessBorrow(SGF, loc);
   SILValue openedExistential =
       createOpenExistentialValue(loc, borrowedExistential.getValue(), type);
   return ManagedValue::forUnmanaged(openedExistential);
@@ -791,7 +791,7 @@ ManagedValue SILGenBuilder::createOpenExistentialValue(SILLocation loc,
 ManagedValue SILGenBuilder::createOpenExistentialBoxValue(SILLocation loc,
                                                           ManagedValue original,
                                                           SILType type) {
-  ManagedValue borrowedExistential = original.borrow(SGF, loc);
+  ManagedValue borrowedExistential = original.formalAccessBorrow(SGF, loc);
   SILValue openedExistential =
       createOpenExistentialBoxValue(loc, borrowedExistential.getValue(), type);
   return ManagedValue::forUnmanaged(openedExistential);

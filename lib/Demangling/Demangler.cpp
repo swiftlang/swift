@@ -111,6 +111,9 @@ static bool isFunctionAttr(Node::Kind kind) {
     case Node::Kind::OutlinedVariable:
     case Node::Kind::OutlinedBridgedMethod:
     case Node::Kind::MergedFunction:
+    case Node::Kind::DynamicallyReplaceableFunctionImpl:
+    case Node::Kind::DynamicallyReplaceableFunctionKey:
+    case Node::Kind::DynamicallyReplaceableFunctionVar:
       return true;
     default:
       return false;
@@ -133,7 +136,7 @@ swift::Demangle::makeSymbolicMangledNameStringRef(const char *base) {
     // Skip over symbolic references.
     if (*end >= '\x01' && *end <= '\x17')
       end += sizeof(uint32_t);
-    if (*end >= '\x18' && *end <= '\x1F')
+    else if (*end >= '\x18' && *end <= '\x1F')
       end += sizeof(void*);
     ++end;
   }
@@ -601,6 +604,18 @@ NodePointer Demangler::demangleOperator() {
     case 'E': return demangleExtensionContext();
     case 'F': return demanglePlainFunction();
     case 'G': return demangleBoundGenericType();
+    case 'H':
+      switch (char c2 = nextChar()) {
+      case 'A': return demangleDependentProtocolConformanceAssociated();
+      case 'C': return demangleConcreteProtocolConformance();
+      case 'D': return demangleDependentProtocolConformanceRoot();
+      case 'I': return demangleDependentProtocolConformanceInherited();
+      default:
+        pushBack();
+        pushBack();
+        return demangleIdentifier();
+      }
+
     case 'I': return demangleImplFunctionType();
     case 'K': return createNode(Node::Kind::ThrowsAnnotation);
     case 'L': return demangleLocalIdentifier();
@@ -1246,14 +1261,157 @@ NodePointer Demangler::popProtocol() {
   return createType(Proto);
 }
 
-NodePointer Demangler::demangleRetroactiveConformance() {
-  NodePointer Index = demangleIndexAsNode();
-  NodePointer Conformance = popProtocolConformance();
-  if (!Index || !Conformance)
+NodePointer Demangler::popAnyProtocolConformanceList() {
+  NodePointer conformanceList
+    = createNode(Node::Kind::AnyProtocolConformanceList);
+  if (!popNode(Node::Kind::EmptyList)) {
+    bool firstElem = false;
+    do {
+      firstElem = (popNode(Node::Kind::FirstElementMarker) != nullptr);
+      NodePointer anyConformance = popAnyProtocolConformance();
+      if (!anyConformance)
+        return nullptr;
+      conformanceList->addChild(anyConformance, *this);
+    } while (!firstElem);
+
+    conformanceList->reverseChildren();
+  }
+  return conformanceList;
+}
+
+NodePointer Demangler::popAnyProtocolConformance() {
+  return popNode([](Node::Kind kind) {
+    switch (kind) {
+    case Node::Kind::ConcreteProtocolConformance:
+    case Node::Kind::DependentProtocolConformanceRoot:
+    case Node::Kind::DependentProtocolConformanceInherited:
+    case Node::Kind::DependentProtocolConformanceAssociated:
+      return true;
+
+    default:
+      return false;
+    }
+  });
+}
+
+NodePointer Demangler::popProtocolConformanceRef() {
+  NodePointer module = popModule();
+  NodePointer proto = popProtocol();
+  auto protocolConformanceRef =
+    createWithChild(Node::Kind::ProtocolConformanceRef, proto);
+
+  // The module is optional, present only for retroactive conformances. Add it
+  // as the second child.
+  if (protocolConformanceRef && module)
+    protocolConformanceRef->addChild(module, *this);
+  return protocolConformanceRef;
+}
+
+NodePointer Demangler::demangleConcreteProtocolConformance() {
+  NodePointer conditionalConformanceList = popAnyProtocolConformanceList();
+  NodePointer conformanceRef = popProtocolConformanceRef();
+  NodePointer type = popNode(Node::Kind::Type);
+  return createWithChildren(Node::Kind::ConcreteProtocolConformance,
+                            type, conformanceRef, conditionalConformanceList);
+}
+
+NodePointer Demangler::popDependentProtocolConformance() {
+  return popNode([](Node::Kind kind) {
+    switch (kind) {
+    case Node::Kind::DependentProtocolConformanceRoot:
+    case Node::Kind::DependentProtocolConformanceInherited:
+    case Node::Kind::DependentProtocolConformanceAssociated:
+      return true;
+
+    default:
+      return false;
+    }
+  });
+}
+
+NodePointer Demangler::demangleDependentProtocolConformanceRoot() {
+  int index = demangleIndex();
+  NodePointer conformance =
+    index > 0 ? createNode(Node::Kind::DependentProtocolConformanceRoot,
+                           index - 1)
+              : createNode(Node::Kind::DependentProtocolConformanceRoot);
+
+  if (NodePointer protocol = popProtocol())
+    conformance->addChild(protocol, *this);
+  else
     return nullptr;
 
-  return createWithChildren(Node::Kind::RetroactiveConformance,
-                            Index, Conformance);
+  if (NodePointer dependentType = popNode(Node::Kind::Type))
+    conformance->addChild(dependentType, *this);
+  else
+    return nullptr;
+
+  return conformance;
+}
+
+NodePointer Demangler::demangleDependentProtocolConformanceInherited() {
+  int index = demangleIndex();
+  NodePointer conformance =
+    index > 0 ? createNode(Node::Kind::DependentProtocolConformanceInherited,
+                           index - 1)
+              : createNode(Node::Kind::DependentProtocolConformanceInherited);
+
+  if (NodePointer protocol = popProtocol())
+    conformance->addChild(protocol, *this);
+  else
+    return nullptr;
+
+  if (auto nested = popDependentProtocolConformance())
+    conformance->addChild(nested, *this);
+  else
+    return nullptr;
+
+  conformance->reverseChildren();
+  return conformance;
+}
+
+NodePointer Demangler::popDependentAssociatedConformance() {
+  NodePointer protocol = popProtocol();
+  NodePointer dependentType = popNode(Node::Kind::Type);
+  return createWithChildren(Node::Kind::DependentAssociatedConformance,
+                            dependentType, protocol);
+}
+
+NodePointer Demangler::demangleDependentProtocolConformanceAssociated() {
+  int index = demangleIndex();
+  NodePointer conformance =
+    index > 0 ? createNode(Node::Kind::DependentProtocolConformanceRoot,
+                           index - 1)
+              : createNode(Node::Kind::DependentProtocolConformanceRoot);
+
+  if (NodePointer associatedConformance = popDependentAssociatedConformance())
+    conformance->addChild(associatedConformance, *this);
+  else
+    return nullptr;
+
+  if (auto nested = popDependentProtocolConformance())
+    conformance->addChild(nested, *this);
+  else
+    return nullptr;
+
+  conformance->reverseChildren();
+
+  return conformance;
+}
+
+NodePointer Demangler::demangleRetroactiveConformance() {
+  int index = demangleIndex();
+  if (index < 0)
+    return nullptr;
+
+  NodePointer conformance = popAnyProtocolConformance();
+  if (!conformance)
+    return nullptr;
+
+  auto retroactiveConformance =
+    createNode(Node::Kind::RetroactiveConformance, index);
+  retroactiveConformance->addChild(conformance, *this);
+  return retroactiveConformance;
 }
 
 NodePointer Demangler::demangleBoundGenericType() {
@@ -1542,6 +1700,9 @@ NodePointer Demangler::demangleMetatype() {
       return createWithPoppedType(Node::Kind::ClassMetadataBaseOffset);
     case 'p':
       return createWithChild(Node::Kind::ProtocolDescriptor, popProtocol());
+    case 'S':
+      return createWithChild(Node::Kind::ProtocolSelfConformanceDescriptor,
+                             popProtocol());
     case 'u':
       return createWithPoppedType(Node::Kind::MethodLookupFunction);
     case 'U':
@@ -1778,6 +1939,9 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     case 'a': return createNode(Node::Kind::PartialApplyObjCForwarder);
     case 'A': return createNode(Node::Kind::PartialApplyForwarder);
     case 'm': return createNode(Node::Kind::MergedFunction);
+    case 'X': return createNode(Node::Kind::DynamicallyReplaceableFunctionVar);
+    case 'x': return createNode(Node::Kind::DynamicallyReplaceableFunctionKey);
+    case 'I': return createNode(Node::Kind::DynamicallyReplaceableFunctionImpl);
     case 'C': {
       NodePointer type = popNode(Node::Kind::Type);
       return createWithChild(Node::Kind::CoroutineContinuationPrototype, type);
@@ -1792,6 +1956,9 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       NodePointer Conf = popProtocolConformance();
       return createWithChildren(Node::Kind::ProtocolWitness, Conf, Entity);
     }
+    case 'S':
+      return createWithChild(Node::Kind::ProtocolSelfConformanceWitness,
+                             popNode(isEntity));
     case 'R':
     case 'r': {
       NodePointer Thunk = createNode(c == 'R' ?
@@ -1830,6 +1997,9 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     case 'k': {
       auto nodeKind = c == 'K' ? Node::Kind::KeyPathGetterThunkHelper
                                : Node::Kind::KeyPathSetterThunkHelper;
+
+      bool isSerialized = nextIf('q');
+
       std::vector<NodePointer> types;
       auto node = popNode();
       if (!node || node->getKind() != Node::Kind::Type)
@@ -1855,6 +2025,10 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       for (auto i = types.rbegin(), e = types.rend(); i != e; ++i) {
         result->addChild(*i, *this);
       }
+
+      if (isSerialized)
+        result->addChild(createNode(Node::Kind::IsSerialized), *this);
+
       return result;
     }
     case 'l': {
@@ -1893,6 +2067,9 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     case 'h': {
       auto nodeKind = c == 'H' ? Node::Kind::KeyPathEqualsThunkHelper
                                : Node::Kind::KeyPathHashThunkHelper;
+
+      bool isSerialized = nextIf('q');
+
       NodePointer genericSig = nullptr;
       std::vector<NodePointer> types;
       
@@ -1922,6 +2099,10 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       }
       if (genericSig)
         result->addChild(genericSig, *this);
+
+      if (isSerialized)
+        result->addChild(createNode(Node::Kind::IsSerialized), *this);
+
       return result;
     }
     case 'v': {
@@ -2177,15 +2358,15 @@ NodePointer Demangler::addFuncSpecParamNumber(NodePointer Param,
 }
 
 NodePointer Demangler::demangleSpecAttributes(Node::Kind SpecKind) {
-  bool isFragile = nextIf('q');
+  bool isSerialized = nextIf('q');
 
   int PassID = (int)nextChar() - '0';
   if (PassID < 0 || PassID > 9)
     return nullptr;
 
   NodePointer SpecNd = createNode(SpecKind);
-  if (isFragile)
-    SpecNd->addChild(createNode(Node::Kind::SpecializationIsFragile),
+  if (isSerialized)
+    SpecNd->addChild(createNode(Node::Kind::IsSerialized),
                      *this);
 
   SpecNd->addChild(createNode(Node::Kind::SpecializationPassID, PassID),
@@ -2212,6 +2393,9 @@ NodePointer Demangler::demangleWitness() {
                         createNode(Node::Kind::Directness, Directness),
                         popNode(isEntity));
     }
+    case 'S':
+      return createWithChild(Node::Kind::ProtocolSelfConformanceWitnessTable,
+                             popProtocol());
     case 'P':
       return createWithChild(Node::Kind::ProtocolWitnessTable,
                              popProtocolConformance());

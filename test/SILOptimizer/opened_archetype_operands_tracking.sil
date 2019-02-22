@@ -72,7 +72,7 @@ class DynamicStorage {
 }
 
 final class ItemStorage<V> : DynamicStorage where V : View {
-  @sil_stored final let content: V
+  @_hasStorage final let content: V
   init(content: V)
   deinit
   override init()
@@ -83,7 +83,7 @@ extension View {
 }
 
 public struct DynamicItem {
-  @sil_stored private var storage: DynamicStorage { get set }
+  @_hasStorage private var storage: DynamicStorage { get set }
   public init(view: View)
 }
 
@@ -136,8 +136,8 @@ func use<T>(_ t: T)
 
 final class Foo<T> where T : P {
   init(_ x: T)
-  @sil_stored final var x: T { get set }
-  @sil_stored final var y: T { get set }
+  @_hasStorage final var x: T { get set }
+  @_hasStorage final var y: T { get set }
   deinit
 }
 

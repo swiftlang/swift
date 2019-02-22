@@ -80,6 +80,7 @@ EXPECTED_DEFAULTS = {
     'build_swift_stdlib_unittest_extra': False,
     'build_swiftpm': False,
     'build_swiftsyntax': False,
+    'build_skstresstester': False,
     'build_tvos': True,
     'build_tvos_device': False,
     'build_tvos_simulator': False,
@@ -197,6 +198,7 @@ EXPECTED_DEFAULTS = {
     'tensorflow_target_lib_dir': None,
     'tensorflow_target_include_dir': None,
     'tensorflow_swift_bindings': None,
+    'tensorflow_swift_apis': None,
     'host_bazel': None,
     'tensorflow_bazel_options': [],
 }
@@ -407,6 +409,7 @@ EXPECTED_OPTIONS = [
     SetTrueOption('--skip-build'),
     SetTrueOption('--swiftpm', dest='build_swiftpm'),
     SetTrueOption('--swiftsyntax', dest='build_swiftsyntax'),
+    SetTrueOption('--skstresstester', dest='build_skstresstester'),
     SetTrueOption('-B', dest='benchmark'),
     SetTrueOption('-S', dest='skip_build'),
     SetTrueOption('-b', dest='build_llbuild'),
@@ -572,6 +575,7 @@ EXPECTED_OPTIONS = [
     PathOption('--tensorflow-target-lib-dir'),
     PathOption('--tensorflow-target-include-dir'),
     PathOption('--tensorflow-swift-bindings'),
+    PathOption('--tensorflow-swift-apis'),
     PathOption('--host-bazel'),
     AppendOption('--tensorflow-bazel-options'),
 ]

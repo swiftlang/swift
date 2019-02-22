@@ -293,17 +293,3 @@ extension BidirectionalCollection {
     return ReversedCollection(_base: self)
   }
 }
-
-extension LazyCollectionProtocol
-  where
-  Self: BidirectionalCollection,
-  Elements: BidirectionalCollection {
-
-  /// Returns the elements of the collection in reverse order.
-  ///
-  /// - Complexity: O(1)
-  @inlinable
-  public __consuming func reversed() -> LazyCollection<ReversedCollection<Elements>> {
-    return ReversedCollection(_base: elements).lazy
-  }
-}

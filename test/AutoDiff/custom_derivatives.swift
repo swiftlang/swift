@@ -10,25 +10,64 @@ import Glibc
 
 var CustomDerivativesTests = TestSuite("CustomDerivatives")
 
-// Not differentiable!
-func foo(_ x: Float) -> Float {
+// Specify non-differentiable functions.
+// These will be wrapped in `differentiableFunction` and tested.
+
+func unary(_ x: Float) -> Float {
   var x = x
   x *= 2
   return x
 }
 
-CustomDerivativesTests.test("Make a differentiable function") {
-  let diffableFoo = differentiableFunction { x in
-    (value: foo(x), pullback: { v in v * x * 2 })
-  }
-  expectEqual(20, gradient(at: 10, in: diffableFoo))
+func binary(_ x: Float, _ y: Float) -> Float {
+  var x = x
+  x *= y
+  return x
 }
 
-CustomDerivativesTests.test("Differentiation of @autodiff function") {
-  let diffableFoo = differentiableFunction { x in
-    (value: foo(x), pullback: { v in v * x * 2 })
+CustomDerivativesTests.test("differentiableFunction-unary") {
+  let diffableUnary = differentiableFunction { x in
+    (value: unary(x), pullback: { v in v * x * 2 })
   }
-  expectEqual(20, gradient(at: 10, in: { x in diffableFoo(x) }))
+  expectEqual(20, gradient(at: 10, in: diffableUnary))
+  // Test differentiation of @differentiable function.
+  expectEqual(20, gradient(at: 10, in: { diffableUnary($0) }))
+  expectEqual(40, gradient(at: 10, in: { diffableUnary($0) * 2 }))
+}
+
+CustomDerivativesTests.test("differentiableFunction-binary") {
+  let diffableBinary = differentiableFunction { (x, y) in
+    (value: binary(x, y), pullback: { v in (v * y, v * x) })
+  }
+  expectEqual((10, 5), gradient(at: 5, 10, in: diffableBinary))
+  // Test differentiation of @differentiable function.
+  expectEqual((10, 5), gradient(at: 5, 10, in: { diffableBinary($0, $1) }))
+  expectEqual((20, 10), gradient(at: 5, 10, in: { diffableBinary($0, $1) * 2 }))
+}
+
+CustomDerivativesTests.test("Checkpointing") {
+  var count = 0
+  func f(_ x: Float) -> Float {
+    count += 1
+    return x * x * x
+  }
+  // Test the top-level function variant of the checkpointing API.
+  expectEqual(324, gradient(at: 3) { (x: Float) -> Float in
+    expectEqual(0, count)
+    let y = withRecomputationInPullbacks(f)(x)
+    expectEqual(1, count)
+    return y * 3 * x
+  })
+  expectEqual(2, count)
+  // Reset and test the method variant.
+  count = 0
+  expectEqual(324, gradient(at: 3) { (x: Float) -> Float in
+    expectEqual(0, count)
+    let y = x.withRecomputationInPullbacks(f)
+    expectEqual(1, count)
+    return y * 3 * x
+  })
+  expectEqual(2, count)
 }
 
 runAllTests()

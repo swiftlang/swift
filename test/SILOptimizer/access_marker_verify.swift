@@ -223,13 +223,10 @@ func testCaptureLocal() -> ()->() {
 // CHECK:   end_access
 // CHECK:   [[CAPTURE:%.*]] = copy_value %0 : ${ var Int }
 // CHECK:   partial_apply [callee_guaranteed] %{{.*}}([[CAPTURE]]) : $@convention(thin) (@guaranteed { var Int }) -> ()
-// CHECK:   alloc_stack $Int
-// CHECK:   [[UNINIT:%.*]] = mark_uninitialized [var]
 // CHECK:   begin_access [read] [unknown] [[PROJ]]
 // CHECK:   [[VAL:%.*]] = load [trivial]
 // CHECK:   end_access
 // CHECK-NOT: begin_access
-// CHECK:   assign [[VAL]] to [[UNINIT]] : $*Int
 // CHECK:   return {{.*}} : $@callee_guaranteed () -> ()
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify16testCaptureLocalyycyF'
 
@@ -948,15 +945,12 @@ func testLocalExistential() {
 // CHECK: partial_apply [callee_guaranteed] %{{.*}}([[PROJ]]) : $@convention(thin) (@inout_aliasable P) -> ()
 // CHECK-NOT: begin_access
 // CHECK: apply
-// CHECK: [[TMP:%.*]] = alloc_stack $P
-// CHECK: [[UNINIT:%.*]] = mark_uninitialized [var] [[TMP]] : $*P
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJ]] : $*P
 // CHECK: [[COPY:%.*]] = alloc_stack $P
 // CHECK-NOT: begin_access
 // CHECK: copy_addr [[ACCESS]] to [initialization] [[COPY]] : $*P
 // CHECK: end_access
 // CHECK-NOT: begin_access
-// CHECK: copy_addr [take] [[COPY]] to [[UNINIT]] : $*P
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify20testLocalExistentialyyF'
 
 // --- address-only argument.

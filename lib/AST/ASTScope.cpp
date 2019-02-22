@@ -1089,6 +1089,7 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Stmt *stmt) {
   case StmtKind::Fallthrough:
   case StmtKind::Fail:
   case StmtKind::Throw:
+  case StmtKind::PoundAssert:
     // Nothing to do for these statements.
     return nullptr;
   }

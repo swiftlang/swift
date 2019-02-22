@@ -71,11 +71,15 @@ FUNC_DECL(GetErrorEmbeddedNSError, "_getErrorEmbeddedNSError")
 
 FUNC_DECL(UnsafeBitCast, "unsafeBitCast")
 
-FUNC_DECL(ProjectKeyPathAny, "_projectKeyPathAny")
-FUNC_DECL(ProjectKeyPathPartial, "_projectKeyPathPartial")
-FUNC_DECL(ProjectKeyPathReadOnly, "_projectKeyPathReadOnly")
-FUNC_DECL(ProjectKeyPathWritable, "_projectKeyPathWritable")
-FUNC_DECL(ProjectKeyPathReferenceWritable, "_projectKeyPathReferenceWritable")
+FUNC_DECL(GetAtKeyPath, "_getAtKeyPath")
+FUNC_DECL(GetAtAnyKeyPath, "_getAtAnyKeyPath")
+FUNC_DECL(GetAtPartialKeyPath, "_getAtPartialKeyPath")
+FUNC_DECL(SetAtWritableKeyPath, "_setAtWritableKeyPath")
+FUNC_DECL(SetAtReferenceWritableKeyPath, "_setAtReferenceWritableKeyPath")
+// These don't actually have AST nodes associated with them right now.
+FUNC_DECL(ReadAtKeyPath, "_readAtKeyPath")
+FUNC_DECL(ModifyAtWritableKeyPath, "_modifyAtWritableKeyPath")
+FUNC_DECL(ModifyAtReferenceWritableKeyPath, "_modifyAtReferenceWritableKeyPath")
 
 FUNC_DECL(Swap, "swap")
 

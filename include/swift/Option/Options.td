@@ -791,6 +791,10 @@ def enable_testing : Flag<["-"], "enable-testing">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Allows this module's internal API to be accessed for testing">;
 
+def enable_private_imports : Flag<["-"], "enable-private-imports">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Allows this module's internal and private API to be accessed">;
+
 def sanitize_EQ : CommaJoined<["-"], "sanitize=">,
   Flags<[FrontendOption, NoInteractiveOption]>, MetaVarName<"<check>">,
   HelpText<"Turn on runtime checks for erroneous behavior.">;

@@ -9,7 +9,7 @@ enum NullableObjCRefcounted {
   case Ref(Builtin.UnknownObject)
   case None
 }
-// CHECK-LABEL: define linkonce_odr hidden void @"$s39enum_value_semantics_special_cases_objc22NullableObjCRefcountedOwxx"(%swift.opaque* noalias %object, %swift.type* %NullableObjCRefcounted) {{.*}} {
+// CHECK-LABEL: define internal void @"$s39enum_value_semantics_special_cases_objc22NullableObjCRefcountedOwxx"(%swift.opaque* noalias %object, %swift.type* %NullableObjCRefcounted) {{.*}} {
 // CHECK: entry:
 // CHECK:   %0 = bitcast %swift.opaque* %object to %T39enum_value_semantics_special_cases_objc22NullableObjCRefcountedO*
 // CHECK:   %1 = bitcast %T39enum_value_semantics_special_cases_objc22NullableObjCRefcountedO* %0 to %objc_object**
@@ -30,7 +30,7 @@ enum AllMixedRefcounted {
   case None
 }
 
-// CHECK-LABEL: define linkonce_odr hidden void @"$s39enum_value_semantics_special_cases_objc18AllMixedRefcountedOwxx"(%swift.opaque* noalias %object, %swift.type* %AllMixedRefcounted) {{.*}} {
+// CHECK-LABEL: define internal void @"$s39enum_value_semantics_special_cases_objc18AllMixedRefcountedOwxx"(%swift.opaque* noalias %object, %swift.type* %AllMixedRefcounted) {{.*}} {
 // CHECK: entry:
 // CHECK:   %0 = bitcast %swift.opaque* %object to %T39enum_value_semantics_special_cases_objc18AllMixedRefcountedO*
 // CHECK:   %1 = bitcast %T39enum_value_semantics_special_cases_objc18AllMixedRefcountedO* %0 to i64*
@@ -50,7 +50,7 @@ enum AllMixedRefcountedTwoSimple {
   case Nothing
 }
 
-// CHECK-LABEL: define linkonce_odr hidden void @"$s39enum_value_semantics_special_cases_objc27AllMixedRefcountedTwoSimpleOwxx"
+// CHECK-LABEL: define internal void @"$s39enum_value_semantics_special_cases_objc27AllMixedRefcountedTwoSimpleOwxx"
 // CHECK:   call void @"$s39enum_value_semantics_special_cases_objc27AllMixedRefcountedTwoSimpleOWOy"
 
 struct Val {
@@ -64,7 +64,7 @@ enum MixedRefcountedWithIndirect {
   case None
 }
 
-// CHECK-LABEL: define linkonce_odr hidden void @"$s39enum_value_semantics_special_cases_objc27MixedRefcountedWithIndirectOwxx"(%swift.opaque* noalias %object, %swift.type* %MixedRefcountedWithIndirect)
+// CHECK-LABEL: define internal void @"$s39enum_value_semantics_special_cases_objc27MixedRefcountedWithIndirectOwxx"(%swift.opaque* noalias %object, %swift.type* %MixedRefcountedWithIndirect)
 // CHECK: entry:
 // CHECK:   %0 = bitcast %swift.opaque* %object to %T39enum_value_semantics_special_cases_objc27MixedRefcountedWithIndirectO*
 // CHECK:   %1 = bitcast %T39enum_value_semantics_special_cases_objc27MixedRefcountedWithIndirectO* %0 to i64*

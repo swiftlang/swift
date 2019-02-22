@@ -234,8 +234,8 @@ func callSetBar(_ s: String) {
 // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
 // CHECK:   [[BORROWED_NATIVE:%.*]] = begin_borrow [[NATIVE]]
 // CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[BORROWED_NATIVE]])
-// CHECK:   [[OPT_BRIDGED:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
 // CHECK:   end_borrow [[BORROWED_NATIVE]]
+// CHECK:   [[OPT_BRIDGED:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
 // CHECK:   [[SET_BAR:%.*]] = function_ref @setBar
 // CHECK:   apply [[SET_BAR]]([[OPT_BRIDGED]])
 // CHECK:   destroy_value [[OPT_BRIDGED]]

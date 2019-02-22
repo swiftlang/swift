@@ -1,5 +1,4 @@
 // RUN: %target-run-simple-swift
-// RUN: %target-run-simple-no-vjp-swift
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -72,6 +71,104 @@ SimpleMathTests.test("CaptureGlobal") {
     return globalVar * x
   }
   expectEqual(30, gradient(at: 0, in: foo))
+}
+
+let foo: (Float) -> Float = { x in
+  return x * x
+}
+SimpleMathTests.test("GlobalLet") {
+  expectEqual(2, gradient(at: 1, in: foo))
+}
+
+var foo_diffable: @differentiable (Float) -> (Float)
+  = differentiableFunction { x in (x * x, { v in 2 * x * v }) }
+SimpleMathTests.test("GlobalDiffableFunc") {
+  expectEqual(2, gradient(at: 1, in: foo_diffable))
+  expectEqual(2, gradient(at: 1, in: { x in foo_diffable(x) }))
+  expectEqual(1, gradient(at: 1, in: { (x: Float) -> Float in
+    foo_diffable = { x in x + 1 };
+    return foo_diffable(x)
+  }))
+  expectEqual(1, gradient(at: 1, in: foo_diffable))
+}
+
+SimpleMathTests.test("SideEffects") {
+  func foo(x: Float) -> Float {
+    var a = x
+    a = a * x
+    a = a * x
+    return a * x
+  }
+  expectEqual(108, gradient(at: 3, in: foo))
+}
+
+SimpleMathTests.test("TupleSideEffects") {
+  func foo(_ x: Float) -> Float {
+    var tuple = (x, x)
+    tuple.0 = tuple.0 * x
+    tuple.0 = tuple.0 * x
+    return x * tuple.0
+  }
+  expectEqual(27, gradient(at: 3, in: foo))
+
+  func fooInout(_ x: Float) -> Float {
+    var tuple = (x, x)
+    tuple.0 *= x
+    tuple.0 *= x
+    return tuple.0 * tuple.0
+  }
+  // FIXME(TF-159): Update after activity analysis handles inout parameters.
+  // expectEqual(27, gradient(at: 3, in: fooInout))
+  expectEqual(0, gradient(at: 3, in: fooInout))
+
+  func bar(_ x: Float) -> Float {
+    var tuple = (x, x)
+    tuple.0 = tuple.0 * x
+    tuple.1 = tuple.0 * x
+    return tuple.0 * tuple.1
+  }
+  // FIXME(TF-246): Update after zero gradient bug is fixed.
+  // expectEqual(81, gradient(at: 3, in: bar))
+  expectEqual(0, gradient(at: 3, in: bar))
+
+  // FIXME(TF-201): Update after reabstraction thunks can be directly differentiated.
+  /*
+  func generic<T : Differentiable & AdditiveArithmetic>(_ x: T) -> T {
+    var tuple = (x, x)
+    tuple.0 += x
+    tuple.1 += x
+    return tuple.0 + tuple.0
+  }
+  expectEqual(1, gradient(at: 3.0, in: generic))
+  */
+}
+
+// Tests TF-21.
+SimpleMathTests.test("StructMemberwiseInitializer") {
+  struct Foo : AdditiveArithmetic, Differentiable {
+    var stored: Float
+    var computed: Float {
+      return stored * stored
+    }
+  }
+
+  let 𝛁foo = pullback(at: Float(4), in: { input -> Foo in
+    let foo = Foo(stored: input)
+    return foo + foo
+  })(Foo.CotangentVector(stored: 1))
+  expectEqual(2, 𝛁foo)
+
+  let 𝛁computed = gradient(at: Float(4)) { input -> Float in
+    let foo = Foo(stored: input)
+    return foo.computed
+  }
+  expectEqual(8, 𝛁computed)
+
+  let 𝛁product = gradient(at: Float(4)) { input -> Float in
+    let foo = Foo(stored: input)
+    return foo.computed * foo.stored
+  }
+  expectEqual(16, 𝛁product)
 }
 
 runAllTests()

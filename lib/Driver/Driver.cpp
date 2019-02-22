@@ -947,7 +947,7 @@ Driver::buildCompilation(const ToolChain &TC,
 
   // Construct the graph of Actions.
   SmallVector<const Action *, 8> TopLevelActions;
-  buildActions(TopLevelActions, TC, OI, OFM ? OFM.getPointer() : nullptr,
+  buildActions(TopLevelActions, TC, OI,
                rebuildEverything ? nullptr : &outOfDateMap, *C);
 
   if (Diags.hadAnyError())
@@ -1389,6 +1389,10 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerOutputType = file_types::TY_LLVM_BC;
       break;
 
+    case options::OPT_dump_ast:
+      OI.CompilerOutputType = file_types::TY_ASTDump;
+      break;
+
     case options::OPT_emit_pch:
       OI.CompilerMode = OutputInfo::Mode::SingleCompile;
       OI.CompilerOutputType = file_types::TY_PCH;
@@ -1411,11 +1415,11 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerOutputType = file_types::TY_Remapping;
       OI.LinkAction = LinkKind::None;
       break;
+
     case options::OPT_parse:
     case options::OPT_resolve_imports:
     case options::OPT_typecheck:
     case options::OPT_dump_parse:
-    case options::OPT_dump_ast:
     case options::OPT_emit_syntax:
     case options::OPT_print_ast:
     case options::OPT_dump_type_refinement_contexts:
@@ -1662,7 +1666,6 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
 
 void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
                           const ToolChain &TC, const OutputInfo &OI,
-                          const OutputFileMap *OFM,
                           const InputInfoMap *OutOfDateMap,
                           Compilation &C) const {
   const DerivedArgList &Args = C.getArgs();
@@ -1765,6 +1768,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
           break;
         }
         LLVM_FALLTHROUGH;
+      case file_types::TY_ASTDump:
       case file_types::TY_Image:
       case file_types::TY_dSYM:
       case file_types::TY_Dependencies:
@@ -1783,7 +1787,6 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_ModuleTrace:
       case file_types::TY_OptRecord:
       case file_types::TY_SwiftParseableInterfaceFile:
-      case file_types::TY_SwiftParseableInterfaceDeps:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
@@ -2473,8 +2476,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
                     Output.get());
 
   if (OI.ShouldGenerateModule && isa<CompileJobAction>(JA))
-    chooseSwiftModuleOutputPath(C, OFM, OutputMap, workingDirectory,
-                                Output.get());
+    chooseSwiftModuleOutputPath(C, OutputMap, workingDirectory, Output.get());
 
   if (OI.ShouldGenerateModule &&
       (isa<CompileJobAction>(JA) || isa<MergeModuleJobAction>(JA)))
@@ -2660,7 +2662,6 @@ void Driver::computeMainOutput(
 }
 
 void Driver::chooseSwiftModuleOutputPath(Compilation &C,
-                                         const OutputFileMap *OFM,
                                          const TypeToPathMap *OutputMap,
                                          StringRef workingDirectory,
                                          CommandOutput *Output) const {

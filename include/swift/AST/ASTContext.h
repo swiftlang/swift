@@ -84,6 +84,7 @@ namespace swift {
   class NominalTypeDecl;
   class NormalProtocolConformance;
   class InheritedProtocolConformance;
+  class SelfProtocolConformance;
   class SpecializedProtocolConformance;
   enum class ProtocolConformanceState;
   class Pattern;
@@ -106,6 +107,8 @@ namespace swift {
   // SWIFT_ENABLE_TENSORFLOW
   enum class AutoDiffAssociatedVectorSpaceKind : unsigned;
   class VectorSpace;
+  class AutoDiffParameterIndices;
+  class DifferentiableAttr;
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -273,6 +276,12 @@ public:
   /// Cache of autodiff-associated vector spaces.
   llvm::DenseMap<std::pair<Type, unsigned>,
                  Optional<VectorSpace>> AutoDiffVectorSpaces;
+
+  /// Cache of `@differentiable` attributes keyed by parameter indices. This
+  /// helps us diagnose multiple `@differentiable`s that are with respect to the
+  /// same set of parameters.
+  llvm::DenseMap<std::pair<Decl *, AutoDiffParameterIndices *>,
+                 DifferentiableAttr *> DifferentiableAttrs;
 
 private:
   /// \brief The current generation number, which reflects the number of
@@ -772,6 +781,10 @@ public:
                          SourceLoc loc,
                          AbstractStorageDecl *storage,
                          ProtocolConformanceState state);
+
+  /// Produce a self-conformance for the given protocol.
+  SelfProtocolConformance *
+  getSelfConformance(ProtocolDecl *protocol);
 
   /// A callback used to produce a diagnostic for an ill-formed protocol
   /// conformance that was type-checked before we're actually walking the

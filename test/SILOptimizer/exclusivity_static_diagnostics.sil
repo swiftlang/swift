@@ -230,7 +230,7 @@ bb0(%0 : @trivial $Int):
 
 
 class ClassWithStoredProperty {
-  @sil_stored var f: Int
+  @_hasStorage var f: Int
   init()
 }
 // CHECK-LABEL: sil hidden @classStoredProperty
