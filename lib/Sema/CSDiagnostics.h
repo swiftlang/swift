@@ -443,9 +443,9 @@ class LabelingFailure final : public FailureDiagnostic {
   ArrayRef<Identifier> CorrectLabels;
 
 public:
-  LabelingFailure(ConstraintSystem &cs, ConstraintLocator *locator,
+  LabelingFailure(Expr *root, ConstraintSystem &cs, ConstraintLocator *locator,
                   ArrayRef<Identifier> labels)
-      : FailureDiagnostic(nullptr, cs, locator), CorrectLabels(labels) {}
+      : FailureDiagnostic(root, cs, locator), CorrectLabels(labels) {}
 
   bool diagnoseAsError() override;
 };
