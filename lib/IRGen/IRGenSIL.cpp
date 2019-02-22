@@ -2442,6 +2442,21 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
 
       break;
     }
+    case GraphOperationInfo::ArgumentLowering::TFFunctionAttribute: {
+      auto silValue = structuredArgument.getSingleArgument();
+      auto *attrNameValAddr = IGM.getAddrOfGlobalString(argumentName.c_str());
+      // Swift Strings are passed in LLVM IR by passing the 2 LLVM values that
+      // are inside them, so we get the 2 LLVM values from the explosion and
+      // pass them to the runtime function.
+      auto attrExplosion = getLoweredExplosion(silValue);
+      assert(attrExplosion.size() == 2 &&
+             "expected 2 LLVM values in Swift String");
+      auto *setAttrFn = IGM.getTFC_OpSetAttrFunctionNameFn();
+      Builder.CreateCall(setAttrFn,
+                         {op, attrNameValAddr, attrExplosion.claimNext(),
+                          attrExplosion.claimNext()});
+      break;
+    }
     case GraphOperationInfo::ArgumentLowering::ShapeAttribute:
       assert(structuredArgument.getKind() == GraphOperationInfo::SAK_Single &&
              "deabstraction should not generate ShapeAttribute lists");
@@ -2836,6 +2851,9 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
             "only integers and arrays are possible for TF_DataType attrs");
       }
       break;
+    }
+    case GraphOperationInfo::ArgumentLowering::TFFunctionAttribute: {
+      assert(0 && "TODO: Implement TFFunctionAttribute");
     }
     case GraphOperationInfo::ArgumentLowering::ShapeAttribute:
       assert(0 && "TODO: implement shape attr");
@@ -3545,15 +3563,31 @@ void IRGenSILFunction::visitTryApplyInst(swift::TryApplyInst *i) {
 }
 
 void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
-  const LoweredValue &calleeLV = getLoweredValue(site.getCallee());
-  
   auto origCalleeType = site.getOrigCalleeType();
   auto substCalleeType = site.getSubstCalleeType();
 
   // SWIFT_ENABLE_TENSORFLOW
-  assert(!origCalleeType->isDifferentiable() && "Differentiable functions "
-         "should not reach here");
-  
+  Optional<LoweredValue> tmpCalleeLV;
+  if (site.getOrigCalleeType()->isDifferentiable()) {
+    auto adFnExp = getLoweredExplosion(site.getCallee());
+    Explosion e;
+    unsigned fieldSize = 1;
+    if (origCalleeType->getRepresentation() ==
+        SILFunctionTypeRepresentation::Thick) {
+      fieldSize = 2;
+    }
+    e.add(adFnExp.getRange(0, 0 + fieldSize));
+    (void)adFnExp.claimAll();
+    tmpCalleeLV = LoweredValue(e);
+
+    origCalleeType = origCalleeType->getWithExtInfo(
+        origCalleeType->getExtInfo().withDifferentiable(false));
+    substCalleeType = substCalleeType->getWithExtInfo(
+        substCalleeType->getExtInfo().withDifferentiable(false));
+  }
+  const LoweredValue &calleeLV =
+      tmpCalleeLV ? *tmpCalleeLV : getLoweredValue(site.getCallee());
+
   auto args = site.getArguments();
   SILFunctionConventions origConv(origCalleeType, getSILModule());
   assert(origConv.getNumSILArguments() == args.size());

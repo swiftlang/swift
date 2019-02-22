@@ -50,15 +50,6 @@ TensorTests.testAllBackends("NumericInitializers") {
               x.array)
 }
 
-TensorTests.testAllBackends("RandomInitializer") {
-  let _ = Tensor<Float>(randomUniform: [3, 4])
-  let _ = Tensor<Float>(randomNormal: [3, 4])
-  // TODO: remove the extra code below once TPU execution supports 0 output
-  // tensors (b/111123797)
-  let extra = Tensor<Float>(1.0)
-  _hostOp(extra)
-}
-
 TensorTests.testAllBackends("ScalarToTensorConversion") {
   let tensor = Tensor<Float>(broadcasting: 42, rank: 4)
   expectEqual([1, 1, 1, 1], tensor.shape)

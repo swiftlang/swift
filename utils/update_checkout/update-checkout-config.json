@@ -39,7 +39,7 @@
         "tensorflow-swift-bindings": {
             "remote": { "id": "tensorflow/swift-bindings" } },
         "tensorflow-swift-apis": {
-            "remote": { "id": "rxwei/DeepLearning" } },
+            "remote": { "id": "tensorflow/swift-apis" } },
         "icu": {
             "remote": { "id": "unicode-org/icu" },
             "platforms": [ "Linux" ]
@@ -226,7 +226,7 @@
                 "llvm": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
                 "clang": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
                 "swift": "tensorflow",
-                "lldb": "69d5b00b876de8dc1b673fa732f69a658de58c65",
+                "lldb": "03a57a13f5df7466db56eb1611126269c7768434",
                 "cmark": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
                 "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
                 "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
@@ -240,9 +240,9 @@
                 "swift-xcode-playground-support": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
                 "ninja": "253e94c1fa511704baeb61cf69995bbf09ba435e",
                 "icu": "release-61-1",
-                "tensorflow": "a6924e6affd935f537cdaf8977094df0e15a7957",
+                "tensorflow": "95f8fd4f30b1e59ea3cb64fbf0036bd7474842cc",
                 "tensorflow-swift-bindings": "10e591340134c37a6c3a1df735a7334a77d5cbc7",
-                "tensorflow-swift-apis": "18cc613db5ff03a510e3ba835a8932531b4a1a84"
+                "tensorflow-swift-apis": "470dbd7e7f27f761fd01686f5526803857e4bb7f"
             }
         }
     }

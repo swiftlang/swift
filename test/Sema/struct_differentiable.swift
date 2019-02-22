@@ -1,5 +1,5 @@
 // SWIFT_ENABLE_TENSORFLOW
-// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unknown %s
+// RUN: %target-swift-frontend -typecheck -verify %s
 
 // Verify that a `Differentiable` type upholds `AllDifferentiableVariables == CotangentVector`.
 func assertAllDifferentiableVariablesEqualsCotangentVector<T>(_: T.Type)
@@ -19,7 +19,10 @@ assertConformsToAdditiveArithmetic(Empty.AllDifferentiableVariables.self)
 struct EmptyAdditiveArithmetic : AdditiveArithmetic, Differentiable {}
 
 // Test structs whose stored properties all have an initial value.
-struct AllLetStoredPropertiesHaveInitialValue : Differentiable { // expected-error {{does not conform to protocol 'Differentiable'}}
+// expected-error @+3 {{does not conform to protocol '__Differentiable'}}
+// expected-error @+2 {{does not conform to protocol '_Differentiable'}}
+// expected-error @+1 {{does not conform to protocol 'Differentiable'}}
+struct AllLetStoredPropertiesHaveInitialValue : Differentiable {
   let x = Float(1)
   let y = Float(1)
 }
@@ -28,7 +31,10 @@ struct AllVarStoredPropertiesHaveInitialValue : Differentiable {
   var y = Float(1)
 }
 // Test struct with both an empty constructor and memberwise initializer.
-struct AllMixedStoredPropertiesHaveInitialValue : Differentiable { // expected-error {{does not conform to protocol 'Differentiable'}}
+// expected-error @+3 {{does not conform to protocol '__Differentiable'}}
+// expected-error @+2 {{does not conform to protocol '_Differentiable'}}
+// expected-error @+1 {{does not conform to protocol 'Differentiable'}}
+struct AllMixedStoredPropertiesHaveInitialValue : Differentiable {
   let x = Float(1)
   var y = Float(1)
   // Memberwise initializer should be `init(y:)` since `x` is immutable.
@@ -73,8 +79,7 @@ struct VectorSpacesEqualSelf : AdditiveArithmetic, Differentiable {
 
 // Test generic type with vector space types to `Self`.
 struct GenericVectorSpacesEqualSelf<T> : AdditiveArithmetic, Differentiable
-  where T : AdditiveArithmetic, T : Differentiable,
-        T == T.TangentVector, T == T.CotangentVector,
+  where T : Differentiable, T == T.TangentVector, T == T.CotangentVector,
         T == T.AllDifferentiableVariables
 {
   var w: T
@@ -125,7 +130,10 @@ assertConformsToVectorNumeric(AllMembersVectorNumeric.TangentVector.self)
 assertConformsToVectorNumeric(AllMembersVectorNumeric.CotangentVector.self)
 
 // Test type with immutable, differentiable stored property.
-struct ImmutableStoredProperty : Differentiable { // expected-error {{does not conform to protocol 'Differentiable'}}
+// expected-error @+3 {{does not conform to protocol '__Differentiable'}}
+// expected-error @+2 {{does not conform to protocol '_Differentiable'}}
+// expected-error @+1 {{does not conform to protocol 'Differentiable'}}
+struct ImmutableStoredProperty : Differentiable {
   var w: Float
   let fixedBias: Float = .pi
 }
@@ -179,47 +187,45 @@ func testKeyPathIterable(x: TestKeyPathIterable) {
   _ = x.allDifferentiableVariables.allKeyPaths
 }
 
+// Test type with user-defined memberwise initializer.
+struct TF_25: Differentiable {
+  public let bar: Float
+  public init(bar: Float) {
+    self.bar = bar
+  }
+}
+// Test user-defined memberwise initializer.
+struct TF_25_Generic<T : Differentiable>: Differentiable {
+  public let bar: T
+  public init(bar: T) {
+    self.bar = bar
+  }
+}
+
+// Test initializer that is not a memberwise initializer because of stored property name vs parameter label mismatch.
+struct HasCustomNonMemberwiseInitializer<T : Differentiable>: Differentiable {
+  var value: T
+  init(randomLabel value: T) { self.value = value }
+}
+
 // Test type with generic environment.
 struct HasGenericEnvironment<Scalar : FloatingPoint & Differentiable> : Differentiable {
   var x: Float
 }
 
 // Test type with generic members that conform to `Differentiable`.
-// FIXME: Blocked by SR-9595: type checker cannot infer `T.TangentVector : AdditiveArithmetic`
-// due to `Differentiable` protocol generic signature minimization bug.
-// expected-error @+1 {{type 'GenericSynthesizeAllStructs<T>' does not conform to protocol 'Differentiable'}}
-struct GenericSynthesizeAllStructs<T> : Differentiable
-  where T : Differentiable
-{
-  // expected-error @+1 {{synthesizing a conformance to 'Differentiable' requires an explicit 'T.TangentVector : AdditiveArithmetic' conformance constraint}}
-  var w: T
-  var b: T
-}
-
-// Test generic type with vector space types to `Self`.
-// FIXME: Blocked by SR-9595: type checker cannot infer `T.TangentVector : AdditiveArithmetic`
-// due to `Differentiable` protocol generic signature minimization bug.
-// expected-error @+1 {{type 'GenericNotAdditiveArithmetic<T>' does not conform to protocol 'Differentiable'}}
-struct GenericNotAdditiveArithmetic<T> : Differentiable
-  where T : Differentiable, T == T.TangentVector, T == T.CotangentVector
-{
-  // expected-error @+1 {{synthesizing a conformance to 'Differentiable' requires an explicit 'T : AdditiveArithmetic' conformance constraint}}
+struct GenericSynthesizeAllStructs<T : Differentiable> : Differentiable {
   var w: T
   var b: T
 }
 
 // Test type in generic context.
-// FIXME: Blocked by SR-9595: type checker cannot infer `T.TangentVector : AdditiveArithmetic`
-// due to `Differentiable` protocol generic signature minimization bug.
 struct A<T : Differentiable> {
   struct B<U : Differentiable, V> : Differentiable {
-    // expected-error @+1 {{type 'A<T>.B<U, V>.InGenericContext' does not conform to protocol 'Differentiable'}}
     struct InGenericContext : Differentiable {
       @noDerivative var a: A
       var b: B
-      // expected-error @+1 {{synthesizing a conformance to 'Differentiable' requires an explicit 'T.TangentVector : AdditiveArithmetic' conformance constraint}}
       var t: T
-      // expected-error @+1 {{synthesizing a conformance to 'Differentiable' requires an explicit 'U.TangentVector : AdditiveArithmetic' conformance constraint}}
       var u: U
     }
   }
@@ -232,35 +238,39 @@ struct Extended {
 extension Extended : Differentiable {}
 
 // Test extension of generic type.
-// FIXME: Blocked by SR-9595: type checker cannot infer `T.TangentVector : AdditiveArithmetic`
-// due to `Differentiable` protocol generic signature minimization bug.
 struct GenericExtended<T> {
-  // expected-error @+1 {{synthesizing a conformance to 'Differentiable' requires an explicit 'T.TangentVector : AdditiveArithmetic' conformance constraint}}
   var x: T
 }
-// expected-error @+1 {{type 'GenericExtended<T>' does not conform to protocol 'Differentiable'}}
 extension GenericExtended : Differentiable where T : Differentiable {}
 
-// Test constrained extension of generic type (workaround for SR-9595).
+// Test constrained extension of generic type.
 struct GenericConstrained<T> {
   var x: T
 }
 extension GenericConstrained : Differentiable
-  where T : Differentiable,
-        T.TangentVector : AdditiveArithmetic,
-        T.CotangentVector : AdditiveArithmetic {}
+  where T : Differentiable {}
+
+// TF-161: Test conditional conformance of `Array`.
+// expected-warning @+1 {{stored property '_buffer' has no derivative because it does not conform to 'Differentiable'; add '@noDerivative' to make it explicit}}
+extension Array : Differentiable where Element : Differentiable {}
 
 // Test errors.
 
 // Test manually customizing vector space types.
 // Thees should fail. Synthesis is semantically unsupported if vector space
 // types are customized.
-struct VectorSpaceTypeAlias : AdditiveArithmetic, Differentiable { // expected-error {{type 'VectorSpaceTypeAlias' does not conform to protocol 'Differentiable'}}
+// expected-error @+3 {{type 'VectorSpaceTypeAlias' does not conform to protocol '__Differentiable'}}
+// expected-error @+2 {{type 'VectorSpaceTypeAlias' does not conform to protocol '_Differentiable'}}
+// expected-error @+1 {{type 'VectorSpaceTypeAlias' does not conform to protocol 'Differentiable'}}
+struct VectorSpaceTypeAlias : AdditiveArithmetic, Differentiable {
   var w: Float
   var b: Float
   typealias TangentVector = Simple
 }
-struct VectorSpaceCustomStruct : AdditiveArithmetic, Differentiable { // expected-error {{type 'VectorSpaceCustomStruct' does not conform to protocol 'Differentiable'}}
+// expected-error @+3 {{type 'VectorSpaceCustomStruct' does not conform to protocol '__Differentiable'}}
+// expected-error @+2 {{type 'VectorSpaceCustomStruct' does not conform to protocol '_Differentiable'}}
+// expected-error @+1 {{type 'VectorSpaceCustomStruct' does not conform to protocol 'Differentiable'}}
+struct VectorSpaceCustomStruct : AdditiveArithmetic, Differentiable {
   var w: Float
   var b: Float
   struct CotangentVector : AdditiveArithmetic, Differentiable {
@@ -282,10 +292,15 @@ struct StaticMembersShouldNotAffectAnything : AdditiveArithmetic, Differentiable
 
 struct ImplicitNoDerivative : Differentiable {
   var a: Float
-  var b: Bool // expected-warning {{stored property has no derivative because it does not conform to 'Differentiable'; add '@noDerivative' to make it explicit}}
+  var b: Bool // expected-warning {{stored property 'b' has no derivative because it does not conform to 'Differentiable'; add '@noDerivative' to make it explicit}}
 }
 
 struct ImplicitNoDerivativeWithSeparateTangent : Differentiable {
   var x: DifferentiableSubset
-  var b: Bool // expected-warning {{stored property has no derivative because it does not conform to 'Differentiable'; add '@noDerivative' to make it explicit}} {{3-3=@noDerivative }}
+  var b: Bool // expected-warning {{stored property 'b' has no derivative because it does not conform to 'Differentiable'; add '@noDerivative' to make it explicit}} {{3-3=@noDerivative }}
+}
+
+// TF-265: Test invalid initializer (that uses a non-existent type).
+struct InvalidInitializer : Differentiable {
+  init(filterShape: (Int, Int, Int, Int), blah: NonExistentType) {} // expected-error {{use of undeclared type 'NonExistentType'}}
 }

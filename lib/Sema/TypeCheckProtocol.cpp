@@ -491,7 +491,9 @@ swift::matchWitness(
           witnessAttrs.getAttribute<DifferentiableAttr>(
               /*AllowInvalid*/ true);
       if (reqDifferentiationAttr &&
-          (!witnessDifferentiationAttr ||
+          (!reqDifferentiationAttr->getParameterIndices() ||
+           !witnessDifferentiationAttr ||
+           !witnessDifferentiationAttr->getParameterIndices() ||
            !witnessDifferentiationAttr->parametersMatch(
                *reqDifferentiationAttr)))
         return RequirementMatch(witness, MatchKind::DifferentiableConflict);
@@ -1820,10 +1822,20 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
       // should go into the new extension we (might) suggest here.
       impliedDisablesMissingWitnessFixits = true;
 
-      diagnoseConformanceImpliedByConditionalConformance(
-          TC.Diags, conformance, implyingConf, issueFixit);
-
-      conformance->setInvalid();
+      // SWIFT_ENABLE_TENSORFLOW
+      // Before diagnosing implied conditional conformances, check if the
+      // implied protocol is an underscored protocol for internal purposes
+      // (e.g. `_Differentiable` or `__Differentiable`, which are workarounds
+      // for TF-213). If so, allow the implied conformance.
+      auto *proto = conformance->getProtocol();
+      auto &ctx = DC->getASTContext();
+      // TODO(TF-213): Remove underscore `Differentiable` protocols.
+      if (proto != ctx.getProtocol(KnownProtocolKind::__Differentiable) &&
+          proto != ctx.getProtocol(KnownProtocolKind::_Differentiable) ) {
+        diagnoseConformanceImpliedByConditionalConformance(
+            TC.Diags, conformance, implyingConf, issueFixit);
+        conformance->setInvalid();
+      }
     }
   }
 
@@ -5457,14 +5469,6 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
     return derived.deriveKeyPathIterable(Requirement);
 
   // SWIFT_ENABLE_TENSORFLOW
-  case KnownProtocolKind::Parameterized:
-    return derived.deriveParameterized(Requirement);
-
-  // SWIFT_ENABLE_TENSORFLOW
-  case KnownProtocolKind::ParameterGroup:
-    return derived.deriveParameterGroup(Requirement);
-
-  // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::AdditiveArithmetic:
     return derived.deriveAdditiveArithmetic(Requirement);
 
@@ -5473,7 +5477,8 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
     return derived.deriveVectorNumeric(Requirement);
 
   // SWIFT_ENABLE_TENSORFLOW
-  case KnownProtocolKind::Differentiable:
+  // TODO(TF-213): Replace with `KnownProtocolKind::Differentiable`.
+  case KnownProtocolKind::__Differentiable:
     return derived.deriveDifferentiable(Requirement);
 
   default:
@@ -5502,13 +5507,10 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::KeyPathIterable:
     return derived.deriveKeyPathIterable(AssocType);
-  case KnownProtocolKind::Parameterized:
-    return derived.deriveParameterized(AssocType);
-  case KnownProtocolKind::ParameterGroup:
-    return derived.deriveParameterGroup(AssocType);
   case KnownProtocolKind::VectorNumeric:
     return derived.deriveVectorNumeric(AssocType);
-  case KnownProtocolKind::Differentiable:
+  // TODO(TF-213): Replace with `KnownProtocolKind::Differentiable`.
+  case KnownProtocolKind::__Differentiable:
     return derived.deriveDifferentiable(AssocType);
   default:
     return nullptr;

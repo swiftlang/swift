@@ -322,6 +322,7 @@ static Type getArrayType(const ASTContext &ctx, Type element) {
 constexpr char AttributeTypeClassifier::normalSupportedTypesDesc[];
 constexpr char AttributeTypeClassifier::shapeSupportedTypesDesc[];
 constexpr char AttributeTypeClassifier::tfDataTypeSupportedTypesDesc[];
+constexpr char AttributeTypeClassifier::tfFunctionSupportedTypesDesc[];
 
 AttributeTypeClassifier::Normal
 AttributeTypeClassifier::classifyNormalAttribute(Type type) {

@@ -21,17 +21,6 @@ func one_to_one_0(_ x: Float) -> Float {
 _ = gradient(at: 0, in: one_to_one_0) // okay!
 
 //===----------------------------------------------------------------------===//
-// Generics
-//===----------------------------------------------------------------------===//
-
-// expected-note @+3 {{differentiating functions with parameters or result of unknown size is not supported yet}}
-// expected-error @+2 {{function is not differentiable}}
-@differentiable()
-func generic<T: Differentiable & FloatingPoint>(_ x: T) -> T {
-  return x + 1
-}
-
-//===----------------------------------------------------------------------===//
 // Non-differentiable stored properties
 //===----------------------------------------------------------------------===//
 
@@ -119,6 +108,7 @@ _ = gradient(at: 0) { x in if_else(0, true) }
 //===----------------------------------------------------------------------===//
 // @differentiable attributes
 //===----------------------------------------------------------------------===//
+
 var a: Float = 3.0
 protocol P {
   @differentiable
@@ -141,4 +131,39 @@ enum T : P {
   // expected-note @+1 {{cannot differentiate writes to global variables}}
   a = a + x
   return a
+}
+
+//===----------------------------------------------------------------------===//
+// Classes and existentials (unsupported yet)
+//===----------------------------------------------------------------------===//
+
+class Foo {
+  // @differentiable cannot be put here. It's rejected by Sema already.
+  func class_method(_ x: Float) -> Float {
+    return x
+  }
+}
+
+// Nested call case.
+@differentiable // expected-error 2 {{function is not differentiable}}
+// expected-note @+1 2 {{when differentiating this function definition}}
+func triesToDifferentiateClassMethod(x: Float) -> Float {
+  // expected-note @+2 {{expression is not differentiable}}
+  // expected-note @+1 {{differentiating class members is not supported yet}}
+  return Foo().class_method(x)
+}
+
+// expected-error @+2 {{function is not differentiable}}
+// expected-note @+1 {{opaque non-'@differentiable' function is not differentiable}}
+_ = gradient(at: .zero, in: Foo().class_method)
+
+//===----------------------------------------------------------------------===//
+// Unreachable
+//===----------------------------------------------------------------------===//
+
+// expected-error @+1 {{function is not differentiable}}
+let no_return: @differentiable (Float) -> Float = { x in
+  let _ = x + 1
+// expected-note @+2 {{missing return for differentiation}}
+// expected-error @+1 {{missing return in a closure expected to return 'Float'}}
 }

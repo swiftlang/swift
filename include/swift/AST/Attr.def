@@ -407,12 +407,10 @@ SIMPLE_DECL_ATTR(compilerEvaluable, CompilerEvaluable,
                  /* Not serialized */ 85)
 SIMPLE_DECL_ATTR(TensorFlowGraph, TensorFlowGraph,
                  OnFunc, 86)
-SIMPLE_DECL_ATTR(TFParameter, TFParameter,
-                 OnVar, 87)
 SIMPLE_DECL_ATTR(_fieldwiseDifferentiable, FieldwiseDifferentiable,
-                 OnNominalType | UserInaccessible, 88)
+                 OnNominalType | UserInaccessible, 87)
 SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
-                 OnVar, 89)
+                 OnVar, 88)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

@@ -1,13 +1,8 @@
 // RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
-// RUN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
 //
-// Simple model tests.
-//
-// NOTE: Only extremely simple models, such as MLP with 2000-iteration training
-// loops, should be added here so that the testing time won't slow down
-// too much.
+// Trivial model tests.
 
 import TensorFlow
 #if TPU
@@ -29,9 +24,9 @@ ModelTests.testAllBackends("StraightLineXORTraining") {
   var loss = Float.infinity
 
   // Parameters
-  var rng = ARC4RandomNumberGenerator(seed: 42)
-  var w1 = Tensor<Float>(randomUniform: [2, 4], generator: &rng)
-  var w2 = Tensor<Float>(randomUniform: [4, 1], generator: &rng)
+  var w1: Tensor<Float> = [[0.69414073, 0.017726839, 0.3128785, 0.74679214],
+                           [0.80624646, 0.8905365, 0.7302696, 0.18774611]]
+  var w2: Tensor<Float> = [[0.38796782], [0.18304485], [0.8680929], [0.8904212]]
   var b1 = Tensor<Float>(zeros: [1, 4])
   var b2 = Tensor<Float>(zeros: [1, 1])
 
@@ -39,17 +34,12 @@ ModelTests.testAllBackends("StraightLineXORTraining") {
   let x: Tensor<Float> = [[0, 0], [0, 1], [1, 0], [1, 1]]
   let y: Tensor<Float> = [[0], [1], [1], [0]]
 
-  // Training loop
-  // FIXME: Use a for-loop when it can be properly deabstracted.
-  var i = 0
-  repeat {
-    // Forward pass
+  for i in 0..<iterationCount {
     let z1 = matmul(x, w1) + b1
     let h1 = sigmoid(z1)
     let z2 = matmul(h1, w2) + b2
     let pred = sigmoid(z2)
 
-    // Backward pass
     let dz2 = pred - y
     let dw2 = matmul(h1.transposed(withPermutations: 1, 0), dz2)
     let db2 = dz2.sum(squeezingAxes: 0)
@@ -57,20 +47,13 @@ ModelTests.testAllBackends("StraightLineXORTraining") {
     let dw1 = matmul(x.transposed(withPermutations: 1, 0), dz1)
     let db1 = dz1.sum(squeezingAxes: 0)
 
-    // Gradient descent
     w1 -= dw1 * learningRate
     b1 -= db1 * learningRate
     w2 -= dw2 * learningRate
     b2 -= db2 * learningRate
 
-    // Update current loss
     loss = dz2.squared().mean(squeezingAxes: 1, 0).scalarized()
-
-    // Update iteration count
-    i += 1
-  } while i < iterationCount
-
-  // Check results
+  }
   expectLT(loss, 0.01)
 }
 
@@ -80,13 +63,12 @@ ModelTests.testAllBackends("XORClassifierTraining") {
 
   // The classifier struct.
   struct MLPClassifier {
-    // Parameters
-    var rng = ARC4RandomNumberGenerator(seed: 42)
     var w1, w2, b1, b2: Tensor<Float>
 
     init() {
-      w1 = Tensor(randomUniform: [2, 4], generator: &rng)
-      w2 = Tensor(randomUniform: [4, 1], generator: &rng)
+      w1 = [[0.69414073, 0.017726839, 0.3128785, 0.74679214],
+            [0.80624646, 0.8905365, 0.7302696, 0.18774611]]
+      w2 = [[0.38796782], [0.18304485], [0.8680929], [0.8904212]]
       b1 = Tensor(zeros: [1, 4])
       b2 = Tensor(zeros: [1, 1])
     }
@@ -111,9 +93,7 @@ ModelTests.testAllBackends("XORClassifierTraining") {
     mutating func train(inputBatch x: Tensor<Float>,
                         outputBatch y: Tensor<Float>,
                         iterationCount: Int, learningRate: Float) {
-      // FIXME: Loop crasher b/73088003
-      var i = 0
-      repeat {
+      for i in 0..<iterationCount {
         let z1 = matmul(x, w1) + b1
         let h1 = sigmoid(z1)
         let z2 = matmul(h1, w2) + b2
@@ -126,15 +106,11 @@ ModelTests.testAllBackends("XORClassifierTraining") {
         let dw1 = matmul(x.transposed(withPermutations: 1, 0), dz1)
         let db1 = dz1.sum(squeezingAxes: 0)
 
-        // Gradient descent
         w1 -= dw1 * learningRate
         b1 -= db1 * learningRate
         w2 -= dw2 * learningRate
         b2 -= db2 * learningRate
-
-        // Update iteration count
-        i += 1
-      } while i < iterationCount
+      }
     }
   }
 
@@ -145,7 +121,6 @@ ModelTests.testAllBackends("XORClassifierTraining") {
     iterationCount: 2000,
     learningRate: 0.2
   )
-  // TODO: Add other expectations once code motion helps avoid send/receive.
   expectEqual(classifier.prediction(for: true, false), true)
 }
 

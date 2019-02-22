@@ -75,22 +75,8 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
     return canDeriveVectorNumeric(Nominal, DC);
 
   // SWIFT_ENABLE_TENSORFLOW
-  if (*knownProtocol == KnownProtocolKind::Differentiable)
+  if (*knownProtocol == KnownProtocolKind::__Differentiable)
     return canDeriveDifferentiable(Nominal, DC);
-
-  // SWIFT_ENABLE_TENSORFLOW
-  // The only requirement for deriving Parameterized is that there exist some
-  // stored properties marked with @TFParameter. The `Parameters` struct can
-  // always be derived, even if parameters have different types.
-  if (*knownProtocol == KnownProtocolKind::Parameterized) {
-    SmallVector<VarDecl *, 8> params;
-    Nominal->getAllTFParameters(params);
-    return !params.empty();
-  }
-
-  // SWIFT_ENABLE_TENSORFLOW
-  if (*knownProtocol == KnownProtocolKind::ParameterGroup)
-    return canDeriveParameterGroup(Nominal);
 
   if (auto *enumDecl = dyn_cast<EnumDecl>(Nominal)) {
     switch (*knownProtocol) {
@@ -233,15 +219,10 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       return getRequirement(KnownProtocolKind::KeyPathIterable);
 
     // SWIFT_ENABLE_TENSORFLOW
-    // Parameterized.allParameters
-    if (name.isSimpleName(ctx.Id_allParameters))
-      return getRequirement(KnownProtocolKind::Parameterized);
-
-    // SWIFT_ENABLE_TENSORFLOW
     // Differentiable.allDifferentiableVariables
     if (name.isSimpleName(ctx.Id_allDifferentiableVariables))
-      return getRequirement(KnownProtocolKind::Differentiable);
-    
+      return getRequirement(KnownProtocolKind::__Differentiable);
+
     return nullptr;
   }
 
@@ -290,7 +271,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       auto argumentNames = name.getArgumentNames();
       if (argumentNames.size() == 1 &&
           argumentNames[0] == ctx.getIdentifier("along")) {
-        return getRequirement(KnownProtocolKind::Differentiable);
+        return getRequirement(KnownProtocolKind::__Differentiable);
       }
     }
 
@@ -301,19 +282,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       auto argumentNames = name.getArgumentNames();
       if (argumentNames.size() == 1 &&
           argumentNames[0] == ctx.getIdentifier("from")) {
-        return getRequirement(KnownProtocolKind::Differentiable);
-      }
-    }
-
-    // SWIFT_ENABLE_TENSORFLOW
-    // ParameterGroup.update(withGradients:_:)
-    if (name.isCompoundName() &&
-        name.getBaseName() == ctx.getIdentifier("update")) {
-      auto argumentNames = name.getArgumentNames();
-      if (argumentNames.size() == 2 &&
-          argumentNames[0] == ctx.getIdentifier("withGradients") &&
-          argumentNames[1].empty()) {
-        return getRequirement(KnownProtocolKind::ParameterGroup);
+        return getRequirement(KnownProtocolKind::__Differentiable);
       }
     }
 
@@ -363,17 +332,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     if (name.isSimpleName(ctx.Id_TangentVector) ||
         name.isSimpleName(ctx.Id_CotangentVector) ||
         name.isSimpleName(ctx.Id_AllDifferentiableVariables))
-      return getRequirement(KnownProtocolKind::Differentiable);
-
-    // SWIFT_ENABLE_TENSORFLOW
-    // Parameterized.Parameters
-    if (name.isSimpleName(ctx.Id_Parameters))
-      return getRequirement(KnownProtocolKind::Parameterized);
-
-    // SWIFT_ENABLE_TENSORFLOW
-    // ParameterGroup.Parameter
-    if (name.isSimpleName(ctx.Id_Parameter))
-      return getRequirement(KnownProtocolKind::ParameterGroup);
+      return getRequirement(KnownProtocolKind::__Differentiable);
 
     // SWIFT_ENABLE_TENSORFLOW
     // VectorNumeric.Scalar

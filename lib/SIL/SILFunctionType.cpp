@@ -154,6 +154,20 @@ CanSILFunctionType SILFunctionType::getWithDifferentiability(
              getWitnessMethodConformanceOrNone());
 }
 
+CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
+  if (!isDifferentiable())
+    return CanSILFunctionType(this);
+  auto nondiffExtInfo = getExtInfo().withDifferentiable(false);
+  SmallVector<SILParameterInfo, 8> newParams;
+  for (auto &param : getParameters())
+    newParams.push_back(param.getWithDifferentiability(
+        SILParameterDifferentiability::DifferentiableOrNotApplicable));
+  return SILFunctionType::get(getGenericSignature(), nondiffExtInfo,
+                              getCoroutineKind(), getCalleeConvention(),
+                              newParams, getYields(), getResults(),
+                              getOptionalErrorResult(), getASTContext());
+}
+
 CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
     const SmallBitVector &parameterIndices, unsigned resultIndex,
     unsigned differentiationOrder,
@@ -166,19 +180,25 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   //                 (R.CotangentVector...) -> (T.CotangentVector...))
 
   auto &ctx = getASTContext();
+  auto &typeConverter = module.Types;
+  Lowering::GenericContextScope
+      genericContextScope(module.Types, getGenericSignature());
 
   auto testParamIndex = [&](unsigned index) -> bool {
     return index < parameterIndices.size() && parameterIndices[index];
   };
 
   // Given a type, returns its formal SIL parameter info.
-  auto getParameterInfoForOriginalResult = [&](
-      CanType type, ResultConvention origResConv) -> SILParameterInfo {
+  auto getCotangentParameterInfoForOriginalResult = [&](
+      CanType cotanType, ResultConvention origResConv) -> SILParameterInfo {
+    auto &tl = typeConverter.getTypeLowering(cotanType);
     ParameterConvention conv;
     switch (origResConv) {
     case ResultConvention::Owned:
     case ResultConvention::Autoreleased:
-      conv = ParameterConvention::Direct_Guaranteed;
+      conv = tl.isTrivial()
+          ? ParameterConvention::Direct_Unowned
+          : ParameterConvention::Direct_Guaranteed;
       break;
     case ResultConvention::Unowned:
     case ResultConvention::UnownedInnerPointer:
@@ -188,20 +208,21 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
       conv = ParameterConvention::Indirect_In_Guaranteed;
       break;
     }
-    return {type, conv};
+    return {cotanType, conv};
   };
 
   // Given a type, returns its formal SIL result info.
-  auto getResultInfoForOriginalParameter = [&](
-      CanType type, ParameterConvention origParamConv) -> SILResultInfo {
+  auto getCotangentResultInfoForOriginalParameter = [&](
+      CanType cotanType, ParameterConvention origParamConv) -> SILResultInfo {
+    auto &tl = typeConverter.getTypeLowering(cotanType);
     ResultConvention conv;
     switch (origParamConv) {
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Guaranteed:
-      conv = ResultConvention::Owned;
-      break;
     case ParameterConvention::Direct_Unowned:
-      conv = ResultConvention::Unowned;
+      conv = tl.isTrivial()
+          ? ResultConvention::Unowned
+          : ResultConvention::Owned;
       break;
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_Inout:
@@ -211,7 +232,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
       conv = ResultConvention::Indirect;
       break;
     }
-    return {type, conv};
+    return {cotanType, conv};
   };
 
   // Unwrap curry levels.
@@ -255,14 +276,29 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
                             ArrayRef<SILResultInfo> newResults,
                             GenericSignature *genericSignature)
       -> CanSILFunctionType {
-    return SILFunctionType::get(genericSignature
-                                  ? genericSignature
-                                  : base->getGenericSignature(),
+    if (!genericSignature)
+      genericSignature = base->getGenericSignature();
+    // If generic signature is specified, use it to canonical result types.
+    // This is important for consistent typing for types like:
+    //     <T : Differentiable, T == T.CotangentVector> (...) ->
+    //         (@out T.CotangentVector)
+    // Which should be canonicalized to:
+    //     <T : Differentiable, T == T.CotangentVector> (...) ->
+    //         (@out T)
+    ArrayRef<SILResultInfo> results =
+        genericSignature
+            ? map<SmallVector<SILResultInfo, 4>>(
+                  newResults, [&](SILResultInfo resInfo) {
+                    return resInfo.getWithType(
+                        resInfo.getType()->getCanonicalType(genericSignature));
+                  })
+            : newResults;
+    return SILFunctionType::get(genericSignature,
                                 base->getExtInfo(),
                                 base->getCoroutineKind(),
                                 base->getCalleeConvention(),
                                 base->getParameters(), base->getYields(),
-                                newResults, base->getOptionalErrorResult(), ctx,
+                                results, base->getOptionalErrorResult(), ctx,
                                 base->getWitnessMethodConformanceOrNone());
   };
 
@@ -300,7 +336,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
                 AutoDiffAssociatedVectorSpaceKind::Cotangent, lookupConformance)
             ->getCanonicalType();
     cotangentParams.push_back(
-        getParameterInfoForOriginalResult(cotangentAssocTy,
+        getCotangentParameterInfoForOriginalResult(cotangentAssocTy,
                                           origRes.getConvention()));
     SmallVector<SILResultInfo, 8> cotangentResults;
     for (auto &param : wrtParams) {
@@ -311,7 +347,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
                   lookupConformance)
               ->getCanonicalType();
       cotangentResults.push_back(
-          getResultInfoForOriginalParameter(paramCotangentTy,
+          getCotangentResultInfoForOriginalParameter(paramCotangentTy,
                                             param.getConvention()));
     }
     closureType = SILFunctionType::get(
@@ -328,17 +364,14 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   results.push_back({closureType, ResultConvention::Owned});
   CanSILFunctionType associatedFunction =
       withNewResults(curryLevels.back(), results,
-                     curryLevels.size() == 1 ? whereClauseGenSig : nullptr);
+                     whereClauseGenSig);
 
   auto curryLevelsWithoutLast =
       ArrayRef<SILFunctionType *>(curryLevels).drop_back(1);
-  for (auto pair : enumerate(reversed(curryLevelsWithoutLast))) {
-    unsigned i = pair.index();
-    auto *curryLevel = pair.value();
+  for (auto *curryLevel : reversed(curryLevelsWithoutLast))
     associatedFunction = withNewResults(
         curryLevel, {{associatedFunction, ResultConvention::Owned}},
-        i == curryLevelsWithoutLast.size() - 1 ? whereClauseGenSig : nullptr);
-  }
+        whereClauseGenSig);
   return associatedFunction;
 }
 
@@ -2372,6 +2405,29 @@ const SILConstantInfo &TypeConverter::getConstantInfo(SILDeclRef constant) {
   CanSILFunctionType silFnType =
     ::getUncachedSILFunctionTypeForConstant(M, constant,
                                             loweredInterfaceType);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // In the case of autodiff associated functions, the above computations
+  // determine `silFnType` by first computing the associated function type at
+  // the AST level and then lowering that. Unfortunately, the actual
+  // SILFunctionType for the function is determined by first lowering the
+  // function's AST type, and then computing the associated function type at the
+  // SIL level. "Lowering" does not commute with "getting the autodiff
+  // associated type", so these two computations produce different results.
+  // Therefore `silFnType` is not the actual type of the function that
+  // `constant` refers to.
+  //
+  // We hackily fix this problem by redoing the computation in the right order.
+  if (auto *autoDiffFuncId = constant.autoDiffAssociatedFunctionIdentifier) {
+    auto origFnConstantInfo =
+        getConstantInfo(constant.asAutoDiffOriginalFunction());
+    auto loweredIndices =
+        autoDiffFuncId->getParameterIndices()->getLowered(formalInterfaceType);
+    silFnType = origFnConstantInfo.SILFnType->getAutoDiffAssociatedFunctionType(
+        loweredIndices, /*resultIndex*/ 0,
+        autoDiffFuncId->getDifferentiationOrder(), autoDiffFuncId->getKind(), M,
+        LookUpConformanceInModule(M.getSwiftModule()));
+  }
 
   LLVM_DEBUG(llvm::dbgs() << "lowering type for constant ";
              constant.print(llvm::dbgs());

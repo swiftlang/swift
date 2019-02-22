@@ -22,3 +22,11 @@ public func test2() {
 }
 
 // CHECK: @{{.*}}selfmin{{.*}}__vjp_src_0_wrt_0
+
+// Test that print compiles fine.
+// Addresses TF-102.
+@differentiable
+func printSideEffectsAreOk(value: Tensor<Float>) -> Tensor<Float> {
+  print(value)
+  return value
+}

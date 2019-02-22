@@ -124,12 +124,14 @@ extension PythonObject : CustomStringConvertible {
   }
 }
 
+#if !swift(>=5)
 // Make `PythonObject` show up nicely in the Xcode Playground results sidebar.
 extension PythonObject : CustomPlaygroundQuickLookable {
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(description)
   }
 }
+#endif
 
 // Mirror representation, used by debugger/REPL.
 extension PythonObject : CustomReflectable {

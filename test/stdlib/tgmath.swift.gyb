@@ -206,4 +206,15 @@ MathTests.test("${T}") {
 % end
 %end
 
+// SWIFT_ENABLE_TENSORFLOW
+% for T in ['Float', 'Float80']:
+MathTests.test("gradient_${T}") {
+  expectEqualWithTolerance(7.3890560989306502274, gradient(at: 2.0 as ${T}, in: exp), ulps:16)
+  expectEqualWithTolerance(0.5, gradient(at: 2.0 as ${T}, in: log), ulps:16)
+  expectEqualWithTolerance(5.774399204041917612, gradient(at: 2.0 as ${T}, in: tan), ulps:16)
+  expectEqualWithTolerance(-0.416146836547142387, gradient(at: 2.0 as ${T}, in: sin), ulps:16)
+  expectEqualWithTolerance(-0.9092974268256816954, gradient(at: 2.0 as ${T}, in: cos), ulps:16)
+}
+%end
+
 runAllTests()

@@ -2430,10 +2430,6 @@ ERROR(broken_decodable_requirement,none,
 // SWIFT_ENABLE_TENSORFLOW
 ERROR(broken_key_path_iterable_requirement,none,
       "KeyPathIterable protocol is broken: unexpected requirement", ())
-ERROR(broken_parameter_group_requirement,none,
-      "ParameterGroup protocol is broken: unexpected requirement", ())
-ERROR(broken_parameterized_requirement,none,
-      "Parameterized protocol is broken: unexpected requirement", ())
 ERROR(parameterized_no_parameters_struct,none,
       "cannot automatically synthesize %0 because 'Parameters' struct does not "
       "exist", (Type))
@@ -2446,12 +2442,10 @@ ERROR(broken_vector_numeric_requirement,none,
       "VectorNumeric protocol is broken: unexpected requirement", ())
 ERROR(broken_differentiable_requirement,none,
       "Differentiable protocol is broken: unexpected requirement", ())
-ERROR(differentiable_need_explicit_addarith_conformance,none,
-      "synthesizing a conformance to 'Differentiable' requires an explicit "
-      "'%0' conformance constraint", (StringRef))
 WARNING(differentiable_implicit_noderivative_fixit,none,
-      "stored property has no derivative because it does not conform to "
-      "'Differentiable'; add '@noDerivative' to make it explicit", ())
+      "stored property %0 has no derivative because it does not conform to "
+      "'Differentiable'; add '@noDerivative' to make it explicit",
+      (Identifier))
 NOTE(protocol_witness_missing_differentiable_attr,none,
      "candidate is missing attribute '%0'", (StringRef))
 
@@ -2706,6 +2700,8 @@ ERROR(differentiable_attr_wrt_self_instance_method_only,none,
 ERROR(differentiable_attr_cannot_diff_wrt_objects_or_existentials,none,
       "class objects and protocol existentials (%0) cannot be differentiated "
       "with respect to", (Type))
+ERROR(differentiable_attr_duplicate,none,
+      "duplicate '@differentiable' attribute", ())
 ERROR(differentiable_attr_function_not_same_type_context,none,
       "%0 is not defined in the current type context", (DeclName))
 ERROR(differentiable_attr_specified_not_function,none,
@@ -2730,6 +2726,8 @@ ERROR(differentiable_attr_nongeneric_trailing_where,none,
       "trailing 'where' clause in '@differentiable' attribute of non-generic function %0", (DeclName))
 ERROR(differentiable_attr_unsupported_req_kind,none,
       "layout requirement are not supported by '@differentiable' attribute", ())
+ERROR(differentiable_attr_class_unsupported,none,
+      "class members cannot be marked with '@differentiable'", ())
 
 // @differentiang
 ERROR(differentiating_attr_expected_result_tuple,none,
@@ -2777,14 +2775,6 @@ ERROR(tf_graph_attr_no_generic_functions,none,
 ERROR(tf_graph_attr_no_functions_with_captures,none,
       "@TensorFlowGraph cannot be applied to functions that capture values",
       ())
-
-// @TFParameter attribute
-ERROR(tfparameter_attr_tensorflow_not_imported,none,
-      "@%0 is available only when 'TensorFlow' is imported", (StringRef))
-ERROR(tfparameter_attr_instance_stored_property_only,none,
-      "only instance stored properties can be declared @%0", (StringRef))
-ERROR(tfparameter_attr_not_in_parameterized,none,
-      "@%0 is allowed only in types that conform to 'Parameterized'", (StringRef))
 
 // @noDerivative attribute
 ERROR(noderivative_only_on_stored_properties_in_differentiable_structs,none,

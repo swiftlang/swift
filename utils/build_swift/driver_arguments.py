@@ -978,7 +978,7 @@ def create_argument_parser():
                 '(RawOpsGenerated.swift).')
     option('--tensorflow-swift-apis', store_path,
            default=None,
-           help='Path to a TensorFlow high-level APIs repository.')
+           help='Path to a TensorFlow deep learning library repository.')
     option('--tensorflow-bazel-options', append,
            type=argparse.ShellSplitType(),
            default=[],

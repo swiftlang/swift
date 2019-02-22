@@ -11,3 +11,14 @@ struct Foo {
 struct Bar : Differentiable {
   @noDerivative var flag: Bool
 }
+
+// Test TF-152: derived conformances "no interface type set" crasher.
+struct TF_152: Differentiable {
+  @differentiable(wrt: bar)
+  func applied(to input: Float, bar: TF_152_Bar) -> Float {
+    return input
+  }
+}
+struct TF_152_Bar: Differentiable {
+  @noDerivative let dense: Float
+}

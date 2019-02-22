@@ -110,6 +110,23 @@ TracerTests.testAllBackends("AllDtypeSupport") {
   traceAndCheckEqual(ui64)
   let i64: Int64 = 8
   traceAndCheckEqual(i64)
+
+  // Bool
+  let boolTF = _graph(with: Tensor<Bool>(true), in: tracee)
+  let (bs, bd) = boolTF(Tensor<Bool>(true), Tensor<Bool>(false))
+  expectTrue(bs.scalarized())
+  expectFalse(bd.scalarized())
+}
+
+TracerTests.testAllBackends("TraceWithNoResult") {
+  func add(state: Tensor<Float>, data: Data) -> (Tensor<Float>) {
+    return state + data
+  }
+  let tracedAdd = _graph(with: Tensor<Float>(2.0), in: add)
+  let three = Tensor<Float>(3.0)
+  expectNearlyEqualWithScalarTensor(5.0, tracedAdd(Tensor<Float>(2.0), three))
+  expectNearlyEqualWithScalarTensor(6.0, tracedAdd(Tensor<Float>(3.0), three))
+  expectNearlyEqualWithScalarTensor(8.0, tracedAdd(Tensor<Float>(5.0), three))
 }
 
 TracerTests.testAllBackends("Basic_IntermediateTensors") {

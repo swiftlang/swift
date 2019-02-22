@@ -11,6 +11,16 @@ func no_jvp_or_vjp(_ x: Float) -> Float {
   return x * x
 }
 
+@differentiable // expected-error {{duplicate '@differentiable' attribute}}
+@differentiable
+func dupe_attributes(arg: Float) -> Float { return arg }
+
+@differentiable(wrt: arg1) // expected-error {{duplicate '@differentiable' attribute}}
+@differentiable(wrt: arg1)
+@differentiable(wrt: arg2) // expected-error {{duplicate '@differentiable' attribute}}
+@differentiable(wrt: arg2)
+func dupe_attributes(arg1: Float, arg2: Float) -> Float { return arg1 }
+
 // JVP
 
 @differentiable(jvp: jvpSimpleJVP)
@@ -95,6 +105,16 @@ func jvpAmbiguousVJP(_ x: Float) -> (Float, (Float) -> Float) {
 }
 func jvpAmbiguousVJP(x: Float) -> (Float, (Float) -> Float) {
   return (x, { $0 })
+}
+
+// TF-153: Class methods are not supported yet.
+class Foo {
+  // Direct differentiation case.
+  // expected-error @+1 {{class members cannot be marked with '@differentiable'}}
+  @differentiable
+  func foo(_ x: Float) -> Float {
+    return x
+  }
 }
 
 struct JVPStruct {
@@ -378,7 +398,7 @@ func vjpWhere1<T : Differentiable>(x: T) -> (T, (T.CotangentVector) -> T.Cotange
   return (x, { v in v })
 }
 
-struct Tensor<Scalar> {}
+struct Tensor<Scalar> : AdditiveArithmetic {}
 extension Tensor : Differentiable where Scalar : Differentiable {
   typealias TangentVector = Tensor
   typealias CotangentVector = Tensor
@@ -426,6 +446,15 @@ extension MethodDiffReq where Self : Differentiable {
   func vjpFoo(x: Self) -> (Self, (Self.CotangentVector) -> Self.CotangentVector) {
     return (self, { $0 })
   }
+}
+
+// expected-error @+1 {{'vjpNonvariadic' does not have expected type '(Float, Int32...) -> (Float, (Float.CotangentVector) -> Float.CotangentVector)' (aka '(Float, Int32...) -> (Float, (Float) -> Float)')}}
+@differentiable(wrt: x, vjp: vjpNonvariadic)
+func variadic(_ x: Float, indices: Int32...) -> Float {
+  return x
+}
+func vjpNonvariadic(_ x: Float, indices: [Int32]) -> (Float, (Float) -> Float) {
+  return (x, { $0 })
 }
 
 // expected-error @+2 {{type 'Scalar' constrained to non-protocol, non-class type 'Float'}}

@@ -8,9 +8,6 @@
 import TensorFlow
 import StdlibUnittest
 
-// TODO(SR-7983): Investigate why this is necessary.
-import SwiftOnoneSupport
-
 var ShapedArrayTests = TestSuite("ShapedArrayTests")
 
 // TODO: add full Collection scalar test suite.
@@ -97,6 +94,35 @@ ShapedArrayTests.test("ScalarMutation") {
   expectEqual([1.0, 2.0, 3.0, 0.0, 0.0, 0.0], y.scalars)
   y.scalars[3...] = ArraySlice([4.0, 5.0, 6.0])
   expectEqual([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], y.scalars)
+}
+
+struct Foo : Equatable, Hashable {
+  var int: Int = 1337
+  var float: Float = .pi
+}
+
+ShapedArrayTests.test("Equatable") {
+  checkEquatable([ShapedArray(shape: [], scalars: [1.0])], oracle: { $0 == $1 })
+  checkEquatable([ShapedArray(shape: [3, 4, 5], repeating: true)], oracle: { $0 == $1 })
+  checkEquatable([ShapedArray(shape: [3, 4, 5], repeating: Foo())], oracle: { $0 == $1 })
+  checkEquatable([ShapedArray(shape: [2, 3], scalars: Array(0..<6))], oracle: { $0 == $1 })
+
+  checkEquatable([ShapedArraySlice(shape: [], scalars: [1.0])], oracle: { $0 == $1 })
+  checkEquatable([ShapedArraySlice(shape: [3, 4, 5], repeating: true)], oracle: { $0 == $1 })
+  checkEquatable([ShapedArraySlice(shape: [3, 4, 5], repeating: Foo())], oracle: { $0 == $1 })
+  checkEquatable([ShapedArraySlice(shape: [2, 3], scalars: Array(0..<6))], oracle: { $0 == $1 })
+}
+
+ShapedArrayTests.test("Hashable") {
+  checkHashable([ShapedArray(shape: [], scalars: [1.0])], equalityOracle: { $0 == $1 })
+  checkHashable([ShapedArray(shape: [3, 4, 5], repeating: true)], equalityOracle: { $0 == $1 })
+  checkHashable([ShapedArray(shape: [3, 4, 5], repeating: Foo())], equalityOracle: { $0 == $1 })
+  checkHashable([ShapedArray(shape: [2, 3], scalars: Array(0..<6))], equalityOracle: { $0 == $1 })
+
+  checkHashable([ShapedArraySlice(shape: [], scalars: [1.0])], equalityOracle: { $0 == $1 })
+  checkHashable([ShapedArraySlice(shape: [3, 4, 5], repeating: true)], equalityOracle: { $0 == $1 })
+  checkHashable([ShapedArraySlice(shape: [3, 4, 5], repeating: Foo())], equalityOracle: { $0 == $1 })
+  checkHashable([ShapedArraySlice(shape: [2, 3], scalars: Array(0..<6))], equalityOracle: { $0 == $1 })
 }
 
 ShapedArrayTests.test("StringDescription") {

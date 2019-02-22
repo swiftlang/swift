@@ -253,6 +253,10 @@ PythonRuntimeTestSuite.test("PythonConvertible") {
   expectEqual(five, Double(5).pythonObject)
 }
 
+PythonRuntimeTestSuite.test("SR-9230") {
+  expectEqual(2, Python.len(Python.dict(a: "a", b: "b")))
+}
+
 // TF-78: isType() consumed refcount for type objects like `PyBool_Type`.
 PythonRuntimeTestSuite.test("PythonRefCount") {
   let b: PythonObject = true

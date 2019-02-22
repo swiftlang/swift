@@ -37,6 +37,12 @@ struct ComplexNested : KeyPathIterable, Equatable {
   var dictionary: [String : Simple]
 }
 
+// TF-123: Test type with `@differentiable` function stored property.
+struct TF_123<Scalar : TensorFlowScalar & Differentiable & FloatingPoint> : KeyPathIterable {
+  let activation1: @differentiable (Float) -> Float
+  let activation2: @differentiable (Tensor<Scalar>) -> Tensor<Scalar>
+}
+
 KeyPathIterableTests.test("Simple") {
   var x = Simple(w: 1, b: 2)
   expectEqual([\Simple.w, \Simple.b], x.allKeyPaths)

@@ -127,7 +127,6 @@ public:
   IGNORED_ATTR(Differentiating)
   IGNORED_ATTR(CompilerEvaluable)
   IGNORED_ATTR(TensorFlowGraph)
-  IGNORED_ATTR(TFParameter)
   IGNORED_ATTR(FieldwiseDifferentiable)
   IGNORED_ATTR(NoDerivative)
 #undef IGNORED_ATTR
@@ -921,7 +920,6 @@ public:
   void visitDifferentiatingAttr(DifferentiatingAttr *attr);
   void visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr);
   void visitTensorFlowGraphAttr(TensorFlowGraphAttr *attr);
-  void visitTFParameterAttr(TFParameterAttr *attr);
   void visitFieldwiseDifferentiableAttr(FieldwiseDifferentiableAttr *attr);
   void visitNoDerivativeAttr(NoDerivativeAttr *attr);
 };
@@ -2478,11 +2476,18 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         original = nullptr;
     }
   }
-  
+
+  // Global immutable vars, for example, have no getter, and therefore trigger
+  // this.
   if (!original) {
-    // Global immutable vars, for example, have no getter, and therefore trigger
-    // this.
     diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
+    return;
+  }
+
+  // Class members are not supported by differentiation yet.
+  if (original->getInnermostTypeContext() &&
+      isa<ClassDecl>(original->getInnermostTypeContext())) {
+    diagnoseAndRemoveAttr(attr, diag::differentiable_attr_class_unsupported);
     return;
   }
 
@@ -2659,6 +2664,14 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   }
 
   auto *checkedWrtParamIndices = autoDiffParameterIndicesBuilder.build(ctx);
+  auto insertion =
+      ctx.DifferentiableAttrs.try_emplace({D, checkedWrtParamIndices}, attr);
+  // Differentiable attributes are uniqued by their parameter indices. Reject
+  // duplicates.
+  if (!insertion.second) {
+    diagnoseAndRemoveAttr(attr, diag::differentiable_attr_duplicate);
+    return;
+  }
 
   // This can happen when someone puts the attribute on an instance method with
   // no parameters (other than the self parameter), and does not specify a wrt
@@ -2783,8 +2796,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       return false;
     for (auto paramPair : llvm::zip(candidateFnTy.getParams(),
                                     required.getParams()))
-      if (std::get<0>(paramPair).getParameterType() !=
-          std::get<1>(paramPair).getParameterType())
+      if (!std::get<0>(paramPair).getPlainType()->isEqual(
+          std::get<1>(paramPair).getPlainType()))
         return false;
 
     // If required result type is non-function, check that result types match
@@ -2960,7 +2973,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     return;
   }
   // `value: R` result tuple element must conform to `Differentiable`.
-  auto diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
+  auto diffableProto = ctx.getProtocol(KnownProtocolKind::__Differentiable);
   auto valueResultType = valueResultElt.getType();
   if (valueResultType->hasTypeParameter())
     valueResultType = derivative->mapTypeIntoContext(valueResultType);
@@ -3237,34 +3250,6 @@ void AttributeChecker::visitTensorFlowGraphAttr(TensorFlowGraphAttr *attr) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-void AttributeChecker::visitTFParameterAttr(TFParameterAttr *attr) {
-  // The `TensorFlow` module must be imported.
-  auto parameterizedProto =
-    TC.Context.getProtocol(KnownProtocolKind::Parameterized);
-  if (!parameterizedProto) {
-    diagnoseAndRemoveAttr(attr, diag::tfparameter_attr_tensorflow_not_imported,
-                          attr->getAttrName());
-    return;
-  }
-  // Declaration must be an instance stored property of a nominal type.
-  auto *VD = dyn_cast<VarDecl>(D);
-  auto *nominal =
-    VD->getDeclContext()->getSelfNominalTypeDecl();
-  if (!nominal || !VD->hasStorage() || VD->isStatic()) {
-    diagnoseAndRemoveAttr(attr,
-                          diag::tfparameter_attr_instance_stored_property_only,
-                          attr->getAttrName());
-    return;
-  }
-  // The nominal type must conform to `Parameterized`.
-  if (!TC.conformsToProtocol(nominal->getDeclaredInterfaceType(),
-                             parameterizedProto, nominal->getDeclContext(),
-                             ConformanceCheckFlags::InExpression)) {
-    diagnoseAndRemoveAttr(attr, diag::tfparameter_attr_not_in_parameterized,
-                          attr->getAttrName());
-  }
-}
-
 void AttributeChecker::visitFieldwiseDifferentiableAttr(
     FieldwiseDifferentiableAttr *attr) {
   auto *structDecl = dyn_cast<StructDecl>(D);
