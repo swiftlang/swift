@@ -24,7 +24,6 @@
 from SwiftMathsFunctions import *
 }%
 
-/* NAMESPACED
 public protocol Mathsable {
   associatedtype Maths: MathsImplementations where Maths.Value == Self
 }
@@ -38,27 +37,28 @@ public protocol MathsImplementations {
 
 %for type in all_floating_point_types():
 extension ${type.stdlib_name}: Mathsable {
+  @_frozen
   public enum Maths: MathsImplementations {
     public typealias Value = ${type.stdlib_name}
 % for func in MathFunctions:
-
-    @_transparent
+    @_alwaysEmitIntoClient
     public static func ${func.decl("Value")} {
       return ${func.impl(type)}
     }
-%end
+% end
   }
 }
-
+ 
 %end
 
+@_fixed_layout
 public struct _SIMDMaths<V>: MathsImplementations
 where V: SIMD, V.Scalar: Mathsable {
   
   public typealias Value = V
 %for func in MathFunctions:
 
-  @_transparent
+  @inlinable
   public static func ${func.decl("V")} {
     var r = V()
     for i in x.indices {
@@ -71,45 +71,6 @@ where V: SIMD, V.Scalar: Mathsable {
 
 extension SIMD where Scalar: Mathsable {
   public typealias Maths = _SIMDMaths<Self>
-}
-
-%for n in [2,3,4,8,16,32,64]:
-extension SIMD${n}: Mathsable where Scalar: Mathsable { }
-%end
-*/
-
-/* NO NAMESPACE */
-public protocol Mathsable {
-%for func in MathFunctions:
-  static func ${func.decl("Self")}
-%end
-}
-
-%for type in all_floating_point_types():
-extension ${type.stdlib_name}: Mathsable {
-% for func in MathFunctions:
-
-  @_transparent
-  public static func ${func.decl(type.stdlib_name)} {
-    return ${func.impl(type)}
-  }
-%end
-}
-
-%end
-
-extension SIMD where Scalar: Mathsable {
-%for func in MathFunctions:
-
-  @_transparent
-  public static func ${func.decl("Self")} {
-    var r = Self()
-    for i in x.indices {
-      r[i] = Scalar.${func.name}(${func.params("", "[i]")})
-    }
-    return r
-  }
-%end
 }
 
 %for n in [2,3,4,8,16,32,64]:

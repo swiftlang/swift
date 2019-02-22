@@ -21,46 +21,6 @@ public func fabs<T: FloatingPoint>(_ x: T) -> T {
 }
 
 @_transparent
-public func sqrt<T: FloatingPoint>(_ x: T) -> T {
-  return x.squareRoot()
-}
-
-@_transparent
-public func fma<T: FloatingPoint>(_ x: T, _ y: T, _ z: T) -> T {
-  return z.addingProduct(x, y)
-}
-
-@_transparent
-public func remainder<T: FloatingPoint>(_ x: T, _ y: T) -> T {
-  return x.remainder(dividingBy: y)
-}
-
-@_transparent
-public func fmod<T: FloatingPoint>(_ x: T, _ y: T) -> T {
-  return x.truncatingRemainder(dividingBy: y)
-}
-
-@_transparent
-public func ceil<T: FloatingPoint>(_ x: T) -> T {
-  return x.rounded(.up)
-}
-
-@_transparent
-public func floor<T: FloatingPoint>(_ x: T) -> T {
-  return x.rounded(.down)
-}
-
-@_transparent
-public func round<T: FloatingPoint>(_ x: T) -> T {
-  return x.rounded()
-}
-
-@_transparent
-public func trunc<T: FloatingPoint>(_ x: T) -> T {
-  return x.rounded(.towardZero)
-}
-
-@_transparent
 public func scalbn<T: FloatingPoint>(_ x: T, _ n : Int) -> T {
   return T(sign: .plus, exponent: T.Exponent(n), significand: x)
 }

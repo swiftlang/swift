@@ -15,8 +15,8 @@ class SwiftMathsFunction(object):
   def decl(self, type):
     return self.name + "(" + self.params("_ ", ": " + type) + ") -> " + type
   
-  def free_decl(self):
-    return self.name + "<T>(" + self.params("_ ", ": T") + ") -> T where T: Mathsable"
+  def free_decl(self, protocol="Mathsable"):
+    return self.name + "<T>(" + self.params("_ ", ": T") + ") -> T where T: " + protocol
   
   def impl(self, type):
     if self.intrinsic:

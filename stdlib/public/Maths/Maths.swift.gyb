@@ -11,54 +11,41 @@
 //===----------------------------------------------------------------------===//
 
 // MARK: - Free functions defined on FloatingPoint
-@_transparent
-public func ceil<T>(_ x: T) -> T where T: FloatingPoint {
-  return x.rounded(.up)
+%for constraint in ["T: FloatingPoint", "T: SIMD, T.Scalar: FloatingPoint"]:
+% for (func,dir) in [("ceil", ".up"), ("floor", ".down"), ("round", ""), ("trunc", ".towardZero")]:
+@_alwaysEmitIntoClient
+public func ${func}<T>(_ x: T) -> T where ${constraint} {
+  return x.rounded(${dir})
 }
 
-@_transparent
-public func floor<T>(_ x: T) -> T where T: FloatingPoint {
-  return x.rounded(.down)
-}
-
-@_transparent
-public func round<T: FloatingPoint>(_ x: T) -> T {
-  return x.rounded()
-}
-
-@_transparent
-public func trunc<T>(_ x: T) -> T where T: FloatingPoint {
-  return x.rounded(.towardZero)
-}
-
-@_transparent
-public func sqrt<T>(_ x: T) -> T where T: FloatingPoint {
+%end
+@_alwaysEmitIntoClient
+public func sqrt<T>(_ x: T) -> T where ${constraint} {
   return x.squareRoot()
 }
 
-@_transparent
-public func fma<T>(_ x: T, _ y: T, _ z: T) -> T where T: FloatingPoint {
+@_alwaysEmitIntoClient
+public func fma<T>(_ x: T, _ y: T, _ z: T) -> T where ${constraint} {
   return z.addingProduct(x, y)
 }
 
-@_transparent
+%end
+@_alwaysEmitIntoClient
 public func remainder<T>(_ x: T, _ y: T) -> T where T: FloatingPoint {
   return x.remainder(dividingBy: y)
 }
 
-@_transparent
+@_alwaysEmitIntoClient
 public func fmod<T>(_ x: T, _ y: T) -> T where T: FloatingPoint {
   return x.truncatingRemainder(dividingBy: y)
 }
 
 // MARK: - Free functions defined on Mathsable
-
 %from SwiftMathsFunctions import *
 %for func in MathFunctions:
 
-@_transparent
+@_alwaysEmitIntoClient
 public func ${func.free_decl()} {
-//  return T.Maths.${func.name}(${func.params()})
-  return T.${func.name}(${func.params()})
+  return T.Maths.${func.name}(${func.params()})
 }
 %end
