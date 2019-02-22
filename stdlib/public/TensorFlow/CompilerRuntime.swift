@@ -859,7 +859,8 @@ extension _TensorArrayProtocolEnhanced {
 /// Trace `fn` with newly created tensor handles and return a trace context.
 private func _trace(
   with dtypes: [TF_DataType],
-  in fn: ([CTensorHandle]) -> [CTensorHandle]) -> TraceContext {
+  in fn: ([CTensorHandle]) -> [CTensorHandle]
+) -> TraceContext {
   debugLog("""
              Tracing over a function with \(dtypes.count) inputs.
              """)
@@ -897,7 +898,7 @@ private func _graphInternal<State : _TensorArrayProtocolEnhanced,
   in fn: (State, Data) -> (State, Result?)
 ) -> (State, Data) -> (State, Result?) {
   let traceContext: TraceContext = withoutActuallyEscaping(fn) { escapableFn in
-    let wrappedFn = {(inputs: [CTensorHandle]) -> [CTensorHandle] in
+    let wrappedFn = { (inputs: [CTensorHandle]) -> [CTensorHandle] in
       let symbolicState = state._makeInstance(
         owning: inputs.dropLast(Data._typeList.count))
       let symbolicData = Data(
@@ -981,10 +982,10 @@ public func _graph<State : _TensorArrayProtocolEnhanced,
 public func _tffunc<State : _TensorArrayProtocolEnhanced,
                     Data : TensorGroup>(
   with state: State,
-  in fn:(State, Data) -> State
+  in fn: (State, Data) -> State
 ) -> (Data) -> (String) {
   let traceContext: TraceContext = withoutActuallyEscaping(fn) { escapableFn in
-    let wrappedFn = {(inputs: [CTensorHandle]) -> [CTensorHandle] in
+    let wrappedFn = { (inputs: [CTensorHandle]) -> [CTensorHandle] in
       let symbolicState = state._makeInstance(
         owning: inputs.dropLast(Data._typeList.count))
       let symbolicData = Data(
@@ -1023,7 +1024,7 @@ public func _tffunc<In : TensorGroup, Out : TensorGroup>(
     let dtypes = In._typeList.map { $0._cDataType }
     return _trace(with: dtypes, in: wrappedFn)
   }
-  return traceContext.specializeTFFunction(with : [])
+  return traceContext.specializeTFFunction(with: [])
 }
 
 /// Returns a valid TF device string such as
