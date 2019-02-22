@@ -1139,9 +1139,29 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // that expect a function that takes a single tuple (of the same
   // arity).
   auto isSingleParam = [&](ArrayRef<AnyFunctionType::Param> params) {
-    return (params.size() == 1 &&
-            params[0].getLabel().empty() &&
-            !params[0].isVariadic());
+    if (params.size() != 1)
+      return false;
+
+    const auto &param = params.front();
+    if (param.isVariadic() || param.isInOut())
+      return false;
+
+    auto paramType = param.getPlainType();
+    // Support following case which was allowed until 5:
+    // ``swift
+    // func bar(_: (Int, Int) -> Void) {}
+    // let foo: ((Int, Int)?) -> Void = { _ in }
+    //
+    // bar(foo) // Ok
+    // ```
+    if (!getASTContext().isSwiftVersionAtLeast(5))
+      paramType = paramType->lookThroughAllOptionalTypes();
+
+    // Parameter should have a label and be either a tuple tuple type,
+    // or a type variable which might later be assigned a tuple type,
+    // e.g. opened generic parameter.
+    return !param.hasLabel() &&
+           (paramType->is<TupleType>() || paramType->is<TypeVariableType>());
   };
 
   auto canImplodeParams = [&](ArrayRef<AnyFunctionType::Param> params) {
