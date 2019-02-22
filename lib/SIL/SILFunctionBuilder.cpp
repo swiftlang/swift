@@ -155,7 +155,7 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
     if (constant.isForeign && decl->hasClangNode())
       F->setClangNodeOwner(decl);
 
-    if (decl->isWeakImported(mod.getSwiftModule(), availCtx))
+    if (decl->isWeakImported(/*forModule=*/nullptr, availCtx))
       F->setWeakLinked();
 
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
