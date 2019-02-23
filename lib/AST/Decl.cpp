@@ -548,7 +548,8 @@ bool Decl::isWeakImported(ModuleDecl *fromModule,
     return false;
 
   auto containingContext =
-      AvailabilityInference::availableRange(this, fromModule->getASTContext());
+      AvailabilityInference::availableRange(this,
+                                            containingModule->getASTContext());
   if (!fromContext.isContainedIn(containingContext))
     return true;
 
