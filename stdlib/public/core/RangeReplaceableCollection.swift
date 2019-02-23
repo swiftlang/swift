@@ -872,6 +872,39 @@ extension RangeReplaceableCollection where Self : BidirectionalCollection {
     let end = endIndex
     removeSubrange(index(end, offsetBy: -k)..<end)
   }
+
+  /// Removes from the end of the collection and returns the specified
+  /// number of elements.
+  ///
+  /// Attempting to extract more elements than exist in the collection
+  /// triggers a runtime error.
+  ///
+  /// Calling this method may invalidate all saved indices of this
+  /// collection. Do not rely on a previously stored index value after
+  /// altering a collection with any operation that can change its length.
+  ///
+  /// - Parameter k: The number of elements to extract from the collection.
+  ///   `k` must be greater than or equal to zero and must not exceed the
+  ///   number of elements in the collection.
+  ///
+  /// - Complexity: O(*k*), where *k* is the specified number of elements.
+  @inlinable
+  public mutating func extractLast(_ k: Int) -> Self {
+    // Duplicate removeLast(_:) logic above to avoid redundant preconditions
+    // and index calculation
+    if k == 0 { return Self() }
+    _precondition(k >= 0, "Number of elements to remove should be non-negative")
+    _precondition(count >= k,
+                  "Can't remove more items from a collection than it contains")
+    let end = endIndex
+    let subrange = index(end, offsetBy: -k)..<end
+    let extracted = Self(self[subrange])
+    if _customRemoveLast(k) {
+      return extracted
+    }
+    removeSubrange(subrange)
+    return extracted
+  }
 }
 
 /// Ambiguity breakers.
@@ -941,6 +974,39 @@ where Self : BidirectionalCollection, SubSequence == Self {
     }
     let end = endIndex
     removeSubrange(index(end, offsetBy: -k)..<end)
+  }
+
+  /// Removes from the end of the collection and returns the specified
+  /// number of elements.
+  ///
+  /// Attempting to extract more elements than exist in the collection
+  /// triggers a runtime error.
+  ///
+  /// Calling this method may invalidate all saved indices of this
+  /// collection. Do not rely on a previously stored index value after
+  /// altering a collection with any operation that can change its length.
+  ///
+  /// - Parameter k: The number of elements to extract from the collection.
+  ///   `k` must be greater than or equal to zero and must not exceed the
+  ///   number of elements in the collection.
+  ///
+  /// - Complexity: O(*k*), where *k* is the specified number of elements.
+  @inlinable
+  public mutating func extractLast(_ k: Int) -> Self {
+    // Duplicate removeLast(_:) logic above to avoid redundant preconditions
+    // and index calculation
+    if k == 0 { return Self() }
+    _precondition(k >= 0, "Number of elements to remove should be non-negative")
+    _precondition(count >= k,
+                  "Can't remove more items from a collection than it contains")
+    let end = endIndex
+    let subrange = index(end, offsetBy: -k)..<end
+    let extracted = Self(self[subrange])
+    if _customRemoveLast(k) {
+      return extracted
+    }
+    removeSubrange(subrange)
+    return extracted
   }
 }
 
@@ -1138,5 +1204,95 @@ extension RangeReplaceableCollection {
     // FIXME: Switch to using RRC.filter once stdlib is compiled for 4.0
     // self = try filter { try !predicate($0) }
     self = try Self(self.lazy.filter { try !shouldBeRemoved($0) })
+  }
+
+  /// Removes and returns all the elements that satisfy the given predicate.
+  ///
+  /// Use this method in place of `removeAll(where:)` to retain the removed
+  /// elements for further processing.
+  ///
+  ///     var phrase = "The rain in Spain stays mainly in the plain."
+  ///
+  ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
+  ///     let extracted = phrase.removeAll(where: { vowels.contains($0) })
+  ///     // phrase == "Th rn n Spn stys mnly n th pln."
+  ///     // extracted == "eaiiaiaaioeai"
+  ///
+  /// - Parameter shouldBeExtracted: A closure that takes an element of the
+  ///   sequence as its argument and returns a Boolean value indicating
+  ///   whether the element should be extracted from the collection.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @inlinable
+  public mutating func extractAll(
+    where shouldBeExtracted: (Element) throws -> Bool
+  ) rethrows -> Self {
+    var extracted = Self()
+    extracted.reserveCapacity(self.count)
+    try self.removeAll {
+      let shouldBeRemoved = try shouldBeExtracted($0)
+      if shouldBeRemoved {
+        extracted.append($0)
+      }
+      return shouldBeRemoved
+    }
+    return extracted
+  }
+}
+
+extension RangeReplaceableCollection {
+  /// Removes from the collection and returns the elements in the specified
+  /// subrange.
+  ///
+  /// All the elements following the specified position are moved to close the
+  /// gap. This example extracts three elements from the middle of an array of
+  /// measurements.
+  ///
+  ///     var measurements = [1.2, 1.5, 2.9, 1.2, 1.5]
+  ///     let extracted = measurements.extractSubrange(1..<4)
+  ///     print("\(measurements), \(extracted)")
+  ///     // Prints "[1.2, 1.5], [1.5, 2.9, 1.2]"
+  ///
+  /// Calling this method may invalidate any existing indices for use with this
+  /// collection.
+  ///
+  /// - Parameter bounds: The range of the collection to be extracted. The
+  ///   bounds of the range must be valid indices of the collection.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @inlinable
+  public mutating func extractSubrange(_ bounds: Range<Index>) -> Self {
+    let extracted = Self(self[bounds])
+    self.removeSubrange(bounds)
+    return extracted
+  }
+
+  /// Removes from the beginning of the collection and returns the specified
+  /// number of elements.
+  ///
+  ///     var bugs = ["Aphid", "Bumblebee", "Cicada", "Damselfly", "Earwig"]
+  ///     let extracted = bugs.extractFirst(3)
+  ///     print("\(bugs), \(extracted)")
+  ///     // Prints "["Damselfly", "Earwig"], ["Aphid", "Bumblebee", "Cicada"]"
+  ///
+  /// Calling this method may invalidate any existing indices for use with this
+  /// collection.
+  ///
+  /// - Parameter k: The number of elements to remove from the collection.
+  ///   `k` must be greater than or equal to zero and must not exceed the
+  ///   number of elements in the collection.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @inlinable
+  public mutating func extractFirst(_ k: Int) -> Self {
+    if k == 0 { return Self() }
+    _precondition(k >= 0, "Number of elements to remove should be non-negative")
+    _precondition(count >= k,
+                  "Can't remove more items from a collection than it has")
+    let end = index(startIndex, offsetBy: k)
+    let subrange = startIndex..<end
+    let extracted = Self(self[subrange])
+    removeSubrange(subrange)
+    return extracted
   }
 }
