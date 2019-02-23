@@ -202,17 +202,18 @@ DynamicAttributeTests.testAllBackends("NormalAttribute Bool") {
 }
 
 DynamicAttributeTests.testAllBackends("NormalAttribute Int64") {
-  let input = Tensor<Int32>([1, 2, 3, 4, 5])
-
-  let shuffled1 = Raw.randomShuffle(value: input, seed: loadInt64_1(),
-                                    seed2: loadInt64_1())
-  let expectedResult1 = ShapedArray<Int32>([1, 4, 2, 3, 5])
-  expectEqual(expectedResult1, shuffled1.array)
-
-  let shuffled2 = Raw.randomShuffle(value: input, seed: loadInt64_2(),
-                                    seed2: loadInt64_2())
-  let expectedResult2 = ShapedArray<Int32>([1, 4, 2, 5, 3])
-  expectEqual(expectedResult2, shuffled2.array)
+  let random1: Tensor<Int32> = Raw.randomUniformInt(shape: Tensor<Int32>([5]),
+                                                    minval: Tensor<Int32>(0),
+                                                    maxval: Tensor<Int32>(20),
+                                                    seed: loadInt64_1(),
+                                                    seed2: loadInt64_1())
+  expectEqual([10, 18, 7, 2, 11], random1.scalars)
+  let random2: Tensor<Int32> = Raw.randomUniformInt(shape: Tensor<Int32>([5]),
+                                                    minval: Tensor<Int32>(50),
+                                                    maxval: Tensor<Int32>(100),
+                                                    seed: loadInt64_2(),
+                                                    seed2: loadInt64_2())
+  expectEqual([70, 78, 90, 77, 78], random2.scalars)
 }
 
 DynamicAttributeTests.testAllBackends("NormalAttribute Double") {
