@@ -16,6 +16,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FileTypes.h"
+#include "swift/Basic/Platform.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
@@ -166,10 +167,16 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
   llvm::SmallString<64> moduleName(moduleID.first.str());
   ModuleFilenamePair fileNames(moduleName);
 
-  StringRef archName = Ctx.LangOpts.Target.getArchName();
-
   SmallVector<ModuleFilenamePair, 4> targetFileNamePairs;
-  targetFileNamePairs.push_back(archName);
+
+  auto normalizedTarget = getTargetSpecificModuleTriple(Ctx.LangOpts.Target);
+  targetFileNamePairs.push_back(ModuleFilenamePair(normalizedTarget.str()));
+
+  // Before this, we used the un-normalized architecture as a target-specific
+  // module name. Fall back to that behavior.
+  targetFileNamePairs.push_back(
+    ModuleFilenamePair(Ctx.LangOpts.Target.getArchName())
+  );
 
   // FIXME: We used to use "major architecture" names for these files---the
   // names checked in "#if arch(...)". Fall back to that name in the one case
@@ -177,7 +184,7 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
   // We should be able to drop this once there's an Xcode that supports the
   // new names.
   if (Ctx.LangOpts.Target.getArch() == llvm::Triple::ArchType::arm)
-    targetFileNamePairs.push_back(StringRef("arm"));
+    targetFileNamePairs.push_back(ModuleFilenamePair("arm"));
 
   auto &fs = *Ctx.SourceMgr.getFileSystem();
   isFramework = false;
@@ -202,7 +209,7 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
     // We can only get here if all targetFileNamePairs failed with
     // 'std::errc::no_such_file_or_directory'.
     if (maybeDiagnoseArchitectureMismatch(moduleID.second,
-                                          moduleName, archName, currPath)) {
+            moduleName, normalizedTarget.str(), currPath)) {
       return false;
     } else {
       return None;
