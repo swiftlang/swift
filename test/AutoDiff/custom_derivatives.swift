@@ -47,14 +47,14 @@ CustomDerivativesTests.test("differentiableFunction-binary") {
 
 CustomDerivativesTests.test("Checkpointing") {
   var count = 0
-  func f(_ x: Float) -> Float {
+  func cube(_ x: Float) -> Float {
     count += 1
     return x * x * x
   }
   // Test the top-level function variant of the checkpointing API.
   expectEqual(324, gradient(at: 3) { (x: Float) -> Float in
     expectEqual(0, count)
-    let y = withRecomputationInPullbacks(f)(x)
+    let y = withRecomputationInPullbacks(cube)(x)
     expectEqual(1, count)
     return y * 3 * x
   })
@@ -63,7 +63,7 @@ CustomDerivativesTests.test("Checkpointing") {
   count = 0
   expectEqual(324, gradient(at: 3) { (x: Float) -> Float in
     expectEqual(0, count)
-    let y = x.withRecomputationInPullbacks(f)
+    let y = x.withRecomputationInPullbacks(cube)
     expectEqual(1, count)
     return y * 3 * x
   })
