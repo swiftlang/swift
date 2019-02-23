@@ -173,6 +173,23 @@ SimpleMathTests.test("StructMemberwiseInitializer") {
     return foo.computed * foo.stored
   }
   expectEqual(16, 𝛁product)
+
+  struct Custom : AdditiveArithmetic, Differentiable {
+    var x: Float
+
+    // Custom initializer with `@differentiable`.
+    @differentiable
+    init(x: Float) {
+      print(x)
+      self.x = x
+    }
+  }
+
+  let 𝛁custom = pullback(at: Float(4), in: { input -> Custom in
+    let foo = Custom(x: input)
+    return foo + foo
+  })(Custom.CotangentVector(x: 1))
+  expectEqual(2, 𝛁foo)
 }
 
 SimpleMathTests.test("StructSideEffects") {

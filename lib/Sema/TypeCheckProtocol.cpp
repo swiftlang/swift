@@ -481,24 +481,6 @@ swift::matchWitness(
         cast<AbstractFunctionDecl>(witness)->hasThrows())
       return RequirementMatch(witness, MatchKind::RethrowsConflict);
 
-    // SWIFT_ENABLE_TENSORFLOW
-    // Differentiation attributes must match completely or the generated
-    // functions will have the wrong signature.
-    {
-      auto *reqDifferentiationAttr =
-          reqAttrs.getAttribute<DifferentiableAttr>(/*AllowInvalid*/ true);
-      auto *witnessDifferentiationAttr =
-          witnessAttrs.getAttribute<DifferentiableAttr>(
-              /*AllowInvalid*/ true);
-      if (reqDifferentiationAttr &&
-          (!reqDifferentiationAttr->getParameterIndices() ||
-           !witnessDifferentiationAttr ||
-           !witnessDifferentiationAttr->getParameterIndices() ||
-           !witnessDifferentiationAttr->parametersMatch(
-               *reqDifferentiationAttr)))
-        return RequirementMatch(witness, MatchKind::DifferentiableConflict);
-    }
-
     // We want to decompose the parameters to handle them separately.
     decomposeFunctionType = true;
   } else if (auto *witnessASD = dyn_cast<AbstractStorageDecl>(witness)) {
@@ -676,6 +658,27 @@ swift::matchWitness(
     if (auto result = matchTypes(std::get<0>(types), std::get<1>(types))) {
       return std::move(result.getValue());
     }
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Differentiation attributes must match completely or the generated
+  // functions will have the wrong signature.
+  // TODO(TF-285): Handle multiple `@differentiable` attributes on protocol
+  // requirements. Only missing attributes should be diagnosed.
+  auto *reqDiffAttr =
+      reqAttrs.getAttribute<DifferentiableAttr>(/*AllowInvalid*/ true);
+  auto *witnessDiffAttr =
+      witnessAttrs.getAttribute<DifferentiableAttr>(/*AllowInvalid*/ true);
+  if (reqDiffAttr && (!reqDiffAttr->getParameterIndices() ||
+                      !witnessDiffAttr ||
+                      !witnessDiffAttr->getParameterIndices() ||
+                      !witnessDiffAttr->parametersMatch(*reqDiffAttr))) {
+    if (auto *vdWitness = dyn_cast<VarDecl>(witness))
+      return RequirementMatch(
+          getStandinForAccessor(vdWitness, AccessorKind::Get),
+          MatchKind::DifferentiableConflict);
+    else
+      return RequirementMatch(witness, MatchKind::DifferentiableConflict);
   }
 
   // Now finalize the match.
@@ -2245,7 +2248,10 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     std::string diffAttrReq;
     {
       llvm::raw_string_ostream stream(diffAttrReq);
+      // TODO(TF-285): Handle multiple `@differentiable` attributes on protocol
+      // requirements. Only missing attributes should be diagnosed.
       req->getAttrs().getAttribute<DifferentiableAttr>()->print(stream, req);
+      diffAttrReq = StringRef(stream.str()).trim();
     }
     diags.diagnose(match.Witness,
                    diag::protocol_witness_missing_differentiable_attr,

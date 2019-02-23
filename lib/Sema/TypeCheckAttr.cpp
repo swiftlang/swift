@@ -2325,7 +2325,7 @@ void AttributeChecker::visitNonOverrideAttr(NonOverrideAttr *attr) {
 
 // SWIFT_ENABLE_TENSORFLOW
 static FuncDecl *resolveAutoDiffAssociatedFunction(
-    TypeChecker &TC, DeclNameWithLoc specifier, FuncDecl *original,
+    TypeChecker &TC, DeclNameWithLoc specifier, AbstractFunctionDecl *original,
     Type expectedTy, std::function<bool(FuncDecl *)> isValid) {
   auto nameLoc = specifier.Loc.getBaseNameLoc();
   auto overloadDiagnostic = [&]() {
@@ -2365,7 +2365,7 @@ static FuncDecl *resolveAutoDiffAssociatedFunction(
     return original->getParent() == func->getParent();
   };
 
-  auto isABIPublic = [&](FuncDecl *func) {
+  auto isABIPublic = [&](AbstractFunctionDecl *func) {
     return func->getFormalAccess() >= AccessLevel::Public ||
            func->getAttrs().hasAttribute<InlinableAttr>() ||
            func->getAttrs().hasAttribute<UsableFromInlineAttr>();
@@ -2461,15 +2461,15 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto lookupConformance =
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
 
-  FuncDecl *original = nullptr;
+  AbstractFunctionDecl *original = nullptr;
   bool isProperty = false;
   if (auto *vd = dyn_cast<VarDecl>(D)) {
     // When used on a storage decl, @differentiable refers to its getter.
     original = vd->getGetter();
     isProperty = true;
-  } else if (auto *fd = dyn_cast<FuncDecl>(D)) {
-    original = fd;
-    if (auto *accessor = dyn_cast<AccessorDecl>(fd)) {
+  } else if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
+    original = afd;
+    if (auto *accessor = dyn_cast<AccessorDecl>(afd)) {
       isProperty = true;
       // We do not support setters yet because inout is not supported yet.
       if (accessor->isSetter())
@@ -2501,15 +2501,15 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto &originalParams = *original->getParameters();
   if (!isInstanceMethod && originalParams.size() == 0) {
     TC.diagnose(attr->getLocation(), diag::differentiable_attr_no_parameters,
-                original->getName())
+                original->getFullName())
         .highlight(original->getSourceRange());
     attr->setInvalid();
     return;
   }
-  auto originalResultTy = original->getResultInterfaceType();
+  auto originalResultTy = originalFnTy->getResult();
   if (originalResultTy->isEqual(ctx.TheEmptyTupleType)) {
     TC.diagnose(attr->getLocation(), diag::differentiable_attr_void_result,
-                original->getName())
+                original->getFullName())
         .highlight(original->getSourceRange());
     attr->setInvalid();
     return;
@@ -2595,80 +2595,88 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Validate the 'wrt:' parameters.
   bool isMethod = original->hasImplicitSelfDecl();
 
-  // These are the parsed wrt param indices, which have not yet been checked.
+  // Get the parsed wrt param indices, which have not yet been checked.
+  // This is defined for parsed attributes.
   auto parsedWrtParams = attr->getParsedParameters();
+  // Get checked wrt param indices.
+  // This is defined only for compiler-synthesized attributes.
+  AutoDiffParameterIndices *checkedWrtParamIndices =
+      attr->getParameterIndices();
 
-  // We will put the checked wrt param indices here.
-  AutoDiffParameterIndicesBuilder autoDiffParameterIndicesBuilder(
-      originalFnTy);
-
-  if (parsedWrtParams.empty()) {
-    if (isProperty)
-      autoDiffParameterIndicesBuilder.setParameter(0);
-    else {
-      // If 'wrt:' is not specified, the wrt parameters are all the parameters
-      // in the main parameter group. Self is intentionally excluded except when
-      // it's a property.
-      unsigned numNonSelfParameters = autoDiffParameterIndicesBuilder.size() -
-          (isMethod ? 1 : 0);
-      for (unsigned i : range(numNonSelfParameters))
-        autoDiffParameterIndicesBuilder.setParameter(i);
+  // If checked wrt param indices are not specified, compute them using parsed
+  // wrt param indices.
+  if (!checkedWrtParamIndices) {
+    AutoDiffParameterIndicesBuilder autoDiffParameterIndicesBuilder(
+        originalFnTy);
+    if (parsedWrtParams.empty()) {
+      if (isProperty)
+        autoDiffParameterIndicesBuilder.setParameter(0);
+      else {
+        // If 'wrt:' is not specified, the wrt parameters are all the parameters
+        // in the main parameter group. Self is intentionally excluded except
+        // when it's a property.
+        unsigned numNonSelfParameters = autoDiffParameterIndicesBuilder.size() -
+            (isMethod ? 1 : 0);
+        for (unsigned i : range(numNonSelfParameters))
+          autoDiffParameterIndicesBuilder.setParameter(i);
+      }
+    } else {
+      // 'wrt:' is specified. Validate and collect the selected parameters.
+      int lastIndex = -1;
+      for (unsigned i : indices(parsedWrtParams)) {
+        auto paramLoc = parsedWrtParams[i].getLoc();
+        switch (parsedWrtParams[i].getKind()) {
+        case ParsedAutoDiffParameter::Kind::Named: {
+          auto nameIter =
+              llvm::find_if(originalParams.getArray(), [&](ParamDecl *param) {
+                return param->getName() == parsedWrtParams[i].getName();
+              });
+          // Parameter name must exist.
+          if (nameIter == originalParams.end()) {
+            TC.diagnose(paramLoc, diag::differentiable_attr_wrt_name_unknown,
+                        parsedWrtParams[i].getName());
+            return;
+          }
+          // Parameter names must be specified in the original order.
+          unsigned index = std::distance(originalParams.begin(), nameIter);
+          if ((int)index <= lastIndex) {
+            TC.diagnose(paramLoc,
+                        diag::differentiable_attr_wrt_names_not_original_order);
+            return;
+          }
+          autoDiffParameterIndicesBuilder.setParameter(index);
+          lastIndex = index;
+          break;
+        }
+        case ParsedAutoDiffParameter::Kind::Self: {
+          // 'self' is only applicable to instance methods.
+          if (!isInstanceMethod) {
+            TC.diagnose(
+                paramLoc,
+                diag::differentiable_attr_wrt_self_instance_method_only);
+            return;
+          }
+          // 'self' can only be the first in the list.
+          if (i > 0) {
+            TC.diagnose(paramLoc,
+                        diag::differentiable_attr_wrt_self_must_be_first);
+            return;
+          }
+          autoDiffParameterIndicesBuilder.setParameter(
+              autoDiffParameterIndicesBuilder.size() - 1);
+          break;
+        }
+        }
+      }
     }
-  } else {
-    // 'wrt:' is specified. Validate and collect the selected parameters.
-    int lastIndex = -1;
-    for (unsigned i : indices(parsedWrtParams)) {
-      auto paramLoc = parsedWrtParams[i].getLoc();
-      switch (parsedWrtParams[i].getKind()) {
-      case ParsedAutoDiffParameter::Kind::Named: {
-        auto nameIter =
-            llvm::find_if(originalParams.getArray(), [&](ParamDecl *param) {
-              return param->getName() == parsedWrtParams[i].getName();
-            });
-        // Parameter name must exist.
-        if (nameIter == originalParams.end()) {
-          TC.diagnose(paramLoc, diag::differentiable_attr_wrt_name_unknown,
-                      parsedWrtParams[i].getName());
-          return;
-        }
-        // Parameter names must be specified in the original order.
-        unsigned index = std::distance(originalParams.begin(), nameIter);
-        if ((int)index <= lastIndex) {
-          TC.diagnose(paramLoc,
-                      diag::differentiable_attr_wrt_names_not_original_order);
-          return;
-        }
-        autoDiffParameterIndicesBuilder.setParameter(index);
-        lastIndex = index;
-        break;
-      }
-      case ParsedAutoDiffParameter::Kind::Self: {
-        // 'self' is only applicable to instance methods.
-        if (!isInstanceMethod) {
-          TC.diagnose(paramLoc,
-                      diag::differentiable_attr_wrt_self_instance_method_only);
-          return;
-        }
-        // 'self' can only be the first in the list.
-        if (i > 0) {
-          TC.diagnose(paramLoc,
-                      diag::differentiable_attr_wrt_self_must_be_first);
-          return;
-        }
-        autoDiffParameterIndicesBuilder.setParameter(
-            autoDiffParameterIndicesBuilder.size() - 1);
-        break;
-      }
-      }
-    }
+    checkedWrtParamIndices = autoDiffParameterIndicesBuilder.build(ctx);
   }
 
-  auto *checkedWrtParamIndices = autoDiffParameterIndicesBuilder.build(ctx);
   auto insertion =
       ctx.DifferentiableAttrs.try_emplace({D, checkedWrtParamIndices}, attr);
-  // Differentiable attributes are uniqued by their parameter indices. Reject
-  // duplicates.
-  if (!insertion.second) {
+  // Differentiable attributes are uniqued by their parameter indices.
+  // Reject duplicate attributes for the same decl and parameter indices pair.
+  if (!insertion.second && insertion.first->getSecond() != attr) {
     diagnoseAndRemoveAttr(attr, diag::differentiable_attr_duplicate);
     return;
   }
@@ -2678,7 +2686,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // list.
   if (checkedWrtParamIndices->isEmpty()) {
     TC.diagnose(attr->getLocation(), diag::differentiable_attr_wrt_nothing,
-                original->getName())
+                original->getFullName())
         .highlight(original->getSourceRange());
     attr->setInvalid();
     return;
@@ -2697,12 +2705,9 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   checkedWrtParamIndices->getSubsetParameterTypes(originalFnTy, wrtParamTypes);
   for (unsigned i : range(wrtParamTypes.size())) {
     auto wrtParamType = original->mapTypeIntoContext(wrtParamTypes[i]);
-    SourceLoc loc;
-    if (parsedWrtParams.empty()) {
-      loc = attr->getLocation();
-    } else {
-      loc = parsedWrtParams[i].getLoc();
-    }
+    SourceLoc loc = parsedWrtParams.empty()
+        ? attr->getLocation()
+        : parsedWrtParams[i].getLoc();
     if (wrtParamType->isAnyClassReferenceType() ||
         wrtParamType->isExistentialType()) {
       TC.diagnose(
