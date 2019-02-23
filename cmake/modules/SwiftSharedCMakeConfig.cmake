@@ -3,28 +3,37 @@ include(SwiftXcodeSupport)
 
 include(CheckCXXCompilerFlag)
 
-macro(swift_common_standalone_build_config_llvm product)
+macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
   option(LLVM_ENABLE_WARNINGS "Enable compiler warnings." ON)
 
+  precondition_translate_flag(${product}_PATH_TO_LLVM_SOURCE PATH_TO_LLVM_SOURCE)
+  precondition_translate_flag(${product}_PATH_TO_LLVM_BUILD PATH_TO_LLVM_BUILD)
+
+  file(TO_CMAKE_PATH "${PATH_TO_LLVM_BUILD}" PATH_TO_LLVM_BUILD)
+
+  set(SWIFT_LLVM_CMAKE_PATHS
+      "${PATH_TO_LLVM_BUILD}/share/llvm/cmake"
+      "${PATH_TO_LLVM_BUILD}/lib/cmake/llvm")
+
+  # Add all LLVM CMake paths to our cmake module path.
+  foreach(path ${SWIFT_LLVM_CMAKE_PATHS})
+    list(APPEND CMAKE_MODULE_PATH ${path})
+  endforeach()
+
   # If we already have a cached value for LLVM_ENABLE_ASSERTIONS, save the value.
-  if(DEFINED LLVM_ENABLE_ASSERTIONS)
+  if (DEFINED LLVM_ENABLE_ASSERTIONS)
     set(LLVM_ENABLE_ASSERTIONS_saved "${LLVM_ENABLE_ASSERTIONS}")
   endif()
 
   # Then we import LLVMConfig. This is going to override whatever cached value
   # we have for LLVM_ENABLE_ASSERTIONS.
-  find_package(LLVM CONFIG REQUIRED NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
-  list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
-
-  set(LLVM_MAIN_SRC_DIR "${LLVM_BUILD_MAIN_SRC_DIR}"
-    CACHE PATH "Path to LLVM source tree")
-  set(LLVM_MAIN_INCLUDE_DIR "${LLVM_BUILD_MAIN_INCLUDE_DIR}"
-    CACHE PATH "Path to llvm/include")
+  find_package(LLVM REQUIRED CONFIG
+    HINTS "${PATH_TO_LLVM_BUILD}" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
 
   # If we did not have a cached value for LLVM_ENABLE_ASSERTIONS, set
   # LLVM_ENABLE_ASSERTIONS_saved to be the ENABLE_ASSERTIONS value from LLVM so
   # we follow LLVMConfig.cmake's value by default if nothing is provided.
-  if(NOT DEFINED LLVM_ENABLE_ASSERTIONS_saved)
+  if (NOT DEFINED LLVM_ENABLE_ASSERTIONS_saved)
     set(LLVM_ENABLE_ASSERTIONS_saved "${LLVM_ENABLE_ASSERTIONS}")
   endif()
 
@@ -40,10 +49,11 @@ macro(swift_common_standalone_build_config_llvm product)
 
   precondition(LLVM_TOOLS_BINARY_DIR)
   escape_path_for_xcode("${LLVM_BUILD_TYPE}" "${LLVM_TOOLS_BINARY_DIR}" LLVM_TOOLS_BINARY_DIR)
-
   precondition_translate_flag(LLVM_BUILD_LIBRARY_DIR LLVM_LIBRARY_DIR)
   escape_path_for_xcode("${LLVM_BUILD_TYPE}" "${LLVM_LIBRARY_DIR}" LLVM_LIBRARY_DIR)
-
+  precondition_translate_flag(LLVM_BUILD_MAIN_INCLUDE_DIR LLVM_MAIN_INCLUDE_DIR)
+  precondition_translate_flag(LLVM_BUILD_BINARY_DIR LLVM_BINARY_DIR)
+  precondition_translate_flag(LLVM_BUILD_MAIN_SRC_DIR LLVM_MAIN_SRC_DIR)
   precondition(LLVM_LIBRARY_DIRS)
   escape_path_for_xcode("${LLVM_BUILD_TYPE}" "${LLVM_LIBRARY_DIRS}" LLVM_LIBRARY_DIRS)
 
@@ -54,41 +64,18 @@ macro(swift_common_standalone_build_config_llvm product)
   set(LLVM_BINARY_OUTPUT_INTDIR "${LLVM_TOOLS_BINARY_DIR}")
   set(LLVM_LIBRARY_OUTPUT_INTDIR "${LLVM_LIBRARY_DIR}")
 
-  if(XCODE)
+  if (XCODE)
     fix_imported_targets_for_xcode("${LLVM_EXPORTED_TARGETS}")
   endif()
 
-  if(NOT CMAKE_CROSSCOMPILING)
+  if(NOT ${is_cross_compiling})
     set(${product}_NATIVE_LLVM_TOOLS_PATH "${LLVM_TOOLS_BINARY_DIR}")
   endif()
 
-  if(CMAKE_CROSSCOMPILING)
-    set(LLVM_NATIVE_BUILD "${LLVM_BINARY_DIR}/NATIVE")
-    if(NOT EXISTS "${LLVM_NATIVE_BUILD}")
-      message(FATAL_ERROR
-        "Attempting to cross-compile swift standalone but no native LLVM build
-        found.  Please cross-compile LLVM as well.")
-    endif()
-
-    if(CMAKE_HOST_SYSTEM_NAME MATCHES Windows)
-      set(HOST_EXECUTABLE_SUFFIX ".exe")
-    endif()
-
-    if(NOT CMAKE_CONFIGURATION_TYPES)
-      set(LLVM_TABLEGEN_EXE
-        "${LLVM_NATIVE_BUILD_DIR}/bin/llvm-tblgen${HOST_EXECUTABLE_SUFFIX}")
-    else()
-      # NOTE: LLVM NATIVE build is always built Release, as is specified in
-      # CrossCompile.cmake
-      set(LLVM_TABLEGEN_EXE
-        "${LLVM_NATIVE_BUILD_DIR}/Release/bin/llvm-tblgen${HOST_EXECUTABLE_SUFFIX}")
-    endif()
-  else()
-    find_program(LLVM_TABLEGEN_EXE "llvm-tblgen" HINTS ${LLVM_TOOLS_BINARY_DIR}
-      NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
-    if(LLVM_TABLEGEN_EXE STREQUAL "LLVM_TABLEGEN_EXE-NOTFOUND")
-      message(FATAL_ERROR "Failed to find tablegen in ${LLVM_TOOLS_BINARY_DIR}")
-    endif()
+  find_program(LLVM_TABLEGEN_EXE "llvm-tblgen" "${${product}_NATIVE_LLVM_TOOLS_PATH}"
+    NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
+  if ("${LLVM_TABLEGEN_EXE}" STREQUAL "LLVM_TABLEGEN_EXE-NOTFOUND")
+    message(FATAL_ERROR "Failed to find tablegen in ${${product}_NATIVE_LLVM_TOOLS_PATH}")
   endif()
 
   include(AddLLVM)
@@ -119,7 +106,7 @@ macro(swift_common_standalone_build_config_llvm product)
     "${PACKAGE_VERSION_MAJOR}.${PACKAGE_VERSION_MINOR}" CACHE STRING
     "Version number that will be placed into the libclang library , in the form XX.YY")
 
-  foreach(INCLUDE_DIR ${LLVM_INCLUDE_DIRS})
+  foreach (INCLUDE_DIR ${LLVM_INCLUDE_DIRS})
     escape_path_for_xcode("${LLVM_BUILD_TYPE}" "${INCLUDE_DIR}" INCLUDE_DIR)
     include_directories(${INCLUDE_DIR})
   endforeach ()
@@ -147,18 +134,52 @@ macro(swift_common_standalone_build_config_llvm product)
   endif()
 endmacro()
 
-macro(swift_common_standalone_build_config_clang product)
-  find_package(Clang CONFIG REQUIRED NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
+macro(swift_common_standalone_build_config_clang product is_cross_compiling)
+  set(${product}_PATH_TO_CLANG_SOURCE "${PATH_TO_LLVM_SOURCE}/tools/clang"
+      CACHE PATH "Path to Clang source code.")
+  set(${product}_PATH_TO_CLANG_BUILD "${PATH_TO_LLVM_BUILD}" CACHE PATH
+    "Path to the directory where Clang was built or installed.")
 
-  if (NOT CMAKE_CROSSCOMPILING)
+  set(PATH_TO_CLANG_SOURCE "${${product}_PATH_TO_CLANG_SOURCE}")
+  set(PATH_TO_CLANG_BUILD "${${product}_PATH_TO_CLANG_BUILD}")
+
+  file(TO_CMAKE_PATH "${PATH_TO_CLANG_SOURCE}" PATH_TO_CLANG_SOURCE)
+  file(TO_CMAKE_PATH "${PATH_TO_CLANG_BUILD}" PATH_TO_CLANG_BUILD)
+
+  # Add all Clang CMake paths to our cmake module path.
+  set(SWIFT_CLANG_CMAKE_PATHS
+    "${PATH_TO_CLANG_BUILD}/share/clang/cmake"
+    "${PATH_TO_CLANG_BUILD}/lib/cmake/clang")
+  foreach(path ${SWIFT_CLANG_CMAKE_PATHS})
+    list(APPEND CMAKE_MODULE_PATH ${path})
+  endforeach()
+
+  # Then include Clang.
+  find_package(Clang REQUIRED CONFIG
+    HINTS "${PATH_TO_CLANG_BUILD}" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
+
+  if(NOT EXISTS "${PATH_TO_CLANG_SOURCE}/include/clang/AST/Decl.h")
+    message(FATAL_ERROR "Please set ${product}_PATH_TO_CLANG_SOURCE to the root directory of Clang's source code.")
+  endif()
+  get_filename_component(CLANG_MAIN_SRC_DIR "${PATH_TO_CLANG_SOURCE}" ABSOLUTE)
+
+  if(NOT EXISTS "${PATH_TO_CLANG_BUILD}/tools/clang/include/clang/Basic/Version.inc")
+    message(FATAL_ERROR "Please set ${product}_PATH_TO_CLANG_BUILD to a directory containing a Clang build.")
+  endif()
+  set(CLANG_BUILD_INCLUDE_DIR "${PATH_TO_CLANG_BUILD}/tools/clang/include")
+
+  if (NOT ${is_cross_compiling})
     set(${product}_NATIVE_CLANG_TOOLS_PATH "${LLVM_TOOLS_BINARY_DIR}")
   endif()
 
-  if(XCODE)
+  set(CLANG_MAIN_INCLUDE_DIR "${CLANG_MAIN_SRC_DIR}/include")
+
+  if (XCODE)
     fix_imported_targets_for_xcode("${CLANG_EXPORTED_TARGETS}")
   endif()
 
-  include_directories(${CLANG_INCLUDE_DIRS})
+  include_directories("${CLANG_BUILD_INCLUDE_DIR}"
+                      "${CLANG_MAIN_INCLUDE_DIR}")
 endmacro()
 
 macro(swift_common_standalone_build_config_cmark product)
@@ -197,9 +218,9 @@ endmacro()
 #
 #   is_cross_compiling
 #     Whether this is cross-compiling host tools.
-macro(swift_common_standalone_build_config product)
-  swift_common_standalone_build_config_llvm(${product})
-  swift_common_standalone_build_config_clang(${product})
+macro(swift_common_standalone_build_config product is_cross_compiling)
+  swift_common_standalone_build_config_llvm(${product} ${is_cross_compiling})
+  swift_common_standalone_build_config_clang(${product} ${is_cross_compiling})
   swift_common_standalone_build_config_cmark(${product})
 
   # Enable groups for IDE generators (Xcode and MSVC).
