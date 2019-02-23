@@ -105,10 +105,10 @@ add_swift_host_library(swiftBasic STATIC
   UnicodeExtendedGraphemeClusters.cpp.gyb
 
   C_COMPILE_FLAGS ${UUID_INCLUDE}
-  LINK_LIBRARIES
-    swiftDemangling
-    ${UUID_LIBRARIES}
   LLVM_COMPONENT_DEPENDS support)
+target_link_libraries(swiftBasic PRIVATE
+  swiftDemangling
+  ${UUID_LIBRARIES})
 
 message(STATUS "Swift version: ${SWIFT_VERSION}")
 message(STATUS "Swift vendor: ${SWIFT_VENDOR}")

@@ -29,7 +29,6 @@ add_swift_host_library(swiftSILGen STATIC
   SILGenProlog.cpp
   SILGenStmt.cpp
   SILGenThunk.cpp
-  SILGenType.cpp
-  LINK_LIBRARIES
-    swiftSIL
-)
+  SILGenType.cpp)
+target_link_libraries(swiftSILGen PRIVATE
+  swiftSIL)

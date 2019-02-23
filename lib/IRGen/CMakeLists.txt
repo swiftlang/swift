@@ -50,12 +50,6 @@ add_swift_host_library(swiftIRGen STATIC
   SwiftTargetInfo.cpp
   TypeLayoutDumper.cpp
   TypeLayoutVerifier.cpp
-  LINK_LIBRARIES
-    swiftAST
-    swiftLLVMPasses
-    swiftSIL
-    swiftSILGen
-    swiftSILOptimizer
 
   INTERFACE_LINK_LIBRARIES
     # Clang dependencies.
@@ -67,3 +61,9 @@ add_swift_host_library(swiftIRGen STATIC
     target
     transformutils
 )
+target_link_libraries(swiftIRGen PRIVATE
+  swiftAST
+  swiftLLVMPasses
+  swiftSIL
+  swiftSILGen
+  swiftSILOptimizer)
