@@ -109,7 +109,7 @@ std::error_code SerializedModuleLoader::findModuleFilesInDirectory(
                                                      ModuleDocBuffer);
 }
 
-bool SerializedModuleLoader::maybeDiagnoseArchitectureMismatch(
+bool SerializedModuleLoader::maybeDiagnoseTargetMismatch(
     SourceLoc sourceLocation, StringRef moduleName, StringRef archName,
     StringRef directoryPath) {
   llvm::vfs::FileSystem &fs = *Ctx.SourceMgr.getFileSystem();
@@ -139,7 +139,7 @@ bool SerializedModuleLoader::maybeDiagnoseArchitectureMismatch(
     return false;
   }
 
-  Ctx.Diags.diagnose(sourceLocation, diag::sema_no_import_arch, moduleName,
+  Ctx.Diags.diagnose(sourceLocation, diag::sema_no_import_target, moduleName,
                      archName, foundArchs);
   return true;
 }
@@ -208,8 +208,8 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
 
     // We can only get here if all targetFileNamePairs failed with
     // 'std::errc::no_such_file_or_directory'.
-    if (maybeDiagnoseArchitectureMismatch(moduleID.second,
-            moduleName, normalizedTarget.str(), currPath)) {
+    if (maybeDiagnoseTargetMismatch(moduleID.second, moduleName,
+                                    normalizedTarget.str(), currPath)) {
       return false;
     } else {
       return None;
