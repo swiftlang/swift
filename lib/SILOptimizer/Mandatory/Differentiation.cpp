@@ -1396,8 +1396,12 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
   assert(usefulValueSets.empty());
   for (auto output : outputValues) {
     usefulValueSets.push_back({});
-    if (output->getType().isDifferentiable(module))
-      usefulValueSets.back().insert(output);
+    // If the output has an address type, propagate usefulness recursively.
+    if (output->getType().isAddress())
+      propagateUsefulThroughBuffer(output, usefulValueSets.size() - 1);
+    // Otherwise, just mark the output as useful.
+    else
+      setUsefulIfDifferentiable(output, usefulValueSets.size() - 1);
   }
   // Propagate usefulness through the function in post-dominance order.
   PostDominanceOrder postDomOrder(&*function.findReturnBB(), pdi);
