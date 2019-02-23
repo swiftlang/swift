@@ -1250,8 +1250,39 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   auto argumentLocator = locator.withPathElement(
       ConstraintLocator::FunctionArgument);
 
-  if (func1Params.size() != func2Params.size())
-    return getTypeMatchFailure(argumentLocator);
+  int diff = func1Params.size() - func2Params.size();
+  if (diff != 0) {
+    if (!shouldAttemptFixes())
+      return getTypeMatchFailure(argumentLocator);
+
+    auto *anchor = locator.trySimplifyToExpr();
+    if (!anchor)
+      return getTypeMatchFailure(argumentLocator);
+
+    // If there are missing arguments, let's add them
+    // using parameter as a template.
+    if (diff < 0) {
+      for (unsigned i = func1Params.size(),
+                    n = func2Params.size(); i != n; ++i) {
+        auto *argLoc =
+            getConstraintLocator(anchor, LocatorPathElt::getTupleElement(i));
+
+        auto arg = func2Params[i].withType(createTypeVariable(argLoc));
+        func1Params.push_back(arg);
+      }
+
+      ArrayRef<AnyFunctionType::Param> argsRef(func1Params);
+      auto *fix = AddMissingArguments::create(*this, func2,
+                                              argsRef.take_back(abs(diff)),
+                                              getConstraintLocator(locator));
+
+      if (recordFix(fix))
+        return getTypeMatchFailure(argumentLocator);
+    } else {
+      // TODO(diagnostics): Add handling of extraneous arguments.
+      return getTypeMatchFailure(argumentLocator);
+    }
+  }
 
   bool hasLabelingFailures = false;
   for (unsigned i : indices(func1Params)) {
@@ -5628,6 +5659,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowTypeOrInstanceMember:
   case FixKind::AllowInvalidPartialApplication:
   case FixKind::AllowInvalidInitRef:
+  case FixKind::AddMissingArguments:
     llvm_unreachable("handled elsewhere");
   }
 

@@ -342,3 +342,16 @@ AllowInvalidInitRef::create(RefKind kind, ConstraintSystem &cs, Type baseTy,
   return new (cs.getAllocator()) AllowInvalidInitRef(
       cs, kind, baseTy, init, isStaticallyDerived, baseRange, locator);
 }
+
+bool AddMissingArguments::diagnose(Expr *root, bool asNote) const {
+  return false;
+}
+
+AddMissingArguments *
+AddMissingArguments::create(ConstraintSystem &cs, FunctionType *funcType,
+                            llvm::ArrayRef<Param> synthesizedArgs,
+                            ConstraintLocator *locator) {
+  unsigned size = totalSizeToAlloc<Param>(synthesizedArgs.size());
+  void *mem = cs.getAllocator().Allocate(size, alignof(AddMissingArguments));
+  return new (mem) AddMissingArguments(cs, funcType, synthesizedArgs, locator);
+}
