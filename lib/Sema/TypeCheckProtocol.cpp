@@ -663,6 +663,8 @@ swift::matchWitness(
   // SWIFT_ENABLE_TENSORFLOW
   // Differentiation attributes must match completely or the generated
   // functions will have the wrong signature.
+  // TODO(TF-285): Handle multiple `@differentiable` attributes on protocol
+  // requirements. Only missing attributes should be diagnosed.
   auto *reqDiffAttr =
       reqAttrs.getAttribute<DifferentiableAttr>(/*AllowInvalid*/ true);
   auto *witnessDiffAttr =
@@ -2246,6 +2248,8 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     std::string diffAttrReq;
     {
       llvm::raw_string_ostream stream(diffAttrReq);
+      // TODO(TF-285): Handle multiple `@differentiable` attributes on protocol
+      // requirements. Only missing attributes should be diagnosed.
       req->getAttrs().getAttribute<DifferentiableAttr>()->print(stream, req);
       diffAttrReq = StringRef(stream.str()).trim();
     }
