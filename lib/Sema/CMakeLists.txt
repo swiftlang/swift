@@ -30,6 +30,7 @@ add_swift_host_library(swiftSema STATIC
   DerivedConformanceAdditiveArithmeticVectorNumeric.cpp
   DerivedConformanceDifferentiable.cpp
   DerivedConformanceKeyPathIterable.cpp
+  DerivedConformanceTensorGroup.cpp
   # SWIFT_ENABLE_TENSORFLOW END
   DerivedConformanceRawRepresentable.cpp
   DerivedConformances.cpp

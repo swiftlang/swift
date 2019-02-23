@@ -67,6 +67,10 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
     return canDeriveKeyPathIterable(Nominal);
 
   // SWIFT_ENABLE_TENSORFLOW
+  if (*knownProtocol == KnownProtocolKind::TensorGroup)
+    return canDeriveTensorGroup(Nominal);
+  
+  // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::AdditiveArithmetic)
     return canDeriveAdditiveArithmetic(Nominal, DC);
 
@@ -217,6 +221,21 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     // KeyPathIterable.allKeyPaths
     if (name.isSimpleName(ctx.Id_allKeyPaths))
       return getRequirement(KnownProtocolKind::KeyPathIterable);
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // TensorGroup._typeList
+    if (name.isSimpleName(ctx.Id_typeList))
+      return getRequirement(KnownProtocolKind::TensorGroup);
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // TensorGroup._unknownShapeList
+    if (name.isSimpleName(ctx.Id_unknownShapeList))
+      return getRequirement(KnownProtocolKind::TensorGroup);
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // TensorGroup._unpackTensorHandles
+    if (name.isSimpleName(ctx.Id_unpackTensorHandles))
+      return getRequirement(KnownProtocolKind::TensorGroup);
 
     // SWIFT_ENABLE_TENSORFLOW
     // Differentiable.allDifferentiableVariables
