@@ -216,9 +216,7 @@ SimpleMathTests.test("StructGeneric") {
     var generic = Generic(x: input, y: input, z: input)
     return generic
   })(Generic<Float>.CotangentVector(x: 1, y: 1, z: 1))
-  // FIXME(TF-274): The true expected result is `3`.
-  // expectEqual(3, 𝛁generic)
-  expectEqual(0, 𝛁generic)
+  expectEqual(3, 𝛁generic)
 
   func fifthPower(_ input: Float) -> Float {
     var generic = Generic(x: input, y: input, z: input)
@@ -227,8 +225,7 @@ SimpleMathTests.test("StructGeneric") {
     return generic.x * generic.y
   }
   // FIXME(TF-274): The true expected result is `405`, like other variants of `fifthPower` above.
-  // expectEqual(405, gradient(at: 3, in: fifthPower))
-  expectEqual(243, gradient(at: 3, in: fifthPower))
+  expectEqual(405, gradient(at: 3, in: fifthPower))
 }
 
 runAllTests()
