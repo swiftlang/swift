@@ -197,6 +197,25 @@ class SubCls : MyCls, Prot {}
 func genFn<T : Prot where T.Blarg : Prot2>(_: T) -> Int {}
 
 func f(x: Int) -> Int {
+
+  // CHECK: <str>#"This is a raw string"#</str>
+  #"This is a raw string"#
+
+  // CHECK: <str>##"This is also a raw string"##</str>
+  ##"This is also a raw string"##
+
+  // CHECK: <str>###"This is an unterminated raw string"</str>
+  ###"This is an unterminated raw string"
+
+  // CHECK: <str>#"""This is a multiline raw string"""#</str>
+  #"""This is a multiline raw string"""#
+
+  // CHECK: <str>#"This is an </str>\#<anchor>(</anchor>interpolated<anchor>)</anchor><str> raw string"#</str>
+  #"This is an \#(interpolated) raw string"#
+
+  // CHECK: <str>#"This is a raw string with an invalid \##() interpolation"#</str>
+  #"This is a raw string with an invalid \##() interpolation"#
+
   // CHECK: <str>"This is string </str>\<anchor>(</anchor>genFn({(a:<type>Int</type> -> <type>Int</type>) <kw>in</kw> a})<anchor>)</anchor><str> interpolation"</str>
   "This is string \(genFn({(a:Int -> Int) in a})) interpolation"
 
