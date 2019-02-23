@@ -518,6 +518,32 @@ func rdar46211109() {
   // expected-error@-1 {{type 'Int' has no member 'Self'}}
 }
 
+class A {}
+
+enum B {
+  static func foo() {
+    bar(A()) // expected-error {{'A' is not convertible to 'B'}}
+  }
+
+  func bar(_: A) {}
+}
+
+class C {
+  static func foo() {
+    bar(0) // expected-error {{instance member 'bar' cannot be used on type 'C'}}
+  }
+
+  func bar(_: Int) {}
+}
+
+class D {
+  static func foo() {}
+
+  func bar() {
+    foo() // expected-error {{static member 'foo' cannot be used on instance of type 'D'}}
+  }
+}
+
 func rdar_48114578() {
   struct S<T> {
     var value: T

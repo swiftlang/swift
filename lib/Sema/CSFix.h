@@ -105,6 +105,9 @@ enum class FixKind : uint8_t {
   /// fix this issue by pretending that member exists and matches
   /// given arguments/result types exactly.
   DefineMemberBasedOnUse,
+	
+  /// Allow access to type member on instance or instance member on type
+  AllowTypeOrInstanceMember,
 
   /// Allow expressions where 'mutating' method is only partially applied,
   /// which means either not applied at all e.g. `Foo.bar` or only `Self`
@@ -522,6 +525,27 @@ public:
   static DefineMemberBasedOnUse *create(ConstraintSystem &cs, Type baseType,
                                         DeclName member,
                                         ConstraintLocator *locator);
+};
+	
+class AllowTypeOrInstanceMember final : public ConstraintFix {
+  Type BaseType;
+  DeclName Name;
+
+public:
+  AllowTypeOrInstanceMember(ConstraintSystem &cs, Type baseType, DeclName member,
+                            ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowTypeOrInstanceMember, locator),
+        BaseType(baseType), Name(member) {}
+
+  std::string getName() const override {
+    return "allow access to instance member on type or a type member on instance";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowTypeOrInstanceMember *create(ConstraintSystem &cs, Type baseType,
+                                           DeclName member,
+                                           ConstraintLocator *locator);
 };
 
 class AllowInvalidPartialApplication final : public ConstraintFix {
