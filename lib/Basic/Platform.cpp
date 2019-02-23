@@ -12,6 +12,8 @@
 
 #include "swift/Basic/Platform.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/ADT/StringSwitch.h"
+#include "llvm/ADT/StringExtras.h"
 
 using namespace swift;
 
@@ -188,3 +190,78 @@ StringRef swift::getMajorArchitectureName(const llvm::Triple &Triple) {
     return Triple.getArchName();
   }
 }
+
+static StringRef
+getArchForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
+  auto tripleArchName = triple.getArchName();
+
+  return llvm::StringSwitch<StringRef>(tripleArchName)
+              .Cases("arm64", "aarch64", "arm64")
+              .Case ("armv7s", "armv7s")
+              .Case ("armv7k", "armv7k")
+              .Case ("armv7", "armv7")
+              .Case ("x86_64h", "x86_64h")
+              .Cases("x86_64", "amd64", "x86_64")
+              .Cases("i386", "i486", "i586", "i686", "i786", "i886", "i986",
+                     "i386")
+              .Cases("unknown", "", "unknown")
+              .Default(tripleArchName);
+}
+
+static StringRef
+getVendorForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
+  return "apple";
+}
+
+static StringRef
+getOSForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
+  auto tripleOSName = triple.getOSName();
+
+  // Truncate the OS name before the first digit.
+  auto tripleOSNameNoVersion = tripleOSName.take_until(llvm::isDigit);
+
+  return llvm::StringSwitch<StringRef>(tripleOSNameNoVersion)
+              .Cases("macos", "macosx", "darwin", "macos")
+              .Case ("ios", "ios")
+              .Case ("tvos", "tvos")
+              .Cases("unknown", "", "unknown")
+              .Default(tripleOSNameNoVersion);
+}
+
+static Optional<StringRef>
+getEnvironmentForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
+  auto tripleEnvironment = triple.getEnvironmentName();
+
+  if (tripleEnvironment == "") {
+    if (swift::tripleIsAnySimulator(triple))
+      return StringRef("simulator");
+    else
+      return None;
+  }
+
+  return llvm::StringSwitch<Optional<StringRef>>(tripleEnvironment)
+              .Case("simulator", StringRef("simulator"))
+              .Case("unknown", None)
+              .Default(tripleEnvironment);
+}
+
+llvm::Triple swift::getTargetSpecificModuleTriple(const llvm::Triple &triple) {
+  if (triple.isOSDarwin()) {
+    StringRef newArch = getArchForAppleTargetSpecificModuleTriple(triple);
+
+    StringRef newVendor = getVendorForAppleTargetSpecificModuleTriple(triple);
+
+    StringRef newOS = getOSForAppleTargetSpecificModuleTriple(triple);
+
+    Optional<StringRef> newEnvironment =
+        getEnvironmentForAppleTargetSpecificModuleTriple(triple);
+
+    if (newEnvironment)
+      return llvm::Triple(newArch, newVendor, newOS, *newEnvironment);
+    else
+      return llvm::Triple(newArch, newVendor, newOS);
+  } else {
+    return triple;
+  }
+}
+
