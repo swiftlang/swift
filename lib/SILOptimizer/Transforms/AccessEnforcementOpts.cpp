@@ -319,7 +319,9 @@ private:
   void addInScopeAccess(RegionInfo &info, BeginAccessInst *beginAccess);
   void removeInScopeAccess(RegionInfo &info, BeginAccessInst *beginAccess);
   void recordConflict(RegionInfo &info, const AccessedStorage &storage);
-  void addOutOfScopeAccess(RegionInfo &info, BeginAccessInst *beginAccess);
+  void addOutOfScopeAccessInsert(RegionInfo &info,
+                                 BeginAccessInst *beginAccess);
+  void addOutOfScopeAccessMerge(RegionInfo &info, BeginAccessInst *beginAccess);
   void mergeAccessStruct(RegionInfo &info,
                          RegionInfo::AccessSummary &accessStruct,
                          const RegionInfo::AccessSummary &RHSAccessStruct);
@@ -386,7 +388,7 @@ void AccessConflictAndMergeAnalysis::recordConflict(
                            true /*isInScope*/);
 }
 
-void AccessConflictAndMergeAnalysis::addOutOfScopeAccess(
+void AccessConflictAndMergeAnalysis::addOutOfScopeAccessInsert(
     RegionInfo &info, BeginAccessInst *beginAccess) {
   auto newStorageInfo = result.getAccessInfo(beginAccess);
   auto pred = [&](BeginAccessInst *it) {
@@ -399,10 +401,42 @@ void AccessConflictAndMergeAnalysis::addOutOfScopeAccess(
       info.outOfScopeConflictFreeAccesses.conflictFreeAccesses.rend(), pred);
 
   if (it == info.outOfScopeConflictFreeAccesses.conflictFreeAccesses.rend()) {
-    // We don't have a match in outOfScopeConflictFreeAccesses
-    // Just add it and return
     info.outOfScopeConflictFreeAccesses.conflictFreeAccesses.insert(
         beginAccess);
+  } else {
+    // we have a nested read case:
+    /*%4 = begin_access [read] [dynamic] %0 : $*X
+     %5 = load %4 : $*X
+     %7 = begin_access [read] [dynamic] %0 : $*X
+     %8 = load %7 : $*X
+     end_access %7 : $*X
+     end_access %4 : $*X*/
+    // we should remove the current one and insert the new.
+    auto *otherBegin = *it;
+    auto rmIt = std::find(
+        info.outOfScopeConflictFreeAccesses.conflictFreeAccesses.begin(),
+        info.outOfScopeConflictFreeAccesses.conflictFreeAccesses.end(),
+        otherBegin);
+    info.outOfScopeConflictFreeAccesses.conflictFreeAccesses.erase(rmIt);
+    info.outOfScopeConflictFreeAccesses.conflictFreeAccesses.insert(
+        beginAccess);
+  }
+}
+
+void AccessConflictAndMergeAnalysis::addOutOfScopeAccessMerge(
+    RegionInfo &info, BeginAccessInst *beginAccess) {
+  auto newStorageInfo = result.getAccessInfo(beginAccess);
+  auto pred = [&](BeginAccessInst *it) {
+    auto currStorageInfo = result.getAccessInfo(it);
+    return currStorageInfo.hasIdenticalBase(newStorageInfo);
+  };
+
+  auto it = std::find_if(
+      info.outOfScopeConflictFreeAccesses.conflictFreeAccesses.rbegin(),
+      info.outOfScopeConflictFreeAccesses.conflictFreeAccesses.rend(), pred);
+
+  if (it == info.outOfScopeConflictFreeAccesses.conflictFreeAccesses.rend()) {
+    // We don't have a match in outOfScopeConflictFreeAccesses - return
     return;
   }
 
@@ -418,29 +452,27 @@ void AccessConflictAndMergeAnalysis::addOutOfScopeAccess(
     return !currStorageInfo.isDistinctFrom(newStorageInfo);
   };
 
-  auto itDistinct = std::find_if(
+  auto itNotDistinct = std::find_if(
       info.outOfScopeConflictFreeAccesses.conflictFreeAccesses.begin(),
       info.outOfScopeConflictFreeAccesses.conflictFreeAccesses.end(),
       predDistinct);
 
-  if (itDistinct ==
+  if (itNotDistinct ==
       info.outOfScopeConflictFreeAccesses.conflictFreeAccesses.end()) {
     LLVM_DEBUG(llvm::dbgs() << "Found mergable pair: " << *otherBegin << ", "
                             << *beginAccess << "\n");
     result.mergePairs.push_back(std::make_pair(otherBegin, beginAccess));
   } else {
-    while (itDistinct !=
+    while (itNotDistinct !=
            info.outOfScopeConflictFreeAccesses.conflictFreeAccesses.end()) {
       info.outOfScopeConflictFreeAccesses.conflictFreeAccesses.erase(
-          itDistinct);
-      itDistinct = std::find_if(
+          itNotDistinct);
+      itNotDistinct = std::find_if(
           info.outOfScopeConflictFreeAccesses.conflictFreeAccesses.begin(),
           info.outOfScopeConflictFreeAccesses.conflictFreeAccesses.end(),
           predDistinct);
     }
   }
-
-  info.outOfScopeConflictFreeAccesses.conflictFreeAccesses.insert(beginAccess);
 }
 
 void AccessConflictAndMergeAnalysis::mergeAccessStruct(
@@ -678,7 +710,7 @@ void AccessConflictAndMergeAnalysis::visitBeginAccess(
   // the reason for calling this method is to check for that.
   // logically, we only need to add an instructio to
   // out-of-scope conflict-free set when we visit end_access
-  addOutOfScopeAccess(info, beginAccess);
+  addOutOfScopeAccessMerge(info, beginAccess);
 }
 
 void AccessConflictAndMergeAnalysis::visitEndAccess(EndAccessInst *endAccess,
@@ -709,7 +741,7 @@ void AccessConflictAndMergeAnalysis::visitEndAccess(EndAccessInst *endAccess,
   LLVM_DEBUG(llvm::dbgs() << "Got out of scope from " << *beginAccess << " to "
                           << *endAccess << "\n");
 
-  addOutOfScopeAccess(info, beginAccess);
+  addOutOfScopeAccessInsert(info, beginAccess);
 }
 
 void AccessConflictAndMergeAnalysis::detectApplyConflicts(
