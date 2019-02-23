@@ -184,7 +184,7 @@ public:
   /// Determine if a TensorGroup requirement can be derived for a type.
   ///
   /// \returns True if the requirement can be derived.
-  static bool canDeriveTensorGroup(NominalTypeDecl *type);
+  static bool canDeriveTensorGroup(NominalTypeDecl *type, DeclContext *DC);
 
   /// Derive a TensorGroup requirement for a nominal type.
   ///

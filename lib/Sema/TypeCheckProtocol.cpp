@@ -5511,8 +5511,6 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::KeyPathIterable:
     return derived.deriveKeyPathIterable(AssocType);
-  case KnownProtocolKind::TensorGroup:
-    return derived.deriveTensorGroup(AssocType);
   case KnownProtocolKind::VectorNumeric:
     return derived.deriveVectorNumeric(AssocType);
   // TODO(TF-213): Replace with `KnownProtocolKind::Differentiable`.

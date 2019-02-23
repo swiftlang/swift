@@ -68,7 +68,7 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
 
   // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::TensorGroup)
-    return canDeriveTensorGroup(Nominal);
+    return canDeriveTensorGroup(Nominal, DC);
   
   // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::AdditiveArithmetic)

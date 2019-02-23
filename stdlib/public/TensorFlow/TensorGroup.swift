@@ -36,9 +36,6 @@ public protocol TensorArrayProtocol {
 /// tensor operation as an argument list whose elements are the tensor fields of
 /// the type.  When a TensorGroup is used as a result, it gets initialized
 /// with its tensor fields set to the tensor operation's tensor results.
-///
-/// TODO: Add a derived conformance to TensorGroup so that users don't have
-/// to write the conformance themselves.
 public protocol TensorGroup : TensorArrayProtocol {
   /// The types of the tensor stored properties in this type.
   static var _typeList: [TensorDataType] { get }
@@ -60,12 +57,6 @@ public extension TensorGroup {
   /// The number of tensor fields in this type.
   static var _tensorHandleCount: Int32 { return Int32(Self._typeList.count) }
   var _tensorHandleCount: Int32 { return Int32(Self._typeList.count) }
-
-  /// An array of `nil`s with the same number of elements as `_outputTypeList`.
-  /// The `nil` represents unknown shape.
-  static var _unknownShapeList: [TensorShape?] {
-    return Array(repeating: nil, count: _typeList.count)
-  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -206,6 +197,7 @@ extension Array : TensorArrayProtocol where Element : TensorArrayProtocol {
       ptr = ptr!.advanced(by: Int(elem._tensorHandleCount))
     }
   }
+
   public var _tensorHandleCount: Int32 {
     var count: Int32 = 0
     for elem in self { count += elem._tensorHandleCount }

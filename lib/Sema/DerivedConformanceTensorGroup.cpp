@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file implements explicit derivation of the TensorGroup protocol for
-// a nominal typ.
+// a nominal type.
 //
 //===----------------------------------------------------------------------===//
 
@@ -30,7 +30,8 @@
 
 using namespace swift;
 
-bool DerivedConformance::canDeriveTensorGroup(NominalTypeDecl *nominal) {
+bool DerivedConformance::canDeriveTensorGroup(NominalTypeDecl *nominal, 
+                                              DeclContext *DC) {
   // Nominal type must be a struct (zero stored properties is okay).
   // Note: we could extend synthesis to support classes.
   auto *structDecl = dyn_cast<StructDecl>(nominal);
@@ -50,27 +51,34 @@ bool DerivedConformance::canDeriveTensorGroup(NominalTypeDecl *nominal) {
   });
 }
 
+// Return the protocol requirement with the specified name.
+static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
+  auto lookup = proto->lookupDirect(name);
+  lookup.erase(std::remove_if(lookup.begin(), lookup.end(),
+                              [](ValueDecl *v) {
+                                return !isa<ProtocolDecl>(
+                                           v->getDeclContext()) ||
+                                       !v->isProtocolRequirement();
+                              }),
+               lookup.end());
+  assert(lookup.size() == 1 && "Ambiguous protocol requirement");
+  return lookup.front();
+}
+
 /// Derive the body for the '_typeList' getter.
 static void
-deriveBodyTensorGroup_typeList(AbstractFunctionDecl *hashValueDecl) {
+deriveBodyTensorGroup_typeList(AbstractFunctionDecl *funcDecl) {
+  auto *parentDC = funcDecl->getParent();
   auto *nominal = funcDecl->getDeclContext()->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
 
   auto *tensorGroupProto = C.getProtocol(KnownProtocolKind::TensorGroup);
-  auto *typesListReq = getProtocolRequirement(, C.Id_typesList);
+  auto *typeListReq = getProtocolRequirement(tensorGroupProto, C.Id_typeList);
 
-  // Collect all member `_typeList` arrays.
-  llvm::SmallVector<Expr *, 2> typeListExprs;
-  for (auto member : nominal->getStoredProperties()) {
-    auto *typeListExpr = new (C) 
-        MemberRefExpr(member, SourceLoc(), typesListReq,
-                      DeclNameLoc(), /*Implicit*/ true);
-    typeListExprs.push_back(typeListExpr);
-  }
-
-  // Concatenate all arrays.
-  Type arrayType = getArrayType(C, 
-      C.getTensorDataTypeDecl()->getDeclaredInterfaceType());
+  // Concatenate all member `_typeList` arrays..
+  Type arrayType = BoundGenericType::get(
+    C.getArrayDecl(), Type(), 
+    {C.getTensorDataTypeDecl()->getDeclaredInterfaceType()});
   auto *arrayTypeExpr = TypeExpr::createImplicit(arrayType, C);
   auto plusOpLookup = C.getArrayDecl()->lookupDirect(C.getIdentifier("+"));
   assert(plusOpLookup.size() == 1 && "Ambiguous 'Array.+' operator.");
@@ -79,20 +87,26 @@ deriveBodyTensorGroup_typeList(AbstractFunctionDecl *hashValueDecl) {
       DeclRefExpr(plusOpDecl, DeclNameLoc(), /*Implicit*/ true);
   auto plusOpExpr = 
         new (C) DotSyntaxCallExpr(plusOpDRE, SourceLoc(), arrayTypeExpr);
-
-  auto array_add_fold = [](Expr* lhsArg, Expr* rhsArg) {
-    // Create expression `lhsArg + rhsArg`.
+  Expr *typeListExpr = nullptr;
+  for (auto member : nominal->getStoredProperties()) {
+    auto memberType =
+        parentDC->mapTypeIntoContext(member->getValueInterfaceType());
+    auto *memberTypeExpr = TypeExpr::createImplicit(memberType, C);
+    auto *memberTypeListExpr = new (C) 
+        MemberRefExpr(memberTypeExpr, SourceLoc(), typeListReq,
+                      DeclNameLoc(), /*Implicit*/ true);
+    if (typeListExpr == nullptr)  {
+      typeListExpr = memberTypeListExpr;
+    } else {
+      // Create expression `lhsArg + rhsArg`.
     auto *plusOpArgs =
-        TupleExpr::create(C, SourceLoc(), {lhsArg, rhsArg}, {}, {}, SourceLoc(),
-                          /*HasTrailingClosure*/ false,
+        TupleExpr::create(C, SourceLoc(), {typeListExpr, memberTypeListExpr}, 
+                          {}, {}, SourceLoc(), /*HasTrailingClosure*/ false,
                           /*Implicit*/ true);
-    return new (C) BinaryExpr(plusOpExpr, plusOpArgs, /*Implicit*/ true);
-  };
-
-  auto typeListExpr = std::reduce(std::next(typeListExprs.begin()), 
-                                  typeListExprs.end(),
-                                  typeListExprs[0],
-                                  array_add_fold);
+    typeListExpr = new (C) BinaryExpr(plusOpExpr, plusOpArgs, 
+                                      /*Implicit*/ true);
+    }
+  }
 
   // Return the resulting data types array.
   auto *returnStmt = new (C) ReturnStmt(SourceLoc(), typeListExpr);
@@ -104,74 +118,142 @@ deriveBodyTensorGroup_typeList(AbstractFunctionDecl *hashValueDecl) {
 
 /// Derive a '_typeList' implementation.
 static ValueDecl *deriveTensorGroup_typeList(DerivedConformance &derived) {
+  auto nominal = derived.Nominal;
   auto &tc = derived.TC;
   ASTContext &C = tc.Context;
 
   auto parentDC = derived.getConformanceContext();
-  Type dataTypeArrayType = getArrayType(C, 
-      C.getTensorDataTypeDecl()->getDeclaredInterfaceType());
+  Type dataTypeArrayType = BoundGenericType::get(
+    C.getArrayDecl(), Type(), 
+    {C.getTensorDataTypeDecl()->getDeclaredInterfaceType()});
+  auto returnType = parentDC->mapTypeIntoContext(dataTypeArrayType);
 
   // Create `_typeList` property declaration.
   VarDecl *typeListDecl;
   PatternBindingDecl *patDecl;
   std::tie(typeListDecl, patDecl) = derived.declareDerivedProperty(
-      C.Id_typeList, dataTypeArrayType, dataTypeArrayType, /*isStatic*/ true,
+      C.Id_typeList, returnType, returnType, /*isStatic*/ true,
       /*isFinal*/ false);
-  // TODO: What's the difference between interface type and context type?
 
-  VarDecl *typeListDecl =
-    new (C) VarDecl(/*IsStatic*/ true, VarDecl::Specifier::Var,
-                    /*IsCaptureList*/ false, SourceLoc(),
-                    C.Id_typeList, parentDC);
-  typeListDecl->setType(dataTypeArrayType);
+  // Add `@inlinable` to the `_typeList` declaration.
+  if (nominal->getEffectiveAccess() > AccessLevel::Internal)
+    typeListDecl->getAttrs().add(new (C) InlinableAttr(/*implicit*/ true));
 
-  ParameterList *params = ParameterList::createEmpty(C);
-
-  AccessorDecl *getterDecl = AccessorDecl::create(C,
-      /*FuncLoc*/ SourceLoc(), /*AccessorKeywordLoc*/ SourceLoc(),
-      AccessorKind::Get, typeListDecl,
-      /*StaticLoc*/ SourceLoc(), StaticSpellingKind::None,
-      /*Throws*/ false, /*ThrowsLoc*/ SourceLoc(),
-      /*GenericParams*/ nullptr, params,
-      TypeLoc::withoutLoc(dataTypeArrayType), parentDC);
-  getterDecl->setImplicit();
-  getterDecl->setBodySynthesizer(&deriveBodyTensorGroup_typeList);
-
-  // Compute the interface type of _typeList().
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    getterDecl->setGenericEnvironment(env);
-  getterDecl->computeType();
-
-  getterDecl->setValidationToChecked();
-  getterDecl->copyFormalAccessFrom(derived.Nominal,
-                                   /*sourceIsParentContext*/ true);
-
-  // Finish creating the property.
-  typeListDecl->setImplicit();
-  typeListDecl->setInterfaceType(dataTypeArrayType);
-  typeListDecl->setValidationToChecked();
+  // Create `_typeList` getter.
+  auto *getterDecl = derived.declareDerivedPropertyGetter(
+      derived.TC, typeListDecl, returnType);
+  getterDecl->setBodySynthesizer(deriveBodyTensorGroup_typeList);
   typeListDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
-                             SourceLoc(), {getterDecl}, SourceLoc());
-  typeListDecl->copyFormalAccessFrom(derived.Nominal,
-                                     /*sourceIsParentContext*/ true);
-
-  Pattern *typeListPat = new (C) NamedPattern(typeListDecl, /*implicit*/ true);
-  typeListPat->setType(dataTypeArrayType);
-  typeListPat = TypedPattern::createImplicit(C, typeListPat, dataTypeArrayType);
-  typeListPat->setType(dataTypeArrayType);
-
-  C.addSynthesizedDecl(typeListDecl);
-  C.addSynthesizedDecl(getterDecl);
-
+                                SourceLoc(), {getterDecl}, SourceLoc());
   derived.addMembersToConformanceContext({getterDecl, typeListDecl, patDecl});
+
   return typeListDecl;
+}
+
+/// Derive the body for the '_unknownShapeList' getter.
+static void
+deriveBodyTensorGroup_unknownShapeList(AbstractFunctionDecl *funcDecl) {
+  auto *parentDC = funcDecl->getParent();
+  auto *nominal = funcDecl->getDeclContext()->getSelfNominalTypeDecl();
+  auto &C = nominal->getASTContext();
+
+  auto *tensorGroupProto = C.getProtocol(KnownProtocolKind::TensorGroup);
+  auto *shapeListReq = getProtocolRequirement(
+      tensorGroupProto, C.Id_unknownShapeList);
+
+  // Concatenate all member `_unknownShapeList` arrays..
+  Type arrayType = BoundGenericType::get(
+    C.getArrayDecl(), Type(), 
+    {BoundGenericType::get(
+        C.getOptionalDecl(), Type(), 
+        {C.getTensorShapeDecl()->getDeclaredInterfaceType()})});
+  auto *arrayTypeExpr = TypeExpr::createImplicit(arrayType, C);
+  auto plusOpLookup = C.getArrayDecl()->lookupDirect(C.getIdentifier("+"));
+  assert(plusOpLookup.size() == 1 && "Ambiguous 'Array.+' operator.");
+  ValueDecl *plusOpDecl = plusOpLookup.front();
+  auto plusOpDRE = new (C) 
+      DeclRefExpr(plusOpDecl, DeclNameLoc(), /*Implicit*/ true);
+  auto plusOpExpr = 
+        new (C) DotSyntaxCallExpr(plusOpDRE, SourceLoc(), arrayTypeExpr);
+  Expr *shapeListExpr = nullptr;
+  for (auto member : nominal->getStoredProperties()) {
+    auto memberType =
+        parentDC->mapTypeIntoContext(member->getValueInterfaceType());
+    auto *memberTypeExpr = TypeExpr::createImplicit(memberType, C);
+    auto *memberShapeListExpr = new (C) 
+        MemberRefExpr(memberTypeExpr, SourceLoc(), shapeListReq,
+                      DeclNameLoc(), /*Implicit*/ true);
+    if (shapeListExpr == nullptr)  {
+      shapeListExpr = memberShapeListExpr;
+    } else {
+      // Create expression `lhsArg + rhsArg`.
+    auto *plusOpArgs =
+        TupleExpr::create(C, SourceLoc(), {shapeListExpr, memberShapeListExpr}, 
+                          {}, {}, SourceLoc(), /*HasTrailingClosure*/ false,
+                          /*Implicit*/ true);
+    shapeListExpr = new (C) BinaryExpr(plusOpExpr, plusOpArgs, 
+                                      /*Implicit*/ true);
+    }
+  }
+
+  // Return the resulting data types array.
+  auto *returnStmt = new (C) ReturnStmt(SourceLoc(), shapeListExpr);
+  auto *body = BraceStmt::create(C, SourceLoc(), {returnStmt}, SourceLoc(),
+                                 /*Implicit*/ true);
+  funcDecl->setBody(BraceStmt::create(C, SourceLoc(), {body}, SourceLoc(),
+                                      /*Implicit*/ true));
+}
+
+/// Derive a '_unknownShapeList' implementation.
+static ValueDecl *deriveTensorGroup_unknownShapeList(DerivedConformance &derived) {
+  auto nominal = derived.Nominal;
+  auto &tc = derived.TC;
+  ASTContext &C = tc.Context;
+
+  auto parentDC = derived.getConformanceContext();
+  Type shapeArrayType = BoundGenericType::get(
+    C.getArrayDecl(), Type(), 
+    {BoundGenericType::get(
+        C.getOptionalDecl(), Type(), 
+        {C.getTensorShapeDecl()->getDeclaredInterfaceType()})});
+  auto returnType = parentDC->mapTypeIntoContext(shapeArrayType);
+
+  // Create `_unknownShapeList` property declaration.
+  VarDecl *unknownShapeListDecl;
+  PatternBindingDecl *patDecl;
+  std::tie(unknownShapeListDecl, patDecl) = derived.declareDerivedProperty(
+      C.Id_unknownShapeList, returnType, returnType, /*isStatic*/ true,
+      /*isFinal*/ false);
+
+  // Add `@inlinable` to the `_unknownShapeListDecl` declaration.
+  if (nominal->getEffectiveAccess() > AccessLevel::Internal)
+    unknownShapeListDecl->getAttrs().add(
+        new (C) InlinableAttr(/*implicit*/ true));
+
+  // Create `_unknownShapeListDecl` getter.
+  auto *getterDecl = derived.declareDerivedPropertyGetter(
+      derived.TC, unknownShapeListDecl, returnType);
+  getterDecl->setBodySynthesizer(deriveBodyTensorGroup_unknownShapeList);
+  unknownShapeListDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
+                                     SourceLoc(), {getterDecl}, SourceLoc());
+  derived.addMembersToConformanceContext(
+      {getterDecl, unknownShapeListDecl, patDecl});
+
+  return unknownShapeListDecl;
 }
 
 ValueDecl *DerivedConformance::deriveTensorGroup(ValueDecl *requirement) {
   ASTContext &C = ConformanceDecl->getASTContext();
 
-  // static var _typeList: [TensorDataType]
+  // public static var _typeList: [TensorDataType]
   if (requirement->getBaseName() == C.Id_typeList) {
     return deriveTensorGroup_typeList(*this);
   }
+
+  // public static var _unknownShapeList: [TensorShape?]
+  if (requirement->getBaseName() == C.Id_unknownShapeList) {
+    return deriveTensorGroup_unknownShapeList(*this);
+  }
+
+  return nullptr;
 }
