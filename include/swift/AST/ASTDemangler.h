@@ -30,10 +30,18 @@
 
 namespace swift {
  
+class TypeDecl;
+
 namespace Demangle {
 
 Type getTypeForMangling(ASTContext &ctx,
                         llvm::StringRef mangling);
+
+TypeDecl *getTypeDeclForMangling(ASTContext &ctx,
+                                 llvm::StringRef mangling);
+
+TypeDecl *getTypeDeclForUSR(ASTContext &ctx,
+                            llvm::StringRef usr);
 
 /// An implementation of MetadataReader's BuilderType concept that
 /// just finds and builds things in the AST.
@@ -57,6 +65,8 @@ public:
   Demangle::NodeFactory &getNodeFactory() { return Factory; }
 
   Type createBuiltinType(StringRef builtinName, StringRef mangledName);
+
+  TypeDecl *createTypeDecl(NodePointer node);
 
   GenericTypeDecl *createTypeDecl(StringRef mangledName, bool &typeAlias);
   

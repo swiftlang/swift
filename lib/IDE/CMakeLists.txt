@@ -7,7 +7,6 @@ add_swift_host_library(swiftIDE STATIC
   Formatting.cpp
   Refactoring.cpp
   ModuleInterfacePrinting.cpp
-  TypeReconstruction.cpp
   REPLCodeCompletion.cpp
   SwiftSourceDocInfo.cpp
   SyntaxModel.cpp
