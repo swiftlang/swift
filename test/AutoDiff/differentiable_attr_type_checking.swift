@@ -481,16 +481,47 @@ protocol DiffReq : Differentiable {
   func f2(_ x: Float, _ y: Float) -> Float
 }
 
-// expected-error @+1 {{does not conform to protocol}}
+// expected-error @+1 {{does not conform to protocol 'DiffReq'}}
 struct ConformingWithErrors : DiffReq {
-  // expected-note @+1 {{@differentiable(wrt: (self, x))}}
+  // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: (self, x))'}}
   func f1(_ x: Float) -> Float {
     return x
   }
 
-  // expected-note @+2 {{@differentiable(wrt: (self, x, y))}}
+  // expected-note @+2 {{candidate is missing attribute '@differentiable(wrt: (self, x, y))'}}
   @differentiable(wrt: (self, x))
   func f2(_ x: Float, _ y: Float) -> Float {
     return x + y
+  }
+}
+
+protocol DifferentiableInit : Differentiable {
+  // expected-note @+2 {{protocol requires initializer 'init(x:y:)' with type '(x: Float, y: Float)'}}
+  @differentiable
+  init(x: Float, y: Float)
+
+  // expected-note @+2 {{protocol requires initializer 'init(x:y:)' with type '(x: Float, y: Int)'}}
+  @differentiable(wrt: x)
+  init(x: Float, y: Int)
+}
+// expected-error @+1 {{does not conform to protocol 'DifferentiableInit'}}
+struct DifferentiableInitStruct : DifferentiableInit {
+  var x: Float
+  var y: Float
+
+  // FIXME(TF-284): Fix unexpected diagnostic.
+  // expected-note @+2 {{candidate is missing attribute '@differentiable(wrt: (x, y))'}}
+  // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: (x))'}}
+  init(x: Float, y: Float) {
+    self.x = x
+    self.y = y
+  }
+
+  // FIXME(TF-284): Fix unexpected diagnostic.
+  // expected-note @+2 {{candidate is missing attribute '@differentiable(wrt: (x))'}}
+  // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: (x, y))'}}
+  init(x: Float, y: Int) {
+    self.x = x
+    self.y = Float(y)
   }
 }
