@@ -25,6 +25,9 @@
 #include "swift/Basic/LLVM.h"
 
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Signals.h"
 
 using namespace llvm::sys;
 
@@ -55,8 +58,8 @@ public:
 } // end namespace swift
 
 bool TaskQueue::supportsBufferingOutput() {
-  // The default implementation does not support buffering output.
-  return false;
+  // The default implementation supports buffering output.
+  return true;
 }
 
 bool TaskQueue::supportsParallelExecution() {
@@ -100,10 +103,22 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
         T->Env.empty() ? decltype(Envp)(None)
                        : decltype(Envp)(llvm::toStringRefArray(T->Env.data()));
 
+    llvm::SmallString<64> stdoutPath;
+    llvm::SmallString<64> stderrPath;
+    if (fs::createTemporaryFile("stdout", "tmp",  stdoutPath)
+        || fs::createTemporaryFile("stderr", "tmp",  stderrPath)) {
+      return true;
+    }
+
+    llvm::sys::RemoveFileOnSignal(stdoutPath);
+    llvm::sys::RemoveFileOnSignal(stderrPath);
+
+    Optional<StringRef> redirects[] = {None, {stdoutPath}, {stderrPath}};
+
     bool ExecutionFailed = false;
     ProcessInfo PI = ExecuteNoWait(T->ExecPath,
                                    llvm::toStringRefArray(Argv.data()), Envp,
-                                   /*redirects*/None, /*memoryLimit*/0,
+                                   /*redirects*/redirects, /*memoryLimit*/0,
                                    /*ErrMsg*/nullptr, &ExecutionFailed);
     if (ExecutionFailed) {
       return true;
@@ -116,12 +131,19 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
     std::string ErrMsg;
     PI = Wait(PI, 0, true, &ErrMsg);
     int ReturnCode = PI.ReturnCode;
+
+    auto stdoutBuffer = llvm::MemoryBuffer::getFile(stdoutPath);
+    auto stderrBuffer = llvm::MemoryBuffer::getFile(stderrPath);
+
+    StringRef stdoutContents = stdoutBuffer.get()->getBuffer();
+    StringRef stderrContents = stderrBuffer.get()->getBuffer();
+
     if (ReturnCode == -2) {
       // Wait() returning a return code of -2 indicates the process received
       // a signal during execution.
       if (Signalled) {
         TaskFinishedResponse Response =
-            Signalled(PI.Pid, ErrMsg, StringRef(), StringRef(), T->Context, None, TaskProcessInformation(PI.Pid));
+            Signalled(PI.Pid, ErrMsg, stdoutContents, stderrContents, T->Context, None, TaskProcessInformation(PI.Pid));
         ContinueExecution = Response != TaskFinishedResponse::StopExecution;
       } else {
         // If we don't have a Signalled callback, unconditionally stop.
@@ -132,12 +154,14 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
       // finished.
       if (Finished) {
         TaskFinishedResponse Response = Finished(PI.Pid, PI.ReturnCode,
-        StringRef(), StringRef(), TaskProcessInformation(PI.Pid), T->Context);
+        stdoutContents, stderrContents, TaskProcessInformation(PI.Pid), T->Context);
         ContinueExecution = Response != TaskFinishedResponse::StopExecution;
       } else if (PI.ReturnCode != 0) {
         ContinueExecution = false;
       }
     }
+    llvm::sys::fs::remove(stdoutPath);
+    llvm::sys::fs::remove(stderrPath);
   }
 
   return !ContinueExecution;
