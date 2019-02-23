@@ -414,10 +414,11 @@ void UnqualifiedLookupFactory::fillInLookup() {
   DeclContext *const DC = dcAndIsCascadingUse.getValue().DC;
   const bool isCascadingUse = dcAndIsCascadingUse.getValue().isCascadingUse;
 
+  recordDependencyOnTopLevelName(DC, Name, isCascadingUse);
+
   // TODO: Does the debugger client care about compound names?
   if (Name.isSimpleName() && DebugClient &&
       DebugClient->lookupOverrides(Name.getBaseName(), DC, Loc,
-  recordDependencyOnTopLevelName(DC, Name, isCascadingUse);
                                    isOriginallyTypeLookup, Results))
     return;
 
