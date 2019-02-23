@@ -2400,9 +2400,14 @@ void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
       attr->setInvalid();
     }
 
-    // While @IBOutlet can be weak, it must be optional. Let it diagnose.
-    if (!isOptional && !var->getAttrs().hasAttribute<IBOutletAttr>()) {
+    if (!isOptional) {
       attr->setInvalid();
+
+      // @IBOutlet has its own diagnostic when the property type is
+      // non-optional.
+      if (var->getAttrs().hasAttribute<IBOutletAttr>())
+        break;
+
       auto diag = diagnose(var->getStartLoc(),
                            diag::invalid_ownership_not_optional,
                            ownershipKind,
