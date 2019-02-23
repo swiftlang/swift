@@ -177,9 +177,9 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
   ClassDecl *destClass = nullptr;
   if (auto archetypeTy = toType.getAs<ArchetypeType>()) {
     if (auto superclassTy = archetypeTy->getSuperclass())
-      destClass = superclassTy->getClassOrBoundGenericClass();
+      destClass = superclassTy->getClassDecl();
   } else {
-    destClass = toType.getClassOrBoundGenericClass();
+    destClass = toType.getClassDecl();
     assert(destClass != nullptr);
   }
 

@@ -49,7 +49,7 @@ mustBridgeToSwiftValueBox(ModuleDecl *M, CanType T) {
   // getBridgedToObjC() might return a null-type for some types
   // whose bridging implementation is allowed to live elsewhere. Exclude this
   // case here.
-  if (auto N = T->getAnyNominal())
+  if (auto N = T->getNominalTypeDecl())
     if (M->getASTContext().isTypeBridgedInExternalModule(N))
       return false;
 
@@ -90,7 +90,7 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
   if (source == target)
     return DynamicCastFeasibility::WillSucceed;
 
-  auto *TargetProtocol = cast_or_null<ProtocolDecl>(target.getAnyNominal());
+  auto *TargetProtocol = cast_or_null<ProtocolDecl>(target.getNominalTypeDecl());
   if (!TargetProtocol)
     return DynamicCastFeasibility::MaySucceed;
 
@@ -99,7 +99,7 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
   if (M->conformsToProtocol(source, TargetProtocol))
     return DynamicCastFeasibility::WillSucceed;
 
-  auto *SourceNominalTy = source.getAnyNominal();
+  auto *SourceNominalTy = source.getNominalTypeDecl();
   if (!SourceNominalTy)
     return DynamicCastFeasibility::MaySucceed;
 
@@ -113,7 +113,7 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
   // superclasses cannot be extended, then it is safe to proceed.
   // No need to check this for structs, as they do not have any
   // superclasses.
-  if (auto *CD = source.getClassOrBoundGenericClass()) {
+  if (auto *CD = source.getClassDecl()) {
     if (canClassOrSuperclassesHaveExtensions(CD, isWholeModuleOpts))
       return DynamicCastFeasibility::MaySucceed;
     // Derived types may conform to the protocol.
@@ -183,11 +183,11 @@ classifyDynamicCastFromProtocol(ModuleDecl *M, CanType source, CanType target,
   // Casts from class existential into a non-class can never succeed.
   if (source->isClassExistentialType() &&
       !target.isAnyExistentialType() &&
-      !target.getClassOrBoundGenericClass() &&
+      !target.getClassDecl() &&
       !isa<ArchetypeType>(target) &&
       !mayBridgeToObjectiveC(M, target)) {
-    assert((target.getEnumOrBoundGenericEnum() ||
-            target.getStructOrBoundGenericStruct() ||
+    assert((target.getEnumDecl() ||
+            target.getStructDecl() ||
             isa<TupleType>(target) ||
             isa<SILFunctionType>(target) ||
             isa<FunctionType>(target) ||
@@ -277,7 +277,7 @@ classifyClassHierarchyCast(CanType source, CanType target) {
 }
 
 CanType swift::getNSBridgedClassOfCFClass(ModuleDecl *M, CanType type) {
-  if (auto classDecl = type->getClassOrBoundGenericClass()) {
+  if (auto classDecl = type->getClassDecl()) {
     if (classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
       if (auto bridgedAttr =
             classDecl->getAttrs().getAttribute<ObjCBridgedAttr>()) {
@@ -442,7 +442,7 @@ swift::classifyDynamicCast(ModuleDecl *M,
     // can never succeed.
     if (source->isClassExistentialType() &&
         !target.isAnyExistentialType() &&
-        !target.getClassOrBoundGenericClass())
+        !target.getClassDecl())
       return DynamicCastFeasibility::WillFail;
 
     // TODO: prove that some conversions to existential metatype will
@@ -459,19 +459,19 @@ swift::classifyDynamicCast(ModuleDecl *M,
 
     // If both metatypes are class metatypes, check if classes can be
     // cast.
-    if (source.getClassOrBoundGenericClass() &&
-        target.getClassOrBoundGenericClass())
+    if (source.getClassDecl() &&
+        target.getClassDecl())
       return classifyClassHierarchyCast(source, target);
 
     // Different structs cannot be cast to each other.
-    if (source.getStructOrBoundGenericStruct() &&
-        target.getStructOrBoundGenericStruct() &&
+    if (source.getStructDecl() &&
+        target.getStructDecl() &&
         source != target)
       return DynamicCastFeasibility::WillFail;
 
     // Different enums cannot be cast to each other.
-    if (source.getEnumOrBoundGenericEnum() &&
-        target.getEnumOrBoundGenericEnum() &&
+    if (source.getEnumDecl() &&
+        target.getEnumDecl() &&
         source != target)
       return DynamicCastFeasibility::WillFail;
 
@@ -541,8 +541,8 @@ swift::classifyDynamicCast(ModuleDecl *M,
   }
 
   // Class casts.
-  auto sourceClass = source.getClassOrBoundGenericClass();
-  auto targetClass = target.getClassOrBoundGenericClass();
+  auto sourceClass = source.getClassDecl();
+  auto targetClass = target.getClassDecl();
   if (sourceClass) {
     if (targetClass) {
       // Imported Objective-C generics don't check the generic parameters, which
@@ -600,11 +600,11 @@ swift::classifyDynamicCast(ModuleDecl *M,
     // be bridged to a SwiftValueBox. You would need an AnyObject source for
     // that.
     if (!target.isAnyExistentialType() &&
-        !target.getClassOrBoundGenericClass() &&
+        !target.getClassDecl() &&
         !isa<ArchetypeType>(target) &&
         mustBridgeToSwiftValueBox(M, target)) {
-      assert((target.getEnumOrBoundGenericEnum() ||
-              target.getStructOrBoundGenericStruct() ||
+      assert((target.getEnumDecl() ||
+              target.getStructDecl() ||
               isa<TupleType>(target) ||
               isa<SILFunctionType>(target) ||
               isa<FunctionType>(target) ||
@@ -640,11 +640,11 @@ swift::classifyDynamicCast(ModuleDecl *M,
   // We know that a cast from Int -> class foobar will fail.
   if (targetClass &&
       !source.isAnyExistentialType() &&
-      !source.getClassOrBoundGenericClass() &&
+      !source.getClassDecl() &&
       !isa<ArchetypeType>(source) &&
       mustBridgeToSwiftValueBox(M, source)) {
-      assert((source.getEnumOrBoundGenericEnum() ||
-              source.getStructOrBoundGenericStruct() ||
+      assert((source.getEnumDecl() ||
+              source.getStructDecl() ||
               isa<TupleType>(source) ||
               isa<SILFunctionType>(source) ||
               isa<FunctionType>(source) ||
@@ -1088,8 +1088,8 @@ bool swift::emitSuccessfulIndirectUnconditionalCast(
   if (src->getType() != dest->getType())
   if (src->getType().isAnyExistentialType() !=
       dest->getType().isAnyExistentialType() ||
-      !(src->getType().getClassOrBoundGenericClass() &&
-       dest->getType().getClassOrBoundGenericClass())) {
+      !(src->getType().getClassDecl() &&
+       dest->getType().getClassDecl())) {
 
     // If there is an existing cast with the same arguments,
     // indicate we cannot improve it.

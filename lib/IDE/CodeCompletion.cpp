@@ -1965,7 +1965,7 @@ public:
                    ->getDeclaredTypeInContext();
     if (BaseTy) {
       BaseTy = BaseTy->getInOutObjectType()->getMetatypeInstanceType();
-      if (auto NTD = BaseTy->getAnyNominal()) {
+      if (auto NTD = BaseTy->getNominalTypeDecl()) {
         auto *Module = NTD->getParentModule();
         auto Conformance = Module->lookupConformance(
             BaseTy, ATD->getProtocol());
@@ -3262,7 +3262,7 @@ public:
       if (op->getName().str() == "??")
         return;
       // 'T == nil'
-      if (auto NT = rhsTy->getNominalOrBoundGenericNominal())
+      if (auto NT = rhsTy->getNominalTypeDecl())
         if (NT->getName() ==
             CurrDeclContext->getASTContext().Id_OptionalNilComparisonType)
           return;
@@ -3369,7 +3369,7 @@ public:
         }
 
         // Check for conformance to the literal protocol.
-        if (auto *NTD = T->getAnyNominal()) {
+        if (auto *NTD = T->getNominalTypeDecl()) {
           SmallVector<ProtocolConformance *, 2> conformances;
           if (NTD->lookupConformance(module, P, conformances)) {
             foundConformance = true;
@@ -3522,7 +3522,7 @@ public:
       // and for some clients this approximation is good enough.
       CompletionContext->MayUseImplicitMemberExpr =
           std::any_of(ExpectedTypes.begin(), ExpectedTypes.end(), [](Type T) {
-            if (auto *NTD = T->getAnyNominal())
+            if (auto *NTD = T->getNominalTypeDecl())
               return isa<EnumDecl>(NTD);
             return false;
           });
@@ -3538,7 +3538,7 @@ public:
       bool addedKeyPath = false;
       for (auto T : ExpectedTypes) {
         T = T->lookThroughAllOptionalTypes();
-        if (auto structDecl = T->getStructOrBoundGenericStruct()) {
+        if (auto structDecl = T->getStructDecl()) {
           if (!addedSelector &&
               structDecl->getName() == Ctx.Id_Selector &&
               structDecl->getParentModule()->getName() == Ctx.Id_ObjectiveC) {
@@ -3549,7 +3549,7 @@ public:
           }
         }
 
-        if (!addedKeyPath && T->getAnyNominal() == Ctx.getStringDecl()) {
+        if (!addedKeyPath && T->getNominalTypeDecl() == Ctx.getStringDecl()) {
           addPoundKeyPath(/*needPound=*/true);
           if (addedSelector) break;
           addedKeyPath = true;
@@ -3678,7 +3678,7 @@ public:
     if (!Ty)
       return;
     ExprType = Ty;
-    auto *TheEnumDecl = dyn_cast_or_null<EnumDecl>(Ty->getAnyNominal());
+    auto *TheEnumDecl = dyn_cast_or_null<EnumDecl>(Ty->getNominalTypeDecl());
     if (!TheEnumDecl)
       return;
     for (auto Element : TheEnumDecl->getAllElements()) {
@@ -5123,7 +5123,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::GenericParams:
-    if (auto GT = ParsedTypeLoc.getType()->getAnyGeneric()) {
+    if (auto GT = ParsedTypeLoc.getType()->getGenericTypeDecl()) {
       if (auto Params = GT->getGenericParams()) {
         for (auto GP : Params->getParams()) {
           Lookup.addGenericTypeParamRef(GP,

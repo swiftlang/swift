@@ -1524,7 +1524,7 @@ bool swift::shouldExpand(SILModule &Module, SILType Ty) {
 /// TODO: Cache the "simple" flag for types to avoid repeating checks.
 bool swift::isSimpleType(SILType SILTy, SILModule& Module) {
   // Classes can never be initialized statically at compile-time.
-  if (SILTy.getClassOrBoundGenericClass()) {
+  if (SILTy.getClassDecl()) {
     return false;
   }
 

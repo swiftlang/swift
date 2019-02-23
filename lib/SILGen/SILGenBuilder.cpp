@@ -66,7 +66,7 @@ MetatypeInst *SILGenBuilder::createMetatype(SILLocation loc, SILType metatype) {
   case MetatypeRepresentation::ObjC: {
     // Walk the type recursively to look for substitutions we may need.
     theMetatype.getInstanceType().findIf([&](Type t) -> bool {
-      auto *decl = t->getAnyNominal();
+      auto *decl = t->getNominalTypeDecl();
       if (!decl)
         return false;
 

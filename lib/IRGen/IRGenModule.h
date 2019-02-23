@@ -363,7 +363,7 @@ public:
 
   void noteUseOfTypeMetadata(Type type) {
     type.visit([&](Type t) {
-      if (auto *nominal = t->getAnyNominal())
+      if (auto *nominal = t->getNominalTypeDecl())
         noteUseOfTypeMetadata(nominal);
     });
   }

@@ -749,7 +749,7 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
   auto calleeFnType = callee->getLoweredFunctionType();
   assert(
       !calleeFnType->hasSelfParam() ||
-      !calleeFnType->getSelfInstanceType()->getClassOrBoundGenericClass() &&
+      !calleeFnType->getSelfInstanceType()->getClassDecl() &&
       "class methods are not supported");
   if (calleeFnType->getGenericSignature()) {
     // Get the substitution map of the call.  This maps from the callee's space

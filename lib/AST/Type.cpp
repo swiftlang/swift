@@ -106,14 +106,8 @@ void *TypeBase::operator new(size_t bytes, const ASTContext &ctx,
   return ctx.Allocate(bytes, alignment, arena);
 }
 
-NominalTypeDecl *CanType::getAnyNominal() const {
-  return dyn_cast_or_null<NominalTypeDecl>(getAnyGeneric());
-}
-
-GenericTypeDecl *CanType::getAnyGeneric() const {
-  if (auto Ty = dyn_cast<AnyGenericType>(*this))
-    return Ty->getDecl();
-  return nullptr;
+NominalTypeDecl *CanType::getNominalTypeDecl() const {
+  return dyn_cast_or_null<NominalTypeDecl>(getGenericTypeDecl());
 }
 
 //===----------------------------------------------------------------------===//
@@ -132,10 +126,8 @@ bool TypeBase::hasReferenceSemantics() {
 
 bool TypeBase::isUninhabited() {
   // Empty enum declarations are uninhabited
-  if (auto nominalDecl = getAnyNominal())
-    if (auto enumDecl = dyn_cast<EnumDecl>(nominalDecl))
-      if (enumDecl->getAllElements().empty())
-        return true;
+  if (auto enumDecl = getEnumDecl())
+    return enumDecl->getAllElements().empty();
   return false;
 }
 
@@ -265,7 +257,7 @@ ExistentialLayout::ExistentialLayout(ProtocolCompositionType *type) {
 
   auto members = type->getMembers();
   if (!members.empty() &&
-      isa<ClassDecl>(members[0]->getAnyNominal())) {
+      isa<ClassDecl>(members[0]->getNominalTypeDecl())) {
     explicitSuperclass = members[0];
     members = members.slice(1);
   }
@@ -343,7 +335,7 @@ bool TypeBase::isSpecialized() {
   Type t = getCanonicalType();
 
   for (;;) {
-    if (!t || !t->getAnyNominal())
+    if (!t || !t->getNominalTypeDecl())
       return false;
     if (t->is<BoundGenericType>())
       return true;
@@ -537,7 +529,7 @@ bool TypeBase::isVoid() {
 
 /// Check if this type is equal to Swift.Bool.
 bool TypeBase::isBool() {
-  if (auto NTD = getAnyNominal())
+  if (auto NTD = getNominalTypeDecl())
     if (isa<StructDecl>(NTD))
       return getASTContext().getBoolDecl() == NTD;
   return false;
@@ -875,7 +867,7 @@ static void addProtocols(Type T,
     return;
   }
 
-  assert(isa<ClassDecl>(T->getAnyNominal()) && "Non-class, non-protocol "
+  assert(isa<ClassDecl>(T->getNominalTypeDecl()) && "Non-class, non-protocol "
          "member in protocol composition");
   assert((!Superclass || Superclass->isEqual(T)) &&
          "Should have diagnosed multiple superclasses by now");
@@ -1361,7 +1353,7 @@ const llvm::fltSemantics &BuiltinFloatType::getAPFloatSemantics() const {
 }
 
 bool TypeBase::mayHaveSuperclass() {
-  if (getClassOrBoundGenericClass())
+  if (getClassDecl())
     return true;
 
   if (auto archetype = getAs<ArchetypeType>())
@@ -1375,7 +1367,7 @@ bool TypeBase::satisfiesClassConstraint() {
 }
 
 Type TypeBase::getSuperclass(bool useArchetypes) {
-  auto *nominalDecl = getAnyNominal();
+  auto *nominalDecl = getNominalTypeDecl();
   auto *classDecl = dyn_cast_or_null<ClassDecl>(nominalDecl);
 
   // Handle some special non-class types here.
@@ -1420,11 +1412,11 @@ bool TypeBase::isExactSuperclassOf(Type ty) {
   // the potential subtype must be a class, superclass-bounded archetype,
   // or subclass existential involving an imported class and @objc
   // protocol.
-  if (!getClassOrBoundGenericClass() ||
+  if (!getClassDecl() ||
       !(ty->mayHaveSuperclass() ||
         (ty->isObjCExistentialType() &&
          ty->getSuperclass() &&
-         ty->getSuperclass()->getAnyNominal()->hasClangNode())))
+         ty->getSuperclass()->getNominalTypeDecl()->hasClangNode())))
     return false;
 
   do {
@@ -1668,7 +1660,7 @@ bool TypeBase::isBindableToSuperclassOf(Type ty) {
   do {
     if (isBindableTo(ty))
       return true;
-    if (ty->getAnyNominal() && ty->getAnyNominal()->isInvalid())
+    if (ty->getNominalTypeDecl() && ty->getNominalTypeDecl()->isInvalid())
       return false;
   } while ((ty = ty->getSuperclass()));
   return false;
@@ -1735,7 +1727,7 @@ bool TypeBase::isBridgeableObjectType() {
 
 bool TypeBase::isPotentiallyBridgedValueType() {
   // struct and enum types
-  if (auto nominal = getAnyNominal()) {
+  if (auto nominal = getNominalTypeDecl()) {
     if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))
       return true;
   }
@@ -1782,7 +1774,7 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
     type = dynSelf->getSelfType();
 
   // @objc classes.
-  if (auto classDecl = type->getClassOrBoundGenericClass()) {
+  if (auto classDecl = type->getClassDecl()) {
     if (classDecl->isObjC())
       return ForeignRepresentableKind::Object;
   }
@@ -1929,7 +1921,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
   if (type->is<BuiltinType>())
     return { ForeignRepresentableKind::Trivial, nullptr };
 
-  auto nominal = type->getAnyNominal();
+  auto nominal = type->getNominalTypeDecl();
   if (!nominal) return failure();
 
   ASTContext &ctx = nominal->getASTContext();
@@ -2054,7 +2046,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
         // FIXME: We allow trivially-representable cases that also
         // conform to _ObjectiveCBridgeable. This may not be desirable
         // and should be re-evaluated.
-        if (auto nominal = typeArg->getAnyNominal()) {
+        if (auto nominal = typeArg->getNominalTypeDecl()) {
           if (auto objcBridgeable
                 = ctx.getProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
             SmallVector<ProtocolConformance *, 1> conformances;
@@ -2133,8 +2125,8 @@ static bool isABICompatibleEvenAddingOptional(CanType t1, CanType t2) {
   // Class metatypes are ABI-compatible even under optionality change.
   if (auto metaTy1 = dyn_cast<MetatypeType>(t1)) {
     if (auto metaTy2 = dyn_cast<MetatypeType>(t2)) {
-      if (metaTy1.getInstanceType().getClassOrBoundGenericClass() &&
-          metaTy2.getInstanceType().getClassOrBoundGenericClass()) {
+      if (metaTy1.getInstanceType().getClassDecl() &&
+          metaTy2.getInstanceType().getClassDecl()) {
         return true;
       }
     }
@@ -2433,7 +2425,7 @@ CanNestedArchetypeType NestedArchetypeType::getNew(
                                    SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                                    Type Superclass,
                                    LayoutConstraint Layout) {
-  assert(!Superclass || Superclass->getClassOrBoundGenericClass());
+  assert(!Superclass || Superclass->getClassDecl());
 
   // Gather the set of protocol declarations to which this archetype conforms.
   ProtocolType::canonicalizeProtocols(ConformsTo);
@@ -2455,7 +2447,7 @@ PrimaryArchetypeType::getNew(const ASTContext &Ctx,
                       SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                       Type Superclass,
                       LayoutConstraint Layout) {
-  assert(!Superclass || Superclass->getClassOrBoundGenericClass());
+  assert(!Superclass || Superclass->getClassDecl());
   assert(GenericEnv && "missing generic environment for archetype");
 
   // Gather the set of protocol declarations to which this archetype conforms.
@@ -3097,7 +3089,7 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
   while (t) {
     // If we have a class-constrained archetype or class-constrained
     // existential, get the underlying superclass constraint.
-    auto *nominalDecl = t->getAnyNominal();
+    auto *nominalDecl = t->getNominalTypeDecl();
     assert(nominalDecl && "expected nominal type here");
     assert(isa<ClassDecl>(nominalDecl) && "expected a class here");
 
@@ -3109,7 +3101,7 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
 
 #ifndef NDEBUG
   auto *currentClass = getConcreteTypeForSuperclassTraversing(this)
-      ->getClassOrBoundGenericClass();
+      ->getClassDecl();
   while (currentClass && currentClass != baseClass)
     currentClass = currentClass->getSuperclassDecl();
   assert(currentClass == baseClass &&
@@ -3149,7 +3141,7 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
   if (auto *ownerClass = dyn_cast<ClassDecl>(ownerNominal))
     baseTy = baseTy->getSuperclassForDecl(ownerClass);
 
-  assert(ownerNominal == baseTy->getAnyNominal());
+  assert(ownerNominal == baseTy->getNominalTypeDecl());
 
   // Gather all of the substitutions for all levels of generic arguments.
   auto *genericSig = dc->getGenericSignatureOfContext();
@@ -3933,7 +3925,7 @@ bool Type::isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic) const {
   if (Type Unwrapped = Ty->getOptionalObjectType())
     return Unwrapped.isPrivateStdlibType(treatNonBuiltinProtocolsAsPublic);
 
-  if (auto TyD = Ty->getAnyNominal())
+  if (auto TyD = Ty->getNominalTypeDecl())
     if (TyD->isPrivateStdlibDecl(treatNonBuiltinProtocolsAsPublic))
       return true;
 

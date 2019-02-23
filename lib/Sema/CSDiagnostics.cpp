@@ -143,7 +143,7 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     auto type = cs.getContextualType();
     assert(type);
     auto *alias = dyn_cast<TypeAliasType>(type.getPointer());
-    return alias ? alias->getDecl() : type->getAnyGeneric();
+    return alias ? alias->getDecl() : type->getGenericTypeDecl();
   }
 
   if (auto *AE = dyn_cast<CallExpr>(anchor)) {
@@ -184,7 +184,7 @@ ValueDecl *RequirementFailure::getDeclRef() const {
   if (auto *NA = dyn_cast<TypeAliasType>(ownerType.getPointer()))
     return NA->getDecl();
 
-  return ownerType->getAnyGeneric();
+  return ownerType->getGenericTypeDecl();
 }
 
 GenericSignature *RequirementFailure::getSignature(ConstraintLocator *locator) {
@@ -1465,7 +1465,7 @@ DeclName MissingMemberFailure::findCorrectEnumCaseName(
     Type Ty, TypoCorrectionResults &corrections, DeclName memberName) {
   if (memberName.isSpecial() || !memberName.isSimpleName())
     return DeclName();
-  if (!Ty->getEnumOrBoundGenericEnum())
+  if (!Ty->getEnumDecl())
     return DeclName();
   auto candidate =
       corrections.getUniqueCandidateMatching([&](ValueDecl *candidate) {
@@ -1566,7 +1566,7 @@ bool MissingMemberFailure::diagnoseAsError() {
     return true;
   } else {
     // Check for a few common cases that can cause missing members.
-    auto *ED = baseType->getEnumOrBoundGenericEnum();
+    auto *ED = baseType->getEnumDecl();
     if (ED && Name.isSimpleName("rawValue")) {
       auto loc = ED->getNameLoc();
       if (loc.isValid()) {
@@ -1619,7 +1619,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   if (!resolvedOverloadChoice.isDecl()) {
     if (auto MT = resolvedOverloadChoice.getBaseType()->getAs<MetatypeType>()) {
       if (auto VD = dyn_cast<ValueDecl>(
-              MT->getMetatypeInstanceType()->getAnyNominal()->getAsDecl())) {
+              MT->getMetatypeInstanceType()->getNominalTypeDecl()->getAsDecl())) {
         decl = VD;
       }
     } else {
@@ -1688,7 +1688,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
       
       assert(TypeDC->isTypeContext() && "Expected type decl context!");
       
-      if (TypeDC->getSelfNominalTypeDecl() == instanceTy->getAnyNominal()) {
+      if (TypeDC->getSelfNominalTypeDecl() == instanceTy->getNominalTypeDecl()) {
         if (propertyInitializer) {
           emitDiagnostic(loc, diag::instance_member_in_initializer, Name);
           return true;

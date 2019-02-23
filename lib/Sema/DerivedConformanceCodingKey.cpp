@@ -343,7 +343,7 @@ static bool canSynthesizeCodingKey(DerivedConformance &derived) {
     rawType = parentDC->mapTypeIntoContext(rawType);
 
     auto &C = derived.TC.Context;
-    auto *nominal = rawType->getCanonicalType()->getAnyNominal();
+    auto *nominal = rawType->getCanonicalType()->getNominalTypeDecl();
     if (nominal != C.getStringDecl() && nominal != C.getIntDecl())
       return false;
   }

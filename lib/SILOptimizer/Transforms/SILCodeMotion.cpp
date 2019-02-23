@@ -315,7 +315,7 @@ void BBEnumTagDataflowState::handlePredCondSelectEnum(CondBranchInst *CondBr) {
 
   // If the enum only has 2 values and its tag isn't the true branch, then we
   // know the true branch must be the other tag.
-  if (EnumDecl *E = Operand->getType().getEnumOrBoundGenericEnum()) {
+  if (EnumDecl *E = Operand->getType().getEnumDecl()) {
     // We can't do this optimization on non-exhaustive enums.
     const SILFunction *Fn = CondBr->getFunction();
     bool IsExhaustive =
@@ -1582,7 +1582,7 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
   // If the enum only has 2 values and its tag isn't the true branch, then we
   // know the true branch must be the other tag.
   EnumElementDecl *Elts[2] = {TrueElement.get(), nullptr};
-  EnumDecl *E = SEI->getEnumOperand()->getType().getEnumOrBoundGenericEnum();
+  EnumDecl *E = SEI->getEnumOperand()->getType().getEnumDecl();
   if (!E)
     return false;
 

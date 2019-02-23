@@ -1390,7 +1390,7 @@ static T *dynCastIgnoringCompatibilityAlias(Decl *D) {
   if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(D)) {
     if (!alias->isCompatibilityAlias())
       return nullptr;
-    D = alias->getDeclaredInterfaceType()->getAnyNominal();
+    D = alias->getDeclaredInterfaceType()->getNominalTypeDecl();
   }
   return dyn_cast_or_null<T>(D);
 }
@@ -1403,7 +1403,7 @@ static T *castIgnoringCompatibilityAlias(Decl *D) {
   if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(D)) {
     assert(alias->isCompatibilityAlias() &&
            "non-compatible typealias found where nominal was expected");
-    D = alias->getDeclaredInterfaceType()->getAnyNominal();
+    D = alias->getDeclaredInterfaceType()->getNominalTypeDecl();
   }
   return cast_or_null<T>(D);
 }

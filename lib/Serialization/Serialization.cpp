@@ -1642,7 +1642,7 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
         Out, ScratchRecord,
         abbrCode,
         addDeclRef(normal->getProtocol()),
-        addDeclRef(normal->getType()->getAnyNominal()),
+        addDeclRef(normal->getType()->getNominalTypeDecl()),
         addModuleRef(normal->getDeclContext()->getParentModule()));
     }
     break;
@@ -2627,7 +2627,7 @@ static void collectDependenciesFromType(llvm::SmallSetVector<Type, 4> &seen,
                                         Type ty,
                                         const ModuleDecl *excluding) {
   ty.visit([&](Type next) {
-    auto *nominal = next->getAnyNominal();
+    auto *nominal = next->getNominalTypeDecl();
     if (!nominal)
       return;
     // FIXME: Types in the same module are still important for enums. It's
@@ -2767,7 +2767,7 @@ void Serializer::writeDecl(const Decl *D) {
 
     // Make sure the base type has registered itself as a provider of generic
     // parameters.
-    auto baseNominal = baseTy->getAnyNominal();
+    auto baseNominal = baseTy->getNominalTypeDecl();
     (void)addDeclRef(baseNominal);
 
     auto conformances = extension->getLocalConformances(

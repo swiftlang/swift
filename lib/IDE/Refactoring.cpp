@@ -1787,7 +1787,7 @@ findConcatenatedExpressions(ResolvedRangeInfo Info, ASTContext &Ctx) {
       // FIXME: we should have ErrorType instead of null.
       if (E->getType().isNull())
         return true;
-      auto ExprType = E->getType()->getNominalOrBoundGenericNominal();
+      auto ExprType = E->getType()->getNominalTypeDecl();
       //Only binary concatenation operators should exist in expression
       if (E->getKind() == ExprKind::Binary) {
         auto *BE = dyn_cast<BinaryExpr>(E);
@@ -2401,7 +2401,7 @@ collectAvailableRefactoringsAtCursor(SourceFile *SF, unsigned Line,
 static EnumDecl* getEnumDeclFromSwitchStmt(SwitchStmt *SwitchS) {
   if (auto SubjectTy = SwitchS->getSubjectExpr()->getType()) {
     // FIXME: Support more complex subject like '(Enum1, Enum2)'.
-    return dyn_cast_or_null<EnumDecl>(SubjectTy->getAnyNominal());
+    return dyn_cast_or_null<EnumDecl>(SubjectTy->getNominalTypeDecl());
   }
   return nullptr;
 }

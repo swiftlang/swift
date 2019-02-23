@@ -79,7 +79,7 @@ static bool isPublicOrUsableFromInline(Type ty) {
     // to be able to print it by desugaring.
     if (auto *aliasTy = dyn_cast<TypeAliasType>(typePart.getPointer()))
       return !isPublicOrUsableFromInline(aliasTy->getDecl());
-    if (auto *nominal = typePart->getAnyNominal())
+    if (auto *nominal = typePart->getNominalTypeDecl())
       return !isPublicOrUsableFromInline(nominal);
     return false;
   });
@@ -294,7 +294,7 @@ void ASTPrinter::printTypeRef(Type T, const TypeDecl *RefTo, Identifier Name) {
   if (isa<GenericTypeParamDecl>(RefTo)) {
     Context = PrintNameContext::GenericParameter;
   } else if (T && T->is<DynamicSelfType>()) {
-    assert(T->castTo<DynamicSelfType>()->getSelfType()->getAnyNominal() &&
+    assert(T->castTo<DynamicSelfType>()->getSelfType()->getNominalTypeDecl() &&
            "protocol Self handled as GenericTypeParamDecl");
     Context = PrintNameContext::ClassDynamicSelf;
   }
@@ -2004,7 +2004,7 @@ static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
   Options.FullyQualifiedTypesIfAmbiguous = false;
 
   // Strip off generic arguments, if any.
-  auto Ty = ExtendedType->getAnyNominal()->getDeclaredType();
+  auto Ty = ExtendedType->getNominalTypeDecl()->getDeclaredType();
 
   Ty->print(Printer, Options);
 }
@@ -2035,7 +2035,7 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
     recordDeclLoc(decl, [&]{
       // We cannot extend sugared types.
       Type extendedType = decl->getExtendedType();
-      if (!extendedType || !extendedType->getAnyNominal()) {
+      if (!extendedType || !extendedType->getNominalTypeDecl()) {
         // Fallback to TypeRepr.
         printTypeLoc(decl->getExtendedTypeLoc());
         return;
@@ -2863,7 +2863,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
     // printing onto a class.
     bool isClassContext;
     if (CurrentType) {
-      isClassContext = CurrentType->getClassOrBoundGenericClass() != nullptr;
+      isClassContext = CurrentType->getClassDecl() != nullptr;
     } else {
       const DeclContext *dc = decl->getDeclContext();
       isClassContext = dc->getSelfClassDecl() != nullptr;
@@ -3346,7 +3346,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     if (!Options.FullyQualifiedTypesIfAmbiguous)
       return false;
 
-    Decl *D = T->getAnyGeneric();
+    Decl *D = T->getGenericTypeDecl();
 
     // If we cannot find the declaration, be extra careful and print
     // the type qualified.
@@ -3648,7 +3648,7 @@ public:
     // in cursor info.
     auto staticSelfT = T->getSelfType();
 
-    if (auto *NTD = staticSelfT->getAnyNominal()) {
+    if (auto *NTD = staticSelfT->getNominalTypeDecl()) {
       if (isa<ClassDecl>(NTD)) {
         auto Name = T->getASTContext().Id_Self;
         Printer.printTypeRef(T, NTD, Name);
@@ -4491,7 +4491,7 @@ swift::getInheritedForPrinting(const Decl *decl,
       bool foundUnprintable = ty.findIf([shouldPrint](Type subTy) {
         if (auto aliasTy = dyn_cast<TypeAliasType>(subTy.getPointer()))
           return !shouldPrint(aliasTy->getDecl());
-        if (auto NTD = subTy->getAnyNominal())
+        if (auto NTD = subTy->getNominalTypeDecl())
           return !shouldPrint(NTD);
         return false;
       });

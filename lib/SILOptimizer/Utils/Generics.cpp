@@ -74,7 +74,7 @@ static std::pair<unsigned, unsigned> getTypeDepthAndWidth(Type t) {
   unsigned Depth = 0;
   unsigned Width = 0;
   if (auto *BGT = t->getAs<BoundGenericType>()) {
-    auto *NTD = BGT->getNominalOrBoundGenericNominal();
+    auto *NTD = BGT->getNominalTypeDecl();
     if (NTD) {
       auto StoredProperties = NTD->getStoredProperties();
       Width += std::distance(StoredProperties.begin(), StoredProperties.end());

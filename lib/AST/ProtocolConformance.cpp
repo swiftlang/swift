@@ -396,7 +396,7 @@ RootProtocolConformance::isWeakImported(ModuleDecl *fromModule,
     return true;
 
   // If the conforming type is weak imported, so are any of its conformances.
-  if (auto *nominal = getType()->getAnyNominal())
+  if (auto *nominal = getType()->getNominalTypeDecl())
     if (nominal->isWeakImported(fromModule, fromContext))
       return true;
 
@@ -424,7 +424,7 @@ bool NormalProtocolConformance::isRetroactive() const {
 
   // If the conformance occurs in the same module as the conforming type
   // definition, this is not a retroactive conformance.
-  if (auto nominal = getType()->getAnyNominal()) {
+  if (auto nominal = getType()->getNominalTypeDecl()) {
     auto nominalModule = nominal->getParentModule();
 
     // Consider the overlay module to be the "home" of a nominal type
@@ -455,7 +455,7 @@ bool NormalProtocolConformance::isResilient() const {
   // FIXME: Looking at the type is not the right long-term solution. We need an
   // explicit mechanism for declaring conformances as 'fragile', or even
   // individual witnesses.
-  if (!getType()->getAnyNominal()->isResilient())
+  if (!getType()->getNominalTypeDecl()->isResilient())
     return false;
 
   switch (getDeclContext()->getParentModule()->getResilienceStrategy()) {
@@ -1021,7 +1021,7 @@ void SpecializedProtocolConformance::computeConditionalRequirements() const {
     // Substitute the conditional requirements so that they're phrased in
     // terms of the specialized types, not the conformance-declaring decl's
     // types.
-    auto nominal = GenericConformance->getType()->getAnyNominal();
+    auto nominal = GenericConformance->getType()->getNominalTypeDecl();
     auto module = nominal->getModuleContext();
     auto subMap = getType()->getContextSubstitutionMap(module, nominal);
 

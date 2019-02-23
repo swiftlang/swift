@@ -511,7 +511,7 @@ void SILBuilder::emitDestructureValueOperation(
 
   // If we do not have a tuple or a struct, add to our results list and return.
   SILType type = v->getType();
-  if (!(type.is<TupleType>() || type.getStructOrBoundGenericStruct())) {
+  if (!(type.is<TupleType>() || type.getStructDecl())) {
     results.emplace_back(v);
     return;
   }
@@ -540,7 +540,7 @@ void SILBuilder::emitDestructureAddressOperation(
 
   // If we do not have a tuple or a struct, add to our results list.
   SILType type = v->getType();
-  if (!(type.is<TupleType>() || type.getStructOrBoundGenericStruct())) {
+  if (!(type.is<TupleType>() || type.getStructDecl())) {
     results.emplace_back(v);
     return;
   }

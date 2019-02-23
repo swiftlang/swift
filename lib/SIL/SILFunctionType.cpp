@@ -105,7 +105,7 @@ SILFunctionType::getWitnessMethodClass() const {
     assert(paramTy->getDepth() == 0 && paramTy->getIndex() == 0);
     auto superclass = genericSig->getSuperclassBound(paramTy);
     if (superclass)
-      return superclass->getClassOrBoundGenericClass();
+      return superclass->getClassDecl();
   }
 
   return nullptr;
@@ -397,7 +397,7 @@ static bool isClangTypeMoreIndirectThanSubstType(SILModule &M,
       return isClangTypeMoreIndirectThanSubstType(M,
                     clangTy->getPointeeType().getTypePtr(), CanType(eltTy));
 
-    if (substTy->getAnyNominal() ==
+    if (substTy->getNominalTypeDecl() ==
           M.getASTContext().getOpaquePointerDecl())
       // TODO: We could conceivably have an indirect opaque ** imported
       // as COpaquePointer. That shouldn't ever happen today, though,
@@ -407,8 +407,8 @@ static bool isClangTypeMoreIndirectThanSubstType(SILModule &M,
 
     if (clangTy->getPointeeType()->getAs<clang::RecordType>()) {
       // CF type as foreign class
-      if (substTy->getClassOrBoundGenericClass() &&
-          substTy->getClassOrBoundGenericClass()->getForeignClassKind() ==
+      if (substTy->getClassDecl() &&
+          substTy->getClassDecl()->getForeignClassKind() ==
             ClassDecl::ForeignKind::CFType) {
         return false;
       }
@@ -1449,7 +1449,7 @@ public:
         return ResultConvention::UnownedInnerPointer;
 
       auto type = tl.getLoweredType();
-      if (type.unwrapOptionalType().getStructOrBoundGenericStruct()
+      if (type.unwrapOptionalType().getStructDecl()
           == type.getASTContext().getUnmanagedDecl())
         return ResultConvention::UnownedInnerPointer;
       return ResultConvention::Unowned;
@@ -1950,7 +1950,7 @@ static bool isClassOrProtocolMethod(ValueDecl *vd) {
   Type contextType = vd->getDeclContext()->getDeclaredInterfaceType();
   if (!contextType)
     return false;
-  return contextType->getClassOrBoundGenericClass()
+  return contextType->getClassDecl()
     || contextType->isClassExistentialType();
 }
 

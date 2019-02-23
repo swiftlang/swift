@@ -80,7 +80,7 @@ static unsigned getElementCountRec(SILModule &Module, SILType T,
   // for each of the tuple members.
   if (IsSelfOfNonDelegatingInitializer) {
     // Protocols never have a stored properties.
-    if (auto *NTD = T.getNominalOrBoundGenericNominal()) {
+    if (auto *NTD = T.getNominalTypeDecl()) {
       unsigned NumElements = 0;
       for (auto *VD : NTD->getStoredProperties())
         NumElements +=
@@ -173,7 +173,7 @@ static SILType getElementTypeRec(SILModule &Module, SILType T, unsigned EltNo,
   // Stored properties with tuple types are tracked with independent lifetimes
   // for each of the tuple members.
   if (IsSelfOfNonDelegatingInitializer) {
-    if (auto *NTD = T.getNominalOrBoundGenericNominal()) {
+    if (auto *NTD = T.getNominalTypeDecl()) {
       bool HasStoredProperties = false;
       for (auto *VD : NTD->getStoredProperties()) {
         HasStoredProperties = true;
@@ -242,7 +242,7 @@ SILValue DIMemoryObjectInfo::emitElementAddress(
     // classes.  Stored properties with tuple types are tracked with independent
     // lifetimes for each of the tuple members.
     if (IsSelf) {
-      if (auto *NTD = PointeeType.getNominalOrBoundGenericNominal()) {
+      if (auto *NTD = PointeeType.getNominalTypeDecl()) {
         bool HasStoredProperties = false;
         for (auto *VD : NTD->getStoredProperties()) {
           if (!HasStoredProperties) {
@@ -347,7 +347,7 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
 
   // If this is indexing into a field of 'self', look it up.
   if (isNonDelegatingInit() && !isDerivedClassSelfOnly()) {
-    if (auto *NTD = MemorySILType.getNominalOrBoundGenericNominal()) {
+    if (auto *NTD = MemorySILType.getNominalTypeDecl()) {
       bool HasStoredProperty = false;
       for (auto *VD : NTD->getStoredProperties()) {
         HasStoredProperty = true;
@@ -390,7 +390,7 @@ bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
 
   auto &Module = MemoryInst->getModule();
 
-  auto *NTD = MemorySILType.getNominalOrBoundGenericNominal();
+  auto *NTD = MemorySILType.getNominalTypeDecl();
   if (!NTD) {
     // Otherwise, we miscounted elements?
     assert(Element == 0 && "Element count problem");
@@ -534,7 +534,7 @@ public:
 
     // If this is a delegating initializer, collect uses specially.
     if (IsSelfOfNonDelegatingInitializer &&
-        TheMemory.getType()->getClassOrBoundGenericClass() != nullptr) {
+        TheMemory.getType()->getClassDecl() != nullptr) {
       assert(!TheMemory.isDerivedClassSelfOnly() &&
              "Should have been handled outside of here");
       // If this is a class pointer, we need to look through ref_element_addrs.
@@ -1089,7 +1089,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 /// constructor.  The memory object has class type.
 void ElementUseCollector::collectClassSelfUses() {
   assert(IsSelfOfNonDelegatingInitializer &&
-         TheMemory.getType()->getClassOrBoundGenericClass() != nullptr);
+         TheMemory.getType()->getClassDecl() != nullptr);
 
   // For efficiency of lookup below, compute a mapping of the local ivars in the
   // class to their element number.
@@ -1097,7 +1097,7 @@ void ElementUseCollector::collectClassSelfUses() {
 
   {
     SILType T = TheMemory.MemorySILType;
-    auto *NTD = T.getNominalOrBoundGenericNominal();
+    auto *NTD = T.getNominalTypeDecl();
     unsigned NumElements = 0;
     for (auto *VD : NTD->getStoredProperties()) {
       EltNumbering[VD] = NumElements;
@@ -1811,7 +1811,7 @@ static bool shouldPerformClassInitSelf(const DIMemoryObjectInfo &MemoryInfo) {
     return true;
 
   return MemoryInfo.isNonDelegatingInit() &&
-         MemoryInfo.getType()->getClassOrBoundGenericClass() != nullptr &&
+         MemoryInfo.getType()->getClassDecl() != nullptr &&
          MemoryInfo.isDerivedClassSelfOnly();
 }
 

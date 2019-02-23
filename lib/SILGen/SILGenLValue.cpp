@@ -2983,7 +2983,7 @@ void LValue::addMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
       if (BaseFormalType->mayHaveSuperclass()) {
         LV.add<RefElementComponent>(Storage, Options, varStorageType, typeData);
       } else {
-        assert(BaseFormalType->getStructOrBoundGenericStruct());
+        assert(BaseFormalType->getStructDecl());
         LV.add<StructElementComponent>(Storage, varStorageType, typeData);
       }
 
@@ -3059,7 +3059,7 @@ LValue SILGenLValue::visitKeyPathApplicationExpr(KeyPathApplicationExpr *e,
                                                  LValueOptions options) {
   auto keyPathExpr = e->getKeyPath();
   auto keyPathKind =
-    *keyPathExpr->getType()->getAnyNominal()->getKeyPathTypeKind();
+    *keyPathExpr->getType()->getNominalTypeDecl()->getKeyPathTypeKind();
 
   // Determine the base access strategy based on the strategy of this access.
   SGFAccessKind subAccess;
@@ -3946,8 +3946,8 @@ RValue SILGenFunction::emitRValueForStorageLoad(
 
   // rvalue MemberRefExprs are produced in two cases: when accessing a 'let'
   // decl member, and when the base is a (non-lvalue) struct.
-  assert(baseFormalType->getAnyNominal() &&
-         base.getType().getASTType()->getAnyNominal() &&
+  assert(baseFormalType->getNominalTypeDecl() &&
+         base.getType().getASTType()->getNominalTypeDecl() &&
          "The base of an rvalue MemberRefExpr should be an rvalue value");
 
   // If the accessed field is stored, emit a StructExtract on the base.

@@ -242,7 +242,7 @@ static void tryDiagnoseUnnecessaryCastOverOptionSet(ASTContext &Ctx,
                                                     Expr *E,
                                                     Type ResultType,
                                                     ModuleDecl *module) {
-  auto *NTD = ResultType->getAnyNominal();
+  auto *NTD = ResultType->getNominalTypeDecl();
   if (!NTD)
     return;
   auto optionSetType = dyn_cast_or_null<ProtocolDecl>(Ctx.getOptionSetDecl());
@@ -762,7 +762,7 @@ public:
                        TC.Context.Id_next, {}, diag::iterator_protocol_broken);
     if (!iteratorNext) return nullptr;
     // Check that next() produces an Optional<T> value.
-    if (iteratorNext->getType()->getAnyNominal()
+    if (iteratorNext->getType()->getNominalTypeDecl()
           != TC.Context.getOptionalDecl()) {
       TC.diagnose(S->getForLoc(), diag::iterator_protocol_broken);
       return nullptr;
@@ -1719,7 +1719,7 @@ static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor,
   if (!ctor->isDesignatedInit()) {
     if (!implicitlyGenerated) {
       auto selfTy = fromCtor->getDeclContext()->getSelfInterfaceType();
-      if (auto classTy = selfTy->getClassOrBoundGenericClass()) {
+      if (auto classTy = selfTy->getClassDecl()) {
         assert(classTy->getSuperclass());
         tc.diagnose(apply->getArg()->getLoc(), diag::chain_convenience_init,
                     classTy->getSuperclass());

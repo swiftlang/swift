@@ -423,10 +423,10 @@ CanType TypeJoin::visitProtocolType(CanType second) {
     return TheAnyType;
 
   auto *firstDecl =
-    cast<ProtocolDecl>(First->getNominalOrBoundGenericNominal());
+    cast<ProtocolDecl>(First->getNominalTypeDecl());
 
   auto *secondDecl =
-    cast<ProtocolDecl>(second->getNominalOrBoundGenericNominal());
+    cast<ProtocolDecl>(second->getNominalTypeDecl());
 
   if (firstDecl->getInheritedProtocols().empty() &&
       secondDecl->getInheritedProtocols().empty())

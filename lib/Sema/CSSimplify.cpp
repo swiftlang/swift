@@ -1296,11 +1296,11 @@ ConstraintSystem::matchSuperclassTypes(Type type1, Type type2,
                                        ConstraintLocatorBuilder locator) {
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
-  auto classDecl2 = type2->getClassOrBoundGenericClass();
+  auto classDecl2 = type2->getClassDecl();
   for (auto super1 = type1->getSuperclass();
        super1;
        super1 = super1->getSuperclass()) {
-    if (super1->getClassOrBoundGenericClass() != classDecl2)
+    if (super1->getClassDecl() != classDecl2)
       continue;
 
     return matchTypes(super1, type2, ConstraintKind::Bind,
@@ -1990,7 +1990,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       auto instanceType2 = meta2->getInstanceType();
       if (isa<MetatypeType>(meta1) &&
           !(instanceType1->mayHaveSuperclass() &&
-            instanceType2->getClassOrBoundGenericClass())) {
+            instanceType2->getClassDecl())) {
         subKind = ConstraintKind::Bind;
       }
 
@@ -2061,15 +2061,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   if (kind >= ConstraintKind::Subtype) {
     // Subclass-to-superclass conversion.
     if (type1->mayHaveSuperclass() &&
-        type2->getClassOrBoundGenericClass() &&
-        type1->getClassOrBoundGenericClass()
-          != type2->getClassOrBoundGenericClass()) {
+        type2->getClassDecl() &&
+        type1->getClassDecl()
+          != type2->getClassDecl()) {
       conversionsOrFixes.push_back(ConversionRestrictionKind::Superclass);
     }
 
     // Existential-to-superclass conversion.
     if (type1->isClassExistentialType() &&
-        type2->getClassOrBoundGenericClass()) {
+        type2->getClassDecl()) {
       conversionsOrFixes.push_back(ConversionRestrictionKind::Superclass);
     }
 
@@ -2161,7 +2161,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // Single @objc protocol value metatypes can be converted to the ObjC
         // Protocol class type.
         auto isProtocolClassType = [&](Type t) -> bool {
-          if (auto classDecl = t->getClassOrBoundGenericClass())
+          if (auto classDecl = t->getClassDecl())
             if (classDecl->getName() == getASTContext().Id_Protocol
                 && classDecl->getModuleContext()->getName()
                     == getASTContext().Id_ObjectiveC)
@@ -2440,7 +2440,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     // a class, force a downcast.
     // FIXME: Also allow types bridged through Objective-C classes.
     if (objectType1->isAnyObject() &&
-        type2->getClassOrBoundGenericClass()) {
+        type2->getClassDecl()) {
       conversionsOrFixes.push_back(
           ForceDowncast::create(*this, type2, getConstraintLocator(locator)));
     }
@@ -2963,8 +2963,8 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     // If casting among classes, and there are open
     // type variables remaining, introduce a subtype constraint to help resolve
     // them.
-    if (fromType->getClassOrBoundGenericClass()
-        && toType->getClassOrBoundGenericClass()
+    if (fromType->getClassDecl()
+        && toType->getClassDecl()
         && (fromType->hasTypeVariable() || toType->hasTypeVariable())) {
       addConstraint(ConstraintKind::Subtype, toType, fromType,
                     getConstraintLocator(locator));
@@ -3188,7 +3188,7 @@ static bool hasDynamicMemberLookupAttribute(Type type,
 
     // Otherwise, this must be a nominal type.
     // Dynamic member lookup doesn't work for tuples, etc.
-    auto nominal = canType->getAnyNominal();
+    auto nominal = canType->getNominalTypeDecl();
     if (!nominal) return false;
 
     // If this type conforms to a protocol with the attribute, then return true.
@@ -3370,7 +3370,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   // If the instance type is String bridged to NSString, compute
   // the type we'll look in for bridging.
   Type bridgedType;
-  if (baseObjTy->getAnyNominal() == TC.Context.getStringDecl()) {
+  if (baseObjTy->getNominalTypeDecl() == TC.Context.getStringDecl()) {
     if (Type classType = TC.Context.getBridgedToObjC(DC, instanceTy)) {
       bridgedType = classType;
     }
@@ -3901,7 +3901,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     {
       if (auto *metatype = baseTy->getAs<MetatypeType>()) {
         auto instanceTy = metatype->getInstanceType();
-        if (auto *NTD = instanceTy->getAnyNominal()) {
+        if (auto *NTD = instanceTy->getNominalTypeDecl()) {
           if (NTD->getName() == getASTContext().Id_OptionalNilComparisonType)
             return SolutionKind::Error;
         }
@@ -4815,7 +4815,7 @@ lookupDynamicCallableMethods(Type type, ConstraintSystem &CS,
                              const ConstraintLocatorBuilder &locator,
                              Identifier argumentName, bool hasKeywordArgs) {
   auto &ctx = CS.getASTContext();
-  auto decl = type->getAnyNominal();
+  auto decl = type->getNominalTypeDecl();
   auto methodName = DeclName(ctx, ctx.Id_dynamicallyCall, { argumentName });
   auto matches = CS.performMemberLookup(ConstraintKind::ValueMember,
                                         methodName, type,
@@ -4904,7 +4904,7 @@ getDynamicCallableMethods(Type type, ConstraintSystem &CS,
 
     // Otherwise, this must be a nominal type.
     // Dynamic calling doesn't work for tuples, etc.
-    auto nominal = canType->getAnyNominal();
+    auto nominal = canType->getNominalTypeDecl();
     if (!nominal) return DynamicCallableMethods();
 
     // If this type conforms to a protocol which has the attribute, then
@@ -5426,7 +5426,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       return SolutionKind::Error;
     }
 
-    auto nativeClass = type1->getClassOrBoundGenericClass();
+    auto nativeClass = type1->getClassDecl();
     auto bridgedObjCClass
       = nativeClass->getAttrs().getAttribute<ObjCBridgedAttr>()->getObjCClass();
 
@@ -5441,7 +5441,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       return SolutionKind::Error;
     }
 
-    auto nativeClass = type2->getClassOrBoundGenericClass();
+    auto nativeClass = type2->getClassDecl();
     auto bridgedObjCClass
       = nativeClass->getAttrs().getAttribute<ObjCBridgedAttr>()->getObjCClass();
 

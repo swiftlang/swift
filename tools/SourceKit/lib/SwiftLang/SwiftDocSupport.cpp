@@ -284,7 +284,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info) {
     if (proto &&
         Req.getKind() == RequirementKind::Conformance &&
         Req.getFirstType()->isEqual(proto->getSelfInterfaceType()) &&
-        Req.getSecondType()->getAnyNominal() == proto)
+        Req.getSecondType()->getNominalTypeDecl() == proto)
       continue;
 
     std::string ReqStr;
@@ -453,7 +453,7 @@ static bool initDocEntityInfo(const TextEntity &Entity,
 static const TypeDecl *getTypeDeclFromType(Type Ty) {
   if (auto alias = dyn_cast<TypeAliasType>(Ty.getPointer()))
     return alias->getDecl();
-  return Ty->getAnyNominal();
+  return Ty->getNominalTypeDecl();
 }
 
 static void passInherits(const ValueDecl *D, DocInfoConsumer &Consumer) {
@@ -535,7 +535,7 @@ static void reportRelated(ASTContext &Ctx, const Decl *D,
       // If underlying type exists, report the inheritance and conformance of the
       // underlying type.
       auto Ty = TAD->getDeclaredInterfaceType();
-      if (auto NM = Ty->getAnyNominal()) {
+      if (auto NM = Ty->getNominalTypeDecl()) {
         passInherits(NM->getInherited(), Consumer);
         passConforms(NM->getSatisfiedProtocolRequirements(/*Sorted=*/true),
                      Consumer);

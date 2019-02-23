@@ -526,7 +526,7 @@ static llvm::Value *emitSuperArgument(IRGenFunction &IGF,
                                            /*allow uninitialized*/ true);
   } else {
     searchClass = cast<MetatypeType>(searchClass).getInstanceType();
-    ClassDecl *searchClassDecl = searchClass.getClassOrBoundGenericClass();
+    ClassDecl *searchClassDecl = searchClass.getClassDecl();
     switch (IGF.IGM.getClassMetadataStrategy(searchClassDecl)) {
     case ClassMetadataStrategy::Resilient:
     case ClassMetadataStrategy::Singleton:

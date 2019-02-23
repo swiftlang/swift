@@ -122,7 +122,7 @@ public:
       return Result<uint64_t>::emplaceFailure(Failure::DependentArgument);
 
     // Split into cases.
-    if (auto typeDecl = type->getNominalOrBoundGenericNominal()) {
+    if (auto typeDecl = type->getNominalTypeDecl()) {
       return getOffsetOfField(type, typeDecl, optMetadata, memberName);
     } else if (auto tupleType = type->getAs<TupleType>()) {
       return getOffsetOfTupleElement(tupleType, optMetadata, memberName);
@@ -519,7 +519,7 @@ public:
     // of the reference.
     auto payloadAddress = result->PayloadAddress;
     if (!result->IsBridgedError &&
-        typeResult->getClassOrBoundGenericClass()) {
+        typeResult->getClassDecl()) {
       auto pointerval = Reader.readPointerValue(
           payloadAddress.getAddressData());
       if (!pointerval)
@@ -547,7 +547,7 @@ public:
     // address returned is the class instance itself and not the address
     // of the reference.
     auto payloadAddress = result->PayloadAddress;
-    if (typeResult->getClassOrBoundGenericClass()) {
+    if (typeResult->getClassDecl()) {
       auto pointerval = Reader.readPointerValue(
           payloadAddress.getAddressData());
       if (!pointerval)

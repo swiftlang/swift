@@ -71,7 +71,7 @@ TypeAccessScopeChecker::walkToTypePre(Type T) {
   ValueDecl *VD;
   if (auto *BNAD = dyn_cast<TypeAliasType>(T.getPointer()))
     VD = BNAD->getDecl();
-  else if (auto *NTD = T->getAnyNominal())
+  else if (auto *NTD = T->getNominalTypeDecl())
     VD = NTD;
   else
     VD = nullptr;

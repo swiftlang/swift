@@ -122,7 +122,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   }
 
   // Special diagnostic for classes.
-  if (auto *CD = T->getClassOrBoundGenericClass()) {
+  if (auto *CD = T->getClassDecl()) {
     if (!CD->isObjC())
       diags.diagnose(TypeRange.Start, diag::not_objc_swift_class)
           .highlight(TypeRange);
@@ -156,7 +156,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
     // See if the superclass is not @objc.
     if (auto superclass = layout.explicitSuperclass) {
-      if (!superclass->getClassOrBoundGenericClass()->isObjC()) {
+      if (!superclass->getClassDecl()->isObjC()) {
         diags.diagnose(TypeRange.Start, diag::not_objc_class_constraint,
                        superclass);
         return;
@@ -337,7 +337,7 @@ static bool checkObjCInForeignClassContext(const ValueDecl *VD,
   if (!type)
     return false;
 
-  auto clas = type->getClassOrBoundGenericClass();
+  auto clas = type->getClassDecl();
   if (!clas)
     return false;
 
@@ -1221,7 +1221,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
 
 /// Determine whether the given type is a C integer type.
 static bool isCIntegerType(Type type) {
-  auto nominal = type->getAnyNominal();
+  auto nominal = type->getNominalTypeDecl();
   if (!nominal) return false;
 
   ASTContext &ctx = nominal->getASTContext();

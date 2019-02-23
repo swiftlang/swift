@@ -617,7 +617,7 @@ SILInstruction *SILCombiner::visitStoreInst(StoreInst *si) {
     if (iterAddrType.aggregateHasUnreferenceableStorage())
       break;
 
-    auto *decl = iterAddrType.getStructOrBoundGenericStruct();
+    auto *decl = iterAddrType.getStructDecl();
     assert(
         !decl->isResilient(mod.getSwiftModule(), f->getResilienceExpansion()) &&
         "This code assumes resilient structs can not have fragile fields. If "
@@ -1618,7 +1618,7 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
   if (auto *MI = dyn_cast<MetatypeInst>(MDVal)) {
     auto &Mod = ARDI->getModule();
     auto SILInstanceTy = MI->getType().getMetatypeInstanceType(Mod);
-    if (!SILInstanceTy.getClassOrBoundGenericClass())
+    if (!SILInstanceTy.getClassDecl())
       return nullptr;
 
     NewInst = Builder.createAllocRef(ARDI->getLoc(), SILInstanceTy,
@@ -1641,7 +1641,7 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
     if (CCBI && CCBI->isExact() && ARDI->getParent() == CCBI->getSuccessBB()) {
       auto &Mod = ARDI->getModule();
       auto SILInstanceTy = CCBI->getCastType().getMetatypeInstanceType(Mod);
-      if (!SILInstanceTy.getClassOrBoundGenericClass())
+      if (!SILInstanceTy.getClassDecl())
         return nullptr;
       NewInst = Builder.createAllocRef(ARDI->getLoc(), SILInstanceTy,
                                        ARDI->isObjC(), false,
@@ -1704,7 +1704,7 @@ visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *CBOI) {
     return nullptr;
 
   auto type = URC->getOperand()->getType().getASTType();
-  if (ClassDecl *cd = type->getClassOrBoundGenericClass()) {
+  if (ClassDecl *cd = type->getClassDecl()) {
     if (!cd->isObjC()) {
       auto int1Ty = SILType::getBuiltinIntegerType(1, Builder.getASTContext());
       SILValue zero = Builder.createIntegerLiteral(CBOI->getLoc(),

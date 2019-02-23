@@ -239,7 +239,7 @@ SILValue swift::getInstanceWithExactDynamicType(SILValue S, SILModule &M,
     if (!SinglePred) {
       if (!isa<SILFunctionArgument>(Arg))
         break;
-      auto *CD = Arg->getType().getClassOrBoundGenericClass();
+      auto *CD = Arg->getType().getClassDecl();
       // Check if this class is effectively final.
       if (!CD || !isKnownFinalClass(CD, M, CHA))
         break;
@@ -332,7 +332,7 @@ SILType swift::getExactDynamicType(SILValue S, SILModule &M,
       if (FArg->getType().is<AnyMetatypeType>()) {
         return SILType();
       }
-      auto *CD = FArg->getType().getClassOrBoundGenericClass();
+      auto *CD = FArg->getType().getClassDecl();
       // If it is not class and it is a trivial type, then it
       // should be the exact type.
       if (!CD && FArg->getType().isTrivial(M)) {
@@ -417,7 +417,7 @@ getSubstitutionsForCallee(SILModule &M,
   if (auto metatypeType = baseSelfType->getAs<MetatypeType>())
     baseSelfType = metatypeType->getInstanceType();
 
-  auto *baseClassDecl = baseSelfType->getClassOrBoundGenericClass();
+  auto *baseClassDecl = baseSelfType->getClassDecl();
   assert(baseClassDecl && "not a class method");
 
   unsigned baseDepth = 0;
@@ -440,7 +440,7 @@ getSubstitutionsForCallee(SILModule &M,
   Type calleeSelfType = AI.getOrigCalleeType()->getSelfParameter().getType();
   if (auto metatypeType = calleeSelfType->getAs<MetatypeType>())
     calleeSelfType = metatypeType->getInstanceType();
-  auto *calleeClassDecl = calleeSelfType->getClassOrBoundGenericClass();
+  auto *calleeClassDecl = calleeSelfType->getClassDecl();
   assert(calleeClassDecl && "self is not a class type");
 
   // Add generic parameters from the method itself, ignoring any generic
@@ -647,7 +647,7 @@ SILFunction *swift::getTargetClassMethod(SILModule &M,
   if (ClassOrMetatypeType.is<MetatypeType>())
     ClassOrMetatypeType = ClassOrMetatypeType.getMetatypeInstanceType(M);
 
-  auto *CD = ClassOrMetatypeType.getClassOrBoundGenericClass();
+  auto *CD = ClassOrMetatypeType.getClassDecl();
   return M.lookUpFunctionInVTable(CD, Member);
 }
 
@@ -1127,7 +1127,7 @@ ApplySite swift::tryDevirtualizeApply(ApplySite AI,
     if (ClassType.is<MetatypeType>())
       ClassType = ClassType.getMetatypeInstanceType(M);
 
-    auto *CD = ClassType.getClassOrBoundGenericClass();
+    auto *CD = ClassType.getClassDecl();
 
     if (isEffectivelyFinalMethod(FAS, ClassType, CD, CHA))
       return tryDevirtualizeClassMethod(FAS, Instance, ORE,
@@ -1195,7 +1195,7 @@ bool swift::canDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA) 
     if (ClassType.is<MetatypeType>())
       ClassType = ClassType.getMetatypeInstanceType(M);
 
-    auto *CD = ClassType.getClassOrBoundGenericClass();
+    auto *CD = ClassType.getClassDecl();
 
     if (isEffectivelyFinalMethod(AI, ClassType, CD, CHA))
       return canDevirtualizeClassMethod(AI, Instance->getType(),

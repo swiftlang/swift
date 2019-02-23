@@ -1239,7 +1239,7 @@ AccessScope WitnessChecker::getRequiredAccessScope() {
 
   bool witnessesMustBeUsableFromInline = false;
   if (Adoptee) {
-    const NominalTypeDecl *adoptingNominal = Adoptee->getAnyNominal();
+    const NominalTypeDecl *adoptingNominal = Adoptee->getNominalTypeDecl();
 
     // Compute the intersection of the conforming type's access scope
     // and the protocol's access scope.
@@ -1542,9 +1542,9 @@ static void diagnoseConformanceImpliedByConditionalConformance(
     llvm::raw_svector_ostream prefixStream(prefix);
     llvm::raw_svector_ostream suffixStream(suffix);
 
-    ValueDecl *decl = T->getAnyNominal();
+    ValueDecl *decl = T->getNominalTypeDecl();
     if (!decl)
-      decl = T->getAnyGeneric();
+      decl = T->getGenericTypeDecl();
 
     prefixStream << "extension " << decl->getFullName() << ": " << protoType << " ";
     suffixStream << " {\n"
@@ -1671,7 +1671,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
   }
 
   // If the protocol requires a class, non-classes are a non-starter.
-  if (Proto->requiresClass() && !canT->getClassOrBoundGenericClass()) {
+  if (Proto->requiresClass() && !canT->getClassDecl()) {
     TC.diagnose(ComplainLoc, diag::non_class_cannot_conform_to_class_protocol,
                 T, ProtoType);
     conformance->setInvalid();
@@ -1680,7 +1680,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
 
   if (Proto->isObjC()) {
     // Foreign classes cannot conform to objc protocols.
-    if (auto clas = canT->getClassOrBoundGenericClass()) {
+    if (auto clas = canT->getClassDecl()) {
       Optional<decltype(diag::cf_class_cannot_conform_to_objc_protocol)>
       diagKind;
       switch (clas->getForeignClassKind()) {
@@ -1738,7 +1738,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     // conditional conformances involving them. Check the full stack of nested
     // types for any obj-c ones.
     while (nestedType) {
-      if (auto clas = nestedType->getClassOrBoundGenericClass()) {
+      if (auto clas = nestedType->getClassDecl()) {
         if (clas->usesObjCGenericsModel()) {
           TC.diagnose(ComplainLoc,
                       diag::objc_generics_cannot_conditionally_conform, T,
@@ -2343,7 +2343,7 @@ bool ConformanceChecker::checkObjCTypeErasedGenerics(
   if (!ctx.LangOpts.EnableObjCInterop && type->hasError())
     return false;
 
-  auto classDecl = Adoptee->getClassOrBoundGenericClass();
+  auto classDecl = Adoptee->getClassDecl();
   if (!classDecl) return false;
 
   if (!classDecl->usesObjCGenericsModel()) return false;
@@ -2808,8 +2808,8 @@ getAdopteeSelfSameTypeConstraint(ClassDecl *selfClass, ValueDecl *witness) {
     if (req.getKind() != RequirementKind::SameType)
       continue;
 
-    if (req.getFirstType()->getAnyNominal() == selfClass ||
-        req.getSecondType()->getAnyNominal() == selfClass) {
+    if (req.getFirstType()->getNominalTypeDecl() == selfClass ||
+        req.getSecondType()->getNominalTypeDecl() == selfClass) {
       // Try to find the requirement-as-written.
       GenericParamList *genericParams = nullptr;
 
@@ -2822,8 +2822,8 @@ getAdopteeSelfSameTypeConstraint(ClassDecl *selfClass, ValueDecl *witness) {
           if (req.getKind() != RequirementReprKind::SameType)
             continue;
 
-          if (req.getFirstType()->getAnyNominal() == selfClass ||
-              req.getSecondType()->getAnyNominal() == selfClass)
+          if (req.getFirstType()->getNominalTypeDecl() == selfClass ||
+              req.getSecondType()->getNominalTypeDecl() == selfClass)
             return &req;
         }
       }
@@ -2839,7 +2839,7 @@ getAdopteeSelfSameTypeConstraint(ClassDecl *selfClass, ValueDecl *witness) {
 
 void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
                                                    ValueDecl *witness) {
-  auto *classDecl = Adoptee->getClassOrBoundGenericClass();
+  auto *classDecl = Adoptee->getClassDecl();
 
   // If we have an initializer requirement and the conforming type
   // is a non-final class, the witness must be 'required'.
@@ -2995,7 +2995,7 @@ ResolveWitnessResult
 ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
 
-  auto *nominal = Adoptee->getAnyNominal();
+  auto *nominal = Adoptee->getNominalTypeDecl();
 
   // Resolve all associated types before trying to resolve this witness.
   resolveTypeWitnesses();
@@ -3245,7 +3245,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       break;
     }
 
-    if (auto *classDecl = Adoptee->getClassOrBoundGenericClass()) {
+    if (auto *classDecl = Adoptee->getClassDecl()) {
       if (!classDecl->isFinal()) {
         checkNonFinalClassWitness(requirement, witness);
       }
@@ -3332,7 +3332,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
 
   // Find the declaration that derives the protocol conformance.
   NominalTypeDecl *derivingTypeDecl = nullptr;
-  auto *nominal = Adoptee->getAnyNominal();
+  auto *nominal = Adoptee->getNominalTypeDecl();
   if (DerivedConformance::derivesProtocolConformance(DC, nominal, Proto))
     derivingTypeDecl = nominal;
 
@@ -3414,7 +3414,7 @@ CheckTypeWitnessResult swift::checkTypeWitness(TypeChecker &tc, DeclContext *dc,
     // build unless we fail here while inferring an associated type
     // somewhere.
     if (contextType->isSpecialized()) {
-      auto *decl = contextType->getAnyNominal();
+      auto *decl = contextType->getNominalTypeDecl();
       auto subMap = contextType->getContextSubstitutionMap(
           dc->getParentModule(),
           decl,
@@ -3933,7 +3933,7 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
   //
   // FIXME: This feels like the wrong place for this, but if we don't put
   // it here, extensions don't end up depending on the extended type.
-  recordConformanceDependency(DC, Adoptee->getAnyNominal(), Conformance, false);
+  recordConformanceDependency(DC, Adoptee->getNominalTypeDecl(), Conformance, false);
 
   // If we complain about any associated types, there is no point in continuing.
   // FIXME: Not really true. We could check witnesses that don't involve the
@@ -3962,7 +3962,7 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
   // Note that we check the module name to smooth over the difference
   // between an imported Objective-C module and its overlay.
   if (Proto->isSpecificProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
-    auto nominal = Adoptee->getAnyNominal();
+    auto nominal = Adoptee->getNominalTypeDecl();
     if (!TC.Context.isTypeBridgedInExternalModule(nominal)) {
       auto clangLoader = TC.Context.getClangModuleLoader();
       if (nominal->getParentModule() != DC->getParentModule() &&
@@ -4011,7 +4011,7 @@ static void diagnoseConformanceFailure(Type T,
 
   // Special case: for enums with a raw type, explain that the failing
   // conformance to RawRepresentable was inferred.
-  if (auto enumDecl = T->getEnumOrBoundGenericEnum()) {
+  if (auto enumDecl = T->getEnumDecl()) {
     if (Proto->isSpecificProtocol(KnownProtocolKind::RawRepresentable) &&
         DerivedConformance::derivesProtocolConformance(DC, enumDecl,
                                                        Proto) &&
@@ -4131,7 +4131,7 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
 
   auto recordDependency = [=](ProtocolConformance *conformance = nullptr) {
     if (!options.contains(ConformanceCheckFlags::SuppressDependencyTracking))
-      if (auto nominal = T->getAnyNominal())
+      if (auto nominal = T->getNominalTypeDecl())
         recordConformanceDependency(DC, nominal, conformance, InExpression);
   };
 
@@ -4279,7 +4279,7 @@ void swift::useObjectiveCBridgeableConformances(DeclContext *dc, Type type) {
 
       // If we have a nominal type, "use" its conformance to
       // _ObjectiveCBridgeable if it has one.
-      if (auto *nominalDecl = ty->getAnyNominal()) {
+      if (auto *nominalDecl = ty->getNominalTypeDecl()) {
         if (isa<ClassDecl>(nominalDecl) || isa<ProtocolDecl>(nominalDecl))
           return Action::Continue;
 

@@ -192,12 +192,12 @@ bool ConstraintSystem::PotentialBindings::isViable(
   // resolution.
   auto type = binding.BindingType;
   if (type->hasTypeVariable()) {
-    auto *NTD = type->getAnyNominal();
+    auto *NTD = type->getNominalTypeDecl();
     if (!NTD)
       return true;
 
     for (auto &existing : Bindings) {
-      auto *existingNTD = existing.BindingType->getAnyNominal();
+      auto *existingNTD = existing.BindingType->getNominalTypeDecl();
       if (existingNTD && NTD == existingNTD)
         return false;
     }
@@ -552,13 +552,13 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
       // specialization of this generic within our list.
       // FIXME: This assumes that, e.g., the default literal
       // int/float/char/string types are never generic.
-      auto nominal = defaultType->getAnyNominal();
+      auto nominal = defaultType->getNominalTypeDecl();
       if (!nominal)
         continue;
 
       bool matched = false;
       for (auto exactType : exactTypes) {
-        if (auto exactNominal = exactType->getAnyNominal()) {
+        if (auto exactNominal = exactType->getNominalTypeDecl()) {
           // FIXME: Check parents?
           if (nominal == exactNominal) {
             matched = true;
@@ -735,7 +735,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
         // overwrite the binding in place because the non-optional type
         // will fail to type-check against the nil-literal conformance.
         auto nominalBindingDecl =
-            binding.BindingType->getRValueType()->getAnyNominal();
+            binding.BindingType->getRValueType()->getNominalTypeDecl();
         bool conformsToExprByNilLiteral = false;
         if (nominalBindingDecl) {
           SmallVector<ProtocolConformance *, 2> conformances;

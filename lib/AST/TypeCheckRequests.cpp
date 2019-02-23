@@ -369,7 +369,7 @@ Optional<Requirement> RequirementRequest::getCachedResult() const {
         !reqRepr.getConstraintLoc().wasValidated())
       return None;
 
-    return Requirement(reqRepr.getConstraint()->getClassOrBoundGenericClass()
+    return Requirement(reqRepr.getConstraint()->getClassDecl()
                          ? RequirementKind::Superclass
                          : RequirementKind::Conformance,
                        reqRepr.getSubject(),

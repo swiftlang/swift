@@ -881,7 +881,7 @@ namespace {
     void lowerChildren(SILModule &M, SmallVectorImpl<Child> &children)
     const override {
       auto silTy = getLoweredType();
-      auto structDecl = silTy.getStructOrBoundGenericStruct();
+      auto structDecl = silTy.getStructDecl();
       assert(structDecl);
       
       for (auto prop : structDecl->getStoredProperties()) {
@@ -2145,7 +2145,7 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
           //
           // However, only do this if its a 'let'; if the capture is
           // mutable, we're going to be capturing a box or an address.
-          if (captureType->getClassOrBoundGenericClass() &&
+          if (captureType->getClassDecl() &&
               capturedVar->isLet()) {
             if (selfCapture)
               selfCapture = selfCapture->mergeFlags(capture);
@@ -2466,7 +2466,7 @@ TypeConverter::getContextBoxTypeForCapture(ValueDecl *captured,
 CanSILBoxType TypeConverter::getBoxTypeForEnumElement(SILType enumType,
                                                       EnumElementDecl *elt) {
 
-  auto *enumDecl = enumType.getEnumOrBoundGenericEnum();
+  auto *enumDecl = enumType.getEnumDecl();
 
   assert(elt->getDeclContext() == enumDecl);
   assert(elt->isIndirect() || elt->getParentEnum()->isIndirect());
@@ -2502,7 +2502,7 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(SILType enumType,
 
 static void countNumberOfInnerFields(unsigned &fieldsCount, SILModule &Module,
                                      SILType Ty) {
-  if (auto *structDecl = Ty.getStructOrBoundGenericStruct()) {
+  if (auto *structDecl = Ty.getStructDecl()) {
     // FIXME: Expansion
     assert(!structDecl->isResilient(Module.getSwiftModule(),
                                     ResilienceExpansion::Minimal) &&
@@ -2527,7 +2527,7 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, SILModule &Module,
     }
     return;
   }
-  if (auto *enumDecl = Ty.getEnumOrBoundGenericEnum()) {
+  if (auto *enumDecl = Ty.getEnumDecl()) {
     if (enumDecl->isIndirect()) {
       return;
     }

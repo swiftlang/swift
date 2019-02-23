@@ -1791,7 +1791,7 @@ llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
                                                      llvm::Value *object,
                                                      CanType objectType,
                                                      bool suppressCast) {
-  ClassDecl *theClass = objectType.getClassOrBoundGenericClass();
+  ClassDecl *theClass = objectType.getClassDecl();
   if (theClass && isKnownNotTaggedPointer(IGF.IGM, theClass))
     return emitLoadOfHeapMetadataRef(IGF, object,
                                      getIsaEncodingForType(IGF.IGM, objectType),
@@ -1900,7 +1900,7 @@ IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
 
   // This needs to be kept up-to-date with hasKnownSwiftMetadata.
 
-  if (auto theClass = type->getClassOrBoundGenericClass()) {
+  if (auto theClass = type->getClassDecl()) {
     // We can access the isas of pure Swift classes directly.
     if (getRootClass(theClass)->hasKnownSwiftImplementation())
       return IsaEncoding::Pointer;

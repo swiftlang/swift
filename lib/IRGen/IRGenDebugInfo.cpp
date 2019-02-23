@@ -1588,7 +1588,7 @@ private:
       TypeDecl = AliasDecl;
       Context = AliasDecl->getParent();
       ClangDecl = AliasDecl->getClangDecl();
-    } else if (auto *ND = DbgTy.getType()->getNominalOrBoundGenericNominal()) {
+    } else if (auto *ND = DbgTy.getType()->getNominalTypeDecl()) {
       TypeDecl = ND;
       Context = ND->getParent();
       ClangDecl = ND->getClangDecl();

@@ -396,7 +396,7 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
 
   CheckedCastBranchInst *LastCCBI = nullptr;
 
-  ClassDecl *CD = ClassType.getClassOrBoundGenericClass();
+  ClassDecl *CD = ClassType.getClassDecl();
   assert(CD && "Expected decl for class type!");
 
   if (!CHA->hasKnownDirectSubclasses(CD)) {

@@ -1785,7 +1785,7 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
                                        MetadataDependencyCollector *collector) {
   auto &IGM = IGF.IGM;
 
-  auto *target = T.getNominalOrBoundGenericNominal();
+  auto *target = T.getNominalTypeDecl();
   llvm::Value *fieldVector
     = emitAddressOfFieldOffsetVector(IGF, metadata, target)
       .getAddress();
@@ -3949,7 +3949,7 @@ namespace {
 } // end anonymous namespace
 
 bool irgen::requiresForeignTypeMetadata(CanType type) {
-  if (NominalTypeDecl *nominal = type->getAnyNominal()) {
+  if (NominalTypeDecl *nominal = type->getNominalTypeDecl()) {
     return requiresForeignTypeMetadata(nominal);
   }
 
@@ -4053,7 +4053,7 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
   }
 
   // Keep type metadata around for all types.
-  addRuntimeResolvableType(type->getAnyNominal());
+  addRuntimeResolvableType(type->getNominalTypeDecl());
   
   // If the enclosing type is also an imported type, force its metadata too.
   if (auto enclosing = type->getNominalParent()) {

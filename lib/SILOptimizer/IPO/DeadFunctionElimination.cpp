@@ -358,7 +358,7 @@ protected:
           assert(MI->getNumOperands() - MI->getNumTypeDependentOperands() == 1
                  && "method insts except witness_method must have 1 operand");
           ClassDecl *MethodCl = MI->getOperand(0)->getType().
-                                  getClassOrBoundGenericClass();
+                                  getClassDecl();
           MethodInfo *mi = getMethodInfo(funcDecl, /*isWitnessTable*/ false);
           ensureAliveClassMethod(mi, dyn_cast<FuncDecl>(funcDecl), MethodCl);
         } else if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {

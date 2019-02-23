@@ -122,7 +122,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     }
 
     // Determine whether we're looking into a Foundation collection.
-    if (auto classDecl = newType->getClassOrBoundGenericClass()) {
+    if (auto classDecl = newType->getClassDecl()) {
       if (classDecl->isObjC() && classDecl->hasClangNode()) {
         SmallString<32> scratch;
         StringRef objcClassName = classDecl->getObjCRuntimeName(scratch);

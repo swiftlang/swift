@@ -913,7 +913,7 @@ void ASTMangler::appendType(Type type) {
       if (auto typeAlias = dyn_cast<TypeAliasType>(type.getPointer()))
         Decl = typeAlias->getDecl();
       else
-        Decl = type->getAnyGeneric();
+        Decl = type->getGenericTypeDecl();
       if (shouldMangleAsGeneric(type)) {
         // Try to mangle the entire name as a substitution.
         if (tryMangleTypeSubstitution(tybase))
@@ -934,7 +934,7 @@ void ASTMangler::appendType(Type type) {
         addTypeSubstitution(type);
         return;
       }
-      appendAnyGenericType(type->getAnyGeneric());
+      appendAnyGenericType(type->getGenericTypeDecl());
       return;
     }
 
@@ -949,7 +949,7 @@ void ASTMangler::appendType(Type type) {
 
     case TypeKind::DynamicSelf: {
       auto dynamicSelf = cast<DynamicSelfType>(tybase);
-      if (dynamicSelf->getSelfType()->getAnyNominal()) {
+      if (dynamicSelf->getSelfType()->getNominalTypeDecl()) {
         appendType(dynamicSelf->getSelfType());
         return appendOperator("XD");
       }
@@ -1260,7 +1260,7 @@ void ASTMangler::appendRetroactiveConformances(Type type) {
     if (type->hasUnboundGenericType())
       return;
 
-    auto nominal = type->getAnyNominal();
+    auto nominal = type->getNominalTypeDecl();
     if (!nominal) return;
 
     module = Mod ? Mod : nominal->getModuleContext();
@@ -2404,7 +2404,7 @@ ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance) {
     appendModule(Mod);
 
   contextSig =
-    conformingType->getAnyNominal()->getGenericSignatureOfContext();
+    conformingType->getNominalTypeDecl()->getGenericSignatureOfContext();
 
   if (GenericSignature *Sig = conformance->getGenericSignature()) {
     appendGenericSignature(Sig, contextSig);
@@ -2425,7 +2425,7 @@ void ASTMangler::appendProtocolConformanceRef(
   } else if (isRetroactiveConformance(conformance)) {
     appendModule(conformance->getDeclContext()->getParentModule());
   } else if (conformance->getDeclContext()->getParentModule() ==
-               conformance->getType()->getAnyNominal()->getParentModule()) {
+               conformance->getType()->getNominalTypeDecl()->getParentModule()) {
     appendOperator("HP");
   } else {
     appendOperator("Hp");

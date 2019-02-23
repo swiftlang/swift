@@ -427,7 +427,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     auto type = getType();
 
     // Builtin types, (), () -> () and so on are in the runtime.
-    if (!type.getAnyNominal())
+    if (!type.getNominalTypeDecl())
       return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
 
     // Imported types.
@@ -463,7 +463,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
       // The full metadata object is private to the containing module.
       return SILLinkage::Private;
     case TypeMetadataAddress::AddressPoint: {
-      auto *nominal = getType().getAnyNominal();
+      auto *nominal = getType().getNominalTypeDecl();
       return getSILLinkage(nominal
                            ? getDeclLinkage(nominal)
                            : FormalLinkage::PublicUnique,
@@ -474,7 +474,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
   // ...but we don't actually expose individual value witnesses (right now).
   case Kind::ValueWitness: {
-    auto *nominal = getType().getAnyNominal();
+    auto *nominal = getType().getNominalTypeDecl();
     if (getDeclLinkage(nominal) == FormalLinkage::PublicNonUnique)
       return SILLinkage::Shared;
     return forDefinition ? SILLinkage::Private : SILLinkage::PrivateExternal;
@@ -565,7 +565,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
   case Kind::ProtocolWitnessTableLazyAccessFunction:
   case Kind::ProtocolWitnessTableLazyCacheVariable: {
-    auto *nominal = getType().getAnyNominal();
+    auto *nominal = getType().getNominalTypeDecl();
     assert(nominal);
     if (getDeclLinkage(nominal) == FormalLinkage::Private ||
         getLinkageAsConformance() == SILLinkage::Private) {
@@ -601,7 +601,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ReflectionFieldDescriptor: {
     // Reflection descriptors for imported types have shared linkage,
     // since we may emit them in other TUs in the same module.
-    if (auto *nominal = getType().getAnyNominal())
+    if (auto *nominal = getType().getNominalTypeDecl())
       if (getDeclLinkage(nominal) == FormalLinkage::PublicNonUnique)
         return SILLinkage::Shared;
     return SILLinkage::Private;
@@ -637,7 +637,7 @@ static bool isAvailableExternally(IRGenModule &IGM, const Decl *decl) {
 }
 
 static bool isAvailableExternally(IRGenModule &IGM, Type type) {
-  if (auto decl = type->getAnyNominal())
+  if (auto decl = type->getNominalTypeDecl())
     return isAvailableExternally(IGM, decl->getDeclContext());
   return true;
 }
@@ -792,7 +792,7 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::TypeMetadata:
     switch (getMetadataAddress()) {
     case TypeMetadataAddress::FullMetadata:
-      if (getType().getClassOrBoundGenericClass())
+      if (getType().getClassDecl())
         return IGM.FullHeapMetadataStructTy;
       else
         return IGM.FullTypeMetadataStructTy;
@@ -929,7 +929,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module,
 
   case Kind::TypeMetadata:
   case Kind::TypeMetadataAccessFunction: {
-    if (auto *nominalDecl = getType()->getAnyNominal())
+    if (auto *nominalDecl = getType()->getNominalTypeDecl())
       return nominalDecl->isWeakImported(module, context);
     return false;
   }
@@ -1083,7 +1083,7 @@ const SourceFile *LinkEntity::getSourceFileForEmission() const {
   case Kind::TypeMetadata: {
     auto ty = getType();
     // Only fully concrete nominal type metadata gets emitted eagerly.
-    auto nom = ty->getAnyNominal();
+    auto nom = ty->getNominalTypeDecl();
     if (!nom || nom->isGenericContext())
       return nullptr;
     

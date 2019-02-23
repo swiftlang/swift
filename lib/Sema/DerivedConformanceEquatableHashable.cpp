@@ -312,7 +312,7 @@ deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl, void *) {
   auto aParam = args->get(0);
   auto bParam = args->get(1);
 
-  assert(!cast<EnumDecl>(aParam->getType()->getAnyNominal())->hasCases());
+  assert(!cast<EnumDecl>(aParam->getType()->getNominalTypeDecl())->hasCases());
 
   SmallVector<ASTNode, 1> statements;
   SmallVector<ASTNode, 0> cases;
@@ -344,7 +344,7 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   auto aParam = args->get(0);
   auto bParam = args->get(1);
 
-  auto enumDecl = cast<EnumDecl>(aParam->getType()->getAnyNominal());
+  auto enumDecl = cast<EnumDecl>(aParam->getType()->getNominalTypeDecl());
 
   // Generate the conversion from the enums to integer indices.
   SmallVector<ASTNode, 6> statements;
@@ -401,7 +401,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   auto bParam = args->get(1);
 
   Type enumType = aParam->getType();
-  auto enumDecl = cast<EnumDecl>(aParam->getType()->getAnyNominal());
+  auto enumDecl = cast<EnumDecl>(aParam->getType()->getNominalTypeDecl());
 
   SmallVector<ASTNode, 6> statements;
   SmallVector<ASTNode, 4> cases;
@@ -515,7 +515,7 @@ static void deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl,
   auto aParam = args->get(0);
   auto bParam = args->get(1);
 
-  auto structDecl = cast<StructDecl>(aParam->getType()->getAnyNominal());
+  auto structDecl = cast<StructDecl>(aParam->getType()->getNominalTypeDecl());
 
   SmallVector<ASTNode, 6> statements;
 
@@ -618,10 +618,10 @@ deriveEquatable_eq(DerivedConformance &derived,
   if (parentDC->getParentModule()->getResilienceStrategy() ==
       ResilienceStrategy::Resilient) {
     generatedIdentifier = C.Id_EqualsOperator;
-  } else if (selfIfaceTy->getEnumOrBoundGenericEnum()) {
+  } else if (selfIfaceTy->getEnumDecl()) {
     generatedIdentifier = C.Id_derived_enum_equals;
   } else {
-    assert(selfIfaceTy->getStructOrBoundGenericStruct());
+    assert(selfIfaceTy->getStructDecl());
     generatedIdentifier = C.Id_derived_struct_equals;
   }
 

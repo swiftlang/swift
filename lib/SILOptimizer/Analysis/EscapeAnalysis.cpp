@@ -1041,7 +1041,7 @@ static bool mayContainReference(SILType Ty, SILModule *Mod) {
   if (Ty.getASTType() == Mod->getASTContext().TheRawPointerType)
     return true;
 
-  if (auto *Str = Ty.getStructOrBoundGenericStruct()) {
+  if (auto *Str = Ty.getStructDecl()) {
     for (auto *Field : Str->getStoredProperties()) {
       if (mayContainReference(Ty.getFieldType(Field, *Mod), Mod))
         return true;
@@ -1055,7 +1055,7 @@ static bool mayContainReference(SILType Ty, SILModule *Mod) {
     }
     return false;
   }
-  if (auto En = Ty.getEnumOrBoundGenericEnum()) {
+  if (auto En = Ty.getEnumDecl()) {
     for (auto *ElemDecl : En->getAllElements()) {
       if (ElemDecl->hasAssociatedValues()
           && mayContainReference(Ty.getEnumElementType(ElemDecl, *Mod), Mod))
@@ -1196,7 +1196,7 @@ bool EscapeAnalysis::buildConnectionGraphForDestructor(
   // destructors for its components.
   while (auto payloadTy = Ty.getOptionalObjectType())
     Ty = payloadTy;
-  auto Class = Ty.getClassOrBoundGenericClass();
+  auto Class = Ty.getClassDecl();
   if (!Class || !Class->hasDestructor())
     return false;
   auto Destructor = Class->getDestructor();
@@ -1608,7 +1608,7 @@ analyzeSelectInst(SelectInst *SI, ConnectionGraph *ConGraph) {
 bool EscapeAnalysis::deinitIsKnownToNotCapture(SILValue V) {
   for (;;) {
     // The deinit of an array buffer does not capture the array elements.
-    if (V->getType().getNominalOrBoundGenericNominal() == ArrayType)
+    if (V->getType().getNominalTypeDecl() == ArrayType)
       return true;
 
     // The deinit of a box does not capture its content.

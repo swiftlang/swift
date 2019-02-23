@@ -36,7 +36,7 @@ DebugTypeInfo::DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy, Size size,
 /// Determine whether this type has a custom @_alignment attribute.
 static bool hasDefaultAlignment(swift::Type Ty) {
   if (auto CanTy = Ty->getCanonicalType())
-    if (auto *TyDecl = CanTy.getNominalOrBoundGenericNominal())
+    if (auto *TyDecl = CanTy.getNominalTypeDecl())
       if (TyDecl->getAttrs().getAttribute<AlignmentAttr>())
         return false;
   return true;

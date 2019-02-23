@@ -108,7 +108,7 @@ public:
         // Pseudogeneric classes don't use their generic parameters so we
         // don't need to visit them.
         if (AFR.isObjC()) {
-          if (auto clas = dyn_cast_or_null<ClassDecl>(ty->getAnyNominal())) {
+          if (auto clas = dyn_cast_or_null<ClassDecl>(ty->getNominalTypeDecl())) {
             if (clas->usesObjCGenericsModel()) {
               return Action::SkipChildren;
             }
@@ -626,7 +626,7 @@ public:
         return false;
 
       if (auto clas = dyn_cast_or_null<ClassDecl>(
-                         cast->getCastTypeLoc().getType()->getAnyNominal())) {
+                         cast->getCastTypeLoc().getType()->getNominalTypeDecl())) {
         if (clas->usesObjCGenericsModel()) {
           return false;
         }

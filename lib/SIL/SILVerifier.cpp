@@ -155,7 +155,7 @@ void verifyKeyPathComponent(SILModule &M,
           require(param.getConvention()
                     == ParameterConvention::Direct_Unowned,
                   "indices pointer should be trivial");
-          require(param.getType()->getAnyNominal()
+          require(param.getType()->getNominalTypeDecl()
                     == C.getUnsafeRawPointerDecl(),
                   "indices pointer should be an UnsafeRawPointer");
         }
@@ -166,7 +166,7 @@ void verifyKeyPathComponent(SILModule &M,
         require(substEqualsType->getResults()[0].getConvention()
                   == ResultConvention::Unowned,
                 "result should be unowned");
-        require(substEqualsType->getResults()[0].getType()->getAnyNominal()
+        require(substEqualsType->getResults()[0].getType()->getNominalTypeDecl()
                   == C.getBoolDecl(),
                 "result should be Bool");
       }
@@ -186,7 +186,7 @@ void verifyKeyPathComponent(SILModule &M,
         require(param.getConvention()
                   == ParameterConvention::Direct_Unowned,
                 "indices pointer should be trivial");
-        require(param.getType()->getAnyNominal()
+        require(param.getType()->getNominalTypeDecl()
                   == C.getUnsafeRawPointerDecl(),
                 "indices pointer should be an UnsafeRawPointer");
         
@@ -196,7 +196,7 @@ void verifyKeyPathComponent(SILModule &M,
         require(substHashType->getResults()[0].getConvention()
                   == ResultConvention::Unowned,
                 "result should be unowned");
-        require(substHashType->getResults()[0].getType()->getAnyNominal()
+        require(substHashType->getResults()[0].getType()->getNominalTypeDecl()
                   == C.getIntDecl(),
                 "result should be Int");
       }
@@ -279,7 +279,7 @@ void verifyKeyPathComponent(SILModule &M,
         require(indicesParam.getConvention()
                   == ParameterConvention::Direct_Unowned,
                 "indices pointer should be trivial");
-        require(indicesParam.getType()->getAnyNominal()
+        require(indicesParam.getType()->getNominalTypeDecl()
                   == C.getUnsafeRawPointerDecl(),
                 "indices pointer should be an UnsafeRawPointer");
       }
@@ -333,7 +333,7 @@ void verifyKeyPathComponent(SILModule &M,
         require(indicesParam.getConvention()
                   == ParameterConvention::Direct_Unowned,
                 "indices pointer should be trivial");
-        require(indicesParam.getType()->getAnyNominal()
+        require(indicesParam.getType()->getNominalTypeDecl()
                   == C.getUnsafeRawPointerDecl(),
                 "indices pointer should be an UnsafeRawPointer");
       }
@@ -1022,7 +1022,7 @@ public:
   }
 
   void checkAllocRefInst(AllocRefInst *AI) {
-    require(AI->isObjC() || AI->getType().getClassOrBoundGenericClass(),
+    require(AI->isObjC() || AI->getType().getClassDecl(),
             "alloc_ref must allocate class");
     checkAllocRefBase(AI);
   }
@@ -1411,7 +1411,7 @@ public:
           return true;
         if (t.getASTType() == t.getASTContext().TheNativeObjectType)
           return true;
-        if (auto clas = t.getClassOrBoundGenericClass())
+        if (auto clas = t.getClassDecl())
           // Must be a class defined in Swift.
           return clas->hasKnownSwiftImplementation();
         return false;
@@ -1888,7 +1888,7 @@ public:
     require(MU->getModule().getStage() == SILStage::Raw,
             "mark_uninitialized instruction can only exist in raw SIL");
     require(Src->getType().isAddress() ||
-            Src->getType().getClassOrBoundGenericClass() ||
+            Src->getType().getClassDecl() ||
             Src->getType().getAs<SILBoxType>(),
             "mark_uninitialized must be an address, class, or box type");
     require(Src->getType() == MU->getType(),"operand and result type mismatch");
@@ -2088,7 +2088,7 @@ public:
   }
   
   void checkStructInst(StructInst *SI) {
-    auto *structDecl = SI->getType().getStructOrBoundGenericStruct();
+    auto *structDecl = SI->getType().getStructDecl();
     require(structDecl, "StructInst must return a struct");
     require(!structDecl->hasUnreferenceableStorage(),
             "Cannot build a struct with unreferenceable storage from elements "
@@ -2116,7 +2116,7 @@ public:
   }
 
   void checkEnumInst(EnumInst *UI) {
-    EnumDecl *ud = UI->getType().getEnumOrBoundGenericEnum();
+    EnumDecl *ud = UI->getType().getEnumDecl();
     require(ud, "EnumInst must return an enum");
     require(UI->getElement()->getParentEnum() == ud,
             "EnumInst case must be a case of the result enum type");
@@ -2138,7 +2138,7 @@ public:
   }
 
   void checkInitEnumDataAddrInst(InitEnumDataAddrInst *UI) {
-    EnumDecl *ud = UI->getOperand()->getType().getEnumOrBoundGenericEnum();
+    EnumDecl *ud = UI->getOperand()->getType().getEnumDecl();
     require(ud, "InitEnumDataAddrInst must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
             "InitEnumDataAddrInst case must be a case of the enum operand type");
@@ -2161,7 +2161,7 @@ public:
   }
 
   void checkUncheckedEnumDataInst(UncheckedEnumDataInst *UI) {
-    EnumDecl *ud = UI->getOperand()->getType().getEnumOrBoundGenericEnum();
+    EnumDecl *ud = UI->getOperand()->getType().getEnumDecl();
     require(ud, "UncheckedEnumData must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
             "UncheckedEnumData case must be a case of the enum operand type");
@@ -2183,7 +2183,7 @@ public:
   }
 
   void checkUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *UI) {
-    EnumDecl *ud = UI->getOperand()->getType().getEnumOrBoundGenericEnum();
+    EnumDecl *ud = UI->getOperand()->getType().getEnumDecl();
     require(ud, "UncheckedTakeEnumDataAddrInst must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
             "UncheckedTakeEnumDataAddrInst case must be a case of the enum operand type");
@@ -2209,7 +2209,7 @@ public:
               || IUAI->getOperand()->getType().is<BoundGenericEnumType>(),
             "InjectEnumAddrInst must take an enum operand");
     require(IUAI->getElement()->getParentEnum()
-              == IUAI->getOperand()->getType().getEnumOrBoundGenericEnum(),
+              == IUAI->getOperand()->getType().getEnumDecl(),
             "InjectEnumAddrInst case must be a case of the enum operand type");
     require(IUAI->getOperand()->getType().isAddress(),
             "InjectEnumAddrInst must take an address operand");
@@ -2290,7 +2290,7 @@ public:
   void checkDeallocRefInst(DeallocRefInst *DI) {
     require(DI->getOperand()->getType().isObject(),
             "Operand of dealloc_ref must be object");
-    auto *cd = DI->getOperand()->getType().getClassOrBoundGenericClass();
+    auto *cd = DI->getOperand()->getType().getClassDecl();
     require(cd, "Operand of dealloc_ref must be of class type");
 
     if (!DI->canAllocOnStack()) {
@@ -2302,13 +2302,13 @@ public:
   void checkDeallocPartialRefInst(DeallocPartialRefInst *DPRI) {
     require(DPRI->getInstance()->getType().isObject(),
             "First operand of dealloc_partial_ref must be object");
-    auto class1 = DPRI->getInstance()->getType().getClassOrBoundGenericClass();
+    auto class1 = DPRI->getInstance()->getType().getClassDecl();
     require(class1,
             "First operand of dealloc_partial_ref must be of class type");
     require(DPRI->getMetatype()->getType().is<MetatypeType>(),
             "Second operand of dealloc_partial_ref must be a metatype");
     auto class2 = DPRI->getMetatype()->getType().castTo<MetatypeType>()
-        ->getInstanceType()->getClassOrBoundGenericClass();
+        ->getInstanceType()->getClassDecl();
     require(class2,
             "Second operand of dealloc_partial_ref must be a class metatype");
     while (class1 != class2) {
@@ -2405,7 +2405,7 @@ public:
             "cannot struct_extract from address");
     require(EI->getType().isObject(),
             "result of struct_extract cannot be address");
-    StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
+    StructDecl *sd = operandTy.getStructDecl();
     require(sd, "must struct_extract from struct");
     require(!sd->isResilient(F.getModule().getSwiftModule(),
                              F.getResilienceExpansion()),
@@ -2449,7 +2449,7 @@ public:
     SILType operandTy = EI->getOperand()->getType();
     require(operandTy.isAddress(),
             "must derive struct_element_addr from address");
-    StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
+    StructDecl *sd = operandTy.getStructDecl();
     require(sd, "struct_element_addr operand must be struct address");
     require(!sd->isResilient(F.getModule().getSwiftModule(),
                              F.getResilienceExpansion()),
@@ -2481,7 +2481,7 @@ public:
     require(EI->getField()->hasStorage(),
             "cannot get address of computed property with ref_element_addr");
     SILType operandTy = EI->getOperand()->getType();
-    ClassDecl *cd = operandTy.getClassOrBoundGenericClass();
+    ClassDecl *cd = operandTy.getClassDecl();
     require(cd, "ref_element_addr operand must be a class instance");
     require(!cd->isResilient(F.getModule().getSwiftModule(),
                              F.getResilienceExpansion()),
@@ -2504,7 +2504,7 @@ public:
     require(RTAI->getType().isAddress(),
             "result of ref_tail_addr must be lvalue");
     SILType operandTy = RTAI->getOperand()->getType();
-    ClassDecl *cd = operandTy.getClassOrBoundGenericClass();
+    ClassDecl *cd = operandTy.getClassDecl();
     require(cd, "ref_tail_addr operand must be a class instance");
     require(!cd->isResilient(F.getModule().getSwiftModule(),
                              F.getResilienceExpansion()),
@@ -2514,7 +2514,7 @@ public:
 
   void checkDestructureStructInst(DestructureStructInst *DSI) {
     SILType operandTy = DSI->getOperand()->getType();
-    StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
+    StructDecl *sd = operandTy.getStructDecl();
     require(sd, "must struct_extract from struct");
     require(!sd->isResilient(F.getModule().getSwiftModule(),
                              F.getResilienceExpansion()),
@@ -2712,7 +2712,7 @@ public:
     // The method ought to appear in the class vtable.
     require(VerifyClassMethodVisitor(
                              operandType.getASTType()->getMetatypeInstanceType()
-                                       ->getClassOrBoundGenericClass(),
+                                       ->getClassDecl(),
                              member).Seen,
             "method does not appear in the class's vtable");
   }
@@ -2743,13 +2743,13 @@ public:
     auto decl = CMI->getMember().getDecl();
     auto methodClass = decl->getDeclContext()->getDeclaredInterfaceType();
 
-    require(methodClass->getClassOrBoundGenericClass(),
+    require(methodClass->getClassDecl(),
             "super_method must look up a class method");
 
     // The method ought to appear in the class vtable.
     require(VerifyClassMethodVisitor(
                              operandType.getASTType()->getMetatypeInstanceType()
-                                       ->getClassOrBoundGenericClass(),
+                                       ->getClassDecl(),
                              member).Seen,
             "method does not appear in the class's vtable");    
   }
@@ -2772,7 +2772,7 @@ public:
     if (auto metatypeType = dyn_cast<MetatypeType>(operandInstanceType))
       operandInstanceType = metatypeType.getInstanceType();
 
-    if (operandInstanceType.getClassOrBoundGenericClass()) {
+    if (operandInstanceType.getClassDecl()) {
       auto overrideTy = TC.getConstantOverrideType(member);
       requireSameType(
           OMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
@@ -2820,7 +2820,7 @@ public:
     auto decl = member.getDecl();
     auto methodClass = decl->getDeclContext()->getDeclaredInterfaceType();
 
-    require(methodClass->getClassOrBoundGenericClass(),
+    require(methodClass->getClassDecl(),
             "objc_super_method must look up a class method");
   }
 
@@ -3329,9 +3329,9 @@ public:
     }
 
     if (isExact) {
-      require(fromCanTy.getClassOrBoundGenericClass(),
+      require(fromCanTy.getClassDecl(),
               "downcast operand must be a class type");
-      require(toCanTy.getClassOrBoundGenericClass(),
+      require(toCanTy.getClassDecl(),
               "downcast must convert to a class type");
       require(SILType::getPrimitiveObjectType(fromCanTy).
               isBindableToSuperclassOf(SILType::getPrimitiveObjectType(toCanTy)),
@@ -3510,7 +3510,7 @@ public:
               "upcast operand must be a class or class metatype instance");
       CanType opInstTy(UI->getOperand()->getType().castTo<MetatypeType>()
                          ->getInstanceType());
-      auto instClass = instTy->getClassOrBoundGenericClass();
+      auto instClass = instTy->getClassDecl();
       require(instClass,
               "upcast must convert a class metatype to a class metatype");
       
@@ -3544,7 +3544,7 @@ public:
           FromTy.getASTType().getOptionalObjectType());
     }
 
-    auto ToClass = ToTy.getClassOrBoundGenericClass();
+    auto ToClass = ToTy.getClassDecl();
     require(ToClass,
             "upcast must convert a class instance to a class type");
       if (ToClass->usesObjCGenericsModel()) {
@@ -3801,7 +3801,7 @@ public:
   }
 
   void checkSelectEnumCases(SelectEnumInstBase *I) {
-    EnumDecl *eDecl = I->getEnumOperand()->getType().getEnumOrBoundGenericEnum();
+    EnumDecl *eDecl = I->getEnumOperand()->getType().getEnumDecl();
     require(eDecl, "select_enum operand must be an enum");
 
     // Find the set of enum elements for the type so we can verify
@@ -3941,7 +3941,7 @@ public:
             "switch_enum operand must be an object");
 
     SILType uTy = SOI->getOperand()->getType();
-    EnumDecl *uDecl = uTy.getEnumOrBoundGenericEnum();
+    EnumDecl *uDecl = uTy.getEnumDecl();
     require(uDecl, "switch_enum operand is not an enum");
 
     // Find the set of enum elements for the type so we can verify
@@ -4026,7 +4026,7 @@ public:
             "switch_enum_addr operand must be an address");
 
     SILType uTy = SOI->getOperand()->getType();
-    EnumDecl *uDecl = uTy.getEnumOrBoundGenericEnum();
+    EnumDecl *uDecl = uTy.getEnumDecl();
     require(uDecl, "switch_enum_addr operand must be an enum");
 
     // Find the set of enum elements for the type so we can verify
@@ -4241,7 +4241,7 @@ public:
             "objc_protocol must be applied to an @objc protocol");
     auto classTy = OPI->getType();
     require(classTy.isObject(), "objc_protocol must produce a value");
-    auto classDecl = classTy.getClassOrBoundGenericClass();
+    auto classDecl = classTy.getClassDecl();
     require(classDecl, "objc_protocol must produce a class instance");
     require(classDecl->getName() == F.getASTContext().Id_Protocol,
             "objc_protocol must produce an instance of ObjectiveC.Protocol class");

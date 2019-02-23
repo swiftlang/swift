@@ -217,7 +217,7 @@ Projection::createAddressProjection(SILBuilder &B, SILLocation Loc,
 
   // We can only create an address projection from an object, unless we have a
   // class.
-  if (BaseTy.getClassOrBoundGenericClass() || !BaseTy.isAddress())
+  if (BaseTy.getClassDecl() || !BaseTy.isAddress())
     return nullptr;
 
   // Ok, we now know that the type of Base and the type represented by the base
@@ -256,7 +256,7 @@ Projection::createAddressProjection(SILBuilder &B, SILLocation Loc,
 
 void Projection::getFirstLevelProjections(SILType Ty, SILModule &Mod,
                                   llvm::SmallVectorImpl<Projection> &Out) {
-  if (auto *S = Ty.getStructOrBoundGenericStruct()) {
+  if (auto *S = Ty.getStructDecl()) {
     unsigned Count = 0;
     for (auto *VDecl : S->getStoredProperties()) {
       (void) VDecl;
@@ -284,7 +284,7 @@ void Projection::getFirstLevelProjections(SILType Ty, SILModule &Mod,
     return;
   }
 
-  if (auto *C = Ty.getClassOrBoundGenericClass()) {
+  if (auto *C = Ty.getClassDecl()) {
     unsigned Count = 0;
     for (auto *VDecl : C->getStoredProperties()) {
       (void) VDecl;
@@ -616,7 +616,7 @@ ProjectionPath::expandTypeIntoLeafProjectionPaths(SILType B, SILModule *Mod,
     //
     // The worklist would never be empty in this case !.
     //
-    if (Ty.getClassOrBoundGenericClass()) {
+    if (Ty.getClassDecl()) {
       LLVM_DEBUG(llvm::dbgs() << "    Found class. Finished projection list\n");
       Paths.push_back(PP);
       continue;
@@ -677,7 +677,7 @@ hasUncoveredNonTrivials(SILType B, SILModule *Mod, ProjectionPathSet &CPaths) {
 
     // There is at least one projection path that leads to a type with
     // reference semantics.
-    if (Ty.getClassOrBoundGenericClass()) {
+    if (Ty.getClassDecl()) {
       Paths.push_back(PP);
       continue;
     }
@@ -763,7 +763,7 @@ Projection::
 createAggFromFirstLevelProjections(SILBuilder &B, SILLocation Loc,
                                    SILType BaseType,
                                    llvm::SmallVectorImpl<SILValue> &Values) {
-  if (BaseType.getStructOrBoundGenericStruct()) {
+  if (BaseType.getStructDecl()) {
     return B.createStruct(Loc, BaseType, Values);
   }
 
@@ -985,7 +985,7 @@ createNextLevelChildren(ProjectionTree &Tree) {
     return;
   }
 
-  if (auto *SD = Ty.getStructOrBoundGenericStruct()) {
+  if (auto *SD = Ty.getStructDecl()) {
     LLVM_DEBUG(llvm::dbgs() << "        Found a struct!\n");
     createNextLevelChildrenForStruct(Tree, SD);
     return;
@@ -1009,7 +1009,7 @@ createAggregate(SILBuilder &B, SILLocation Loc, ArrayRef<SILValue> Args) const {
 
   SILType Ty = getType();
 
-  if (Ty.getStructOrBoundGenericStruct()) {
+  if (Ty.getStructDecl()) {
     return B.createStruct(Loc, Ty, Args);
   }
 

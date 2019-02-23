@@ -441,13 +441,12 @@ public:
     return isObjCExistentialTypeImpl(*this);
   }
 
-  ClassDecl *getClassOrBoundGenericClass() const; // in Types.h
-  StructDecl *getStructOrBoundGenericStruct() const; // in Types.h
-  EnumDecl *getEnumOrBoundGenericEnum() const; // in Types.h
-  NominalTypeDecl *getNominalOrBoundGenericNominal() const; // in Types.h
+  ClassDecl *getClassDecl() const; // in Types.h
+  StructDecl *getStructDecl() const; // in Types.h
+  EnumDecl *getEnumDecl() const; // in Types.h
+  NominalTypeDecl *getNominalTypeDecl() const; // in Types.h
+  GenericTypeDecl *getGenericTypeDecl() const; // in Types.h
   CanType getNominalParent() const; // in Types.h
-  NominalTypeDecl *getAnyNominal() const;
-  GenericTypeDecl *getAnyGeneric() const;
 
   CanType getOptionalObjectType() const {
     return getOptionalObjectTypeImpl(*this);

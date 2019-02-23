@@ -567,7 +567,7 @@ std::string AccessSummaryAnalysis::getSubPathDescription(
   for (unsigned index : reversed(reversedIndices)) {
     os << ".";
 
-    if (StructDecl *D = containingType.getStructOrBoundGenericStruct()) {
+    if (StructDecl *D = containingType.getStructDecl()) {
       auto iter = D->getStoredProperties().begin();
       std::advance(iter, index);
       VarDecl *var = *iter;

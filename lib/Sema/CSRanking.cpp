@@ -181,12 +181,12 @@ namespace {
 /// Determines whether the first type is nominally a superclass of the second
 /// type, ignore generic arguments.
 static bool isNominallySuperclassOf(Type type1, Type type2) {
-  auto nominal1 = type1->getAnyNominal();
+  auto nominal1 = type1->getNominalTypeDecl();
   if (!nominal1)
     return false;
 
   for (auto super2 = type2; super2; super2 = super2->getSuperclass()) {
-    if (super2->getAnyNominal() == nominal1)
+    if (super2->getNominalTypeDecl() == nominal1)
       return true;
   }
 
@@ -1152,14 +1152,14 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // Post-1.0, we'll need to remove this hack in favor of richer constraint
     // declarations.
     if (!(score1 || score2)) {
-      if (auto nominalType2 = type2->getNominalOrBoundGenericNominal()) {
+      if (auto nominalType2 = type2->getNominalTypeDecl()) {
         if ((nominalType2->getName() ==
              cs.TC.Context.Id_OptionalNilComparisonType)) {
           ++score2;
         }
       }
 
-      if (auto nominalType1 = type1->getNominalOrBoundGenericNominal()) {
+      if (auto nominalType1 = type1->getNominalTypeDecl()) {
         if ((nominalType1->getName() ==
              cs.TC.Context.Id_OptionalNilComparisonType)) {
           ++score1;

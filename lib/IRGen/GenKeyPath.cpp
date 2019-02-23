@@ -813,7 +813,7 @@ emitKeyPathComponent(IRGenModule &IGM,
     // For a struct stored property, we may know the fixed offset of the field,
     // or we may need to fetch it out of the type's metadata at instantiation
     // time.
-    if (auto theStruct = loweredBaseTy.getStructOrBoundGenericStruct()) {
+    if (auto theStruct = loweredBaseTy.getStructDecl()) {
       if (auto offset = emitPhysicalStructMemberFixedOffset(IGM,
                                                             loweredBaseTy,
                                                             property)) {
@@ -838,13 +838,13 @@ emitKeyPathComponent(IRGenModule &IGM,
     // or we may need to fetch it at instantiation time. Depending on the
     // ObjC-ness and resilience of the class hierarchy, there might be a few
     // different ways we need to go about this.
-    if (loweredBaseTy.getClassOrBoundGenericClass()) {
+    if (loweredBaseTy.getClassDecl()) {
 
       // Use the property's class type to determine the field access.
       auto propertyBaseDecl = property->getDeclContext()->getSelfClassDecl();
       auto currentBaseTy =
           loweredBaseTy.getASTType()->getSuperclassForDecl(propertyBaseDecl);
-      assert(currentBaseTy->getClassOrBoundGenericClass() == propertyBaseDecl);
+      assert(currentBaseTy->getClassDecl() == propertyBaseDecl);
       loweredBaseTy =
           IGM.getLoweredType(AbstractionPattern::getOpaque(), currentBaseTy);
 
@@ -877,7 +877,7 @@ emitKeyPathComponent(IRGenModule &IGM,
         fields.addInt32(header.getData());
         auto fieldOffset =
           getClassFieldOffsetOffset(IGM,
-                                    loweredBaseTy.getClassOrBoundGenericClass(),
+                                    loweredBaseTy.getClassDecl(),
                                     property);
         fields.addInt32(fieldOffset.getValue());
         break;
@@ -1042,7 +1042,7 @@ emitKeyPathComponent(IRGenModule &IGM,
       // the property.
       auto property = id.getProperty();
       idKind = KeyPathComponentHeader::StoredPropertyIndex;
-      if (auto struc = baseTy->getStructOrBoundGenericStruct()) {
+      if (auto struc = baseTy->getStructDecl()) {
         // Scan the stored properties of the struct to find the index. We should
         // only ever use a struct field as a uniquing key from inside the
         // struct's own module, so this is OK.
@@ -1058,7 +1058,7 @@ emitKeyPathComponent(IRGenModule &IGM,
         }
         assert(structIdx && "not a stored property of the struct?!");
         idValue = llvm::ConstantInt::get(IGM.SizeTy, structIdx.getValue());
-      } else if (auto *classDecl = baseTy->getClassOrBoundGenericClass()) {
+      } else if (auto *classDecl = baseTy->getClassDecl()) {
         // TODO: This field index would require runtime resolution with Swift
         // native class resilience. We never directly access ObjC-imported
         // ivars so we can disregard ObjC ivar resilience for this computation

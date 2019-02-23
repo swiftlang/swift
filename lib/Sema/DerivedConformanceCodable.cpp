@@ -282,7 +282,7 @@ static CodingKeysValidity hasValidCodingKeysEnum(DerivedConformance &derived) {
   // type.
   auto codingKeysType = codingKeysTypeDecl->getDeclaredInterfaceType();
   if (isa<TypeAliasDecl>(codingKeysTypeDecl))
-    codingKeysTypeDecl = codingKeysType->getAnyNominal();
+    codingKeysTypeDecl = codingKeysType->getNominalTypeDecl();
 
   // Ensure that the type we found conforms to the CodingKey protocol.
   auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
@@ -424,7 +424,7 @@ static EnumDecl *lookupEvaluatedCodingKeysEnum(ASTContext &C,
 
   auto *codingKeysDecl = codingKeyDecls.front();
   if (auto *typealiasDecl = dyn_cast<TypeAliasDecl>(codingKeysDecl))
-    codingKeysDecl = typealiasDecl->getDeclaredInterfaceType()->getAnyNominal();
+    codingKeysDecl = typealiasDecl->getDeclaredInterfaceType()->getNominalTypeDecl();
 
   return dyn_cast<EnumDecl>(codingKeysDecl);
 }
@@ -621,7 +621,7 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *)
       varType = referenceType->getReferentType();
     }
 
-    if (varType->getAnyNominal() == C.getOptionalDecl())
+    if (varType->getNominalTypeDecl() == C.getOptionalDecl())
       methodName = C.Id_encodeIfPresent;
 
     SmallVector<Identifier, 2> argNames{Identifier(), C.Id_forKey};
@@ -852,7 +852,7 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
         varType = referenceType->getReferentType();
       }
 
-      if (varType->getAnyNominal() == C.getOptionalDecl()) {
+      if (varType->getNominalTypeDecl() == C.getOptionalDecl()) {
         methodName = C.Id_decodeIfPresent;
 
         // The type we request out of decodeIfPresent needs to be unwrapped

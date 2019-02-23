@@ -244,7 +244,7 @@ public:
   void visitAncestor(ClassDecl *ancestor) {
     auto superTy = ancestor->getSuperclass();
     if (superTy)
-      visitAncestor(superTy->getClassOrBoundGenericClass());
+      visitAncestor(superTy->getClassDecl());
 
     addVTableEntries(ancestor);
   }

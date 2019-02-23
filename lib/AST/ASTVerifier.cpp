@@ -1083,7 +1083,7 @@ public:
     }
     
     void verifyChecked(EnumIsCaseExpr *E) {
-      auto nom = E->getSubExpr()->getType()->getAnyNominal();
+      auto nom = E->getSubExpr()->getType()->getNominalTypeDecl();
       if (!nom || !isa<EnumDecl>(nom)) {
         Out << "enum_is_decl operand is not an enum: ";
         E->getSubExpr()->getType().print(Out);
@@ -1307,7 +1307,7 @@ public:
         abort();
       }
 
-      if (!E->getType()->getClassOrBoundGenericClass()) {
+      if (!E->getType()->getClassDecl()) {
         Out << "ProtocolMetatypeToObject does not produce class:\n";
         E->dump(Out);
         Out << "\n";
@@ -1353,7 +1353,7 @@ public:
       
       // Ensure we don't convert an array to a void pointer this way.
       
-      if (fromElement->getNominalOrBoundGenericNominal() == Ctx.getArrayDecl()
+      if (fromElement->getNominalTypeDecl() == Ctx.getArrayDecl()
           && toElement->isEqual(Ctx.TheEmptyTupleType)) {
         Out << "InOutToPointer is converting an array to a void pointer; "
                "ArrayToPointer should be used instead:\n";
@@ -1377,7 +1377,7 @@ public:
       // The source may be optionally inout.
       auto fromArray = E->getSubExpr()->getType()->getInOutObjectType();
       
-      if (fromArray->getNominalOrBoundGenericNominal() != Ctx.getArrayDecl()) {
+      if (fromArray->getNominalTypeDecl() != Ctx.getArrayDecl()) {
         Out << "ArrayToPointer does not convert from array:\n";
         E->dump(Out);
         Out << "\n";
@@ -1398,7 +1398,7 @@ public:
       PrettyStackTraceExpr debugStack(Ctx,
                                       "verifying StringToPointer", E);
       
-      if (E->getSubExpr()->getType()->getNominalOrBoundGenericNominal()
+      if (E->getSubExpr()->getType()->getNominalTypeDecl()
             != Ctx.getStringDecl()) {
         Out << "StringToPointer does not convert from string:\n";
         E->dump(Out);
@@ -1439,8 +1439,8 @@ public:
         abort();
       }
 
-      if (!destTy->getClassOrBoundGenericClass() ||
-          !(srcTy->getClassOrBoundGenericClass() ||
+      if (!destTy->getClassDecl() ||
+          !(srcTy->getClassDecl() ||
             srcTy->is<DynamicSelfType>())) {
         Out << "DerivedToBaseExpr does not involve class types:\n";
         E->dump(Out);
@@ -2898,7 +2898,7 @@ public:
       // Verify that the optionality of the result type of the
       // initializer matches the failability of the initializer.
       if (!CD->isInvalid() &&
-          CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() !=
+          CD->getDeclContext()->getDeclaredInterfaceType()->getNominalTypeDecl() !=
               Ctx.getOptionalDecl()) {
         bool resultIsOptional = (bool) CD->getResultInterfaceType()->getOptionalObjectType();
         auto declIsOptional = CD->getFailability() != OTK_None;
@@ -3363,7 +3363,7 @@ public:
       }
 
       // If the destination is a class, walk the supertypes of the source.
-      if (destTy->getClassOrBoundGenericClass()) {
+      if (destTy->getClassDecl()) {
         if (!destTy->isBindableToSuperclassOf(srcTy)) {
           srcTy.print(Out);
           Out << " is not a superclass of ";

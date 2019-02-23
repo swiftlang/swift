@@ -966,7 +966,7 @@ bool SILGenModule::requiresIVarDestroyer(ClassDecl *cd) {
   // the superclass is not @objc.
   return (hasNonTrivialIVars(cd) &&
           cd->getSuperclass() &&
-          !cd->getSuperclass()->getClassOrBoundGenericClass()->hasClangNode());
+          !cd->getSuperclass()->getClassDecl()->hasClangNode());
 }
 
 /// TODO: This needs a better name.

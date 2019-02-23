@@ -194,7 +194,7 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
       if (auto defaultType = TC.getDefaultType(literalProtocol, DC)) {
         // Check whether the nominal types match. This makes sure that we
         // properly handle Array vs. Array<T>.
-        if (defaultType->getAnyNominal() != type->getAnyNominal())
+        if (defaultType->getNominalTypeDecl() != type->getNominalTypeDecl())
           increaseScore(SK_NonDefaultLiteral);
       }
     }
@@ -1145,7 +1145,7 @@ static void addSelfConstraint(ConstraintSystem &cs, Type objectTy, Type selfTy,
   assert(!selfTy->is<ProtocolType>());
 
   // Otherwise, use a subtype constraint for classes to cope with inheritance.
-  if (selfTy->getClassOrBoundGenericClass()) {
+  if (selfTy->getClassDecl()) {
     cs.addConstraint(ConstraintKind::Subtype, objectTy, selfTy,
                      cs.getConstraintLocator(locator));
     return;
@@ -1709,7 +1709,7 @@ static bool isNonFinalClass(Type type) {
   if (auto dynamicSelf = type->getAs<DynamicSelfType>())
     type = dynamicSelf->getSelfType();
 
-  if (auto classDecl = type->getClassOrBoundGenericClass())
+  if (auto classDecl = type->getClassDecl())
     return !classDecl->isFinal();
 
   if (auto archetype = type->getAs<ArchetypeType>())

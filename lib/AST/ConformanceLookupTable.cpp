@@ -220,7 +220,7 @@ void ConformanceLookupTable::inheritConformances(ClassDecl *classDecl,
 
     for (const auto &inherited : classDecl->getInherited()) {
       if (auto inheritedType = inherited.getType()) {
-        if (inheritedType->getClassOrBoundGenericClass()) {
+        if (inheritedType->getClassDecl()) {
           superclassLoc = inherited.getSourceRange().Start;
           return superclassLoc;
         }

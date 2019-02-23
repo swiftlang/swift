@@ -318,9 +318,9 @@ public:
     assert(isValid());
     assert((getKind() == ProjectionKind::Struct ||
             getKind() == ProjectionKind::Class));
-    assert(BaseType.getNominalOrBoundGenericNominal() &&
+    assert(BaseType.getNominalTypeDecl() &&
            "This should only be called with a nominal type");
-    auto *NDecl = BaseType.getNominalOrBoundGenericNominal();
+    auto *NDecl = BaseType.getNominalTypeDecl();
     auto Iter = NDecl->getStoredProperties().begin();
     std::advance(Iter, getIndex());
     return *Iter;
@@ -329,8 +329,8 @@ public:
   EnumElementDecl *getEnumElementDecl(SILType BaseType) const {
     assert(isValid());
     assert(getKind() == ProjectionKind::Enum);
-    assert(BaseType.getEnumOrBoundGenericEnum() && "Expected enum type");
-    auto Iter = BaseType.getEnumOrBoundGenericEnum()->getAllElements().begin();
+    assert(BaseType.getEnumDecl() && "Expected enum type");
+    auto Iter = BaseType.getEnumDecl()->getAllElements().begin();
     std::advance(Iter, getIndex());
     return *Iter;
   }

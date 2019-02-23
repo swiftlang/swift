@@ -487,7 +487,7 @@ Type ASTBuilder::createProtocolCompositionType(
   std::vector<Type> members;
   for (auto protocol : protocols)
     members.push_back(protocol->getDeclaredType());
-  if (superclass && superclass->getClassOrBoundGenericClass())
+  if (superclass && superclass->getClassDecl())
     members.push_back(superclass);
   return ProtocolCompositionType::get(Ctx, members, isClassBound);
 }
@@ -656,7 +656,7 @@ bool ASTBuilder::validateParentType(TypeDecl *decl, Type parent) {
 
   if (isa<NominalTypeDecl>(decl)) {
     // The parent should be a nominal type when desugared.
-    auto *parentNominal = parent->getAnyNominal();
+    auto *parentNominal = parent->getNominalTypeDecl();
     if (!parentNominal || parentNominal != parentDecl) {
       return false;
     }

@@ -800,7 +800,7 @@ Type AssociatedTypeInference::computeFixedTypeWitness(
   // require a fixed type for this associated type.
   Type dependentType = assocType->getDeclaredInterfaceType();
   Type resultType;
-  for (auto conformedProto : adoptee->getAnyNominal()->getAllProtocols()) {
+  for (auto conformedProto : adoptee->getNominalTypeDecl()->getAllProtocols()) {
     if (!conformedProto->inheritsFrom(assocType->getProtocol()))
       continue;
 
@@ -891,7 +891,7 @@ Type AssociatedTypeInference::computeDerivedTypeWitness(
     return Type();
 
   // Can we derive conformances for this protocol and adoptee?
-  NominalTypeDecl *derivingTypeDecl = adoptee->getAnyNominal();
+  NominalTypeDecl *derivingTypeDecl = adoptee->getNominalTypeDecl();
   if (!DerivedConformance::derivesProtocolConformance(dc, derivingTypeDecl,
                                                       proto))
     return Type();
@@ -1741,7 +1741,7 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
           if (failed.Result.isError())
             continue;
 
-          if ((!failed.TypeWitness->getAnyNominal() ||
+          if ((!failed.TypeWitness->getNominalTypeDecl() ||
                failed.TypeWitness->isExistentialType()) &&
               failed.Result.isConformanceRequirement()) {
             diags.diagnose(failed.Witness,
@@ -1750,7 +1750,7 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
                            failed.Result.getRequirement());
             continue;
           }
-          if (!failed.TypeWitness->getClassOrBoundGenericClass() &&
+          if (!failed.TypeWitness->getClassDecl() &&
               failed.Result.isSuperclassRequirement()) {
             diags.diagnose(failed.Witness,
                            diag::associated_type_witness_inherit_impossible,

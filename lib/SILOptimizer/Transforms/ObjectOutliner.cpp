@@ -28,7 +28,7 @@ class ObjectOutliner {
   int GlobIdx = 0;
 
   bool isCOWType(SILType type) {
-    return type.getNominalOrBoundGenericNominal() == ArrayDecl;
+    return type.getNominalTypeDecl() == ArrayDecl;
   }
 
   bool isValidUseOfObject(SILInstruction *Val, bool isCOWObject,
@@ -310,7 +310,7 @@ bool ObjectOutliner::optimizeObjectAllocation(
   }
 
   SILType Ty = ARI->getType();
-  ClassDecl *Cl = Ty.getClassOrBoundGenericClass();
+  ClassDecl *Cl = Ty.getClassDecl();
   if (!Cl)
     return false;
   llvm::SmallVector<VarDecl *, 16> Fields;
@@ -443,7 +443,7 @@ void ObjectOutliner::replaceFindStringCall(ApplyInst *FindStringCall) {
     return;
 
   SILType cacheType = FTy->getParameters()[2].getSILStorageType().getObjectType();
-  NominalTypeDecl *cacheDecl = cacheType.getNominalOrBoundGenericNominal();
+  NominalTypeDecl *cacheDecl = cacheType.getNominalTypeDecl();
   if (!cacheDecl)
     return;
 

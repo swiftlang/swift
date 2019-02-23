@@ -107,12 +107,12 @@ class GlobalPropertyOpt {
   llvm::SmallVector<Entry *, 32> WorkList;
   
   bool isArrayType(SILType type) {
-    return type.getNominalOrBoundGenericNominal() == ArrayType &&
+    return type.getNominalTypeDecl() == ArrayType &&
            !type.isAddress();
   }
   
   bool isArrayAddressType(SILType type) {
-    return type.getNominalOrBoundGenericNominal() == ArrayType &&
+    return type.getNominalTypeDecl() == ArrayType &&
            type.isAddress();
   }
   
@@ -121,7 +121,7 @@ class GlobalPropertyOpt {
   bool isTupleWithArray(CanType type) {
     if (auto tuple = dyn_cast<TupleType>(type)) {
       for (Type subType : tuple->getElementTypes()) {
-        if (CanType(subType).getNominalOrBoundGenericNominal() == ArrayType)
+        if (CanType(subType).getNominalTypeDecl() == ArrayType)
           return true;
       }
     }

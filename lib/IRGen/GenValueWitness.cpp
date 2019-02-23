@@ -406,7 +406,7 @@ static CanType getFormalTypeInContext(CanType abstractType, DeclContext *dc) {
 /// unbound generic types --- return the formal type within the type's
 /// primary defining context.
 static CanType getFormalTypeInContext(CanType abstractType) {
-  if (auto nominal = abstractType.getAnyNominal())
+  if (auto nominal = abstractType.getNominalTypeDecl())
     return getFormalTypeInContext(abstractType, nominal);
   return abstractType;
 }
@@ -818,7 +818,7 @@ static void addValueWitness(IRGenModule &IGM,
       flags = flags.withIncomplete(true);
     }
 
-    if (concreteType.getEnumOrBoundGenericEnum())
+    if (concreteType.getEnumDecl())
       flags = flags.withEnumWitnesses(true);
 
     return B.addInt32(flags.getOpaqueValue());
@@ -848,7 +848,7 @@ static void addValueWitness(IRGenModule &IGM,
   case ValueWitness::GetEnumTag:
   case ValueWitness::DestructiveProjectEnumData:
   case ValueWitness::DestructiveInjectEnumTag:
-    assert(concreteType.getEnumOrBoundGenericEnum());
+    assert(concreteType.getEnumDecl());
     goto standard;
   }
   llvm_unreachable("bad value witness kind");
@@ -864,7 +864,7 @@ static void addValueWitness(IRGenModule &IGM,
 
 static bool shouldAddEnumWitnesses(CanType abstractType) {
   // Needs to handle UnboundGenericType.
-  return dyn_cast_or_null<EnumDecl>(abstractType.getAnyNominal()) != nullptr;
+  return dyn_cast_or_null<EnumDecl>(abstractType.getNominalTypeDecl()) != nullptr;
 }
 
 static llvm::StructType *getValueWitnessTableType(IRGenModule &IGM,
@@ -934,7 +934,7 @@ getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type) {
   if (IGM.useDllStorage())
     return nullptr;
   
-  if (auto nom = type->getAnyNominal()) {
+  if (auto nom = type->getNominalTypeDecl()) {
     // TODO: Generic metadata patterns relative-reference their VWT, which won't
     // work if the VWT is in a different module without supporting indirection
     // through the GOT.

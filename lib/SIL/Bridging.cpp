@@ -154,7 +154,7 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
 
   // Class metatypes bridge to ObjC metatypes.
   if (auto metaTy = t->getAs<MetatypeType>()) {
-    if (metaTy->getInstanceType()->getClassOrBoundGenericClass()
+    if (metaTy->getInstanceType()->getClassDecl()
         // Self argument of an ObjC protocol
         || metaTy->getInstanceType()->is<GenericTypeParamType>()) {
       return MetatypeType::get(metaTy->getInstanceType(),

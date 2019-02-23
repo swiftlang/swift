@@ -40,7 +40,7 @@ STATISTIC(NumAllocRemoved, "Number of allocations completely removed");
 // from Swift.
 static StructDecl *
 getFullyReferenceableStruct(SILType Ty) {
-  auto SD = Ty.getStructOrBoundGenericStruct();
+  auto SD = Ty.getStructDecl();
   if (!SD || SD->hasUnreferenceableStorage())
     return nullptr;
   return SD;

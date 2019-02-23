@@ -2075,7 +2075,7 @@ TypeDecl *EquivalenceClass::lookupNestedType(
   // FIXME: Shouldn't we always look here?
   if (!bestAssocType && concreteDecls.empty()) {
     Type typeToSearch = concreteType ? concreteType : superclass;
-    auto *decl = typeToSearch ? typeToSearch->getAnyNominal() : nullptr;
+    auto *decl = typeToSearch ? typeToSearch->getNominalTypeDecl() : nullptr;
     if (decl) {
       SmallVector<ValueDecl *, 2> foundMembers;
       decl->getParentModule()->lookupQualified(
@@ -3851,7 +3851,7 @@ static Type substituteConcreteType(GenericSignatureBuilder &builder,
     auto parentPA = basePA->getEquivalenceClassIfPresent();
     parentType =
         parentPA->concreteType ? parentPA->concreteType : parentPA->superclass;
-    auto parentDecl = parentType->getAnyNominal();
+    auto parentDecl = parentType->getNominalTypeDecl();
 
     subMap = parentType->getMemberSubstitutionMap(parentDecl->getParentModule(),
                                                   concreteDecl);
@@ -4544,7 +4544,7 @@ bool GenericSignatureBuilder::updateSuperclass(
                        type.getDependentType(*this))->viaDerived(*this);
     addLayoutRequirementDirect(type,
                          LayoutConstraint::getLayoutConstraint(
-                             superclass->getClassOrBoundGenericClass()->isObjC()
+                             superclass->getClassDecl()->isObjC()
                                  ? LayoutConstraintKind::Class
                                  : LayoutConstraintKind::NativeClass,
                              getASTContext()),
@@ -4628,7 +4628,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
 
   // Check whether we have a reasonable constraint type at all.
   if (!constraintType->isExistentialType() &&
-      !constraintType->getClassOrBoundGenericClass()) {
+      !constraintType->getClassDecl()) {
     if (source.getLoc().isValid() && !constraintType->hasError()) {
       auto subjectType = subject.dyn_cast<Type>();
       if (!subjectType)
@@ -5348,7 +5348,7 @@ public:
       return Action::Continue;
 
     // Infer from generic nominal types.
-    auto decl = ty->getAnyNominal();
+    auto decl = ty->getNominalTypeDecl();
     if (!decl) return Action::Continue;
 
     auto genericSig = decl->getGenericSignature();

@@ -459,7 +459,7 @@ namespace {
     }
 
     void collect(IRGenFunction &IGF, CanType type) {
-      auto *decl = type.getNominalOrBoundGenericNominal();
+      auto *decl = type.getNominalTypeDecl();
       GenericTypeRequirements requirements(IGF.IGM, decl);
 
       auto subs =
@@ -489,7 +489,7 @@ static bool isTypeErasedGenericClass(NominalTypeDecl *ntd) {
 }
 
 static bool isTypeErasedGenericClassType(CanType type) {
-  if (auto nom = type->getAnyNominal())
+  if (auto nom = type->getNominalTypeDecl())
     return isTypeErasedGenericClass(nom);
   return false;
 }
@@ -499,7 +499,7 @@ CanType
 irgen::getRuntimeReifiedType(IRGenModule &IGM, CanType type) {
   return CanType(type.transform([&](Type t) -> Type {
     if (isTypeErasedGenericClassType(CanType(t))) {
-      return t->getAnyNominal()->getDeclaredType()->getCanonicalType();
+      return t->getNominalTypeDecl()->getDeclaredType()->getCanonicalType();
     }
     return t;
   }));
@@ -511,7 +511,7 @@ irgen::getRuntimeReifiedType(IRGenModule &IGM, CanType type) {
 llvm::Constant *irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
                                                       CanType type,
                                               bool allowDynamicUninitialized) {
-  auto theDecl = type->getClassOrBoundGenericClass();
+  auto theDecl = type->getClassDecl();
   assert(theDecl && "emitting constant heap metadata ref for non-class type?");
 
   switch (IGM.getClassMetadataStrategy(theDecl)) {
@@ -605,7 +605,7 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
 
   // We are applying generic parameters to a generic type.
   assert(theType->isSpecialized() &&
-         theType->getAnyNominal() == theDecl);
+         theType->getNominalTypeDecl() == theDecl);
 
   // Check to see if we've maybe got a local reference already.
   if (auto cache = IGF.tryGetLocalTypeMetadata(theType, request))
@@ -714,7 +714,7 @@ MetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
   // the metadata for the existential type.
   //
   // This needs to kept in sync with hasRequiredTypeMetadataAccessPattern.
-  auto nominal = type->getAnyNominal();
+  auto nominal = type->getNominalTypeDecl();
   if (nominal && !isa<ProtocolDecl>(nominal)) {
     // Metadata accessors for fully-substituted generic types are
     // emitted with shared linkage.
@@ -1728,7 +1728,7 @@ emitDirectTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
          "cannot emit metadata accessor for context-dependent type");
 
   // We only take this path for non-generic nominal types.
-  auto typeDecl = type->getAnyNominal();
+  auto typeDecl = type->getNominalTypeDecl();
   if (!typeDecl)
     return emitDirectTypeMetadataRef(IGF, type, request);
 
@@ -1833,7 +1833,7 @@ irgen::createTypeMetadataAccessFunction(IRGenModule &IGM, CanType type,
     // For in-place initialization, drill down to the first element.
     case CacheStrategy::SingletonInitialization:
       cacheVariable = IGM.getAddrOfTypeMetadataSingletonInitializationCache(
-                                          type->getAnyNominal(), ForDefinition);
+                                          type->getNominalTypeDecl(), ForDefinition);
       break;
     }
 
@@ -2338,12 +2338,12 @@ namespace {
 
     llvm::Value *visitClassType(CanClassType type,
                                 DynamicMetadataRequest request) {
-      return visitAnyClassType(type->getClassOrBoundGenericClass(), request);
+      return visitAnyClassType(type->getClassDecl(), request);
     }
 
     llvm::Value *visitBoundGenericClassType(CanBoundGenericClassType type,
                                             DynamicMetadataRequest request) {
-      return visitAnyClassType(type->getClassOrBoundGenericClass(), request);
+      return visitAnyClassType(type->getClassDecl(), request);
     }
 
     llvm::Value *visitTupleType(CanTupleType type,
@@ -2502,7 +2502,7 @@ llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type,
     return classPtr;
   }
   
-  if (ClassDecl *theClass = type->getClassOrBoundGenericClass()) {
+  if (ClassDecl *theClass = type->getClassDecl()) {
     if (!hasKnownSwiftMetadata(IGF.IGM, theClass)) {
       llvm::Value *result =
         emitObjCHeapMetadataRef(IGF, theClass, allowUninitialized);

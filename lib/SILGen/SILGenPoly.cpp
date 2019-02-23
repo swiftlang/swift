@@ -332,7 +332,7 @@ RValue Transform::transform(RValue &&input,
 // Single @objc protocol value metatypes can be converted to the ObjC
 // Protocol class type.
 static bool isProtocolClass(Type t) {
-  auto classDecl = t->getClassOrBoundGenericClass();
+  auto classDecl = t->getClassDecl();
   if (!classDecl)
     return false;
 
@@ -476,10 +476,10 @@ ManagedValue Transform::transform(ManagedValue v,
   }
 
   //  - upcasts for classes
-  if (outputSubstType->getClassOrBoundGenericClass() &&
-      inputSubstType->getClassOrBoundGenericClass()) {
-    auto class1 = inputSubstType->getClassOrBoundGenericClass();
-    auto class2 = outputSubstType->getClassOrBoundGenericClass();
+  if (outputSubstType->getClassDecl() &&
+      inputSubstType->getClassDecl()) {
+    auto class1 = inputSubstType->getClassDecl();
+    auto class2 = outputSubstType->getClassDecl();
 
     // CF <-> Objective-C via toll-free bridging.
     if ((class1->getForeignClassKind() == ClassDecl::ForeignKind::CFType) ^
@@ -501,10 +501,10 @@ ManagedValue Transform::transform(ManagedValue v,
   }
 
   // - upcasts for collections
-  if (outputSubstType->getStructOrBoundGenericStruct() &&
-      inputSubstType->getStructOrBoundGenericStruct()) {
-    auto *inputStruct = inputSubstType->getStructOrBoundGenericStruct();
-    auto *outputStruct = outputSubstType->getStructOrBoundGenericStruct();
+  if (outputSubstType->getStructDecl() &&
+      inputSubstType->getStructDecl()) {
+    auto *inputStruct = inputSubstType->getStructDecl();
+    auto *outputStruct = outputSubstType->getStructDecl();
 
     // Attempt collection upcast only if input and output declarations match.
     if (inputStruct == outputStruct) {
@@ -527,7 +527,7 @@ ManagedValue Transform::transform(ManagedValue v,
   }
 
   //  - upcasts from an archetype
-  if (outputSubstType->getClassOrBoundGenericClass()) {
+  if (outputSubstType->getClassDecl()) {
     if (auto archetypeType = dyn_cast<ArchetypeType>(inputSubstType)) {
       if (archetypeType->getSuperclass()) {
         // Replace the cleanup with a new one on the superclass value so we
@@ -609,7 +609,7 @@ ManagedValue Transform::transform(ManagedValue v,
 
   // - T : Hashable to AnyHashable
   if (isa<StructType>(outputSubstType) &&
-      outputSubstType->getAnyNominal() ==
+      outputSubstType->getNominalTypeDecl() ==
         SGF.getASTContext().getAnyHashableDecl()) {
     auto *protocol = SGF.getASTContext().getProtocol(
         KnownProtocolKind::Hashable);

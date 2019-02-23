@@ -154,7 +154,7 @@ public:
                                              /*allow uninitialized*/ false);
     classMetadata = Builder.CreateBitCast(classMetadata, IGM.ObjCClassPtrTy);
     metaclassMetadata = IGM.getAddrOfMetaclassObject(
-                                       origTy.getClassOrBoundGenericClass(),
+                                       origTy.getClassDecl(),
                                                          NotForDefinition);
     metaclassMetadata = llvm::ConstantExpr::getBitCast(metaclassMetadata,
                                                    IGM.ObjCClassPtrTy);
@@ -2982,7 +2982,7 @@ llvm::Function *
 IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
                                               ForDefinition_t forDefinition) {
   assert(!type->hasArchetype() && !type->hasTypeParameter());
-  NominalTypeDecl *Nominal = type->getNominalOrBoundGenericNominal();
+  NominalTypeDecl *Nominal = type->getNominalTypeDecl();
   IRGen.noteUseOfTypeMetadata(Nominal);
 
   LinkEntity entity = LinkEntity::forTypeMetadataAccessFunction(type);
@@ -3138,7 +3138,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
 
   if (isPattern) {
     assert(isConstant && "Type metadata patterns must be constant");
-    auto addr = getAddrOfTypeMetadataPattern(concreteType->getAnyNominal(),
+    auto addr = getAddrOfTypeMetadataPattern(concreteType->getNominalTypeDecl(),
                                              init, section);
 
     return cast<llvm::GlobalValue>(addr);
@@ -3149,7 +3149,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
   TypeMetadataAddress addrKind;
   unsigned adjustmentIndex;
 
-  if (concreteType->getClassOrBoundGenericClass()) {
+  if (concreteType->getClassDecl()) {
     addrKind = TypeMetadataAddress::FullMetadata;
     adjustmentIndex = MetadataAdjustmentIndex::Class;
   } else {
@@ -3176,7 +3176,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
     addUsedGlobal(var);
 
   // Keep type metadata around for all types.
-  if (auto nominal = concreteType->getAnyNominal())
+  if (auto nominal = concreteType->getNominalTypeDecl())
     addRuntimeResolvableType(nominal);
 
   // For concrete metadata, declare the alias to its address point.
@@ -3236,12 +3236,12 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   // point.
   } else if (isa<ClassType>(concreteType) ||
              isa<BoundGenericClassType>(concreteType)) {
-    assert(!concreteType->getClassOrBoundGenericClass()->isForeign()
+    assert(!concreteType->getClassDecl()->isForeign()
            && "metadata for foreign classes should be emitted as "
               "foreign candidate");
     defaultVarTy = TypeMetadataStructTy;
     adjustmentIndex = 0;
-  } else if (auto nom = concreteType->getAnyNominal()) {
+  } else if (auto nom = concreteType->getNominalTypeDecl()) {
     assert(!isa<ClangModuleUnit>(nom->getModuleScopeContext())
            && "metadata for foreign type should be emitted as "
               "foreign candidate");
@@ -3260,7 +3260,7 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
   // If this is a use, and the type metadata is emitted lazily,
   // trigger lazy emission of the metadata.
-  if (NominalTypeDecl *nominal = concreteType->getAnyNominal()) {
+  if (NominalTypeDecl *nominal = concreteType->getNominalTypeDecl()) {
     IRGen.noteUseOfTypeMetadata(nominal);
   }
 

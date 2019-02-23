@@ -865,7 +865,7 @@ bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet 
         if (!reportRef(TAD, IdLoc, Info, None))
           return false;
         if (auto Ty = TAD->getUnderlyingTypeLoc().getType()) {
-          NTD = Ty->getAnyNominal();
+          NTD = Ty->getNominalTypeDecl();
           isImplicit = true;
         }
       } else {
@@ -880,7 +880,7 @@ bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet 
   }
 
   if (Ty.getType()) {
-    if (auto nominal = Ty.getType()->getAnyNominal())
+    if (auto nominal = Ty.getType()->getNominalTypeDecl())
       if (!reportRelatedRef(nominal, Ty.getLoc(), /*isImplicit=*/false, Relations, Related))
         return false;
   }
@@ -972,7 +972,7 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
 NominalTypeDecl *
 IndexSwiftASTWalker::getTypeLocAsNominalTypeDecl(const TypeLoc &Ty) {
   if (Type T = Ty.getType())
-    return T->getAnyNominal();
+    return T->getNominalTypeDecl();
   if (auto *T = dyn_cast_or_null<IdentTypeRepr>(Ty.getTypeRepr())) {
     auto Comp = T->getComponentRange().back();
     if (auto NTD = dyn_cast_or_null<NominalTypeDecl>(Comp->getBoundDecl()))
@@ -1218,7 +1218,7 @@ bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,
       auto paramList = D->getParameters();
       if (!paramList->getArray().empty()) {
         auto param = paramList->get(0);
-        if (auto nominal = param->getType()->getAnyNominal()) {
+        if (auto nominal = param->getType()->getNominalTypeDecl()) {
           addRelation(Info, (SymbolRoleSet) SymbolRole::RelationIBTypeOf, nominal);
         }
       }
@@ -1310,7 +1310,7 @@ bool IndexSwiftASTWalker::initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc,
     else if (auto MetaT = ReceiverTy->getAs<MetatypeType>())
       ReceiverTy = MetaT->getInstanceType();
 
-    if (auto TyD = ReceiverTy->getAnyNominal()) {
+    if (auto TyD = ReceiverTy->getNominalTypeDecl()) {
       if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationReceivedBy, TyD))
         return true;
       if (isDynamicCall(BaseE, D))

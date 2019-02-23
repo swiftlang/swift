@@ -62,8 +62,8 @@ PrintOptions PrintOptions::printTypeInterface(Type T) {
   result.PrintExtensionFromConformingProtocols = true;
   result.TransformContext = TypeTransformContext(T);
   result.printExtensionContentAsMembers = [T](const ExtensionDecl *ED) {
-    return isExtensionApplied(*T->getNominalOrBoundGenericNominal()->
-                              getDeclContext(), T, ED);
+    return isExtensionApplied(*T->getNominalTypeDecl()->getDeclContext(),
+                              T, ED);
   };
   result.CurrentPrintabilityChecker.reset(new ModulePrinterPrintableChecker());
   return result;
@@ -471,7 +471,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       }
       if (auto *CD = dyn_cast<ClassDecl>(Back)) {
         if (auto Super = CD->getSuperclass())
-          Unhandled.push_back(Super->getAnyNominal());
+          Unhandled.push_back(Super->getNominalTypeDecl());
       }
     }
 

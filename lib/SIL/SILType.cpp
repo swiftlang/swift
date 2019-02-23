@@ -139,7 +139,7 @@ SILType SILType::getFieldType(VarDecl *field, SILModule &M) const {
                               field, nullptr)->getCanonicalType();
   }
   auto loweredTy = M.Types.getLoweredType(origFieldTy, substFieldTy);
-  if (isAddress() || getClassOrBoundGenericClass() != nullptr) {
+  if (isAddress() || getClassDecl() != nullptr) {
     return loweredTy.getAddressType();
   } else {
     return loweredTy.getObjectType();
@@ -147,7 +147,7 @@ SILType SILType::getFieldType(VarDecl *field, SILModule &M) const {
 }
 
 SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
-  assert(elt->getDeclContext() == getEnumOrBoundGenericEnum());
+  assert(elt->getDeclContext() == getEnumDecl());
   assert(elt->hasAssociatedValues());
 
   if (auto objectType = getASTType().getOptionalObjectType()) {
@@ -253,7 +253,7 @@ bool SILType::aggregateContainsRecord(SILType Record, SILModule &Mod) const {
     }
 
     // Then if we have an enum...
-    if (EnumDecl *E = Ty.getEnumOrBoundGenericEnum()) {
+    if (EnumDecl *E = Ty.getEnumDecl()) {
       for (auto Elt : E->getAllElements())
         if (Elt->hasAssociatedValues())
           Worklist.push_back(Ty.getEnumElementType(Elt, Mod));
@@ -261,7 +261,7 @@ bool SILType::aggregateContainsRecord(SILType Record, SILModule &Mod) const {
     }
 
     // Then if we have a struct address...
-    if (StructDecl *S = Ty.getStructOrBoundGenericStruct())
+    if (StructDecl *S = Ty.getStructDecl())
       for (VarDecl *Var : S->getStoredProperties())
         Worklist.push_back(Ty.getFieldType(Var, Mod));
 
@@ -277,7 +277,7 @@ bool SILType::aggregateContainsRecord(SILType Record, SILModule &Mod) const {
 }
 
 bool SILType::aggregateHasUnreferenceableStorage() const {
-  if (auto s = getStructOrBoundGenericStruct()) {
+  if (auto s = getStructDecl()) {
     return s->hasUnreferenceableStorage();
   }
   return false;

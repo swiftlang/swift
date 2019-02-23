@@ -792,7 +792,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       BNK_Double,
     };
     BitcastableNumberKind getBitcastableNumberKind(Type t) const {
-      auto decl = t->getNominalOrBoundGenericNominal();
+      auto decl = t->getNominalTypeDecl();
 #define MATCH_DECL(type) \
       if (decl == TC.Context.get##type##Decl()) \
         return BNK_##type;
@@ -915,7 +915,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
           auto d = TC.diagnose(DRE->getLoc(),
                          diag::bitcasting_to_change_pointer_kind,
                          fromTy, toTy,
-                         toTy->getStructOrBoundGenericStruct()->getName());
+                         toTy->getStructDecl()->getName());
           if (subExpr) {
             StringRef before, after;
             switch (toPTK) {
@@ -2060,8 +2060,8 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
     Type normalizedOverrideTy = normalizeType(overrideTy, overrideSpec);
     if (!bridged->isEqual(normalizedOverrideTy)) {
       // If both are nominal types, check again, ignoring generic arguments.
-      auto *overrideNominal = normalizedOverrideTy->getAnyNominal();
-      if (!overrideNominal || bridged->getAnyNominal() != overrideNominal) {
+      auto *overrideNominal = normalizedOverrideTy->getNominalTypeDecl();
+      if (!overrideNominal || bridged->getNominalTypeDecl() != overrideNominal) {
         return false;
       }
     }
@@ -2711,10 +2711,10 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
   if (auto *KPA = dyn_cast<KeyPathApplicationExpr>(E)) {
     auto &C = KPA->getType()->getASTContext();
     KPA->getKeyPath()->walk(*this);
-    if (KPA->getKeyPath()->getType()->getAnyNominal()
+    if (KPA->getKeyPath()->getType()->getNominalTypeDecl()
           == C.getWritableKeyPathDecl())
       markStoredOrInOutExpr(KPA->getBase(), RK_Written|RK_Read);
-    if (KPA->getKeyPath()->getType()->getAnyNominal()
+    if (KPA->getKeyPath()->getType()->getNominalTypeDecl()
           == C.getReferenceWritableKeyPathDecl())
       markStoredOrInOutExpr(KPA->getBase(), RK_Read);
     return;
@@ -3857,7 +3857,7 @@ static void diagnoseDeprecatedWritableKeyPath(TypeChecker &TC, const Expr *E,
         return;
 
       if (auto *keyPathExpr = dyn_cast<KeyPathExpr>(E->getKeyPath())) {
-        auto *decl = keyPathExpr->getType()->getNominalOrBoundGenericNominal();
+        auto *decl = keyPathExpr->getType()->getNominalTypeDecl();
         if (decl != TC.Context.getWritableKeyPathDecl() &&
             decl != TC.Context.getReferenceWritableKeyPathDecl())
           return;
@@ -4070,7 +4070,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
   } while (true);
 
   // Nominal types.
-  if (auto nominal = type->getAnyNominal()) {
+  if (auto nominal = type->getNominalTypeDecl()) {
     // If we have a collection, get the element type.
     if (auto bound = type->getAs<BoundGenericType>()) {
       ASTContext &ctx = nominal->getASTContext();

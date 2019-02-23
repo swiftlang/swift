@@ -728,7 +728,7 @@ static bool isPublicOrUsableFromInline(Type ty) {
     // to be able to print it by desugaring.
     if (auto *aliasTy = dyn_cast<TypeAliasType>(typePart.getPointer()))
       return !isPublicOrUsableFromInline(aliasTy->getDecl());
-    if (auto *nominal = typePart->getAnyNominal())
+    if (auto *nominal = typePart->getNominalTypeDecl())
       return !isPublicOrUsableFromInline(nominal);
     return false;
   });

@@ -170,7 +170,7 @@ printTypeInterface(ModuleDecl *M, Type Ty, ASTPrinter &Printer,
     return true;
   }
   Ty = Ty->getRValueType();
-  if (auto ND = Ty->getNominalOrBoundGenericNominal()) {
+  if (auto ND = Ty->getNominalTypeDecl()) {
     PrintOptions Options = PrintOptions::printTypeInterface(Ty.getPointer());
     ND->print(Printer, Options);
     printTypeNameToString(Ty, TypeName);

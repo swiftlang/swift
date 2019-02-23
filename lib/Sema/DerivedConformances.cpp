@@ -95,7 +95,7 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
           auto parentDC = enumDecl->getDeclContext();
           ASTContext &C = parentDC->getASTContext();
 
-          auto nominal = rawType->getAnyNominal();
+          auto nominal = rawType->getNominalTypeDecl();
           return nominal == C.getStringDecl() || nominal == C.getIntDecl();
         }
 

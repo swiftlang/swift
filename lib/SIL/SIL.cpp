@@ -80,7 +80,7 @@ swift::getLinkageForProtocolConformance(const RootProtocolConformance *C,
   if (isa<ClangModuleUnit>(C->getDeclContext()->getModuleScopeContext()))
     return SILLinkage::Shared;
 
-  auto typeDecl = C->getType()->getNominalOrBoundGenericNominal();
+  auto typeDecl = C->getType()->getNominalTypeDecl();
   AccessLevel access = std::min(C->getProtocol()->getEffectiveAccess(),
                                 typeDecl->getEffectiveAccess());
   switch (access) {
@@ -108,7 +108,7 @@ bool SILModule::isTypeMetadataAccessible(CanType type) {
     // Note that this function returns true if the type is *illegal* to use.
 
     // Ignore non-nominal types.
-    auto decl = type.getNominalOrBoundGenericNominal();
+    auto decl = type.getNominalTypeDecl();
     if (!decl)
       return false;
 

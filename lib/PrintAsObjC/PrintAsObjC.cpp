@@ -47,12 +47,12 @@ using namespace swift;
 using namespace swift::objc_translation;
 
 static bool isNSObjectOrAnyHashable(ASTContext &ctx, Type type) {
-  if (auto classDecl = type->getClassOrBoundGenericClass()) {
+  if (auto classDecl = type->getClassDecl()) {
     return classDecl->getName()
              == ctx.getSwiftId(KnownFoundationEntity::NSObject) &&
            classDecl->getModuleContext()->getName() == ctx.Id_ObjectiveC;
   }
-  if (auto nomDecl = type->getAnyNominal()) {
+  if (auto nomDecl = type->getNominalTypeDecl()) {
     return nomDecl == ctx.getAnyHashableDecl();
   }
 
@@ -1060,7 +1060,7 @@ private:
     assert(genericTy->getGenericArgs().size() == 1);
 
     auto argTy = genericTy->getGenericArgs().front();
-    if (auto classDecl = argTy->getClassOrBoundGenericClass())
+    if (auto classDecl = argTy->getClassDecl())
       os << "IBOutletCollection(" << getNameForObjC(classDecl) << ") ";
     else
       os << "IBOutletCollection(id) ";
@@ -1087,7 +1087,7 @@ private:
   /// Returns true if \p ty can be used with Objective-C reference-counting
   /// annotations like \c strong and \c weak.
   bool isObjCReferenceCountableObjectType(Type ty) {
-    if (auto classDecl = ty->getClassOrBoundGenericClass()) {
+    if (auto classDecl = ty->getClassDecl()) {
       switch (classDecl->getForeignClassKind()) {
       case ClassDecl::ForeignKind::Normal:
       case ClassDecl::ForeignKind::RuntimeOnly:
@@ -1157,7 +1157,7 @@ private:
         copyTy = unwrappedTy;
       }
 
-      auto nominal = copyTy->getNominalOrBoundGenericNominal();
+      auto nominal = copyTy->getNominalTypeDecl();
       if (nominal && isa<StructDecl>(nominal)) {
         if (nominal == ctx.getArrayDecl() ||
             nominal == ctx.getDictionaryDecl() ||
@@ -1370,7 +1370,7 @@ private:
     if (!objcType) return nullptr;
 
     // Dig out the Objective-C class.
-    return objcType->getClassOrBoundGenericClass();
+    return objcType->getClassDecl();
   }
 
   /// If the nominal type is bridged to Objective-C (via a conformance
@@ -1647,7 +1647,7 @@ private:
 
   void visitStructType(StructType *ST,
                        Optional<OptionalTypeKind> optionalKind) {
-    const StructDecl *SD = ST->getStructOrBoundGenericStruct();
+    const StructDecl *SD = ST->getStructDecl();
 
     // Handle known type names.
     if (printIfKnownSimpleType(SD, optionalKind))
@@ -1683,7 +1683,7 @@ private:
 
     // Use the type as bridged to Objective-C unless the element type is itself
     // an imported type or a collection.
-    const StructDecl *SD = ty->getStructOrBoundGenericStruct();
+    const StructDecl *SD = ty->getStructDecl();
     if (ty->isAny()) {
       ty = ctx.getAnyObjectType();
     } else if (SD != ctx.getArrayDecl() &&
@@ -1762,7 +1762,7 @@ private:
   void visitBoundGenericClassType(BoundGenericClassType *BGT,
                                   Optional<OptionalTypeKind> optionalKind) {
     // Only handle imported ObjC generics.
-    auto CD = BGT->getClassOrBoundGenericClass();
+    auto CD = BGT->getClassDecl();
     if (!CD->isObjC())
       return visitType(BGT, optionalKind);
     
@@ -1807,7 +1807,7 @@ private:
   }
 
   void visitClassType(ClassType *CT, Optional<OptionalTypeKind> optionalKind) {
-    const ClassDecl *CD = CT->getClassOrBoundGenericClass();
+    const ClassDecl *CD = CT->getClassDecl();
     assert(CD->isObjC());
     auto clangDecl = dyn_cast_or_null<clang::NamedDecl>(CD->getClangDecl());
     if (clangDecl) {
@@ -1840,7 +1840,7 @@ private:
     }
 
     if (auto superclass = layout.explicitSuperclass) {
-      auto *CD = superclass->getClassOrBoundGenericClass();
+      auto *CD = superclass->getClassDecl();
       assert(CD->isObjC());
       if (isMetatype) {
         os << "SWIFT_METATYPE(" << getNameForObjC(CD) << ")";

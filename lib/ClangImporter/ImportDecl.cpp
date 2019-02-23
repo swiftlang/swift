@@ -769,7 +769,7 @@ makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
   assert (anonymousFieldDecl && "anonymous field not generated");
 
   auto anonymousFieldType = anonymousFieldDecl->getInterfaceType();
-  auto anonymousFieldTypeDecl = anonymousFieldType->getStructOrBoundGenericStruct();
+  auto anonymousFieldTypeDecl = anonymousFieldType->getStructDecl();
 
   VarDecl *anonymousInnerFieldDecl = nullptr;
   for (auto decl : anonymousFieldTypeDecl->lookupDirect(importedFieldDecl->getName())) {
@@ -2419,7 +2419,7 @@ namespace {
                   dyn_cast<TypeAliasType>(SwiftType.getPointer()))
               return NAT->getDecl();
 
-            auto *NTD = SwiftType->getAnyNominal();
+            auto *NTD = SwiftType->getNominalTypeDecl();
             assert(NTD);
             return NTD;
           }
@@ -3759,7 +3759,7 @@ namespace {
       // If the declaration we attached the 'objc' attribute to is within a
       // class, record it in the class.
       if (auto contextTy = decl->getDeclContext()->getDeclaredInterfaceType()) {
-        if (auto classDecl = contextTy->getClassOrBoundGenericClass()) {
+        if (auto classDecl = contextTy->getClassDecl()) {
           if (auto method = dyn_cast<AbstractFunctionDecl>(decl)) {
             if (name)
               classDecl->recordObjCMethod(method, *name);
@@ -3796,7 +3796,7 @@ namespace {
                     llvm::function_ref<bool(AbstractFunctionDecl *fn)> filter) {
       // We only need to perform this check for classes.
       auto classDecl
-        = dc->getDeclaredInterfaceType()->getClassOrBoundGenericClass();
+        = dc->getDeclaredInterfaceType()->getClassDecl();
       if (!classDecl)
         return false;
 
@@ -4472,7 +4472,7 @@ namespace {
         if (!nsObjectTy)
           return nullptr;
         const ClassDecl *nsObjectDecl =
-          nsObjectTy->getClassOrBoundGenericClass();
+          nsObjectTy->getClassDecl();
 
         auto result = createFakeRootClass(Impl.SwiftContext.Id_Protocol,
                                       nsObjectDecl->getDeclContext());
@@ -4601,7 +4601,7 @@ namespace {
       // If the superclass is runtime-only, our class is also. This only
       // matters in the case above.
       if (superclassType) {
-        auto superclassDecl = cast<ClassDecl>(superclassType->getAnyNominal());
+        auto superclassDecl = cast<ClassDecl>(superclassType->getNominalTypeDecl());
         auto kind = superclassDecl->getForeignClassKind();
         if (kind != ClassDecl::ForeignKind::Normal)
           result->setForeignClassKind(kind);
@@ -5243,7 +5243,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
 
   // Local function to add a known protocol only when the
   // underlying type conforms to it.
-  auto computedNominal = computedPropertyUnderlyingType->getAnyNominal();
+  auto computedNominal = computedPropertyUnderlyingType->getNominalTypeDecl();
   auto transferKnown = [&](KnownProtocolKind kind) {
     if (!computedNominal)
       return false;
@@ -7989,7 +7989,7 @@ ClangImporter::Implementation::importDeclContextOf(
 
         // Look through typealiases.
         if (auto typealias = dyn_cast<TypeAliasDecl>(decl))
-          importedDC = typealias->getDeclaredInterfaceType()->getAnyNominal();
+          importedDC = typealias->getDeclaredInterfaceType()->getNominalTypeDecl();
         else // Map to a nominal type declaration.
           importedDC = dyn_cast<NominalTypeDecl>(decl);
         break;

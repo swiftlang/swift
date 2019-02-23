@@ -1183,7 +1183,7 @@ static ValueDecl *lookupMember(Parser &P, Type Ty, DeclBaseName Name,
   if (auto MetaTy = CheckTy->getAs<AnyMetatypeType>())
     CheckTy = MetaTy->getInstanceType();
 
-  if (auto nominal = CheckTy->getAnyNominal()) {
+  if (auto nominal = CheckTy->getNominalTypeDecl()) {
     auto found = nominal->lookupDirect(Name);
     Lookup.append(found.begin(), found.end());
   } else if (auto moduleTy = CheckTy->getAs<ModuleType>()) {

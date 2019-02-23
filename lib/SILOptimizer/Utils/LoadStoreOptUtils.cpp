@@ -43,7 +43,7 @@ void
 LSValue::reduceInner(LSLocation &Base, SILModule *M, LSLocationValueMap &Values,
                      SILInstruction *InsertPt) {
   // If this is a class reference type, we have reached end of the type tree.
-  if (Base.getType(M).getClassOrBoundGenericClass())
+  if (Base.getType(M).getClassDecl())
     return;
 
   // This a don't expand node.
@@ -191,7 +191,7 @@ static bool
 getSubLocations(LSLocationList &SubLocations, LSLocation Base, SILModule *M,
              const LSLocationList &Locs) {
   // If this is a class reference type, we have reached end of the type tree.
-  if (Base.getType(M).getClassOrBoundGenericClass())
+  if (Base.getType(M).getClassDecl())
     return false;
 
   // Don't expand if it would be too complex. As Locs is a list (and not a set)

@@ -128,7 +128,7 @@ bool SROAMemoryUseAnalyzer::analyze() {
   SILType Type = AI->getType();
 
   TT = Type.getAs<TupleType>();
-  SD = Type.getStructOrBoundGenericStruct();
+  SD = Type.getStructDecl();
   bool HasUnrefField = AI->getElementType().aggregateHasUnreferenceableStorage();
 
   // Check that the allocated type is a struct or a tuple and that there are

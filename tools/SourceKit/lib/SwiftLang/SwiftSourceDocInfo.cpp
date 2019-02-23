@@ -719,7 +719,7 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   auto BaseType = findBaseTypeForReplacingArchetype(VD, ContainerTy);
   bool InSynthesizedExtension = false;
   if (BaseType) {
-    if (auto Target = BaseType->getAnyNominal()) {
+    if (auto Target = BaseType->getNominalTypeDecl()) {
       SynthesizedExtensionAnalyzer Analyzer(Target,
                                           PrintOptions::printModuleInterface());
       InSynthesizedExtension = Analyzer.isInSynthesizedExtension(VD);
@@ -739,7 +739,7 @@ static bool passCursorInfoForDecl(SourceFile* SF,
     SwiftLangSupport::printUSR(VD, OS);
     if (InSynthesizedExtension) {
         OS << LangSupport::SynthesizedUSRSeparator;
-        SwiftLangSupport::printUSR(BaseType->getAnyNominal(), OS);
+        SwiftLangSupport::printUSR(BaseType->getNominalTypeDecl(), OS);
     }
   }
   unsigned USREnd = SS.size();
@@ -800,7 +800,7 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   unsigned GroupBegin = SS.size();
   {
     llvm::raw_svector_ostream OS(SS);
-    auto *GroupVD = InSynthesizedExtension ? BaseType->getAnyNominal() : VD;
+    auto *GroupVD = InSynthesizedExtension ? BaseType->getNominalTypeDecl() : VD;
     if (auto OP = GroupVD->getGroupName())
       OS << OP.getValue();
   }

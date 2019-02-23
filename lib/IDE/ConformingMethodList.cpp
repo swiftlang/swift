@@ -107,7 +107,7 @@ void ConformingMethodListCallbacks::resolveExpectedTypes(
 
   for (auto name : names) {
     if (auto ty = Demangle::getTypeForMangling(ctx, name)) {
-      if (auto Proto = dyn_cast_or_null<ProtocolDecl>(ty->getAnyGeneric()))
+      if (auto Proto = dyn_cast_or_null<ProtocolDecl>(ty->getGenericTypeDecl()))
         result.push_back(Proto);
     }
   }

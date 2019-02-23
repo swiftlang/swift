@@ -1777,7 +1777,7 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
                                        ClassDecl *classDecl,
                                        Type superclassTy,
                                        ConstructorDecl *superclassCtor) {
-  auto *superclassDecl = superclassTy->getAnyNominal();
+  auto *superclassDecl = superclassTy->getNominalTypeDecl();
 
   auto *moduleDecl = classDecl->getParentModule();
   auto subMap = superclassTy->getContextSubstitutionMap(
@@ -1994,7 +1994,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   auto *superclassCtorDecl =
       superclassCtor->getDeclContext()->getSelfNominalTypeDecl();
   Type superclassTy = classDecl->getSuperclass();
-  NominalTypeDecl *superclassDecl = superclassTy->getAnyNominal();
+  NominalTypeDecl *superclassDecl = superclassTy->getNominalTypeDecl();
   if (superclassCtorDecl != superclassDecl) {
     return nullptr;
   }

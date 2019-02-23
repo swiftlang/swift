@@ -1101,7 +1101,7 @@ public:
                 TypeDecl *origTypeDecl = typeAliasDecl
                   ->getDeclaredInterfaceType()
                   ->getDesugaredType()
-                  ->getNominalOrBoundGenericNominal();
+                  ->getNominalTypeDecl();
                 if (origTypeDecl) {
                   printOrDumpDecl(origTypeDecl, doPrint);
                   typeDecl = origTypeDecl;

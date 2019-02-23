@@ -888,12 +888,12 @@ static StringRef getTypeName(SDKContext &Ctx, Type Ty,
   if (auto *NAT = dyn_cast<TypeAliasType>(Ty.getPointer())) {
     return NAT->getDecl()->getNameStr();
   }
-  if (Ty->getAnyNominal()) {
+  if (Ty->getNominalTypeDecl()) {
     if (IsImplicitlyUnwrappedOptional) {
       assert(Ty->getOptionalObjectType());
       return StringRef("ImplicitlyUnwrappedOptional");
     }
-    return Ty->getAnyNominal()->getNameStr();
+    return Ty->getNominalTypeDecl()->getNameStr();
   }
 #define TYPE(id, parent)                                                      \
   if (Ty->getKind() == TypeKind::id) {                                        \
@@ -1098,7 +1098,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info) :
   if (isFunctionTypeNoEscape(Ty))
     TypeAttrs.push_back(TypeAttrKind::TAK_noescape);
   // If this is a nominal type, get its Usr.
-  if (auto *ND = Ty->getAnyNominal()) {
+  if (auto *ND = Ty->getNominalTypeDecl()) {
     Usr = calculateUsr(Ctx, ND);
   }
 }
@@ -1160,7 +1160,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
   // Get enum raw type name if this is an enum.
   if (auto *ED = dyn_cast<EnumDecl>(VD)) {
     if (auto RT = ED->getRawType()) {
-      if (auto *D = RT->getNominalOrBoundGenericNominal()) {
+      if (auto *D = RT->getNominalTypeDecl()) {
         EnumRawTypeName = D->getName().str();
       }
     }

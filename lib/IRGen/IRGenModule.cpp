@@ -755,7 +755,7 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
     return true;
 
   NominalTypeDecl *ConformingTy =
-    wt->getConformingType()->getNominalOrBoundGenericNominal();
+    wt->getConformingType()->getNominalTypeDecl();
 
   switch (ConformingTy->getEffectiveAccess()) {
     case AccessLevel::Private:

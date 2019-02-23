@@ -565,7 +565,7 @@ public:
   LoadInst *isLoadInstToHandle(SILInstruction *Inst) {
     if (auto *LI = dyn_cast<LoadInst>(Inst)) {
       if (!ArrayType ||
-          LI->getType().getNominalOrBoundGenericNominal() != ArrayType) {
+          LI->getType().getNominalTypeDecl() != ArrayType) {
         return LI;
       }
     }

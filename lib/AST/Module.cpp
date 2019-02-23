@@ -696,7 +696,7 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
   if (type->is<UnresolvedType>())
     return ProtocolConformanceRef(protocol);
 
-  auto nominal = type->getAnyNominal();
+  auto nominal = type->getNominalTypeDecl();
 
   // If we don't have a nominal type, there are no conformances.
   if (!nominal || isa<ProtocolDecl>(nominal)) return None;
@@ -717,7 +717,7 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
     // Dig out the conforming nominal type.
     auto rootConformance = inherited->getRootNormalConformance();
     auto conformingClass
-      = rootConformance->getType()->getClassOrBoundGenericClass();
+      = rootConformance->getType()->getClassDecl();
 
     // Map up to our superclass's type.
     auto superclassTy = type->getSuperclassForDecl(conformingClass);

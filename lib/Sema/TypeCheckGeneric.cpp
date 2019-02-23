@@ -1019,7 +1019,7 @@ RequirementRequest::evaluate(Evaluator &evaluator,
   case RequirementReprKind::TypeConstraint: {
     Type subject = resolveType(reqRepr.getSubjectLoc());
     Type constraint = resolveType(reqRepr.getConstraintLoc());
-    return Requirement(constraint->getClassOrBoundGenericClass()
+    return Requirement(constraint->getClassDecl()
                          ? RequirementKind::Superclass
                          : RequirementKind::Conformance,
                        subject, constraint);

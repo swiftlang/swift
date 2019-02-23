@@ -1995,7 +1995,7 @@ void IRGenSILFunction::visitValueMetatypeInst(swift::ValueMetatypeInst *i) {
   
   Explosion e;
   
-  if (instanceTy.getClassOrBoundGenericClass()) {
+  if (instanceTy.getClassDecl()) {
     e.add(emitDynamicTypeOfHeapObject(*this,
                            getClassBaseValue(*this, i->getOperand()),
                            metaTy->getRepresentation(), instanceTy));
@@ -4022,8 +4022,8 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
     return;
 
   Type Desugared = Decl->getType()->getDesugaredType();
-  if (Desugared->getClassOrBoundGenericClass() ||
-      Desugared->getStructOrBoundGenericStruct())
+  if (Desugared->getClassDecl() ||
+      Desugared->getStructDecl())
     zeroInit(dyn_cast<llvm::AllocaInst>(addr.getAddress().getAddress()));
   emitDebugInfoForAllocStack(i, type, addr.getAddress().getAddress());
 }
@@ -4848,7 +4848,7 @@ void IRGenSILFunction::visitBridgeObjectToRefInst(
   llvm::Value *taggedRef = nullptr;
   llvm::Value *boBits = nullptr;
   
-  ClassDecl *Cl = i->getType().getClassOrBoundGenericClass();
+  ClassDecl *Cl = i->getType().getClassDecl();
   if (IGM.TargetInfo.hasObjCTaggedPointers() &&
       (!Cl || !isKnownNotTaggedPointer(IGM, Cl))) {
     boBits = Builder.CreatePtrToInt(bo, IGM.SizeTy);
@@ -5472,7 +5472,7 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
     // Load the superclass of the static type of the 'self' value.
     llvm::Value *superMetadata;
     auto instanceTy = CanType(baseType.getASTType()->getMetatypeInstanceType());
-    if (!IGM.hasResilientMetadata(instanceTy.getClassOrBoundGenericClass(),
+    if (!IGM.hasResilientMetadata(instanceTy.getClassDecl(),
                                   ResilienceExpansion::Maximal)) {
       // It's still possible that the static type of 'self' is not resilient, in
       // which case we can assume its superclass.

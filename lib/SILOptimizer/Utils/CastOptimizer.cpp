@@ -107,7 +107,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
 
   // AnyHashable is a special case - it does not conform to NSObject -
   // If AnyHashable - Bail out of the optimization
-  if (auto DT = Target.getNominalOrBoundGenericNominal()) {
+  if (auto DT = Target.getNominalTypeDecl()) {
     if (DT == M.getASTContext().getAnyHashableDecl()) {
       return nullptr;
     }
@@ -351,7 +351,7 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
   // Generate code to invoke _bridgeToObjectiveC
   SILBuilderWithScope Builder(Inst, BuilderContext);
 
-  auto *NTD = Source.getNominalOrBoundGenericNominal();
+  auto *NTD = Source.getNominalTypeDecl();
   assert(NTD);
   auto Members = NTD->lookupDirect(M.getASTContext().Id_bridgeToObjectiveC);
   if (Members.empty()) {
@@ -376,12 +376,12 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
   if (!Mod)
     return nullptr;
   SmallVector<ValueDecl *, 2> Results;
-  Mod->lookupMember(Results, Source.getNominalOrBoundGenericNominal(),
+  Mod->lookupMember(Results, Source.getNominalTypeDecl(),
                     M.getASTContext().Id_bridgeToObjectiveC, Identifier());
   ArrayRef<ValueDecl *> ResultsRef(Results);
   if (ResultsRef.empty()) {
     M.getSwiftModule()->lookupMember(
-        Results, Source.getNominalOrBoundGenericNominal(),
+        Results, Source.getNominalTypeDecl(),
         M.getASTContext().Id_bridgeToObjectiveC, Identifier());
     ResultsRef = Results;
   }
@@ -628,10 +628,10 @@ SILInstruction *CastOptimizer::optimizeBridgedCasts(
   // and that one of the types is a class and another one is a struct.
   if (source.isAnyExistentialType() || target.isAnyExistentialType() ||
       source->is<ArchetypeType>() || target->is<ArchetypeType>() ||
-      (source.getClassOrBoundGenericClass() &&
-       !target.getStructOrBoundGenericStruct()) ||
-      (target.getClassOrBoundGenericClass() &&
-       !source.getStructOrBoundGenericStruct()))
+      (source.getClassDecl() &&
+       !target.getStructDecl()) ||
+      (target.getClassDecl() &&
+       !source.getStructDecl()))
     return nullptr;
 
   // Casts involving non-bound generic types cannot be optimized.
@@ -659,9 +659,9 @@ SILInstruction *CastOptimizer::optimizeBridgedCasts(
     return nullptr;
   }
 
-  if ((CanBridgedSourceTy && CanBridgedSourceTy->getAnyNominal() ==
+  if ((CanBridgedSourceTy && CanBridgedSourceTy->getNominalTypeDecl() ==
                                  M.getASTContext().getNSErrorDecl()) ||
-      (CanBridgedTargetTy && CanBridgedSourceTy->getAnyNominal() ==
+      (CanBridgedTargetTy && CanBridgedSourceTy->getNominalTypeDecl() ==
                                  M.getASTContext().getNSErrorDecl())) {
     // FIXME: Can't optimize bridging with NSError.
     return nullptr;
@@ -1396,7 +1396,7 @@ static bool optimizeStaticallyKnownProtocolConformance(
     auto &Ctx = Mod.getASTContext();
     auto *SM = Mod.getSwiftModule();
 
-    auto Proto = dyn_cast<ProtocolDecl>(TargetType->getAnyNominal());
+    auto Proto = dyn_cast<ProtocolDecl>(TargetType->getNominalTypeDecl());
     if (!Proto)
       return false;
 

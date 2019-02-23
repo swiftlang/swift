@@ -1669,7 +1669,7 @@ protected:
 static SILValue createStructExtract(SILBuilder &B, SILLocation Loc,
                                     SILValue Opd, unsigned FieldNo) {
   SILType Ty = Opd->getType();
-  auto SD = Ty.getStructOrBoundGenericStruct();
+  auto SD = Ty.getStructDecl();
   auto Properties = SD->getStoredProperties();
   unsigned Counter = 0;
   for (auto *D : Properties)

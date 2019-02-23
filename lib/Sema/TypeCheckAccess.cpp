@@ -686,7 +686,7 @@ public:
         if (ty->is<ProtocolCompositionType>())
           if (auto superclass = ty->getExistentialLayout().explicitSuperclass)
             ty = superclass;
-        return ty->getAnyNominal() == superclassDecl;
+        return ty->getNominalTypeDecl() == superclassDecl;
       });
       // Sanity check: we couldn't find the superclass for whatever reason
       // (possibly because it's synthetic or something), so don't bother
@@ -1231,7 +1231,7 @@ public:
         if (ty->is<ProtocolCompositionType>())
           if (auto superclass = ty->getExistentialLayout().explicitSuperclass)
             ty = superclass;
-        return ty->getAnyNominal() == superclassDecl;
+        return ty->getNominalTypeDecl() == superclassDecl;
       });
       // Sanity check: we couldn't find the superclass for whatever reason
       // (possibly because it's synthetic or something), so don't bother

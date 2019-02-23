@@ -101,7 +101,7 @@ static bool isLargeLoadableType(GenericEnvironment *GenericEnv, SILType t,
     canType = GenericEnv->mapTypeIntoContext(canType)->getCanonicalType();
   }
 
-  if (canType.getAnyGeneric()) {
+  if (canType.getGenericTypeDecl()) {
     assert(t.isObject() && "Expected only two categories: address and object");
     assert(!canType->hasTypeParameter());
     const TypeInfo &TI = Mod.getTypeInfoForLowered(canType);

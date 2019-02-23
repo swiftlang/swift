@@ -1033,7 +1033,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
       auto Found = false;
       if (auto *Base = MRE->getBase()) {
-        if (hasRevertRawRepresentableChange(Base->getType()->getAnyNominal())) {
+        if (hasRevertRawRepresentableChange(Base->getType()->getNominalTypeDecl())) {
           Found = true;
         }
       }
@@ -1056,7 +1056,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       auto Found = false;
       if (auto *CRC = dyn_cast<ConstructorRefCallExpr>(CE->getFn())) {
         if (auto *TE = dyn_cast<TypeExpr>(CRC->getBase())) {
-          if (hasRevertRawRepresentableChange(TE->getInstanceType()->getAnyNominal()))
+          if (hasRevertRawRepresentableChange(TE->getInstanceType()->getNominalTypeDecl()))
             Found = true;
         }
       }

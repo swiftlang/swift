@@ -923,7 +923,7 @@ public:
 };
 
 static bool hasArrayType(SILValue Value, SILModule &M) {
-  return Value->getType().getNominalOrBoundGenericNominal() ==
+  return Value->getType().getNominalTypeDecl() ==
            M.getASTContext().getArrayDecl();
 }
 

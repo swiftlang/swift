@@ -374,7 +374,7 @@ isAcceptableOutletType(Type type, bool &isArray, TypeChecker &TC) {
   if (type->isObjCExistentialType() || type->isAny())
     return None; // @objc existential types are okay
 
-  auto nominal = type->getAnyNominal();
+  auto nominal = type->getNominalTypeDecl();
 
   if (auto classDecl = dyn_cast_or_null<ClassDecl>(nominal)) {
     if (classDecl->isObjC())
@@ -846,7 +846,7 @@ static bool checkObjectOrOptionalObjectType(TypeChecker &TC, Decl *D,
   if (auto unwrapped = ty->getOptionalObjectType())
     ty = unwrapped;
 
-  if (auto classDecl = ty->getClassOrBoundGenericClass()) {
+  if (auto classDecl = ty->getClassDecl()) {
     // @objc class types are okay.
     if (!classDecl->isObjC()) {
       TC.diagnose(D, diag::ibaction_nonobjc_class_argument,
@@ -1061,7 +1061,7 @@ void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
       // Do a rough check to allow any ObjC-representable struct or enum type
       // on iOS.
       Type ty = paramList->get(0)->getType();
-      if (auto nominal = ty->getAnyNominal())
+      if (auto nominal = ty->getNominalTypeDecl())
         if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))
           if (!nominal->isOptionalDecl())
             if (ty->isTriviallyRepresentableIn(ForeignLanguage::ObjectiveC,
@@ -1472,7 +1472,7 @@ void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
     return;
   }
   // Only classes can have required constructors.
-  if (parentTy->getClassOrBoundGenericClass()) {
+  if (parentTy->getClassDecl()) {
     // The constructor must be declared within the class itself.
     // FIXME: Allow an SDK overlay to add a required initializer to a class
     // defined in Objective-C

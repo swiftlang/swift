@@ -424,7 +424,7 @@ static void checkInheritanceClause(
     }
 
     // If this is a class type, it may be the superclass.
-    if (inheritedTy->getClassOrBoundGenericClass()) {
+    if (inheritedTy->getClassDecl()) {
       // First, check if we already had a superclass.
       if (superclassTy) {
         // FIXME: Check for shadowed protocol names, i.e., NSObject?
@@ -555,7 +555,7 @@ static ArrayRef<EnumDecl *> getInheritedForCycleCheck(TypeChecker &tc,
                                                       EnumDecl *enumDecl,
                                                       EnumDecl **scratch) {
   if (enumDecl->hasRawType()) {
-    *scratch = enumDecl->getRawType()->getEnumOrBoundGenericEnum();
+    *scratch = enumDecl->getRawType()->getEnumDecl();
     return *scratch ? ArrayRef<EnumDecl*>(*scratch) : ArrayRef<EnumDecl*>{};
   }
   return { };
@@ -1775,7 +1775,7 @@ static NominalTypeDecl *resolveSingleNominalTypeDecl(
   if (tc.validateType(typeLoc, TypeResolution::forInterface(DC), options))
     return nullptr;
 
-  return typeLoc.getType()->getAnyNominal();
+  return typeLoc.getType()->getNominalTypeDecl();
 }
 
 static bool checkDesignatedTypes(OperatorDecl *OD,
@@ -2716,7 +2716,7 @@ public:
     CD->addImplicitDestructor();
 
     if (auto superclassTy = CD->getSuperclass()) {
-      ClassDecl *Super = superclassTy->getClassOrBoundGenericClass();
+      ClassDecl *Super = superclassTy->getClassDecl();
 
       if (auto *SF = CD->getParentSourceFile()) {
         if (auto *tracker = SF->getReferencedNameTracker()) {
@@ -3392,7 +3392,7 @@ bool swift::isMemberOperator(FuncDecl *decl, Type type) {
     // Look through a metatype reference, if there is one.
     paramType = paramType->getMetatypeInstanceType();
 
-    auto nominal = paramType->getAnyNominal();
+    auto nominal = paramType->getNominalTypeDecl();
     if (type.isNull()) {
       // Is it the same nominal type?
       if (selfNominal && nominal == selfNominal)
@@ -3400,7 +3400,7 @@ bool swift::isMemberOperator(FuncDecl *decl, Type type) {
     } else {
       // Is it the same nominal type? Or a generic (which may or may not match)?
       if (paramType->is<GenericTypeParamType>() ||
-          nominal == type->getAnyNominal())
+          nominal == type->getNominalTypeDecl())
         return true;
     }
 
@@ -4009,7 +4009,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // extensions thereof.
     if (CD->isConvenienceInit()) {
       if (auto extType = CD->getDeclContext()->getDeclaredInterfaceType()) {
-        auto extClass = extType->getClassOrBoundGenericClass();
+        auto extClass = extType->getClassDecl();
 
         // Forbid convenience inits on Foreign CF types, as Swift does not yet
         // support user-defined factory inits.
@@ -4023,8 +4023,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
             CD->getAttrs().getAttribute<ConvenienceAttr>()->getLocation();
 
           // Produce a tailored diagnostic for structs and enums.
-          bool isStruct = extType->getStructOrBoundGenericStruct() != nullptr;
-          if (isStruct || extType->getEnumOrBoundGenericEnum()) {
+          bool isStruct = extType->getStructDecl() != nullptr;
+          if (isStruct || extType->getEnumDecl()) {
             diagnose(CD->getLoc(), diag::enumstruct_convenience_init,
                      isStruct ? "structs" : "enums")
               .fixItRemove(ConvenienceLoc);
@@ -4045,7 +4045,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       // If we implement the ability for extensions defined in the same module
       // (or the same file) to add vtable entries, we can re-evaluate this
       // restriction.
-      if (extType->getClassOrBoundGenericClass() &&
+      if (extType->getClassDecl() &&
           isa<ExtensionDecl>(CD->getDeclContext()) &&
           !(CD->getAttrs().hasAttribute<DynamicReplacementAttr>())) {
         diagnose(CD->getLoc(), diag::designated_init_in_extension, extType)
@@ -4455,7 +4455,7 @@ static bool isPassThroughTypealias(TypeAliasDecl *typealias) {
   // Pass-through only makes sense when the typealias refers to a nominal
   // type.
   Type underlyingType = typealias->getUnderlyingTypeLoc().getType();
-  auto nominal = underlyingType->getAnyNominal();
+  auto nominal = underlyingType->getNominalTypeDecl();
   if (!nominal) return false;
 
   // Check that the nominal type and the typealias are either both generic
@@ -4520,7 +4520,7 @@ static Type formExtensionInterfaceType(
     type = type->getCanonicalType();
 
   Type parentType = type->getNominalParent();
-  GenericTypeDecl *genericDecl = type->getAnyGeneric();
+  GenericTypeDecl *genericDecl = type->getGenericTypeDecl();
 
   // Reconstruct the parent, if there is one.
   if (parentType) {
@@ -4538,7 +4538,7 @@ static Type formExtensionInterfaceType(
   auto typealias = dyn_cast<TypeAliasDecl>(genericDecl);
   if (!nominal) {
     Type underlyingType = typealias->getUnderlyingTypeLoc().getType();
-    nominal = underlyingType->getNominalOrBoundGenericNominal();
+    nominal = underlyingType->getNominalTypeDecl();
   }
 
   // Form the result.
@@ -4665,7 +4665,7 @@ static void validateExtendedType(ExtensionDecl *ext, TypeChecker &tc) {
   // Hack to allow extending a generic typealias.
   if (auto *unboundGeneric = extendedType->getAs<UnboundGenericType>()) {
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
-      auto extendedNominal = aliasDecl->getDeclaredInterfaceType()->getAnyNominal();
+      auto extendedNominal = aliasDecl->getDeclaredInterfaceType()->getNominalTypeDecl();
       if (extendedNominal) {
         extendedType = extendedNominal->getDeclaredType();
         if (!isPassThroughTypealias(aliasDecl))
@@ -4684,7 +4684,7 @@ static void validateExtendedType(ExtensionDecl *ext, TypeChecker &tc) {
   }
 
   // Cannot extend function types, tuple types, etc.
-  if (!extendedType->getAnyNominal()) {
+  if (!extendedType->getNominalTypeDecl()) {
     tc.diagnose(ext->getLoc(), diag::non_nominal_extension, extendedType)
       .highlight(ext->getExtendedTypeLoc().getSourceRange());
     ext->setInvalid();
@@ -4697,7 +4697,7 @@ static void validateExtendedType(ExtensionDecl *ext, TypeChecker &tc) {
   if (extendedType->isSpecialized() &&
       !isNonGenericTypeAliasType(extendedType)) {
     tc.diagnose(ext->getLoc(), diag::extension_specialization,
-                extendedType->getAnyNominal()->getName())
+                extendedType->getNominalTypeDecl()->getName())
     .highlight(ext->getExtendedTypeLoc().getSourceRange());
     ext->setInvalid();
     ext->getExtendedTypeLoc().setInvalidType(tc.Context);
@@ -5233,7 +5233,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       return;
     }
 
-    auto *superclassDecl = superclassTy->getClassOrBoundGenericClass();
+    auto *superclassDecl = superclassTy->getClassDecl();
     assert(superclassDecl && "Superclass of class is not a class?");
     if (!superclassDecl->addedImplicitInitializers())
       addImplicitConstructors(superclassDecl);

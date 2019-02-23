@@ -170,7 +170,7 @@ llvm::Constant *IRGenModule::getTypeRef(CanType type, MangledTypeRefRole role) {
   case MangledTypeRefRole::Metadata:
     // Note that we're using all of the nominal types referenced by this type.
     type.findIf([&](CanType type) -> bool {
-      if (auto nominal = type.getAnyNominal())
+      if (auto nominal = type.getNominalTypeDecl())
         this->IRGen.noteUseOfTypeMetadata(nominal);
       return false;
     });
@@ -274,7 +274,7 @@ protected:
       // In effect they're treated like an opaque blob, which is OK
       // for now, at least until we want to import C++ types or
       // something like that.
-      if (auto Nominal = t->getAnyNominal())
+      if (auto Nominal = t->getNominalTypeDecl())
         if (Nominal->hasClangNode()) {
           if (isa<StructDecl>(Nominal) ||
               isa<EnumDecl>(Nominal))
@@ -366,7 +366,7 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
   void layout() override {
     // If the conforming type is generic, we just want to emit the
     // unbound generic type here.
-    auto *Nominal = Conformance->getType()->getAnyNominal();
+    auto *Nominal = Conformance->getType()->getNominalTypeDecl();
     assert(Nominal && "Structural conformance?");
 
     PrettyStackTraceDecl DebugStack("emitting associated type metadata",

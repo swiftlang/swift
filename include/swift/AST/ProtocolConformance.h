@@ -969,7 +969,7 @@ public:
   /// Get the declaration context that contains the conforming extension or
   /// nominal type declaration.
   DeclContext *getDeclContext() const {
-    auto bgc = getType()->getClassOrBoundGenericClass();
+    auto bgc = getType()->getClassDecl();
 
     // In some cases, we may not have a BGC handy, in which case we should
     // delegate to the inherited conformance for the decl context.

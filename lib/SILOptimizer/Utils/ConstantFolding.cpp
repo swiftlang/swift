@@ -1077,7 +1077,7 @@ bool maybeExplicitFPCons(BuiltinInst *BI, const BuiltinInfo &Builtin) {
   // construction of Double could be a part of an explicit conversion
   // and suppress the warning.
   auto &astCtx = BI->getModule().getASTContext();
-  auto *typeDecl = callExpr->getType()->getCanonicalType().getAnyNominal();
+  auto *typeDecl = callExpr->getType()->getCanonicalType().getNominalTypeDecl();
   return (typeDecl && typeDecl == astCtx.getDoubleDecl());
 }
 

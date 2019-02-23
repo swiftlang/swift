@@ -64,7 +64,7 @@ bool DestructorAnalysis::isSafeType(CanType Ty) {
   //   * either it implements the _DestructorSafeContainer protocol and
   //     all the type parameters are safe types.
   //   * or all stored properties are safe types.
-  if (auto *Struct = Ty->getStructOrBoundGenericStruct()) {
+  if (auto *Struct = Ty->getStructDecl()) {
 
     if (implementsDestructorSafeContainerProtocol(Struct) &&
         areTypeParametersSafe(Ty))

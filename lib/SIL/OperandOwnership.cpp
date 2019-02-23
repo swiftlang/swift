@@ -422,7 +422,7 @@ OperandOwnershipKindClassifier::checkTerminatorArgumentMatchesDestBB(
       destBB->getArgument(opIndex)->getOwnershipKind();
 
   // Then if we do not have an enum, make sure that the conventions match.
-  if (!getType().getEnumOrBoundGenericEnum()) {
+  if (!getType().getEnumDecl()) {
     auto lifetimeConstraint =
         destBlockArgOwnershipKind.getForwardingLifetimeConstraint();
     return Map::compatibilityMap(destBlockArgOwnershipKind, lifetimeConstraint);
@@ -561,7 +561,7 @@ OperandOwnershipKindClassifier::visitReturnInst(ReturnInst *ri) {
   auto base = *mergedBase;
 
   // TODO: This may not be needed once trivial is any.
-  if (getType().getEnumOrBoundGenericEnum()) {
+  if (getType().getEnumDecl()) {
     return visitEnumArgument(base);
   }
 
@@ -690,7 +690,7 @@ OperandOwnershipKindMap OperandOwnershipKindClassifier::visitApplyParameter(
 
   // Check if we have an enum. If not, then we just check against the passed in
   // convention.
-  if (!getType().getEnumOrBoundGenericEnum()) {
+  if (!getType().getEnumDecl()) {
     // We allow for owned to be passed to apply parameters.
     if (kind != ValueOwnershipKind::Owned) {
       return Map::compatibilityMap(

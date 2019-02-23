@@ -564,7 +564,7 @@ namespace {
     // conforms to the literal protocol and test against it directly.
     // This helps to avoid 'widening' the favored type to the default type for
     // the literal.
-    if (otherArgTy && otherArgTy->getAnyNominal()) {
+    if (otherArgTy && otherArgTy->getNominalTypeDecl()) {
       return otherArgTy->isEqual(paramTy) &&
              tc.conformsToProtocol(otherArgTy, literalProto, CS.DC,
                                    ConformanceCheckFlags::InExpression);

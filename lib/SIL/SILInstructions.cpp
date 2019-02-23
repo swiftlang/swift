@@ -877,7 +877,7 @@ StructInst::StructInst(SILDebugLocation Loc, SILType Ty,
           Elems, Loc, Ty,
           HasOwnership ? *mergeSILValueOwnership(Elems)
                        : ValueOwnershipKind(ValueOwnershipKind::Any)) {
-  assert(!Ty.getStructOrBoundGenericStruct()->hasUnreferenceableStorage());
+  assert(!Ty.getStructDecl()->hasUnreferenceableStorage());
 }
 
 ObjectInst *ObjectInst::create(SILDebugLocation Loc, SILType Ty,
@@ -1458,7 +1458,7 @@ namespace {
     assert(inst->hasDefault() && "doesn't have a default");
     SILType enumType = enumValue->getType();
 
-    EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
+    EnumDecl *decl = enumType.getEnumDecl();
     assert(decl && "switch_enum operand is not an enum");
 
     const SILFunction *F = inst->getFunction();
@@ -1550,7 +1550,7 @@ NullablePtr<EnumElementDecl>
 SwitchEnumInstBase::getUniqueCaseForDestination(SILBasicBlock *BB) {
   SILValue value = getOperand();
   SILType enumType = value->getType();
-  EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
+  EnumDecl *decl = enumType.getEnumDecl();
   assert(decl && "switch_enum operand is not an enum");
   (void)decl;
 
@@ -2365,7 +2365,7 @@ static void computeAggregateFirstLevelSubtypeInfo(
 DestructureStructInst *DestructureStructInst::create(SILModule &M,
                                                      SILDebugLocation Loc,
                                                      SILValue Operand) {
-  assert(Operand->getType().getStructOrBoundGenericStruct() &&
+  assert(Operand->getType().getStructDecl() &&
          "Expected a struct typed operand?!");
 
   llvm::SmallVector<SILType, 8> Types;

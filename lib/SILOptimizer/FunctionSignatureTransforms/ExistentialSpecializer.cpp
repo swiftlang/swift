@@ -99,7 +99,7 @@ bool ExistentialSpecializer::findConcreteTypeFromSoleConformingType(
     return false;
   assert(ArgType.isExistentialType());
   /// Find the protocol decl.
-  auto *PD = dyn_cast<ProtocolDecl>(SwiftArgType->getAnyNominal());
+  auto *PD = dyn_cast<ProtocolDecl>(SwiftArgType->getNominalTypeDecl());
   if (!PD)
     return false;
 

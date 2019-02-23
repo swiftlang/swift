@@ -97,7 +97,7 @@ SuperclassTypeRequest::evaluate(Evaluator &evaluator,
     if (!inheritedType) continue;
 
     // If we found a class, return it.
-    if (inheritedType->getClassOrBoundGenericClass()) {
+    if (inheritedType->getClassDecl()) {
       return inheritedType;
     }
 
@@ -105,7 +105,7 @@ SuperclassTypeRequest::evaluate(Evaluator &evaluator,
     if (inheritedType->isExistentialType()) {
       if (auto superclassType =
             inheritedType->getExistentialLayout().explicitSuperclass) {
-        if (superclassType->getClassOrBoundGenericClass()) {
+        if (superclassType->getClassDecl()) {
           return superclassType;
         }
       }

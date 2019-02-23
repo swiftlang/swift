@@ -4021,13 +4021,13 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       // Ok, we are casting between class-like things. Let's see if we have
       // explicit superclass bounds.
       Type toSuperclass;
-      if (toType->getClassOrBoundGenericClass())
+      if (toType->getClassDecl())
         toSuperclass = toType;
       else
         toSuperclass = toType->getSuperclass();
 
       Type fromSuperclass;
-      if (fromType->getClassOrBoundGenericClass())
+      if (fromType->getClassDecl())
         fromSuperclass = fromType;
       else
         fromSuperclass = fromType->getSuperclass();
@@ -4116,7 +4116,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // The runtime doesn't support casts to CF types and always lets them succeed.
   // This "always fails" diagnosis makes no sense when paired with the CF
   // one.
-  auto clas = toType->getClassOrBoundGenericClass();
+  auto clas = toType->getClassDecl();
   if (clas && clas->getForeignClassKind() == ClassDecl::ForeignKind::CFType)
     return CheckedCastKind::ValueCast;
   
@@ -4125,7 +4125,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // covariance, or for APIs where the generic parameter annotations in the
   // ObjC headers are inaccurate.
   if (clas && clas->usesObjCGenericsModel()) {
-    if (fromType->getClassOrBoundGenericClass() == clas)
+    if (fromType->getClassDecl() == clas)
       return CheckedCastKind::ValueCast;
   }
 

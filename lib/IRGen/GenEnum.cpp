@@ -6137,7 +6137,7 @@ namespace {
 
 const EnumImplStrategy &
 irgen::getEnumImplStrategy(IRGenModule &IGM, SILType ty) {
-  assert(ty.getEnumOrBoundGenericEnum() && "not an enum");
+  assert(ty.getEnumDecl() && "not an enum");
   auto *ti = &IGM.getTypeInfo(ty);
   if (auto *loadableTI = dyn_cast<LoadableTypeInfo>(ti))
     return loadableTI->as<LoadableEnumTypeInfo>().Strategy;

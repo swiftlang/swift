@@ -215,7 +215,7 @@ void CircularityChecker::run() {
 /// \return true if a problem was found and all further processing
 ///   should be aborted.
 bool CircularityChecker::expandType(CanType type, unsigned depth) {
-  if (auto D = type.getAnyNominal()) {
+  if (auto D = type.getNominalTypeDecl()) {
     return expandNominal(type, D, depth);
   } else if (auto tuple = dyn_cast<TupleType>(type)) {
     return expandTuple(tuple, depth);
@@ -323,10 +323,10 @@ bool CircularityChecker::addMember(CanType parentType, ValueDecl *member,
 
   if (isa<TupleType>(memberType)) {
     // Ok, visit tuples.
-  } else if (memberType.getStructOrBoundGenericStruct()) {
+  } else if (memberType.getStructDecl()) {
     // Ok, visit structs.
     // TODO: skip non-generic types in different modules?
-  } else if (auto E = memberType.getEnumOrBoundGenericEnum()) {
+  } else if (auto E = memberType.getEnumDecl()) {
     // Ok, visit non-indirect enums.
     if (E->isIndirect()) return false;
     // TODO: skip non-generic types in different modules?

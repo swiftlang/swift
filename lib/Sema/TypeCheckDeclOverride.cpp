@@ -672,7 +672,7 @@ namespace {
     /// a supertype of the given type.
     Type getSuperMemberDeclType(ValueDecl *baseDecl) const {
       auto selfType = decl->getDeclContext()->getSelfInterfaceType();
-      if (selfType->getClassOrBoundGenericClass()) {
+      if (selfType->getClassDecl()) {
         selfType = selfType->getSuperclass();
         assert(selfType && "No superclass type?");
       }

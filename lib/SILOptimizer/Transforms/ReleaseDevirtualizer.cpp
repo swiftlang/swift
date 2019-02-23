@@ -132,7 +132,7 @@ bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,
                                             SILValue object) {
   LLVM_DEBUG(llvm::dbgs() << "  create dealloc call\n");
 
-  ClassDecl *Cl = AllocType.getClassOrBoundGenericClass();
+  ClassDecl *Cl = AllocType.getClassDecl();
   assert(Cl && "no class type allocated with alloc_ref");
 
   // Find the destructor of the type.
@@ -144,7 +144,7 @@ bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,
     return false;
 
   CanSILFunctionType DeallocType = Dealloc->getLoweredFunctionType();
-  auto *NTD = AllocType.getASTType()->getAnyNominal();
+  auto *NTD = AllocType.getASTType()->getNominalTypeDecl();
   auto AllocSubMap = AllocType.getASTType()
     ->getContextSubstitutionMap(M.getSwiftModule(), NTD);
 

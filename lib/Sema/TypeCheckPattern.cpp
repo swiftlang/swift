@@ -464,7 +464,7 @@ public:
     Type ty = TC.resolveIdentifierType(TypeResolution::forContextual(DC), repr,
                                        options);
     
-    auto *enumDecl = dyn_cast_or_null<EnumDecl>(ty->getAnyNominal());
+    auto *enumDecl = dyn_cast_or_null<EnumDecl>(ty->getNominalTypeDecl());
     if (!enumDecl)
       return nullptr;
 
@@ -578,7 +578,7 @@ public:
       // See first if the entire repr resolves to a type.
       Type enumTy = TC.resolveIdentifierType(TypeResolution::forContextual(DC),
                                              prefixRepr, options);
-      if (!dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal()))
+      if (!dyn_cast_or_null<EnumDecl>(enumTy->getNominalTypeDecl()))
         return nullptr;
 
       referencedElement
@@ -787,7 +787,7 @@ static void requestLayoutForMetadataSources(TypeChecker &tc, Type type) {
     // parameter is of dependent type then the body of a function with said
     // parameter could potentially require the generic type's layout to
     // recover them.
-    if (auto *nominalDecl = type->getAnyNominal()) {
+    if (auto *nominalDecl = type->getNominalTypeDecl()) {
       tc.requestNominalLayout(nominalDecl);
     }
   });
@@ -1225,7 +1225,7 @@ recur:
   case PatternKind::Expr: {
     assert(cast<ExprPattern>(P)->isResolved()
            && "coercing unresolved expr pattern!");
-    if (type->getAnyNominal() == Context.getBoolDecl()) {
+    if (type->getNominalTypeDecl() == Context.getBoolDecl()) {
       // The type is Bool.
       // Check if the pattern is a Bool literal
       auto EP = cast<ExprPattern>(P);
@@ -1365,7 +1365,7 @@ recur:
           // so we have to do this check here. Additionally, .Some
           // isn't a static VarDecl, so the existing mechanics in
           // extractEnumElement won't work.
-          if (type->getAnyNominal() == Context.getOptionalDecl()) {
+          if (type->getNominalTypeDecl() == Context.getOptionalDecl()) {
             if (EEP->getName().str() == "None" ||
                 EEP->getName().str() == "Some") {
               SmallString<4> Rename;
@@ -1417,7 +1417,7 @@ recur:
       // the context type to resolve the parameters.
       else if (parentTy->hasUnboundGenericType()) {
         if (parentTy->is<UnboundGenericType>() &&
-            parentTy->getAnyNominal() == type->getAnyNominal()) {
+            parentTy->getNominalTypeDecl() == type->getNominalTypeDecl()) {
           enumTy = type;
         } else {
           diagnose(EEP->getLoc(), diag::ambiguous_enum_pattern_type,

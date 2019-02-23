@@ -405,7 +405,7 @@ namespace {
     SILType TheStruct;
   public:
     StructNonFixedOffsets(SILType type) : TheStruct(type) {
-      assert(TheStruct.getStructOrBoundGenericStruct());
+      assert(TheStruct.getStructDecl());
     }
     
     llvm::Value *getOffsetForIndex(IRGenFunction &IGF, unsigned index) override {
@@ -414,7 +414,7 @@ namespace {
       // Get the field offset vector from the struct metadata.
       llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(TheStruct);
       Address fieldVector = emitAddressOfFieldOffsetVector(IGF, metadata,
-                                    TheStruct.getStructOrBoundGenericStruct());
+                                    TheStruct.getStructDecl());
       
       // Grab the indexed offset.
       fieldVector = IGF.Builder.CreateConstArrayGEP(fieldVector, index,
@@ -425,7 +425,7 @@ namespace {
     MemberAccessStrategy getFieldAccessStrategy(IRGenModule &IGM,
                                                 unsigned nonFixedIndex) {
       auto start =
-        IGM.getMetadataLayout(TheStruct.getStructOrBoundGenericStruct())
+        IGM.getMetadataLayout(TheStruct.getStructDecl())
           .getFieldOffsetVectorOffset();
 
       // FIXME: Handle resilience
@@ -588,13 +588,13 @@ namespace {
     }
 
     SILType getType(VarDecl *field) {
-      assert(field->getDeclContext() == TheStruct->getAnyNominal());
+      assert(field->getDeclContext() == TheStruct->getNominalTypeDecl());
       auto silType = SILType::getPrimitiveAddressType(TheStruct);
       return silType.getFieldType(field, IGM.getSILModule());
     }
 
     StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
-      return StructLayout(IGM, TheStruct->getAnyNominal(),
+      return StructLayout(IGM, TheStruct->getNominalTypeDecl(),
                           LayoutKind::NonHeapObject,
                           LayoutStrategy::Optimal, fieldTypes, StructTy);
     }

@@ -1763,7 +1763,7 @@ CaseBlocks::CaseBlocks(
   CaseInfos.reserve(rows.size());
   CaseCounts.reserve(rows.size());
 
-  auto enumDecl = sourceType.getEnumOrBoundGenericEnum();
+  auto enumDecl = sourceType.getEnumDecl();
 
   llvm::SmallDenseMap<EnumElementDecl *, unsigned, 16> caseToIndex;
   for (auto &row : rows) {
@@ -2802,7 +2802,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
 
     // Special case: if it's a single @objc enum, we can print the raw value.
     CanType ty = S->getSubjectExpr()->getType()->getCanonicalType();
-    if (auto *singleEnumDecl = ty->getEnumOrBoundGenericEnum()) {
+    if (auto *singleEnumDecl = ty->getEnumDecl()) {
       if (singleEnumDecl->isObjC()) {
         emitDiagnoseOfUnexpectedEnumCaseValue(*this, location,
                                               subject.getFinalManagedValue(),

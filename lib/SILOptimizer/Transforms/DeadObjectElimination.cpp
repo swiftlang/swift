@@ -62,7 +62,7 @@ using UserList = llvm::SmallSetVector<SILInstruction *, 16>;
 // so its destructor cannot be extended at runtime.
 static SILFunction *getDestructor(AllocRefInst *ARI) {
   // We only support classes.
-  ClassDecl *ClsDecl = ARI->getType().getClassOrBoundGenericClass();
+  ClassDecl *ClsDecl = ARI->getType().getClassDecl();
   if (!ClsDecl)
     return nullptr;
 

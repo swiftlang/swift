@@ -3095,7 +3095,7 @@ bool FailureDiagnosis::diagnoseImplicitSelfErrors(
 
       // If base is present but it doesn't represent a valid nominal,
       // we can't use current candidate as one of the choices.
-      if (base && !base->getInterfaceType()->getNominalOrBoundGenericNominal())
+      if (base && !base->getInterfaceType()->getNominalTypeDecl())
         continue;
 
       auto context = decl->getDeclContext();
@@ -3202,7 +3202,7 @@ diagnoseInstanceMethodAsCurriedMemberOnType(CalleeCandidateInfo &CCI,
         }
         assert(TypeDC->isTypeContext() && "Expected type decl context!");
 
-        if (TypeDC->getSelfNominalTypeDecl() == instanceType->getAnyNominal()) {
+        if (TypeDC->getSelfNominalTypeDecl() == instanceType->getNominalTypeDecl()) {
           if (propertyInitializer)
             TC.diagnose(UDE->getLoc(), diag::instance_member_in_initializer,
                         UDE->getName());
@@ -3923,7 +3923,7 @@ bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
                                                ArrayRef<Identifier> argLabels) {
   if (auto *MTT = CS.getType(fnExpr)->getAs<MetatypeType>()) {
     auto instTy = MTT->getInstanceType();
-    if (instTy->getAnyNominal()) {
+    if (instTy->getNominalTypeDecl()) {
       // If we are invoking a constructor on a nominal type and there are
       // absolutely no candidates, then they must all be private.
       if (CCI.empty() || (CCI.size() == 1 && CCI.candidates[0].getDecl() &&
@@ -4533,7 +4533,7 @@ static bool isCastToTypedPointer(ConstraintSystem &CS, const Expr *Fn,
   if (auto ArgOptType = ArgType->getOptionalObjectType())
     ArgType = ArgOptType;
 
-  auto *InitNom = InitType->getAnyNominal();
+  auto *InitNom = InitType->getNominalTypeDecl();
   if (!InitNom)
     return false;
 
@@ -4541,7 +4541,7 @@ static bool isCastToTypedPointer(ConstraintSystem &CS, const Expr *Fn,
       && InitNom != Ctx.getUnsafePointerDecl()) {
     return false;
   }
-  auto *ArgNom = ArgType->getAnyNominal();
+  auto *ArgNom = ArgType->getNominalTypeDecl();
   if (!ArgNom)
     return false;
 
@@ -6209,7 +6209,7 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
     }
 
     // Determine whether we're looking into a Foundation collection.
-    if (auto classDecl = newType->getClassOrBoundGenericClass()) {
+    if (auto classDecl = newType->getClassDecl()) {
       if (classDecl->isObjC() && classDecl->hasClangNode()) {
         SmallString<32> scratch;
         StringRef objcClassName = classDecl->getObjCRuntimeName(scratch);
@@ -7403,7 +7403,7 @@ static void noteGenericParameterSource(const TypeLoc &loc,
   // If we didn't find the type in the TypeRepr, fall back to the type in the
   // type checked expression.
   if (!FoundDecl) {
-    if (const GenericTypeDecl *generic = loc.getType()->getAnyGeneric())
+    if (const GenericTypeDecl *generic = loc.getType()->getGenericTypeDecl())
       if (hasGenericParameter(generic, paramTy))
         FoundDecl = generic;
   }

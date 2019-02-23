@@ -1413,7 +1413,7 @@ public:
     SILType opTy = operand->getType();
     if (opTy.is<TupleType>())
       return createDestructureTuple(loc, operand);
-    if (opTy.getStructOrBoundGenericStruct())
+    if (opTy.getStructDecl())
       return createDestructureStruct(loc, operand);
     llvm_unreachable("Can not emit a destructure for this type of operand.");
   }

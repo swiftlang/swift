@@ -458,7 +458,7 @@ bool SILFunction::hasSelfMetadataParam() const {
       selfTy = dynamicSelfTy.getSelfType();
   }
 
-  return !!selfTy.getClassOrBoundGenericClass();
+  return !!selfTy.getClassDecl();
 }
 
 bool SILFunction::hasName(const char *Name) const {

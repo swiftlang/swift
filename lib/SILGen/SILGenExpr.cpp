@@ -1306,8 +1306,8 @@ RValue SILGenFunction::emitCollectionConversion(SILLocation loc,
                                                 CanType toCollection,
                                                 ManagedValue mv,
                                                 SGFContext C) {
-  auto *fromDecl = fromCollection->getAnyNominal();
-  auto *toDecl = toCollection->getAnyNominal();
+  auto *fromDecl = fromCollection->getNominalTypeDecl();
+  auto *toDecl = toCollection->getNominalTypeDecl();
 
   auto fromSubMap = fromCollection->getContextSubstitutionMap(
     SGM.SwiftModule, fromDecl);
@@ -1345,11 +1345,11 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
   // Get the intrinsic function.
   auto &ctx = SGF.getASTContext();
   FuncDecl *fn = nullptr;
-  if (fromCollection->getAnyNominal() == ctx.getArrayDecl()) {
+  if (fromCollection->getNominalTypeDecl() == ctx.getArrayDecl()) {
     fn = SGF.SGM.getArrayForceCast(loc);
-  } else if (fromCollection->getAnyNominal() == ctx.getDictionaryDecl()) {
+  } else if (fromCollection->getNominalTypeDecl() == ctx.getDictionaryDecl()) {
     fn = SGF.SGM.getDictionaryUpCast(loc);
-  } else if (fromCollection->getAnyNominal() == ctx.getSetDecl()) {
+  } else if (fromCollection->getNominalTypeDecl() == ctx.getSetDecl()) {
     fn = SGF.SGM.getSetUpCast(loc);
   } else {
     llvm_unreachable("unsupported collection upcast kind");
@@ -2164,7 +2164,7 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
   // If we have a nominal type decl as our base, try to emit the base rvalue's
   // member using special logic that will let us avoid extra retains
   // and releases.
-  if (auto *N = E->getBase()->getType()->getNominalOrBoundGenericNominal())
+  if (auto *N = E->getBase()->getType()->getNominalTypeDecl())
     if (auto RV = NominalTypeMemberRefRValueEmitter(E, C, N).emit(SGF))
       return RValue(std::move(RV.getValue()));
 
@@ -2590,7 +2590,7 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
   
   // Upcast a class instance to the property's declared type if necessary.
   if (auto propertyClass = storage->getDeclContext()->getSelfClassDecl()) {
-    if (baseType->getClassOrBoundGenericClass() != propertyClass) {
+    if (baseType->getClassDecl() != propertyClass) {
       baseType = baseType->getSuperclassForDecl(propertyClass)
         ->getCanonicalType();
       paramSubstValue = subSGF.B.createUpcast(loc, paramSubstValue,

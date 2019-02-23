@@ -97,7 +97,7 @@ public:
   /// True if the memory object is the 'self' argument of a struct initializer.
   bool isStructInitSelf() const {
     if (MemoryInst->isRootSelf() || MemoryInst->isCrossModuleRootSelf()) {
-      if (auto decl = getType()->getAnyNominal()) {
+      if (auto decl = getType()->getNominalTypeDecl()) {
         if (isa<StructDecl>(decl)) {
           return true;
         }
@@ -123,7 +123,7 @@ public:
       return false;
 
     if (!MemoryInst->isVar()) {
-      if (auto decl = getType()->getAnyNominal()) {
+      if (auto decl = getType()->getNominalTypeDecl()) {
         if (isa<ClassDecl>(decl)) {
           return true;
         }

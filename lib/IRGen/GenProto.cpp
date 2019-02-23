@@ -374,7 +374,7 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
       if (!isSelfParameter) return;
-      if (type->getNominalOrBoundGenericNominal()) {
+      if (type->getNominalTypeDecl()) {
         considerNewTypeSource(MetadataSource::Kind::GenericLValueMetadata,
                               paramIndex, type, IsExact);
       }
@@ -384,7 +384,7 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Direct_Guaranteed:
       // Classes are sources of metadata.
-      if (type->getClassOrBoundGenericClass()) {
+      if (type->getClassDecl()) {
         considerNewTypeSource(MetadataSource::Kind::ClassPointer,
                               paramIndex, type, IsInexact);
         return;
@@ -407,7 +407,7 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
         // Thick metatypes for Objective-C parameterized classes are not
         // sources of metadata.
         CanType objTy = metatypeTy.getInstanceType();
-        if (auto classDecl = objTy->getClassOrBoundGenericClass())
+        if (auto classDecl = objTy->getClassDecl())
           if (classDecl->usesObjCGenericsModel())
             return;
 
@@ -545,7 +545,7 @@ void EmitPolymorphicParameters::bindExtraSource(const MetadataSource &source,
       auto selfTy = FnType->getSelfInstanceType();
       CanType argTy = getTypeInContext(selfTy);
       setTypeMetadataName(IGF.IGM, metadata, argTy);
-      auto *CD = selfTy.getClassOrBoundGenericClass();
+      auto *CD = selfTy.getClassDecl();
       // The self metadata here corresponds to the conforming type.
       // For an inheritable conformance, that may be a subclass of the static
       // type, and so the self metadata will be inexact. Currently, all
@@ -1769,7 +1769,7 @@ namespace {
       // Add a relative reference to the type, with the type reference
       // kind stored in the flags.
       auto ref = IGM.getTypeEntityReference(
-                   Conformance->getType()->getAnyNominal());
+                   Conformance->getType()->getNominalTypeDecl());
       B.addRelativeAddress(ref.getValue());
       Flags = Flags.withTypeReferenceKind(ref.getKind());
     }
@@ -1822,7 +1822,7 @@ namespace {
       if (!normal || normal->getConditionalRequirements().empty())
         return;
 
-      auto nominal = normal->getType()->getAnyNominal();
+      auto nominal = normal->getType()->getNominalTypeDecl();
       irgen::addGenericRequirements(IGM, B,
         nominal->getGenericSignatureOfContext(),
         normal->getConditionalRequirements());
@@ -2376,7 +2376,7 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
     auto type = sourceKey.Type;
     if (auto archetypeTy = dyn_cast<ArchetypeType>(type))
       type = archetypeTy->getSuperclass()->getCanonicalType();
-    auto *nominal = type.getAnyNominal();
+    auto *nominal = type.getNominalTypeDecl();
     auto reqtIndex = component.getPrimaryIndex();
 
     GenericTypeRequirements requirements(IGF.IGM, nominal);

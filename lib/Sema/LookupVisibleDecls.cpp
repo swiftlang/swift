@@ -183,7 +183,7 @@ static void doGlobalExtensionLookup(Type BaseType,
                                     LookupState LS,
                                     DeclVisibilityKind Reason,
                                     LazyResolver *TypeResolver) {
-  auto nominal = LookupType->getAnyNominal();
+  auto nominal = LookupType->getNominalTypeDecl();
 
   // Look in each extension of this type.
   for (auto extension : nominal->getExtensions()) {
@@ -213,7 +213,7 @@ static void lookupTypeMembers(Type BaseType, Type LookupType,
                               const DeclContext *CurrDC, LookupState LS,
                               DeclVisibilityKind Reason,
                               LazyResolver *TypeResolver) {
-  NominalTypeDecl *D = LookupType->getAnyNominal();
+  NominalTypeDecl *D = LookupType->getNominalTypeDecl();
   assert(D && "should have a nominal type");
 
   SmallVector<ValueDecl*, 2> FoundDecls;
@@ -374,7 +374,7 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
     Type BaseTy, VisibleDeclConsumer &Consumer, LookupState LS,
     const DeclContext *FromContext, DeclVisibilityKind Reason,
     LazyResolver *TypeResolver, VisitedSet &Visited) {
-  NominalTypeDecl *CurrNominal = BaseTy->getAnyNominal();
+  NominalTypeDecl *CurrNominal = BaseTy->getNominalTypeDecl();
   if (!CurrNominal)
     return;
 
@@ -561,7 +561,7 @@ static void lookupVisibleMemberDeclsImpl(
 
   llvm::SmallPtrSet<ClassDecl *, 8> Ancestors;
   do {
-    NominalTypeDecl *CurNominal = BaseTy->getAnyNominal();
+    NominalTypeDecl *CurNominal = BaseTy->getNominalTypeDecl();
     if (!CurNominal)
       break;
 
@@ -651,10 +651,10 @@ template <> struct DenseMapInfo<FoundDeclTy> {
 // substitution map.
 static Type getBaseTypeForMember(ModuleDecl *M, ValueDecl *OtherVD, Type BaseTy) {
   if (auto *Proto = OtherVD->getDeclContext()->getSelfProtocolDecl()) {
-    if (BaseTy->getClassOrBoundGenericClass()) {
+    if (BaseTy->getClassDecl()) {
       if (auto Conformance = M->lookupConformance(BaseTy, Proto)) {
         auto *Superclass = Conformance->getConcrete()->getRootConformance()
-            ->getType()->getClassOrBoundGenericClass();
+            ->getType()->getClassDecl();
         return BaseTy->getSuperclassForDecl(Superclass);
       }
     }
@@ -741,7 +741,8 @@ public:
     // don't substitute either.
     bool shouldSubst = (!BaseTy->isAnyObject() &&
                         !BaseTy->hasTypeVariable() &&
-                        (BaseTy->getNominalOrBoundGenericNominal() ||
+                        !BaseTy->is<UnboundGenericType>() &&
+                        (BaseTy->getNominalTypeDecl() ||
                          BaseTy->is<ArchetypeType>()) &&
                         VD->getDeclContext()->isTypeContext());
     ModuleDecl *M = DC->getParentModule();

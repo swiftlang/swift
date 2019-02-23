@@ -1986,7 +1986,7 @@ static bool finishLookup(const DeclContext *dc, NLOptions options,
 /// directly references, to facilitate name lookup into those types.
 static void extractDirectlyReferencedNominalTypes(
               Type type, SmallVectorImpl<NominalTypeDecl *> &decls) {
-  if (auto nominal = type->getAnyNominal()) {
+  if (auto nominal = type->getNominalTypeDecl()) {
     decls.push_back(nominal);
     return;
   }
@@ -2004,7 +2004,7 @@ static void extractDirectlyReferencedNominalTypes(
 
     // Look into the superclasses of this archetype.
     if (auto superclass = archetypeTy->getSuperclass()) {
-      if (auto superclassDecl = superclass->getClassOrBoundGenericClass())
+      if (auto superclassDecl = superclass->getClassDecl())
         decls.push_back(superclassDecl);
     }
 
@@ -2020,7 +2020,7 @@ static void extractDirectlyReferencedNominalTypes(
     }
 
     if (auto superclass = layout.explicitSuperclass) {
-      auto *superclassDecl = superclass->getClassOrBoundGenericClass();
+      auto *superclassDecl = superclass->getClassDecl();
       if (superclassDecl)
         decls.push_back(superclassDecl);
     }
@@ -2567,7 +2567,7 @@ static DirectlyReferencedTypeDecls directReferencesForType(Type type) {
     return { 1, aliasType->getDecl() };
 
   // If there is a generic declaration, return it.
-  if (auto genericDecl = type->getAnyGeneric())
+  if (auto genericDecl = type->getGenericTypeDecl())
     return { 1, genericDecl };
 
   if (type->isExistentialType()) {
@@ -2576,7 +2576,7 @@ static DirectlyReferencedTypeDecls directReferencesForType(Type type) {
 
     // Superclass.
     if (auto superclassType = layout.explicitSuperclass) {
-      if (auto superclassDecl = superclassType->getAnyGeneric()) {
+      if (auto superclassDecl = superclassType->getGenericTypeDecl()) {
         result.push_back(superclassDecl);
       }
     }

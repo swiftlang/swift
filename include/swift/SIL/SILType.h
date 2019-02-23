@@ -198,23 +198,23 @@ public:
 
   /// Retrieve the ClassDecl for a type that maps to a Swift class or
   /// bound generic class type.
-  ClassDecl *getClassOrBoundGenericClass() const {
-    return getASTType().getClassOrBoundGenericClass();
+  ClassDecl *getClassDecl() const {
+    return getASTType().getClassDecl();
   }
   /// Retrieve the StructDecl for a type that maps to a Swift struct or
   /// bound generic struct type.
-  StructDecl *getStructOrBoundGenericStruct() const {
-    return getASTType().getStructOrBoundGenericStruct();
+  StructDecl *getStructDecl() const {
+    return getASTType().getStructDecl();
   }
   /// Retrieve the EnumDecl for a type that maps to a Swift enum or
   /// bound generic enum type.
-  EnumDecl *getEnumOrBoundGenericEnum() const {
-    return getASTType().getEnumOrBoundGenericEnum();
+  EnumDecl *getEnumDecl() const {
+    return getASTType().getEnumDecl();
   }
   /// Retrieve the NominalTypeDecl for a type that maps to a Swift
   /// nominal or bound generic nominal type.
-  NominalTypeDecl *getNominalOrBoundGenericNominal() const {
-    return getASTType().getNominalOrBoundGenericNominal();
+  NominalTypeDecl *getNominalTypeDecl() const {
+    return getASTType().getNominalTypeDecl();
   }
   
   /// True if the type is an address type.
@@ -369,9 +369,9 @@ public:
 
   static bool isClassOrClassMetatype(Type t) {
     if (auto *meta = t->getAs<AnyMetatypeType>()) {
-      return bool(meta->getInstanceType()->getClassOrBoundGenericClass());
+      return bool(meta->getInstanceType()->getClassDecl());
     } else {
-      return bool(t->getClassOrBoundGenericClass());
+      return bool(t->getClassDecl());
     }
   }
 

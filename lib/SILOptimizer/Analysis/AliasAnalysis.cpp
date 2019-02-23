@@ -459,7 +459,7 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
   if (RTy.is<BuiltinRawPointerType>())
     return true;
 
-  ClassDecl *LTyClass = LTy.getClassOrBoundGenericClass();
+  ClassDecl *LTyClass = LTy.getClassDecl();
 
   // The Builtin reference types can alias any class instance.
   if (LTyClass) {
@@ -487,19 +487,19 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
     return false;
 
   // Structs do not alias non-structs.
-  StructDecl *LTyStruct = LTy.getStructOrBoundGenericStruct();
-  StructDecl *RTyStruct = RTy.getStructOrBoundGenericStruct();
+  StructDecl *LTyStruct = LTy.getStructDecl();
+  StructDecl *RTyStruct = RTy.getStructDecl();
   if ((LTyStruct && !RTyStruct) || (!LTyStruct && RTyStruct))
     return false;
 
   // Enums do not alias non-enums.
-  EnumDecl *LTyEnum = LTy.getEnumOrBoundGenericEnum();
-  EnumDecl *RTyEnum = RTy.getEnumOrBoundGenericEnum();
+  EnumDecl *LTyEnum = LTy.getEnumDecl();
+  EnumDecl *RTyEnum = RTy.getEnumDecl();
   if ((LTyEnum && !RTyEnum) || (!LTyEnum && RTyEnum))
     return false;
 
   // Classes do not alias non-classes.
-  ClassDecl *RTyClass = RTy.getClassOrBoundGenericClass();
+  ClassDecl *RTyClass = RTy.getClassDecl();
   if ((LTyClass && !RTyClass) || (!LTyClass && RTyClass))
     return false;
 

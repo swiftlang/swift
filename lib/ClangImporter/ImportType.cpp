@@ -745,7 +745,7 @@ namespace {
         case ImportHint::NSUInteger:
           // NSUInteger might be imported as Int rather than UInt depending
           // on where the import lives.
-          if (underlyingResult.AbstractType->getAnyNominal() ==
+          if (underlyingResult.AbstractType->getNominalTypeDecl() ==
               Impl.SwiftContext.getIntDecl())
             break;
           LLVM_FALLTHROUGH;
@@ -981,7 +981,7 @@ namespace {
               type->qual_begin(), type->qual_end()
             };
             auto *nsObjectProto =
-                Impl.getNSObjectProtocolType()->getAnyNominal();
+                Impl.getNSObjectProtocolType()->getNominalTypeDecl();
             if (!nsObjectProto) {
               // Input is malformed
               return {};
@@ -1053,7 +1053,7 @@ namespace {
             if (unboundDecl == Impl.SwiftContext.getDictionaryDecl() ||
                 unboundDecl == Impl.SwiftContext.getSetDecl()) {
               auto &keyType = importedTypeArgs[0];
-              auto keyStructDecl = keyType->getStructOrBoundGenericStruct();
+              auto keyStructDecl = keyType->getStructDecl();
               if (!Impl.matchesHashableBound(keyType) ||
                   // Dictionary and Array conditionally conform to Hashable,
                   // but the conformance doesn't necessarily apply with the
@@ -1256,7 +1256,7 @@ static ImportedType adjustTypeForConcreteImport(
     if (!elementObj)
       return Type();
 
-    auto elementClass = elementObj->getClassOrBoundGenericClass();
+    auto elementClass = elementObj->getClassDecl();
     if (!elementClass)
       return Type();
 
@@ -1430,7 +1430,7 @@ static ImportedType adjustTypeForConcreteImport(
   // pointer, and it's not a portable assumption anyway.)
   if (importKind == ImportTypeKind::Parameter &&
       optKind == OTK_ImplicitlyUnwrappedOptional) {
-    if (auto *nominal = importedType->getNominalOrBoundGenericNominal()) {
+    if (auto *nominal = importedType->getNominalTypeDecl()) {
       if (nominal->getName().str() == "CVaListPointer" &&
           nominal->getParentModule()->isStdlibModule()) {
         optKind = OTK_None;
@@ -2475,9 +2475,9 @@ bool ClangImporter::Implementation::matchesHashableBound(Type type) {
 
   // Struct or enum type must have been bridged.
   // TODO: Check that the bridged type is Hashable?
-  if (type->getStructOrBoundGenericStruct() ||
-      type->getEnumOrBoundGenericEnum()) {
-    auto nominal = type->getAnyNominal();
+  if (type->getStructDecl() ||
+      type->getEnumDecl()) {
+    auto nominal = type->getNominalTypeDecl();
     auto hashable = SwiftContext.getProtocol(KnownProtocolKind::Hashable);
     SmallVector<ProtocolConformance *, 2> conformances;
     return hashable &&

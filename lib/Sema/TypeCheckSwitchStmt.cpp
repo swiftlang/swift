@@ -743,7 +743,7 @@ namespace {
         if (tp->isBool()) {
           arr.push_back(Space::forBool(true));
           arr.push_back(Space::forBool(false));
-        } else if (auto *E = tp->getEnumOrBoundGenericEnum()) {
+        } else if (auto *E = tp->getEnumDecl()) {
           // Look into each case of the enum and decompose it in turn.
           auto children = E->getAllElements();
           std::transform(children.begin(), children.end(),
@@ -819,7 +819,7 @@ namespace {
 
       static bool canDecompose(Type tp, const DeclContext *DC) {
         return tp->is<TupleType>() || tp->isBool() ||
-               tp->getEnumOrBoundGenericEnum();
+               tp->getEnumDecl();
       }
 
       // Search the space for a reason to downgrade exhaustiveness errors to
@@ -1082,7 +1082,7 @@ namespace {
         assert(defaultReason == RequiresDefault::No);
         Type subjectType = Switch->getSubjectExpr()->getType();
         bool shouldIncludeFutureVersionComment = false;
-        if (auto *theEnum = subjectType->getEnumOrBoundGenericEnum()) {
+        if (auto *theEnum = subjectType->getEnumDecl()) {
           shouldIncludeFutureVersionComment =
               theEnum->getParentModule()->isSystemModule();
         }
@@ -1406,7 +1406,7 @@ namespace {
       }
       case PatternKind::EnumElement: {
         auto *VP = cast<EnumElementPattern>(item);
-        TC.validateDecl(item->getType()->getEnumOrBoundGenericEnum());
+        TC.validateDecl(item->getType()->getEnumDecl());
         
         auto *SP = VP->getSubPattern();
         if (!SP) {

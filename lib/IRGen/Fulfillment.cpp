@@ -252,11 +252,11 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
                                          const InterestingKeysCallback &keys) {
   // Objective-C generics don't preserve their generic parameters at runtime,
   // so they aren't able to fulfill type metadata requirements.
-  if (type.getAnyNominal()->hasClangNode()) {
+  if (type.getNominalTypeDecl()->hasClangNode()) {
     return false;
   }
   
-  auto *nominal = type.getAnyNominal();
+  auto *nominal = type.getNominalTypeDecl();
   if (!nominal->isGenericContext() || isa<ProtocolDecl>(nominal)) {
     return false;
   }

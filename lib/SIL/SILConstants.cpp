@@ -660,7 +660,7 @@ static SymbolicValue getIndexedElement(SymbolicValue aggregate,
 
   SymbolicValue elt = aggregate.getAggregateValue()[elementNo];
   Type eltType;
-  if (auto *decl = type->getStructOrBoundGenericStruct()) {
+  if (auto *decl = type->getStructDecl()) {
     auto it = decl->getStoredProperties().begin();
     std::advance(it, elementNo);
     eltType = (*it)->getType();
@@ -704,7 +704,7 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
   if (aggregate.getKind() == SymbolicValue::UninitMemory) {
     unsigned numMembers;
     // We need to have either a struct or a tuple type.
-    if (auto *decl = type->getStructOrBoundGenericStruct()) {
+    if (auto *decl = type->getStructDecl()) {
       numMembers = std::distance(decl->getStoredProperties().begin(),
                                  decl->getStoredProperties().end());
     } else if (auto tuple = type->getAs<TupleType>()) {
@@ -725,7 +725,7 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
 
   ArrayRef<SymbolicValue> oldElts = aggregate.getAggregateValue();
   Type eltType;
-  if (auto *decl = type->getStructOrBoundGenericStruct()) {
+  if (auto *decl = type->getStructDecl()) {
     auto it = decl->getStoredProperties().begin();
     std::advance(it, elementNo);
     eltType = (*it)->getType();

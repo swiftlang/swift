@@ -121,7 +121,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
 
   emitConstructorMetatypeArg(SGF, ctor);
 
-  auto *decl = selfTy.getStructOrBoundGenericStruct();
+  auto *decl = selfTy.getStructDecl();
   assert(decl && "not a struct?!");
 
   // If we have an indirect return slot, initialize it in-place.

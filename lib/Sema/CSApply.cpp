@@ -881,7 +881,7 @@ namespace {
           if ((isa<FuncDecl>(func) &&
                cast<FuncDecl>(func)->hasDynamicSelf()) ||
               (isa<ConstructorDecl>(func) &&
-               containerTy->getClassOrBoundGenericClass())) {
+               containerTy->getClassDecl())) {
             refTy = refTy->replaceCovariantResultType(containerTy, 2);
             if (!baseTy->isEqual(containerTy)) {
               dynamicSelfFnType = refTy->replaceCovariantResultType(baseTy, 2);
@@ -2468,7 +2468,7 @@ namespace {
     void diagnoseAmbiguousNominalMember(Type baseTy, Expr *result) {
       if (auto baseTyUnwrapped = baseTy->lookThroughAllOptionalTypes()) {
         // Return if the base type doesn't have a nominal type decl
-        if (!baseTyUnwrapped->getNominalOrBoundGenericNominal()) {
+        if (!baseTyUnwrapped->getNominalTypeDecl()) {
           return;
         }
         
@@ -2495,7 +2495,7 @@ namespace {
           // Look up the enum case in the unwrapped type to check if it exists
           // as a member
           auto baseTyNominalDecl = baseTyUnwrapped
-                                   ->getNominalOrBoundGenericNominal();
+                                   ->getNominalTypeDecl();
           auto &tc = cs.getTypeChecker();
           auto results = tc.lookupMember(baseTyNominalDecl->getModuleContext(),
                                          baseTyUnwrapped,
@@ -3286,7 +3286,7 @@ namespace {
           auto destObjectType = destValueType;
           if (auto metaTy = destObjectType->getAs<MetatypeType>())
             destObjectType = metaTy->getInstanceType();
-          if (auto destClass = destObjectType->getClassOrBoundGenericClass()) {
+          if (auto destClass = destObjectType->getClassDecl()) {
             if (destClass->getForeignClassKind() ==
                   ClassDecl::ForeignKind::CFType) {
               if (SuppressDiagnostics)
@@ -6270,7 +6270,7 @@ Expr *ExprRewriter::buildObjCBridgeExpr(Expr *expr, Type toType,
     // FIXME: Ideally we would instead have already recorded a restriction
     // when solving the constraint, and we wouldn't need to duplicate this
     // part of coerceToType() here.
-    if (auto foreignClass = toType->getClassOrBoundGenericClass()) {
+    if (auto foreignClass = toType->getClassDecl()) {
       if (foreignClass->getForeignClassKind() ==
             ClassDecl::ForeignKind::CFType) {
         return cs.cacheType(
@@ -6514,7 +6514,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::CFTollFreeBridgeToObjC: {
-      auto foreignClass = fromType->getClassOrBoundGenericClass();
+      auto foreignClass = fromType->getClassDecl();
       auto objcType = foreignClass->getAttrs().getAttribute<ObjCBridgedAttr>()
                         ->getObjCClass()->getDeclaredInterfaceType();
       auto asObjCClass = cs.cacheType(
@@ -6523,7 +6523,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::ObjCTollFreeBridgeToCF: {
-      auto foreignClass = toType->getClassOrBoundGenericClass();
+      auto foreignClass = toType->getClassDecl();
       auto objcType = foreignClass->getAttrs().getAttribute<ObjCBridgedAttr>()
                         ->getObjCClass()->getDeclaredInterfaceType();
       Expr *result = coerceToType(expr, objcType, locator);
@@ -6584,7 +6584,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::DynamicSelf:
   case TypeKind::BoundGenericClass:
   case TypeKind::Class: {
-    if (!toType->getClassOrBoundGenericClass())
+    if (!toType->getClassDecl())
       break;
     for (auto fromSuperClass = fromType->getSuperclass();
          fromSuperClass;
@@ -6679,7 +6679,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       llvm_unreachable("unhandled metatype kind");
     }
     
-    if (auto toClass = toType->getClassOrBoundGenericClass()) {
+    if (auto toClass = toType->getClassDecl()) {
       if (toClass->getName() == cs.getASTContext().Id_Protocol
           && toClass->getModuleContext()->getName()
               == cs.getASTContext().Id_ObjectiveC) {
@@ -7513,7 +7513,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
       return apply;
     }
 
-    assert(ty->getNominalOrBoundGenericNominal() || ty->is<DynamicSelfType>() ||
+    assert(ty->getNominalTypeDecl() || ty->is<DynamicSelfType>() ||
            ty->isExistentialType() || ty->is<ArchetypeType>());
 
     // We have the constructor.

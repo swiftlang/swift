@@ -66,7 +66,7 @@ static bool hasRecursiveCallInPath(SILBasicBlock &Block,
         // Though, this has the added bonus of not looking into vtables
         // outside the current module.  Because we're not doing IPA, let
         // alone cross-module IPA, this is all well and good.
-        auto *BGC = ClassType.getNominalOrBoundGenericNominal();
+        auto *BGC = ClassType.getNominalTypeDecl();
         if (BGC && BGC->getModuleContext() != TargetModule) {
           continue;
         }

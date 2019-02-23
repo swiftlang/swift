@@ -666,7 +666,7 @@ FuncDecl *ASTContext::getPlusFunctionOnRangeReplaceableCollection() const {
         continue;
       for (auto Req: FD->getGenericRequirements()) {
         if (Req.getKind() == RequirementKind::Conformance &&
-              Req.getSecondType()->getNominalOrBoundGenericNominal() ==
+              Req.getSecondType()->getNominalTypeDecl() ==
             getRangeReplaceableCollectionDecl()) {
           getImpl().PlusFunctionOnRangeReplaceableCollection = FD;
         }
@@ -688,13 +688,13 @@ FuncDecl *ASTContext::getPlusFunctionOnString() const {
       if (!FD->getOperatorDecl())
         continue;
       auto ResultType = FD->getResultInterfaceType();
-      if (ResultType->getNominalOrBoundGenericNominal() != getStringDecl())
+      if (ResultType->getNominalTypeDecl() != getStringDecl())
         continue;
       auto ParamList = FD->getParameters();
       if (ParamList->size() != 2)
         continue;
       auto CheckIfStringParam = [this](ParamDecl* Param) {
-        auto Type = Param->getInterfaceType()->getNominalOrBoundGenericNominal();
+        auto Type = Param->getInterfaceType()->getNominalTypeDecl();
         return Type == getStringDecl();
       };
       if (CheckIfStringParam(ParamList->get(0)) &&
@@ -3184,7 +3184,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     // Convenience initializers have a dynamic 'self' in '-swift-version 5'.
     if (Ctx.isSwiftVersionAtLeast(5)) {
       if (wantDynamicSelf && CD->isConvenienceInit())
-        if (auto *classDecl = selfTy->getClassOrBoundGenericClass())
+        if (auto *classDecl = selfTy->getClassDecl())
           if (!classDecl->isFinal())
             isDynamicSelf = true;
     }
@@ -4597,7 +4597,7 @@ static NominalTypeDecl *findUnderlyingTypeInModule(ASTContext &ctx,
     if (auto typealias = dyn_cast<TypeAliasDecl>(result)) {
       if (auto resolver = ctx.getLazyResolver())
         resolver->resolveDeclSignature(typealias);
-      return typealias->getDeclaredInterfaceType()->getAnyNominal();
+      return typealias->getDeclaredInterfaceType()->getNominalTypeDecl();
     }
   }
 
@@ -4853,7 +4853,7 @@ bool ASTContext::isTypeBridgedInExternalModule(
 }
 
 bool ASTContext::isObjCClassWithMultipleSwiftBridgedTypes(Type t) {
-  auto clas = t->getClassOrBoundGenericClass();
+  auto clas = t->getClassDecl();
   if (!clas)
     return false;
   
@@ -4900,7 +4900,7 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
     [&](KnownProtocolKind known) -> Optional<ProtocolConformanceRef> {
       // Don't ascribe any behavior to Optional other than what we explicitly
       // give it. We don't want things like AnyObject?? to work.
-      if (type->getAnyNominal() == getOptionalDecl())
+      if (type->getNominalTypeDecl() == getOptionalDecl())
         return None;
       
       // Find the protocol.
