@@ -485,6 +485,10 @@ public:
   /// has been imported.  Otherwise, this returns null.
   ClassDecl *getTensorHandleDecl() const;
 
+  /// Retrieve the decl for TensorFlow.CTensorHandle iff the TensorFlow module
+  /// has been imported.  Otherwise, this returns null.
+  ClassDecl *getCTensorHandleDecl() const;
+
   /// Retrieve the decl for TensorFlow.TensorShape iff the TensorFlow module
   /// has been imported.  Otherwise, this returns null.
   StructDecl *getTensorShapeDecl() const;

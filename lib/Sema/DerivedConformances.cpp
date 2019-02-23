@@ -67,6 +67,10 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
     return canDeriveKeyPathIterable(Nominal);
 
   // SWIFT_ENABLE_TENSORFLOW
+  if (*knownProtocol == KnownProtocolKind::TensorArrayProtocol)
+    return canDeriveTensorArrayProtocol(Nominal, DC);
+
+  // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::TensorGroup)
     return canDeriveTensorGroup(Nominal, DC);
   
@@ -223,6 +227,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       return getRequirement(KnownProtocolKind::KeyPathIterable);
 
     // SWIFT_ENABLE_TENSORFLOW
+    // TensorArrayProtocol._unpackTensorHandles
+    if (name.isSimpleName(ctx.Id_unpackTensorHandles))
+      return getRequirement(KnownProtocolKind::TensorArrayProtocol);
+
+    // SWIFT_ENABLE_TENSORFLOW
     // TensorGroup._typeList
     if (name.isSimpleName(ctx.Id_typeList))
       return getRequirement(KnownProtocolKind::TensorGroup);
@@ -230,11 +239,6 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     // SWIFT_ENABLE_TENSORFLOW
     // TensorGroup._unknownShapeList
     if (name.isSimpleName(ctx.Id_unknownShapeList))
-      return getRequirement(KnownProtocolKind::TensorGroup);
-
-    // SWIFT_ENABLE_TENSORFLOW
-    // TensorGroup._unpackTensorHandles
-    if (name.isSimpleName(ctx.Id_unpackTensorHandles))
       return getRequirement(KnownProtocolKind::TensorGroup);
 
     // SWIFT_ENABLE_TENSORFLOW

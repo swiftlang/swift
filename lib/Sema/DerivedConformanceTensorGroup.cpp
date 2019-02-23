@@ -119,8 +119,8 @@ deriveBodyTensorGroup_typeList(AbstractFunctionDecl *funcDecl) {
 /// Derive a '_typeList' implementation.
 static ValueDecl *deriveTensorGroup_typeList(DerivedConformance &derived) {
   auto nominal = derived.Nominal;
-  auto &tc = derived.TC;
-  ASTContext &C = tc.Context;
+  auto &TC = derived.TC;
+  ASTContext &C = TC.Context;
 
   auto parentDC = derived.getConformanceContext();
   Type dataTypeArrayType = BoundGenericType::get(
@@ -141,7 +141,7 @@ static ValueDecl *deriveTensorGroup_typeList(DerivedConformance &derived) {
 
   // Create `_typeList` getter.
   auto *getterDecl = derived.declareDerivedPropertyGetter(
-      derived.TC, typeListDecl, returnType);
+      TC, typeListDecl, returnType);
   getterDecl->setBodySynthesizer(deriveBodyTensorGroup_typeList);
   typeListDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
                                 SourceLoc(), {getterDecl}, SourceLoc());
@@ -205,10 +205,11 @@ deriveBodyTensorGroup_unknownShapeList(AbstractFunctionDecl *funcDecl) {
 }
 
 /// Derive a '_unknownShapeList' implementation.
-static ValueDecl *deriveTensorGroup_unknownShapeList(DerivedConformance &derived) {
+static ValueDecl *deriveTensorGroup_unknownShapeList(
+    DerivedConformance &derived) {
   auto nominal = derived.Nominal;
-  auto &tc = derived.TC;
-  ASTContext &C = tc.Context;
+  auto &TC = derived.TC;
+  ASTContext &C = TC.Context;
 
   auto parentDC = derived.getConformanceContext();
   Type shapeArrayType = BoundGenericType::get(
@@ -232,7 +233,7 @@ static ValueDecl *deriveTensorGroup_unknownShapeList(DerivedConformance &derived
 
   // Create `_unknownShapeListDecl` getter.
   auto *getterDecl = derived.declareDerivedPropertyGetter(
-      derived.TC, unknownShapeListDecl, returnType);
+      TC, unknownShapeListDecl, returnType);
   getterDecl->setBodySynthesizer(deriveBodyTensorGroup_unknownShapeList);
   unknownShapeListDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
                                      SourceLoc(), {getterDecl}, SourceLoc());
@@ -243,17 +244,10 @@ static ValueDecl *deriveTensorGroup_unknownShapeList(DerivedConformance &derived
 }
 
 ValueDecl *DerivedConformance::deriveTensorGroup(ValueDecl *requirement) {
-  ASTContext &C = ConformanceDecl->getASTContext();
-
-  // public static var _typeList: [TensorDataType]
-  if (requirement->getBaseName() == C.Id_typeList) {
+  if (requirement->getBaseName() == TC.Context.Id_typeList)
     return deriveTensorGroup_typeList(*this);
-  }
-
-  // public static var _unknownShapeList: [TensorShape?]
-  if (requirement->getBaseName() == C.Id_unknownShapeList) {
+  if (requirement->getBaseName() == TC.Context.Id_unknownShapeList)
     return deriveTensorGroup_unknownShapeList(*this);
-  }
-
+  TC.diagnose(requirement->getLoc(), diag::broken_tensor_group_requirement);
   return nullptr;
 }

@@ -5469,6 +5469,10 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
     return derived.deriveKeyPathIterable(Requirement);
 
   // SWIFT_ENABLE_TENSORFLOW
+	case KnownProtocolKind::TensorArrayProtocol:
+    return derived.deriveTensorArrayProtocol(Requirement);
+  
+  // SWIFT_ENABLE_TENSORFLOW
 	case KnownProtocolKind::TensorGroup:
 	  return derived.deriveTensorGroup(Requirement);
 
