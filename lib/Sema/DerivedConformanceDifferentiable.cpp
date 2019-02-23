@@ -409,6 +409,7 @@ static ValueDecl *deriveDifferentiable_method(
     // constructor is synthesized during SILGen, which is too late.
     auto *initDecl = createImplicitConstructor(
         TC, returnNominal, ImplicitConstructorKind::Memberwise);
+    initDecl->setDeclContext(parentDC);
     if (nominal == returnNominal)
       derived.addMembersToConformanceContext(initDecl);
     else
@@ -624,9 +625,17 @@ deriveDifferentiable_allDifferentiableVariables(DerivedConformance &derived) {
 
   // If all differentiable variables are mutable, derive a setter for
   // `allDifferentiableVariables`.
-  auto allDiffVarsMutable = llvm::all_of(
-      allDiffableVarsStruct->getStoredProperties(),
-      [](VarDecl *decl) -> bool { return decl->isSettable(nullptr); });
+  SmallVector<VarDecl *, 8> diffProperties;
+  getStoredPropertiesForDifferentiation(
+      allDiffableVarsStruct, parentDC, diffProperties);
+  auto allDiffVarsMutable = llvm::all_of(diffProperties,
+      [&](VarDecl *decl) -> bool {
+        if (!decl->isSettable(nullptr))
+          return false;
+        auto *allDiffableVars =
+            getUnderlyingAllDiffableVariables(parentDC, decl);
+        return allDiffableVars->isSettable(nullptr);
+      });
   if (allDiffVarsMutable) {
     auto *setterDecl = derived.declareDerivedPropertySetter(
         derived.TC, allDiffableVarsDecl, returnTy);

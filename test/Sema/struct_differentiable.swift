@@ -306,9 +306,18 @@ struct InvalidInitializer : Differentiable {
 }
 
 struct AllDiffableWithLetHasNoSetter : Differentiable {
-  var a: Float = 0.2
-  let b: Float = 0.3
+  var mutable: Float
+  let immutable: Float
 }
-let valWithoutAllDiffSetter = AllDiffableWithLetHasNoSetter()
-// expected-error {{setter not found TODO}}
+let valWithoutAllDiffSetter = AllDiffableWithLetHasNoSetter(mutable: 1, immutable: 1)
+// expected-error @+1 {{'allDifferentiableVariables' is immutable}}
 valWithoutAllDiffSetter.allDifferentiableVariables = valWithoutAllDiffSetter.allDifferentiableVariables
+
+struct GenericAllDiffableWithLetHasNoSetter<T : Differentiable> : Differentiable {
+  // Though this stored property is mutable, `mutable.allDifferentiableVariables` may not be.
+  var mutable: T
+  func test() {
+    // expected-error @+1 {{'allDifferentiableVariables' is immutable}}
+    self.allDifferentiableVariables = self.allDifferentiableVariables
+  }
+}

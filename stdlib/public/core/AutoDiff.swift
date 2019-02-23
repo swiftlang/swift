@@ -101,16 +101,13 @@ public protocol Differentiable : _Differentiable
         TangentVector.CotangentVector == CotangentVector,
         CotangentVector.TangentVector == CotangentVector,
         CotangentVector.CotangentVector == TangentVector,
+        // NOTE: Tests fail due to these two missing conformances.
+        // CotangentVector.AllDifferentiableVariables == CotangentVector,
+        // TangentVector.AllDifferentiableVariables == TangentVector,
         AllDifferentiableVariables.AllDifferentiableVariables ==
           AllDifferentiableVariables,
         AllDifferentiableVariables.TangentVector == TangentVector,
         AllDifferentiableVariables.CotangentVector == CotangentVector {
-}
-
-public extension Differentiable where AllDifferentiableVariables == Self {
-  var allDifferentiableVariables: AllDifferentiableVariables {
-    return self
-  }
 }
 
 // FIXME: The `Self : AdditiveArithmetic` constraint should be implied by

@@ -130,6 +130,10 @@ extension Tensor : Differentiable
   public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
     return cotangent
   }
+  public var allDifferentiableVariables: AllDifferentiableVariables {
+    get { return self }
+    set { self = newValue }
+  }
 }
 
 //===----------------------------------------------------------------------===//
