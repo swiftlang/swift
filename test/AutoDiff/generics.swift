@@ -41,4 +41,16 @@ extension Tensor where Scalar : Numeric {
 }
 _ = pullback(at: Tensor<Float>(1), in: { $0.variance() })
 
+// Tests TF-277.
+protocol Layer : Differentiable {
+  associatedtype Output : Differentiable
+}
+struct SupervisedTrainer<Model : Layer> {
+  var model: Model
+  var lossFunction: @differentiable (Model.Output, Model.Output) -> Float
+  func fit(y: Model.Output) {
+     _ = gradient(at: Float(1)) { _ in return lossFunction(y, y) }
+  }
+}
+
 // TODO: add more tests.

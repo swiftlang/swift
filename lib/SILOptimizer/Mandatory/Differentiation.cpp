@@ -2991,9 +2991,9 @@ public:
   /// Primal has qualified ownership. We assign store ownership qualifier while
   /// cloning the `store` instruction.
   void visitStoreInst(StoreInst *si) {
-    auto destTy = si->getDest()->getType().getASTType();
+    auto destTy = getOpType(si->getDest()->getType());
     auto loc = remapLocation(si->getLoc());
-    auto soq = getBufferSOQ(getOpASTType(destTy), *getPrimal());
+    auto soq = getBufferSOQ(destTy.getASTType(), *getPrimal());
     getBuilder().createStore(loc, getOpValue(si->getSrc()),
                              getOpValue(si->getDest()), soq);
   }
@@ -3001,9 +3001,9 @@ public:
   /// Primal has qualified ownership. We assign load ownership qualified while
   /// cloning the `load` instruction.
   void visitLoadInst(LoadInst *li) {
-    auto srcTy = li->getOperand()->getType().getASTType();
+    auto srcTy = getOpType(li->getOperand()->getType());
     auto loc = remapLocation(li->getLoc());
-    auto loq = getBufferLOQ(getOpASTType(srcTy), *getPrimal());
+    auto loq = getBufferLOQ(srcTy.getASTType(), *getPrimal());
     mapValue(
         li, getBuilder().createLoad(loc, getOpValue(li->getOperand()), loq));
   }
