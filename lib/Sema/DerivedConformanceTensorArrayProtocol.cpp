@@ -1,4 +1,4 @@
-//===--- DerivedConformanceTensorGroup.cpp ----------------------------===//
+//===--- DerivedConformanceTensorArrayProtocol.cpp ------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements explicit derivation of the TensorGroup protocol for
-// a nominal type.
+// This file implements explicit derivation of the TensorArrayProtocol protocol 
+// for a nominal type.
 //
 //===----------------------------------------------------------------------===//
 
@@ -110,7 +110,8 @@ deriveBodyTensorArrayProtocol_unpackTensorHandles(
   Type intType = C.getIntDecl()->getDeclaredType();
   TypeExpr *intTypeExpr = TypeExpr::createImplicit(intType, C);
 
-  // Go through the member TensorGroups and call `_unpackTensorHandles(into:)`.
+  // Go through the member TensorArrayProtocols and call 
+  // `_unpackTensorHandles(into:)`.
   llvm::SmallVector<ASTNode, 2> memberExprs;
   for (auto member : nominal->getStoredProperties()) {
     auto *memberRefExpr = new (C) DeclRefExpr(member, DeclNameLoc(),
