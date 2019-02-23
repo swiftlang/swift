@@ -261,7 +261,10 @@ private:
   /// results yet?
   bool isLookupDoneWithoutIncludingOuterResults() const;
 
-  void setIndexOfFirstOuterResultIfNotSetAlready();
+  /// Every time lookup finishes searching a scope, call me
+  /// to record the dividing line between results from first fruitful scope and
+  /// the result.
+  void recordCompletionOfAScope();
 
 #pragma mark normal (non-ASTScope-based) lookup declarations
 
@@ -414,10 +417,10 @@ void UnqualifiedLookupFactory::fillInLookup() {
   // TODO: Does the debugger client care about compound names?
   if (Name.isSimpleName() && DebugClient &&
       DebugClient->lookupOverrides(Name.getBaseName(), DC, Loc,
+  recordDependencyOnTopLevelName(DC, Name, isCascadingUse);
                                    isOriginallyTypeLookup, Results))
     return;
 
-  recordDependencyOnTopLevelName(DC, Name, isCascadingUse);
   addPrivateImports(DC);
   if (addNamesKnownToDebugClient(DC))
     return;
@@ -429,7 +432,7 @@ void UnqualifiedLookupFactory::fillInLookup() {
   if (lookForAModuleWithTheGivenName(DC))
     return;
   // Make sure we've recorded the inner-result-boundary.
-  setIndexOfFirstOuterResultIfNotSetAlready(); // DMU elim?
+  recordCompletionOfAScope(); // DMU elim?
 }
 
 bool UnqualifiedLookupFactory::shouldUseASTScopeLookup() const {
@@ -511,7 +514,7 @@ UnqualifiedLookupFactory::lookInScopeForASTScopeLookup(
     Consumer.foundDecl(local, getLocalDeclVisibilityKind(currentScope));
   }
 
-  setIndexOfFirstOuterResultIfNotSetAlready();
+  recordCompletionOfAScope();
   // If we found anything, we're done.
   if (isLookupDoneWithoutIncludingOuterResults())
     return None;
@@ -641,7 +644,7 @@ UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
     } else {
       filterForDiscriminator(Results, DebugClient);
 
-      setIndexOfFirstOuterResultIfNotSetAlready();
+      recordCompletionOfAScope();
       if (isLookupDoneWithoutIncludingOuterResults())
         return None;
     }
@@ -740,7 +743,7 @@ UnqualifiedLookupFactory::lookupInPatternBindingInitializer(
   // instance member lookup.
   if (auto *selfParam = PBI->getImplicitSelfDecl()) {
     Consumer.foundDecl(selfParam, DeclVisibilityKind::FunctionParameter);
-    setIndexOfFirstOuterResultIfNotSetAlready();
+    recordCompletionOfAScope();
     if (isLookupDoneWithoutIncludingOuterResults())
       return None;
     DeclContext *const parent = PBI->getParent();
@@ -789,15 +792,15 @@ UnqualifiedLookupFactory::lookupInFunctionDecl(AbstractFunctionDecl *AFD,
 
     namelookup::FindLocalVal localVal(SM, Loc, Consumer);
     localVal.visit(AFD->getBody());
-    
-    setIndexOfFirstOuterResultIfNotSetAlready();
+
+    recordCompletionOfAScope();
     if (isLookupDoneWithoutIncludingOuterResults())
       return None;
 
     if (auto *P = AFD->getImplicitSelfDecl())
       localVal.checkValueDecl(P, DeclVisibilityKind::FunctionParameter);
     localVal.checkParameterList(AFD->getParameters());
-    setIndexOfFirstOuterResultIfNotSetAlready();
+    recordCompletionOfAScope();
     if (isLookupDoneWithoutIncludingOuterResults())
       return None;
   }
@@ -811,7 +814,7 @@ UnqualifiedLookupFactory::lookupInFunctionDecl(AbstractFunctionDecl *AFD,
 
   // Look in the generic parameters after checking our local declaration.
   addGenericParametersForFunction(AFD);
-  setIndexOfFirstOuterResultIfNotSetAlready();
+  recordCompletionOfAScope();
   if (isLookupDoneWithoutIncludingOuterResults())
     return None;
 
@@ -849,12 +852,12 @@ UnqualifiedLookupFactory::lookupInClosure(AbstractClosureExpr *ACE,
       namelookup::FindLocalVal localVal(SM, Loc, Consumer);
       if (auto body = CE->getBody())
         localVal.visit(body);
-      setIndexOfFirstOuterResultIfNotSetAlready();
+      recordCompletionOfAScope();
       if (isLookupDoneWithoutIncludingOuterResults())
         return None;
       if (auto params = CE->getParameters())
         localVal.checkParameterList(params);
-      setIndexOfFirstOuterResultIfNotSetAlready();
+      recordCompletionOfAScope();
       if (isLookupDoneWithoutIncludingOuterResults())
         return None;
     }
@@ -939,7 +942,7 @@ bool UnqualifiedLookupFactory::addGenericParametersHereAndInEnclosingScopes(
     namelookup::FindLocalVal localVal(SM, Loc, Consumer);
     localVal.checkGenericParams(dcGenericParams);
 
-    setIndexOfFirstOuterResultIfNotSetAlready();
+    recordCompletionOfAScope();
     if (isLookupDoneWithoutIncludingOuterResults())
       return true;
   }
@@ -967,7 +970,7 @@ bool UnqualifiedLookupFactory::addLocalVariableResults(DeclContext *dc) {
       // local types.
       namelookup::FindLocalVal localVal(SM, Loc, Consumer);
       localVal.checkSourceFile(*SF);
-      setIndexOfFirstOuterResultIfNotSetAlready();
+      recordCompletionOfAScope();
       if (isLookupDoneWithoutIncludingOuterResults())
         return true;
     }
@@ -1012,7 +1015,7 @@ bool UnqualifiedLookupFactory::handleUnavailableInnerResults(
   }
   filterForDiscriminator(Results, DebugClient);
 
-  setIndexOfFirstOuterResultIfNotSetAlready();
+  recordCompletionOfAScope();
   return isLookupDoneWithoutIncludingOuterResults();
 }
 
@@ -1052,14 +1055,14 @@ bool UnqualifiedLookupFactory::addNamesKnownToDebugClient(DeclContext *dc) {
   if (Name.isSimpleName() && DebugClient)
     DebugClient->lookupAdditions(Name.getBaseName(), dc, Loc,
                                  isOriginallyTypeLookup, Results);
-  setIndexOfFirstOuterResultIfNotSetAlready();
+  recordCompletionOfAScope();
   // If we've found something, we're done.
   return !Results.empty();
 }
 
 bool UnqualifiedLookupFactory::addUnavailableInnerResults() {
   Results = std::move(UnavailableInnerResults);
-  setIndexOfFirstOuterResultIfNotSetAlready();
+  recordCompletionOfAScope();
   return !Results.empty();
 }
 
@@ -1072,7 +1075,7 @@ bool UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
   // Look for a module with the given name.
   if (Name.isSimpleName(M.getName())) {
     Results.push_back(LookupResultEntry(&M));
-    setIndexOfFirstOuterResultIfNotSetAlready();
+    recordCompletionOfAScope();
     return true;
   }
   ModuleDecl *desiredModule = Ctx.getLoadedModule(Name.getBaseIdentifier());
@@ -1110,7 +1113,7 @@ bool UnqualifiedLookupFactory::isLookupDoneWithoutIncludingOuterResults()
   return !Results.empty() && !options.contains(Flags::IncludeOuterResults);
 }
 
-void UnqualifiedLookupFactory::setIndexOfFirstOuterResultIfNotSetAlready() {
+void UnqualifiedLookupFactory::recordCompletionOfAScope() {
   // OK to call (NOOP) if there are more inner results and Results is empty
   if (IndexOfFirstOuterResult == 0)
     IndexOfFirstOuterResult = Results.size();
