@@ -97,8 +97,8 @@ protocol InternalProtocol {
 // -- number of witness table entries
 // CHECK-SAME:   i16 0,
 
-// -- size of private area + 'requires instantiation' bit (not set)
-// CHECK-SAME:   i16 0,
+// -- size of private area + 'requires instantiation' bit
+// CHECK-SAME:   i16 1,
 
 // -- instantiator function
 // CHECK-SAME:   i32 0
@@ -127,8 +127,8 @@ protocol InternalProtocol {
 // -- number of witness table entries
 // CHECK-SAME:   i16 0,
 
-// -- size of private area + 'requires instantiation' bit (not set)
-// CHECK-SAME:   i16 0,
+// -- size of private area + 'requires instantiation' bit
+// CHECK-SAME:   i16 1,
 
 // -- instantiator function
 // CHECK-SAME:   i32 0

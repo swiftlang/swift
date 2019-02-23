@@ -794,8 +794,7 @@ public:
 
   bool isResilientConformance(const NormalProtocolConformance *conformance);
   bool isResilientConformance(const RootProtocolConformance *root);
-  bool isDependentConformance(const RootProtocolConformance *conformance,
-                              bool considerResilience);
+  bool isDependentConformance(const RootProtocolConformance *conformance);
 
   Alignment getCappedAlignment(Alignment alignment);
 
