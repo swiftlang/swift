@@ -1890,7 +1890,7 @@ func testDeDuped2(_ x: dedupP) {
 // PROTOCOL_EXT_DEDUP_2: Begin completions, 5 items
 // PROTOCOL_EXT_DEDUP_2: Decl[InstanceMethod]/CurrNominal:   .foo()[#dedupP.T#]; name=foo()
 // PROTOCOL_EXT_DEDUP_2: Decl[InstanceVar]/CurrNominal:      .bar[#dedupP.T#]; name=bar
-// PROTOCOL_EXT_DEDUP_2: Decl[Subscript]/CurrNominal:        [{#(x): dedupP.T#}][#Self.T#]; name=[x: dedupP.T]
+// PROTOCOL_EXT_DEDUP_2: Decl[Subscript]/CurrNominal:        [{#(x): dedupP.T#}][#dedupP.T#]; name=[x: dedupP.T]
 // PROTOCOL_EXT_DEDUP_2: Keyword[self]/CurrNominal:          .self[#dedupP#]; name=self
 // PROTOCOL_EXT_DEDUP_2: End completions
 }
@@ -1899,7 +1899,7 @@ func testDeDuped3<T : dedupP where T.T == Int>(_ x: T) {
 // PROTOCOL_EXT_DEDUP_3: Begin completions, 5 items
 // PROTOCOL_EXT_DEDUP_3: Decl[InstanceMethod]/CurrNominal:   .foo()[#Int#]; name=foo()
 // PROTOCOL_EXT_DEDUP_3: Decl[InstanceVar]/CurrNominal:      .bar[#Int#]; name=bar
-// PROTOCOL_EXT_DEDUP_3: Decl[Subscript]/CurrNominal:        [{#(x): Int#}][#Self.T#]; name=[x: Int]
+// PROTOCOL_EXT_DEDUP_3: Decl[Subscript]/CurrNominal:        [{#(x): Int#}][#Int#]; name=[x: Int]
 // PROTOCOL_EXT_DEDUP_3: Keyword[self]/CurrNominal:          .self[#T#]; name=self
 // PROTOCOL_EXT_DEDUP_3: End completions
 }

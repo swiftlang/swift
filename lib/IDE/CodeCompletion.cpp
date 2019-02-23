@@ -2545,6 +2545,10 @@ public:
     if (HaveDot && !IsAfterSwiftKeyPathRoot)
       return;
 
+    auto subscriptType = getTypeOfMember(SD)->getAs<AnyFunctionType>();
+    if (!subscriptType)
+      return;
+
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
@@ -2563,19 +2567,17 @@ public:
     }
 
     Builder.addLeftBracket();
-    addCallArgumentPatterns(Builder,
-                            getTypeOfMember(SD)->castTo<AnyFunctionType>(),
-                            SD->getIndices(), true);
+    addCallArgumentPatterns(Builder, subscriptType, SD->getIndices(), true);
     Builder.addRightBracket();
 
     // Add a type annotation.
-    Type T = SD->getElementInterfaceType();
+    Type resultTy = subscriptType->getResult();
     if (IsDynamicLookup) {
       // Values of properties that were found on a AnyObject have
       // Optional<T> type.
-      T = OptionalType::get(T);
+      resultTy = OptionalType::get(resultTy);
     }
-    addTypeAnnotation(Builder, T);
+    addTypeAnnotation(Builder, resultTy);
   }
 
   void addNominalTypeRef(const NominalTypeDecl *NTD,
