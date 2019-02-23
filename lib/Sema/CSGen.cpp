@@ -2523,10 +2523,8 @@ namespace {
           return resultOfTypeOperation(typeOperation, expr->getArg());
       }
 
-      if (isa<DeclRefExpr>(fnExpr)) {
-        if (auto fnType = CS.getType(fnExpr)->getAs<AnyFunctionType>()) {
-          outputTy = fnType->getResult();
-        }
+      if (auto fnType = CS.getType(fnExpr)->getAs<AnyFunctionType>()) {
+        outputTy = fnType->getResult();
       } else if (auto OSR = dyn_cast<OverloadedDeclRefExpr>(fnExpr)) {
         // Determine if the overloads are all functions that share a common
         // return type.

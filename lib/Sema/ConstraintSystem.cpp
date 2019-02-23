@@ -21,6 +21,7 @@
 #include "TypeCheckType.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallString.h"
@@ -1464,6 +1465,364 @@ static ArrayRef<OverloadChoice> partitionSIMDOperators(
   return scratch;
 }
 
+/// Retrieve the type that will be used when matching the given overload.
+static Type getEffectiveOverloadType(const OverloadChoice &overload) {
+  switch (overload.getKind()) {
+  case OverloadChoiceKind::Decl:
+    // Declaration choices are handled below.
+    break;
+
+  case OverloadChoiceKind::BaseType:
+  case OverloadChoiceKind::DeclViaBridge:
+  case OverloadChoiceKind::DeclViaDynamic:
+  case OverloadChoiceKind::DeclViaUnwrappedOptional:
+  case OverloadChoiceKind::DynamicMemberLookup:
+  case OverloadChoiceKind::KeyPathApplication:
+  case OverloadChoiceKind::TupleIndex:
+    return Type();
+  }
+
+  auto decl = overload.getDecl();
+
+  // Retrieve the interface type.
+  auto type = decl->getInterfaceType();
+  if (!type) {
+    decl->getASTContext().getLazyResolver()->resolveDeclSignature(decl);
+    type = decl->getInterfaceType();
+    if (!type) {
+      return Type();
+    }
+  }
+
+  // If we have a generic function type, drop the generic signature; we don't
+  // need it for this comparison.
+  if (auto genericFn = type->getAs<GenericFunctionType>()) {
+    type = FunctionType::get(genericFn->getParams(),
+                             genericFn->getResult(),
+                             genericFn->getExtInfo());
+  }
+
+  // If this declaration is within a type context, bail out.
+  if (decl->getDeclContext()->isTypeContext()) {
+    return Type();
+  }
+
+  return type;
+}
+
+namespace {
+/// Type visitor that extracts the common type between two types, when
+/// possible.
+class CommonTypeVisitor : public TypeVisitor<CommonTypeVisitor, Type, Type> {
+  /// Perform a "leaf" match for types, which does not consider the children.
+  Type handleLeafMatch(Type type1, Type type2) {
+    if (type1->isEqual(type2))
+      return type1;
+
+    return handleMismatch(type1, type2);
+  }
+
+  /// Handle a mismatch between two types.
+  Type handleMismatch(Type type1, Type type2) {
+    return Type();
+  }
+
+public:
+  Type visitTupleType(TupleType *tuple1, Type type2) {
+    if (tuple1->isEqual(type2))
+      return Type(tuple1);
+
+    auto tuple2 = type2->getAs<TupleType>();
+    if (!tuple2) {
+      return handleMismatch(Type(tuple1), type2);
+    }
+
+    // Check for structural similarity between the two tuple types.
+    auto elements1 = tuple1->getElements();
+    auto elements2 = tuple2->getElements();
+    if (elements1.size() != elements2.size()) {
+      return handleMismatch(Type(tuple1), type2);
+    }
+
+    for (unsigned i : indices(elements1)) {
+      const auto &elt1 = elements1[i];
+      const auto &elt2 = elements2[i];
+      if (elt1.getName() != elt2.getName() ||
+          elt1.getParameterFlags() != elt2.getParameterFlags()) {
+        return handleMismatch(Type(tuple1), type2);
+      }
+    }
+
+    // Recurse on the element types.
+    SmallVector<TupleTypeElt, 4> newElements;
+    newElements.reserve(elements1.size());
+    for (unsigned i : indices(elements1)) {
+      const auto &elt1 = elements1[i];
+      const auto &elt2 = elements2[i];
+      Type elementType = visit(elt1.getRawType(), elt2.getRawType());
+      if (!elementType) {
+        return handleMismatch(Type(tuple1), type2);
+      }
+
+      newElements.push_back(elt1.getWithType(elementType));
+    }
+    return TupleType::get(newElements, tuple1->getASTContext());
+  }
+
+  Type visitReferenceStorageType(ReferenceStorageType *refStorage1,
+                                 Type type2) {
+    if (refStorage1->isEqual(type2))
+      return Type(refStorage1);
+
+    auto refStorage2 = type2->getAs<ReferenceStorageType>();
+    if (!refStorage2 ||
+        refStorage1->getOwnership() != refStorage2->getOwnership()) {
+      return handleMismatch(Type(refStorage1), type2);
+    }
+
+    Type newReferentType = visit(refStorage1->getReferentType(),
+                                 refStorage2->getReferentType());
+    if (!newReferentType) {
+      return handleMismatch(Type(refStorage1), type2);
+    }
+
+    return ReferenceStorageType::get(newReferentType,
+                                     refStorage1->getOwnership(),
+                                     refStorage1->getASTContext());
+  }
+
+  Type visitAnyMetatypeType(AnyMetatypeType *metatype1, Type type2) {
+    if (metatype1->isEqual(type2))
+      return Type(metatype1);
+
+
+    auto metatype2 = type2->getAs<AnyMetatypeType>();
+    if (!metatype2) {
+      return handleMismatch(Type(metatype1), type2);
+    }
+
+    if (metatype1->getKind() != metatype2->getKind() ||
+        metatype1->hasRepresentation() != metatype2->hasRepresentation() ||
+        (metatype1->hasRepresentation() &&
+         metatype2->getRepresentation() != metatype2->getRepresentation())) {
+      return handleMismatch(Type(metatype1), type2);
+    }
+
+    Type newInstanceType = visit(metatype1->getInstanceType(),
+                                 metatype2->getInstanceType());
+    if (!newInstanceType) {
+      return handleMismatch(Type(metatype1), type2);
+    }
+
+    Optional<MetatypeRepresentation> representation;
+    if (metatype1->hasRepresentation())
+      representation = metatype1->getRepresentation();
+
+    if (metatype1->getKind() == TypeKind::Metatype)
+      return MetatypeType::get(newInstanceType, representation);
+
+    assert(metatype1->getKind() == TypeKind::ExistentialMetatype);
+    return ExistentialMetatypeType::get(newInstanceType, representation);
+  }
+
+  Type visitFunctionType(FunctionType *function1, Type type2) {
+    if (function1->isEqual(type2))
+      return Type(function1);
+
+    auto function2 = type2->getAs<FunctionType>();
+    if (!function2 ||
+        function1->getExtInfo() != function2->getExtInfo() ||
+        function1->getNumParams() != function2->getNumParams()) {
+      return handleMismatch(Type(function1), type2);
+    }
+
+    // Check for a structural match between the parameters.
+    auto params1 = function1->getParams();
+    auto params2 = function2->getParams();
+    for (unsigned i : indices(params1)) {
+      const auto &param1 = params1[i];
+      const auto &param2 = params2[i];
+      if (param1.getLabel() != param2.getLabel() ||
+          param1.getParameterFlags() != param2.getParameterFlags()) {
+        return handleMismatch(Type(function1), type2);
+      }
+    }
+
+    Type newResultType = visit(function1->getResult(), function2->getResult());
+    if (!newResultType) {
+      return handleMismatch(Type(function1), type2);
+    }
+
+    SmallVector<AnyFunctionType::Param, 4> newParams;
+    newParams.reserve(params1.size());
+    for (unsigned i : indices(params1)) {
+      const auto &param1 = params1[i];
+      const auto &param2 = params2[i];
+      Type newParamType = visit(param1.getPlainType(), param2.getPlainType());
+      if (!newParamType) {
+        return handleMismatch(Type(function1), type2);
+      }
+
+      newParams.push_back(AnyFunctionType::Param(newParamType,
+                                                 param1.getLabel(),
+                                                 param1.getParameterFlags()));
+    }
+
+    return FunctionType::get(newParams, newResultType, function1->getExtInfo());
+  }
+
+  Type visitGenericFunctionType(GenericFunctionType *function1, Type type2) {
+    llvm_unreachable("Caller should have eliminated these");
+  }
+
+  Type visitLValueType(LValueType *lvalue1, Type type2) {
+    if (lvalue1->isEqual(type2))
+      return Type(lvalue1);
+
+    auto lvalue2 = type2->getAs<LValueType>();
+    if (!lvalue2) {
+      return handleMismatch(Type(lvalue1), type2);
+    }
+
+    Type newObjectType =
+      visit(lvalue1->getObjectType(), lvalue2->getObjectType());
+    if (!newObjectType) {
+      return handleMismatch(Type(lvalue1), type2);
+    }
+
+    return LValueType::get(newObjectType);
+  }
+
+  Type visitInOutType(InOutType *inout1, Type type2) {
+    if (inout1->isEqual(type2))
+      return Type(inout1);
+
+    auto inout2 = type2->getAs<InOutType>();
+    if (!inout2) {
+      return handleMismatch(Type(inout1), type2);
+    }
+
+    Type newObjectType =
+      visit(inout1->getObjectType(), inout2->getObjectType());
+    if (!newObjectType) {
+      return handleMismatch(Type(inout1), type2);
+    }
+
+    return LValueType::get(newObjectType);
+  }
+
+  Type visitSugarType(SugarType *sugar1, Type type2) {
+    if (sugar1->isEqual(type2))
+      return Type(sugar1);
+
+    // FIXME: Reconstitute sugar.
+    return visit(Type(sugar1->getSinglyDesugaredType()), type2);
+  }
+
+#define FAILURE_CASE(Class)                                 \
+  Type visit##Class##Type(Class##Type *type1, Type type2) { \
+    return Type();                                          \
+  }
+
+#define LEAF_CASE(Class)                                    \
+  Type visit##Class##Type(Class##Type *type1, Type type2) { \
+    return handleLeafMatch(Type(type1), type2);             \
+  }
+
+  FAILURE_CASE(Error)
+  FAILURE_CASE(Unresolved)
+  LEAF_CASE(Builtin)
+  LEAF_CASE(Nominal)  // FIXME: We can do a more specific match here.
+  LEAF_CASE(BoundGeneric)  // FIXME: We can do a more specific match here.
+  FAILURE_CASE(UnboundGeneric)
+  LEAF_CASE(Module)
+  LEAF_CASE(DynamicSelf) // FIXME: Can we do better here?
+  LEAF_CASE(Substitutable)
+  LEAF_CASE(DependentMember)
+  LEAF_CASE(SILFunction)
+  LEAF_CASE(SILBlockStorage)
+  LEAF_CASE(SILBox)
+  LEAF_CASE(SILToken)
+  LEAF_CASE(ProtocolComposition)
+  LEAF_CASE(TypeVariable) // FIXME: Could do better here when we create vars
+
+#undef LEAF_CASE
+#undef FAILURE_CASE
+};
+
+}
+
+Type ConstraintSystem::findCommonOverloadType(
+    ArrayRef<OverloadChoice> choices,
+    ArrayRef<OverloadChoice> outerAlternatives,
+    ConstraintLocator *locator) {
+  // Local function to consider this s new overload choice, updating the
+  // "common type". Returns true if this overload cannot be integrated into
+  // the common type, at which point there is no "common type".
+  Type commonType;
+  auto considerOverload = [&](const OverloadChoice &overload) -> bool {
+    // If we can't even get a type for the overload, there's nothing more to
+    // do.
+    Type overloadType = getEffectiveOverloadType(overload);
+    if (!overloadType) {
+      return true;
+    }
+
+    // If this is the first overload, record it's type as the common type.
+    if (!commonType) {
+      commonType = overloadType;
+      return false;
+    }
+
+    // Find the common type between the current common type and the new
+    // overload's type.
+    commonType = CommonTypeVisitor().visit(commonType, overloadType);
+    if (!commonType) {
+      return true;
+    }
+
+    return false;
+  };
+
+  // Consider all of the choices and outer alternatives.
+  for (const auto &choice : choices) {
+    if (considerOverload(choice))
+      return Type();
+  }
+  for (const auto &choice : outerAlternatives) {
+    if (considerOverload(choice))
+      return Type();
+  }
+
+  assert(commonType && "We can't get here without having a common type");
+
+  // If our common type contains any generic parameters, open them up into
+  // type variables.
+  if (commonType->hasTypeParameter()) {
+    llvm::SmallDenseMap<const GenericTypeParamType *, TypeVariableType *>
+        openedGenericParams;
+    commonType = commonType.transformRec([&](TypeBase *type) -> Optional<Type> {
+      if (auto genericParam = dyn_cast<GenericTypeParamType>(type)) {
+        auto canGenericParam = GenericTypeParamType::get(
+            genericParam->getDepth(),
+            genericParam->getIndex(),
+            type->getASTContext());
+        auto knownTypeVar = openedGenericParams.find(canGenericParam);
+        if (knownTypeVar != openedGenericParams.end())
+          return Type(knownTypeVar->second);
+
+        auto typeVar = createTypeVariable(locator);
+        openedGenericParams[canGenericParam] = typeVar;
+        return Type(typeVar);
+      }
+
+      return None;
+    });
+  }
+
+  return commonType;
+}
+
 void ConstraintSystem::addOverloadSet(Type boundType,
                                       ArrayRef<OverloadChoice> choices,
                                       DeclContext *useDC,
@@ -1476,6 +1835,13 @@ void ConstraintSystem::addOverloadSet(Type boundType,
   if (choices.size() == 1 && outerAlternatives.empty()) {
     addBindOverloadConstraint(boundType, choices.front(), locator, useDC);
     return;
+  }
+
+  // If we can compute a common type for the overload set, bind that type.
+  if (Type commonType = findCommonOverloadType(choices, outerAlternatives,
+                                               locator)) {
+    addConstraint(ConstraintKind::Bind, boundType, commonType, locator);
+    boundType = commonType;
   }
 
   tryOptimizeGenericDisjunction(*this, choices, favoredChoice);
