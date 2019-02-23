@@ -226,7 +226,8 @@ public:
 
 private:
   bool useASTScopesForExperimentalLookup() const;
-  
+
+  void lookInModuleScope(DCAndResolvedIsCascadingUse dcAndIsCascadingUse);
 
 #pragma mark ASTScope-based-lookup declarations
 
@@ -407,11 +408,14 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   Optional<DCAndResolvedIsCascadingUse> dcAndIsCascadingUse = useASTScopesForExperimentalLookup()
   ? experimentallyLookInASTScopes(DC, isCascadingUseInitial)
   :  lookInDeclContexts(DC, isCascadingUseInitial);
-  if (!dcAndIsCascadingUse.hasValue())
-    return;
+  if (dcAndIsCascadingUse.hasValue())
+    lookInModuleScope(dcAndIsCascadingUse.getValue());
+}
 
-  DeclContext *const DC = dcAndIsCascadingUse.getValue().DC;
-  const bool isCascadingUse = dcAndIsCascadingUse.getValue().isCascadingUse;
+void UnqualifiedLookupFactory::lookInModuleScope(
+    DCAndResolvedIsCascadingUse dcAndIsCascadingUse) {
+  DeclContext *const DC = dcAndIsCascadingUse.DC;
+  const bool isCascadingUse = dcAndIsCascadingUse.isCascadingUse;
 
   recordDependencyOnTopLevelName(DC, Name, isCascadingUse);
 
