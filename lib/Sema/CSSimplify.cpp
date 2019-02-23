@@ -3756,11 +3756,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     return SolutionKind::Solved;
   }
   
-  
-  // If we found some unviable results, then fail, but without recovery.
-  if (!result.UnviableCandidates.empty())
-    return SolutionKind::Error;
-  
 
   // If the lookup found no hits at all (either viable or unviable), diagnose it
   // as such and try to recover in various ways.
@@ -3771,6 +3766,50 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     // off to see if the problem is related to base not being explicitly unwrapped.
     if (!MissingMembers.insert(locator))
       return SolutionKind::Error;
+
+    // FIXME(diagnostics): If there were no viable results, but there are
+    // unviable ones, we'd have to introduce fix for each specific problem.
+    if (!result.UnviableCandidates.empty()) {
+      // Check if we have unviable candidates whose reason for rejection
+      // is either UR_InstanceMemberOnType or UR_TypeMemberOnInstance
+      SmallVector<OverloadChoice, 4> filteredCandidates;
+
+      llvm::for_each(
+          result.UnviableCandidates,
+          [&](const std::pair<OverloadChoice,
+                              MemberLookupResult::UnviableReason> &c) {
+            if (c.second == MemberLookupResult::UR_InstanceMemberOnType ||
+                c.second == MemberLookupResult::UR_TypeMemberOnInstance) {
+              filteredCandidates.push_back(std::move(c.first));
+            }
+          });
+
+      // If we do, then allow them
+      if (!filteredCandidates.empty()) {
+
+        auto meetsProtocolBaseMetatypeCriteria =
+            baseTy->is<AnyMetatypeType>() && baseTy->getMetatypeInstanceType()
+                                                 ->getWithoutParens()
+                                                 ->isAnyExistentialType();
+
+        auto requiresProtocolMetatypeFix =
+            llvm::any_of(filteredCandidates, [&](const OverloadChoice &c) {
+              return c.isDecl() && isa<ConstructorDecl>(c.getDecl());
+            });
+
+        if (!meetsProtocolBaseMetatypeCriteria ||
+            !requiresProtocolMetatypeFix) {
+          auto fix =
+              AllowTypeOrInstanceMember::create(*this, baseTy, member, locator);
+          if (recordFix(fix))
+            // The fix wasn't successful, so return an error
+            return SolutionKind::Error;
+        }
+
+        addOverloadSet(memberTy, filteredCandidates, useDC, locator);
+        return SolutionKind::Solved;
+      }
+    }
 
     if (baseObjTy->getOptionalObjectType()) {
       // If the base type was an optional, look through it.
@@ -5556,6 +5595,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AutoClosureForwarding:
   case FixKind::RemoveUnwrap:
   case FixKind::DefineMemberBasedOnUse:
+  case FixKind::AllowTypeOrInstanceMember:
   case FixKind::AllowInvalidPartialApplication:
   case FixKind::AllowInvalidInitRef:
     llvm_unreachable("handled elsewhere");
