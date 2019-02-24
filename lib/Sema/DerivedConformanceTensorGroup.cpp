@@ -65,6 +65,18 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, DeclName name) {
   return lookup.front();
 }
 
+// Return the static method with the specified name.
+static ValueDecl *getStaticMethod(ProtocolDecl *proto, DeclName name) {
+  auto lookup = proto->lookupDirect(name);
+  lookup.erase(std::remove_if(lookup.begin(), lookup.end(),
+                              [](ValueDecl *v) {
+                                return !v->isStatic();
+                              }),
+               lookup.end());
+  assert(lookup.size() == 1 && "Ambiguous static method");
+  return lookup.front();
+}
+
 /// Derive the body for the '_typeList' getter.
 static void
 deriveBodyTensorGroup_typeList(AbstractFunctionDecl *funcDecl) {
@@ -253,11 +265,11 @@ deriveBodyTensorGroup_init(
 
   // Obtain the address type.
   auto cTensorHandleType = C.getOpaquePointerDecl()->getDeclaredType();
-  Type baseAddressType = BoundGenericType::get(
+  auto baseAddressType = BoundGenericType::get(
       C.getUnsafePointerDecl(), Type(), {cTensorHandleType});
-  Type addressType = BoundGenericType::get(
+  auto addressType = BoundGenericType::get(
       C.getOptionalDecl(), Type(), {baseAddressType});
-  TypeExpr *addressTE = TypeExpr::createImplicit(addressType, C);
+  auto *addressTE = TypeExpr::createImplicit(addressType, C);
 
   // Get references to `self` and parameter declarations.
   auto *selfDecl = funcDecl->getImplicitSelfDecl();
@@ -287,16 +299,13 @@ deriveBodyTensorGroup_init(
   StmtConditionElement cond[] = {
       StmtConditionElement(SourceLoc(), currAddressPat, /*Init*/ paramDRE)};
 
-  // Get the necessary protocol requirements.
-  auto *tensorArrayProto = C.getProtocol(
-      KnownProtocolKind::TensorArrayProtocol);
-  auto *tensorHandleCountReq = getProtocolRequirement(
-      tensorArrayProto, C.Id_tensorHandleCount);
-  
+  // Get the necessary protocol requirements.  
   auto *tensorGroupProto = C.getProtocol(KnownProtocolKind::TensorGroup);
   auto initName = DeclName(
-    C, DeclBaseName::createConstructor(), {C.getIdentifier("_owning")});
+      C, DeclBaseName::createConstructor(), {C.getIdentifier("_owning")});
   auto *initReq = getProtocolRequirement(tensorGroupProto, initName);
+  auto *tensorHandleCountReq = getStaticMethod(
+      tensorGroupProto, C.Id_tensorHandleCount);
 
   Type intType = C.getIntDecl()->getDeclaredType();
   TypeExpr *intTE = TypeExpr::createImplicit(intType, C);
@@ -310,8 +319,9 @@ deriveBodyTensorGroup_init(
         member->getValueInterfaceType());
     auto *memberTypeExpr = TypeExpr::createImplicit(memberType, C);
     auto module = nominal->getModuleContext();
-    auto confRef = module->lookupConformance(memberType, tensorGroupProto);
-    assert(confRef && "Member does not conform to `TensorArrayProtocol`");
+    auto tensorGroupConfRef = module->lookupConformance(
+        memberType, tensorGroupProto);
+    assert(tensorGroupConfRef && "Member does not conform to `TensorGroup`");
 
     // Get member type's constructor, e.g. `MemberType.init(_owning:)`.
     // Use protocol requirement declaration for the method by default: this
@@ -319,8 +329,8 @@ deriveBodyTensorGroup_init(
     ValueDecl *memberInitDecl = initReq;
     // If conformance reference is concrete, then use concrete witness
     // declaration for the constructor.
-    if (confRef->isConcrete())
-      memberInitDecl = confRef->getConcrete()->getWitnessDecl(
+    if (tensorGroupConfRef->isConcrete())
+      memberInitDecl = tensorGroupConfRef->getConcrete()->getWitnessDecl(
           initReq, C.getLazyResolver());
     assert(memberInitDecl && "Member constructor declaration must exist");
     auto memberInitDRE = new (C) DeclRefExpr(
@@ -372,10 +382,10 @@ deriveBodyTensorGroup_init(
                                   advancedName, DeclNameLoc(), 
                                   /*Implicit*/ true);
     
-    // Obtain `Member._tensorHandleCount`.
-    auto *memberCountMRE = new (C) 
-        MemberRefExpr(selfDRE, SourceLoc(), tensorHandleCountReq,
-                      DeclNameLoc(), /*Implicit*/ true);
+    // Obtain `MemberType._tensorHandleCount`.
+    auto *memberCountMRE = new (C) MemberRefExpr(
+        memberTypeExpr, SourceLoc(), tensorHandleCountReq, DeclNameLoc(), 
+        /*Implicit*/ true);
     
     // Cast the tensor handle count to Int.
     auto intInitName = DeclName(C, DeclBaseName::createConstructor(), 
