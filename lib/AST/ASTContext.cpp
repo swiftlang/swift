@@ -149,8 +149,6 @@ struct ASTContext::Implementation {
   // SWIFT_ENABLE_TENSORFLOW
   /// The declaration of TensorFlow.TensorHandle<T>.
   ClassDecl *TensorHandleDecl = nullptr;
-  /// The declaration of TensorFlow.CTensorHandle.
-  ClassDecl *CTensorHandleDecl = nullptr;
   /// The declaration of TensorFlow.TensorShape.
   StructDecl *TensorShapeDecl = nullptr;
   /// The declaration of TensorFlow.TensorDataType.
