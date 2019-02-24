@@ -178,7 +178,8 @@ private:
     void dump() const;
   };
 
-  struct PerDeclInfo {
+  struct PerContextInfo {
+    DeclContext *dc; // TODO: Eliminate ME
     DeclContext *lookupContextForThisDecl;
     Optional<PlacesToSearch> placesToSearch;
     Optional<bool> isCascadingUse;
@@ -207,7 +208,7 @@ private:
   SmallVector<LookupResultEntry, 4> UnavailableInnerResults;
 
 public: // for exp debugging
-  std::vector<PerDeclInfo> breadcrumbs;
+  std::vector<PerContextInfo> breadcrumbs;
   SourceFile const *recordedSF = nullptr;
   DeclName recordedName;
   bool recordedIsCascadingUse = false;
@@ -290,34 +291,32 @@ private:
 
   void lookupNameInDeclContexts(const DCAndUnresolvedIsCascadingUse);
 
-  Optional<PerDeclInfo>
-      lookupLocalsInAppropriateContext(DCAndUnresolvedIsCascadingUse);
+  void finishLookingInContext(const PerContextInfo &&);
+
+  void lookupLocalsInAppropriateContext(DCAndUnresolvedIsCascadingUse);
 
   // TODO: use objects & virtuals
 
-  Optional<PerDeclInfo>
-  lookupLocalsInPatternBindingInitializer(PatternBindingInitializer *PBI,
-                                    Optional<bool> isCascadingUse);
+  void lookupLocalsInPatternBindingInitializer(PatternBindingInitializer *PBI,
+                                               Optional<bool> isCascadingUse);
 
-  Optional<PerDeclInfo> lookupLocalsInFunctionDecl(AbstractFunctionDecl *AFD,
-                                             Optional<bool> isCascadingUse);
+  void lookupLocalsInFunctionDecl(AbstractFunctionDecl *AFD,
+                                  Optional<bool> isCascadingUse);
 
-  Optional<PerDeclInfo> lookupLocalsInClosure(AbstractClosureExpr *ACE,
-                                        Optional<bool> isCascadingUse);
+  void lookupLocalsInClosure(AbstractClosureExpr *ACE,
+                             Optional<bool> isCascadingUse);
 
   template <typename NominalTypeDeclOrExtensionDecl>
-  Optional<PerDeclInfo>
-  lookupLocalsInNominalTypeOrExtension(NominalTypeDeclOrExtensionDecl *D,
-                                 Optional<bool> isCascadingUse) const;
+  void lookupLocalsInNominalTypeOrExtension(NominalTypeDeclOrExtensionDecl *D,
+                                            Optional<bool> isCascadingUse);
 
-  Optional<PerDeclInfo>
-  lookupLocalsInDefaultArgumentInitializer(DefaultArgumentInitializer *I,
-                                     Optional<bool> isCascadingUse) const;
+  void lookupLocalsInDefaultArgumentInitializer(DefaultArgumentInitializer *I,
+                                                Optional<bool> isCascadingUse);
+
+  void lookupLocalsInMiscContext(DeclContext *dc,
+                                 Optional<bool> isCascadingUse);
 
   bool isOutsideBodyOfFunction(const AbstractFunctionDecl *const AFD) const;
-
-  Optional<PerDeclInfo>
-  lookupLocalsInMiscContext(DeclContext *dc, Optional<bool> isCascadingUse) const;
 
   /// Check the generic parameters of our context.
   /// Return true if done with lookup
@@ -667,15 +666,17 @@ void UnqualifiedLookupFactory::lookupNameInDeclContexts(
       lookInModuleScopeContext(dcAndIsCascadingUseArg.resolve(true));
     return;
   }
-  const auto r = lookupLocalsInAppropriateContext(dcAndIsCascadingUseArg);
-  if (!r.hasValue())
-    return;
-  breadcrumbs.push_back(r.getValue());
-  auto lookupContextForThisDecl = r.getValue().lookupContextForThisDecl;
-  auto placesToSearch = std::move(r.getValue().placesToSearch);
-  auto isCascadingUse = r.getValue().isCascadingUse;
+  lookupLocalsInAppropriateContext(dcAndIsCascadingUseArg);
+}
 
-  if (!isa<DefaultArgumentInitializer>(dcAndIsCascadingUseArg.whereToLook) &&
+void UnqualifiedLookupFactory::finishLookingInContext(
+    const PerContextInfo &&info) {
+  breadcrumbs.push_back(info);
+  auto lookupContextForThisDecl = info.lookupContextForThisDecl;
+  auto placesToSearch = std::move(info.placesToSearch);
+  auto isCascadingUse = info.isCascadingUse;
+
+  if (!isa<DefaultArgumentInitializer>(info.dc) &&
       addGenericParametersHereAndInEnclosingScopes(lookupContextForThisDecl))
     return;
   if (placesToSearch.hasValue() && !placesToSearch.getValue().empty()) {
@@ -687,37 +688,34 @@ void UnqualifiedLookupFactory::lookupNameInDeclContexts(
       return;
   }
   auto *const whereToLookNext = lookupContextForThisDecl->getParentForLookup();
-  assert(whereToLookNext != dcAndIsCascadingUseArg.whereToLook &&
-         "non-termination");
+  assert(whereToLookNext != info.dc && "non-termination");
 
   lookupNameInDeclContexts(
       DCAndUnresolvedIsCascadingUse{whereToLookNext, isCascadingUse});
 }
 // clang-format on
 
-Optional<UnqualifiedLookupFactory::PerDeclInfo>
-UnqualifiedLookupFactory::lookupLocalsInAppropriateContext(
+void UnqualifiedLookupFactory::lookupLocalsInAppropriateContext(
     const DCAndUnresolvedIsCascadingUse dcAndIsCasc) {
   DeclContext *const dc = dcAndIsCasc.whereToLook;
   const auto isCascadingUseSoFar = dcAndIsCasc.isCascadingUse;
   if (auto *PBI = dyn_cast<PatternBindingInitializer>(dc))
-    return lookupLocalsInPatternBindingInitializer(PBI, isCascadingUseSoFar);
-  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(dc))
-    return lookupLocalsInFunctionDecl(AFD, isCascadingUseSoFar);
-  if (auto *ACE = dyn_cast<AbstractClosureExpr>(dc))
-    return lookupLocalsInClosure(ACE, isCascadingUseSoFar);
-  if (auto *ED = dyn_cast<ExtensionDecl>(dc))
-    return lookupLocalsInNominalTypeOrExtension(ED, isCascadingUseSoFar);
-  if (auto *ND = dyn_cast<NominalTypeDecl>(dc))
-    return lookupLocalsInNominalTypeOrExtension(ND, isCascadingUseSoFar);
-  if (auto I = dyn_cast<DefaultArgumentInitializer>(dc))
-    return lookupLocalsInDefaultArgumentInitializer(I, isCascadingUseSoFar);
-
-  return lookupLocalsInMiscContext(dc, isCascadingUseSoFar);
+    lookupLocalsInPatternBindingInitializer(PBI, isCascadingUseSoFar);
+  else if (auto *AFD = dyn_cast<AbstractFunctionDecl>(dc))
+    lookupLocalsInFunctionDecl(AFD, isCascadingUseSoFar);
+  else if (auto *ACE = dyn_cast<AbstractClosureExpr>(dc))
+    lookupLocalsInClosure(ACE, isCascadingUseSoFar);
+  else if (auto *ED = dyn_cast<ExtensionDecl>(dc))
+    lookupLocalsInNominalTypeOrExtension(ED, isCascadingUseSoFar);
+  else if (auto *ND = dyn_cast<NominalTypeDecl>(dc))
+    lookupLocalsInNominalTypeOrExtension(ND, isCascadingUseSoFar);
+  else if (auto I = dyn_cast<DefaultArgumentInitializer>(dc))
+    lookupLocalsInDefaultArgumentInitializer(I, isCascadingUseSoFar);
+  else
+    lookupLocalsInMiscContext(dc, isCascadingUseSoFar);
 }
 
-Optional<UnqualifiedLookupFactory::PerDeclInfo>
-UnqualifiedLookupFactory::lookupLocalsInPatternBindingInitializer(
+void UnqualifiedLookupFactory::lookupLocalsInPatternBindingInitializer(
     PatternBindingInitializer *PBI, Optional<bool> isCascadingUse) {
   auto *PBD = PBI->getBinding();
   assert(PBD);
@@ -727,14 +725,16 @@ UnqualifiedLookupFactory::lookupLocalsInPatternBindingInitializer(
     Consumer.foundDecl(selfParam, DeclVisibilityKind::FunctionParameter);
     recordCompletionOfAScope();
     if (isFirstResultEnough())
-      return None;
+      return;
     DeclContext *const parent = PBI->getParent();
     // clang-format off
-    return PerDeclInfo{
+    finishLookingInContext( PerContextInfo{
+      PBI,
       parent,
       PlacesToSearch(PBI, parent, parent),
       resolveIsCascadingUse(PBI, isCascadingUse,
-                            /*onlyCareAboutFunctionBody=*/false)};
+                            /*onlyCareAboutFunctionBody=*/false)});
+    return;
     // clang-format no
   }
   // Initializers for stored properties of types perform static
@@ -742,30 +742,32 @@ UnqualifiedLookupFactory::lookupLocalsInPatternBindingInitializer(
   if (PBD->getDeclContext()->isTypeContext()) {
     DeclContext *const surroundingContext = PBI->getParent();
     // clang-format off
-    return PerDeclInfo{
+    finishLookingInContext( PerContextInfo{
+      PBI,
       surroundingContext,
       PlacesToSearch(surroundingContext,
                      surroundingContext, surroundingContext),
       resolveIsCascadingUse(surroundingContext,
                             None,
-                            /*onlyCareAboutFunctionBody=*/false)};
+                            /*onlyCareAboutFunctionBody=*/false)});
+    return;
     // clang-format on
   }
   // Otherwise, we have an initializer for a global or local property.
   // There's not much to find here, we'll keep going up to a parent
   // context.
   // clang-format off
-  return PerDeclInfo{
+  finishLookingInContext( PerContextInfo{
+    PBI,
     PBI,
     None,
     resolveIsCascadingUse(PBI, isCascadingUse,
-                          /*onlyCareAboutFunctionBody=*/false)};
+                          /*onlyCareAboutFunctionBody=*/false)});
   // clang-format on
 }
 
-Optional<UnqualifiedLookupFactory::PerDeclInfo>
-UnqualifiedLookupFactory::lookupLocalsInFunctionDecl(AbstractFunctionDecl *AFD,
-                                               Optional<bool> isCascadingUse) {
+void UnqualifiedLookupFactory::lookupLocalsInFunctionDecl(
+    AbstractFunctionDecl *AFD, Optional<bool> isCascadingUse) {
   // Look for local variables; normally, the parser resolves these
   // for us, but it can't do the right thing inside local types.
   // FIXME: when we can parse and typecheck the function body partially
@@ -777,14 +779,14 @@ UnqualifiedLookupFactory::lookupLocalsInFunctionDecl(AbstractFunctionDecl *AFD,
 
     recordCompletionOfAScope();
     if (isFirstResultEnough())
-      return None;
+      return;
 
     if (auto *P = AFD->getImplicitSelfDecl())
       localVal.checkValueDecl(P, DeclVisibilityKind::FunctionParameter);
     localVal.checkParameterList(AFD->getParameters());
     recordCompletionOfAScope();
     if (isFirstResultEnough())
-      return None;
+      return;
   }
   // TODO: is isOutsideBodyOfFunction better than the disjunction below?
   const bool returnValueForIsCascadingUse =
@@ -798,14 +800,17 @@ UnqualifiedLookupFactory::lookupLocalsInFunctionDecl(AbstractFunctionDecl *AFD,
   addGenericParametersForFunction(AFD);
   recordCompletionOfAScope();
   if (isFirstResultEnough())
-    return None;
+    return;
 
-  if (!AFD->getDeclContext()->isTypeContext())
-     // clang-format off
-     return PerDeclInfo{
+  if (!AFD->getDeclContext()->isTypeContext()) {
+    // clang-format off
+     finishLookingInContext( PerContextInfo{
+       AFD,
        AFD,
        None,
-       returnValueForIsCascadingUse};
+       returnValueForIsCascadingUse});
+    return;
+  }
   // clang-format on
   
   DeclContext *const fnDeclContext = AFD->getDeclContext();
@@ -815,18 +820,18 @@ UnqualifiedLookupFactory::lookupLocalsInFunctionDecl(AbstractFunctionDecl *AFD,
   // is the nominal type, not 'self'.
   DeclContext *const BaseDC = isOutsideBodyOfFunction(AFD) ? fnDeclContext : AFD;
   // clang-format off
-  return PerDeclInfo{
-    AFD->getParent(),
-    PlacesToSearch(BaseDC,
-                   fnDeclContext,
-                   fnDeclContext),
-    returnValueForIsCascadingUse};
-    // clang-format on
+  finishLookingInContext( PerContextInfo{
+      AFD,
+      AFD->getParent(),
+      PlacesToSearch(BaseDC,
+                     fnDeclContext,
+                     fnDeclContext),
+    returnValueForIsCascadingUse});
+  // clang-format on
 }
 
-Optional<UnqualifiedLookupFactory::PerDeclInfo>
-UnqualifiedLookupFactory::lookupLocalsInClosure(AbstractClosureExpr *ACE,
-                                          Optional<bool> isCascadingUse) {
+void UnqualifiedLookupFactory::lookupLocalsInClosure(
+    AbstractClosureExpr *ACE, Optional<bool> isCascadingUse) {
   // Look for local variables; normally, the parser resolves these
   // for us, but it can't do the right thing inside local types.
   if (Loc.isValid()) {
@@ -836,49 +841,60 @@ UnqualifiedLookupFactory::lookupLocalsInClosure(AbstractClosureExpr *ACE,
         localVal.visit(body);
       recordCompletionOfAScope();
       if (isFirstResultEnough())
-        return None;
+        return;
       if (auto params = CE->getParameters())
         localVal.checkParameterList(params);
       recordCompletionOfAScope();
       if (isFirstResultEnough())
-        return None;
+        return;
     }
   }
   // clang-format off
-  return PerDeclInfo{
-    ACE,
-    None,
-    resolveIsCascadingUse(ACE, isCascadingUse,
-                          /*onlyCareAboutFunctionBody=*/false)};
+  finishLookingInContext( PerContextInfo{
+      ACE,
+      ACE,
+      None,
+      resolveIsCascadingUse(ACE, isCascadingUse,
+                            /*onlyCareAboutFunctionBody=*/false)});
   // clang-format on
 }
 
 template <typename NominalTypeDeclOrExtensionDecl>
-Optional<UnqualifiedLookupFactory::PerDeclInfo>
-UnqualifiedLookupFactory::lookupLocalsInNominalTypeOrExtension(
-    NominalTypeDeclOrExtensionDecl *D, Optional<bool> isCascadingUse) const {
+void UnqualifiedLookupFactory::lookupLocalsInNominalTypeOrExtension(
+    NominalTypeDeclOrExtensionDecl *D, Optional<bool> isCascadingUse) {
   // clang-format off
-  return PerDeclInfo{
-    D,
-    shouldLookupMembers(D, Loc)
-    ? Optional<PlacesToSearch>(PlacesToSearch(D, D, D))
-    : None,
-    resolveIsCascadingUse(D, isCascadingUse,
-                          /*onlyCareAboutFunctionBody=*/false)};
+  finishLookingInContext( PerContextInfo{
+      D,
+      D,
+      shouldLookupMembers(D, Loc)
+      ? Optional<PlacesToSearch>(PlacesToSearch(D, D, D))
+      : None,
+      resolveIsCascadingUse(D, isCascadingUse,
+                            /*onlyCareAboutFunctionBody=*/false)});
 
   // clang-format on
 }
 
-Optional<UnqualifiedLookupFactory::PerDeclInfo>
-UnqualifiedLookupFactory::lookupLocalsInDefaultArgumentInitializer(
-    DefaultArgumentInitializer *I, Optional<bool> isCascadingUse) const {
+void UnqualifiedLookupFactory::lookupLocalsInDefaultArgumentInitializer(
+    DefaultArgumentInitializer *I, Optional<bool> isCascadingUse) {
   // In a default argument, skip immediately out of both the
   // initializer and the function.
+  finishLookingInContext(PerContextInfo{I, I->getParent(), None, false});
+}
+
+void UnqualifiedLookupFactory::lookupLocalsInMiscContext(
+    DeclContext *dc, Optional<bool> isCascadingUse) {
   // clang-format off
-  return PerDeclInfo{
-    I->getParent(),
-    None,
-    false};
+  assert(isa<TopLevelCodeDecl>(dc) ||
+         isa<Initializer>(dc) ||
+         isa<TypeAliasDecl>(dc) ||
+         isa<SubscriptDecl>(dc));
+  finishLookingInContext( PerContextInfo{
+      dc,
+      dc,
+      None,
+      resolveIsCascadingUse(DC, isCascadingUse,
+                            /*onlyCareAboutFunctionBody=*/false)});
   // clang-format on
 }
 
@@ -887,22 +903,6 @@ bool UnqualifiedLookupFactory::isOutsideBodyOfFunction(
   return !AFD->isImplicit() && Loc.isValid() &&
          AFD->getBodySourceRange().isValid() &&
          !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc);
-}
-
-Optional<UnqualifiedLookupFactory::PerDeclInfo>
-UnqualifiedLookupFactory::lookupLocalsInMiscContext(
-    DeclContext *dc, Optional<bool> isCascadingUse) const {
-  // clang-format off
-  assert(isa<TopLevelCodeDecl>(dc) ||
-         isa<Initializer>(dc) ||
-         isa<TypeAliasDecl>(dc) ||
-         isa<SubscriptDecl>(dc));
-  return PerDeclInfo{
-    dc,
-    None,
-    resolveIsCascadingUse(DC, isCascadingUse,
-                          /*onlyCareAboutFunctionBody=*/false)};
-  // clang-format on
 }
 
 GenericParamList *
@@ -1715,12 +1715,12 @@ void UnqualifiedLookupFactory::dumpBreadcrumbs() const {
   auto &e = llvm::errs();
   for (size_t i : indices(breadcrumbs)) {
     e << i << "\n";
-    const PerDeclInfo &s = breadcrumbs[i];
+    const PerContextInfo &s = breadcrumbs[i];
     s.dump();
   }
 }
 
-void UnqualifiedLookupFactory::PerDeclInfo::dump() const {
+void UnqualifiedLookupFactory::PerContextInfo::dump() const {
   auto &e = llvm::errs();
   e << " dc: ";
   lookupContextForThisDecl->dumpContext();
