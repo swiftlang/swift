@@ -167,3 +167,12 @@ let no_return: @differentiable (Float) -> Float = { x in
 // expected-note @+2 {{missing return for differentiation}}
 // expected-error @+1 {{missing return in a closure expected to return 'Float'}}
 }
+
+// expected-error @+1 2 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 2 {{when differentiating this function definition}}
+func roundingGivesError(x: Float) -> Float {
+  // expected-note @+2 {{cannot differentiate through a non-differentiable result; do you want to add '.withoutDerivative()'?}}
+  // expected-note @+1 {{expression is not differentiable}}
+  return Float(Int(x))
+}

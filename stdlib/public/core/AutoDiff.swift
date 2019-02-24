@@ -124,6 +124,13 @@ public extension Differentiable
   }
 }
 
+public extension Differentiable {
+  /// Identity function that stops gradients from propagating.
+  @inline(__always)
+  @_semantics("autodiff.nonvarying")
+  func withoutDerivative() -> Self { return self }
+}
+
 //===----------------------------------------------------------------------===//
 // Functional utilities
 //===----------------------------------------------------------------------===//
