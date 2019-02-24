@@ -349,7 +349,7 @@ getNumAutoDiffAssociatedFunctions(unsigned differentiationOrder);
 bool getBuiltinAutoDiffApplyConfig(StringRef operationName,
                                    AutoDiffAssociatedFunctionKind &kind,
                                    unsigned &arity, unsigned &order,
-                                   bool &rethrows, bool &isMethod);
+                                   bool &rethrows);
 } // end namespace autodiff
 
 class BuiltinFloatType;
