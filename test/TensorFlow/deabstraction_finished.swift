@@ -250,7 +250,7 @@ public func testTensorFlowClosures(_ a: Float) -> Tensor<Int32>{
 // CHECK: sil private {{.*}}testTensorFlowClosures{{.*}} : $@callee_owned (TensorHandle<Builtin.FPIEEE32>) -> TensorHandle<Int32> {
 // CHECK: bb0(%0 : @unowned $TensorHandle<Builtin.FPIEEE32>):
 // CHECK:  [[A:%.*]] = unchecked_ref_cast %0 : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
-// CHECK:  [[B:%.*]] = graph_op "Cast"([[A]] : $TensorHandle<Float>) {SrcT$dtype: i32 1, DstT$dtype: i32 3, __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Int32>
+// CHECK:  [[B:%.*]] = graph_op "Cast"([[A]] : $TensorHandle<Float>) {SrcT$dtype: i32 1, DstT$dtype: i32 3, Truncate: i1 0, __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Int32>
 // CHECK:  return [[B]] : $TensorHandle<Int32>
 // CHECK: } 
 
@@ -258,7 +258,7 @@ public func testTensorFlowClosures(_ a: Float) -> Tensor<Int32>{
 // sil private @[[NAME]] : $@callee_owned (TensorHandle<Builtin.FPIEEE32>) -> TensorHandle<Int32> {
 // bb0(%0 : @unowned $TensorHandle<Builtin.FPIEEE32>):
 //   [[A:%.*]] = unchecked_ref_cast %0 : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
-//   [[B:%.*]] = graph_op "Cast"([[A]] : $TensorHandle<Float>) {SrcT$dtype: i32 1, DstT: $Int32, __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Int32>
+//   [[B:%.*]] = graph_op "Cast"([[A]] : $TensorHandle<Float>) {SrcT$dtype: i32 1, DstT: $Int32, Truncate: i1 0, __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Int32>
 //   return [[B]] : $TensorHandle<Int32>
 // } // end sil function '[[NAME]]'
 

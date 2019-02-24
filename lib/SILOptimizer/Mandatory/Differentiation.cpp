@@ -35,6 +35,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/LoopInfo.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
@@ -76,23 +77,20 @@ static void createEntryArguments(SILFunction *f) {
   auto moduleDecl = f->getModule().getSwiftModule();
   assert((entry->getNumArguments() == 0 || conv.getNumSILArguments() == 0) &&
          "Entry already has arguments?!");
-  // Create a dummy argument declaration.
-  // Necessary to prevent crash during argument explosion optimization.
-  auto createDummyParamDecl = [&] {
-    return new (ctx)
-        ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                  Identifier(), SourceLoc(), Identifier(), moduleDecl);
+  auto createFunctionArgument = [&](SILType type) {
+    // Create a dummy parameter declaration.
+    // Necessary to prevent crash during argument explosion optimization.
+    auto loc = f->getLocation().getSourceLoc();
+    auto *decl = new (ctx)
+        ParamDecl(VarDecl::Specifier::Default, loc, loc, Identifier(), loc,
+                  Identifier(), moduleDecl);
+    decl->setType(type.getASTType());
+    entry->createFunctionArgument(type, decl);
   };
-  for (auto indResultTy : conv.getIndirectSILResultTypes())
-    entry->createFunctionArgument(
-        f->mapTypeIntoContext(indResultTy).getAddressType(),
-        createDummyParamDecl());
-  for (auto paramTy : conv.getParameterSILTypes()) {
-    auto *decl = createDummyParamDecl();
-    auto ty = f->mapTypeIntoContext(paramTy);
-    decl->setType(ty.getASTType());
-    entry->createFunctionArgument(ty, decl);
-  }
+  for (auto indResTy : conv.getIndirectSILResultTypes())
+    createFunctionArgument(f->mapTypeIntoContext(indResTy).getAddressType());
+  for (auto paramTy : conv.getParameterSILTypes())
+    createFunctionArgument(f->mapTypeIntoContext(paramTy));
 }
 
 static bool isWithoutDerivative(SILValue v) {
@@ -1400,8 +1398,12 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
   assert(usefulValueSets.empty());
   for (auto output : outputValues) {
     usefulValueSets.push_back({});
-    if (output->getType().isDifferentiable(module))
-      usefulValueSets.back().insert(output);
+    // If the output has an address type, propagate usefulness recursively.
+    if (output->getType().isAddress())
+      propagateUsefulThroughBuffer(output, usefulValueSets.size() - 1);
+    // Otherwise, just mark the output as useful.
+    else
+      setUseful(output, usefulValueSets.size() - 1);
   }
   // Propagate usefulness through the function in post-dominance order.
   PostDominanceOrder postDomOrder(&*function.findReturnBB(), pdi);
@@ -1474,23 +1476,20 @@ void DifferentiableActivityInfo::recursivelySetVaried(
 void DifferentiableActivityInfo::propagateUsefulThroughBuffer(
     SILValue value, unsigned dependentVariableIndex) {
   assert(value->getType().isAddress());
+  // Check whether value is already useful to prevent infinite recursion.
+  if (isUseful(value, dependentVariableIndex))
+    return;
   setUseful(value, dependentVariableIndex);
   if (auto *inst = value->getDefiningInstruction())
     for (auto &operand : inst->getAllOperands())
       if (operand.get()->getType().isAddress())
         propagateUsefulThroughBuffer(operand.get(), dependentVariableIndex);
-  auto isProjectingMemory = [](SILInstruction *inst) -> bool {
-    bool hasAddrResults = llvm::any_of(inst->getResults(),
-        [&](SILValue res) { return res->getType().isAddress(); });
-    bool hasAddrOperands = llvm::any_of(inst->getAllOperands(),
-        [&](Operand &op) { return op.get()->getType().isAddress(); });
-    return hasAddrResults && hasAddrOperands;
-  };
+  // Recursively propagate usefulness through users that are projections or
+  // `begin_access` instructions.
   for (auto use : value->getUses())
-    if (isProjectingMemory(use->getUser()))
-      for (auto res : use->getUser()->getResults())
-        if (res->getType().isAddress())
-          setUseful(res, dependentVariableIndex);
+    for (auto res : use->getUser()->getResults())
+      if (Projection::isAddressProjection(res) || isa<BeginAccessInst>(res))
+        propagateUsefulThroughBuffer(res, dependentVariableIndex);
 }
 
 bool DifferentiableActivityInfo::isVaried(
@@ -3651,6 +3650,34 @@ private:
                                            ValueWithCleanup(SILValue()));
     if (!insertion.second) // not inserted
       return insertion.first->getSecond();
+
+    // Check whether the original buffer is an address-to-address projection.
+    // If so, recurse until the buffer is such a projection but its operand is
+    // not. Then, get the adjoint buffer of the operand and return a
+    // corresponding projection into it.
+    if (Projection::isAddressProjection(originalBuffer) &&
+        !Projection::isObjectToAddressProjection(originalBuffer)) {
+      // Get operand of the projection (i.e. the base memory).
+      auto *inst = cast<SingleValueInstruction>(originalBuffer);
+      Projection proj(inst);
+      auto loc = inst->getLoc();
+      auto base = inst->getOperand(0);
+      // Get the corresponding projection into the adjoint buffer.
+      SILValue adjProj;
+      auto adjBase = getAdjointBuffer(base);
+      if (proj.getKind() == ProjectionKind::Struct) {
+        auto cotanField = proj.getVarDecl(remapType(adjBase.getType()));
+        adjProj = builder.createStructElementAddr(loc, adjBase.getValue(),
+                                                  cotanField);
+      } else {
+        adjProj = proj.createAddressProjection(builder, loc, adjBase.getValue())
+                      .get();
+      }
+      ValueWithCleanup bufWithCleanup(
+          adjProj, makeCleanupFromChildren({adjBase.getCleanup()}));
+      return (bufferMap[originalBuffer] = bufWithCleanup);
+    }
+
     // Set insertion point for local allocation builder: before the last local
     // allocation, or at the start of the adjoint entry BB if no local
     // allocations exist yet.
@@ -4248,103 +4275,6 @@ public:
     }
   }
 
-  void visitStructElementAddrInst(StructElementAddrInst *seai) {
-    auto loc = seai->getLoc();
-    auto &differentiationStrategies =
-        getDifferentiationTask()->getStructExtractDifferentiationStrategies();
-    auto strategy = differentiationStrategies.lookup(seai);
-    switch (strategy) {
-    case StructExtractDifferentiationStrategy::Inactive:
-      assert(!activityInfo.isActive(seai, synthesis.indices));
-      return;
-    case StructExtractDifferentiationStrategy::Fieldwise: {
-      // Compute adjoint as follows:
-      //   y = struct_element_addr x, #key
-      //   adj[x]#key' = struct_element_addr adj[x], #key'
-      //   adj[x]#key' += adj[y]
-      // where `#key'` is the field in the cotangent space corresponding to
-      // `#key`.
-      auto structTy = remapType(seai->getOperand()->getType()).getASTType();
-      auto cotangentVectorTy = structTy->getAutoDiffAssociatedVectorSpace(
-          AutoDiffAssociatedVectorSpaceKind::Cotangent,
-          LookUpConformanceInModule(getModule().getSwiftModule()))
-              ->getType()->getCanonicalType();
-      auto *cotangentVectorDecl =
-          cotangentVectorTy->getStructOrBoundGenericStruct();
-      assert(cotangentVectorDecl);
-      // Find the corresponding field in the cotangent space.
-      VarDecl *correspondingField = nullptr;
-      // If the cotangent space is the original struct, then field is the same.
-      if (cotangentVectorDecl == seai->getStructDecl())
-        correspondingField = seai->getField();
-      // Otherwise, look up the field by name.
-      else {
-        auto correspondingFieldLookup =
-        cotangentVectorDecl->lookupDirect(seai->getField()->getName());
-        assert(correspondingFieldLookup.size() == 1);
-        correspondingField = cast<VarDecl>(correspondingFieldLookup.front());
-      }
-      // Extract:
-      // - Adjoint buffer of `struct_element_addr`: `adj[y]`.
-      // - Element address of adjoint buffer of `struct_element_addr` operand:
-      //   `adj[x]#key'`.
-      auto adjElt = getAdjointBuffer(seai);
-      auto adjStructElt =
-          builder.createStructElementAddr(loc,
-              getAdjointBuffer(seai->getOperand()), correspondingField);
-      // Accumulate element address's adjoint buffer into the corresponding
-      // element address of `struct_element_addr` operand's adjoint buffer:
-      // `adj[x]#key' += adj[y]`.
-      auto *destAccess = builder.createBeginAccess(
-          loc, adjStructElt, SILAccessKind::Modify,
-          SILAccessEnforcement::Static, /*noNestedConflict*/ true,
-          /*fromBuiltin*/ false);
-      auto *readAccess = builder.createBeginAccess(
-          loc, adjElt, SILAccessKind::Read, SILAccessEnforcement::Static,
-          /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-      accumulateIndirect(destAccess, readAccess);
-      builder.createEndAccess(loc, readAccess, /*aborted*/ false);
-      builder.createEndAccess(loc, destAccess, /*aborted*/ false);
-      return;
-    }
-    case StructExtractDifferentiationStrategy::Getter: {
-      // Construct pullback arguments.
-      // Allocate buffer for pullback indirect result.
-      auto *pullbackResultBuf = builder.createAllocStack(
-          loc, remapType(getCotangentType(seai->getOperand()->getType(),
-                                          getModule())));
-      auto adjElt = getAdjointBuffer(seai);
-
-      // Get the pullback.
-      auto *pullbackField = getPrimalInfo().lookUpPullbackDecl(seai);
-      assert(pullbackField);
-      auto pullback = builder.createStructExtract(
-          loc, primalValueAggregateInAdj, pullbackField);
-
-      // Call the pullback.
-      auto *pullbackCall = builder.createApply(
-          loc, pullback, {pullbackResultBuf, adjElt}, /*isNonThrowing*/ false);
-      assert(pullbackCall->getNumIndirectResults() == 1 &&
-             pullbackCall->getIndirectSILResults().front() ==
-                  pullbackResultBuf);
-
-      // Accumulate pullback result buffer into adjoint buffer for original
-      // `struct_element_addr` operand.
-      auto *readAccess = builder.createBeginAccess(
-          loc, pullbackResultBuf, SILAccessKind::Read,
-          SILAccessEnforcement::Static, /*noNestedConflict*/ true,
-          /*fromBuiltin*/ false);
-      accumulateIndirect(getAdjointBuffer(seai->getOperand()),
-                         pullbackResultBuf);
-      builder.createEndAccess(loc, readAccess, /*aborted*/ false);
-      // Clean up and deallocate pullback indirect result buffer.
-      emitCleanup(builder, loc, pullbackResultBuf);
-      builder.createDeallocStack(loc, pullbackResultBuf);
-      break;
-    }
-    }
-  }
-
   /// Handle `tuple` instruction.
   ///   y = tuple (x0, x1, x2, ...)
   ///   adj[x0] += tuple_extract adj[y], 0
@@ -4403,30 +4333,6 @@ public:
       break;
     }
     }
-  }
-
-  /// Handle `tuple_element_addr` instruction.
-  ///   y = tuple_element_addr x, <n>
-  ///                              |--- n-th element
-  ///   adj[x]#n = tuple_element_addr adj[y], <n>
-  ///   adj[x]#n += adj[y]
-  void visitTupleElementAddrInst(TupleElementAddrInst *teai) {
-    auto loc = teai->getLoc();
-    auto adjElt = getAdjointBuffer(teai);
-    auto adjTupleElt = builder.createTupleElementAddr(
-        loc, getAdjointBuffer(teai->getOperand()), teai->getFieldNo());
-    // Accumulate element address's adjoint buffer into the corresponding
-    // element address of `tuple_element_addr` operand's adjoint buffer:
-    // `adj[x]#n += adj[y]`.
-    auto *destAccess = builder.createBeginAccess(
-        loc, adjTupleElt, SILAccessKind::Modify, SILAccessEnforcement::Static,
-        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-    auto *readAccess = builder.createBeginAccess(
-        loc, adjElt, SILAccessKind::Read, SILAccessEnforcement::Static,
-        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-    accumulateIndirect(destAccess, readAccess);
-    builder.createEndAccess(loc, readAccess, /*aborted*/ false);
-    builder.createEndAccess(loc, destAccess, /*aborted*/ false);
   }
 
   // Handle `alloc_stack` instruction.
@@ -4627,6 +4533,10 @@ public:
   NO_ADJOINT(StrongRetainUnowned)
   NO_ADJOINT(DestroyValue)
   NO_ADJOINT(DestroyAddr)
+  // Projection operations have no adjoint visitor.
+  // Corresponding adjoint projections are created in `getAdjointBuffer`.
+  NO_ADJOINT(StructElementAddr)
+  NO_ADJOINT(TupleElementAddr)
 #undef NO_DERIVATIVE
 };
 } // end anonymous namespace

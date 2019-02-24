@@ -774,8 +774,8 @@ public extension PythonObject {
 /// Return true if the specified objects an instance of the low-level Python
 /// type descriptor passed in as 'type'.
 private func isType(_ object: PythonObject,
-                    type: UnsafeMutableRawPointer) -> Bool {
-  let typePyRef = PythonObject(borrowing: type)
+                    type: PyObjectPointer) -> Bool {
+  let typePyRef = PythonObject(owning: type)
 
   let result = Python.isinstance(object, typePyRef)
 
