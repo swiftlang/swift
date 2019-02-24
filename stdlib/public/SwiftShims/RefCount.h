@@ -739,7 +739,7 @@ class RefCounts {
     do {
       newbits = oldbits;
       bool fast = newbits.incrementStrongExtraRefCount(inc);
-      if (__builtin_expect(!fast, 0)) {
+      if (SWIFT_UNLIKELY(!fast)) {
         if (oldbits.isImmortal())
           return;
         return incrementSlow(oldbits, inc);
@@ -752,7 +752,7 @@ class RefCounts {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     auto newbits = oldbits;
     bool fast = newbits.incrementStrongExtraRefCount(inc);
-    if (__builtin_expect(!fast, 0)) {
+    if (SWIFT_UNLIKELY(!fast)) {
       if (oldbits.isImmortal())
         return;
       return incrementNonAtomicSlow(oldbits, inc);
@@ -770,7 +770,7 @@ class RefCounts {
 
       newbits = oldbits;
       bool fast = newbits.incrementStrongExtraRefCount(1);
-      if (__builtin_expect(!fast, 0)) {
+      if (SWIFT_UNLIKELY(!fast)) {
         if (oldbits.isImmortal())
           return true;
         return tryIncrementSlow(oldbits);
@@ -787,7 +787,7 @@ class RefCounts {
 
     auto newbits = oldbits;
     bool fast = newbits.incrementStrongExtraRefCount(1);
-    if (__builtin_expect(!fast, 0)) {
+    if (SWIFT_UNLIKELY(!fast)) {
       if (oldbits.isImmortal())
         return true;
       return tryIncrementNonAtomicSlow(oldbits);
@@ -1000,7 +1000,7 @@ class RefCounts {
       newbits = oldbits;
       bool fast =
         newbits.decrementStrongExtraRefCount(dec);
-      if (__builtin_expect(!fast, 0)) {
+      if (SWIFT_UNLIKELY(!fast)) {
         if (oldbits.isImmortal()) {
             return false;
         }
