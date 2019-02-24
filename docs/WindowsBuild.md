@@ -163,10 +163,8 @@ cmake -G Ninja^
  -DSWIFT_INCLUDE_DOCS=OFF^
  -DSWIFT_PATH_TO_CMARK_SOURCE="S:\cmark"^
  -DSWIFT_PATH_TO_CMARK_BUILD="S:\b\cmark"^
- -DSWIFT_PATH_TO_LLVM_SOURCE="S:\llvm"^
- -DSWIFT_PATH_TO_LLVM_BUILD="S:\b\llvm"^
- -DSWIFT_PATH_TO_CLANG_SOURCE="S:\clang"^
- -DSWIFT_PATH_TO_CLANG_BUILD="S:\b\llvm"^
+ -DLLVM_DIR=S:\b\llvm\lib\cmake\llvm^
+ -DClang_DIR=S:\b\llvm\lib\cmake\clang^
  -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE="S:\swift-corelibs-libdispatch"^
  -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="S:/thirdparty/icu4c-63_1-Win64-MSVC2017/include"^
  -DSWIFT_WINDOWS_x86_64_ICU_UC="S:/thirdparty/icu4c-63_1-Win64-MSVC2017/lib64/icuuc.lib"^
