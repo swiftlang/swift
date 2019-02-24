@@ -266,13 +266,9 @@ private:
     }
   };
 
-  /// Return status and new selfDC and new DC
-  ASTScopeLookupState
-  lookInScopeForASTScopeLookup(const ASTScopeLookupState);
+  void lookInScopeForASTScopeLookup(const ASTScopeLookupState);
 
-  /// Returns status and selfDC and DC
-  ASTScopeLookupState
-  lookIntoDeclarationContextForASTScopeLookup(ASTScopeLookupState);
+  void lookIntoDeclarationContextForASTScopeLookup(ASTScopeLookupState);
   /// Can lookup stop searching for results, assuming hasn't looked for outer
   /// results yet?
   bool isFirstResultEnough() const;
@@ -467,15 +463,7 @@ UnqualifiedLookupFactory::experimentallyLookInASTScopes(DeclContext *const start
   // Walk scopes outward from the innermost scope until we find something.
  
   ASTScopeLookupState state{lookupScopeAndIsCascadingUse.first, nullptr, startDC, lookupScopeAndIsCascadingUse.second};
-  while ( state.scope) {
-    state = lookInScopeForASTScopeLookup(state);
-    if (!state.scope)
-      break;
-    state = state.withParentScope();
-  }
-  if (isFirstResultEnough())
-    return;
-  lookInModuleScopeContext(DCAndResolvedIsCascadingUse{state.dc, state.isCascadingUse.getValue()});
+  lookInScopeForASTScopeLookup(state);
 }
 
 std::pair<const ASTScope *, bool>
@@ -509,8 +497,7 @@ UnqualifiedLookupFactory::nonoperatorScopeForASTScopeLookup(
   return std::make_pair(lookupScope, isCascadingUse);
 }
 
-UnqualifiedLookupFactory::ASTScopeLookupState
-UnqualifiedLookupFactory::lookInScopeForASTScopeLookup(
+void UnqualifiedLookupFactory::lookInScopeForASTScopeLookup(
     const ASTScopeLookupState state) {
 
   // Perform local lookup within this scope.
@@ -522,93 +509,107 @@ UnqualifiedLookupFactory::lookInScopeForASTScopeLookup(
   recordCompletionOfAScope();
   // If we found anything, we're done.
   if (isFirstResultEnough())
-    return state.withNoScope();
+    return;
 
   // When we are in the body of a method, get the 'self' declaration.
   if (state.scope->getKind() == ASTScopeKind::AbstractFunctionBody &&
       state.scope->getAbstractFunctionDecl()
           ->getDeclContext()
           ->isTypeContext()) {
-    return state.withSelfDC(state.scope->getAbstractFunctionDecl());
+    lookInScopeForASTScopeLookup(
+        state.withSelfDC(state.scope->getAbstractFunctionDecl())
+            .withParentScope());
+    return;
   }
 
   // If there is a declaration context associated with this scope, we might
   // want to look in it.
-  return lookIntoDeclarationContextForASTScopeLookup(state);
+  lookIntoDeclarationContextForASTScopeLookup(state);
 }
 
-UnqualifiedLookupFactory::ASTScopeLookupState
-UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
+void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
     ASTScopeLookupState stateArg) {
-  
+
   DeclContext *scopeDC = stateArg.scope->getDeclContext();
-  if (!scopeDC)
-    return stateArg;
+  if (!scopeDC) {
+    lookInScopeForASTScopeLookup(stateArg.withParentScope());
+    return;
+  }
 
   // If we haven't determined whether we have a cascading use, do so now.
   const bool isCascadingUseResult = resolveIsCascadingUse(
       scopeDC, stateArg.isCascadingUse, /*onlyCareAboutFunctionBody=*/false);
-  
-  const ASTScopeLookupState defaultReturnState = stateArg.withResolvedIsCascadingUse(isCascadingUseResult);
+
+  const ASTScopeLookupState defaultNextState =
+      stateArg.withResolvedIsCascadingUse(isCascadingUseResult)
+          .withParentScope();
 
   // Pattern binding initializers are only interesting insofar as they
   // affect lookup in an enclosing nominal type or extension thereof.
   if (auto *bindingInit = dyn_cast<PatternBindingInitializer>(scopeDC)) {
     // Lazy variable initializer contexts have a 'self' parameter for
     // instance member lookup.
-    if (bindingInit->getImplicitSelfDecl())
-      return defaultReturnState.withSelfDC(bindingInit);
-
-    return defaultReturnState;
+    lookInScopeForASTScopeLookup(bindingInit->getImplicitSelfDecl()
+                                     ? defaultNextState.withSelfDC(bindingInit)
+                                     : defaultNextState);
+    return;
   }
 
   // Default arguments only have 'static' access to the members of the
   // enclosing type, if there is one.
-  if (isa<DefaultArgumentInitializer>(scopeDC))
-    return defaultReturnState;
-
+  if (isa<DefaultArgumentInitializer>(scopeDC)) {
+    lookInScopeForASTScopeLookup(defaultNextState);
+    return;
+  }
   // Functions/initializers/deinitializers are only interesting insofar as
   // they affect lookup in an enclosing nominal type or extension thereof.
-  if (isa<AbstractFunctionDecl>(scopeDC))
-    return defaultReturnState;
-
+  if (isa<AbstractFunctionDecl>(scopeDC)) {
+    lookInScopeForASTScopeLookup(defaultNextState);
+    return;
+  }
   // Subscripts have no lookup of their own.
-  if (isa<SubscriptDecl>(scopeDC))
-    return defaultReturnState;
-
+  if (isa<SubscriptDecl>(scopeDC)) {
+    lookInScopeForASTScopeLookup(defaultNextState);
+    return;
+  }
   // Closures have no lookup of their own.
-  if (isa<AbstractClosureExpr>(scopeDC))
-    return defaultReturnState;
-
+  if (isa<AbstractClosureExpr>(scopeDC)) {
+    lookInScopeForASTScopeLookup(defaultNextState);
+    return;
+  }
   // Top-level declarations have no lookup of their own.
-  if (isa<TopLevelCodeDecl>(scopeDC))
-    return defaultReturnState;
-
+  if (isa<TopLevelCodeDecl>(scopeDC)) {
+    lookInScopeForASTScopeLookup(defaultNextState);
+    return;
+  }
   // Typealiases have no lookup of their own.
-  if (isa<TypeAliasDecl>(scopeDC))
-    return defaultReturnState;
-
+  if (isa<TypeAliasDecl>(scopeDC)) {
+    lookInScopeForASTScopeLookup(defaultNextState);
+    return;
+  }
   // Lookup in the source file's scope marks the end.
   if (isa<SourceFile>(scopeDC)) {
-    // FIXME: A bit of a hack.
-    return defaultReturnState.withDC(scopeDC).withNoScope();
+    lookInModuleScopeContext(
+        DCAndResolvedIsCascadingUse{scopeDC, isCascadingUseResult});
+    return;
   }
 
   // We have a nominal type or an extension thereof. Perform lookup into
   // the nominal type.
   auto nominal = scopeDC->getSelfNominalTypeDecl();
-  if (!nominal)
-    return defaultReturnState;
-
+  if (!nominal) {
+    lookInScopeForASTScopeLookup(defaultNextState);
+    return;
+  }
   // Dig out the type we're looking into.
   using LookupDecls = SmallVector<NominalTypeDecl *, 2>;
   LookupDecls lookupDecls;
   populateLookupDeclsFromContext(scopeDC, lookupDecls);
 
- 
   // Perform lookup into the type.
-   NLOptions options = baseNLOptions | (
-    isCascadingUseResult ? NL_KnownCascadingDependency : NL_KnownNonCascadingDependency);
+  NLOptions options =
+      baseNLOptions | (isCascadingUseResult ? NL_KnownCascadingDependency
+                                            : NL_KnownNonCascadingDependency);
 
   SmallVector<ValueDecl *, 4> lookup;
   scopeDC->lookupQualified(lookupDecls, Name, options, lookup);
@@ -616,8 +617,8 @@ UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
   auto startIndex = Results.size();
   for (auto result : lookup) {
     auto *baseDC = scopeDC;
-    if (!isa<TypeDecl>(result) && defaultReturnState.selfDC)
-      baseDC = defaultReturnState.selfDC;
+    if (!isa<TypeDecl>(result) && defaultNextState.selfDC)
+      baseDC = defaultNextState.selfDC;
     Results.push_back(LookupResultEntry(baseDC, result));
   }
 
@@ -640,15 +641,14 @@ UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
 
       recordCompletionOfAScope();
       if (isFirstResultEnough())
-        return defaultReturnState.withNoScope();
+        return;
     }
   }
-
   // Forget the 'self' declaration.
-  return defaultReturnState.withSelfDC(nullptr);
+  lookInScopeForASTScopeLookup(defaultNextState.withSelfDC(nullptr));
 }
 
-#pragma mark context-based lookup declarations
+#pragma mark context-based lookup definitions
 
 void
 UnqualifiedLookupFactory::lookInDeclContexts(DeclContext *dc, const Optional <bool> isCascadingUseArg) {
