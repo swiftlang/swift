@@ -283,7 +283,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     }
 
     // SWIFT_ENABLE_TENSORFLOW
-    // TensorArrayProtocol._unpackTensorHandles
+    // TensorArrayProtocol._unpackTensorHandles(into:)
     if (name.isCompoundName() && 
         name.getBaseName() == ctx.Id_unpackTensorHandles) {
       auto argumentNames = name.getArgumentNames();
@@ -334,6 +334,12 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       // Decodable.init(from: Decoder)
       if (argumentNames[0] == ctx.Id_from)
         return getRequirement(KnownProtocolKind::Decodable);
+
+      // SWIFT_ENABLE_TENSORFLOW
+      // TensorGroup.init(_owning:)
+      if (argumentNames[0] == ctx.getIdentifier("_owning")) {
+        return getRequirement(KnownProtocolKind::TensorGroup);
+      }
     }
 
     return nullptr;

@@ -124,7 +124,7 @@ deriveBodyTensorArrayProtocol_unpackTensorHandles(
   // `_unpackTensorHandles(into:)`.
   llvm::SmallVector<ASTNode, 2> memberExprs;
   for (auto member : nominal->getStoredProperties()) {
-    // Find `Self` member corresponding to member from returned nominal type.
+    // Find `Self` member corresponding to this member.
     VarDecl *selfMember = nullptr;
     for (auto candidate : nominal->getStoredProperties()) {
       if (candidate->getName() == member->getName()) {
@@ -191,7 +191,7 @@ deriveBodyTensorArrayProtocol_unpackTensorHandles(
     auto *intInitCallExpr = CallExpr::createImplicit(
         C, intInitExpr, {memberCountMRE}, {Identifier()});
     
-    // Advance the current address.
+    // Assign the new address.
     auto *assignCallExpr = CallExpr::createImplicit(
         C, advancedMethodExpr, {intInitCallExpr}, {C.getIdentifier("by")});
     auto *assignExpr = new (C) AssignExpr(addressDRE, SourceLoc(), 
@@ -262,7 +262,6 @@ static ValueDecl
       C.getUnsafeMutablePointerDecl(), Type(), {cTensorHandleType});
   Type addressType = BoundGenericType::get(
       C.getOptionalDecl(), Type(), {baseAddressType});
-  
   Type voidType = C.getVoidDecl()->getDeclaredInterfaceType();
 
   return deriveTensorArrayProtocol_method(
