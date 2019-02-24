@@ -551,6 +551,16 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     };
 
     if (!isConfused) {
+      if (Name.getBaseName().userFacingName() == "Self") {
+        DeclName selfName(Context.getIdentifier("self"));
+        auto selfInstance = lookupUnqualified(DC, selfName, Loc, lookupOptions);
+        if (!selfInstance.empty()) {
+          ValueDecl *D = selfInstance.front().getValueDecl();
+          Expr *E = new (Context) DeclRefExpr(D, nameLoc, /*Implicit=*/false);
+          return new (Context) DynamicTypeExpr(Loc, Loc, E, Loc, Type());
+        }
+      }
+
       TypoCorrectionResults corrections(*this, Name, nameLoc);
       performTypoCorrection(DC, UDRE->getRefKind(), Type(),
                             lookupOptions, corrections);

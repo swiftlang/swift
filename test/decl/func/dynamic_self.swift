@@ -89,7 +89,7 @@ class C1 {
 
     if b { return self.init(int: 5) }
 
-    return Self() // expected-error{{use of unresolved identifier 'Self'; did you mean 'self'?}}
+    return Self() // expected-error{{non-nominal type 'Self.Type' does not support explicit initialization}}
   }
 
   // This used to crash because metatype construction went down a
@@ -413,3 +413,45 @@ func useSelfOperator() {
   let s = SelfOperator()
   _ = s + s
 }
+
+// These references to Self are now possible
+
+class A<T> {
+  let b: Int
+  required init(a: Int) {
+    print("\(Self).\(#function)")
+    b = a
+  }
+  static func z() {
+    print("\(Self.self).\(#function)")
+  }
+  class func y() {
+    print("\(Self).\(#function)")
+  }
+  func x() {
+    print("\(Self.self).\(#function)")
+    Self.y()
+    Self.z()
+    _ = Self.init(a: 77)
+  }
+}
+
+class B: A<Int> {
+  let a: Int
+  required convenience init(a: Int) {
+    print("\(Self).\(#function)")
+    self.init()
+  }
+  init() {
+    print("\(Self.self).\(#function)")
+    Self.y()
+    Self.z()
+    a = 99
+    super.init(a: 88)
+  }
+  override class func y() {
+    print("\(Self).\(#function)")
+  }
+}
+
+B().x()
