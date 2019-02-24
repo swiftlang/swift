@@ -443,7 +443,7 @@ void swift::findClosuresForFunctionValue(
         continue;
       }
       // SWIFT_ENABLE_TENSORFLOW
-      if (AutoDiffFunctionInst* ADFI = dyn_cast<AutoDiffFunctionInst>(I)) {
+      if (auto *ADFI = dyn_cast<AutoDiffFunctionInst>(I)) {
         worklistInsert(ADFI->getOperand(0));
         continue;
       }
