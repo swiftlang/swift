@@ -81,42 +81,42 @@ deriveBodyTensorArrayProtocol_unpackTensorHandles(
   Type addressType = BoundGenericType::get(
       C.getOptionalDecl(), Type(), {baseAddressType});
 
-  // Get the address parameter.
+  // Get references to `self` and parameter declarations.
+  auto *selfDecl = funcDecl->getImplicitSelfDecl();
+  auto *selfDRE =
+      new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit*/ true);
   auto *paramDecl = funcDecl->getParameters()->get(0);
-  auto *paramDRE = new (C) 
-      DeclRefExpr(paramDecl, DeclNameLoc(), /*Implicit*/ true, 
-                  AccessSemantics::Ordinary, /*Ty*/ addressType);
-  paramDRE->setFunctionRefKind(FunctionRefKind::Unapplied);
+  auto *paramDRE =
+      new (C) DeclRefExpr(paramDecl, DeclNameLoc(), /*Implicit*/ true);
 
   // Create an `if var` statement for the current address.
   VarDecl *currAddressDecl = new (C) VarDecl(
       /*IsStatic*/ false, VarDecl::Specifier::Var, /*IsCaptureList*/ false, 
-      SourceLoc(), C.getIdentifier("currentAddress"), parentDC);
+      SourceLoc(), C.getIdentifier("currentAddress"), funcDecl);
   currAddressDecl->setImplicit();
-  currAddressDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
+  currAddressDecl->setHasNonPatternBindingInit(true);
   currAddressDecl->setInterfaceType(baseAddressType);
   currAddressDecl->setValidationToChecked();
 
   Pattern *currAddressPat = new (C) 
       NamedPattern(currAddressDecl, /*implicit*/ true);
-  currAddressPat->setType(baseAddressType);
   currAddressPat = new (C) 
       VarPattern(SourceLoc(), /*isLet*/ false, currAddressPat, 
                  /*implicit*/ true);
-  currAddressPat->setType(baseAddressType);
   currAddressPat = new (C)
       OptionalSomePattern(currAddressPat, currAddressPat->getEndLoc(), 
                           /*implicit*/ true);
-  currAddressPat->setType(addressType);
-  auto cond = StmtConditionElement(SourceLoc(), currAddressPat, 
-                                   /*Init*/ paramDRE);
+  StmtConditionElement cond[] = {
+      StmtConditionElement(SourceLoc(), currAddressPat, /*Init*/ paramDRE)};
 
   // Get method protocol requirement.
   auto *tensorArrayProto = C.getProtocol(
       KnownProtocolKind::TensorArrayProtocol);
   auto *methodReq = getProtocolRequirement(tensorArrayProto, 
                                            C.Id_unpackTensorHandles);
-  
+  auto *countReq = getProtocolRequirement(tensorArrayProto, 
+                                          C.Id_tensorHandleCount);
+
   Type intType = C.getIntDecl()->getDeclaredType();
   TypeExpr *intTypeExpr = TypeExpr::createImplicit(intType, C);
 
@@ -124,42 +124,77 @@ deriveBodyTensorArrayProtocol_unpackTensorHandles(
   // `_unpackTensorHandles(into:)`.
   llvm::SmallVector<ASTNode, 2> memberExprs;
   for (auto member : nominal->getStoredProperties()) {
-    auto *memberRefExpr = new (C) DeclRefExpr(member, DeclNameLoc(),
-                                              /*Implicit*/ true);
-    auto memberType =
-        parentDC->mapTypeIntoContext(member->getValueInterfaceType());
-    auto *memberTypeExpr = TypeExpr::createImplicit(memberType, C);
-    auto *memberMethodRefExpr = new (C) 
-        MemberRefExpr(memberTypeExpr, SourceLoc(), methodReq,
-                      DeclNameLoc(), /*Implicit*/ true);
-    auto *methodCallExpr = new (C) 
-        DotSyntaxCallExpr(memberRefExpr, SourceLoc(), memberMethodRefExpr);
-    
+    // Find `Self` member corresponding to member from returned nominal type.
+    VarDecl *selfMember = nullptr;
+    for (auto candidate : nominal->getStoredProperties()) {
+      if (candidate->getName() == member->getName()) {
+        selfMember = candidate;
+        break;
+      }
+    }
+    assert(selfMember && "Could not find corresponding self member");
+    auto module = nominal->getModuleContext();
+    auto selfMemberType =
+        parentDC->mapTypeIntoContext(selfMember->getValueInterfaceType());
+    auto confRef = module->lookupConformance(selfMemberType, tensorArrayProto);
+    assert(confRef && "Member does not conform to `TensorArrayProtocol`");
+
+    // Get member type's method, e.g. `Member._unpackTensorHandles(into:)`.
+    // Use protocol requirement declaration for the method by default: this
+    // will be dynamically dispatched.
+    ValueDecl *memberMethodDecl = methodReq;
+    // If conformance reference is concrete, then use concrete witness
+    // declaration for the operator.
+    if (confRef->isConcrete())
+      memberMethodDecl = confRef->getConcrete()->getWitnessDecl(
+          methodReq, C.getLazyResolver());
+    assert(memberMethodDecl && "Member method declaration must exist");
+    auto memberMethodDRE =
+        new (C) DeclRefExpr(memberMethodDecl, DeclNameLoc(), /*Implicit*/ true);
+    memberMethodDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
+
+    // Create reference to member method: `Member._unpackTensorHandles(into:)`.
+    auto memberExpr =
+        new (C) MemberRefExpr(selfDRE, SourceLoc(), selfMember, DeclNameLoc(),
+                              /*Implicit*/ true);
+    auto memberMethodExpr =
+        new (C) DotSyntaxCallExpr(memberMethodDRE, SourceLoc(), memberExpr);
+
     // Obtain the method call argument.
-    auto *addressDeclRefExpr = new (C) 
-        DeclRefExpr(currAddressDecl, DeclNameLoc(), /*implicit*/ true);
-    auto *loadExpr = new (C) LoadExpr(addressDeclRefExpr, baseAddressType);
+    auto *addressDRE = 
+        new (C) DeclRefExpr(currAddressDecl, DeclNameLoc(), /*implicit*/ true);
+    auto *loadExpr = new (C) LoadExpr(addressDRE, baseAddressType);
     auto *injectExpr = new (C) InjectIntoOptionalExpr(loadExpr, addressType);
-    auto *tupleExpr = TupleExpr::create(
-        C, SourceLoc(), {injectExpr}, {C.getIdentifier("into")}, {}, 
-        SourceLoc(), /*HasTrailingClosure*/ false, /*Implicit*/ true);
 
     auto *callExpr = CallExpr::createImplicit(
-        C, methodCallExpr, {tupleExpr}, {C.getIdentifier("into")});
+        C, memberMethodExpr, {injectExpr}, {C.getIdentifier("into")});
     
     // Advance the current address.
-    auto *dotExpr = new (C)
-        UnresolvedDotExpr(addressDeclRefExpr, SourceLoc(), 
-                          C.getIdentifier("advanced"), DeclNameLoc(), 
-                          /*Implicit*/ true);
-    DeclName name(C, C.Id_tensorHandleCount, {Identifier()});
-    auto *countDotExpr = new (C)
-        UnresolvedDotExpr(memberTypeExpr, SourceLoc(), name, 
-                          DeclNameLoc(), /*Implicit*/ true);
-    auto *countExpr = new (C) ConstructorRefCallExpr(countDotExpr, intTypeExpr);
+    DeclName advancedName(C, C.getIdentifier("advanced"), 
+                          {C.getIdentifier("by")});
+    auto *advancedMethodExpr = 
+        new (C) UnresolvedDotExpr(addressDRE, SourceLoc(),
+                                  advancedName, DeclNameLoc(), 
+                                  /*Implicit*/ true);
+    
+    // Obtain `Member._tensorHandleCount`.
+    auto *memberCountMRE = new (C) 
+        MemberRefExpr(selfDRE, SourceLoc(), countReq,
+                      DeclNameLoc(), /*Implicit*/ true);
+    
+    // Cast the tensor handle count to Int.
+    auto intInitName = DeclName(C, DeclBaseName::createConstructor(), 
+                                Identifier());
+    auto *intInitExpr = 
+        new (C) UnresolvedDotExpr(intTypeExpr, SourceLoc(), intInitName, 
+                                  DeclNameLoc(), /*Implicit*/ true);
+    auto *intInitCallExpr = CallExpr::createImplicit(
+        C, intInitExpr, {memberCountMRE}, {Identifier()});
+    
+    // Advance the current address.
     auto *assignCallExpr = CallExpr::createImplicit(
-        C, dotExpr, {countExpr}, {C.getIdentifier("by")});
-    auto *assignExpr = new (C) AssignExpr(addressDeclRefExpr, SourceLoc(), 
+        C, advancedMethodExpr, {intInitCallExpr}, {C.getIdentifier("by")});
+    auto *assignExpr = new (C) AssignExpr(addressDRE, SourceLoc(), 
                                           assignCallExpr, /*Implicit*/ true);
     
     memberExprs.push_back(callExpr);
@@ -171,9 +206,9 @@ deriveBodyTensorArrayProtocol_unpackTensorHandles(
                                      SourceLoc(), /*implicit*/ true);
 
   auto *ifStmt = new (C)
-      IfStmt(LabeledStmtInfo(), /*IfLoc*/ SourceLoc(), /*Cond*/ cond,
-             /*Then*/ thenBody, /*ElseLoc*/ SourceLoc(), /*Else*/ nullptr, 
-             /*implicit*/ true);
+      IfStmt(LabeledStmtInfo(), /*IfLoc*/ SourceLoc(), 
+             /*Cond*/ C.AllocateCopy(cond), /*Then*/ thenBody, 
+             /*ElseLoc*/ SourceLoc(), /*Else*/ nullptr, /*implicit*/ true);
   
   funcDecl->setBody(BraceStmt::create(C, SourceLoc(), {ifStmt}, SourceLoc(),
                                       /*implicit*/ true));
