@@ -75,16 +75,18 @@ deriveBodyTensorArrayProtocol_unpackTensorHandles(
   auto &C = nominal->getASTContext();
 
   // Obtain the address type.
+  auto cTensorHandleType = C.getOpaquePointerDecl()->getDeclaredType();
   Type baseAddressType = BoundGenericType::get(
-      C.getUnsafeMutablePointerDecl(), Type(), 
-      {C.getCTensorHandleDecl()->getDeclaredInterfaceType()});
+      C.getUnsafeMutablePointerDecl(), Type(), {cTensorHandleType});
   Type addressType = BoundGenericType::get(
       C.getOptionalDecl(), Type(), {baseAddressType});
 
   // Get the address parameter.
   auto *paramDecl = funcDecl->getParameters()->get(0);
-  auto *paramDRE =
-      new (C) DeclRefExpr(paramDecl, DeclNameLoc(), /*Implicit*/ true);
+  auto *paramDRE = new (C) 
+      DeclRefExpr(paramDecl, DeclNameLoc(), /*Implicit*/ true, 
+                  AccessSemantics::Ordinary, /*Ty*/ addressType);
+  paramDRE->setFunctionRefKind(FunctionRefKind::Unapplied);
 
   // Create an `if var` statement for the current address.
   VarDecl *currAddressDecl = new (C) VarDecl(
@@ -92,15 +94,23 @@ deriveBodyTensorArrayProtocol_unpackTensorHandles(
       SourceLoc(), C.getIdentifier("currentAddress"), parentDC);
   currAddressDecl->setImplicit();
   currAddressDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  currAddressDecl->setInterfaceType(addressType);
+  currAddressDecl->setInterfaceType(baseAddressType);
   currAddressDecl->setValidationToChecked();
-  Pattern *currAddressPat = new (C) OptionalSomePattern(
-      new (C) NamedPattern(currAddressDecl, /*implicit*/ true),
-      SourceLoc(), /*implicit*/ true);
-  currAddressPat = TypedPattern::createImplicit(C, currAddressPat, addressType);
+
+  Pattern *currAddressPat = new (C) 
+      NamedPattern(currAddressDecl, /*implicit*/ true);
+  currAddressPat->setType(baseAddressType);
+  currAddressPat = new (C) 
+      VarPattern(SourceLoc(), /*isLet*/ false, currAddressPat, 
+                 /*implicit*/ true);
+  currAddressPat->setType(baseAddressType);
+  currAddressPat = new (C)
+      OptionalSomePattern(currAddressPat, currAddressPat->getEndLoc(), 
+                          /*implicit*/ true);
+  currAddressPat->setType(addressType);
   auto cond = StmtConditionElement(SourceLoc(), currAddressPat, 
                                    /*Init*/ paramDRE);
-  
+
   // Get method protocol requirement.
   auto *tensorArrayProto = C.getProtocol(
       KnownProtocolKind::TensorArrayProtocol);
@@ -189,7 +199,7 @@ static ValueDecl *deriveTensorArrayProtocol_method(
   auto funcDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
                                    SourceLoc(), declName, SourceLoc(),
                                    /*Throws*/ false, SourceLoc(),
-                                   /*GenericParams=*/nullptr, params,
+                                   /*GenericParams*/ nullptr, params,
                                    TypeLoc::withoutLoc(returnType), parentDC);
   funcDecl->setImplicit();
   funcDecl->setBodySynthesizer(bodySynthesizer);
@@ -212,9 +222,9 @@ static ValueDecl
   auto &C = derived.TC.Context;
 
   // Obtain the address type.
+  auto cTensorHandleType = C.getOpaquePointerDecl()->getDeclaredType();
   Type baseAddressType = BoundGenericType::get(
-      C.getUnsafeMutablePointerDecl(), Type(), 
-      {C.getCTensorHandleDecl()->getDeclaredInterfaceType()});
+      C.getUnsafeMutablePointerDecl(), Type(), {cTensorHandleType});
   Type addressType = BoundGenericType::get(
       C.getOptionalDecl(), Type(), {baseAddressType});
   

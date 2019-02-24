@@ -227,11 +227,6 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       return getRequirement(KnownProtocolKind::KeyPathIterable);
 
     // SWIFT_ENABLE_TENSORFLOW
-    // TensorArrayProtocol._unpackTensorHandles
-    if (name.isSimpleName(ctx.Id_unpackTensorHandles))
-      return getRequirement(KnownProtocolKind::TensorArrayProtocol);
-
-    // SWIFT_ENABLE_TENSORFLOW
     // TensorGroup._typeList
     if (name.isSimpleName(ctx.Id_typeList))
       return getRequirement(KnownProtocolKind::TensorGroup);
@@ -284,6 +279,17 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       auto argumentNames = name.getArgumentNames();
       if (argumentNames.size() == 2) {
         return getRequirement(KnownProtocolKind::VectorNumeric);
+      }
+    }
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // TensorArrayProtocol._unpackTensorHandles
+    if (name.isCompoundName() && 
+        name.getBaseName() == ctx.Id_unpackTensorHandles) {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 1 &&
+          argumentNames[0] == ctx.getIdentifier("into")) {
+        return getRequirement(KnownProtocolKind::TensorArrayProtocol);
       }
     }
 
