@@ -179,8 +179,8 @@ private:
   };
 
   struct PerContextInfo {
-    DeclContext *dc; // TODO: Eliminate ME
-    DeclContext *lookupContextForThisDecl;
+    DeclContext *thisContext; // TODO: Eliminate ME
+    DeclContext *lookupContextForThisContext;
     Optional<PlacesToSearch> placesToSearch;
     Optional<bool> isCascadingUse;
 
@@ -672,23 +672,24 @@ void UnqualifiedLookupFactory::lookupNameInDeclContexts(
 void UnqualifiedLookupFactory::finishLookingInContext(
     const PerContextInfo &&info) {
   breadcrumbs.push_back(info);
-  auto lookupContextForThisDecl = info.lookupContextForThisDecl;
+  auto lookupContextForThisContext = info.lookupContextForThisContext;
   auto placesToSearch = std::move(info.placesToSearch);
   auto isCascadingUse = info.isCascadingUse;
 
-  if (!isa<DefaultArgumentInitializer>(info.dc) &&
-      addGenericParametersHereAndInEnclosingScopes(lookupContextForThisDecl))
+  if (!isa<DefaultArgumentInitializer>(info.thisContext) &&
+      addGenericParametersHereAndInEnclosingScopes(lookupContextForThisContext))
     return;
   if (placesToSearch.hasValue() && !placesToSearch.getValue().empty()) {
     auto startIndexOfInnerResults = Results.size();
-    placesToSearch.getValue().addToResults(Name, isCascadingUse.getValue(),
-                                           baseNLOptions,
-                                           lookupContextForThisDecl, Results);
+    placesToSearch.getValue().addToResults(
+        Name, isCascadingUse.getValue(), baseNLOptions,
+        lookupContextForThisContext, Results);
     if (handleUnavailableInnerResults(startIndexOfInnerResults))
       return;
   }
-  auto *const whereToLookNext = lookupContextForThisDecl->getParentForLookup();
-  assert(whereToLookNext != info.dc && "non-termination");
+  auto *const whereToLookNext =
+      lookupContextForThisContext->getParentForLookup();
+  assert(whereToLookNext != info.thisContext && "non-termination");
 
   lookupNameInDeclContexts(
       DCAndUnresolvedIsCascadingUse{whereToLookNext, isCascadingUse});
@@ -1723,7 +1724,7 @@ void UnqualifiedLookupFactory::dumpBreadcrumbs() const {
 void UnqualifiedLookupFactory::PerContextInfo::dump() const {
   auto &e = llvm::errs();
   e << " dc: ";
-  lookupContextForThisDecl->dumpContext();
+  lookupContextForThisContext->dumpContext();
   if (placesToSearch.hasValue())
     placesToSearch.getValue().dump();
 }
