@@ -193,14 +193,21 @@ extension DatasetIterator : IteratorProtocol {
   }
 }
 
+/// A 2-tuple-like struct that conforms to TensorGroup that represents the 
+/// result type of a zip operation between two datasets.
+public struct ZippedTensors<T: TensorGroup, U: TensorGroup> : TensorGroup {
+  public var first: T
+  public var second: U
+}
+
 // TODO(SR-9156): This does not work in graph mode.
 @inlinable @inline(__always)
 public func zip<T : TensorGroup, U : TensorGroup>(
   _ dataset1: Dataset<T>, _ dataset2: Dataset<U>
-) -> Dataset<TensorPair<T, U>> {
+) -> Dataset<ZippedTensors<T, U>> {
   let handle: VariantHandle = #tfop(
-     "ZipDataset", TensorPair(dataset1._handle, dataset2._handle),
-     output_types$dtype: TensorPair<T, U>._typeList,
-     output_shapes: TensorPair<T, U>._unknownShapeList)
+     "ZipDataset", ZippedTensors(dataset1._handle, dataset2._handle),
+     output_types$dtype: ZippedTensors<T, U>._typeList,
+     output_shapes: ZippedTensors<T, U>._unknownShapeList)
   return Dataset(_handle: handle)
 }
