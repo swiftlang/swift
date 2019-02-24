@@ -243,6 +243,16 @@ private:
   nonoperatorScopeForASTScopeLookup(DeclContext *dc,
                                     Optional<bool> isCascadingUse) const;
 
+  struct DCAndUnresolvedIsCascadingUse {
+    DeclContext *whereToLook;
+    Optional<bool> isCascadingUse;
+    DCAndResolvedIsCascadingUse resolve(const bool resolution) const {
+      return DCAndResolvedIsCascadingUse{
+          whereToLook,
+          isCascadingUse.hasValue() ? isCascadingUse.getValue() : resolution};
+    }
+  };
+
   struct ASTScopeLookupState {
     const ASTScope *scope;
     DeclContext *selfDC;
@@ -282,24 +292,12 @@ private:
   
   void lookInDeclContexts(DeclContext *dc, const Optional <bool> isCascadingUseArg);
 
-  /// Return None if lookup done.
-  Optional<DCAndResolvedIsCascadingUse>
-  lookupOperatorInDeclContexts(DeclContext *dc, Optional<bool> isCascadingUse);
+  void lookupOperatorInDeclContexts(DCAndUnresolvedIsCascadingUse);
 
   /// Return None if lookup done.
   Optional<DCAndResolvedIsCascadingUse>
   lookupNameInDeclContexts(DeclContext * dc,
                          const Optional<bool> isCascadingUseArg);
-
-  struct DCAndUnresolvedIsCascadingUse {
-    DeclContext *whereToLook;
-    Optional<bool> isCascadingUse;
-    DCAndResolvedIsCascadingUse resolve(const bool resolution) const {
-      return DCAndResolvedIsCascadingUse{
-          whereToLook,
-          isCascadingUse.hasValue() ? isCascadingUse.getValue() : resolution};
-    }
-  };
 
   /// Return the next context to search.
   Optional<DCAndUnresolvedIsCascadingUse>
@@ -370,7 +368,11 @@ private:
   static bool resolveIsCascadingUse(const DeclContext *const dc,
                                     Optional<bool> isCascadingUse,
                                     bool onlyCareAboutFunctionBody);
-
+  static bool resolveIsCascadingUse(DCAndUnresolvedIsCascadingUse x,
+                                    bool onlyCareAboutFunctionBody) {
+    return resolveIsCascadingUse(x.whereToLook, x.isCascadingUse,
+                                 onlyCareAboutFunctionBody);
+  }
   void dumpBreadcrumbs() const;
 
 public:
@@ -652,10 +654,12 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
 
 void
 UnqualifiedLookupFactory::lookInDeclContexts(DeclContext *dc, const Optional <bool> isCascadingUseArg) {
-//#error move final rnt to tails of next two
-  auto dcAndIsCascadingUse =
-  Name.isOperator() ? lookupOperatorInDeclContexts(DC, isCascadingUseArg)
-  : lookupNameInDeclContexts(DC, isCascadingUseArg);
+  if (Name.isOperator()) {
+    lookupOperatorInDeclContexts(
+        DCAndUnresolvedIsCascadingUse{DC, isCascadingUseArg});
+    return;
+  }
+  auto dcAndIsCascadingUse = lookupNameInDeclContexts(DC, isCascadingUseArg);
   if (!dcAndIsCascadingUse.hasValue())
     return;
   if (addLocalVariableResults(dcAndIsCascadingUse.getValue().DC))
@@ -663,13 +667,14 @@ UnqualifiedLookupFactory::lookInDeclContexts(DeclContext *dc, const Optional <bo
   lookInModuleScopeContext(dcAndIsCascadingUse.getValue());
 }
 
-Optional<UnqualifiedLookupFactory::DCAndResolvedIsCascadingUse>
-UnqualifiedLookupFactory::lookupOperatorInDeclContexts(DeclContext *dc,
-                                         Optional<bool> isCascadingUse) {
-  auto *msc = dc->getModuleScopeContext();
-  return DCAndResolvedIsCascadingUse{
-      msc, resolveIsCascadingUse(dc, isCascadingUse,
-                                 /*onlyCareAboutFunctionBody*/ true)};
+void UnqualifiedLookupFactory::lookupOperatorInDeclContexts(
+    const DCAndUnresolvedIsCascadingUse dcAndUseArg) {
+  DCAndResolvedIsCascadingUse dcAndResolvedIsCascadingUse{
+      dcAndUseArg.whereToLook->getModuleScopeContext(),
+      resolveIsCascadingUse(dcAndUseArg,
+                            /*onlyCareAboutFunctionBody*/ true)};
+  if (!addLocalVariableResults(dcAndResolvedIsCascadingUse.DC))
+    lookInModuleScopeContext(dcAndResolvedIsCascadingUse);
 }
 
 // TODO: Unify with LookupVisibleDecls.cpp::lookupVisibleDeclsImpl
