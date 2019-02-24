@@ -497,6 +497,7 @@ public extension Tensor {
   @inlinable
   var rank: Int32 {
     @inline(__always)
+    @_semantics("autodiff.nonvarying")
     get {
       return _TFGetScalarOrDie(rankTensor.handle)
     }
@@ -506,6 +507,7 @@ public extension Tensor {
   @inlinable
   var shape: TensorShape {
     @inline(__always)
+    @_semantics("autodiff.nonvarying")
     get {
       return TensorShape(shapeTensor.scalars)
     }
