@@ -3008,26 +3008,6 @@ public:
         recursivelyDeleteTriviallyDeadInstructions(
             getOpValue(origCallee)->getDefiningInstruction());
   }
-
-  /// Primal has qualified ownership. We assign store ownership qualifier while
-  /// cloning the `store` instruction.
-  void visitStoreInst(StoreInst *si) {
-    auto destTy = si->getDest()->getType().getASTType();
-    auto loc = remapLocation(si->getLoc());
-    auto soq = getBufferSOQ(getOpASTType(destTy), *getPrimal());
-    getBuilder().createStore(loc, getOpValue(si->getSrc()),
-                             getOpValue(si->getDest()), soq);
-  }
-
-  /// Primal has qualified ownership. We assign load ownership qualified while
-  /// cloning the `load` instruction.
-  void visitLoadInst(LoadInst *li) {
-    auto srcTy = li->getOperand()->getType().getASTType();
-    auto loc = remapLocation(li->getLoc());
-    auto loq = getBufferLOQ(getOpASTType(srcTy), *getPrimal());
-    mapValue(
-        li, getBuilder().createLoad(loc, getOpValue(li->getOperand()), loq));
-  }
 };
 } // end anonymous namespace
 
