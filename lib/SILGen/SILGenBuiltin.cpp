@@ -1181,9 +1181,9 @@ static ManagedValue emitBuiltinAutoDiffApply(SILGenFunction &SGF,
   auto builtinName = builtinDecl->getName().str();
   AutoDiffAssociatedFunctionKind kind;
   unsigned arity, order;
-  bool rethrows, isMethod;
+  bool rethrows;
   auto successfullyParsed = autodiff::getBuiltinAutoDiffApplyConfig(
-      builtinName, kind, arity, order, rethrows, isMethod);
+      builtinName, kind, arity, order, rethrows);
   assert(successfullyParsed);
   return emitBuiltinAutoDiffApplyAssociatedFunction(kind, arity, order,
                                                     rethrows, SGF, loc,

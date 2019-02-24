@@ -69,7 +69,7 @@ autodiff::getNumAutoDiffAssociatedFunctions(unsigned differentiationOrder) {
 
 bool autodiff::getBuiltinAutoDiffApplyConfig(
     StringRef operationName, AutoDiffAssociatedFunctionKind &kind,
-    unsigned &arity, unsigned &order, bool &rethrows, bool &isMethod) {
+    unsigned &arity, unsigned &order, bool &rethrows) {
   // SWIFT_ENABLE_TENSORFLOW
   if (!operationName.startswith("autodiffApply_"))
     return false;
@@ -108,13 +108,6 @@ bool autodiff::getBuiltinAutoDiffApplyConfig(
     rethrows = true;
   } else {
     rethrows = false;
-  }
-  // Parse '_method'.
-  if (operationName.startswith("_method")) {
-    operationName = operationName.drop_front(strlen("_method"));
-    isMethod = true;
-  } else {
-    isMethod = false;
   }
   return operationName.empty();
 }
