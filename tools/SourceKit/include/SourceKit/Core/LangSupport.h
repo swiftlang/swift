@@ -44,6 +44,7 @@ struct EntityInfo {
   StringRef ReceiverUSR;
   bool IsDynamic = false;
   bool IsTestCandidate = false;
+  bool IsImplicit = false;
   unsigned Line = 0;
   unsigned Column = 0;
   ArrayRef<UIdent> Attrs;
@@ -121,6 +122,18 @@ struct CodeCompletionInfo {
 
   Optional<DescriptionStructure> descriptionStructure;
   Optional<ArrayRef<ParameterStructure>> parametersStructure;
+};
+
+struct ExpressionType {
+  unsigned ExprOffset;
+  unsigned ExprLength;
+  unsigned TypeOffset;
+  unsigned TypeLength;
+};
+
+struct ExpressionTypesInFile {
+  std::vector<ExpressionType> Results;
+  StringRef TypeBuffer;
 };
 
 class CodeCompletionConsumer {
@@ -533,6 +546,31 @@ public:
   virtual void failed(StringRef ErrDescription) = 0;
 };
 
+struct ConformingMethodListResult {
+  StringRef TypeName;
+  StringRef TypeUSR;
+
+  struct Member {
+    StringRef Name;
+    StringRef TypeName;
+    StringRef TypeUSR;
+    StringRef Description;
+    StringRef SourceText;
+    StringRef DocBrief;
+  };
+  ArrayRef<Member> Members;
+};
+
+class ConformingMethodListConsumer {
+  virtual void anchor();
+
+public:
+  virtual ~ConformingMethodListConsumer() {}
+
+  virtual void handleResult(const ConformingMethodListResult &Result) = 0;
+  virtual void failed(StringRef ErrDescription) = 0;
+};
+
 class LangSupport {
   virtual void anchor();
 
@@ -683,6 +721,10 @@ public:
                                    ArrayRef<const char*> Args,
                                    CategorizedEditsReceiver Receiver) = 0;
 
+  virtual void collectExpressionTypes(StringRef FileName,
+                                      ArrayRef<const char *> Args,
+                                      std::function<void(const ExpressionTypesInFile&)> Receiver) = 0;
+
   virtual void getDocInfo(llvm::MemoryBuffer *InputBuf,
                           StringRef ModuleName,
                           ArrayRef<const char *> Args,
@@ -693,9 +735,14 @@ public:
                                         ArrayRef<const char *> Args,
                                         TypeContextInfoConsumer &Consumer) = 0;
 
+  virtual void getConformingMethodList(llvm::MemoryBuffer *inputBuf,
+                                       unsigned Offset,
+                                       ArrayRef<const char *> Args,
+                                       ArrayRef<const char *> ExpectedTypes,
+                                       ConformingMethodListConsumer &Consumer) = 0;
+
   virtual void getStatistics(StatisticsReceiver) = 0;
 };
-
 } // namespace SourceKit
 
 #endif

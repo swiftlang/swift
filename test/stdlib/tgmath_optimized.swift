@@ -4,12 +4,14 @@
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
-#if os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
-  import Glibc
-#elseif os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+  import Glibc
 #elseif os(Windows)
   import MSVCRT
+#else
+#error("Unsupported platform")
 #endif
 import StdlibUnittest
 

@@ -44,6 +44,12 @@ public:
   virtual void configuredCompiler(CompilerInstance &instance);
 };
 
+namespace frontend {
+namespace utils {
+StringRef escapeForMake(StringRef raw, llvm::SmallVectorImpl<char> &buffer);
+}
+}
+
 /// Perform all the operations of the frontend, exactly as if invoked
 /// with -frontend.
 ///

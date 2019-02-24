@@ -58,6 +58,18 @@ private struct PrivateStruct: PublicProto, InternalProto, FilePrivateProto, Priv
   public var publicVar = 0
 }
 
+public struct PublicStructWithInternalExtension: PublicProto, InternalProto, FilePrivateProto, PrivateProto {}
+// expected-error@-1 {{method 'publicReq()' must be declared public because it matches a requirement in public protocol 'PublicProto'}} {{none}}
+// expected-error@-2 {{method 'internalReq()' must be declared internal because it matches a requirement in internal protocol 'InternalProto'}} {{none}}
+// expected-error@-3 {{method 'filePrivateReq()' must be declared fileprivate because it matches a requirement in fileprivate protocol 'FilePrivateProto'}} {{none}}
+// expected-error@-4 {{method 'privateReq()' must be declared fileprivate because it matches a requirement in private protocol 'PrivateProto'}} {{none}}
+internal extension PublicStructWithInternalExtension {
+  private func publicReq() {} // expected-note {{move the instance method to another extension where it can be declared 'public' to satisfy the requirement}} {{none}}
+  private func internalReq() {} // expected-note {{mark the instance method as 'internal' to satisfy the requirement}} {{3-11=}}
+  private func filePrivateReq() {} // expected-note {{mark the instance method as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
+  private func privateReq() {} // expected-note {{mark the instance method as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
+}
+
 extension PublicStruct {
   public init(x: Int) { self.init() }
 }
@@ -670,6 +682,22 @@ internal struct EquatablishOuterProblem3 {
 private func ==(lhs: EquatablishOuterProblem3.Inner, rhs: EquatablishOuterProblem3.Inner) {}
 // expected-note@-1 {{mark the operator function as 'internal' to satisfy the requirement}} {{1-8=internal}}
 
+internal struct EquatablishOuterProblem4 {
+  public struct Inner : Equatablish {} // expected-error {{method '==' must be as accessible as its enclosing type because it matches a requirement in protocol 'Equatablish'}} {{none}}
+}
+internal extension EquatablishOuterProblem4.Inner {
+  fileprivate static func ==(lhs: EquatablishOuterProblem4.Inner, rhs: EquatablishOuterProblem4.Inner) {}
+  // expected-note@-1 {{mark the operator function as 'internal' to satisfy the requirement}} {{3-15=}}
+}
+
+internal struct EquatablishOuterProblem5 {
+  public struct Inner : Equatablish {} // expected-error {{method '==' must be as accessible as its enclosing type because it matches a requirement in protocol 'Equatablish'}} {{none}}
+}
+private extension EquatablishOuterProblem5.Inner {
+  static func ==(lhs: EquatablishOuterProblem5.Inner, rhs: EquatablishOuterProblem5.Inner) {}
+  // expected-note@-1 {{move the operator function to another extension where it can be declared 'internal' to satisfy the requirement}} {{none}}
+}
+
 
 public protocol AssocTypeProto {
   associatedtype Assoc
@@ -691,6 +719,20 @@ internal struct AssocTypeOuterProblem2 {
   public struct Inner : AssocTypeProto {
     fileprivate typealias Assoc = Int // expected-error {{type alias 'Assoc' must be as accessible as its enclosing type because it matches a requirement in protocol 'AssocTypeProto'}} {{none}} expected-note {{mark the type alias as 'internal' to satisfy the requirement}} {{5-16=internal}}
   }
+}
+
+internal struct AssocTypeOuterProblem3 {
+  public struct Inner : AssocTypeProto {} // expected-error {{type alias 'Assoc' must be as accessible as its enclosing type because it matches a requirement in protocol 'AssocTypeProto'}} {{none}}
+}
+internal extension AssocTypeOuterProblem3.Inner {
+  fileprivate typealias Assoc = Int // expected-note {{mark the type alias as 'internal' to satisfy the requirement}} {{3-15=}}
+}
+
+internal struct AssocTypeOuterProblem4 {
+  public struct Inner : AssocTypeProto {} // expected-error {{type alias 'Assoc' must be as accessible as its enclosing type because it matches a requirement in protocol 'AssocTypeProto'}} {{none}}
+}
+private extension AssocTypeOuterProblem4.Inner {
+  typealias Assoc = Int // expected-note {{move the type alias to another extension where it can be declared 'internal' to satisfy the requirement}} {{none}}
 }
 
 internal typealias InternalComposition = PublicClass & PublicProto // expected-note {{declared here}}

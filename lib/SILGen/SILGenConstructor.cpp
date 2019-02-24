@@ -35,7 +35,9 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &SGF,
   auto ctorFnType = ctor->getInterfaceType()->castTo<AnyFunctionType>();
   assert(ctorFnType->getParams().size() == 1 &&
          "more than one self parameter?");
-  Type metatype = ctorFnType->getParams()[0].getOldType();
+  auto param = ctorFnType->getParams()[0];
+  assert(!param.isVariadic() && !param.isInOut());
+  Type metatype = param.getPlainType();
   auto *DC = ctor->getInnermostDeclContext();
   auto &AC = SGF.getASTContext();
   auto VD =
@@ -409,10 +411,9 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
   // Emit the exploded constructor argument.
   ArgumentSource payload;
   if (element->hasAssociatedValues()) {
-    RValue arg = emitImplicitValueConstructorArg
-      (*this, Loc, element->getArgumentInterfaceType()->getCanonicalType(),
-       element->getDeclContext());
-   payload = ArgumentSource(Loc, std::move(arg));
+    auto eltArgTy = element->getArgumentInterfaceType()->getCanonicalType();
+    RValue arg = emitImplicitValueConstructorArg(*this, Loc, eltArgTy, element);
+    payload = ArgumentSource(Loc, std::move(arg));
   }
 
   // Emit the metatype argument.
@@ -908,7 +909,7 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
 
               return Type(type);
             },
-            MakeAbstractConformanceForGenericType());
+            LookUpConformanceInModule(dc->getParentModule()));
         }
 
         // Get the type of the initialization result, in terms

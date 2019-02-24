@@ -89,14 +89,14 @@ public func _stdlib_thread_create_block<Argument, Result>(
   let contextAsVoidPointer = Unmanaged.passRetained(context).toOpaque()
 
 #if os(Windows)
-  var threadID =
+  let threadID =
       _beginthreadex(nil, 0, { invokeBlockContext($0)!
                                   .assumingMemoryBound(to: UInt32.self).pointee },
                      contextAsVoidPointer, 0, nil)
   if threadID == 0 {
     return (errno, nil)
   } else {
-    return (0, UnsafeMutablePointer<ThreadHandle>(&threadID).pointee)
+    return (0, ThreadHandle(bitPattern: threadID))
   }
 #else
   var threadID = _make_pthread_t()

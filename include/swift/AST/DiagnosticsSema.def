@@ -1508,9 +1508,6 @@ WARNING(function_type_usable_from_inline_warn,none,
         "'@usableFromInline' %select{function|method|initializer}0 "
         "should be '@usableFromInline' or public",
         (unsigned, bool))
-ERROR(noreturn_not_supported,none,
-      "'@noreturn' has been removed; functions that never return should have a "
-      "return type of 'Never' instead", ())
 
 // Extensions
 ERROR(non_nominal_extension,none,
@@ -1725,6 +1722,10 @@ ERROR(type_witness_objc_generic_parameter,none,
       (Type, Type, bool, DeclName, DeclName))
 NOTE(witness_fix_access,none,
      "mark the %0 as '%select{%error|fileprivate|internal|public|%error}1' to "
+     "satisfy the requirement", (DescriptiveDeclKind, AccessLevel))
+NOTE(witness_move_to_another_extension,none,
+     "move the %0 to another extension where it can be declared "
+     "'%select{%error|%error|internal|public|%error}1' to "
      "satisfy the requirement", (DescriptiveDeclKind, AccessLevel))
 WARNING(assoc_type_default_conformance_failed,none,
         "default type %0 for associated type %1 does not satisfy constraint "
@@ -1982,6 +1983,9 @@ ERROR(protocol_composition_one_class,none,
 ERROR(requires_conformance_nonprotocol,none,
       "type %0 constrained to non-protocol, non-class type %1",
       (Type, Type))
+NOTE(requires_conformance_nonprotocol_fixit,none,
+     "use '%0 == %1' to require '%0' to be '%1'",
+     (StringRef, StringRef))
 ERROR(requires_not_suitable_archetype,none,
       "type %0 in conformance requirement does not refer to a "
       "generic parameter or associated type",
@@ -3917,6 +3921,14 @@ ERROR(dynamic_replacement_not_in_extension, none,
       "dynamicReplacement(for:) of %0 is not defined in an extension or at the file level", (DeclName))
 ERROR(dynamic_replacement_must_not_be_dynamic, none,
       "dynamicReplacement(for:) of %0 must not be dynamic itself", (DeclName))
+ERROR(dynamic_replacement_replaced_not_objc_dynamic, none,
+      "%0 is not marked @objc dynamic", (DeclName))
+ERROR(dynamic_replacement_replacement_not_objc_dynamic, none,
+      "%0 is marked @objc dynamic", (DeclName))
+ERROR(dynamic_replacement_replaced_constructor_is_convenience, none,
+      "replaced constructor %0 is marked as convenience", (DeclName))
+ERROR(dynamic_replacement_replaced_constructor_is_not_convenience, none,
+      "replaced constructor %0 is not marked as convenience", (DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: @available
@@ -4075,6 +4087,7 @@ ERROR(usable_from_inline_attr_in_protocol,none,
 #define FRAGILE_FUNC_KIND \
   "%select{a '@_transparent' function|" \
   "an '@inlinable' function|" \
+  "an '@_alwaysEmitIntoClient' function|" \
   "a default argument value|" \
   "a property initializer in a '@_fixed_layout' type}"
 
@@ -4108,7 +4121,7 @@ NOTE(resilience_decl_declared_here,
 
 ERROR(class_designated_init_inlinable_resilient,none,
       "initializer for class %0 is "
-      "'%select{@_transparent|@inlinable|%error}1' and must "
+      "'%select{@_transparent|@inlinable|@_alwaysEmitIntoClient|%error}1' and must "
       "delegate to another initializer", (Type, unsigned))
 
 ERROR(attribute_invalid_on_stored_property,

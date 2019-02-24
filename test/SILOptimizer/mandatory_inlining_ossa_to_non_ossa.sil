@@ -283,13 +283,177 @@ bb6:
 // CHECK: [[SOME]]([[PAYLOAD:%.*]] :
 // CHECK:   release_value [[PAYLOAD]]
 //
-// CHECK: [[DEFAULT]]
+// CHECK: [[DEFAULT]]:
 // CHECK:   release_value [[ARG1]]
 // CHECK: } // end sil function 'term_non_ossa_caller'
 sil @term_non_ossa_caller : $@convention(thin) (@owned Builtin.NativeObject, @owned FakeOptional<Klass>) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $FakeOptional<Klass>):
   %2 = function_ref @term_ossa_callee : $@convention(thin) (@owned Builtin.NativeObject, @owned FakeOptional<Klass>) -> ()
   apply %2(%0, %1) : $@convention(thin) (@owned Builtin.NativeObject, @owned FakeOptional<Klass>) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [transparent] [ossa] @term_ossa_checked_cast_addr_br_takealways_callee : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  %2 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Builtin.NativeObject
+  checked_cast_addr_br take_always Builtin.NativeObject in %1 : $*Builtin.NativeObject to Klass in %2 : $*Klass, bb1, bb2
+
+bb1:
+  destroy_addr %2 : $*Klass
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %2 : $*Klass
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+
+// CHECK-LABEL: sil @term_nonossa_checked_cast_addr_br_takealways_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK-NEXT:   strong_retain [[ARG]]
+// CHECK-NEXT:   [[SRC_ADDR:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK-NEXT:   [[DEST_ADDR:%.*]] = alloc_stack $Klass
+// CHECK-NEXT:   store [[ARG]] to [[SRC_ADDR]]
+// CHECK-NEXT:   [[RELOADED_ARG:%.*]] = load [[SRC_ADDR]]
+// CHECK-NEXT:   checked_cast_br [[RELOADED_ARG]] : $Builtin.NativeObject to $Klass, [[SUCCESS_BB:bb[0-9]+]], [[FAILURE_BB:bb[0-9]+]]
+//
+// ==> On success, we store the value into dest. The destroy is not from the
+// ==> optimizer, but from the code.
+// CHECK: [[SUCCESS_BB]]([[CAST_VALUE:%.*]] :
+// CHECK-NEXT:   store [[CAST_VALUE]] to [[DEST_ADDR]]
+// CHECK-NEXT:   destroy_addr [[DEST_ADDR]]
+// CHECK-NEXT:   br [[CONT_BB:bb[0-9]+]]
+//
+// ==> take_always implies we destroy in failure
+// CHECK: [[FAILURE_BB]]:
+// CHECK-NEXT:   strong_release [[RELOADED_ARG]]
+// CHECK-NEXT:   br [[CONT_BB]]
+//
+// CHECK: [[CONT_BB]]:
+// CHECK:   strong_release [[ARG]]
+// CHECK: } // end sil function 'term_nonossa_checked_cast_addr_br_takealways_caller'
+sil @term_nonossa_checked_cast_addr_br_takealways_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %3 = function_ref @term_ossa_checked_cast_addr_br_takealways_callee : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  apply %3(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [transparent] [ossa] @term_ossa_checked_cast_addr_br_takeonsuccess_callee : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  %2 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Builtin.NativeObject
+  checked_cast_addr_br take_on_success Builtin.NativeObject in %1 : $*Builtin.NativeObject to Klass in %2 : $*Klass, bb1, bb2
+
+bb1:
+  destroy_addr %2 : $*Klass
+  br bb3
+
+bb2:
+  destroy_addr %1 : $*Builtin.NativeObject
+  br bb3
+
+bb3:
+  dealloc_stack %2 : $*Klass
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @term_nonossa_checked_cast_addr_br_takeonsuccess_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK-NEXT:   strong_retain [[ARG]]
+// CHECK-NEXT:   [[SRC_ADDR:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK-NEXT:   [[DEST_ADDR:%.*]] = alloc_stack $Klass
+// CHECK-NEXT:   store [[ARG]] to [[SRC_ADDR]]
+// CHECK-NEXT:   [[RELOADED_ARG:%.*]] = load [[SRC_ADDR]]
+// CHECK-NEXT:   checked_cast_br [[RELOADED_ARG]] : $Builtin.NativeObject to $Klass, [[SUCCESS_BB:bb[0-9]+]], [[FAILURE_BB:bb[0-9]+]]
+//
+// CHECK: [[SUCCESS_BB]]([[CAST_VALUE:%.*]] :
+// ==> On success, we store into dest and destroy dest.
+// CHECK-NEXT:   store [[CAST_VALUE]] to [[DEST_ADDR]]
+// CHECK-NEXT:   destroy_addr [[DEST_ADDR]]
+// CHECK-NEXT:   br [[CONT_BB:bb[0-9]+]]
+//
+// ==> Since we are doing a take on success and we failed... store the original
+// ==> value back into the memory slot.
+// CHECK: [[FAILURE_BB]]:
+// CHECK-NEXT:   store [[RELOADED_ARG]] to [[SRC_ADDR]]
+// CHECK-NEXT:   destroy_addr [[SRC_ADDR]]
+// CHECK-NEXT:   br [[CONT_BB]]
+// CHECK: } // end sil function 'term_nonossa_checked_cast_addr_br_takeonsuccess_caller'
+sil @term_nonossa_checked_cast_addr_br_takeonsuccess_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %2 = function_ref @term_ossa_checked_cast_addr_br_takeonsuccess_callee : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  apply %2(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [transparent] [ossa] @term_ossa_checked_cast_addr_br_copyonsuccess_callee : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  %2 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Builtin.NativeObject
+  checked_cast_addr_br copy_on_success Builtin.NativeObject in %1 : $*Builtin.NativeObject to Klass in %2 : $*Klass, bb1, bb2
+
+bb1:
+  destroy_addr %2 : $*Klass
+  destroy_addr %1 : $*Builtin.NativeObject
+  br bb3
+
+bb2:
+  destroy_addr %1 : $*Builtin.NativeObject
+  br bb3
+
+bb3:
+  dealloc_stack %2 : $*Klass
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @term_nonossa_checked_cast_addr_br_copyonsuccess_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK-NEXT:   strong_retain [[ARG]]
+// CHECK-NEXT:   [[SRC_ADDR:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK-NEXT:   [[DEST_ADDR:%.*]] = alloc_stack $Klass
+// CHECK-NEXT:   store [[ARG]] to [[SRC_ADDR]]
+// CHECK-NEXT:   [[RELOADED_ARG:%.*]] = load [[SRC_ADDR]]
+// CHECK-NEXT:   checked_cast_br [[RELOADED_ARG]] : $Builtin.NativeObject to $Klass, [[SUCCESS_BB:bb[0-9]+]], [[FAILURE_BB:bb[0-9]+]]
+//
+// CHECK: [[SUCCESS_BB]]([[CAST_VALUE:%.*]] :
+// CHECK-NEXT:   strong_retain [[CAST_VALUE]]
+// CHECK-NEXT:   store [[CAST_VALUE]] to [[DEST_ADDR]]
+// CHECK-NEXT:   destroy_addr [[DEST_ADDR]]
+// CHECK-NEXT:   destroy_addr [[SRC_ADDR]]
+// CHECK-NEXT:   br [[CONT_BB:bb[0-9]+]]
+//
+// CHECK: [[FAILURE_BB]]:
+// CHECK-NEXT:   destroy_addr [[SRC_ADDR]]
+// CHECK-NEXT:   br [[CONT_BB]]
+//
+// CHECK: } // end sil function 'term_nonossa_checked_cast_addr_br_copyonsuccess_caller'
+sil @term_nonossa_checked_cast_addr_br_copyonsuccess_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @term_ossa_checked_cast_addr_br_copyonsuccess_callee : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  apply %1(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
 }

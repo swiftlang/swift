@@ -8,6 +8,7 @@
 //
 // We then modify LeafModule.swiftinterface to have an error in it, and check that we get a diagnostic and failure.
 //
+// We then modify LeafModule.swiftinterface to have an error in an @inlinable function body, and check we get a diagnostic and failure.
 //
 // Setup phase 1: Write input files.
 //
@@ -32,6 +33,7 @@
 //
 // RUN: %{python} %S/Inputs/check-is-old.py %t/OtherModule.swiftinterface %t/LeafModule.swiftinterface
 // RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
+// RUN: cp %t/LeafModule.swiftinterface %t/LeafModule.swiftinterface.backup
 // RUN: echo "@inlinable func foo() { var x = 10 }" >>%t/LeafModule.swiftinterface
 // RUN: %{python} %S/Inputs/make-old.py %t/LeafModule.swiftinterface
 // RUN: %{python} %S/Inputs/check-is-old.py %t/LeafModule.swiftinterface
@@ -65,6 +67,29 @@
 // RUN: not %target-swift-frontend -I %t -module-cache-path %t/modulecache -serialize-diagnostics -serialize-diagnostics-path %t/err.dia -enable-parseable-module-interface -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s
 // RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
 // RUN: c-index-test -read-diagnostics %t/err.dia 2>&1 | %FileCheck %s -check-prefix=CHECK-ERROR
+//
+//
+// Next test: add an inlinable function body with an unresolved identifier to LeafModule.swiftinterface; check we do not get a rebuild and report the additional error correctly.
+//
+// RUN: mv %t/LeafModule.swiftinterface.backup %t/LeafModule.swiftinterface
+// RUN: echo "@inlinable func bar() { var x = unresolved }" >>%t/LeafModule.swiftinterface
+// RUN: %{python} %S/Inputs/make-old.py %t/LeafModule.swiftinterface
+// RUN: %{python} %S/Inputs/check-is-old.py %t/OtherModule.swiftinterface %t/LeafModule.swiftinterface
+// RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
+// RUN: not %target-swift-frontend -I %t -module-cache-path %t/modulecache -enable-parseable-module-interface -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s >%t/err-inline.txt 2>&1
+// RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
+// RUN: %FileCheck %s -check-prefix=CHECK-ERROR-INLINE <%t/err-inline.txt
+// CHECK-ERROR-INLINE: LeafModule.swiftinterface:6:33: error: use of unresolved identifier 'unresolved'
+// CHECK-ERROR-INLINE: OtherModule.swiftinterface:4:8: error: no such module 'LeafModule'
+//
+//
+// Next test: same as above, but with a .dia file
+//
+// RUN: %{python} %S/Inputs/check-is-old.py %t/OtherModule.swiftinterface %t/LeafModule.swiftinterface
+// RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
+// RUN: not %target-swift-frontend -I %t -module-cache-path %t/modulecache -serialize-diagnostics -serialize-diagnostics-path %t/err-inline.dia -enable-parseable-module-interface -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s
+// RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
+// RUN: c-index-test -read-diagnostics %t/err-inline.dia 2>&1 | %FileCheck %s -check-prefix=CHECK-ERROR-INLINE
 
 import OtherModule
 

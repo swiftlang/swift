@@ -12,10 +12,11 @@
 //
 // This file defines the SILWitnessTable class, which is used to map a protocol
 // conformance for a type to its implementing SILFunctions. This information is
-// (FIXME will be) used by IRGen to create witness tables for protocol dispatch.
+// used by IRGen to create witness tables for protocol dispatch.
+//
 // It can also be used by generic specialization and existential
-// devirtualization passes to promote witness_method and protocol_method
-// instructions to static function_refs.
+// devirtualization passes to promote witness_method instructions to static
+// function_refs.
 //
 //===----------------------------------------------------------------------===//
 
@@ -24,7 +25,6 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/SmallString.h"
 
@@ -171,11 +171,6 @@ bool SILWitnessTable::conformanceIsSerialized(
   auto normalConformance = dyn_cast<NormalProtocolConformance>(conformance);
   if (normalConformance && normalConformance->isResilient())
     return false;
-
-  // Serialize witness tables for conformances synthesized by
-  // the ClangImporter.
-  if (isa<ClangModuleUnit>(conformance->getDeclContext()->getModuleScopeContext()))
-    return true;
 
   if (conformance->getProtocol()->getEffectiveAccess() < AccessLevel::Public)
     return false;

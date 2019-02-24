@@ -13,6 +13,7 @@
 #include "XMLValidator.h"
 #include "ModuleAPIDiff.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Comment.h"
@@ -32,6 +33,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CommentConversion.h"
+#include "swift/IDE/ConformingMethodList.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/REPLCodeCompletion.h"
 #include "swift/IDE/SourceEntityWalker.h"
@@ -93,6 +95,7 @@ enum class ActionType {
   PrintLocalTypes,
   PrintTypeInterface,
   PrintIndexedSymbols,
+  PrintExpressionTypes,
   TestCreateCompilerInvocation,
   CompilerInvocationFromModule,
   GenerateModuleAPIDescription,
@@ -100,6 +103,7 @@ enum class ActionType {
   ReconstructType,
   Range,
   TypeContextInfo,
+  ConformingMethodList,
 };
 
 class NullDebuggerClient : public DebuggerClient {
@@ -224,7 +228,13 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                       "Print indexed symbol information"),
            clEnumValN(ActionType::TypeContextInfo,
 	                    "type-context-info",
-                      "Perform expression context info analysis")));
+                      "Perform expression context info analysis"),
+           clEnumValN(ActionType::PrintExpressionTypes,
+                      "print-expr-type",
+                      "Print types for all expressions in the file"),
+           clEnumValN(ActionType::ConformingMethodList,
+	                    "conforming-methods",
+                      "Perform conforming method analysis for expression")));
 
 static llvm::cl::opt<std::string>
 SourceFilename("source-filename", llvm::cl::desc("Name of the source file"),
@@ -257,6 +267,12 @@ SwiftVersion("swift-version", llvm::cl::desc("Swift version"),
 static llvm::cl::opt<std::string>
 ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"),
                 llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+EnableParseableModuleInterface("enable-parseable-module-interface",
+           llvm::cl::desc("Enable loading .swiftinterface files when available"),
+           llvm::cl::cat(Category),
+           llvm::cl::init(true));
 
 static llvm::cl::opt<std::string>
 PCHOutputDir("pch-output-dir",
@@ -411,6 +427,13 @@ static llvm::cl::opt<std::string>
 DebugClientDiscriminator("debug-client-discriminator",
   llvm::cl::desc("A discriminator to prefer in lookups"),
   llvm::cl::cat(Category));
+
+// '-conforming-methods' options.
+
+static llvm::cl::list<std::string>
+ConformingMethodListExpectedTypes("conforming-methods-expected-types",
+    llvm::cl::desc("Set expected types for comforming method list"),
+    llvm::cl::cat(Category));
 
 // '-syntax-coloring' options.
 
@@ -722,6 +745,70 @@ static int doTypeContextInfo(const CompilerInvocation &InitInvok,
   // Consumer.
   std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
       ide::makeTypeContextInfoCallbacksFactory(*Consumer));
+
+  Invocation.setCodeCompletionFactory(callbacksFactory.get());
+  if (!SecondSourceFileName.empty()) {
+    Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(
+        SecondSourceFileName);
+  }
+  CompilerInstance CI;
+
+  PrintingDiagnosticConsumer PrintDiags;
+  if (CodeCompletionDiagnostics) {
+    // Display diagnostics to stderr.
+    CI.addDiagnosticConsumer(&PrintDiags);
+  }
+  if (CI.setup(Invocation))
+    return 1;
+  CI.performSema();
+  return 0;
+}
+
+static int
+doConformingMethodList(const CompilerInvocation &InitInvok,
+                       StringRef SourceFilename, StringRef SecondSourceFileName,
+                       StringRef CodeCompletionToken,
+                       bool CodeCompletionDiagnostics,
+                       const std::vector<std::string> expectedTypeNames) {
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
+      llvm::MemoryBuffer::getFile(SourceFilename);
+  if (!FileBufOrErr) {
+    llvm::errs() << "error opening input file: "
+                 << FileBufOrErr.getError().message() << '\n';
+    return 1;
+  }
+
+  unsigned Offset;
+
+  std::unique_ptr<llvm::MemoryBuffer> CleanFile(removeCodeCompletionTokens(
+      FileBufOrErr.get().get(), CodeCompletionToken, &Offset));
+
+  if (Offset == ~0U) {
+    llvm::errs() << "could not find code completion token \""
+                 << CodeCompletionToken << "\"\n";
+    return 1;
+  }
+  llvm::outs() << "found code completion token " << CodeCompletionToken
+               << " at offset " << Offset << "\n";
+  llvm::errs() << "found code completion token " << CodeCompletionToken
+               << " at offset " << Offset << "\n";
+
+  CompilerInvocation Invocation(InitInvok);
+
+  Invocation.setCodeCompletionPoint(CleanFile.get(), Offset);
+
+  SmallVector<const char *, 4> typeNames;
+  for (auto &name : expectedTypeNames)
+    typeNames.push_back(name.c_str());
+
+  // Create a CodeCompletionConsumer.
+  std::unique_ptr<ide::ConformingMethodListConsumer> Consumer(
+      new ide::PrintingConformingMethodListConsumer(llvm::outs()));
+
+  // Create a factory for code completion callbacks that will feed the
+  // Consumer.
+  std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
+      ide::makeConformingMethodListCallbacksFactory(typeNames, *Consumer));
 
   Invocation.setCodeCompletionFactory(callbacksFactory.get());
   if (!SecondSourceFileName.empty()) {
@@ -1614,15 +1701,66 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
   }
 
   // If we were given a mangled name, only print that declaration.
-  std::string error;
-  const Decl *D = ide::getDeclFromMangledSymbolName(CI.getASTContext(),
-                                                    MangledNameToFind, error);
+  const TypeDecl *D = Demangle::getTypeDeclForMangling(CI.getASTContext(),
+                                                       MangledNameToFind);
   if (!D) {
-    llvm::errs() << "Unable to find decl for symbol: " << error << "\n";
+    llvm::errs() << "Unable to find decl for symbol: "
+                 << MangledNameToFind << "\n";
     return EXIT_FAILURE;
   }
 
   D->print(llvm::outs(), Options);
+  return EXIT_SUCCESS;
+}
+
+static int doPrintExpressionTypes(const CompilerInvocation &InitInvok,
+                                  StringRef SourceFilename) {
+  CompilerInvocation Invocation(InitInvok);
+  Invocation.getFrontendOptions().InputsAndOutputs.addPrimaryInputFile(SourceFilename);
+  CompilerInstance CI;
+
+  // Display diagnostics to stderr.
+  PrintingDiagnosticConsumer PrintDiags;
+  CI.addDiagnosticConsumer(&PrintDiags);
+  if (CI.setup(Invocation))
+    return EXIT_FAILURE;
+  CI.performSema();
+  std::vector<ExpressionTypeInfo> Scratch;
+
+  // Buffer for where types will be printed.
+  llvm::SmallString<256> TypeBuffer;
+  llvm::raw_svector_ostream OS(TypeBuffer);
+  SourceFile &SF = *CI.getPrimarySourceFile();
+  auto Source = SF.getASTContext().SourceMgr.getRangeForBuffer(*SF.getBufferID()).str();
+  std::vector<std::pair<unsigned, std::string>> SortedTags;
+
+  // Collect all tags of expressions.
+  for (auto R: collectExpressionType(*CI.getPrimarySourceFile(), Scratch, OS)) {
+    SortedTags.push_back({R.offset,
+      (llvm::Twine("<expr type:\"") + TypeBuffer.str().substr(R.typeOffset,
+                                                  R.typeLength) + "\">").str()});
+    SortedTags.push_back({R.offset + R.length, "</expr>"});
+  }
+  // Sort tags by offset.
+  std::stable_sort(SortedTags.begin(), SortedTags.end(),
+    [](std::pair<unsigned, std::string> T1, std::pair<unsigned, std::string> T2) {
+      return T1.first < T2.first;
+  });
+
+  ArrayRef<std::pair<unsigned, std::string>> SortedTagsRef = SortedTags;
+  unsigned Cur = 0;
+  do {
+    // Print tags that are due at current offset.
+    while(!SortedTagsRef.empty() && SortedTagsRef.front().first == Cur) {
+      llvm::outs() << SortedTagsRef.front().second;
+      SortedTagsRef = SortedTagsRef.drop_front();
+    }
+    auto Start = Cur;
+    // Change current offset to the start offset of next tag.
+    Cur = SortedTagsRef.empty() ? Source.size() : SortedTagsRef.front().first;
+    // Print the source before next tag.
+    llvm::outs() << Source.substr(Start, Cur - Start);
+  } while(!SortedTagsRef.empty());
   return EXIT_SUCCESS;
 }
 
@@ -2682,7 +2820,7 @@ public:
 
     if (T) {
       T = T->getRValueType();
-      tryDemangleType(T,
+      tryDemangleType(T->mapTypeOutOfContext(),
                       (NestedDCs.empty()
                        ? D->getDeclContext()
                        : NestedDCs.back()),
@@ -2694,22 +2832,22 @@ public:
 private:
   void tryDemangleType(Type T, const DeclContext *DC, CharSourceRange range) {
     Mangle::ASTMangler Mangler;
-    std::string mangledName(Mangler.mangleTypeForDebugger(
-                              T->mapTypeOutOfContext(), DC));
-    std::string Error;
+    std::string mangledName(Mangler.mangleTypeForDebugger(T, DC));
     Type ReconstructedType = DC->mapTypeIntoContext(
-        getTypeFromMangledSymbolname(Ctx, mangledName, Error));
+        Demangle::getTypeForMangling(Ctx, mangledName));
     Stream << "type: ";
     if (ReconstructedType) {
       ReconstructedType->print(Stream);
     } else {
       Stream << "FAILURE";
     }
-    Stream << "\tfor '" << range.str() << "' mangled=" << mangledName << " "
-           << Error << "\n";
+    Stream << "\tfor '" << range.str() << "' mangled=" << mangledName << "\n";
   }
 
   void tryDemangleDecl(ValueDecl *VD, CharSourceRange range, bool isRef) {
+    if (!isa<TypeDecl>(VD) || isa<GenericTypeParamDecl>(VD))
+      return;
+
     std::string USR;
     {
       llvm::raw_string_ostream OS(USR);
@@ -2723,7 +2861,7 @@ private:
       Stream << "decl: ";
     }
 
-    if (Decl *reDecl = getDeclFromUSR(Ctx, USR, error)) {
+    if (TypeDecl *reDecl = Demangle::getTypeDeclForUSR(Ctx, USR)) {
       PrintOptions POpts;
       POpts.PreferTypeRepr = false;
       POpts.PrintParameterSpecifiers = true;
@@ -2731,8 +2869,7 @@ private:
     } else {
       Stream << "FAILURE";
     }
-    Stream << "\tfor '" << range.str() << "' usr=" << USR << " " << error
-           << "\n";
+    Stream << "\tfor '" << range.str() << "' usr=" << USR << "\n";
   }
 };
 
@@ -3127,6 +3264,8 @@ int main(int argc, char *argv[]) {
         InitInvok.getLangOptions().EffectiveLanguageVersion = actual.getValue();
     }
   }
+  InitInvok.getFrontendOptions().EnableParseableModuleInterface =
+    options::EnableParseableModuleInterface;
   InitInvok.getClangImporterOptions().ModuleCachePath =
     options::ModuleCachePath;
   InitInvok.getClangImporterOptions().PrecompiledHeaderOutputDir =
@@ -3269,6 +3408,25 @@ int main(int argc, char *argv[]) {
                                   options::SecondSourceFilename,
                                   options::CodeCompletionToken,
                                   options::CodeCompletionDiagnostics);
+    break;
+
+  case ActionType::PrintExpressionTypes:
+    ExitCode = doPrintExpressionTypes(InitInvok,
+                                      options::SourceFilename);
+    break;
+
+
+  case ActionType::ConformingMethodList:
+    if (options::CodeCompletionToken.empty()) {
+      llvm::errs() << "token name required\n";
+      return 1;
+    }
+    ExitCode = doConformingMethodList(InitInvok,
+                                      options::SourceFilename,
+                                      options::SecondSourceFilename,
+                                      options::CodeCompletionToken,
+                                      options::CodeCompletionDiagnostics,
+                                      options::ConformingMethodListExpectedTypes);
     break;
 
   case ActionType::SyntaxColoring:

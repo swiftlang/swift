@@ -939,8 +939,9 @@ private:
 // MARK: Declarations for YAMLTraits for reading/writing of SourceFileDepGraph
 //==============================================================================
 
-// This introduces a redefinition for Linux.
-#if !defined(__linux__)
+// This introduces a redefinition where ever std::is_same_t<size_t, uint64_t>
+// holds
+#if !(defined(__linux__) || defined(_WIN64))
 LLVM_YAML_DECLARE_SCALAR_TRAITS(size_t, QuotingType::None)
 #endif
 LLVM_YAML_DECLARE_ENUM_TRAITS(swift::experimental_dependencies::NodeKind)

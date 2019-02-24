@@ -663,19 +663,10 @@ public:
 
 private:
   Type MaxIntegerType;
-  Type StringType;
-  Type SubstringType;
-  Type IntType;
-  Type Int8Type;
-  Type UInt8Type;
   Type NSObjectType;
   Type NSNumberType;
   Type NSValueType;
   Type ObjCSelectorType;
-  Type ExceptionType;
-
-  /// The \c Swift.UnsafeMutablePointer<T> declaration.
-  Optional<NominalTypeDecl *> ArrayDecl;
 
   /// The set of expressions currently being analyzed for failures.
   llvm::DenseMap<Expr*, Expr*> DiagnosedExprs;
@@ -1857,9 +1848,6 @@ public:
   /// operator \c name appended to the expression.
   Expr *findLHS(DeclContext *DC, Expr *E, Identifier name);
 
-  /// Look up the Bool type in the standard library.
-  Type lookupBoolType(const DeclContext *dc);
-
   /// @}
 
   /// \name Overload resolution
@@ -1937,6 +1925,7 @@ public:
   enum class FragileFunctionKind : unsigned {
     Transparent,
     Inlinable,
+    AlwaysEmitIntoClient,
     DefaultArgument,
     PropertyInitializer
   };

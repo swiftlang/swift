@@ -262,7 +262,7 @@ void SourceFileDepGraph::verifySame(const SourceFileDepGraph &other) const {
 namespace llvm {
 namespace yaml {
 // This introduces a redefinition for Linux.
-#if !defined(__linux__)
+#if !(defined(__linux__) || defined(_WIN64))
 void ScalarTraits<size_t>::output(const size_t &Val, void *, raw_ostream &out) {
   out << Val;
 }
@@ -273,8 +273,8 @@ StringRef ScalarTraits<size_t>::input(StringRef scalar, void *ctxt,
 }
 #endif
 
-void ScalarEnumerationTraits<NodeKind>::enumeration(
-    IO &io, swift::experimental_dependencies::NodeKind &value) {
+void ScalarEnumerationTraits<swift::experimental_dependencies::NodeKind>::
+    enumeration(IO &io, swift::experimental_dependencies::NodeKind &value) {
   using NodeKind = swift::experimental_dependencies::NodeKind;
   io.enumCase(value, "topLevel", NodeKind::topLevel);
   io.enumCase(value, "nominal", NodeKind::nominal);

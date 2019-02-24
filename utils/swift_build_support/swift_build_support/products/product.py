@@ -35,6 +35,28 @@ class Product(object):
         return "{}-{}".format(cls.product_name(),
                               host_target.name)
 
+    @classmethod
+    def is_build_script_impl_product(cls):
+        """is_build_script_impl_product -> bool
+
+        Whether this product is produced by build-script-impl.
+        """
+        return True
+
+    def do_build(self, host_target):
+        """do_build() -> void
+
+        Perform the build, for a non-build-script-impl product.
+        """
+        raise NotImplementedError
+
+    def do_test(self, host_target):
+        """do_build() -> void
+
+        Run the tests, for a non-build-script-impl product.
+        """
+        raise NotImplementedError
+
     def __init__(self, args, toolchain, source_dir, build_dir):
         self.args = args
         self.toolchain = toolchain

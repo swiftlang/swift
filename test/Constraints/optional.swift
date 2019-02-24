@@ -302,3 +302,34 @@ func rdar45218255(_ i: Int) {
   _ = [i!]         // expected-error {{cannot force unwrap value of non-optional type 'Int'}} {{9-10=}}
   _ = S<Int>([i!]) // expected-error {{cannot force unwrap value of non-optional type 'Int'}} {{16-17=}}
 }
+
+// rdar://problem/47967277 - cannot assign through '!': '$0' is immutable
+func sr_9893_1() {
+  func foo<T : Equatable>(_: @autoclosure () throws -> T,
+                          _: @autoclosure () throws -> T) {}
+
+  class A {
+    var bar: String?
+  }
+
+  let r1 = A()
+  let r2 = A()
+
+  let arr1: [A] = []
+  foo(Set(arr1.map { $0.bar! }), Set([r1, r2].map { $0.bar! })) // Ok
+}
+
+func sr_9893_2(cString: UnsafePointer<CChar>) {
+  struct S {
+    var a: Int32 = 0
+    var b = ContiguousArray<CChar>(repeating: 0, count: 10)
+  }
+
+  var s = S()
+
+  withUnsafeMutablePointer(to: &s.a) { ptrA in
+    s.b.withUnsafeMutableBufferPointer { bufferB in
+      withVaList([ptrA, bufferB.baseAddress!]) { ptr in } // Ok
+    }
+  }
+}

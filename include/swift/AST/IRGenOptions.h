@@ -168,9 +168,6 @@ public:
   /// Emit mangled names of anonymous context descriptors.
   unsigned EnableAnonymousContextMangledNames : 1;
 
-  /// Enables resilient class layout.
-  unsigned EnableClassResilience : 1;
-
   /// Bypass resilience when accessing resilient frameworks.
   unsigned EnableResilienceBypass : 1;
 
@@ -178,8 +175,13 @@ public:
   /// Used on Windows to avoid cross-module references.
   unsigned LazyInitializeClassMetadata : 1;
 
+  /// Normally if the -read-legacy-type-info flag is not specified, we look for
+  /// a file named "legacy-<arch>.yaml" in SearchPathOpts.RuntimeLibraryPath.
+  /// Passing this flag completely disables this behavior.
+  unsigned DisableLegacyTypeInfo : 1;
+
   /// The path to load legacy type layouts from.
-  StringRef ReadTypeInfoPath;
+  StringRef ReadLegacyTypeInfoPath;
 
   /// Should we try to build incrementally by not emitting an object file if it
   /// has the same IR hash as the module that we are preparing to emit?
@@ -196,6 +198,9 @@ public:
 
   /// Enable chaining of dynamic replacements.
   unsigned EnableDynamicReplacementChaining : 1;
+
+  /// Disable round-trip verification of mangled debug types.
+  unsigned DisableRoundTripDebugTypes : 1;
 
   /// Path to the profdata file to be used for PGO, or the empty string.
   std::string UseProfile = "";
@@ -228,10 +233,11 @@ public:
         EmbedMode(IRGenEmbedMode::None), HasValueNamesSetting(false),
         ValueNames(false), EnableReflectionMetadata(true),
         EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
-        EnableClassResilience(false),
         EnableResilienceBypass(false), LazyInitializeClassMetadata(false),
+        DisableLegacyTypeInfo(false),
         UseIncrementalLLVMCodeGen(true), UseSwiftCall(false),
         GenerateProfile(false), EnableDynamicReplacementChaining(false),
+        DisableRoundTripDebugTypes(false),
         CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}
 

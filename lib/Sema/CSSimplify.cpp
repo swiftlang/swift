@@ -18,6 +18,8 @@
 #include "CSFix.h"
 #include "ConstraintSystem.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/StringExtras.h"
@@ -753,7 +755,7 @@ public:
       return true;
 
     auto *anchor = Locator.getBaseLocator()->getAnchor();
-    if (!anchor || !isa<CallExpr>(anchor))
+    if (!anchor)
       return true;
 
     auto *locator = CS.getConstraintLocator(anchor);
@@ -1182,7 +1184,10 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
           // We somehow let tuple unsplatting function conversions
           // through in some cases in Swift 4, so let's let that
           // continue to work, but only for Swift 4.
-          if (simplified && isa<DeclRefExpr>(simplified)) {
+          if (simplified &&
+              (isa<DeclRefExpr>(simplified) ||
+               isa<OverloadedDeclRefExpr>(simplified) ||
+               isa<UnresolvedDeclRefExpr>(simplified))) {
             implodeParams(func2Params);
           }
         }
@@ -1227,6 +1232,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   if (func1Params.size() != func2Params.size())
     return getTypeMatchFailure(argumentLocator);
 
+  bool hasLabelingFailures = false;
   for (unsigned i : indices(func1Params)) {
     auto func1Param = func1Params[i];
     auto func2Param = func2Params[i];
@@ -1240,8 +1246,15 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     // FIXME: We should not end up with labels here at all, but we do
     // from invalid code in diagnostics, and as a result of code completion
     // directly building constraint systems.
-    if (func1Param.getLabel() != func2Param.getLabel())
-      return getTypeMatchFailure(argumentLocator);
+    if (func1Param.getLabel() != func2Param.getLabel()) {
+      if (!shouldAttemptFixes())
+        return getTypeMatchFailure(argumentLocator);
+
+      // If we are allowed to attempt fixes, let's ignore labeling
+      // failures, and create a fix to re-label arguments if types
+      // line up correctly.
+      hasLabelingFailures = true;
+    }
 
     // FIXME: We should check value ownership too, but it's not completely
     // trivial because of inout-to-pointer conversions.
@@ -1256,6 +1269,17 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                 LocatorPathElt::getTupleElement(i))));
     if (result.isFailure())
       return result;
+  }
+
+  if (hasLabelingFailures) {
+    SmallVector<Identifier, 4> correctLabels;
+    for (const auto &param : func2Params)
+      correctLabels.push_back(param.getLabel());
+
+    auto *fix = RelabelArguments::create(*this, correctLabels,
+                                         getConstraintLocator(argumentLocator));
+    if (recordFix(fix))
+      return getTypeMatchFailure(argumentLocator);
   }
 
   // Result type can be covariant (or equal).
@@ -1602,7 +1626,7 @@ ConstraintSystem::matchTypesBindTypeVar(
 
 static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
                                             Type type2, Expr *anchor,
-                                            LocatorPathElt &req) {
+                                            ArrayRef<LocatorPathElt> path) {
   // Can't fix not yet properly resolved types.
   if (type1->hasTypeVariable() || type2->hasTypeVariable())
     return nullptr;
@@ -1612,9 +1636,21 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
   if (type1->hasDependentMember() || type2->hasDependentMember())
     return nullptr;
 
-  // Build simplified locator which only contains anchor and requirement info.
-  ConstraintLocatorBuilder requirement(cs.getConstraintLocator(anchor));
-  auto *reqLoc = cs.getConstraintLocator(requirement.withPathElement(req));
+  auto req = path.back();
+  if (req.isConditionalRequirement()) {
+    // path is - ... -> open generic -> type req # -> cond req #,
+    // to identify type requirement we only need `open generic -> type req #`
+    // part, because that's how fixes for type requirements are recorded.
+    auto reqPath = path.drop_back();
+    // If underlying conformance requirement has been fixed,
+    // then there is no reason to fix up conditional requirements.
+    if (cs.hasFixFor(cs.getConstraintLocator(anchor, reqPath,
+                                             /*summaryFlags=*/0)))
+      return nullptr;
+  }
+
+  auto *reqLoc = cs.getConstraintLocator(anchor, path,
+                                         /*summaryFlags=*/0);
 
   auto reqKind = static_cast<RequirementKind>(req.getValue2());
   switch (reqKind) {
@@ -1644,8 +1680,9 @@ repairFailures(ConstraintSystem &cs, Type lhs, Type rhs,
 
   auto &elt = path.back();
   switch (elt.getKind()) {
-  case ConstraintLocator::TypeParameterRequirement: {
-    if (auto *fix = fixRequirementFailure(cs, lhs, rhs, anchor, elt))
+  case ConstraintLocator::TypeParameterRequirement:
+  case ConstraintLocator::ConditionalRequirement: {
+    if (auto *fix = fixRequirementFailure(cs, lhs, rhs, anchor, path))
       conversionsOrFixes.push_back(fix);
     break;
   }
@@ -2691,10 +2728,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     if (conformance.isConcrete()) {
       unsigned index = 0;
       for (const auto &req : conformance.getConditionalRequirements()) {
-        addConstraint(
-          req,
-          locator.withPathElement(
-            LocatorPathElt::getConditionalRequirementComponent(index++)));
+        addConstraint(req,
+                      locator.withPathElement(
+                          LocatorPathElt::getConditionalRequirementComponent(
+                              index++, req.getKind())));
       }
     }
 
@@ -2764,17 +2801,25 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     SmallVector<LocatorPathElt, 4> path;
     auto *anchor = locator.getLocatorParts(path);
 
-    if (!path.empty() && path.back().getKind() ==
-        ConstraintLocator::PathElementKind::TypeParameterRequirement) {
-      auto typeRequirement = path.back();
-      // Let's strip all of the unnecessary information from locator,
-      // diagnostics only care about anchor - to lookup type,
-      // and what was the requirement# which is not satisfied.
-      ConstraintLocatorBuilder requirement(getConstraintLocator(anchor));
-      auto *reqLoc =
-          getConstraintLocator(requirement.withPathElement(typeRequirement));
+    if (path.empty())
+      return SolutionKind::Error;
 
-      auto *fix = MissingConformance::create(*this, type, protocol, reqLoc);
+    if (path.back().isTypeParameterRequirement() ||
+        path.back().isConditionalRequirement()) {
+      if (path.back().isConditionalRequirement()) {
+        // Drop 'conditional requirement' element, remainder
+        // of the path is going to point to type requirement
+        // this conditional comes from.
+        auto reqPath = ArrayRef<LocatorPathElt>(path).drop_back();
+        // Underlying conformance requirement is itself fixed,
+        // this wouldn't lead to a right solution.
+        if (hasFixFor(getConstraintLocator(anchor, reqPath,
+                                           /*summaryFlags=*/0)))
+          return SolutionKind::Error;
+      }
+
+      auto *fix = MissingConformance::create(*this, type, protocol,
+                                             getConstraintLocator(locator));
       if (!recordFix(fix))
         return SolutionKind::Solved;
     }
@@ -3711,11 +3756,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     return SolutionKind::Solved;
   }
   
-  
-  // If we found some unviable results, then fail, but without recovery.
-  if (!result.UnviableCandidates.empty())
-    return SolutionKind::Error;
-  
 
   // If the lookup found no hits at all (either viable or unviable), diagnose it
   // as such and try to recover in various ways.
@@ -3726,6 +3766,50 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     // off to see if the problem is related to base not being explicitly unwrapped.
     if (!MissingMembers.insert(locator))
       return SolutionKind::Error;
+
+    // FIXME(diagnostics): If there were no viable results, but there are
+    // unviable ones, we'd have to introduce fix for each specific problem.
+    if (!result.UnviableCandidates.empty()) {
+      // Check if we have unviable candidates whose reason for rejection
+      // is either UR_InstanceMemberOnType or UR_TypeMemberOnInstance
+      SmallVector<OverloadChoice, 4> filteredCandidates;
+
+      llvm::for_each(
+          result.UnviableCandidates,
+          [&](const std::pair<OverloadChoice,
+                              MemberLookupResult::UnviableReason> &c) {
+            if (c.second == MemberLookupResult::UR_InstanceMemberOnType ||
+                c.second == MemberLookupResult::UR_TypeMemberOnInstance) {
+              filteredCandidates.push_back(std::move(c.first));
+            }
+          });
+
+      // If we do, then allow them
+      if (!filteredCandidates.empty()) {
+
+        auto meetsProtocolBaseMetatypeCriteria =
+            baseTy->is<AnyMetatypeType>() && baseTy->getMetatypeInstanceType()
+                                                 ->getWithoutParens()
+                                                 ->isAnyExistentialType();
+
+        auto requiresProtocolMetatypeFix =
+            llvm::any_of(filteredCandidates, [&](const OverloadChoice &c) {
+              return c.isDecl() && isa<ConstructorDecl>(c.getDecl());
+            });
+
+        if (!meetsProtocolBaseMetatypeCriteria ||
+            !requiresProtocolMetatypeFix) {
+          auto fix =
+              AllowTypeOrInstanceMember::create(*this, baseTy, member, locator);
+          if (recordFix(fix))
+            // The fix wasn't successful, so return an error
+            return SolutionKind::Error;
+        }
+
+        addOverloadSet(memberTy, filteredCandidates, useDC, locator);
+        return SolutionKind::Solved;
+      }
+    }
 
     if (baseObjTy->getOptionalObjectType()) {
       // If the base type was an optional, look through it.
@@ -5417,12 +5501,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix) {
     // Always useful, unless duplicate of exactly the same fix and location.
     // This situation might happen when the same fix kind is applicable to
     // different overload choices.
-    auto *loc = fix->getLocator();
-    auto existingFix = llvm::find_if(Fixes, [&](const ConstraintFix *e) {
-      // If we already have a fix like this recorded, let's not do it again,
-      return e->getKind() == fix->getKind() && e->getLocator() == loc;
-    });
-    if (existingFix == Fixes.end())
+    if (!hasFixFor(fix->getLocator()))
       Fixes.push_back(fix);
   } else {
     // Only useful to record if no pre-existing fix in the subexpr tree.
@@ -5516,7 +5595,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AutoClosureForwarding:
   case FixKind::RemoveUnwrap:
   case FixKind::DefineMemberBasedOnUse:
+  case FixKind::AllowTypeOrInstanceMember:
   case FixKind::AllowInvalidPartialApplication:
+  case FixKind::AllowInvalidInitRef:
     llvm_unreachable("handled elsewhere");
   }
 

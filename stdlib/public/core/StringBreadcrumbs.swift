@@ -79,8 +79,8 @@ extension _StringBreadcrumbs {
   internal func getBreadcrumb(
     forIndex idx: String.Index
   ) -> (lowerBound: String.Index, offset: Int) {
-    var lowerBound = idx.encodedOffset / 3 / stride
-    var upperBound = Swift.min(1 + (idx.encodedOffset / stride), crumbs.count)
+    var lowerBound = idx._encodedOffset / 3 / stride
+    var upperBound = Swift.min(1 + (idx._encodedOffset / stride), crumbs.count)
     _internalInvariant(crumbs[lowerBound] <= idx)
     _internalInvariant(upperBound == crumbs.count || crumbs[upperBound] >= idx)
 
@@ -126,7 +126,8 @@ extension _StringGuts {
     }
 
     _internalInvariant(mutPtr.pointee != nil)
-    return UnsafePointer(mutPtr)
+    // assuming optional class reference and class reference can alias
+    return UnsafeRawPointer(mutPtr).assumingMemoryBound(to: _StringBreadcrumbs.self)
   }
 
   @inline(never) // slow-path
@@ -137,6 +138,7 @@ extension _StringGuts {
     // Thread-safe compare-and-swap
     let crumbs = _StringBreadcrumbs(String(self))
     _stdlib_atomicInitializeARCRef(
-      object: UnsafeMutablePointer(mutPtr), desired: crumbs)
+      object: UnsafeMutableRawPointer(mutPtr).assumingMemoryBound(to: Optional<AnyObject>.self), 
+      desired: crumbs)
   }
 }

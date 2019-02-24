@@ -27,6 +27,8 @@ sil @partial_apply_user : $@convention(thin) (@owned @callee_owned (@owned Built
 sil @fromLiteral : $@convention(thin) (Builtin.Int128, @thin Int64.Type) -> Int64
 sil @use_nativeobject : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 
+class Klass {}
+
 //////////////////////////////////////
 // Multiple Inline in a Block Tests //
 //////////////////////////////////////
@@ -578,7 +580,7 @@ bb2:
   br bb3(%14 : $Bool)
 
 bb3(%16 : $Bool):
-  strong_release %3 : ${ var @callee_owned () -> Bool } 
+  strong_release %3 : ${ var @callee_owned () -> Bool }
   strong_release %2 : ${ var Bool }
   return %16 : $Bool
 }

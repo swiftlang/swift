@@ -18,6 +18,7 @@
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/Availability.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -317,7 +318,7 @@ std::string LinkEntity::mangleAsString() const {
     assert(isa<AbstractFunctionDecl>(getDecl()));
     std::string Result;
     if (auto *Constructor = dyn_cast<ConstructorDecl>(getDecl())) {
-      Result = mangler.mangleConstructorEntity(Constructor, true,
+      Result = mangler.mangleConstructorEntity(Constructor, isAllocator(),
                                                /*isCurried=*/false);
     } else  {
       Result = mangler.mangleEntity(getDecl(), /*isCurried=*/false);
@@ -343,8 +344,9 @@ std::string LinkEntity::mangleAsString() const {
     assert(isa<AbstractFunctionDecl>(getDecl()));
     std::string Result;
     if (auto *Constructor = dyn_cast<ConstructorDecl>(getDecl())) {
-      Result = mangler.mangleConstructorEntity(Constructor, true,
-                                               /*isCurried=*/false);
+      Result =
+          mangler.mangleConstructorEntity(Constructor, isAllocator(),
+                                          /*isCurried=*/false);
     } else  {
       Result = mangler.mangleEntity(getDecl(), /*isCurried=*/false);
     }
@@ -356,8 +358,9 @@ std::string LinkEntity::mangleAsString() const {
     assert(isa<AbstractFunctionDecl>(getDecl()));
     std::string Result;
     if (auto *Constructor = dyn_cast<ConstructorDecl>(getDecl())) {
-      Result = mangler.mangleConstructorEntity(Constructor, true,
-                                               /*isCurried=*/false);
+      Result =
+          mangler.mangleConstructorEntity(Constructor, isAllocator(),
+                                          /*isCurried=*/false);
     } else  {
       Result = mangler.mangleEntity(getDecl(), /*isCurried=*/false);
     }
@@ -888,18 +891,21 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   }
 }
 
-bool LinkEntity::isWeakImported(ModuleDecl *module) const {
+bool LinkEntity::isWeakImported(ModuleDecl *module,
+                                AvailabilityContext context) const {
   switch (getKind()) {
   case Kind::SILGlobalVariable:
-    if (getSILGlobalVariable()->getDecl())
-      return getSILGlobalVariable()->getDecl()->isWeakImported(module);
+    if (getSILGlobalVariable()->getDecl()) {
+      return getSILGlobalVariable()->getDecl()
+          ->isWeakImported(module, context);
+    }
     return false;
   case Kind::DynamicallyReplaceableFunctionKey:
   case Kind::DynamicallyReplaceableFunctionVariable:
   case Kind::SILFunction: {
     // For imported functions check the Clang declaration.
     if (auto clangOwner = getSILFunction()->getClangNodeOwner())
-      return clangOwner->isWeakImported(module);
+      return clangOwner->isWeakImported(module, context);
 
     // For native functions check a flag on the SILFunction
     // itself.
@@ -915,16 +921,16 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
     // type stored in extra storage area is weak linked.
     auto assocConformance = getAssociatedConformance();
     auto *depMemTy = assocConformance.first->castTo<DependentMemberType>();
-    return depMemTy->getAssocType()->isWeakImported(module);
+    return depMemTy->getAssocType()->isWeakImported(module, context);
   }
 
   case Kind::BaseConformanceDescriptor:
-    return cast<ProtocolDecl>(getDecl())->isWeakImported(module);
+    return cast<ProtocolDecl>(getDecl())->isWeakImported(module, context);
 
   case Kind::TypeMetadata:
   case Kind::TypeMetadataAccessFunction: {
     if (auto *nominalDecl = getType()->getAnyNominal())
-      return nominalDecl->isWeakImported(module);
+      return nominalDecl->isWeakImported(module, context);
     return false;
   }
 
@@ -952,12 +958,12 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::DynamicallyReplaceableFunctionKeyAST:
   case Kind::DynamicallyReplaceableFunctionVariableAST:
   case Kind::DynamicallyReplaceableFunctionImpl:
-    return getDecl()->isWeakImported(module);
+    return getDecl()->isWeakImported(module, context);
 
   case Kind::ProtocolWitnessTable:
   case Kind::ProtocolConformanceDescriptor:
     return getProtocolConformance()->getRootConformance()
-                                   ->isWeakImported(module);
+                                   ->isWeakImported(module, context);
 
   // TODO: Revisit some of the below, for weak conformances.
   case Kind::TypeMetadataPattern:

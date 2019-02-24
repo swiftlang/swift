@@ -15,6 +15,8 @@ protocol SwiftP {
   func foo()
 }
 
+class Klass {}
+
 /////////////////////////////////
 // Tests for SILCombinerApply. //
 /////////////////////////////////
@@ -635,4 +637,38 @@ bb11(%128 : $Error):
 bb99:
   %t = tuple()
   return %t : $()
+}
+
+sil @convert_function_simplification_callee : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : $Klass):
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @convert_function_simplification_callee_with_error : $@convention(thin) (@guaranteed Klass) -> @error Error {
+bb0(%0 : $Klass):
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @convert_function_simplification_caller : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK:   [[FUNC:%.*]] = function_ref @convert_function_simplification_callee : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:   apply [[FUNC]]({{.*}}) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:   [[FUNC:%.*]] = function_ref @convert_function_simplification_callee_with_error : $@convention(thin) (@guaranteed Klass) -> @error Error
+// CHECK:   apply [nothrow] [[FUNC]]({{.*}}) : $@convention(thin) (@guaranteed Klass) -> @error Error
+// CHECK: } // end sil function 'convert_function_simplification_caller'
+sil @convert_function_simplification_caller : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : $Klass):
+  %1 = function_ref @convert_function_simplification_callee : $@convention(thin) (@guaranteed Klass) -> ()
+  %2 = thin_to_thick_function %1 : $@convention(thin) (@guaranteed Klass) -> () to $@callee_guaranteed (@guaranteed Klass) -> ()
+  %3 = convert_function %2 : $@callee_guaranteed (@guaranteed Klass) -> () to $@callee_guaranteed (@guaranteed Klass) -> @error Error
+  %4 = apply [nothrow] %3(%0) : $@callee_guaranteed (@guaranteed Klass) -> @error Error
+
+  %5 = function_ref @convert_function_simplification_callee_with_error : $@convention(thin) (@guaranteed Klass) -> @error Error
+  %6 = thin_to_thick_function %5 : $@convention(thin) (@guaranteed Klass) -> @error Error to $@callee_guaranteed (@guaranteed Klass) -> @error Error
+  %7 = convert_function %6 : $@callee_guaranteed (@guaranteed Klass) -> @error Error to $@callee_guaranteed (@guaranteed Klass) -> @error Error
+  %8 = apply [nothrow] %7(%0) : $@callee_guaranteed (@guaranteed Klass) -> @error Error
+
+  %9999 = tuple()
+  return %9999 : $()
 }

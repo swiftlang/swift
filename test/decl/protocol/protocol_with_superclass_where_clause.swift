@@ -208,10 +208,10 @@ protocol ProtocolWithClassInits where Self : ClassWithInits<Int> {}
 
 func useProtocolWithClassInits1() {
   _ = ProtocolWithClassInits(notRequiredInit: ())
-  // expected-error@-1 {{member 'init' cannot be used on type 'ProtocolWithClassInits'}}
+  // expected-error@-1 {{protocol type 'ProtocolWithClassInits' cannot be instantiated}}
 
   _ = ProtocolWithClassInits(requiredInit: ())
-  // expected-error@-1 {{member 'init' cannot be used on type 'ProtocolWithClassInits'}}
+  // expected-error@-1 {{protocol type 'ProtocolWithClassInits' cannot be instantiated}}
 }
 
 func useProtocolWithClassInits2(_ t: ProtocolWithClassInits.Type) {
@@ -237,10 +237,10 @@ protocol ProtocolRefinesClassInits : ProtocolWithClassInits {}
 
 func useProtocolRefinesClassInits1() {
   _ = ProtocolRefinesClassInits(notRequiredInit: ())
-  // expected-error@-1 {{member 'init' cannot be used on type 'ProtocolRefinesClassInits'}}
+  // expected-error@-1 {{protocol type 'ProtocolRefinesClassInits' cannot be instantiated}}
 
   _ = ProtocolRefinesClassInits(requiredInit: ())
-  // expected-error@-1 {{member 'init' cannot be used on type 'ProtocolRefinesClassInits'}}
+  // expected-error@-1 {{protocol type 'ProtocolRefinesClassInits' cannot be instantiated}}
 }
 
 func useProtocolRefinesClassInits2(_ t: ProtocolRefinesClassInits.Type) {

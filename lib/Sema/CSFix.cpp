@@ -20,6 +20,7 @@
 #include "CSDiagnostics.h"
 #include "ConstraintLocator.h"
 #include "ConstraintSystem.h"
+#include "OverloadChoice.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
@@ -144,7 +145,8 @@ MarkExplicitlyEscaping::create(ConstraintSystem &cs, ConstraintLocator *locator,
 }
 
 bool RelabelArguments::diagnose(Expr *root, bool asNote) const {
-  LabelingFailure failure(getConstraintSystem(), getLocator(), getLabels());
+  LabelingFailure failure(root, getConstraintSystem(), getLocator(),
+                          getLabels());
   return failure.diagnose(asNote);
 }
 
@@ -262,6 +264,18 @@ DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
       DefineMemberBasedOnUse(cs, baseType, member, locator);
 }
 
+bool AllowTypeOrInstanceMember::diagnose(Expr *root, bool asNote) const {
+  auto failure = AllowTypeOrInstanceMemberFailure(root, getConstraintSystem(),
+                                                  BaseType, Name, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowTypeOrInstanceMember *AllowTypeOrInstanceMember::create(ConstraintSystem &cs,
+                                                             Type baseType,
+                                                             DeclName member,
+                                                             ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowTypeOrInstanceMember(cs, baseType, member, locator);
+}
 bool AllowInvalidPartialApplication::diagnose(Expr *root, bool asNote) const {
   auto failure = PartialApplicationFailure(root, isWarning(),
                                            getConstraintSystem(), getLocator());
@@ -273,4 +287,58 @@ AllowInvalidPartialApplication::create(bool isWarning, ConstraintSystem &cs,
                                        ConstraintLocator *locator) {
   return new (cs.getAllocator())
       AllowInvalidPartialApplication(isWarning, cs, locator);
+}
+
+bool AllowInvalidInitRef::diagnose(Expr *root, bool asNote) const {
+  switch (Kind) {
+  case RefKind::DynamicOnMetatype: {
+    InvalidDynamicInitOnMetatypeFailure failure(
+        root, getConstraintSystem(), BaseType, Init, BaseRange, getLocator());
+    return failure.diagnose(asNote);
+  }
+
+  case RefKind::ProtocolMetatype: {
+    InitOnProtocolMetatypeFailure failure(root, getConstraintSystem(), BaseType,
+                                          Init, IsStaticallyDerived, BaseRange,
+                                          getLocator());
+    return failure.diagnose(asNote);
+  }
+
+  case RefKind::NonConstMetatype: {
+    ImplicitInitOnNonConstMetatypeFailure failure(root, getConstraintSystem(),
+                                                  BaseType, Init, getLocator());
+    return failure.diagnose(asNote);
+  }
+  }
+}
+
+AllowInvalidInitRef *AllowInvalidInitRef::dynamicOnMetatype(
+    ConstraintSystem &cs, Type baseTy, ConstructorDecl *init,
+    SourceRange baseRange, ConstraintLocator *locator) {
+  return create(RefKind::DynamicOnMetatype, cs, baseTy, init,
+                /*isStaticallyDerived=*/false, baseRange, locator);
+}
+
+AllowInvalidInitRef *AllowInvalidInitRef::onProtocolMetatype(
+    ConstraintSystem &cs, Type baseTy, ConstructorDecl *init,
+    bool isStaticallyDerived, SourceRange baseRange,
+    ConstraintLocator *locator) {
+  return create(RefKind::ProtocolMetatype, cs, baseTy, init,
+                isStaticallyDerived, baseRange, locator);
+}
+
+AllowInvalidInitRef *
+AllowInvalidInitRef::onNonConstMetatype(ConstraintSystem &cs, Type baseTy,
+                                        ConstructorDecl *init,
+                                        ConstraintLocator *locator) {
+  return create(RefKind::NonConstMetatype, cs, baseTy, init,
+                /*isStaticallyDerived=*/false, SourceRange(), locator);
+}
+
+AllowInvalidInitRef *
+AllowInvalidInitRef::create(RefKind kind, ConstraintSystem &cs, Type baseTy,
+                            ConstructorDecl *init, bool isStaticallyDerived,
+                            SourceRange baseRange, ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowInvalidInitRef(
+      cs, kind, baseTy, init, isStaticallyDerived, baseRange, locator);
 }

@@ -105,8 +105,8 @@ bb0(%0 : $@thick C.Type):
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %T5class1CC* @autorelease(%T5class1CC*) {{.*}} {
-// CHECK:         %1 = bitcast %T5class1CC* %0 to %objc_object*
-// CHECK:         call %objc_object* @objc_autorelease(%objc_object* %1)
+// CHECK:         %1 = bitcast %T5class1CC* %0 to i8*
+// CHECK:         call i8* @llvm.objc.autorelease(i8* %1)
 // CHECK:         ret %T5class1CC* %0
 sil @autorelease : $@convention(thin) (@owned C) -> C {
 entry(%c : $C):
@@ -115,8 +115,8 @@ entry(%c : $C):
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i64 @autorelease_optional(i64) {{.*}} {
-// CHECK:         %1 = inttoptr i64 %0 to %objc_object*
-// CHECK:         call %objc_object* @objc_autorelease(%objc_object* %1)
+// CHECK:         %1 = inttoptr i64 %0 to i8*
+// CHECK:         call i8* @llvm.objc.autorelease(i8* %1)
 // CHECK:         ret i64 %0
 sil @autorelease_optional : $@convention(thin) (@owned C?) -> C? {
 entry(%c : $C?):

@@ -82,7 +82,7 @@ public:
   bool hasPostTerminatorIP() const {
     return GetInsertBlock() != nullptr &&
            !GetInsertBlock()->empty() &&
-           isa<llvm::TerminatorInst>(GetInsertBlock()->back());
+           GetInsertBlock()->back().isTerminator();
   }
 
   void ClearInsertionPoint() {

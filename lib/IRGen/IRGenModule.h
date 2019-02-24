@@ -143,6 +143,7 @@ namespace irgen {
   class TypeConverter;
   class TypeInfo;
   enum class ValueWitness : unsigned;
+  enum class ClassMetadataStrategy;
 
 class IRGenModule;
 
@@ -473,6 +474,7 @@ public:
   const llvm::Triple Triple;
   std::unique_ptr<llvm::TargetMachine> TargetMachine;
   ModuleDecl *getSwiftModule() const;
+  AvailabilityContext getAvailabilityContext() const;
   Lowering::TypeConverter &getSILTypes() const;
   SILModule &getSILModule() const { return IRGen.SIL; }
   const IRGenOptions &getOptions() const { return IRGen.Opts; }
@@ -790,6 +792,10 @@ public:
   ResilienceExpansion getResilienceExpansionForLayout(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(SILGlobalVariable *var);
 
+  bool isResilientConformance(const NormalProtocolConformance *conformance);
+  bool isResilientConformance(const RootProtocolConformance *root);
+  bool isDependentConformance(const RootProtocolConformance *conformance);
+
   Alignment getCappedAlignment(Alignment alignment);
 
   SpareBitVector getSpareBitsForType(llvm::Type *scalarTy, Size size);
@@ -800,6 +806,8 @@ public:
   ClassMetadataLayout &getClassMetadataLayout(ClassDecl *decl);
   EnumMetadataLayout &getMetadataLayout(EnumDecl *decl);
   ForeignClassMetadataLayout &getForeignMetadataLayout(ClassDecl *decl);
+
+  ClassMetadataStrategy getClassMetadataStrategy(const ClassDecl *theClass);
 
 private:
   TypeConverter &Types;

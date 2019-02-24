@@ -374,48 +374,6 @@ static Stmt *findNearestStmt(const DeclContext *DC, SourceLoc Loc,
   const_cast<DeclContext *>(DC)->walkContext(Finder);
   return Finder.getFoundStmt();
 }
-/// Prepare the given expression for type-checking again, prinicipally by
-/// erasing any ErrorType types on the given expression, allowing later
-/// type-checking to make progress.
-///
-/// FIXME: this is fundamentally a workaround for the fact that we may end up
-/// typechecking parts of an expression more than once - first for checking
-/// the context, and later for checking more-specific things like unresolved
-/// members.  We should restructure code-completion type-checking so that we
-/// never typecheck more than once (or find a more principled way to do it).
-static void prepareForRetypechecking(Expr *E) {
-  assert(E);
-  struct Eraser : public ASTWalker {
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      if (expr && expr->getType() && (expr->getType()->hasError() ||
-                                      expr->getType()->hasUnresolvedType()))
-        expr->setType(Type());
-      if (auto *ACE = dyn_cast_or_null<AutoClosureExpr>(expr)) {
-        return { true, ACE->getSingleExpressionBody() };
-      }
-      return { true, expr };
-    }
-    bool walkToTypeLocPre(TypeLoc &TL) override {
-      if (TL.getType() && (TL.getType()->hasError() ||
-                           TL.getType()->hasUnresolvedType()))
-        TL.setType(Type());
-      return true;
-    }
-
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-      if (P && P->hasType() && (P->getType()->hasError() ||
-                                P->getType()->hasUnresolvedType())) {
-        P->setType(Type());
-      }
-      return { true, P };
-    }
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      return { false, S };
-    }
-  };
-
-  E->walk(Eraser());
-}
 
 CodeCompletionString::CodeCompletionString(ArrayRef<Chunk> Chunks) {
   std::uninitialized_copy(Chunks.begin(), Chunks.end(),
@@ -2703,23 +2661,24 @@ public:
     setClangDeclKeywords(EED, Pairs, Builder);
     addLeadingDot(Builder);
     Builder.addTextChunk(EED->getName().str());
-    if (auto *params = EED->getParameterList()) {
+
+    // Enum element is of function type; (Self.type) -> Self or
+    // (Self.Type) -> (Args...) -> Self.
+    Type EnumType = getTypeOfMember(EED);
+    if (EnumType->is<AnyFunctionType>())
+      EnumType = EnumType->castTo<AnyFunctionType>()->getResult();
+
+    if (EnumType->is<FunctionType>()) {
       Builder.addLeftParen();
-      addParameters(Builder, params);
+      addParamPatternFromFunction(Builder, EnumType->castTo<FunctionType>(),
+                                  nullptr);
       Builder.addRightParen();
+
+      // Extract result as the enum type.
+      EnumType = EnumType->castTo<FunctionType>()->getResult();
     }
 
-    // Enum element is of function type such as EnumName.type -> Int ->
-    // EnumName; however we should show Int -> EnumName as the type
-    Type EnumType;
-    if (EED->hasInterfaceType()) {
-      EnumType = EED->getInterfaceType();
-      if (auto FuncType = EnumType->getAs<AnyFunctionType>()) {
-        EnumType = FuncType->getResult();
-      }
-    }
-    if (EnumType)
-      addTypeAnnotation(Builder, EnumType);
+    addTypeAnnotation(Builder, EnumType);
   }
 
   void addKeyword(StringRef Name, Type TypeAnnotation = Type(),
@@ -3082,6 +3041,29 @@ public:
       return true;
     }
     return false;
+  }
+
+  void getPostfixKeywordCompletions(Type ExprType, Expr *ParsedExpr) {
+    if (!ExprType->getAs<ModuleType>()) {
+      addKeyword(getTokenText(tok::kw_self), ExprType->getRValueType(),
+                 SemanticContextKind::CurrentNominal,
+                 CodeCompletionKeywordKind::kw_self);
+    }
+
+    if (isa<TypeExpr>(ParsedExpr)) {
+      if (auto *T = ExprType->getAs<AnyMetatypeType>()) {
+        auto instanceTy = T->getInstanceType();
+        if (instanceTy->isAnyExistentialType()) {
+          addKeyword("Protocol", MetatypeType::get(instanceTy),
+                     SemanticContextKind::CurrentNominal);
+          addKeyword("Type", ExistentialMetatypeType::get(instanceTy),
+                     SemanticContextKind::CurrentNominal);
+        } else {
+          addKeyword("Type", MetatypeType::get(instanceTy),
+                     SemanticContextKind::CurrentNominal);
+        }
+      }
+    }
   }
 
   void getValueExprCompletions(Type ExprType, ValueDecl *VD = nullptr) {
@@ -3695,6 +3677,7 @@ public:
     auto Ty = Switch->getSubjectExpr()->getType();
     if (!Ty)
       return;
+    ExprType = Ty;
     auto *TheEnumDecl = dyn_cast_or_null<EnumDecl>(Ty->getAnyNominal());
     if (!TheEnumDecl)
       return;
@@ -3707,11 +3690,15 @@ public:
     Kind = LookupKind::Type;
     this->BaseType = BaseType;
     NeedLeadingDot = !HaveDot;
-    Type MetaBase = MetatypeType::get(BaseType);
-    lookupVisibleMemberDecls(*this, MetaBase,
+    lookupVisibleMemberDecls(*this, MetatypeType::get(BaseType),
                              CurrDeclContext, TypeResolver,
                              IncludeInstanceMembers);
-    addKeyword("Type", MetaBase);
+    if (BaseType->isAnyExistentialType()) {
+      addKeyword("Protocol", MetatypeType::get(BaseType));
+      addKeyword("Type", ExistentialMetatypeType::get(BaseType));
+    } else {
+      addKeyword("Type", MetatypeType::get(BaseType));
+    }
   }
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
@@ -4886,11 +4873,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (isDynamicLookup(*ExprType))
       Lookup.setIsDynamicLookup();
 
-    if (!ExprType.getValue()->getAs<ModuleType>())
-      Lookup.addKeyword(getTokenText(tok::kw_self),
-                        (*ExprType)->getRValueType(),
-                        SemanticContextKind::CurrentNominal,
-                        CodeCompletionKeywordKind::kw_self);
+    Lookup.getPostfixKeywordCompletions(*ExprType, ParsedExpr);
 
     if (isa<BindOptionalExpr>(ParsedExpr) || isa<ForceValueExpr>(ParsedExpr))
       Lookup.setIsUnwrappedOptional(true);
@@ -4948,12 +4931,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       Lookup.setIsDynamicLookup();
     Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
     Lookup.getOperatorCompletions(ParsedExpr, leadingSequenceExprs);
-
-    if (!ExprType.getValue()->getAs<ModuleType>())
-      Lookup.addKeyword(getTokenText(tok::kw_self),
-                        (*ExprType)->getRValueType(),
-                        SemanticContextKind::CurrentNominal,
-                        CodeCompletionKeywordKind::kw_self);
+    Lookup.getPostfixKeywordCompletions(*ExprType, ParsedExpr);
     break;
   }
 

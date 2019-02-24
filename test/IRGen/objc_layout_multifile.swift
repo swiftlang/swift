@@ -9,6 +9,6 @@
 class Foo {
   // CHECK-LABEL: define hidden swiftcc void @"$s21objc_layout_multifile3FooC3barAA3BarCSgvs"
   // CHECK-NOT: ret
-  // CHECK: @objc_retain
+  // CHECK: @llvm.objc.retain
   var bar: Bar?
 }

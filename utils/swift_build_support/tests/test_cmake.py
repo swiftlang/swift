@@ -205,10 +205,11 @@ class CMakeTestCase(unittest.TestCase):
         self.assertEqual(
             list(cmake.common_options()),
             ["-G", "Ninja",
-             "-DCMAKE_C_COMPILER:PATH=" + self.mock_distcc_path(),
-             "-DCMAKE_C_COMPILER_ARG1=/path/to/clang",
-             "-DCMAKE_CXX_COMPILER:PATH=" + self.mock_distcc_path(),
-             "-DCMAKE_CXX_COMPILER_ARG1=/path/to/clang++",
+             "-DCMAKE_C_COMPILER_LAUNCHER:PATH=" + self.mock_distcc_path(),
+             "-DCMAKE_CXX_COMPILER_LAUNCHER:PATH=" + self.mock_distcc_path(),
+             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
+             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_xcode(self):
@@ -290,10 +291,11 @@ class CMakeTestCase(unittest.TestCase):
             ["-G", "Xcode",
              "-DLLVM_USE_SANITIZER=Address;Undefined",
              "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
-             "-DCMAKE_C_COMPILER:PATH=" + self.mock_distcc_path(),
-             "-DCMAKE_C_COMPILER_ARG1=/path/to/clang",
-             "-DCMAKE_CXX_COMPILER:PATH=" + self.mock_distcc_path(),
-             "-DCMAKE_CXX_COMPILER_ARG1=/path/to/clang++",
+             "-DCMAKE_C_COMPILER_LAUNCHER:PATH=" + self.mock_distcc_path(),
+             "-DCMAKE_CXX_COMPILER_LAUNCHER:PATH=" + self.mock_distcc_path(),
+             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
+             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_CONFIGURATION_TYPES=" +
              "Debug;Release;MinSizeRel;RelWithDebInfo",
              "-DLLVM_VERSION_MAJOR:STRING=9",

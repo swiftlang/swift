@@ -16,6 +16,7 @@
 
 #include "swift/TBDGen/TBDGen.h"
 
+#include "swift/AST/Availability.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Module.h"
@@ -69,7 +70,8 @@ void TBDGenVisitor::addSymbol(SILDeclRef declRef) {
 
 void TBDGenVisitor::addSymbol(LinkEntity entity) {
   auto linkage =
-      LinkInfo::get(UniversalLinkInfo, SwiftModule, entity, ForDefinition);
+      LinkInfo::get(UniversalLinkInfo, SwiftModule, AvailCtx,
+                    entity, ForDefinition);
 
   auto externallyVisible =
       llvm::GlobalValue::isExternalLinkage(linkage.getLinkage()) &&
@@ -164,6 +166,21 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
   }
 }
 
+/// Determine whether dynamic replacement should be emitted for the allocator or
+/// the initializer given a decl.
+/// The rule is that structs and convenience init of classes emit a
+/// dynamic replacement for the allocator.
+/// Designated init of classes emit a dynamic replacement for the intializer.
+/// This is because the super class init call is emitted to the initializer and
+/// needs to be dynamic.
+static bool shouldUseAllocatorMangling(const AbstractFunctionDecl *afd) {
+  auto constructor = dyn_cast<ConstructorDecl>(afd);
+  if (!constructor)
+    return false;
+  return constructor->getParent()->getSelfClassDecl() == nullptr ||
+         constructor->isConvenienceInit();
+}
+
 void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   // A @_silgen_name("...") function without a body only exists
   // to forward-declare a symbol from another library.
@@ -175,13 +192,20 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
 
   // Add the global function pointer for a dynamically replaceable function.
   if (AFD->isNativeDynamic()) {
-    addSymbol(LinkEntity::forDynamicallyReplaceableFunctionVariable(AFD));
-    addSymbol(LinkEntity::forDynamicallyReplaceableFunctionImpl(AFD));
-    addSymbol(LinkEntity::forDynamicallyReplaceableFunctionKey(AFD));
+    bool useAllocator = shouldUseAllocatorMangling(AFD);
+    addSymbol(LinkEntity::forDynamicallyReplaceableFunctionVariable(
+        AFD, useAllocator));
+    addSymbol(
+        LinkEntity::forDynamicallyReplaceableFunctionImpl(AFD, useAllocator));
+    addSymbol(
+        LinkEntity::forDynamicallyReplaceableFunctionKey(AFD, useAllocator));
   }
   if (AFD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
-    addSymbol(LinkEntity::forDynamicallyReplaceableFunctionVariable(AFD));
-    addSymbol(LinkEntity::forDynamicallyReplaceableFunctionImpl(AFD));
+    bool useAllocator = shouldUseAllocatorMangling(AFD);
+    addSymbol(LinkEntity::forDynamicallyReplaceableFunctionVariable(
+        AFD, useAllocator));
+    addSymbol(
+        LinkEntity::forDynamicallyReplaceableFunctionImpl(AFD, useAllocator));
   }
 
   if (AFD->getAttrs().hasAttribute<CDeclAttr>()) {
@@ -562,9 +586,11 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
                                            StringSet *symbols,
                                            llvm::raw_ostream *os,
                                            const TBDGenOptions &opts) {
+  auto &ctx = M->getASTContext();
   auto isWholeModule = singleFile == nullptr;
-  const auto &target = M->getASTContext().LangOpts.Target;
+  const auto &target = ctx.LangOpts.Target;
   UniversalLinkageInfo linkInfo(target, opts.HasMultipleIGMs, isWholeModule);
+  auto availCtx = AvailabilityContext::forDeploymentTarget(ctx);
 
   tapi::internal::InterfaceFile file;
   file.setFileType(tapi::internal::FileType::TBD_V3);
@@ -580,7 +606,7 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   file.setArch(arch);
   file.setInstallAPI();
 
-  TBDGenVisitor visitor(file, arch, symbols, linkInfo, M, opts);
+  TBDGenVisitor visitor(file, arch, symbols, linkInfo, M, availCtx, opts);
 
   auto visitFile = [&](FileUnit *file) {
     if (file == M->getFiles()[0]) {

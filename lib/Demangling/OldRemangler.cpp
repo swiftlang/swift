@@ -214,7 +214,11 @@ namespace {
     std::unordered_map<SubstitutionEntry, unsigned,
                        SubstitutionEntry::Hasher> Substitutions;
   public:
-    Remangler(DemanglerPrinter &out) : Out(out) {}
+    Remangler(DemanglerPrinter &out,
+              NodeFactory *BorrowFrom) : Out(out) {
+      if (BorrowFrom)
+        Factory.providePreallocatedMemory(*BorrowFrom);
+    }
 
     class EntityContext {
       bool AsContext = false;
@@ -590,6 +594,10 @@ void Remangler::mangleIsSerialized(Node *node) {
   Out << "q";
 }
 
+void Remangler::mangleFunctionSignatureSpecializationReturn(Node *node) {
+  mangleFunctionSignatureSpecializationParam(node);
+}
+
 void Remangler::mangleFunctionSignatureSpecializationParam(Node *node) {
   if (!node->hasChildren()) {
     Out << "n_";
@@ -870,13 +878,13 @@ void Remangler::mangleDirectness(Node *node) {
 
 void Remangler::mangleValueWitness(Node *node) {
   const char *Code = nullptr;
-  switch (ValueWitnessKind(node->getIndex())) {
+  switch (ValueWitnessKind(node->getFirstChild()->getIndex())) {
 #define VALUE_WITNESS(MANGLING, NAME) \
     case ValueWitnessKind::NAME: Code = #MANGLING; break;
 #include "swift/Demangling/ValueWitnessMangling.def"
   }
   Out << 'w' << Code;
-  mangleSingleChildNode(node); // type
+  mangleChildNode(node, 1); // type
 }
 
 void Remangler::mangleValueWitnessTable(Node *node) {
@@ -1310,8 +1318,9 @@ void Remangler::manglePrivateDeclName(Node *node) {
 void Remangler::mangleRelatedEntityDeclName(Node *node) {
   // Non-round-trip mangling: pretend we have a private discriminator "$A" for a
   // related entity "A".
-  Out << 'P' << (node->getText().size() + 1) << '$' << node->getText();
-  mangleChildNodes(node);
+  NodePointer kindNode = node->getFirstChild();
+  Out << 'P' << (kindNode->getText().size() + 1) << '$' << kindNode->getText();
+  mangleChildNode(node, 1);
 }
 
 void Remangler::mangleTypeMangling(Node *node) {
@@ -1823,11 +1832,11 @@ void Remangler::mangleDependentAssociatedTypeRef(Node *node) {
   SubstitutionEntry entry;
   if (trySubstitution(node, entry)) return;
 
-  if (node->getNumChildren() > 0) {
+  if (node->getNumChildren() > 1) {
     Out << 'P';
-    mangleProtocolWithoutPrefix(node->getFirstChild());
+    mangleProtocolWithoutPrefix(node->getChild(1));
   }
-  mangleIdentifier(node);
+  mangleIdentifier(node->getFirstChild());
 
   addSubstitution(entry);
 }
@@ -2260,11 +2269,27 @@ void Remangler::mangleProtocolSymbolicReference(Node *node, EntityContext&) {
   unreachable("unsupported");
 }
 
+void Remangler::mangleSugaredOptional(Node *node) {
+  unreachable("unsupported");
+}
+
+void Remangler::mangleSugaredArray(Node *node) {
+  unreachable("unsupported");
+}
+
+void Remangler::mangleSugaredDictionary(Node *node) {
+  unreachable("unsupported");
+}
+
+void Remangler::mangleSugaredParen(Node *node) {
+  unreachable("unsupported");
+}
+
 /// The top-level interface to the remangler.
-std::string Demangle::mangleNodeOld(const NodePointer &node) {
+std::string Demangle::mangleNodeOld(NodePointer node, NodeFactory *BorrowFrom) {
   if (!node) return "";
 
   DemanglerPrinter printer;
-  Remangler(printer).mangle(node);
+  Remangler(printer, BorrowFrom).mangle(node);
   return std::move(printer).str();
 }

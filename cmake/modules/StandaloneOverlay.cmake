@@ -22,16 +22,11 @@ set(SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS "2.0" CACHE STRING "")
 set(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES TRUE)
 
 set(SWIFT_SOURCE_DIR "${SWIFT_SOURCE_ROOT}/src/swift" CACHE PATH "")
-set(SWIFT_PATH_TO_LLVM_SOURCE "${SWIFT_SOURCE_ROOT}/src/llvm" CACHE PATH "")
 set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "${TOOLCHAIN_DIR}/usr/bin" CACHE PATH "")
 set(SWIFT_SDKS ${SWIFT_HOST_VARIANT_SDK})
 
-set(LLVM_CMAKE_MODULES_PATH "${SWIFT_PATH_TO_LLVM_SOURCE}/cmake/modules")
-
-list(APPEND CMAKE_MODULE_PATH
-  "${PROJECT_SOURCE_DIR}/../../../../cmake/modules"
-  ${LLVM_CMAKE_MODULES_PATH}
-)
+find_package(LLVM CONFIG REQUIRED NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
+list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}" "${PROJECT_SOURCE_DIR}/../../../../cmake/modules")
 
 set(SWIFT_DARWIN_XCRUN_TOOLCHAIN "XcodeDefault" CACHE STRING
     "The name of the toolchain to pass to 'xcrun'")
@@ -59,13 +54,13 @@ precondition(SWIFT_DEST_ROOT)
 precondition(SWIFT_HOST_VARIANT_SDK)
 precondition(TOOLCHAIN_DIR)
 
+# Without this line, installing components is broken. This needs refactoring.
+swift_configure_components()
+
 # Some overlays include the runtime's headers,
 # and some of those headers are generated at build time.
 add_subdirectory("${SWIFT_SOURCE_DIR}/include" "${SWIFT_SOURCE_DIR}/include")
 add_subdirectory("${SWIFT_SOURCE_DIR}/apinotes" "${SWIFT_SOURCE_DIR}/apinotes")
-
-# Without this line, installing components is broken. This needs refactoring.
-swift_configure_components()
 
 precondition(unknown_sdks NEGATE MESSAGE "Unknown SDKs: ${unknown_sdks}")
 precondition(SWIFT_CONFIGURED_SDKS MESSAGE "No SDKs selected.")

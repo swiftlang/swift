@@ -4,7 +4,7 @@ struct Foo {
   // CHECK: !DISubprogram(name: "init", linkageName: "$s12Constructors3FooV1xACs5Int64V_tcfC",
   // CHECK-SAME:          line: [[@LINE+3]]
   // CHECK-NOT:           scopeLine: 0
-  // CHECK-SAME:          isDefinition: true
+  // CHECK-SAME:          DISPFlagDefinition
   init(x: Int64) {}
   func bar(_ x: Int64) {}
 }

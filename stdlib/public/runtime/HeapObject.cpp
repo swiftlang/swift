@@ -117,7 +117,7 @@ struct InitStaticObjectContext {
 static void initStaticObjectWithContext(void *OpaqueCtx) {
   InitStaticObjectContext *Ctx = (InitStaticObjectContext *)OpaqueCtx;
   Ctx->object->metadata = Ctx->metadata;
-  Ctx->object->refCounts.initForNotFreeing();
+  Ctx->object->refCounts.initImmortal();
 }
 
 // TODO: We could generate inline code for the fast-path, i.e. the metadata

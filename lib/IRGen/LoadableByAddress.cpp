@@ -1607,6 +1607,8 @@ private:
                            SmallVectorImpl<SILInstruction *> &Delete);
   bool recreateApply(SILInstruction &I,
                      SmallVectorImpl<SILInstruction *> &Delete);
+  bool recreateTupleInstr(SILInstruction &I,
+                          SmallVectorImpl<SILInstruction *> &Delete);
   bool recreateConvInstr(SILInstruction &I,
                          SmallVectorImpl<SILInstruction *> &Delete);
   bool recreateBuiltinInstr(SILInstruction &I,
@@ -2617,6 +2619,34 @@ bool LoadableByAddress::fixStoreToBlockStorageInstr(
   return true;
 }
 
+bool LoadableByAddress::recreateTupleInstr(
+    SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete) {
+  auto *tupleInstr = dyn_cast<TupleInst>(&I);
+  if (!tupleInstr)
+    return false;
+
+  // Check if we need to recreate the tuple:
+  auto *F = tupleInstr->getFunction();
+  auto *currIRMod = getIRGenModule()->IRGen.getGenModule(F);
+  GenericEnvironment *genEnv = F->getGenericEnvironment();
+  auto resultTy = tupleInstr->getType();
+  auto newResultTy = MapperCache.getNewSILType(genEnv, resultTy, *currIRMod);
+  if (resultTy == newResultTy)
+    return true;
+
+  // The tuple type have changed based on its members.
+  // For example if one or more of them are ‘large’ loadable types
+  SILBuilderWithScope tupleBuilder(tupleInstr);
+  SmallVector<SILValue, 8> elems;
+  for (auto elem : tupleInstr->getElements()) {
+    elems.push_back(elem);
+  }
+  auto *newTuple = tupleBuilder.createTuple(tupleInstr->getLoc(), elems);
+  tupleInstr->replaceAllUsesWith(newTuple);
+  Delete.push_back(tupleInstr);
+  return true;
+}
+
 bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
                          SmallVectorImpl<SILInstruction *> &Delete) {
   auto *convInstr = dyn_cast<SingleValueInstruction>(&I);
@@ -2855,7 +2885,9 @@ void LoadableByAddress::run() {
     SmallVector<SILInstruction *, 32> Delete;
     for (SILBasicBlock &BB : CurrF) {
       for (SILInstruction &I : BB) {
-        if (recreateConvInstr(I, Delete))
+        if (recreateTupleInstr(I, Delete))
+          continue;
+        else if (recreateConvInstr(I, Delete))
           continue;
         else if (recreateBuiltinInstr(I, Delete))
           continue;

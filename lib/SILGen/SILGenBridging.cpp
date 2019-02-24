@@ -350,8 +350,10 @@ static void expandTupleTypes(CanType type, SmallVectorImpl<CanType> &results) {
 static SmallVector<CanType, 8>
 expandTupleTypes(AnyFunctionType::CanParamArrayRef params) {
   SmallVector<CanType, 8> results;
-  for (auto param : params)
-    expandTupleTypes(param.getOldType(), results);
+  for (auto param : params) {
+    assert(!param.isInOut() && !param.isVariadic());
+    expandTupleTypes(param.getPlainType(), results);
+  }
   return results;
 }
 

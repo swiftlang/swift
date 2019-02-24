@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 472; // Last change: partial_apply [stack]
+const uint16_t SWIFTMODULE_VERSION_MINOR = 475; // Last change: Generalize nested archetype serialization
 
 using DeclIDField = BCFixed<31>;
 
@@ -766,17 +766,24 @@ namespace decls_block {
     MetatypeRepresentationField        // representation
   >;
 
-  using ArchetypeTypeLayout = BCRecordLayout<
-    ARCHETYPE_TYPE,
+  using PrimaryArchetypeTypeLayout = BCRecordLayout<
+    PRIMARY_ARCHETYPE_TYPE,
     GenericEnvironmentIDField, // generic environment
-    TypeIDField                // interface type
+    BCVBR<4>, // generic type parameter depth
+    BCVBR<4>  // index + 1, or zero if we have a generic type parameter decl
   >;
 
-  using OpenedExistentialTypeLayout = BCRecordLayout<
-    OPENED_EXISTENTIAL_TYPE,
+  using OpenedArchetypeTypeLayout = BCRecordLayout<
+    OPENED_ARCHETYPE_TYPE,
     TypeIDField         // the existential type
   >;
-
+  
+  using NestedArchetypeTypeLayout = BCRecordLayout<
+    NESTED_ARCHETYPE_TYPE,
+    TypeIDField, // root archetype
+    TypeIDField // interface type relative to root
+  >;
+  
   using DynamicSelfTypeLayout = BCRecordLayout<
     DYNAMIC_SELF_TYPE,
     TypeIDField          // self type
@@ -1058,7 +1065,7 @@ namespace decls_block {
     // - the foreign error convention, if any
     // - inlinable body text, if any
   >;
-
+  
   // TODO: remove the unnecessary FuncDecl components here
   using AccessorLayout = BCRecordLayout<
     ACCESSOR_DECL,

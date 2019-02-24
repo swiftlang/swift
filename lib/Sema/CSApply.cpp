@@ -227,13 +227,35 @@ getImplicitMemberReferenceAccessSemantics(Expr *base, VarDecl *member,
   return member->getAccessSemanticsFromContext(DC, isAccessOnSelf);
 }
 
+/// This extends functionality of `Expr::isTypeReference` with
+/// support for `UnresolvedDotExpr` and `UnresolvedMemberExpr`.
+/// This method could be used on not yet fully type-checked AST.
 bool ConstraintSystem::isTypeReference(const Expr *E) {
-  return E->isTypeReference([&](const Expr *E) -> Type { return getType(E); });
+  return E->isTypeReference(
+      [&](const Expr *E) -> Type { return simplifyType(getType(E)); },
+      [&](const Expr *E) -> Decl * {
+        if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
+          return findResolvedMemberRef(
+              getConstraintLocator(UDE, ConstraintLocator::Member));
+        }
+
+        if (auto *UME = dyn_cast<UnresolvedMemberExpr>(E)) {
+          return findResolvedMemberRef(
+              getConstraintLocator(UME, ConstraintLocator::UnresolvedMember));
+        }
+
+        if (isa<OverloadSetRefExpr>(E))
+          return findResolvedMemberRef(
+              getConstraintLocator(const_cast<Expr *>(E)));
+
+        return nullptr;
+      });
 }
 
 bool ConstraintSystem::isStaticallyDerivedMetatype(const Expr *E) {
   return E->isStaticallyDerivedMetatype(
-      [&](const Expr *E) -> Type { return getType(E); });
+      [&](const Expr *E) -> Type { return simplifyType(getType(E)); },
+      [&](const Expr *E) -> bool { return isTypeReference(E); });
 }
 
 Type ConstraintSystem::getInstanceType(const TypeExpr *E) {
@@ -295,78 +317,6 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
     buf.append(self.begin(), self.end());
   }
   
-  return true;
-}
-
-/// Determine whether the given type refers to a non-final class (or
-/// dynamic self of one).
-static bool isNonFinalClass(Type type) {
-  if (auto dynamicSelf = type->getAs<DynamicSelfType>())
-    type = dynamicSelf->getSelfType();
-
-  if (auto classDecl = type->getClassOrBoundGenericClass())
-    return !classDecl->isFinal();
-
-  if (auto archetype = type->getAs<ArchetypeType>())
-    if (auto super = archetype->getSuperclass())
-      return isNonFinalClass(super);
-
-  if (type->isExistentialType())
-    return true;
-
-  return false;
-}
-
-// Non-required constructors may not be not inherited. Therefore when
-// constructing a class object, either the metatype must be statically
-// derived (rather than an arbitrary value of metatype type) or the referenced
-// constructor must be required.
-static bool
-diagnoseInvalidDynamicConstructorReferences(ConstraintSystem &cs,
-                                            Expr *base,
-                                            DeclNameLoc memberRefLoc,
-                                            ConstructorDecl *ctorDecl,
-                                            bool SuppressDiagnostics) {
-  auto &tc = cs.getTypeChecker();
-  auto baseTy = cs.getType(base)->getRValueType();
-  auto instanceTy = baseTy->getMetatypeInstanceType();
-
-  bool isStaticallyDerived =
-    base->isStaticallyDerivedMetatype(
-      [&](const Expr *expr) -> Type {
-        return cs.getType(expr);
-      });
-
-  // FIXME: The "hasClangNode" check here is a complete hack.
-  if (isNonFinalClass(instanceTy) &&
-      !isStaticallyDerived &&
-      !ctorDecl->hasClangNode() &&
-      !(ctorDecl->isRequired() ||
-        ctorDecl->getDeclContext()->getSelfProtocolDecl())) {
-    if (SuppressDiagnostics)
-      return false;
-
-    tc.diagnose(memberRefLoc, diag::dynamic_construct_class, instanceTy)
-      .highlight(base->getSourceRange());
-    auto ctor = cast<ConstructorDecl>(ctorDecl);
-    tc.diagnose(ctorDecl, diag::note_nonrequired_initializer,
-                ctor->isImplicit(), ctor->getFullName());
-  // Constructors cannot be called on a protocol metatype, because there is no
-  // metatype to witness it.
-  } else if (isa<ConstructorDecl>(ctorDecl) &&
-             baseTy->is<MetatypeType>() &&
-             instanceTy->isExistentialType()) {
-    if (SuppressDiagnostics)
-      return false;
-
-    if (isStaticallyDerived) {
-      tc.diagnose(memberRefLoc, diag::construct_protocol_by_name, instanceTy)
-        .highlight(base->getSourceRange());
-    } else {
-      tc.diagnose(memberRefLoc, diag::construct_protocol_value, baseTy)
-        .highlight(base->getSourceRange());
-    }
-  }
   return true;
 }
 
@@ -877,14 +827,6 @@ namespace {
       if (auto baseMeta = baseTy->getAs<AnyMetatypeType>()) {
         baseIsInstance = false;
         baseTy = baseMeta->getInstanceType();
-
-        // If the member is a constructor, verify that it can be legally
-        // referenced from this base.
-        if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-          if (!diagnoseInvalidDynamicConstructorReferences(cs, base, memberLoc,
-                                           ctor, SuppressDiagnostics))
-            return nullptr;
-        }
       }
 
       // Build a member reference.
@@ -1836,19 +1778,15 @@ namespace {
       DeclName builtinInitName(tc.Context, DeclBaseName::createConstructor(),
                                { tc.Context.Id_builtinIntegerLiteral });
 
-      return convertLiteral(
-               expr,
-               type,
-               cs.getType(expr),
-               protocol,
-               tc.Context.Id_IntegerLiteralType,
-               initName,
-               builtinProtocol,
-               tc.Context.TheIntegerLiteralType,
-               builtinInitName,
-               nullptr,
-               diag::integer_literal_broken_proto,
-               diag::builtin_integer_literal_broken_proto);
+      auto *result = convertLiteralInPlace(
+          expr, type, protocol, tc.Context.Id_IntegerLiteralType, initName,
+          builtinProtocol, builtinInitName, diag::integer_literal_broken_proto,
+          diag::builtin_integer_literal_broken_proto);
+      if (result) {
+        // TODO: It seems that callers expect this to have types assigned...
+        result->setType(cs.getType(result));
+      }
+      return result;
     }
     
     Expr *visitNilLiteralExpr(NilLiteralExpr *expr) {
@@ -1999,18 +1937,14 @@ namespace {
                         { tc.Context.Id_booleanLiteral });
       DeclName builtinInitName(tc.Context, DeclBaseName::createConstructor(),
                                { tc.Context.Id_builtinBooleanLiteral });
-      return convertLiteral(
+      return convertLiteralInPlace(
                expr,
                type,
-               cs.getType(expr),
                protocol,
                tc.Context.Id_BooleanLiteralType,
                initName,
                builtinProtocol,
-               Type(BuiltinIntegerType::get(BuiltinIntegerWidth::fixed(1), 
-                                            tc.Context)),
                builtinInitName,
-               nullptr,
                diag::boolean_literal_broken_proto,
                diag::builtin_boolean_literal_broken_proto);
     }
@@ -2510,8 +2444,16 @@ namespace {
             expr->getArgumentLabelLocs(), expr->hasTrailingClosure(),
             /*implicit=*/expr->isImplicit(), Type(), getType);
         result = finishApply(apply, Type(), cs.getConstraintLocator(expr));
+
+        // FIXME: Application could fail, because some of the solutions
+        // are not expressible in AST (yet?), like certain tuple-to-tuple
+        // conversions. Better solution here would be not to form solutions
+        // which couldn't be applied by e.g. detecting situations like that
+        // and inserting fixes early.
+        if (!result)
+          return nullptr;
       }
-			
+
       // Check for ambiguous member if the base is an Optional
       if (baseTy->getOptionalObjectType()) {
         diagnoseAmbiguousNominalMember(baseTy, result);
@@ -2638,18 +2580,6 @@ namespace {
           if (dre->getDecl()->getFullName() == cs.getASTContext().Id_self) {
             // We have a reference to 'self'.
             diagnoseBadInitRef = false;
-
-            // Special case -- in a protocol extension initializer with a class
-            // constrainted Self type, 'self' has archetype type, and only
-            // required initializers can be called.
-            if (cs.getType(dre)->getRValueType()->is<ArchetypeType>()) {
-              if (!diagnoseInvalidDynamicConstructorReferences(cs, base,
-                                                               nameLoc,
-                                                               ctor,
-                                                               SuppressDiagnostics))
-                return nullptr;
-            }
-
             // Make sure the reference to 'self' occurs within an initializer.
             if (!dyn_cast_or_null<ConstructorDecl>(
                    cs.DC->getInnermostMethodContext())) {
@@ -3630,7 +3560,11 @@ namespace {
           });
         }
 
-        literalInit->setImplicit(false);
+        if (auto *literal = dyn_cast<NumberLiteralExpr>(literalInit)) {
+          literal->setExplicitConversion();
+        } else {
+          literalInit->setImplicit(false);
+        }
 
         cs.setType(expr, toType);
         // Keep the coercion around, because it contains the source range
@@ -6590,41 +6524,56 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
   }
 
+  // Handle "from specific" coercions before "catch all" coercions.
+  auto desugaredFromType = fromType->getDesugaredType();
+  switch (desugaredFromType->getKind()) {
   // Coercions from an lvalue: load or perform implicit address-of. We perform
   // these coercions first because they are often the first step in a multi-step
   // coercion.
-  if (auto fromLValue = fromType->getAs<LValueType>()) {
-    if (auto *toIO = toType->getAs<InOutType>()) {
-      // In an 'inout' operator like "i += 1", the operand is converted from
-      // an implicit lvalue to an inout argument.
-      assert(toIO->getObjectType()->isEqual(fromLValue->getObjectType()));
-      return cs.cacheType(new (tc.Context)
-                              InOutExpr(expr->getStartLoc(), expr,
-                                        toIO->getObjectType(),
-                                        /*isImplicit*/ true));
-    }
+  case TypeKind::LValue: {
+    auto fromLValue = cast<LValueType>(desugaredFromType);
+    auto toIO = toType->getAs<InOutType>();
+    if (!toIO)
+      return coerceToType(addImplicitLoadExpr(cs, expr), toType, locator);
 
-    return coerceToType(addImplicitLoadExpr(cs, expr), toType, locator);
+    // In an 'inout' operator like "i += 1", the operand is converted from
+    // an implicit lvalue to an inout argument.
+    assert(toIO->getObjectType()->isEqual(fromLValue->getObjectType()));
+    return cs.cacheType(new (tc.Context) InOutExpr(expr->getStartLoc(), expr,
+                                                   toIO->getObjectType(),
+                                                   /*isImplicit*/ true));
   }
 
-  // Coercions to tuple type.
-  if (auto toTuple = toType->getAs<TupleType>()) {
-    // Coerce from a tuple to a tuple.
-    if (auto fromTuple = fromType->getAs<TupleType>()) {
-      SmallVector<unsigned, 4> sources;
-      if (!computeTupleShuffle(fromTuple, toTuple, sources)) {
-        return coerceTupleToTuple(expr, fromTuple, toTuple,
-                                  locator, sources);
-      }
+  // Coerce from a tuple to a tuple.
+  case TypeKind::Tuple: {
+    auto fromTuple = cast<TupleType>(desugaredFromType);
+    auto toTuple = toType->getAs<TupleType>();
+    if (!toTuple)
+      break;
+    SmallVector<unsigned, 4> sources;
+    if (!computeTupleShuffle(fromTuple, toTuple, sources)) {
+      return coerceTupleToTuple(expr, fromTuple, toTuple,
+                                locator, sources);
     }
+    break;
   }
+
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::OpenedArchetype:
+  case TypeKind::NestedArchetype:
+    if (!cast<ArchetypeType>(desugaredFromType)->requiresClass())
+      break;
+    LLVM_FALLTHROUGH;
 
   // Coercion from a subclass to a superclass.
   //
   // FIXME: Can we rig things up so that we always have a Superclass
   // conversion restriction in this case?
-  if (fromType->mayHaveSuperclass() &&
-      toType->getClassOrBoundGenericClass()) {
+  case TypeKind::DynamicSelf:
+  case TypeKind::BoundGenericClass:
+  case TypeKind::Class: {
+    if (!toType->getClassOrBoundGenericClass())
+      break;
     for (auto fromSuperClass = fromType->getSuperclass();
          fromSuperClass;
          fromSuperClass = fromSuperClass->getSuperclass()) {
@@ -6632,10 +6581,17 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         return coerceSuperclass(expr, toType, locator);
       }
     }
+    break;
   }
 
-  // Coercions to function type.
-  if (auto toFunc = toType->getAs<FunctionType>()) {
+  // Coercion from one function type to another, this produces a
+  // FunctionConversionExpr in its full generality.
+  case TypeKind::Function: {
+    auto fromFunc = cast<FunctionType>(desugaredFromType);
+    auto toFunc = toType->getAs<FunctionType>();
+    if (!toFunc)
+      break;
+
     // Default argument generator must return escaping functions. Therefore, we
     // leave an explicit escape to noescape cast here such that SILGen can skip
     // the cast and emit a code for the escaping function.
@@ -6644,49 +6600,52 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       isInDefaultArgumentContext = (initalizerCtx->getInitializerKind() ==
                                     InitializerKind::DefaultArgument);
     auto toEI = toFunc->getExtInfo();
-    // Coercion from one function type to another, this produces a
-    // FunctionConversionExpr in its full generality.
-    if (auto fromFunc = fromType->getAs<FunctionType>()) {
-      assert(toType->is<FunctionType>());
-      // If we have a ClosureExpr, then we can safely propagate the 'no escape'
-      // bit to the closure without invalidating prior analysis.
-      auto fromEI = fromFunc->getExtInfo();
-      if (toEI.isNoEscape() && !fromEI.isNoEscape()) {
-        auto newFromFuncType = fromFunc->withExtInfo(fromEI.withNoEscape());
-        if (!isInDefaultArgumentContext &&
-            applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
-          fromFunc = newFromFuncType->castTo<FunctionType>();
-          // Propagating the 'no escape' bit might have satisfied the entire
-          // conversion.  If so, we're done, otherwise keep converting.
-          if (fromFunc->isEqual(toType))
-            return expr;
-        } else if (isInDefaultArgumentContext) {
-          // First apply the conversion *without* noescape attribute.
-          if (!newFromFuncType->isEqual(toType)) {
-            auto escapingToFuncTy =
-                toFunc->withExtInfo(toEI.withNoEscape(false));
-            maybeDiagnoseUnsupportedFunctionConversion(cs, expr, toFunc);
-            expr = cs.cacheType(new (tc.Context) FunctionConversionExpr(
-                expr, escapingToFuncTy));
-          }
-          // Apply an explict function conversion *only* for the escape to
-          // noescape conversion. This conversion will be stripped by the
-          // default argument generator. (We can't return a @noescape function)
-          auto newExpr = cs.cacheType(new (tc.Context)
-                                          FunctionConversionExpr(expr, toFunc));
-          return newExpr;
+    assert(toType->is<FunctionType>());
+    // If we have a ClosureExpr, then we can safely propagate the 'no escape'
+    // bit to the closure without invalidating prior analysis.
+    auto fromEI = fromFunc->getExtInfo();
+    if (toEI.isNoEscape() && !fromEI.isNoEscape()) {
+      auto newFromFuncType = fromFunc->withExtInfo(fromEI.withNoEscape());
+      if (!isInDefaultArgumentContext &&
+          applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
+        fromFunc = newFromFuncType->castTo<FunctionType>();
+        // Propagating the 'no escape' bit might have satisfied the entire
+        // conversion.  If so, we're done, otherwise keep converting.
+        if (fromFunc->isEqual(toType))
+          return expr;
+      } else if (isInDefaultArgumentContext) {
+        // First apply the conversion *without* noescape attribute.
+        if (!newFromFuncType->isEqual(toType)) {
+          auto escapingToFuncTy =
+              toFunc->withExtInfo(toEI.withNoEscape(false));
+          maybeDiagnoseUnsupportedFunctionConversion(cs, expr, toFunc);
+          expr = cs.cacheType(new (tc.Context) FunctionConversionExpr(
+              expr, escapingToFuncTy));
         }
+        // Apply an explict function conversion *only* for the escape to
+        // noescape conversion. This conversion will be stripped by the
+        // default argument generator. (We can't return a @noescape function)
+        auto newExpr = cs.cacheType(new (tc.Context)
+                                        FunctionConversionExpr(expr, toFunc));
+        return newExpr;
       }
-
-      maybeDiagnoseUnsupportedFunctionConversion(cs, expr, toFunc);
-
-      return cs.cacheType(new (tc.Context)
-                              FunctionConversionExpr(expr, toType));
     }
+
+    maybeDiagnoseUnsupportedFunctionConversion(cs, expr, toFunc);
+
+    return cs.cacheType(new (tc.Context)
+                            FunctionConversionExpr(expr, toType));
   }
 
-  // Coercions from metadata to objects.
-  if (auto fromMeta = fromType->getAs<AnyMetatypeType>()) {
+  // Coercions from one metatype to another.
+  case TypeKind::Metatype: {
+    if (auto toMeta = toType->getAs<MetatypeType>())
+      return cs.cacheType(new(tc.Context) MetatypeConversionExpr(expr, toMeta));
+    LLVM_FALLTHROUGH;
+  }
+  // Coercions from metatype to objects.
+  case TypeKind::ExistentialMetatype: {
+    auto fromMeta = cast<AnyMetatypeType>(desugaredFromType);
     if (toType->isAnyObject()) {
       assert(cs.getASTContext().LangOpts.EnableObjCInterop
              && "metatype-to-object conversion requires objc interop");
@@ -6722,39 +6681,86 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
           new (tc.Context) ProtocolMetatypeToObjectExpr(expr, toType));
       }
     }
+
+    break;
   }
 
+#define SUGARED_TYPE(Name, Parent) case TypeKind::Name:
+#define BUILTIN_TYPE(Name, Parent) case TypeKind::Name:
+#define UNCHECKED_TYPE(Name, Parent) case TypeKind::Name:
+#define ARTIFICIAL_TYPE(Name, Parent) case TypeKind::Name:
+#define TYPE(Name, Parent)
+#include "swift/AST/TypeNodes.def"
+  case TypeKind::Error:
+  case TypeKind::InOut:
+  case TypeKind::Module:
+  case TypeKind::Enum:
+  case TypeKind::Struct:
+  case TypeKind::Protocol:
+  case TypeKind::ProtocolComposition:
+  case TypeKind::BoundGenericEnum:
+  case TypeKind::BoundGenericStruct:
+  case TypeKind::GenericFunction:
+  case TypeKind::GenericTypeParam:
+  case TypeKind::DependentMember:
+    break;
+  }
+
+  // "Catch all" coercions.
+  auto desugaredToType = toType->getDesugaredType();
+  switch (desugaredToType->getKind()) {
   // Coercions from a type to an existential type.
-  if (toType->isAnyExistentialType()) {
+  case TypeKind::ExistentialMetatype:
+  case TypeKind::ProtocolComposition:
+  case TypeKind::Protocol:
     return coerceExistential(expr, toType, locator);
-  }
-
-  if (toType->getOptionalObjectType() &&
-      cs.getType(expr)->getOptionalObjectType()) {
-    return coerceOptionalToOptional(expr, toType, locator, typeFromPattern);
-  }
 
   // Coercion to Optional<T>.
-  if (auto toGenericType = toType->getAs<BoundGenericType>()) {
-    if (toGenericType->getDecl()->isOptionalDecl()) {
-      tc.requireOptionalIntrinsics(expr->getLoc());
+  case TypeKind::BoundGenericEnum: {
+    auto toGenericType = cast<BoundGenericEnumType>(desugaredToType);
+    if (!toGenericType->getDecl()->isOptionalDecl())
+      break;
+    tc.requireOptionalIntrinsics(expr->getLoc());
 
-      Type valueType = toGenericType->getGenericArgs()[0];
-      expr = coerceToType(expr, valueType, locator);
-      if (!expr) return nullptr;
+    if (cs.getType(expr)->getOptionalObjectType())
+      return coerceOptionalToOptional(expr, toType, locator, typeFromPattern);
 
-      auto *result =
-          cs.cacheType(new (tc.Context) InjectIntoOptionalExpr(expr, toType));
-      diagnoseOptionalInjection(result);
-      return result;
-    }
+    Type valueType = toGenericType->getGenericArgs()[0];
+    expr = coerceToType(expr, valueType, locator);
+    if (!expr) return nullptr;
+
+    auto *result =
+        cs.cacheType(new (tc.Context) InjectIntoOptionalExpr(expr, toType));
+    diagnoseOptionalInjection(result);
+    return result;
   }
 
-  // Coercion from one metatype to another.
-  if (fromType->is<MetatypeType>() &&
-      toType->is<MetatypeType>()) {
-    auto toMeta = toType->castTo<MetatypeType>();
-    return cs.cacheType(new (tc.Context) MetatypeConversionExpr(expr, toMeta));
+#define SUGARED_TYPE(Name, Parent) case TypeKind::Name:
+#define BUILTIN_TYPE(Name, Parent) case TypeKind::Name:
+#define UNCHECKED_TYPE(Name, Parent) case TypeKind::Name:
+#define ARTIFICIAL_TYPE(Name, Parent) case TypeKind::Name:
+#define TYPE(Name, Parent)
+#include "swift/AST/TypeNodes.def"
+  case TypeKind::Error:
+  case TypeKind::Module:
+  case TypeKind::Tuple:
+  case TypeKind::Enum:
+  case TypeKind::Struct:
+  case TypeKind::Class:
+  case TypeKind::BoundGenericClass:
+  case TypeKind::BoundGenericStruct:
+  case TypeKind::Metatype:
+  case TypeKind::DynamicSelf:
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::OpenedArchetype:
+  case TypeKind::NestedArchetype:
+  case TypeKind::GenericTypeParam:
+  case TypeKind::DependentMember:
+  case TypeKind::Function:
+  case TypeKind::GenericFunction:
+  case TypeKind::LValue:
+  case TypeKind::InOut:
+    break;
   }
 
   // Unresolved types come up in diagnostics for lvalue and inout types.
@@ -7053,6 +7059,10 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
     // Set the builtin initializer.
     if (auto stringLiteral = dyn_cast<StringLiteralExpr>(literal))
       stringLiteral->setBuiltinInitializer(witness);
+    else if (auto booleanLiteral = dyn_cast<BooleanLiteralExpr>(literal))
+      booleanLiteral->setBuiltinInitializer(witness);
+    else if (auto numberLiteral = dyn_cast<NumberLiteralExpr>(literal))
+      numberLiteral->setBuiltinInitializer(witness);
     else {
       cast<MagicIdentifierLiteralExpr>(literal)
         ->setBuiltinInitializer(witness);
@@ -7100,6 +7110,10 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
     nilLiteral->setInitializer(witness);
   else if (auto stringLiteral = dyn_cast<StringLiteralExpr>(literal))
     stringLiteral->setInitializer(witness);
+  else if (auto booleanLiteral = dyn_cast<BooleanLiteralExpr>(literal))
+    booleanLiteral->setInitializer(witness);
+  else if (auto numberLiteral = dyn_cast<NumberLiteralExpr>(literal))
+    numberLiteral->setInitializer(witness);
   else
     cast<MagicIdentifierLiteralExpr>(literal)->setInitializer(witness);
 
@@ -7469,24 +7483,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   if (auto metaTy = cs.getType(fn)->getAs<AnyMetatypeType>()) {
     auto ty = metaTy->getInstanceType();
 
-    if (!cs.isTypeReference(fn)) {
-      bool isExistentialType = false;
-      // If this is an attempt to initialize existential type.
-      if (auto metaType = cs.getType(fn)->getAs<MetatypeType>()) {
-        auto instanceType = metaType->getInstanceType();
-        isExistentialType = instanceType->isExistentialType();
-      }
-
-      if (!isExistentialType) {
-        // If the metatype value isn't a type expression,
-        // the user should reference '.init' explicitly, for clarity.
-        cs.TC
-            .diagnose(apply->getArg()->getStartLoc(),
-                      diag::missing_init_on_metatype_initialization)
-            .fixItInsert(apply->getArg()->getStartLoc(), ".init");
-      }
-    }
-
     // If we're "constructing" a tuple type, it's simply a conversion.
     if (auto tupleTy = ty->getAs<TupleType>()) {
       // FIXME: Need an AST to represent this properly.
@@ -7630,9 +7626,13 @@ bool swift::exprNeedsParensOutsideFollowingOperator(
   Expr *parent;
   unsigned index;
   std::tie(parent, index) = getPrecedenceParentAndIndex(expr, rootExpr);
-  if (!parent || isa<TupleExpr>(parent) || isa<ParenExpr>(parent)) {
+  if (!parent || isa<TupleExpr>(parent)) {
     return false;
   }
+
+  if (auto parenExp = dyn_cast<ParenExpr>(parent))
+    if (!parenExp->isImplicit())
+      return false;
 
   if (parent->isInfixOperator()) {
     auto parentPG = TC.lookupPrecedenceGroupForInfixOperator(DC, parent);
@@ -8101,6 +8101,12 @@ Expr *Solution::convertOptionalToBool(Expr *expr,
   // Match the optional value against its `Some` case.
   auto &ctx = tc.Context;
   auto isSomeExpr = new (ctx) EnumIsCaseExpr(expr, ctx.getOptionalSomeDecl());
-  cs.setType(isSomeExpr, tc.lookupBoolType(cs.DC));
+  auto boolDecl = ctx.getBoolDecl();
+
+  if (!boolDecl) {
+    tc.diagnose(SourceLoc(), diag::broken_bool);
+  }
+
+  cs.setType(isSomeExpr, boolDecl ? boolDecl->getDeclaredType() : Type());
   return isSomeExpr;
 }

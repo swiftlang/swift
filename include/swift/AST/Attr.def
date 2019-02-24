@@ -49,7 +49,6 @@
 // Type attributes
 TYPE_ATTR(autoclosure)
 TYPE_ATTR(convention)
-TYPE_ATTR(noreturn)
 TYPE_ATTR(noescape)
 TYPE_ATTR(escaping)
 
@@ -136,9 +135,7 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(optional, Optional,
 SIMPLE_DECL_ATTR(dynamicCallable, DynamicCallable,
   OnNominalType,
   6)
-SIMPLE_DECL_ATTR(noreturn, NoReturn,
-  OnFunc | OnAccessor,
-  7)
+// NOTE: 7 is unused
 SIMPLE_DECL_ATTR(_exported, Exported,
   OnImport |
   UserInaccessible,
@@ -390,6 +387,9 @@ DECL_ATTR(_private, PrivateImport,
   OnImport |
   UserInaccessible |
   NotSerialized, 82)
+SIMPLE_DECL_ATTR(_alwaysEmitIntoClient, AlwaysEmitIntoClient,
+  OnVar | OnSubscript | OnAbstractFunction | UserInaccessible,
+  83)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

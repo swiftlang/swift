@@ -10,10 +10,14 @@
 // don't support TSan.
 // UNSUPPORTED: remote_run
 
-#if os(macOS) || os(iOS)
-import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin)
-import Glibc
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+  import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+  import Glibc
+#elseif os(Windows)
+  import MSVCRT
+#else
+#error("Unsupported platform")
 #endif
 
 // Make sure we can handle swifterror and don't bail during the LLVM

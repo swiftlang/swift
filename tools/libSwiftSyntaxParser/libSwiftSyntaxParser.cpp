@@ -22,6 +22,7 @@
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/SyntaxParseActions.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
+#include "swift/Syntax/SyntaxNodes.h"
 #include "swift/Subsystems.h"
 #include <Block.h>
 
@@ -229,4 +230,8 @@ swiftparse_client_node_t
 swiftparse_parse_string(swiftparse_parser_t c_parser, const char *source) {
   SynParser *parser = static_cast<SynParser*>(c_parser);
   return parser->parse(source);
+}
+
+const char* swiftparse_syntax_structure_versioning_identifier(void) {
+  return getSyntaxStructureVersioningIdentifier();
 }

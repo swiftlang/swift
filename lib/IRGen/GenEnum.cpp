@@ -5429,7 +5429,8 @@ namespace {
       llvm::BasicBlock *conditionalBlock = nullptr;
       llvm::BasicBlock *afterConditionalBlock = nullptr;
       llvm::BasicBlock *beforeNullPtrCheck = nullptr;
-      if (Case->isWeakImported(IGM.getSwiftModule())) {
+      if (Case->isWeakImported(IGM.getSwiftModule(),
+                               IGM.getAvailabilityContext())) {
         beforeNullPtrCheck = IGF.Builder.GetInsertBlock();
         auto address = IGM.getAddrOfEnumCase(Case, NotForDefinition);
         conditionalBlock = llvm::BasicBlock::Create(C);

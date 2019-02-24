@@ -392,6 +392,8 @@ struct SILDeclRef {
 
   bool isDynamicallyReplaceable() const;
 
+  bool canBeDynamicReplacement() const;
+
 private:
   friend struct llvm::DenseMapInfo<swift::SILDeclRef>;
   /// Produces a SILDeclRef from an opaque value.

@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/class_resilience.swift
-// RUN: %target-swift-frontend -emit-module -enable-resilience -enable-class-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
-// RUN: %target-swift-frontend -emit-module -enable-resilience -enable-class-resilience -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
-// RUN: %target-swift-frontend -emit-module -enable-resilience -enable-class-resilience -emit-module-path=%t/resilient_class.swiftmodule -module-name=resilient_class -I %t %S/../Inputs/resilient_class.swift
-// RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience -enable-class-resilience %t/class_resilience.swift | %FileCheck %t/class_resilience.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime -DINT=i%target-ptrsize
-// RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience -enable-class-resilience -O %t/class_resilience.swift
+// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
+// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_class.swiftmodule -module-name=resilient_class -I %t %S/../Inputs/resilient_class.swift
+// RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience %t/class_resilience.swift | %FileCheck %t/class_resilience.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience -O %t/class_resilience.swift
 
 // CHECK: @"$s16class_resilience26ClassWithResilientPropertyC1s16resilient_struct4SizeVvpWvd" = hidden global [[INT]] 0
 // CHECK: @"$s16class_resilience26ClassWithResilientPropertyC5colors5Int32VvpWvd" = hidden global [[INT]] 0
@@ -15,6 +15,9 @@
 // CHECK: @"$s16class_resilience14ResilientChildC5fields5Int32VvpWvd" = hidden global [[INT]] {{8|16}}
 
 // CHECK: @"$s16class_resilience21ResilientGenericChildCMo" = {{(protected )?}}{{(dllexport )?}}global [[BOUNDS:{ (i32|i64), i32, i32 }]] zeroinitializer
+
+// CHECK: @"$s16class_resilience27ClassWithEmptyThenResilientC9resilient0H7_struct0G3IntVvpWvd" = hidden global [[INT]] 0,
+// CHECK: @"$s16class_resilience27ClassWithResilientThenEmptyC9resilient0H7_struct0E3IntVvpWvd" = hidden global [[INT]] 0,
 
 // CHECK: @"$s16class_resilience26ClassWithResilientPropertyCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
 // CHECK-SAME-32: { [[INT]] 52, i32 2, i32 13 }
@@ -112,6 +115,9 @@
 // CHECK: @"$s16class_resilience24MyResilientConcreteChildCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
 // CHECK-SAME-32: { [[INT]] 64, i32 2, i32 16 }
 // CHECK-SAME-64: { [[INT]] 104, i32 2, i32 13 }
+
+// CHECK: @"$s16class_resilience27ClassWithEmptyThenResilientC5emptyAA0E0VvpWvd" = hidden constant [[INT]] 0,
+// CHECK: @"$s16class_resilience27ClassWithResilientThenEmptyC5emptyAA0G0VvpWvd" = hidden constant [[INT]] 0,
 
 // CHECK: @"$s16class_resilience14ResilientChildC5fields5Int32VvgTq" = {{(protected )?}}{{(dllexport )?}}alias %swift.method_descriptor, getelementptr inbounds
 // CHECK: @"$s16class_resilience14ResilientChildC5fields5Int32VvsTq" = {{(protected )?}}{{(dllexport )?}}alias %swift.method_descriptor, getelementptr inbounds
@@ -241,6 +247,34 @@ public class MyResilientConcreteChild : MyResilientGenericParent<Int> {
 extension ResilientGenericOutsideParent {
   public func genericExtensionMethod() -> A.Type {
     return A.self
+  }
+}
+
+// rdar://48031465
+// Field offsets for empty fields in resilient classes should be initialized
+// to their best-known value and made non-constant if that value might
+// disagree with the dynamic value.
+
+@_fixed_layout
+public struct Empty {}
+
+public class ClassWithEmptyThenResilient {
+  public let empty: Empty
+  public let resilient: ResilientInt
+
+  public init(empty: Empty, resilient: ResilientInt) {
+    self.empty = empty
+    self.resilient = resilient
+  }
+}
+
+public class ClassWithResilientThenEmpty {
+  public let resilient: ResilientInt
+  public let empty: Empty
+
+  public init(empty: Empty, resilient: ResilientInt) {
+    self.empty = empty
+    self.resilient = resilient
   }
 }
 
@@ -400,7 +434,13 @@ extension ResilientGenericOutsideParent {
 // CHECK: dependency-satisfied:
 
 // -- ClassLayoutFlags = 0x100 (HasStaticVTable)
-// CHECK:      void @swift_initClassMetadata(%swift.type* %0, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK-NEXT: [[INITDEP_METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-NEXT: [[INITDEP_STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
+// CHECK-NEXT: [[INITDEP_PRESENT:%.*]] = icmp eq %swift.type* [[INITDEP_METADATA]], null
+// CHECK-NEXT: br i1 [[INITDEP_PRESENT]], label %dependency-satisfied1, label %metadata-dependencies.cont
+
+// CHECK: dependency-satisfied1:
 
 // CHECK-native:      [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* {{.*}}
 // CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @"$s16class_resilience26ClassWithResilientPropertyC1s16resilient_struct4SizeVvpWvd"
@@ -412,8 +452,8 @@ extension ResilientGenericOutsideParent {
 
 // CHECK: metadata-dependencies.cont:
 
-// CHECK-NEXT: [[PENDING_METADATA:%.*]] = phi %swift.type* [ [[SIZE_METADATA]], %entry ], [ null, %dependency-satisfied ]
-// CHECK-NEXT: [[NEW_STATUS:%.*]] = phi [[INT]] [ 63, %entry ], [ 0, %dependency-satisfied ]
+// CHECK-NEXT: [[PENDING_METADATA:%.*]] = phi %swift.type* [ [[SIZE_METADATA]], %entry ], [ [[INITDEP_METADATA]], %dependency-satisfied ], [ null, %dependency-satisfied1 ]
+// CHECK-NEXT: [[NEW_STATUS:%.*]] = phi [[INT]] [ 63, %entry ], [ [[INITDEP_STATUS]], %dependency-satisfied ], [ 0, %dependency-satisfied1 ]
 // CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[PENDING_METADATA]], 0
 // CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
 // CHECK-NEXT: ret %swift.metadata_response [[T1]]
@@ -448,7 +488,13 @@ extension ResilientGenericOutsideParent {
 // CHECK: dependency-satisfied:
 
 // -- ClassLayoutFlags = 0x100 (HasStaticVTable)
-// CHECK:      call void @swift_initClassMetadata(%swift.type* %0, [[INT]] 256, [[INT]] 2, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 2, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK-NEXT: [[INITDEP_METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-NEXT: [[INITDEP_STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
+// CHECK-NEXT: [[INITDEP_PRESENT:%.*]] = icmp eq %swift.type* [[INITDEP_METADATA]], null
+// CHECK-NEXT: br i1 [[INITDEP_PRESENT]], label %dependency-satisfied1, label %metadata-dependencies.cont
+
+// CHECK: dependency-satisfied1:
 
 // CHECK-native:      [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* {{.*}}
 // CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @"$s16class_resilience33ClassWithResilientlySizedPropertyC1r16resilient_struct9RectangleVvpWvd"
@@ -460,8 +506,8 @@ extension ResilientGenericOutsideParent {
 
 // CHECK: metadata-dependencies.cont:
 
-// CHECK-NEXT: [[PENDING_METADATA:%.*]] = phi %swift.type* [ [[SIZE_METADATA]], %entry ], [ null, %dependency-satisfied ]
-// CHECK-NEXT: [[NEW_STATUS:%.*]] = phi [[INT]] [ 63, %entry ], [ 0, %dependency-satisfied ]
+// CHECK-NEXT: [[PENDING_METADATA:%.*]] = phi %swift.type* [ [[SIZE_METADATA]], %entry ], [ [[INITDEP_METADATA]], %dependency-satisfied ], [ null, %dependency-satisfied1 ]
+// CHECK-NEXT: [[NEW_STATUS:%.*]] = phi [[INT]] [ 63, %entry ], [ [[INITDEP_STATUS]], %dependency-satisfied ], [ 0, %dependency-satisfied1 ]
 // CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[PENDING_METADATA]], 0
 // CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
 // CHECK-NEXT: ret %swift.metadata_response [[T1]]
@@ -481,7 +527,7 @@ extension ResilientGenericOutsideParent {
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s16class_resilience14ResilientChildCMr"(%swift.type*, i8*, i8**)
 
 // Initialize field offset vector...
-// CHECK:      call void @swift_initClassMetadata(%swift.type* %0, [[INT]] 0, [[INT]] 1, i8*** {{.*}}, [[INT]]* {{.*}})
+// CHECK:      call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 0, [[INT]] 1, i8*** {{.*}}, [[INT]]* {{.*}})
 
 // CHECK: ret %swift.metadata_response
 
@@ -519,7 +565,7 @@ extension ResilientGenericOutsideParent {
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s16class_resilience21ResilientGenericChildCMr"
 // CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**)
 
-// CHECK:              call void @swift_initClassMetadata(%swift.type* [[METADATA]], [[INT]] 0,
+// CHECK:              call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* [[METADATA]], [[INT]] 0,
 // CHECK:              ret %swift.metadata_response
 
 

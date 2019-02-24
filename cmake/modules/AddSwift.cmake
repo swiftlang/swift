@@ -30,7 +30,11 @@ endfunction()
 # Compute the library subdirectory to use for the given sdk and
 # architecture, placing the result in 'result_var_name'.
 function(compute_library_subdir result_var_name sdk arch)
-  set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}" PARENT_SCOPE)
+  if(sdk IN_LIST SWIFT_APPLE_PLATFORMS)
+    set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}" PARENT_SCOPE)
+  else()
+    set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}" PARENT_SCOPE)
+  endif()
 endfunction()
 
 function(_compute_lto_flag option out_var)
@@ -821,10 +825,10 @@ function(_add_swift_library_single target name)
     endif()
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-autolink-library;-Xfrontend;oldnames)
     # TODO(compnerd) handle /MT and /MTd
-    if("${CMAKE_BUILD_TYPE}" STREQUAL "RELEASE")
-      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-autolink-library;-Xfrontend;msvcrt)
-    else()
+    if(CMAKE_BUILD_TYPE MATCHES Debug)
       list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-autolink-library;-Xfrontend;msvcrtd)
+    else()
+      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-autolink-library;-Xfrontend;msvcrt)
     endif()
   endif()
 
@@ -1156,6 +1160,8 @@ function(_add_swift_library_single target name)
   # Don't set PROPERTY COMPILE_FLAGS or LINK_FLAGS directly.
   set(c_compile_flags ${SWIFTLIB_SINGLE_C_COMPILE_FLAGS})
   set(link_flags ${SWIFTLIB_SINGLE_LINK_FLAGS})
+
+  set(library_search_subdir "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
   set(library_search_directories
       "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}"
       "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}"
@@ -1189,6 +1195,11 @@ function(_add_swift_library_single target name)
     "${SWIFTLIB_SINGLE_FORCE_BUILD_OPTIMIZED_keyword}"
     RESULT_VAR_NAME c_compile_flags
     )
+  if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS)
+    if(libkind STREQUAL SHARED)
+      list(APPEND c_compile_flags -D_WINDLL)
+    endif()
+  endif()
   _add_variant_link_flags(
     SDK "${SWIFTLIB_SINGLE_SDK}"
     ARCH "${SWIFTLIB_SINGLE_ARCHITECTURE}"
@@ -1300,6 +1311,7 @@ function(_add_swift_library_single target name)
   if(target_static)
     set_property(TARGET "${target_static}" APPEND_STRING PROPERTY
         COMPILE_FLAGS " ${c_compile_flags}")
+    # FIXME: The fallback paths here are going to be dynamic libraries.
     set(library_search_directories
         "${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}"
         "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}"
@@ -1767,7 +1779,7 @@ function(add_swift_target_library name)
       # building both simultaneously.  Effectively, only shared builds are
       # supported on windows currently.
       if(SWIFTLIB_SHARED)
-        list(APPEND swiftlib_swift_compile_flags_all -D_USRDLL)
+        list(APPEND swiftlib_swift_compile_flags_all -D_WINDLL)
         if(SWIFTLIB_IS_STDLIB_CORE)
           list(APPEND swiftlib_swift_compile_flags_all -DswiftCore_EXPORTS)
         endif()
@@ -2136,6 +2148,10 @@ function(_add_swift_executable_single name)
         "${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES}"
         "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}"
         SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS)
+    _list_add_string_suffix(
+        "${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES}"
+        "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
+        SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES)
   else()
     _list_add_string_suffix(
         "${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES}"

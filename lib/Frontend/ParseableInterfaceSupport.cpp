@@ -28,6 +28,7 @@
 #include "clang/Basic/Module.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/Preprocessor.h"
+#include "clang/Lex/PreprocessorOptions.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringSet.h"
@@ -50,7 +51,7 @@ static swift::version::Version InterfaceFormatVersion({1, 0});
 
 static bool
 extractSwiftInterfaceVersionAndArgs(DiagnosticEngine &Diags, SourceLoc DiagLoc,
-                                    clang::vfs::FileSystem &FS,
+                                    llvm::vfs::FileSystem &FS,
                                     StringRef SwiftInterfacePathIn,
                                     swift::version::Version &Vers,
                                     llvm::StringSaver &SubArgSaver,
@@ -83,7 +84,7 @@ extractSwiftInterfaceVersionAndArgs(DiagnosticEngine &Diags, SourceLoc DiagLoc,
 }
 
 static std::unique_ptr<llvm::MemoryBuffer>
-getBufferOfDependency(clang::vfs::FileSystem &FS,
+getBufferOfDependency(llvm::vfs::FileSystem &FS,
                       StringRef ModulePath, StringRef DepPath,
                       DiagnosticEngine &Diags, SourceLoc DiagLoc) {
   auto DepBuf = FS.getBufferForFile(DepPath, /*FileSize=*/-1,
@@ -95,6 +96,20 @@ getBufferOfDependency(clang::vfs::FileSystem &FS,
     return nullptr;
   }
   return std::move(DepBuf.get());
+}
+
+static Optional<llvm::vfs::Status>
+getStatusOfDependency(llvm::vfs::FileSystem &FS,
+                      StringRef ModulePath, StringRef DepPath,
+                      DiagnosticEngine &Diags, SourceLoc DiagLoc) {
+  auto Status = FS.status(DepPath);
+  if (!Status) {
+    Diags.diagnose(DiagLoc,
+                   diag::missing_dependency_of_parseable_module_interface,
+                   DepPath, ModulePath, Status.getError().message());
+    return None;
+  }
+  return Status.get();
 }
 
 /// Construct a cache key for the .swiftmodule being generated. There is a
@@ -111,20 +126,24 @@ static std::string getCacheHash(ASTContext &Ctx,
                                 const CompilerInvocation &SubInvocation,
                                 StringRef InPath) {
   // Start with the compiler version (which will be either tag names or revs).
-  std::string vers = swift::version::getSwiftFullVersion(
-      Ctx.LangOpts.EffectiveLanguageVersion);
-  llvm::hash_code H = llvm::hash_value(vers);
+  // Explicitly don't pass in the "effective" language version -- this would
+  // mean modules built in different -swift-version modes would rebuild their
+  // dependencies.
+  llvm::hash_code H = hash_value(swift::version::getSwiftFullVersion());
 
   // Simplest representation of input "identity" (not content) is just a
   // pathname, and probably all we can get from the VFS in this regard anyways.
-  H = llvm::hash_combine(H, InPath);
+  H = hash_combine(H, InPath);
 
-  // ClangImporterOpts does include the target CPU, which is redundant: we
-  // already have separate .swiftinterface files per target due to expanding
-  // preprocessing directives, but further specializing the cache key to that
-  // target is harmless and will not make any extra cache entries, so allow it.
-  H = llvm::hash_combine(
-      H, SubInvocation.getClangImporterOptions().getPCHHashComponents());
+  // Include the target CPU architecture. In practice, .swiftinterface files
+  // will be in architecture-specific subdirectories and would have
+  // architecture-specific pieces #if'd out. However, it doesn't hurt to
+  // include it, and it guards against mistakenly reusing cached modules across
+  // architectures.
+  H = hash_combine(H, SubInvocation.getLangOptions().Target.getArchName());
+
+  // The SDK path is going to affect how this module is imported, so include it.
+  H = hash_combine(H, SubInvocation.getSDKPath());
 
   return llvm::APInt(64, H).toString(36, /*Signed=*/false);
 }
@@ -150,6 +169,16 @@ createInvocationForBuildingFromInterface(ASTContext &Ctx, StringRef ModuleName,
   SubInvocation.setModuleName(ModuleName);
   SubInvocation.setClangModuleCachePath(CacheDir);
   SubInvocation.getFrontendOptions().PrebuiltModuleCachePath = PrebuiltCacheDir;
+
+  // Respect the detailed-record preprocessor setting of the parent context.
+  // This, and the "raw" clang module format it implicitly enables, are required
+  // by sourcekitd.
+  if (auto *ClangLoader = Ctx.getClangModuleLoader()) {
+    auto &Opts = ClangLoader->getClangInstance().getPreprocessorOpts();
+    if (Opts.DetailedRecord) {
+      SubInvocation.getClangImporterOptions().DetailedPreprocessingRecord = true;
+    }
+  }
 
   // Inhibit warnings from the SubInvocation since we are assuming the user
   // is not in a position to fix them.
@@ -195,10 +224,21 @@ void ParseableInterfaceModuleLoader::configureSubInvocationInputsAndOutputs(
   SubFEOpts.InputsAndOutputs.setMainAndSupplementaryOutputs({MainOut}, {SOPs});
 }
 
+// Checks that a dependency read from the cached module is up to date compared
+// to the interface file it represents.
+static bool dependencyIsUpToDate(llvm::vfs::FileSystem &FS, FileDependency In,
+                                 StringRef ModulePath, DiagnosticEngine &Diags,
+                                 SourceLoc DiagLoc) {
+  auto Status = getStatusOfDependency(FS, ModulePath, In.Path, Diags, DiagLoc);
+  if (!Status) return false;
+  uint64_t mtime = Status->getLastModificationTime().time_since_epoch().count();
+  return Status->getSize() == In.Size && mtime == In.ModificationTime;
+}
+
 // Check that the output .swiftmodule file is at least as new as all the
 // dependencies it read when it was built last time.
 static bool
-swiftModuleIsUpToDate(clang::vfs::FileSystem &FS,
+swiftModuleIsUpToDate(llvm::vfs::FileSystem &FS,
                       std::pair<Identifier, SourceLoc> ModuleID,
                       StringRef OutPath,
                       DiagnosticEngine &Diags,
@@ -223,11 +263,7 @@ swiftModuleIsUpToDate(clang::vfs::FileSystem &FS,
   for (auto In : AllDeps) {
     if (OuterTracker)
       OuterTracker->addDependency(In.Path, /*IsSystem=*/false);
-    auto DepBuf = getBufferOfDependency(FS, OutPath, In.Path, Diags,
-                                        ModuleID.second);
-    if (!DepBuf ||
-        DepBuf->getBufferSize() != In.Size ||
-        xxHash64(DepBuf->getBuffer()) != In.Hash) {
+    if (!dependencyIsUpToDate(FS, In, OutPath, Diags, ModuleID.second)) {
       LLVM_DEBUG(llvm::dbgs() << "Dep " << In.Path
                  << " is directly out of date\n");
       return false;
@@ -249,7 +285,7 @@ swiftModuleIsUpToDate(clang::vfs::FileSystem &FS,
 ///      out to avoid having to do recursive scanning when rechecking this
 ///      dependency in the future.
 static bool
-collectDepsForSerialization(clang::vfs::FileSystem &FS,
+collectDepsForSerialization(llvm::vfs::FileSystem &FS,
                             CompilerInstance &SubInstance,
                             StringRef InPath, StringRef ModuleCachePath,
                             SmallVectorImpl<FileDependency> &Deps,
@@ -263,13 +299,15 @@ collectDepsForSerialization(clang::vfs::FileSystem &FS,
     if (AllDepNames.insert(DepName).second && OuterTracker) {
         OuterTracker->addDependency(DepName, /*IsSystem=*/false);
     }
-    auto DepBuf = getBufferOfDependency(FS, InPath, DepName, Diags, DiagLoc);
-    if (!DepBuf) {
+    auto Status = getStatusOfDependency(FS, InPath, DepName, Diags, DiagLoc);
+    if (!Status)
       return true;
-    }
-    uint64_t Size = DepBuf->getBufferSize();
-    uint64_t Hash = xxHash64(DepBuf->getBuffer());
-    Deps.push_back(FileDependency{Size, Hash, DepName});
+    auto DepBuf = getBufferOfDependency(FS, InPath, DepName, Diags, DiagLoc);
+    if (!DepBuf)
+      return true;
+    uint64_t mtime =
+      Status->getLastModificationTime().time_since_epoch().count();
+    Deps.push_back(FileDependency{Status->getSize(), mtime, DepName});
 
     if (ModuleCachePath.empty())
       continue;
@@ -305,7 +343,7 @@ collectDepsForSerialization(clang::vfs::FileSystem &FS,
 }
 
 bool ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
-    clang::vfs::FileSystem &FS, DiagnosticEngine &Diags, SourceLoc DiagLoc,
+    llvm::vfs::FileSystem &FS, DiagnosticEngine &Diags, SourceLoc DiagLoc,
     CompilerInvocation &SubInvocation, StringRef InPath, StringRef OutPath,
     StringRef ModuleCachePath, DependencyTracker *OuterTracker,
     bool ShouldSerializeDeps) {
@@ -425,12 +463,12 @@ bool ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
       return;
     }
 
-    SubError = Diags.hadAnyError();
+    SubError = SubInstance.getDiags().hadAnyError();
   });
   return !RunSuccess || SubError;
 }
 
-static bool serializedASTLooksValidOrCannotBeRead(clang::vfs::FileSystem &FS,
+static bool serializedASTLooksValidOrCannotBeRead(llvm::vfs::FileSystem &FS,
                                                   StringRef ModPath) {
   auto ModBuf = FS.getBufferForFile(ModPath, /*FileSize=*/-1,
                                     /*RequiresNullTerminator=*/false);

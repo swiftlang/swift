@@ -78,6 +78,51 @@ static SILValue scalarizeLoad(LoadInst *LI,
   return B.createStruct(LI->getLoc(), LI->getType(), ElementTmps);
 }
 
+/// Scalarize a load_borrow down to its subelements. It will scalarize each of
+/// the end_borrows of the load_borrow as well.
+static void scalarizeLoadBorrow(LoadBorrowInst *lbi,
+                                SmallVectorImpl<SILValue> &elementAddrs) {
+  // First gather all of our end_borrows. We are going to scalarize them as
+  // well.
+  SmallVector<EndBorrowInst *, 8> endBorrows;
+  for (auto *op : lbi->getUses()) {
+    if (auto *ebi = dyn_cast<EndBorrowInst>(op->getUser())) {
+      endBorrows.push_back(ebi);
+    }
+  }
+
+  SILBuilderWithScope b(lbi);
+  SmallVector<SILValue, 4> elementTmps;
+
+  for (unsigned i : indices(elementAddrs)) {
+    if (elementAddrs[i]->getType().isTrivial(lbi->getModule())) {
+      elementTmps.push_back(b.createLoad(lbi->getLoc(), elementAddrs[i],
+                                         LoadOwnershipQualifier::Trivial));
+      continue;
+    }
+
+    SILValue v = b.createLoadBorrow(lbi->getLoc(), elementAddrs[i]);
+    for (auto *ebi : endBorrows) {
+      SILBuilderWithScope(ebi).createEndBorrow(lbi->getLoc(), v);
+    }
+    elementTmps.push_back(v);
+  }
+
+  // Inline constructor.
+  auto result = ([&]() -> SILValue {
+    if (lbi->getType().is<TupleType>())
+      return b.createTuple(lbi->getLoc(), lbi->getType(), elementTmps);
+    return b.createStruct(lbi->getLoc(), lbi->getType(), elementTmps);
+  })();
+
+  // Delete all of the end borrows, rauw, and we are done!
+  for (auto *ebi : endBorrows) {
+    ebi->eraseFromParent();
+  }
+  lbi->replaceAllUsesWith(result);
+  lbi->eraseFromParent();
+}
+
 //===----------------------------------------------------------------------===//
 //                     ElementUseCollector Implementation
 //===----------------------------------------------------------------------===//
@@ -230,7 +275,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
     }
 
     // Loads are a use of the value.
-    if (isa<LoadInst>(User)) {
+    if (isa<LoadInst>(User) || isa<LoadBorrowInst>(User)) {
       if (PointeeType.is<TupleType>())
         UsesToScalarize.push_back(User);
       else
@@ -415,6 +460,12 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
         SILValue Result = scalarizeLoad(LI, ElementAddrs);
         LI->replaceAllUsesWith(Result);
         LI->eraseFromParent();
+        continue;
+      }
+
+      // Scalarize LoadBorrowInst
+      if (auto *LBI = dyn_cast<LoadBorrowInst>(User)) {
+        scalarizeLoadBorrow(LBI, ElementAddrs);
         continue;
       }
 
