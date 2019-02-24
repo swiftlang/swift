@@ -1195,6 +1195,11 @@ function(_add_swift_library_single target name)
     "${SWIFTLIB_SINGLE_FORCE_BUILD_OPTIMIZED_keyword}"
     RESULT_VAR_NAME c_compile_flags
     )
+  if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS)
+    if(libkind STREQUAL SHARED)
+      list(APPEND c_compile_flags -D_WINDLL)
+    endif()
+  endif()
   _add_variant_link_flags(
     SDK "${SWIFTLIB_SINGLE_SDK}"
     ARCH "${SWIFTLIB_SINGLE_ARCHITECTURE}"
