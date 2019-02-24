@@ -232,11 +232,6 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       return getRequirement(KnownProtocolKind::TensorGroup);
 
     // SWIFT_ENABLE_TENSORFLOW
-    // TensorGroup._unknownShapeList
-    if (name.isSimpleName(ctx.Id_unknownShapeList))
-      return getRequirement(KnownProtocolKind::TensorGroup);
-
-    // SWIFT_ENABLE_TENSORFLOW
     // Differentiable.allDifferentiableVariables
     if (name.isSimpleName(ctx.Id_allDifferentiableVariables))
       return getRequirement(KnownProtocolKind::__Differentiable);

@@ -162,99 +162,6 @@ static ValueDecl *deriveTensorGroup_typeList(DerivedConformance &derived) {
   return typeListDecl;
 }
 
-/// Derive the body for the '_unknownShapeList' getter.
-static void
-deriveBodyTensorGroup_unknownShapeList(AbstractFunctionDecl *funcDecl) {
-  auto *parentDC = funcDecl->getParent();
-  auto *nominal = funcDecl->getDeclContext()->getSelfNominalTypeDecl();
-  auto &C = nominal->getASTContext();
-
-  auto *tensorGroupProto = C.getProtocol(KnownProtocolKind::TensorGroup);
-  auto *shapeListReq = getProtocolRequirement(
-      tensorGroupProto, C.Id_unknownShapeList);
-
-  // Concatenate all member `_unknownShapeList` arrays..
-  Type arrayType = BoundGenericType::get(
-    C.getArrayDecl(), Type(), 
-    {BoundGenericType::get(
-        C.getOptionalDecl(), Type(), 
-        {C.getTensorShapeDecl()->getDeclaredInterfaceType()})});
-  auto *arrayTypeExpr = TypeExpr::createImplicit(arrayType, C);
-  auto plusOpLookup = C.getArrayDecl()->lookupDirect(C.getIdentifier("+"));
-  assert(plusOpLookup.size() == 1 && "Ambiguous 'Array.+' operator.");
-  ValueDecl *plusOpDecl = plusOpLookup.front();
-  auto plusOpDRE = new (C) 
-      DeclRefExpr(plusOpDecl, DeclNameLoc(), /*Implicit*/ true);
-  auto plusOpExpr = 
-        new (C) DotSyntaxCallExpr(plusOpDRE, SourceLoc(), arrayTypeExpr);
-  Expr *shapeListExpr = nullptr;
-  for (auto member : nominal->getStoredProperties()) {
-    auto memberType =
-        parentDC->mapTypeIntoContext(member->getValueInterfaceType());
-    auto *memberTypeExpr = TypeExpr::createImplicit(memberType, C);
-    auto *memberShapeListExpr = new (C) 
-        MemberRefExpr(memberTypeExpr, SourceLoc(), shapeListReq,
-                      DeclNameLoc(), /*Implicit*/ true);
-    if (shapeListExpr == nullptr)  {
-      shapeListExpr = memberShapeListExpr;
-    } else {
-      // Create expression `lhsArg + rhsArg`.
-    auto *plusOpArgs =
-        TupleExpr::create(C, SourceLoc(), {shapeListExpr, memberShapeListExpr}, 
-                          {}, {}, SourceLoc(), /*HasTrailingClosure*/ false,
-                          /*Implicit*/ true);
-    shapeListExpr = new (C) BinaryExpr(plusOpExpr, plusOpArgs, 
-                                      /*Implicit*/ true);
-    }
-  }
-
-  // Return the resulting data types array.
-  auto *returnStmt = new (C) ReturnStmt(SourceLoc(), shapeListExpr);
-  auto *body = BraceStmt::create(C, SourceLoc(), {returnStmt}, SourceLoc(),
-                                 /*Implicit*/ true);
-  funcDecl->setBody(BraceStmt::create(C, SourceLoc(), {body}, SourceLoc(),
-                                      /*Implicit*/ true));
-}
-
-/// Derive a '_unknownShapeList' implementation.
-static ValueDecl *deriveTensorGroup_unknownShapeList(
-    DerivedConformance &derived) {
-  auto nominal = derived.Nominal;
-  auto &TC = derived.TC;
-  ASTContext &C = TC.Context;
-
-  auto parentDC = derived.getConformanceContext();
-  Type shapeArrayType = BoundGenericType::get(
-    C.getArrayDecl(), Type(), 
-    {BoundGenericType::get(
-        C.getOptionalDecl(), Type(), 
-        {C.getTensorShapeDecl()->getDeclaredInterfaceType()})});
-  auto returnType = parentDC->mapTypeIntoContext(shapeArrayType);
-
-  // Create `_unknownShapeList` property declaration.
-  VarDecl *unknownShapeListDecl;
-  PatternBindingDecl *patDecl;
-  std::tie(unknownShapeListDecl, patDecl) = derived.declareDerivedProperty(
-      C.Id_unknownShapeList, returnType, returnType, /*isStatic*/ true,
-      /*isFinal*/ false);
-
-  // Add `@inlinable` to the `_unknownShapeListDecl` declaration.
-  if (nominal->getEffectiveAccess() > AccessLevel::Internal)
-    unknownShapeListDecl->getAttrs().add(
-        new (C) InlinableAttr(/*implicit*/ true));
-
-  // Create `_unknownShapeListDecl` getter.
-  auto *getterDecl = derived.declareDerivedPropertyGetter(
-      TC, unknownShapeListDecl, returnType);
-  getterDecl->setBodySynthesizer(deriveBodyTensorGroup_unknownShapeList);
-  unknownShapeListDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
-                                     SourceLoc(), {getterDecl}, SourceLoc());
-  derived.addMembersToConformanceContext(
-      {getterDecl, unknownShapeListDecl, patDecl});
-
-  return unknownShapeListDecl;
-}
-
 // Synthesize body for `init(_owning:)`.
 static void 
 deriveBodyTensorGroup_init(
@@ -482,8 +389,6 @@ static ValueDecl
 ValueDecl *DerivedConformance::deriveTensorGroup(ValueDecl *requirement) {
   if (requirement->getBaseName() == TC.Context.Id_typeList)
     return deriveTensorGroup_typeList(*this);
-  if (requirement->getBaseName() == TC.Context.Id_unknownShapeList)
-    return deriveTensorGroup_unknownShapeList(*this);
   if (requirement->getBaseName() == DeclBaseName::createConstructor())
     return deriveTensorGroup_init(*this);
   TC.diagnose(requirement->getLoc(), diag::broken_tensor_group_requirement);
