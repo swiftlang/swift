@@ -176,3 +176,26 @@ func roundingGivesError(x: Float) -> Float {
   // expected-note @+1 {{expression is not differentiable}}
   return Float(Int(x))
 }
+
+//===----------------------------------------------------------------------===//
+// Inout arguments
+//===----------------------------------------------------------------------===//
+
+func activeInoutArg(_ x: Float) -> Float {
+  var a = x
+  // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
+  a += x
+  return a
+}
+// expected-error @+1 {{function is not differentiable}}
+_ = pullback(at: .zero, in: activeInoutArg(_:))
+
+
+func activeInoutArgTuple(_ x: Float) -> Float {
+  var tuple = (x, x)
+  // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
+  tuple.0 *= x
+  return x * tuple.0
+}
+// expected-error @+1 {{function is not differentiable}}
+_ = pullback(at: .zero, in: activeInoutArgTuple(_:))

@@ -364,13 +364,8 @@ ERROR(pound_assert_failure,none,
 // Automatic differentiation diagnostics
 ERROR(autodiff_internal_swift_not_imported,none,
       "AD internal error: the Swift module is not imported", ())
-ERROR(autodiff_unsupported_type,none,
-      "differentiating '%0' is not supported yet", (Type))
 ERROR(autodiff_function_not_differentiable,none,
       "function is not differentiable", ())
-NOTE(autodiff_function_indirect_params_or_result_unsupported,none,
-     "differentiating functions with parameters or result of unknown size "
-     "is not supported yet", ())
 NOTE(autodiff_external_nondifferentiable_function,none,
      "cannot differentiate an external function that has not been marked "
      "'@differentiable'", ())
@@ -412,14 +407,12 @@ NOTE(autodiff_when_differentiating_function_definition,none,
      "when differentiating this function definition", ())
 NOTE(autodiff_expression_is_not_differentiable,none,
      "expression is not differentiable", ())
-NOTE(autodiff_nested_function_call_multiple_return_active,none,
-     "function call is being differentiated from multiple return values", ())
+NOTE(autodiff_cannot_differentiate_through_inout_arguments,none,
+     "cannot differentiate through 'inout' arguments", ())
 NOTE(autodiff_control_flow_not_supported,none,
      "differentiating control flow is not supported yet", ())
 NOTE(autodiff_class_member_not_supported,none,
      "differentiating class members is not supported yet", ())
-NOTE(autodiff_nested_not_supported,none,
-     "nested differentiation is not supported yet", ())
 NOTE(autodiff_missing_return,none,
      "missing return for differentiation", ())
 
