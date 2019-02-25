@@ -39,6 +39,7 @@ it provides some of the needed headers and libraries.
 1. Clone `apple/swift` into a folder named `swift`
 1. Clone `apple/swift-corelibs-libdispatch` into a folder named `swift-corelibs-libdispatch`
 1. Clone `apple/swift-corelibs-foundation` into a folder named `swift-corelibs-foundation`
+1. Clone `apple/swift-corelibs-xctest` into a folder name `swift-corelibs-xctest`
 1. Clone `apple/swift-lldb` into a folder named `lldb`
 
 - Currently, other repositories in the Swift project have not been tested and
@@ -60,6 +61,7 @@ git clone https://github.com/apple/swift-compiler-rt compiler-rt
 git clone https://github.com/apple/swift
 git clone https://github.com/apple/swift-corelibs-libdispatch
 git clone https://github.com/apple/swift-corelibs-foundation
+git clone https://github.com/apple/swift-corelibs-xctest
 git clone https://github.com/apple/swift-lldb lldb
 ```
 
@@ -268,7 +270,24 @@ cmake -G Ninja^
 
 ```
 
-### 12. Install Swift on Windows
+### 12. Build swift-corelibs-xctest
+
+```cmd
+mkdir "S:\b\xctest"
+pushd "S:\b\xctest"
+cmke -G Ninja^
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo^
+  -DCMAKE_SWIFT_COMPILER=S:\b\swift\bin\swiftc.exe^
+  -DXCTEST_PATH_TO_COREFOUNDATION_BUILD=S:\b\foundation\CoreFoundation-prefix^
+  -DXCTEST_PATH_TO_FOUNDATION_BUILD=S:\b\foundation^
+  -DXCTEST_PATH_TO_LIBDPATCH_SOURCE=S:\b\swift-corelibs-libdispatch^
+  -DXCTEST_PATH_TO_LIBDISPATCH_BUILD=S:\b\libdispatch^
+  S:\swift-corelibs-xctest
+popd
+cmake --build S:\b\xctest
+```
+
+### 13. Install Swift on Windows
 
 - Run ninja install:
 
