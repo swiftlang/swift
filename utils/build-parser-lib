@@ -114,7 +114,7 @@ class Builder(object):
         cmake_args += ['-DSWIFT_BUILD_REMOTE_MIRROR=FALSE', '-DSWIFT_BUILD_DYNAMIC_STDLIB=FALSE',
             '-DSWIFT_BUILD_STATIC_STDLIB=FALSE', '-DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY=FALSE',
             '-DSWIFT_BUILD_STATIC_SDK_OVERLAY=FALSE']
-        cmake_args += ['-DLLVM_INCLUDE_TESTS=FALSE', '-DCLANG_INCLUDE_TESTS=FALSE']
+        cmake_args += ['-DLLVM_INCLUDE_TESTS=FALSE', '-DCLANG_INCLUDE_TESTS=FALSE', '-DSWIFT_INCLUDE_TESTS=FALSE']
         cmake_args += [os.path.join(SWIFT_SOURCE_ROOT, 'llvm')]
         self.call(cmake_args)
 
