@@ -124,7 +124,7 @@ func testSR6022_P<T: SR6022_P>(_: T.Type) {
 func testSR6022_P_1<U>(_: U.Type) {
   _ = sr6022 as! U // Okay
   _ = sr6022 as? U // Okay
-  _ = sr6022_1 as? U // Okay
+  _ = sr6022_1 as! U // Okay
   _ = sr6022_1 as? U // Okay
 }
 
