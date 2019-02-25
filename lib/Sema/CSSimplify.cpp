@@ -3291,6 +3291,47 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   MemberLookupResult result;
   result.OverallResult = MemberLookupResult::HasResults;
 
+  // If we have a simple name, determine whether there are argument
+  // labels we can use to restrict the set of lookup results.
+  Optional<ArgumentLabelState> argumentLabels;
+  if (memberName.isSimpleName()) {
+    argumentLabels = getArgumentLabels(ConstraintLocatorBuilder(memberLocator));
+
+    // If we're referencing AnyObject and we have argument labels, put
+    // the argument labels into the name: we don't want to look for
+    // anything else, because the cost of the general search is so
+    // high.
+    if (baseObjTy->isAnyObject() && argumentLabels) {
+      memberName = DeclName(TC.Context, memberName.getBaseName(),
+                            argumentLabels->Labels);
+      argumentLabels.reset();
+    }
+  }
+
+  /// Determine whether the given declaration has compatible argument
+  /// labels.
+  auto hasCompatibleArgumentLabels = [&argumentLabels](Type baseObjTy,
+                                                       ValueDecl *decl) -> bool {
+    if (!argumentLabels)
+      return true;
+
+    return areConservativelyCompatibleArgumentLabels(decl, baseObjTy,
+                                          argumentLabels->Labels,
+                                          argumentLabels->HasTrailingClosure);
+  };
+
+  // If we're looking for a subscript, consider key path operations.
+  if (memberName.isSimpleName() &&
+      memberName.getBaseName().getKind() == DeclBaseName::Kind::Subscript &&
+      (!argumentLabels ||
+       argumentLabelsMatchKeyPathApplication(
+           getASTContext(),
+           argumentLabels->Labels,
+           argumentLabels->HasTrailingClosure))) {
+    result.ViableCandidates.push_back(
+        OverloadChoice(baseTy, OverloadChoiceKind::KeyPathApplication));
+  }
+
   // If the base type is a tuple type, look for the named or indexed member
   // of the tuple.
   if (auto baseTuple = baseObjTy->getAs<TupleType>()) {
@@ -3322,47 +3363,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
 
   if (!instanceTy->mayHaveMembers())
     return result;
-
-  // If we have a simple name, determine whether there are argument
-  // labels we can use to restrict the set of lookup results.
-  Optional<ArgumentLabelState> argumentLabels;
-  if (memberName.isSimpleName()) {
-    argumentLabels = getArgumentLabels(ConstraintLocatorBuilder(memberLocator));
-
-    // If we're referencing AnyObject and we have argument labels, put
-    // the argument labels into the name: we don't want to look for
-    // anything else, because the cost of the general search is so
-    // high.
-    if (baseObjTy->isAnyObject() && argumentLabels) {
-      memberName = DeclName(TC.Context, memberName.getBaseName(),
-                            argumentLabels->Labels);
-      argumentLabels.reset();
-    }
-  }
-
-  /// Determine whether the given declaration has compatible argument
-  /// labels.
-  auto hasCompatibleArgumentLabels = [&argumentLabels](Type baseObjTy,
-                                                       ValueDecl *decl) -> bool {
-    if (!argumentLabels)
-      return true;
-
-    return areConservativelyCompatibleArgumentLabels(decl, baseObjTy,
-                                          argumentLabels->Labels,
-                                          argumentLabels->HasTrailingClosure);
-  };
-
-    // If we're looking for a subscript, consider key path operations.
-  if (memberName.isSimpleName() &&
-      memberName.getBaseName().getKind() == DeclBaseName::Kind::Subscript &&
-      (!argumentLabels ||
-       argumentLabelsMatchKeyPathApplication(
-           getASTContext(),
-           argumentLabels->Labels,
-           argumentLabels->HasTrailingClosure))) {
-    result.ViableCandidates.push_back(
-        OverloadChoice(baseTy, OverloadChoiceKind::KeyPathApplication));
-  }
 
   // Look for members within the base.
   LookupResult &lookup = lookupMember(instanceTy, memberName);
