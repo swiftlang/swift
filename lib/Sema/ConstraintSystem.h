@@ -1442,6 +1442,11 @@ public:
   /// that locator.
   llvm::DenseMap<ConstraintLocator *, ArgumentLabelState> ArgumentLabels;
 
+  /// Retrieve the argument labels that are provided for a
+  /// reference at the given locator.
+  Optional<ArgumentLabelState>
+  getArgumentLabels(ConstraintLocatorBuilder locator);
+
   ResolvedOverloadSetListItem *getResolvedOverloadSets() const {
     return resolvedOverloadSets;
   }
@@ -3460,7 +3465,7 @@ matchCallArguments(ConstraintSystem &cs,
 /// given parameter depth cannot be used with the given value.
 /// If this cannot be proven, conservatively returns true.
 bool areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
-                                               bool hasCurriedSelf,
+                                               Type baseObjTy,
                                                ArrayRef<Identifier> labels,
                                                bool hasTrailingClosure);
 

@@ -44,3 +44,13 @@ func testSubscript(x: X, i: Int) {
 func testUnresolvedMember(i: Int) -> X {
   return .init(i, i)
 }
+
+func foo(_: Int) { }
+func foo(_: Int, _: Int) { }
+func foo(_: Int, _: Int, _: Int) { }
+
+func testModuleScope(i: Int) {
+  foo(i)
+  foo(i, i)
+  foo(i, i, i)
+}

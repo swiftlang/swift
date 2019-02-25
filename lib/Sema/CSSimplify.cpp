@@ -100,7 +100,7 @@ static Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
 
 bool constraints::
 areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
-                                          bool hasCurriedSelf,
+                                          Type baseObjTy,
                                           ArrayRef<Identifier> labels,
                                           bool hasTrailingClosure) {
   const AnyFunctionType *fTy;
@@ -108,12 +108,25 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
   if (auto fn = dyn_cast<AbstractFunctionDecl>(decl)) {
     fTy = fn->getInterfaceType()->castTo<AnyFunctionType>();
   } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
-    assert(!hasCurriedSelf && "Subscripts never have curried 'self'");
     fTy = subscript->getInterfaceType()->castTo<AnyFunctionType>();
   } else {
     return true;
   }
-  
+
+  // Determine whrther the 'self' of a member will be applied by a member
+  // lookup.
+  bool hasCurriedSelf;
+  if (isa<SubscriptDecl>(decl) || !decl->getDeclContext()->isTypeContext()) {
+    hasCurriedSelf = false;
+  } else if (baseObjTy && baseObjTy->is<ModuleType>()) {
+    hasCurriedSelf = false;
+  } else if (baseObjTy && baseObjTy->is<AnyMetatypeType>() &&
+             decl->isInstanceMember()) {
+    hasCurriedSelf = false;
+  } else {
+    hasCurriedSelf = true;
+  }
+
   SmallVector<AnyFunctionType::Param, 8> argInfos;
   for (auto argLabel : labels) {
     argInfos.push_back(AnyFunctionType::Param(Type(), argLabel, {}));
@@ -3119,10 +3132,8 @@ ConstraintSystem::simplifyFunctionComponentConstraint(
   return SolutionKind::Solved;
 }
 
-/// Retrieve the argument labels that are provided for a member
-/// reference at the given locator.
-static Optional<ConstraintSystem::ArgumentLabelState>
-getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
+Optional<ConstraintSystem::ArgumentLabelState>
+ConstraintSystem::getArgumentLabels(ConstraintLocatorBuilder locator) {
   SmallVector<LocatorPathElt, 2> parts;
   Expr *anchor = locator.getLocatorParts(parts);
   if (!anchor)
@@ -3162,8 +3173,8 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
   if (!parts.empty())
     return None;
 
-  auto known = cs.ArgumentLabels.find(cs.getConstraintLocator(anchor));
-  if (known == cs.ArgumentLabels.end())
+  auto known = ArgumentLabels.find(getConstraintLocator(anchor));
+  if (known == ArgumentLabels.end())
     return None;
 
   return known->second;
@@ -3316,8 +3327,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   // labels we can use to restrict the set of lookup results.
   Optional<ArgumentLabelState> argumentLabels;
   if (memberName.isSimpleName()) {
-    argumentLabels = getArgumentLabels(*this,
-                                       ConstraintLocatorBuilder(memberLocator));
+    argumentLabels = getArgumentLabels(ConstraintLocatorBuilder(memberLocator));
 
     // If we're referencing AnyObject and we have argument labels, put
     // the argument labels into the name: we don't want to look for
@@ -3337,22 +3347,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     if (!argumentLabels)
       return true;
 
-    // This is a member lookup, which generally means that the call arguments
-    // (if we have any) will apply to the second level of parameters, with
-    // the member lookup binding the first level.  But there are cases where
-    // we can get an unapplied declaration reference back.
-    bool hasCurriedSelf;
-    if (isa<SubscriptDecl>(decl)) {
-      hasCurriedSelf = false;
-    } else if (baseObjTy->is<ModuleType>()) {
-      hasCurriedSelf = false;
-    } else if (baseObjTy->is<AnyMetatypeType>() && decl->isInstanceMember()) {
-      hasCurriedSelf = false;
-    } else {
-      hasCurriedSelf = true;
-    }
-
-    return areConservativelyCompatibleArgumentLabels(decl, hasCurriedSelf,
+    return areConservativelyCompatibleArgumentLabels(decl, baseObjTy,
                                           argumentLabels->Labels,
                                           argumentLabels->HasTrailingClosure);
   };

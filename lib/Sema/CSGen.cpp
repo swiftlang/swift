@@ -1472,7 +1472,12 @@ namespace {
       auto tv = CS.createTypeVariable(locator, TVO_CanBindToLValue);
       ArrayRef<ValueDecl*> decls = expr->getDecls();
       SmallVector<OverloadChoice, 4> choices;
-      
+
+      // If we have a simple name, determine whether there are argument
+      // labels we can use to restrict the set of lookup results.
+      auto argumentLabels = CS.getArgumentLabels(locator);
+
+    retry:
       for (unsigned i = 0, n = decls.size(); i != n; ++i) {
         // If the result is invalid, skip it.
         // FIXME: Note this as invalid, in case we don't find a solution,
@@ -1481,9 +1486,23 @@ namespace {
         if (decls[i]->isInvalid())
           continue;
 
+        // If the argument labels we have don't match up, skip this choice.
+        if (argumentLabels &&
+            !areConservativelyCompatibleArgumentLabels(
+              decls[i], Type(), argumentLabels->Labels,
+              argumentLabels->HasTrailingClosure))
+          continue;
+
         OverloadChoice choice =
             OverloadChoice(Type(), decls[i], expr->getFunctionRefKind());
         choices.push_back(choice);
+      }
+
+      // If there were no choices with matching labels, drop label information
+      // and try again.
+      if (choices.empty() && argumentLabels) {
+        argumentLabels = None;
+        goto retry;
       }
 
       // If there are no valid overloads, give up.
