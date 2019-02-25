@@ -150,7 +150,6 @@ NO_OPERAND_INST(Unwind)
         ValueOwnershipKind::OWNERSHIP,                                         \
         UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT);                       \
   }
-CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, IsEscapingClosure)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, RefElementAddr)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialValue)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialBoxValue)
@@ -266,6 +265,7 @@ ACCEPTS_ANY_OWNERSHIP_INST(ExistentialMetatype)
 ACCEPTS_ANY_OWNERSHIP_INST(ValueMetatype)
 ACCEPTS_ANY_OWNERSHIP_INST(UncheckedOwnershipConversion)
 ACCEPTS_ANY_OWNERSHIP_INST(ValueToBridgeObject)
+ACCEPTS_ANY_OWNERSHIP_INST(IsEscapingClosure)
 #undef ACCEPTS_ANY_OWNERSHIP_INST
 
 // Trivial if trivial typed, otherwise must accept owned?
