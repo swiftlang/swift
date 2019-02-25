@@ -3657,7 +3657,23 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
 
       break;
     }
-        
+
+    case KeyPathExpr::Component::Kind::TupleElement: {
+      assert(baseTy->is<TupleType>() && "baseTy is expected to be a TupleType");
+
+      auto tupleIndex = component.getTupleIndex();
+      auto elementTy = baseTy->getAs<TupleType>()
+        ->getElementType(tupleIndex)
+        ->getCanonicalType();
+
+      loweredComponents.push_back(
+        KeyPathPatternComponent::forTupleElement(tupleIndex, elementTy));
+
+      baseTy = loweredComponents.back().getComponentType();
+
+      break;
+    }
+
     case KeyPathExpr::Component::Kind::OptionalChain:
     case KeyPathExpr::Component::Kind::OptionalForce:
     case KeyPathExpr::Component::Kind::OptionalWrap: {

@@ -211,6 +211,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     case KeyPathExpr::Component::Kind::UnresolvedSubscript:
     case KeyPathExpr::Component::Kind::OptionalChain:
     case KeyPathExpr::Component::Kind::OptionalForce:
+    case KeyPathExpr::Component::Kind::TupleElement:
       diagnose(componentNameLoc,
                diag::expr_unsupported_objc_key_path_component,
                (unsigned)kind);
