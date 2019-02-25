@@ -3064,7 +3064,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   }
 
   auto *originalFnType =
-      getAutoDiffOriginalFunctionType(derivativeInterfaceType);;
+      getAutoDiffOriginalFunctionType(derivativeInterfaceType);
 
   std::function<bool(GenericSignature *, GenericSignature *)>
     checkGenericSignatureSatisfied =
@@ -3147,6 +3147,59 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     return;
   }
   attr->setOriginalFunction(originalFn);
+
+  // Reject different-file retroactive derivatives.
+  // TODO(TF-136): Full support for cross-file/cross-module retroactive
+  // differentiability will require SIL differnetiability witnesses and lots of
+  // plumbing.
+  if (originalFn->getParentSourceFile() != derivative->getParentSourceFile()) {
+    diagnoseAndRemoveAttr(
+        attr, diag::differentiating_attr_not_in_same_file_as_original);
+    return;
+  }
+
+  // TODO: When `wrt:` is supported in the `@differentiating` attribute, replace
+  // this with the parameter indices resolved by the earlier checking logic in
+  // this function.
+  auto allParameterIndices =
+      AutoDiffParameterIndicesBuilder(originalFnType, /*setAllParams*/ true)
+          .build(ctx);
+
+  // Add the derivative function to the original function's `@differentiable`
+  // attribute with the same parameters. If this attribute does not exist,
+  // create one.
+  DifferentiableAttr *da = nullptr;
+  for (auto *cda : originalFn->getAttrs().getAttributes<DifferentiableAttr>())
+    if (allParameterIndices == cda->getParameterIndices())
+      da = const_cast<DifferentiableAttr *>(cda);
+
+  // TODO: Infer the original `@differentiable`'s generic requirements.
+  if (!da) {
+    da = DifferentiableAttr::create(ctx, /*implicit*/ true, SourceLoc(),
+                                    SourceRange(), allParameterIndices, None,
+                                    None, {});
+    originalFn->getAttrs().add(da);
+  }
+  switch (kind) {
+  case AutoDiffAssociatedFunctionKind::JVP:
+    if (auto jvp = da->getJVP()) {
+      diagnoseAndRemoveAttr(
+          attr, diag::differentiating_attr_original_already_has_derivative,
+          jvp->Name);
+      return;
+    }
+    da->setJVPFunction(derivative);
+    break;
+  case AutoDiffAssociatedFunctionKind::VJP:
+    if (auto vjp = da->getVJP()) {
+      diagnoseAndRemoveAttr(
+          attr, diag::differentiating_attr_original_already_has_derivative,
+          vjp->Name);
+      return;
+    }
+    da->setVJPFunction(derivative);
+    break;
+  }
 }
 
 static bool

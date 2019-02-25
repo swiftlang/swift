@@ -75,6 +75,7 @@ func vjpFooExtraGenericRequirements<T : FloatingPoint & Differentiable & BinaryI
 // Test static methods.
 
 extension AdditiveArithmetic where Self : Differentiable {
+  // expected-error @+1 {{derivative not in the same file as the original function}}
   @differentiating(+)
   static func vjpPlus(x: Self, y: Self) -> (value: Self, pullback: (Self.CotangentVector) -> (Self.CotangentVector, Self.CotangentVector)) {
     return (x + y, { v in (v, v) })
@@ -82,6 +83,7 @@ extension AdditiveArithmetic where Self : Differentiable {
 }
 
 extension FloatingPoint where Self : Differentiable, Self == Self.CotangentVector {
+  // expected-error @+1 {{derivative not in the same file as the original function}}
   @differentiating(+)
   static func vjpPlus(x: Self, y: Self) -> (value: Self, pullback: (Self) -> (Self, Self)) {
     return (x + y, { v in (v, v) })

@@ -1810,8 +1810,15 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
     auto *task =
         context.lookUpMinimalDifferentiationTask(originalFn, desiredIndices);
     if (!task) {
+      // If the function is intentionally marked as being opauqe to
+      // differentiation, then we should not create a task for it.
+      if (originalFn->hasSemanticsAttr("autodiff.opaque")) {
+        context.emitNondifferentiabilityError(original, parentTask,
+            diag::autodiff_opaque_function_not_differentiable);
+        return None;
+      }
+      // Check and diagnose non-differentiable arguments.
       auto originalFnTy = originalFn->getLoweredFunctionType();
-
       for (unsigned paramIndex : range(originalFnTy->getNumParameters())) {
         if (desiredIndices.isWrtParameter(paramIndex) &&
             !originalFnTy->getParameters()[paramIndex]
@@ -1822,7 +1829,7 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
           return None;
         }
       }
-
+      // Check and diagnose non-differentiable results.
       if (!originalFnTy->getResults()[desiredIndices.source]
                .getSILStorageType()
                .isDifferentiable(context.getModule())) {
@@ -1830,13 +1837,14 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
             original, parentTask, diag::autodiff_nondifferentiable_result);
         return None;
       }
-
+      // Check and diagnose external declarations.
       if (originalFn->isExternalDeclaration()) {
         context.emitNondifferentiabilityError(
             original, parentTask,
             diag::autodiff_external_nondifferentiable_function);
         return None;
       }
+      // Sanity check passed. Create a differentiation task.
       task = context.registerDifferentiationTask(originalFn, desiredIndices,
                                                  invoker);
     }

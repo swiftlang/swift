@@ -2748,6 +2748,10 @@ ERROR(differentiating_attr_unexpected_diff_params_type,none,
       "unexpected differentiation parameters type; got %0, but expected %1", (Type, Type))
 ERROR(differentiating_attr_overload_not_found,none,
       "%0 does not have expected type %1", (DeclName, Type))
+ERROR(differentiating_attr_not_in_same_file_as_original,none,
+      "derivative not in the same file as the original function", ())
+ERROR(differentiating_attr_original_already_has_derivative,none,
+      "a derivative already exists for %0", (DeclName))
 
 // @compilerEvaluable
 ERROR(compiler_evaluable_bad_context,none,
