@@ -239,8 +239,7 @@ private:
 
   bool useASTScopesForExperimentalLookup() const;
 
-  void lookupNonlocalsInModuleScopeContext(
-      DCAndResolvedIsCascadingUse dcAndIsCascadingUse);
+  void lookupNonlocalsInModuleScopeContext(DeclContext *);
 
 #pragma mark ASTScope-based-lookup declarations
 
@@ -408,12 +407,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
 }
 
 void UnqualifiedLookupFactory::lookupNonlocalsInModuleScopeContext(
-    DCAndResolvedIsCascadingUse dcAndIsCascadingUse) {
-  DeclContext *const DC = dcAndIsCascadingUse.DC;
-  const bool isCascadingUse = dcAndIsCascadingUse.isCascadingUse;
-
-  recordDependencyOnTopLevelName(DC, Name, isCascadingUse);
-
+    DeclContext *DC) {
   // TODO: Does the debugger client care about compound names?
   if (Name.isSimpleName() && DebugClient &&
       DebugClient->lookupOverrides(Name.getBaseName(), DC, Loc,
@@ -581,8 +575,8 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
   }
   // Lookup in the source file's scope marks the end.
   if (isa<SourceFile>(scopeDC)) {
-    lookupNonlocalsInModuleScopeContext(
-        DCAndResolvedIsCascadingUse{scopeDC, isCascadingUseResult});
+    recordDependencyOnTopLevelName(scopeDC, Name, isCascadingUseResult);
+    lookupNonlocalsInModuleScopeContext(scopeDC);
     return;
   }
 
@@ -717,8 +711,9 @@ void UnqualifiedLookupFactory::lookupInModuleScopeContext(
   recordCompletionOfAScope();
   if (isFirstResultEnough())
     return;
-  lookupNonlocalsInModuleScopeContext(
-      DCAndUnresolvedIsCascadingUse{dc, isCascadingUse}.resolve(true));
+  recordDependencyOnTopLevelName(
+      dc, Name, isCascadingUse.hasValue() ? isCascadingUse.getValue() : true);
+  lookupNonlocalsInModuleScopeContext(dc);
 }
 
 void UnqualifiedLookupFactory::lookupLocalsInPatternBindingInitializer(
