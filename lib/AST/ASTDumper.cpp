@@ -2635,6 +2635,11 @@ public:
         OS << "identity";
         OS << '\n';
         break;
+      case KeyPathExpr::Component::Kind::TupleElement:
+        OS << "tuple_element ";
+        OS << "#" << component.getTupleIndex();
+        OS << " ";
+        break;
       }
       OS << "type=";
       component.getComponentType().print(OS);

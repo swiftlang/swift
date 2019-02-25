@@ -49,6 +49,19 @@ public struct External<T> {
   init()
 }
 
+public struct T {
+  public var x: (Int, Int)
+  public var y: (a: Int, b: Int, c: Int)
+  public let z: (Int, Int)
+  public let w: (Int, C)
+}
+
+public struct GenT<A, B> {
+  public var x: (A, B)
+  public let y: (a: A, b: B)
+  public let z: (e0: External<A>, e1: External<B>)
+}
+
 // CHECK-LABEL: sil shared [serialized] [ossa] @stored_properties
 sil shared [serialized] [ossa] @stored_properties : $@convention(thin) () -> () {
 entry:
@@ -71,6 +84,47 @@ entry:
   %a = keypath $WritableKeyPath<Gen<D,E,F>, D>, <G: P, H: Q, I: R> (root $Gen<G, H, I>; stored_property #Gen.x : $G) <D, E, F>
   // CHECK: keypath $KeyPath<Gen<D, E, F>, E>, <τ_0_0, τ_0_1, τ_0_2 where {{.*}}> (root $Gen<τ_0_0, τ_0_1, τ_0_2>; stored_property #Gen.y : $τ_0_1) <D, E, F>
   %b = keypath $KeyPath<Gen<D,E,F>, E>, <G: P, H: Q, I: R> (root $Gen<G, H, I>; stored_property #Gen.y : $H) <D, E, F>
+
+  return undef : $()
+}
+
+// CHECK-LABEL: sil shared [serialized] [ossa] @tuple_elements
+sil shared [serialized] [ossa] @tuple_elements : $@convention(thin) () -> () {
+entry:
+  // CHECK: keypath $WritableKeyPath<T, Int>, (root $T; stored_property #T.x : $(Int, Int); tuple_element #0 : $Int)
+  %a = keypath $WritableKeyPath<T, Int>, (root $T; stored_property #T.x : $(Int, Int); tuple_element #0 : $Int)
+  // CHECK: keypath $WritableKeyPath<T, Int>, (root $T; stored_property #T.y : $(a: Int, b: Int, c: Int); tuple_element #2 : $Int)
+  %b = keypath $WritableKeyPath<T, Int>, (root $T; stored_property #T.y : $(a: Int, b: Int, c: Int); tuple_element #2 : $Int)
+  // CHECK: keypath $KeyPath<T, Int>, (root $T; stored_property #T.z : $(Int, Int); tuple_element #1 : $Int)
+  %c = keypath $KeyPath<T, Int>, (root $T; stored_property #T.z : $(Int, Int); tuple_element #1 : $Int)
+  // CHECK: keypath $ReferenceWritableKeyPath<T, C>, (root $T; stored_property #T.w : $(Int, C); tuple_element #1 : $C)
+  %d = keypath $ReferenceWritableKeyPath<T, C>, (root $T; stored_property #T.w : $(Int, C); tuple_element #1 : $C)
+
+  return undef : $()
+}
+
+// CHECK-LABEL: sil shared [serialized] [ossa] @tuple_generic
+sil shared [serialized] [ossa] @tuple_generic : $@convention(thin) <T, U> () -> () {
+entry:
+  // CHECK: keypath $WritableKeyPath<(T, U), T>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #0 : $τ_0_0) <T, U>
+  %a = keypath $WritableKeyPath<(T, U), T>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #0 : $τ_0_0) <T, U>
+  // CHECK: keypath $WritableKeyPath<(T, U), U>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1) <T, U>
+  %b = keypath $WritableKeyPath<(T, U), U>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1) <T, U>
+
+  // CHECK: keypath $WritableKeyPath<GenT<T, U>, T>, <τ_0_0, τ_0_1> (root $GenT<τ_0_0, τ_0_1>; stored_property #GenT.x : $(τ_0_0, τ_0_1); tuple_element #0 : $τ_0_0) <T, U>
+  %c = keypath $WritableKeyPath<GenT<T, U>, T>, <τ_0_0, τ_0_1> (root $GenT<τ_0_0, τ_0_1>; stored_property #GenT.x : $(τ_0_0, τ_0_1); tuple_element #0 : $τ_0_0) <T, U>
+  // CHECK: keypath $WritableKeyPath<GenT<T, U>, U>, <τ_0_0, τ_0_1> (root $GenT<τ_0_0, τ_0_1>; stored_property #GenT.x : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1) <T, U>
+  %d = keypath $WritableKeyPath<GenT<T, U>, U>, <τ_0_0, τ_0_1> (root $GenT<τ_0_0, τ_0_1>; stored_property #GenT.x : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1) <T, U>
+
+  // CHECK: keypath $KeyPath<GenT<T, U>, T>, <τ_0_0, τ_0_1> (root $GenT<τ_0_0, τ_0_1>; stored_property #GenT.y : $(a: τ_0_0, b: τ_0_1); tuple_element #0 : $τ_0_0) <T, U>
+  %e = keypath $KeyPath<GenT<T, U>, T>, <τ_0_0, τ_0_1> (root $GenT<τ_0_0, τ_0_1>; stored_property #GenT.y : $(a: τ_0_0, b: τ_0_1); tuple_element #0 : $τ_0_0) <T, U>
+  // CHECK: keypath $KeyPath<GenT<T, U>, U>, <τ_0_0, τ_0_1> (root $GenT<τ_0_0, τ_0_1>; stored_property #GenT.y : $(a: τ_0_0, b: τ_0_1); tuple_element #1 : $τ_0_1) <T, U>
+  %f = keypath $KeyPath<GenT<T, U>, U>, <τ_0_0, τ_0_1> (root $GenT<τ_0_0, τ_0_1>; stored_property #GenT.y : $(a: τ_0_0, b: τ_0_1); tuple_element #1 : $τ_0_1) <T, U>
+
+  // CHECK: keypath $KeyPath<GenT<T, U>, T>, <τ_0_0, τ_0_1> (root $GenT<τ_0_0, τ_0_1>; stored_property #GenT.z : $(e0: External<τ_0_0>, e1: External<τ_0_1>); tuple_element #0 : $External<τ_0_0>; stored_property #External.ro : $τ_0_0) <T, U>
+  %g = keypath $KeyPath<GenT<T, U>, T>, <τ_0_0, τ_0_1> (root $GenT<τ_0_0, τ_0_1>; stored_property #GenT.z : $(e0: External<τ_0_0>, e1: External<τ_0_1>); tuple_element #0 : $External<τ_0_0>; stored_property #External.ro : $τ_0_0) <T, U>
+  // CHECK: keypath $KeyPath<GenT<T, U>, U>, <τ_0_0, τ_0_1> (root $GenT<τ_0_0, τ_0_1>; stored_property #GenT.z : $(e0: External<τ_0_0>, e1: External<τ_0_1>); tuple_element #1 : $External<τ_0_1>; stored_property #External.ro : $τ_0_1) <T, U>
+  %h = keypath $KeyPath<GenT<T, U>, U>, <τ_0_0, τ_0_1> (root $GenT<τ_0_0, τ_0_1>; stored_property #GenT.z : $(e0: External<τ_0_0>, e1: External<τ_0_1>); tuple_element #1 : $External<τ_0_1>; stored_property #External.ro : $τ_0_1) <T, U>
 
   return undef : $()
 }
@@ -161,11 +215,13 @@ sil [serialized] [ossa] @serialize_all : $@convention(thin) () -> () {
 entry:
   %0 = function_ref @stored_properties : $@convention(thin) () -> ()
   %1 = function_ref @stored_properties_generic : $@convention(thin) <D: P, E: Q, F: R> () -> ()
-  %2 = function_ref @computed_properties : $@convention(thin) () -> ()
-  %3 = function_ref @computed_properties_generic : $@convention(thin) <D: P, E: Q, F: R> () -> ()
-  %4 = function_ref @optional : $@convention(thin) () -> ()
-  %5 = function_ref @indexes : $@convention(thin) (S, C) -> ()
-  %6 = function_ref @external : $@convention(thin) <D: P, E: Q, F: R> () -> ()
+  %2 = function_ref @tuple_elements : $@convention(thin) () -> ()
+  %3 = function_ref @tuple_generic : $@convention(thin) <T, U> () -> ()
+  %4 = function_ref @computed_properties : $@convention(thin) () -> ()
+  %5 = function_ref @computed_properties_generic : $@convention(thin) <D: P, E: Q, F: R> () -> ()
+  %6 = function_ref @optional : $@convention(thin) () -> ()
+  %7 = function_ref @indexes : $@convention(thin) (S, C) -> ()
+  %8 = function_ref @external : $@convention(thin) <D: P, E: Q, F: R> () -> ()
 
   unreachable
 }
