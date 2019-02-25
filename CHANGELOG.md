@@ -24,6 +24,25 @@ CHANGELOG
 Swift 5.0
 ---------
 
+* [SE-0235][]:
+
+  The standard library now contains a `Result` type for manually propagating errors.
+  
+  ```swift
+  enum Result<Success, Failure: Error> {
+      case success(Success)
+      case failure(Failure)
+  }
+  ```
+  
+  This type serves a complementary role to that of throwing functions and initializers. 
+  Use `Result` in situations where automatic error propagation or `try`-`catch` 
+  blocks are undesirable, such as in asynchronous code or when accumulating the 
+  results of successive error-producing operations.
+  
+* `Error` now conforms to itself. This allows for the use of `Error` itself as 
+  the argument for a generic parameter constrained to `Error`.
+
 * Swift 3 mode has been removed. Supported values for the `-swift-version`
   flag are `4`, `4.2`, and `5`.
 
@@ -7406,6 +7425,7 @@ Swift 1.0
 [SE-0227]: <https://github.com/apple/swift-evolution/blob/master/proposals/0227-identity-keypath.md>
 [SE-0228]: <https://github.com/apple/swift-evolution/blob/master/proposals/0228-fix-expressiblebystringinterpolation.md>
 [SE-0230]: <https://github.com/apple/swift-evolution/blob/master/proposals/0230-flatten-optional-try.md>
+[SE-O235]: <https://github.com/apple/swift-evolution/blob/master/proposals/0235-add-result.md>
 
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
 [SR-419]: <https://bugs.swift.org/browse/SR-419>
