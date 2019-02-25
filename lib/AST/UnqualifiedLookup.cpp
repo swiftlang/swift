@@ -332,8 +332,7 @@ private:
   /// Return true if lookup is done
   bool addLocalVariableResults(DeclContext *dc);
 
-  /// Return true if finished with lookup
-  bool setAsideUnavailableResults(size_t firstPossiblyUnavailableResult);
+  void setAsideUnavailableResults(size_t firstPossiblyUnavailableResult);
 
   void recordDependencyOnTopLevelName(DeclContext *topLevelContext,
                                       DeclName name, bool isCascadingUse);
@@ -692,10 +691,11 @@ void UnqualifiedLookupFactory::finishLookingInContext(
     placesToSearch.getValue().addToResults(
         Name, isCascadingUse.getValue(), baseNLOptions,
         lookupContextForThisContext, Results);
-    if (setAsideUnavailableResults(firstPossiblyUnavailableResult))
+    setAsideUnavailableResults(firstPossiblyUnavailableResult);
+    recordCompletionOfAScope();
+    if (isFirstResultEnough())
       return;
   }
-
   // Recurse into the next context.
   lookupStartingWith(DCAndUnresolvedIsCascadingUse{
       lookupContextForThisContext->getParentForLookup(), isCascadingUse});
@@ -976,12 +976,12 @@ void UnqualifiedLookupFactory::PlacesToSearch::addToResults(
     results.push_back(LookupResultEntry(whereValueIsMember(Result), Result));
 }
 
-bool UnqualifiedLookupFactory::setAsideUnavailableResults(
+void UnqualifiedLookupFactory::setAsideUnavailableResults(
     const size_t firstPossiblyUnavailableResult) {
   // An optimization:
   assert(Results.size() >= firstPossiblyUnavailableResult);
   if (Results.size() == firstPossiblyUnavailableResult)
-    return false;
+    return;
   // Predicate that determines whether a lookup result should
   // be unavailable except as a last-ditch effort.
   auto unavailableLookupResult = [&](const LookupResultEntry &result) {
@@ -995,12 +995,9 @@ bool UnqualifiedLookupFactory::setAsideUnavailableResults(
   if (std::all_of(begin, Results.end(), unavailableLookupResult)) {
     UnavailableInnerResults.append(begin, Results.end());
     Results.erase(begin, Results.end());
-    return false;
+    return;
   }
   filterForDiscriminator(Results, DebugClient);
-
-  recordCompletionOfAScope();
-  return isFirstResultEnough();
 }
 
 void UnqualifiedLookupFactory::recordDependencyOnTopLevelName(
