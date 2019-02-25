@@ -118,6 +118,8 @@ if(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
     swiftBasic
     swiftSyntax
     ${clangBasicDep})
+  target_compile_definitions(swiftAST PRIVATE
+    SWIFT_BUILD_ONLY_SYNTAXPARSERLIB=1)
 else()
   target_link_libraries(swiftAST PRIVATE
     swiftBasic
