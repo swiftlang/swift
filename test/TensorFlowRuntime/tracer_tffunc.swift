@@ -22,8 +22,6 @@ extension Tensor : _TensorArrayProtocolEnhanced {
   }
 }
 
-#if !CUDA
-
 TracerTests.testAllBackends("SimpleTFFunction") {
   func cond(i: Tensor<Int32>, n: Tensor<Int32>) -> (Tensor<Int32>) {
     return (Tensor<Int32>(i .< n))
@@ -37,7 +35,7 @@ TracerTests.testAllBackends("SimpleTFFunction") {
 
   func runWhile(_ n: Int32) -> Tensor<Int32> {
     return #tfop(
-      "StatelessWhile",
+      "While",
       Tensor<Int32>(0),
       T$dtype: [Int32.tensorFlowDataType],
       cond$func: tffunc(Tensor<Int32>(n)),
@@ -47,7 +45,5 @@ TracerTests.testAllBackends("SimpleTFFunction") {
   expectEqualWithScalarTensor(10, runWhile(10))
   expectEqualWithScalarTensor(300, runWhile(300))
 }
-
-#endif // !CUDA
 
 runAllTests()
