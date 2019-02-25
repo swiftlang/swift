@@ -1099,6 +1099,7 @@ public:
   static void addImplicitDynamicAttribute(Decl *D);
   void checkDeclAttributes(Decl *D);
   void checkDynamicReplacementAttribute(ValueDecl *D);
+  static ValueDecl *findReplacedDynamicFunction(const ValueDecl *d);
   void checkTypeModifyingDeclAttributes(VarDecl *var);
 
   void checkReferenceOwnershipAttr(VarDecl *D, ReferenceOwnershipAttr *attr);
