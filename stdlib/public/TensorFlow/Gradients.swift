@@ -241,7 +241,7 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
   static func _vjpDivide(
     lhs: Tensor, rhs: Tensor
   ) -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
-    return (lhs * rhs, {
+    return (lhs / rhs, {
       [lhsShape = lhs.shapeTensor, rhsShape = rhs.shapeTensor] v in
       ((v / rhs).unbroadcast(toShape: lhsShape),
        ((-lhs) / rhs.squared() * v).unbroadcast(toShape: rhsShape))
