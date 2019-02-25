@@ -114,6 +114,7 @@ class Builder(object):
         cmake_args += ['-DSWIFT_BUILD_REMOTE_MIRROR=FALSE', '-DSWIFT_BUILD_DYNAMIC_STDLIB=FALSE',
             '-DSWIFT_BUILD_STATIC_STDLIB=FALSE', '-DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY=FALSE',
             '-DSWIFT_BUILD_STATIC_SDK_OVERLAY=FALSE']
+        cmake_args += ['-DLLVM_INCLUDE_TESTS=FALSE', '-DCLANG_INCLUDE_TESTS=FALSE']
         cmake_args += [os.path.join(SWIFT_SOURCE_ROOT, 'llvm')]
         self.call(cmake_args)
 
@@ -185,6 +186,11 @@ def main():
     store_int = optbuilder.actions.store_int
     store_path = optbuilder.actions.store_path
 
+    default_profile_input = os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "parser-lib", "profile-input.swift")
+    default_jobs = multiprocessing.cpu_count()
+    default_build_dir = os.path.join(SWIFT_BUILD_ROOT, 'parser-lib')
+    default_install_prefix = defaults.DARWIN_INSTALL_PREFIX if isMac else UNIX_INSTALL_PREFIX
+
     option('--release', store_true,
         help='build in release mode')
     option('--lto', store('lto_type'),
@@ -202,8 +208,8 @@ def main():
                 'Options: frontend, ir. If no optional arg is provided, ir is '
                 'chosen by default')
     option('--profile-input', store_path,
-           default=os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "parser-lib", "profile-input.swift"),
-           help='the source file to use for PGO profiling input')
+           default=default_profile_input,
+           help='the source file to use for PGO profiling input (default = %s)' % default_profile_input)
     option('--no-assertions', store_true,
         help='disable assertions')
     option(['-v', '--verbose'], store_true,
@@ -211,19 +217,18 @@ def main():
     option('--dry-run', store_true,
            help='print the commands to execute but not actually execute them')
     option(['-j', '--jobs'], store_int('build_jobs'),
-           default=multiprocessing.cpu_count(),
-           help='the number of parallel build jobs to use')
+           default=default_jobs,
+           help='the number of parallel build jobs to use (default = %s)' % default_jobs)
     option('--build-dir', store_path,
-           default=os.path.join(SWIFT_BUILD_ROOT, 'parser-lib'),
-           help='the path where the build products will be placed. '
-           'If none is specified it will use <workspace>/build/parser-lib')
+           default=default_build_dir,
+           help='the path where the build products will be placed. (default = %s)' % default_build_dir)
     option('--install-symroot', store_path,
            help='the path to install debug symbols into')
     option('--install-destdir', store_path,
            help='the path to use as the filesystem root for the installation')
     option('--install-prefix', store,
-           default = defaults.DARWIN_INSTALL_PREFIX if isMac else UNIX_INSTALL_PREFIX,
-           help='the install prefix to use')
+           default = default_install_prefix,
+           help='the install prefix to use (default = %s)' % default_install_prefix)
     option('--version', store,
            help='version string to use for the parser library')
 
