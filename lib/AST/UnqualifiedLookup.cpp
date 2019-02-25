@@ -322,9 +322,7 @@ private:
 
   bool isOutsideBodyOfFunction(const AbstractFunctionDecl *const AFD) const;
 
-  /// Check the generic parameters of our context.
-  /// Return true if done with lookup
-  bool addGenericParametersHereAndInEnclosingScopes(DeclContext *dc);
+  void addGenericParametersHereAndInEnclosingScopes(DeclContext *dc);
 
   /// Consume generic parameters
   void addGenericParametersForFunction(AbstractFunctionDecl *AFD);
@@ -335,7 +333,7 @@ private:
   bool addLocalVariableResults(DeclContext *dc);
 
   /// Return true if finished with lookup
-  bool setAsideUnavailableResults(const size_t startIndexOfInnerResults);
+  bool setAsideUnavailableResults(size_t firstPossiblyUnavailableResult);
 
   void recordDependencyOnTopLevelName(DeclContext *topLevelContext,
                                       DeclName name, bool isCascadingUse);
@@ -683,16 +681,18 @@ void UnqualifiedLookupFactory::finishLookingInContext(
                                        lookupContextForThisContext,
                                        placesToSearch, isCascadingUse});
 #endif
-  if (addGenericParameters == AddGenericParameters::Yes &&
-      addGenericParametersHereAndInEnclosingScopes(lookupContextForThisContext))
-    return;
+  if (addGenericParameters == AddGenericParameters::Yes) {
+    addGenericParametersHereAndInEnclosingScopes(lookupContextForThisContext);
+    if (isFirstResultEnough())
+      return;
+  }
 
   if (placesToSearch.hasValue() && !placesToSearch.getValue().empty()) {
-    auto startIndexOfInnerResults = Results.size();
+    auto firstPossiblyUnavailableResult = Results.size();
     placesToSearch.getValue().addToResults(
         Name, isCascadingUse.getValue(), baseNLOptions,
         lookupContextForThisContext, Results);
-    if (setAsideUnavailableResults(startIndexOfInnerResults))
+    if (setAsideUnavailableResults(firstPossiblyUnavailableResult))
       return;
   }
 
@@ -919,7 +919,7 @@ UnqualifiedLookupFactory::getGenericParams(const DeclContext *const dc) {
   return nullptr;
 }
 
-bool UnqualifiedLookupFactory::addGenericParametersHereAndInEnclosingScopes(
+void UnqualifiedLookupFactory::addGenericParametersHereAndInEnclosingScopes(
     DeclContext *dc) {
   for (GenericParamList *dcGenericParams = getGenericParams(dc);
        dcGenericParams;
@@ -929,9 +929,8 @@ bool UnqualifiedLookupFactory::addGenericParametersHereAndInEnclosingScopes(
 
     recordCompletionOfAScope();
     if (isFirstResultEnough())
-      return true;
+      break;
   }
-  return false;
 }
 
 void UnqualifiedLookupFactory::addGenericParametersForFunction(
@@ -978,10 +977,10 @@ void UnqualifiedLookupFactory::PlacesToSearch::addToResults(
 }
 
 bool UnqualifiedLookupFactory::setAsideUnavailableResults(
-    const size_t startIndexOfInnerResults) {
+    const size_t firstPossiblyUnavailableResult) {
   // An optimization:
-  assert(Results.size() >= startIndexOfInnerResults);
-  if (Results.size() == startIndexOfInnerResults)
+  assert(Results.size() >= firstPossiblyUnavailableResult);
+  if (Results.size() == firstPossiblyUnavailableResult)
     return false;
   // Predicate that determines whether a lookup result should
   // be unavailable except as a last-ditch effort.
@@ -992,7 +991,7 @@ bool UnqualifiedLookupFactory::setAsideUnavailableResults(
   };
 
   // If all of the results we found are unavailable, keep looking.
-  auto begin = Results.begin() + startIndexOfInnerResults;
+  auto begin = Results.begin() + firstPossiblyUnavailableResult;
   if (std::all_of(begin, Results.end(), unavailableLookupResult)) {
     UnavailableInnerResults.append(begin, Results.end());
     Results.erase(begin, Results.end());
