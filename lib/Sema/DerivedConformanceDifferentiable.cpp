@@ -59,6 +59,8 @@ getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal,
       continue;
     if (!vd->hasInterfaceType())
       C.getLazyResolver()->resolveDeclSignature(vd);
+    if (!vd->hasInterfaceType())
+      continue;
     auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
     if (!TypeChecker::conformsToProtocol(varType, diffableProto, nominal,
                                          ConformanceCheckFlags::Used))
@@ -94,7 +96,6 @@ static Type getAssociatedType(VarDecl *decl, DeclContext *DC, Identifier id) {
     return nullptr;
   Type assocType = ProtocolConformanceRef::getTypeWitnessByName(
       varType, *conf, id, C.getLazyResolver());
-  assert(assocType && "`Differentiable` protocol associated type not found");
   return assocType;
 }
 
@@ -847,6 +848,8 @@ static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
   for (auto *vd : nominal->getStoredProperties()) {
     if (!vd->hasInterfaceType())
       TC.resolveDeclSignature(vd);
+    if (!vd->hasInterfaceType())
+      continue;
     auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
     if (vd->getAttrs().hasAttribute<NoDerivativeAttr>() ||
         TC.conformsToProtocol(varType, diffableProto, nominal,
@@ -974,6 +977,15 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
   auto nominal = derived.Nominal;
   auto &C = nominal->getASTContext();
 
+  // Get all stored properties for differentation.
+  SmallVector<VarDecl *, 16> diffProperties;
+  getStoredPropertiesForDifferentiation(nominal, parentDC, diffProperties);
+
+  // If any member has an invalid associated type, return nullptr.
+  for (auto *member : diffProperties)
+    if (!getAssociatedType(member, parentDC, id))
+      return nullptr;
+
   // Since associated types will be derived, we make this struct a fieldwise
   // differentiable type.
   if (!nominal->getAttrs().hasAttribute<FieldwiseDifferentiableAttr>())
@@ -987,10 +999,6 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
     if (auto *structDecl = convertToStructDecl(lookup.front()))
       if (structDecl->isImplicit())
         return structDecl->getDeclaredInterfaceType();
-
-  // Get all stored properties for differentation.
-  SmallVector<VarDecl *, 16> diffProperties;
-  getStoredPropertiesForDifferentiation(nominal, parentDC, diffProperties);
 
   // Check whether at least one `@noDerivative` stored property exists.
   unsigned numStoredProperties =
