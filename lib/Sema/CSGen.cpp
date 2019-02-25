@@ -3654,6 +3654,14 @@ namespace {
         return { true, expr };
       }
 
+      if (auto subscript = dyn_cast<SubscriptExpr>(expr)) {
+        associateArgumentLabels(subscript,
+                                { subscript->getArgumentLabels(),
+                                  subscript->hasTrailingClosure() },
+                                /*labelsArePermanent=*/true);
+        return { true, expr };
+      }
+
       // FIXME: other expressions have argument labels, but this is an
       // optimization, so stage it in later.
       return { true, expr };

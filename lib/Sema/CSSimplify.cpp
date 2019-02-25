@@ -103,11 +103,16 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
                                           bool hasCurriedSelf,
                                           ArrayRef<Identifier> labels,
                                           bool hasTrailingClosure) {
-  // Bail out conservatively if this isn't a function declaration.
-  auto fn = dyn_cast<AbstractFunctionDecl>(decl);
-  if (!fn) return true;
-  
-  auto *fTy = fn->getInterfaceType()->castTo<AnyFunctionType>();
+  const AnyFunctionType *fTy;
+
+  if (auto fn = dyn_cast<AbstractFunctionDecl>(decl)) {
+    fTy = fn->getInterfaceType()->castTo<AnyFunctionType>();
+  } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+    assert(!hasCurriedSelf && "Subscripts never have curried 'self'");
+    fTy = subscript->getInterfaceType()->castTo<AnyFunctionType>();
+  } else {
+    return true;
+  }
   
   SmallVector<AnyFunctionType::Param, 8> argInfos;
   for (auto argLabel : labels) {
@@ -3331,7 +3336,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // the member lookup binding the first level.  But there are cases where
     // we can get an unapplied declaration reference back.
     bool hasCurriedSelf;
-    if (baseObjTy->is<ModuleType>()) {
+    if (isa<SubscriptDecl>(decl)) {
+      hasCurriedSelf = false;
+    } else if (baseObjTy->is<ModuleType>()) {
       hasCurriedSelf = false;
     } else if (baseObjTy->is<AnyMetatypeType>() && decl->isInstanceMember()) {
       hasCurriedSelf = false;
