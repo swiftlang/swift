@@ -648,7 +648,7 @@ public extension Tensor {
   @inlinable @inline(__always)
   @differentiable(
     wrt: self, vjp: _vjpReshaped(toShape:)
-    where Scalar : Differentiable & FloatingPoint
+    where Scalar : TensorFlowFloatingPoint
   )
   func reshaped(toShape newShape: Tensor<Int32>) -> Tensor {
     return Raw.reshape(self, shape: newShape)
@@ -672,7 +672,7 @@ public extension Tensor {
   @inlinable @inline(__always)
   @differentiable(
     wrt: self, vjp: _vjpExpandingShape(at:)
-    where Scalar : Differentiable & FloatingPoint
+    where Scalar : TensorFlowFloatingPoint
   )
   func expandingShape(at shapeIndex: Int32) -> Tensor {
     return Raw.expandDims(self, dim: Tensor<Int32>(shapeIndex))
