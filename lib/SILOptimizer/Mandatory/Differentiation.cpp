@@ -3653,9 +3653,20 @@ private:
         adjProj = proj.createAddressProjection(builder, loc, adjBase.getValue())
                       .get();
       }
-      ValueWithCleanup bufWithCleanup(
+      ValueWithCleanup projWithCleanup(
           adjProj, makeCleanupFromChildren({adjBase.getCleanup()}));
-      return (bufferMap[originalBuffer] = bufWithCleanup);
+      return (bufferMap[originalBuffer] = projWithCleanup);
+    }
+    // If the original buffer is a `begin_access` instruction, get the adjoint
+    // buffer of its operand and return a corresponding `begin_access` into it.
+    if (auto *bai = dyn_cast<BeginAccessInst>(originalBuffer)) {
+      auto adjBase = getAdjointBuffer(bai->getOperand());
+      auto *adjAccess = builder.createBeginAccess(
+          bai->getLoc(), adjBase, bai->getAccessKind(), bai->getEnforcement(),
+          /*noNestedConflict*/ false, /*fromBuiltin*/ false);
+      ValueWithCleanup accessWithCleanup(
+          adjAccess, makeCleanupFromChildren({adjBase.getCleanup()}));
+      return (bufferMap[originalBuffer] = accessWithCleanup);
     }
 
     // Set insertion point for local allocation builder: before the last local

@@ -220,6 +220,18 @@ SimpleMathTests.test("StructSideEffects") {
     return tuple.point.x * tuple.point.y
   }
   expectEqual(405, gradient(at: 3, in: mix))
+
+  // Test TF-282.
+  struct Add : Differentiable {
+    var bias: Float
+    func applied(to input: Float) -> Float {
+      var tmp = input
+      tmp = tmp + bias
+      return tmp
+    }
+  }
+  let model = Add(bias: 1)
+  expectEqual(Add.CotangentVector(bias: 1), gradient(at: model) { m in m.applied(to: 1) })
 }
 
 SimpleMathTests.test("StructGeneric") {
