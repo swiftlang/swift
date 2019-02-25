@@ -28,6 +28,14 @@ TensorADTests.testAllBackends("TestGenericGrad") {
   expectEqual([0.2, 0.4, 0.6], gradient(at: Tensor([0.1, 0.2, 0.3]), in: square))
 }
 
+TensorADTests.testAllBackends("TestScalarGenericGrad") {
+  // Tests TF-287.
+  func negate<T : TensorFlowFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
+    return 1 - x
+  }
+  expectEqual(Tensor(-1), gradient(at: Tensor([0.1, 0.2, 0.3]), in: negate))
+}
+
 TensorADTests.testAllBackends("+") {
   let f = { (a: Tensor<Float>, b: Tensor<Float>) in a + b }
   expectTrue((Tensor(1), Tensor(1)) == gradient(at: Tensor(0), Tensor(0), in: f))

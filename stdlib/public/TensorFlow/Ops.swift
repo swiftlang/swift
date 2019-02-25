@@ -120,9 +120,7 @@ extension Tensor : VectorNumeric where Scalar : Numeric {
 
 extension Tensor : ShapedVectorNumeric where Scalar : Numeric {}
 
-extension Tensor : Differentiable
-  where Scalar : Differentiable & FloatingPoint
-{
+extension Tensor : Differentiable where Scalar : TensorFlowFloatingPoint {
   public typealias TangentVector = Tensor
   public typealias CotangentVector = Tensor
   public typealias AllDifferentiableVariables = Tensor
