@@ -1909,8 +1909,7 @@ public:
   IfExpr *getIf() {
     if (!Assign)
       return nullptr;
-
-    return dyn_cast<IfExpr>(Assign->getSrc());
+    return dyn_cast_or_null<IfExpr>(Assign->getSrc());
   }
 
   SourceRange getNameRange() {
