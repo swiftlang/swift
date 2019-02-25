@@ -110,15 +110,6 @@ SimpleMathTests.test("TupleSideEffects") {
   }
   expectEqual(27, gradient(at: 3, in: foo))
 
-  func fooInout(_ x: Float) -> Float {
-    var tuple = (x, x)
-    tuple.0 *= x
-    return x * tuple.0
-  }
-  // FIXME(TF-159): Update after activity analysis handles inout parameters.
-  // expectEqual(27, gradient(at: 3, in: fooInout))
-  expectEqual(12, gradient(at: 3, in: fooInout))
-
   func fifthPower(_ x: Float) -> Float {
     var tuple = (x, x)
     tuple.0 = tuple.0 * x

@@ -1378,7 +1378,7 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
             auto structIsFieldwiseDiffable = sei->getStructDecl()->getAttrs()
                 .hasAttribute<FieldwiseDifferentiableAttr>();
             if (!(hasNoDeriv && structIsFieldwiseDiffable))
-              for (auto result: inst.getResults())
+              for (auto result : inst.getResults())
                 setVaried(result, i);
           }
         }
@@ -1423,6 +1423,10 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
             checkAndSetUseful(dirRes);
           for (auto indRes : ai->getIndirectSILResults())
             checkAndSetUseful(indRes);
+          auto paramInfos = ai->getSubstCalleeConv().getParameters();
+          for (auto i : indices(paramInfos))
+            if (paramInfos[i].isIndirectInOut())
+              checkAndSetUseful(ai->getArgumentsWithoutIndirectResults()[i]);
         }
         // Handle `store`.
         else if (auto *si = dyn_cast<StoreInst>(&inst)) {
@@ -2553,8 +2557,6 @@ public:
     auto structLoweredTy =
         getContext().getTypeConverter().getLoweredType(structTy);
     auto primValsVal = builder.createStruct(loc, structLoweredTy, primalValues);
-    // FIXME: Handle tapes.
-    //
     // If the original result was a tuple, return a tuple of all elements in the
     // original result tuple and the primal value struct value.
     auto origResTy = origResInPrimal->getType();
@@ -2867,25 +2869,44 @@ public:
         LookUpConformanceInModule(swiftModule));
   }
 
+  // If an `apply` has active results or active inout parameters, replace it
+  // with an `apply` of its VJP.
   void visitApplyInst(ApplyInst *ai) {
     auto &context = getContext();
-    // Special handling logic only applies when `apply` has active results. If
-    // not, just do standard cloning.
+    // Special handling logic only applies when `apply` has active results or
+    // active arguments at an active 'inout' parameter position. If not, just do
+    // standard cloning.
     SmallVector<SILValue, 4> allResults;
     allResults.push_back(ai);
     allResults.append(ai->getIndirectSILResults().begin(),
                       ai->getIndirectSILResults().end());
-    if (llvm::none_of(allResults, [&](SILValue result) {
+    auto hasActiveResults = llvm::any_of(allResults, [&](SILValue result) {
       return activityInfo.isActive(result, synthesis.indices);
-    })) {
-      LLVM_DEBUG(getADDebugStream() << "Not active:\n" << *ai << '\n');
+    });
+    // Check for active 'inout' arguments.
+    auto paramInfos = ai->getSubstCalleeConv().getParameters();
+    bool hasActiveInoutParams = false;
+    for (unsigned i : swift::indices(paramInfos))
+      if (paramInfos[i].isIndirectInOut() &&
+          activityInfo.isActive(ai->getArgumentsWithoutIndirectResults()[i],
+                                synthesis.indices))
+        hasActiveInoutParams = true;
+    // Reject funtions with active inout arguments. It's not supported yet.
+    if (hasActiveInoutParams) {
+      context.emitNondifferentiabilityError(ai, getDifferentiationTask(),
+          diag::autodiff_cannot_differentiate_through_inout_arguments);
+      errorOccurred = true;
+      return;
+    }
+    // If there's no active results, this function should not be differentiated.
+    // Do standard cloning.
+    if (!hasActiveResults) {
+      LLVM_DEBUG(getADDebugStream() << "No active results:\n" << *ai << '\n');
       SILClonerWithScopes::visitApplyInst(ai);
       return;
     }
 
-    // This instruction is active. Replace it with a call to the VJP.
-
-    // Get the indices required for differentiating this function.
+    // Get the parameter indices required for differentiating this function.
     LLVM_DEBUG(getADDebugStream() << "Primal-transforming:\n" << *ai << '\n');
     SmallVector<unsigned, 8> activeParamIndices;
     SmallVector<unsigned, 8> activeResultIndices;
@@ -2901,14 +2922,12 @@ public:
                    activeResultIndices.begin(), activeResultIndices.end(),
                    [&s](unsigned i) { s << i; }, [&s] { s << ", "; });
                s << "}\n";);
-
     // FIXME: We don't support multiple active results yet.
     if (activeResultIndices.size() > 1) {
       context.emitNondifferentiabilityError(ai, synthesis.task);
       errorOccurred = true;
       return;
     }
-
     // Form expected indices by assuming there's only one result.
     SILAutoDiffIndices indices(activeResultIndices.front(), activeParamIndices);
 
@@ -3726,13 +3745,26 @@ private:
   
   bool shouldBeDifferentiated(SILInstruction *inst,
                               const SILAutoDiffIndices &indices) {
+    // Anything with an active result should be differentiated.
     if (llvm::any_of(inst->getResults(),
             [&](SILValue val) { return activityInfo.isActive(val, indices); }))
       return true;
-    if (auto *ai = dyn_cast<ApplyInst>(inst))
+    if (auto *ai = dyn_cast<ApplyInst>(inst)) {
+      // Function applications with an active indirect result should be
+      // differentiated.
       for (auto indRes : ai->getIndirectSILResults())
         if (activityInfo.isActive(indRes, indices))
           return true;
+      // Function applications with an inout argument should be differentiated.
+      auto paramInfos = ai->getSubstCalleeConv().getParameters();
+      for (auto i : swift::indices(paramInfos))
+        if (paramInfos[i].isIndirectInOut() &&
+            activityInfo.isActive(
+                ai->getArgumentsWithoutIndirectResults()[i], indices))
+          return true;
+    }
+    // Instructions that may write to memory and has an active operand should
+    // be differentiated.
     if (inst->mayWriteToMemory())
       for (auto &op : inst->getAllOperands())
         if (activityInfo.isActive(op.get(), indices))
