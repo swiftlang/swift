@@ -21,6 +21,11 @@ CHANGELOG
 
 </details>
 
+Swift 5.1
+---------
+
+* Key path expressions can now include references to tuple elements.
+
 Swift 5.0
 ---------
 
