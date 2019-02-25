@@ -3662,6 +3662,14 @@ namespace {
         return { true, expr };
       }
 
+      if (auto unresolvedMember = dyn_cast<UnresolvedMemberExpr>(expr)) {
+        associateArgumentLabels(unresolvedMember,
+                                { unresolvedMember->getArgumentLabels(),
+                                  unresolvedMember->hasTrailingClosure() },
+                                /*labelsArePermanent=*/true);
+        return { true, expr };
+      }
+
       // FIXME: other expressions have argument labels, but this is an
       // optimization, so stage it in later.
       return { true, expr };

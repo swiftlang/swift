@@ -3130,7 +3130,8 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
 
   while (!parts.empty()) {
     if (parts.back().getKind() == ConstraintLocator::Member ||
-        parts.back().getKind() == ConstraintLocator::SubscriptMember) {
+        parts.back().getKind() == ConstraintLocator::SubscriptMember ||
+        parts.back().getKind() == ConstraintLocator::UnresolvedMember) {
       parts.pop_back();
       continue;
     }
