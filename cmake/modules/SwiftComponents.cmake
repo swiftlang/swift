@@ -75,6 +75,8 @@ list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "dev")
 # These clang header options conflict with 'clang-builtin-headers'.
 list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "clang-resource-dir-symlink")
 list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "clang-builtin-headers-in-clang-resource-dir")
+# This conflicts with LLVM itself when doing unified builds.
+list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "toolchain-dev-tools")
 # The sourcekit install variants are currently mutually exclusive.
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "sourcekit-inproc")
