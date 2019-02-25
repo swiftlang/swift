@@ -1264,8 +1264,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     if (diff < 0) {
       for (unsigned i = func1Params.size(),
                     n = func2Params.size(); i != n; ++i) {
-        auto *argLoc =
-            getConstraintLocator(anchor, LocatorPathElt::getTupleElement(i));
+        auto *argLoc = getConstraintLocator(
+            anchor, LocatorPathElt::getSynthesizedArgument(i));
 
         auto arg = func2Params[i].withType(createTypeVariable(argLoc));
         func1Params.push_back(arg);
