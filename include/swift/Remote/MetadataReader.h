@@ -432,7 +432,7 @@ public:
     if (!Reader->readBytes(RemoteAddress(ExistentialAddress),
                            (uint8_t *)&Container, sizeof(Container)))
       return None;
-    auto MetadataAddress = reinterpret_cast<StoredPointer>(Container.Type);
+    auto MetadataAddress = static_cast<StoredPointer>(Container.Type);
     auto Metadata = readMetadata(MetadataAddress);
     if (!Metadata)
       return None;
