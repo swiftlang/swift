@@ -1515,26 +1515,6 @@ public extension Tensor {
     }
   }
 
-  /// Access the subdimensional tensor at the specified list of indices.
-  /// - Parameter indices: List of indices.
-  /// - Note: this function is more efficient than using `subscript(index:)`
-  ///   multiple times because this produces a single GatherNd op (compared with
-  ///   multiple Gather ops).
-  @inlinable
-  subscript(indices: Int32...) -> Tensor {
-    @inline(__always)
-    get {
-      // NOTE: Rewriting this using Slice is difficult: the main challenge is in
-      // constructing the "sizes" argument, which essentially is
-      // `indices.shapeTensor` but with `indices.count` number of leading 1s.
-      // Since GatherNd is the exact op that performs subdimensional indexing,
-      // it is used here in spite of the fact it may perform allocation(?).
-      // TODO: Consider more clearly distinguishing `subscript(index:)` and
-      // `subscript(indices:)`, since their implementations are quite different.
-      return Raw.gatherNd(params: self, indices: Tensor<Int32>(indices))
-    }
-  }
-
   /// Access the subtensor specified by a contiguous range of indices.
   /// - Parameter bounds: Contiguous range of indices.
   @inlinable
