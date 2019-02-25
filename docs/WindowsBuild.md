@@ -102,22 +102,7 @@ mklink "%VCToolsInstallDir%\include\visualc.apinotes" S:\swift\stdlib\public\Pla
 
 Warning: Creating the above links usually requires administrator privileges. The quick and easy way to do this is to open a second developer prompt by right clicking whatever shortcut you used to open the first one, choosing Run As Administrator, and pasting the above commands into the resulting window. You can then close the privileged prompt; this is the only step which requires elevation.
 
-### 5. Build CMark
-- This must be done from within a developer command prompt. CMark is a fairly
-  small project and should only take a few minutes to build.
-```cmd
-mkdir "S:\b\cmark"
-pushd "S:\b\cmark"
-cmake -G Ninja^
-  -DCMAKE_BUILD_TYPE=RelWithDebInfo^
-  -DCMAKE_C_COMPILER=cl^
-  -DCMAKE_CXX_COMPILER=cl^
-  S:/cmark
-popd
-cmake --build "S:\b\cmark"
-```
-
-### 6. Build LLVM/Clang
+### 5. Build LLVM/Clang
 - This must be done from within a developer command prompt. LLVM and Clang are
   large projects, so building might take a few hours. Make sure that the build
   type for LLVM/Clang is compatbile with the build type for Swift. That is,
@@ -144,6 +129,21 @@ cmake --build "S:\b\llvm"
 
 ```cmd
 path S:\b\llvm\bin;%PATH%
+```
+
+### 6. Build CMark
+- This must be done from within a developer command prompt. CMark is a fairly
+  small project and should only take a few minutes to build.
+```cmd
+mkdir "S:\b\cmark"
+pushd "S:\b\cmark"
+cmake -G Ninja^
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo^
+  -DCMAKE_C_COMPILER=cl^
+  -DCMAKE_CXX_COMPILER=cl^
+  S:\cmark
+popd
+cmake --build "S:\b\cmark"
 ```
 
 ### 7. Build Swift
