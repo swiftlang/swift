@@ -718,19 +718,17 @@ bool importer::isUnavailableInSwift(
     if (attr->getPlatform()->getName() == "swift")
       return true;
 
-    if (platformAvailability.filter &&
-        !platformAvailability.filter(attr->getPlatform()->getName())) {
+    if (!platformAvailability.isPlatformRelevant(
+            attr->getPlatform()->getName())) {
       continue;
     }
 
-    if (platformAvailability.deprecatedAsUnavailableFilter) {
-      llvm::VersionTuple version = attr->getDeprecated();
-      if (version.empty())
-        continue;
-      if (platformAvailability.deprecatedAsUnavailableFilter(
-            version.getMajor(), version.getMinor())) {
-        return true;
-      }
+
+    llvm::VersionTuple version = attr->getDeprecated();
+    if (version.empty())
+      continue;
+    if (platformAvailability.treatDeprecatedAsUnavailable(decl, version)) {
+      return true;
     }
   }
 
