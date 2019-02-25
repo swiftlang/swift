@@ -35,6 +35,7 @@ using namespace constraints;
 //===----------------------------------------------------------------------===//
 // Constraint solver statistics
 //===----------------------------------------------------------------------===//
+
 #define DEBUG_TYPE "Constraint solver overall"
 #define JOIN2(X,Y) X##Y
 STATISTIC(NumSolutionAttempts, "# of solution attempts");

@@ -23,10 +23,17 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
 
 using namespace swift;
 using namespace constraints;
+
+#define DEBUG_TYPE "Constraint solver"
+STATISTIC(NumFailedMatchCallArguments,
+          "# of failed matchCallArguments() calls (total)");
+STATISTIC(NumFailedMatchCallArgumentsInLookup,
+          "# of failed matchCallArguments() calls during lookup");
 
 MatchCallArgumentListener::~MatchCallArgumentListener() { }
 
@@ -120,10 +127,15 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
   MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 8> unusedParamBindings;
 
-  return !matchCallArguments(argInfos, params, defaultMap,
-                             hasTrailingClosure,
-                             /*allow fixes*/ false,
-                             listener, unusedParamBindings);
+  if (matchCallArguments(argInfos, params, defaultMap,
+                         hasTrailingClosure,
+                         /*allow fixes*/ false,
+                         listener, unusedParamBindings)) {
+    ++NumFailedMatchCallArgumentsInLookup;
+    return false;
+  }
+
+  return true;
 }
 
 /// Determine the default type-matching options to use when decomposing a
@@ -473,6 +485,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
       nextArgIdx = 0;
       skipClaimedArgs();
       listener.extraArgument(nextArgIdx);
+      ++NumFailedMatchCallArguments;
       return true;
     }
 
@@ -499,6 +512,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         continue;
 
       listener.missingArgument(paramIdx);
+      ++NumFailedMatchCallArguments;
       return true;
     }
   }
@@ -539,16 +553,21 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
           // - The parameter is unnamed, in which case we try to fix the
           //   problem by removing the name.
           if (expectedLabel.empty()) {
-            if (listener.extraneousLabel(toArgIdx))
+            if (listener.extraneousLabel(toArgIdx)) {
+              ++NumFailedMatchCallArguments;
               return true;
+            }
           // - The argument is unnamed, in which case we try to fix the
           //   problem by adding the name.
           } else if (argumentLabel.empty()) {
-            if (listener.missingLabel(toArgIdx))
+            if (listener.missingLabel(toArgIdx)) {
+              ++NumFailedMatchCallArguments;
               return true;
+            }
           // - The argument label has a typo at the same position.
           } else if (fromArgIdx == toArgIdx &&
                      listener.incorrectLabel(toArgIdx)) {
+            ++NumFailedMatchCallArguments;
             return true;
           }
         }
@@ -560,6 +579,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         }
 
         listener.outOfOrderArgument(fromArgIdx, toArgIdx);
+        ++NumFailedMatchCallArguments;
         return true;
       }
     }
@@ -571,7 +591,12 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
     return false;
 
   // The arguments were relabeled; notify the listener.
-  return listener.relabelArguments(actualArgNames);
+  if (listener.relabelArguments(actualArgNames)) {
+    ++NumFailedMatchCallArguments;
+    return true;
+  }
+
+  return false;
 }
 
 /// Find the callee declaration and uncurry level for a given call
