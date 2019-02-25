@@ -143,6 +143,18 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
   return true;
 }
 
+/// Check whether the given argument labels match the key path application
+/// subscript labels.
+///
+/// \returns true if they match, false otherwise.
+static bool argumentLabelsMatchKeyPathApplication(ASTContext &ctx,
+                                                  ArrayRef<Identifier> labels,
+                                                  bool hasTrailingClosure) {
+  return !hasTrailingClosure &&
+         labels.size() == 1 &&
+         labels.front() == ctx.Id_keyPath;
+}
+
 /// Determine the default type-matching options to use when decomposing a
 /// constraint into smaller constraints.
 static ConstraintSystem::TypeMatchOptions getDefaultDecompositionOptions(
@@ -3266,13 +3278,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   // Okay, start building up the result list.
   MemberLookupResult result;
   result.OverallResult = MemberLookupResult::HasResults;
-  
-  // If we're looking for a subscript, consider key path operations.
-  if (memberName.isSimpleName() &&
-      memberName.getBaseName().getKind() == DeclBaseName::Kind::Subscript) {
-    result.ViableCandidates.push_back(
-        OverloadChoice(baseTy, OverloadChoiceKind::KeyPathApplication));
-  }
 
   // If the base type is a tuple type, look for the named or indexed member
   // of the tuple.
@@ -3350,6 +3355,18 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
                                           argumentLabels->Labels,
                                           argumentLabels->HasTrailingClosure);
   };
+
+    // If we're looking for a subscript, consider key path operations.
+  if (memberName.isSimpleName() &&
+      memberName.getBaseName().getKind() == DeclBaseName::Kind::Subscript &&
+      (!argumentLabels ||
+       argumentLabelsMatchKeyPathApplication(
+           getASTContext(),
+           argumentLabels->Labels,
+           argumentLabels->HasTrailingClosure))) {
+    result.ViableCandidates.push_back(
+        OverloadChoice(baseTy, OverloadChoiceKind::KeyPathApplication));
+  }
 
   // Look for members within the base.
   LookupResult &lookup = lookupMember(instanceTy, memberName);
