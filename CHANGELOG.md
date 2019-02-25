@@ -7425,7 +7425,7 @@ Swift 1.0
 [SE-0227]: <https://github.com/apple/swift-evolution/blob/master/proposals/0227-identity-keypath.md>
 [SE-0228]: <https://github.com/apple/swift-evolution/blob/master/proposals/0228-fix-expressiblebystringinterpolation.md>
 [SE-0230]: <https://github.com/apple/swift-evolution/blob/master/proposals/0230-flatten-optional-try.md>
-[SE-O235]: <https://github.com/apple/swift-evolution/blob/master/proposals/0235-add-result.md>
+[SE-0235]: <https://github.com/apple/swift-evolution/blob/master/proposals/0235-add-result.md>
 
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
 [SR-419]: <https://bugs.swift.org/browse/SR-419>
