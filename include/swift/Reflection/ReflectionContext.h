@@ -60,7 +60,6 @@ template <> struct ELFTraits<llvm::ELF::ELFCLASS32> {
   using Section = const struct llvm::ELF::Elf32_Shdr;
   using Offset = llvm::ELF::Elf32_Off;
   using Size = llvm::ELF::Elf32_Word;
-  using Address = llvm::ELF::Elf32_Addr;
   static constexpr unsigned char ELFClass = llvm::ELF::ELFCLASS32;
 };
 
@@ -69,7 +68,6 @@ template <> struct ELFTraits<llvm::ELF::ELFCLASS64> {
   using Section = const struct llvm::ELF::Elf64_Shdr;
   using Offset = llvm::ELF::Elf64_Off;
   using Size = llvm::ELF::Elf64_Xword;
-  using Address = llvm::ELF::Elf64_Addr;
   static constexpr unsigned char ELFClass = llvm::ELF::ELFCLASS64;
 };
 
@@ -202,7 +200,7 @@ public:
                                                RangeEnd - RangeStart);
 
     auto findMachOSectionByName = [&](std::string Name)
-        -> std::pair<std::pair<const char *, const char *>, uint32_t> {
+        -> std::pair<std::pair<const char *, const char *>, uint64_t> {
       for (unsigned I = 0; I < NumSect; ++I) {
         auto S = reinterpret_cast<typename T::Section *>(
             SectionsBuf + (I * sizeof(typename T::Section)));
@@ -233,8 +231,8 @@ public:
         ReflStrMdSec.first.first == nullptr)
       return false;
 
-    auto LocalStartAddress = reinterpret_cast<uintptr_t>(SectBuf.get());
-    auto RemoteStartAddress = static_cast<uintptr_t>(RangeStart);
+    auto LocalStartAddress = reinterpret_cast<uint64_t>(SectBuf.get());
+    auto RemoteStartAddress = static_cast<uint64_t>(RangeStart);
 
     ReflectionInfo info = {
         {{FieldMdSec.first.first, FieldMdSec.first.second}, 0},
@@ -332,7 +330,7 @@ public:
     auto StrTab = reinterpret_cast<const char *>(StrTabBuf.get());
 
     auto findELFSectionByName = [&](std::string Name)
-        -> std::pair<std::pair<const char *, const char *>, typename T::Address> {
+        -> std::pair<std::pair<const char *, const char *>, uint64_t> {
       // Now for all the sections, find their name.
       for (const typename T::Section *Hdr : SecHdrVec) {
         uint32_t Offset = Hdr->sh_name;
@@ -367,9 +365,9 @@ public:
         ReflStrMdSec.first.first == nullptr)
       return false;
 
-    auto LocalStartAddress = reinterpret_cast<uintptr_t>(Buf.get());
+    auto LocalStartAddress = reinterpret_cast<uint64_t>(Buf.get());
     auto RemoteStartAddress =
-        static_cast<uintptr_t>(ImageStart.getAddressData());
+        static_cast<uint64_t>(ImageStart.getAddressData());
 
     ReflectionInfo info = {
         {{FieldMdSec.first.first, FieldMdSec.first.second}, FieldMdSec.second},
