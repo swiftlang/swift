@@ -60,6 +60,7 @@ template <> struct ELFTraits<llvm::ELF::ELFCLASS32> {
   using Section = const struct llvm::ELF::Elf32_Shdr;
   using Offset = llvm::ELF::Elf32_Off;
   using Size = llvm::ELF::Elf32_Word;
+  using Address = llvm::ELF::Elf32_Addr;
   static constexpr unsigned char ELFClass = llvm::ELF::ELFCLASS32;
 };
 
@@ -68,6 +69,7 @@ template <> struct ELFTraits<llvm::ELF::ELFCLASS64> {
   using Section = const struct llvm::ELF::Elf64_Shdr;
   using Offset = llvm::ELF::Elf64_Off;
   using Size = llvm::ELF::Elf64_Xword;
+  using Address = llvm::ELF::Elf64_Addr;
   static constexpr unsigned char ELFClass = llvm::ELF::ELFCLASS64;
 };
 
@@ -330,7 +332,7 @@ public:
     auto StrTab = reinterpret_cast<const char *>(StrTabBuf.get());
 
     auto findELFSectionByName = [&](std::string Name)
-        -> std::pair<std::pair<const char *, const char *>, uint32_t> {
+        -> std::pair<std::pair<const char *, const char *>, typename T::Address> {
       // Now for all the sections, find their name.
       for (const typename T::Section *Hdr : SecHdrVec) {
         uint32_t Offset = Hdr->sh_name;
