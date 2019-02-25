@@ -91,7 +91,7 @@ struct SR718 {
   subscript(a a : UInt) -> Int { return 0 }
 }
 
-SR718()[a: Int()] // expected-error {{extraneous argument label 'a:' in subscript}}
+SR718()[a: Int()] // expected-error {{cannot convert value of type 'Int' to expected argument type 'UInt'}}
 
 // rdar://problem/25601561 - Qol: Bad diagnostic for failed assignment from Any to more specific type
 

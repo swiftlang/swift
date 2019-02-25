@@ -14,3 +14,15 @@ func testModuleScope(i: Int) {
   // CHECK: (introducing single enabled disjunction term {{.*}} (Int, Int) -> ()
   foo(i, i)
 }
+
+struct X {
+  subscript(_: Int) -> Int { return 0 }
+  subscript(_: Int, _: Int) -> Double { return 0 }
+  subscript(_: Int, _: Int, _: Int) -> String { return "" }
+}
+
+func testSubscript(x: X, i: Int) {
+  // CHECK: disabled disjunction term {{.*}}X.subscript(_:)
+  // CHECK-NEXT: disabled disjunction term {{.*}}X.subscript(_:_:_:)
+  _ = x[i, i]
+}

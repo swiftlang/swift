@@ -122,7 +122,9 @@ bool constraints::areConservativelyCompatibleArgumentLabels(
   // the member lookup binding the first level.  But there are cases where
   // we can get an unapplied declaration reference back.
   bool hasCurriedSelf;
-  if (!baseType || baseType->is<ModuleType>()) {
+  if (isa<SubscriptDecl>(decl)) {
+    hasCurriedSelf = false;
+  } else if (!baseType || baseType->is<ModuleType>()) {
     hasCurriedSelf = false;
   } else if (baseType->is<AnyMetatypeType>() && decl->isInstanceMember()) {
     hasCurriedSelf = false;
@@ -139,11 +141,16 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
                                           bool hasCurriedSelf,
                                           ArrayRef<Identifier> labels,
                                           bool hasTrailingClosure) {
-  // Bail out conservatively if this isn't a function declaration.
-  auto fn = dyn_cast<AbstractFunctionDecl>(decl);
-  if (!fn) return true;
-  
-  auto *fTy = fn->getInterfaceType()->castTo<AnyFunctionType>();
+  const AnyFunctionType *fTy;
+
+  if (auto fn = dyn_cast<AbstractFunctionDecl>(decl)) {
+    fTy = fn->getInterfaceType()->castTo<AnyFunctionType>();
+  } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+    assert(!hasCurriedSelf && "Subscripts never have curried 'self'");
+    fTy = subscript->getInterfaceType()->castTo<AnyFunctionType>();
+  } else {
+    return true;
+  }
   
   SmallVector<AnyFunctionType::Param, 8> argInfos;
   for (auto argLabel : labels) {
@@ -3573,7 +3580,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
 
     // If the argument labels for this result are incompatible with
     // the call site, skip it.
+    // FIXME: The subscript check here forces the use of the
+    // function-application simplification logic to handle labels.
     if (argumentLabels &&
+        (!candidate.isDecl() || !isa<SubscriptDecl>(candidate.getDecl())) &&
         !areConservativelyCompatibleArgumentLabels(
             candidate, argumentLabels->Labels,
             argumentLabels->HasTrailingClosure)) {
