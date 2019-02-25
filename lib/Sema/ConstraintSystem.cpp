@@ -1484,6 +1484,10 @@ static Type getEffectiveOverloadType(const OverloadChoice &overload) {
 
   auto decl = overload.getDecl();
 
+  // Ignore type declarations.
+  if (isa<TypeDecl>(decl))
+    return Type();
+
   // Retrieve the interface type.
   auto type = decl->getInterfaceType();
   if (!type) {
