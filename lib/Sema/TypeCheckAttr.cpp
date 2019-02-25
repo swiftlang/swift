@@ -2462,15 +2462,12 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
 
   AbstractFunctionDecl *original = nullptr;
-  bool isProperty = false;
   if (auto *vd = dyn_cast<VarDecl>(D)) {
     // When used on a storage decl, @differentiable refers to its getter.
     original = vd->getGetter();
-    isProperty = true;
   } else if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
     original = afd;
     if (auto *accessor = dyn_cast<AccessorDecl>(afd)) {
-      isProperty = true;
       // We do not support setters yet because inout is not supported yet.
       if (accessor->isSetter())
         original = nullptr;
@@ -2609,16 +2606,13 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     AutoDiffParameterIndicesBuilder autoDiffParameterIndicesBuilder(
         originalFnTy);
     if (parsedWrtParams.empty()) {
-      if (isProperty)
-        autoDiffParameterIndicesBuilder.setParameter(0);
-      else {
-        // If 'wrt:' is not specified, the wrt parameters are all the parameters
-        // in the main parameter group. Self is intentionally excluded except
-        // when it's a property.
-        unsigned numNonSelfParameters = autoDiffParameterIndicesBuilder.size() -
-            (isMethod ? 1 : 0);
-        for (unsigned i : range(numNonSelfParameters))
-          autoDiffParameterIndicesBuilder.setParameter(i);
+      if (original->isStatic() || isa<ConstructorDecl>(original)) {
+        auto *methodTy =
+            original->getMethodInterfaceType()->castTo<AnyFunctionType>();
+        autoDiffParameterIndicesBuilder
+            .setParameters(0, methodTy->getNumParams());
+      } else {
+        autoDiffParameterIndicesBuilder.setAllParameters();
       }
     } else {
       // 'wrt:' is specified. Validate and collect the selected parameters.

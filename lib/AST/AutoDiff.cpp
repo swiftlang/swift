@@ -262,8 +262,8 @@ static unsigned getNumAutoDiffParameterIndices(AnyFunctionType *fnTy) {
 }
 
 AutoDiffParameterIndicesBuilder::AutoDiffParameterIndicesBuilder(
-    AnyFunctionType *functionType, bool setAllParams) :
-    parameters(getNumAutoDiffParameterIndices(functionType), setAllParams) {
+    AnyFunctionType *functionType, bool setAllParams)
+    : parameters(getNumAutoDiffParameterIndices(functionType), setAllParams) {
 }
 
 AutoDiffParameterIndices *
@@ -274,6 +274,15 @@ AutoDiffParameterIndicesBuilder::build(ASTContext &C) const {
 void AutoDiffParameterIndicesBuilder::setParameter(unsigned paramIndex) {
   assert(paramIndex < parameters.size() && "paramIndex out of bounds");
   parameters.set(paramIndex);
+}
+
+void AutoDiffParameterIndicesBuilder::setParameters(unsigned lowerBound,
+                                                    unsigned upperBound) {
+  parameters.set(lowerBound, upperBound);
+}
+
+void AutoDiffParameterIndicesBuilder::setAllParameters() {
+  parameters.set();
 }
 
 Type VectorSpace::getType() const {

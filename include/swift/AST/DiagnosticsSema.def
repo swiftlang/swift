@@ -2446,8 +2446,6 @@ WARNING(differentiable_implicit_noderivative_fixit,none,
       "stored property %0 has no derivative because it does not conform to "
       "'Differentiable'; add '@noDerivative' to make it explicit",
       (Identifier))
-NOTE(protocol_witness_missing_differentiable_attr,none,
-     "candidate is missing attribute '%0'", (StringRef))
 
 NOTE(codable_extraneous_codingkey_case_here,none,
      "CodingKey case %0 does not match any stored properties", (Identifier))
@@ -2728,6 +2726,8 @@ ERROR(differentiable_attr_unsupported_req_kind,none,
       "layout requirement are not supported by '@differentiable' attribute", ())
 ERROR(differentiable_attr_class_unsupported,none,
       "class members cannot be marked with '@differentiable'", ())
+NOTE(protocol_witness_missing_specific_differentiable_attr,none,
+     "candidate is missing attribute '%0'", (StringRef))
 
 // @differentiang
 ERROR(differentiating_attr_expected_result_tuple,none,

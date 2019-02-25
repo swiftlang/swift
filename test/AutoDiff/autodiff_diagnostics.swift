@@ -111,14 +111,14 @@ _ = gradient(at: 0) { x in if_else(0, true) }
 
 var a: Float = 3.0
 protocol P {
-  @differentiable
+  @differentiable(wrt: x)
   func foo(x: Float) -> Float
 }
 
 enum T : P {
   // expected-note @+2 {{when differentiating this function definition}}
   // expected-error @+1 {{function is not differentiable}}
-  @differentiable func foo(x: Float) -> Float {
+  @differentiable(wrt: x) func foo(x: Float) -> Float {
     // expected-note @+1 {{cannot differentiate writes to global variables}}
     a = a + x
     return a
@@ -127,7 +127,7 @@ enum T : P {
 
 // expected-note @+2 {{when differentiating this function definition}}
 // expected-error @+1 {{function is not differentiable}}
-@differentiable func foo(x: Float) -> Float {
+@differentiable(wrt: x) func foo(x: Float) -> Float {
   // expected-note @+1 {{cannot differentiate writes to global variables}}
   a = a + x
   return a

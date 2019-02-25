@@ -7,12 +7,12 @@ import Swift
 import SwiftShims
 
 protocol DifferentiableRequirement {
-  @differentiable()
+  @differentiable(wrt: x)
   func f(_ x: Float) -> Float
 }
 
 struct DifferentiableConformance : DifferentiableRequirement {
-  @differentiable(jvp: df, vjp: pf)
+  @differentiable(wrt: x, jvp: df, vjp: pf)
   func f(_ x: Float) -> Float
   func df(_ x: Float) -> (Float, (Float) -> Float)
   func pf(_ x: Float) -> (Float, (Float) -> Float)

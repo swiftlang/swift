@@ -7,7 +7,7 @@ public struct Foo : Differentiable {
 }
 
 // CHECK-AST-LABEL: @_fieldwiseDifferentiable public struct Foo : Differentiable {
-// CHECK-AST:   @differentiable(wrt: (self))
+// CHECK-AST:   @differentiable
 // CHECK-AST:   public var a: Float
 // CHECK-AST:   internal init(a: Float)
 // CHECK-AST:   @_fieldwiseDifferentiable public struct AllDifferentiableVariables

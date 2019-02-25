@@ -6,13 +6,13 @@ import StdlibUnittest
 var ExistentialTests = TestSuite("Existential")
 
 protocol A {
-  @differentiable
-  func a(_: Float) -> Float
+  @differentiable(wrt: x)
+  func a(_ x: Float) -> Float
 }
 func b(g: A) -> Float { return (3.0 as Float).gradient() { x in g.a(x) } }
 
 struct B : A {
-  @differentiable
+  @differentiable(wrt: x)
   func a(_ x: Float) -> Float { return x * 5.0 }
 }
 
