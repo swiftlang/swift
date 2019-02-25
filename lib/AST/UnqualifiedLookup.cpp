@@ -178,8 +178,9 @@ private:
     void dump() const;
   };
 
+  enum class AddGenericParameters { Yes, No };
   struct PerContextInfo {
-    DeclContext *thisContext; // TODO: Eliminate ME
+    AddGenericParameters addGenericParameters;
     DeclContext *lookupContextForThisContext;
     Optional<PlacesToSearch> placesToSearch;
     Optional<bool> isCascadingUse;
@@ -676,7 +677,7 @@ void UnqualifiedLookupFactory::finishLookingInContext(
   auto placesToSearch = std::move(info.placesToSearch);
   auto isCascadingUse = info.isCascadingUse;
 
-  if (!isa<DefaultArgumentInitializer>(info.thisContext) &&
+  if (info.addGenericParameters == AddGenericParameters::Yes &&
       addGenericParametersHereAndInEnclosingScopes(lookupContextForThisContext))
     return;
   if (placesToSearch.hasValue() && !placesToSearch.getValue().empty()) {
@@ -689,12 +690,10 @@ void UnqualifiedLookupFactory::finishLookingInContext(
   }
   auto *const whereToLookNext =
       lookupContextForThisContext->getParentForLookup();
-  assert(whereToLookNext != info.thisContext && "non-termination");
 
   lookupNameInDeclContexts(
       DCAndUnresolvedIsCascadingUse{whereToLookNext, isCascadingUse});
 }
-// clang-format on
 
 void UnqualifiedLookupFactory::lookupLocalsInAppropriateContext(
     const DCAndUnresolvedIsCascadingUse dcAndIsCasc) {
@@ -730,7 +729,7 @@ void UnqualifiedLookupFactory::lookupLocalsInPatternBindingInitializer(
     DeclContext *const parent = PBI->getParent();
     // clang-format off
     finishLookingInContext( PerContextInfo{
-      PBI,
+      AddGenericParameters::Yes,
       parent,
       PlacesToSearch(PBI, parent, parent),
       resolveIsCascadingUse(PBI, isCascadingUse,
@@ -744,7 +743,7 @@ void UnqualifiedLookupFactory::lookupLocalsInPatternBindingInitializer(
     DeclContext *const surroundingContext = PBI->getParent();
     // clang-format off
     finishLookingInContext( PerContextInfo{
-      PBI,
+      AddGenericParameters::Yes,
       surroundingContext,
       PlacesToSearch(surroundingContext,
                      surroundingContext, surroundingContext),
@@ -759,7 +758,7 @@ void UnqualifiedLookupFactory::lookupLocalsInPatternBindingInitializer(
   // context.
   // clang-format off
   finishLookingInContext( PerContextInfo{
-    PBI,
+    AddGenericParameters::Yes,
     PBI,
     None,
     resolveIsCascadingUse(PBI, isCascadingUse,
@@ -806,7 +805,7 @@ void UnqualifiedLookupFactory::lookupLocalsInFunctionDecl(
   if (!AFD->getDeclContext()->isTypeContext()) {
     // clang-format off
      finishLookingInContext( PerContextInfo{
-       AFD,
+       AddGenericParameters::Yes,
        AFD,
        None,
        returnValueForIsCascadingUse});
@@ -822,7 +821,7 @@ void UnqualifiedLookupFactory::lookupLocalsInFunctionDecl(
   DeclContext *const BaseDC = isOutsideBodyOfFunction(AFD) ? fnDeclContext : AFD;
   // clang-format off
   finishLookingInContext( PerContextInfo{
-      AFD,
+    AddGenericParameters::Yes,
       AFD->getParent(),
       PlacesToSearch(BaseDC,
                      fnDeclContext,
@@ -852,7 +851,7 @@ void UnqualifiedLookupFactory::lookupLocalsInClosure(
   }
   // clang-format off
   finishLookingInContext( PerContextInfo{
-      ACE,
+      AddGenericParameters::Yes,
       ACE,
       None,
       resolveIsCascadingUse(ACE, isCascadingUse,
@@ -865,7 +864,7 @@ void UnqualifiedLookupFactory::lookupLocalsInNominalTypeOrExtension(
     NominalTypeDeclOrExtensionDecl *D, Optional<bool> isCascadingUse) {
   // clang-format off
   finishLookingInContext( PerContextInfo{
-      D,
+      AddGenericParameters::Yes,
       D,
       shouldLookupMembers(D, Loc)
       ? Optional<PlacesToSearch>(PlacesToSearch(D, D, D))
@@ -880,7 +879,8 @@ void UnqualifiedLookupFactory::lookupLocalsInDefaultArgumentInitializer(
     DefaultArgumentInitializer *I, Optional<bool> isCascadingUse) {
   // In a default argument, skip immediately out of both the
   // initializer and the function.
-  finishLookingInContext(PerContextInfo{I, I->getParent(), None, false});
+  finishLookingInContext(
+      PerContextInfo{AddGenericParameters::No, I->getParent(), None, false});
 }
 
 void UnqualifiedLookupFactory::lookupLocalsInMiscContext(
@@ -891,7 +891,7 @@ void UnqualifiedLookupFactory::lookupLocalsInMiscContext(
          isa<TypeAliasDecl>(dc) ||
          isa<SubscriptDecl>(dc));
   finishLookingInContext( PerContextInfo{
-      dc,
+      AddGenericParameters::Yes,
       dc,
       None,
       resolveIsCascadingUse(DC, isCascadingUse,
@@ -1723,6 +1723,8 @@ void UnqualifiedLookupFactory::dumpBreadcrumbs() const {
 
 void UnqualifiedLookupFactory::PerContextInfo::dump() const {
   auto &e = llvm::errs();
+  e << (addGenericParameters == AddGenericParameters::Yes ? " add generics, "
+                                                          : "");
   e << " dc: ";
   lookupContextForThisContext->dumpContext();
   if (placesToSearch.hasValue())
