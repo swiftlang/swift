@@ -11,6 +11,12 @@ import StdlibUnittest
 
 var TensorGroupTests = TestSuite("TensorGroup")
 
+extension TensorDataType : Equatable {
+  public static func == (lhs: TensorDataType, rhs: TensorDataType) -> Bool {
+    return Int(lhs._cDataType.rawValue) == Int(rhs._cDataType.rawValue)
+  }
+}
+
 struct Simple : TensorGroup {
   var w, b: Tensor<Float>
 }
@@ -20,7 +26,7 @@ struct Mixed : TensorGroup {
   var string: StringTensor
   var float: Tensor<Float>
   // Immutable.
-  let int: Tensor<Int>
+  let int: Tensor<Int32>
 }
 
 struct Nested : TensorGroup {
@@ -36,41 +42,31 @@ struct Generic<T: TensorGroup, U: TensorGroup> : TensorGroup {
 }
 
 TensorGroupTests.test("Simple") {
-  var x = Simple(w: 1, b: 2)
   let float = Float.tensorFlowDataType
-  expectEqual([float, float], x._typeList)
+  expectEqual([float, float], Simple._typeList)
 }
 
-KeyPathIterableTests.test("Mixed") {
-  var x = Mixed(
-    string: StringTensor("hello"), float: Tensor<Float>(.pi), 
-    int: Tensor<Int>(0))
+TensorGroupTests.test("Mixed") {
   let float = Float.tensorFlowDataType
-  let int = Int.tensorFlowDataType
+  let int = Int32.tensorFlowDataType
   let string = String.tensorFlowDataType
-  expectEqual([string, float, int], x._typeList)
+  expectEqual([string, float, int], Mixed._typeList)
 }
 
-KeyPathIterableTests.test("Nested") {
-  var s = Simple(w: 1, b: 2)
-  var m = Mixed(
-    string: StringTensor("hello"), float: Tensor<Float>(.pi), 
-    int: Tensor<Int>(0))
-  var x = Nested(simple: s, mixed: m)
+TensorGroupTests.test("Nested") {
   let float = Float.tensorFlowDataType
-  let int = Int.tensorFlowDataType
+  let int = Int32.tensorFlowDataType
   let string = String.tensorFlowDataType
-  expectEqual([float, float, string, float, int], x._typeList)
+  expectEqual([float, float, string, float, int], Nested._typeList)
 }
 
-KeyPathIterableTests.test("Generic") {
-  var s = Simple(w: 1, b: 2)
-  var m = Mixed(
-    string: StringTensor("hello"), float: Tensor<Float>(.pi), 
-    int: Tensor<Int>(0))
-  var x = Generic(t: s, u: m)
+TensorGroupTests.test("Generic") {
   let float = Float.tensorFlowDataType
-  let int = Int.tensorFlowDataType
+  let int = Int32.tensorFlowDataType
   let string = String.tensorFlowDataType
-  expectEqual([float, float, string, float, int], x._typeList)
+  expectEqual(
+    [float, float, string, float, int], 
+    Generic<Simple, Mixed>._typeList)
 }
+
+runAllTests()
