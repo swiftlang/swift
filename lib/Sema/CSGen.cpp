@@ -540,7 +540,6 @@ namespace {
   /// "favored" because they match exactly.
   bool isFavoredParamAndArg(ConstraintSystem &CS,
                             Type paramTy,
-                            Expr *arg,
                             Type argTy,
                             Type otherArgTy = Type()) {
     // Determine the argument type.
@@ -550,31 +549,44 @@ namespace {
     if (paramTy->isEqual(argTy))
       return true;
 
-    // If the argument is a literal, this is a favored param/arg pair if
-    // the parameter is of that default type.
-    auto &tc = CS.getTypeChecker();
-    auto literalProto = tc.getLiteralProtocol(arg->getSemanticsProvidingExpr());
-    if (!literalProto) return false;
+    llvm::SmallSetVector<ProtocolDecl *, 2> literalProtos;
+    if (auto argTypeVar = argTy->getAs<TypeVariableType>()) {
+      llvm::SetVector<Constraint *> constraints;
+      CS.getConstraintGraph().gatherConstraints(
+          argTypeVar, constraints,
+          ConstraintGraph::GatheringKind::EquivalenceClass,
+          [](Constraint *constraint) {
+            return constraint->getKind() == ConstraintKind::LiteralConformsTo;
+          });
+
+      for (auto constraint : constraints) {
+        literalProtos.insert(constraint->getProtocol());
+      }
+    }
 
     // Dig out the second argument type.
     if (otherArgTy)
       otherArgTy = otherArgTy->getWithoutSpecifierType();
 
-    // If there is another, concrete argument, check whether it's type
-    // conforms to the literal protocol and test against it directly.
-    // This helps to avoid 'widening' the favored type to the default type for
-    // the literal.
-    if (otherArgTy && otherArgTy->getAnyNominal()) {
-      return otherArgTy->isEqual(paramTy) &&
-             tc.conformsToProtocol(otherArgTy, literalProto, CS.DC,
-                                   ConformanceCheckFlags::InExpression);
+    auto &tc = CS.getTypeChecker();
+    for (auto literalProto : literalProtos) {
+      // If there is another, concrete argument, check whether it's type
+      // conforms to the literal protocol and test against it directly.
+      // This helps to avoid 'widening' the favored type to the default type for
+      // the literal.
+      if (otherArgTy && otherArgTy->getAnyNominal()) {
+        if (otherArgTy->isEqual(paramTy) &&
+            tc.conformsToProtocol(otherArgTy, literalProto, CS.DC,
+                                  ConformanceCheckFlags::InExpression))
+          return true;
+      } else if (Type defaultType = tc.getDefaultType(literalProto, CS.DC)) {
+        // If there is a default type for the literal protocol, check whether
+        // it is the same as the parameter type.
+        // Check whether there is a default type to compare against.
+        if (paramTy->isEqual(defaultType))
+          return true;
+      }
     }
-
-    // If there is a default type for the literal protocol, check whether
-    // it is the same as the parameter type.
-    // Check whether there is a default type to compare against.
-    if (Type defaultType = tc.getDefaultType(literalProto, CS.DC))
-      return paramTy->isEqual(defaultType);
 
     return false;
   }
@@ -744,7 +756,7 @@ namespace {
       auto contextualTy = CS.getContextualType(expr);
 
       return isFavoredParamAndArg(
-                 CS, paramTy, expr->getArg(),
+                 CS, paramTy,
                  CS.getType(expr->getArg())->getWithoutParens()) &&
              (!contextualTy || contextualTy->isEqual(resultTy));
     };
@@ -899,14 +911,6 @@ namespace {
           CS.setFavoredType(argTupleExpr->getElement(1), favoredExprTy);
           secondFavoredTy = favoredExprTy;
         }
-        
-        if (firstFavoredTy && firstArgTy->is<TypeVariableType>()) {
-          firstArgTy = firstFavoredTy;
-        }
-        
-        if (secondFavoredTy && secondArgTy->is<TypeVariableType>()) {
-          secondArgTy = secondFavoredTy;
-        }
       }
       
       // Figure out the parameter type.
@@ -924,9 +928,8 @@ namespace {
       auto resultTy = fnTy->getResult();
       auto contextualTy = CS.getContextualType(expr);
 
-      return (isFavoredParamAndArg(CS, firstParamTy, firstArg, firstArgTy,
-                                   secondArgTy) ||
-              isFavoredParamAndArg(CS, secondParamTy, secondArg, secondArgTy,
+      return (isFavoredParamAndArg(CS, firstParamTy, firstArgTy, secondArgTy) ||
+              isFavoredParamAndArg(CS, secondParamTy, secondArgTy,
                                    firstArgTy)) &&
              firstParamTy->isEqual(secondParamTy) &&
              !isPotentialForcingOpportunity(firstArgTy, secondArgTy) &&
@@ -1109,7 +1112,7 @@ namespace {
           auto keyTy = dictTy->first;
           auto valueTy = dictTy->second;
 
-          if (isFavoredParamAndArg(CS, keyTy, index, CS.getType(index))) {
+          if (isFavoredParamAndArg(CS, keyTy, CS.getType(index))) {
             outputTy = OptionalType::get(valueTy);
             
             if (isLValueBase)
@@ -2523,10 +2526,8 @@ namespace {
           return resultOfTypeOperation(typeOperation, expr->getArg());
       }
 
-      if (isa<DeclRefExpr>(fnExpr)) {
-        if (auto fnType = CS.getType(fnExpr)->getAs<AnyFunctionType>()) {
-          outputTy = fnType->getResult();
-        }
+      if (auto fnType = CS.getType(fnExpr)->getAs<AnyFunctionType>()) {
+        outputTy = fnType->getResult();
       } else if (auto OSR = dyn_cast<OverloadedDeclRefExpr>(fnExpr)) {
         // Determine if the overloads are all functions that share a common
         // return type.
