@@ -1,4 +1,4 @@
-//===--- CastOptimizer.h --------------------------------------------------===//
+//===--- CastOptimizer.h ----------------------------------*- C++ -*-------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -30,6 +30,7 @@
 namespace swift {
 
 class SILOptFunctionBuilder;
+struct SILDynamicCastInst;
 
 /// This is a helper class used to optimize casts.
 class CastOptimizer {
@@ -144,6 +145,7 @@ public:
       UnconditionalCheckedCastAddrInst *Inst);
 
   /// Check if it is a bridged cast and optimize it.
+  ///
   /// May change the control flow.
   SILInstruction *optimizeBridgedCasts(SILInstruction *Inst,
                                        CastConsumptionKind ConsumptionKind,
@@ -151,6 +153,8 @@ public:
                                        SILValue Dest, CanType Source,
                                        CanType Target, SILBasicBlock *SuccessBB,
                                        SILBasicBlock *FailureBB);
+
+  SILInstruction *optimizeBridgedCasts(SILDynamicCastInst cast);
 
   SILValue optimizeMetatypeConversion(ConversionInst *mci,
                                       MetatypeRepresentation representation);
