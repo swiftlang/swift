@@ -12,38 +12,38 @@
 
 // MARK: Diff application to RangeReplaceableCollection
 
-extension RangeReplaceableCollection {
-  private static func fastApplicationEnumeration(
-    of diff: CollectionDifference<Element>,
-    _ f: (CollectionDifference<Element>.Change) -> Void
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
+extension CollectionDifference {
+  fileprivate func _fastEnumeratedApply(
+    _ consume: (Change) -> Void
   ) {
-    let totalRemoves = diff.removals.count
-    let totalInserts = diff.insertions.count
+    let totalRemoves = removals.count
+    let totalInserts = insertions.count
     var enumeratedRemoves = 0
     var enumeratedInserts = 0
 
     while enumeratedRemoves < totalRemoves || enumeratedInserts < totalInserts {
-      let consume: CollectionDifference<Element>.Change
-      if enumeratedRemoves < diff.removals.count && enumeratedInserts < diff.insertions.count {
-        let removeOffset = diff.removals[enumeratedRemoves].offset
-        let insertOffset = diff.insertions[enumeratedInserts].offset
+      let change: Change
+      if enumeratedRemoves < removals.count && enumeratedInserts < insertions.count {
+        let removeOffset = removals[enumeratedRemoves]._offset
+        let insertOffset = insertions[enumeratedInserts]._offset
         if removeOffset - enumeratedRemoves <= insertOffset - enumeratedInserts {
-          consume = diff.removals[enumeratedRemoves]
+          change = removals[enumeratedRemoves]
         } else {
-          consume = diff.insertions[enumeratedInserts]
+          change = insertions[enumeratedInserts]
         }
       } else if enumeratedRemoves < totalRemoves {
-        consume = diff.removals[enumeratedRemoves]
+        change = removals[enumeratedRemoves]
       } else if enumeratedInserts < totalInserts {
-        consume = diff.insertions[enumeratedInserts]
+        change = insertions[enumeratedInserts]
       } else {
         // Not reached, loop should have exited.
         preconditionFailure()
       }
 
-      f(consume)
+      consume(change)
 
-      switch consume {
+      switch change {
       case .remove(_, _, _):
         enumeratedRemoves += 1
       case .insert(_, _, _):
@@ -51,7 +51,9 @@ extension RangeReplaceableCollection {
       }
     }
   }
+}
 
+extension RangeReplaceableCollection {
   /// Applies a difference to a collection.
   ///
   /// - Parameter difference: The difference to be applied.
@@ -62,7 +64,7 @@ extension RangeReplaceableCollection {
   ///
   /// - Complexity: O(*n* + *c*), where *n* is `self.count` and *c* is the
   ///   number of changes contained by the parameter.
-  @available(swift, introduced: 5.1)
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
   public func applying(_ difference: CollectionDifference<Element>) -> Self? {
     var result = Self()
     var enumeratedRemoves = 0
@@ -70,13 +72,16 @@ extension RangeReplaceableCollection {
     var enumeratedOriginals = 0
     var currentIndex = self.startIndex
 
-    func append(into target: inout Self, contentsOf source: Self, from index: inout Self.Index, count: Int) {
+    func append(
+      into target: inout Self,
+      contentsOf source: Self,
+      from index: inout Self.Index, count: Int) {
       let start = index
       source.formIndex(&index, offsetBy: count)
       target.append(contentsOf: source[start..<index])
     }
 
-    Self.fastApplicationEnumeration(of: difference) { change in
+    difference._fastEnumeratedApply { change in
       switch change {
       case .remove(offset: let offset, element: _, associatedWith: _):
         let origCount = offset - enumeratedOriginals
@@ -105,7 +110,6 @@ extension RangeReplaceableCollection {
 
 // MARK: Definition of API
 
-@available(swift, introduced: 5.1)
 extension BidirectionalCollection {
   /// Returns the difference needed to produce the receiver's state from the
   /// parameter's state, using the provided closure to establish equivalence
@@ -124,18 +128,20 @@ extension BidirectionalCollection {
   /// - Complexity: For pathological inputs, worst case performance is
   ///   O(`self.count` * `other.count`). Faster execution can be expected
   ///   when the collections share many common elements.
-  public func difference<C>(
-    from other: C, by areEquivalent: (Element, C.Element) -> Bool
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
+  public func difference<C: BidirectionalCollection>(
+    from other: C,
+    by areEquivalent: (Element, C.Element) -> Bool
   ) -> CollectionDifference<Element>
-    where C : BidirectionalCollection, C.Element == Self.Element
+  where C.Element == Self.Element
   {
     var rawChanges: [CollectionDifference<Element>.Change] = []
 
-    let source = CountingIndexCollection(other)
-    let target = CountingIndexCollection(self)
-    let result = CollectionChanges(from: source, to: target, by: areEquivalent)
-      for c in result {
-      switch c {
+    let source = _CountingIndexCollection(other)
+    let target = _CountingIndexCollection(self)
+    let result = _CollectionChanges(from: source, to: target, by: areEquivalent)
+    for change in result {
+      switch change {
       case let .removed(r):
         for i in source.indices[r] {
           rawChanges.append(
@@ -156,7 +162,7 @@ extension BidirectionalCollection {
       }
     }
 
-    return CollectionDifference<Element>(validatedChanges: rawChanges)
+    return CollectionDifference<Element>(_validatedChanges: rawChanges)
   }
 }
 
@@ -178,9 +184,10 @@ extension BidirectionalCollection where Element : Equatable {
   ///   O(`self.count` * `other.count`). Faster execution can be expected
   ///   when the collections share many common elements, or if `Element`
   ///   also conforms to `Hashable`.
-  public func difference<C>(from other: C) -> CollectionDifference<Element>
-    where C: BidirectionalCollection, C.Element == Self.Element
-  {
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
+  public func difference<C: BidirectionalCollection>(
+    from other: C
+  ) -> CollectionDifference<Element> where C.Element == Self.Element {
     return difference(from: other, by: ==)
   }
 }
@@ -188,8 +195,9 @@ extension BidirectionalCollection where Element : Equatable {
 extension BidirectionalCollection {
   /// Returns a pair of subsequences containing the initial elements that
   /// `self` and `other` have in common.
-  fileprivate func commonPrefix<Other : BidirectionalCollection>(
-    with other: Other, by areEquivalent: (Element, Other.Element) -> Bool
+  fileprivate func _commonPrefix<Other: BidirectionalCollection>(
+    with other: Other,
+    by areEquivalent: (Element, Other.Element) -> Bool
   ) -> (SubSequence, Other.SubSequence) where Element == Other.Element {
     let (s1, s2) = (startIndex, other.startIndex)
     let (e1, e2) = (endIndex, other.endIndex)
@@ -235,10 +243,9 @@ extension BidirectionalCollection {
 /// - Note: `CollectionChanges` holds a reference to state used to run the
 ///     difference algorithm, which can be exponentially larger than the
 ///     changes themselves.
-fileprivate struct CollectionChanges<
-  SourceIndex : Comparable, TargetIndex : Comparable
-> {
-  typealias Endpoint = (x: SourceIndex, y: TargetIndex)
+fileprivate struct _CollectionChanges<SourceIndex, TargetIndex>
+where SourceIndex: Comparable, TargetIndex: Comparable {
+  fileprivate typealias Endpoint = (x: SourceIndex, y: TargetIndex)
 
   /// An encoding of change elements as an array of index pairs stored in
   /// `pathStorage[pathStartIndex...]`.
@@ -271,7 +278,7 @@ fileprivate struct CollectionChanges<
   private var pathStartIndex: Int
 
   /// Creates a collection of changes from a difference path.
-  init(
+  fileprivate init(
     pathStorage: [Endpoint], pathStartIndex: Int
   ) {
     self.pathStorage = pathStorage
@@ -286,32 +293,32 @@ fileprivate struct CollectionChanges<
   }
 }
 
-extension CollectionChanges {
+extension _CollectionChanges {
   /// A range of elements removed from the source, inserted in the target, or
   /// that the source and target have in common.
-  enum Element {
+  fileprivate enum Element {
     case removed(Range<SourceIndex>)
     case inserted(Range<TargetIndex>)
     case matched(Range<SourceIndex>, Range<TargetIndex>)
   }
 }
 
-extension CollectionChanges : RandomAccessCollection {
-  typealias Index = Int
+extension _CollectionChanges: RandomAccessCollection {
+  fileprivate typealias Index = Int
 
-  var startIndex: Index {
+  fileprivate var startIndex: Index {
     return 0
   }
 
-  var endIndex: Index {
+  fileprivate var endIndex: Index {
     return Swift.max(0, pathStorage.endIndex - pathStartIndex - 1)
   }
 
-  func index(after i: Index) -> Index {
+  fileprivate func index(after i: Index) -> Index {
     return i + 1
   }
 
-  subscript(position: Index) -> Element {
+  fileprivate subscript(position: Index) -> Element {
     precondition((startIndex..<endIndex).contains(position))
 
     let current = pathStorage[position + pathStartIndex]
@@ -327,21 +334,24 @@ extension CollectionChanges : RandomAccessCollection {
   }
 }
 
-extension CollectionChanges : CustomStringConvertible {
-  var description: String {
-    return String(describing: Array(self))
+extension _CollectionChanges: CustomStringConvertible {
+  fileprivate var description: String {
+    return _makeCollectionDescription()
   }
 }
 
-extension CollectionChanges {
+extension _CollectionChanges {
   /// Creates the collection of changes between `source` and `target`.
   ///
   /// - Runtime: O(*n* * *d*), where *n* is `source.count + target.count` and
   ///   *d* is the minimal number of inserted and removed elements.
   /// - Space: O(*d* * *d*), where *d* is the minimal number of inserted and
   ///   removed elements.
-  init<Source : BidirectionalCollection, Target : BidirectionalCollection>(
-    from source: Source, to target: Target, by areEquivalent: (Source.Element, Target.Element) -> Bool
+  fileprivate
+  init<Source: BidirectionalCollection, Target: BidirectionalCollection>(
+    from source: Source,
+    to target: Target,
+    by areEquivalent: (Source.Element, Target.Element) -> Bool
   ) where
     Source.Element == Target.Element,
     Source.Index == SourceIndex,
@@ -358,10 +368,13 @@ extension CollectionChanges {
   ///   *d* is the minimal number of inserted and removed elements.
   /// - Space: O(*d*²), where *d* is the minimal number of inserted and
   ///   removed elements.
-  mutating func formChanges<
-    Source : BidirectionalCollection, Target : BidirectionalCollection
+  private mutating func formChanges<
+    Source: BidirectionalCollection,
+    Target: BidirectionalCollection
   >(
-    from source: Source, to target: Target, by areEquivalent: (Source.Element, Target.Element) -> Bool
+    from source: Source,
+    to target: Target,
+    by areEquivalent: (Source.Element, Target.Element) -> Bool
   ) where
     Source.Element == Target.Element,
     Source.Index == SourceIndex,
@@ -369,7 +382,7 @@ extension CollectionChanges {
   {
     let pathStart = (x: source.startIndex, y: target.startIndex)
     let pathEnd = (x: source.endIndex, y: target.endIndex)
-    let matches = source.commonPrefix(with: target, by: areEquivalent)
+    let matches = source._commonPrefix(with: target, by: areEquivalent)
     let (x, y) = (matches.0.endIndex, matches.1.endIndex)
 
     if pathStart == pathEnd {
@@ -395,7 +408,8 @@ extension CollectionChanges {
   ///   *d* is the number of inserts and removes.
   /// - Space: O(*d* * *d*), where *d* is the number of inserts and removes.
   private mutating func formChangesCore<
-    Source : BidirectionalCollection, Target : BidirectionalCollection
+    Source: BidirectionalCollection,
+    Target: BidirectionalCollection
   >(
     from a: Source,
     to b: Target,
@@ -429,7 +443,7 @@ extension CollectionChanges {
     var (x, y) = (x, y)
     let (n, m) = (a.endIndex, b.endIndex)
 
-    var v = SearchState<Source.Index, Target.Index>(consuming: &pathStorage)
+    var v = _SearchState<Source.Index, Target.Index>(consuming: &pathStorage)
 
     v.appendFrontier(repeating: (x, y))
     var d = 1
@@ -445,7 +459,7 @@ extension CollectionChanges {
           if x != n { a.formIndex(after: &x) }
         }
 
-        let matches = a[x..<n].commonPrefix(with: b[y..<m], by: areEquivalent)
+        let matches = a[x..<n]._commonPrefix(with: b[y..<m], by: areEquivalent)
         (x, y) = (matches.0.endIndex, matches.1.endIndex)
         v[d, k] = (x, y)
 
@@ -462,28 +476,29 @@ extension CollectionChanges {
 }
 
 /// The search paths being explored.
-fileprivate struct SearchState<
-  SourceIndex : Comparable, TargetIndex : Comparable
+fileprivate struct _SearchState<
+  SourceIndex: Comparable,
+  TargetIndex: Comparable
 > {
-  typealias Endpoint = (x: SourceIndex, y: TargetIndex)
+  fileprivate typealias Endpoint = (x: SourceIndex, y: TargetIndex)
 
   /// The search frontier for each iteration.
   ///
   /// The nth iteration of the core algorithm requires storing n + 1 search
   /// path endpoints. Thus, the shape of the storage required is a triangle.
-  private var endpoints = LowerTriangularMatrix<Endpoint>()
+  private var endpoints = _LowerTriangularMatrix<Endpoint>()
 
   /// Creates an instance, taking the capacity of `storage` for itself.
   ///
   /// - Postcondition: `storage` is empty.
-  init(consuming storage: inout [Endpoint]) {
+  fileprivate init(consuming storage: inout [Endpoint]) {
     storage.removeAll(keepingCapacity: true)
     swap(&storage, &endpoints.storage)
   }
 
   /// Returns the endpoint of the search frontier for iteration `d` on
   /// diagonal `k`.
-  subscript(d: Int, k: Int) -> Endpoint {
+  fileprivate subscript(d: Int, k: Int) -> Endpoint {
     get {
       assert((-d...d).contains(k))
       assert((d + k) % 2 == 0)
@@ -498,20 +513,24 @@ fileprivate struct SearchState<
 
   /// Adds endpoints initialized to `repeatedValue` for the search frontier of
   /// the next iteration.
-  mutating func appendFrontier(repeating repeatedValue: Endpoint) {
+  fileprivate mutating func appendFrontier(repeating repeatedValue: Endpoint) {
     endpoints.appendRow(repeating: repeatedValue)
   }
 }
 
-extension SearchState {
-  /// Removes and returns `CollectionChanges`, leaving `SearchState` empty.
+extension _SearchState {
+  /// Removes and returns `_CollectionChanges`, leaving `_SearchState` empty.
   ///
   /// - Precondition: There is at least one difference between `a` and `b`
-  mutating func removeCollectionChanges<
-    Source : BidirectionalCollection, Target : BidirectionalCollection
+  fileprivate mutating func removeCollectionChanges<
+    Source: BidirectionalCollection,
+    Target: BidirectionalCollection
   >(
-    a: Source, b: Target, d: Int, delta: Int
-  ) -> CollectionChanges<Source.Index, Target.Index>
+    a: Source,
+    b: Target,
+    d: Int,
+    delta: Int
+  ) -> _CollectionChanges<Source.Index, Target.Index>
     where Source.Index == SourceIndex, Target.Index == TargetIndex
   {
     // Calculating the difference path is very similar to running the core
@@ -614,12 +633,12 @@ extension SearchState {
 
     let pathStorage = endpoints.storage
     endpoints.storage = []
-    return CollectionChanges(pathStorage: pathStorage, pathStartIndex: i)
+    return _CollectionChanges(pathStorage: pathStorage, pathStartIndex: i)
   }
 }
 
 /// An index that counts its offset from the start of its collection.
-struct CountingIndex<Base : Comparable> : Equatable {
+private struct _CountingIndex<Base: Comparable>: Equatable {
   /// The position in the underlying collection.
   let base: Base
   /// The offset from the start index of the collection or `nil` if `self` is
@@ -627,56 +646,56 @@ struct CountingIndex<Base : Comparable> : Equatable {
   let offset: Int?
 }
 
-extension CountingIndex : Comparable {
-  static func <(lhs: CountingIndex, rhs: CountingIndex) -> Bool {
+extension _CountingIndex: Comparable {
+  fileprivate static func <(lhs: _CountingIndex, rhs: _CountingIndex) -> Bool {
     return (lhs.base, lhs.offset ?? Int.max) < (rhs.base, rhs.offset ?? Int.max)
   }
 }
 
 /// A collection that counts the offset of its indices from its start index.
 ///
-/// You can use `CountingIndexCollection` with algorithms on `Collection` to
+/// You can use `_CountingIndexCollection` with algorithms on `Collection` to
 /// calculate offsets of significance:
 ///
-///   if let i = CountingIndexCollection("Café").index(of: "f") {
+///   if let i = _CountingIndexCollection("Café").index(of: "f") {
 ///     print(i.offset)
 ///   }
 ///   // Prints "2"
 ///
 /// - Note: The offset of `endIndex` is `nil`
-struct CountingIndexCollection<Base : BidirectionalCollection> {
-  let base: Base
+private struct _CountingIndexCollection<Base: BidirectionalCollection> {
+  private let base: Base
 
-  init(_ base: Base) {
+  fileprivate init(_ base: Base) {
     self.base = base
   }
 }
 
-extension CountingIndexCollection : BidirectionalCollection {
-  typealias Index = CountingIndex<Base.Index>
-  typealias Element = Base.Element
+extension _CountingIndexCollection : BidirectionalCollection {
+  fileprivate typealias Index = _CountingIndex<Base.Index>
+  fileprivate typealias Element = Base.Element
 
-  var startIndex: Index {
+  fileprivate var startIndex: Index {
     return Index(base: base.startIndex, offset: base.isEmpty ? nil : 0)
   }
 
-  var endIndex: Index {
+  fileprivate var endIndex: Index {
     return Index(base: base.endIndex, offset: nil)
   }
 
-  func index(after i: Index) -> Index {
+  fileprivate func index(after i: Index) -> Index {
     let next = base.index(after: i.base)
     return Index(
       base: next, offset: next == base.endIndex ? nil : i.offset! + 1)
   }
 
-  func index(before i: Index) -> Index {
+  fileprivate func index(before i: Index) -> Index {
     let prev = base.index(before: i.base)
     return Index(
       base: prev, offset: prev == base.endIndex ? nil : i.offset! + 1)
   }
 
-  subscript(position: Index) -> Element {
+  fileprivate subscript(position: Index) -> Element {
     return base[position.base]
   }
 }
@@ -684,7 +703,7 @@ extension CountingIndexCollection : BidirectionalCollection {
 /// Returns the nth [triangular number].
 ///
 /// [triangular number]: https://en.wikipedia.org/wiki/Triangular_number
-fileprivate func triangularNumber(_ n: Int) -> Int {
+fileprivate func _triangularNumber(_ n: Int) -> Int {
   return n * (n + 1) / 2
 }
 
@@ -693,7 +712,7 @@ fileprivate func triangularNumber(_ n: Int) -> Int {
 ///
 /// A [lower triangular matrix] can be dynamically grown:
 ///
-///   var m = LowerTriangularMatrix<Int>()
+///   var m = _LowerTriangularMatrix<Int>()
 ///   m.appendRow(repeating: 1)
 ///   m.appendRow(repeating: 2)
 ///   m.appendRow(repeating: 3)
@@ -705,74 +724,78 @@ fileprivate func triangularNumber(_ n: Int) -> Int {
 ///   ])
 ///
 /// [lower triangular matrix]: http://en.wikipedia.org/wiki/Triangular_matrix
-fileprivate struct LowerTriangularMatrix<Element> {
+fileprivate struct _LowerTriangularMatrix<Element> {
   /// The matrix elements stored in [row major order][rmo].
   ///
   /// [rmo]: http://en.wikipedia.org/wiki/Row-_and_column-major_order
-  var storage: [Element] = []
+  fileprivate var storage: [Element] = []
 
   /// The dimension of the matrix.
   ///
   /// Being a square matrix, the number of rows and columns are equal.
-  var dimension: Int = 0
+  fileprivate var dimension: Int = 0
 
-  subscript(row: Int, column: Int) -> Element {
+  fileprivate subscript(row: Int, column: Int) -> Element {
     get {
       assert((0...row).contains(column))
-      return storage[triangularNumber(row) + column]
+      return storage[_triangularNumber(row) + column]
     }
     set {
       assert((0...row).contains(column))
-      storage[triangularNumber(row) + column] = newValue
+      storage[_triangularNumber(row) + column] = newValue
     }
   }
 
-  mutating func appendRow(repeating repeatedValue: Element) {
+  fileprivate mutating func appendRow(repeating repeatedValue: Element) {
     dimension += 1
     storage.append(contentsOf: repeatElement(repeatedValue, count: dimension))
   }
 }
 
-extension LowerTriangularMatrix {
+extension _LowerTriangularMatrix {
   /// A collection that visits the elements in the matrix in [row major
   /// order][rmo].
   ///
   /// [rmo]: http://en.wikipedia.org/wiki/Row-_and_column-major_order
-  struct RowMajorOrder : RandomAccessCollection {
-    var base: LowerTriangularMatrix
+  fileprivate struct RowMajorOrder : RandomAccessCollection {
+    private var base: _LowerTriangularMatrix
 
-    var startIndex: Int {
+    fileprivate init(base: _LowerTriangularMatrix) {
+      self.base = base
+    }
+
+    fileprivate var startIndex: Int {
       return base.storage.startIndex
     }
 
-    var endIndex: Int {
+    fileprivate var endIndex: Int {
       return base.storage.endIndex
     }
 
-    func index(after i: Int) -> Int {
+    fileprivate func index(after i: Int) -> Int {
       return i + 1
     }
 
-    func index(before i: Int) -> Int {
+    fileprivate func index(before i: Int) -> Int {
       return i - 1
     }
 
-    subscript(position: Int) -> Element {
+    fileprivate subscript(position: Int) -> Element {
       return base.storage[position]
     }
   }
 
-  var rowMajorOrder: RowMajorOrder {
+  fileprivate var rowMajorOrder: RowMajorOrder {
     return RowMajorOrder(base: self)
   }
 
-  subscript(row r: Int) -> Slice<RowMajorOrder> {
-    return rowMajorOrder[triangularNumber(r)..<triangularNumber(r + 1)]
+  fileprivate subscript(row r: Int) -> Slice<RowMajorOrder> {
+    return rowMajorOrder[_triangularNumber(r)..<_triangularNumber(r + 1)]
   }
 }
 
-extension LowerTriangularMatrix : CustomStringConvertible {
-  var description: String {
+extension _LowerTriangularMatrix: CustomStringConvertible {
+  fileprivate var description: String {
     var rows: [[Element]] = []
     for row in 0..<dimension {
       rows.append(Array(self[row: row]))
