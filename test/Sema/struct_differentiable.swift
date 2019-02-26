@@ -20,8 +20,10 @@ struct EmptyAdditiveArithmetic : AdditiveArithmetic, Differentiable {}
 
 // Test structs whose stored properties all have a default value.
 struct AllLetStoredPropertiesHaveInitialValue : Differentiable {
-  let x = Float(1) // expected-warning {{'let' properties with a default value do not have a derivative; add '@noDerivative' to make it explicit}} {{3-3=@noDerivative }}
-  let y = Float(1) // expected-warning {{'let' properties with a default value do not have a derivative; add '@noDerivative' to make it explicit}} {{3-3=@noDerivative }}
+  // expected-warning @+1 {{'let' properties with a default value do not have a derivative; add '@noDerivative' to make it explicit, or change it to 'var' to allow derivatives}} {{3-3=@noDerivative }}
+  let x = Float(1)
+  // expected-warning @+1 {{'let' properties with a default value do not have a derivative; add '@noDerivative' to make it explicit, or change it to 'var' to allow derivatives}} {{3-3=@noDerivative }}
+  let y = Float(1)
 }
 struct AllVarStoredPropertiesHaveInitialValue : Differentiable {
   var x = Float(1)
@@ -29,7 +31,7 @@ struct AllVarStoredPropertiesHaveInitialValue : Differentiable {
 }
 // Test struct with both an empty constructor and memberwise initializer.
 struct AllMixedStoredPropertiesHaveInitialValue : Differentiable {
-  let x = Float(1) // expected-warning {{'let' properties with a default value do not have a derivative; add '@noDerivative' to make it explicit}} {{3-3=@noDerivative }}
+  let x = Float(1) // expected-warning {{'let' properties with a default value do not have a derivative}} {{3-3=@noDerivative }}
   var y = Float(1)
   // Memberwise initializer should be `init(y:)` since `x` is immutable.
   static func testMemberwiseInitializer() {
@@ -126,7 +128,7 @@ assertConformsToVectorNumeric(AllMembersVectorNumeric.CotangentVector.self)
 // Test type with immutable, differentiable stored property.
 struct ImmutableStoredProperty : Differentiable {
   var w: Float
-  let fixedBias: Float = .pi // expected-warning {{'let' properties with a default value do not have a derivative; add '@noDerivative' to make it explicit}} {{3-3=@noDerivative }}
+  let fixedBias: Float = .pi // expected-warning {{'let' properties with a default value do not have a derivative}} {{3-3=@noDerivative }}
 }
 _ = ImmutableStoredProperty.TangentVector(w: 1)
 
