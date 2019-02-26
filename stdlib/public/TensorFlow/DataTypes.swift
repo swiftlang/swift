@@ -75,7 +75,8 @@ public typealias TensorFlowInteger = TensorFlowScalar & BinaryInteger
 
 public protocol TensorFlowFloatingPoint :
   TensorFlowScalar & BinaryFloatingPoint & Differentiable
-  where Self == Self.TangentVector,
+  where Self.RawSignificand: FixedWidthInteger,
+        Self == Self.TangentVector,
         Self == Self.CotangentVector,
         Self == Self.AllDifferentiableVariables {}
 
