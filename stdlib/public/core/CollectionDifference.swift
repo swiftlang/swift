@@ -212,7 +212,10 @@ extension CollectionDifference : Collection {
 
   // Opaque index type is isomorphic to Int
   public struct Index: Comparable, Hashable {
-    public static func < (lhs: CollectionDifference<ChangeElement>.Index, rhs: CollectionDifference<ChangeElement>.Index) -> Bool {
+    public static func < (
+      lhs: CollectionDifference<ChangeElement>.Index, 
+      rhs: CollectionDifference<ChangeElement>.Index
+    ) -> Bool {
       return lhs.i < rhs.i
     }
     
