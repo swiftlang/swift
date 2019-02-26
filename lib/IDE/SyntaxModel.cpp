@@ -178,8 +178,9 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
       }
 
       case tok::unknown: {
-        if (Tok.getRawText().startswith("\"")) {
-          // This is an invalid string literal
+        if (Tok.getRawText().ltrim('#').startswith("\"")) {
+          // This is likely an invalid single-line ("), multi-line ("""),
+          // or raw (#", ##", #""", etc.) string literal.
           Kind = SyntaxNodeKind::String;
           break;
         }
