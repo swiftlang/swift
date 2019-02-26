@@ -510,33 +510,21 @@ struct DifferentiableInitStruct : DifferentiableInit {
   var y: Float
 
   // FIXME(TF-284): Fix unexpected diagnostic.
-<<<<<<< HEAD
-  // expected-note @+2 {{candidate is missing attribute '@differentiable(wrt: (x, y))'}}
-  // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: (x))'}}
-=======
   // expected-note @+2 {{candidate is missing attribute '@differentiable'}}
   // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: x)'}}
->>>>>>> upstream/tensorflow
   init(x: Float, y: Float) {
     self.x = x
     self.y = y
   }
 
   // FIXME(TF-284): Fix unexpected diagnostic.
-<<<<<<< HEAD
-  // expected-note @+2 {{candidate is missing attribute '@differentiable(wrt: (x))'}}
-  // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: (x, y))'}}
-=======
   // expected-note @+2 {{candidate is missing attribute '@differentiable(wrt: x)'}}
   // expected-note @+1 {{candidate is missing attribute '@differentiable'}}
->>>>>>> upstream/tensorflow
   init(x: Float, y: Int) {
     self.x = x
     self.y = Float(y)
   }
 }
-<<<<<<< HEAD
-=======
 
 
 protocol NotRefiningDiffable {
@@ -595,4 +583,3 @@ struct TF296B {
     return a + b
   }
 }
->>>>>>> upstream/tensorflow

@@ -661,26 +661,6 @@ swift::matchWitness(
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-<<<<<<< HEAD
-  // Differentiation attributes must match completely or the generated
-  // functions will have the wrong signature.
-  // TODO(TF-285): Handle multiple `@differentiable` attributes on protocol
-  // requirements. Only missing attributes should be diagnosed.
-  auto *reqDiffAttr =
-      reqAttrs.getAttribute<DifferentiableAttr>(/*AllowInvalid*/ true);
-  auto *witnessDiffAttr =
-      witnessAttrs.getAttribute<DifferentiableAttr>(/*AllowInvalid*/ true);
-  if (reqDiffAttr && (!reqDiffAttr->getParameterIndices() ||
-                      !witnessDiffAttr ||
-                      !witnessDiffAttr->getParameterIndices() ||
-                      !witnessDiffAttr->parametersMatch(*reqDiffAttr))) {
-    if (auto *vdWitness = dyn_cast<VarDecl>(witness))
-      return RequirementMatch(
-          getStandinForAccessor(vdWitness, AccessorKind::Get),
-          MatchKind::DifferentiableConflict);
-    else
-      return RequirementMatch(witness, MatchKind::DifferentiableConflict);
-=======
   // '@differentiable' attributes must match completely.
   for (auto *reqDiffAttr : reqAttrs.getAttributes<DifferentiableAttr>()) {
     auto witnessDiffAttrs =
@@ -697,7 +677,6 @@ swift::matchWitness(
       else
         return RequirementMatch(witness, MatchKind::DifferentiableConflict);
     }
->>>>>>> upstream/tensorflow
   }
 
   // Now finalize the match.
@@ -2269,17 +2248,10 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
       assert(da);
       std::string diffAttrReq;
       llvm::raw_string_ostream stream(diffAttrReq);
-<<<<<<< HEAD
-      // TODO(TF-285): Handle multiple `@differentiable` attributes on protocol
-      // requirements. Only missing attributes should be diagnosed.
-      req->getAttrs().getAttribute<DifferentiableAttr>()->print(stream, req);
-      diffAttrReq = StringRef(stream.str()).trim();
-=======
       da->print(stream, req);
       diags.diagnose(match.Witness,
           diag::protocol_witness_missing_specific_differentiable_attr,
           StringRef(stream.str()).trim());
->>>>>>> upstream/tensorflow
     }
     break;
   }

@@ -2462,24 +2462,12 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
 
   AbstractFunctionDecl *original = nullptr;
-<<<<<<< HEAD
-  bool isProperty = false;
-  if (auto *vd = dyn_cast<VarDecl>(D)) {
-    // When used on a storage decl, @differentiable refers to its getter.
-    original = vd->getGetter();
-    isProperty = true;
-  } else if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
-    original = afd;
-    if (auto *accessor = dyn_cast<AccessorDecl>(afd)) {
-      isProperty = true;
-=======
   if (auto *vd = dyn_cast<VarDecl>(D)) {
     // When used on a storage decl, @differentiable refers to its getter.
     original = vd->getGetter();
   } else if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
     original = afd;
     if (auto *accessor = dyn_cast<AccessorDecl>(afd)) {
->>>>>>> upstream/tensorflow
       // We do not support setters yet because inout is not supported yet.
       if (accessor->isSetter())
         original = nullptr;
@@ -2612,8 +2600,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   AutoDiffParameterIndices *checkedWrtParamIndices =
       attr->getParameterIndices();
 
-<<<<<<< HEAD
-=======
   // Predicate checking if a type has associated tangent and cotangent spaces.
   auto hasAssociatedSpaces = [&](Type type) -> bool {
     return (bool)type->getAutoDiffAssociatedVectorSpace(
@@ -2622,73 +2608,12 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
                AutoDiffAssociatedVectorSpaceKind::Cotangent, lookupConformance);
   };
 
->>>>>>> upstream/tensorflow
   // If checked wrt param indices are not specified, compute them using parsed
   // wrt param indices.
   if (!checkedWrtParamIndices) {
     AutoDiffParameterIndicesBuilder autoDiffParameterIndicesBuilder(
         originalFnTy);
     if (parsedWrtParams.empty()) {
-<<<<<<< HEAD
-      if (isProperty)
-        autoDiffParameterIndicesBuilder.setParameter(0);
-      else {
-        // If 'wrt:' is not specified, the wrt parameters are all the parameters
-        // in the main parameter group. Self is intentionally excluded except
-        // when it's a property.
-        unsigned numNonSelfParameters = autoDiffParameterIndicesBuilder.size() -
-            (isMethod ? 1 : 0);
-        for (unsigned i : range(numNonSelfParameters))
-          autoDiffParameterIndicesBuilder.setParameter(i);
-      }
-    } else {
-      // 'wrt:' is specified. Validate and collect the selected parameters.
-      int lastIndex = -1;
-      for (unsigned i : indices(parsedWrtParams)) {
-        auto paramLoc = parsedWrtParams[i].getLoc();
-        switch (parsedWrtParams[i].getKind()) {
-        case ParsedAutoDiffParameter::Kind::Named: {
-          auto nameIter =
-              llvm::find_if(originalParams.getArray(), [&](ParamDecl *param) {
-                return param->getName() == parsedWrtParams[i].getName();
-              });
-          // Parameter name must exist.
-          if (nameIter == originalParams.end()) {
-            TC.diagnose(paramLoc, diag::differentiable_attr_wrt_name_unknown,
-                        parsedWrtParams[i].getName());
-            return;
-          }
-          // Parameter names must be specified in the original order.
-          unsigned index = std::distance(originalParams.begin(), nameIter);
-          if ((int)index <= lastIndex) {
-            TC.diagnose(paramLoc,
-                        diag::differentiable_attr_wrt_names_not_original_order);
-            return;
-          }
-          autoDiffParameterIndicesBuilder.setParameter(index);
-          lastIndex = index;
-          break;
-        }
-        case ParsedAutoDiffParameter::Kind::Self: {
-          // 'self' is only applicable to instance methods.
-          if (!isInstanceMethod) {
-            TC.diagnose(
-                paramLoc,
-                diag::differentiable_attr_wrt_self_instance_method_only);
-            return;
-          }
-          // 'self' can only be the first in the list.
-          if (i > 0) {
-            TC.diagnose(paramLoc,
-                        diag::differentiable_attr_wrt_self_must_be_first);
-            return;
-          }
-          autoDiffParameterIndicesBuilder.setParameter(
-              autoDiffParameterIndicesBuilder.size() - 1);
-          break;
-        }
-        }
-=======
       SmallVector<Type, 4> allWrtParamTypes;
 
       auto isDifferentiableParam = [&](unsigned i) {
@@ -2801,7 +2726,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
           break;
         }
         }
->>>>>>> upstream/tensorflow
       }
     }
     checkedWrtParamIndices = autoDiffParameterIndicesBuilder.build(ctx);

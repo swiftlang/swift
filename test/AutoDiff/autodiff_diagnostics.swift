@@ -176,8 +176,6 @@ func roundingGivesError(x: Float) -> Float {
   // expected-note @+1 {{expression is not differentiable}}
   return Float(Int(x))
 }
-<<<<<<< HEAD
-=======
 
 //===----------------------------------------------------------------------===//
 // Inout arguments
@@ -201,4 +199,3 @@ func activeInoutArgTuple(_ x: Float) -> Float {
 }
 // expected-error @+1 {{function is not differentiable}}
 _ = pullback(at: .zero, in: activeInoutArgTuple(_:))
->>>>>>> upstream/tensorflow

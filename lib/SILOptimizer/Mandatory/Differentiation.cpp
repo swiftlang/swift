@@ -1380,11 +1380,7 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
             auto structIsFieldwiseDiffable = sei->getStructDecl()->getAttrs()
                 .hasAttribute<FieldwiseDifferentiableAttr>();
             if (!(hasNoDeriv && structIsFieldwiseDiffable))
-<<<<<<< HEAD
-              for (auto result: inst.getResults())
-=======
               for (auto result : inst.getResults())
->>>>>>> upstream/tensorflow
                 setVaried(result, i);
           }
         }
@@ -1816,10 +1812,6 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
     auto *task =
         context.lookUpMinimalDifferentiationTask(originalFn, desiredIndices);
     if (!task) {
-<<<<<<< HEAD
-      auto originalFnTy = originalFn->getLoweredFunctionType();
-
-=======
       // If the function is intentionally marked as being opauqe to
       // differentiation, then we should not create a task for it.
       if (originalFn->hasSemanticsAttr("autodiff.opaque")) {
@@ -1829,7 +1821,6 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
       }
       // Check and diagnose non-differentiable arguments.
       auto originalFnTy = originalFn->getLoweredFunctionType();
->>>>>>> upstream/tensorflow
       for (unsigned paramIndex : range(originalFnTy->getNumParameters())) {
         if (desiredIndices.isWrtParameter(paramIndex) &&
             !originalFnTy->getParameters()[paramIndex]
@@ -1840,11 +1831,7 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
           return None;
         }
       }
-<<<<<<< HEAD
-
-=======
       // Check and diagnose non-differentiable results.
->>>>>>> upstream/tensorflow
       if (!originalFnTy->getResults()[desiredIndices.source]
                .getSILStorageType()
                .isDifferentiable(context.getModule())) {
@@ -1852,11 +1839,7 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
             original, parentTask, diag::autodiff_nondifferentiable_result);
         return None;
       }
-<<<<<<< HEAD
-
-=======
       // Check and diagnose external declarations.
->>>>>>> upstream/tensorflow
       if (originalFn->isExternalDeclaration()) {
         context.emitNondifferentiabilityError(
             original, parentTask,
