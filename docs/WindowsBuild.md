@@ -159,8 +159,8 @@ mkdir "S:\b\swift"
 pushd "S:\b\swift"
 cmake -G Ninja^
  -DCMAKE_BUILD_TYPE=RelWithDebInfo^
- -DCMAKE_C_COMPILER=clang-cl^
- -DCMAKE_CXX_COMPILER=clang-cl^
+ -DCMAKE_C_COMPILER=cl^
+ -DCMAKE_CXX_COMPILER=cl^
  -DCMAKE_EXE_LINKER_FLAGS:STRING="/INCREMENTAL:NO"^
  -DCMAKE_SHARED_LINKER_FLAGS:STRING="/INCREMENTAL:NO"^
  -DSWIFT_INCLUDE_DOCS=OFF^
@@ -220,9 +220,9 @@ Running the testsuite on Windows has additional external dependencies.  You must
   2. diffutils
   3. grep
   4. sed
-  
+
 ```cmd
-path S:\b\swift\bin;S:\b\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles(x86)%\GnuWin32\bin;S:\thirdparty\icu4c-63_1-Win64-MSVC2017\lib64
+path S:\thirdparty\icu4c-63_1-Win64-MSVC2017\bin64;S:\b\swift\bin;S:\b\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles(x86)%\GnuWin32\bin
 ninja -C S:\b\swift check-swift
 ```
 
@@ -236,12 +236,16 @@ cmake -G Ninja^
   -DCMAKE_C_COMPILER=clang-cl^
   -DCMAKE_CXX_COMPILER=clang-cl^
   -DCMAKE_SWIFT_COMPILER=S:\b\swift\bin\swiftc.exe^
-  -DSwift_DIR=S:\b\swift\lib\cmake\swift^
   -DENABLE_SWIFT=ON^
   -DENABLE_TESTING=OFF^
   S:\swift-corelibs-libdispatch
 popd
 cmake --build S:\b\libdispatch
+```
+
+- Add libdispatch to your path:
+```cmd
+path S:\b\libdispatch;S:\b\libdispatch\src;%PATH%
 ```
 
 ### 11. Build libxml2
@@ -279,21 +283,34 @@ cmake -G Ninja^
 
 ```
 
+- Add Foundation to your path:
+```cmd
+path S:\b\foundation;%PATH%
+```
+
 ### 13. Build swift-corelibs-xctest
 
 ```cmd
 mkdir "S:\b\xctest"
 pushd "S:\b\xctest"
-cmke -G Ninja^
+cmake -G Ninja^
+  -DBUILD_SHARED_LIBS=YES^
   -DCMAKE_BUILD_TYPE=RelWithDebInfo^
   -DCMAKE_SWIFT_COMPILER=S:\b\swift\bin\swiftc.exe^
   -DXCTEST_PATH_TO_COREFOUNDATION_BUILD=S:\b\foundation\CoreFoundation-prefix^
   -DXCTEST_PATH_TO_FOUNDATION_BUILD=S:\b\foundation^
-  -DXCTEST_PATH_TO_LIBDPATCH_SOURCE=S:\b\swift-corelibs-libdispatch^
+  -DXCTEST_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch^
   -DXCTEST_PATH_TO_LIBDISPATCH_BUILD=S:\b\libdispatch^
+  -DLIT_COMMAND=S:\llvm\utils\lit\lit.py^
+  -DPYTHON_EXECUTABLE=C:\Python27\python.exe^
   S:\swift-corelibs-xctest
 popd
 cmake --build S:\b\xctest
+```
+
+- Add XCTest to your path:
+```cmd
+path S:\b\xctest;%PATH%
 ```
 
 ### 14. Install Swift on Windows
