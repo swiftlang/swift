@@ -344,7 +344,9 @@ AllowInvalidInitRef::create(RefKind kind, ConstraintSystem &cs, Type baseTy,
 }
 
 bool AddMissingArguments::diagnose(Expr *root, bool asNote) const {
-  return false;
+  MissingArgumentsFailure failure(root, getConstraintSystem(), Fn,
+                                  NumSynthesized, getLocator());
+  return failure.diagnose(asNote);
 }
 
 AddMissingArguments *

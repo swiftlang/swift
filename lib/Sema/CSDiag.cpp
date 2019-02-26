@@ -5775,8 +5775,8 @@ bool FailureDiagnosis::diagnoseClosureExpr(
   // If we have a contextual type available for this closure, apply it to the
   // ParamDecls in our parameter list.  This ensures that any uses of them get
   // appropriate types.
-  if (contextualType && contextualType->is<AnyFunctionType>()) {
-    auto fnType = contextualType->getAs<AnyFunctionType>();
+  if (contextualType && contextualType->is<FunctionType>()) {
+    auto fnType = contextualType->getAs<FunctionType>();
     auto *params = CE->getParameters();
     auto inferredArgs = fnType->getParams();
     
@@ -5791,36 +5791,6 @@ bool FailureDiagnosis::diagnoseClosureExpr(
     unsigned inferredArgCount = inferredArgs.size();
 
     if (actualArgCount != inferredArgCount) {
-      // If the closure didn't specify any arguments and it is in a context that
-      // needs some, produce a fixit to turn "{...}" into "{ _,_ in ...}".
-      if (actualArgCount == 0 && CE->getInLoc().isInvalid()) {
-        auto diag =
-          diagnose(CE->getStartLoc(), diag::closure_argument_list_missing,
-                   inferredArgCount);
-        std::string fixText; // Let's provide fixits for up to 10 args.
-
-        if (inferredArgCount <= 10) {
-          fixText += " _";
-          for (unsigned i = 0; i < inferredArgCount - 1; i ++) {
-            fixText += ",_";
-          }
-          fixText += " in ";
-        }
-
-        if (!fixText.empty()) {
-          // Determine if there is already a space after the { in the closure to
-          // make sure we introduce the right whitespace.
-          auto afterBrace = CE->getStartLoc().getAdvancedLoc(1);
-          auto text = CS.TC.Context.SourceMgr.extractText({afterBrace, 1});
-          if (text.size() == 1 && text == " ")
-            fixText = fixText.erase(fixText.size() - 1);
-          else
-            fixText = fixText.erase(0, 1);
-          diag.fixItInsertAfter(CE->getStartLoc(), fixText);
-        }
-        return true;
-      }
-
       if (inferredArgCount == 1 && actualArgCount > 1) {
         auto *argTupleTy = inferredArgs.front().getOldType()->getAs<TupleType>();
         // Let's see if inferred argument is actually a tuple inside of Paren.
@@ -5956,49 +5926,33 @@ bool FailureDiagnosis::diagnoseClosureExpr(
         }
       }
 
-      bool onlyAnonymousParams =
-      std::all_of(params->begin(), params->end(), [](ParamDecl *param) {
-        return !param->hasName();
-      });
+      // Extraneous arguments.
+      if (inferredArgCount < actualArgCount) {
+        auto diag = diagnose(
+            params->getStartLoc(), diag::closure_argument_list_tuple, fnType,
+            inferredArgCount, actualArgCount, (actualArgCount == 1));
 
-      // Okay, the wrong number of arguments was used, complain about that.
-      // Before doing so, strip attributes off the function type so that they
-      // don't confuse the issue.
-      fnType = FunctionType::get(fnType->getParams(), fnType->getResult(),
-                                 fnType->getExtInfo());
-      auto diag = diagnose(
-          params->getStartLoc(), diag::closure_argument_list_tuple, fnType,
-          inferredArgCount, actualArgCount, (actualArgCount == 1));
+        bool onlyAnonymousParams =
+            std::all_of(params->begin(), params->end(),
+                        [](ParamDecl *param) { return !param->hasName(); });
 
-      // If closure expects no parameters but N was given,
-      // and all of them are anonymous let's suggest removing them.
-      if (inferredArgCount == 0 && onlyAnonymousParams) {
-        auto inLoc = CE->getInLoc();
-        auto &sourceMgr = CS.getASTContext().SourceMgr;
+        // If closure expects no parameters but N was given,
+        // and all of them are anonymous let's suggest removing them.
+        if (inferredArgCount == 0 && onlyAnonymousParams) {
+          auto inLoc = CE->getInLoc();
+          auto &sourceMgr = CS.getASTContext().SourceMgr;
 
-        if (inLoc.isValid())
-          diag.fixItRemoveChars(params->getStartLoc(),
-                                Lexer::getLocForEndOfToken(sourceMgr, inLoc));
+          if (inLoc.isValid())
+            diag.fixItRemoveChars(params->getStartLoc(),
+                                  Lexer::getLocForEndOfToken(sourceMgr, inLoc));
+        }
         return true;
       }
 
-      // If the number of parameters is less than number of inferred
-      // and all of the parameters are anonymous, let's suggest a fix-it
-      // with the rest of the missing parameters.
-      if (actualArgCount < inferredArgCount) {
-        SmallString<32> fixIt;
-        llvm::raw_svector_ostream OS(fixIt);
-
-        OS << ",";
-        auto numMissing = inferredArgCount - actualArgCount;
-        for (unsigned i = 0; i != numMissing; ++i) {
-          OS << ((onlyAnonymousParams) ? "_" : "<#arg#>");
-          OS << ((i == numMissing - 1) ? " " : ",");
-        }
-
-        diag.fixItInsertAfter(params->getEndLoc(), OS.str());
-      }
-      return true;
+      MissingArgumentsFailure failure(
+          expr, CS, fnType, inferredArgCount - actualArgCount,
+          CS.getConstraintLocator(CE, ConstraintLocator::ContextualType));
+      return failure.diagnoseAsError();
     }
 
     // Coerce parameter types here only if there are no unresolved
