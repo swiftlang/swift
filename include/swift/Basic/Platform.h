@@ -78,7 +78,7 @@ namespace swift {
   /// Computes the normalized target triple used as the most preferred name for
   /// module loading.
   ///
-  /// For platforms with module stability, this canonicalizes architecture,
+  /// For platforms with fat binaries, this canonicalizes architecture,
   /// vendor, and OS names, strips OS versions, and makes inferred environments
   /// explicit. For other platforms, it returns the unmodified triple.
   ///
