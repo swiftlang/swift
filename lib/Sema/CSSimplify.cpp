@@ -1262,6 +1262,43 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     // If there are missing arguments, let's add them
     // using parameter as a template.
     if (diff < 0) {
+      // If there are N parameters but a single closure argument
+      // (which might be anonymous), it's most likely used as a
+      // tuple e.g. `$0.0`.
+      Optional<TypeBase *> argumentTuple;
+      if (isa<ClosureExpr>(anchor) && isSingleParam(func1Params)) {
+        auto isParam = [](const Expr *expr) {
+          if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
+            if (auto *decl = DRE->getDecl())
+              return isa<ParamDecl>(decl);
+          }
+          return false;
+        };
+
+        const auto &arg = func1Params.back();
+        if (auto *argTy = arg.getPlainType()->getAs<TypeVariableType>()) {
+          anchor->forEachChildExpr([&](Expr *expr) -> Expr * {
+            if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
+              if (!isParam(UDE->getBase()))
+                return expr;
+
+              auto name = UDE->getName().getBaseIdentifier();
+              unsigned index = 0;
+              if (!name.str().getAsInteger(10, index) ||
+                  llvm::any_of(func2Params,
+                               [&](const AnyFunctionType::Param &param) {
+                                 return param.getLabel() == name;
+                               })) {
+                argumentTuple.emplace(argTy);
+                func1Params.pop_back();
+                return nullptr;
+              }
+            }
+            return expr;
+          });
+        }
+      }
+
       for (unsigned i = func1Params.size(),
                     n = func2Params.size(); i != n; ++i) {
         auto *argLoc = getConstraintLocator(
@@ -1278,6 +1315,15 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
       if (recordFix(fix))
         return getTypeMatchFailure(argumentLocator);
+
+      // If the argument was a single "tuple", let's bind newly
+      // synthesized arguments to it.
+      if (argumentTuple) {
+        addConstraint(ConstraintKind::Bind, *argumentTuple,
+                      FunctionType::composeInput(getASTContext(), func1Params,
+                                                 /*canonicalVararg=*/false),
+                      getConstraintLocator(anchor));
+      }
     } else {
       // TODO(diagnostics): Add handling of extraneous arguments.
       return getTypeMatchFailure(argumentLocator);
