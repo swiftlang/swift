@@ -321,10 +321,6 @@ public:
     // `AutoDiffFunctionExpr`.
     FunctionConversion,
 
-    // Invoked by a `@differentiable` attribute in the Swift source. This case
-    // has an associated `@differentiable` attribute.
-    DifferentiableAttribute,
-
     // Invoker by a `[differentiable]` attribute in SIL **without** being linked
     // to a Swift AST attribute. This case has an associated `[differentiable]`
     // attribute.
@@ -348,12 +344,6 @@ private:
     AutoDiffFunctionExpr *functionConversion;
     Value(AutoDiffFunctionExpr *expr) : functionConversion(expr) {}
 
-    /// The `@differentiable` attribute associated with the
-    /// `DifferentiableAttribute` case.
-    std::pair<DifferentiableAttr *, FuncDecl *> differentiableAttribute;
-    Value(DifferentiableAttr *attr, FuncDecl *fd)
-        : differentiableAttribute({attr, fd}) {}
-
     /// The `[differentiable]` attribute associated with the
     /// `SILDifferentiableAttribute` case.
     std::pair<SILDifferentiableAttr *, SILFunction *>
@@ -372,8 +362,6 @@ public:
       : kind(Kind::IndirectDifferentiation), value(applyInst, task) {}
   DifferentiationInvoker(AutoDiffFunctionExpr *expr)
       : kind(Kind::FunctionConversion), value(expr) {}
-  DifferentiationInvoker(DifferentiableAttr *attr, FuncDecl *fd)
-      : kind(Kind::DifferentiableAttribute), value(attr, fd) {}
   DifferentiationInvoker(SILDifferentiableAttr *attr, SILFunction *f)
       : kind(Kind::SILDifferentiableAttribute), value(attr, f) {}
 
@@ -395,12 +383,6 @@ public:
     return value.functionConversion;
   }
 
-  std::pair<DifferentiableAttr *, FuncDecl *>
-  getDifferentiableAttribute() const {
-    assert(kind == Kind::DifferentiableAttribute);
-    return value.differentiableAttribute;
-  }
-
   std::pair<SILDifferentiableAttr *, SILFunction *>
   getSILDifferentiableAttribute() const {
     assert(kind == Kind::SILDifferentiableAttribute);
@@ -415,8 +397,6 @@ public:
       return getIndirectDifferentiation().first->getLoc().getSourceLoc();
     case Kind::FunctionConversion:
       return getFunctionConversion()->getLoc();
-    case Kind::DifferentiableAttribute:
-      return getDifferentiableAttribute().first->getLocation();
     case Kind::SILDifferentiableAttribute:
       return getSILDifferentiableAttribute().second
           ->getLocation().getSourceLoc();
@@ -732,13 +712,6 @@ void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
     os << "differential_operator=(";
     getFunctionConversion()->print(printer, options);
     os << ')';
-    break;
-  }
-  case Kind::DifferentiableAttribute: {
-    auto diffAttr = getDifferentiableAttribute();
-    os << "differentiable_attribute=(attr=(";
-    diffAttr.first->print(os);
-    os << ") func_decl=" << diffAttr.second->getFullName();
     break;
   }
   case Kind::SILDifferentiableAttribute: {
@@ -1146,17 +1119,6 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
     auto *expr = invoker.getFunctionConversion();
     diagnose(expr->getLoc(), diag::autodiff_function_not_differentiable)
         .highlight(expr->getSubExpr()->getSourceRange());
-    return diagnose(loc,
-        diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
-  }
-
-  // For a `@differentiable` attribute, emit a "not differentiable" error on the
-  // attribute first and a note on the non-differentiable operation.
-  case DifferentiationInvoker::Kind::DifferentiableAttribute: {
-    auto diffAttr = invoker.getDifferentiableAttribute();
-    diagnose(diffAttr.first->getLocation(),
-             diag::autodiff_function_not_differentiable)
-        .highlight(diffAttr.second->getNameLoc());
     return diagnose(loc,
         diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
   }
@@ -5174,8 +5136,6 @@ DifferentiationTask::DifferentiationTask(ADContext &context,
   // If differentiation is triggered by `@differentiable`, we export its symbol
   // when the original function is public.
   auto isAssocFnExported =
-      invoker.getKind() ==
-          DifferentiationInvoker::Kind::DifferentiableAttribute ||
       invoker.getKind() ==
           DifferentiationInvoker::Kind::SILDifferentiableAttribute;
 
