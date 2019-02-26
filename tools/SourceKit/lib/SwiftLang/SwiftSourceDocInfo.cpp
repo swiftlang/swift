@@ -2057,8 +2057,7 @@ void SwiftLangSupport::collectExpressionTypes(StringRef FileName,
       llvm::raw_svector_ostream OS(TypeBuffer);
       ExpressionTypesInFile Result;
       for (auto Item: collectExpressionType(*SF, Scratch, OS)) {
-        Result.Results.push_back({Item.offset, Item.length, Item.typeOffset,
-          Item.typeLength});
+        Result.Results.push_back({Item.offset, Item.length, Item.typeOffset});
       }
       Result.TypeBuffer = OS.str();
       Receiver(Result);

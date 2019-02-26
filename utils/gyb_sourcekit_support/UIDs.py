@@ -168,8 +168,7 @@ UID_KEYS = [
     KEY('ExpressionTypeList', 'key.expression_type_list'),
     KEY('ExpressionOffset', 'key.expression_offset'),
     KEY('ExpressionLength', 'key.expression_length'),
-    KEY('TypeOffset', 'key.type_offset'),
-    KEY('TypeLength', 'key.type_length'),
+    KEY('ExpressionType', 'key.expression_type'),
 ]
 
 

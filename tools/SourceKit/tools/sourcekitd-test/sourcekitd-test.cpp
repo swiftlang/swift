@@ -1537,20 +1537,18 @@ static void printRangeInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
 }
 
 static void printExpressionType(sourcekitd_variant_t Info, llvm::raw_ostream &OS) {
-  auto *TypeBuffer = sourcekitd_variant_dictionary_get_string(Info, KeyTypeBuffer);
-  sourcekitd_variant_t ExprList = sourcekitd_variant_dictionary_get_value(Info,
-    KeyExpressionTypeList);
-  unsigned Count = sourcekitd_variant_array_get_count(ExprList);
-  for (unsigned i = 0; i != Count; ++i) {
-    sourcekitd_variant_t Item = sourcekitd_variant_array_get_value(ExprList, i);
-    unsigned Offset = sourcekitd_variant_dictionary_get_int64(Item, KeyExpressionOffset);
-    unsigned Length = sourcekitd_variant_dictionary_get_int64(Item, KeyExpressionLength);
-    StringRef PrintedType(TypeBuffer + sourcekitd_variant_dictionary_get_int64(Item,
-      KeyTypeOffset), sourcekitd_variant_dictionary_get_int64(Item, KeyTypeLength));
-    OS << "(" << Offset << ", " << Offset + Length << "): " << PrintedType << "\n";
-  }
+  auto TypeBuffer = sourcekitd_variant_dictionary_get_value(Info, KeyExpressionTypeList);
+  unsigned Count = sourcekitd_variant_array_get_count(TypeBuffer);
   if (!Count) {
     OS << "cannot find expression types in the file\n";
+    return;
+  }
+  for (unsigned i = 0; i != Count; ++i) {
+    sourcekitd_variant_t Item = sourcekitd_variant_array_get_value(TypeBuffer, i);
+    unsigned Offset = sourcekitd_variant_dictionary_get_int64(Item, KeyExpressionOffset);
+    unsigned Length = sourcekitd_variant_dictionary_get_int64(Item, KeyExpressionLength);
+    OS << "(" << Offset << ", " << Offset + Length << "): " <<
+      sourcekitd_variant_dictionary_get_string(Item, KeyExpressionType) << "\n";
   }
 }
 
