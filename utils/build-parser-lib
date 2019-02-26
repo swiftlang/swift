@@ -59,6 +59,7 @@ def call_without_sleeping(command, env=None, dry_run=False, echo=False):
 class Builder(object):
     def __init__(self, toolchain, args):
         self.toolchain = toolchain
+        self.ninja_path = args.ninja_path
         self.build_release = args.release
         self.enable_assertions = not args.no_assertions
         self.lto_type = args.lto_type
@@ -81,6 +82,7 @@ class Builder(object):
 
     def configure(self, enable_debuginfo, instrumentation=None, profile_data=None):
         cmake_args = [self.toolchain.cmake, '-G', 'Ninja']
+        cmake_args += ['-DCMAKE_MAKE_PROGRAM='+self.ninja_path]
         if isMac:
             cmake_args += ['-DCMAKE_OSX_DEPLOYMENT_TARGET=10.12', '-DSWIFT_DARWIN_DEPLOYMENT_VERSION_OSX=10.12']
         else:
@@ -186,10 +188,13 @@ def main():
     store_int = optbuilder.actions.store_int
     store_path = optbuilder.actions.store_path
 
+    toolchain = host_toolchain(xcrun_toolchain='default')
+
     default_profile_input = os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "parser-lib", "profile-input.swift")
     default_jobs = multiprocessing.cpu_count()
     default_build_dir = os.path.join(SWIFT_BUILD_ROOT, 'parser-lib')
     default_install_prefix = defaults.DARWIN_INSTALL_PREFIX if isMac else UNIX_INSTALL_PREFIX
+    default_ninja = toolchain.ninja
 
     option('--release', store_true,
         help='build in release mode')
@@ -231,11 +236,13 @@ def main():
            help='the install prefix to use (default = %s)' % default_install_prefix)
     option('--version', store,
            help='version string to use for the parser library')
+    option('--ninja-path', store_path,
+           default = default_ninja,
+           help='the path to ninja (default = %s)' % default_ninja)
 
     parser = optbuilder.build()
     args = parser.parse_args()
 
-    toolchain = host_toolchain(xcrun_toolchain='default')
     builder = Builder(toolchain, args)
     builder.run()
     return 0
