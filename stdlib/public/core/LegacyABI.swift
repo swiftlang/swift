@@ -33,3 +33,9 @@ internal func _isContinuation(_ x: UInt8) -> Bool {
   return UTF8.isContinuation(x)
 }
 
+extension Substring {
+@available(*, unavailable, renamed: "Substring.base")
+  @inlinable
+  internal var _wholeString: String { return base }
+}
+

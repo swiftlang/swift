@@ -193,8 +193,8 @@ extension String {
   internal static func _fromSubstring(
     _ substring: __shared Substring
   ) -> String {
-    if substring._offsetRange == substring._wholeString._offsetRange {
-      return substring._wholeString
+    if substring._offsetRange == substring.base._offsetRange {
+      return substring.base
     }
 
     return String._copying(substring)
