@@ -638,11 +638,13 @@ public:
     {
       llvm::raw_svector_ostream OS(Buffer);
       E->getType()->getRValueType()->reconstituteSugar(true)->print(OS);
+      // Ensure the end user can directly use the char*
+      OS << '\0';
     }
 
     // Add the type information to the result list.
     Results.push_back({Offset, Length, getTypeOffsets(Buffer.str()),
-      static_cast<uint32_t>(Buffer.size())});
+      static_cast<uint32_t>(Buffer.size()) - 1});
 
     // Keep track of that we have a type reported for this range.
     AllPrintedTypes[Offset].insert(Length);
