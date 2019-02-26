@@ -1069,6 +1069,14 @@ swift::emitSuccessfulScalarUnconditionalCast(SILBuilder &B, ModuleDecl *M,
   return result.Value;
 }
 
+bool swift::emitSuccessfulIndirectUnconditionalCast(SILBuilder &B,
+                                                    SILDynamicCastInst inst) {
+  return emitSuccessfulIndirectUnconditionalCast(
+      B, inst.getModule().getSwiftModule(), inst.getLocation(),
+      inst.getSource(), inst.getSourceType(), inst.getDest(),
+      inst.getTargetType(), inst.getInstruction());
+}
+
 bool swift::emitSuccessfulIndirectUnconditionalCast(
     SILBuilder &B, ModuleDecl *M, SILLocation loc, SILValue src,
     CanType sourceType, SILValue dest, CanType targetType,

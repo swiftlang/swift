@@ -609,15 +609,11 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
 }
 
 SILInstruction *CastOptimizer::optimizeBridgedCasts(SILDynamicCastInst cast) {
-  switch (cast.getKind()) {
-  case SILDynamicCastKind::CheckedCastAddrBranchInst:
-  case SILDynamicCastKind::CheckedCastBranchInst:
-  case SILDynamicCastKind::CheckedCastValueBranchInst:
-  case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
-  case SILDynamicCastKind::UnconditionalCheckedCastInst:
-  case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
-    llvm_unreachable("unsupported");
-  }
+  return optimizeBridgedCasts(
+      cast.getInstruction(), cast.getBridgedCastConsumptionKind(),
+      cast.isConditionalCast(), cast.getSource(), cast.getDest(),
+      cast.getSourceType(), cast.getTargetType(), cast.getSuccessBlock(),
+      cast.getFailureBlock());
 }
 
 /// Make use of the fact that some of these casts cannot fail.
@@ -705,32 +701,23 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
   if (!Inst)
     return nullptr;
 
-  auto Loc = Inst->getLoc();
-  auto Src = Inst->getSrc();
-  auto Dest = Inst->getDest();
-  auto SourceType = Inst->getSourceType();
-  auto TargetType = Inst->getTargetType();
-  auto *SuccessBB = Inst->getSuccessBB();
-  auto *FailureBB = Inst->getFailureBB();
-  auto &Mod = Inst->getModule();
+  SILDynamicCastInst cast(Inst);
+
+  auto Loc = cast.getLocation();
+  auto Src = cast.getSource();
+  auto Dest = cast.getDest();
+  auto *SuccessBB = cast.getSuccessBlock();
 
   SILBuilderWithScope Builder(Inst, BuilderContext);
 
-  // Try to determine the outcome of the cast from a known type
-  // to a protocol type at compile-time.
-  bool isSourceTypeExact = isa<MetatypeInst>(Inst->getSrc());
-
   // Check if we can statically predict the outcome of the cast.
-  auto Feasibility =
-      classifyDynamicCast(Mod.getSwiftModule(), SourceType, TargetType,
-                          isSourceTypeExact, Mod.isWholeModule());
+  auto Feasibility = cast.getCastFeasibility();
 
   if (Feasibility == DynamicCastFeasibility::WillFail) {
-    if (shouldDestroyOnFailure(Inst->getConsumptionKind())) {
-      auto &srcTL = Builder.getModule().getTypeLowering(Src->getType());
-      srcTL.emitDestroyAddress(Builder, Loc, Src);
+    if (cast.shouldDestroyOnFailure()) {
+      Builder.emitDestroyAddr(Loc, cast.getSource());
     }
-    auto NewI = Builder.createBranch(Loc, FailureBB);
+    auto NewI = Builder.createBranch(Loc, cast.getFailureBlock());
     EraseInstAction(Inst);
     WillFailAction();
     return NewI;
@@ -751,13 +738,9 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
 
   SILInstruction *BridgedI = nullptr;
 
-  // To apply the bridged optimizations, we should
-  // ensure that types are not existential,
-  // and that not both types are classes.
-  BridgedI = optimizeBridgedCasts(
-      Inst, Inst->getConsumptionKind(),
-      /* isConditional */ Feasibility == DynamicCastFeasibility::MaySucceed,
-      Src, Dest, SourceType, TargetType, SuccessBB, FailureBB);
+  // To apply the bridged optimizations, we should ensure that types are not
+  // existential, and that not both types are classes.
+  BridgedI = optimizeBridgedCasts(cast);
 
   if (!BridgedI) {
     // If the cast may succeed or fail, and it can't be optimized into a
@@ -772,13 +755,12 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
     // The unconditional_addr_cast can be skipped, if the result of a cast
     // is not used afterwards.
     if (ResultNotUsed) {
-      if (shouldTakeOnSuccess(Inst->getConsumptionKind())) {
-        auto &srcTL = Builder.getModule().getTypeLowering(Src->getType());
-        srcTL.emitDestroyAddress(Builder, Loc, Src);
+      if (cast.shouldTakeOnSuccess()) {
+        Builder.emitDestroyAddr(Loc, cast.getSource());
       }
       EraseInstAction(Inst);
       Builder.setInsertionPoint(BB);
-      auto *NewI = Builder.createBranch(Loc, SuccessBB);
+      auto *NewI = Builder.createBranch(Loc, cast.getSuccessBlock());
       WillSucceedAction();
       return NewI;
     }
@@ -793,7 +775,7 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
     //
     // Both TakeOnSuccess and TakeAlways can be reduced to an
     // UnconditionalCheckedCast, since the failure path is irrelevant.
-    switch (Inst->getConsumptionKind()) {
+    switch (cast.getConsumptionKind()) {
     case CastConsumptionKind::BorrowAlways:
       llvm_unreachable("checked_cast_addr_br never has BorrowAlways");
     case CastConsumptionKind::CopyOnSuccess:
@@ -803,9 +785,7 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
       break;
     }
 
-    if (!emitSuccessfulIndirectUnconditionalCast(Builder, Mod.getSwiftModule(),
-                                                 Loc, Src, SourceType, Dest,
-                                                 TargetType, Inst)) {
+    if (!emitSuccessfulIndirectUnconditionalCast(Builder, cast)) {
       // No optimization was possible.
       return nullptr;
     }

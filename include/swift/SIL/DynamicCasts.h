@@ -32,6 +32,7 @@ class SILLocation;
 class SILModule;
 class SILType;
 enum class CastConsumptionKind : unsigned char;
+struct SILDynamicCastInst;
 
 enum class DynamicCastFeasibility {
   /// The cast will always succeed.
@@ -73,6 +74,9 @@ bool emitSuccessfulIndirectUnconditionalCast(
     SILValue src, CanType sourceType,
     SILValue dest, CanType targetType,
     SILInstruction *existingCast = nullptr);
+
+bool emitSuccessfulIndirectUnconditionalCast(SILBuilder &b,
+                                             SILDynamicCastInst inst);
 
 /// Can the given cast be performed by the scalar checked-cast
 /// instructions, or does we need to use the indirect instructions?
@@ -173,9 +177,27 @@ public:
 
   SILInstruction *getInstruction() const { return inst; }
 
+  /// In certain cases the consumption kind needed for a bridging cast is
+  /// different from a normal cast for instance in cases where we need to go
+  /// through memory since we can not represent a cast with objects. In this
+  /// case, we need a separate entry point.
+  CastConsumptionKind getBridgedCastConsumptionKind() const {
+    switch (getKind()) {
+    case SILDynamicCastKind::CheckedCastAddrBranchInst:
+      return cast<CheckedCastAddrBranchInst>(inst)->getConsumptionKind();
+    case SILDynamicCastKind::CheckedCastBranchInst:
+    case SILDynamicCastKind::CheckedCastValueBranchInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
+      llvm_unreachable("unsupported query");
+    }
+  }
+
   CastConsumptionKind getConsumptionKind() const {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
+      return cast<CheckedCastAddrBranchInst>(inst)->getConsumptionKind();
     case SILDynamicCastKind::CheckedCastBranchInst:
     case SILDynamicCastKind::CheckedCastValueBranchInst:
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
@@ -188,6 +210,7 @@ public:
   SILBasicBlock *getSuccessBlock() {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
+      return cast<CheckedCastAddrBranchInst>(inst)->getSuccessBB();
     case SILDynamicCastKind::CheckedCastBranchInst:
     case SILDynamicCastKind::CheckedCastValueBranchInst:
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
@@ -204,6 +227,7 @@ public:
   SILBasicBlock *getFailureBlock() {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
+      return cast<CheckedCastAddrBranchInst>(inst)->getFailureBB();
     case SILDynamicCastKind::CheckedCastBranchInst:
     case SILDynamicCastKind::CheckedCastValueBranchInst:
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
@@ -220,6 +244,7 @@ public:
   SILValue getSource() const {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
+      return cast<CheckedCastAddrBranchInst>(inst)->getSrc();
     case SILDynamicCastKind::CheckedCastBranchInst:
     case SILDynamicCastKind::CheckedCastValueBranchInst:
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
@@ -233,6 +258,7 @@ public:
   SILValue getDest() const {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
+      return cast<CheckedCastAddrBranchInst>(inst)->getDest();
     case SILDynamicCastKind::CheckedCastBranchInst:
     case SILDynamicCastKind::CheckedCastValueBranchInst:
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
@@ -245,6 +271,7 @@ public:
   CanType getSourceType() const {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
+      return cast<CheckedCastAddrBranchInst>(inst)->getSourceType();
     case SILDynamicCastKind::CheckedCastBranchInst:
     case SILDynamicCastKind::CheckedCastValueBranchInst:
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
@@ -269,6 +296,7 @@ public:
   CanType getTargetType() const {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
+      return cast<CheckedCastAddrBranchInst>(inst)->getTargetType();
     case SILDynamicCastKind::CheckedCastBranchInst:
     case SILDynamicCastKind::CheckedCastValueBranchInst:
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
@@ -293,6 +321,7 @@ public:
   bool isSourceTypeExact() const {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
+      return isa<MetatypeInst>(getSource());
     case SILDynamicCastKind::CheckedCastBranchInst:
     case SILDynamicCastKind::CheckedCastValueBranchInst:
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
@@ -306,7 +335,7 @@ public:
 
   SILModule &getModule() const { return inst->getModule(); }
 
-  DynamicCastFeasibility classifyDynamicCast() const {
+  DynamicCastFeasibility getCastFeasibility() const {
     return swift::classifyDynamicCast(
         getModule().getSwiftModule(), getSourceType(), getTargetType(),
         isSourceTypeExact(), getModule().isWholeModule());
@@ -323,6 +352,7 @@ public:
   bool isConditionalCast() const {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
+      return getCastFeasibility() == DynamicCastFeasibility::MaySucceed;
     case SILDynamicCastKind::CheckedCastBranchInst:
     case SILDynamicCastKind::CheckedCastValueBranchInst:
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
@@ -330,6 +360,14 @@ public:
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unsupported");
     }
+  }
+
+  bool shouldDestroyOnFailure() const {
+    return swift::shouldDestroyOnFailure(getConsumptionKind());
+  }
+
+  bool shouldTakeOnSuccess() const {
+    return swift::shouldTakeOnSuccess(getConsumptionKind());
   }
 };
 
