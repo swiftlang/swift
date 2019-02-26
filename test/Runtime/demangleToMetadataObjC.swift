@@ -11,14 +11,24 @@ import Dispatch
 let DemangleToMetadataTests = TestSuite("DemangleToMetadataObjC")
 
 @objc class C : NSObject { }
+@objc(CRenamedInObjC) class CRenamed : NSObject { }
 @objc enum E: Int { case a }
 @objc protocol P1 { }
 protocol P2 { }
 @objc protocol P3: P1 { }
 @objc protocol mainP4 { }
 
+@objc(P5RenamedInObjC) protocol P5 { }
+
 DemangleToMetadataTests.test("@objc classes") {
   expectEqual(type(of: C()), _typeByName("4main1CC")!)
+
+  // @objc class that's been renamed, which can be found by its Objective-C
+  // name...
+  expectEqual(type(of: CRenamed()), _typeByName("So14CRenamedInObjCC")!)
+
+  // ... but not by it's Swift name.
+  expectNil(_typeByName("4main8CRenamed"))
 }
 
 DemangleToMetadataTests.test("@objc enums") {
@@ -40,9 +50,16 @@ DemangleToMetadataTests.test("Objective-C classes") {
 }
 
 func f1_composition_NSCoding(_: NSCoding) { }
+func f1_composition_P5(_: P5) { }
 
 DemangleToMetadataTests.test("Objective-C protocols") {
   expectEqual(type(of: f1_composition_NSCoding), _typeByName("yySo8NSCoding_pc")!)
+
+  // @objc Swift protocols can be found by their Objective-C names...
+  expectEqual(type(of: f1_composition_P5), _typeByName("yySo15P5RenamedInObjC_pc")!)
+
+  // ... but not their Swift names.
+  expectNil(_typeByName("yy4main2P5_pc"))
 }
 
 DemangleToMetadataTests.test("Classes that don't exist") {
