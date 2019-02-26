@@ -1003,12 +1003,35 @@ unsigned SILDeclRef::getParameterListCount() const {
   }
 }
 
+static bool isDesignatedConstructorForClass(ValueDecl *decl) {
+  if (auto *ctor = dyn_cast_or_null<ConstructorDecl>(decl))
+    if (ctor->getDeclContext()->getSelfClassDecl())
+      return ctor->isDesignatedInit();
+  return false;
+}
+
+bool SILDeclRef::canBeDynamicReplacement() const {
+  if (kind == SILDeclRef::Kind::Destroyer)
+    return false;
+  if (kind == SILDeclRef::Kind::Initializer)
+    return isDesignatedConstructorForClass(getDecl());
+  if (kind == SILDeclRef::Kind::Allocator)
+    return !isDesignatedConstructorForClass(getDecl());
+  return true;
+}
+
 bool SILDeclRef::isDynamicallyReplaceable() const {
   if (isStoredPropertyInitializer())
     return false;
 
+  // Class allocators are not dynamic replaceable.
+  if (kind == SILDeclRef::Kind::Allocator &&
+      isDesignatedConstructorForClass(getDecl()))
+    return false;
+
   if (kind == SILDeclRef::Kind::Destroyer ||
-      kind == SILDeclRef::Kind::Initializer ||
+      (kind == SILDeclRef::Kind::Initializer &&
+       !isDesignatedConstructorForClass(getDecl())) ||
       kind == SILDeclRef::Kind::GlobalAccessor) {
     return false;
   }
