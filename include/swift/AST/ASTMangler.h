@@ -38,6 +38,10 @@ protected:
   /// Optimize out protocol names if a type only conforms to one protocol.
   bool OptimizeProtocolNames = true;
 
+  /// If enabled, use Objective-C runtime names when mangling @objc Swift
+  /// protocols.
+  bool UseObjCProtocolNames = false;
+
   /// If enabled, non-canonical types are allowed and type alias types get a
   /// special mangling.
   bool DWARFMangling;
@@ -171,7 +175,7 @@ public:
   };
   
   static Optional<SpecialContext>
-  getSpecialManglingContext(const ValueDecl *decl);
+  getSpecialManglingContext(const ValueDecl *decl, bool useObjCProtocolNames);
 
   static const clang::NamedDecl *
   getClangDeclForMangling(const ValueDecl *decl);

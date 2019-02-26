@@ -747,7 +747,8 @@ IRGenModule::getAddrOfParentContextDescriptor(DeclContext *from,
   // Some types get special treatment.
   if (auto Type = dyn_cast<NominalTypeDecl>(from)) {
     // Use a special module context if we have one.
-    if (auto context = Mangle::ASTMangler::getSpecialManglingContext(Type)) {
+    if (auto context =
+          Mangle::ASTMangler::getSpecialManglingContext(Type, false)) {
       switch (*context) {
       case Mangle::ASTMangler::ObjCContext:
         return {getAddrOfObjCModuleContextDescriptor(),
