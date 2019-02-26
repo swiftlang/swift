@@ -325,6 +325,7 @@ public:
                                              swift::AccessorKind AccKind,
                                              bool IsRef = false);
   static SourceKit::UIdent getUIDForModuleRef();
+  static SourceKit::UIdent getUIDForObjCAttr();
   static SourceKit::UIdent getUIDForSyntaxNodeKind(
       swift::ide::SyntaxNodeKind Kind);
   static SourceKit::UIdent getUIDForSyntaxStructureKind(
