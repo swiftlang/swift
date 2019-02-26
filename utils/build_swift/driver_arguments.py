@@ -357,6 +357,10 @@ def create_argument_parser():
     option('--host-cxx', store_path(executable=True),
            help='the absolute path to CXX, the "clang++" compiler for the '
                 'host platform. Default is auto detected.')
+    option('--cmake-c-launcher', store_path(executable=True),
+           help='the absolute path to set CMAKE_C_COMPILER_LAUNCHER')
+    option('--cmake-cxx-launcher', store_path(executable=True),
+           help='the absolute path to set CMAKE_CXX_COMPILER_LAUNCHER')
     option('--host-lipo', store_path(executable=True),
            help='the absolute path to lipo. Default is auto detected.')
     option('--host-libtool', store_path(executable=True),
