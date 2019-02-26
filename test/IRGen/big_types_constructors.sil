@@ -16,13 +16,27 @@ public struct BigStruct {
   var i8 : Int32 = 8
 }
 
+public struct BigBigStruct {
+  var s : BigStruct
+}
+
+public enum LargeTupleEnum {
+  case Empty1
+  case Empty2
+  case Full((BigStruct, Int32))
+}
+
 // CHECK-LABEL: sil @test_tuple : $@convention(thin) (@in_constant BigStruct) -> @out (BigStruct, Int32) {
 // CHECK: bb0(%0 : $*(BigStruct, Int32), %1 : $*BigStruct):
-// CHECK: [[BIG:%.*]] = load %{{.*}} : $*BigStruct
+// CHECK: [[ALLOCBIG:%.*]] = alloc_stack $(BigStruct, Int32)
 // CHECK: [[INTLIT:%.*]] = integer_literal $Builtin.Int32, 42
 // CHECK: [[INTLITSTRUCT:%.*]] = struct $Int32 ([[INTLIT]] : $Builtin.Int32)
-// CHECK: [[TUPLE:%.*]] = tuple ([[BIG]] : $BigStruct, [[INTLITSTRUCT]] : $Int32)
-// CHECK: store [[TUPLE]] to %0 : $*(BigStruct, Int32)
+// CHECK: [[TBIGADDR:%.*]] = tuple_element_addr [[ALLOCBIG]] : $*(BigStruct, Int32), 0
+// CHECK: copy_addr [take] %1 to [initialization] [[TBIGADDR]] : $*BigStruct
+// CHECK: [[TINTADDR:%.*]] = tuple_element_addr [[ALLOCBIG]] : $*(BigStruct, Int32), 1
+// CHECK: store [[INTLITSTRUCT]] to [[TINTADDR]] : $*Int32
+// CHECK: copy_addr [take] [[ALLOCBIG]] to [initialization] %0 : $*(BigStruct, Int32)
+// CHECK: dealloc_stack [[ALLOCBIG]] : $*(BigStruct, Int32)
 // CHECK: return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function 'test_tuple'
 sil @test_tuple : $@convention(thin) (BigStruct) -> (BigStruct, Int32) {
@@ -33,8 +47,13 @@ bb0(%0 : $BigStruct):
   return %4 : $(BigStruct, Int32)
 }
 
-
-sil hidden @$construct_big_struct : $@convention(method) (@thin BigStruct.Type) -> BigStruct {
+// CHECK-LABEL: sil hidden @construct_big_struct : $@convention(method) (@thin BigStruct.Type) -> @out BigStruct {
+// CHECK: bb0(%0 : $*BigStruct, %1 : $@thin BigStruct.Type):
+// CHECK: [[ALLOCBIG:%.*]] = alloc_stack $BigStruct
+// CHECK: copy_addr [take] [[ALLOCBIG]] to [initialization] %0 : $*BigStruct
+// CHECK: return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function 'construct_big_struct'
+sil hidden @construct_big_struct : $@convention(method) (@thin BigStruct.Type) -> BigStruct {
 bb0(%0 : $@thin BigStruct.Type):
   %1 = alloc_stack $BigStruct, var, name "self"   // users: %36, %32, %28, %24, %20, %16, %12, %8, %4, %39
   %2 = integer_literal $Builtin.Int32, 0          // user: %3
@@ -89,16 +108,97 @@ bb0(%0 : $@thin BigStruct.Type):
 // CHECK-LABEL: } // end sil function 'call_test_tuple'
 sil @call_test_tuple : $@convention(thin) () -> () {
 bb0:
-  %0 = metatype $@thin BigStruct.Type             // user: %2
+  %0 = metatype $@thin BigStruct.Type
   // function_ref BigStruct.init()
-  %1 = function_ref @$construct_big_struct : $@convention(method) (@thin BigStruct.Type) -> BigStruct // user: %2
-  %2 = apply %1(%0) : $@convention(method) (@thin BigStruct.Type) -> BigStruct // users: %5, %3
-  debug_value %2 : $BigStruct, let, name "b"      // id: %3
+  %1 = function_ref @construct_big_struct : $@convention(method) (@thin BigStruct.Type) -> BigStruct
+  %2 = apply %1(%0) : $@convention(method) (@thin BigStruct.Type) -> BigStruct
+  debug_value %2 : $BigStruct, let, name "b"
   // function_ref test_tuple(_:)
-  %4 = function_ref @test_tuple : $@convention(thin) (BigStruct) -> (BigStruct, Int32) // user: %5
-  %5 = apply %4(%2) : $@convention(thin) (BigStruct) -> (BigStruct, Int32) // users: %7, %6
+  %4 = function_ref @test_tuple : $@convention(thin) (BigStruct) -> (BigStruct, Int32)
+  %5 = apply %4(%2) : $@convention(thin) (BigStruct) -> (BigStruct, Int32)
   %6 = tuple_extract %5 : $(BigStruct, Int32), 0
   %7 = tuple_extract %5 : $(BigStruct, Int32), 1
-  %8 = tuple ()                                   // user: %9
-  return %8 : $()                                 // id: %9
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil @test_tuple_local_only : $@convention(thin) (@in_constant BigStruct) -> () {
+// CHECK: bb0(%0 : $*BigStruct):
+// CHECK: [[TBIGADDR:%.*]] = tuple_element_addr %{{.*}} : $*(BigStruct, Int32), 0
+// CHECK-NEXT: copy_addr [take] %0 to [initialization] [[TBIGADDR]] : $*BigStruct
+// CHECK: [[TBIGADDR:%.*]] = tuple_element_addr %{{.*}} : $*((BigStruct, Int32), Int32), 0
+// CHECK-NEXT: copy_addr [take] %{{.*}} to [initialization] [[TBIGADDR]] : $*(BigStruct, Int32)
+// CHECK: return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function 'test_tuple_local_only'
+sil @test_tuple_local_only : $@convention(thin) (BigStruct) -> () {
+bb0(%0 : $BigStruct):
+  %2 = integer_literal $Builtin.Int32, 42
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  %4 = tuple (%0 : $BigStruct, %3 : $Int32)
+  %5 = tuple (%4: $(BigStruct, Int32), %3 : $Int32)
+  %rt = tuple ()
+  return %rt : $()
+}
+
+// CHECK-LABEL: sil @test_struct_construction : $@convention(thin) (@in_constant BigStruct) -> @out BigBigStruct {
+// CHECK: bb0(%0 : $*BigBigStruct, %1 : $*BigStruct):
+// CHECK: [[ALLOCBIG:%.*]] = alloc_stack $BigBigStruct
+// CHECK-NEXT: [[TBIGADDR:%.*]] = struct_element_addr [[ALLOCBIG]] : $*BigBigStruct, #BigBigStruct.s
+// CHECK-NEXT: copy_addr [take] %1 to [initialization] [[TBIGADDR]] : $*BigStruct
+// CHECK-NEXT: copy_addr [take] [[ALLOCBIG]] to [initialization] %0 : $*BigBigStruct
+// CHECK-NEXT: dealloc_stack [[ALLOCBIG]] : $*BigBigStruct
+// CHECK: return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function 'test_struct_construction'
+sil @test_struct_construction : $@convention(thin) (BigStruct) -> BigBigStruct {
+bb0(%0 : $BigStruct):
+  %bigStruct = struct $BigBigStruct (%0 : $BigStruct)
+  return %bigStruct : $BigBigStruct
+}
+
+// CHECK-LABEL: sil @test_tuple_try_apply : $@convention(thin) (@in_guaranteed Int32, @noescape @callee_guaranteed (@guaranteed Int32) -> (@out Optional<(BigStruct, Int32)>, @error Error)) -> (@out Optional<(BigStruct, Int32)>, @error Error) {
+// CHECK: bb0(%0 : $*Optional<(BigStruct, Int32)>, %1 : $*Int32, %2 : $@noescape @callee_guaranteed (@guaranteed Int32) -> (@out Optional<(BigStruct, Int32)>, @error Error)):
+// CHECK: [[ALLOCBIG:%.*]] = alloc_stack $Optional<(BigStruct, Int32)>
+// CHECK: try_apply %2([[ALLOCBIG]], %{{.*}}) : $@noescape @callee_guaranteed (@guaranteed Int32) -> (@out Optional<(BigStruct, Int32)>, @error Error), normal bb1, error bb2
+// CHECK: bb1(%6 : $()):
+// CHECK: copy_addr [take] [[ALLOCBIG]] to [initialization] %0 : $*Optional<(BigStruct, Int32)>
+// CHECK: return %{{.*}} : $()
+// CHECK: bb2(%{{.*}} : $Error):
+// CHECK: throw %{{.*}} : $Error
+// CHECK-LABEL: } // end sil function 'test_tuple_try_apply'
+sil @test_tuple_try_apply : $@convention(thin) (@in_guaranteed Int32, @noescape @callee_guaranteed (@guaranteed Int32) -> (@owned Optional<(BigStruct, Int32)>, @error Error)) -> (@out Optional<(BigStruct, Int32)>, @error Error) {
+bb0(%0 : $*Optional<(BigStruct, Int32)>, %1 : $*Int32, %2 : $@noescape @callee_guaranteed (@guaranteed Int32) -> (@owned Optional<(BigStruct, Int32)>, @error Error)):
+  %3 = load %1 : $*Int32
+  try_apply %2(%3) : $@noescape @callee_guaranteed (@guaranteed Int32) -> (@owned Optional<(BigStruct, Int32)>, @error Error), normal bb1, error bb2
+
+bb1(%5 : $Optional<(BigStruct, Int32)>):
+  store %5 to %0 : $*Optional<(BigStruct, Int32)>
+  %7 = tuple ()
+  return %7 : $()
+
+bb2(%9 : $Error):
+  %10 = builtin "willThrow"(%9 : $Error) : $()
+  throw %9 : $Error
+}
+
+// CHECK-LABEL: sil @test_enum_tuple_try_apply : $@convention(thin) (@in_guaranteed Int32, @noescape @callee_guaranteed (@guaranteed Int32) -> (@out LargeTupleEnum, @error Error)) -> (@out Optional<(BigStruct, Int32)>, @error Error) {
+// CHECK: bb0(%0 : $*Optional<(BigStruct, Int32)>, %1 : $*Int32, %2 : $@noescape @callee_guaranteed (@guaranteed Int32) -> (@out LargeTupleEnum, @error Error)):
+// CHECK: [[ALLOCBIG:%.*]] = alloc_stack $LargeTupleEnum
+// CHECK: try_apply %2([[ALLOCBIG]], %{{.*}}) : $@noescape @callee_guaranteed (@guaranteed Int32) -> (@out LargeTupleEnum, @error Error), normal bb1, error bb2
+// CHECK: bb1(%6 : $()):
+// CHECK: return %{{.*}} : $()
+// CHECK: bb2(%{{.*}} : $Error):
+// CHECK: throw %{{.*}} : $Error
+// CHECK-LABEL: } // end sil function 'test_enum_tuple_try_apply'
+sil @test_enum_tuple_try_apply : $@convention(thin) (@in_guaranteed Int32, @noescape @callee_guaranteed (@guaranteed Int32) -> (@owned LargeTupleEnum, @error Error)) -> (@out Optional<(BigStruct, Int32)>, @error Error) {
+bb0(%0 : $*Optional<(BigStruct, Int32)>, %1 : $*Int32, %2 : $@noescape @callee_guaranteed (@guaranteed Int32) -> (@owned LargeTupleEnum, @error Error)):
+  %3 = load %1 : $*Int32
+  try_apply %2(%3) : $@noescape @callee_guaranteed (@guaranteed Int32) -> (@owned LargeTupleEnum, @error Error), normal bb1, error bb2
+
+bb1(%5 : $LargeTupleEnum):
+  %7 = tuple ()
+  return %7 : $()
+
+bb2(%9 : $Error):
+  %10 = builtin "willThrow"(%9 : $Error) : $()
+  throw %9 : $Error
 }
