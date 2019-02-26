@@ -41,6 +41,7 @@ it provides some of the needed headers and libraries.
 1. Clone `apple/swift-corelibs-foundation` into a folder named `swift-corelibs-foundation`
 1. Clone `apple/swift-corelibs-xctest` into a folder name `swift-corelibs-xctest`
 1. Clone `apple/swift-lldb` into a folder named `lldb`
+1. Clone `libxml2` into a folder named `libxml2`
 
 - Currently, other repositories in the Swift project have not been tested and
   may not be supported.
@@ -63,6 +64,7 @@ git clone https://github.com/apple/swift-corelibs-libdispatch
 git clone https://github.com/apple/swift-corelibs-foundation
 git clone https://github.com/apple/swift-corelibs-xctest
 git clone https://github.com/apple/swift-lldb lldb
+git clone https://gitlab.gnome.org/GNOME/libxml2.git libxml2
 ```
 
 ### 3. Acquire ICU
@@ -242,11 +244,19 @@ popd
 cmake --build S:\b\libdispatch
 ```
 
-### 11. Build swift-corelibs-foundation
+### 11. Build libxml2
+
+```cmd
+pushd "S:\libxml2\win32"
+cscript configure.js iconv=no
+nmake /f Makefile.msvc
+popd
+```
+
+### 12. Build swift-corelibs-foundation
 
 To build Foundation you will need builds of:
 
-- `libxml2` (http://xmlsoft.org, download and unzip the Windows prebuilt or build your own)
 - `libcurl` (https://curl.haxx.se, download the source, `cd` into `winbuild`, and run `nmake /f Makefile.vc mode=static VC=15 MACHINE=x64`)
 
 ```cmd
@@ -269,7 +279,7 @@ cmake -G Ninja^
 
 ```
 
-### 12. Build swift-corelibs-xctest
+### 13. Build swift-corelibs-xctest
 
 ```cmd
 mkdir "S:\b\xctest"
@@ -286,7 +296,7 @@ popd
 cmake --build S:\b\xctest
 ```
 
-### 13. Install Swift on Windows
+### 14. Install Swift on Windows
 
 - Run ninja install:
 
