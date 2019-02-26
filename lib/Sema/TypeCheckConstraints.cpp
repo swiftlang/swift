@@ -551,12 +551,21 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     };
 
     if (!isConfused) {
-      if (Name.getBaseName().userFacingName() == "Self") {
-        DeclName selfName(Context.getIdentifier("self"));
-        auto selfInstance = lookupUnqualified(DC, selfName, Loc, lookupOptions);
-        if (!selfInstance.empty()) {
-          ValueDecl *D = selfInstance.front().getValueDecl();
+      if (Name == Context.Id_Self) {
+//        return new (Context) TypeExpr(TypeLoc::withoutLoc(
+//            DynamicSelfType::get(
+//              DC->getInnermostTypeContext()
+//                                 ->getSelfTypeInContext()
+//                                 //->getDeclaredInterfaceType()
+//                                 , Context)));
+        auto selfs = lookupUnqualified(DC, Context.Id_self, Loc, lookupOptions);
+        if (!selfs.empty()) {
+          ValueDecl *D = selfs.front().getValueDecl();
           Expr *E = new (Context) DeclRefExpr(D, nameLoc, /*Implicit=*/false);
+          if (auto func = dyn_cast<AbstractFunctionDecl>(
+                                        DC->getInnermostMethodContext()))
+            if (func->isStatic())
+              return E;
           return new (Context) DynamicTypeExpr(Loc, Loc, E, Loc, Type());
         }
       }

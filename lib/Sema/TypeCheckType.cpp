@@ -1061,6 +1061,8 @@ static Type diagnoseUnknownType(TypeResolution resolution,
         // type. Fix this by replacing 'Self' with the nominal type name.
         assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
 
+        return nominal->getDeclaredInterfaceType();
+
         // Produce a Fix-It replacing 'Self' with the nominal type name.
         auto name = getDeclNameFromContext(dc, nominal);
         diags.diagnose(comp->getIdLoc(), diag::self_in_nominal, name)
