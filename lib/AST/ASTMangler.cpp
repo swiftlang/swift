@@ -367,7 +367,7 @@ std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   DWARFMangling = true;
   OptimizeProtocolNames = false;
   beginMangling();
-  
+
   if (DC)
     bindGenericParameters(DC);
 
@@ -601,6 +601,33 @@ static StringRef getPrivateDiscriminatorIfNecessary(const ValueDecl *decl) {
   return discriminator.str();
 }
 
+/// If the declaration is an @objc protocol defined in Swift and the
+/// Objective-C name has been overrridden from the default, return the
+/// specified name.
+///
+/// \param useObjCProtocolNames When false, always returns \c None.
+static Optional<std::string> getOverriddenSwiftProtocolObjCName(
+                                                  const ValueDecl *decl,
+                                                  bool useObjCProtocolNames) {
+  if (!useObjCProtocolNames)
+    return None;
+
+  auto proto = dyn_cast<ProtocolDecl>(decl);
+  if (!proto) return None;
+
+  if (!proto->isObjC()) return None;
+
+  // If there is an 'objc' attribute with a name, use that name.
+  if (auto objc = proto->getAttrs().getAttribute<ObjCAttr>()) {
+    if (auto name = objc->getName()) {
+      llvm::SmallString<4> buffer;
+      return std::string(name->getString(buffer));
+    }
+  }
+
+  return None;
+}
+
 void ASTMangler::appendDeclName(const ValueDecl *decl) {
   DeclBaseName name = decl->getBaseName();
   assert(!name.isSpecial() && "Cannot print special names");
@@ -625,6 +652,11 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
         appendOperator("oi");
         break;
     }
+  } else if (auto objCName =
+               getOverriddenSwiftProtocolObjCName(decl, UseObjCProtocolNames)) {
+    // @objc Swift protocols should be mangled as Objective-C protocols,
+    // so append the Objective-C runtime name.
+    appendIdentifier(*objCName);
   } else if (!name.empty()) {
     appendIdentifier(name.getIdentifier().str());
   } else {
@@ -1353,7 +1385,8 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
 }
 
 Optional<ASTMangler::SpecialContext>
-ASTMangler::getSpecialManglingContext(const ValueDecl *decl) {
+ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
+                                      bool useObjCProtocolNames) {
   // Declarations provided by a C module have a special context mangling.
   //   known-context ::= 'So'
   //
@@ -1368,6 +1401,11 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl) {
       return ASTMangler::ClangImporterContext;
     }
   }
+
+  // If @objc Swift protocols should be mangled as Objective-C protocols,
+  // they are defined in the Objective-C context.
+  if (getOverriddenSwiftProtocolObjCName(decl, useObjCProtocolNames))
+    return ASTMangler::ObjCContext;
 
   // Nested types imported from C should also get use the special "So" context.
   if (isa<TypeDecl>(decl)) {
@@ -1394,7 +1432,7 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl) {
 /// This is the top-level entrypoint for mangling <context>.
 void ASTMangler::appendContextOf(const ValueDecl *decl) {
   // Check for a special mangling context.
-  if (auto context = getSpecialManglingContext(decl)) {
+  if (auto context = getSpecialManglingContext(decl, UseObjCProtocolNames)) {
     switch (*context) {
     case ClangImporterContext:
       return appendOperator("SC");
