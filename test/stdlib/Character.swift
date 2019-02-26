@@ -347,6 +347,19 @@ CharacterTests.test("String.append(_: Character)") {
   }
 }
 
+CharacterTests.test("utf6/16/unicodescalar views") {
+  for c in testCharacters {
+    expectEqualSequence(String(c).unicodeScalars, c.unicodeScalars)
+    expectEqualSequence(String(c).utf8, c.utf8)
+    expectEqualSequence(String(c).utf16, c.utf16)
+
+    expectEqualSequence(
+      String(c).unicodeScalars.reversed(), c.unicodeScalars.reversed())
+    expectEqualSequence(String(c).utf8.reversed(), c.utf8.reversed())
+    expectEqualSequence(String(c).utf16.reversed(), c.utf16.reversed())
+  }
+}
+
 var UnicodeScalarTests = TestSuite("UnicodeScalar")
 
 UnicodeScalarTests.test("UInt8(ascii: UnicodeScalar)") {
