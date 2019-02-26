@@ -415,7 +415,7 @@ extension String.UTF8View {
 
     let (scalar, scalarLen) = _guts.foreignErrorCorrectedScalar(
       startingAt: i.strippingTranscoding)
-    let utf8Len = _numUTF8CodeUnits(scalar)
+    let utf8Len = UTF8.width(scalar)
 
     if utf8Len == 1 {
       _internalInvariant(i.transcodedOffset == 0)
@@ -442,7 +442,7 @@ extension String.UTF8View {
 
     let (scalar, scalarLen) = _guts.foreignErrorCorrectedScalar(
       endingAt: i)
-    let utf8Len = _numUTF8CodeUnits(scalar)
+    let utf8Len = UTF8.width(scalar)
     return i.encoded(offsetBy: -scalarLen).transcoded(withOffset: utf8Len &- 1)
   }
 

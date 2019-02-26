@@ -16,6 +16,40 @@ extension Unicode {
   }
 }
 
+extension Unicode.UTF8 {
+  /// Returns the number of code units required to encode the given Unicode
+  /// scalar.
+  ///
+  /// Because a Unicode scalar value can require up to 21 bits to store its
+  /// value, some Unicode scalars are represented in UTF-8 by a sequence of up
+  /// to 4 code units. The first code unit is designated a *lead* byte and the
+  /// rest are *continuation* bytes.
+  ///
+  ///     let anA: Unicode.Scalar = "A"
+  ///     print(anA.value)
+  ///     // Prints "65"
+  ///     print(UTF8.width(anA))
+  ///     // Prints "1"
+  ///
+  ///     let anApple: Unicode.Scalar = "🍎"
+  ///     print(anApple.value)
+  ///     // Prints "127822"
+  ///     print(UTF8.width(anApple))
+  ///     // Prints "4"
+  ///
+  /// - Parameter x: A Unicode scalar value.
+  /// - Returns: The width of `x` when encoded in UTF-8, from `1` to `4`.
+  @_alwaysEmitIntoClient
+  public static func width(_ x: Unicode.Scalar) -> Int {
+    switch x.value {
+      case 0..<0x80: return 1
+      case 0x80..<0x0800: return 2
+      case 0x0800..<0x1_0000: return 3
+      default: return 4
+    }
+  }
+}
+
 extension Unicode.UTF8 : _UnicodeEncoding {
   public typealias CodeUnit = UInt8
   public typealias EncodedScalar = _ValidUTF8Buffer
@@ -28,7 +62,14 @@ extension Unicode.UTF8 : _UnicodeEncoding {
   @inline(__always)
   @inlinable
   public static func _isScalar(_ x: CodeUnit) -> Bool {
-    return x & 0x80 == 0
+    return isASCII(x)
+  }
+
+  /// Returns whether the given code unit represents an ASCII scalar
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  public static func isASCII(_ x: CodeUnit) -> Bool {
+    return x & 0b1000_0000 == 0
   }
 
   @inline(__always)
