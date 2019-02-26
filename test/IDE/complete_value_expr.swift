@@ -216,6 +216,8 @@ struct FooStruct {
   func instanceFunc8(_ a: (Int, Int)) {}
   mutating
   func instanceFunc9(a: @autoclosure () -> Int) {}
+  mutating
+  func instanceFunc10(arg: Int, optArg: Int = 0) {}
 
   mutating
   func varargInstanceFunc0(_ v: Int...) {}
@@ -334,6 +336,8 @@ var fooObject: FooStruct
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc7({#a: Int#})[#Void#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc8({#(a): (Int, Int)#})[#Void#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc9({#a: Int#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc10({#arg: Int#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc10({#arg: Int#}, {#optArg: Int#})[#Void#]{{; name=.+$}}
 //
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: varargInstanceFunc0({#(v): Int...#})[#Void#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: varargInstanceFunc1({#(a): Float#}, {#v: Int...#})[#Void#]{{; name=.+$}}
@@ -367,6 +371,8 @@ var fooObject: FooStruct
 // FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc7({#a: Int#})[#Void#]{{; name=.+$}}
 // FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc8({#(a): (Int, Int)#})[#Void#]{{; name=.+$}}
 // FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc9({#a: Int#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc10({#arg: Int#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc10({#arg: Int#}, {#optArg: Int#})[#Void#]{{; name=.+$}}
 //
 // FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .varargInstanceFunc0({#(v): Int...#})[#Void#]{{; name=.+$}}
 // FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .varargInstanceFunc1({#(a): Float#}, {#v: Int...#})[#Void#]{{; name=.+$}}
@@ -404,6 +410,7 @@ var fooObject: FooStruct
 // FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc7({#(self): &FooStruct#})[#(a: Int) -> Void#]{{; name=.+$}}
 // FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc8({#(self): &FooStruct#})[#((Int, Int)) -> Void#]{{; name=.+$}}
 // FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc9({#(self): &FooStruct#})[#(a: @autoclosure () -> Int) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc10({#(self): &FooStruct#})[#(arg: Int, optArg: Int) -> Void#]{{; name=.+$}}
 // FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: varargInstanceFunc0({#(self): &FooStruct#})[#(Int...) -> Void#]{{; name=.+$}}
 // FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: varargInstanceFunc1({#(self): &FooStruct#})[#(Float, v: Int...) -> Void#]{{; name=.+$}}
 // FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: varargInstanceFunc2({#(self): &FooStruct#})[#(Float, b: Double, v: Int...) -> Void#]{{; name=.+$}}
@@ -451,6 +458,7 @@ var fooObject: FooStruct
 // FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc7({#(self): &FooStruct#})[#(a: Int) -> Void#]{{; name=.+$}}
 // FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc8({#(self): &FooStruct#})[#((Int, Int)) -> Void#]{{; name=.+$}}
 // FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc9({#(self): &FooStruct#})[#(a: @autoclosure () -> Int) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc10({#(self): &FooStruct#})[#(arg: Int, optArg: Int) -> Void#]{{; name=.+$}}
 // FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .varargInstanceFunc0({#(self): &FooStruct#})[#(Int...) -> Void#]{{; name=.+$}}
 // FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .varargInstanceFunc1({#(self): &FooStruct#})[#(Float, v: Int...) -> Void#]{{; name=.+$}}
 // FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .varargInstanceFunc2({#(self): &FooStruct#})[#(Float, b: Double, v: Int...) -> Void#]{{; name=.+$}}
@@ -1933,6 +1941,7 @@ func testThrows003(_ x: HasThrowingMembers) {
   x.#^MEMBER_THROWS1^#
 // MEMBER_THROWS1: Begin completions
 // MEMBER_THROWS1-DAG: Decl[InstanceMethod]/CurrNominal:   memberThrows()[' throws'][#Void#]
+// MEMBER_THROWS1-DAG: Decl[InstanceMethod]/CurrNominal:   memberRethrows {|}[' rethrows'][#Void#]
 // MEMBER_THROWS1-DAG: Decl[InstanceMethod]/CurrNominal:   memberRethrows({#(x): () throws -> ()##() throws -> ()#})[' rethrows'][#Void#]
 // MEMBER_THROWS1: End completions
 }

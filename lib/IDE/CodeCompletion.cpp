@@ -2315,8 +2315,6 @@ public:
     if (FD->getName().empty())
       return;
     foundFunction(FD);
-    bool IsImplicitlyCurriedInstanceMethod =
-        isImplicitlyCurriedInstanceMethod(FD);
 
     StringRef Name = FD->getName().get();
     assert(!Name.empty() && "name should not be empty");
@@ -2324,27 +2322,20 @@ public:
     Type FunctionType = getTypeOfMember(FD);
     assert(FunctionType);
 
-    unsigned NumParamLists;
-    if (FD->hasImplicitSelfDecl()) {
-      if (IsImplicitlyCurriedInstanceMethod)
-        NumParamLists = 2;
-      else {
-        NumParamLists = 1;
+    auto AFT = FunctionType->getAs<AnyFunctionType>();
 
-        // Strip off 'self'
-        if (FunctionType->is<AnyFunctionType>())
-          FunctionType = FunctionType->castTo<AnyFunctionType>()->getResult();
-      }
-    } else {
-      NumParamLists = 1;
+    bool IsImplicitlyCurriedInstanceMethod = false;
+    if (FD->hasImplicitSelfDecl()) {
+      IsImplicitlyCurriedInstanceMethod = isImplicitlyCurriedInstanceMethod(FD);
+
+      // Strip off '(_ self: Self)' if needed.
+      if (AFT && !IsImplicitlyCurriedInstanceMethod)
+        AFT = AFT->getResult()->getAs<AnyFunctionType>();
     }
 
     bool trivialTrailingClosure = false;
-    if (!IsImplicitlyCurriedInstanceMethod &&
-        FunctionType->is<AnyFunctionType>()) {
-      trivialTrailingClosure = hasTrivialTrailingClosure(
-          FD, FunctionType->castTo<AnyFunctionType>());
-    }
+    if (AFT && !IsImplicitlyCurriedInstanceMethod)
+      trivialTrailingClosure = hasTrivialTrailingClosure(FD, AFT);
 
     // Add the method, possibly including any default arguments.
     auto addMethodImpl = [&](bool includeDefaultArgs = true,
@@ -2364,14 +2355,13 @@ public:
 
       llvm::SmallString<32> TypeStr;
 
-      if (!FunctionType->is<AnyFunctionType>()) {
+      if (!AFT) {
         llvm::raw_svector_ostream OS(TypeStr);
         FunctionType.print(OS);
         Builder.addTypeAnnotation(OS.str());
         return;
       }
 
-      auto AFT = FunctionType->castTo<AnyFunctionType>();
       if (IsImplicitlyCurriedInstanceMethod) {
         Builder.addLeftParen();
         addCallArgumentPatterns(Builder, AFT->getParams(),
@@ -2380,6 +2370,7 @@ public:
         Builder.addRightParen();
       } else if (trivialTrailingClosure) {
         Builder.addBraceStmtWithCursor(" { code }");
+        addThrows(Builder, AFT, FD);
       } else {
         Builder.addLeftParen();
         addCallArgumentPatterns(Builder, AFT, FD->getParameters(),
@@ -2393,11 +2384,12 @@ public:
       // Build type annotation.
       {
         llvm::raw_svector_ostream OS(TypeStr);
-        for (unsigned i = 0; i < NumParamLists - 1; ++i) {
+        if (IsImplicitlyCurriedInstanceMethod) {
           ResultType->castTo<AnyFunctionType>()->printParams(OS);
           ResultType = ResultType->castTo<AnyFunctionType>()->getResult();
           OS << " -> ";
         }
+
         // What's left is the result type.
         if (ResultType->isVoid()) {
           OS << "Void";
@@ -2417,15 +2409,16 @@ public:
       Builder.addTypeAnnotation(TypeStr);
     };
 
-    if (FunctionType->is<AnyFunctionType>() &&
-        hasInterestingDefaultValues(FD)) {
-      addMethodImpl(/*includeDefaultArgs*/ false);
+    if (!AFT || IsImplicitlyCurriedInstanceMethod) {
+      addMethodImpl();
+    } else {
+      if (trivialTrailingClosure)
+        addMethodImpl(/*includeDefaultArgs=*/false,
+                      /*trivialTrailingClosure=*/true);
+      if (hasInterestingDefaultValues(FD))
+        addMethodImpl(/*includeDefaultArgs=*/false);
+      addMethodImpl(/*includeDefaultArgs=*/true);
     }
-    if (trivialTrailingClosure) {
-      addMethodImpl(/*includeDefaultArgs=*/false,
-                    /*trivialTrailingClosure=*/true);
-    }
-    addMethodImpl();
   }
 
   void addConstructorCall(const ConstructorDecl *CD, DeclVisibilityKind Reason,
