@@ -1,13 +1,13 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s | %FileCheck %s
 
 protocol Proto : Differentiable {
-  @differentiable()
+  @differentiable(wrt: (x, y))
   func function1(_ x: Float, _ y: Float) -> Float
 
   @differentiable(wrt: (self, x, y))
   func function2(_ x: Float, _ y: Float) -> Float
 
-  @differentiable(wrt: (y))
+  @differentiable(wrt: y)
   func function3(_ x: Float, _ y: Float) -> Float
 }
 
@@ -28,7 +28,7 @@ struct S : Proto, VectorNumeric {
     return (p, { dp in S(p: dp) })
   }
 
-  @differentiable()
+  @differentiable(wrt: (x, y))
   func function1(_ x: Float, _ y: Float) -> Float {
     return x + y + p
   }

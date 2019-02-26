@@ -199,6 +199,12 @@ public:
   /// `AutoDiffParameterIndices::parameters` for documentation about the order.
   void setParameter(unsigned parameterIndex);
 
+  /// Sets the parameters at indices in the specified range.
+  void setParameters(unsigned lowerBound, unsigned upperBound);
+
+  /// Sets all parameters.
+  void setAllParameters();
+
   /// Returns the number of parameters.
   unsigned size() { return parameters.size(); }
 };

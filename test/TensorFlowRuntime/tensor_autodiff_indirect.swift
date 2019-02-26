@@ -33,7 +33,7 @@ TensorADTests.testAllBackends("Concrete") {
 }
 
 extension Tensor where Scalar : Differentiable & FloatingPoint {
-  @differentiable(vjp: vjpFoo)
+  @differentiable(wrt: x, vjp: vjpFoo)
   func foo(_ x: Scalar) -> Scalar {
     return x
   }

@@ -161,7 +161,7 @@ extension JVPStruct : Differentiable {
 }
 
 extension JVPStruct {
-  @differentiable(jvp: wrtAllNonSelfJVP)
+  @differentiable(wrt: x, jvp: wrtAllNonSelfJVP)
   func wrtAllNonSelf(x: Float) -> Float {
     return x + p
   }
@@ -318,7 +318,7 @@ extension VJPStruct : Differentiable {
 }
 
 extension VJPStruct {
-  @differentiable(vjp: wrtAllNonSelfVJP)
+  @differentiable(wrt: x, vjp: wrtAllNonSelfVJP)
   func wrtAllNonSelf(x: Float) -> Float {
     return x + p
   }
@@ -422,7 +422,7 @@ func vjpWhere2<Scalar : Numeric & Differentiable>(x: Tensor<Scalar>) -> (Tensor<
 
 struct A<T> {
   struct B<U, V> {
-    @differentiable(where T : Differentiable, V : Differentiable, V.TangentVector == V)
+    @differentiable(wrt: x where T : Differentiable, V : Differentiable, V.TangentVector == V)
     func whereInGenericContext<T>(x: T) -> T {
       return x
     }
@@ -510,18 +510,50 @@ struct DifferentiableInitStruct : DifferentiableInit {
   var y: Float
 
   // FIXME(TF-284): Fix unexpected diagnostic.
-  // expected-note @+2 {{candidate is missing attribute '@differentiable(wrt: (x, y))'}}
-  // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: (x))'}}
+  // expected-note @+2 {{candidate is missing attribute '@differentiable'}}
+  // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: x)'}}
   init(x: Float, y: Float) {
     self.x = x
     self.y = y
   }
 
   // FIXME(TF-284): Fix unexpected diagnostic.
-  // expected-note @+2 {{candidate is missing attribute '@differentiable(wrt: (x))'}}
-  // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: (x, y))'}}
+  // expected-note @+2 {{candidate is missing attribute '@differentiable(wrt: x)'}}
+  // expected-note @+1 {{candidate is missing attribute '@differentiable'}}
   init(x: Float, y: Int) {
     self.x = x
     self.y = Float(y)
+  }
+}
+
+
+protocol NotRefiningDiffable {
+  @differentiable(wrt: x)
+  // expected-note @+1 {{protocol requires function 'a' with type '(Float) -> Float'; do you want to add a stub?}}
+  func a(_ x: Float) -> Float
+}
+
+// expected-error @+1 {{type 'CertainlyNotDiffableWrtSelf' does not conform to protocol 'NotRefiningDiffable'}}
+struct CertainlyNotDiffableWrtSelf : NotRefiningDiffable {
+  // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: x)'}}
+  func a(_ x: Float) -> Float { return x * 5.0 }
+}
+
+
+protocol TF285 : Differentiable {
+  @differentiable(wrt: (x, y))
+  @differentiable(wrt: x)
+  // expected-note @+1 {{protocol requires function 'foo(x:y:)' with type '(Float, Float) -> Float'; do you want to add a stub?}}
+  func foo(x: Float, y: Float) -> Float
+}
+
+// expected-error @+1 {{type 'TF285MissingOneDiffAttr' does not conform to protocol 'TF285'}}
+struct TF285MissingOneDiffAttr : TF285 {
+  // Requirement is missing an attribute.
+  @differentiable(wrt: x)
+  // expected-note @+2 {{candidate is missing attribute '@differentiable(wrt: x)}}
+  // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: (x, y))}}
+  func foo(x: Float, y: Float) -> Float {
+    return x
   }
 }
