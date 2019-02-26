@@ -404,5 +404,20 @@ UnicodeScalarTests.test("LosslessStringConvertible") {
   checkLosslessStringConvertible((0...127).map { UnicodeScalar(Int($0))! })
 }
 
+if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  UnicodeScalarTests.test("Views") {
+    let scalars = baseScalars + continuingScalars
+    for scalar in scalars {
+      expectEqual(scalar, String(scalar).unicodeScalars.first!)
+      expectEqualSequence(String(scalar).utf8, scalar.utf8)
+      expectEqualSequence(String(scalar).utf16, scalar.utf16)
+
+      expectEqualSequence(String(scalar).utf8.reversed(), scalar.utf8.reversed())
+      expectEqualSequence(
+        String(scalar).utf16.reversed(), scalar.utf16.reversed())
+    }
+  }
+}
+
 runAllTests()
 
