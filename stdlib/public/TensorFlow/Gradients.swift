@@ -46,14 +46,14 @@ infix operator .> : ComparisonPrecedence
 
 public extension Differentiable {
   @inlinable
-  func gradient<R : Differentiable & FloatingPoint>(
+  func gradient<R : TensorFlowFloatingPoint>(
     in f: @differentiable (Self) -> Tensor<R>
   ) -> CotangentVector {
     return self.pullback(in: f)(Tensor<R>(1))
   }
 
   @inlinable
-  func valueWithGradient<R : Differentiable & FloatingPoint>(
+  func valueWithGradient<R : TensorFlowFloatingPoint>(
     in f: @differentiable (Self) -> Tensor<R>
   ) -> (value: Tensor<R>, gradient: CotangentVector) {
     let (y, pb) = self.valueWithPullback(in: f)
@@ -61,17 +61,16 @@ public extension Differentiable {
   }
 
   @inlinable
-  func gradient<T : Differentiable, R : Differentiable & FloatingPoint>(
+  func gradient<T : Differentiable, R : TensorFlowFloatingPoint>(
     at x: T, in f: @differentiable (Self, T) -> Tensor<R>
   ) -> (CotangentVector, T.CotangentVector) {
     return self.pullback(at: x, in: f)(Tensor<R>(1))
   }
 
   @inlinable
-  func valueWithGradient<T : Differentiable, R>(
+  func valueWithGradient<T : Differentiable, R : TensorFlowFloatingPoint>(
     at x: T, in f: @differentiable (Self, T) -> Tensor<R>
-  ) -> (value: Tensor<R>, gradient: (CotangentVector, T.CotangentVector))
-    where R : Differentiable & FloatingPoint {
+  ) -> (value: Tensor<R>, gradient: (CotangentVector, T.CotangentVector)) {
     let (y, pb) = self.valueWithPullback(at: x, in: f)
     return (y, pb(Tensor<R>(1)))
   }
@@ -87,7 +86,7 @@ public extension Differentiable {
 public func valueWithGradient<T, R>(
   at x: T, in f: @differentiable (T) -> Tensor<R>
 ) -> (value: Tensor<R>, gradient: T.CotangentVector)
-where T : Differentiable, R : Differentiable & FloatingPoint {
+where T : Differentiable, R : TensorFlowFloatingPoint {
   let (y, pullback) = valueWithPullback(at: x, in: f)
   return (y, pullback(Tensor<R>(1)))
 }
@@ -97,7 +96,7 @@ public func valueWithGradient<T, U, R>(
   at x: T, _ y: U, in f: @differentiable (T, U) -> Tensor<R>
 ) -> (value: Tensor<R>, gradient: (T.CotangentVector, U.CotangentVector))
   where T : Differentiable, U : Differentiable,
-        R : Differentiable & FloatingPoint {
+        R : TensorFlowFloatingPoint {
   let (y, pullback) = valueWithPullback(at: x, y, in: f)
   return (y, pullback(Tensor<R>(1)))
 }
@@ -108,7 +107,7 @@ public func valueWithGradient<T, U, V, R>(
 ) -> (value: Tensor<R>,
       gradient: (T.CotangentVector, U.CotangentVector, V.CotangentVector))
   where T : Differentiable, U : Differentiable, V : Differentiable,
-        R : Differentiable & FloatingPoint {
+        R : TensorFlowFloatingPoint {
   let (y, pullback) = valueWithPullback(at: x, y, z, in: f)
   return (y, pullback(Tensor<R>(1)))
 }
@@ -119,7 +118,7 @@ public func valueWithGradient<T, U, V, R>(
 public func valueWithGradient<T, R>(
   of f: @escaping @differentiable (T) -> Tensor<R>
 ) -> (T) -> (value: Tensor<R>, gradient: T.CotangentVector)
-  where T : Differentiable, R : Differentiable & FloatingPoint {
+  where T : Differentiable, R : TensorFlowFloatingPoint {
   return { x in valueWithGradient(at: x, in: f) }
 }
 
@@ -129,7 +128,7 @@ public func valueWithGradient<T, U, R>(
 ) -> (T, U)
     -> (value: Tensor<R>, gradient: (T.CotangentVector, U.CotangentVector))
   where T : Differentiable, U : Differentiable,
-        R : Differentiable & FloatingPoint {
+        R : TensorFlowFloatingPoint {
   return { x, y in valueWithGradient(at: x, y, in: f) }
 }
 
@@ -140,7 +139,7 @@ public func valueWithGradient<T, U, V, R>(
     -> (value: Tensor<R>,
         gradient: (T.CotangentVector, U.CotangentVector, V.CotangentVector))
   where T : Differentiable, U : Differentiable, V : Differentiable,
-        R : Differentiable & FloatingPoint {
+        R : TensorFlowFloatingPoint {
   return { x, y, z in valueWithGradient(at: x, y, z, in: f) }
 }
 
@@ -150,7 +149,7 @@ public func valueWithGradient<T, U, V, R>(
 public func gradient<T, R>(
   at x: T, in f: @differentiable (T) -> Tensor<R>
 ) -> T.CotangentVector
-  where T : Differentiable, R : Differentiable & FloatingPoint {
+  where T : Differentiable, R : TensorFlowFloatingPoint {
   return pullback(at: x, in: f)(Tensor<R>(1))
 }
 
@@ -159,7 +158,7 @@ public func gradient<T, U, R>(
   at x: T, _ y: U, in f: @differentiable (T, U) -> Tensor<R>
 ) -> (T.CotangentVector, U.CotangentVector)
   where T : Differentiable, U : Differentiable,
-        R : Differentiable & FloatingPoint {
+        R : TensorFlowFloatingPoint {
   return pullback(at: x, y, in: f)(Tensor<R>(1))
 }
 
@@ -168,7 +167,7 @@ public func gradient<T, U, V, R>(
   at x: T, _ y: U, _ z: V, in f: @differentiable (T, U, V) -> Tensor<R>
 ) -> (T.CotangentVector, U.CotangentVector, V.CotangentVector)
   where T : Differentiable, U : Differentiable, V : Differentiable,
-        R : Differentiable & FloatingPoint {
+        R : TensorFlowFloatingPoint {
   return pullback(at: x, y, z, in: f)(Tensor<R>(1))
 }
 
@@ -178,7 +177,7 @@ public func gradient<T, U, V, R>(
 public func gradient<T, R>(
   of f: @escaping @differentiable (T) -> Tensor<R>
 ) -> (T) -> T.CotangentVector
-  where T : Differentiable, R : Differentiable & FloatingPoint {
+  where T : Differentiable, R : TensorFlowFloatingPoint {
   return { x in gradient(at: x, in: f) }
 }
 
@@ -187,7 +186,7 @@ public func gradient<T, U, R>(
   of f: @escaping @differentiable (T, U) -> Tensor<R>
 ) -> (T, U) -> (T.CotangentVector, U.CotangentVector)
   where T : Differentiable, U : Differentiable,
-        R : Differentiable & FloatingPoint {
+        R : TensorFlowFloatingPoint {
   return { x, y in gradient(at: x, y, in: f) }
 }
 
@@ -196,7 +195,7 @@ public func gradient<T, U, V, R>(
   of f: @escaping @differentiable (T, U, V) -> Tensor<R>
 ) -> (T, U, V) -> (T.CotangentVector, U.CotangentVector, V.CotangentVector)
   where T : Differentiable, U : Differentiable, V : Differentiable,
-        R : Differentiable & FloatingPoint {
+        R : TensorFlowFloatingPoint {
   return { x, y, z in gradient(at: x, y, z, in: f) }
 }
 
@@ -204,7 +203,7 @@ public func gradient<T, U, V, R>(
 // Elementwise binary
 //===----------------------------------------------------------------------===//
 
-extension Tensor where Scalar : Differentiable & FloatingPoint {
+extension Tensor where Scalar : TensorFlowFloatingPoint {
   @inlinable
   static func _vjpAdd(
     lhs: Tensor, rhs: Tensor
@@ -249,8 +248,7 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
   }
 }
 
-extension Tensor where Scalar : Differentiable & FloatingPoint,
-                       Scalar == Scalar.CotangentVector {
+extension Tensor where Scalar : TensorFlowFloatingPoint {
   @inlinable
   static func _vjpAdd(
     lhs: Tensor, rhs: Scalar
@@ -313,7 +311,7 @@ extension Tensor where Scalar : Differentiable & FloatingPoint,
 }
 
 @inlinable
-func _vjpMinMaxHelper<T : Differentiable & FloatingPoint>(
+func _vjpMinMaxHelper<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>, _ y: Tensor<T>, originalValue: Tensor<T>, vector: Tensor<T>
 ) -> (Tensor<T>, Tensor<T>) {
   let denom = 1 + Tensor<T>(x .== y)
@@ -323,7 +321,7 @@ func _vjpMinMaxHelper<T : Differentiable & FloatingPoint>(
 }
 
 @inlinable
-func _vjpMax<T : Differentiable & FloatingPoint>(
+func _vjpMax<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>, _ y: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> (Tensor<T>, Tensor<T>)) {
   let value = max(x, y)
@@ -332,7 +330,7 @@ func _vjpMax<T : Differentiable & FloatingPoint>(
 }
 
 @inlinable
-func _vjpMin<T : Differentiable & FloatingPoint>(
+func _vjpMin<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>, _ y: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> (Tensor<T>, Tensor<T>)) {
   let value = min(x, y)
@@ -341,7 +339,7 @@ func _vjpMin<T : Differentiable & FloatingPoint>(
 }
 
 @inlinable
-func _vjpPow<T : Differentiable & FloatingPoint>(
+func _vjpPow<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>, _ y: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> (Tensor<T>, Tensor<T>)) {
   let value = pow(x, y)
@@ -355,7 +353,7 @@ func _vjpPow<T : Differentiable & FloatingPoint>(
 // Elementwise unary
 //===----------------------------------------------------------------------===//
 
-extension Tensor where Scalar : Differentiable & FloatingPoint {
+extension Tensor where Scalar : TensorFlowFloatingPoint {
   @inlinable
   static func _vjpNegate(_ x: Tensor) -> (Tensor, (Tensor) -> Tensor) {
     return (-x, { v in -v })
@@ -363,28 +361,28 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
 }
 
 @inlinable
-func _vjpLog<T : Differentiable & FloatingPoint>(
+func _vjpLog<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
   return (log(x), { v in v / x })
 }
 
 @inlinable
-func _vjpSin<T : Differentiable & FloatingPoint>(
+func _vjpSin<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
   return (sin(x), { v in v * cos(x) })
 }
 
 @inlinable
-func _vjpCos<T : Differentiable & FloatingPoint>(
+func _vjpCos<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
   return (cos(x), { v in -v * sin(x) })
 }
 
 @inlinable
-func _vjpTan<T : Differentiable & FloatingPoint>(
+func _vjpTan<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
   let value = tan(x)
@@ -392,21 +390,21 @@ func _vjpTan<T : Differentiable & FloatingPoint>(
 }
 
 @inlinable
-func _vjpSinh<T : Differentiable & FloatingPoint>(
+func _vjpSinh<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
   return (sinh(x), { v in v * cosh(x) })
 }
 
 @inlinable
-func _vjpCosh<T : Differentiable & FloatingPoint>(
+func _vjpCosh<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
   return (cosh(x), { v in v * sinh(x) })
 }
 
 @inlinable
-func _vjpTanh<T : Differentiable & FloatingPoint>(
+func _vjpTanh<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
   let value = tanh(x)
@@ -414,7 +412,7 @@ func _vjpTanh<T : Differentiable & FloatingPoint>(
 }
 
 @inlinable
-func _vjpExp<T : Differentiable & FloatingPoint>(
+func _vjpExp<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
   let value = exp(x)
@@ -422,21 +420,21 @@ func _vjpExp<T : Differentiable & FloatingPoint>(
 }
 
 @inlinable
-func _vjpCeil<T : Differentiable & FloatingPoint>(
+func _vjpCeil<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
   return (ceil(x), { _ in Tensor(0).broadcast(like: x) })
 }
 
 @inlinable
-func _vjpFloor<T : Differentiable & FloatingPoint>(
+func _vjpFloor<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
   return (floor(x), { _ in Tensor(0).broadcast(like: x) })
 }
 
 @inlinable
-func _vjpSqrt<T : Differentiable & FloatingPoint>(
+func _vjpSqrt<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
   let value = sqrt(x)
@@ -444,7 +442,7 @@ func _vjpSqrt<T : Differentiable & FloatingPoint>(
 }
 
 @inlinable
-func _vjpRsqrt<T : Differentiable & FloatingPoint>(
+func _vjpRsqrt<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
   let value = rsqrt(x)
@@ -452,7 +450,7 @@ func _vjpRsqrt<T : Differentiable & FloatingPoint>(
 }
 
 @inlinable
-func _vjpLogSoftmax<T : Differentiable & FloatingPoint>(
+func _vjpLogSoftmax<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
   let value = logSoftmax(x)
@@ -461,7 +459,7 @@ func _vjpLogSoftmax<T : Differentiable & FloatingPoint>(
   })
 }
 
-extension Tensor where Scalar : Differentiable & FloatingPoint {
+extension Tensor where Scalar : TensorFlowFloatingPoint {
   @inlinable
   func _vjpSquared() -> (Tensor, (Tensor) -> Tensor) {
     return (squared(), { 2 * self * $0 })
@@ -473,7 +471,7 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
 //===----------------------------------------------------------------------===//
 
 @inlinable
-func _vjpMatmul<Scalar : Differentiable & FloatingPoint>(
+func _vjpMatmul<Scalar : TensorFlowFloatingPoint>(
   _ lhs: Tensor<Scalar>, _ rhs: Tensor<Scalar>
 ) -> (Tensor<Scalar>, (Tensor<Scalar>) -> (Tensor<Scalar>, Tensor<Scalar>)) {
   let value = matmul(lhs, rhs)
@@ -485,7 +483,7 @@ func _vjpMatmul<Scalar : Differentiable & FloatingPoint>(
 // TODO: We have to define a custom VJP on • because AD can't yet
 // differentiate generic methods. After AD can differentiate generic methods,
 // remove the custom VJP.
-extension Tensor where Scalar : Differentiable & FloatingPoint {
+extension Tensor where Scalar : TensorFlowFloatingPoint {
   @inlinable
   static func _vjpMatmulOperator(
     lhs: Tensor, rhs: Tensor
@@ -527,7 +525,7 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
 // Shape transformations
 //===----------------------------------------------------------------------===//
 
-extension Tensor where Scalar : Differentiable & FloatingPoint {
+extension Tensor where Scalar : TensorFlowFloatingPoint {
   @inlinable
   func _vjpReshaped(
     toShape newShape: Tensor<Int32>
@@ -553,7 +551,7 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
 // Reduction
 //===----------------------------------------------------------------------===//
 
-extension Tensor where Scalar : Differentiable & FloatingPoint {
+extension Tensor where Scalar : TensorFlowFloatingPoint {
   @inlinable
   func _vjpMean() -> (Tensor, (Tensor) -> Tensor) {
     return (mean(), { [shape = shapeTensor, count = scalarCountTensor] in
@@ -585,8 +583,7 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
 // Normalization
 //===----------------------------------------------------------------------===//
 
-extension Tensor where Scalar : BinaryFloatingPoint & Differentiable,
-                       Scalar == Scalar.CotangentVector {
+extension Tensor where Scalar : TensorFlowFloatingPoint {
   // TODO: Verify that these calculations are correct.
   @inlinable
   func _vjpBatchNormalized(
@@ -624,7 +621,7 @@ extension Tensor where Scalar : BinaryFloatingPoint & Differentiable,
 // Convolution and pooling
 //===----------------------------------------------------------------------===//
 
-extension Tensor where Scalar : Differentiable & FloatingPoint {
+extension Tensor where Scalar : TensorFlowFloatingPoint {
   /// TensorFlow builtin conv2d gradient helper for the input.
   @inlinable
   @differentiable(
@@ -780,7 +777,7 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
 //===----------------------------------------------------------------------===//
 
 @inlinable
-func _vjpSigmoid<T : Differentiable & FloatingPoint>(
+func _vjpSigmoid<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
   let value = sigmoid(x)
@@ -788,7 +785,7 @@ func _vjpSigmoid<T : Differentiable & FloatingPoint>(
 }
 
 @inlinable
-func _vjpSoftmax<T : Differentiable & FloatingPoint>(
+func _vjpSoftmax<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
   let value = softmax(x)
@@ -799,7 +796,7 @@ func _vjpSoftmax<T : Differentiable & FloatingPoint>(
 }
 
 @inlinable
-func _vjpRelu<T : Differentiable & FloatingPoint>(
+func _vjpRelu<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
   return (relu(x), { v in Tensor(x .> 0) * v })

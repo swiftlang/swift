@@ -22,10 +22,18 @@ TensorADTests.testAllBackends("TestSimpleGrad") {
 }
 
 TensorADTests.testAllBackends("TestGenericGrad") {
-  func square<T : FloatingPoint & Differentiable>(_ x: Tensor<T>) -> Tensor<T> {
+  func square<T : TensorFlowFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
     return x * x
   }
   expectEqual([0.2, 0.4, 0.6], gradient(at: Tensor([0.1, 0.2, 0.3]), in: square))
+}
+
+TensorADTests.testAllBackends("TestScalarGenericGrad") {
+  // Tests TF-287.
+  func negate<T : TensorFlowFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
+    return 1 - x
+  }
+  expectEqual(Tensor(-1), gradient(at: Tensor([0.1, 0.2, 0.3]), in: negate))
 }
 
 TensorADTests.testAllBackends("+") {
