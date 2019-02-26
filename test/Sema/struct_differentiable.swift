@@ -18,12 +18,11 @@ assertConformsToAdditiveArithmetic(Empty.AllDifferentiableVariables.self)
 // Previously, this crashed due to duplicate memberwise initializer synthesis.
 struct EmptyAdditiveArithmetic : AdditiveArithmetic, Differentiable {}
 
-// Test structs whose stored properties all have an initial value.
-// expected-error @+3 {{does not conform to protocol '__Differentiable'}}
-// expected-error @+2 {{does not conform to protocol '_Differentiable'}}
-// expected-error @+1 {{does not conform to protocol 'Differentiable'}}
+// Test structs whose stored properties all have a default value.
 struct AllLetStoredPropertiesHaveInitialValue : Differentiable {
+  // expected-warning @+1 {{'let' properties with a default value do not have a derivative; add '@noDerivative' to make it explicit, or change it to 'var' to allow derivatives}} {{3-3=@noDerivative }}
   let x = Float(1)
+  // expected-warning @+1 {{'let' properties with a default value do not have a derivative; add '@noDerivative' to make it explicit, or change it to 'var' to allow derivatives}} {{3-3=@noDerivative }}
   let y = Float(1)
 }
 struct AllVarStoredPropertiesHaveInitialValue : Differentiable {
@@ -31,11 +30,8 @@ struct AllVarStoredPropertiesHaveInitialValue : Differentiable {
   var y = Float(1)
 }
 // Test struct with both an empty constructor and memberwise initializer.
-// expected-error @+3 {{does not conform to protocol '__Differentiable'}}
-// expected-error @+2 {{does not conform to protocol '_Differentiable'}}
-// expected-error @+1 {{does not conform to protocol 'Differentiable'}}
 struct AllMixedStoredPropertiesHaveInitialValue : Differentiable {
-  let x = Float(1)
+  let x = Float(1) // expected-warning {{'let' properties with a default value do not have a derivative}} {{3-3=@noDerivative }}
   var y = Float(1)
   // Memberwise initializer should be `init(y:)` since `x` is immutable.
   static func testMemberwiseInitializer() {
@@ -130,14 +126,11 @@ assertConformsToVectorNumeric(AllMembersVectorNumeric.TangentVector.self)
 assertConformsToVectorNumeric(AllMembersVectorNumeric.CotangentVector.self)
 
 // Test type with immutable, differentiable stored property.
-// expected-error @+3 {{does not conform to protocol '__Differentiable'}}
-// expected-error @+2 {{does not conform to protocol '_Differentiable'}}
-// expected-error @+1 {{does not conform to protocol 'Differentiable'}}
 struct ImmutableStoredProperty : Differentiable {
   var w: Float
-  let fixedBias: Float = .pi
+  let fixedBias: Float = .pi // expected-warning {{'let' properties with a default value do not have a derivative}} {{3-3=@noDerivative }}
 }
-_ = ImmutableStoredProperty.TangentVector(w: 1, fixedBias: 1)
+_ = ImmutableStoredProperty.TangentVector(w: 1)
 
 // Test type whose properties are not all differentiable.
 struct DifferentiableSubset : Differentiable {

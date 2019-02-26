@@ -3086,10 +3086,14 @@ ConstructorDecl *NominalTypeDecl::getEffectiveMemberwiseInitializer() {
     // Return true if `ctorDecl` is marked as a memberwise initializer.
     if (ctorDecl->isMemberwiseInitializer())
       return true;
-    // Get stored property count and initializer type.
-    unsigned numStoredProperties =
-        std::distance(getStoredProperties().begin(),
-                      getStoredProperties().end());
+    // Get all stored properties, excluding `let` properties with initial
+    // values.
+    SmallVector<VarDecl *, 8> storedProperties;
+    for (auto *vd : getStoredProperties()) {
+      if (vd->isLet() && vd->hasInitialValue())
+        continue;
+      storedProperties.push_back(vd);
+    }
     // Return false if constructor does not have interface type set. It is not
     // possible to determine whether it is a memberwise initializer.
     if (!ctorDecl->hasInterfaceType())
@@ -3100,12 +3104,12 @@ ConstructorDecl *NominalTypeDecl::getEffectiveMemberwiseInitializer() {
     if (!ctorType)
       return false;
     // Return false if stored property/initializer parameter count do not match.
-    if (numStoredProperties != ctorType->getNumParams())
+    if (storedProperties.size() != ctorType->getNumParams())
       return false;
     // Return true if all stored property types/names match initializer
     // parameter types/labels.
     return llvm::all_of(
-        llvm::zip(getStoredProperties(), ctorType->getParams()),
+        llvm::zip(storedProperties, ctorType->getParams()),
         [&](std::tuple<VarDecl *, AnyFunctionType::Param> pair) {
           auto *storedProp = std::get<0>(pair);
           auto param = std::get<1>(pair);

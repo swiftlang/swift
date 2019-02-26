@@ -57,6 +57,8 @@ getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal,
   for (auto *vd : nominal->getStoredProperties()) {
     if (vd->getAttrs().hasAttribute<NoDerivativeAttr>())
       continue;
+    if (vd->isLet() && vd->hasInitialValue())
+      continue;
     if (!vd->hasInterfaceType())
       C.getLazyResolver()->resolveDeclSignature(vd);
     if (!vd->hasInterfaceType())
@@ -204,8 +206,6 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
   SmallVector<VarDecl *, 16> diffProperties;
   getStoredPropertiesForDifferentiation(structDecl, DC, diffProperties);
   return llvm::all_of(diffProperties, [&](VarDecl *v) {
-    if (v->isLet() && v->hasInitialValue())
-      return false;
     if (!v->hasInterfaceType())
       lazyResolver->resolveDeclSignature(v);
     if (!v->hasInterfaceType())
@@ -685,10 +685,10 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
     inherited.push_back(addArithType);
 
   // Associated struct can derive `AdditiveArithmetic` if the associated types
-  // of all members conform to `AdditiveArithmetic`.
+  // of all stored properties conform to `AdditiveArithmetic`.
   bool canDeriveAdditiveArithmetic =
-      llvm::all_of(diffProperties, [&](VarDecl *var) {
-        return TC.conformsToProtocol(getAssociatedType(var, parentDC, id),
+      llvm::all_of(diffProperties, [&](VarDecl *vd) {
+        return TC.conformsToProtocol(getAssociatedType(vd, parentDC, id),
                                      addArithProto, parentDC,
                                      ConformanceCheckFlags::Used);
         });
@@ -698,14 +698,14 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
   Type sameScalarType;
   bool canDeriveVectorNumeric =
       canDeriveAdditiveArithmetic && !diffProperties.empty() && 
-      llvm::all_of(diffProperties, [&](VarDecl *var) {
-        auto conf = TC.conformsToProtocol(getAssociatedType(var, parentDC, id),
+      llvm::all_of(diffProperties, [&](VarDecl *vd) {
+        auto conf = TC.conformsToProtocol(getAssociatedType(vd, parentDC, id),
                                           vecNumProto, nominal,
                                           ConformanceCheckFlags::Used);
         if (!conf)
           return false;
         Type scalarType = ProtocolConformanceRef::getTypeWitnessByName(
-            var->getType(), *conf, C.Id_Scalar, C.getLazyResolver());
+            vd->getType(), *conf, C.Id_Scalar, C.getLazyResolver());
         if (!sameScalarType) {
           sameScalarType = scalarType;
           return true;
@@ -837,9 +837,11 @@ static void addAssociatedTypeAliasDecl(Identifier name,
   C.addSynthesizedDecl(aliasDecl);
 };
 
-// If any stored property in the nominal does not conform to `Differentiable`
-// but does not have an explicit `@noDerivative` attribute, emit a warning and
-// a fixit so that the user will make it explicit.
+// Diagnose stored properties in the nominal that do not have an explicit
+// `@noDerivative` attribute, but either:
+// - Do not conform to `Differentiable`.
+// - Are a `let` stored property with an initial value.
+// Emit a warning and a fixit so that users will make the attribute explicit.
 static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
                                                  NominalTypeDecl *nominal,
                                                  DeclContext* DC) {
@@ -851,19 +853,37 @@ static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
     if (!vd->hasInterfaceType())
       continue;
     auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
-    if (vd->getAttrs().hasAttribute<NoDerivativeAttr>() ||
-        TC.conformsToProtocol(varType, diffableProto, nominal,
-                              ConformanceCheckFlags::Used))
+    if (vd->getAttrs().hasAttribute<NoDerivativeAttr>())
       continue;
+    // Check whether to diagnose stored property.
+    bool conformsToDifferentiable =
+        TC.conformsToProtocol(varType, diffableProto, nominal,
+                              ConformanceCheckFlags::Used).hasValue();
+    bool isConstantProperty = vd->isLet() && vd->hasInitialValue();
+    // If stored property should not be diagnosed, continue.
+    if (conformsToDifferentiable && !isConstantProperty)
+      continue;
+    // Otherwise, add an implicit `@noDerivative` attribute.
     nominal->getAttrs().add(
         new (TC.Context) NoDerivativeAttr(/*Implicit*/ true));
     auto loc =
         vd->getLoc().isValid() ? vd->getLoc() : DC->getAsDecl()->getLoc();
     assert(loc.isValid() && "Expected valid source location");
-    TC.diagnose(loc, diag::differentiable_implicit_noderivative_fixit,
-                vd->getName())
+    // Diagnose stored property with fixit.
+    if (!conformsToDifferentiable) {
+      TC.diagnose(loc,
+                  diag::differentiable_nondiff_type_implicit_noderivative_fixit,
+                  vd->getName())
+          .fixItInsert(vd->getAttributeInsertionLoc(/*forModifier*/ false),
+                       "@noDerivative ");
+      continue;
+    }
+    TC.diagnose(
+          loc,
+          diag::differentiable_constant_property_implicit_noderivative_fixit)
         .fixItInsert(vd->getAttributeInsertionLoc(/*forModifier*/ false),
                      "@noDerivative ");
+
   }
 }
 
