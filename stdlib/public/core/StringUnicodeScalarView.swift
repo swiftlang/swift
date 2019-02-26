@@ -418,7 +418,7 @@ extension String.UnicodeScalarView {
   internal func _foreignIndex(after i: Index) -> Index {
     _internalInvariant(_guts.isForeign)
     let cu = _guts.foreignErrorCorrectedUTF16CodeUnit(at: i)
-    let len = _isLeadingSurrogate(cu) ? 2 : 1
+    let len = UTF16.isLeadSurrogate(cu) ? 2 : 1
 
     return i.encoded(offsetBy: len)
   }
@@ -429,7 +429,7 @@ extension String.UnicodeScalarView {
     _internalInvariant(_guts.isForeign)
     let priorIdx = i.priorEncoded
     let cu = _guts.foreignErrorCorrectedUTF16CodeUnit(at: priorIdx)
-    let len = _isTrailingSurrogate(cu) ? 2 : 1
+    let len = UTF16.isTrailSurrogate(cu) ? 2 : 1
 
     return i.encoded(offsetBy: -len)
   }
