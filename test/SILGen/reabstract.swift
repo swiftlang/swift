@@ -112,3 +112,23 @@ func testSharedOwnedOpaque(_ s: C, o: C) {
   let box = Box(t: evenLessFun)
   box.t(s, o)
 }
+
+// Make sure that when we generate the reabstraction thunk from Klass -> P, we
+// pass off the value at +1.
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$s10reabstract1P_pIegg_xIegg_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0, @guaranteed @callee_guaranteed (@guaranteed P) -> ()) -> () {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $τ_0_0,
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[EXISTENTIAL:%.*]] = init_existential_ref [[ARG_COPY]]
+// CHECK:   [[BORROWED_EXISTENTIAL:%.*]] = begin_borrow [[EXISTENTIAL]]
+// CHECK:   apply {{%.*}}([[BORROWED_EXISTENTIAL]])
+// CHECK:   end_borrow [[BORROWED_EXISTENTIAL]]
+// CHECK:   destroy_value [[EXISTENTIAL]]
+// CHECK: } // end sil function '$s10reabstract1P_pIegg_xIegg_AaBRzlTR'
+protocol P : class {}
+class Klass : P { }
+extension P { static func crash(setup: ((Self) -> ())?) {} }
+func checkInitExistentialThunk() -> P? {
+  let cls : P.Type = Klass.self
+  cls.crash(setup: { (arg:  P) -> () in  })
+  return nil
+}

@@ -241,7 +241,11 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
                    [&](SGFContext C) -> ManagedValue {
                      if (openedArchetype)
                        return SGF.manageOpaqueValue(state, loc, C);
-                     return input;
+                     if (input.isPlusOne(SGF))
+                       return input;
+                     if (C.isGuaranteedPlusZeroOk())
+                       return input;
+                     return input.copyUnmanaged(SGF, loc);
                    });
   
   return input;
