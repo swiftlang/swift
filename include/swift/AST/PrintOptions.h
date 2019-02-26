@@ -275,6 +275,9 @@ struct PrintOptions {
   /// '@sil_weak', '@sil_unmanaged'.
   bool PrintStorageRepresentationAttrs = false;
 
+  /// Whether to print 'static' or 'class' on static decls.
+  bool PrintStaticKeyword = true;
+
   /// Whether to print 'override' keyword on overridden decls.
   bool PrintOverrideKeyword = true;
 
