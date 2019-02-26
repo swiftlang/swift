@@ -46,10 +46,10 @@ func _tensorSeeds(_ seed: Tensor<Int64>) -> (Tensor<Int64>, Tensor<Int64>) {
 /// collection of element tensors.
 @_fixed_layout
 public struct Dataset<Element : TensorGroup> {
-  @usableFromInline let _handle: VariantHandle
+  public let _handle: VariantHandle
 
-  @usableFromInline @inline(__always)
-  internal init(_handle: VariantHandle) {
+  @inlinable @inline(__always)
+  public init(_handle: VariantHandle) {
     self._handle = _handle
   }
 }
@@ -189,9 +189,15 @@ extension DatasetIterator : IteratorProtocol {
 
 /// A 2-tuple-like struct that conforms to TensorGroup that represents the 
 /// result type of a zip operation between two datasets.
-public struct ZippedTensors<T: TensorGroup, U: TensorGroup> : TensorGroup {
+@_fixed_layout
+public struct ZippedTensors<T : TensorGroup, U : TensorGroup> : TensorGroup {
   public var first: T
   public var second: U
+
+  public init(_ first: T, _ second: U) {
+    self.first = first
+    self.second = second
+  }
 }
 
 // TODO(SR-9156): This does not work in graph mode.
