@@ -35,3 +35,16 @@ extension Float {
     return (.zero, { $0 })
   }
 }
+
+
+public func publicDiffableIndirect(_ x: Float, _ y: Float) -> Float { return x }
+
+internal func internalDiffableIndirect(_ x: Float, _ y: Float) -> Float { return x }
+
+private func privateDiffableIndirect(_ x: Float, _ y: Float) -> Float { return x }
+
+func invokeIndirect() {
+  print(gradient(of: publicDiffableIndirect)(1, 2))
+  print(gradient(of: internalDiffableIndirect)(1, 2))
+  print(gradient(of: privateDiffableIndirect)(1, 2))
+}
