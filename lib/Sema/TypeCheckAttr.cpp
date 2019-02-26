@@ -2600,19 +2600,84 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   AutoDiffParameterIndices *checkedWrtParamIndices =
       attr->getParameterIndices();
 
+  // Predicate checking if a type has associated tangent and cotangent spaces.
+  auto hasAssociatedSpaces = [&](Type type) -> bool {
+    return (bool)type->getAutoDiffAssociatedVectorSpace(
+               AutoDiffAssociatedVectorSpaceKind::Tangent, lookupConformance) &&
+           (bool)type->getAutoDiffAssociatedVectorSpace(
+               AutoDiffAssociatedVectorSpaceKind::Cotangent, lookupConformance);
+  };
+
   // If checked wrt param indices are not specified, compute them using parsed
   // wrt param indices.
   if (!checkedWrtParamIndices) {
     AutoDiffParameterIndicesBuilder autoDiffParameterIndicesBuilder(
         originalFnTy);
     if (parsedWrtParams.empty()) {
-      if (original->isStatic() || isa<ConstructorDecl>(original)) {
+      SmallVector<Type, 4> allWrtParamTypes;
+
+      auto isDifferentiableParam = [&](unsigned i) {
+        if (i >= allWrtParamTypes.size())
+          return false;
+        auto wrtParamType = original->mapTypeIntoContext(allWrtParamTypes[i]);
+        if (wrtParamType->isAnyClassReferenceType() ||
+            wrtParamType->isExistentialType())
+          return false;
+        if (whereClauseGenEnv) {
+          auto wrtParamInterfaceType = !wrtParamType->hasTypeParameter()
+                                           ? wrtParamType->mapTypeOutOfContext()
+                                           : wrtParamType;
+          wrtParamType =
+              whereClauseGenEnv->mapTypeIntoContext(wrtParamInterfaceType);
+        }
+        return hasAssociatedSpaces(wrtParamType);
+      };
+
+      // The wrt types listed when verifying are in (T1) -> (T2, T3) -> R order,
+      // but the bits are in T2, T3, T1 order.
+      //
+      // That works out to three cases:
+      // Static function on a type:
+      // Check: (T2, T3).
+      //
+      // Method function:
+      // Check: (T2, T3, T1).
+      //
+      // Free standing function: (This will be: (T1, T2, T3) -> R)
+      // Check (T1, T2, T3).
+      // TODO: Clean all this up.
+      bool isStaticSelf =
+          original->isStatic() || isa<ConstructorDecl>(original);
+      if (auto *fnTy = originalFnTy->getResult()->getAs<AnyFunctionType>()) {
+        if ((!isInstanceMethod && !isStaticSelf) ||
+            fnTy->getResult()->is<AnyFunctionType>()) {
+          TC.diagnose(attr->getLocation(),
+                      diag::differentiable_attr_no_currying);
+          return;
+        }
+        for (auto &param : fnTy->getParams()) {
+          allWrtParamTypes.push_back(param.getPlainType());
+        }
+        assert(originalFnTy->getNumParams() == 1 &&
+               "This must be in the form (Self) -> (Args...) -> R");
+      }
+
+      if (isStaticSelf) {
         auto *methodTy =
             original->getMethodInterfaceType()->castTo<AnyFunctionType>();
-        autoDiffParameterIndicesBuilder
-            .setParameters(0, methodTy->getNumParams());
+        for (unsigned i : range(methodTy->getNumParams())) {
+          if (isDifferentiableParam(i))
+            autoDiffParameterIndicesBuilder.setParameter(i);
+        }
       } else {
-        autoDiffParameterIndicesBuilder.setAllParameters();
+        for (auto &param : originalFnTy->getParams()) {
+          allWrtParamTypes.push_back(param.getPlainType());
+        }
+
+        for (unsigned i : range(autoDiffParameterIndicesBuilder.size())) {
+          if (isDifferentiableParam(i))
+            autoDiffParameterIndicesBuilder.setParameter(i);
+        }
       }
     } else {
       // 'wrt:' is specified. Validate and collect the selected parameters.
@@ -2685,14 +2750,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     attr->setInvalid();
     return;
   }
-
-  // Predicate checking if a type has associated tangent and cotangent spaces.
-  auto hasAssociatedSpaces = [&](Type type) -> bool {
-    return (bool)type->getAutoDiffAssociatedVectorSpace(
-               AutoDiffAssociatedVectorSpaceKind::Tangent, lookupConformance) &&
-           (bool)type->getAutoDiffAssociatedVectorSpace(
-               AutoDiffAssociatedVectorSpaceKind::Cotangent, lookupConformance);
-  };
 
   // Check that the user has only selected wrt params with allowed types.
   SmallVector<Type, 4> wrtParamTypes;

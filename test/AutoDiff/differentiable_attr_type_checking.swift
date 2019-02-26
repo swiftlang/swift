@@ -77,7 +77,7 @@ func jvpWrongTypeJVP(x: Float) -> (Float, (Float) -> Int) {
   return (x, { v in Int(v) })
 }
 
-// expected-error @+1 {{can only differentiate with respect to parameters that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
+// expected-error @+1 {{specify at least one parameter to differentiate with respect to}}
 @differentiable(jvp: jvpSimpleJVP)
 func jvpNonDiffParam(x: Int) -> Float {
   return Float(x)
@@ -256,7 +256,7 @@ func vjpWrongTypeVJP(x: Float) -> (Float, (Float) -> Int) {
   return (x, { v in Int(v) })
 }
 
-// expected-error @+1 {{can only differentiate with respect to parameters that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
+// expected-error @+1 {{specify at least one parameter to differentiate with respect to}}
 @differentiable(vjp: vjpSimpleVJP)
 func vjpNonDiffParam(x: Int) -> Float {
   return Float(x)
@@ -458,7 +458,7 @@ func vjpNonvariadic(_ x: Float, indices: [Int32]) -> (Float, (Float) -> Float) {
 }
 
 // expected-error @+2 {{type 'Scalar' constrained to non-protocol, non-class type 'Float'}}
-// expected-error @+1 {{can only differentiate with respect to parameters that conform to 'Differentiable', but 'Scalar' does not conform to 'Differentiable'}}
+// expected-error @+1 {{specify at least one parameter to differentiate with respect to}}
 @differentiable(where Scalar : Float)
 func invalidRequirementConformance<Scalar>(x: Scalar) -> Scalar {
   return x
@@ -555,5 +555,31 @@ struct TF285MissingOneDiffAttr : TF285 {
   // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: (x, y))}}
   func foo(x: Float, y: Float) -> Float {
     return x
+  }
+}
+
+
+// TF296: Make `@differentiable` parameters default to all parameters that conform to `Differentiable`.
+
+@differentiable
+func TF296Fn(_ a: Float, _ b: Int) -> Float {
+  return a + Float(b)
+}
+
+struct TF296A : Differentiable {
+  var a: Float
+
+  @differentiable
+  func fn(_ b: Float, _ c: Int) -> Float {
+    return a + b + Float(c)
+  }
+}
+
+struct TF296B {
+  var a: Float
+
+  @differentiable
+  func fn(_ b: Float) -> Float {
+    return a + b
   }
 }
