@@ -2442,12 +2442,12 @@ ERROR(broken_vector_numeric_requirement,none,
       "VectorNumeric protocol is broken: unexpected requirement", ())
 ERROR(broken_differentiable_requirement,none,
       "Differentiable protocol is broken: unexpected requirement", ())
-WARNING(differentiable_implicit_noderivative_fixit,none,
+WARNING(differentiable_nondiff_type_implicit_noderivative_fixit,none,
       "stored property %0 has no derivative because it does not conform to "
       "'Differentiable'; add '@noDerivative' to make it explicit",
       (Identifier))
 WARNING(differentiable_constant_property_implicit_noderivative_fixit,none,
-      "'let' properties with an initial value do not have a derivative; add "
+      "'let' properties with a default value do not have a derivative; add "
       "'@noDerivative' to make it explicit",
       ())
 NOTE(protocol_witness_missing_differentiable_attr,none,

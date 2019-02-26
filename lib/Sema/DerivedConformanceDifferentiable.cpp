@@ -871,7 +871,8 @@ static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
     assert(loc.isValid() && "Expected valid source location");
     // Diagnose stored property with fixit.
     if (!conformsToDifferentiable) {
-      TC.diagnose(loc, diag::differentiable_implicit_noderivative_fixit,
+      TC.diagnose(loc,
+                  diag::differentiable_nondiff_type_implicit_noderivative_fixit,
                   vd->getName())
           .fixItInsert(vd->getAttributeInsertionLoc(/*forModifier*/ false),
                        "@noDerivative ");
