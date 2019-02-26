@@ -5239,7 +5239,9 @@ DictionaryTestSuite.test("Values.MutationDoesNotInvalidateIndices.Native") {
 }
 
 #if _runtime(_ObjC)
-DictionaryTestSuite.test("Values.MutationDoesNotInvalidateIndices.Bridged") {
+DictionaryTestSuite.test("Values.MutationDoesNotInvalidateIndices.Bridged")
+  .skip(.always("rdar://problem/47973577"))
+  .code {
   let objects: [NSNumber] = [1, 2, 3, 4]
   let keys: [NSString] = ["Blanche", "Rose", "Dorothy", "Sophia"]
   let ns = NSDictionary(objects: objects, forKeys: keys)
