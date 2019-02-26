@@ -2446,6 +2446,12 @@ WARNING(differentiable_implicit_noderivative_fixit,none,
       "stored property %0 has no derivative because it does not conform to "
       "'Differentiable'; add '@noDerivative' to make it explicit",
       (Identifier))
+WARNING(differentiable_constant_property_implicit_noderivative_fixit,none,
+      "'let' properties with an initial value do not have a derivative; add "
+      "'@noDerivative' to make it explicit",
+      ())
+NOTE(protocol_witness_missing_differentiable_attr,none,
+     "candidate is missing attribute '%0'", (StringRef))
 
 NOTE(codable_extraneous_codingkey_case_here,none,
      "CodingKey case %0 does not match any stored properties", (Identifier))
