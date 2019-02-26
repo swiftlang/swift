@@ -557,15 +557,17 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   // SWIFT_ENABLE_TENSORFLOW
   case DAK_Differentiable: {
     Printer.printAttrName("@differentiable");
-    Printer << '(';
     auto *attr = cast<DifferentiableAttr>(this);
     auto parsedParams = attr->getParsedParameters();
-
+    // If no attribute parameter is specified, do not print parentheses at all.
+    if (parsedParams.empty() && !attr->getJVP() && !attr->getVJP() &&
+        !attr->getWhereClause())
+      break;
+    Printer << '(';
     // Get original function.
     auto *original = dyn_cast_or_null<AbstractFunctionDecl>(D);
     if (auto *varDecl = dyn_cast_or_null<VarDecl>(D))
       original = varDecl->getGetter();
-    bool isMethod = original && original->hasImplicitSelfDecl();
 
     // Print comma if not leading clause.
     bool isLeadingClause = true;
@@ -579,35 +581,24 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
     // Print differentiation parameters, if any.
     if (auto indices = attr->getParameterIndices()) {
-      printCommaIfNecessary();
-      Printer << "wrt: (";
-      SmallBitVector parameters(indices->parameters);
-      // Check if differentiating wrt `self`. If so, manually print it first.
-      if (isMethod && parameters.test(parameters.size() - 1)) {
-        parameters.reset(parameters.size() - 1);
-        Printer << "self";
-        if (parameters.any())
-          Printer << ", ";
+      if (!parsedParams.empty()) {
+        printCommaIfNecessary();
+        Printer << "wrt: ";
+        if (parsedParams.size() > 1)
+          Printer << '(';
+        interleave(parsedParams, [&](const ParsedAutoDiffParameter &param) {
+          switch (param.getKind()) {
+          case ParsedAutoDiffParameter::Kind::Named:
+            Printer << param.getName();
+            break;
+          case ParsedAutoDiffParameter::Kind::Self:
+            Printer << "self";
+            break;
+          }
+        }, [&]{ Printer << ", "; });
+        if (parsedParams.size() > 1)
+          Printer << ')';
       }
-      // Print remaining differentiation parameters.
-      interleave(parameters.set_bits(), [&](unsigned index) {
-        Printer << original->getParameters()->get(index)->getName().str();
-      }, [&] { Printer << ", "; });
-      Printer << ")";
-    } else if (!parsedParams.empty()) {
-      printCommaIfNecessary();
-      Printer << "wrt: (";
-      interleave(parsedParams, [&](const ParsedAutoDiffParameter &param) {
-        switch (param.getKind()) {
-        case ParsedAutoDiffParameter::Kind::Named:
-          Printer << param.getName();
-          break;
-        case ParsedAutoDiffParameter::Kind::Self:
-          Printer << "self";
-          break;
-        }
-      }, [&] { Printer << ", "; });
-      Printer << ")";
     }
     // Print jvp function name.
     if (auto jvp = attr->getJVP()) {

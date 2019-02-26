@@ -110,6 +110,7 @@ SimpleMathTests.test("TupleSideEffects") {
   }
   expectEqual(27, gradient(at: 3, in: foo))
 
+<<<<<<< HEAD
   func fooInout(_ x: Float) -> Float {
     var tuple = (x, x)
     tuple.0 *= x
@@ -119,6 +120,8 @@ SimpleMathTests.test("TupleSideEffects") {
   // expectEqual(27, gradient(at: 3, in: fooInout))
   expectEqual(12, gradient(at: 3, in: fooInout))
 
+=======
+>>>>>>> upstream/tensorflow
   func fifthPower(_ x: Float) -> Float {
     var tuple = (x, x)
     tuple.0 = tuple.0 * x

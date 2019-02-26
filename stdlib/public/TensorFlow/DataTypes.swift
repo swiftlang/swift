@@ -72,8 +72,16 @@ public protocol TensorFlowScalar : _TensorFlowDataTypeCompatible {}
 public typealias TensorFlowNumeric = TensorFlowScalar & Numeric
 public typealias TensorFlowSignedNumeric = TensorFlowScalar & SignedNumeric
 public typealias TensorFlowInteger = TensorFlowScalar & BinaryInteger
-public typealias TensorFlowFloatingPoint
-  = TensorFlowScalar & BinaryFloatingPoint & Differentiable
+
+public protocol TensorFlowFloatingPoint :
+  TensorFlowScalar & BinaryFloatingPoint & Differentiable
+  where Self.RawSignificand: FixedWidthInteger,
+        Self == Self.TangentVector,
+        Self == Self.CotangentVector,
+        Self == Self.AllDifferentiableVariables {}
+
+extension Float : TensorFlowFloatingPoint {}
+extension Double : TensorFlowFloatingPoint {}
 
 // This is the implementation of the _getScalarOrDie requirement for each
 // concrete type below.  We use this round-about approach to implement the

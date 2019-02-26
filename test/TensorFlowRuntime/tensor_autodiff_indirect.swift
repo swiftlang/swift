@@ -14,9 +14,7 @@ import TensorFlowUnittest
 var TensorADTests = TestSuite("TensorIndirectAD")
 
 TensorADTests.testAllBackends("Generic") {
-  func indirect<Scalar : Differentiable & FloatingPoint>(_ x: Tensor<Scalar>) -> Tensor<Scalar>
-    where Scalar == Scalar.CotangentVector
-  {
+  func indirect<Scalar : TensorFlowFloatingPoint>(_ x: Tensor<Scalar>) -> Tensor<Scalar> {
     return (x + 3) * (x + 3)
   }
   expectEqual(Tensor(8), gradient(at: Tensor(1), in: indirect))
@@ -33,7 +31,7 @@ TensorADTests.testAllBackends("Concrete") {
 }
 
 extension Tensor where Scalar : Differentiable & FloatingPoint {
-  @differentiable(vjp: vjpFoo)
+  @differentiable(wrt: x, vjp: vjpFoo)
   func foo(_ x: Scalar) -> Scalar {
     return x
   }

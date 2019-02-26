@@ -2462,6 +2462,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
 
   AbstractFunctionDecl *original = nullptr;
+<<<<<<< HEAD
   bool isProperty = false;
   if (auto *vd = dyn_cast<VarDecl>(D)) {
     // When used on a storage decl, @differentiable refers to its getter.
@@ -2471,6 +2472,14 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     original = afd;
     if (auto *accessor = dyn_cast<AccessorDecl>(afd)) {
       isProperty = true;
+=======
+  if (auto *vd = dyn_cast<VarDecl>(D)) {
+    // When used on a storage decl, @differentiable refers to its getter.
+    original = vd->getGetter();
+  } else if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
+    original = afd;
+    if (auto *accessor = dyn_cast<AccessorDecl>(afd)) {
+>>>>>>> upstream/tensorflow
       // We do not support setters yet because inout is not supported yet.
       if (accessor->isSetter())
         original = nullptr;
@@ -2603,12 +2612,24 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   AutoDiffParameterIndices *checkedWrtParamIndices =
       attr->getParameterIndices();
 
+<<<<<<< HEAD
+=======
+  // Predicate checking if a type has associated tangent and cotangent spaces.
+  auto hasAssociatedSpaces = [&](Type type) -> bool {
+    return (bool)type->getAutoDiffAssociatedVectorSpace(
+               AutoDiffAssociatedVectorSpaceKind::Tangent, lookupConformance) &&
+           (bool)type->getAutoDiffAssociatedVectorSpace(
+               AutoDiffAssociatedVectorSpaceKind::Cotangent, lookupConformance);
+  };
+
+>>>>>>> upstream/tensorflow
   // If checked wrt param indices are not specified, compute them using parsed
   // wrt param indices.
   if (!checkedWrtParamIndices) {
     AutoDiffParameterIndicesBuilder autoDiffParameterIndicesBuilder(
         originalFnTy);
     if (parsedWrtParams.empty()) {
+<<<<<<< HEAD
       if (isProperty)
         autoDiffParameterIndicesBuilder.setParameter(0);
       else {
@@ -2667,6 +2688,120 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
           break;
         }
         }
+=======
+      SmallVector<Type, 4> allWrtParamTypes;
+
+      auto isDifferentiableParam = [&](unsigned i) {
+        if (i >= allWrtParamTypes.size())
+          return false;
+        auto wrtParamType = original->mapTypeIntoContext(allWrtParamTypes[i]);
+        if (wrtParamType->isAnyClassReferenceType() ||
+            wrtParamType->isExistentialType())
+          return false;
+        if (whereClauseGenEnv) {
+          auto wrtParamInterfaceType = !wrtParamType->hasTypeParameter()
+                                           ? wrtParamType->mapTypeOutOfContext()
+                                           : wrtParamType;
+          wrtParamType =
+              whereClauseGenEnv->mapTypeIntoContext(wrtParamInterfaceType);
+        }
+        return hasAssociatedSpaces(wrtParamType);
+      };
+
+      // The wrt types listed when verifying are in (T1) -> (T2, T3) -> R order,
+      // but the bits are in T2, T3, T1 order.
+      //
+      // That works out to three cases:
+      // Static function on a type:
+      // Check: (T2, T3).
+      //
+      // Method function:
+      // Check: (T2, T3, T1).
+      //
+      // Free standing function: (This will be: (T1, T2, T3) -> R)
+      // Check (T1, T2, T3).
+      // TODO: Clean all this up.
+      bool isStaticSelf =
+          original->isStatic() || isa<ConstructorDecl>(original);
+      if (auto *fnTy = originalFnTy->getResult()->getAs<AnyFunctionType>()) {
+        if ((!isInstanceMethod && !isStaticSelf) ||
+            fnTy->getResult()->is<AnyFunctionType>()) {
+          TC.diagnose(attr->getLocation(),
+                      diag::differentiable_attr_no_currying);
+          return;
+        }
+        for (auto &param : fnTy->getParams()) {
+          allWrtParamTypes.push_back(param.getPlainType());
+        }
+        assert(originalFnTy->getNumParams() == 1 &&
+               "This must be in the form (Self) -> (Args...) -> R");
+      }
+
+      if (isStaticSelf) {
+        auto *methodTy =
+            original->getMethodInterfaceType()->castTo<AnyFunctionType>();
+        for (unsigned i : range(methodTy->getNumParams())) {
+          if (isDifferentiableParam(i))
+            autoDiffParameterIndicesBuilder.setParameter(i);
+        }
+      } else {
+        for (auto &param : originalFnTy->getParams()) {
+          allWrtParamTypes.push_back(param.getPlainType());
+        }
+
+        for (unsigned i : range(autoDiffParameterIndicesBuilder.size())) {
+          if (isDifferentiableParam(i))
+            autoDiffParameterIndicesBuilder.setParameter(i);
+        }
+      }
+    } else {
+      // 'wrt:' is specified. Validate and collect the selected parameters.
+      int lastIndex = -1;
+      for (unsigned i : indices(parsedWrtParams)) {
+        auto paramLoc = parsedWrtParams[i].getLoc();
+        switch (parsedWrtParams[i].getKind()) {
+        case ParsedAutoDiffParameter::Kind::Named: {
+          auto nameIter =
+              llvm::find_if(originalParams.getArray(), [&](ParamDecl *param) {
+                return param->getName() == parsedWrtParams[i].getName();
+              });
+          // Parameter name must exist.
+          if (nameIter == originalParams.end()) {
+            TC.diagnose(paramLoc, diag::differentiable_attr_wrt_name_unknown,
+                        parsedWrtParams[i].getName());
+            return;
+          }
+          // Parameter names must be specified in the original order.
+          unsigned index = std::distance(originalParams.begin(), nameIter);
+          if ((int)index <= lastIndex) {
+            TC.diagnose(paramLoc,
+                        diag::differentiable_attr_wrt_names_not_original_order);
+            return;
+          }
+          autoDiffParameterIndicesBuilder.setParameter(index);
+          lastIndex = index;
+          break;
+        }
+        case ParsedAutoDiffParameter::Kind::Self: {
+          // 'self' is only applicable to instance methods.
+          if (!isInstanceMethod) {
+            TC.diagnose(
+                paramLoc,
+                diag::differentiable_attr_wrt_self_instance_method_only);
+            return;
+          }
+          // 'self' can only be the first in the list.
+          if (i > 0) {
+            TC.diagnose(paramLoc,
+                        diag::differentiable_attr_wrt_self_must_be_first);
+            return;
+          }
+          autoDiffParameterIndicesBuilder.setParameter(
+              autoDiffParameterIndicesBuilder.size() - 1);
+          break;
+        }
+        }
+>>>>>>> upstream/tensorflow
       }
     }
     checkedWrtParamIndices = autoDiffParameterIndicesBuilder.build(ctx);
@@ -2691,14 +2826,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     attr->setInvalid();
     return;
   }
-
-  // Predicate checking if a type has associated tangent and cotangent spaces.
-  auto hasAssociatedSpaces = [&](Type type) -> bool {
-    return (bool)type->getAutoDiffAssociatedVectorSpace(
-               AutoDiffAssociatedVectorSpaceKind::Tangent, lookupConformance) &&
-           (bool)type->getAutoDiffAssociatedVectorSpace(
-               AutoDiffAssociatedVectorSpaceKind::Cotangent, lookupConformance);
-  };
 
   // Check that the user has only selected wrt params with allowed types.
   SmallVector<Type, 4> wrtParamTypes;
@@ -3064,7 +3191,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   }
 
   auto *originalFnType =
-      getAutoDiffOriginalFunctionType(derivativeInterfaceType);;
+      getAutoDiffOriginalFunctionType(derivativeInterfaceType);
 
   std::function<bool(GenericSignature *, GenericSignature *)>
     checkGenericSignatureSatisfied =
@@ -3147,6 +3274,59 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     return;
   }
   attr->setOriginalFunction(originalFn);
+
+  // Reject different-file retroactive derivatives.
+  // TODO(TF-136): Full support for cross-file/cross-module retroactive
+  // differentiability will require SIL differnetiability witnesses and lots of
+  // plumbing.
+  if (originalFn->getParentSourceFile() != derivative->getParentSourceFile()) {
+    diagnoseAndRemoveAttr(
+        attr, diag::differentiating_attr_not_in_same_file_as_original);
+    return;
+  }
+
+  // TODO: When `wrt:` is supported in the `@differentiating` attribute, replace
+  // this with the parameter indices resolved by the earlier checking logic in
+  // this function.
+  auto allParameterIndices =
+      AutoDiffParameterIndicesBuilder(originalFnType, /*setAllParams*/ true)
+          .build(ctx);
+
+  // Add the derivative function to the original function's `@differentiable`
+  // attribute with the same parameters. If this attribute does not exist,
+  // create one.
+  DifferentiableAttr *da = nullptr;
+  for (auto *cda : originalFn->getAttrs().getAttributes<DifferentiableAttr>())
+    if (allParameterIndices == cda->getParameterIndices())
+      da = const_cast<DifferentiableAttr *>(cda);
+
+  // TODO: Infer the original `@differentiable`'s generic requirements.
+  if (!da) {
+    da = DifferentiableAttr::create(ctx, /*implicit*/ true, SourceLoc(),
+                                    SourceRange(), allParameterIndices, None,
+                                    None, {});
+    originalFn->getAttrs().add(da);
+  }
+  switch (kind) {
+  case AutoDiffAssociatedFunctionKind::JVP:
+    if (auto jvp = da->getJVP()) {
+      diagnoseAndRemoveAttr(
+          attr, diag::differentiating_attr_original_already_has_derivative,
+          jvp->Name);
+      return;
+    }
+    da->setJVPFunction(derivative);
+    break;
+  case AutoDiffAssociatedFunctionKind::VJP:
+    if (auto vjp = da->getVJP()) {
+      diagnoseAndRemoveAttr(
+          attr, diag::differentiating_attr_original_already_has_derivative,
+          vjp->Name);
+      return;
+    }
+    da->setVJPFunction(derivative);
+    break;
+  }
 }
 
 static bool

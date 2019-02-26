@@ -117,9 +117,7 @@ ModelADTests.testAllBackends("XORTraining") {
 }
 
 ModelADTests.testAllBackends("WithRespectToModel") {
-  struct Foo<Scalar>: Differentiable
-    where Scalar: FloatingPoint & Differentiable & TensorFlowScalar {
-
+  struct Foo<Scalar>: Differentiable where Scalar: TensorFlowFloatingPoint {
     var bar: Tensor<Scalar>
     var baz: Tensor<Scalar>
 
