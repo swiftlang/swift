@@ -2081,7 +2081,7 @@ static CanSILFunctionType buildThunkType(SILFunction *fn,
   for (auto &yield : expectedType->getYields()) {
     auto yieldIfaceTy = yield.getType()->mapTypeOutOfContext();
     auto interfaceYield =
-    yield.getWithType(yieldIfaceTy->getCanonicalType(genericSig));
+        yield.getWithType(yieldIfaceTy->getCanonicalType(genericSig));
     interfaceYields.push_back(interfaceYield);
   }
 
@@ -2089,7 +2089,7 @@ static CanSILFunctionType buildThunkType(SILFunction *fn,
   for (auto &result : expectedType->getResults()) {
     auto resultIfaceTy = result.getType()->mapTypeOutOfContext();
     auto interfaceResult =
-    result.getWithType(resultIfaceTy->getCanonicalType(genericSig));
+        result.getWithType(resultIfaceTy->getCanonicalType(genericSig));
     interfaceResults.push_back(interfaceResult);
   }
 
@@ -2164,33 +2164,29 @@ static SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
     return alloc;
   };
 
-  // Store reabstracted results.
-  SmallVector<std::pair<unsigned, SILValue>, 4> directToIndirectResults;
-  SmallVector<SILValue, 4> indirectToDirectResults;
-
-  // Reabstract results.
-  assert(fromType->getResults().size() == toType->getResults().size());
-  for (unsigned resIdx : range(toType->getResults().size())) {
+  // Handle indirect results.
+  assert(fromType->getNumResults() == toType->getNumResults());
+  for (unsigned resIdx : range(toType->getNumResults())) {
     auto fromRes = fromConv.getResults()[resIdx];
     auto toRes = toConv.getResults()[resIdx];
     // No abstraction mismatch.
-    if (fromRes.isFormalIndirect() == toRes.isFormalIndirect())
+    if (fromRes.isFormalIndirect() == toRes.isFormalIndirect()) {
+      // If result types are indirect, directly pass as next argument.
+      if (toRes.isFormalIndirect())
+        useNextArgument();
       continue;
+    }
     // Convert indirect result to direct result.
     if (fromRes.isFormalIndirect()) {
       SILType resultTy = fromConv.getSILType(fromRes);
       assert(resultTy.isAddress());
       auto *indRes = createAllocStack(resultTy);
       arguments.push_back(indRes);
-      indirectToDirectResults.push_back(indRes);
       continue;
     }
     // Convert direct result to indirect result.
-    assert(toRes.isFormalIndirect());
-    SILType resultTy = toConv.getSILType(toRes);
-    assert(resultTy.isAddress());
-    directToIndirectResults.push_back({resIdx, *toArgIter++});
-    continue;
+    // Increment thunk argument iterator; reabstraction handled later.
+    toArgIter++;
   }
 
   // Reabstract parameters.
@@ -2205,8 +2201,9 @@ static SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
     }
     // Convert indirect parameter to direct parameter.
     if (fromParam.isFormalIndirect()) {
-      auto paramTy = thunk->mapTypeIntoContext(
-          fromConv.getSILType(fromType->getParameters()[paramIdx]));
+      auto paramTy = fromConv.getSILType(fromType->getParameters()[paramIdx]);
+      if (!paramTy.hasArchetype())
+        paramTy = thunk->mapTypeIntoContext(paramTy);
       assert(paramTy.isAddress());
       auto *toArg = *toArgIter++;
       auto *buf = createAllocStack(toArg->getType());
@@ -2231,23 +2228,42 @@ static SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   // Extract all direct results.
   SmallVector<SILValue, 4> dirResults;
   extractAllElements(apply, builder, dirResults);
-  // Push non-reabstracted direct results.
-  for (unsigned i : range(dirResults.size()))
-    if (!toConv.isSILIndirect(toConv.getResults()[i]))
-      results.push_back(dirResults[i]);
-  // Load direct results from indirect results.
-  for (auto indRes : indirectToDirectResults) {
-    auto *load = builder.createLoad(loc, indRes,
-        getBufferLOQ(indRes->getType().getASTType(), *thunk));
-    builder.createRetainValue(loc, load, builder.getDefaultAtomicity());
-    results.push_back(load);
-  }
-  // Store direct results to indirect results.
-  for (auto pair : directToIndirectResults) {
-    auto dirResIdx = std::get<0>(pair);
-    auto indRes = std::get<1>(pair);
-    builder.createStore(loc, dirResults[dirResIdx], indRes,
-         getBufferSOQ(indRes->getType().getASTType(), *thunk));
+
+  auto fromDirResultsIter = dirResults.begin();
+  auto fromIndResultsIter = apply->getIndirectSILResults().begin();
+  auto toIndResultsIter = thunk->getIndirectResults().begin();
+  // Reabstract results.
+  for (unsigned resIdx : range(toType->getNumResults())) {
+    auto fromRes = fromConv.getResults()[resIdx];
+    auto toRes = toConv.getResults()[resIdx];
+    // No abstraction mismatch.
+    if (fromRes.isFormalIndirect() == toRes.isFormalIndirect()) {
+      // If result types are direct, add call result as direct thunk result.
+      if (toRes.isFormalDirect())
+        results.push_back(*fromDirResultsIter++);
+      // If result types are indirect, increment indirect result iterators.
+      else {
+        ++fromIndResultsIter;
+        ++toIndResultsIter;
+      }
+      continue;
+    }
+    // Load direct results from indirect results.
+    if (fromRes.isFormalIndirect()) {
+      auto indRes = *fromIndResultsIter++;
+      auto *load = builder.createLoad(loc, indRes,
+          getBufferLOQ(indRes->getType().getASTType(), *thunk));
+      builder.createRetainValue(loc, load, builder.getDefaultAtomicity());
+      results.push_back(load);
+      continue;
+    }
+    // Store direct results to indirect results.
+    assert(toRes.isFormalIndirect());
+    SILType resultTy = toConv.getSILType(toRes);
+    assert(resultTy.isAddress());
+    auto indRes = *toIndResultsIter++;
+    builder.createStore(loc, *fromDirResultsIter++, indRes,
+                        getBufferSOQ(indRes->getType().getASTType(), *thunk));
   }
   auto retVal = joinElements(results, builder, loc);
 

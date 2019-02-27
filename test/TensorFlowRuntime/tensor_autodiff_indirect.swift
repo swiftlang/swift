@@ -185,4 +185,27 @@ TensorADTests.testAllBackends("GenericLayerMembers") {
   testWrtInput(Tensor(randomUniform: [2, 3]))
 }
 
+// Tests TF-308.
+TensorADTests.testAllBackends("GenericWrapperLayer") {
+  struct Wrapper<Wrapped: Layer, Scalar: TensorFlowFloatingPoint>: Layer
+    where Wrapped.Input == Tensor<Scalar>, Wrapped.Output == Tensor<Scalar>
+  {
+    var layer: Wrapped
+
+    @differentiable
+    func applied(to input: Wrapped.Input) -> Wrapped.Output {
+      return layer.applied(to: input)
+    }
+  }
+
+  let dense = Dense<Float>(inputSize: 2, outputSize: 3, activation: relu)
+  let wrapper = Wrapper(layer: dense)
+  let input = Tensor<Float>(ones: [2, 2])
+  let seed = Tensor<Float>(ones: [input.shape[0], dense.weight.shape[1]])
+
+  let 𝛁wrapper = pullback(at: wrapper) { $0.applied(to: input) }(seed)
+  let 𝛁dense = pullback(at: dense) { $0.applied(to: input) }(seed)
+  expectEqual(Wrapper.CotangentVector(layer: 𝛁dense), 𝛁wrapper)
+}
+
 runAllTests()
