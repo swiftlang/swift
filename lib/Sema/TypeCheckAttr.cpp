@@ -2616,12 +2616,17 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     if (parsedWrtParams.empty()) {
       SmallVector<Type, 4> allWrtParamTypes;
 
+      // Returns true if the i-th parameter type is differentiable.
       auto isDifferentiableParam = [&](unsigned i) {
         if (i >= allWrtParamTypes.size())
           return false;
         auto wrtParamType = original->mapTypeIntoContext(allWrtParamTypes[i]);
+        // Return false for class/existential types.
         if (wrtParamType->isAnyClassReferenceType() ||
             wrtParamType->isExistentialType())
+          return false;
+        // Return false for function types.
+        if (wrtParamType->is<AnyFunctionType>())
           return false;
         if (whereClauseGenEnv) {
           auto wrtParamInterfaceType = !wrtParamType->hasTypeParameter()
@@ -2630,6 +2635,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
           wrtParamType =
               whereClauseGenEnv->mapTypeIntoContext(wrtParamInterfaceType);
         }
+        // Return true if the type has associated tangent and cotangent spaces.
         return hasAssociatedSpaces(wrtParamType);
       };
 
@@ -2648,36 +2654,31 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       // TODO: Clean all this up.
       bool isStaticSelf =
           original->isStatic() || isa<ConstructorDecl>(original);
-      if (auto *fnTy = originalFnTy->getResult()->getAs<AnyFunctionType>()) {
+      if (auto *fnTy = originalResultTy->getAs<AnyFunctionType>()) {
         if ((!isInstanceMethod && !isStaticSelf) ||
             fnTy->getResult()->is<AnyFunctionType>()) {
           TC.diagnose(attr->getLocation(),
                       diag::differentiable_attr_no_currying);
           return;
         }
-        for (auto &param : fnTy->getParams()) {
+        for (auto &param : fnTy->getParams())
           allWrtParamTypes.push_back(param.getPlainType());
-        }
         assert(originalFnTy->getNumParams() == 1 &&
                "This must be in the form (Self) -> (Args...) -> R");
       }
 
       if (isStaticSelf) {
-        auto *methodTy =
-            original->getMethodInterfaceType()->castTo<AnyFunctionType>();
-        for (unsigned i : range(methodTy->getNumParams())) {
+        auto *methodTy = originalResultTy->castTo<AnyFunctionType>();
+        for (unsigned i : range(methodTy->getNumParams()))
           if (isDifferentiableParam(i))
             autoDiffParameterIndicesBuilder.setParameter(i);
-        }
       } else {
-        for (auto &param : originalFnTy->getParams()) {
+        for (auto &param : originalFnTy->getParams())
           allWrtParamTypes.push_back(param.getPlainType());
-        }
 
-        for (unsigned i : range(autoDiffParameterIndicesBuilder.size())) {
+        for (unsigned i : range(autoDiffParameterIndicesBuilder.size()))
           if (isDifferentiableParam(i))
             autoDiffParameterIndicesBuilder.setParameter(i);
-        }
       }
     } else {
       // 'wrt:' is specified. Validate and collect the selected parameters.
@@ -2765,6 +2766,12 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
           loc,
           diag::differentiable_attr_cannot_diff_wrt_objects_or_existentials,
           wrtParamType);
+      attr->setInvalid();
+      return;
+    }
+    if (wrtParamType->is<AnyFunctionType>()) {
+      TC.diagnose(loc, diag::differentiable_attr_cannot_diff_wrt_functions,
+                  wrtParamType);
       attr->setInvalid();
       return;
     }

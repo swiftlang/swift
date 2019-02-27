@@ -3622,6 +3622,14 @@ private:
     if (!insertion.second) // not inserted
       return insertion.first->getSecond();
 
+    // Diagnose non-differentiable buffers.
+    if (!originalBuffer->getType().isDifferentiable(getModule())) {
+      getContext().emitNondifferentiabilityError(
+          originalBuffer, getDifferentiationTask());
+      errorOccurred = true;
+      return (bufferMap[originalBuffer] = ValueWithCleanup());
+    }
+
     // Check whether the original buffer is an address-to-address projection.
     // If so, recurse until the buffer is such a projection but its operand is
     // not. Then, get the adjoint buffer of the operand and return a
@@ -3637,7 +3645,13 @@ private:
       SILValue adjProj;
       auto adjBase = getAdjointBuffer(base);
       if (proj.getKind() == ProjectionKind::Struct) {
-        auto cotanField = proj.getVarDecl(remapType(adjBase.getType()));
+        auto *origField = proj.getVarDecl(base->getType());
+        auto *cotangentVectorDecl =
+            adjBase.getType().getStructOrBoundGenericStruct();
+        auto cotanFieldLookup =
+            cotangentVectorDecl->lookupDirect(origField->getName());
+        assert(cotanFieldLookup.size() == 1);
+        auto *cotanField = cast<VarDecl>(cotanFieldLookup.front());
         adjProj = builder.createStructElementAddr(loc, adjBase.getValue(),
                                                   cotanField);
       } else {
@@ -3652,6 +3666,8 @@ private:
     // buffer of its operand and return a corresponding `begin_access` into it.
     if (auto *bai = dyn_cast<BeginAccessInst>(originalBuffer)) {
       auto adjBase = getAdjointBuffer(bai->getOperand());
+      if (errorOccurred)
+        return (bufferMap[originalBuffer] = ValueWithCleanup());
       auto *adjAccess = builder.createBeginAccess(
           bai->getLoc(), adjBase, bai->getAccessKind(), bai->getEnforcement(),
           /*noNestedConflict*/ false, /*fromBuiltin*/ false);
@@ -3694,6 +3710,8 @@ private:
     assert(originalBuffer->getFunction() == &getOriginal());
     assert(rhsBufferAccess->getFunction() == &getAdjoint());
     auto adjointBuffer = getAdjointBuffer(originalBuffer);
+    if (errorOccurred)
+      return;
     auto *destAccess = builder.createBeginAccess(
         rhsBufferAccess.getLoc(), adjointBuffer, SILAccessKind::Modify,
         SILAccessEnforcement::Static, /*noNestedConflict*/ true,
@@ -3851,6 +3869,8 @@ public:
         retElts.push_back(val);
       } else {
         auto adjBuf = getAdjointBuffer(origParam);
+        if (errorOccurred)
+          return;
         indParamAdjoints.push_back(adjBuf);
       }
     };
@@ -3975,6 +3995,8 @@ public:
       }
     } else {
       seed = getAdjointBuffer(origResult);
+      if (errorOccurred)
+        return;
     }
 
     // Create allocations for pullback indirect results.
@@ -4046,6 +4068,8 @@ public:
         } else {
           if (origArg->getType().isAddress()) {
             auto adjBuf = getAdjointBuffer(origArg);
+            if (errorOccurred)
+              return;
             auto *tmpBuf =
                 builder.createAllocStack(loc, cotanWrtSelf->getType());
             builder.createStore(loc, cotanWrtSelf, tmpBuf,
@@ -4087,6 +4111,8 @@ public:
       } else {
         if (origArg->getType().isAddress()) {
           auto adjBuf = getAdjointBuffer(origArg);
+          if (errorOccurred)
+            return;
           auto *tmpBuf = builder.createAllocStack(loc, cotan->getType());
           builder.createStore(loc, cotan, tmpBuf,
               getBufferSOQ(tmpBuf->getType().getASTType(), getAdjoint()));
@@ -4145,16 +4171,20 @@ public:
 
         // Accumulate adjoints for the fields of the `struct` operand.
         for (auto *field : structDecl->getStoredProperties()) {
+          // There does not exist a corresponding cotangent field for original
+          // fields with `@noDerivative` attribute. Emit an error.
+          if (field->getAttrs().hasAttribute<NoDerivativeAttr>())
+            continue;
           // Find the corresponding field in the cotangent space.
           VarDecl *cotanField = nullptr;
           if (cotangentVectorDecl == structDecl)
             cotanField = field;
           // Otherwise, look up the field by name.
           else {
-            auto correspondingFieldLookup =
-            cotangentVectorDecl->lookupDirect(field->getName());
-            assert(correspondingFieldLookup.size() == 1);
-            cotanField = cast<VarDecl>(correspondingFieldLookup.front());
+            auto cotanFieldLookup =
+                cotangentVectorDecl->lookupDirect(field->getName());
+            assert(cotanFieldLookup.size() == 1);
+            cotanField = cast<VarDecl>(cotanFieldLookup.front());
           }
           auto *adjStructElt =
               builder.createStructExtract(loc, adjStruct, cotanField);
@@ -4335,6 +4365,8 @@ public:
   //    Adjoint: dealloc_stack adj[y]
   void visitAllocStackInst(AllocStackInst *asi) {
     auto adjBuf = getAdjointBuffer(asi);
+    if (errorOccurred)
+      return;
     if (auto *cleanup = adjBuf.getCleanup())
       cleanup->applyRecursively(builder, asi->getLoc());
     builder.createDeallocStack(asi->getLoc(), adjBuf);
@@ -4375,6 +4407,8 @@ public:
     builder.createEndAccess(li->getLoc(), initAccess, /*aborted*/ false);
     // Get the adjoint buffer.
     auto &adjBuf = getAdjointBuffer(li->getOperand());
+    if (errorOccurred)
+      return;
     // Accumulate the adjoint value in the local buffer into the adjoint buffer.
     auto *readAccess = builder.createBeginAccess(
         li->getLoc(), localBuf, SILAccessKind::Read,
@@ -4394,6 +4428,8 @@ public:
   //    Adjoint: adj[x] += load adj[y]; adj[y] = 0
   void visitStoreInst(StoreInst *si) {
     auto &adjBuf = getAdjointBuffer(si->getDest());
+    if (errorOccurred)
+      return;
     auto bufType = remapType(adjBuf.getType());
     auto adjVal = builder.createLoad(si->getLoc(), adjBuf,
         getBufferLOQ(bufType.getASTType(), getAdjoint()));
@@ -4427,6 +4463,8 @@ public:
   //    Adjoint: adj[x] += adj[y]; adj[y] = 0
   void visitCopyAddrInst(CopyAddrInst *cai) {
     auto &adjDest = getAdjointBuffer(cai->getDest());
+    if (errorOccurred)
+      return;
     auto destType = remapType(adjDest.getType());
     // Disable the buffer's top-level cleanup (which is supposed to operate on
     // the buffer), create a cleanup for the value that carrys all child
@@ -4480,6 +4518,8 @@ public:
       }
     }
     auto accessBuf = getAdjointBuffer(bai);
+    if (errorOccurred)
+      return;
     builder.createEndAccess(bai->getLoc(), accessBuf, /*aborted*/ false);
   }
 
@@ -4488,6 +4528,8 @@ public:
   //    Adjoint: adj[y] = begin_access inverse(access_kind) adj[x]
   void visitEndAccessInst(EndAccessInst *eai) {
     auto adjBuf = getAdjointBuffer(eai->getSource());
+    if (errorOccurred)
+      return;
     SILAccessKind kind;
     switch (eai->getBeginAccess()->getAccessKind()) {
     case SILAccessKind::Read: kind = SILAccessKind::Modify; break;

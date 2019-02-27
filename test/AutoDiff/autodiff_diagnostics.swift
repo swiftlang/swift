@@ -133,6 +133,30 @@ enum T : P {
   return a
 }
 
+// Test `@differentiable` on initializer with assignments.
+struct TF_305 : Differentiable {
+  var filter: Float
+  var bias: Float
+  typealias Activation = @differentiable (Float) -> Float
+  @noDerivative let activation: Activation
+  @noDerivative let strides: (Int, Int)
+
+  // expected-error @+2 {{function is not differentiable}}
+  // expected-note @+2 {{when differentiating this function definition}}
+  @differentiable
+  public init(
+    filter: Float,
+    bias: Float,
+    activation: @escaping Activation,
+    strides: (Int, Int)
+  ) {
+    self.filter = filter
+    self.bias = bias
+    self.activation = activation
+    self.strides = strides // expected-note {{expression is not differentiable}}
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Classes and existentials (unsupported yet)
 //===----------------------------------------------------------------------===//
