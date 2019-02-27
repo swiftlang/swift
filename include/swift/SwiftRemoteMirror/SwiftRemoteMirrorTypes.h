@@ -24,7 +24,7 @@
 extern "C" {
 #endif
 
-typedef uintptr_t swift_typeref_t;
+typedef uint64_t swift_typeref_t;
 
 /// Represents one of the Swift reflection sections of an image.
 typedef struct swift_reflection_section {
@@ -37,37 +37,37 @@ typedef struct swift_reflection_section {
 typedef struct swift_reflection_info {
   struct {
     swift_reflection_section_t section;
-    uintptr_t offset;
+    uint64_t offset;
   } field;
 
   struct {
     swift_reflection_section_t section;
-    uintptr_t offset;
+    uint64_t offset;
   } associated_types;
 
   struct {
     swift_reflection_section_t section;
-    uintptr_t offset;
+    uint64_t offset;
   } builtin_types;
 
   struct {
     swift_reflection_section_t section;
-    uintptr_t offset;
+    uint64_t offset;
   } capture;
 
   struct {
     swift_reflection_section_t section;
-    uintptr_t offset;
+    uint64_t offset;
   } type_references;
 
   struct {
     swift_reflection_section_t section;
-    uintptr_t offset;
+    uint64_t offset;
   } reflection_strings;
 
   // Start address in local and remote address spaces.
-  uintptr_t LocalStartAddress;
-  uintptr_t RemoteStartAddress;
+  uint64_t LocalStartAddress;
+  uint64_t RemoteStartAddress;
 } swift_reflection_info_t;
 
 /// The layout kind of a Swift type.
