@@ -83,23 +83,7 @@ static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
   llvm_unreachable("Unhandled ASTScopeKind in switch.");
 }
 
-static void populateLookupDeclsFromContext(
-    DeclContext *dc, SmallVectorImpl<NominalTypeDecl *> &lookupDecls) {
-  auto nominal = dc->getSelfNominalTypeDecl();
-  if (!nominal)
-    return;
 
-  lookupDecls.push_back(nominal);
-
-  // For a protocol extension, check whether there are additional "Self"
-  // constraints that can affect name lookup.
-  if (dc->getExtendedProtocolDecl()) {
-    auto ext = cast<ExtensionDecl>(dc);
-    auto bounds = getSelfBoundsFromWhereClause(ext);
-    for (auto bound : bounds.decls)
-      lookupDecls.push_back(bound);
-  }
-}
 
 namespace {
 
@@ -151,42 +135,47 @@ private:
     const bool isCascadingUse;
   };
 
+  /// Finds lookup results based on the types that self conforms to.
+  /// For instance, self always conforms to a struct, enum or class.
+  /// But in addition, self could conform to any number of protocols.
+  /// For example, when there's a protocol extension, e.g. extension P where
+  /// self: P2, self also conforms to P2 so P2 must be searched.
+  class ResultFinderForSelfsConformances {
+    /// Nontypes are formally members of the base type, i.e. the dynamic type
+    /// of the activation record.
+    DeclContext *const dynamicContext;
+    /// Types are formally members of the metatype, i.e. the static type of the
+    /// activation record.
+    // DOUG: can you help clarify the above comments?
+    DeclContext *const staticContext;
+    using NominalTypesThatSelfMustConformTo = SmallVector<NominalTypeDecl *, 2>;
+    NominalTypesThatSelfMustConformTo nominalTypesThatSelfMustConformTo;
 
-  struct PlacesToSearch {
-    /// Nontypes are formally members of the base type
-    DeclContext *const whereNonTypesAreMembers;
-    /// Types are formally members of the metatype
-    DeclContext *const whereTypesAreMembers;
-    /// Places to search for the lookup.
-    SmallVector<NominalTypeDecl *, 2> places;
+  public:
+    /// \p staticContext is also the context from which to derive the self types
+    ResultFinderForSelfsConformances(DeclContext *dynamicContext,
+                                     DeclContext *staticContext);
 
-    PlacesToSearch(DeclContext *whereNonTypesAreMembers,
-                   DeclContext *whereTypesAreMembers,
-                   DeclContext *placesHolder);
-    bool empty() const {
-      return whereNonTypesAreMembers == nullptr || places.empty();
-    }
+    void dump() const;
+
+  private:
+    NominalTypesThatSelfMustConformTo
+    findNominalTypesThatSelfMustConformTo(DeclContext *dc);
+
     // Classify this declaration.
     // Types are formally members of the metatype.
     DeclContext *whereValueIsMember(const ValueDecl *const member) const {
-      return isa<TypeDecl>(member) ? whereTypesAreMembers
-                                   : whereNonTypesAreMembers;
+      return isa<TypeDecl>(member) ? staticContext : dynamicContext;
     }
-    void addToResults(const DeclName &Name, bool isCascadingUse,
-                      NLOptions baseNLOptions, DeclContext *contextForLookup,
-                      SmallVectorImpl<LookupResultEntry> &results) const;
-    void dump() const;
+
+  public:
+    /// Do the lookups and add matches to results.
+    void findResults(const DeclName &Name, bool isCascadingUse,
+                     NLOptions baseNLOptions, DeclContext *contextForLookup,
+                     SmallVectorImpl<LookupResultEntry> &results) const;
   };
 
   enum class AddGenericParameters { Yes, No };
-  struct PerContextInfo {
-    AddGenericParameters addGenericParameters;
-    DeclContext *lookupContextForThisContext;
-    Optional<PlacesToSearch> placesToSearch;
-    Optional<bool> isCascadingUse;
-
-    void dump() const;
-  };
 
   // Inputs
   const DeclName Name;
@@ -209,7 +198,6 @@ private:
   SmallVector<LookupResultEntry, 4> UnavailableInnerResults;
 
 public: // for exp debugging
-  std::vector<PerContextInfo> breadcrumbs;
   SourceFile const *recordedSF = nullptr;
   DeclName recordedName;
   bool recordedIsCascadingUse = false;
@@ -231,9 +219,8 @@ private:
     DeclContext *whereToLook;
     Optional<bool> isCascadingUse;
     DCAndResolvedIsCascadingUse resolve(const bool resolution) const {
-      return DCAndResolvedIsCascadingUse{
-          whereToLook,
-          isCascadingUse.hasValue() ? isCascadingUse.getValue() : resolution};
+      return DCAndResolvedIsCascadingUse{whereToLook,
+                                         isCascadingUse.getValueOr(resolution)};
     }
   };
 
@@ -290,35 +277,59 @@ private:
   
   void lookupOperatorInDeclContexts(DCAndUnresolvedIsCascadingUse);
 
-  void lookupStartingWith(const DCAndUnresolvedIsCascadingUse);
+  void lookupNamesIntroducedBy(const DCAndUnresolvedIsCascadingUse);
 
   void finishLookingInContext(AddGenericParameters addGenericParameters,
                               DeclContext *lookupContextForThisContext,
-                              Optional<PlacesToSearch> &&placesToSearch,
+                              Optional<ResultFinderForSelfsConformances>
+                                  &&resultFinderForSelfsConformances,
                               Optional<bool> isCascadingUse);
 
   void lookupInModuleScopeContext(DeclContext *, Optional<bool> isCascadingUse);
 
-  // TODO: use objects & virtuals
+  // TODO: use objects & virtuals?
 
-  void lookupLocalsInPatternBindingInitializer(PatternBindingInitializer *PBI,
-                                               Optional<bool> isCascadingUse);
+  void lookupNamesIntroducedByPatternBindingInitializer(
+      PatternBindingInitializer *PBI, Optional<bool> isCascadingUse);
 
-  void lookupLocalsInFunctionDecl(AbstractFunctionDecl *AFD,
-                                  Optional<bool> isCascadingUse);
+  void
+  lookupNamesIntroducedByLazyVariableInitializer(PatternBindingInitializer *PBI,
+                                                 ParamDecl *selfParam,
+                                                 Optional<bool> isCascadingUse);
 
-  void lookupLocalsInClosure(AbstractClosureExpr *ACE,
-                             Optional<bool> isCascadingUse);
+  void lookupNamesIntroducedByInitializerOfStoredPropertyOfAType(
+      PatternBindingInitializer *PBI, Optional<bool> isCascadingUse);
+
+  /// An initializer of a global name, or a function-likelocal name.
+  void lookupNamesIntroducedByInitializerOfGlobalOrLocal(
+      PatternBindingInitializer *PBI, Optional<bool> isCascadingUse);
+
+  void lookupNamesIntroducedByFunctionDecl(AbstractFunctionDecl *AFD,
+                                           Optional<bool> isCascadingUse);
+
+  void lookupNamesIntroducedByMemberFunction(AbstractFunctionDecl *AFD,
+                                             bool isCascadingUse);
+
+  void lookupNamesIntroducedByPureFunction(AbstractFunctionDecl *AFD,
+                                           bool isCascadingUse);
+
+  void lookupNamesIntroducedByClosure(AbstractClosureExpr *ACE,
+                                      Optional<bool> isCascadingUse);
 
   template <typename NominalTypeDeclOrExtensionDecl>
-  void lookupLocalsInNominalTypeOrExtension(NominalTypeDeclOrExtensionDecl *D,
-                                            Optional<bool> isCascadingUse);
+  void lookupNamesIntroducedByNominalTypeOrExtension(
+      NominalTypeDeclOrExtensionDecl *D, Optional<bool> isCascadingUse);
 
-  void lookupLocalsInDefaultArgumentInitializer(DefaultArgumentInitializer *I,
-                                                Optional<bool> isCascadingUse);
+  void lookupNamesIntroducedByDefaultArgumentInitializer(
+      DefaultArgumentInitializer *I, Optional<bool> isCascadingUse);
 
-  void lookupLocalsInMiscContext(DeclContext *dc,
-                                 Optional<bool> isCascadingUse);
+  void lookupNamesIntroducedByMiscContext(DeclContext *dc,
+                                          Optional<bool> isCascadingUse);
+
+  void lookForLocalVariablesIn(AbstractFunctionDecl *AFD,
+                               Optional<bool> isCascadingUse);
+  void lookForLocalVariablesIn(ClosureExpr *);
+  void lookForLocalVariablesIn(SourceFile *);
 
   bool isOutsideBodyOfFunction(const AbstractFunctionDecl *const AFD) const;
 
@@ -329,9 +340,9 @@ private:
 
   static GenericParamList *getGenericParams(const DeclContext *const dc);
 
-  /// Return true if lookup is done
-  void addLocalVariableResults(DeclContext *dc);
-
+  /// For diagnostic purposes, move aside the unavailables, and put
+  /// them back as a last-ditch effort.
+  /// Could be cleaner someday with a richer interface to UnqualifiedLookup.
   void setAsideUnavailableResults(size_t firstPossiblyUnavailableResult);
 
   void recordDependencyOnTopLevelName(DeclContext *topLevelContext,
@@ -358,6 +369,12 @@ private:
     return resolveIsCascadingUse(x.whereToLook, x.isCascadingUse,
                                  onlyCareAboutFunctionBody);
   }
+
+  void findResultsAndSaveUnavailables(ResultFinderForSelfsConformances &&PTS,
+                                      bool isCascadingUse,
+                                      NLOptions baseNLOptions,
+                                      DeclContext *lookupContextForThisContext);
+
   void dumpBreadcrumbs() const;
 
 public:
@@ -403,7 +420,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   else if (Name.isOperator())
     lookupOperatorInDeclContexts(dcAndIsCascadingUse);
   else
-    lookupStartingWith(dcAndIsCascadingUse);
+    lookupNamesIntroducedBy(dcAndIsCascadingUse);
 }
 
 void UnqualifiedLookupFactory::lookupNonlocalsInModuleScopeContext(
@@ -588,48 +605,14 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
     return;
   }
   // Dig out the type we're looking into.
-  using LookupDecls = SmallVector<NominalTypeDecl *, 2>;
-  LookupDecls lookupDecls;
-  populateLookupDeclsFromContext(scopeDC, lookupDecls);
-
-  // Perform lookup into the type.
-  NLOptions options =
-      baseNLOptions | (isCascadingUseResult ? NL_KnownCascadingDependency
-                                            : NL_KnownNonCascadingDependency);
-
-  SmallVector<ValueDecl *, 4> lookup;
-  scopeDC->lookupQualified(lookupDecls, Name, options, lookup);
-
-  auto startIndex = Results.size();
-  for (auto result : lookup) {
-    auto *baseDC = scopeDC;
-    if (!isa<TypeDecl>(result) && defaultNextState.selfDC)
-      baseDC = defaultNextState.selfDC;
-    Results.push_back(LookupResultEntry(baseDC, result));
-  }
-
-  if (!Results.empty()) {
-    // Predicate that determines whether a lookup result should
-    // be unavailable except as a last-ditch effort.
-    auto unavailableLookupResult = [&](const LookupResultEntry &result) {
-      auto &effectiveVersion = Ctx.LangOpts.EffectiveLanguageVersion;
-      return result.getValueDecl()->getAttrs().isUnavailableInSwiftVersion(
-          effectiveVersion);
-    };
-
-    // If all of the results we just found are unavailable, keep looking.
-    auto begin = Results.begin() + startIndex;
-    if (std::all_of(begin, Results.end(), unavailableLookupResult)) {
-      UnavailableInnerResults.append(begin, Results.end());
-      Results.erase(begin, Results.end());
-    } else {
-      filterForDiscriminator(Results, DebugClient);
-
-      recordCompletionOfAScope();
-      if (isFirstResultEnough())
-        return;
-    }
-  }
+  // Perform lookup into the type
+  findResultsAndSaveUnavailables(
+      ResultFinderForSelfsConformances(
+          defaultNextState.selfDC ? defaultNextState.selfDC : scopeDC, scopeDC),
+      isCascadingUseResult, baseNLOptions, scopeDC);
+  recordCompletionOfAScope();
+  if (isFirstResultEnough())
+    return;
   // Forget the 'self' declaration.
   lookInScopeForASTScopeLookup(defaultNextState.withSelfDC(nullptr));
 }
@@ -639,213 +622,214 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
 void UnqualifiedLookupFactory::lookupOperatorInDeclContexts(
     const DCAndUnresolvedIsCascadingUse dcAndUseArg) {
   DCAndResolvedIsCascadingUse dcAndResolvedIsCascadingUse{
+      // Operators are global
       dcAndUseArg.whereToLook->getModuleScopeContext(),
-      resolveIsCascadingUse(dcAndUseArg,
-                            /*onlyCareAboutFunctionBody*/ true)};
+      resolveIsCascadingUse(dcAndUseArg, /*onlyCareAboutFunctionBody*/ true)};
   lookupInModuleScopeContext(dcAndResolvedIsCascadingUse.DC,
                              dcAndResolvedIsCascadingUse.isCascadingUse);
 }
 
 // TODO: Unify with LookupVisibleDecls.cpp::lookupVisibleDeclsImpl
-void UnqualifiedLookupFactory::lookupStartingWith(
+void UnqualifiedLookupFactory::lookupNamesIntroducedBy(
     const DCAndUnresolvedIsCascadingUse dcAndIsCascadingUseArg) {
-  // TODO: reloc comment
-  // If we are inside of a method, check to see if there are any ivars in
-  // scope, and if so, whether this is a reference to one of them.
-  // FIXME: We should persist this information between lookups.
 
   DeclContext *const dc = dcAndIsCascadingUseArg.whereToLook;
   const auto isCascadingUseSoFar = dcAndIsCascadingUseArg.isCascadingUse;
   if (dc->isModuleScopeContext())
     lookupInModuleScopeContext(dc, isCascadingUseSoFar);
   else if (auto *PBI = dyn_cast<PatternBindingInitializer>(dc))
-    lookupLocalsInPatternBindingInitializer(PBI, isCascadingUseSoFar);
+    lookupNamesIntroducedByPatternBindingInitializer(PBI, isCascadingUseSoFar);
   else if (auto *AFD = dyn_cast<AbstractFunctionDecl>(dc))
-    lookupLocalsInFunctionDecl(AFD, isCascadingUseSoFar);
+    lookupNamesIntroducedByFunctionDecl(AFD, isCascadingUseSoFar);
   else if (auto *ACE = dyn_cast<AbstractClosureExpr>(dc))
-    lookupLocalsInClosure(ACE, isCascadingUseSoFar);
+    lookupNamesIntroducedByClosure(ACE, isCascadingUseSoFar);
   else if (auto *ED = dyn_cast<ExtensionDecl>(dc))
-    lookupLocalsInNominalTypeOrExtension(ED, isCascadingUseSoFar);
+    lookupNamesIntroducedByNominalTypeOrExtension(ED, isCascadingUseSoFar);
   else if (auto *ND = dyn_cast<NominalTypeDecl>(dc))
-    lookupLocalsInNominalTypeOrExtension(ND, isCascadingUseSoFar);
+    lookupNamesIntroducedByNominalTypeOrExtension(ND, isCascadingUseSoFar);
   else if (auto I = dyn_cast<DefaultArgumentInitializer>(dc))
-    lookupLocalsInDefaultArgumentInitializer(I, isCascadingUseSoFar);
+    lookupNamesIntroducedByDefaultArgumentInitializer(I, isCascadingUseSoFar);
   else
-    lookupLocalsInMiscContext(dc, isCascadingUseSoFar);
+    lookupNamesIntroducedByMiscContext(dc, isCascadingUseSoFar);
 }
 
 void UnqualifiedLookupFactory::finishLookingInContext(
     const AddGenericParameters addGenericParameters,
     DeclContext *const lookupContextForThisContext,
-    Optional<PlacesToSearch> &&placesToSearch,
+    Optional<ResultFinderForSelfsConformances>
+        &&resultFinderForSelfsConformances,
     const Optional<bool> isCascadingUse) {
-#ifndef NDEBUG
-  breadcrumbs.push_back(PerContextInfo{addGenericParameters,
-                                       lookupContextForThisContext,
-                                       placesToSearch, isCascadingUse});
-#endif
+
+  // When a generic has the same name as a member, Swift prioritizes the generic
+  // because the member could still be named by qualifying it. But there is no
+  // corresponding way to qualify a generic parameter.
+  // So, look for genrics first.
   if (addGenericParameters == AddGenericParameters::Yes) {
     addGenericParametersHereAndInEnclosingScopes(lookupContextForThisContext);
     if (isFirstResultEnough())
       return;
   }
-
-  if (placesToSearch.hasValue() && !placesToSearch.getValue().empty()) {
-    auto firstPossiblyUnavailableResult = Results.size();
-    placesToSearch.getValue().addToResults(
-        Name, isCascadingUse.getValue(), baseNLOptions,
-        lookupContextForThisContext, Results);
-    setAsideUnavailableResults(firstPossiblyUnavailableResult);
+  if (resultFinderForSelfsConformances) {
+    findResultsAndSaveUnavailables(std::move(*resultFinderForSelfsConformances),
+                                   *isCascadingUse, baseNLOptions,
+                                   lookupContextForThisContext);
     recordCompletionOfAScope();
     if (isFirstResultEnough())
       return;
   }
   // Recurse into the next context.
-  lookupStartingWith(DCAndUnresolvedIsCascadingUse{
+  lookupNamesIntroducedBy(DCAndUnresolvedIsCascadingUse{
       lookupContextForThisContext->getParentForLookup(), isCascadingUse});
+}
+
+void UnqualifiedLookupFactory::findResultsAndSaveUnavailables(
+    ResultFinderForSelfsConformances &&PTS, bool isCascadingUse,
+    NLOptions baseNLOptions, DeclContext *lookupContextForThisContext) {
+  auto firstPossiblyUnavailableResult = Results.size();
+  PTS.findResults(Name, isCascadingUse, baseNLOptions,
+                  lookupContextForThisContext, Results);
+  setAsideUnavailableResults(firstPossiblyUnavailableResult);
 }
 
 void UnqualifiedLookupFactory::lookupInModuleScopeContext(
     DeclContext *dc, Optional<bool> isCascadingUse) {
-  addLocalVariableResults(dc);
-  recordCompletionOfAScope();
+  if (auto SF = dyn_cast<SourceFile>(dc))
+    lookForLocalVariablesIn(SF);
   if (isFirstResultEnough())
     return;
-  recordDependencyOnTopLevelName(
-      dc, Name, isCascadingUse.hasValue() ? isCascadingUse.getValue() : true);
+  recordDependencyOnTopLevelName(dc, Name, isCascadingUse.getValueOr(true));
   lookupNonlocalsInModuleScopeContext(dc);
 }
 
-void UnqualifiedLookupFactory::lookupLocalsInPatternBindingInitializer(
+void UnqualifiedLookupFactory::lookupNamesIntroducedByPatternBindingInitializer(
     PatternBindingInitializer *PBI, Optional<bool> isCascadingUse) {
-  auto *PBD = PBI->getBinding();
-  assert(PBD);
+  assert(PBI->getBinding());
   // Lazy variable initializer contexts have a 'self' parameter for
   // instance member lookup.
-  if (auto *selfParam = PBI->getImplicitSelfDecl()) {
+  if (auto *selfParam = PBI->getImplicitSelfDecl())
+    lookupNamesIntroducedByLazyVariableInitializer(PBI, selfParam,
+                                                   isCascadingUse);
+  else if (PBI->getBinding()->getDeclContext()->isTypeContext())
+    lookupNamesIntroducedByInitializerOfStoredPropertyOfAType(PBI,
+                                                              isCascadingUse);
+  else
+    lookupNamesIntroducedByInitializerOfGlobalOrLocal(PBI, isCascadingUse);
+  }
+
+  void UnqualifiedLookupFactory::lookupNamesIntroducedByLazyVariableInitializer(
+      PatternBindingInitializer *PBI, ParamDecl *selfParam,
+      Optional<bool> isCascadingUse) {
     Consumer.foundDecl(selfParam, DeclVisibilityKind::FunctionParameter);
     recordCompletionOfAScope();
     if (isFirstResultEnough())
       return;
-    DeclContext *const parent = PBI->getParent();
+    DeclContext *const patternContainer = PBI->getParent();
     // clang-format off
-    finishLookingInContext(
-      AddGenericParameters::Yes,
-      parent,
-      PlacesToSearch(PBI, parent, parent),
-      resolveIsCascadingUse(PBI, isCascadingUse,
-                            /*onlyCareAboutFunctionBody=*/false));
-    return;
-    // clang-format no
-  }
+  finishLookingInContext(
+    AddGenericParameters::Yes,
+    patternContainer,
+    ResultFinderForSelfsConformances(PBI, patternContainer),
+    resolveIsCascadingUse(PBI, isCascadingUse,
+                         /*onlyCareAboutFunctionBody=*/false));
+    // clang-format on
+}
+
+void UnqualifiedLookupFactory::
+    lookupNamesIntroducedByInitializerOfStoredPropertyOfAType(
+        PatternBindingInitializer *PBI, Optional<bool> isCascadingUse) {
   // Initializers for stored properties of types perform static
   // lookup into the surrounding context.
-  if (PBD->getDeclContext()->isTypeContext()) {
-    DeclContext *const surroundingContext = PBI->getParent();
-    // clang-format off
-    finishLookingInContext(
-      AddGenericParameters::Yes,
-      surroundingContext,
-      PlacesToSearch(surroundingContext, surroundingContext,
-                     surroundingContext),
-      resolveIsCascadingUse(surroundingContext, None,
-                            /*onlyCareAboutFunctionBody=*/false));
-    return;
-    // clang-format on
-  }
-  // Otherwise, we have an initializer for a global or local property.
-  // There's not much to find here, we'll keep going up to a parent
-  // context.
+  DeclContext *const storedPropertyContainer = PBI->getParent();
   // clang-format off
   finishLookingInContext(
     AddGenericParameters::Yes,
-    PBI,
-    None,
-    resolveIsCascadingUse(PBI, isCascadingUse,
+    storedPropertyContainer,
+    ResultFinderForSelfsConformances(storedPropertyContainer, storedPropertyContainer),
+    resolveIsCascadingUse(storedPropertyContainer, None,
                           /*onlyCareAboutFunctionBody=*/false));
   // clang-format on
 }
 
-void UnqualifiedLookupFactory::lookupLocalsInFunctionDecl(
-    AbstractFunctionDecl *AFD, Optional<bool> isCascadingUse) {
-  // Look for local variables; normally, the parser resolves these
-  // for us, but it can't do the right thing inside local types.
-  // FIXME: when we can parse and typecheck the function body partially
-  // for code completion, AFD->getBody() check can be removed.
-  if (Loc.isValid() && AFD->getBody()) {
+void UnqualifiedLookupFactory::
+    lookupNamesIntroducedByInitializerOfGlobalOrLocal(
+        PatternBindingInitializer *PBI, Optional<bool> isCascadingUse) {
+  // There's not much to find here, we'll keep going up to a parent
+  // context.
+  // clang-format off
+  finishLookingInContext(
+                         AddGenericParameters::Yes,
+                         PBI,
+                         None, // not looking in the partic type
+                         resolveIsCascadingUse(PBI, isCascadingUse,
+                                               /*onlyCareAboutFunctionBody=*/false));
+  // clang-format on
+}
 
-    namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-    localVal.visit(AFD->getBody());
+void UnqualifiedLookupFactory::lookupNamesIntroducedByFunctionDecl(
+    AbstractFunctionDecl *AFD, Optional<bool> isCascadingUseArg) {
 
-    recordCompletionOfAScope();
-    if (isFirstResultEnough())
-      return;
-
-    if (auto *P = AFD->getImplicitSelfDecl())
-      localVal.checkValueDecl(P, DeclVisibilityKind::FunctionParameter);
-    localVal.checkParameterList(AFD->getParameters());
-    recordCompletionOfAScope();
-    if (isFirstResultEnough())
-      return;
-  }
-  // TODO: is isOutsideBodyOfFunction better than the disjunction below?
-  const bool returnValueForIsCascadingUse =
+  // DOUG: how does this differ from isOutsideBodyOfFunction below?
+  const bool isCascadingUse =
       AFD->isCascadingContextForLookup(false) &&
-      (isCascadingUse.hasValue()
-           ? isCascadingUse.getValue()
-           : !Loc.isValid() || !AFD->getBody() ||
-                 !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc));
+      (isCascadingUseArg.getValueOr(
+          Loc.isInvalid() || !AFD->getBody() ||
+          !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc)));
 
-  // Look in the generic parameters after checking our local declaration.
-  addGenericParametersForFunction(AFD);
-  recordCompletionOfAScope();
+  if (AFD->getDeclContext()->isTypeContext())
+    lookupNamesIntroducedByMemberFunction(AFD, isCascadingUse);
+  else
+    lookupNamesIntroducedByPureFunction(AFD, isCascadingUse);
+}
+
+void UnqualifiedLookupFactory::lookupNamesIntroducedByMemberFunction(
+    AbstractFunctionDecl *AFD, bool isCascadingUse) {
+  lookForLocalVariablesIn(AFD, isCascadingUse);
   if (isFirstResultEnough())
     return;
-
-  if (!AFD->getDeclContext()->isTypeContext()) {
-    // clang-format off
-     finishLookingInContext(
-       AddGenericParameters::Yes,
-       AFD,
-       None,
-       returnValueForIsCascadingUse);
+  // If we're inside a function context, we're about to move to
+  // the parent DC, so we have to check the function's generic
+  // parameters first.
+  addGenericParametersForFunction(AFD);
+  if (isFirstResultEnough())
     return;
-  }
-  // clang-format on
-  
   DeclContext *const fnDeclContext = AFD->getDeclContext();
   // If we're not in the body of the function (for example, we
   // might be type checking a default argument expression and
   // performing name lookup from there), the base declaration
   // is the nominal type, not 'self'.
   DeclContext *const BaseDC = isOutsideBodyOfFunction(AFD) ? fnDeclContext : AFD;
+  // If we are inside of a method, check to see if there are any ivars in
+  // scope, and if so, whether this is a reference to one of them.
+  // FIXME: We should persist this information between lookups.
   // clang-format off
   finishLookingInContext(
-    AddGenericParameters::Yes,
-    AFD->getParent(),
-    PlacesToSearch(BaseDC, fnDeclContext, fnDeclContext),
-    returnValueForIsCascadingUse);
+                         AddGenericParameters::Yes,
+                         AFD->getParent(),
+                         ResultFinderForSelfsConformances(BaseDC, fnDeclContext),
+                         isCascadingUse);
   // clang-format on
 }
 
-void UnqualifiedLookupFactory::lookupLocalsInClosure(
+void UnqualifiedLookupFactory::lookupNamesIntroducedByPureFunction(
+    AbstractFunctionDecl *AFD, bool isCascadingUse) {
+  lookForLocalVariablesIn(AFD, isCascadingUse);
+  if (isFirstResultEnough())
+    return;
+  // clang-format off
+  finishLookingInContext(
+                         AddGenericParameters::Yes,
+                         AFD,
+                         None,
+                         isCascadingUse);
+}
+
+
+void UnqualifiedLookupFactory::lookupNamesIntroducedByClosure(
     AbstractClosureExpr *ACE, Optional<bool> isCascadingUse) {
-  // Look for local variables; normally, the parser resolves these
-  // for us, but it can't do the right thing inside local types.
-  if (Loc.isValid()) {
-    if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
-      namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-      if (auto body = CE->getBody())
-        localVal.visit(body);
-      recordCompletionOfAScope();
-      if (isFirstResultEnough())
-        return;
-      if (auto params = CE->getParameters())
-        localVal.checkParameterList(params);
-      recordCompletionOfAScope();
-      if (isFirstResultEnough())
-        return;
-    }
+  if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
+    lookForLocalVariablesIn(CE);
+    if (isFirstResultEnough())
+      return;
   }
   // clang-format off
   finishLookingInContext(
@@ -853,19 +837,19 @@ void UnqualifiedLookupFactory::lookupLocalsInClosure(
     ACE,
     None,
     resolveIsCascadingUse(ACE, isCascadingUse,
-                            /*onlyCareAboutFunctionBody=*/false));
+                         /*onlyCareAboutFunctionBody=*/false));
   // clang-format on
 }
 
 template <typename NominalTypeDeclOrExtensionDecl>
-void UnqualifiedLookupFactory::lookupLocalsInNominalTypeOrExtension(
+void UnqualifiedLookupFactory::lookupNamesIntroducedByNominalTypeOrExtension(
     NominalTypeDeclOrExtensionDecl *D, Optional<bool> isCascadingUse) {
   // clang-format off
   finishLookingInContext(
     AddGenericParameters::Yes,
     D,
     shouldLookupMembers(D, Loc)
-    ? Optional<PlacesToSearch>(PlacesToSearch(D, D, D))
+    ? Optional<ResultFinderForSelfsConformances>(ResultFinderForSelfsConformances(D, D))
     : None,
     resolveIsCascadingUse(D, isCascadingUse,
                           /*onlyCareAboutFunctionBody=*/false));
@@ -873,14 +857,15 @@ void UnqualifiedLookupFactory::lookupLocalsInNominalTypeOrExtension(
   // clang-format on
 }
 
-void UnqualifiedLookupFactory::lookupLocalsInDefaultArgumentInitializer(
-    DefaultArgumentInitializer *I, Optional<bool> isCascadingUse) {
+void UnqualifiedLookupFactory::
+    lookupNamesIntroducedByDefaultArgumentInitializer(
+        DefaultArgumentInitializer *I, Optional<bool> isCascadingUse) {
   // In a default argument, skip immediately out of both the
   // initializer and the function.
   finishLookingInContext(AddGenericParameters::No, I->getParent(), None, false);
 }
 
-void UnqualifiedLookupFactory::lookupLocalsInMiscContext(
+void UnqualifiedLookupFactory::lookupNamesIntroducedByMiscContext(
     DeclContext *dc, Optional<bool> isCascadingUse) {
   // clang-format off
   assert(isa<TopLevelCodeDecl>(dc) ||
@@ -894,6 +879,56 @@ void UnqualifiedLookupFactory::lookupLocalsInMiscContext(
     resolveIsCascadingUse(DC, isCascadingUse,
                           /*onlyCareAboutFunctionBody=*/false));
   // clang-format on
+}
+
+void UnqualifiedLookupFactory::lookForLocalVariablesIn(
+    AbstractFunctionDecl *AFD, Optional<bool> isCascadingUse) {
+  // Look for local variables; normally, the parser resolves these
+  // for us, but it can't do the right thing inside local types.
+  // FIXME: when we can parse and typecheck the function body partially
+  // for code completion, AFD->getBody() check can be removed.
+
+  if (Loc.isInvalid() || !AFD->getBody()) {
+    return;
+  }
+
+  namelookup::FindLocalVal localVal(SM, Loc, Consumer);
+  localVal.visit(AFD->getBody());
+  recordCompletionOfAScope();
+  if (isFirstResultEnough())
+    return;
+
+  if (auto *P = AFD->getImplicitSelfDecl())
+    localVal.checkValueDecl(P, DeclVisibilityKind::FunctionParameter);
+  localVal.checkParameterList(AFD->getParameters());
+  recordCompletionOfAScope();
+}
+
+void UnqualifiedLookupFactory::lookForLocalVariablesIn(ClosureExpr *CE) {
+  // Look for local variables; normally, the parser resolves these
+  // for us, but it can't do the right thing inside local types.
+  if (Loc.isInvalid())
+    return;
+  namelookup::FindLocalVal localVal(SM, Loc, Consumer);
+  if (auto body = CE->getBody())
+    localVal.visit(body);
+  recordCompletionOfAScope();
+  if (isFirstResultEnough())
+    return;
+  if (auto params = CE->getParameters())
+    localVal.checkParameterList(params);
+  recordCompletionOfAScope();
+}
+
+void UnqualifiedLookupFactory::lookForLocalVariablesIn(SourceFile *SF) {
+  if (Loc.isInvalid())
+    return;
+  // Look for local variables in top-level code; normally, the parser
+  // resolves these for us, but it can't do the right thing for
+  // local types.
+  namelookup::FindLocalVal localVal(SM, Loc, Consumer);
+  localVal.checkSourceFile(*SF);
+  recordCompletionOfAScope();
 }
 
 bool UnqualifiedLookupFactory::isOutsideBodyOfFunction(
@@ -911,11 +946,16 @@ UnqualifiedLookupFactory::getGenericParams(const DeclContext *const dc) {
     return ext->getGenericParams();
   if (auto subscript = dyn_cast<SubscriptDecl>(dc))
     return subscript->getGenericParams();
+  if (auto func = dyn_cast<AbstractFunctionDecl>(dc))
+    return func->getGenericParams();
   return nullptr;
 }
 
 void UnqualifiedLookupFactory::addGenericParametersHereAndInEnclosingScopes(
     DeclContext *dc) {
+  // Generics can be nested, so visit the generic list, innermost first.
+  // Cannot use DeclContext::forEachGenericContext because this code breaks out
+  // if it finds a match and isFirstResultEnough()
   for (GenericParamList *dcGenericParams = getGenericParams(dc);
        dcGenericParams;
        dcGenericParams = dcGenericParams->getOuterParameters()) {
@@ -930,41 +970,35 @@ void UnqualifiedLookupFactory::addGenericParametersHereAndInEnclosingScopes(
 
 void UnqualifiedLookupFactory::addGenericParametersForFunction(
     AbstractFunctionDecl *AFD) {
-  // If we're inside a function context, we've already moved to
-  // the parent DC, so we have to check the function's generic
-  // parameters first.
   GenericParamList *GenericParams = AFD->getGenericParams();
   if (GenericParams) {
     namelookup::FindLocalVal localVal(SM, Loc, Consumer);
     localVal.checkGenericParams(GenericParams);
+    recordCompletionOfAScope();
   }
 }
 
-void UnqualifiedLookupFactory::addLocalVariableResults(DeclContext *dc) {
-  if (auto SF = dyn_cast<SourceFile>(dc)) {
-    if (Loc.isValid()) {
-      // Look for local variables in top-level code; normally, the parser
-      // resolves these for us, but it can't do the right thing for
-      // local types.
-      namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-      localVal.checkSourceFile(*SF);
-    }
-  }
-}
-
-void UnqualifiedLookupFactory::PlacesToSearch::addToResults(
+void UnqualifiedLookupFactory::ResultFinderForSelfsConformances::findResults(
     const DeclName &Name, bool isCascadingUse, NLOptions baseNLOptions,
     DeclContext *contextForLookup,
     SmallVectorImpl<LookupResultEntry> &results) const {
+  // An optimization:
+  if (nominalTypesThatSelfMustConformTo.empty())
+    return;
   const NLOptions options =
       baseNLOptions | (isCascadingUse ? NL_KnownCascadingDependency
                                       : NL_KnownNonCascadingDependency);
 
   SmallVector<ValueDecl *, 4> Lookup;
-  contextForLookup->lookupQualified(places, Name, options, Lookup);
+  contextForLookup->lookupQualified(nominalTypesThatSelfMustConformTo, Name,
+                                    options, Lookup);
   for (auto Result : Lookup)
     results.push_back(LookupResultEntry(whereValueIsMember(Result), Result));
 }
+
+// TODO (someday): Instead of adding unavailable entries to Results,
+// then later shunting them aside, just put them in the right place
+// to begin with.
 
 void UnqualifiedLookupFactory::setAsideUnavailableResults(
     const size_t firstPossiblyUnavailableResult) {
@@ -983,10 +1017,14 @@ void UnqualifiedLookupFactory::setAsideUnavailableResults(
   // If all of the results we found are unavailable, keep looking.
   auto begin = Results.begin() + firstPossiblyUnavailableResult;
   if (std::all_of(begin, Results.end(), unavailableLookupResult)) {
+    // better to have more structure in results
     UnavailableInnerResults.append(begin, Results.end());
     Results.erase(begin, Results.end());
     return;
   }
+  // The debugger may have a different private discriminator
+  // in order to support lookup relative to the place where
+  // execution is suspended.
   filterForDiscriminator(Results, DebugClient);
 }
 
@@ -1086,17 +1124,19 @@ void UnqualifiedLookupFactory::recordCompletionOfAScope() {
 bool UnqualifiedLookupFactory::resolveIsCascadingUse(
     const DeclContext *const dc, Optional<bool> isCascadingUse,
     bool onlyCareAboutFunctionBody) {
-  return isCascadingUse.hasValue()
-             ? isCascadingUse.getValue()
-             : dc->isCascadingContextForLookup(
-                   /*functionsAreNonCascading=*/onlyCareAboutFunctionBody);
+  return isCascadingUse.getValueOr(dc->isCascadingContextForLookup(
+      /*functionsAreNonCascading=*/onlyCareAboutFunctionBody));
 }
+
+#pragma mark LegacyUnqualifiedLookup
 
 namespace {
 /// This class implements and represents the result of performing
 /// unqualified lookup (i.e. lookup for a plain identifier).
 /// It is being kept around in order to check the refactoring against the new
 /// UnqualifiedLookup above.
+/// TODO: after landing the UnqualifiedLookupFactory and passing tests,
+/// delete this class.
 class LegacyUnqualifiedLookup {
 public:
   using Flags = UnqualifiedLookup::Flags;
@@ -1130,6 +1170,10 @@ public: // for exp debugging
   SourceFile const *recordedSF = nullptr;
   DeclName recordedName;
   bool recordedIsCascadingUse = false;
+
+private:
+  static void populateLookupDeclsFromContext(
+      DeclContext *dc, SmallVectorImpl<NominalTypeDecl *> &lookupDecls);
 };
 }; // namespace
 
@@ -1281,7 +1325,7 @@ LegacyUnqualifiedLookup::LegacyUnqualifiedLookup(DeclName Name, DeclContext *DC,
 
         NLOptions options = baseNLOptions;
         // Perform lookup into the type.
-        if (isCascadingUse.getValue())
+        if (*isCascadingUse)
           options |= NL_KnownCascadingDependency;
         else
           options |= NL_KnownNonCascadingDependency;
@@ -1502,7 +1546,7 @@ LegacyUnqualifiedLookup::LegacyUnqualifiedLookup(DeclName Name, DeclContext *DC,
 
         if (BaseDC && !lookupDecls.empty()) {
           NLOptions options = baseNLOptions;
-          if (isCascadingUse.getValue())
+          if (*isCascadingUse)
             options |= NL_KnownCascadingDependency;
           else
             options |= NL_KnownNonCascadingDependency;
@@ -1575,10 +1619,10 @@ LegacyUnqualifiedLookup::LegacyUnqualifiedLookup(DeclName Name, DeclContext *DC,
                                    isOriginallyTypeLookup, Results))
     return;
 
-  recordLookupOfTopLevelName(DC, Name, isCascadingUse.getValue());
+  recordLookupOfTopLevelName(DC, Name, *isCascadingUse);
   recordedSF = dyn_cast<SourceFile>(DC);
   recordedName = Name;
-  recordedIsCascadingUse = isCascadingUse.getValue();
+  recordedIsCascadingUse = *isCascadingUse;
 
   // Add private imports to the extra search list.
   SmallVector<ModuleDecl::ImportedModule, 8> extraImports;
@@ -1651,22 +1695,61 @@ TypeDecl *LegacyUnqualifiedLookup::getSingleTypeResult() const {
   return dyn_cast<TypeDecl>(Results.back().getValueDecl());
 }
 
-UnqualifiedLookupFactory::PlacesToSearch::PlacesToSearch(
-    DeclContext *whereNonTypesAreMembers,
-    DeclContext *whereTypesAreMembers, DeclContext *placesHolder)
-    : whereNonTypesAreMembers(whereNonTypesAreMembers),
-      whereTypesAreMembers(whereTypesAreMembers) {
-  populateLookupDeclsFromContext(placesHolder, places);
+UnqualifiedLookupFactory::ResultFinderForSelfsConformances::
+    ResultFinderForSelfsConformances(DeclContext *dynamicContext,
+                                     DeclContext *staticContext)
+    : dynamicContext(dynamicContext), staticContext(staticContext),
+      nominalTypesThatSelfMustConformTo(
+          findNominalTypesThatSelfMustConformTo(staticContext)) {}
+
+UnqualifiedLookupFactory::ResultFinderForSelfsConformances::
+    NominalTypesThatSelfMustConformTo
+    UnqualifiedLookupFactory::ResultFinderForSelfsConformances::
+        findNominalTypesThatSelfMustConformTo(DeclContext *dc) {
+  auto nominal = dc->getSelfNominalTypeDecl();
+  if (!nominal)
+    return {};
+
+  NominalTypesThatSelfMustConformTo lookupDecls;
+  lookupDecls.push_back(nominal);
+
+  // For a protocol extension, check whether there are additional "Self"
+  // constraints that can affect name lookup.
+  if (dc->getExtendedProtocolDecl()) {
+    auto ext = cast<ExtensionDecl>(dc);
+    auto bounds = getSelfBoundsFromWhereClause(ext);
+    for (auto bound : bounds.decls)
+      lookupDecls.push_back(bound);
+  }
+  return lookupDecls;
 }
 
-void UnqualifiedLookupFactory::PlacesToSearch::dump() const {
-  llvm::errs() << "whereNonTypesAreMembers: ";
-  whereNonTypesAreMembers->dumpContext();
-  llvm::errs() << "whereTypesAreMembers: ";
-  whereTypesAreMembers->dumpContext();
-  llvm::errs() << "places: ";
-  for (const auto *D : places)
-    D->dump();
+void LegacyUnqualifiedLookup::populateLookupDeclsFromContext(
+    DeclContext *dc, SmallVectorImpl<NominalTypeDecl *> &lookupDecls) {
+  auto nominal = dc->getSelfNominalTypeDecl();
+  if (!nominal)
+    return;
+
+  lookupDecls.push_back(nominal);
+
+  // For a protocol extension, check whether there are additional "Self"
+  // constraints that can affect name lookup.
+  if (dc->getExtendedProtocolDecl()) {
+    auto ext = cast<ExtensionDecl>(dc);
+    auto bounds = getSelfBoundsFromWhereClause(ext);
+    for (auto bound : bounds.decls)
+      lookupDecls.push_back(bound);
+  }
+}
+
+void UnqualifiedLookupFactory::ResultFinderForSelfsConformances::dump() const {
+  llvm::errs() << "dynamicContext: ";
+  dynamicContext->dumpContext();
+  llvm::errs() << "staticContext: ";
+  staticContext->dumpContext();
+  llvm::errs() << "nominalTypesThatSelfMustConformTo: ";
+  for (const auto *D : nominalTypesThatSelfMustConformTo)
+    D->dump(llvm::errs(), 1);
   llvm::errs() << "\n";
 }
 
@@ -1691,25 +1774,6 @@ TypeDecl *UnqualifiedLookup::getSingleTypeResult() const {
   if (Results.size() != 1)
     return nullptr;
   return dyn_cast<TypeDecl>(Results.back().getValueDecl());
-}
-
-void UnqualifiedLookupFactory::dumpBreadcrumbs() const {
-  auto &e = llvm::errs();
-  for (size_t i : indices(breadcrumbs)) {
-    e << i << "\n";
-    const PerContextInfo &s = breadcrumbs[i];
-    s.dump();
-  }
-}
-
-void UnqualifiedLookupFactory::PerContextInfo::dump() const {
-  auto &e = llvm::errs();
-  e << (addGenericParameters == AddGenericParameters::Yes ? " add generics, "
-                                                          : "");
-  e << " dc: ";
-  lookupContextForThisContext->dumpContext();
-  if (placesToSearch.hasValue())
-    placesToSearch.getValue().dump();
 }
 
 bool UnqualifiedLookupFactory::verifyEqualToLegacy(
