@@ -418,3 +418,14 @@ switch sr7799 {
  case .baz: break // Ok
  default: break
 }
+
+let sr7799_1: SR_7799?? = .baz
+
+switch sr7799_1 {
+ case .bar?: break // Ok
+ case .baz: break // Ok
+ default: break
+}
+
+if case .baz = sr7799_1 {} // Ok
+if case .bar? = sr7799_1 {} // Ok

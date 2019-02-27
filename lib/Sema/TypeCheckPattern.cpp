@@ -1391,9 +1391,10 @@ recur:
           // If we have an optional type, let's try to see if the case
           // exists in its base type and if it does then synthesize an
           // OptionalSomePattern that wraps the case.
-          if (auto baseType = type->getOptionalObjectType()) {
-            if (lookupEnumMemberElement(*this, dc, baseType, EEP->getName(),
-                                        EEP->getLoc())) {
+          if (type->getOptionalObjectType()) {
+            if (lookupEnumMemberElement(*this, dc,
+                                        type->lookThroughAllOptionalTypes(),
+                                        EEP->getName(), EEP->getLoc())) {
               P = new (Context)
                   OptionalSomePattern(EEP, EEP->getEndLoc(), /*implicit*/true);
               return coercePatternToType(P, resolution, type, options);
