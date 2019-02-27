@@ -336,7 +336,7 @@ suite.test("Basic diffing algorithm validators") {
 
   for (source, target, expected, line) in expectedChanges {
     let actual = target.difference(from: source).inferringMoves()
-    expectEqual(actual, CollectionDifference(expected), "failed test at line \(line)")
+    expectEqual(CollectionDifference(expected), actual, "failed test at line \(line)")
   }
 }
 
@@ -444,7 +444,7 @@ suite.test("Enumeration order is safe") {
   diff.forEach { c in
     enumerationOrderedChanges.append(c)
   }
-  expectEqual(safelyOrderedChanges, enumerationOrderedChanges)
+  expectEqual(enumerationOrderedChanges, safelyOrderedChanges)
 }
 
 suite.test("Change validator rejects bad associations") {
@@ -546,15 +546,10 @@ suite.test("Move inference") {
   expectEqual(w, n?.inferringMoves())
 }
 
-suite.test("Three way diff demo code") {
-  let base = "Is\nit\ntime\nalready?"
-  let theirs = "Hi\nthere\nis\nit\ntime\nalready?"
-  let mine = "Is\nit\nreview\ntime\nalready?"
-
-  // Split the contents of the sources into lines
-  let baseLines = base.components(separatedBy: "\n")
-  let theirLines = theirs.components(separatedBy: "\n")
-  let myLines = mine.components(separatedBy: "\n")
+suite.test("Three way merge") {
+  let baseLines = ["Is", "it", "time", "already?"]
+  let theirLines = ["Hi", "there", "is", "it", "time", "already?"]
+  let myLines = ["Is", "it", "review", "time", "already?"]
 
   // Create a difference from base to theirs
   let diff = theirLines.difference(from: baseLines)
@@ -566,8 +561,7 @@ suite.test("Three way diff demo code") {
   }
 
   // Reassemble the result
-  let patched = patchedLines.joined(separator: "\n")
-  expectEqual(patched, "Hi\nthere\nis\nit\nreview\ntime\nalready?")
+  expectEqual(patchedLines, ["Hi", "there", "is", "it", "review", "time", "already?"])
   // print(patched)
 }
 
@@ -586,12 +580,8 @@ suite.test("Diff reversal demo code") {
 }
 
 suite.test("Naive application by enumeration") {
-  let base = "Is\nit\ntime\nalready?"
-  let theirs = "Hi\nthere\nis\nit\ntime\nalready?"
-
-  // Split the contents of the sources into lines
-  var arr = base.components(separatedBy: "\n")
-  let theirLines = theirs.components(separatedBy: "\n")
+  var arr = ["Is", "it", "time", "already?"]
+  let theirLines = ["Hi", "there", "is", "it", "time", "already?"]
 
   // Create a difference from base to theirs
   let diff = theirLines.difference(from: arr)
@@ -605,7 +595,7 @@ suite.test("Naive application by enumeration") {
     }
   }
 
-  expectEqual(arr, theirLines)
+  expectEqual(theirLines, arr)
 }
 
 suite.test("Fast applicator boundary conditions") {
