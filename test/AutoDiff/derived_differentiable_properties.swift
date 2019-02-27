@@ -65,3 +65,23 @@ struct TestKeyPathIterable : Differentiable, KeyPathIterable {
 // CHECK-AST:           internal typealias CotangentVector = TestKeyPathIterable.AllDifferentiableVariables
 // CHECK-AST:         internal typealias TangentVector = TestKeyPathIterable.AllDifferentiableVariables
 // CHECK-AST:         internal typealias CotangentVector = TestKeyPathIterable.AllDifferentiableVariables
+
+struct GenericCotanMember<T : Differentiable> : Differentiable, AdditiveArithmetic {
+  var x: T.CotangentVector
+}
+
+// TODO(TF-316): Revisit after `Differentiable` derived conformances behavior is standardized.
+// `AllDifferentiableVariables` and `CotangentVector` structs need not both be synthesized.
+
+// CHECK-AST-LABEL: @_fieldwiseDifferentiable internal struct GenericCotanMember<T> : Differentiable, AdditiveArithmetic where T : Differentiable {
+// CHECK-AST:         var x: T.CotangentVector
+// CHECK-AST:         internal init(x: T.CotangentVector)
+// CHECK-AST:         internal typealias TangentVector = GenericCotanMember<T>
+// CHECK-AST-LABEL:   @_fieldwiseDifferentiable internal struct AllDifferentiableVariables : Differentiable
+// CHECK-AST:           internal typealias TangentVector = GenericCotanMember<T>
+// CHECK-AST:           internal typealias CotangentVector = GenericCotanMember<T>.CotangentVector
+// CHECK-AST:           internal typealias AllDifferentiableVariables = GenericCotanMember<T>.AllDifferentiableVariables
+// CHECK-AST-LABEL:   @_fieldwiseDifferentiable internal struct CotangentVector : Differentiable, AdditiveArithmetic
+// CHECK-AST:           internal typealias TangentVector = GenericCotanMember<T>.CotangentVector
+// CHECK-AST:           internal typealias CotangentVector = GenericCotanMember<T>
+// CHECK-AST:           internal typealias AllDifferentiableVariables = GenericCotanMember<T>.CotangentVector
