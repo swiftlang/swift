@@ -300,7 +300,9 @@ func _diagnoseUnexpectedNilOptional(_filenameStart: Builtin.RawPointer,
                                     _filenameIsASCII: Builtin.Int1,
                                     _line: Builtin.Word,
                                     _isImplicitUnwrap: Builtin.Int1) {
-  _preconditionFailure(
+  // Cannot use _preconditionFailure as the file and line info would not be
+  // printed.
+  preconditionFailure(
     Bool(_isImplicitUnwrap)
       ? "Unexpectedly found nil while implicitly unwrapping an Optional value"
       : "Unexpectedly found nil while unwrapping an Optional value",
