@@ -162,6 +162,11 @@ UID_KEYS = [
     KEY('ImplicitMembers', 'key.implicitmembers'),
     KEY('ExpectedTypes', 'key.expectedtypes'),
     KEY('Members', 'key.members'),
+    KEY('TypeBuffer', 'key.printedtypebuffer'),
+    KEY('ExpressionTypeList', 'key.expression_type_list'),
+    KEY('ExpressionOffset', 'key.expression_offset'),
+    KEY('ExpressionLength', 'key.expression_length'),
+    KEY('ExpressionType', 'key.expression_type'),
 ]
 
 
@@ -217,6 +222,7 @@ UID_REQUESTS = [
     REQUEST('EnableCompileNotifications',
             'source.request.enable-compile-notifications'),
     REQUEST('TestNotification', 'source.request.test_notification'),
+    REQUEST('CollectExpressionType', 'source.request.expression.type'),
 ]
 
 
