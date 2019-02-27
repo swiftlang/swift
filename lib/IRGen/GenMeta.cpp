@@ -1212,27 +1212,6 @@ namespace {
     // void addReflectionFieldDescriptor();
   };
 
-  /// Build a doubly-null-terminated list of field names.
-  ///
-  /// ABI TODO: This should be unnecessary when the fields that use it are
-  /// superseded.
-  template<typename ValueDeclRange>
-  unsigned getFieldNameString(const ValueDeclRange &fields,
-                              llvm::SmallVectorImpl<char> &out) {
-    unsigned numFields = 0;
-
-    {
-      llvm::raw_svector_ostream os(out);
-      
-      for (ValueDecl *prop : fields) {
-        os << prop->getBaseName() << '\0';
-        ++numFields;
-      }
-      // The final null terminator is provided by getAddrOfGlobalString.
-    }
-    return numFields;
-  }
-
   class StructContextDescriptorBuilder
     : public TypeContextDescriptorBuilderBase<StructContextDescriptorBuilder,
                                               StructDecl>
@@ -1652,6 +1631,99 @@ namespace {
 
       // uint32_t FieldOffsetVectorOffset;
       B.addInt32(getFieldVectorOffset() / IGM.getPointerSize());
+    }
+  };
+  
+  class OpaqueTypeDescriptorBuilder
+      : public ContextDescriptorBuilderBase<OpaqueTypeDescriptorBuilder>
+  {
+    using super = ContextDescriptorBuilderBase;
+
+    OpaqueTypeDecl *O;
+  public:
+    
+    OpaqueTypeDescriptorBuilder(IRGenModule &IGM, OpaqueTypeDecl *O)
+      : super(IGM), O(O)
+    {}
+    
+    void layout() {
+      super::layout();
+      addUnderlyingTypeAndConformances();
+    }
+    
+    void addUnderlyingTypeAndConformances() {
+      auto underlyingType = Type(O->getUnderlyingInterfaceType())
+        .subst(*O->getUnderlyingTypeSubstitutions())
+        ->getCanonicalType(O->getOpaqueInterfaceGenericSignature());
+      
+      B.addRelativeAddress(IGM.getTypeRef(underlyingType,
+                                          MangledTypeRefRole::Metadata));
+      
+      auto opaqueType = O->getDeclaredInterfaceType()->castTo<MetatypeType>()
+        ->getInstanceType()->castTo<OpaqueTypeArchetypeType>();
+      for (auto proto : opaqueType->getProtocols()) {
+        auto conformance = ProtocolConformanceRef(proto);
+        auto underlyingConformance = conformance
+          .subst(O->getUnderlyingInterfaceType(),
+                 *O->getUnderlyingTypeSubstitutions());
+        
+        // fixme
+        B.addInt32(0);
+      }
+    }
+    
+    bool isUniqueDescriptor() {
+      switch (LinkEntity::forOpaqueTypeDescriptor(O)
+                .getLinkage(NotForDefinition)) {
+      case SILLinkage::Public:
+      case SILLinkage::PublicExternal:
+      case SILLinkage::Hidden:
+      case SILLinkage::HiddenExternal:
+      case SILLinkage::Private:
+      case SILLinkage::PrivateExternal:
+        return true;
+        
+      case SILLinkage::Shared:
+      case SILLinkage::SharedExternal:
+      case SILLinkage::PublicNonABI:
+        return false;
+      }
+    }
+    
+    GenericSignature *getGenericSignature() {
+      return O->getOpaqueInterfaceGenericSignature();
+    }
+    
+    ConstantReference getParent() {
+      // If we have debug mangled names enabled for anonymous contexts, nest
+      // the opaque type descriptor inside an anonymous context for the
+      // defining function. This will let type reconstruction in the debugger
+      // match the opaque context back into the AST.
+      if (IGM.IRGen.Opts.EnableAnonymousContextMangledNames) {
+        IGM.getAddrOfParentContextDescriptor
+        O->getParent();
+      }
+
+      // Use the innermost generic context, or the module.
+      // In debug mode, use an anonymous context with debug name for type
+      // reconstruction
+    }
+    
+    ContextDescriptorKind getContextKind() {
+      return ContextDescriptorKind::OpaqueType;
+    }
+    
+    void emit() {
+      asImpl().layout();
+      
+      // getAddrOfOpaqueTypeDescriptor etc.
+    }
+    
+    uint16_t getKindSpecificFlags() {
+      // Store the ordinal of the generic argument that represents the opaque
+      // type in the encoded generic signature.
+      return O->getOpaqueInterfaceGenericSignature()
+        ->getGenericParamOrdinal(O->getUnderlyingInterfaceType());
     }
   };
 } // end anonymous namespace

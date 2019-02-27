@@ -1785,11 +1785,15 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::Var:
     return;
 
-  case DeclKind::Func:
   case DeclKind::Accessor:
     // Handled in SIL.
     return;
 
+  case DeclKind::Func:
+    // The function body itself is lowered to SIL, but there may be associated
+    // decls to emit.
+    return emitFuncDecl(cast<FuncDecl>(D));
+  
   case DeclKind::TopLevelCode:
     // All the top-level code will be lowered separately.
     return;
@@ -3677,10 +3681,13 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     case DeclKind::PoundDiagnostic:
       continue;
 
+    case DeclKind::Func:
+      emitFuncDecl(cast<FuncDecl>(member));
+      continue;
+
     case DeclKind::Var:
     case DeclKind::Subscript:
     case DeclKind::PatternBinding:
-    case DeclKind::Func:
     case DeclKind::Accessor:
     case DeclKind::Constructor:
     case DeclKind::Destructor:
