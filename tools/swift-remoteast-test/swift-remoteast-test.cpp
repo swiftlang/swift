@@ -42,7 +42,6 @@ using namespace swift::remoteAST;
 static ASTContext *context = nullptr;
 
 /// The RemoteAST for the code we're running.
-std::shared_ptr<MemoryReader> reader;
 std::unique_ptr<RemoteASTContext> remoteContext;
 
 static RemoteASTContext &getRemoteASTContext() {
@@ -172,6 +171,14 @@ printDynamicTypeAndAddressForExistential(void *object,
   } else {
     out << result.getFailure().render() << '\n';
   }
+}
+
+// FIXME: swiftcall
+/// func stopRemoteAST(_: AnyObject)
+LLVM_ATTRIBUTE_USED extern "C" void SWIFT_REMOTEAST_TEST_ABI
+stopRemoteAST() {
+  if (remoteContext)
+    remoteContext.reset();
 }
 
 namespace {

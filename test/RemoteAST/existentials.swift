@@ -7,6 +7,9 @@
 @_silgen_name("printDynamicTypeAndAddressForExistential")
 func printDynamicTypeAndAddressForExistential<T>(_: T)
 
+@_silgen_name("stopRemoteAST")
+func stopRemoteAST()
+
 struct MyStruct<T, U, V> {
   let x: T
   let y: U
@@ -51,3 +54,5 @@ printDynamicTypeAndAddressForExistential(q)
 // CHECK-NEXT: Any.Type
 let metatype : Any.Type = Any.self
 printDynamicTypeAndAddressForExistential(metatype)
+
+stopRemoteAST()
