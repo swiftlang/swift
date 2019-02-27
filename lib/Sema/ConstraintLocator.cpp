@@ -74,6 +74,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case ImplicitlyUnwrappedDisjunctionChoice:
     case DynamicLookupResult:
     case ContextualType:
+    case SynthesizedArgument:
       if (unsigned numValues = numNumericValuesInPathElement(elt.getKind())) {
         id.AddInteger(elt.getValue());
         if (numValues > 1)
@@ -260,6 +261,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case ContextualType:
       out << "contextual type";
+      break;
+
+    case SynthesizedArgument:
+      out << " synthesized argument #" << llvm::utostr(elt.getValue());
       break;
     }
   }
