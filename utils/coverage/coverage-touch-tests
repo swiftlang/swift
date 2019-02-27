@@ -86,7 +86,7 @@ def main():
     console.setLevel(level=args.log.upper())
     logging.debug(args)
     environment = os.environ.copy()
-    environment['GIT_EXTERNAL_DIFF'] = script_path
+    environment['GIT_EXTERNAL_DIFF'] = script_path.replace('\\', '/')
     logging.info('Getting diff of swift dir: %s', args.swift_dir)
     output = subprocess.check_output(['git', '-C', args.swift_dir, 'diff'],
                                      env=environment, universal_newlines=True)
