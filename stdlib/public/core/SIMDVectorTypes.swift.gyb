@@ -76,19 +76,20 @@ public struct SIMD${n}<Scalar> : SIMD where Scalar: SIMDScalar {
 %  end
 % end
 % if n >= 4:
+  % halfN = int(n/2)
   /// Creates a new vector from two half-length vectors.
   @_transparent
-  public init(lowHalf: SIMD${n/2}<Scalar>, highHalf: SIMD${n/2}<Scalar>) {
+  public init(lowHalf: SIMD${halfN}<Scalar>, highHalf: SIMD${halfN}<Scalar>) {
     self.init()
     self.lowHalf = lowHalf
     self.highHalf = highHalf
   }
 
-%  for (half,indx) in [('low','i'), ('high',str(n/2)+'+i'), ('even','2*i'), ('odd','2*i+1')]:
+%  for (half,indx) in [('low','i'), ('high',str(halfN)+'+i'), ('even','2*i'), ('odd','2*i+1')]:
   /// A half-length vector made up of the ${half} elements of the vector.
-  public var ${half}Half: SIMD${n/2}<Scalar> {
+  public var ${half}Half: SIMD${halfN}<Scalar> {
     @inlinable get {
-      var result = SIMD${n/2}<Scalar>()
+      var result = SIMD${halfN}<Scalar>()
       for i in result.indices { result[i] = self[${indx}] }
       return result
     }
@@ -147,7 +148,7 @@ extension SIMD${n} : CustomDebugStringConvertible {
   public var debugDescription: String {
     return "SIMD${n}<\(Scalar.self)>(${', '.join(map(lambda c:
                        '\\(self['+ str(c) + '])',
-                       xrange(n)))})"
+                       range(n)))})"
   }
 }
 
@@ -184,7 +185,7 @@ extension ${Self} : SIMDScalar {
   public typealias SIMDMaskScalar = ${Mask}
 
 % for n in storagescalarCounts:
-%  bytes = n * self_type.bits / 8
+%  bytes = int(n * self_type.bits / 8)
   /// Storage for a vector of ${spelledNumbers[n]} integers.
   @_fixed_layout
   @_alignment(${bytes if bytes <= 16 else 16})
@@ -229,7 +230,7 @@ extension ${Self} : SIMDScalar {
   public typealias SIMDMaskScalar = Int${bits}
 
 % for n in storagescalarCounts:
-%  bytes = n * bits / 8
+%  bytes = int(n * bits / 8)
   /// Storage for a vector of ${spelledNumbers[n]} floating-point values.
   @_fixed_layout
   @_alignment(${bytes if bytes <= 16 else 16})

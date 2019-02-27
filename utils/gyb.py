@@ -4,6 +4,7 @@
 
 from __future__ import print_function
 
+import io
 import os
 import re
 import sys
@@ -19,6 +20,8 @@ try:
     basestring
 except NameError:
     basestring = str
+
+is_py2 = sys.version_info[0] == 2
 
 
 def get_line_starts(s):
@@ -398,8 +401,12 @@ class ParseContext(object):
         if sys.platform == 'win32':
             self.filename = self.filename.replace('\\', '/')
         if template is None:
-            with open(filename) as f:
-                self.template = f.read()
+            if is_py2:
+                with open(filename) as f:
+                    self.template = f.read()
+            else:
+                with io.open(filename, 'r', encoding='utf-8') as f:
+                    self.template = f.read()
         else:
             self.template = template
         self.line_starts = get_line_starts(self.template)
@@ -733,8 +740,10 @@ class Code(ASTNode):
             result_string = None
             if isinstance(result, Number) and not isinstance(result, Integral):
                 result_string = repr(result)
-            else:
+            elif not isinstance(result, bytes):
                 result_string = str(result)
+            else:
+                result_string = result
             context.append_text(
                 result_string, self.filename, self.start_line_number)
 
@@ -760,8 +769,8 @@ def expand(filename, line_directive=_default_line_directive, **local_bindings):
     >>> # manually handle closing and deleting this file to allow us to open
     >>> # the file by its name across all platforms.
     >>> f = NamedTemporaryFile(delete=False)
-    >>> f.write(
-    ... r'''---
+    >>> _ = f.write(
+    ... b'''---
     ... % for i in range(int(x)):
     ... a pox on ${i} for epoxy
     ... % end
@@ -769,7 +778,7 @@ def expand(filename, line_directive=_default_line_directive, **local_bindings):
     ...
     ...    3}
     ... abc
-    ... ${"w\nx\nX\ny"}
+    ... ${"w\\nx\\nX\\ny"}
     ... z
     ... ''')
     >>> f.flush()
@@ -1146,6 +1155,20 @@ def main():
     import argparse
     import sys
 
+    if is_py2:
+        read_file_mode = 'r'
+
+        def file_wrapper(f):
+            return f
+    else:
+        read_file_mode = 'rb'
+
+        def file_wrapper(f):
+            if isinstance(f, io.TextIOWrapper):
+                return f
+            else:
+                return io.TextIOWrapper(f, encoding='utf-8')
+
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description='Generate Your Boilerplate!', epilog='''
@@ -1215,11 +1238,11 @@ def main():
         help='''Bindings to be set in the template's execution context''')
 
     parser.add_argument(
-        'file', type=argparse.FileType(),
+        'file', type=argparse.FileType(read_file_mode),
         help='Path to GYB template file (defaults to stdin)', nargs='?',
         default=sys.stdin)
     parser.add_argument(
-        '-o', dest='target', type=argparse.FileType('w'),
+        '-o', dest='target', type=argparse.FileType('wb'),
         help='Output file (defaults to stdout)', default=sys.stdout)
     parser.add_argument(
         '--test', action='store_true',
@@ -1252,6 +1275,7 @@ def main():
             sys.exit(1)
 
     bindings = dict(x.split('=', 1) for x in args.defines)
+    args.file = file_wrapper(args.file)
     ast = parse_template(args.file.name, args.file.read())
     if args.dump:
         print(ast)
@@ -1260,7 +1284,13 @@ def main():
     os.chdir(os.path.dirname(os.path.abspath(args.file.name)))
     sys.path = ['.'] + sys.path
 
-    args.target.write(execute_template(ast, args.line_directive, **bindings))
+    if isinstance(args.target, io.TextIOBase):
+        args.target.write(
+            execute_template(ast, args.line_directive, **bindings))
+    else:
+        args.target.write(
+            execute_template(
+                ast, args.line_directive, **bindings).encode('utf-8'))
 
 
 if __name__ == '__main__':

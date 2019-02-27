@@ -36,7 +36,7 @@ Note: the third parameter, zero, is not for user consumption.
   else:
     r = n % radix
     digit = chr((ord('0') + r) if r < 10 else (ord('a') + r - 10))
-    return inRadix(radix, int(n / radix), '') + digit
+    return inRadix(radix, int(n // radix), '') + digit
 
 # The maximal legal radix
 max_radix = ord('z') - ord('a') + 1 + 10

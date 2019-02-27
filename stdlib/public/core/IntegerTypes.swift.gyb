@@ -17,7 +17,6 @@
 from SwiftIntTypes import all_integer_types, int_max_bits, should_define_truncating_bit_pattern_init
 from SwiftFloatingPointTypes import getFtoIBounds
 
-from string import maketrans, capitalize
 from itertools import chain
 
 # Number of bits in the Builtin.Word type
@@ -1651,7 +1650,7 @@ extension ${Self} : Hashable {
     return Hasher._hash(
       seed: seed,
       bytes: UInt64(truncatingIfNeeded: ${U}${Self}(_value)),
-      count: ${bits / 8})
+      count: ${int(bits // 8)})
     % end
   }
 }
