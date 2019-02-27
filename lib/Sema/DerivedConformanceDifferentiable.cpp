@@ -148,10 +148,18 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
     if (!structDecl)
       return nullptr;
     // Valid candidate must either:
-    // - Be implicit (previously synthesized).
-    // - Equal nominal (and conform to `AdditiveArithmetic` if flag is true).
+    // 1. Be implicit (previously synthesized).
     if (structDecl->isImplicit())
       return structDecl;
+    // 2. Equal nominal's implicit parent.
+    //    This can occur during mutually recursive constraints. Example:
+    //   `X == X.TangentVector, X.CotangentVector.CotangentVector == X`.
+    if (nominal->isImplicit() && structDecl == nominal->getDeclContext() &&
+        TypeChecker::conformsToProtocol(structDecl->getDeclaredInterfaceType(),
+                                        diffableProto, DC,
+                                        ConformanceCheckFlags::Used))
+      return structDecl;
+    // 3. Equal nominal (and conform to `AdditiveArithmetic` if flag is true).
     if (structDecl == nominal) {
       if (!checkAdditiveArithmetic)
         return structDecl;
@@ -815,12 +823,12 @@ static void addAssociatedTypeAliasDecl(Identifier name,
   auto lookup = nominal->lookupDirect(name);
   assert(lookup.size() < 2 &&
          "Expected at most one associated type named member");
-  // If implicit typealias with the given name already exists in source
+  // If implicit type declaration with the given name already exists in source
   // struct, return it.
   if (lookup.size() == 1) {
-    auto existingAlias = dyn_cast<TypeAliasDecl>(lookup.front());
-    assert(existingAlias && existingAlias->isImplicit() &&
-           "Expected lookup result to be an implicit typealias");
+    auto existingTypeDecl = dyn_cast<TypeDecl>(lookup.front());
+    assert(existingTypeDecl && existingTypeDecl->isImplicit() &&
+           "Expected lookup result to be an implicit type declaration");
     return;
   }
   // Otherwise, create a new typealias.
@@ -898,31 +906,31 @@ getOrSynthesizeAssociatedStructType(DerivedConformance &derived,
   auto *nominal = derived.Nominal;
   auto &C = nominal->getASTContext();
 
-  // Get or synthesize `TangentVector`, `CotangentVector`, and
-  // `AllDifferentiableVariables` structs at once. Synthesizing all three
-  // structs at once is necessary in order to correctly set their mutually
-  // recursive associated types.
-  auto tangentStructSynthesis =
-      getOrSynthesizeSingleAssociatedStruct(derived, C.Id_TangentVector);
-  auto *tangentStruct = tangentStructSynthesis.first;
-  bool freshlySynthesized = tangentStructSynthesis.second;
-  if (!tangentStruct)
-    return nullptr;
-
-  auto cotangentStructSynthesis =
-      getOrSynthesizeSingleAssociatedStruct(derived, C.Id_CotangentVector);
-  auto *cotangentStruct = cotangentStructSynthesis.first;
-  if (!cotangentStruct)
-    return nullptr;
-  assert(freshlySynthesized == cotangentStructSynthesis.second);
-
+  // Get or synthesize `AllDifferentiableVariables`, `TangentVector`, and
+  // `CotangentVector` structs at once. Synthesizing all three structs at once
+  // is necessary in order to correctly set their mutually recursive associated
+  // types.
   auto allDiffableVarsStructSynthesis =
       getOrSynthesizeSingleAssociatedStruct(derived,
                                             C.Id_AllDifferentiableVariables);
   auto *allDiffableVarsStruct = allDiffableVarsStructSynthesis.first;
   if (!allDiffableVarsStruct)
     return nullptr;
-  assert(freshlySynthesized == allDiffableVarsStructSynthesis.second);
+  bool freshlySynthesized = allDiffableVarsStructSynthesis.second;
+
+  auto tangentStructSynthesis =
+      getOrSynthesizeSingleAssociatedStruct(derived, C.Id_TangentVector);
+  auto *tangentStruct = tangentStructSynthesis.first;
+  if (!tangentStruct)
+    return nullptr;
+  freshlySynthesized |= tangentStructSynthesis.second;
+
+  auto cotangentStructSynthesis =
+      getOrSynthesizeSingleAssociatedStruct(derived, C.Id_CotangentVector);
+  auto *cotangentStruct = cotangentStructSynthesis.first;
+  if (!cotangentStruct)
+    return nullptr;
+  freshlySynthesized |= cotangentStructSynthesis.second;
 
   // When all structs are freshly synthesized, we check emit warnings for
   // implicit `@noDerivative` members. Checking for fresh synthesis is necessary
@@ -953,9 +961,9 @@ getOrSynthesizeAssociatedStructType(DerivedConformance &derived,
   addAssociatedTypeAliasDecl(C.Id_AllDifferentiableVariables,
                              cotangentStruct, cotangentStruct, TC);
 
+  TC.validateDecl(allDiffableVarsStruct);
   TC.validateDecl(tangentStruct);
   TC.validateDecl(cotangentStruct);
-  TC.validateDecl(allDiffableVarsStruct);
 
   // Sanity checks for synthesized structs.
   assert(DerivedConformance::canDeriveAdditiveArithmetic(tangentStruct,
@@ -1082,7 +1090,7 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
   if (allMembersAssocTypesEqualsSelf) {
     auto allDiffableVarsStructSynthesis = getOrSynthesizeSingleAssociatedStruct(
         derived, C.Id_AllDifferentiableVariables);
-    auto allDiffableVarsStruct = allDiffableVarsStructSynthesis.first;
+    auto *allDiffableVarsStruct = allDiffableVarsStructSynthesis.first;
     auto freshlySynthesized = allDiffableVarsStructSynthesis.second;
     // `AllDifferentiableVariables` must conform to `AdditiveArithmetic`.
     // This should be guaranteed.
