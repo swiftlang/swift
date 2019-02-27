@@ -293,6 +293,7 @@ namespace {
                          isFixedSize(),
                          doesMetadataRequireInitialization(),
                          doesMetadataRequireRelocation(),
+                         ClassHasObjCAncestry,
                          classTy,
                          allStoredProps,
                          allFieldAccesses,
@@ -393,7 +394,7 @@ namespace {
         }
 
         auto element = ElementLayout::getIncomplete(*eltType);
-        addField(element, LayoutStrategy::Universal);
+        bool isKnownEmpty = !addField(element, LayoutStrategy::Universal);
 
         // The 'Elements' list only contains superclass fields when we're
         // building a layout for tail allocation.
@@ -402,7 +403,7 @@ namespace {
 
         if (!superclass) {
           AllStoredProperties.push_back(var);
-          AllFieldAccesses.push_back(getFieldAccess());
+          AllFieldAccesses.push_back(getFieldAccess(isKnownEmpty));
         }
       }
 
@@ -459,7 +460,12 @@ namespace {
       }
     }
 
-    FieldAccess getFieldAccess() {
+    FieldAccess getFieldAccess(bool isKnownEmpty) {
+      // If the field is known empty, then its access pattern is always
+      // constant-direct.
+      if (isKnownEmpty)
+        return FieldAccess::ConstantDirect;
+
       // If the layout so far has a fixed size, the field offset is known
       // statically.
       if (isFixedSize())
@@ -635,8 +641,7 @@ irgen::getClassFieldOffset(IRGenModule &IGM, SILType baseType, VarDecl *field) {
 
   auto fieldInfo = classLayout.getFieldAccessAndElement(field);
   auto element = fieldInfo.second;
-  assert(element.getKind() == ElementLayout::Kind::Fixed ||
-         element.getKind() == ElementLayout::Kind::Empty);
+  assert(element.hasByteOffset());
   return element.getByteOffset();
 }
 
