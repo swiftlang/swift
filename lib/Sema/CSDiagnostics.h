@@ -877,6 +877,28 @@ public:
   bool diagnoseAsError() override;
 };
 
+class MissingArgumentsFailure final : public FailureDiagnostic {
+  using Param = AnyFunctionType::Param;
+
+  FunctionType *Fn;
+  unsigned NumSynthesized;
+
+public:
+  MissingArgumentsFailure(Expr *root, ConstraintSystem &cs,
+                          FunctionType *funcType,
+                          unsigned numSynthesized,
+                          ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), Fn(funcType),
+        NumSynthesized(numSynthesized) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  /// If missing arguments come from trailing closure,
+  /// let's produce tailored diagnostics.
+  bool diagnoseTrailingClosure(ClosureExpr *closure);
+};
+
 } // end namespace constraints
 } // end namespace swift
 

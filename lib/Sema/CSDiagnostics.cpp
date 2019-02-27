@@ -1931,3 +1931,81 @@ bool ImplicitInitOnNonConstMetatypeFailure::diagnoseAsError() {
       .fixItInsert(loc, ".init");
   return true;
 }
+
+bool MissingArgumentsFailure::diagnoseAsError() {
+  auto *locator = getLocator();
+  auto path = locator->getPath();
+
+  // TODO: Currently this is only intended to diagnose contextual failures.
+  if (!(path.back().getKind() == ConstraintLocator::ApplyArgToParam ||
+        path.back().getKind() == ConstraintLocator::ContextualType))
+    return false;
+
+  if (auto *closure = dyn_cast<ClosureExpr>(getAnchor()))
+    return diagnoseTrailingClosure(closure);
+
+  return false;
+}
+
+bool MissingArgumentsFailure::diagnoseTrailingClosure(ClosureExpr *closure) {
+  auto diff = Fn->getNumParams() - NumSynthesized;
+
+  // If the closure didn't specify any arguments and it is in a context that
+  // needs some, produce a fixit to turn "{...}" into "{ _,_ in ...}".
+  if (diff == 0) {
+    auto diag =
+        emitDiagnostic(closure->getStartLoc(),
+                       diag::closure_argument_list_missing, NumSynthesized);
+
+    std::string fixText; // Let's provide fixits for up to 10 args.
+    if (Fn->getNumParams() <= 10) {
+      fixText += " ";
+      interleave(
+          Fn->getParams(),
+          [&fixText](const AnyFunctionType::Param &param) { fixText += '_'; },
+          [&fixText] { fixText += ','; });
+      fixText += " in ";
+    }
+
+    if (!fixText.empty()) {
+      // Determine if there is already a space after the { in the closure to
+      // make sure we introduce the right whitespace.
+      auto afterBrace = closure->getStartLoc().getAdvancedLoc(1);
+      auto text = getASTContext().SourceMgr.extractText({afterBrace, 1});
+      if (text.size() == 1 && text == " ")
+        fixText = fixText.erase(fixText.size() - 1);
+      else
+        fixText = fixText.erase(0, 1);
+      diag.fixItInsertAfter(closure->getStartLoc(), fixText);
+    }
+
+    return true;
+  }
+
+  auto params = closure->getParameters();
+  bool onlyAnonymousParams =
+      std::all_of(params->begin(), params->end(),
+                  [](ParamDecl *param) { return !param->hasName(); });
+
+  auto diag =
+      emitDiagnostic(params->getStartLoc(), diag::closure_argument_list_tuple,
+                     resolveType(Fn), Fn->getNumParams(), diff, diff == 1);
+
+  // If the number of parameters is less than number of inferred
+  // let's try to suggest a fix-it with the rest of the missing parameters.
+  if (!closure->hasExplicitResultType() &&
+      closure->getInLoc().isValid()) {
+    SmallString<32> fixIt;
+    llvm::raw_svector_ostream OS(fixIt);
+
+    OS << ",";
+    for (unsigned i = 0; i != NumSynthesized; ++i) {
+      OS << ((onlyAnonymousParams) ? "_" : "<#arg#>");
+      OS << ((i == NumSynthesized - 1) ? " " : ",");
+    }
+
+    diag.fixItInsertAfter(params->getEndLoc(), OS.str());
+  }
+
+  return true;
+}
