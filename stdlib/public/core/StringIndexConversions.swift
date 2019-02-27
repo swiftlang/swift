@@ -12,12 +12,15 @@
 
 extension String.Index {
   private init?<S: StringProtocol>(
-    _ sourcePosition: String.Index, _genericWithin target: S
+    _ idx: String.Index, _genericWithin target: S
   ) {
-    guard target._wholeGuts.isOnGraphemeClusterBoundary(sourcePosition) else {
+    guard target._wholeGuts.isOnGraphemeClusterBoundary(idx),
+          idx >= target.startIndex && idx <= target.endIndex
+    else {
       return nil
     }
-    self = sourcePosition
+
+    self = idx
   }
 
   /// Creates an index in the given string that corresponds exactly to the

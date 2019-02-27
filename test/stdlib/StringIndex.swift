@@ -215,6 +215,11 @@ StringIndexTests.test("String.Index(_:within) / Range<String.Index>(_:in:)") {
       String.Index(idx, within: str), String.Index(idx, within: substr))
   }
 
+  expectNil(String.Index(str.startIndex, within: str.dropFirst()))
+  expectNil(String.Index(str.endIndex, within: str.dropLast()))
+  expectNotNil(String.Index(str.startIndex, within: str))
+  expectNotNil(String.Index(str.endIndex, within: str))
+
   let utf16Count = str.utf16.count
   let utf16Indices = Array(str.utf16.indices) + [str.utf16.endIndex]
   for location in 0..<utf16Count {
