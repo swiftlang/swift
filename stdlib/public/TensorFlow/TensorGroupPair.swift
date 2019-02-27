@@ -1,4 +1,4 @@
-//===-- TensorPair.swift --------------------------------------*- swift -*-===//
+//===-- TensorGroupPair.swift --------------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,13 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the TensorPair type.
+// This file defines the TensorGroupPair type.
 //
 //===----------------------------------------------------------------------===//
 
+typealias TensorPair<T, U> = TensorGroupPair<Tensor<T>, Tensor<U>>
+
 /// A 2-tuple-like struct that conforms to TensorGroup so that you can use
 /// 2-tuples in APIs that require TensorGroups.
-public struct TensorPair<T : TensorGroup, U : TensorGroup> {
+public struct TensorGroupPair<T : TensorGroup, U : TensorGroup> {
   public var first: T
   public var second: U
 
@@ -26,7 +28,7 @@ public struct TensorPair<T : TensorGroup, U : TensorGroup> {
   }
 }
 
-extension TensorPair : TensorGroup {
+extension TensorGroupPair : TensorGroup {
   @inlinable
   public static var _typeList: [TensorDataType] {
     return T._typeList + U._typeList

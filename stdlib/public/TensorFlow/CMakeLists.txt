@@ -44,8 +44,8 @@ set(SOURCES
   StringTensor.swift
   Tensor.swift
   TensorGroup.swift
+  TensorGroupPair.swift
   TensorHandle.swift
-  TensorPair.swift
   TensorProtocol.swift
   TensorShape.swift
   Utilities.swift
