@@ -101,7 +101,9 @@ public typealias UnicodeScalarType = String
 /// The default type for an otherwise-unconstrained Unicode extended
 /// grapheme cluster literal.
 public typealias ExtendedGraphemeClusterType = String
-/// The default type for an otherwise-unconstrained string literal.
+/// The default type for an otherwise-unconstrained 'character' literal.
+public typealias CharacterLiteralType = Character
+/// The default type for an otherwise-unconstrained "string" literal.
 public typealias StringLiteralType = String
 
 //===----------------------------------------------------------------------===//

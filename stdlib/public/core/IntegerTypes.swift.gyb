@@ -1663,14 +1663,17 @@ extension ${Self} : _HasCustomAnyHashableRepresentation {
   }
 }
 
+/// Conformances for character literals
+/// Users will need to opt-in for now.
 extension ${Self} :
-    _ExpressibleByBuiltinUnicodeScalarLiteral,
-    ExpressibleByUnicodeScalarLiteral {
+    _ExpressibleByBuiltinUnicodeScalarLiteral/*,
+    ExpressibleByUnicodeScalarLiteral*/ {
   @_transparent
   public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
     self = ${Self}(truncatingIfNeeded: UInt32(value))
   }
   @_transparent
+  @available(swift 5.1)
   public init(unicodeScalarLiteral value: ${Self}) {
     self = value
   }

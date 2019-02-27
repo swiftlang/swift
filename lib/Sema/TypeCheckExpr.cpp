@@ -676,12 +676,26 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc,
   // This is a tempoprary workaround until ExpressibleByUnicodeScalarLiteral
   // and ExpressibleByExtendedGraphemeClusterLiteral are removed as literal
   // protocols for Strings to give character literals Character default type.
-  // Remove this at the same time as changing TypeChecker.cpp, line 171 to
-  // return these protocols only for character literals which will complete
-  // making String and Character literals distinct in time for Swift 6.
+  // Remove this at the same time as changing TypeChecker.cpp, line 118 to
+  // return these protocols only for character literals along with making
+  // their literal type CharacterLiteralType = Character in Policy.swift as
+  // referred to in KnownProtocols.def which will complete making String
+  // and Character literals distinct in time for Swift 6.
   if (isCharacterLiteral) {
+    static const char *name = "CharacterLiteralType";
     TypeChecker &tc = createForContext(dc->getASTContext());
-    return lookupDefaultLiteralType(tc, tc.getStdlibModule(dc), "Character");
+    Type type = lookupDefaultLiteralType(tc, dc, name);
+
+    if (!type)
+      type = lookupDefaultLiteralType(tc, tc.getStdlibModule(dc), name);
+
+    // Strip off one level of sugar; we don't actually want to print
+    // the name of the typealias itself anywhere.
+    if (type) {
+      if (auto boundTypeAlias = dyn_cast<TypeAliasType>(type.getPointer()))
+        type = boundTypeAlias->getSinglyDesugaredType();
+    }
+    return type;
   }
   if (auto knownProtocolKindIfAny = getKnownProtocolKindIfAny(protocol)) {
     Type t = evaluateOrDefault(
