@@ -17,6 +17,7 @@
 # macosx: XCTest
 # ios: XCTest
 # tvos: XCTest
+# watchos: XCTest
 
 from __future__ import print_function
 
