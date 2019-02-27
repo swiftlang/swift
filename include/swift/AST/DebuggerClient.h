@@ -61,6 +61,11 @@ public:
                                SourceLoc Loc, bool IsTypeLookup,
                                ResultVector &RV) = 0;
 
+  /// Allows the DebuggerClient to prune the results of a name lookup before
+  /// returning to the caller. (See finishLookup in NameLookup.cpp.)
+  virtual void finishLookup(const DeclContext *dc, NLOptions options,
+                            SmallVectorImpl<ValueDecl *> &decls) {}
+
   /// When evaluating an expression in the context of an existing source file,
   /// we may want to prefer declarations from that source file.
   /// The DebuggerClient can return a private-discriminator to tell lookup to
