@@ -3678,12 +3678,7 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
   ConstraintGenerator cg(*this);
   ConstraintWalker cw(cg);
   
-  Expr* result = expr->walk(cw);
-  
-  if (result)
-    this->optimizeConstraints(result);
-
-  return result;
+  return expr->walk(cw);
 }
 
 Type ConstraintSystem::generateConstraints(Pattern *pattern,

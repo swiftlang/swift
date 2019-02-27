@@ -584,12 +584,17 @@ bool ConstraintSystem::Candidate::solve(
 
   // Try to solve the system and record all available solutions.
   llvm::SmallVector<Solution, 2> solutions;
-  {
+  if (!cs.failedConstraint) {
     SolverState state(cs, FreeTypeVariableBinding::Allow);
+    SolverScope outermostScope(cs);
 
-    // Use solve which doesn't try to filter solution list.
-    // Because we want the whole set of possible domain choices.
-    cs.solve(solutions);
+    // Optimize constraints before we solve.
+    cs.optimizeConstraints(E);
+    if (!cs.failedConstraint) {
+      // Use solve which doesn't try to filter solution list.
+      // Because we want the whole set of possible domain choices.
+      cs.solve(solutions);
+    }
   }
 
   if (TC.getLangOpts().DebugConstraintSolver) {
@@ -1174,8 +1179,20 @@ ConstraintSystem::solveImpl(Expr *&expr,
 bool ConstraintSystem::solve(Expr *const expr,
                              SmallVectorImpl<Solution> &solutions,
                              FreeTypeVariableBinding allowFreeTypeVariables) {
+  if (failedConstraint)
+    return true;
+
   // Set up solver state.
   SolverState state(*this, allowFreeTypeVariables);
+
+  // If we have an expression we're type checking, optimize constraints
+  // based on that expression.
+  SolverScope outermostScope(*this);
+  if (expr && !expr->getType()) {
+    optimizeConstraints(expr);
+    if (failedConstraint)
+      return true;
+  }
 
   // Solve the system.
   solve(solutions);
