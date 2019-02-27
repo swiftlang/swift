@@ -362,10 +362,9 @@ class DerivedWithFilePrivateSetter: BaseWithFilePrivateSetter {
     }
 }
 
-// Issues with final overrides of open members
 open class OpenBase {
-  open func instanceMethod() {} // expected-note {{overridden declaration is here}}
-  open class func classMethod() {} // expected-note {{overridden declaration is here}}
+  open func instanceMethod() {}
+  open class func classMethod() {}
 }
 
 public class PublicDerived : OpenBase {
@@ -379,8 +378,8 @@ open class OpenDerived : OpenBase {
 }
 
 open class OpenDerivedPublic : OpenBase {
-  override public func instanceMethod() {} // expected-error {{overriding instance method must be as accessible as the declaration it overrides}}
-  override public class func classMethod() {} // expected-error {{overriding class method must be as accessible as the declaration it overrides}}
+  override public func instanceMethod() {} // Ok
+  override public class func classMethod() {} // Ok
 }
 
 open class OpenDerivedFinal : OpenBase {
