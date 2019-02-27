@@ -191,10 +191,10 @@ extension DatasetIterator : IteratorProtocol {
 @inlinable @inline(__always)
 public func zip<T : TensorGroup, U : TensorGroup>(
   _ dataset1: Dataset<T>, _ dataset2: Dataset<U>
-) -> Dataset<TensorPair<T, U>> {
+) -> Dataset<TensorGroupPair<T, U>> {
   let handle: VariantHandle = #tfop(
-     "ZipDataset", TensorPair(dataset1._handle, dataset2._handle),
-     output_types$dtype: TensorPair<T, U>._typeList,
-     output_shapes: TensorPair<T, U>._unknownShapeList)
+     "ZipDataset", TensorGroupPair(dataset1._handle, dataset2._handle),
+     output_types$dtype: TensorGroupPair<T, U>._typeList,
+     output_shapes: TensorGroupPair<T, U>._unknownShapeList)
   return Dataset(_handle: handle)
 }
