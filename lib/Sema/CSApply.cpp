@@ -6570,32 +6570,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     break;
   }
 
-  case TypeKind::PrimaryArchetype:
-  case TypeKind::OpenedArchetype:
-  case TypeKind::NestedArchetype:
-    if (!cast<ArchetypeType>(desugaredFromType)->requiresClass())
-      break;
-    LLVM_FALLTHROUGH;
-
-  // Coercion from a subclass to a superclass.
-  //
-  // FIXME: Can we rig things up so that we always have a Superclass
-  // conversion restriction in this case?
-  case TypeKind::DynamicSelf:
-  case TypeKind::BoundGenericClass:
-  case TypeKind::Class: {
-    if (!toType->getClassOrBoundGenericClass())
-      break;
-    for (auto fromSuperClass = fromType->getSuperclass();
-         fromSuperClass;
-         fromSuperClass = fromSuperClass->getSuperclass()) {
-      if (fromSuperClass->isEqual(toType)) {
-        return coerceSuperclass(expr, toType, locator);
-      }
-    }
-    break;
-  }
-
   // Coercion from one function type to another, this produces a
   // FunctionConversionExpr in its full generality.
   case TypeKind::Function: {
@@ -6715,6 +6689,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::GenericFunction:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::OpenedArchetype:
+  case TypeKind::NestedArchetype:
+  case TypeKind::DynamicSelf:
+  case TypeKind::BoundGenericClass:
+  case TypeKind::Class:
     break;
   }
 
