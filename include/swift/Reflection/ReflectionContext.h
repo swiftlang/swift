@@ -18,8 +18,10 @@
 #ifndef SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 #define SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 
+#include "llvm/BinaryFormat/COFF.h"
 #include "llvm/BinaryFormat/MachO.h"
 #include "llvm/BinaryFormat/ELF.h"
+#include "llvm/Object/COFF.h"
 
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Remote/MetadataReader.h"
@@ -286,6 +288,100 @@ public:
       return readMachOSections<MachOTraits<8>>(ImageStart);
     return false;
   }
+
+#elif defined(_WIN32)
+  bool addImage(RemoteAddress ImageStart) {
+    auto DOSHdrBuf = this->getReader().readBytes(
+        ImageStart, sizeof(llvm::object::dos_header));
+    auto DOSHdr =
+        reinterpret_cast<const llvm::object::dos_header *>(DOSHdrBuf.get());
+    auto COFFFileHdrAddr = ImageStart.getAddressData() +
+                           DOSHdr->AddressOfNewExeHeader +
+                           sizeof(llvm::COFF::PEMagic);
+
+    auto COFFFileHdrBuf = this->getReader().readBytes(
+        RemoteAddress(COFFFileHdrAddr), sizeof(llvm::object::coff_file_header));
+    auto COFFFileHdr = reinterpret_cast<const llvm::object::coff_file_header *>(
+        COFFFileHdrBuf.get());
+
+    auto SectionTableAddr = COFFFileHdrAddr +
+                            sizeof(llvm::object::coff_file_header) +
+                            COFFFileHdr->SizeOfOptionalHeader;
+    auto SectionTableBuf = this->getReader().readBytes(
+        RemoteAddress(SectionTableAddr),
+        sizeof(llvm::object::coff_section) * COFFFileHdr->NumberOfSections);
+
+    auto findCOFFSectionByName = [&](llvm::StringRef Name)
+        -> std::pair<std::pair<const char *, const char *>, uint32_t> {
+      for (size_t i = 0; i < COFFFileHdr->NumberOfSections; ++i) {
+        const llvm::object::coff_section *COFFSec =
+            reinterpret_cast<const llvm::object::coff_section *>(
+                SectionTableBuf.get()) +
+            i;
+        llvm::StringRef SectionName =
+            (COFFSec->Name[llvm::COFF::NameSize - 1] == 0)
+                ? COFFSec->Name
+                : llvm::StringRef(COFFSec->Name, llvm::COFF::NameSize);
+        if (SectionName != Name)
+          continue;
+        auto Addr = ImageStart.getAddressData() + COFFSec->PointerToRawData;
+        auto Buf = this->getReader().readBytes(RemoteAddress(Addr),
+                                               COFFSec->VirtualSize);
+        const char *Begin = reinterpret_cast<const char *>(Buf.get());
+        const char *End = Begin + COFFSec->VirtualSize;
+        savedBuffers.push_back(std::move(Buf));
+        return {{Begin, End},
+                COFFSec->VirtualAddress - COFFSec->PointerToRawData};
+      }
+      return {{nullptr, nullptr}, 0};
+    };
+
+    std::pair<std::pair<const char *, const char *>, uint32_t> CaptureSec =
+        findCOFFSectionByName(".sw5cptr");
+    std::pair<std::pair<const char *, const char *>, uint32_t> TypeRefMdSec =
+        findCOFFSectionByName(".sw5tyrf");
+
+    // FIXME: Make use of .sw5flmd section (the section content appears to be
+    // incorrect on Windows at the moment).
+    std::pair<std::pair<const char *, const char *>, uint32_t> FieldMdSec = {
+        {nullptr, nullptr}, 0};
+    // FIXME: Make use of .sw5asty.
+    std::pair<std::pair<const char *, const char *>, uint32_t> AssocTySec = {
+        {nullptr, nullptr}, 0};
+    // FIXME: Make use of .sw5bltn.
+    std::pair<std::pair<const char *, const char *>, uint32_t> BuiltinTySec = {
+        {nullptr, nullptr}, 0};
+    // FIXME: Make use of .sw5repl.
+    std::pair<std::pair<const char *, const char *>, uint32_t> ReflStrMdSec = {
+        {nullptr, nullptr}, 0};
+
+    if (FieldMdSec.first.first == nullptr &&
+        AssocTySec.first.first == nullptr &&
+        BuiltinTySec.first.first == nullptr &&
+        CaptureSec.first.first == nullptr &&
+        TypeRefMdSec.first.first == nullptr &&
+        ReflStrMdSec.first.first == nullptr)
+      return false;
+    auto LocalStartAddress = reinterpret_cast<uintptr_t>(DOSHdrBuf.get());
+    auto RemoteStartAddress =
+        static_cast<uintptr_t>(ImageStart.getAddressData());
+
+    ReflectionInfo Info = {
+        {{FieldMdSec.first.first, FieldMdSec.first.second}, FieldMdSec.second},
+        {{AssocTySec.first.first, AssocTySec.first.second}, AssocTySec.second},
+        {{BuiltinTySec.first.first, BuiltinTySec.first.second},
+         BuiltinTySec.second},
+        {{CaptureSec.first.first, CaptureSec.first.second}, CaptureSec.second},
+        {{TypeRefMdSec.first.first, TypeRefMdSec.first.second},
+         TypeRefMdSec.second},
+        {{ReflStrMdSec.first.first, ReflStrMdSec.first.second},
+         ReflStrMdSec.second},
+        LocalStartAddress,
+        RemoteStartAddress};
+    this->addReflectionInfo(Info);
+    return true;
+  }
+
 #else // ELF platforms.
   template <typename T> bool readELFSections(RemoteAddress ImageStart) {
     auto Buf =
