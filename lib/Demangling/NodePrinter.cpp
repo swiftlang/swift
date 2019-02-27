@@ -50,8 +50,7 @@ DemanglerPrinter &DemanglerPrinter::operator<<(long long n) & {
   return *this;
 }
 
-std::string Demangle::archetypeName(Node::IndexType index,
-                                    Node::IndexType depth) {
+std::string Demangle::archetypeName(uint64_t index, uint64_t depth) {
   DemanglerPrinter name;
   do {
     name << (char)('A' + (index % 26));
@@ -1959,7 +1958,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
         }
         // FIXME: Depth won't match when a generic signature applies to a
         // method in generic type context.
-        Printer << archetypeName(index, depth);
+        Printer << Options.ArchetypeName(index, depth);
       }
     }
     
@@ -2036,13 +2035,8 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   }
   case Node::Kind::DependentGenericParamType: {
     unsigned index = Node->getChild(1)->getIndex();
-    do {
-      Printer << (char)('A' + (index % 26));
-      index /= 26;
-    } while (index);
     unsigned depth = Node->getChild(0)->getIndex();
-    if (depth != 0)
-      Printer << depth;
+    Printer << Options.ArchetypeName(index, depth);
     return nullptr;
   }
   case Node::Kind::DependentGenericType: {
