@@ -15,6 +15,7 @@
 #include "sourcekitd/DocStructureArray.h"
 #include "sourcekitd/DocSupportAnnotationArray.h"
 #include "sourcekitd/TokenAnnotationsArray.h"
+#include "sourcekitd/ExpressionTypeArray.h"
 
 #include "SourceKit/Core/Context.h"
 #include "SourceKit/Core/LangSupport.h"
@@ -139,6 +140,8 @@ static sourcekitd_response_t reportDocInfo(llvm::MemoryBuffer *InputBuf,
                                            ArrayRef<const char *> Args);
 
 static void reportCursorInfo(const CursorInfoData &Info, ResponseReceiver Rec);
+
+static void reportExpressionTypeInfo(const ExpressionTypesInFile &Info, ResponseReceiver Rec);
 
 static void reportRangeInfo(const RangeInfo &Info, ResponseReceiver Rec);
 
@@ -986,6 +989,14 @@ handleSemanticRequest(RequestDict Req,
     return Rec(createErrorRequestInvalid("'key.line' or 'key.column' are required"));
   }
 
+  if (ReqUID == RequestCollectExpressionType) {
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+    return Lang.collectExpressionTypes(*SourceFile, Args,
+      [Rec](const ExpressionTypesInFile &Info) {
+        reportExpressionTypeInfo(Info, Rec);
+      });
+  }
+
   if (ReqUID == RequestFindLocalRenameRanges) {
     int64_t Line = 0, Column = 0, Length = 0;
     if (Req.getInt64(KeyLine, Line, /*isOptional=*/false))
@@ -1707,6 +1718,22 @@ static void reportNameInfo(const NameTranslatingInfo &Info, ResponseReceiver Rec
     Elem.set(KeyIsZeroArgSelector, Info.IsZeroArgSelector);
   }
   Rec(RespBuilder.createResponse());
+}
+
+//===----------------------------------------------------------------------===//
+// ReportExpressionTypeInfo
+//===----------------------------------------------------------------------===//
+static void reportExpressionTypeInfo(const ExpressionTypesInFile &Info,
+                                     ResponseReceiver Rec) {
+  ResponseBuilder Builder;
+  auto Dict = Builder.getDictionary();
+  ExpressionTypeArrayBuilder ArrBuilder(Info.TypeBuffer);
+  for (auto &R: Info.Results) {
+    ArrBuilder.add(R);
+  }
+  Dict.setCustomBuffer(KeyExpressionTypeList, CustomBufferKind::ExpressionTypeArray,
+                       ArrBuilder.createBuffer());
+  Rec(Builder.createResponse());
 }
 
 //===----------------------------------------------------------------------===//
