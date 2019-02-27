@@ -1,11 +1,18 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -emit-ir -o - -primary-file %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -enable-resilience -enable-class-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %t -enable-resilience -enable-class-resilience -enable-objc-interop -emit-ir -o - -primary-file %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
 
 // XFAIL: CPU=armv7k
 // XFAIL: CPU=powerpc64le
 
-// CHECK: %swift.type = type { [[INT:i32|i64]] }
-
 import Foundation
+import resilient_struct
+
+// Note that these are all mutable to allow for the runtime to slide them.
+// CHECK: @"$s21class_resilience_objc27ClassWithEmptyThenResilientC9resilient0I7_struct0H3IntVvpWvd" = hidden global [[INT]] 0,
+// CHECK: @"$s21class_resilience_objc27ClassWithResilientThenEmptyC9resilient0I7_struct0F3IntVvpWvd" = hidden global [[INT]] 0,
+// CHECK: @"$s21class_resilience_objc27ClassWithEmptyThenResilientC5emptyAA0F0VvpWvd" = hidden global [[INT]] 0,
+// CHECK: @"$s21class_resilience_objc27ClassWithResilientThenEmptyC5emptyAA0H0VvpWvd" = hidden global [[INT]] 0,
 
 public class FixedLayoutObjCSubclass : NSObject {
   // This field could use constant direct access because NSObject has
@@ -89,4 +96,27 @@ func testConstantIndirectFieldAccess<T>(_ o: GenericObjCSubclass<T>) {
   // layout. Non-constant indirect is never needed for Objective-C classes
   // because the field offset vector only contains Swift field offsets.
   o.field = 10
+}
+
+@_fixed_layout
+public struct Empty {}
+
+public class ClassWithEmptyThenResilient : DummyClass {
+  public let empty: Empty
+  public let resilient: ResilientInt
+
+  public init(empty: Empty, resilient: ResilientInt) {
+    self.empty = empty
+    self.resilient = resilient
+  }
+}
+
+public class ClassWithResilientThenEmpty : DummyClass {
+  public let resilient: ResilientInt
+  public let empty: Empty
+
+  public init(empty: Empty, resilient: ResilientInt) {
+    self.empty = empty
+    self.resilient = resilient
+  }
 }
