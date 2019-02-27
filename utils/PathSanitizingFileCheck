@@ -15,6 +15,7 @@ import argparse
 import subprocess
 import sys
 
+is_py2 = sys.version_info[0] == 2
 
 def main():
     parser = argparse.ArgumentParser(
@@ -44,10 +45,10 @@ constants.""")
 
     args, unknown_args = parser.parse_known_args()
 
-    stdin = sys.stdin.read()
+    stdin = sys.stdin.read() if is_py2 else sys.stdin.buffer.read()
     for s in args.sanitize_strings:
         replacement, pattern = s.split('=', 1)
-        stdin = stdin.replace(pattern, replacement)
+        stdin = stdin.replace(pattern.encode(), replacement.encode())
 
     p = subprocess.Popen(
         [args.file_check_path] + unknown_args, stdin=subprocess.PIPE)

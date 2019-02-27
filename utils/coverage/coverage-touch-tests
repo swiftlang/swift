@@ -56,11 +56,10 @@ def worker(args):
     return set(tmp_covering_tests)
 
 
-NUM_CORES = multiprocessing.cpu_count()
-pool = multiprocessing.Pool(NUM_CORES)
-
-
 def main():
+    NUM_CORES = multiprocessing.cpu_count()
+    pool = multiprocessing.Pool(NUM_CORES)
+
     parser = argparse.ArgumentParser(
         description='Touch tests covering git changes')
     parser.add_argument('--swift-dir',
@@ -90,7 +89,7 @@ def main():
     environment['GIT_EXTERNAL_DIFF'] = script_path
     logging.info('Getting diff of swift dir: %s', args.swift_dir)
     output = subprocess.check_output(['git', '-C', args.swift_dir, 'diff'],
-                                     env=environment)
+                                     env=environment, universal_newlines=True)
     changed_ranges = []
     for line in output.splitlines():
         logging.debug(line)

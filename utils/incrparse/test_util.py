@@ -3,6 +3,7 @@
 from __future__ import print_function
 
 import argparse
+import io
 import os
 import re
 import subprocess
@@ -21,7 +22,7 @@ def escapeCmdArg(arg):
 
 
 def run_command(cmd):
-    print(' '.join([escapeCmdArg(arg) for arg in cmd]))
+    print(' '.join([escapeCmdArg(arg) for arg in cmd]).encode())
     return subprocess.check_output(cmd, stderr=subprocess.STDOUT)
 
 
@@ -107,9 +108,9 @@ def parseLine(line, line_no, test_case, incremental_edit_args, reparse_args,
 
 def prepareForIncrParse(test_file, test_case, pre_edit_file, post_edit_file,
                         incremental_edit_args, reparse_args):
-    with open(test_file, mode='r') as test_file_handle, \
-            open(pre_edit_file, mode='w+b') as pre_edit_file_handle, \
-            open(post_edit_file, mode='w+b') as post_edit_file_handle:
+    with io.open(test_file, mode='r', encoding='utf-8') as test_file_handle, \
+            io.open(pre_edit_file, mode='w+', encoding='utf-8') as pre_edit_file_handle, \
+            io.open(post_edit_file, mode='w+', encoding='utf-8') as post_edit_file_handle:
 
         current_reparse_start = None
 

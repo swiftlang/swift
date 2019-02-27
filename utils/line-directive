@@ -12,6 +12,7 @@
 # ----------------------------------------------------------------------------
 from __future__ import print_function
 import bisect
+import io
 import os
 import re
 import shlex
@@ -73,7 +74,7 @@ def _make_line_map(target_filename, stream=None):
     [(0, 'box', 1), (1, 'foo.bar', 3), (5, 'baz.txt', 20)]
     """
     result = [(0, target_filename, 1)]
-    input = stream or open(target_filename)
+    input = stream or io.open(target_filename, encoding='ascii', errors='ignore')
     for i, l in enumerate(input.readlines()):
         m = line_pattern.match(l)
         if m:
