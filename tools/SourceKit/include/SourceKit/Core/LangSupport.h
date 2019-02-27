@@ -533,6 +533,31 @@ public:
   virtual void failed(StringRef ErrDescription) = 0;
 };
 
+struct ConformingMethodListResult {
+  StringRef TypeName;
+  StringRef TypeUSR;
+
+  struct Member {
+    StringRef Name;
+    StringRef TypeName;
+    StringRef TypeUSR;
+    StringRef Description;
+    StringRef SourceText;
+    StringRef DocBrief;
+  };
+  ArrayRef<Member> Members;
+};
+
+class ConformingMethodListConsumer {
+  virtual void anchor();
+
+public:
+  virtual ~ConformingMethodListConsumer() {}
+
+  virtual void handleResult(const ConformingMethodListResult &Result) = 0;
+  virtual void failed(StringRef ErrDescription) = 0;
+};
+
 class LangSupport {
   virtual void anchor();
 
@@ -692,6 +717,12 @@ public:
                                         unsigned Offset,
                                         ArrayRef<const char *> Args,
                                         TypeContextInfoConsumer &Consumer) = 0;
+
+  virtual void getConformingMethodList(llvm::MemoryBuffer *inputBuf,
+                                       unsigned Offset,
+                                       ArrayRef<const char *> Args,
+                                       ArrayRef<const char *> ExpectedTypes,
+                                       ConformingMethodListConsumer &Consumer) = 0;
 
   virtual void getStatistics(StatisticsReceiver) = 0;
 };
