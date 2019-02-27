@@ -1063,6 +1063,108 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   llvm_unreachable("Unhandled ConstraintKind in switch.");
 }
 
+/// Check whether given parameter list represents a single tuple
+/// or type variable which could be later resolved to tuple.
+/// This is useful for SE-0110 related fixes in `matchFunctionTypes`.
+static bool isSingleTupleParam(ASTContext &ctx,
+                               ArrayRef<AnyFunctionType::Param> params) {
+  if (params.size() != 1)
+    return false;
+
+  const auto &param = params.front();
+  if (param.isVariadic() || param.isInOut())
+    return false;
+
+  auto paramType = param.getPlainType();
+  // Support following case which was allowed until 5:
+  //
+  // func bar(_: (Int, Int) -> Void) {}
+  // let foo: ((Int, Int)?) -> Void = { _ in }
+  //
+  // bar(foo) // Ok
+  if (!ctx.isSwiftVersionAtLeast(5))
+    paramType = paramType->lookThroughAllOptionalTypes();
+
+  // Parameter should have a label and be either a tuple tuple type,
+  // or a type variable which might later be assigned a tuple type,
+  // e.g. opened generic parameter.
+  return !param.hasLabel() &&
+         (paramType->is<TupleType>() || paramType->is<TypeVariableType>());
+}
+
+/// Attempt to fix missing arguments by introducing type variables
+/// and inferring their types from parameters.
+static bool fixMissingArguments(ConstraintSystem &cs, Expr *anchor,
+                                FunctionType *funcType,
+                                SmallVectorImpl<AnyFunctionType::Param> &args,
+                                SmallVectorImpl<AnyFunctionType::Param> &params,
+                                unsigned numMissing,
+                                ConstraintLocatorBuilder locator) {
+  assert(args.size() < params.size());
+
+  auto &ctx = cs.getASTContext();
+  // If there are N parameters but a single closure argument
+  // (which might be anonymous), it's most likely used as a
+  // tuple e.g. `$0.0`.
+  Optional<TypeBase *> argumentTuple;
+  if (isa<ClosureExpr>(anchor) && isSingleTupleParam(ctx, args)) {
+    auto isParam = [](const Expr *expr) {
+      if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
+        if (auto *decl = DRE->getDecl())
+          return isa<ParamDecl>(decl);
+      }
+      return false;
+    };
+
+    const auto &arg = args.back();
+    if (auto *argTy = arg.getPlainType()->getAs<TypeVariableType>()) {
+      anchor->forEachChildExpr([&](Expr *expr) -> Expr * {
+        if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
+          if (!isParam(UDE->getBase()))
+            return expr;
+
+          auto name = UDE->getName().getBaseIdentifier();
+          unsigned index = 0;
+          if (!name.str().getAsInteger(10, index) ||
+              llvm::any_of(params, [&](const AnyFunctionType::Param &param) {
+                return param.getLabel() == name;
+              })) {
+            argumentTuple.emplace(argTy);
+            args.pop_back();
+            return nullptr;
+          }
+        }
+        return expr;
+      });
+    }
+  }
+
+  for (unsigned i = args.size(), n = params.size(); i != n; ++i) {
+    auto *argLoc = cs.getConstraintLocator(
+        anchor, LocatorPathElt::getSynthesizedArgument(i));
+    args.push_back(params[i].withType(cs.createTypeVariable(argLoc)));
+  }
+
+  ArrayRef<AnyFunctionType::Param> argsRef(args);
+  auto *fix =
+      AddMissingArguments::create(cs, funcType, argsRef.take_back(numMissing),
+                                  cs.getConstraintLocator(locator));
+
+  if (cs.recordFix(fix))
+    return true;
+
+  // If the argument was a single "tuple", let's bind newly
+  // synthesized arguments to it.
+  if (argumentTuple) {
+    cs.addConstraint(ConstraintKind::Bind, *argumentTuple,
+                     FunctionType::composeInput(ctx, args,
+                                                /*canonicalVararg=*/false),
+                     cs.getConstraintLocator(anchor));
+  }
+
+  return false;
+}
+
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintKind kind, TypeMatchOptions flags,
@@ -1137,33 +1239,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // Add a very narrow exception to SE-0110 by allowing functions that
   // take multiple arguments to be passed as an argument in places
   // that expect a function that takes a single tuple (of the same
-  // arity).
-  auto isSingleParam = [&](ArrayRef<AnyFunctionType::Param> params) {
-    if (params.size() != 1)
-      return false;
-
-    const auto &param = params.front();
-    if (param.isVariadic() || param.isInOut())
-      return false;
-
-    auto paramType = param.getPlainType();
-    // Support following case which was allowed until 5:
-    // ``swift
-    // func bar(_: (Int, Int) -> Void) {}
-    // let foo: ((Int, Int)?) -> Void = { _ in }
-    //
-    // bar(foo) // Ok
-    // ```
-    if (!getASTContext().isSwiftVersionAtLeast(5))
-      paramType = paramType->lookThroughAllOptionalTypes();
-
-    // Parameter should have a label and be either a tuple tuple type,
-    // or a type variable which might later be assigned a tuple type,
-    // e.g. opened generic parameter.
-    return !param.hasLabel() &&
-           (paramType->is<TupleType>() || paramType->is<TypeVariableType>());
-  };
-
+  // arity);
   auto canImplodeParams = [&](ArrayRef<AnyFunctionType::Param> params) {
     if (params.size() == 1)
       return false;
@@ -1194,12 +1270,13 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         });
 
     if (last != path.rend()) {
+      auto &ctx = getASTContext();
       if (last->getKind() == ConstraintLocator::ApplyArgToParam) {
-        if (isSingleParam(func2Params) &&
+        if (isSingleTupleParam(ctx, func2Params) &&
             canImplodeParams(func1Params)) {
           implodeParams(func1Params);
-        } else if (!getASTContext().isSwiftVersionAtLeast(5) &&
-                   isSingleParam(func1Params) &&
+        } else if (!ctx.isSwiftVersionAtLeast(5) &&
+                   isSingleTupleParam(ctx, func1Params) &&
                    canImplodeParams(func2Params)) {
           auto *simplified = locator.trySimplifyToExpr();
           // We somehow let tuple unsplatting function conversions
@@ -1236,7 +1313,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
     if (last != path.rend()) {
       if (last->getKind() == ConstraintLocator::ApplyArgToParam) {
-        if (isSingleParam(func1Params) &&
+        if (isSingleTupleParam(getASTContext(), func1Params) &&
             func1Params[0].getOldType()->isVoid()) {
           if (func2Params.empty()) {
             func2Params.emplace_back(getASTContext().TheEmptyTupleType);
@@ -1262,68 +1339,9 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     // If there are missing arguments, let's add them
     // using parameter as a template.
     if (diff < 0) {
-      // If there are N parameters but a single closure argument
-      // (which might be anonymous), it's most likely used as a
-      // tuple e.g. `$0.0`.
-      Optional<TypeBase *> argumentTuple;
-      if (isa<ClosureExpr>(anchor) && isSingleParam(func1Params)) {
-        auto isParam = [](const Expr *expr) {
-          if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
-            if (auto *decl = DRE->getDecl())
-              return isa<ParamDecl>(decl);
-          }
-          return false;
-        };
-
-        const auto &arg = func1Params.back();
-        if (auto *argTy = arg.getPlainType()->getAs<TypeVariableType>()) {
-          anchor->forEachChildExpr([&](Expr *expr) -> Expr * {
-            if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
-              if (!isParam(UDE->getBase()))
-                return expr;
-
-              auto name = UDE->getName().getBaseIdentifier();
-              unsigned index = 0;
-              if (!name.str().getAsInteger(10, index) ||
-                  llvm::any_of(func2Params,
-                               [&](const AnyFunctionType::Param &param) {
-                                 return param.getLabel() == name;
-                               })) {
-                argumentTuple.emplace(argTy);
-                func1Params.pop_back();
-                return nullptr;
-              }
-            }
-            return expr;
-          });
-        }
-      }
-
-      for (unsigned i = func1Params.size(),
-                    n = func2Params.size(); i != n; ++i) {
-        auto *argLoc = getConstraintLocator(
-            anchor, LocatorPathElt::getSynthesizedArgument(i));
-
-        auto arg = func2Params[i].withType(createTypeVariable(argLoc));
-        func1Params.push_back(arg);
-      }
-
-      ArrayRef<AnyFunctionType::Param> argsRef(func1Params);
-      auto *fix = AddMissingArguments::create(*this, func2,
-                                              argsRef.take_back(abs(diff)),
-                                              getConstraintLocator(locator));
-
-      if (recordFix(fix))
+      if (fixMissingArguments(*this, anchor, func2, func1Params, func2Params,
+                              abs(diff), locator))
         return getTypeMatchFailure(argumentLocator);
-
-      // If the argument was a single "tuple", let's bind newly
-      // synthesized arguments to it.
-      if (argumentTuple) {
-        addConstraint(ConstraintKind::Bind, *argumentTuple,
-                      FunctionType::composeInput(getASTContext(), func1Params,
-                                                 /*canonicalVararg=*/false),
-                      getConstraintLocator(anchor));
-      }
     } else {
       // TODO(diagnostics): Add handling of extraneous arguments.
       return getTypeMatchFailure(argumentLocator);
