@@ -4470,8 +4470,6 @@ public:
     } else {
       emitZeroIndirect(bufType.getASTType(), adjBuf, si->getLoc());
     }
-    auto cleanup = makeCleanup(adjBuf, emitCleanup);
-    adjBuf.setCleanup(cleanup);
   }
 
   // Handle `copy_addr` instruction.
@@ -4534,6 +4532,9 @@ public:
       }
     }
     auto accessBuf = getAdjointBuffer(bai);
+    auto &sourceBuf = getAdjointBuffer(bai->getSource());
+    sourceBuf.setCleanup(makeCleanupFromChildren({sourceBuf.getCleanup(),
+                                                  accessBuf.getCleanup()}));
     if (errorOccurred)
       return;
     builder.createEndAccess(bai->getLoc(), accessBuf, /*aborted*/ false);
@@ -4558,7 +4559,7 @@ public:
         eai->getBeginAccess()->hasNoNestedConflict(),
         eai->getBeginAccess()->isFromBuiltin());
     setAdjointBuffer(eai->getOperand(),
-                     ValueWithCleanup(adjAccess, adjBuf.getCleanup()));
+                     ValueWithCleanup(adjAccess, makeCleanupFromChildren({})));
   }
 
 #define NOT_DIFFERENTIABLE(INST, DIAG) \
