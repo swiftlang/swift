@@ -304,7 +304,8 @@ void collectPossibleCalleesByQualifiedLookup(
 
   SmallVector<ValueDecl *, 2> decls;
   auto resolver = DC.getASTContext().getLazyResolver();
-  if (!DC.lookupQualified(baseTy, name, NL_QualifiedDefault, resolver, decls))
+  if (!DC.lookupQualified(baseTy->getMetatypeInstanceType(), name,
+                          NL_QualifiedDefault, resolver, decls))
     return;
 
   for (auto *VD : decls) {
@@ -315,13 +316,22 @@ void collectPossibleCalleesByQualifiedLookup(
     if (!VD->hasInterfaceType())
       continue;
     Type declaredMemberType = VD->getInterfaceType();
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
-      if (AFD->getDeclContext()->isTypeContext())
+    if (VD->getDeclContext()->isTypeContext()) {
+      if (auto *FD = dyn_cast<FuncDecl>(VD)) {
+        if (!baseTy->is<AnyMetatypeType>())
+          declaredMemberType =
+              declaredMemberType->castTo<AnyFunctionType>()->getResult();
+      }
+      if (auto *CD = dyn_cast<ConstructorDecl>(VD)) {
+        if (!baseTy->is<AnyMetatypeType>())
+          continue;
         declaredMemberType =
             declaredMemberType->castTo<AnyFunctionType>()->getResult();
+      }
+    }
 
-    auto fnType =
-        baseTy->getTypeOfMember(DC.getParentModule(), VD, declaredMemberType);
+    auto fnType = baseTy->getMetatypeInstanceType()->getTypeOfMember(
+        DC.getParentModule(), VD, declaredMemberType);
 
     if (!fnType)
       continue;
@@ -341,8 +351,8 @@ void collectPossibleCalleesByQualifiedLookup(
       DC.getASTContext(), &DC, CompletionTypeCheckKind::Normal, baseExpr, ref);
   if (!baseTyOpt)
     return;
-  auto baseTy = (*baseTyOpt)->getRValueType()->getMetatypeInstanceType();
-  if (!baseTy->mayHaveMembers())
+  auto baseTy = (*baseTyOpt)->getRValueType();
+  if (!baseTy->getMetatypeInstanceType()->mayHaveMembers())
     return;
 
   collectPossibleCalleesByQualifiedLookup(DC, baseTy, name, candidates);
@@ -387,7 +397,7 @@ bool collectPossibleCalleesForApply(
       auto baseTy = AMT->getInstanceType();
       if (baseTy->mayHaveMembers())
         collectPossibleCalleesByQualifiedLookup(
-            DC, baseTy, DeclBaseName::createConstructor(), candidates);
+            DC, AMT, DeclBaseName::createConstructor(), candidates);
     }
   }
 

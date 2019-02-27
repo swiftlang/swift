@@ -596,13 +596,16 @@ func testNestedContext() {
 
 class TestImplicitlyCurriedSelf {
   func foo(x: Int) { }
+  func foo(arg: Int, optArg: Int) { }
+
   static func test() {
     foo(#^CURRIED_SELF_1^#
     self.foo(#^CURRIED_SELF_2^#
     TestImplicitlyCurriedSelf.foo(#^CURRIED_SELF_3^#
 
-// CURRIED_SELF_1: Begin completions, 1 items
-// CURRIED_SELF_1-DAG: Pattern/CurrModule:                 ['(']{#(self): TestImplicitlyCurriedSelf#}[')'][#(Int) -> ()#]{{; name=.+$}}
+// CURRIED_SELF_1: Begin completions, 2 items
+// CURRIED_SELF_1-DAG: Pattern/CurrModule: ['(']{#(self): TestImplicitlyCurriedSelf#}[')'][#(Int) -> ()#]{{; name=.+$}}
+// CURRIED_SELF_1-DAG: Pattern/CurrModule: ['(']{#(self): TestImplicitlyCurriedSelf#}[')'][#(Int, Int) -> ()#]{{; name=.+$}}
 // CURRIED_SELF_1: End completions
   }
 }
