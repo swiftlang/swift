@@ -2171,7 +2171,7 @@ static SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
     auto toRes = toConv.getResults()[resIdx];
     // No abstraction mismatch.
     if (fromRes.isFormalIndirect() == toRes.isFormalIndirect()) {
-      // If result typess are indirect, directly pass as next argument.
+      // If result types are indirect, directly pass as next argument.
       if (toRes.isFormalIndirect())
         useNextArgument();
       continue;
