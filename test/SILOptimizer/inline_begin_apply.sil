@@ -494,8 +494,6 @@ bb0:
 // CHECK:   dealloc_stack [[A32]] : $*Builtin.Int32
 // CHECK:   unreachable
 // CHECK: bb2:
-// CHECK:   dealloc_stack [[A32]] : $*Builtin.Int32
-// CHECK:   dealloc_stack [[A16]] : $*Builtin.Int16
 // CHECK:   unreachable
 // CHECK: bb3:
 // CHECK:   dealloc_stack [[A32]] : $*Builtin.Int32
