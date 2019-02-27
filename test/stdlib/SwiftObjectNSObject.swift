@@ -51,7 +51,7 @@ if #available(OSX 10.12, iOS 10.0, *) {
   // does not return
 } else {
   // Horrible hack to satisfy FileCheck
-  print("c ##SwiftObjectNSObject.C##")
-  print("d ##SwiftObjectNSObject.D##")
-  print("S ##Swift._SwiftObject##")
+  fputs("c ##SwiftObjectNSObject.C##\n", stderr)
+  fputs("d ##SwiftObjectNSObject.D##\n", stderr)
+  fputs("S ##Swift._SwiftObject##\n", stderr)
 }
