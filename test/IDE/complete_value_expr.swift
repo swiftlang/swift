@@ -190,6 +190,10 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOLTYPE_DOT_2 | %FileCheck %s -check-prefix=PROTOCOLTYPE_DOT_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOLTYPE_DOT_3 | %FileCheck %s -check-prefix=PROTOCOLTYPE_DOT_3
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_IN_MEMBERDECLINIT_1 | %FileCheck %s -check-prefix=FOO_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_IN_MEMBERDECLINIT_2 | %FileCheck %s -check-prefix=FOO_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_IN_MEMBERDECLINIT_3 | %FileCheck %s -check-prefix=FOO_OBJECT_DOT
+
 // Test code completion of expressions that produce a value.
 
 struct FooStruct {
@@ -2117,5 +2121,24 @@ class TestChain {
 // COMPLEX_CHAIN_1-DAG: Decl[InstanceVar]/CurrNominal:      prop1[#Int#]
 // COMPLEX_CHAIN_1-DAG: Decl[InstanceVar]/CurrNominal:      prop2[#Int#]
 // COMPLEX_CHAIN_1: End completions
+  }
+}
+
+// rdar://problem/48453760
+struct InitializerTest {
+  let value1: FooStruct = {
+    $0.#^CLOSURE_IN_MEMBERDECLINIT_1^#
+    return $0
+  }(FooStruct())
+
+  let value2: FooStruct = { (b: FooStruct ) -> FooStruct in
+    b.#^CLOSURE_IN_MEMBERDECLINIT_2^#
+    return b
+  }(FooStruct())
+}
+// rdar://problem/40944761
+extension String {
+  static let v = { (obj: FooStruct) in
+    obj.#^CLOSURE_IN_MEMBERDECLINIT_3^#
   }
 }

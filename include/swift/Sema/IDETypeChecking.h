@@ -39,6 +39,9 @@ namespace swift {
   /// Typecheck a declaration parsed during code completion.
   void typeCheckCompletionDecl(Decl *D);
 
+  /// Typecheck binding initializer at \p bindingIndex.
+  void typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned bindingIndex);
+
   /// Check if T1 is convertible to T2.
   ///
   /// \returns true on convertible, false on not.
