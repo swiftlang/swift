@@ -597,10 +597,6 @@ bool SILDeclRef::isNoinline() const {
         return true;
   }
 
-  if (auto *attr = decl->getAttrs().getAttribute<SemanticsAttr>())
-    if (attr->Value.equals("keypath.entry"))
-      return true;
-
   return false;
 }
 
