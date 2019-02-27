@@ -21,6 +21,26 @@ func dupe_attributes(arg: Float) -> Float { return arg }
 @differentiable(wrt: arg2)
 func dupe_attributes(arg1: Float, arg2: Float) -> Float { return arg1 }
 
+class Class {}
+// expected-error @+1 {{class objects and protocol existentials ('Class') cannot be differentiated with respect to}}
+@differentiable(wrt: x)
+func invalidDiffWrtClass(_ x: Class) -> Class {
+  return x
+}
+
+protocol Proto {}
+// expected-error @+1 {{class objects and protocol existentials ('Proto') cannot be differentiated with respect to}}
+@differentiable(wrt: x)
+func invalidDiffWrtExistential(_ x: Proto) -> Proto {
+  return x
+}
+
+// expected-error @+1 {{functions ('@differentiable (Float) -> Float') cannot be differentiated with respect to}}
+@differentiable(wrt: fn)
+func invalidDiffWrtFunction(_ fn: @differentiable(Float) -> Float) -> Float {
+  return fn(.pi)
+}
+
 // JVP
 
 @differentiable(jvp: jvpSimpleJVP)
@@ -559,14 +579,19 @@ struct TF285MissingOneDiffAttr : TF285 {
 }
 
 
-// TF296: Make `@differentiable` parameters default to all parameters that conform to `Differentiable`.
+// TF-296: Infer `@differentiable` wrt parameters to be to all parameters that conform to `Differentiable`.
 
 @differentiable
-func TF296Fn(_ a: Float, _ b: Int) -> Float {
+func infer1(_ a: Float, _ b: Int) -> Float {
   return a + Float(b)
 }
 
-struct TF296A : Differentiable {
+@differentiable
+func infer2(_ fn: @differentiable(Float) -> Float, x: Float) -> Float {
+  return fn(x)
+}
+
+struct DiffableStruct : Differentiable {
   var a: Float
 
   @differentiable
@@ -575,7 +600,7 @@ struct TF296A : Differentiable {
   }
 }
 
-struct TF296B {
+struct NonDiffableStruct {
   var a: Float
 
   @differentiable
