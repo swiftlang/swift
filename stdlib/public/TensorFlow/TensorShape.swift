@@ -20,8 +20,7 @@
 @_fixed_layout
 public struct TensorShape : ExpressibleByArrayLiteral {
   /// The dimensions of the shape.
-  @usableFromInline
-  internal var dimensions: [Int32]
+  public var dimensions: [Int32]
 
   /// Initialize with an array of dimensions. The rank of the tensor is the
   /// length of the array.
@@ -105,12 +104,12 @@ public extension TensorShape {
   @inlinable
   subscript(index: Int32) -> Int32 {
     @inline(__always)
-    get {
-      return dimensions[Int(index)]
+    _read {
+      yield dimensions[Int(index)]
     }
     @inline(__always)
-    set {
-      dimensions[Int(index)] = newValue
+    _modify {
+      yield &dimensions[Int(index)]
     }
   }
 
@@ -134,12 +133,11 @@ public extension TensorShape {
 
 extension TensorShape : Equatable {
   @inlinable @inline(__always)
-  public static func ==(lhs: TensorShape, rhs: TensorShape) -> Bool {
+  public static func == (lhs: TensorShape, rhs: TensorShape) -> Bool {
     return lhs.dimensions == rhs.dimensions
   }
 }
 
-/// Codable conformance.
 extension TensorShape : Codable {
   @inlinable
   public func encode(to encoder: Encoder) throws {
