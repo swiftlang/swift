@@ -273,6 +273,17 @@ private:
   /// the result.
   void recordCompletionOfAScope();
 
+  template <typename Fn> void runIfNotDoneYet(Fn fn) {
+    recordCompletionOfAScope();
+    if (!isFirstResultEnough())
+      fn();
+  }
+
+  template <typename Fn1, typename Fn2> void runIfNotDoneYet(Fn1 fn1, Fn2 fn2) {
+    runIfNotDoneYet(fn1);
+    runIfNotDoneYet(fn2);
+  }
+
 #pragma mark normal (non-ASTScope-based) lookup declarations
   
   void lookupOperatorInDeclContexts(DCAndUnresolvedIsCascadingUse);
@@ -334,6 +345,7 @@ private:
   bool isOutsideBodyOfFunction(const AbstractFunctionDecl *const AFD) const;
 
   void addGenericParametersHereAndInEnclosingScopes(DeclContext *dc);
+  void addGenericParametersHereAndInEnclosingScopes(GenericParamList *);
 
   /// Consume generic parameters
   void addGenericParametersForFunction(AbstractFunctionDecl *AFD);
@@ -508,26 +520,23 @@ void UnqualifiedLookupFactory::lookInScopeForASTScopeLookup(
   for (auto local : localBindings) {
     Consumer.foundDecl(local, getLocalDeclVisibilityKind(state.scope));
   }
-
-  recordCompletionOfAScope();
-  // If we found anything, we're done.
-  if (isFirstResultEnough())
-    return;
+  const bool inBody =
+      state.scope->getKind() == ASTScopeKind::AbstractFunctionBody &&
+      state.scope->getAbstractFunctionDecl()->getDeclContext()->isTypeContext();
 
   // When we are in the body of a method, get the 'self' declaration.
-  if (state.scope->getKind() == ASTScopeKind::AbstractFunctionBody &&
-      state.scope->getAbstractFunctionDecl()
-          ->getDeclContext()
-          ->isTypeContext()) {
-    lookInScopeForASTScopeLookup(
-        state.withSelfDC(state.scope->getAbstractFunctionDecl())
-            .withParentScope());
+  runIfNotDoneYet([&] {
+    if (inBody)
+      lookInScopeForASTScopeLookup(
+          state.withSelfDC(state.scope->getAbstractFunctionDecl())
+              .withParentScope());
+  });
+  if (inBody)
     return;
-  }
 
   // If there is a declaration context associated with this scope, we might
   // want to look in it.
-  lookIntoDeclarationContextForASTScopeLookup(state);
+  runIfNotDoneYet([&] { lookIntoDeclarationContextForASTScopeLookup(state); });
 }
 
 void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
@@ -610,11 +619,10 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
       ResultFinderForSelfsConformances(
           defaultNextState.selfDC ? defaultNextState.selfDC : scopeDC, scopeDC),
       isCascadingUseResult, baseNLOptions, scopeDC);
-  recordCompletionOfAScope();
-  if (isFirstResultEnough())
-    return;
   // Forget the 'self' declaration.
-  lookInScopeForASTScopeLookup(defaultNextState.withSelfDC(nullptr));
+  runIfNotDoneYet([&] {
+    lookInScopeForASTScopeLookup(defaultNextState.withSelfDC(nullptr));
+  });
 }
 
 #pragma mark context-based lookup definitions
@@ -664,22 +672,21 @@ void UnqualifiedLookupFactory::finishLookingInContext(
   // because the member could still be named by qualifying it. But there is no
   // corresponding way to qualify a generic parameter.
   // So, look for genrics first.
-  if (addGenericParameters == AddGenericParameters::Yes) {
+  if (addGenericParameters == AddGenericParameters::Yes)
     addGenericParametersHereAndInEnclosingScopes(lookupContextForThisContext);
-    if (isFirstResultEnough())
-      return;
-  }
-  if (resultFinderForSelfsConformances) {
-    findResultsAndSaveUnavailables(std::move(*resultFinderForSelfsConformances),
-                                   *isCascadingUse, baseNLOptions,
-                                   lookupContextForThisContext);
-    recordCompletionOfAScope();
-    if (isFirstResultEnough())
-      return;
-  }
-  // Recurse into the next context.
-  lookupNamesIntroducedBy(DCAndUnresolvedIsCascadingUse{
-      lookupContextForThisContext->getParentForLookup(), isCascadingUse});
+
+  runIfNotDoneYet(
+      [&] {
+        if (resultFinderForSelfsConformances)
+          findResultsAndSaveUnavailables(
+              std::move(*resultFinderForSelfsConformances), *isCascadingUse,
+              baseNLOptions, lookupContextForThisContext);
+      },
+      // Recurse into the next context.
+      [&] {
+        lookupNamesIntroducedBy(DCAndUnresolvedIsCascadingUse{
+            lookupContextForThisContext->getParentForLookup(), isCascadingUse});
+      });
 }
 
 void UnqualifiedLookupFactory::findResultsAndSaveUnavailables(
@@ -695,10 +702,11 @@ void UnqualifiedLookupFactory::lookupInModuleScopeContext(
     DeclContext *dc, Optional<bool> isCascadingUse) {
   if (auto SF = dyn_cast<SourceFile>(dc))
     lookForLocalVariablesIn(SF);
-  if (isFirstResultEnough())
-    return;
-  recordDependencyOnTopLevelName(dc, Name, isCascadingUse.getValueOr(true));
-  lookupNonlocalsInModuleScopeContext(dc);
+  runIfNotDoneYet([&] {
+    // TODO: why isn't the following line unconditional?
+    recordDependencyOnTopLevelName(dc, Name, isCascadingUse.getValueOr(true));
+    lookupNonlocalsInModuleScopeContext(dc);
+  });
 }
 
 void UnqualifiedLookupFactory::lookupNamesIntroducedByPatternBindingInitializer(
@@ -720,18 +728,17 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByPatternBindingInitializer(
       PatternBindingInitializer *PBI, ParamDecl *selfParam,
       Optional<bool> isCascadingUse) {
     Consumer.foundDecl(selfParam, DeclVisibilityKind::FunctionParameter);
-    recordCompletionOfAScope();
-    if (isFirstResultEnough())
-      return;
-    DeclContext *const patternContainer = PBI->getParent();
-    // clang-format off
-  finishLookingInContext(
-    AddGenericParameters::Yes,
-    patternContainer,
-    ResultFinderForSelfsConformances(PBI, patternContainer),
-    resolveIsCascadingUse(PBI, isCascadingUse,
-                         /*onlyCareAboutFunctionBody=*/false));
-    // clang-format on
+    runIfNotDoneYet([&] {
+      DeclContext *const patternContainer = PBI->getParent();
+      // clang-format off
+    finishLookingInContext(
+      AddGenericParameters::Yes,
+      patternContainer,
+      ResultFinderForSelfsConformances(PBI, patternContainer),
+      resolveIsCascadingUse(PBI, isCascadingUse,
+                           /*onlyCareAboutFunctionBody=*/false));
+      // clang-format on
+    });
 }
 
 void UnqualifiedLookupFactory::
@@ -784,61 +791,64 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByFunctionDecl(
 void UnqualifiedLookupFactory::lookupNamesIntroducedByMemberFunction(
     AbstractFunctionDecl *AFD, bool isCascadingUse) {
   lookForLocalVariablesIn(AFD, isCascadingUse);
-  if (isFirstResultEnough())
-    return;
-  // If we're inside a function context, we're about to move to
-  // the parent DC, so we have to check the function's generic
-  // parameters first.
-  addGenericParametersForFunction(AFD);
-  if (isFirstResultEnough())
-    return;
-  DeclContext *const fnDeclContext = AFD->getDeclContext();
-  // If we're not in the body of the function (for example, we
-  // might be type checking a default argument expression and
-  // performing name lookup from there), the base declaration
-  // is the nominal type, not 'self'.
-  DeclContext *const BaseDC = isOutsideBodyOfFunction(AFD) ? fnDeclContext : AFD;
-  // If we are inside of a method, check to see if there are any ivars in
-  // scope, and if so, whether this is a reference to one of them.
-  // FIXME: We should persist this information between lookups.
-  // clang-format off
-  finishLookingInContext(
-                         AddGenericParameters::Yes,
-                         AFD->getParent(),
-                         ResultFinderForSelfsConformances(BaseDC, fnDeclContext),
-                         isCascadingUse);
-  // clang-format on
+  runIfNotDoneYet(
+      [&] {
+        // If we're inside a function context, we're about to move to
+        // the parent DC, so we have to check the function's generic
+        // parameters first.
+        // Cannot start here in finishLookingInContext because AFD's
+        // getOuterParameters may be null even when AFD's parent has generics.
+        addGenericParametersForFunction(AFD);
+      },
+      [&] {
+        DeclContext *const fnDeclContext = AFD->getDeclContext();
+        // If we're not in the body of the function (for example, we
+        // might be type checking a default argument expression and
+        // performing name lookup from there), the base declaration
+        // is the nominal type, not 'self'.
+        DeclContext *const BaseDC =
+            isOutsideBodyOfFunction(AFD) ? fnDeclContext : AFD;
+        // If we are inside of a method, check to see if there are any ivars in
+        // scope, and if so, whether this is a reference to one of them.
+        // FIXME: We should persist this information between lookups.
+        // clang-format off
+      finishLookingInContext(
+                             AddGenericParameters::Yes,
+                             AFD->getParent(),
+                             ResultFinderForSelfsConformances(BaseDC, fnDeclContext),
+                             isCascadingUse);
+        // clang-format on
+      });
 }
 
 void UnqualifiedLookupFactory::lookupNamesIntroducedByPureFunction(
     AbstractFunctionDecl *AFD, bool isCascadingUse) {
   lookForLocalVariablesIn(AFD, isCascadingUse);
-  if (isFirstResultEnough())
-    return;
-  // clang-format off
-  finishLookingInContext(
-                         AddGenericParameters::Yes,
-                         AFD,
-                         None,
-                         isCascadingUse);
+  runIfNotDoneYet([&] {
+    // clang-format off
+    finishLookingInContext(
+                           AddGenericParameters::Yes,
+                           AFD,
+                           None,
+                           isCascadingUse);
+  });
 }
 
 
 void UnqualifiedLookupFactory::lookupNamesIntroducedByClosure(
     AbstractClosureExpr *ACE, Optional<bool> isCascadingUse) {
-  if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
+  if (auto *CE = dyn_cast<ClosureExpr>(ACE))
     lookForLocalVariablesIn(CE);
-    if (isFirstResultEnough())
-      return;
-  }
-  // clang-format off
-  finishLookingInContext(
-    AddGenericParameters::Yes,
-    ACE,
-    None,
-    resolveIsCascadingUse(ACE, isCascadingUse,
-                         /*onlyCareAboutFunctionBody=*/false));
-  // clang-format on
+  runIfNotDoneYet([&] {
+    // clang-format off
+    finishLookingInContext(
+      AddGenericParameters::Yes,
+      ACE,
+      None,
+      resolveIsCascadingUse(ACE, isCascadingUse,
+                           /*onlyCareAboutFunctionBody=*/false));
+    // clang-format on
+  });
 }
 
 template <typename NominalTypeDeclOrExtensionDecl>
@@ -894,14 +904,12 @@ void UnqualifiedLookupFactory::lookForLocalVariablesIn(
 
   namelookup::FindLocalVal localVal(SM, Loc, Consumer);
   localVal.visit(AFD->getBody());
-  recordCompletionOfAScope();
-  if (isFirstResultEnough())
-    return;
 
-  if (auto *P = AFD->getImplicitSelfDecl())
-    localVal.checkValueDecl(P, DeclVisibilityKind::FunctionParameter);
-  localVal.checkParameterList(AFD->getParameters());
-  recordCompletionOfAScope();
+  runIfNotDoneYet([&] {
+    if (auto *P = AFD->getImplicitSelfDecl())
+      localVal.checkValueDecl(P, DeclVisibilityKind::FunctionParameter);
+    localVal.checkParameterList(AFD->getParameters());
+  });
 }
 
 void UnqualifiedLookupFactory::lookForLocalVariablesIn(ClosureExpr *CE) {
@@ -912,12 +920,10 @@ void UnqualifiedLookupFactory::lookForLocalVariablesIn(ClosureExpr *CE) {
   namelookup::FindLocalVal localVal(SM, Loc, Consumer);
   if (auto body = CE->getBody())
     localVal.visit(body);
-  recordCompletionOfAScope();
-  if (isFirstResultEnough())
-    return;
-  if (auto params = CE->getParameters())
-    localVal.checkParameterList(params);
-  recordCompletionOfAScope();
+  runIfNotDoneYet([&] {
+    if (auto params = CE->getParameters())
+      localVal.checkParameterList(params);
+  });
 }
 
 void UnqualifiedLookupFactory::lookForLocalVariablesIn(SourceFile *SF) {
@@ -928,7 +934,6 @@ void UnqualifiedLookupFactory::lookForLocalVariablesIn(SourceFile *SF) {
   // local types.
   namelookup::FindLocalVal localVal(SM, Loc, Consumer);
   localVal.checkSourceFile(*SF);
-  recordCompletionOfAScope();
 }
 
 bool UnqualifiedLookupFactory::isOutsideBodyOfFunction(
@@ -956,16 +961,19 @@ void UnqualifiedLookupFactory::addGenericParametersHereAndInEnclosingScopes(
   // Generics can be nested, so visit the generic list, innermost first.
   // Cannot use DeclContext::forEachGenericContext because this code breaks out
   // if it finds a match and isFirstResultEnough()
-  for (GenericParamList *dcGenericParams = getGenericParams(dc);
-       dcGenericParams;
-       dcGenericParams = dcGenericParams->getOuterParameters()) {
-    namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-    localVal.checkGenericParams(dcGenericParams);
+  addGenericParametersHereAndInEnclosingScopes(getGenericParams(dc));
+}
 
-    recordCompletionOfAScope();
-    if (isFirstResultEnough())
-      break;
-  }
+void UnqualifiedLookupFactory::addGenericParametersHereAndInEnclosingScopes(
+    GenericParamList *dcGenericParams) {
+  if (!dcGenericParams)
+    return;
+  namelookup::FindLocalVal localVal(SM, Loc, Consumer);
+  localVal.checkGenericParams(dcGenericParams);
+  runIfNotDoneYet([&] {
+    addGenericParametersHereAndInEnclosingScopes(
+        dcGenericParams->getOuterParameters());
+  });
 }
 
 void UnqualifiedLookupFactory::addGenericParametersForFunction(
@@ -974,7 +982,6 @@ void UnqualifiedLookupFactory::addGenericParametersForFunction(
   if (GenericParams) {
     namelookup::FindLocalVal localVal(SM, Loc, Consumer);
     localVal.checkGenericParams(GenericParams);
-    recordCompletionOfAScope();
   }
 }
 
