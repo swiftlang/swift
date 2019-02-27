@@ -75,7 +75,8 @@ extension RangeReplaceableCollection {
     func append(
       into target: inout Self,
       contentsOf source: Self,
-      from index: inout Self.Index, count: Int) {
+      from index: inout Self.Index, count: Int
+    ) {
       let start = index
       source.formIndex(&index, offsetBy: count)
       target.append(contentsOf: source[start..<index])
@@ -96,14 +97,14 @@ extension RangeReplaceableCollection {
         enumeratedOriginals += origCount
         enumeratedInserts += 1
       }
-      assert(enumeratedOriginals <= self.count)
+      _internalInvariant(enumeratedOriginals <= self.count)
     }
     let origCount = self.count - enumeratedOriginals
     append(into: &result, contentsOf: self, from: &currentIndex, count: origCount)
 
-    assert(currentIndex == self.endIndex)
-    assert(enumeratedOriginals + origCount == self.count)
-    assert(result.count == self.count + enumeratedInserts - enumeratedRemoves)
+    _internalInvariant(currentIndex == self.endIndex)
+    _internalInvariant(enumeratedOriginals + origCount == self.count)
+    _internalInvariant(result.count == self.count + enumeratedInserts - enumeratedRemoves)
     return result
   }
 }
@@ -133,8 +134,7 @@ extension BidirectionalCollection {
     from other: C,
     by areEquivalent: (Element, C.Element) -> Bool
   ) -> CollectionDifference<Element>
-  where C.Element == Self.Element
-  {
+  where C.Element == Self.Element {
     var rawChanges: [CollectionDifference<Element>.Change] = []
 
     let source = _CountingIndexCollection(other)
@@ -198,7 +198,8 @@ extension BidirectionalCollection {
   fileprivate func _commonPrefix<Other: BidirectionalCollection>(
     with other: Other,
     by areEquivalent: (Element, Other.Element) -> Bool
-  ) -> (SubSequence, Other.SubSequence) where Element == Other.Element {
+  ) -> (SubSequence, Other.SubSequence)
+  where Element == Other.Element {
     let (s1, s2) = (startIndex, other.startIndex)
     let (e1, e2) = (endIndex, other.endIndex)
     var (i1, i2) = (s1, s2)
@@ -319,7 +320,7 @@ extension _CollectionChanges: RandomAccessCollection {
   }
 
   fileprivate subscript(position: Index) -> Element {
-    precondition((startIndex..<endIndex).contains(position))
+    _internalInvariant((startIndex..<endIndex).contains(position))
 
     let current = pathStorage[position + pathStartIndex]
     let next = pathStorage[position + pathStartIndex + 1]
@@ -500,13 +501,13 @@ fileprivate struct _SearchState<
   /// diagonal `k`.
   fileprivate subscript(d: Int, k: Int) -> Endpoint {
     get {
-      assert((-d...d).contains(k))
-      assert((d + k) % 2 == 0)
+      _internalInvariant((-d...d).contains(k))
+      _internalInvariant((d + k) % 2 == 0)
       return endpoints[d, (d + k) / 2]
     }
     set {
-      assert((-d...d).contains(k))
-      assert((d + k) % 2 == 0)
+      _internalInvariant((-d...d).contains(k))
+      _internalInvariant((d + k) % 2 == 0)
       endpoints[d, (d + k) / 2] = newValue
     }
   }
@@ -582,7 +583,7 @@ extension _SearchState {
     // *d* is the minimal number of inserted and removed elements). If there
     // are no consecutive removes or inserts and every remove or insert is
     // sandwiched between matches, the path will need `2 + d * 2` elements.
-    assert(d > 0, "Must be at least one difference between `a` and `b`")
+    _internalInvariant(d > 0, "Must be at least one difference between `a` and `b`")
     if d == 1 {
       endpoints.storage.append(pathEnd)
     }
@@ -737,11 +738,11 @@ fileprivate struct _LowerTriangularMatrix<Element> {
 
   fileprivate subscript(row: Int, column: Int) -> Element {
     get {
-      assert((0...row).contains(column))
+      _internalInvariant((0...row).contains(column))
       return storage[_triangularNumber(row) + column]
     }
     set {
-      assert((0...row).contains(column))
+      _internalInvariant((0...row).contains(column))
       storage[_triangularNumber(row) + column] = newValue
     }
   }

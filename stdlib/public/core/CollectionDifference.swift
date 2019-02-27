@@ -20,6 +20,7 @@ public struct CollectionDifference<ChangeElement> {
   /// each `remove` refers to the offset of its `element` in the original
   /// state. Non-`nil` values of `associatedWith` refer to the offset of the
   /// complementary change.
+  @_frozen
   public enum Change {
     case insert(offset: Int, element: ChangeElement, associatedWith: Int?)
     case remove(offset: Int, element: ChangeElement, associatedWith: Int?)
@@ -87,22 +88,22 @@ public struct CollectionDifference<ChangeElement> {
     var insertOffset = Set<Int>()
     var removeOffset = Set<Int>()
 
-    for c in changes {
-      let offset = c._offset
+    for change in changes {
+      let offset = change._offset
       if offset < 0 { return false }
 
-      switch c {
+      switch change {
       case .remove(_, _, _):
         if removeOffset.contains(offset) { return false }
         removeOffset.insert(offset)
       case .insert(_, _, _):
         if insertOffset.contains(offset) { return false }
         insertOffset.insert(offset)
-      }
+      } 
 
-      if let assoc = c._associatedOffset {
+      if let assoc = change._associatedOffset {
         if assoc < 0 { return false }
-        switch c {
+        switch change {
         case .remove(_, _, _):
           if removeOffsetToAssoc[offset] != nil { return false }
           removeOffsetToAssoc[offset] = assoc
@@ -137,7 +138,7 @@ public struct CollectionDifference<ChangeElement> {
   public init?<Changes: Collection>(
     _ changes: Changes
   ) where Changes.Element == Change {
-    if !CollectionDifference<ChangeElement>._validateChanges(changes) {
+    guard CollectionDifference<ChangeElement>._validateChanges(changes) else {
       return nil
     }
 
@@ -217,8 +218,10 @@ public struct CollectionDifference<ChangeElement> {
 extension CollectionDifference: Collection {
   public typealias Element = Change
 
-  public struct Index: Equatable, Hashable, Comparable {
+  @_fixed_layout
+  public struct Index {
     // Opaque index type is isomorphic to Int
+    @usableFromInline
     internal let _offset: Int
 
     internal init(_offset offset: Int) {
@@ -259,12 +262,32 @@ extension CollectionDifference: Collection {
 }
 
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
-extension CollectionDifference.Index { // Comparable
+extension CollectionDifference.Index: Equatable {
+  @inlinable
+  public static func == (
+    lhs: CollectionDifference.Index,
+    rhs: CollectionDifference.Index
+  ) -> Bool {
+    return lhs._offset == rhs._offset
+  }
+}
+
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
+extension CollectionDifference.Index: Comparable {
+  @inlinable
   public static func < (
     lhs: CollectionDifference.Index,
     rhs: CollectionDifference.Index
   ) -> Bool {
     return lhs._offset < rhs._offset
+  }
+}
+
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
+extension CollectionDifference.Index: Hashable {
+  @inlinable
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(_offset)
   }
 }
 
@@ -289,50 +312,50 @@ extension CollectionDifference where ChangeElement: Hashable {
   ///
   /// - Complexity: O(*n*) where *n* is `self.count`
   public func inferringMoves() -> CollectionDifference<ChangeElement> {
-    let removeDict: [ChangeElement:Int?] = {
-      var res = [ChangeElement:Int?](minimumCapacity: Swift.min(removals.count, insertions.count))
-      for r in removals {
-        let element = r._element
-        if res[element] != .none {
-          res[element] = .some(.none)
+    let uniqueRemovals: [ChangeElement:Int?] = {
+      var result = [ChangeElement:Int?](minimumCapacity: Swift.min(removals.count, insertions.count))
+      for removal in removals {
+        let element = removal._element
+        if result[element] != .none {
+          result[element] = .some(.none)
         } else {
-          res[element] = .some(r._offset)
+          result[element] = .some(removal._offset)
         }
       }
-      return res.filter { (_, v) -> Bool in v != .none }
+      return result.filter { (_, v) -> Bool in v != .none }
     }()
     
-    let insertDict: [ChangeElement:Int?] = {
-      var res = [ChangeElement:Int?](minimumCapacity: Swift.min(removals.count, insertions.count))
-      for i in insertions {
-        let element = i._element
-        if res[element] != .none {
-          res[element] = .some(.none)
+    let uniqueInsertions: [ChangeElement:Int?] = {
+      var result = [ChangeElement:Int?](minimumCapacity: Swift.min(removals.count, insertions.count))
+      for insertion in insertions {
+        let element = insertion._element
+        if result[element] != .none {
+          result[element] = .some(.none)
         } else {
-          res[element] = .some(i._offset)
+          result[element] = .some(insertion._offset)
         }
       }
-      return res.filter { (_, v) -> Bool in v != .none }
+      return result.filter { (_, v) -> Bool in v != .none }
     }()
 
-    return CollectionDifference(_validatedChanges: map({ (c: Change) -> Change in
-      switch c {
-      case .remove(offset: let o, element: let e, associatedWith: _):
-        if removeDict[e] == nil {
-          return c
+    return CollectionDifference(_validatedChanges: map({ (change: Change) -> Change in
+      switch change {
+      case .remove(offset: let offset, element: let element, associatedWith: _):
+        if uniqueRemovals[element] == nil {
+          return change
         }
-        if let assoc = insertDict[e] {
-          return .remove(offset: o, element: e, associatedWith: assoc)
+        if let assoc = uniqueInsertions[element] {
+          return .remove(offset: offset, element: element, associatedWith: assoc)
         }
-      case .insert(offset: let o, element: let e, associatedWith: _):
-        if insertDict[e] == nil {
-          return c
+      case .insert(offset: let offset, element: let element, associatedWith: _):
+        if uniqueInsertions[element] == nil {
+          return change
         }
-        if let assoc = removeDict[e] {
-          return .insert(offset: o, element: e, associatedWith: assoc)
+        if let assoc = uniqueRemovals[element] {
+          return .insert(offset: offset, element: element, associatedWith: assoc)
         }
       }
-      return c
+      return change
     }))
   }
 }
