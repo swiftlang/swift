@@ -1,13 +1,15 @@
 if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
    ("${SWIFT_HOST_VARIANT_ARCH}" STREQUAL "${SWIFT_PRIMARY_VARIANT_ARCH}"))
 
-  if(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
+  if("${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
+    # Do nothing
+  elseif(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
     if(NOT "${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
       message(FATAL_ERROR "Building the swift runtime is not supported with ${CMAKE_C_COMPILER_ID}. Use the just-built clang instead.")
-    else()
-      message(WARNING "Building the swift runtime using the host compiler, and not the just-built clang.")
     endif()
   else()
+    message(WARNING "Building the swift runtime using the host compiler, and not the just-built clang.")
+
     # If we use Clang-cl or MSVC, CMake provides default compiler and linker flags that are incompatible
     # with the frontend of Clang or Clang++.
     if(SWIFT_COMPILER_IS_MSVC_LIKE)
