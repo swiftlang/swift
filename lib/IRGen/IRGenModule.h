@@ -348,6 +348,7 @@ public:
   /// non-public types as well as imported types, except for classes and
   /// protocols which are always emitted eagerly.
   bool hasLazyMetadata(NominalTypeDecl *type);
+  bool hasLazyMetadata(OpaqueTypeDecl *type);
 
   /// Emit everything which is reachable from already emitted IR.
   void emitLazyDefinitions();
@@ -1188,6 +1189,8 @@ public:
   void emitStructDecl(StructDecl *D);
   void emitClassDecl(ClassDecl *D);
   void emitExtension(ExtensionDecl *D);
+  void emitFuncDecl(FuncDecl *D);
+  void emitOpaqueTypeDecl(OpaqueTypeDecl *D);
   void emitSILGlobalVariable(SILGlobalVariable *gv);
   void emitCoverageMapping();
   void emitSILFunction(SILFunction *f);
