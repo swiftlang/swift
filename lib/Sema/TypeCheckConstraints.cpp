@@ -558,6 +558,17 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
 //                                 ->getSelfTypeInContext()
 //                                 //->getDeclaredInterfaceType()
 //                                 , Context)));
+//        return new (Context) TypeExpr(TypeLoc::withoutLoc(
+//            DC->getInnermostTypeContext()
+//                                 ->getSelfTypeInContext()));
+
+//        Type SelfType = DC->getInnermostTypeContext()->getSelfInterfaceType();
+//        if (ClassType::classof(SelfType.getPointer()))
+//          SelfType = DynamicSelfType::get(SelfType, Context);
+//        return new (Context) TypeExpr(TypeLoc(new (Context)
+//                FixedTypeRepr(DC//->getInnermostTypeContext()
+//                              ->mapTypeIntoContext(SelfType), Loc)));
+
         auto selfs = lookupUnqualified(DC, Context.Id_self, Loc, lookupOptions);
         if (!selfs.empty()) {
           ValueDecl *D = selfs.front().getValueDecl();
