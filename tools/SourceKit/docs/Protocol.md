@@ -717,7 +717,6 @@ type checking and the necessary compiler arguments to help resolve all dependenc
 ### Response
 ```
 {
-    <key.printedtypebuffer>:          (string)                    // A text buffer where all expression types are printed to.
     <key.expression_type_list>:       (array) [expr-type-info*]   // A list of expression and type
 }
 ```
@@ -727,8 +726,7 @@ expr-type-info ::=
 {
   <key.expression_offset>:    (int64)    // Offset of an expression in the source file
   <key.expression_length>:    (int64)    // Length of an expression in the source file
-  <key.type_offset>:          (int64)    // Offset of the printed type of the expression in the printed type buffer
-  <key.type_length>:          (int64)    // Length of the printed type of the expression in the printed type buffer
+  <key.expression_type>:      (string)   // Printed type of this expression
 }
 ```
 
