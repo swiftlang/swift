@@ -430,14 +430,27 @@ public:
            "failed to finish MetadataDependencyCollector");
   }
 
-  /// Check the dependency.  This takes a metadata and state separately
-  /// instead of taking a MetadataResponse because it's quite important
-  /// that we not rely on anything from MetadataResponse that might assume
-  /// that we've already done dependency collection.
+  /// Given the result of fetching metadata, check whether it creates a
+  /// metadata dependency, and branch if so.
+  ///
+  /// This takes a metadata and state separately instead of taking a
+  /// MetadataResponse pair because it's quite important that we not rely on
+  /// anything from MetadataResponse that might assume that we've already
+  /// done dependency collection.
   void checkDependency(IRGenFunction &IGF, DynamicMetadataRequest request,
                        llvm::Value *metadata, llvm::Value *state);
 
+  /// Given an optional MetadataDependency value (e.g. the result of calling
+  /// a dependency-returning function, in which a dependency is signalled
+  /// by a non-null metadata value), check whether it indicates a dependency
+  /// and branch if so.
+  void collect(IRGenFunction &IGF, llvm::Value *dependencyPair);
+
   MetadataDependency finish(IRGenFunction &IGF);
+
+private:
+  void emitCheckBranch(IRGenFunction &IGF, llvm::Value *satisfied,
+                       llvm::Value *metadata, llvm::Value *requiredState);
 };
 
 enum class MetadataAccessStrategy {

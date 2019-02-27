@@ -166,6 +166,15 @@ protected:
   using DiagInReference = Diag<DescriptiveDeclKind, DeclName, Type, Type, Type>;
   using DiagAsNote = Diag<Type, Type, Type, Type, StringRef>;
 
+  /// If this failure associated with one of the conditional requirements,
+  /// this field would represent conformance where requirement comes from.
+  const ProtocolConformance *Conformance = nullptr;
+
+  /// The source of the requirement, if available. One exception
+  /// is failure associated with conditional requirement where
+  /// underlying conformance is specialized.
+  const GenericSignature *Signature;
+
   const ValueDecl *AffectedDecl;
   /// If possible, find application expression associated
   /// with current generic requirement failure, that helps
@@ -175,22 +184,26 @@ protected:
 public:
   RequirementFailure(ConstraintSystem &cs, Expr *expr, RequirementKind kind,
                      ConstraintLocator *locator)
-      : FailureDiagnostic(expr, cs, locator), AffectedDecl(getDeclRef()) {
+      : FailureDiagnostic(expr, cs, locator),
+        Conformance(getConformanceForConditionalReq(locator)),
+        Signature(getSignature(locator)), AffectedDecl(getDeclRef()) {
     assert(locator);
+    assert(isConditional() || Signature);
     assert(AffectedDecl);
 
     auto path = locator->getPath();
     assert(!path.empty());
 
     auto &last = path.back();
-    assert(last.getKind() == ConstraintLocator::TypeParameterRequirement);
+    assert(last.isTypeParameterRequirement() ||
+           last.isConditionalRequirement());
     assert(static_cast<RequirementKind>(last.getValue2()) == kind);
 
     // It's possible sometimes not to have no base expression.
     if (!expr)
       return;
 
-    if (auto *parentExpr = findParentExpr(getAnchor()))
+    if (auto *parentExpr = findParentExpr(getRawAnchor()))
       Apply = dyn_cast<ApplyExpr>(parentExpr);
   }
 
@@ -199,7 +212,8 @@ public:
     assert(!path.empty());
 
     auto &requirementLoc = path.back();
-    assert(requirementLoc.getKind() == PathEltKind::TypeParameterRequirement);
+    assert(requirementLoc.isTypeParameterRequirement() ||
+           requirementLoc.isConditionalRequirement());
     return requirementLoc.getValue();
   }
 
@@ -219,6 +233,13 @@ public:
   bool diagnoseAsNote() override;
 
 protected:
+  /// Determine whether this is a conditional requirement failure.
+  bool isConditional() const { return bool(Conformance); }
+
+  /// Check whether this requirement comes from the contextual type
+  /// that root expression is coerced/converted into.
+  bool isFromContextualType() const;
+
   /// Retrieve declaration contextual where current
   /// requirement has been introduced.
   const DeclContext *getRequirementDC() const;
@@ -230,12 +251,38 @@ protected:
   /// Determine whether it would be possible to diagnose
   /// current requirement failure.
   bool canDiagnoseFailure() const {
+    // If this is a conditional requirement failure,
+    // we have a lot more information compared to
+    // type requirement case, because we know that
+    // underlying conformance requirement matched.
+    if (isConditional())
+      return true;
+
+    auto *anchor = getAnchor();
+    // In the situations like this:
+    //
+    // ```swift
+    // enum E<T: P> { case foo(T) }
+    // let _: E = .foo(...)
+    // ```
+    //
+    // `E` is going to be opened twice. First, when
+    // it's used as a contextual type, and when `E.foo`
+    // is found and its function type is opened.
+    // We still want to record both fixes but should
+    // avoid diagnosing the same problem multiple times.
+    if (isa<UnresolvedMemberExpr>(anchor)) {
+      auto path = getLocator()->getPath();
+      if (path.front().getKind() != ConstraintLocator::UnresolvedMember)
+        return false;
+    }
+
     // For static/initializer calls there is going to be
     // a separate fix, attached to the argument, which is
     // much easier to diagnose.
     // For operator calls we can't currently produce a good
     // diagnostic, so instead let's refer to expression diagnostics.
-    return !(Apply && (isOperator(Apply) || isa<TypeExpr>(getAnchor())));
+    return !(Apply && (isOperator(Apply) || isa<TypeExpr>(anchor)));
   }
 
   static bool isOperator(const ApplyExpr *apply) {
@@ -247,7 +294,19 @@ private:
   /// Retrieve declaration associated with failing generic requirement.
   ValueDecl *getDeclRef() const;
 
-  void emitRequirementNote(const Decl *anchor) const;
+  /// Retrieve generic signature where this parameter originates from.
+  GenericSignature *getSignature(ConstraintLocator *locator);
+
+  void emitRequirementNote(const Decl *anchor, Type lhs, Type rhs) const;
+
+  /// Determine whether given declaration represents a static
+  /// or instance property/method, excluding operators.
+  static bool isStaticOrInstanceMember(const ValueDecl *decl);
+
+  /// If this is a failure in conditional requirement, retrieve
+  /// conformance information.
+  ProtocolConformance *
+  getConformanceForConditionalReq(ConstraintLocator *locator);
 };
 
 /// Diagnostics for failed conformance checks originating from
@@ -384,9 +443,9 @@ class LabelingFailure final : public FailureDiagnostic {
   ArrayRef<Identifier> CorrectLabels;
 
 public:
-  LabelingFailure(ConstraintSystem &cs, ConstraintLocator *locator,
+  LabelingFailure(Expr *root, ConstraintSystem &cs, ConstraintLocator *locator,
                   ArrayRef<Identifier> labels)
-      : FailureDiagnostic(nullptr, cs, locator), CorrectLabels(labels) {}
+      : FailureDiagnostic(root, cs, locator), CorrectLabels(labels) {}
 
   bool diagnoseAsError() override;
 };
@@ -703,6 +762,89 @@ public:
   PartialApplicationFailure(Expr *root, bool warning, ConstraintSystem &cs,
                             ConstraintLocator *locator)
       : FailureDiagnostic(root, cs, locator), CompatibilityWarning(warning) {}
+
+  bool diagnoseAsError() override;
+};
+
+class InvalidInitRefFailure : public FailureDiagnostic {
+protected:
+  Type BaseType;
+  const ConstructorDecl *Init;
+  SourceRange BaseRange;
+
+  InvalidInitRefFailure(Expr *root, ConstraintSystem &cs, Type baseTy,
+                        const ConstructorDecl *init, SourceRange baseRange,
+                        ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), BaseType(baseTy), Init(init),
+        BaseRange(baseRange) {}
+
+public:
+  bool diagnoseAsError() override = 0;
+};
+
+/// Diagnose an attempt to construct an object of class type with a metatype
+/// value without using 'required' initializer:
+///
+/// ```swift
+///  class C {
+///    init(value: Int) {}
+///  }
+///
+///  func make<T: C>(type: T.Type) -> T {
+///    return T.init(value: 42)
+///  }
+/// ```
+class InvalidDynamicInitOnMetatypeFailure final : public InvalidInitRefFailure {
+public:
+  InvalidDynamicInitOnMetatypeFailure(Expr *root, ConstraintSystem &cs,
+                                      Type baseTy, const ConstructorDecl *init,
+                                      SourceRange baseRange,
+                                      ConstraintLocator *locator)
+      : InvalidInitRefFailure(root, cs, baseTy, init, baseRange, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an attempt to call initializer on protocol metatype:
+///
+/// ```swift
+///  protocol P {
+///    init(value: Int)
+///  }
+///
+///  func make(type: P.Type) -> P {
+///    return type.init(value: 42)
+///  }
+/// ```
+class InitOnProtocolMetatypeFailure final : public InvalidInitRefFailure {
+  bool IsStaticallyDerived;
+
+public:
+  InitOnProtocolMetatypeFailure(Expr *root, ConstraintSystem &cs, Type baseTy,
+                                const ConstructorDecl *init,
+                                bool isStaticallyDerived, SourceRange baseRange,
+                                ConstraintLocator *locator)
+      : InvalidInitRefFailure(root, cs, baseTy, init, baseRange, locator),
+        IsStaticallyDerived(isStaticallyDerived) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an attempt to construct an instance using non-constant
+/// metatype base without explictly specifying `init`:
+///
+/// ```swift
+/// let foo = Int.self
+/// foo(0) // should be `foo.init(0)`
+/// ```
+class ImplicitInitOnNonConstMetatypeFailure final
+    : public InvalidInitRefFailure {
+public:
+  ImplicitInitOnNonConstMetatypeFailure(Expr *root, ConstraintSystem &cs,
+                                        Type baseTy,
+                                        const ConstructorDecl *init,
+                                        ConstraintLocator *locator)
+      : InvalidInitRefFailure(root, cs, baseTy, init, SourceRange(), locator) {}
 
   bool diagnoseAsError() override;
 };

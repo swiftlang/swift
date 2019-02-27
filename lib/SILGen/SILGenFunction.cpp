@@ -97,6 +97,9 @@ DeclName SILGenModule::getMagicFunctionName(DeclContext *dc) {
     assert(e->getExtendedNominal() && "extension for nonnominal");
     return e->getExtendedNominal()->getName();
   }
+  if (auto EED = dyn_cast<EnumElementDecl>(dc)) {
+    return EED->getFullName();
+  }
   llvm_unreachable("unexpected #function context");
 }
 
@@ -115,7 +118,7 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
   case SILDeclRef::Kind::GlobalAccessor:
     return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
   case SILDeclRef::Kind::DefaultArgGenerator:
-    return getMagicFunctionName(cast<AbstractFunctionDecl>(ref.getDecl()));
+    return getMagicFunctionName(cast<DeclContext>(ref.getDecl()));
   case SILDeclRef::Kind::StoredPropertyInitializer:
     return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
   case SILDeclRef::Kind::IVarInitializer:

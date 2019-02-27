@@ -4,10 +4,14 @@
 
 import StdlibUnittest
 import SwiftPrivateThreadExtras
-#if os(OSX) || os(iOS)
-import Darwin
-#elseif os(Linux)
-import Glibc
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+  import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+  import Glibc
+#elseif os(Windows)
+  import MSVCRT
+#else
+#error("Unsupported platform")
 #endif
 
 

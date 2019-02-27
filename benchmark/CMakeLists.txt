@@ -58,7 +58,6 @@ set(SWIFT_BENCH_MODULES
     single-source/ClassArrayGetter
     single-source/Codable
     single-source/Combos
-    single-source/CountAlgo
     single-source/DataBenchmarks
     single-source/DeadArray
     single-source/DictOfArraysToArrayOfDicts
@@ -90,7 +89,6 @@ set(SWIFT_BENCH_MODULES
     single-source/FloatingPointPrinting
     single-source/Hanoi
     single-source/Hash
-    single-source/HashQuadratic
     single-source/Histogram
     single-source/InsertCharacter  
     single-source/Integrate

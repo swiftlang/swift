@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "alloc-stack-hoisting"
 
 #include "swift/IRGen/IRGenSILPasses.h"
+#include "swift/AST/Availability.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -61,7 +62,8 @@ static bool isHoistable(AllocStackInst *Inst, irgen::IRGenModule &Mod) {
   bool foundWeaklyImported =
       SILTy.getASTType().findIf([&Mod](CanType type) -> bool {
         if (auto nominal = type->getNominalOrBoundGenericNominal())
-          if (nominal->isWeakImported(Mod.getSILModule().getSwiftModule())) {
+          if (nominal->isWeakImported(Mod.getSwiftModule(),
+                                      Mod.getAvailabilityContext())) {
             return true;
           }
         return false;

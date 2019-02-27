@@ -25,6 +25,7 @@
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/ImmutableSet.h"
 #include "llvm/ADT/Statistic.h"
@@ -768,6 +769,7 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
 
   SmallVector<ParameterConvention, 16> CapturedArgConventions;
   SmallVector<SILValue, 32> FullArgs;
+  bool needUpdateStackNesting = false;
 
   // Visiting blocks in reverse order avoids revisiting instructions after block
   // splitting, which would be quadratic.
@@ -886,6 +888,8 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
         closureCleanup.recordDeadFunction(I);
       });
 
+      needUpdateStackNesting |= Inliner.needsUpdateStackNesting(InnerAI);
+
       // Inlining deletes the apply, and can introduce multiple new basic
       // blocks. After this, CalleeValue and other instructions may be invalid.
       // nextBB will point to the last inlined block
@@ -905,6 +909,11 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
       break;
     }
   }
+
+  if (needUpdateStackNesting) {
+    StackNesting().correctStackNesting(F);
+  }
+
   // Keep track of full inlined functions so we don't waste time recursively
   // reprocessing them.
   FullyInlinedSet.insert(F);

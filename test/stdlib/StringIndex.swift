@@ -19,6 +19,7 @@ let simpleStrings: [String] = [
     SimpleString.largeASCII.rawValue,
     SimpleString.largeUnicode.rawValue,
     SimpleString.emoji.rawValue,
+    "",
 ]
 
 StringIndexTests.test("basic sanity checks") {
@@ -130,5 +131,77 @@ StringIndexTests.test("interchange") {
     validateIndices(s)
   }
 }
+
+StringIndexTests.test("UTF-16 Offsets") {
+  func validateOffsets(_ s: String) {
+    let end = s.endIndex
+    let utf16Count = s.utf16.count
+
+    expectEqual(end, String.Index(utf16Offset: utf16Count, in: s))
+    expectEqual(end, String.Index(utf16Offset: utf16Count, in: s[...]))
+
+    let pastEnd = String.Index(utf16Offset: utf16Count+1, in: s)
+
+    expectNotEqual(end, pastEnd)
+    expectEqual(pastEnd, String.Index(utf16Offset: utf16Count+1, in: s[...]))
+    expectEqual(pastEnd, String.Index(utf16Offset: utf16Count+2, in: s))
+    expectEqual(pastEnd, String.Index(utf16Offset: -1, in: s))
+    expectEqual(
+      pastEnd, String.Index(utf16Offset: Swift.max(1, utf16Count), in: s.dropFirst()))
+
+    let utf16Indices = Array(s.utf16.indices)
+    expectEqual(utf16Count, utf16Indices.count)
+    for i in 0..<utf16Indices.count {
+      let idx = String.Index(utf16Offset: i, in: s)
+      expectEqual(utf16Indices[i], idx)
+      expectEqual(i, idx.utf16Offset(in: s))
+      expectEqual(i, idx.utf16Offset(in: s[...]))
+
+      if i < s.dropLast().utf16.count {
+        expectEqual(
+          utf16Indices[i], String.Index(utf16Offset: i, in: s.dropLast()))
+        expectEqual(i, idx.utf16Offset(in: s.dropLast()))
+      } else if i == s.dropLast().utf16.count {
+        expectEqual(
+          utf16Indices[i], String.Index(utf16Offset: i, in: s.dropLast()))
+      } else {
+        expectNotEqual(
+          utf16Indices[i], String.Index(utf16Offset: i, in: s.dropLast()))
+      }
+    }
+  }
+
+  for s in simpleStrings {
+    validateOffsets(s)
+  }
+}
+
+func swift5ScalarAlign(_ idx: String.Index, in str: String) -> String.Index {
+  var idx = idx
+  while str.utf8[idx] & 0xC0 == 0x80 { str.utf8.formIndex(before: &idx) }
+  return idx
+}
+
+StringIndexTests.test("Scalar Align UTF-8 indices") {
+  // TODO: Test a new aligning API when we add it. For now, we
+  // test scalar-aligning UTF-8 indices
+
+  let str = "a😇"
+  let subScalarIdx = str.utf8.index(str.utf8.startIndex, offsetBy: 2)
+
+  let roundedIdx = swift5ScalarAlign(subScalarIdx, in: str)
+  expectEqual(1, roundedIdx.utf16Offset(in: str))
+
+  let roundedIdx2 = str.utf8[...subScalarIdx].lastIndex { $0 & 0xC0 != 0x80 }
+  expectEqual(roundedIdx, roundedIdx)
+
+  var roundedIdx3 = subScalarIdx
+  while roundedIdx3.samePosition(in: str.unicodeScalars) == nil {
+    str.utf8.formIndex(before: &roundedIdx3)
+  }
+  expectEqual(roundedIdx, roundedIdx3)
+}
+
+
 
 runAllTests()

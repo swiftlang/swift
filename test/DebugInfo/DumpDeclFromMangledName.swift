@@ -19,7 +19,7 @@
 // INVALID-DECL: patatino does not exist, exiting.
 
 // RUN: not %lldb-moduleimport-test %t/DeclReconstr \
-// RUN:   --type-from-mangled-old=patatino 2>&1 | \
+// RUN:   --type-from-mangled=patatino 2>&1 | \
 // RUN:   %FileCheck %s --check-prefix=INVALID-TYPE
 // INVALID-TYPE: patatino does not exist, exiting.
 

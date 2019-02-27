@@ -1058,7 +1058,9 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   }
 
   for (auto const &dep : options.Dependencies) {
-    FileDependency.emit(ScratchRecord, dep.Size, dep.Hash, dep.Path);
+    FileDependency.emit(ScratchRecord, dep.Size,
+                        dep.ModificationTime,
+                        dep.Path);
   }
 
   SmallVector<ModuleDecl::ImportedModule, 8> allImports;
@@ -2664,7 +2666,16 @@ void Serializer::writeDecl(const Decl *D) {
   (void)id;
 
   assert((id - 1) == DeclOffsets.size());
+  assert((TypeOffsets.empty() || TypeOffsets.back() != Out.GetCurrentBitNo()) &&
+         "encoding Decl and Type to the same offset");
   DeclOffsets.push_back(Out.GetCurrentBitNo());
+  SWIFT_DEFER {
+    // This is important enough to leave on in Release builds.
+    if (DeclOffsets.back() == Out.GetCurrentBitNo()) {
+      llvm::PrettyStackTraceString message("failed to serialize anything");
+      abort();
+    }
+  };
 
   assert(!D->isInvalid() && "cannot create a module with an invalid decl");
   if (isDeclXRef(D)) {
@@ -2760,8 +2771,7 @@ void Serializer::writeDecl(const Decl *D) {
     (void)addDeclRef(baseNominal);
 
     auto conformances = extension->getLocalConformances(
-                          ConformanceLookupKind::All,
-                          nullptr, /*sorted=*/true);
+                          ConformanceLookupKind::All, nullptr);
 
     SmallVector<TypeID, 8> inheritedAndDependencyTypes;
     for (auto inherited : extension->getInherited()) {
@@ -3016,8 +3026,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(theStruct->getDeclContext());
 
     auto conformances = theStruct->getLocalConformances(
-                          ConformanceLookupKind::All,
-                          nullptr, /*sorted=*/true);
+                          ConformanceLookupKind::All, nullptr);
 
     SmallVector<TypeID, 4> inheritedTypes;
     for (auto inherited : theStruct->getInherited()) {
@@ -3054,8 +3063,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(theEnum->getDeclContext());
 
     auto conformances = theEnum->getLocalConformances(
-                          ConformanceLookupKind::All,
-                          nullptr, /*sorted=*/true);
+                          ConformanceLookupKind::All, nullptr);
 
     SmallVector<TypeID, 4> inheritedAndDependencyTypes;
     for (auto inherited : theEnum->getInherited()) {
@@ -3109,8 +3117,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(theClass->getDeclContext());
 
     auto conformances = theClass->getLocalConformances(
-                          ConformanceLookupKind::All,
-                          nullptr, /*sorted=*/true);
+                          ConformanceLookupKind::All, nullptr);
 
     SmallVector<TypeID, 4> inheritedTypes;
     for (auto inherited : theClass->getInherited()) {
@@ -3284,7 +3291,7 @@ void Serializer::writeDecl(const Decl *D) {
     Type ty = fn->getInterfaceType();
     for (auto dependency : collectDependenciesFromType(ty->getCanonicalType()))
       nameComponentsAndDependencies.push_back(addTypeRef(dependency));
-
+    
     FuncLayout::emitRecord(Out, ScratchRecord, abbrCode,
                            contextID,
                            fn->isImplicit(),
@@ -3321,7 +3328,7 @@ void Serializer::writeDecl(const Decl *D) {
 
     break;
   }
-
+      
   case DeclKind::Accessor: {
     auto fn = cast<AccessorDecl>(D);
     verifyAttrSerializable(fn);
@@ -3675,14 +3682,23 @@ static TypeAliasDecl *findTypeAliasForBuiltin(ASTContext &Ctx, Type T) {
 
 void Serializer::writeType(Type ty) {
   using namespace decls_block;
+  PrettyStackTraceType traceRAII(ty->getASTContext(), "serializing", ty);
 
   auto id = DeclAndTypeIDs[ty];
   assert(id != 0 && "type not referenced properly");
   (void)id;
 
   assert((id - 1) == TypeOffsets.size());
-
+  assert((DeclOffsets.empty() || DeclOffsets.back() != Out.GetCurrentBitNo()) &&
+         "encoding Decl and Type to the same offset");
   TypeOffsets.push_back(Out.GetCurrentBitNo());
+  SWIFT_DEFER {
+    // This is important enough to leave on in Release builds.
+    if (TypeOffsets.back() == Out.GetCurrentBitNo()) {
+      llvm::PrettyStackTraceString message("failed to serialize anything");
+      abort();
+    }
+  };
 
   switch (ty->getKind()) {
   case TypeKind::Error:
@@ -3802,28 +3818,38 @@ void Serializer::writeType(Type ty) {
                                       addTypeRef(dynamicSelfTy->getSelfType()));
     break;
   }
-
-  case TypeKind::PrimaryArchetype:
-  case TypeKind::NestedArchetype: {
-    auto archetypeTy = cast<ArchetypeType>(ty.getPointer());
-
-    auto env = archetypeTy->getPrimary()->getGenericEnvironment();
-    assert(env && "Primary archetype without generic environment?");
+      
+  case TypeKind::PrimaryArchetype: {
+    auto archetypeTy = cast<PrimaryArchetypeType>(ty.getPointer());
+    auto env = archetypeTy->getGenericEnvironment();
 
     GenericEnvironmentID envID = addGenericEnvironmentRef(env);
-    Type interfaceType = archetypeTy->getInterfaceType();
+    auto interfaceType = archetypeTy->getInterfaceType()
+      ->castTo<GenericTypeParamType>();
 
-    unsigned abbrCode = DeclTypeAbbrCodes[ArchetypeTypeLayout::Code];
-    ArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    envID, addTypeRef(interfaceType));
+    unsigned abbrCode = DeclTypeAbbrCodes[PrimaryArchetypeTypeLayout::Code];
+    PrimaryArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                           envID,
+                                           interfaceType->getDepth(),
+                                           interfaceType->getIndex());
     break;
   }
 
   case TypeKind::OpenedArchetype: {
     auto archetypeTy = cast<OpenedArchetypeType>(ty.getPointer());
-    unsigned abbrCode = DeclTypeAbbrCodes[OpenedExistentialTypeLayout::Code];
-    OpenedExistentialTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+    unsigned abbrCode = DeclTypeAbbrCodes[OpenedArchetypeTypeLayout::Code];
+    OpenedArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                            addTypeRef(archetypeTy->getOpenedExistentialType()));
+    break;
+  }
+
+  case TypeKind::NestedArchetype: {
+    auto archetypeTy = cast<NestedArchetypeType>(ty.getPointer());
+    auto rootTypeID = addTypeRef(archetypeTy->getRoot());
+    auto interfaceTypeID = addTypeRef(archetypeTy->getInterfaceType());
+    unsigned abbrCode = DeclTypeAbbrCodes[NestedArchetypeTypeLayout::Code];
+    NestedArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                          rootTypeID, interfaceTypeID);
     break;
   }
 
@@ -4081,7 +4107,9 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<FunctionParamLayout>();
   registerDeclTypeAbbr<MetatypeTypeLayout>();
   registerDeclTypeAbbr<ExistentialMetatypeTypeLayout>();
-  registerDeclTypeAbbr<ArchetypeTypeLayout>();
+  registerDeclTypeAbbr<PrimaryArchetypeTypeLayout>();
+  registerDeclTypeAbbr<OpenedArchetypeTypeLayout>();
+  registerDeclTypeAbbr<NestedArchetypeTypeLayout>();
   registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
   registerDeclTypeAbbr<BoundGenericTypeLayout>();
   registerDeclTypeAbbr<GenericFunctionTypeLayout>();
@@ -4094,7 +4122,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<UnboundGenericTypeLayout>();
   registerDeclTypeAbbr<OptionalTypeLayout>();
   registerDeclTypeAbbr<DynamicSelfTypeLayout>();
-  registerDeclTypeAbbr<OpenedExistentialTypeLayout>();
 
   registerDeclTypeAbbr<TypeAliasLayout>();
   registerDeclTypeAbbr<GenericTypeParamTypeLayout>();

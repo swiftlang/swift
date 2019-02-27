@@ -99,3 +99,7 @@ ${node.name} ${node.name}::with${child.name}(
 
 %   end
 % end
+
+const char* swift::syntax::getSyntaxStructureVersioningIdentifier() {
+  return "${calculate_node_hash()}";
+}

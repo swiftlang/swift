@@ -2100,7 +2100,9 @@ TypeDecl *EquivalenceClass::lookupNestedType(
   // Infer same-type constraints among same-named associated type anchors.
   if (assocTypeAnchors.size() > 1) {
     auto anchorType = getAnchor(builder, builder.getGenericParams());
-    auto inferredSource = FloatingRequirementSource::forInferred(nullptr);
+    auto inferredSource =
+      FloatingRequirementSource::forNestedTypeNameMatch(
+        assocTypeAnchors.front()->getName());
     for (auto assocType : assocTypeAnchors) {
       if (assocType == bestAssocType) continue;
 
@@ -2809,6 +2811,8 @@ static void concretizeNestedTypeFromConcreteParent(
         ->getTypeWitness(assocType, builder.getLazyResolver());
     if (!witnessType || witnessType->hasError())
       return; // FIXME: should we delay here?
+  } else if (auto archetype = concreteParent->getAs<ArchetypeType>()) {
+    witnessType = archetype->getNestedType(assocType->getName());
   } else {
     witnessType = DependentMemberType::get(concreteParent, assocType);
   }
@@ -2900,7 +2904,7 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
 
 void ArchetypeType::resolveNestedType(
                                     std::pair<Identifier, Type> &nested) const {
-  auto genericEnv = getPrimary()->getGenericEnvironment();
+  auto genericEnv = getGenericEnvironment();
   auto &builder = *genericEnv->getGenericSignatureBuilder();
 
   Type interfaceType = getInterfaceType();
@@ -3884,7 +3888,7 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
   }
 
   // The equivalence class of a dependent member type is determined by its
-  // base equivalence class.
+  // base equivalence class, if there is one.
   if (auto depMemTy = type->getAs<DependentMemberType>()) {
     // Find the equivalence class of the base.
     auto resolvedBase =
@@ -3892,6 +3896,9 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
                                    resolutionKind,
                                    wantExactPotentialArchetype);
     if (!resolvedBase) return resolvedBase;
+    // If the base is concrete, so is this member.
+    if (resolvedBase.getAsConcreteType())
+      return ResolvedType::forConcrete(type);
 
     // Find the nested type declaration for this.
     auto baseEquivClass = resolvedBase.getEquivalenceClass(*this);
@@ -4629,8 +4636,14 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
                         ->getDependentType(getGenericParams());
 
       Impl->HadAnyError = true;
-      Diags.diagnose(source.getLoc(), diag::requires_conformance_nonprotocol,
-                     subjectType, constraintType);
+      
+      if (subjectType->is<DependentMemberType>()) {
+        subjectType = resolveDependentMemberTypes(*this, subjectType);
+      }
+
+      auto invalidConstraint = Constraint<Type>(
+          {subject, constraintType, source.getSource(*this, subjectType)});
+      invalidIsaConstraints.push_back(invalidConstraint);
     }
 
     return ConstraintResult::Conflicting;
@@ -4732,7 +4745,8 @@ void GenericSignatureBuilder::addedNestedType(PotentialArchetype *nestedPA) {
   if (allNested.size() > 1) {
     auto firstPA = allNested.front();
     auto inferredSource =
-      FloatingRequirementSource::forInferred(nullptr);
+      FloatingRequirementSource::forNestedTypeNameMatch(
+        nestedPA->getNestedName());
 
     addSameTypeRequirement(firstPA, nestedPA, inferredSource,
                            UnresolvedHandlingKind::GenerateConstraints);
@@ -5749,6 +5763,43 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
         break;
       }
     }
+  }
+  
+  // Emit a diagnostic if we recorded any constraints where the constraint
+  // type was not constrained to a protocol or class. Provide a fix-it if
+  // allowConcreteGenericParams is true or the subject type is a member type.
+  if (!invalidIsaConstraints.empty()) {
+    for (auto constraint : invalidIsaConstraints) {
+      auto subjectType = constraint.getSubjectDependentType(getGenericParams());
+      auto constraintType = constraint.value;
+      auto source = constraint.source;
+      auto loc = source->getLoc();
+
+      Diags.diagnose(loc, diag::requires_conformance_nonprotocol,
+                     subjectType, constraintType);
+      
+      auto getNameWithoutSelf = [&](std::string subjectTypeName) {
+        std::string selfSubstring = "Self.";
+        
+        if (subjectTypeName.rfind(selfSubstring, 0) == 0) {
+          return subjectTypeName.erase(0, selfSubstring.length());
+        }
+        
+        return subjectTypeName;
+      };
+
+      if (allowConcreteGenericParams ||
+          (subjectType->is<DependentMemberType>() &&
+           !source->isProtocolRequirement())) {
+        auto subjectTypeName = subjectType.getString();
+        auto subjectTypeNameWithoutSelf = getNameWithoutSelf(subjectTypeName);
+        Diags.diagnose(loc, diag::requires_conformance_nonprotocol_fixit,
+                       subjectTypeNameWithoutSelf, constraintType.getString())
+             .fixItReplace(loc, " == ");
+      }
+    }
+
+    invalidIsaConstraints.clear();
   }
 }
 

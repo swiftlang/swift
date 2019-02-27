@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Availability.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/DiagnosticsIRGen.h"
@@ -34,7 +35,7 @@
 #include "clang/Lex/PreprocessorOptions.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/HeaderSearchOptions.h"
-#include "clang/Frontend/CodeGenOptions.h"
+#include "clang/Basic/CodeGenOptions.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
@@ -721,6 +722,10 @@ Address IRGenModule::getAddrOfObjCISAMask() {
 
 ModuleDecl *IRGenModule::getSwiftModule() const {
   return IRGen.SIL.getSwiftModule();
+}
+
+AvailabilityContext IRGenModule::getAvailabilityContext() const {
+  return AvailabilityContext::forDeploymentTarget(Context);
 }
 
 Lowering::TypeConverter &IRGenModule::getSILTypes() const {

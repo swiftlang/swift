@@ -18,7 +18,7 @@ extension NLTokenizer {
   @nonobjc
   public func tokenRange(at index: String.Index) -> Range<String.Index> {
     let str = self.string ?? ""
-    let characterIndex = index.encodedOffset
+    let characterIndex = index.utf16Offset(in: str)
     let nsrange = self.__tokenRange(at:characterIndex)
     return Range(nsrange, in: str)!
   }

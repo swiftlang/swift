@@ -1659,8 +1659,18 @@ bool TempRValueOptPass::collectLoads(
 
     // Check if there is another function argument, which is inout which might
     // modify the source of the copy_addr.
-    // If we would remove the copy_addr in this case, it would result in an
-    // exclusivity violation.
+    //
+    // When a use of the temporary is an apply, then we need to prove that the
+    // function called by the apply cannot modify the temporary's source
+    // value. By design, this should be handled by
+    // `checkNoSourceModification`. However, this would be too conservative
+    // since it's common for the apply to have an @out argument, and alias
+    // analysis cannot prove that the @out does not alias with `src`. Instead,
+    // `checkNoSourceModification` always avoids analyzing the current use, so
+    // applies need to be handled here. We already know that an @out cannot
+    // alias with `src` because the `src` value must be initialized at the point
+    // of the call. Hence, it is sufficient to check specifically for another
+    // @inout that might alias with `src`.
     auto calleeConv = apply.getSubstCalleeConv();
     unsigned calleeArgIdx = apply.getCalleeArgIndexOfFirstAppliedArg();
     for (Operand &operand : apply.getArgumentOperands()) {

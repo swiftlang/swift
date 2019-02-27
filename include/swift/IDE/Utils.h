@@ -134,9 +134,6 @@ Decl *getDeclFromUSR(ASTContext &context, StringRef USR, std::string &error);
 Decl *getDeclFromMangledSymbolName(ASTContext &context, StringRef mangledName,
                                    std::string &error);
 
-Type getTypeFromMangledSymbolname(ASTContext &Ctx, StringRef mangledName,
-                                  std::string &error);
-
 class XMLEscapingPrinter : public StreamPrinter {
   public:
   XMLEscapingPrinter(raw_ostream &OS) : StreamPrinter(OS){};

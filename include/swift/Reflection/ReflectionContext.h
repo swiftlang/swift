@@ -52,6 +52,25 @@ template <> struct MachOTraits<8> {
   using Section = const struct llvm::MachO::section_64;
   static constexpr size_t MagicNumber = llvm::MachO::MH_MAGIC_64;
 };
+
+template <unsigned char ELFClass> struct ELFTraits;
+
+template <> struct ELFTraits<llvm::ELF::ELFCLASS32> {
+  using Header = const struct llvm::ELF::Elf32_Ehdr;
+  using Section = const struct llvm::ELF::Elf32_Shdr;
+  using Offset = llvm::ELF::Elf32_Off;
+  using Size = llvm::ELF::Elf32_Word;
+  static constexpr unsigned char ELFClass = llvm::ELF::ELFCLASS32;
+};
+
+template <> struct ELFTraits<llvm::ELF::ELFCLASS64> {
+  using Header = const struct llvm::ELF::Elf64_Ehdr;
+  using Section = const struct llvm::ELF::Elf64_Shdr;
+  using Offset = llvm::ELF::Elf64_Off;
+  using Size = llvm::ELF::Elf64_Xword;
+  static constexpr unsigned char ELFClass = llvm::ELF::ELFCLASS64;
+};
+
 } // namespace
 
 namespace swift {
@@ -266,15 +285,12 @@ public:
     return false;
   }
 #else // ELF platforms.
-  bool addImage(RemoteAddress ImageStart) {
+  template <typename T> bool readELFSections(RemoteAddress ImageStart) {
     auto Buf =
-        this->getReader().readBytes(ImageStart, sizeof(llvm::ELF::Elf64_Ehdr));
+        this->getReader().readBytes(ImageStart, sizeof(typename T::Header));
 
-    // Read the header.
-    auto Hdr = reinterpret_cast<const llvm::ELF::Elf64_Ehdr *>(Buf.get());
-
-    if (!Hdr->checkMagic())
-      return false;
+    auto Hdr = reinterpret_cast<const typename T::Header *>(Buf.get());
+    assert(Hdr->getFileClass() == T::ELFClass && "invalid ELF file class");
 
     // From the header, grab informations about the section header table.
     auto SectionHdrAddress = ImageStart.getAddressData() + Hdr->e_shoff;
@@ -283,13 +299,13 @@ public:
 
     // Collect all the section headers, we need them to look up the
     // reflection sections (by name) and the string table.
-    std::vector<const llvm::ELF::Elf64_Shdr *> SecHdrVec;
+    std::vector<const typename T::Section *> SecHdrVec;
     for (unsigned I = 0; I < SectionHdrNumEntries; ++I) {
       auto SecBuf = this->getReader().readBytes(
           RemoteAddress(SectionHdrAddress + (I * SectionEntrySize)),
           SectionEntrySize);
       auto SecHdr =
-          reinterpret_cast<const llvm::ELF::Elf64_Shdr *>(SecBuf.get());
+          reinterpret_cast<const typename T::Section *>(SecBuf.get());
       SecHdrVec.push_back(SecHdr);
     }
 
@@ -304,9 +320,9 @@ public:
 
     assert(SecIdx < SecHdrVec.size() && "malformed ELF object");
 
-    const llvm::ELF::Elf64_Shdr *SecHdrStrTab = SecHdrVec[SecIdx];
-    llvm::ELF::Elf64_Off StrTabOffset = SecHdrStrTab->sh_offset;
-    llvm::ELF::Elf64_Xword StrTabSize = SecHdrStrTab->sh_size;
+    const typename T::Section *SecHdrStrTab = SecHdrVec[SecIdx];
+    typename T::Offset StrTabOffset = SecHdrStrTab->sh_offset;
+    typename T::Size StrTabSize = SecHdrStrTab->sh_size;
 
     auto StrTabStart =
         RemoteAddress(ImageStart.getAddressData() + StrTabOffset);
@@ -316,7 +332,7 @@ public:
     auto findELFSectionByName = [&](std::string Name)
         -> std::pair<std::pair<const char *, const char *>, uint32_t> {
       // Now for all the sections, find their name.
-      for (const llvm::ELF::Elf64_Shdr *Hdr : SecHdrVec) {
+      for (const typename T::Section *Hdr : SecHdrVec) {
         uint32_t Offset = Hdr->sh_name;
         auto SecName = std::string(StrTab + Offset);
         if (SecName != Name)
@@ -370,6 +386,27 @@ public:
 
     savedBuffers.push_back(std::move(Buf));
     return true;
+  }
+
+  bool addImage(RemoteAddress ImageStart) {
+    auto Buf =
+        this->getReader().readBytes(ImageStart, sizeof(llvm::ELF::Elf64_Ehdr));
+
+    // Read the header.
+    auto Hdr = reinterpret_cast<const llvm::ELF::Elf64_Ehdr *>(Buf.get());
+
+    if (!Hdr->checkMagic())
+      return false;
+
+    // Check if we have a ELFCLASS32 or ELFCLASS64
+    unsigned char FileClass = Hdr->getFileClass();
+    if (FileClass == llvm::ELF::ELFCLASS64) {
+      return readELFSections<ELFTraits<llvm::ELF::ELFCLASS64>>(ImageStart);
+    } else if (FileClass == llvm::ELF::ELFCLASS32) {
+      return readELFSections<ELFTraits<llvm::ELF::ELFCLASS32>>(ImageStart);
+    } else {
+      return false;
+    }
   }
 #endif
 
@@ -520,15 +557,14 @@ public:
           readMetadataAndValueOpaqueExistential(ExistentialAddress);
       if (!OptMetaAndValue)
         return false;
-      RemoteAddress MetadataAddress = OptMetaAndValue->first;
-      RemoteAddress ValueAddress = OptMetaAndValue->second;
 
-      auto InstanceTR = readTypeFromMetadata(MetadataAddress.getAddressData());
+      auto InstanceTR = readTypeFromMetadata(
+          OptMetaAndValue->MetadataAddress.getAddressData());
       if (!InstanceTR)
         return false;
 
       *OutInstanceTR = InstanceTR;
-      *OutInstanceAddress = ValueAddress;
+      *OutInstanceAddress = OptMetaAndValue->PayloadAddress;
       return true;
     }
     case RecordKind::ErrorExistential: {
@@ -537,16 +573,15 @@ public:
       if (!OptMetaAndValue)
         return false;
 
-      RemoteAddress InstanceMetadataAddress = OptMetaAndValue->first;
-      RemoteAddress InstanceAddress = OptMetaAndValue->second;
+      // FIXME: Check third value, 'IsBridgedError'
 
-      auto InstanceTR =
-          readTypeFromMetadata(InstanceMetadataAddress.getAddressData());
+      auto InstanceTR = readTypeFromMetadata(
+          OptMetaAndValue->MetadataAddress.getAddressData());
       if (!InstanceTR)
         return false;
 
       *OutInstanceTR = InstanceTR;
-      *OutInstanceAddress = RemoteAddress(InstanceAddress);
+      *OutInstanceAddress = OptMetaAndValue->PayloadAddress;
       return true;
     }
     default:

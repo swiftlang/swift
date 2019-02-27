@@ -287,6 +287,22 @@ func sr964() {
       print(suspiciousSetter) // expected-warning {{setter argument 'newValue' was never used, but the property was accessed}} expected-note {{did you mean to use 'newValue' instead of accessing the property's current value?}} {{13-29=newValue}}
     }
   }
+  struct MemberGetterStruct {
+    var suspiciousSetter: String {
+      get { return "" }
+      set {
+        print(suspiciousSetter) // expected-warning {{setter argument 'newValue' was never used, but the property was accessed}} expected-note {{did you mean to use 'newValue' instead of accessing the property's current value?}} {{15-31=newValue}}
+      }
+    }
+  }
+  class MemberGetterClass {
+    var suspiciousSetter: String {
+      get { return "" }
+      set {
+        print(suspiciousSetter) // expected-warning {{setter argument 'newValue' was never used, but the property was accessed}} expected-note {{did you mean to use 'newValue' instead of accessing the property's current value?}} {{15-31=newValue}}
+      }
+    }
+  }
   var namedSuspiciousSetter: String {
     get { return "" }
     set(parameter) {
@@ -302,6 +318,15 @@ func sr964() {
     set {
       print(multiTriggerSetter) // expected-warning {{setter argument 'newValue' was never used, but the property was accessed}} expected-note {{did you mean to use 'newValue' instead of accessing the property's current value?}} {{13-31=newValue}}
       print(multiTriggerSetter)
+    }
+  }
+}
+struct MemberGetterExtension {}
+extension MemberGetterExtension {
+  var suspiciousSetter: String {
+    get { return "" }
+    set {
+      print(suspiciousSetter) // expected-warning {{setter argument 'newValue' was never used, but the property was accessed}} expected-note {{did you mean to use 'newValue' instead of accessing the property's current value?}} {{13-29=newValue}}
     }
   }
 }

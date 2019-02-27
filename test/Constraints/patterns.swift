@@ -291,10 +291,7 @@ switch staticMembers {
   case .init(0): break
   case .init(_): break // expected-error{{'_' can only appear in a pattern}}
   case .init(let x): break // expected-error{{cannot appear in an expression}}
-  case .init(opt: 0): break
-  // expected-error@-1 {{value of optional type 'StaticMembers?' must be unwrapped to a value of type 'StaticMembers'}}
-  // expected-note@-2 {{coalesce}}
-  // expected-note@-3 {{force-unwrap}}
+  case .init(opt: 0): break // expected-error{{pattern cannot match values of type 'StaticMembers'}}
 
   case .prop: break
   // TODO: repeated error message

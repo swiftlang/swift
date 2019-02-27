@@ -1203,8 +1203,8 @@
       "conformances": [
         {
           "kind": "Conformance",
-          "name": "Comparable",
-          "printedName": "Comparable"
+          "name": "FixedWidthInteger",
+          "printedName": "FixedWidthInteger"
         },
         {
           "kind": "Conformance",
@@ -1318,8 +1318,8 @@
         },
         {
           "kind": "Conformance",
-          "name": "FixedWidthInteger",
-          "printedName": "FixedWidthInteger"
+          "name": "Comparable",
+          "printedName": "Comparable"
         },
         {
           "kind": "Conformance",

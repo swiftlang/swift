@@ -97,7 +97,7 @@ def driver_skip_execution : Flag<["-"], "driver-skip-execution">,
   HelpText<"Skip execution of subtasks when performing compilation">;
 def driver_use_frontend_path : Separate<["-"], "driver-use-frontend-path">,
   InternalDebugOpt,
-  HelpText<"Use the given executable to perform compilations">;
+  HelpText<"Use the given executable to perform compilations. Arguments can be passed as a ';' separated list">;
 def driver_show_incremental : Flag<["-"], "driver-show-incremental">,
   InternalDebugOpt,
   HelpText<"With -v, dump information about why files are being rebuilt">;
@@ -132,6 +132,21 @@ def driver_always_rebuild_dependents :
 def enable_experimental_dependencies :
 Flag<["-"], "enable-experimental-dependencies">, Flags<[FrontendOption, HelpHidden]>,
 HelpText<"Experimental work-in-progress to be more selective about incremental recompilation">;
+
+def driver_verify_experimental_dependency_graph_after_every_import :
+Flag<["-"], "driver-verify-experimental-dependency-graph-after-every-import">,
+InternalDebugOpt,
+HelpText<"Debug DriverGraph by verifying it after every import">;
+
+def driver_emit_experimental_dependency_dot_file_after_every_import :
+Flag<["-"], "driver-emit-experimental-dependency-dot-file-after-every-import">,
+InternalDebugOpt,
+HelpText<"Emit dot files every time driver imports an experimental swiftdeps file.">;
+
+def experimental_dependency_include_intrafile :
+Flag<["-"], "experimental-dependency-include-intrafile">,
+InternalDebugOpt,
+HelpText<"Include within-file dependencies.">;
 
 def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
   HelpText<"Set the driver mode to either 'swift' or 'swiftc'">;

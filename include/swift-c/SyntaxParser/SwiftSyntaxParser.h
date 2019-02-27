@@ -221,6 +221,17 @@ swiftparse_parser_set_node_lookup(swiftparse_parser_t,
 SWIFTPARSE_PUBLIC swiftparse_client_node_t
 swiftparse_parse_string(swiftparse_parser_t, const char *source);
 
+/// Returns a constant string pointer for verification purposes.
+///
+/// Working as a hash value, the constant string is calculated during compilation
+/// time from syntax node declarations.
+///
+/// During runtime, SwiftSyntax client can compare its own version of the hash
+/// value with the result of the function call. Mismatch indicates the parser
+/// library isn't compatible with the client side, e.g. added/removed node
+/// declarations, etc.
+SWIFTPARSE_PUBLIC const char* swiftparse_syntax_structure_versioning_identifier(void);
+
 SWIFTPARSE_END_DECLS
 
 #endif

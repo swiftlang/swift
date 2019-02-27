@@ -3,3 +3,4 @@ swiftparse_parser_create
 swiftparse_parser_dispose
 swiftparse_parser_set_node_handler
 swiftparse_parser_set_node_lookup
+swiftparse_syntax_structure_versioning_identifier

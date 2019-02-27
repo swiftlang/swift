@@ -16,12 +16,6 @@
 // Strings
 //===----------------------------------------------------------------------===//
 
-@available(*, unavailable, message: "Please use String or NSString")
-public class NSSimpleCString {}
-
-@available(*, unavailable, message: "Please use String or NSString")
-public class NSConstantString {}
-
 extension NSString : ExpressibleByStringLiteral {
   /// Create an instance initialized to `value`.
   public required convenience init(stringLiteral value: StaticString) {

@@ -485,7 +485,7 @@ ClosureCloner::populateCloned() {
     if (Cloned->hasOwnership() &&
         MappedValue.getOwnershipKind() != ValueOwnershipKind::Any) {
       SILLocation Loc(const_cast<ValueDecl *>((*I)->getDecl()));
-      MappedValue = getBuilder().createBeginBorrow(Loc, MappedValue);
+      MappedValue = getBuilder().emitBeginBorrowOperation(Loc, MappedValue);
     }
     entryArgs.push_back(MappedValue);
 
@@ -578,7 +578,7 @@ void ClosureCloner::visitDestroyValueInst(DestroyValueInst *Inst) {
           Value.getOwnershipKind() != ValueOwnershipKind::Any) {
         auto *BBI = cast<BeginBorrowInst>(Value);
         Value = BBI->getOperand();
-        B.createEndBorrow(Inst->getLoc(), BBI, Value);
+        B.emitEndBorrowOperation(Inst->getLoc(), BBI);
       }
 
       typeLowering.emitDestroyValue(B, Inst->getLoc(), Value);

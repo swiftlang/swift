@@ -1244,7 +1244,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     // cast to the result type - it could be substituted.
     if (origConv.getSILResultType().hasTypeParameter()) {
       auto ResType = fwd->getReturnType();
-      callResult = subIGF.Builder.CreateBitCast(callResult, ResType);
+      if (ResType != callResult->getType())
+        callResult = subIGF.coerceValue(callResult, ResType, subIGF.IGM.DataLayout);
     }
     subIGF.Builder.CreateRet(callResult);
   }

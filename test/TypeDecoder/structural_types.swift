@@ -116,6 +116,10 @@ do {
   blackHole(metatype)
 }
 
+do {
+  let escaping: (@escaping () -> ()) -> () = { _ in }
+  blackHole(escaping)
+}
 // DEMANGLE: $syycD
 // DEMANGLE: $sySSzcD
 // DEMANGLE: $sySSncD
@@ -131,6 +135,7 @@ do {
 // DEMANGLE: $sSi_SfSitD
 // DEMANGLE: $sSim_Sf1xSitD
 // DEMANGLE: $sSi1x_SfSim1ytD
+// DEMANGLE: $syyyccD
 
 // CHECK: () -> ()
 // CHECK: (inout String) -> ()
@@ -147,6 +152,7 @@ do {
 // CHECK: (Int, Float, Int)
 // CHECK: (Int.Type, x: Float, Int)
 // CHECK: (x: Int, Float, y: Int.Type)
+// CHECK: (@escaping () -> ()) -> ()
 
 // DEMANGLE: $sSimD
 // DEMANGLE: $syycmD
@@ -164,6 +170,7 @@ do {
 // DEMANGLE: $sSi_SfSitmD
 // DEMANGLE: $sSim_Sf1xSitmD
 // DEMANGLE: $sSi1x_SfSim1ytmD
+// DEMANGLE: $syyyccmD
 
 // CHECK: Int.Type
 // CHECK: ((inout String) -> ()).Type
@@ -180,3 +187,4 @@ do {
 // CHECK: (Int, Float, Int).Type
 // CHECK: (Int.Type, x: Float, Int).Type
 // CHECK: (x: Int, Float, y: Int.Type).Type
+// CHECK: ((@escaping () -> ()) -> ()).Type

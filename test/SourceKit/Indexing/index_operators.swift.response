@@ -153,7 +153,8 @@
           key.kind: source.lang.swift.decl.function.constructor,
           key.usr: "s:15index_operators7StructBVACycfc",
           key.line: 12,
-          key.column: 8
+          key.column: 8,
+          key.is_implicit: 1
         }
       ]
     }

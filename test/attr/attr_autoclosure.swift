@@ -136,7 +136,6 @@ let _ : (@autoclosure(escaping) () -> ()) -> ()
 
 // escaping is the name of param type
 let _ : (@autoclosure(escaping) -> ()) -> ()  // expected-error {{use of undeclared type 'escaping'}}
-// expected-error@-1 {{argument type of @autoclosure parameter must be '()'}}
 
 // Migration
 // expected-error @+1 {{attribute can only be applied to types, not declarations}}
@@ -257,4 +256,12 @@ func rdar_47586626() {
 
   foo(s) // ok
   bar(s) // ok
+}
+
+protocol P_47586626 {
+  typealias F = () -> Int
+  typealias G<T> = () -> T
+
+  func foo(_: @autoclosure F)
+  func bar<T>(_: @autoclosure G<T>)
 }

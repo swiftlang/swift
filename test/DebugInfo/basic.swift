@@ -3,8 +3,9 @@
 // Verify that we don't emit any debug info by default.
 // RUN: %target-swift-frontend %s -emit-ir -o - \
 // RUN:   | %FileCheck %s --check-prefix NDEBUG
+// NDEBUG: source_filename
 // NDEBUG-NOT: !dbg
-// NDEBUG-NOT: DW_TAG
+// NDEBUG-NOT: DICompileUnit
 // --------------------------------------------------------------------
 // Verify that we don't emit any debug info with -gnone.
 // RUN: %target-swift-frontend %s -emit-ir -gnone -o - \
@@ -14,9 +15,9 @@
 // RUN: %target-swift-frontend %s -emit-ir -gline-tables-only -o - \
 // RUN:   | %FileCheck %s --check-prefix CHECK-LINETABLES
 // CHECK: !dbg
-// CHECK-LINETABLES-NOT: DW_TAG_{{.*}}variable
+// CHECK-LINETABLES-NOT: DI{{.*}}Variable
 // CHECK-LINETABLES-NOT: DW_TAG_structure_type
-// CHECK-LINETABLES-NOT: DW_TAG_basic_type
+// CHECK-LINETABLES-NOT: DIBasicType
 // --------------------------------------------------------------------
 // Now check that we do generate line+scope info with -g.
 // RUN: %target-swift-frontend %/s -emit-ir -g -o - \
@@ -71,9 +72,8 @@ func foo(_ a: Int64, _ b: Int64) -> Int64 {
      }
 }
 
-// CHECK-DAG: ![[FILE_CWD:[0-9]+]] = !DIFile(filename: "{{.*}}DebugInfo/basic.swift", directory: "{{.*}}")
-// CHECK-DAG: ![[MAINFILE:[0-9]+]] = !DIFile(filename: "basic.swift", directory: "{{.*}}DebugInfo")
-// CHECK-DAG: !DICompileUnit(language: DW_LANG_Swift, file: ![[FILE_CWD]],{{.*}} producer: "{{.*}}Swift version{{.*}},{{.*}}
+// CHECK-DAG: ![[MAINFILE:[0-9]+]] = !DIFile(filename: "{{.*}}DebugInfo/basic.swift", directory: "{{.*}}")
+// CHECK-DAG: !DICompileUnit(language: DW_LANG_Swift, file: ![[MAINFILE]],{{.*}} producer: "{{.*}}Swift version{{.*}},{{.*}}
 // CHECK-DAG: !DISubprogram(name: "main", {{.*}}file: ![[MAINFILE]],
 
 // Function type for foo.

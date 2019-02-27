@@ -223,7 +223,7 @@ public:
 /// For a mangled node that refers to an Objective-C class or protocol,
 /// return the class or protocol name.
 static inline Optional<StringRef> getObjCClassOrProtocolName(
-    const Demangle::NodePointer &node) {
+    NodePointer node) {
   if (node->getKind() != Demangle::Node::Kind::Class &&
       node->getKind() != Demangle::Node::Kind::Protocol)
     return None;
@@ -262,7 +262,7 @@ class TypeDecoder {
     : Builder(Builder) {}
 
   /// Given a demangle tree, attempt to turn it into a type.
-  BuiltType decodeMangledType(const Demangle::NodePointer &Node) {
+  BuiltType decodeMangledType(NodePointer Node) {
     if (!Node) return BuiltType();
 
     using NodeKind = Demangle::Node::Kind;
@@ -301,7 +301,7 @@ class TypeDecoder {
       if (!decodeMangledTypeDecl(Node, typeDecl, parent, typeAlias))
         return BuiltType();
 
-      if (typeAlias && Node->getKind() == NodeKind::TypeAlias)
+      if (typeAlias)
         return Builder.createTypeAliasType(typeDecl, parent);
 
       return Builder.createNominalType(typeDecl, parent);
@@ -676,21 +676,21 @@ class TypeDecoder {
       auto base = decodeMangledType(Node->getChild(0));
       if (!base)
         return BuiltType();
-      auto member = Node->getChild(1)->getText();
       auto assocTypeChild = Node->getChild(1);
-      if (assocTypeChild->getNumChildren() < 1)
+      auto member = assocTypeChild->getFirstChild()->getText();
+      if (assocTypeChild->getNumChildren() < 2)
         return Builder.createDependentMemberType(member, base);
 
-      auto protocol = decodeMangledProtocolType(assocTypeChild->getChild(0));
+      auto protocol = decodeMangledProtocolType(assocTypeChild->getChild(1));
       if (!protocol)
         return BuiltType();
       return Builder.createDependentMemberType(member, base, protocol);
     }
     case NodeKind::DependentAssociatedTypeRef: {
-      if (Node->getNumChildren() < 1)
+      if (Node->getNumChildren() < 2)
         return BuiltType();
 
-      return decodeMangledType(Node->getChild(0));
+      return decodeMangledType(Node->getChild(1));
     }
     case NodeKind::Unowned: {
       if (Node->getNumChildren() < 1)
@@ -732,6 +732,50 @@ class TypeDecoder {
       // TODO: Implement SILBoxTypeRefs with layout. As a stopgap, specify the
       // NativeObject type ref.
       return Builder.createBuiltinType("Builtin.NativeObject", "Bo");
+    }
+    case NodeKind::SugaredOptional: {
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
+      auto base = decodeMangledType(Node->getChild(0));
+      if (!base)
+        return BuiltType();
+
+      return Builder.createOptionalType(base);
+    }
+    case NodeKind::SugaredArray: {
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
+      auto base = decodeMangledType(Node->getChild(0));
+      if (!base)
+        return BuiltType();
+
+      return Builder.createArrayType(base);
+    }
+    case NodeKind::SugaredDictionary: {
+      if (Node->getNumChildren() < 2)
+        return BuiltType();
+
+      auto key = decodeMangledType(Node->getChild(0));
+      if (!key)
+        return BuiltType();
+
+      auto value = decodeMangledType(Node->getChild(1));
+      if (!key)
+        return BuiltType();
+
+      return Builder.createDictionaryType(key, value);
+    }
+    case NodeKind::SugaredParen: {
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
+      auto base = decodeMangledType(Node->getChild(0));
+      if (!base)
+        return BuiltType();
+
+      return Builder.createParenType(base);
     }
     default:
       return BuiltType();
@@ -878,7 +922,7 @@ private:
       return true;
     };
 
-    auto decodeParam = [&](const Demangle::NodePointer &paramNode)
+    auto decodeParam = [&](NodePointer paramNode)
         -> Optional<FunctionParam<BuiltType>> {
       if (paramNode->getKind() != NodeKind::TupleElement)
         return None;
@@ -935,7 +979,7 @@ private:
 template<typename BuilderType>
 inline typename BuilderType::BuiltType
 decodeMangledType(BuilderType &Builder,
-                  const Demangle::NodePointer &Node) {
+                  NodePointer Node) {
   return TypeDecoder<BuilderType>(Builder).decodeMangledType(Node);
 }
 

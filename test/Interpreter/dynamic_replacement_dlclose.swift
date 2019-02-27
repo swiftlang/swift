@@ -5,17 +5,21 @@
 // RUN: %target-codesign %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
 // RUN: %target-run %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
 
+// REQUIRES: executable_test
+
 import Module1
 
 import StdlibUnittest
 
-#if os(Linux)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+  import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
   import Glibc
 #elseif os(Windows)
   import MSVCRT
   import WinSDK
 #else
-  import Darwin
+#error("Unsupported platform")
 #endif
 
 var DynamicallyReplaceable = TestSuite("DynamicallyReplaceable")

@@ -536,7 +536,8 @@ bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
   return false;
 }
 
-bool Decl::isWeakImported(ModuleDecl *fromModule) const {
+bool Decl::isWeakImported(ModuleDecl *fromModule,
+                          AvailabilityContext fromContext) const {
   // For a Clang declaration, trust Clang.
   if (auto clangDecl = getClangDecl()) {
     return clangDecl->isWeakImported();
@@ -546,22 +547,27 @@ bool Decl::isWeakImported(ModuleDecl *fromModule) const {
   if (containingModule == fromModule)
     return false;
 
+  auto containingContext =
+      AvailabilityInference::availableRange(this, fromModule->getASTContext());
+  if (!fromContext.isContainedIn(containingContext))
+    return true;
+
   if (getAttrs().hasAttribute<WeakLinkedAttr>())
     return true;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
-    return accessor->getStorage()->isWeakImported(fromModule);
+    return accessor->getStorage()->isWeakImported(fromModule, fromContext);
 
   if (auto *dtor = dyn_cast<DestructorDecl>(this))
-    return cast<ClassDecl>(dtor->getDeclContext())->isWeakImported(fromModule);
+    return cast<ClassDecl>(dtor->getDeclContext())->isWeakImported(
+        fromModule, fromContext);
 
   auto *dc = getDeclContext();
   if (auto *ext = dyn_cast<ExtensionDecl>(dc))
-    return ext->isWeakImported(fromModule);
+    return ext->isWeakImported(fromModule, fromContext);
   if (auto *ntd = dyn_cast<NominalTypeDecl>(dc))
-    return ntd->isWeakImported(fromModule);
+    return ntd->isWeakImported(fromModule, fromContext);
 
-  // FIXME: Also check availability when containingModule is resilient.
   return false;
 }
 
@@ -2406,14 +2412,9 @@ void ValueDecl::setInterfaceType(Type type) {
     assert(!type->hasTypeVariable() && "Type variable in interface type");
     assert(!type->is<InOutType>() && "Interface type must be materializable");
 
-    // lldb creates global typealiases with archetypes in them.
-    // FIXME: Add an isDebugAlias() flag, like isDebugVar().
-    //
-    // Also, ParamDecls in closure contexts can have type variables
+    // ParamDecls in closure contexts can have type variables
     // archetype in them during constraint generation.
-    if (!isa<TypeAliasDecl>(this) &&
-        !(isa<ParamDecl>(this) &&
-          isa<AbstractClosureExpr>(getDeclContext()))) {
+    if (!(isa<ParamDecl>(this) && isa<AbstractClosureExpr>(getDeclContext()))) {
       assert(!type->hasArchetype() &&
              "Archetype in interface type");
     }
@@ -2523,12 +2524,14 @@ bool ValueDecl::isUsableFromInline() const {
   assert(getFormalAccess() == AccessLevel::Internal);
 
   if (getAttrs().hasAttribute<UsableFromInlineAttr>() ||
+      getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
       getAttrs().hasAttribute<InlinableAttr>())
     return true;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this)) {
     auto *storage = accessor->getStorage();
     if (storage->getAttrs().hasAttribute<UsableFromInlineAttr>() ||
+        storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
         storage->getAttrs().hasAttribute<InlinableAttr>())
       return true;
   }
@@ -3383,9 +3386,11 @@ TypeLoc &AssociatedTypeDecl::getDefaultDefinitionLoc() {
 
 SourceRange AssociatedTypeDecl::getSourceRange() const {
   SourceLoc endLoc;
-  if (auto TWC = getTrailingWhereClause())
+  if (auto TWC = getTrailingWhereClause()) {
     endLoc = TWC->getSourceRange().End;
-  else if (!getInherited().empty()) {
+  } else if (getDefaultDefinitionLoc().hasLocation()) {
+    endLoc = getDefaultDefinitionLoc().getSourceRange().End;
+  } else if (!getInherited().empty()) {
     endLoc = getInherited().back().getSourceRange().End;
   } else {
     endLoc = getNameLoc();
@@ -4125,8 +4130,15 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
   // the parameter type.
   if (auto funcTy = type->getAs<AnyFunctionType>()) {
     auto inputKind = SelfReferenceKind::None();
-    for (auto &elt : funcTy->getParams()) {
-      inputKind |= findProtocolSelfReferences(proto, elt.getOldType(),
+    for (auto param : funcTy->getParams()) {
+      // inout parameters are invariant.
+      if (param.isInOut()) {
+        if (findProtocolSelfReferences(proto, param.getPlainType(),
+                                       skipAssocTypes)) {
+          return SelfReferenceKind::Other();
+        }
+      }
+      inputKind |= findProtocolSelfReferences(proto, param.getParameterType(),
                                               skipAssocTypes);
     }
     auto resultKind = findProtocolSelfReferences(proto, funcTy->getResult(),
@@ -4155,14 +4167,6 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
   if (auto selfType = type->getAs<DynamicSelfType>()) {
     return findProtocolSelfReferences(proto, selfType->getSelfType(),
                                       skipAssocTypes);
-  }
-
-  // InOut types are invariant.
-  if (auto inOutType = type->getAs<InOutType>()) {
-    if (findProtocolSelfReferences(proto, inOutType->getObjectType(),
-                                   skipAssocTypes)) {
-      return SelfReferenceKind::Other();
-    }
   }
 
   // Bound generic types are invariant.
@@ -4235,8 +4239,15 @@ ProtocolDecl::findProtocolSelfReferences(const ValueDecl *value,
     // as a function result type.
     if (!allowCovariantParameters) {
       auto inputKind = SelfReferenceKind::None();
-      for (auto &elt : type->castTo<AnyFunctionType>()->getParams()) {
-        inputKind |= ::findProtocolSelfReferences(this, elt.getOldType(),
+      for (auto param : type->castTo<AnyFunctionType>()->getParams()) {
+        // inout parameters are invariant.
+        if (param.isInOut()) {
+          if (::findProtocolSelfReferences(this, param.getPlainType(),
+                                           skipAssocTypes)) {
+            return SelfReferenceKind::Other();
+          }
+        }
+        inputKind |= ::findProtocolSelfReferences(this, param.getParameterType(),
                                                   skipAssocTypes);
       }
 
@@ -4382,6 +4393,24 @@ void ProtocolDecl::setRequirementSignature(ArrayRef<Requirement> requirements) {
     RequirementSignature = getASTContext().AllocateCopy(requirements).data();
     Bits.ProtocolDecl.NumRequirementsInSignature = requirements.size();
   }
+}
+
+void ProtocolDecl::computeKnownProtocolKind() const {
+  auto module = getModuleContext();
+  if (module != module->getASTContext().getStdlibModule() &&
+      !module->getName().is("Foundation")) {
+    const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = 1;
+    return;
+  }
+
+  unsigned value =
+    llvm::StringSwitch<unsigned>(getBaseName().userFacingName())
+#define PROTOCOL_WITH_NAME(Id, Name) \
+      .Case(Name, static_cast<unsigned>(KnownProtocolKind::Id) + 2)
+#include "swift/AST/KnownProtocols.def"
+      .Default(1);
+
+  const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = value;
 }
 
 void AbstractStorageDecl::overwriteImplInfo(StorageImplInfo implInfo) {
@@ -6321,8 +6350,10 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
       // Prior to Swift 5, cross-module initializers were permitted to be
       // non-delegating. However, if the struct isn't fixed-layout, we have to
       // be delegating because, well, we don't know the layout.
+      // A dynamic replacement is permitted to be non-delegating.
       if (NTD->isResilient() ||
-          containingModule->getASTContext().isSwiftVersionAtLeast(5)) {
+          (containingModule->getASTContext().isSwiftVersionAtLeast(5) &&
+           !getAttrs().getAttribute<DynamicReplacementAttr>())) {
         if (containingModule != NTD->getParentModule())
           Kind = BodyInitKind::Delegating;
       }

@@ -812,8 +812,11 @@ StringRef swift::getSILAccessEnforcementName(SILAccessEnforcement enforcement) {
   llvm_unreachable("bad access enforcement");
 }
 
-AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest)
-    : InstructionBase(Loc), Operands(this, Src, Dest) {}
+AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest,
+                       AssignOwnershipQualifier Qualifier)
+    : InstructionBase(Loc), Operands(this, Src, Dest) {
+  SILInstruction::Bits.AssignInst.OwnershipQualifier = unsigned(Qualifier);
+}
 
 MarkFunctionEscapeInst *
 MarkFunctionEscapeInst::create(SILDebugLocation Loc,
@@ -1564,6 +1567,12 @@ SwitchEnumInstBase::getUniqueCaseForDestination(SILBasicBlock *BB) {
     return getUniqueCaseForDefault();
   }
   return D;
+}
+
+NullablePtr<SILBasicBlock> SwitchEnumInstBase::getDefaultBBOrNull() const {
+  if (!hasDefault())
+    return nullptr;
+  return getDefaultBB();
 }
 
 SwitchEnumInst *SwitchEnumInst::create(

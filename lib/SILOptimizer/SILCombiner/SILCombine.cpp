@@ -279,6 +279,15 @@ void SILCombiner::replaceInstUsesWith(SingleValueInstruction &I, ValueBase *V) {
   I.replaceAllUsesWith(V);
 }
 
+void SILCombiner::replaceValueUsesWith(SILValue oldValue, SILValue newValue) {
+  Worklist.addUsersToWorklist(oldValue); // Add all modified instrs to worklist.
+
+  LLVM_DEBUG(llvm::dbgs() << "SC: Replacing " << oldValue << "\n"
+                          << "    with " << newValue << '\n');
+
+  oldValue->replaceAllUsesWith(newValue);
+}
+
 /// Replace all of the results of the old instruction with the
 /// corresponding results of the new instruction.
 void SILCombiner::replaceInstUsesPairwiseWith(SILInstruction *oldI,

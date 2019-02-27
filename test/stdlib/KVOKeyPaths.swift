@@ -3,6 +3,9 @@
 
 // REQUIRES: objc_interop
 
+// SR-9838 Disable because it blocks PR testing.
+// UNSUPPORTED: CPU=i386
+
 import Foundation
 
 struct Guts {
@@ -127,13 +130,17 @@ class Target2 : NSObject, NSKeyValueObservingCustomization {
     // with the ability to look up the key path using the other.
     static func keyPathsAffectingValue(for key: AnyKeyPath) -> Set<AnyKeyPath> {
         print("keyPathsAffectingValue: key == \\.name:", key == \Target2.name)
-        _ = Dummy().observe(\.name) { (_, _) in }
+        withExtendedLifetime(Dummy()) { (dummy) in
+			_ = dummy.observe(\.name) { (_, _) in }
+		}
         return []
     }
 
     static func automaticallyNotifiesObservers(for key: AnyKeyPath) -> Bool {
         print("automaticallyNotifiesObservers: key == \\.name:", key == \Target2.name)
-        _ = Dummy().observe(\.name) { (_, _) in }
+        withExtendedLifetime(Dummy()) { (dummy) in
+			_ = dummy.observe(\.name) { (_, _) in }
+		}
         return true
     }
 }

@@ -570,8 +570,8 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-NEXT: [[SECOND_ADDR:%.*]] = getelementptr inbounds { i64, i64 }, { i64, i64 }* [[PAYLOAD]], i32 0, i32 1
 // CHECK-NEXT: [[SECOND:%.*]] = load i64, i64* [[SECOND_ADDR]], align 8
 
-//   -- Mask off spare bits in the payload               -- 0x3fffffffffffffff
-// CHECK-NEXT: [[SECOND_PROJ:%.*]] = and i64 [[SECOND]], 4611686018427387903
+//   -- Mask off spare bits in the payload               -- 0x00fffffffffffff8
+// CHECK-NEXT: [[SECOND_PROJ:%.*]] = and i64 [[SECOND]], 72057594037927928
 
 //   -- Store the low bits of the tag in the spare bits of the payload
 // CHECK-NEXT: [[TAG:%.*]] = zext i32 [[TAG_TMP]] to i64

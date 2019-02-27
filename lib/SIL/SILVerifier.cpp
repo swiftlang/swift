@@ -77,16 +77,14 @@ static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
 /// Returns true if A is an opened existential type or is equal to an
 /// archetype from F's generic context.
 static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
-  if (isa<OpenedArchetypeType>(A))
+  auto root = dyn_cast<PrimaryArchetypeType>(A->getRoot());
+  if (!root)
     return true;
-
-  // Find the primary archetype.
-  auto P = A->getPrimary();
 
   // Ok, we have a primary archetype, make sure it is in the nested generic
   // environment of our caller.
   if (auto *genericEnv = F->getGenericEnvironment())
-    if (P->getGenericEnvironment() == genericEnv)
+    if (root->getGenericEnvironment() == genericEnv)
       return true;
 
   return false;
@@ -2542,10 +2540,9 @@ public:
             selfRequirement->getKind() == RequirementKind::Conformance,
             "first non-same-typerequirement should be conformance requirement");
     auto conformsTo = genericSig->getConformsTo(selfGenericParam);
-    require(conformsTo.size() == 1,
-            "requirement Self parameter must conform to exactly one protocol");
-    require(conformsTo[0] == protocol,
-            "requirement Self parameter should be constrained by protocol");
+    require(std::find(conformsTo.begin(), conformsTo.end(), protocol)
+              != conformsTo.end(),
+            "requirement Self parameter must conform to called protocol");
 
     auto lookupType = AMI->getLookupType();
     if (getOpenedArchetypeOf(lookupType)) {
@@ -3382,20 +3379,17 @@ public:
                 CBI->getCastType(),
             "success dest block argument of checked_cast_br must match type of "
             "cast");
-    require(F.hasOwnership() || CBI->getFailureBB()->args_empty(),
-            "failure dest of checked_cast_br in unqualified ownership sil must "
-            "take no arguments");
-#if 0
-    require(F.hasUnqualifiedOwnership() ||
-                CBI->getFailureBB()->args_size() == 1,
+    require(!F.hasOwnership() || CBI->getFailureBB()->args_size() == 1,
             "failure dest of checked_cast_br must take one argument in "
             "ownership qualified sil");
-    require(F.hasUnqualifiedOwnership() ||
+    require(!F.hasOwnership() ||
                 CBI->getFailureBB()->args_begin()[0]->getType() ==
                     CBI->getOperand()->getType(),
             "failure dest block argument must match type of original type in "
             "ownership qualified sil");
-#endif
+    require(F.hasOwnership() || CBI->getFailureBB()->args_empty(),
+            "Failure dest of checked_cast_br must not take any argument in "
+            "non-ownership qualified sil");
   }
 
   void checkCheckedCastValueBranchInst(CheckedCastValueBranchInst *CBI) {
@@ -4500,7 +4494,7 @@ public:
   /// - accesses must be uniquely ended
   /// - flow-sensitive states must be equivalent on all paths into a block
   void verifyFlowSensitiveRules(SILFunction *F) {
-    // Do a breath-first search through the basic blocks.
+    // Do a traversal of the basic blocks.
     // Note that we intentionally don't verify these properties in blocks
     // that can't be reached from the entry block.
     llvm::DenseMap<SILBasicBlock*, VerifyFlowSensitiveRulesDetails::BBState> visitedBBs;
@@ -5028,8 +5022,6 @@ void SILWitnessTable::verify(const SILModule &M) const {
     assert(getEntries().empty() &&
            "A witness table declaration should not have any entries.");
 
-  auto *protocol = getConformance()->getProtocol();
-
   for (const Entry &E : getEntries())
     if (E.getKind() == SILWitnessTable::WitnessKind::Method) {
       SILFunction *F = E.getMethodWitness().Witness;
@@ -5045,15 +5037,6 @@ void SILWitnessTable::verify(const SILModule &M) const {
         assert(F->getLoweredFunctionType()->getRepresentation() ==
                SILFunctionTypeRepresentation::WitnessMethod &&
                "Witnesses must have witness_method representation.");
-        auto *witnessSelfProtocol = F->getLoweredFunctionType()
-            ->getDefaultWitnessMethodProtocol();
-        assert((witnessSelfProtocol == nullptr ||
-                witnessSelfProtocol == protocol) &&
-               "Witnesses must either have a concrete Self, or an "
-               "an abstract Self that is constrained to their "
-               "protocol.");
-        (void)protocol;
-        (void)witnessSelfProtocol;
       }
     }
 }
@@ -5078,12 +5061,6 @@ void SILDefaultWitnessTable::verify(const SILModule &M) const {
     assert(F->getLoweredFunctionType()->getRepresentation() ==
            SILFunctionTypeRepresentation::WitnessMethod &&
            "Default witnesses must have witness_method representation.");
-
-    auto *witnessSelfProtocol = F->getLoweredFunctionType()
-        ->getDefaultWitnessMethodProtocol();
-    assert(witnessSelfProtocol == getProtocol() &&
-           "Default witnesses must have an abstract Self parameter "
-           "constrained to their protocol.");
   }
 #endif
 }

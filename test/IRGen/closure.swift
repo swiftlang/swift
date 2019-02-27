@@ -1,11 +1,15 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s
 // RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CAPTURE
+// RUN: %target-swift-frontend -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=OPT
 
 // REQUIRES: CPU=x86_64
 
+// CHECK-DAG: [[FILENAME:@[0-9]+]] = {{.*}} c"{{.*}}closure.swift\00"
+// OPT: [[FILENAME:@[0-9]+]] = {{.*}} [1 x i8] zeroinitializer
+
 // -- partial_apply context metadata
 
-// CHECK: [[METADATA:@.*]] = private constant %swift.full_boxmetadata { void (%swift.refcounted*)* @objectdestroy, i8** null, %swift.type { i64 1024 }, i32 16, i8* bitcast ({ i32, i32, i32, i32 }* @"\01l__swift5_reflection_descriptor" to i8*) }
+// CHECK-DAG: [[METADATA:@.*]] = private constant %swift.full_boxmetadata { void (%swift.refcounted*)* @objectdestroy, i8** null, %swift.type { i64 1024 }, i32 16, i8* bitcast ({ i32, i32, i32, i32 }* @"\01l__swift5_reflection_descriptor" to i8*) }
 
 func a(i i: Int) -> (Int) -> Int {
   return { x in i }
@@ -64,4 +68,12 @@ func useClosure(_ cl : () -> ()) {}
 // CAPTURE-NOT: reflection_descriptor{{.*}} = private constant { i32, i32, i32, i32, i32, i32, i32, i32 } { i32 5, i32 0, i32 0
 func no_capture_descriptor(_ c: C, _ d: C, _ e: C, _ f: C, _ g: C) {
   useClosure( { _ = c ; _ = d ; _ = e ; _ = f ; _ = g })
+}
+
+// CHECK-LABEL: define hidden swiftcc { i8*, %swift.refcounted* } @"$s7closure9letEscape1fyycyyXE_tF"(i8*, %swift.opaque*)
+// CHECK: call i1 @swift_isEscapingClosureAtFileLocation(%swift.refcounted* {{.*}}, i8* getelementptr inbounds ({{.*}} [[FILENAME]]
+// OPT-LABEL: define hidden swiftcc { i8*, %swift.refcounted* } @"$s7closure9letEscape1fyycyyXE_tF"(i8*, %swift.opaque*)
+// OPT: call i1 @swift_isEscapingClosureAtFileLocation(%swift.refcounted* {{.*}}, i8* getelementptr inbounds ({{.*}} [[FILENAME]]
+func letEscape(f: () -> ()) -> () -> () {
+  return withoutActuallyEscaping(f) { return $0 }
 }

@@ -77,7 +77,7 @@ GenericTypeDecl *ASTBuilder::createTypeDecl(StringRef mangledName,
 }
 
 ProtocolDecl *
-ASTBuilder::createProtocolDecl(const Demangle::NodePointer &node) {
+ASTBuilder::createProtocolDecl(NodePointer node) {
   bool typeAlias;
   return dyn_cast_or_null<ProtocolDecl>(
     createTypeDecl(node, typeAlias));
@@ -125,6 +125,12 @@ Type ASTBuilder::createTypeAliasType(GenericTypeDecl *decl, Type parent) {
   // If the declaration is generic, fail.
   if (aliasDecl->getGenericParams())
     return Type();
+
+  // Imported types can be renamed to be members of other (non-generic)
+  // types, but the mangling does not have a parent type. Just use the
+  // declared type directly in this case and skip the parent check below.
+  if (aliasDecl->hasClangNode() && !aliasDecl->isGenericContext())
+    return aliasDecl->getDeclaredInterfaceType();
 
   // Validate the parent type.
   if (!validateParentType(aliasDecl, parent))
@@ -306,6 +312,10 @@ Type ASTBuilder::createFunctionType(
                               .withValueOwnership(ownership)
                               .withVariadic(flags.isVariadic())
                               .withAutoClosure(flags.isAutoClosure());
+
+    if (auto *fnType = type->getAs<FunctionType>())
+      if (!fnType->isNoEscape())
+        parameterFlags = parameterFlags.withEscaping(true);
 
     funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));
   }
@@ -567,6 +577,22 @@ Type ASTBuilder::getOpaqueType() {
   return Type();
 }
 
+Type ASTBuilder::createOptionalType(Type base) {
+  return OptionalType::get(base);
+}
+
+Type ASTBuilder::createArrayType(Type base) {
+  return ArraySliceType::get(base);
+}
+
+Type ASTBuilder::createDictionaryType(Type key, Type value) {
+  return DictionaryType::get(key, value);
+}
+
+Type ASTBuilder::createParenType(Type base) {
+  return ParenType::get(Ctx, base);
+}
+
 bool ASTBuilder::validateParentType(TypeDecl *decl, Type parent) {
   auto parentDecl = decl->getDeclContext()->getSelfNominalTypeDecl();
 
@@ -619,7 +645,7 @@ DeclContext *ASTBuilder::getNotionalDC() {
 }
 
 GenericTypeDecl *
-ASTBuilder::createTypeDecl(const Demangle::NodePointer &node,
+ASTBuilder::createTypeDecl(NodePointer node,
                            bool &typeAlias) {
   auto DC = findDeclContext(node);
   if (!DC)
@@ -630,14 +656,14 @@ ASTBuilder::createTypeDecl(const Demangle::NodePointer &node,
 }
 
 ModuleDecl *
-ASTBuilder::findModule(const Demangle::NodePointer &node) {
+ASTBuilder::findModule(NodePointer node) {
   assert(node->getKind() == Demangle::Node::Kind::Module);
   const auto &moduleName = node->getText();
   return Ctx.getModuleByName(moduleName);
 }
 
 Demangle::NodePointer
-ASTBuilder::findModuleNode(const Demangle::NodePointer &node) {
+ASTBuilder::findModuleNode(NodePointer node) {
   auto child = node;
   while (child->hasChildren() &&
          child->getKind() != Demangle::Node::Kind::Module) {
@@ -651,7 +677,7 @@ ASTBuilder::findModuleNode(const Demangle::NodePointer &node) {
 }
 
 Optional<ASTBuilder::ForeignModuleKind>
-ASTBuilder::getForeignModuleKind(const Demangle::NodePointer &node) {
+ASTBuilder::getForeignModuleKind(NodePointer node) {
   if (node->getKind() == Demangle::Node::Kind::DeclContext)
     return getForeignModuleKind(node->getFirstChild());
 
@@ -667,7 +693,7 @@ ASTBuilder::getForeignModuleKind(const Demangle::NodePointer &node) {
 
 CanGenericSignature ASTBuilder::demangleGenericSignature(
     NominalTypeDecl *nominalDecl,
-    const Demangle::NodePointer &node) {
+    NodePointer node) {
   GenericSignatureBuilder builder(Ctx);
   builder.addGenericSignature(nominalDecl->getGenericSignature());
 
@@ -742,7 +768,7 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
 }
 
 DeclContext *
-ASTBuilder::findDeclContext(const Demangle::NodePointer &node) {
+ASTBuilder::findDeclContext(NodePointer node) {
   switch (node->getKind()) {
   case Demangle::Node::Kind::DeclContext:
   case Demangle::Node::Kind::Type:
@@ -794,8 +820,8 @@ ASTBuilder::findDeclContext(const Demangle::NodePointer &node) {
 
     } else if (declNameNode->getKind() ==
                  Demangle::Node::Kind::RelatedEntityDeclName) {
-      name = declNameNode->getChild(0)->getText();
-      relatedEntityKind = declNameNode->getText();
+      name = declNameNode->getChild(1)->getText();
+      relatedEntityKind = declNameNode->getFirstChild()->getText();
 
     // Ignore any other decl-name productions for now.
     } else {

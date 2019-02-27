@@ -8,18 +8,24 @@ roots:
       - name: Bcrypt.h
         type: file
         external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/shared/bcrypt.h"
+      - name: ConcurrencySal.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/shared/concurrencysal.h"
       - name: DriverSpecs.h
         type: file
         external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/shared/driverspecs.h"
       - name: SpecStrings.h
         type: file
         external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/shared/specstrings.h"
+      - name: WlanTypes.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/shared/wlantypes.h"
       - name: wtypesbase.h
         type: file
         external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/shared/WTypesbase.h"
-      - name: ConcurrencySal.h
+      - name: iprtrmib.h
         type: file
-        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/shared/concurrencysal.h"
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/shared/Iprtrmib.h"
   - name: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um"
     type: directory
     contents:
@@ -32,6 +38,12 @@ roots:
       - name: exdisp.h
         type: file
         external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/ExDisp.h"
+      - name: ipexport.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/IPExport.h"
+      - name: iptypes.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/IPTypes.h"
       - name: isguids.h
         type: file
         external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/IsGuids.h"
@@ -98,6 +110,9 @@ roots:
       - name: winnls.h
         type: file
         external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/WinNls.h"
+      - name: winsock2.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/WinSock2.h"
       - name: winuser.h
         type: file
         external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/WinUser.h"

@@ -716,6 +716,27 @@ public:
                       BeginBorrowInst(getSILDebugLocation(Loc), LV));
   }
 
+  SILValue emitLoadBorrowOperation(SILLocation loc, SILValue v) {
+    if (!hasOwnership()) {
+      return emitLoadValueOperation(loc, v,
+                                    LoadOwnershipQualifier::Unqualified);
+    }
+    return createLoadBorrow(loc, v);
+  }
+
+  SILValue emitBeginBorrowOperation(SILLocation loc, SILValue v) {
+    if (!hasOwnership() ||
+        v.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Guaranteed))
+      return v;
+    return createBeginBorrow(loc, v);
+  }
+
+  void emitEndBorrowOperation(SILLocation loc, SILValue v) {
+    if (!hasOwnership())
+      return;
+    createEndBorrow(loc, v);
+  }
+
   // Pass in an address or value, perform a begin_borrow/load_borrow and pass
   // the value to the passed in closure. After the closure has finished
   // executing, automatically insert the end_borrow. The closure can assume that
@@ -812,9 +833,11 @@ public:
         getSILDebugLocation(loc), buffer, enforcement, aborted, fromBuiltin));
   }
 
-  AssignInst *createAssign(SILLocation Loc, SILValue Src, SILValue DestAddr) {
+  AssignInst *createAssign(SILLocation Loc, SILValue Src, SILValue DestAddr,
+                           AssignOwnershipQualifier Qualifier) {
     return insert(new (getModule())
-                      AssignInst(getSILDebugLocation(Loc), Src, DestAddr));
+                      AssignInst(getSILDebugLocation(Loc), Src, DestAddr,
+                                 Qualifier));
   }
 
   StoreBorrowInst *createStoreBorrow(SILLocation Loc, SILValue Src,
@@ -2125,12 +2148,18 @@ private:
   }
 
   bool isLoadableOrOpaque(SILType Ty) {
-    if (!F) {
-      // We are inserting into the static initializer of a SILGlobalVariable.
-      // All types used there are loadable by definition.
+    auto &M = C.Module;
+
+    if (!SILModuleConventions(M).useLoweredAddresses())
       return true;
-    }
-    return Ty.isLoadableOrOpaque(F);
+
+    auto expansion = ResilienceExpansion::Maximal;
+    // If there's no current SILFunction, we're inserting into a global
+    // variable initializer.
+    if (F)
+      expansion = F->getResilienceExpansion();
+
+    return M.getTypeLowering(Ty, expansion).isLoadable();
   }
 
   void appendOperandTypeName(SILType OpdTy, llvm::SmallString<16> &Name) {

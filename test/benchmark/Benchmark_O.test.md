@@ -14,9 +14,9 @@ as a verification of this public API to prevent its accidental breakage.
 [BD]: https://github.com/apple/swift/blob/master/benchmark/scripts/Benchmark_Driver
 [Testing]: https://github.com/apple/swift/blob/master/docs/Testing.md
 
-Note: Following tests use *HashQuadratic* as an example of a benchmark that is
-excluded from the default "pre-commit" list because it is marked `unstable` and
-the default skip-tags (`unstable,skip`) will exclude it.  The *Ackermann* and
+Note: Following tests use *Existential.* as an example of a benchmarks that are
+excluded from the default "pre-commit" list because they are marked `skip` and
+the default skip-tags (`unstable,skip`) will exclude them.  The *Ackermann* and
 *AngryPhonebook* are alphabetically the first two benchmarks in the test suite
 (used to verify running by index). If these assumptions change, the test must be
 adapted.
@@ -27,7 +27,7 @@ RUN: %Benchmark_O --list | %FileCheck %s \
 RUN:                      --check-prefix LISTPRECOMMIT \
 RUN:                      --check-prefix LISTTAGS
 LISTPRECOMMIT: #,Test,[Tags]
-LISTPRECOMMIT-NOT: HashQuadratic
+LISTPRECOMMIT-NOT: Existential.
 LISTPRECOMMIT: {{[0-9]+}},AngryPhonebook
 LISTTAGS-SAME: ,[
 LISTTAGS-NOT: TestsUtils.BenchmarkCategory.
@@ -35,14 +35,14 @@ LISTTAGS-SAME: String, api, validation
 LISTTAGS-SAME: ]
 ````
 
-Verify HashQuadratic is listed when skip-tags are explicitly empty and that it
-is marked unstable:
+Verify `Existential.` benchmarks are listed when skip-tags are explicitly empty
+and that they are marked `skip`:
 
 ````
 RUN: %Benchmark_O --list --skip-tags= | %FileCheck %s --check-prefix LISTALL
 LISTALL: AngryPhonebook
-LISTALL: HashQuadratic
-LISTALL-SAME: unstable
+LISTALL: Existential.
+LISTALL-SAME: skip
 ````
 
 ## Benchmark Selection
@@ -54,8 +54,9 @@ It provides us with ability to do a "dry run".
 Run benchmark by name (even if its tags match the skip-tags) or test number:
 
 ````
-RUN: %Benchmark_O HashQuadratic --list | %FileCheck %s --check-prefix NAMEDSKIP
-NAMEDSKIP: HashQuadratic
+RUN: %Benchmark_O Existential.Mutating.Ref1 --list \
+RUN:              | %FileCheck %s --check-prefix NAMEDSKIP
+NAMEDSKIP: Existential.Mutating.Ref1
 
 RUN: %Benchmark_O 1 --list | %FileCheck %s --check-prefix RUNBYNUMBER
 RUNBYNUMBER: Ackermann

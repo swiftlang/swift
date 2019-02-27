@@ -517,6 +517,8 @@ public:
   SILInstructionResultArray getResults() const { return getResultsImpl(); }
   unsigned getNumResults() const { return getResults().size(); }
 
+  SILValue getResult(unsigned index) const { return getResults()[index]; }
+
   /// Return the types of the results produced by this instruction.
   SILInstructionResultArray::type_range getResultTypes() const {
     return getResultsImpl().getTypes();
@@ -3603,6 +3605,25 @@ public:
   }
 };
 
+// *NOTE* When serializing, we can only represent up to 4 values here. If more
+// qualifiers are added, SIL serialization must be updated.
+enum class AssignOwnershipQualifier {
+  /// Unknown initialization method
+  Unknown,
+
+  /// The box contains a fully-initialized value.
+  Reassign,
+
+  /// The box contains a class instance that we own, but the instance has
+  /// not been initialized and should be freed with a special SIL
+  /// instruction made for this purpose.
+  Reinit,
+
+  /// The box contains an undefined value that should be ignored.
+  Init,
+};
+static_assert(2 == SILNode::NumAssignOwnershipQualifierBits, "Size mismatch");
+
 /// AssignInst - Represents an abstract assignment to a memory location, which
 /// may either be an initialization or a store sequence.  This is only valid in
 /// Raw SIL.
@@ -3613,7 +3634,9 @@ class AssignInst
 
   FixedOperandList<2> Operands;
 
-  AssignInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest);
+  AssignInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest,
+             AssignOwnershipQualifier Qualifier =
+                AssignOwnershipQualifier::Unknown);
 
 public:
   enum {
@@ -3628,6 +3651,14 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  AssignOwnershipQualifier getOwnershipQualifier() const {
+    return AssignOwnershipQualifier(
+      SILInstruction::Bits.AssignInst.OwnershipQualifier);
+  }
+  void setOwnershipQualifier(AssignOwnershipQualifier qualifier) {
+    SILInstruction::Bits.AssignInst.OwnershipQualifier = unsigned(qualifier);
+  }
 };
 
 /// Indicates that a memory location is uninitialized at this point and needs to
@@ -6161,8 +6192,12 @@ public:
   }
 };
 
-/// MarkDependenceInst - Marks that one value depends on another for
-/// validity in a non-obvious way.
+/// Indicates that the validity of the first operand ("the value") depends on
+/// the value of the second operand ("the base").  Operations that would destroy
+/// the base must not be moved before any instructions which depend on the
+/// result of this instruction, exactly as if the address had been obviously
+/// derived from that operand (e.g. using ``ref_element_addr``). The result is
+/// always equal to the first operand.
 class MarkDependenceInst
     : public InstructionBase<SILInstructionKind::MarkDependenceInst,
                              SingleValueInstruction> {
@@ -6178,6 +6213,7 @@ public:
   enum { Value, Base };
 
   SILValue getValue() const { return Operands[Value].get(); }
+
   SILValue getBase() const { return Operands[Base].get(); }
 
   void setValue(SILValue newVal) {
@@ -7207,10 +7243,14 @@ public:
   bool hasDefault() const {
     return SILInstruction::Bits.SwitchEnumInstBase.HasDefault;
   }
+
   SILBasicBlock *getDefaultBB() const {
     assert(hasDefault() && "doesn't have a default");
     return getSuccessorBuf()[getNumCases()];
   }
+
+  NullablePtr<SILBasicBlock> getDefaultBBOrNull() const;
+
   ProfileCounter getDefaultCount() const {
     assert(hasDefault() && "doesn't have a default");
     return getSuccessorBuf()[getNumCases()].getCount();

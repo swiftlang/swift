@@ -13,6 +13,7 @@
 #ifndef SWIFT_SIL_SILFUNCTIONBUILDER_H
 #define SWIFT_SIL_SILFUNCTIONBUILDER_H
 
+#include "swift/AST/Availability.h"
 #include "swift/SIL/SILModule.h"
 
 namespace swift {
@@ -42,13 +43,20 @@ class SILGenFunctionBuilder;
 ///    code-reuse in between these different SILFunction creation sites.
 class SILFunctionBuilder {
   SILModule &mod;
+  AvailabilityContext availCtx;
 
   friend class SILParserFunctionBuilder;
   friend class SILSerializationFunctionBuilder;
   friend class SILOptFunctionBuilder;
   friend class Lowering::SILGenFunctionBuilder;
 
-  SILFunctionBuilder(SILModule &mod) : mod(mod) {}
+  SILFunctionBuilder(SILModule &mod)
+      : SILFunctionBuilder(mod,
+                           AvailabilityContext::forDeploymentTarget(
+                             mod.getASTContext())) {}
+
+  SILFunctionBuilder(SILModule &mod, AvailabilityContext availCtx)
+      : mod(mod), availCtx(availCtx) {}
 
   /// Return the declaration of a utility function that can, but needn't, be
   /// shared between different parts of a program.
