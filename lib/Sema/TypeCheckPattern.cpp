@@ -1390,7 +1390,9 @@ recur:
 
           // If we have an optional type, let's try to see if the case
           // exists in its base type and if it does then synthesize an
-          // OptionalSomePattern that wraps the case.
+          // OptionalSomePattern that wraps the case. This uses recursion
+          // to add multiple levels of OptionalSomePattern if the optional
+          // is nested.
           if (type->getOptionalObjectType()) {
             if (lookupEnumMemberElement(*this, dc,
                                         type->lookThroughAllOptionalTypes(),
