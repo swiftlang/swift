@@ -4826,6 +4826,15 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   if (auto typeVar = desugar2->getAs<TypeVariableType>()) {
     auto choices = getUnboundBindOverloads(typeVar);
     if (Type resultType = findCommonResultType(choices)) {
+      ASTContext &ctx = getASTContext();
+      if (ctx.LangOpts.DebugConstraintSolver) {
+        auto &log = ctx.TypeCheckerDebug->getStream();
+        log.indent(solverState ? solverState->depth * 2 + 2 : 0)
+          << "(common result type for $T" << typeVar->getID() << " is "
+          << resultType.getString()
+          << ")\n";
+      }
+
       addConstraint(ConstraintKind::Bind, func1->getResult(), resultType,
                     locator);
     }
