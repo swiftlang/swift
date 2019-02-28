@@ -884,9 +884,11 @@ public:
   }
 
   SILDifferentiableAttr *createDifferentiableAttr(
-      SILFunction *original, const SILAutoDiffIndices &indices) const {
+      SILFunction *original, const SILAutoDiffIndices &indices,
+      ArrayRef<Requirement> contextualRequirements) const {
     assert(!lookUpDifferentiableAttr(original, indices));
-    auto *attr = SILDifferentiableAttr::create(getModule(), indices);
+    auto *attr = SILDifferentiableAttr::create(getModule(), indices,
+                                               contextualRequirements);
     original->addDifferentiableAttr(attr);
     return attr;
   }
@@ -894,11 +896,12 @@ public:
   /// Finds or creates a `[differentiable]` attribute on the specified
   /// original function corresponding to the specified parameter indices.
   SILDifferentiableAttr *getOrCreateDifferentiableAttr(
-      SILFunction *original, const SILAutoDiffIndices &indices) {
+      SILFunction *original, const SILAutoDiffIndices &indices,
+      ArrayRef<Requirement> contextualRequirements) {
     if (auto *attr = lookUpDifferentiableAttr(original, indices))
       return attr;
     assert(original->isDefinition());
-    return createDifferentiableAttr(original, indices);
+    return createDifferentiableAttr(original, indices, contextualRequirements);
   }
 
   /// Finds a differentiation task on a function such that the task produces
@@ -965,7 +968,14 @@ public:
                               DifferentiationInvoker invoker) {
     // Make sure this pair of original and indices is unique.
     assert(!lookUpDifferentiationTask(original, indices));
-    auto *attr = getOrCreateDifferentiableAttr(original, indices);
+    ArrayRef<Requirement> contextualRequirements;
+    if (invoker.getKind() ==
+        DifferentiationInvoker::Kind::IndirectDifferentiation)
+      contextualRequirements = invoker.getIndirectDifferentiation()
+                                   .second->getAttribute()
+                                   ->getRequirements();
+    auto *attr = getOrCreateDifferentiableAttr(
+        original, indices, contextualRequirements);
     std::unique_ptr<DifferentiationTask> task(
         new DifferentiationTask(*this, original, std::move(attr), invoker));
     differentiationTasks.push_back(std::move(task));
@@ -1115,7 +1125,7 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
 //===----------------------------------------------------------------------===//
 
 namespace {
-class DifferentiableActivityInfo;
+class DifferentiableActivityCollection;
 
 /// In many real situations, the end-users of AD need only the derivatives of
 /// some selected outputs of `P` with respect to some selected inputs of `P`.
@@ -1149,7 +1159,7 @@ class DifferentiableActivityInfo;
 /// Reference:
 /// Laurent Hascoët. Automatic Differentiation by Program Transformation. 2007.
 class DifferentiableActivityAnalysis
-    : public FunctionAnalysisBase<DifferentiableActivityInfo> {
+    : public FunctionAnalysisBase<DifferentiableActivityCollection> {
 private:
   DominanceAnalysis *dominanceAnalysis = nullptr;
   PostDominanceAnalysis *postDominanceAnalysis = nullptr;
@@ -1166,7 +1176,7 @@ public:
     return k & InvalidationKind::Everything;
   }
 
-  virtual std::unique_ptr<DifferentiableActivityInfo>
+  virtual std::unique_ptr<DifferentiableActivityCollection>
   newFunctionAnalysis(SILFunction *f) override;
 
   virtual void initialize(SILPassManager *pm) override;
@@ -1191,7 +1201,8 @@ using Activity = OptionSet<ActivityFlags>;
 /// indices.
 class DifferentiableActivityInfo {
 private:
-  SILFunction &function;
+  DifferentiableActivityCollection &parent;
+  GenericSignature *assocGenSig = nullptr;
 
   /// Input values, i.e. parameters (both direct and indirect).
   SmallVector<SILValue, 4> inputValues;
@@ -1206,6 +1217,9 @@ private:
   /// value (input) index.
   SmallVector<SmallDenseSet<SILValue>, 4> variedValueSets;
 
+  /// The original function.
+  SILFunction &getFunction();
+
   /// Perform analysis and populate sets.
   void analyze(DominanceInfo *di, PostDominanceInfo *pdi);
 
@@ -1216,9 +1230,8 @@ private:
                                     unsigned dependentVariableIndex);
 
 public:
-  explicit DifferentiableActivityInfo(SILFunction &f,
-                                      DominanceInfo *di,
-                                      PostDominanceInfo *pdi);
+  explicit DifferentiableActivityInfo(
+      DifferentiableActivityCollection &parent, GenericSignature *assocGenSig);
 
   bool isVaried(SILValue value, unsigned independentVariableIndex) const;
   bool isUseful(SILValue value, unsigned dependentVariableIndex) const;
@@ -1231,13 +1244,32 @@ public:
   Activity getActivity(SILInstruction *inst,
                        const SILAutoDiffIndices &indices) const;
 };
+
+class DifferentiableActivityCollection {
+public:
+  SmallDenseMap<GenericSignature *, DifferentiableActivityInfo> activityInfoMap;
+  SILFunction &function;
+  DominanceInfo *domInfo;
+  PostDominanceInfo *postDomInfo;
+
+  DifferentiableActivityInfo &getActivityInfo(GenericSignature *assocGenSig) {
+    DifferentiableActivityInfo info(*this, assocGenSig);
+    auto insertion = activityInfoMap.try_emplace(assocGenSig, info);
+    return insertion.first->getSecond();
+  }
+
+  explicit DifferentiableActivityCollection(SILFunction &f,
+                                            DominanceInfo *di,
+                                            PostDominanceInfo *pdi);
+};
+
 } // end anonymous namespace
 
-std::unique_ptr<DifferentiableActivityInfo>
+std::unique_ptr<DifferentiableActivityCollection>
 DifferentiableActivityAnalysis::newFunctionAnalysis(SILFunction *f) {
   assert(dominanceAnalysis && "Expect a valid dominance anaysis");
   assert(postDominanceAnalysis && "Expect a valid post-dominance anaysis");
-  return llvm::make_unique<DifferentiableActivityInfo>(
+  return llvm::make_unique<DifferentiableActivityCollection>(
       *f, dominanceAnalysis->get(f), postDominanceAnalysis->get(f));
 }
 
@@ -1250,15 +1282,23 @@ SILAnalysis *swift::createDifferentiableActivityAnalysis(SILModule *m) {
   return new DifferentiableActivityAnalysis();
 }
 
-DifferentiableActivityInfo::DifferentiableActivityInfo(SILFunction &f,
-                                                       DominanceInfo *di,
-                                                       PostDominanceInfo *pdi)
-    : function(f) {
-  analyze(di, pdi);
+DifferentiableActivityCollection::DifferentiableActivityCollection(
+    SILFunction &f, DominanceInfo *di, PostDominanceInfo *pdi)
+    : function(f), domInfo(di), postDomInfo(pdi) {}
+
+DifferentiableActivityInfo::DifferentiableActivityInfo(
+    DifferentiableActivityCollection &parent, GenericSignature *assocGenSig)
+    : parent(parent), assocGenSig(assocGenSig) {
+  analyze(parent.domInfo, parent.postDomInfo);
+}
+
+SILFunction &DifferentiableActivityInfo::getFunction() {
+  return parent.function;
 }
 
 void DifferentiableActivityInfo::analyze(DominanceInfo *di,
                                          PostDominanceInfo *pdi) {
+  auto &function = getFunction();
   LLVM_DEBUG(getADDebugStream()
              << "Running activity analysis on @" << function.getName() << '\n');
   // Inputs are just function's arguments, count `n`.
@@ -1280,14 +1320,10 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
       s << val << '\n';
   });
 
-  auto &module = function.getModule();
   // Mark inputs as varied.
   assert(variedValueSets.empty());
-  for (auto input : inputValues) {
-    variedValueSets.push_back({});
-    if (input->getType().isDifferentiable(module))
-      variedValueSets.back().insert(input);
-  }
+  for (auto input : inputValues)
+    variedValueSets.push_back({input});
   // Propagate varied-ness through the function in dominance order.
   DominanceOrder domOrder(function.getEntryBlock(), di);
   while (auto *block = domOrder.getNext()) {
@@ -1316,6 +1352,19 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
           if (isVaried(cai->getSrc(), i))
             recursivelySetVaried(cai->getDest(), i);
         }
+        // Handle `tuple_element_addr`.
+        else if (auto *teai = dyn_cast<TupleElementAddrInst>(&inst)) {
+          if (isVaried(teai->getOperand(), i)) {
+            auto projType = teai->getType().getASTType();
+            if (assocGenSig && projType->hasArchetype())
+              projType = assocGenSig->getCanonicalTypeInContext(
+                  projType->mapTypeOutOfContext());
+            if (projType->getAutoDiffAssociatedVectorSpace(
+                AutoDiffAssociatedVectorSpaceKind::Cotangent,
+                LookUpConformanceInSignature(*assocGenSig)))
+              setVaried(teai, i);
+          }
+        }
 
 // Handle `struct_extract` and `struct_element_addr` instructions.
 // - If the field is marked `@noDerivative` and belongs to a
@@ -1330,8 +1379,7 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
       auto structIsFieldwiseDiffable = sei->getStructDecl()->getAttrs() \
           .hasAttribute<FieldwiseDifferentiableAttr>(); \
       if (!(hasNoDeriv && structIsFieldwiseDiffable)) \
-        for (auto result : inst.getResults()) \
-          setVaried(result, i); \
+        setVaried(sei, i); \
     } \
   }
   PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION(StructExtract)
@@ -3025,7 +3073,9 @@ bool PrimalGen::performSynthesis(FunctionSynthesisItem item) {
   auto &passManager = context.getPassManager();
   auto *activityAnalysis =
       passManager.getAnalysis<DifferentiableActivityAnalysis>();
-  auto &activityInfo = *activityAnalysis->get(item.original);
+  auto &activityCollection = *activityAnalysis->get(item.original);
+  auto &activityInfo = activityCollection.getActivityInfo(
+      item.target->getLoweredFunctionType()->getGenericSignature());
   // For debugging, dump the original function's activity analysis.
   LLVM_DEBUG(dumpActivityInfo(*item.original, item.task->getIndices(),
                               activityInfo, getADDebugStream()));
@@ -3546,15 +3596,17 @@ private:
                     adjointGenEnv->getForwardingSubstitutionMap());
   }
 
+  Optional<VectorSpace> getCotangentSpace(CanType type) {
+    return type->getAutoDiffAssociatedVectorSpace(
+        AutoDiffAssociatedVectorSpaceKind::Cotangent,
+        LookUpConformanceInModule(getModule().getSwiftModule()));
+  }
+
   /// Assuming the given type conforms to `Differentiable` after remapping,
   /// returns the associated cotangent space type.
   SILType getRemappedCotangentType(SILType type) {
     return SILType::getPrimitiveObjectType(
-        remapType(type).getASTType()
-            ->getAutoDiffAssociatedVectorSpace(
-                AutoDiffAssociatedVectorSpaceKind::Cotangent,
-                LookUpConformanceInModule(getModule().getSwiftModule()))
-            ->getCanonicalType());
+        getCotangentSpace(remapType(type).getASTType())->getCanonicalType());
   }
 
   //--------------------------------------------------------------------------//
@@ -3636,21 +3688,31 @@ private:
   SILValue getAdjointProjection(SILValue originalProjection) {
     // Handle `struct_element_addr`.
     if (auto *seai = dyn_cast<StructElementAddrInst>(originalProjection)) {
-      auto adjBase = getAdjointBuffer(seai->getOperand());
+      auto adjSource = getAdjointBuffer(seai->getOperand());
       auto *cotangentVectorDecl =
-          adjBase.getType().getStructOrBoundGenericStruct();
+          adjSource.getType().getStructOrBoundGenericStruct();
       auto cotanFieldLookup =
           cotangentVectorDecl->lookupDirect(seai->getField()->getName());
       assert(cotanFieldLookup.size() == 1);
       auto *cotanField = cast<VarDecl>(cotanFieldLookup.front());
       return builder.createStructElementAddr(
-         seai->getLoc(), adjBase.getValue(), cotanField);
+         seai->getLoc(), adjSource.getValue(), cotanField);
     }
     // Handle `tuple_element_addr`.
     if (auto *teai = dyn_cast<TupleElementAddrInst>(originalProjection)) {
-      auto adjBase = getAdjointBuffer(teai->getOperand());
+      auto source = teai->getOperand();
+      auto adjSource = getAdjointBuffer(source);
+      if (!adjSource.getType().is<TupleType>())
+        return adjSource;
+      auto origTupleTy = source->getType().castTo<TupleType>();
+      unsigned adjIndex = 0;
+      for (unsigned i : range(teai->getFieldNo())) {
+        if (getCotangentSpace(
+                origTupleTy->getElement(i).getType()->getCanonicalType()))
+          ++adjIndex;
+      }
       return builder.createTupleElementAddr(
-          teai->getLoc(), adjBase.getValue(), teai->getFieldNo());
+          teai->getLoc(), adjSource.getValue(), adjIndex);
     }
     // Handle `begin_access`.
     if (auto *bai = dyn_cast<BeginAccessInst>(originalProjection)) {
@@ -3947,17 +4009,23 @@ public:
     if (errorOccurred)
       return;
 
+    LLVM_DEBUG(getADDebugStream() << "AdjointEmitter visited:\n[ORIG]"
+               << *inst);
 #ifndef NDEBUG
     auto beforeInsertion = std::prev(builder.getInsertionPoint());
 #endif
     SILInstructionVisitor::visit(inst);
     LLVM_DEBUG({
-      auto &s = getADDebugStream()
-          << "AdjointEmitter visited:\n[ORIG]" << *inst;
-      s << "[ADJ] Emitted:\n";
+      // auto &s = getADDebugStream()
+      //     << "AdjointEmitter visited:\n[ORIG]" << *inst;
+      // s << "[ADJ] Emitted:\n";
+      // auto afterInsertion = builder.getInsertionPoint();
+      // for (auto it = ++beforeInsertion; it != afterInsertion; ++it)
+      //   s << *it;
+      llvm::dbgs() << "[ADJ] Emitted:\n";
       auto afterInsertion = builder.getInsertionPoint();
       for (auto it = ++beforeInsertion; it != afterInsertion; ++it)
-        s << *it;
+        llvm::dbgs() << *it;
     });
   }
 
@@ -4338,22 +4406,34 @@ public:
     auto av = takeAdjointValue(ti);
     switch (av.getKind()) {
     case AdjointValueKind::Zero:
-      for (auto eltVal : ti->getElements())
+      for (auto eltVal : ti->getElements()) {
+        if (!getCotangentSpace(eltVal->getType().getASTType()))
+          continue;
         addAdjointValue(eltVal, makeZeroAdjointValue(
             getRemappedCotangentType(eltVal->getType())));
+      }
       break;
     case AdjointValueKind::Concrete: {
       auto val = av.getConcreteValue();
-      for (auto i : range(ti->getNumOperands()))
-        addAdjointValue(ti->getOperand(i),
-            makeConcreteAdjointValue(ValueWithCleanup(
-                builder.createTupleExtract(ti->getLoc(), val, i),
-                val.getCleanup())));
+      unsigned adjIdx = 0;
+      for (auto i : range(ti->getNumOperands())) {
+        if (!getCotangentSpace(ti->getOperand(i)->getType().getASTType()))
+          continue;
+        auto adjElt = val;
+        if (val.getType().is<TupleType>())
+          adjElt = ValueWithCleanup(builder.createTupleExtract(
+              ti->getLoc(), val, adjIdx++), val.getCleanup());
+        addAdjointValue(ti->getOperand(i), makeConcreteAdjointValue(adjElt));
+      }
       break;
     }
     case AdjointValueKind::Aggregate:
-      for (auto i : range(ti->getElements().size()))
-        addAdjointValue(ti->getElement(i), av.takeAggregateElement(i));
+      unsigned adjIdx = 0;
+      for (auto i : range(ti->getElements().size())) {
+        if (!getCotangentSpace(ti->getElement(i)->getType().getASTType()))
+          continue;
+        addAdjointValue(ti->getElement(i), av.takeAggregateElement(adjIdx++));
+      }
       break;
     }
   }
@@ -4364,7 +4444,6 @@ public:
   ///   adj[x] += tuple (0, 0, ..., adj[y], ..., 0, 0)
   void visitTupleExtractInst(TupleExtractInst *tei) {
     auto tupleCotanTy = getRemappedCotangentType(tei->getOperand()->getType());
-    auto tupleCotanTupleTy = tupleCotanTy.castTo<TupleType>();
     auto av = takeAdjointValue(tei);
     switch (av.getKind()) {
     case AdjointValueKind::Zero:
@@ -4372,14 +4451,29 @@ public:
       break;
     case AdjointValueKind::Aggregate:
     case AdjointValueKind::Concrete: {
+      auto tupleTy = tei->getTupleType();
+      auto tupleCotanTupleTy = tupleCotanTy.getAs<TupleType>();
+      if (!tupleCotanTupleTy) {
+        addAdjointValue(tei->getOperand(), std::move(av));
+        break;
+      }
       SmallVector<AdjointValue, 8> elements;
-      for (unsigned i : range(tupleCotanTupleTy->getNumElements())) {
+      unsigned adjIdx = 0;
+      for (unsigned i : range(tupleTy->getNumElements())) {
+        if (!getCotangentSpace(
+                tupleTy->getElement(i).getType()->getCanonicalType()))
+          continue;
         if (tei->getFieldNo() == i)
           elements.push_back(av);
         else
           elements.push_back(makeZeroAdjointValue(
               getRemappedCotangentType(SILType::getPrimitiveObjectType(
-                  tupleCotanTupleTy->getElementType(i)->getCanonicalType()))));
+                  tupleCotanTupleTy->getElementType(adjIdx++)
+                      ->getCanonicalType()))));
+      }
+      if (elements.size() == 1) {
+        addAdjointValue(tei->getOperand(), std::move(elements.front()));
+        break;
       }
       addAdjointValue(tei->getOperand(),
           makeAggregateAdjointValue(tupleCotanTy, elements));
@@ -5131,9 +5225,12 @@ bool AdjointGen::performSynthesis(FunctionSynthesisItem item) {
       passManager.getAnalysis<DifferentiableActivityAnalysis>();
   auto *postDomAnalysis =
       passManager.getAnalysis<PostDominanceAnalysis>();
+  auto &activityCollection = *activityAnalysis->get(item.original);
+  auto &activityInfo = activityCollection.getActivityInfo(
+      item.target->getLoweredFunctionType()->getGenericSignature());
   // Generate primal code.
-  AdjointEmitter emitter(item, *activityAnalysis->get(item.original),
-                         *postDomAnalysis->get(item.original), *this);
+  AdjointEmitter emitter(
+      item, activityInfo, *postDomAnalysis->get(item.original), *this);
   // Run the adjoint emitter.
   return emitter.run();
 }

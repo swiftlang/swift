@@ -138,6 +138,41 @@ SimpleMathTests.test("TupleSideEffects") {
   */
 }
 
+// Tests TF-321.
+SimpleMathTests.test("TupleNonDifferentiableElements") {
+  func foo(_ x: Float) -> Float {
+    var tuple = (x, 1)
+    tuple.0 = x
+    tuple.1 = 1
+    return tuple.0
+  }
+  expectEqual(1, gradient(at: 1, in: foo))
+
+  func bar(_ x: Float) -> Float {
+    var tuple: (Int, Int, Float, Float) = (1, 1, x, x)
+    tuple.0 = 1
+    tuple.1 = 1
+    tuple.3 = x
+    return tuple.3
+  }
+  expectEqual(1, gradient(at: 1, in: bar))
+
+  struct Wrapper<T> {
+    @differentiable(where T : Differentiable)
+    func baz(_ x: T) -> T {
+      var tuple = (1, 1, x, 1)
+      tuple.0 = 1
+      tuple.2 = x
+      tuple.3 = 1
+      return tuple.2
+    }
+  }
+  expectEqual(1, gradient(at: Float(1), in: { x -> Float in
+    let wrapper = Wrapper<Float>()
+    return wrapper.baz(x)
+  }))
+}
+
 // Tests TF-21.
 SimpleMathTests.test("StructMemberwiseInitializer") {
   struct Foo : AdditiveArithmetic, Differentiable {

@@ -2600,12 +2600,13 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   AutoDiffParameterIndices *checkedWrtParamIndices =
       attr->getParameterIndices();
 
-  // Predicate checking if a type has associated tangent and cotangent spaces.
-  auto hasAssociatedSpaces = [&](Type type) -> bool {
-    return (bool)type->getAutoDiffAssociatedVectorSpace(
-               AutoDiffAssociatedVectorSpaceKind::Tangent, lookupConformance) &&
-           (bool)type->getAutoDiffAssociatedVectorSpace(
-               AutoDiffAssociatedVectorSpaceKind::Cotangent, lookupConformance);
+  // Returns true if a type conforms to `Differentiable`.
+  auto conformsToDifferentiable = [&](Type type) -> bool {
+    auto *differentiableProto =
+        ctx.getProtocol(KnownProtocolKind::Differentiable);
+    return LookUpConformanceInModule(original->getModuleContext())(
+        differentiableProto->getDeclaredInterfaceType()->getCanonicalType(),
+        type, differentiableProto).hasValue();
   };
 
   // If checked wrt param indices are not specified, compute them using parsed
@@ -2635,8 +2636,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
           wrtParamType =
               whereClauseGenEnv->mapTypeIntoContext(wrtParamInterfaceType);
         }
-        // Return true if the type has associated tangent and cotangent spaces.
-        return hasAssociatedSpaces(wrtParamType);
+        // Return true if the type conforms to `Differentiable`.
+        return conformsToDifferentiable(wrtParamType);
       };
 
       // The wrt types listed when verifying are in (T1) -> (T2, T3) -> R order,
@@ -2785,7 +2786,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       wrtParamType =
           whereClauseGenEnv->mapTypeIntoContext(wrtParamInterfaceType);
     }
-    if (!hasAssociatedSpaces(wrtParamType)) {
+    if (!conformsToDifferentiable(wrtParamType)) {
       TC.diagnose(loc, diag::differentiable_attr_wrt_not_differentiable,
                   wrtParamType);
       attr->setInvalid();
@@ -2807,7 +2808,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
           resultTupleEltType = whereClauseGenEnv->mapTypeIntoContext(
               resultTupleEltType->mapTypeOutOfContext());
         }
-        if (!hasAssociatedSpaces(resultTupleEltType)) {
+        if (!conformsToDifferentiable(resultTupleEltType)) {
           TC.diagnose(attr->getLocation(),
                       diag::differentiable_attr_result_not_differentiable,
                       resultTupleElt.getType());
@@ -2823,7 +2824,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         originalResult =
             whereClauseGenEnv->mapTypeIntoContext(originalResultInterfaceType);
       }
-      if (!hasAssociatedSpaces(originalResult)) {
+      if (!conformsToDifferentiable(originalResult)) {
         TC.diagnose(attr->getLocation(),
                     diag::differentiable_attr_result_not_differentiable,
                     originalResult);
@@ -3374,10 +3375,13 @@ void AttributeChecker::visitFieldwiseDifferentiableAttr(
         diag::fieldwise_differentiable_only_on_differentiable_structs);
     return;
   }
-  if (!TC.conformsToProtocol(
-          structDecl->getDeclaredInterfaceType(),
-          TC.Context.getProtocol(KnownProtocolKind::Differentiable),
-          structDecl, ConformanceCheckFlags::Used)) {
+  auto *differentiableProto =
+      TC.Context.getProtocol(KnownProtocolKind::Differentiable);
+  auto lookupConformance =
+      LookUpConformanceInModule(D->getModuleContext());
+  if (!lookupConformance(
+    differentiableProto->getDeclaredInterfaceType()->getCanonicalType(),
+    structDecl->getDeclaredInterfaceType(), differentiableProto).hasValue()) {
     diagnoseAndRemoveAttr(attr,
         diag::fieldwise_differentiable_only_on_differentiable_structs);
     return;
