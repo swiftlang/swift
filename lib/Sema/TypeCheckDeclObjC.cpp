@@ -1048,6 +1048,20 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
     return shouldMarkClassAsObjC(classDecl);
   }
 
+  // Infer @objc for @_dynamicReplacement(for:) when replaced decl is @objc.
+  if (isa<AbstractFunctionDecl>(VD) || isa<AbstractStorageDecl>(VD))
+    if (auto *replacementAttr =
+            VD->getAttrs().getAttribute<DynamicReplacementAttr>()) {
+      if (auto *replaced = replacementAttr->getReplacedFunction()) {
+        if (replaced->isObjC())
+          return ObjCReason(ObjCReason::ImplicitlyObjC);
+      } else if (auto *replaced =
+                     TypeChecker::findReplacedDynamicFunction(VD)) {
+        if (replaced->isObjC())
+          return ObjCReason(ObjCReason::ImplicitlyObjC);
+      }
+    }
+
   // Destructors are always @objc, with -dealloc as their entry point.
   if (isa<DestructorDecl>(VD))
     return ObjCReason(ObjCReason::ImplicitlyObjC);

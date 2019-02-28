@@ -608,6 +608,18 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
   return NewI;
 }
 
+SILInstruction *CastOptimizer::optimizeBridgedCasts(SILDynamicCastInst cast) {
+  switch (cast.getKind()) {
+  case SILDynamicCastKind::CheckedCastAddrBranchInst:
+  case SILDynamicCastKind::CheckedCastBranchInst:
+  case SILDynamicCastKind::CheckedCastValueBranchInst:
+  case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
+  case SILDynamicCastKind::UnconditionalCheckedCastInst:
+  case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
+    llvm_unreachable("unsupported");
+  }
+}
+
 /// Make use of the fact that some of these casts cannot fail.
 /// For example, if the ObjC type is exactly the expected
 /// _ObjectiveCType type, then it would always succeed for

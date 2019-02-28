@@ -15,6 +15,7 @@
 #include "sourcekitd/DocStructureArray.h"
 #include "sourcekitd/DocSupportAnnotationArray.h"
 #include "sourcekitd/TokenAnnotationsArray.h"
+#include "sourcekitd/ExpressionTypeArray.h"
 
 #include "SourceKit/Core/Context.h"
 #include "SourceKit/Core/LangSupport.h"
@@ -1240,6 +1241,8 @@ bool SKIndexingConsumer::startSourceEntity(const EntityInfo &Info) {
     Elem.set(KeyReceiverUSR, Info.ReceiverUSR);
   if (Info.IsDynamic)
     Elem.setBool(KeyIsDynamic, true);
+  if (Info.IsImplicit)
+    Elem.setBool(KeyIsImplicit, true);
   if (Info.IsTestCandidate)
     Elem.setBool(KeyIsTestCandidate, true);
 
@@ -1740,15 +1743,12 @@ static void reportExpressionTypeInfo(const ExpressionTypesInFile &Info,
                                      ResponseReceiver Rec) {
   ResponseBuilder Builder;
   auto Dict = Builder.getDictionary();
-  Dict.set(KeyTypeBuffer, Info.TypeBuffer);
-  ResponseBuilder::Array Arr = Dict.setArray(KeyExpressionTypeList);
-  for (auto Result: Info.Results) {
-    auto Elem = Arr.appendDictionary();
-    Elem.set(KeyExpressionOffset, Result.ExprOffset);
-    Elem.set(KeyExpressionLength, Result.ExprLength);
-    Elem.set(KeyTypeOffset, Result.TypeOffset);
-    Elem.set(KeyTypeLength, Result.TypeLength);
+  ExpressionTypeArrayBuilder ArrBuilder(Info.TypeBuffer);
+  for (auto &R: Info.Results) {
+    ArrBuilder.add(R);
   }
+  Dict.setCustomBuffer(KeyExpressionTypeList, CustomBufferKind::ExpressionTypeArray,
+                       ArrBuilder.createBuffer());
   Rec(Builder.createResponse());
 }
 

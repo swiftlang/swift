@@ -310,7 +310,7 @@ func test_isa_1(p: P) {
     a()
     // CHECK:   function_ref @$s6switch1ayyF
     // CHECK:   br [[CONT:bb[0-9]+]]
-    
+
   // CHECK: [[IS_NOT_X]]:
   // CHECK:   checked_cast_addr_br copy_on_success P in [[P]] : $*P to Y in {{%.*}} : $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
 
@@ -524,7 +524,7 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK: [[NO_CASE1]]:
   // CHECK:   destroy_value [[CAST_D1_COPY]]
   // CHECK:   br [[NEXT_CASE:bb5]]
-  
+
   // CHECK: [[IS_NOT_D1]]([[NOCAST_D1:%.*]] : @guaranteed $B):
   // CHECK:   end_borrow [[NOCAST_D1]]
   // CHECK:   br [[NEXT_CASE]]
@@ -1020,7 +1020,7 @@ func testOptionalEnumMixWithNil(_ a : Int?) -> Int {
 // CHECK-LABEL: sil hidden [ossa] @$s6switch43testMultiPatternsWithOuterScopeSameNamedVar4base6filterySiSg_AEtF
 func testMultiPatternsWithOuterScopeSameNamedVar(base: Int?, filter: Int?) {
   switch(base, filter) {
-    
+
   case (.some(let base), .some(let filter)):
     // CHECK: bb2(%10 : $Int):
     // CHECK-NEXT: debug_value %8 : $Int, let, name "base"
@@ -1034,7 +1034,7 @@ func testMultiPatternsWithOuterScopeSameNamedVar(base: Int?, filter: Int?) {
     // CHECK: bb5([[OTHER_BASE:%.*]] : $Int)
     // CHECK-NEXT: debug_value [[OTHER_BASE]] : $Int, let, name "base"
     // CHECK-NEXT: br bb6([[OTHER_BASE]] : $Int)
-    
+
     // CHECK: bb6([[ARG:%.*]] : $Int):
     print("single: \(base)")
   default:
@@ -1259,5 +1259,29 @@ func partial_address_only_tuple_dispatch_with_fail_case(_ name: Klass, _ value: 
     break
   default:
     break
+  }
+}
+
+// This was crashing the ownership verifier at some point and was reported in
+// SR-6664. Just make sure that we still pass the ownership verifier.
+
+// `indirect` is necessary; generic parameter is necessary.
+indirect enum SR6664_Base<Element> {
+  // Tuple associated value is necessary; one element must be a function,
+  // the other must be a non-function using the generic parameter.
+  // (The original associated value was `(where: (Element) -> Bool, of: Element?)`,
+  // to give you an idea of the variety of types.)
+  case index((Int) -> Void, Element)
+
+  // Function can be in an extension or not. Can have a return value or not. Can
+  // have a parameter or not. Can be generic or not.
+  func relative() {
+    switch self {
+    // Matching the case is necessary. You can capture or ignore the associated
+    // values.
+    case .index:
+      // Body doesn't matter.
+      break
+    }
   }
 }

@@ -366,10 +366,25 @@ bool MissingConformanceFailure::diagnoseAsError() {
 
 bool LabelingFailure::diagnoseAsError() {
   auto &cs = getConstraintSystem();
-  auto *call = cast<CallExpr>(getAnchor());
-  return diagnoseArgumentLabelError(cs.getASTContext(), call->getArg(),
-                                    CorrectLabels,
-                                    isa<SubscriptExpr>(call->getFn()));
+  auto *anchor = getRawAnchor();
+
+  Expr *argExpr = nullptr;
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
+    if (auto *call = dyn_cast_or_null<CallExpr>(findParentExpr(UDE)))
+      argExpr = call->getArg();
+  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
+    argExpr = UME->getArgument();
+  } else if (auto *call = dyn_cast<CallExpr>(anchor)) {
+    argExpr = call->getArg();
+  } else if (auto *SE = dyn_cast<SubscriptExpr>(anchor)) {
+    argExpr = SE->getIndex();
+  }
+
+  if (!argExpr)
+    return false;
+
+  return diagnoseArgumentLabelError(cs.getASTContext(), argExpr, CorrectLabels,
+                                    isa<SubscriptExpr>(anchor));
 }
 
 bool NoEscapeFuncToTypeConversionFailure::diagnoseAsError() {
@@ -531,7 +546,7 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
 }
 
 // Suggest a default value via ?? <default value>
-static void offerDefaultValueUnwrapFixit(TypeChecker &TC, DeclContext *DC, Expr *expr) {
+static void offerDefaultValueUnwrapFixit(TypeChecker &TC, DeclContext *DC, Expr *expr, Expr *rootExpr) {
   auto diag =
   TC.diagnose(expr->getLoc(), diag::unwrap_with_default_value);
 
@@ -539,7 +554,7 @@ static void offerDefaultValueUnwrapFixit(TypeChecker &TC, DeclContext *DC, Expr 
   bool needsParensInside =
   exprNeedsParensBeforeAddingNilCoalescing(TC, DC, expr);
   bool needsParensOutside =
-  exprNeedsParensAfterAddingNilCoalescing(TC, DC, expr, expr);
+  exprNeedsParensAfterAddingNilCoalescing(TC, DC, expr, rootExpr);
 
   llvm::SmallString<2> insertBefore;
   llvm::SmallString<32> insertAfter;
@@ -603,7 +618,7 @@ public:
   int referencesCount() { return count; }
 };
 
-static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Type baseType,
+static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Expr *rootExpr, Type baseType,
                            Type unwrappedType) {
 
   assert(!baseType->hasTypeVariable() &&
@@ -658,14 +673,14 @@ static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Type baseType,
         }
         diag.flush();
 
-        offerDefaultValueUnwrapFixit(CS.TC, varDecl->getDeclContext(),
-                                     initializer);
+        offerDefaultValueUnwrapFixit(CS.TC, varDecl->getDeclContext(), 
+                                     initializer, rootExpr);
         offerForceUnwrapFixit(CS, initializer);
       }
     }
   }
 
-  offerDefaultValueUnwrapFixit(CS.TC, CS.DC, expr);
+  offerDefaultValueUnwrapFixit(CS.TC, CS.DC, expr, rootExpr);
   offerForceUnwrapFixit(CS, expr);
   return true;
 }
@@ -675,6 +690,7 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
     return false;
 
   auto *anchor = getAnchor();
+  auto *rootExpr = getParentExpr();
 
   if (auto assignExpr = dyn_cast<AssignExpr>(anchor))
     anchor = assignExpr->getSrc();
@@ -684,7 +700,7 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
 
   auto *tryExpr = dyn_cast<OptionalTryExpr>(unwrapped);
   if (!tryExpr) {
-    return diagnoseUnwrap(getConstraintSystem(), unwrapped, getBaseType(),
+    return diagnoseUnwrap(getConstraintSystem(), unwrapped, rootExpr, getBaseType(),
                           getUnwrappedType());
   }
 
@@ -1585,6 +1601,284 @@ bool MissingMemberFailure::diagnoseAsError() {
   return true;
 }
 
+bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
+  auto loc = getAnchor()->getLoc();
+  auto &cs = getConstraintSystem();
+  auto locator = getLocator();
+
+  if (loc.isInvalid()) {
+    return true;
+  }
+
+  Expr *expr = getParentExpr();
+  SourceRange baseRange = expr ? expr->getSourceRange() : SourceRange();
+  auto resolvedOverloadChoice = getResolvedOverload(locator)->Choice;
+
+  ValueDecl *decl = nullptr;
+
+  if (!resolvedOverloadChoice.isDecl()) {
+    if (auto MT = resolvedOverloadChoice.getBaseType()->getAs<MetatypeType>()) {
+      if (auto VD = dyn_cast<ValueDecl>(
+              MT->getMetatypeInstanceType()->getAnyNominal()->getAsDecl())) {
+        decl = VD;
+      }
+    } else {
+      return true;
+    }
+  }
+
+  auto member = decl ? decl : resolvedOverloadChoice.getDecl();
+
+  // If the base is an implicit self type reference, and we're in a
+  // an initializer, then the user wrote something like:
+  //
+  //   class Foo { let x = 1, y = x }
+  //
+  // which runs in type context, not instance context, or
+  //
+  //   class Bar {
+  //     let otherwise = 1              // instance member
+  //     var x: Int
+  //     func init(x: Int =otherwise) { // default parameter
+  //       self.x = x
+  //     }
+  //   }
+  //
+  // in which an instance member is used as a default value for a
+  // parameter.
+  //
+  // Produce a tailored diagnostic for these cases since this
+  // comes up and is otherwise non-obvious what is going on.
+
+  if (Name.isSimpleName(DeclBaseName::createConstructor()) &&
+      !BaseType->getRValueType()->is<AnyMetatypeType>()) {
+    if (auto ctorRef = dyn_cast<UnresolvedDotExpr>(getRawAnchor())) {
+      if (isa<SuperRefExpr>(ctorRef->getBase())) {
+        emitDiagnostic(loc, diag::super_initializer_not_in_initializer);
+        return true;
+      }
+      SourceRange fixItRng = ctorRef->getNameLoc().getSourceRange();
+      emitDiagnostic(loc, diag::init_not_instance_member)
+          .fixItInsert(fixItRng.Start, "type(of: ")
+          .fixItInsertAfter(fixItRng.End, ")");
+      return true;
+    }
+  }
+
+  if (BaseType->is<AnyMetatypeType>() && !member->isStatic()) {
+    auto instanceTy = BaseType->getRValueType();
+    
+    if (auto *AMT = instanceTy->getAs<AnyMetatypeType>()) {
+      instanceTy = AMT->getInstanceType();
+    }
+
+    if (getRawAnchor() &&
+        cs.DC->getContextKind() == DeclContextKind::Initializer) {
+      auto *TypeDC = cs.DC->getParent();
+      bool propertyInitializer = true;
+      // If the parent context is not a type context, we expect it
+      // to be a defaulted parameter in a function declaration.
+      if (!TypeDC->isTypeContext()) {
+        assert(TypeDC->getContextKind() ==
+               DeclContextKind::AbstractFunctionDecl &&
+               "Expected function decl context for initializer!");
+        TypeDC = TypeDC->getParent();
+        propertyInitializer = false;
+      }
+      
+      assert(TypeDC->isTypeContext() && "Expected type decl context!");
+      
+      if (TypeDC->getSelfNominalTypeDecl() == instanceTy->getAnyNominal()) {
+        if (propertyInitializer) {
+          emitDiagnostic(loc, diag::instance_member_in_initializer, Name);
+          return true;
+        } else {
+          emitDiagnostic(loc, diag::instance_member_in_default_parameter, Name);
+          return true;
+        }
+      }
+    }
+
+    auto maybeCallExpr = getRawAnchor();
+
+    if (auto UDE = dyn_cast<UnresolvedDotExpr>(maybeCallExpr)) {
+      maybeCallExpr = UDE->getBase();
+    }
+
+    if (auto callExpr = dyn_cast<ApplyExpr>(maybeCallExpr)) {
+      auto fnExpr = callExpr->getFn();
+      auto fnType = cs.getType(fnExpr)->getRValueType();
+      auto arg = callExpr->getArg();
+
+      if (fnType->is<ExistentialMetatypeType>()) {
+        emitDiagnostic(arg->getStartLoc(),
+                       diag::missing_init_on_metatype_initialization)
+            .highlight(fnExpr->getSourceRange());
+        return true;
+      }
+    }
+
+    // Check whether the instance member is declared on parent context and if so
+    // provide more specialized message.
+    auto memberTypeContext = member->getDeclContext()->getInnermostTypeContext();
+    auto currentTypeContext = cs.DC->getInnermostTypeContext();
+    
+    if (memberTypeContext && currentTypeContext &&
+        memberTypeContext->getSemanticDepth() <
+        currentTypeContext->getSemanticDepth()) {
+      emitDiagnostic(loc, diag::could_not_use_instance_member_on_type,
+                     currentTypeContext->getDeclaredInterfaceType(), Name,
+                     memberTypeContext->getDeclaredInterfaceType(), true)
+          .highlight(baseRange)
+          .highlight(member->getSourceRange());
+      return true;
+    }
+
+    if (isa<TypeExpr>(getRawAnchor())) {
+      emitDiagnostic(loc, diag::instance_member_use_on_type, instanceTy, Name)
+          .highlight(getRawAnchor()->getSourceRange());
+      return true;
+    }
+
+    // Just emit a generic "instance member cannot be used" error
+    emitDiagnostic(loc, diag::could_not_use_instance_member_on_type, instanceTy,
+                   Name, instanceTy, false)
+        .highlight(getAnchor()->getSourceRange());
+    return true;
+  } else {
+    // If the base of the lookup is a protocol metatype, suggest
+    // to replace the metatype with 'Self'
+    // error saying the lookup cannot be on a protocol metatype
+    Optional<InFlightDiagnostic> Diag;
+    auto baseObjTy = BaseType->getRValueType();
+    
+    if (auto metatypeTy = baseObjTy->getAs<MetatypeType>()) {
+      auto instanceTy = metatypeTy->getInstanceType();
+      
+      // This will only happen if we have an unresolved dot expression
+      // (.foo) where foo is a protocol member and the contextual type is
+      // an optional protocol metatype.
+      if (auto objectTy = instanceTy->getOptionalObjectType()) {
+        instanceTy = objectTy;
+        baseObjTy = MetatypeType::get(objectTy);
+      }
+      assert(instanceTy->isExistentialType());
+      
+      // Give a customized message if we're accessing a member type
+      // of a protocol -- otherwise a diagnostic talking about
+      // static members doesn't make a whole lot of sense
+      if (auto TAD = dyn_cast<TypeAliasDecl>(member)) {
+        Diag.emplace(emitDiagnostic(loc, diag::typealias_outside_of_protocol,
+                                    TAD->getName()));
+      } else if (auto ATD = dyn_cast<AssociatedTypeDecl>(member)) {
+        Diag.emplace(emitDiagnostic(loc, diag::assoc_type_outside_of_protocol,
+                                    ATD->getName()));
+      } else if (isa<ConstructorDecl>(member)) {
+        Diag.emplace(emitDiagnostic(loc, diag::construct_protocol_by_name,
+                                    instanceTy));
+      } else {
+        Diag.emplace(emitDiagnostic(loc,
+                                    diag::could_not_use_type_member_on_protocol_metatype,
+                                    baseObjTy, Name));
+      }
+      
+      Diag->highlight(baseRange).highlight(getAnchor()->getSourceRange());
+      
+      // See through function decl context
+      if (auto parent = cs.DC->getInnermostTypeContext()) {
+        // If we are in a protocol extension of 'Proto' and we see
+        // 'Proto.static', suggest 'Self.static'
+        if (auto extensionContext = parent->getExtendedProtocolDecl()) {
+          if (extensionContext->getDeclaredType()->isEqual(instanceTy)) {
+            Diag->fixItReplace(getAnchor()->getSourceRange(), "Self");
+          }
+        }
+      }
+      
+      return true;
+    }
+    
+    if (isa<EnumElementDecl>(member)) {
+      Diag.emplace(emitDiagnostic(loc, diag::could_not_use_enum_element_on_instance,
+                                  Name));
+    }
+    else {
+      Diag.emplace(emitDiagnostic(loc, diag::could_not_use_type_member_on_instance,
+                                  baseObjTy, Name));
+    }
+    
+    Diag->highlight(getAnchor()->getSourceRange());
+
+    if (Name.isSimpleName(DeclBaseName::createConstructor()) &&
+        !baseObjTy->is<AnyMetatypeType>()) {
+      if (auto ctorRef = dyn_cast<UnresolvedDotExpr>(getRawAnchor())) {
+        SourceRange fixItRng = ctorRef->getNameLoc().getSourceRange();
+        Diag->fixItInsert(fixItRng.Start, "type(of: ");
+        Diag->fixItInsertAfter(fixItRng.End, ")");
+        return true;
+      }
+    }
+
+    // Determine the contextual type of the expression
+    Type contextualType;
+    for (auto iterateCS = &cs; contextualType.isNull() && iterateCS;
+         iterateCS = iterateCS->baseCS) {
+      contextualType = iterateCS->getContextualType();
+    }
+    
+    // Try to provide a fix-it that only contains a '.'
+    if (contextualType) {
+      if (baseObjTy->isEqual(contextualType)) {
+        Diag->fixItInsert(loc, ".");
+        return true;
+      }
+    }
+    
+    // Check if the expression is the matching operator ~=, most often used in
+    // case statements. If so, try to provide a single dot fix-it
+    const Expr *contextualTypeNode = nullptr;
+    ConstraintSystem *lastCS = nullptr;
+    for (auto iterateCS = &cs; iterateCS; iterateCS = iterateCS->baseCS) {
+      lastCS = iterateCS;
+      contextualTypeNode = iterateCS->getContextualTypeNode();
+    }
+    
+    // The '~=' operator is an overloaded decl ref inside a binaryExpr
+    if (auto binaryExpr = dyn_cast<BinaryExpr>(contextualTypeNode)) {
+      if (auto overloadedFn
+          = dyn_cast<OverloadedDeclRefExpr>(binaryExpr->getFn())) {
+        if (!overloadedFn->getDecls().empty()) {
+          // Fetch any declaration to check if the name is '~='
+          ValueDecl *decl0 = overloadedFn->getDecls()[0];
+          
+          if (decl0->getBaseName() == decl0->getASTContext().Id_MatchOperator) {
+            assert(binaryExpr->getArg()->getElements().size() == 2);
+            
+            // If the rhs of '~=' is the enum type, a single dot suffixes
+            // since the type can be inferred
+            Type secondArgType =
+            lastCS->getType(binaryExpr->getArg()->getElement(1));
+            if (secondArgType->isEqual(baseObjTy)) {
+              Diag->fixItInsert(loc, ".");
+              return true;
+            }
+          }
+        }
+      }
+    }
+    
+    // Fall back to a fix-it with a full type qualifier
+    auto nominal = member->getDeclContext()->getSelfNominalTypeDecl();
+    SmallString<32> typeName;
+    llvm::raw_svector_ostream typeNameStream(typeName);
+    typeNameStream << nominal->getSelfInterfaceType() << ".";
+    
+    Diag->fixItInsert(loc, typeNameStream.str());
+    return true;
+  }
+  
+  return false;
+}
 bool PartialApplicationFailure::diagnoseAsError() {
   auto &cs = getConstraintSystem();
   auto *anchor = cast<UnresolvedDotExpr>(getRawAnchor());
@@ -1635,5 +1929,83 @@ bool ImplicitInitOnNonConstMetatypeFailure::diagnoseAsError() {
   auto loc = apply->getArg()->getStartLoc();
   emitDiagnostic(loc, diag::missing_init_on_metatype_initialization)
       .fixItInsert(loc, ".init");
+  return true;
+}
+
+bool MissingArgumentsFailure::diagnoseAsError() {
+  auto *locator = getLocator();
+  auto path = locator->getPath();
+
+  // TODO: Currently this is only intended to diagnose contextual failures.
+  if (!(path.back().getKind() == ConstraintLocator::ApplyArgToParam ||
+        path.back().getKind() == ConstraintLocator::ContextualType))
+    return false;
+
+  if (auto *closure = dyn_cast<ClosureExpr>(getAnchor()))
+    return diagnoseTrailingClosure(closure);
+
+  return false;
+}
+
+bool MissingArgumentsFailure::diagnoseTrailingClosure(ClosureExpr *closure) {
+  auto diff = Fn->getNumParams() - NumSynthesized;
+
+  // If the closure didn't specify any arguments and it is in a context that
+  // needs some, produce a fixit to turn "{...}" into "{ _,_ in ...}".
+  if (diff == 0) {
+    auto diag =
+        emitDiagnostic(closure->getStartLoc(),
+                       diag::closure_argument_list_missing, NumSynthesized);
+
+    std::string fixText; // Let's provide fixits for up to 10 args.
+    if (Fn->getNumParams() <= 10) {
+      fixText += " ";
+      interleave(
+          Fn->getParams(),
+          [&fixText](const AnyFunctionType::Param &param) { fixText += '_'; },
+          [&fixText] { fixText += ','; });
+      fixText += " in ";
+    }
+
+    if (!fixText.empty()) {
+      // Determine if there is already a space after the { in the closure to
+      // make sure we introduce the right whitespace.
+      auto afterBrace = closure->getStartLoc().getAdvancedLoc(1);
+      auto text = getASTContext().SourceMgr.extractText({afterBrace, 1});
+      if (text.size() == 1 && text == " ")
+        fixText = fixText.erase(fixText.size() - 1);
+      else
+        fixText = fixText.erase(0, 1);
+      diag.fixItInsertAfter(closure->getStartLoc(), fixText);
+    }
+
+    return true;
+  }
+
+  auto params = closure->getParameters();
+  bool onlyAnonymousParams =
+      std::all_of(params->begin(), params->end(),
+                  [](ParamDecl *param) { return !param->hasName(); });
+
+  auto diag =
+      emitDiagnostic(params->getStartLoc(), diag::closure_argument_list_tuple,
+                     resolveType(Fn), Fn->getNumParams(), diff, diff == 1);
+
+  // If the number of parameters is less than number of inferred
+  // let's try to suggest a fix-it with the rest of the missing parameters.
+  if (!closure->hasExplicitResultType() &&
+      closure->getInLoc().isValid()) {
+    SmallString<32> fixIt;
+    llvm::raw_svector_ostream OS(fixIt);
+
+    OS << ",";
+    for (unsigned i = 0; i != NumSynthesized; ++i) {
+      OS << ((onlyAnonymousParams) ? "_" : "<#arg#>");
+      OS << ((i == NumSynthesized - 1) ? " " : ",");
+    }
+
+    diag.fixItInsertAfter(params->getEndLoc(), OS.str());
+  }
+
   return true;
 }

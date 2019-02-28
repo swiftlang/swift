@@ -48,7 +48,7 @@ function(get_test_dependencies SDK result_var_name)
     list(APPEND deps_binaries FileCheck arcmt-test c-arcmt-test c-index-test
          clang llc llvm-cov llvm-dwarfdump llvm-link llvm-as llvm-dis
          llvm-bcanalyzer llvm-nm llvm-readobj llvm-profdata count not
-         llvm-strings)
+         llvm-strings dsymutil)
   endif()
   if(SWIFT_BUILD_SYNTAXPARSERLIB)
     list(APPEND deps_binaries swift-syntax-parser-test)
@@ -88,15 +88,7 @@ function(get_test_dependencies SDK result_var_name)
   set("${result_var_name}" "${deps}" PARENT_SCOPE)
 endfunction()
 
-if(PATH_TO_LLVM_SOURCE)
-  set(LIT "${PATH_TO_LLVM_SOURCE}/utils/lit/lit.py")
-else()
-  set(LIT "${PATH_TO_LLVM_BUILD}/${CMAKE_CFG_INTDIR}/bin/llvm-lit")
-  # Installed LLVM does not contain ${CMAKE_CFG_INTDIR} in paths.
-  if(NOT EXISTS "${LIT}")
-    set(LIT "${PATH_TO_LLVM_BUILD}/llvm-lit/bin")
-  endif()
-endif()
+set(LIT "${LLVM_MAIN_SRC_DIR}/utils/lit/lit.py")
 
 # Incremental mode in lit orders test files by the last modification time
 # instead of by the path, which is good for CI. In this mode lit also updates

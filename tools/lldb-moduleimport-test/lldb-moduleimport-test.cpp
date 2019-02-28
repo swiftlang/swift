@@ -20,7 +20,6 @@
 #include "swift/AST/PrintOptions.h"
 #include "swift/ASTSectionImporter/ASTSectionImporter.h"
 #include "swift/Frontend/Frontend.h"
-#include "swift/IDE/Utils.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Basic/Dwarf.h"
@@ -79,15 +78,14 @@ validateModule(llvm::StringRef data, bool Verbose,
 
 static void resolveDeclFromMangledNameList(
     swift::ASTContext &Ctx, llvm::ArrayRef<std::string> MangledNames) {
-  std::string Error;
   for (auto &Mangled : MangledNames) {
-    swift::Decl *ResolvedDecl =
-        swift::ide::getDeclFromMangledSymbolName(Ctx, Mangled, Error);
+    swift::TypeDecl *ResolvedDecl =
+        swift::Demangle::getTypeDeclForMangling(Ctx, Mangled);
     if (!ResolvedDecl) {
       llvm::errs() << "Can't resolve decl of " << Mangled << "\n";
     } else {
-      ResolvedDecl->print(llvm::errs());
-      llvm::errs() << "\n";
+      ResolvedDecl->dumpRef(llvm::outs());
+      llvm::outs() << "\n";
     }
   }
 }

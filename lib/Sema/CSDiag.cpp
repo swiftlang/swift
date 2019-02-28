@@ -511,14 +511,6 @@ private:
   /// Produce a diagnostic for a general member-lookup failure (irrespective of
   /// the exact expression kind).
   bool diagnoseGeneralMemberFailure(Constraint *constraint);
-  
-  /// Diagnose the lookup of a static member or enum element as instance member.
-  void diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
-                                          Expr *baseExpr,
-                                          DeclName memberName,
-                                          DeclNameLoc nameLoc,
-                                          ValueDecl *member,
-                                          SourceLoc loc);
 
   /// Given a result of name lookup that had no viable results, diagnose the
   /// unviable ones.
@@ -779,140 +771,6 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
                                 constraint->getFunctionRefKind(), locator);
 }
 
-void FailureDiagnosis::
-diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
-                                   Expr *baseExpr,
-                                   DeclName memberName,
-                                   DeclNameLoc nameLoc,
-                                   ValueDecl *member,
-                                   SourceLoc loc) {
-  SourceRange baseRange = baseExpr ? baseExpr->getSourceRange() : SourceRange();
-
-  Optional<InFlightDiagnostic> Diag;
-
-  // If the base of the lookup is a protocol metatype, suggest
-  // to replace the metatype with 'Self'
-  // error saying the lookup cannot be on a protocol metatype
-  if (auto metatypeTy = baseObjTy->getAs<MetatypeType>()) {
-    auto instanceTy = metatypeTy->getInstanceType();
-
-    // This will only happen if we have an unresolved dot expression
-    // (.foo) where foo is a protocol member and the contextual type is
-    // an optional protocol metatype.
-    if (auto objectTy = instanceTy->getOptionalObjectType()) {
-      instanceTy = objectTy;
-      baseObjTy = MetatypeType::get(objectTy);
-    }
-    assert(instanceTy->isExistentialType());
-
-    // Give a customized message if we're accessing a member type
-    // of a protocol -- otherwise a diagnostic talking about
-    // static members doesn't make a whole lot of sense
-    if (auto TAD = dyn_cast<TypeAliasDecl>(member)) {
-      Diag.emplace(diagnose(loc,
-                            diag::typealias_outside_of_protocol,
-                            TAD->getName()));
-    } else if (auto ATD = dyn_cast<AssociatedTypeDecl>(member)) {
-      Diag.emplace(diagnose(loc,
-                            diag::assoc_type_outside_of_protocol,
-                            ATD->getName()));
-    } else if (isa<ConstructorDecl>(member)) {
-      Diag.emplace(diagnose(loc,
-                            diag::construct_protocol_by_name,
-                            instanceTy));
-    } else {
-      Diag.emplace(diagnose(loc,
-                            diag::could_not_use_type_member_on_protocol_metatype,
-                            baseObjTy, memberName));
-    }
-
-    Diag->highlight(baseRange).highlight(nameLoc.getSourceRange());
-
-    // See through function decl context
-    if (auto parent = CS.DC->getInnermostTypeContext()) {
-      // If we are in a protocol extension of 'Proto' and we see
-      // 'Proto.static', suggest 'Self.static'
-      if (auto extensionContext = parent->getExtendedProtocolDecl()) {
-        if (extensionContext->getDeclaredType()->isEqual(instanceTy)) {
-          Diag->fixItReplace(baseRange, "Self");
-        }
-      }
-    }
-
-    return;
-  }
-
-  if (isa<EnumElementDecl>(member))
-    Diag.emplace(diagnose(loc, diag::could_not_use_enum_element_on_instance,
-                          memberName));
-  else
-    Diag.emplace(diagnose(loc, diag::could_not_use_type_member_on_instance,
-                          baseObjTy, memberName));
-
-  Diag->highlight(nameLoc.getSourceRange());
-
-  // No fix-it if the lookup was qualified
-  if (baseExpr && !baseExpr->isImplicit())
-    return;
-
-  // Determine the contextual type of the expression
-  Type contextualType;
-  for (auto iterateCS = &CS; contextualType.isNull() && iterateCS;
-       iterateCS = iterateCS->baseCS) {
-    contextualType = iterateCS->getContextualType();
-  }
-
-  // Try to provide a fix-it that only contains a '.'
-  if (contextualType) {
-    if (baseObjTy->isEqual(contextualType)) {
-      Diag->fixItInsert(loc, ".");
-      return;
-    }
-  }
-
-  // Check if the expression is the matching operator ~=, most often used in
-  // case statements. If so, try to provide a single dot fix-it
-  const Expr *contextualTypeNode = nullptr;
-  ConstraintSystem *lastCS = nullptr;
-  for (auto iterateCS = &CS; iterateCS; iterateCS = iterateCS->baseCS) {
-    lastCS = iterateCS;
-    contextualTypeNode = iterateCS->getContextualTypeNode();
-  }
-
-  // The '~=' operator is an overloaded decl ref inside a binaryExpr
-  if (auto binaryExpr = dyn_cast<BinaryExpr>(contextualTypeNode)) {
-    if (auto overloadedFn
-          = dyn_cast<OverloadedDeclRefExpr>(binaryExpr->getFn())) {
-      if (!overloadedFn->getDecls().empty()) {
-        // Fetch any declaration to check if the name is '~='
-        ValueDecl *decl0 = overloadedFn->getDecls()[0];
-
-        if (decl0->getBaseName() == decl0->getASTContext().Id_MatchOperator) {
-          assert(binaryExpr->getArg()->getElements().size() == 2);
-
-          // If the rhs of '~=' is the enum type, a single dot suffixes
-          // since the type can be inferred
-          Type secondArgType =
-              lastCS->getType(binaryExpr->getArg()->getElement(1));
-          if (secondArgType->isEqual(baseObjTy)) {
-            Diag->fixItInsert(loc, ".");
-            return;
-          }
-        }
-      }
-    }
-  }
-
-  // Fall back to a fix-it with a full type qualifier
-  auto nominal = member->getDeclContext()->getSelfNominalTypeDecl();
-  SmallString<32> typeName;
-  llvm::raw_svector_ostream typeNameStream(typeName);
-  typeNameStream << nominal->getSelfInterfaceType() << ".";
-
-  Diag->fixItInsert(loc, typeNameStream.str());
-  return;
-}
-
 /// Given a result of name lookup that had no viable results, diagnose the
 /// unviable ones.
 void FailureDiagnosis::diagnoseUnviableLookupResults(
@@ -955,80 +813,20 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
                instanceTy, memberName)
         .highlight(baseRange).highlight(nameLoc.getSourceRange());
       return;
-    case MemberLookupResult::UR_InstanceMemberOnType: {
-      // If the base is an implicit self type reference, and we're in a
-      // an initializer, then the user wrote something like:
-      //
-      //   class Foo { let x = 1, y = x }
-      //
-      // which runs in type context, not instance context, or
-      //
-      //   class Bar {
-      //     let otherwise = 1              // instance member
-      //     var x: Int
-      //     func init(x: Int =otherwise) { // default parameter
-      //       self.x = x
-      //     }
-      //   }
-      //
-      // in which an instance member is used as a default value for a
-      // parameter.
-      //
-      // Produce a tailored diagnostic for these cases since this
-      // comes up and is otherwise non-obvious what is going on.
-      if (baseExpr && baseExpr->isImplicit() && isa<Initializer>(CS.DC)) {
-        auto *TypeDC = CS.DC->getParent();
-        bool propertyInitializer = true;
-        // If the parent context is not a type context, we expect it
-        // to be a defaulted parameter in a function declaration.
-        if (!TypeDC->isTypeContext()) {
-          assert(TypeDC->getContextKind() ==
-                     DeclContextKind::AbstractFunctionDecl &&
-                 "Expected function decl context for initializer!");
-          TypeDC = TypeDC->getParent();
-          propertyInitializer = false;
-        }
-        assert(TypeDC->isTypeContext() && "Expected type decl context!");
-
-        if (TypeDC->getSelfNominalTypeDecl() == instanceTy->getAnyNominal()) {
-          if (propertyInitializer)
-            CS.TC.diagnose(nameLoc, diag::instance_member_in_initializer,
-                           memberName);
-          else
-            CS.TC.diagnose(nameLoc, diag::instance_member_in_default_parameter,
-                           memberName);
-          return;
-        }
-      }
-
-      // Check whether the instance member is declared on parent context and if so
-      // provide more specialized message.
-      auto memberTypeContext = member->getDeclContext()->getInnermostTypeContext();
-      auto currentTypeContext = CS.DC->getInnermostTypeContext();
-      if (memberTypeContext && currentTypeContext &&
-          memberTypeContext->getSemanticDepth() <
-          currentTypeContext->getSemanticDepth()) {
-        diagnose(loc, diag::could_not_use_instance_member_on_type,
-                 currentTypeContext->getDeclaredInterfaceType(), memberName,
-                 memberTypeContext->getDeclaredInterfaceType(),
-                 true)
-          .highlight(baseRange).highlight(nameLoc.getSourceRange());
-      } else {
-        diagnose(loc, diag::could_not_use_instance_member_on_type,
-                 instanceTy, memberName,
-                 instanceTy,
-                 false)
-         .highlight(baseRange).highlight(nameLoc.getSourceRange());
-      }
+    case MemberLookupResult::UR_InstanceMemberOnType:
+    case MemberLookupResult::UR_TypeMemberOnInstance: {
+      auto locatorKind = isa<SubscriptExpr>(E)
+                             ? ConstraintLocator::SubscriptMember
+                             : ConstraintLocator::Member;
+      AllowTypeOrInstanceMemberFailure failure(
+          nullptr, CS, baseObjTy, memberName,
+          CS.getConstraintLocator(E, locatorKind));
+      auto diagnosed = failure.diagnoseAsError();
+      assert(diagnosed &&
+             "Failed to produce missing or extraneous metatype diagnostic");
+      (void)diagnosed;
       return;
     }
-
-    case MemberLookupResult::UR_TypeMemberOnInstance:
-      diagnoseTypeMemberOnInstanceLookup(baseObjTy, baseExpr,
-                                         memberName, nameLoc,
-                                         member, loc);
-      return;
-        
     case MemberLookupResult::UR_MutatingMemberOnRValue:
     case MemberLookupResult::UR_MutatingGetterOnRValue: {
       auto diagIDsubelt = diag::cannot_pass_rvalue_mutating_subelement;
@@ -1062,9 +860,6 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
     }
   }
 
-  // FIXME: Emit candidate set....
-  
-  
   // Otherwise, we don't have a specific issue to diagnose.  Just say the vague
   // 'cannot use' diagnostic.
   if (!baseObjTy->isEqual(instanceTy))
@@ -3437,7 +3232,7 @@ diagnoseInstanceMethodAsCurriedMemberOnType(CalleeCandidateInfo &CCI,
       } else {
         TC.diagnose(UDE->getLoc(), diag::could_not_use_instance_member_on_type,
                     instanceType, UDE->getName(), instanceType, false)
-          .highlight(baseExpr->getSourceRange());
+        .highlight(baseExpr->getSourceRange());
       }
       return true;
     }
@@ -5177,7 +4972,9 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       auto diag = diagnose(arg->getStartLoc(),
                            diag::missing_init_on_metatype_initialization);
       diag.highlight(fnExpr->getSourceRange());
-    } else {
+    }
+
+    if (!fnType->is<ExistentialMetatypeType>()) {
       auto diag = diagnose(arg->getStartLoc(),
                            diag::cannot_call_non_function_value, fnType);
       diag.highlight(fnExpr->getSourceRange());
@@ -5625,6 +5422,36 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // If we have an argument list (i.e., a scalar, or a non-zero-element tuple)
   // then diagnose with some specificity about the arguments.
   bool isInitializer = isa<TypeExpr>(fnExpr);
+  if (!fnType->is<AnyMetatypeType>() &&
+      ((isa<TupleExpr>(argExpr) &&
+        cast<TupleExpr>(argExpr)->getNumElements() == 1) ||
+       (isa<ParenExpr>(argExpr) &&
+        !isa<LoadExpr>(cast<ParenExpr>(argExpr)->getSubExpr())))) {
+    if (auto ctorRef = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
+      if (ctorRef->getName().isSimpleName(DeclBaseName::createConstructor())) {
+        // Diagnose 'super.init', which can only appear inside another
+        // initializer, specially.
+        if (isa<SuperRefExpr>(ctorRef->getBase())) {
+          diagnose(fnExpr->getLoc(),
+                   diag::super_initializer_not_in_initializer);
+          calleeInfo.suggestPotentialOverloads(fnExpr->getLoc());
+          return true;
+        }
+
+        // Suggest inserting a call to 'type(of:)' to construct another object
+        // of the same dynamic type.
+        SourceRange fixItRng = ctorRef->getNameLoc().getSourceRange();
+
+        // Surround the caller in `type(of:)`.
+        diagnose(fnExpr->getLoc(), diag::init_not_instance_member)
+            .fixItInsert(fixItRng.Start, "type(of: ")
+            .fixItInsertAfter(fixItRng.End, ")");
+        calleeInfo.suggestPotentialOverloads(fnExpr->getLoc());
+        return true;
+      }
+    }
+  }
+
   if (isa<TupleExpr>(argExpr) &&
       cast<TupleExpr>(argExpr)->getNumElements() == 0) {
     // Emit diagnostics that say "no arguments".
@@ -5948,8 +5775,8 @@ bool FailureDiagnosis::diagnoseClosureExpr(
   // If we have a contextual type available for this closure, apply it to the
   // ParamDecls in our parameter list.  This ensures that any uses of them get
   // appropriate types.
-  if (contextualType && contextualType->is<AnyFunctionType>()) {
-    auto fnType = contextualType->getAs<AnyFunctionType>();
+  if (contextualType && contextualType->is<FunctionType>()) {
+    auto fnType = contextualType->getAs<FunctionType>();
     auto *params = CE->getParameters();
     auto inferredArgs = fnType->getParams();
     
@@ -5964,36 +5791,6 @@ bool FailureDiagnosis::diagnoseClosureExpr(
     unsigned inferredArgCount = inferredArgs.size();
 
     if (actualArgCount != inferredArgCount) {
-      // If the closure didn't specify any arguments and it is in a context that
-      // needs some, produce a fixit to turn "{...}" into "{ _,_ in ...}".
-      if (actualArgCount == 0 && CE->getInLoc().isInvalid()) {
-        auto diag =
-          diagnose(CE->getStartLoc(), diag::closure_argument_list_missing,
-                   inferredArgCount);
-        std::string fixText; // Let's provide fixits for up to 10 args.
-
-        if (inferredArgCount <= 10) {
-          fixText += " _";
-          for (unsigned i = 0; i < inferredArgCount - 1; i ++) {
-            fixText += ",_";
-          }
-          fixText += " in ";
-        }
-
-        if (!fixText.empty()) {
-          // Determine if there is already a space after the { in the closure to
-          // make sure we introduce the right whitespace.
-          auto afterBrace = CE->getStartLoc().getAdvancedLoc(1);
-          auto text = CS.TC.Context.SourceMgr.extractText({afterBrace, 1});
-          if (text.size() == 1 && text == " ")
-            fixText = fixText.erase(fixText.size() - 1);
-          else
-            fixText = fixText.erase(0, 1);
-          diag.fixItInsertAfter(CE->getStartLoc(), fixText);
-        }
-        return true;
-      }
-
       if (inferredArgCount == 1 && actualArgCount > 1) {
         auto *argTupleTy = inferredArgs.front().getOldType()->getAs<TupleType>();
         // Let's see if inferred argument is actually a tuple inside of Paren.
@@ -6129,49 +5926,33 @@ bool FailureDiagnosis::diagnoseClosureExpr(
         }
       }
 
-      bool onlyAnonymousParams =
-      std::all_of(params->begin(), params->end(), [](ParamDecl *param) {
-        return !param->hasName();
-      });
+      // Extraneous arguments.
+      if (inferredArgCount < actualArgCount) {
+        auto diag = diagnose(
+            params->getStartLoc(), diag::closure_argument_list_tuple, fnType,
+            inferredArgCount, actualArgCount, (actualArgCount == 1));
 
-      // Okay, the wrong number of arguments was used, complain about that.
-      // Before doing so, strip attributes off the function type so that they
-      // don't confuse the issue.
-      fnType = FunctionType::get(fnType->getParams(), fnType->getResult(),
-                                 fnType->getExtInfo());
-      auto diag = diagnose(
-          params->getStartLoc(), diag::closure_argument_list_tuple, fnType,
-          inferredArgCount, actualArgCount, (actualArgCount == 1));
+        bool onlyAnonymousParams =
+            std::all_of(params->begin(), params->end(),
+                        [](ParamDecl *param) { return !param->hasName(); });
 
-      // If closure expects no parameters but N was given,
-      // and all of them are anonymous let's suggest removing them.
-      if (inferredArgCount == 0 && onlyAnonymousParams) {
-        auto inLoc = CE->getInLoc();
-        auto &sourceMgr = CS.getASTContext().SourceMgr;
+        // If closure expects no parameters but N was given,
+        // and all of them are anonymous let's suggest removing them.
+        if (inferredArgCount == 0 && onlyAnonymousParams) {
+          auto inLoc = CE->getInLoc();
+          auto &sourceMgr = CS.getASTContext().SourceMgr;
 
-        if (inLoc.isValid())
-          diag.fixItRemoveChars(params->getStartLoc(),
-                                Lexer::getLocForEndOfToken(sourceMgr, inLoc));
+          if (inLoc.isValid())
+            diag.fixItRemoveChars(params->getStartLoc(),
+                                  Lexer::getLocForEndOfToken(sourceMgr, inLoc));
+        }
         return true;
       }
 
-      // If the number of parameters is less than number of inferred
-      // and all of the parameters are anonymous, let's suggest a fix-it
-      // with the rest of the missing parameters.
-      if (actualArgCount < inferredArgCount) {
-        SmallString<32> fixIt;
-        llvm::raw_svector_ostream OS(fixIt);
-
-        OS << ",";
-        auto numMissing = inferredArgCount - actualArgCount;
-        for (unsigned i = 0; i != numMissing; ++i) {
-          OS << ((onlyAnonymousParams) ? "_" : "<#arg#>");
-          OS << ((i == numMissing - 1) ? " " : ",");
-        }
-
-        diag.fixItInsertAfter(params->getEndLoc(), OS.str());
-      }
-      return true;
+      MissingArgumentsFailure failure(
+          expr, CS, fnType, inferredArgCount - actualArgCount,
+          CS.getConstraintLocator(CE, ConstraintLocator::ContextualType));
+      return failure.diagnoseAsError();
     }
 
     // Coerce parameter types here only if there are no unresolved
@@ -6277,28 +6058,6 @@ bool FailureDiagnosis::diagnoseClosureExpr(
   }
 
   // Otherwise, we can't produce a specific diagnostic.
-  return false;
-}
-
-static bool diagnoseKeyPathUnsupportedOperations(TypeChecker &TC,
-                                                 KeyPathExpr *KPE) {
-  if (KPE->isObjC())
-    return false;
-
-  using ComponentKind = KeyPathExpr::Component::Kind;
-  const auto components = KPE->getComponents();
-
-  if (auto *rootType = KPE->getRootType()) {
-    if (isa<TupleTypeRepr>(rootType)) {
-      auto first = components.front();
-      if (first.getKind() == ComponentKind::UnresolvedProperty) {
-        TC.diagnose(first.getLoc(),
-                    diag::unsupported_keypath_tuple_element_reference);
-        return true;
-      }
-    }
-  }
-
   return false;
 }
 
@@ -6499,6 +6258,7 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
     case KeyPathExpr::Component::Kind::OptionalWrap:
     case KeyPathExpr::Component::Kind::Property:
     case KeyPathExpr::Component::Kind::Subscript:
+    case KeyPathExpr::Component::Kind::TupleElement:
       llvm_unreachable("already resolved!");
     }
 
@@ -6532,18 +6292,13 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
                                corrections);
 
       if (currentType) {
-        if (currentType->is<TupleType>()) {
-          TC.diagnose(KPE->getLoc(), diag::expr_keypath_unimplemented_tuple);
-          isInvalid = true;
-          break;
-        }
-        else
-          TC.diagnose(componentNameLoc, diag::could_not_find_type_member,
-                      currentType, componentName);
-      } else
+        TC.diagnose(componentNameLoc, diag::could_not_find_type_member,
+                    currentType, componentName);
+      } else {
         TC.diagnose(componentNameLoc, diag::use_unresolved_identifier,
                     componentName, false);
-
+      }
+        
       // Note all the correction candidates.
       corrections.noteAllCandidates();
       corrections.addAllCandidatesToLookup(lookup);
@@ -6655,9 +6410,6 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
 }
 
 bool FailureDiagnosis::visitKeyPathExpr(KeyPathExpr *KPE) {
-  if (diagnoseKeyPathUnsupportedOperations(CS.TC, KPE))
-    return true;
-
   auto contextualType = CS.getContextualType();
 
   auto components = KPE->getComponents();

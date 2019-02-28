@@ -27,7 +27,7 @@ We use multiple approaches to test the Swift toolchain.
 
 ### Testsuite subsets
 
-The testsuite is split into four subsets:
+The testsuite is split into five subsets:
 
 * Primary testsuite, located under ``swift/test``.
 * Validation testsuite, located under ``swift/validation-test``.
@@ -59,7 +59,7 @@ configured to use your local build directory. For example:
     % ${LLVM_SOURCE_ROOT}/utils/lit/lit.py -sv ${SWIFT_BUILD_DIR}/test-macosx-x86_64/Parse/
 ```
 
-This runs the tests in the 'test/Parse/' directory targeting 64-bit macOS. 
+This runs the tests in the 'test/Parse/' directory targeting 64-bit macOS.
 The ``-sv`` options give you a nice progress bar and only show you
 output from the tests that fail.
 

@@ -150,7 +150,6 @@ NO_OPERAND_INST(Unwind)
         ValueOwnershipKind::OWNERSHIP,                                         \
         UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT);                       \
   }
-CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, IsEscapingClosure)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, RefElementAddr)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialValue)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialBoxValue)
@@ -266,6 +265,7 @@ ACCEPTS_ANY_OWNERSHIP_INST(ExistentialMetatype)
 ACCEPTS_ANY_OWNERSHIP_INST(ValueMetatype)
 ACCEPTS_ANY_OWNERSHIP_INST(UncheckedOwnershipConversion)
 ACCEPTS_ANY_OWNERSHIP_INST(ValueToBridgeObject)
+ACCEPTS_ANY_OWNERSHIP_INST(IsEscapingClosure)
 #undef ACCEPTS_ANY_OWNERSHIP_INST
 
 // Trivial if trivial typed, otherwise must accept owned?
@@ -859,19 +859,19 @@ OperandOwnershipKindClassifier::visitCopyBlockWithoutEscapingInst(
 
 OperandOwnershipKindMap OperandOwnershipKindClassifier::visitMarkDependenceInst(
     MarkDependenceInst *mdi) {
+  // If we are analyzing "the value", we forward ownership.
+  if (getValue() == mdi->getValue()) {
+    auto kind = getValue().getOwnershipKind();
+    if (kind == ValueOwnershipKind::Any)
+      return Map::allLive();
+    auto lifetimeConstraint = kind.getForwardingLifetimeConstraint();
+    return Map::compatibilityMap(kind, lifetimeConstraint);
+  }
 
-  // Forward ownership if the mark_dependence instruction marks a dependence
-  // on a @noescape function type for an escaping function type.
-  if (getValue() == mdi->getValue())
-    if (auto resFnTy = mdi->getType().getAs<SILFunctionType>())
-      if (auto baseFnTy = mdi->getBase()->getType().getAs<SILFunctionType>())
-        if (!resFnTy->isNoEscape() && baseFnTy->isNoEscape())
-          return Map::compatibilityMap(
-              ValueOwnershipKind::Owned,
-              UseLifetimeConstraint::MustBeInvalidated);
-
-  // We always treat mark dependence as a use that keeps a value alive. We will
-  // be introducing a begin_dependence/end_dependence version of this later.
+  // If we are not the "value" of the mark_dependence, then we must be the
+  // "base". This means that any use that would destroy "value" can not be moved
+  // before any uses of "base". We treat this as non-consuming and rely on the
+  // rest of the optimizer to respect the movement restrictions.
   return Map::allLive();
 }
 

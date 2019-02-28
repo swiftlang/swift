@@ -432,7 +432,7 @@ public:
     if (!Reader->readBytes(RemoteAddress(ExistentialAddress),
                            (uint8_t *)&Container, sizeof(Container)))
       return None;
-    auto MetadataAddress = reinterpret_cast<StoredPointer>(Container.Type);
+    auto MetadataAddress = static_cast<StoredPointer>(Container.Type);
     auto Metadata = readMetadata(MetadataAddress);
     if (!Metadata)
       return None;
@@ -2472,8 +2472,13 @@ private:
     TaggedPointerExtendedClasses =
         TaggedPointerExtendedClassesAddr.getAddressData();
 
-    tryFindAndReadSymbol(TaggedPointerObfuscator,
-                         "objc_debug_taggedpointer_obfuscator");
+    // The tagged pointer obfuscator is not present on older OSes, in
+    // which case we can treat it as zero.
+    TaggedPointerObfuscator = 0;
+    auto TaggedPointerObfuscatorAddr = Reader->getSymbolAddress(
+      "objc_debug_taggedpointer_obfuscator");
+    if (TaggedPointerObfuscatorAddr)
+      tryReadSymbol(TaggedPointerObfuscatorAddr, TaggedPointerObfuscator);
 
 #   undef tryFindSymbol
 #   undef tryReadSymbol

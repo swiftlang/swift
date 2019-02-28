@@ -875,3 +875,32 @@ struct rdar43866352<Options> {
     callback = { (options: Options) in } // expected-error {{cannot assign value of type '(inout Options) -> ()' to type '(inout _) -> Void'}}
   }
 }
+
+extension Hashable {
+  var self_: Self {
+    return self
+  }
+}
+
+do {
+  struct S<
+      C : Collection,
+      I : Hashable,
+      R : Numeric
+  > {
+    init(_ arr: C,
+         id: KeyPath<C.Element, I>,
+         content: @escaping (C.Element) -> R) {}
+  }
+
+  func foo(_ arr: [Int]) {
+    // FIXME: This behavior related to tuple splat being allowed
+    //        in conversion between a single dependent member
+    //        parameter and empty parameter functions e.g.
+    //        () -> Void `convertable to` (T.V) -> Void.
+    _ = S(arr, id: \.self_) {
+      // expected-error@-1 {{type '_' has no member 'self_'}}
+      return 42
+    }
+  }
+}

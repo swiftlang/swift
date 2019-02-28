@@ -25,6 +25,9 @@
 #include "swift/Basic/LLVM.h"
 
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Signals.h"
 
 using namespace llvm::sys;
 
@@ -43,20 +46,23 @@ public:
   /// the current process's environment will be used instead.
   ArrayRef<const char *> Env;
 
+  /// True if the errors of the Task should be stored in Errors instead of Output.
+  bool SeparateErrors;
+
   /// Context associated with this Task.
   void *Context;
 
   Task(const char *ExecPath, ArrayRef<const char *> Args,
-       ArrayRef<const char *> Env = llvm::None, void *Context = nullptr)
-      : ExecPath(ExecPath), Args(Args), Env(Env), Context(Context) {}
+       ArrayRef<const char *> Env = llvm::None, void *Context = nullptr, bool SeparateErrors = false)
+      : ExecPath(ExecPath), Args(Args), Env(Env), Context(Context), SeparateErrors(SeparateErrors) {}
 };
 
 } // end namespace sys
 } // end namespace swift
 
 bool TaskQueue::supportsBufferingOutput() {
-  // The default implementation does not support buffering output.
-  return false;
+  // The default implementation supports buffering output.
+  return true;
 }
 
 bool TaskQueue::supportsParallelExecution() {
@@ -72,10 +78,7 @@ unsigned TaskQueue::getNumberOfParallelTasks() const {
 void TaskQueue::addTask(const char *ExecPath, ArrayRef<const char *> Args,
                         ArrayRef<const char *> Env, void *Context,
                         bool SeparateErrors) {
-  // This implementation of TaskQueue ignores SeparateErrors.
-  // We need to reference SeparateErrors to avoid warnings, though.
-  (void)SeparateErrors;
-  std::unique_ptr<Task> T(new Task(ExecPath, Args, Env, Context));
+  std::unique_ptr<Task> T(new Task(ExecPath, Args, Env, Context, SeparateErrors));
   QueuedTasks.push(std::move(T));
 }
 
@@ -100,10 +103,24 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
         T->Env.empty() ? decltype(Envp)(None)
                        : decltype(Envp)(llvm::toStringRefArray(T->Env.data()));
 
+    llvm::SmallString<64> stdoutPath;
+    if (fs::createTemporaryFile("stdout", "tmp",  stdoutPath))
+      return true;
+    llvm::sys::RemoveFileOnSignal(stdoutPath);
+
+    llvm::SmallString<64> stderrPath;
+    if (T->SeparateErrors) {
+      if (fs::createTemporaryFile("stderr", "tmp", stdoutPath))
+        return true;
+      llvm::sys::RemoveFileOnSignal(stderrPath);
+    }
+
+    Optional<StringRef> redirects[] = {None, {stdoutPath}, {T->SeparateErrors ? stderrPath : stdoutPath}};
+
     bool ExecutionFailed = false;
     ProcessInfo PI = ExecuteNoWait(T->ExecPath,
                                    llvm::toStringRefArray(Argv.data()), Envp,
-                                   /*redirects*/None, /*memoryLimit*/0,
+                                   /*redirects*/redirects, /*memoryLimit*/0,
                                    /*ErrMsg*/nullptr, &ExecutionFailed);
     if (ExecutionFailed) {
       return true;
@@ -116,12 +133,22 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
     std::string ErrMsg;
     PI = Wait(PI, 0, true, &ErrMsg);
     int ReturnCode = PI.ReturnCode;
+
+    auto stdoutBuffer = llvm::MemoryBuffer::getFile(stdoutPath);
+    StringRef stdoutContents = stdoutBuffer.get()->getBuffer();
+
+    StringRef stderrContents;
+    if (T->SeparateErrors) {
+      auto stderrBuffer = llvm::MemoryBuffer::getFile(stderrPath);
+      stderrContents = stderrBuffer.get()->getBuffer();
+    }
+
     if (ReturnCode == -2) {
       // Wait() returning a return code of -2 indicates the process received
       // a signal during execution.
       if (Signalled) {
         TaskFinishedResponse Response =
-            Signalled(PI.Pid, ErrMsg, StringRef(), StringRef(), T->Context, None, TaskProcessInformation(PI.Pid));
+            Signalled(PI.Pid, ErrMsg, stdoutContents, stderrContents, T->Context, None, TaskProcessInformation(PI.Pid));
         ContinueExecution = Response != TaskFinishedResponse::StopExecution;
       } else {
         // If we don't have a Signalled callback, unconditionally stop.
@@ -132,12 +159,15 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
       // finished.
       if (Finished) {
         TaskFinishedResponse Response = Finished(PI.Pid, PI.ReturnCode,
-        StringRef(), StringRef(), TaskProcessInformation(PI.Pid), T->Context);
+        stdoutContents, stderrContents, TaskProcessInformation(PI.Pid), T->Context);
         ContinueExecution = Response != TaskFinishedResponse::StopExecution;
       } else if (PI.ReturnCode != 0) {
         ContinueExecution = false;
       }
     }
+    llvm::sys::fs::remove(stdoutPath);
+    if (T->SeparateErrors)
+      llvm::sys::fs::remove(stderrPath);
   }
 
   return !ContinueExecution;

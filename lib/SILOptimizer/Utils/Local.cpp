@@ -1624,6 +1624,47 @@ bool swift::analyzeStaticInitializer(
   return StaticInitializerAnalysis(forwardInstructions).analyze(V);
 }
 
+/// FIXME: This must be kept in sync with replaceLoadSequence()
+/// below. What a horrible design.
+bool swift::canReplaceLoadSequence(SILInstruction *I) {
+  if (auto *CAI = dyn_cast<CopyAddrInst>(I))
+    return true;
+
+  if (auto *LI = dyn_cast<LoadInst>(I))
+    return true;
+
+  if (auto *SEAI = dyn_cast<StructElementAddrInst>(I)) {
+    for (auto SEAIUse : SEAI->getUses()) {
+      if (!canReplaceLoadSequence(SEAIUse->getUser()))
+        return false;
+    }
+    return true;
+  }
+
+  if (auto *TEAI = dyn_cast<TupleElementAddrInst>(I)) {
+    for (auto TEAIUse : TEAI->getUses()) {
+      if (!canReplaceLoadSequence(TEAIUse->getUser()))
+        return false;
+    }
+    return true;
+  }
+
+  if (auto *BA = dyn_cast<BeginAccessInst>(I)) {
+    for (auto Use : BA->getUses()) {
+      if (!canReplaceLoadSequence(Use->getUser()))
+        return false;
+    }
+    return true;
+  }
+
+  // Incidental uses of an address are meaningless with regard to the loaded
+  // value.
+  if (isIncidentalUse(I) || isa<BeginUnpairedAccessInst>(I))
+    return true;
+
+  return false;
+}
+
 /// Replace load sequence which may contain
 /// a chain of struct_element_addr followed by a load.
 /// The sequence is traversed inside out, i.e.
@@ -1634,33 +1675,40 @@ bool swift::analyzeStaticInitializer(
 /// guarantee that the only uses of `I` are struct_element_addr and
 /// tuple_element_addr?
 void swift::replaceLoadSequence(SILInstruction *I,
-                                SILValue Value,
-                                SILBuilder &B) {
+                                SILValue Value) {
+  if (auto *CAI = dyn_cast<CopyAddrInst>(I)) {
+    SILBuilder B(CAI);
+    B.createStore(CAI->getLoc(), Value, CAI->getDest(),
+                  StoreOwnershipQualifier::Unqualified);
+    return;
+  }
+
   if (auto *LI = dyn_cast<LoadInst>(I)) {
     LI->replaceAllUsesWith(Value);
     return;
   }
 
-  // It is a series of struct_element_addr followed by load.
   if (auto *SEAI = dyn_cast<StructElementAddrInst>(I)) {
+    SILBuilder B(SEAI);
     auto *SEI = B.createStructExtract(SEAI->getLoc(), Value, SEAI->getField());
     for (auto SEAIUse : SEAI->getUses()) {
-      replaceLoadSequence(SEAIUse->getUser(), SEI, B);
+      replaceLoadSequence(SEAIUse->getUser(), SEI);
     }
     return;
   }
 
   if (auto *TEAI = dyn_cast<TupleElementAddrInst>(I)) {
+    SILBuilder B(TEAI);
     auto *TEI = B.createTupleExtract(TEAI->getLoc(), Value, TEAI->getFieldNo());
     for (auto TEAIUse : TEAI->getUses()) {
-      replaceLoadSequence(TEAIUse->getUser(), TEI, B);
+      replaceLoadSequence(TEAIUse->getUser(), TEI);
     }
     return;
   }
 
   if (auto *BA = dyn_cast<BeginAccessInst>(I)) {
     for (auto Use : BA->getUses()) {
-      replaceLoadSequence(Use->getUser(), Value, B);
+      replaceLoadSequence(Use->getUser(), Value);
     }
     return;
   }

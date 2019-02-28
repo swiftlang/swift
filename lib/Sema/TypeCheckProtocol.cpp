@@ -2518,16 +2518,19 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     if (checkWitnessAccess(assocType, typeDecl, &isSetter)) {
       assert(!isSetter);
 
-      // Avoid relying on the lifetime of 'this'.
+      // Note: you must not capture 'this' in the below closure.
       const DeclContext *DC = this->DC;
+      auto requiredAccessScope = getRequiredAccessScope();
+
       diagnoseOrDefer(assocType, false,
-          [this, DC, typeDecl](NormalProtocolConformance *conformance) {
+          [DC, requiredAccessScope, typeDecl](
+            NormalProtocolConformance *conformance) {
         AccessLevel requiredAccess =
-            getRequiredAccessScope().requiredAccessForDiagnostics();
+            requiredAccessScope.requiredAccessForDiagnostics();
         auto proto = conformance->getProtocol();
         auto protoAccessScope = proto->getFormalAccessScope(DC);
         bool protoForcesAccess =
-            getRequiredAccessScope().hasEqualDeclContextWith(protoAccessScope);
+            requiredAccessScope.hasEqualDeclContextWith(protoAccessScope);
         auto diagKind = protoForcesAccess
                           ? diag::type_witness_not_accessible_proto
                           : diag::type_witness_not_accessible_type;
@@ -2600,11 +2603,6 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
         auto *attr = new (TC.Context) UsableFromInlineAttr(/*implicit=*/true);
         aliasDecl->getAttrs().add(attr);
       }
-
-      bool unused;
-      assert(TC.Context.hadError() ||
-             !checkWitnessAccess(assocType, aliasDecl, &unused));
-      (void)unused;
 
       if (nominal == DC) {
         nominal->addMember(aliasDecl);

@@ -104,6 +104,21 @@ private:
     return impl.finishSourceEntity(UID);
   }
 
+  std::vector<UIdent> getDeclAttributeUIDs(const Decl *decl) {
+    std::vector<UIdent> uidAttrs =
+      SwiftLangSupport::UIDsFromDeclAttributes(decl->getAttrs());
+
+    // check if we should report an implicit @objc attribute
+    if (!decl->getAttrs().getAttribute(DeclAttrKind::DAK_ObjC)) {
+      if (auto *VD = dyn_cast<ValueDecl>(decl)) {
+        if (VD->isObjC()) {
+            uidAttrs.push_back(SwiftLangSupport::getUIDForObjCAttr());
+        }
+      }
+    }
+    return uidAttrs;
+  }
+
   template <typename F>
   bool withEntityInfo(const IndexSymbol &symbol, F func) {
     EntityInfo info;
@@ -118,11 +133,11 @@ private:
     info.Column = symbol.column;
     info.ReceiverUSR = symbol.getReceiverUSR();
     info.IsDynamic = symbol.roles & (unsigned)SymbolRole::Dynamic;
+    info.IsImplicit = symbol.roles & (unsigned)SymbolRole::Implicit;
     info.IsTestCandidate = symbol.symInfo.Properties & SymbolProperty::UnitTest;
     std::vector<UIdent> uidAttrs;
     if (!isRef) {
-      uidAttrs =
-        SwiftLangSupport::UIDsFromDeclAttributes(symbol.decl->getAttrs());
+      uidAttrs = getDeclAttributeUIDs(symbol.decl);
       info.Attrs = uidAttrs;
     }
     return func(info);
@@ -141,8 +156,7 @@ private:
     info.IsTestCandidate = relation.symInfo.Properties & SymbolProperty::UnitTest;
     std::vector<UIdent> uidAttrs;
     if (!isRef) {
-      uidAttrs =
-      SwiftLangSupport::UIDsFromDeclAttributes(relation.decl->getAttrs());
+      uidAttrs = getDeclAttributeUIDs(relation.decl);
       info.Attrs = uidAttrs;
     }
     return func(info);

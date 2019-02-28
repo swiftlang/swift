@@ -1,8 +1,12 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-build-swift -emit-executable %s -g -o %t/generics -emit-module
-// RUN: sed -ne '/\/\/ *DEMANGLE: /s/\/\/ *DEMANGLE: *//p' < %s > %t/input
-// RUN: %lldb-moduleimport-test %t/generics -type-from-mangled=%t/input | %FileCheck %s
+
+// RUN: sed -ne '/\/\/ *DEMANGLE-TYPE: /s/\/\/ *DEMANGLE-TYPE: *//p' < %s > %t/input
+// RUN: %lldb-moduleimport-test-with-sdk %t/generics -type-from-mangled=%t/input | %FileCheck %s --check-prefix=CHECK-TYPE
+
+// RUN: sed -ne '/\/\/ *DEMANGLE-DECL: /s/\/\/ *DEMANGLE-DECL: *//p' < %s > %t/input
+// RUN: %lldb-moduleimport-test-with-sdk %t/generics -decl-from-mangled=%t/input | %FileCheck %s --check-prefix=CHECK-DECL
 
 func blackHole(_: Any...) {}
 
@@ -52,58 +56,64 @@ struct OuterBoth<A : First & Second, B : First & Second> {
   }
 }
 
-// DEMANGLE: $sxD
-// DEMANGLE: $s5AssocQzD
-// DEMANGLE: $s5Assoc_AAQZD
+// DEMANGLE-TYPE: $sxD
+// DEMANGLE-TYPE: $s5AssocQzD
+// DEMANGLE-TYPE: $s5Assoc_AAQZD
 
-// CHECK: τ_0_0
-// CHECK: τ_0_0.Assoc
-// CHECK: τ_0_0.Assoc.Assoc
+// CHECK-TYPE: τ_0_0
+// CHECK-TYPE: τ_0_0.Assoc
+// CHECK-TYPE: τ_0_0.Assoc.Assoc
 
-// DEMANGLE: $sq_D
-// DEMANGLE: $s5AssocQy_D
-// DEMANGLE: $s5Assoc_AAQY_D
+// DEMANGLE-TYPE: $sq_D
+// DEMANGLE-TYPE: $s5AssocQy_D
+// DEMANGLE-TYPE: $s5Assoc_AAQY_D
 
-// CHECK: τ_0_1
-// CHECK: τ_0_1.Assoc
-// CHECK: τ_0_1.Assoc.Assoc
+// CHECK-TYPE: τ_0_1
+// CHECK-TYPE: τ_0_1.Assoc
+// CHECK-TYPE: τ_0_1.Assoc.Assoc
 
-// DEMANGLE: $sqd__D
-// DEMANGLE: $s5AssocQyd__D
-// DEMANGLE: $s5Assoc_AAQYd__D
+// DEMANGLE-TYPE: $sqd__D
+// DEMANGLE-TYPE: $s5AssocQyd__D
+// DEMANGLE-TYPE: $s5Assoc_AAQYd__D
 
-// CHECK: τ_1_0
-// CHECK: τ_1_0.Assoc
-// CHECK: τ_1_0.Assoc.Assoc
+// CHECK-TYPE: τ_1_0
+// CHECK-TYPE: τ_1_0.Assoc
+// CHECK-TYPE: τ_1_0.Assoc.Assoc
 
-// DEMANGLE: $sqd_0_D
-// DEMANGLE: $s5AssocQyd_0_D
-// DEMANGLE: $s5Assoc_AAQYd_0_D
+// DEMANGLE-TYPE: $sqd_0_D
+// DEMANGLE-TYPE: $s5AssocQyd_0_D
+// DEMANGLE-TYPE: $s5Assoc_AAQYd_0_D
 
-// CHECK: τ_1_1
-// CHECK: τ_1_1.Assoc
-// CHECK: τ_1_1.Assoc.Assoc
+// CHECK-TYPE: τ_1_1
+// CHECK-TYPE: τ_1_1.Assoc
+// CHECK-TYPE: τ_1_1.Assoc.Assoc
 
-// DEMANGLE: $s5Assoc8generics5FirstPQzD
-// DEMANGLE: $s5Assoc8generics5FirstP_AaDQZD
+// DEMANGLE-TYPE: $s5Assoc8generics5FirstPQzD
+// DEMANGLE-TYPE: $s5Assoc8generics5FirstP_AaDQZD
 
-// CHECK: τ_0_0.Assoc
-// CHECK: τ_0_0.Assoc.Assoc
+// CHECK-TYPE: τ_0_0.Assoc
+// CHECK-TYPE: τ_0_0.Assoc.Assoc
 
-// DEMANGLE: $s5Assoc8generics5FirstPQy_D
-// DEMANGLE: $s5Assoc8generics5FirstP_AaDQY_D
+// DEMANGLE-TYPE: $s5Assoc8generics5FirstPQy_D
+// DEMANGLE-TYPE: $s5Assoc8generics5FirstP_AaDQY_D
 
-// CHECK: τ_0_1.Assoc
-// CHECK: τ_0_1.Assoc.Assoc
+// CHECK-TYPE: τ_0_1.Assoc
+// CHECK-TYPE: τ_0_1.Assoc.Assoc
 
-// DEMANGLE: $s5Assoc8generics5FirstPQyd__D
-// DEMANGLE: $s5Assoc8generics5FirstP_AaDQYd__D
+// DEMANGLE-TYPE: $s5Assoc8generics5FirstPQyd__D
+// DEMANGLE-TYPE: $s5Assoc8generics5FirstP_AaDQYd__D
 
-// CHECK: τ_1_0.Assoc
-// CHECK: τ_1_0.Assoc.Assoc
+// CHECK-TYPE: τ_1_0.Assoc
+// CHECK-TYPE: τ_1_0.Assoc.Assoc
 
-// DEMANGLE: $s5Assoc8generics5FirstPQyd_0_D
-// DEMANGLE: $s5Assoc8generics5FirstP_AaDQYd_0_D
+// DEMANGLE-TYPE: $s5Assoc8generics5FirstPQyd_0_D
+// DEMANGLE-TYPE: $s5Assoc8generics5FirstP_AaDQYd_0_D
 
-// CHECK: τ_1_1.Assoc
-// CHECK: τ_1_1.Assoc.Assoc
+// CHECK-TYPE: τ_1_1.Assoc
+// CHECK-TYPE: τ_1_1.Assoc.Assoc
+
+// DEMANGLE-DECL: $s8generics5FirstP5AssocQa
+// CHECK-DECL: generics.(file).First.Assoc
+
+// DEMANGLE-DECL: $s8generics6SecondP5AssocQa
+// CHECK-DECL: generics.(file).Second.Assoc

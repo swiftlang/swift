@@ -792,6 +792,10 @@ public:
   ResilienceExpansion getResilienceExpansionForLayout(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(SILGlobalVariable *var);
 
+  bool isResilientConformance(const NormalProtocolConformance *conformance);
+  bool isResilientConformance(const RootProtocolConformance *root);
+  bool isDependentConformance(const RootProtocolConformance *conformance);
+
   Alignment getCappedAlignment(Alignment alignment);
 
   SpareBitVector getSpareBitsForType(llvm::Type *scalarTy, Size size);

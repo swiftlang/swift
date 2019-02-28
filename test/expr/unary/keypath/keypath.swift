@@ -220,8 +220,6 @@ func testKeyPathInGenericContext<H: Hashable, X>(hashable: H, anything: X) {
 func testDisembodiedStringInterpolation(x: Int) {
   \(x) // expected-error{{string interpolation}} expected-error{{}}
   \(x, radix: 16) // expected-error{{string interpolation}} expected-error{{}}
-
-  _ = \(Int, Int).0 // expected-error{{cannot reference tuple elements}}
 }
 
 func testNoComponents() {
@@ -234,21 +232,59 @@ struct TupleStruct {
   var labeled: (foo: Int, bar: String)
 }
 
-func tupleComponent() {
-  // TODO: Customized diagnostic
-  let _ = \(Int, String).0 // expected-error{{}}
-  let _ = \(Int, String).1 // expected-error{{}}
-  let _ = \TupleStruct.unlabeled.0 // expected-error{{}}
-  let _ = \TupleStruct.unlabeled.1 // expected-error{{}}
+typealias UnlabeledGenericTuple<T, U> = (T, U)
+typealias LabeledGenericTuple<T, U> = (a: T, b: U)
 
-  let _ = \(foo: Int, bar: String).0 // expected-error{{}}
-  let _ = \(foo: Int, bar: String).1 // expected-error{{}}
-  let _ = \(foo: Int, bar: String).foo // expected-error{{}}
-  let _ = \(foo: Int, bar: String).bar // expected-error{{}}
-  let _ = \TupleStruct.labeled.0 // expected-error{{}}
-  let _ = \TupleStruct.labeled.1 // expected-error{{}}
-  let _ = \TupleStruct.labeled.foo // expected-error{{}}
-  let _ = \TupleStruct.labeled.bar // expected-error{{}}
+func tupleComponent<T, U>(_: T, _: U) {
+  let _ = \(Int, String).0
+  let _ = \(Int, String).1
+  let _ = \TupleStruct.unlabeled.0
+  let _ = \TupleStruct.unlabeled.1
+
+  let _ = \(foo: Int, bar: String).0
+  let _ = \(foo: Int, bar: String).1
+  let _ = \(foo: Int, bar: String).foo
+  let _ = \(foo: Int, bar: String).bar
+  let _ = \TupleStruct.labeled.0
+  let _ = \TupleStruct.labeled.1
+  let _ = \TupleStruct.labeled.foo
+  let _ = \TupleStruct.labeled.bar
+
+  let _ = \(T, U).0
+  let _ = \(T, U).1
+  let _ = \UnlabeledGenericTuple<T, U>.0
+  let _ = \UnlabeledGenericTuple<T, U>.1
+
+  let _ = \(a: T, b: U).0
+  let _ = \(a: T, b: U).1
+  let _ = \(a: T, b: U).a
+  let _ = \(a: T, b: U).b
+  let _ = \LabeledGenericTuple<T, U>.0
+  let _ = \LabeledGenericTuple<T, U>.1
+  let _ = \LabeledGenericTuple<T, U>.a
+  let _ = \LabeledGenericTuple<T, U>.b
+}
+
+func tuple_el_0<T, U>() -> KeyPath<(T, U), T> {
+  return \.0
+}
+
+func tuple_el_1<T, U>() -> KeyPath<(T, U), U> {
+  return \.1
+}
+
+func tupleGeneric<T, U>(_ v: (T, U)) {
+  _ = (1, "hello")[keyPath: tuple_el_0()]
+  _ = (1, "hello")[keyPath: tuple_el_1()]
+
+  _ = v[keyPath: tuple_el_0()]
+  _ = v[keyPath: tuple_el_1()]
+
+  _ = ("tuple", "too", "big")[keyPath: tuple_el_1()]
+  // expected-note@-12 {{}}
+  // expected-error@-2 {{cannot be applied}}
+  // expected-error@-3 {{cannot be applied}}
+  // expected-error@-4 {{could not be inferred}}
 }
 
 struct Z { }

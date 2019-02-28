@@ -861,7 +861,7 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
     }
   } else if (baseHasOpenAccess &&
              classDecl->hasOpenAccess(dc) &&
-             decl->getFormalAccess() != AccessLevel::Open &&
+             decl->getFormalAccess() < AccessLevel::Public &&
              !decl->isFinal()) {
     {
       auto diag = diags.diagnose(decl, diag::override_not_accessible,

@@ -44,6 +44,7 @@ struct EntityInfo {
   StringRef ReceiverUSR;
   bool IsDynamic = false;
   bool IsTestCandidate = false;
+  bool IsImplicit = false;
   unsigned Line = 0;
   unsigned Column = 0;
   ArrayRef<UIdent> Attrs;
@@ -127,7 +128,6 @@ struct ExpressionType {
   unsigned ExprOffset;
   unsigned ExprLength;
   unsigned TypeOffset;
-  unsigned TypeLength;
 };
 
 struct ExpressionTypesInFile {
