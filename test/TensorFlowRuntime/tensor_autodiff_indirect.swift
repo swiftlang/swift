@@ -208,4 +208,11 @@ TensorADTests.testAllBackends("GenericWrapperLayer") {
   expectEqual(Wrapper.CotangentVector(layer: 𝛁dense), 𝛁wrapper)
 }
 
+TensorADTests.testAllBackends("TF-324") {
+  @differentiable(where T : TensorFlowFloatingPoint)
+  func TF_324<T>(_ lhs: T, _ rhs: Tensor<T>) -> Tensor<T> where T : FloatingPoint {
+    return pow(Tensor(lhs), rhs)
+  }
+}
+
 runAllTests()
