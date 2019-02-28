@@ -141,8 +141,6 @@ struct TF_305 : Differentiable {
   @noDerivative let activation: Activation
   @noDerivative let strides: (Int, Int)
 
-  // expected-error @+2 {{function is not differentiable}}
-  // expected-note @+2 {{when differentiating this function definition}}
   @differentiable
   public init(
     filter: Float,
@@ -153,7 +151,7 @@ struct TF_305 : Differentiable {
     self.filter = filter
     self.bias = bias
     self.activation = activation
-    self.strides = strides // expected-note {{expression is not differentiable}}
+    self.strides = strides
   }
 }
 

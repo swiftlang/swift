@@ -60,7 +60,6 @@ public struct Conv2D<Scalar: TensorFlowFloatingPoint>: Layer {
   @noDerivative public let strides: (Int32, Int32)
   @noDerivative public let padding: Padding
 
-  // TODO(TF-309): Add `@differentiable` initializer using assignments, when supported.
   @differentiable
   public init(
     filter: Tensor<Scalar>,
@@ -69,8 +68,11 @@ public struct Conv2D<Scalar: TensorFlowFloatingPoint>: Layer {
     strides: (Int, Int),
     padding: Padding
   ) {
-    self.init(filter: filter, bias: bias, activation: activation,
-              strides: (Int32(strides.0), Int32(strides.1)), padding: padding)
+    self.filter = filter
+    self.bias = bias
+    self.activation = activation
+    self.strides = (Int32(strides.0), Int32(strides.1))
+    self.padding = padding
   }
 
   @differentiable

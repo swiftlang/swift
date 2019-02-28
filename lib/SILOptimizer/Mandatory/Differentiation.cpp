@@ -1346,6 +1346,21 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
                 setVaried(result, i);
           }
         }
+        // Handle `struct_element_addr`.
+        else if (auto *seai = dyn_cast<StructElementAddrInst>(&inst)) {
+          if (isVaried(seai->getOperand(), i)) {
+            // If `@noDerivative` exists on the field while the struct is
+            // `@_fieldwiseDifferentiable`, this field is not in the set of
+            // differentiable variables that we want to track the variedness of.
+            auto hasNoDeriv = seai->getField()->getAttrs()
+                .hasAttribute<NoDerivativeAttr>();
+            auto structIsFieldwiseDiffable = seai->getStructDecl()->getAttrs()
+                .hasAttribute<FieldwiseDifferentiableAttr>();
+            if (!(hasNoDeriv && structIsFieldwiseDiffable))
+              for (auto result : inst.getResults())
+                setVaried(result, i);
+          }
+        }
         // Handle everything else.
         else {
           for (auto &op : inst.getAllOperands())
@@ -4229,6 +4244,10 @@ public:
   }
 
   void visitStructExtractInst(StructExtractInst *sei) {
+    // There does not exist a corresponding cotangent field for original
+    // fields with `@noDerivative` attribute. Emit an error.
+    if (sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>())
+      return;
     auto loc = sei->getLoc();
     auto &differentiationStrategies =
         getDifferentiationTask()->getStructExtractDifferentiationStrategies();

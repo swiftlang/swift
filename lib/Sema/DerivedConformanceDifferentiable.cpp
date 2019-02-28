@@ -872,7 +872,7 @@ static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
     if (conformsToDifferentiable && !isConstantProperty)
       continue;
     // Otherwise, add an implicit `@noDerivative` attribute.
-    nominal->getAttrs().add(
+    vd->getAttrs().add(
         new (TC.Context) NoDerivativeAttr(/*Implicit*/ true));
     auto loc =
         vd->getLoc().isValid() ? vd->getLoc() : DC->getAsDecl()->getLoc();
