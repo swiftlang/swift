@@ -3058,7 +3058,8 @@ public:
         ParamInfo(paramInfo), Arguments(args), CandidateInfo(CCI),
         IsSubscript(isSubscript) {}
 
-  void extraArgument(unsigned extraArgIdx) override {
+  bool extraArguments(ArrayRef<unsigned> extraArgIndices) override {
+    auto extraArgIdx = extraArgIndices.front();
     auto name = Arguments[extraArgIdx].getLabel();
     Expr *arg = ArgExpr;
 
@@ -3094,6 +3095,7 @@ public:
           .highlight(arg->getSourceRange());
 
     Diagnosed = true;
+    return true;
   }
 
   void missingArgument(unsigned missingParamIdx) override {

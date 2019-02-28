@@ -281,8 +281,9 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
     CandidateCloseness getResult() const {
       return result;
     }
-    void extraArgument(unsigned argIdx) override {
+    bool extraArguments(ArrayRef<unsigned> argIndices) override {
       result = CC_ArgumentCountMismatch;
+      return true;
     }
     void missingArgument(unsigned paramIdx) override {
       result = CC_ArgumentCountMismatch;

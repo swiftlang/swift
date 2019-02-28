@@ -3774,8 +3774,11 @@ public:
   /// Indicates that the argument at the given index does not match any
   /// parameter.
   ///
-  /// \param argIdx The index of the extra argument.
-  virtual void extraArgument(unsigned argIdx);
+  /// \param argIndices The indices of the extra arguments.
+  ///
+  /// \returns true to indicate that this should cause a failure, false
+  /// otherwise.
+  virtual bool extraArguments(ArrayRef<unsigned> argIndices);
 
   /// Indicates that no argument was provided for the parameter at the given
   /// indices.
