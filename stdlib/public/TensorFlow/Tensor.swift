@@ -214,10 +214,20 @@ public extension Tensor where Scalar : Numeric {
 public extension Tensor {
   /// Creates a tensor from a scalar value.
   @inlinable @inline(__always)
+  @differentiable(vjp: _vjpScalarInit where Scalar : TensorFlowFloatingPoint)
   init(_ value: Scalar) {
     self.init(handle: _TFTensorFromScalar(value))
   }
+}
 
+internal extension Tensor where Scalar : TensorFlowFloatingPoint {
+  @inlinable
+  static func _vjpScalarInit(_ value: Scalar) -> (Tensor, (Tensor) -> Scalar) {
+    return (Tensor(value), { $0.scalarized() })
+  }
+}
+
+public extension Tensor {
   /// Creates a tensor from an array of tensors (which may themselves be
   /// scalars).
   @inlinable @inline(__always)
@@ -324,6 +334,20 @@ public extension Tensor {
     }
     self.init(handle: handle)
   }
+}
+
+public extension Tensor {
+  /// Creates a tensor with the specified shape and a single, repeated value.
+  ///
+  /// - Parameters:
+  ///   - shape: The dimensions of the tensor.
+  ///   - repeatedValue: The scalar value to repeat.
+  ///
+  @inlinable @inline(__always)
+  @available(*, deprecated, renamed: "init(repeating:shape:)")
+  init(shape: TensorShape, repeating repeatedValue: Scalar) {
+    self.init(repeating: repeatedValue, shape: shape)
+  }
 
   /// Creates a tensor with the specified shape and a single, repeated value.
   ///
@@ -331,24 +355,33 @@ public extension Tensor {
   ///   - shape: The dimensions of the tensor.
   ///   - repeatedValue: The scalar value to repeat.
   ///
-  // TODO: Deprecate this in favor of `init(repeating:shape:)`.
   @inlinable @inline(__always)
-  init(shape: TensorShape, repeating repeatedValue: Scalar) {
-    self.init(repeating: repeatedValue, shape: shape)
-  }
-
-  @inlinable @inline(__always)
+  @differentiable(vjp: _vjpInit(repeating:shape:)
+                  where Scalar : TensorFlowFloatingPoint)
   init(repeating repeatedValue: Scalar, shape: TensorShape) {
     self = Raw.fill(dims: Tensor<Int32>(shape.dimensions),
                     value: Tensor(repeatedValue))
   }
+}
 
+internal extension Tensor where Scalar : TensorFlowFloatingPoint {
+  @inlinable
+  static func _vjpInit(
+    repeating repeatedValue: Scalar,
+    shape: TensorShape
+  ) -> (Tensor, (Tensor) -> Scalar) {
+    return (Tensor(repeating: repeatedValue, shape: shape),
+            { $0.sum().scalarized() })
+  }
+}
+
+public extension Tensor {
   /// Creates a tensor by broadcasting the given scalar to a given rank with
   /// all dimensions being 1.
   @inlinable @inline(__always)
+  // @differentiable(where Scalar : TensorFlowFloatingPoint)
   init(broadcasting scalar: Scalar, rank: Int32) {
-    let shapeTensor = Tensor<Int32>(shape: [rank], repeating: 1)
-    self = Raw.fill(dims: shapeTensor, value: Tensor(scalar))
+    self = Tensor(scalar).reshaped(to: TensorShape(repeating: 1, count: rank))
   }
 
   /// Creates a tensor of shape `[4]` from a 4-tuple.
@@ -533,7 +566,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Parameter shape: The dimensions of the tensor.
   @inlinable @inline(__always)
   init(zeros shape: TensorShape) {
-    self.init(shape: shape, repeating: 0)
+    self.init(repeating: 0, shape: shape)
   }
 
   /// Creates a tensor with all scalars set to one.
@@ -541,16 +574,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Parameter shape: The dimensions of the tensor.
   @inlinable @inline(__always)
   init(ones shape: TensorShape) {
-    self.init(shape: shape, repeating: 1)
-  }
-
-  @inline(never) // make @inlinable when implemented.
-  static func eye(
-    rowCount: Int, columnCount: Int? = nil, batchShape: [Int]? = nil
-  ) -> Tensor {
-    // NOTE: TF doesn't have an "Eye" op. Instead, the `tf.eye` function
-    // composes many tensor/linear algebra ops.
-    fatalError("FIXME: implement eye")
+    self.init(repeating: 1, shape: shape)
   }
 
   /// Creates a 1-D tensor representing a sequence from a starting value to, but

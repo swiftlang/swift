@@ -44,8 +44,7 @@ public func sinking_crash(w1: Tensor<Float>) {
 // This crashed the partitioning pass because the end point of the program was
 // calculated to be inside the loop, but the startpoint was outside.
 public func endpointComputationCrash() {
-  var w1 = Tensor<Float>(shape: [2, 4], repeating: 0.5)
-
+  var w1 = Tensor<Float>(repeating: 0.5, shape: [2, 4])
   for _ in 0..<1000 {
     w1 -= w1
   }
@@ -76,8 +75,8 @@ public func testStraightLineXORTraining() {
   let outputBatch = Tensor<Float>([[0.0], [1.0], [1.0], [0.0]])
 
   // Parameters
-  var w1 = Tensor<Float>(shape: [2, 4], repeating: 0.5)
-  var w2 = Tensor<Float>(shape: [4, 1], repeating: 0.5)
+  var w1 = Tensor<Float>(repeating: 0.5, shape: [2, 4])
+  var w2 = Tensor<Float>(repeating: 0.5, shape: [4, 1])
 
   var b1 = Tensor<Float>(zeros: [1, 4])
   var b2 = Tensor<Float>(zeros: [1, 1])
@@ -130,8 +129,8 @@ func opaqueGenericFunction<T>(_ a : T)
 @inline(never)
 public func sinkTensorToScalarCrash() {
   var loss = Float.infinity
-  let w1 = Tensor<Float>(shape: [4, 1], repeating: 0.1)
-  var w2 = Tensor<Float>(shape: [4, 1], repeating: 0.5)
+  let w1 = Tensor<Float>(repeating: 0.1, shape: [4, 1])
+  var w2 = Tensor<Float>(repeating: 0.5, shape: [4, 1])
 
   for _ in 0...10000 {
     w2 -= w1

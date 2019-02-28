@@ -110,8 +110,8 @@ public func tensorShape() -> Tensor<Float> {
 // initializers.
 public func test75407624() {
   let a = Tensor<Float>([1])
-  let b = Tensor<Float>(shape: [1], repeating: 1)
-  let c = Tensor<Float>(shape: [1], repeating: 1)
+  let b = Tensor<Float>(repeating: 1, shape: [1])
+  let c = Tensor<Float>(repeating: 1, shape: [1])
   let d = Tensor<Float>(shape: [2,2], scalars: [1,2,3,4])
   _ = a+b+c+d
 }
