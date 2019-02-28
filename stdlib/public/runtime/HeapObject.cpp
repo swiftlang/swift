@@ -84,9 +84,11 @@ static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
   assert(isAlignmentMask(requiredAlignmentMask));
   auto object = reinterpret_cast<HeapObject *>(
       swift_slowAlloc(requiredSize, requiredAlignmentMask));
-  // FIXME: this should be a placement new but that adds a null check
-  object->metadata = metadata;
-  object->refCounts.init();
+
+  // NOTE: this relies on the C++17 guaranteed semantics of no null-pointer
+  // check on the placement new allocator which we have observed on Windows,
+  // Linux, and macOS.
+  new (object) HeapObject(metadata);
 
   // If leak tracking is enabled, start tracking this object.
   SWIFT_LEAKS_START_TRACKING_OBJECT(object);
