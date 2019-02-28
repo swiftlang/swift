@@ -1337,7 +1337,7 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
 //   `@_fieldwiseDifferentiable` struct, do not set the result as varied because
 //   it is not in the set of differentiable variables.
 // - Otherwise, propagate variedness from operand to result as usual.
-#define VISIT_STRUCT_ELEMENT_INST(INST) \
+#define PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION(INST) \
   else if (auto *sei = dyn_cast<INST##Inst>(&inst)) { \
     if (isVaried(sei->getOperand(), i)) { \
       auto hasNoDeriv = sei->getField()->getAttrs() \
@@ -1349,9 +1349,8 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
           setVaried(result, i); \
     } \
   }
-
-  VISIT_STRUCT_ELEMENT_INST(StructExtract)
-  VISIT_STRUCT_ELEMENT_INST(StructElementAddr)
+  PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION(StructExtract)
+  PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION(StructElementAddr)
 #undef VISIT_STRUCT_ELEMENT_INNS
 
         // Handle everything else.
@@ -4580,15 +4579,15 @@ public:
                      ValueWithCleanup(adjAccess, makeCleanupFromChildren({})));
   }
 
-#define PROPAGATE_CLEANUP(INST) \
+#define PROPAGATE_BUFFER_CLEANUP(INST) \
   void visit##INST##Inst(INST##Inst *inst) { \
-    auto adjBase = getAdjointBuffer(inst->getOperand()); \
-    auto adjProj = getAdjointBuffer(inst); \
+    auto &adjBase = getAdjointBuffer(inst->getOperand()); \
+    auto &adjProj = getAdjointBuffer(inst); \
     adjProj.setCleanup(makeCleanupFromChildren( \
         {adjProj.getCleanup(), adjBase.getCleanup()})); \
   }
-  PROPAGATE_CLEANUP(StructElementAddr)
-  PROPAGATE_CLEANUP(TupleElementAddr)
+  PROPAGATE_BUFFER_CLEANUP(StructElementAddr)
+  PROPAGATE_BUFFER_CLEANUP(TupleElementAddr)
 #undef PROPAGATE_CLEANUP
 
 #define NOT_DIFFERENTIABLE(INST, DIAG) \
