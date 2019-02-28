@@ -288,7 +288,7 @@ public:
   }
 
 #elif defined(_WIN32)
-  bool addImage(RemoteAddress ImageStart) {
+  bool readPECOFFSections(RemoteAddress ImageStart) {
     auto DOSHdrBuf = this->getReader().readBytes(
         ImageStart, sizeof(llvm::object::dos_header));
     auto DOSHdr =
@@ -380,6 +380,29 @@ public:
     return true;
   }
 
+  bool addImage(RemoteAddress ImageStart) {
+    auto Buf = this->getReader().readBytes(ImageStart,
+                                           sizeof(llvm::object::dos_header));
+    if (!Buf)
+      return false;
+
+    auto DOSHdr = reinterpret_cast<const llvm::object::dos_header *>(Buf.get());
+    if (!(DOSHdr->Magic[0] == 'M' && DOSHdr->Magic[1] == 'Z'))
+      return false;
+
+    auto PEHeaderAddress =
+        ImageStart.getAddressData() + DOSHdr->AddressOfNewExeHeader;
+
+    Buf = this->getReader().readBytes(RemoteAddress(PEHeaderAddress),
+                                      sizeof(llvm::COFF::PEMagic));
+    if (!Buf)
+      return false;
+
+    if (memcmp(Buf.get(), llvm::COFF::PEMagic, sizeof(llvm::COFF::PEMagic)))
+      return false;
+
+    return readPECOFFSections(ImageStart);
+  }
 #else // ELF platforms.
   template <typename T> bool readELFSections(RemoteAddress ImageStart) {
     auto Buf =
