@@ -3806,6 +3806,17 @@ public:
     SmallVector<SILValue, 8> origFormalResults;
     collectAllFormalResultsInTypeOrder(original, origFormalResults);
     auto origResult = origFormalResults[task->getIndices().source];
+    // Emit warning if original result is not varied, because it will always have
+    // a zero derivative.
+    if (!activityInfo.isVaried(origResult, task->getIndices().source)) {
+      // Emit fixit if original result has a valid source location.
+      auto sourceLoc = origResult.getLoc().getSourceLoc();
+      if (sourceLoc.isValid()) {
+        getContext()
+            .diagnose(sourceLoc, diag::autodiff_nonvaried_result_fixit)
+            .fixItInsertAfter(sourceLoc, ".withoutDerivative()");
+      }
+    }
 
     builder.setInsertionPoint(adjointEntry);
     if (seed->getType().isAddress()) {
@@ -4232,6 +4243,9 @@ public:
   }
 
   void visitStructExtractInst(StructExtractInst *sei) {
+    assert(!sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>() &&
+           "`struct_extract` with `@noDerivative` field should not be "
+           "differentiated; activity analysis should not marked as varied");
     auto loc = sei->getLoc();
     auto &differentiationStrategies =
         getDifferentiationTask()->getStructExtractDifferentiationStrategies();

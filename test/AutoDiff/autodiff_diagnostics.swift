@@ -54,6 +54,14 @@ _ = gradient(at: NoDerivativeProperty(x: 1, y: 1)) { s -> Float in
   tmp.y = tmp.x
   return tmp.x
 }
+_ = gradient(at: NoDerivativeProperty(x: 1, y: 1)) { s in
+  // expected-warning @+1 {{result does not depend on differentiation arguments and always has a zero derivative; do you want to add '.withoutDerivative()'?}} {{13-13=.withoutDerivative()}}
+  return s.y
+}
+_ = gradient(at: NoDerivativeProperty(x: 1, y: 1)) {
+  // expected-warning @+1 {{result does not depend on differentiation arguments and always has a zero derivative; do you want to add '.withoutDerivative()'?}} {{7-7=.withoutDerivative()}}
+  $0.y
+}
 
 //===----------------------------------------------------------------------===//
 // Function composition
