@@ -1332,10 +1332,12 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
             recursivelySetVaried(cai->getDest(), i);
         }
 
-// If `@noDerivative` exists on the field while the struct is
-// `@_fieldwiseDifferentiable`, this field is not in the set of
-// differentiable variables that we want to track the variedness of.
-#define DIAGNOSE_STRUCT_NO_DERIVATIVE_FIELD(INST) \
+// Handle `struct_extract` and `struct_element_addr` instructions.
+// - If the field is marked `@noDerivative` and belongs to a
+//   `@_fieldwiseDifferentiable` struct, do not set the result as varied because
+//   it is not in the set of differentiable variables.
+// - Otherwise, propagate variedness from operand to result as usual.
+#define VISIT_STRUCT_ELEMENT_INST(INST) \
   else if (auto *sei = dyn_cast<INST##Inst>(&inst)) { \
     if (isVaried(sei->getOperand(), i)) { \
       auto hasNoDeriv = sei->getField()->getAttrs() \
@@ -1347,11 +1349,10 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
           setVaried(result, i); \
     } \
   }
-  // Handle `struct_extract`.
-  DIAGNOSE_STRUCT_NO_DERIVATIVE_FIELD(StructExtract)
-  // Handle `struct_element_addr`.
-  DIAGNOSE_STRUCT_NO_DERIVATIVE_FIELD(StructElementAddr)
-#undef DIAGNOSE_STRUCT_NO_DERIVATIVE_FIELD
+
+  VISIT_STRUCT_ELEMENT_INST(StructExtract)
+  VISIT_STRUCT_ELEMENT_INST(StructElementAddr)
+#undef VISIT_STRUCT_ELEMENT_INNS
 
         // Handle everything else.
         else {
