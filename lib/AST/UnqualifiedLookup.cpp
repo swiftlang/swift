@@ -226,7 +226,7 @@ private:
 
   bool useASTScopesForExperimentalLookup() const;
 
-  void lookupNonlocalsInModuleScopeContext(DeclContext *);
+  void lookUpTopLevelNamesInModuleScopeContext(DeclContext *);
 
 #pragma mark ASTScope-based-lookup declarations
 
@@ -435,7 +435,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
     lookupNamesIntroducedBy(dcAndIsCascadingUse);
 }
 
-void UnqualifiedLookupFactory::lookupNonlocalsInModuleScopeContext(
+void UnqualifiedLookupFactory::lookUpTopLevelNamesInModuleScopeContext(
     DeclContext *DC) {
   // TODO: Does the debugger client care about compound names?
   if (Name.isSimpleName() && DebugClient &&
@@ -601,7 +601,7 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
   // Lookup in the source file's scope marks the end.
   if (isa<SourceFile>(scopeDC)) {
     recordDependencyOnTopLevelName(scopeDC, Name, isCascadingUseResult);
-    lookupNonlocalsInModuleScopeContext(scopeDC);
+    lookUpTopLevelNamesInModuleScopeContext(scopeDC);
     return;
   }
 
@@ -702,10 +702,10 @@ void UnqualifiedLookupFactory::lookupInModuleScopeContext(
   if (auto SF = dyn_cast<SourceFile>(dc))
     lookForLocalVariablesIn(SF);
   ifNotDoneYet([&] {
-    // TODO: figure out why this line is here, not unconditional, or after
-    // lookupNonLocals.
+    // If no result has been found yet, the dependency must be on a top-level
+    // name, since up to now, the search has been for non-top-level names.
     recordDependencyOnTopLevelName(dc, Name, isCascadingUse.getValueOr(true));
-    lookupNonlocalsInModuleScopeContext(dc);
+    lookUpTopLevelNamesInModuleScopeContext(dc);
   });
 }
 
