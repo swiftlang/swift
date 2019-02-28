@@ -896,6 +896,11 @@ bool SILGlobalOpt::run() {
     if (!F.shouldOptimize())
       continue;
 
+    // TODO: Add support for ownership.
+    if (F.hasOwnership()) {
+      continue;
+    }
+
     // Cache cold blocks per function.
     ColdBlockInfo ColdBlocks(DA);
     for (auto &BB : F) {
