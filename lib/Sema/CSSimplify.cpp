@@ -35,7 +35,9 @@ using namespace constraints;
 
 MatchCallArgumentListener::~MatchCallArgumentListener() { }
 
-void MatchCallArgumentListener::extraArgument(unsigned argIdx) { }
+bool MatchCallArgumentListener::extraArguments(ArrayRef<unsigned> argIndices) {
+  return true;
+}
 
 Optional<unsigned>
 MatchCallArgumentListener::missingArgument(unsigned paramIdx) {
@@ -561,12 +563,15 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
       }
     }
 
-    // If we still haven't claimed all of the arguments, fail.
+    // If we still haven't claimed all of the arguments,
+    // fail if there is no recovery.
     if (numClaimedArgs != numArgs) {
-      nextArgIdx = 0;
-      skipClaimedArgs();
-      listener.extraArgument(nextArgIdx);
-      return true;
+      SmallVector<unsigned, 4> extraneous;
+      for (auto index : indices(claimedArgs)) {
+        if (!claimedArgs[index])
+          extraneous.push_back(index);
+      }
+      return listener.extraArguments(extraneous);
     }
 
     // FIXME: If we had the actual parameters and knew the body names, those
