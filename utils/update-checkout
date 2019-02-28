@@ -11,5 +11,8 @@ import update_checkout
 # named update-checkout'.
 # As such, we need to manually set sys.modules[__name__] to a valid module
 # identifier to work around these errors.
-sys.modules[__name__] = sys.modules['update_checkout']
-update_checkout.main()
+if sys.version_info[0] == 2:
+    sys.modules[__name__] = sys.modules['update_checkout']
+
+if __name__ == "__main__":
+    update_checkout.main()

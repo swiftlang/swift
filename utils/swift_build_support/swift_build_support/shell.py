@@ -199,9 +199,9 @@ def run(*args, **kwargs):
         print(repo_path)
         _echo_command(dry_run, *args, env=env)
         if stdout:
-            print(stdout, end="")
+            print(stdout.decode(), end="")
         if stderr:
-            print(stderr, end="")
+            print(stderr.decode(), end="")
         print()
     if lock:
         lock.release()
