@@ -169,6 +169,19 @@ class Traversal : public TypeVisitor<Traversal, bool>
 
     return false;
   }
+  
+  bool visitArchetypeType(ArchetypeType *ty) {
+    // If the root is an opaque archetype, visit its substitution replacement
+    // types.
+    if (auto opaqueRoot = dyn_cast<OpaqueTypeArchetypeType>(ty->getRoot())) {
+      for (auto arg : opaqueRoot->getSubstitutions().getReplacementTypes()) {
+        if (doIt(arg)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
 
   bool visitTypeVariableType(TypeVariableType *ty) { return false; }
   

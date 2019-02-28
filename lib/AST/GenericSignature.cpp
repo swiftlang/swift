@@ -1029,6 +1029,14 @@ unsigned GenericParamKey::findIndexIn(
   return genericParams.size();
 }
 
+SubstitutionMap GenericSignature::getIdentitySubstitutionMap() const {
+  return SubstitutionMap::get(const_cast<GenericSignature*>(this),
+                              [](SubstitutableType *t) -> Type {
+                                return Type(cast<GenericTypeParamType>(t));
+                              },
+                              MakeAbstractConformanceForGenericType());
+}
+
 unsigned GenericSignature::getGenericParamOrdinal(GenericTypeParamType *param) {
   return GenericParamKey(param->getDepth(), param->getIndex())
     .findIndexIn(getGenericParams());
