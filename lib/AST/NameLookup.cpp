@@ -2931,8 +2931,14 @@ void FindLocalVal::visitCaseStmt(CaseStmt *S) {
       }
     }
   }
-  if (!inPatterns && !items.empty())
-    checkPattern(items[0].getPattern(), DeclVisibilityKind::LocalVariable);
+
+  // Then check the var decls for the case body.
+  if (!inPatterns && !items.empty()) {
+    for (auto &vd : S->getCaseBodyVariables()) {
+      checkValueDecl(&vd, DeclVisibilityKind::LocalVariable);
+    }
+  }
+
   visit(S->getBody());
 }
 

@@ -17,12 +17,13 @@
 #ifndef SWIFT_AST_STMT_H
 #define SWIFT_AST_STMT_H
 
+#include "swift/AST/ASTNode.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/AvailabilitySpec.h"
-#include "swift/AST/ASTNode.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/NullablePtr.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
@@ -943,6 +944,8 @@ class CaseStmt final : public Stmt,
 
   llvm::PointerIntPair<Stmt *, 1, bool> BodyAndHasBoundDecls;
 
+  Optional<MutableArrayRef<VarDecl>> CaseBodyVariables;
+
   CaseStmt(SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
            bool HasBoundDecls, SourceLoc UnknownAttrLoc, SourceLoc ColonLoc,
            Stmt *Body, Optional<bool> Implicit);
@@ -988,6 +991,19 @@ public:
     // diagnosing otherwise-non-exhaustive switches, and the user can't edit
     // a synthesized case.
     return UnknownAttrLoc.isValid();
+  }
+
+  bool isCaseBodyVariablesInitialized() const {
+    return CaseBodyVariables.hasValue();
+  }
+
+  ArrayRef<VarDecl> getCaseBodyVariables() const { return *CaseBodyVariables; }
+
+  MutableArrayRef<VarDecl> getCaseBodyVariables() { return *CaseBodyVariables; }
+
+  void setCaseBodyVariables(MutableArrayRef<VarDecl> Variables) {
+    assert(!CaseBodyVariables && "Setting a case stmts case body vars twice?!");
+    CaseBodyVariables = Variables;
   }
 
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Case; }
