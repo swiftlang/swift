@@ -4125,9 +4125,9 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedVectorSpace(
         kind, lookupConformance);
     if (!resultSpace)
       return cache(None);
-    return VectorSpace::getFunction(
+    return cache(VectorSpace::getFunction(
         makeFunctionType(fnTy, fnTy->getParams(), resultSpace->getType(),
-                         fnTy->getOptGenericSignature()));
+                         fnTy->getOptGenericSignature())));
   }
 
   // Tuples' tangent/cotangent is a tuple of each element's Tangent/Cotangent.
@@ -4137,9 +4137,14 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedVectorSpace(
       auto eltSpace = elt.getType()
           ->getAutoDiffAssociatedVectorSpace(kind, lookupConformance);
       if (!eltSpace)
-        return cache(None);
+        continue;
       newElts.push_back(elt.getWithType(eltSpace->getType()));
     }
+    if (newElts.empty())
+      return cache(
+          VectorSpace::getTuple(ctx.TheEmptyTupleType->castTo<TupleType>()));
+    if (newElts.size() == 1)
+      return cache(VectorSpace::getVector(newElts.front().getType()));
     auto *tupleType = TupleType::get(newElts, ctx)->castTo<TupleType>();
     return cache(VectorSpace::getTuple(tupleType));
   }

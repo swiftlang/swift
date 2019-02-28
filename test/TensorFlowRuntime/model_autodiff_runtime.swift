@@ -35,7 +35,7 @@ public struct Dense<Scalar: TensorFlowFloatingPoint>: Layer {
     return [\Dense.weight, \Dense.bias]
   }
 
-  @differentiable(wrt: (self, input))
+  @differentiable
   public func applied(to input: Tensor<Scalar>) -> Tensor<Scalar> {
     return activation(matmul(input, weight) + bias)
   }
@@ -48,6 +48,38 @@ public extension Dense where Scalar.RawSignificand: FixedWidthInteger {
               ),
               bias: Tensor(zeros: [Int32(outputSize)]),
               activation: activation)
+  }
+}
+
+@_fixed_layout
+public struct Conv2D<Scalar: TensorFlowFloatingPoint>: Layer {
+  public var filter: Tensor<Scalar>
+  public var bias: Tensor<Scalar>
+  public typealias Activation = @differentiable (Tensor<Scalar>) -> Tensor<Scalar>
+  @noDerivative public let activation: Activation
+  @noDerivative public let strides: (Int32, Int32)
+  @noDerivative public let padding: Padding
+
+  @differentiable
+  public init(
+    filter: Tensor<Scalar>,
+    bias: Tensor<Scalar>,
+    activation: @escaping Activation,
+    strides: (Int, Int),
+    padding: Padding
+  ) {
+    self.filter = filter
+    self.bias = bias
+    self.activation = activation
+    self.strides = (Int32(strides.0), Int32(strides.1))
+    self.padding = padding
+  }
+
+  @differentiable
+  public func applied(to input: Tensor<Scalar>) -> Tensor<Scalar> {
+      return activation(input.convolved2D(withFilter: filter,
+                                          strides: (1, strides.0, strides.1, 1),
+                                          padding: padding) + bias)
   }
 }
 

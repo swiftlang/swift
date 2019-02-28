@@ -228,21 +228,6 @@ static LoadOwnershipQualifier getBufferLOQ(Type type, SILFunction &fn) {
   return LoadOwnershipQualifier::Unqualified;
 }
 
-/// Assuming the given type conforms to `Differentiable`, returns the associated
-/// cotangent space type.
-static SILType getCotangentType(CanType type, SILModule &mod) {
-  return SILType::getPrimitiveObjectType(
-      type->getAutoDiffAssociatedVectorSpace(
-          AutoDiffAssociatedVectorSpaceKind::Cotangent,
-          LookUpConformanceInModule(mod.getSwiftModule()))->getCanonicalType());
-}
-
-/// Assuming the given type conforms to `Differentiable`, returns the associated
-/// cotangent space type.
-static SILType getCotangentType(SILType type, SILModule &mod) {
-  return getCotangentType(type.getASTType(), mod).copyCategory(type);
-}
-
 // Return the expected generic signature for autodiff associated functions given
 // a SILDifferentiableAttr. The expected generic signature is built from the
 // original generic signature and the attribute's requirements.
@@ -321,10 +306,6 @@ public:
     // `AutoDiffFunctionExpr`.
     FunctionConversion,
 
-    // Invoked by a `@differentiable` attribute in the Swift source. This case
-    // has an associated `@differentiable` attribute.
-    DifferentiableAttribute,
-
     // Invoker by a `[differentiable]` attribute in SIL **without** being linked
     // to a Swift AST attribute. This case has an associated `[differentiable]`
     // attribute.
@@ -348,12 +329,6 @@ private:
     AutoDiffFunctionExpr *functionConversion;
     Value(AutoDiffFunctionExpr *expr) : functionConversion(expr) {}
 
-    /// The `@differentiable` attribute associated with the
-    /// `DifferentiableAttribute` case.
-    std::pair<DifferentiableAttr *, FuncDecl *> differentiableAttribute;
-    Value(DifferentiableAttr *attr, FuncDecl *fd)
-        : differentiableAttribute({attr, fd}) {}
-
     /// The `[differentiable]` attribute associated with the
     /// `SILDifferentiableAttribute` case.
     std::pair<SILDifferentiableAttr *, SILFunction *>
@@ -372,8 +347,6 @@ public:
       : kind(Kind::IndirectDifferentiation), value(applyInst, task) {}
   DifferentiationInvoker(AutoDiffFunctionExpr *expr)
       : kind(Kind::FunctionConversion), value(expr) {}
-  DifferentiationInvoker(DifferentiableAttr *attr, FuncDecl *fd)
-      : kind(Kind::DifferentiableAttribute), value(attr, fd) {}
   DifferentiationInvoker(SILDifferentiableAttr *attr, SILFunction *f)
       : kind(Kind::SILDifferentiableAttribute), value(attr, f) {}
 
@@ -395,12 +368,6 @@ public:
     return value.functionConversion;
   }
 
-  std::pair<DifferentiableAttr *, FuncDecl *>
-  getDifferentiableAttribute() const {
-    assert(kind == Kind::DifferentiableAttribute);
-    return value.differentiableAttribute;
-  }
-
   std::pair<SILDifferentiableAttr *, SILFunction *>
   getSILDifferentiableAttribute() const {
     assert(kind == Kind::SILDifferentiableAttribute);
@@ -415,8 +382,6 @@ public:
       return getIndirectDifferentiation().first->getLoc().getSourceLoc();
     case Kind::FunctionConversion:
       return getFunctionConversion()->getLoc();
-    case Kind::DifferentiableAttribute:
-      return getDifferentiableAttribute().first->getLocation();
     case Kind::SILDifferentiableAttribute:
       return getSILDifferentiableAttribute().second
           ->getLocation().getSourceLoc();
@@ -734,13 +699,6 @@ void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
     os << ')';
     break;
   }
-  case Kind::DifferentiableAttribute: {
-    auto diffAttr = getDifferentiableAttribute();
-    os << "differentiable_attribute=(attr=(";
-    diffAttr.first->print(os);
-    os << ") func_decl=" << diffAttr.second->getFullName();
-    break;
-  }
   case Kind::SILDifferentiableAttribute: {
     auto diffAttr = getSILDifferentiableAttribute();
     os << "sil_differentiable_attribute=(attr=(";
@@ -926,9 +884,11 @@ public:
   }
 
   SILDifferentiableAttr *createDifferentiableAttr(
-      SILFunction *original, const SILAutoDiffIndices &indices) const {
+      SILFunction *original, const SILAutoDiffIndices &indices,
+      ArrayRef<Requirement> contextualRequirements) const {
     assert(!lookUpDifferentiableAttr(original, indices));
-    auto *attr = SILDifferentiableAttr::create(getModule(), indices);
+    auto *attr = SILDifferentiableAttr::create(getModule(), indices,
+                                               contextualRequirements);
     original->addDifferentiableAttr(attr);
     return attr;
   }
@@ -936,11 +896,12 @@ public:
   /// Finds or creates a `[differentiable]` attribute on the specified
   /// original function corresponding to the specified parameter indices.
   SILDifferentiableAttr *getOrCreateDifferentiableAttr(
-      SILFunction *original, const SILAutoDiffIndices &indices) {
+      SILFunction *original, const SILAutoDiffIndices &indices,
+      ArrayRef<Requirement> contextualRequirements) {
     if (auto *attr = lookUpDifferentiableAttr(original, indices))
       return attr;
     assert(original->isDefinition());
-    return createDifferentiableAttr(original, indices);
+    return createDifferentiableAttr(original, indices, contextualRequirements);
   }
 
   /// Finds a differentiation task on a function such that the task produces
@@ -1007,7 +968,14 @@ public:
                               DifferentiationInvoker invoker) {
     // Make sure this pair of original and indices is unique.
     assert(!lookUpDifferentiationTask(original, indices));
-    auto *attr = getOrCreateDifferentiableAttr(original, indices);
+    ArrayRef<Requirement> contextualRequirements;
+    if (invoker.getKind() ==
+        DifferentiationInvoker::Kind::IndirectDifferentiation)
+      contextualRequirements = invoker.getIndirectDifferentiation()
+                                   .second->getAttribute()
+                                   ->getRequirements();
+    auto *attr = getOrCreateDifferentiableAttr(
+        original, indices, contextualRequirements);
     std::unique_ptr<DifferentiationTask> task(
         new DifferentiationTask(*this, original, std::move(attr), invoker));
     differentiationTasks.push_back(std::move(task));
@@ -1149,17 +1117,6 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
     return diagnose(loc,
         diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
   }
-
-  // For a `@differentiable` attribute, emit a "not differentiable" error on the
-  // attribute first and a note on the non-differentiable operation.
-  case DifferentiationInvoker::Kind::DifferentiableAttribute: {
-    auto diffAttr = invoker.getDifferentiableAttribute();
-    diagnose(diffAttr.first->getLocation(),
-             diag::autodiff_function_not_differentiable)
-        .highlight(diffAttr.second->getNameLoc());
-    return diagnose(loc,
-        diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
-  }
   }
 }
 
@@ -1168,7 +1125,7 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
 //===----------------------------------------------------------------------===//
 
 namespace {
-class DifferentiableActivityInfo;
+class DifferentiableActivityCollection;
 
 /// In many real situations, the end-users of AD need only the derivatives of
 /// some selected outputs of `P` with respect to some selected inputs of `P`.
@@ -1202,7 +1159,7 @@ class DifferentiableActivityInfo;
 /// Reference:
 /// Laurent Hascoët. Automatic Differentiation by Program Transformation. 2007.
 class DifferentiableActivityAnalysis
-    : public FunctionAnalysisBase<DifferentiableActivityInfo> {
+    : public FunctionAnalysisBase<DifferentiableActivityCollection> {
 private:
   DominanceAnalysis *dominanceAnalysis = nullptr;
   PostDominanceAnalysis *postDominanceAnalysis = nullptr;
@@ -1219,7 +1176,7 @@ public:
     return k & InvalidationKind::Everything;
   }
 
-  virtual std::unique_ptr<DifferentiableActivityInfo>
+  virtual std::unique_ptr<DifferentiableActivityCollection>
   newFunctionAnalysis(SILFunction *f) override;
 
   virtual void initialize(SILPassManager *pm) override;
@@ -1244,7 +1201,8 @@ using Activity = OptionSet<ActivityFlags>;
 /// indices.
 class DifferentiableActivityInfo {
 private:
-  SILFunction &function;
+  DifferentiableActivityCollection &parent;
+  GenericSignature *assocGenSig = nullptr;
 
   /// Input values, i.e. parameters (both direct and indirect).
   SmallVector<SILValue, 4> inputValues;
@@ -1259,6 +1217,9 @@ private:
   /// value (input) index.
   SmallVector<SmallDenseSet<SILValue>, 4> variedValueSets;
 
+  /// The original function.
+  SILFunction &getFunction();
+
   /// Perform analysis and populate sets.
   void analyze(DominanceInfo *di, PostDominanceInfo *pdi);
 
@@ -1269,9 +1230,8 @@ private:
                                     unsigned dependentVariableIndex);
 
 public:
-  explicit DifferentiableActivityInfo(SILFunction &f,
-                                      DominanceInfo *di,
-                                      PostDominanceInfo *pdi);
+  explicit DifferentiableActivityInfo(
+      DifferentiableActivityCollection &parent, GenericSignature *assocGenSig);
 
   bool isVaried(SILValue value, unsigned independentVariableIndex) const;
   bool isUseful(SILValue value, unsigned dependentVariableIndex) const;
@@ -1284,13 +1244,32 @@ public:
   Activity getActivity(SILInstruction *inst,
                        const SILAutoDiffIndices &indices) const;
 };
+
+class DifferentiableActivityCollection {
+public:
+  SmallDenseMap<GenericSignature *, DifferentiableActivityInfo> activityInfoMap;
+  SILFunction &function;
+  DominanceInfo *domInfo;
+  PostDominanceInfo *postDomInfo;
+
+  DifferentiableActivityInfo &getActivityInfo(GenericSignature *assocGenSig) {
+    DifferentiableActivityInfo info(*this, assocGenSig);
+    auto insertion = activityInfoMap.try_emplace(assocGenSig, info);
+    return insertion.first->getSecond();
+  }
+
+  explicit DifferentiableActivityCollection(SILFunction &f,
+                                            DominanceInfo *di,
+                                            PostDominanceInfo *pdi);
+};
+
 } // end anonymous namespace
 
-std::unique_ptr<DifferentiableActivityInfo>
+std::unique_ptr<DifferentiableActivityCollection>
 DifferentiableActivityAnalysis::newFunctionAnalysis(SILFunction *f) {
   assert(dominanceAnalysis && "Expect a valid dominance anaysis");
   assert(postDominanceAnalysis && "Expect a valid post-dominance anaysis");
-  return llvm::make_unique<DifferentiableActivityInfo>(
+  return llvm::make_unique<DifferentiableActivityCollection>(
       *f, dominanceAnalysis->get(f), postDominanceAnalysis->get(f));
 }
 
@@ -1303,15 +1282,23 @@ SILAnalysis *swift::createDifferentiableActivityAnalysis(SILModule *m) {
   return new DifferentiableActivityAnalysis();
 }
 
-DifferentiableActivityInfo::DifferentiableActivityInfo(SILFunction &f,
-                                                       DominanceInfo *di,
-                                                       PostDominanceInfo *pdi)
-    : function(f) {
-  analyze(di, pdi);
+DifferentiableActivityCollection::DifferentiableActivityCollection(
+    SILFunction &f, DominanceInfo *di, PostDominanceInfo *pdi)
+    : function(f), domInfo(di), postDomInfo(pdi) {}
+
+DifferentiableActivityInfo::DifferentiableActivityInfo(
+    DifferentiableActivityCollection &parent, GenericSignature *assocGenSig)
+    : parent(parent), assocGenSig(assocGenSig) {
+  analyze(parent.domInfo, parent.postDomInfo);
+}
+
+SILFunction &DifferentiableActivityInfo::getFunction() {
+  return parent.function;
 }
 
 void DifferentiableActivityInfo::analyze(DominanceInfo *di,
                                          PostDominanceInfo *pdi) {
+  auto &function = getFunction();
   LLVM_DEBUG(getADDebugStream()
              << "Running activity analysis on @" << function.getName() << '\n');
   // Inputs are just function's arguments, count `n`.
@@ -1333,14 +1320,10 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
       s << val << '\n';
   });
 
-  auto &module = function.getModule();
   // Mark inputs as varied.
   assert(variedValueSets.empty());
-  for (auto input : inputValues) {
-    variedValueSets.push_back({});
-    if (input->getType().isDifferentiable(module))
-      variedValueSets.back().insert(input);
-  }
+  for (auto input : inputValues)
+    variedValueSets.push_back({input});
   // Propagate varied-ness through the function in dominance order.
   DominanceOrder domOrder(function.getEntryBlock(), di);
   while (auto *block = domOrder.getNext()) {
@@ -1369,21 +1352,40 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
           if (isVaried(cai->getSrc(), i))
             recursivelySetVaried(cai->getDest(), i);
         }
-        // Handle `struct_extract`.
-        else if (auto *sei = dyn_cast<StructExtractInst>(&inst)) {
-          if (isVaried(sei->getOperand(), i)) {
-            // If `@noDerivative` exists on the field while the struct is
-            // `@_fieldwiseDifferentiable`, this field is not in the set of
-            // differentiable variables that we want to track the variedness of.
-            auto hasNoDeriv = sei->getField()->getAttrs()
-                .hasAttribute<NoDerivativeAttr>();
-            auto structIsFieldwiseDiffable = sei->getStructDecl()->getAttrs()
-                .hasAttribute<FieldwiseDifferentiableAttr>();
-            if (!(hasNoDeriv && structIsFieldwiseDiffable))
-              for (auto result : inst.getResults())
-                setVaried(result, i);
+        // Handle `tuple_element_addr`.
+        else if (auto *teai = dyn_cast<TupleElementAddrInst>(&inst)) {
+          if (isVaried(teai->getOperand(), i)) {
+            auto projType = teai->getType().getASTType();
+            if (assocGenSig && projType->hasArchetype())
+              projType = assocGenSig->getCanonicalTypeInContext(
+                  projType->mapTypeOutOfContext());
+            if (projType->getAutoDiffAssociatedVectorSpace(
+                AutoDiffAssociatedVectorSpaceKind::Cotangent,
+                LookUpConformanceInSignature(*assocGenSig)))
+              setVaried(teai, i);
           }
         }
+
+// Handle `struct_extract` and `struct_element_addr` instructions.
+// - If the field is marked `@noDerivative` and belongs to a
+//   `@_fieldwiseDifferentiable` struct, do not set the result as varied because
+//   it is not in the set of differentiable variables.
+// - Otherwise, propagate variedness from operand to result as usual.
+#define PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION(INST) \
+  else if (auto *sei = dyn_cast<INST##Inst>(&inst)) { \
+    if (isVaried(sei->getOperand(), i)) { \
+      auto hasNoDeriv = sei->getField()->getAttrs() \
+          .hasAttribute<NoDerivativeAttr>(); \
+      auto structIsFieldwiseDiffable = sei->getStructDecl()->getAttrs() \
+          .hasAttribute<FieldwiseDifferentiableAttr>(); \
+      if (!(hasNoDeriv && structIsFieldwiseDiffable)) \
+        setVaried(sei, i); \
+    } \
+  }
+  PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION(StructExtract)
+  PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION(StructElementAddr)
+#undef VISIT_STRUCT_ELEMENT_INNS
+
         // Handle everything else.
         else {
           for (auto &op : inst.getAllOperands())
@@ -2119,7 +2121,7 @@ static CanSILFunctionType buildThunkType(SILFunction *fn,
   for (auto &yield : expectedType->getYields()) {
     auto yieldIfaceTy = yield.getType()->mapTypeOutOfContext();
     auto interfaceYield =
-    yield.getWithType(yieldIfaceTy->getCanonicalType(genericSig));
+        yield.getWithType(yieldIfaceTy->getCanonicalType(genericSig));
     interfaceYields.push_back(interfaceYield);
   }
 
@@ -2127,7 +2129,7 @@ static CanSILFunctionType buildThunkType(SILFunction *fn,
   for (auto &result : expectedType->getResults()) {
     auto resultIfaceTy = result.getType()->mapTypeOutOfContext();
     auto interfaceResult =
-    result.getWithType(resultIfaceTy->getCanonicalType(genericSig));
+        result.getWithType(resultIfaceTy->getCanonicalType(genericSig));
     interfaceResults.push_back(interfaceResult);
   }
 
@@ -2202,33 +2204,29 @@ static SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
     return alloc;
   };
 
-  // Store reabstracted results.
-  SmallVector<std::pair<unsigned, SILValue>, 4> directToIndirectResults;
-  SmallVector<SILValue, 4> indirectToDirectResults;
-
-  // Reabstract results.
-  assert(fromType->getResults().size() == toType->getResults().size());
-  for (unsigned resIdx : range(toType->getResults().size())) {
+  // Handle indirect results.
+  assert(fromType->getNumResults() == toType->getNumResults());
+  for (unsigned resIdx : range(toType->getNumResults())) {
     auto fromRes = fromConv.getResults()[resIdx];
     auto toRes = toConv.getResults()[resIdx];
     // No abstraction mismatch.
-    if (fromRes.isFormalIndirect() == toRes.isFormalIndirect())
+    if (fromRes.isFormalIndirect() == toRes.isFormalIndirect()) {
+      // If result types are indirect, directly pass as next argument.
+      if (toRes.isFormalIndirect())
+        useNextArgument();
       continue;
+    }
     // Convert indirect result to direct result.
     if (fromRes.isFormalIndirect()) {
       SILType resultTy = fromConv.getSILType(fromRes);
       assert(resultTy.isAddress());
       auto *indRes = createAllocStack(resultTy);
       arguments.push_back(indRes);
-      indirectToDirectResults.push_back(indRes);
       continue;
     }
     // Convert direct result to indirect result.
-    assert(toRes.isFormalIndirect());
-    SILType resultTy = toConv.getSILType(toRes);
-    assert(resultTy.isAddress());
-    directToIndirectResults.push_back({resIdx, *toArgIter++});
-    continue;
+    // Increment thunk argument iterator; reabstraction handled later.
+    toArgIter++;
   }
 
   // Reabstract parameters.
@@ -2243,8 +2241,9 @@ static SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
     }
     // Convert indirect parameter to direct parameter.
     if (fromParam.isFormalIndirect()) {
-      auto paramTy = thunk->mapTypeIntoContext(
-          fromConv.getSILType(fromType->getParameters()[paramIdx]));
+      auto paramTy = fromConv.getSILType(fromType->getParameters()[paramIdx]);
+      if (!paramTy.hasArchetype())
+        paramTy = thunk->mapTypeIntoContext(paramTy);
       assert(paramTy.isAddress());
       auto *toArg = *toArgIter++;
       auto *buf = createAllocStack(toArg->getType());
@@ -2269,23 +2268,42 @@ static SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   // Extract all direct results.
   SmallVector<SILValue, 4> dirResults;
   extractAllElements(apply, builder, dirResults);
-  // Push non-reabstracted direct results.
-  for (unsigned i : range(dirResults.size()))
-    if (!toConv.isSILIndirect(toConv.getResults()[i]))
-      results.push_back(dirResults[i]);
-  // Load direct results from indirect results.
-  for (auto indRes : indirectToDirectResults) {
-    auto *load = builder.createLoad(loc, indRes,
-        getBufferLOQ(indRes->getType().getASTType(), *thunk));
-    builder.createRetainValue(loc, load, builder.getDefaultAtomicity());
-    results.push_back(load);
-  }
-  // Store direct results to indirect results.
-  for (auto pair : directToIndirectResults) {
-    auto dirResIdx = std::get<0>(pair);
-    auto indRes = std::get<1>(pair);
-    builder.createStore(loc, dirResults[dirResIdx], indRes,
-         getBufferSOQ(indRes->getType().getASTType(), *thunk));
+
+  auto fromDirResultsIter = dirResults.begin();
+  auto fromIndResultsIter = apply->getIndirectSILResults().begin();
+  auto toIndResultsIter = thunk->getIndirectResults().begin();
+  // Reabstract results.
+  for (unsigned resIdx : range(toType->getNumResults())) {
+    auto fromRes = fromConv.getResults()[resIdx];
+    auto toRes = toConv.getResults()[resIdx];
+    // No abstraction mismatch.
+    if (fromRes.isFormalIndirect() == toRes.isFormalIndirect()) {
+      // If result types are direct, add call result as direct thunk result.
+      if (toRes.isFormalDirect())
+        results.push_back(*fromDirResultsIter++);
+      // If result types are indirect, increment indirect result iterators.
+      else {
+        ++fromIndResultsIter;
+        ++toIndResultsIter;
+      }
+      continue;
+    }
+    // Load direct results from indirect results.
+    if (fromRes.isFormalIndirect()) {
+      auto indRes = *fromIndResultsIter++;
+      auto *load = builder.createLoad(loc, indRes,
+          getBufferLOQ(indRes->getType().getASTType(), *thunk));
+      builder.createRetainValue(loc, load, builder.getDefaultAtomicity());
+      results.push_back(load);
+      continue;
+    }
+    // Store direct results to indirect results.
+    assert(toRes.isFormalIndirect());
+    SILType resultTy = toConv.getSILType(toRes);
+    assert(resultTy.isAddress());
+    auto indRes = *toIndResultsIter++;
+    builder.createStore(loc, *fromDirResultsIter++, indRes,
+                        getBufferSOQ(indRes->getType().getASTType(), *thunk));
   }
   auto retVal = joinElements(results, builder, loc);
 
@@ -3055,7 +3073,9 @@ bool PrimalGen::performSynthesis(FunctionSynthesisItem item) {
   auto &passManager = context.getPassManager();
   auto *activityAnalysis =
       passManager.getAnalysis<DifferentiableActivityAnalysis>();
-  auto &activityInfo = *activityAnalysis->get(item.original);
+  auto &activityCollection = *activityAnalysis->get(item.original);
+  auto &activityInfo = activityCollection.getActivityInfo(
+      item.target->getLoweredFunctionType()->getGenericSignature());
   // For debugging, dump the original function's activity analysis.
   LLVM_DEBUG(dumpActivityInfo(*item.original, item.task->getIndices(),
                               activityInfo, getADDebugStream()));
@@ -3576,6 +3596,19 @@ private:
                     adjointGenEnv->getForwardingSubstitutionMap());
   }
 
+  Optional<VectorSpace> getCotangentSpace(CanType type) {
+    return type->getAutoDiffAssociatedVectorSpace(
+        AutoDiffAssociatedVectorSpaceKind::Cotangent,
+        LookUpConformanceInModule(getModule().getSwiftModule()));
+  }
+
+  /// Assuming the given type conforms to `Differentiable` after remapping,
+  /// returns the associated cotangent space type.
+  SILType getRemappedCotangentType(SILType type) {
+    return SILType::getPrimitiveObjectType(
+        getCotangentSpace(remapType(type).getASTType())->getCanonicalType());
+  }
+
   //--------------------------------------------------------------------------//
   // Managed value mapping
   //--------------------------------------------------------------------------//
@@ -3605,7 +3638,7 @@ private:
     assert(originalValue->getFunction() == &getOriginal());
     auto insertion = valueMap.try_emplace(
         originalValue, makeZeroAdjointValue(
-            getCotangentType(originalValue->getType(), getModule())));
+            getRemappedCotangentType(originalValue->getType())));
     auto it = insertion.first;
     SWIFT_DEFER { valueMap.erase(it); };
     return std::move(it->getSecond());
@@ -3652,6 +3685,47 @@ private:
     assert(insertion.second); (void)insertion;
   }
 
+  SILValue getAdjointProjection(SILValue originalProjection) {
+    // Handle `struct_element_addr`.
+    if (auto *seai = dyn_cast<StructElementAddrInst>(originalProjection)) {
+      auto adjSource = getAdjointBuffer(seai->getOperand());
+      auto *cotangentVectorDecl =
+          adjSource.getType().getStructOrBoundGenericStruct();
+      auto cotanFieldLookup =
+          cotangentVectorDecl->lookupDirect(seai->getField()->getName());
+      assert(cotanFieldLookup.size() == 1);
+      auto *cotanField = cast<VarDecl>(cotanFieldLookup.front());
+      return builder.createStructElementAddr(
+         seai->getLoc(), adjSource.getValue(), cotanField);
+    }
+    // Handle `tuple_element_addr`.
+    if (auto *teai = dyn_cast<TupleElementAddrInst>(originalProjection)) {
+      auto source = teai->getOperand();
+      auto adjSource = getAdjointBuffer(source);
+      if (!adjSource.getType().is<TupleType>())
+        return adjSource;
+      auto origTupleTy = source->getType().castTo<TupleType>();
+      unsigned adjIndex = 0;
+      for (unsigned i : range(teai->getFieldNo())) {
+        if (getCotangentSpace(
+                origTupleTy->getElement(i).getType()->getCanonicalType()))
+          ++adjIndex;
+      }
+      return builder.createTupleElementAddr(
+          teai->getLoc(), adjSource.getValue(), adjIndex);
+    }
+    // Handle `begin_access`.
+    if (auto *bai = dyn_cast<BeginAccessInst>(originalProjection)) {
+      auto adjBase = getAdjointBuffer(bai->getOperand());
+      if (errorOccurred)
+        return (bufferMap[originalProjection] = ValueWithCleanup());
+      return builder.createBeginAccess(
+          bai->getLoc(), adjBase, bai->getAccessKind(), bai->getEnforcement(),
+          /*noNestedConflict*/ false, /*fromBuiltin*/ false);
+    }
+    return SILValue();
+  }
+
   ValueWithCleanup &getAdjointBuffer(SILValue originalBuffer) {
     assert(originalBuffer->getType().isAddress());
     assert(originalBuffer->getFunction() == &getOriginal());
@@ -3660,42 +3734,23 @@ private:
     if (!insertion.second) // not inserted
       return insertion.first->getSecond();
 
-    // Check whether the original buffer is an address-to-address projection.
-    // If so, recurse until the buffer is such a projection but its operand is
-    // not. Then, get the adjoint buffer of the operand and return a
-    // corresponding projection into it.
-    if (Projection::isAddressProjection(originalBuffer) &&
-        !Projection::isObjectToAddressProjection(originalBuffer)) {
-      // Get operand of the projection (i.e. the base memory).
-      auto *inst = cast<SingleValueInstruction>(originalBuffer);
-      Projection proj(inst);
-      auto loc = inst->getLoc();
-      auto base = inst->getOperand(0);
-      // Get the corresponding projection into the adjoint buffer.
-      SILValue adjProj;
-      auto adjBase = getAdjointBuffer(base);
-      if (proj.getKind() == ProjectionKind::Struct) {
-        auto cotanField = proj.getVarDecl(remapType(adjBase.getType()));
-        adjProj = builder.createStructElementAddr(loc, adjBase.getValue(),
-                                                  cotanField);
-      } else {
-        adjProj = proj.createAddressProjection(builder, loc, adjBase.getValue())
-                      .get();
+    // Diagnose `struct_element_addr` instructions to `@noDerivative` fields.
+    if (auto *seai = dyn_cast<StructElementAddrInst>(originalBuffer)) {
+      if (seai->getField()->getAttrs().hasAttribute<NoDerivativeAttr>()) {
+        getContext().emitNondifferentiabilityError(
+            originalBuffer, getDifferentiationTask(),
+            diag::autodiff_noderivative_stored_property);
+        errorOccurred = true;
+        return (bufferMap[originalBuffer] = ValueWithCleanup());
       }
-      ValueWithCleanup projWithCleanup(
-          adjProj, makeCleanupFromChildren({adjBase.getCleanup()}));
-      return (bufferMap[originalBuffer] = projWithCleanup);
     }
-    // If the original buffer is a `begin_access` instruction, get the adjoint
-    // buffer of its operand and return a corresponding `begin_access` into it.
-    if (auto *bai = dyn_cast<BeginAccessInst>(originalBuffer)) {
-      auto adjBase = getAdjointBuffer(bai->getOperand());
-      auto *adjAccess = builder.createBeginAccess(
-          bai->getLoc(), adjBase, bai->getAccessKind(), bai->getEnforcement(),
-          /*noNestedConflict*/ false, /*fromBuiltin*/ false);
-      ValueWithCleanup accessWithCleanup(
-          adjAccess, makeCleanupFromChildren({adjBase.getCleanup()}));
-      return (bufferMap[originalBuffer] = accessWithCleanup);
+
+    // If the original buffer is a projection, return a corresponding projection
+    // into the adjoint buffer.
+    if (auto adjProj = getAdjointProjection(originalBuffer)) {
+      ValueWithCleanup projWithCleanup(
+          adjProj, makeCleanup(adjProj, /*cleanup*/ nullptr));
+      return (bufferMap[originalBuffer] = projWithCleanup);
     }
 
     // Set insertion point for local allocation builder: before the last local
@@ -3708,8 +3763,9 @@ private:
       localAllocBuilder.setInsertionPoint(
           localAllocations.back().getValue()->getDefiningInstruction());
     // Allocate local buffer and initialize to zero.
-    auto *newBuf = localAllocBuilder.createAllocStack(originalBuffer.getLoc(),
-        remapType(getCotangentType(originalBuffer->getType(), getModule())));
+    auto *newBuf = localAllocBuilder.createAllocStack(
+        originalBuffer.getLoc(),
+        getRemappedCotangentType(originalBuffer->getType()));
     auto *access = localAllocBuilder.createBeginAccess(
         newBuf->getLoc(), newBuf, SILAccessKind::Init,
         SILAccessEnforcement::Static, /*noNestedConflict*/ true,
@@ -3732,6 +3788,8 @@ private:
     assert(originalBuffer->getFunction() == &getOriginal());
     assert(rhsBufferAccess->getFunction() == &getAdjoint());
     auto adjointBuffer = getAdjointBuffer(originalBuffer);
+    if (errorOccurred)
+      return;
     auto *destAccess = builder.createBeginAccess(
         rhsBufferAccess.getLoc(), adjointBuffer, SILAccessKind::Modify,
         SILAccessEnforcement::Static, /*noNestedConflict*/ true,
@@ -3807,6 +3865,17 @@ public:
     SmallVector<SILValue, 8> origFormalResults;
     collectAllFormalResultsInTypeOrder(original, origFormalResults);
     auto origResult = origFormalResults[task->getIndices().source];
+    // Emit warning if original result is not varied, because it will always
+    // have a zero derivative.
+    if (!activityInfo.isVaried(origResult, task->getIndices().parameters)) {
+      // Emit fixit if original result has a valid source location.
+      auto sourceLoc = origResult.getLoc().getSourceLoc();
+      if (sourceLoc.isValid()) {
+        getContext()
+            .diagnose(sourceLoc, diag::autodiff_nonvaried_result_fixit)
+            .fixItInsertAfter(sourceLoc, ".withoutDerivative()");
+      }
+    }
 
     builder.setInsertionPoint(adjointEntry);
     if (seed->getType().isAddress()) {
@@ -3889,6 +3958,8 @@ public:
         retElts.push_back(val);
       } else {
         auto adjBuf = getAdjointBuffer(origParam);
+        if (errorOccurred)
+          return;
         indParamAdjoints.push_back(adjBuf);
       }
     };
@@ -3938,17 +4009,23 @@ public:
     if (errorOccurred)
       return;
 
+    LLVM_DEBUG(getADDebugStream() << "AdjointEmitter visited:\n[ORIG]"
+               << *inst);
 #ifndef NDEBUG
     auto beforeInsertion = std::prev(builder.getInsertionPoint());
 #endif
     SILInstructionVisitor::visit(inst);
     LLVM_DEBUG({
-      auto &s = getADDebugStream()
-          << "AdjointEmitter visited:\n[ORIG]" << *inst;
-      s << "[ADJ] Emitted:\n";
+      // auto &s = getADDebugStream()
+      //     << "AdjointEmitter visited:\n[ORIG]" << *inst;
+      // s << "[ADJ] Emitted:\n";
+      // auto afterInsertion = builder.getInsertionPoint();
+      // for (auto it = ++beforeInsertion; it != afterInsertion; ++it)
+      //   s << *it;
+      llvm::dbgs() << "[ADJ] Emitted:\n";
       auto afterInsertion = builder.getInsertionPoint();
       for (auto it = ++beforeInsertion; it != afterInsertion; ++it)
-        s << *it;
+        llvm::dbgs() << *it;
     });
   }
 
@@ -4013,6 +4090,8 @@ public:
       }
     } else {
       seed = getAdjointBuffer(origResult);
+      if (errorOccurred)
+        return;
     }
 
     // Create allocations for pullback indirect results.
@@ -4084,6 +4163,8 @@ public:
         } else {
           if (origArg->getType().isAddress()) {
             auto adjBuf = getAdjointBuffer(origArg);
+            if (errorOccurred)
+              return;
             auto *tmpBuf =
                 builder.createAllocStack(loc, cotanWrtSelf->getType());
             builder.createStore(loc, cotanWrtSelf, tmpBuf,
@@ -4125,6 +4206,8 @@ public:
       } else {
         if (origArg->getType().isAddress()) {
           auto adjBuf = getAdjointBuffer(origArg);
+          if (errorOccurred)
+            return;
           auto *tmpBuf = builder.createAllocStack(loc, cotan->getType());
           builder.createStore(loc, cotan, tmpBuf,
               getBufferSOQ(tmpBuf->getType().getASTType(), getAdjoint()));
@@ -4163,7 +4246,7 @@ public:
       for (auto *field : structDecl->getStoredProperties()) {
         auto fv = si->getFieldValue(field);
         addAdjointValue(fv, makeZeroAdjointValue(
-            getCotangentType(fv->getType(), getModule())));
+            getRemappedCotangentType(fv->getType())));
       }
       break;
     case AdjointValueKind::Concrete: {
@@ -4183,16 +4266,20 @@ public:
 
         // Accumulate adjoints for the fields of the `struct` operand.
         for (auto *field : structDecl->getStoredProperties()) {
+          // There does not exist a corresponding cotangent field for original
+          // fields with `@noDerivative` attribute. Emit an error.
+          if (field->getAttrs().hasAttribute<NoDerivativeAttr>())
+            continue;
           // Find the corresponding field in the cotangent space.
           VarDecl *cotanField = nullptr;
           if (cotangentVectorDecl == structDecl)
             cotanField = field;
           // Otherwise, look up the field by name.
           else {
-            auto correspondingFieldLookup =
-            cotangentVectorDecl->lookupDirect(field->getName());
-            assert(correspondingFieldLookup.size() == 1);
-            cotanField = cast<VarDecl>(correspondingFieldLookup.front());
+            auto cotanFieldLookup =
+                cotangentVectorDecl->lookupDirect(field->getName());
+            assert(cotanFieldLookup.size() == 1);
+            cotanField = cast<VarDecl>(cotanFieldLookup.front());
           }
           auto *adjStructElt =
               builder.createStructExtract(loc, adjStruct, cotanField);
@@ -4221,6 +4308,9 @@ public:
   }
 
   void visitStructExtractInst(StructExtractInst *sei) {
+    assert(!sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>() &&
+           "`struct_extract` with `@noDerivative` field should not be "
+           "differentiated; activity analysis should not marked as varied");
     auto loc = sei->getLoc();
     auto &differentiationStrategies =
         getDifferentiationTask()->getStructExtractDifferentiationStrategies();
@@ -4316,22 +4406,34 @@ public:
     auto av = takeAdjointValue(ti);
     switch (av.getKind()) {
     case AdjointValueKind::Zero:
-      for (auto eltVal : ti->getElements())
+      for (auto eltVal : ti->getElements()) {
+        if (!getCotangentSpace(eltVal->getType().getASTType()))
+          continue;
         addAdjointValue(eltVal, makeZeroAdjointValue(
-            getCotangentType(eltVal->getType(), getModule())));
+            getRemappedCotangentType(eltVal->getType())));
+      }
       break;
     case AdjointValueKind::Concrete: {
       auto val = av.getConcreteValue();
-      for (auto i : range(ti->getNumOperands()))
-        addAdjointValue(ti->getOperand(i),
-            makeConcreteAdjointValue(ValueWithCleanup(
-                builder.createTupleExtract(ti->getLoc(), val, i),
-                val.getCleanup())));
+      unsigned adjIdx = 0;
+      for (auto i : range(ti->getNumOperands())) {
+        if (!getCotangentSpace(ti->getOperand(i)->getType().getASTType()))
+          continue;
+        auto adjElt = val;
+        if (val.getType().is<TupleType>())
+          adjElt = ValueWithCleanup(builder.createTupleExtract(
+              ti->getLoc(), val, adjIdx++), val.getCleanup());
+        addAdjointValue(ti->getOperand(i), makeConcreteAdjointValue(adjElt));
+      }
       break;
     }
     case AdjointValueKind::Aggregate:
-      for (auto i : range(ti->getElements().size()))
-        addAdjointValue(ti->getElement(i), av.takeAggregateElement(i));
+      unsigned adjIdx = 0;
+      for (auto i : range(ti->getElements().size())) {
+        if (!getCotangentSpace(ti->getElement(i)->getType().getASTType()))
+          continue;
+        addAdjointValue(ti->getElement(i), av.takeAggregateElement(adjIdx++));
+      }
       break;
     }
   }
@@ -4341,25 +4443,37 @@ public:
   ///                         |--- n-th element
   ///   adj[x] += tuple (0, 0, ..., adj[y], ..., 0, 0)
   void visitTupleExtractInst(TupleExtractInst *tei) {
-    auto *tupleTy = tei->getTupleType();
-    auto tupleCotanTy = getCotangentType(tupleTy->getCanonicalType(),
-                                         getModule());
+    auto tupleCotanTy = getRemappedCotangentType(tei->getOperand()->getType());
     auto av = takeAdjointValue(tei);
     switch (av.getKind()) {
     case AdjointValueKind::Zero:
-      addAdjointValue(tei->getOperand(),
-                      makeZeroAdjointValue(tupleCotanTy));
+      addAdjointValue(tei->getOperand(), makeZeroAdjointValue(tupleCotanTy));
       break;
     case AdjointValueKind::Aggregate:
     case AdjointValueKind::Concrete: {
+      auto tupleTy = tei->getTupleType();
+      auto tupleCotanTupleTy = tupleCotanTy.getAs<TupleType>();
+      if (!tupleCotanTupleTy) {
+        addAdjointValue(tei->getOperand(), std::move(av));
+        break;
+      }
       SmallVector<AdjointValue, 8> elements;
+      unsigned adjIdx = 0;
       for (unsigned i : range(tupleTy->getNumElements())) {
+        if (!getCotangentSpace(
+                tupleTy->getElement(i).getType()->getCanonicalType()))
+          continue;
         if (tei->getFieldNo() == i)
           elements.push_back(av);
         else
           elements.push_back(makeZeroAdjointValue(
-              getCotangentType(tupleTy->getElementType(i)->getCanonicalType(),
-                               getModule())));
+              getRemappedCotangentType(SILType::getPrimitiveObjectType(
+                  tupleCotanTupleTy->getElementType(adjIdx++)
+                      ->getCanonicalType()))));
+      }
+      if (elements.size() == 1) {
+        addAdjointValue(tei->getOperand(), std::move(elements.front()));
+        break;
       }
       addAdjointValue(tei->getOperand(),
           makeAggregateAdjointValue(tupleCotanTy, elements));
@@ -4373,6 +4487,8 @@ public:
   //    Adjoint: dealloc_stack adj[y]
   void visitAllocStackInst(AllocStackInst *asi) {
     auto adjBuf = getAdjointBuffer(asi);
+    if (errorOccurred)
+      return;
     if (auto *cleanup = adjBuf.getCleanup())
       cleanup->applyRecursively(builder, asi->getLoc());
     builder.createDeallocStack(asi->getLoc(), adjBuf);
@@ -4382,8 +4498,7 @@ public:
   //   Original: dealloc_stack y
   //    Adjoint: adj[y] = alloc_stack $T.CotangentVector
   void visitDeallocStackInst(DeallocStackInst *dsi) {
-    auto bufType =
-        remapType(getCotangentType(dsi->getOperand()->getType(), getModule()));
+    auto bufType = getRemappedCotangentType(dsi->getOperand()->getType());
     auto *adjBuf = builder.createAllocStack(dsi->getLoc(), bufType);
     auto *access = builder.createBeginAccess(dsi->getLoc(), adjBuf,
                                              SILAccessKind::Init,
@@ -4413,6 +4528,8 @@ public:
     builder.createEndAccess(li->getLoc(), initAccess, /*aborted*/ false);
     // Get the adjoint buffer.
     auto &adjBuf = getAdjointBuffer(li->getOperand());
+    if (errorOccurred)
+      return;
     // Accumulate the adjoint value in the local buffer into the adjoint buffer.
     auto *readAccess = builder.createBeginAccess(
         li->getLoc(), localBuf, SILAccessKind::Read,
@@ -4432,6 +4549,8 @@ public:
   //    Adjoint: adj[x] += load adj[y]; adj[y] = 0
   void visitStoreInst(StoreInst *si) {
     auto &adjBuf = getAdjointBuffer(si->getDest());
+    if (errorOccurred)
+      return;
     auto bufType = remapType(adjBuf.getType());
     auto adjVal = builder.createLoad(si->getLoc(), adjBuf,
         getBufferLOQ(bufType.getASTType(), getAdjoint()));
@@ -4456,8 +4575,6 @@ public:
     } else {
       emitZeroIndirect(bufType.getASTType(), adjBuf, si->getLoc());
     }
-    auto cleanup = makeCleanup(adjBuf, emitCleanup);
-    adjBuf.setCleanup(cleanup);
   }
 
   // Handle `copy_addr` instruction.
@@ -4465,6 +4582,8 @@ public:
   //    Adjoint: adj[x] += adj[y]; adj[y] = 0
   void visitCopyAddrInst(CopyAddrInst *cai) {
     auto &adjDest = getAdjointBuffer(cai->getDest());
+    if (errorOccurred)
+      return;
     auto destType = remapType(adjDest.getType());
     // Disable the buffer's top-level cleanup (which is supposed to operate on
     // the buffer), create a cleanup for the value that carrys all child
@@ -4518,6 +4637,11 @@ public:
       }
     }
     auto accessBuf = getAdjointBuffer(bai);
+    auto &sourceBuf = getAdjointBuffer(bai->getSource());
+    sourceBuf.setCleanup(makeCleanupFromChildren({sourceBuf.getCleanup(),
+                                                  accessBuf.getCleanup()}));
+    if (errorOccurred)
+      return;
     builder.createEndAccess(bai->getLoc(), accessBuf, /*aborted*/ false);
   }
 
@@ -4526,6 +4650,8 @@ public:
   //    Adjoint: adj[y] = begin_access inverse(access_kind) adj[x]
   void visitEndAccessInst(EndAccessInst *eai) {
     auto adjBuf = getAdjointBuffer(eai->getSource());
+    if (errorOccurred)
+      return;
     SILAccessKind kind;
     switch (eai->getBeginAccess()->getAccessKind()) {
     case SILAccessKind::Read: kind = SILAccessKind::Modify; break;
@@ -4538,8 +4664,19 @@ public:
         eai->getBeginAccess()->hasNoNestedConflict(),
         eai->getBeginAccess()->isFromBuiltin());
     setAdjointBuffer(eai->getOperand(),
-                     ValueWithCleanup(adjAccess, adjBuf.getCleanup()));
+                     ValueWithCleanup(adjAccess, makeCleanupFromChildren({})));
   }
+
+#define PROPAGATE_BUFFER_CLEANUP(INST) \
+  void visit##INST##Inst(INST##Inst *inst) { \
+    auto &adjBase = getAdjointBuffer(inst->getOperand()); \
+    auto &adjProj = getAdjointBuffer(inst); \
+    adjProj.setCleanup(makeCleanupFromChildren( \
+        {adjProj.getCleanup(), adjBase.getCleanup()})); \
+  }
+  PROPAGATE_BUFFER_CLEANUP(StructElementAddr)
+  PROPAGATE_BUFFER_CLEANUP(TupleElementAddr)
+#undef PROPAGATE_CLEANUP
 
 #define NOT_DIFFERENTIABLE(INST, DIAG) \
   void visit##INST##Inst(INST##Inst *inst) { \
@@ -4566,10 +4703,6 @@ public:
   NO_ADJOINT(StrongRetainUnowned)
   NO_ADJOINT(DestroyValue)
   NO_ADJOINT(DestroyAddr)
-  // Projection operations have no adjoint visitor.
-  // Corresponding adjoint projections are created in `getAdjointBuffer`.
-  NO_ADJOINT(StructElementAddr)
-  NO_ADJOINT(TupleElementAddr)
 #undef NO_DERIVATIVE
 };
 } // end anonymous namespace
@@ -5092,9 +5225,12 @@ bool AdjointGen::performSynthesis(FunctionSynthesisItem item) {
       passManager.getAnalysis<DifferentiableActivityAnalysis>();
   auto *postDomAnalysis =
       passManager.getAnalysis<PostDominanceAnalysis>();
+  auto &activityCollection = *activityAnalysis->get(item.original);
+  auto &activityInfo = activityCollection.getActivityInfo(
+      item.target->getLoweredFunctionType()->getGenericSignature());
   // Generate primal code.
-  AdjointEmitter emitter(item, *activityAnalysis->get(item.original),
-                         *postDomAnalysis->get(item.original), *this);
+  AdjointEmitter emitter(
+      item, activityInfo, *postDomAnalysis->get(item.original), *this);
   // Run the adjoint emitter.
   return emitter.run();
 }
@@ -5174,8 +5310,6 @@ DifferentiationTask::DifferentiationTask(ADContext &context,
   // If differentiation is triggered by `@differentiable`, we export its symbol
   // when the original function is public.
   auto isAssocFnExported =
-      invoker.getKind() ==
-          DifferentiationInvoker::Kind::DifferentiableAttribute ||
       invoker.getKind() ==
           DifferentiationInvoker::Kind::SILDifferentiableAttribute;
 

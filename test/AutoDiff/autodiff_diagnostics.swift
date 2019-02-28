@@ -43,6 +43,26 @@ extension S : Differentiable, VectorNumeric {
 // expected-note @+1 {{property is not differentiable}}
 _ = gradient(at: S(p: 0)) { s in 2 * s.p }
 
+struct NoDerivativeProperty : Differentiable {
+  var x: Float
+  @noDerivative var y: Float
+}
+// expected-error @+1 {{function is not differentiable}}
+_ = gradient(at: NoDerivativeProperty(x: 1, y: 1)) { s -> Float in
+  var tmp = s
+  // expected-note @+1 {{cannot differentiate through a '@noDerivative' stored property; do you want to add '.withoutDerivative()'?}}
+  tmp.y = tmp.x
+  return tmp.x
+}
+_ = gradient(at: NoDerivativeProperty(x: 1, y: 1)) { s in
+  // expected-warning @+1 {{result does not depend on differentiation arguments and will always have a zero derivative; do you want to add '.withoutDerivative()'?}} {{13-13=.withoutDerivative()}}
+  return s.y
+}
+_ = gradient(at: NoDerivativeProperty(x: 1, y: 1)) {
+  // expected-warning @+1 {{result does not depend on differentiation arguments and will always have a zero derivative; do you want to add '.withoutDerivative()'?}} {{7-7=.withoutDerivative()}}
+  $0.y
+}
+
 //===----------------------------------------------------------------------===//
 // Function composition
 //===----------------------------------------------------------------------===//
@@ -131,6 +151,28 @@ enum T : P {
   // expected-note @+1 {{cannot differentiate writes to global variables}}
   a = a + x
   return a
+}
+
+// Test `@differentiable` on initializer with assignments.
+struct TF_305 : Differentiable {
+  var filter: Float
+  var bias: Float
+  typealias Activation = @differentiable (Float) -> Float
+  @noDerivative let activation: Activation
+  @noDerivative let strides: (Int, Int)
+
+  @differentiable
+  public init(
+    filter: Float,
+    bias: Float,
+    activation: @escaping Activation,
+    strides: (Int, Int)
+  ) {
+    self.filter = filter
+    self.bias = bias
+    self.activation = activation
+    self.strides = strides
+  }
 }
 
 //===----------------------------------------------------------------------===//

@@ -663,21 +663,15 @@ public extension Tensor {
   }
 }
 
-public extension Tensor {
-  /// Concatenates tensors along the first dimension.
-  /// - Precondition: The tensors must have the same shape, except for the
-  ///   leading dimension.
-  @inlinable @inline(__always)
-  func concatenated(with other: Tensor) -> Tensor {
-    return Raw.concatV2([self, other], axis: Tensor<Int32>(0))
-  }
 
+public extension Tensor {
   /// Concatenates tensors along the specified axis.
   /// - Precondition: The tensors must have the same dimensions, except for the
   ///   specified axis.
   /// - Precondition: The axis must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
-  func concatenated(with other: Tensor, alongAxis axis: Int32) -> Tensor {
+  @differentiable(vjp: _vjpConcatenated where Scalar : TensorFlowFloatingPoint)
+  func concatenated(with other: Tensor, alongAxis axis: Int32 = 0) -> Tensor {
     return Raw.concatV2([self, other], axis: Tensor<Int32>(axis))
   }
 
@@ -687,8 +681,28 @@ public extension Tensor {
   ///   and may be controversial. The existence/naming of `++` will be discussed
   ///   during a later API design phase.
   @inlinable @inline(__always)
+  @differentiable(where Scalar : TensorFlowFloatingPoint)
   static func ++ (lhs: Tensor, rhs: Tensor) -> Tensor {
     return lhs.concatenated(with: rhs)
+  }
+}
+
+internal extension Tensor where Scalar : TensorFlowFloatingPoint {
+  @inlinable @inline(__always)
+  func _vjpConcatenated(with other: Tensor, alongAxis axis: Int32)
+    -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
+    let idx = axis >= 0 ? axis : rank - axis
+    let splits = Tensor<Int32>([shapeTensor[idx], other.shapeTensor[idx]])
+    return (Raw.concatV2([self, other], axis: Tensor<Int32>(axis)), { result in
+      let ret: (TensorHandle<Scalar>, TensorHandle<Scalar>) = #tfop("SplitV",
+        result,
+        splits,
+        Tensor<Int32>(axis),
+        num_split: Int64(2),
+        T$dtype: Scalar.tensorFlowDataType,
+        Tlen$dtype: Int32.tensorFlowDataType)
+      return (Tensor(handle: ret.0), Tensor(handle: ret.1))
+    })
   }
 }
 
@@ -864,6 +878,7 @@ public func pow<T>(_ lhs: Tensor<T>, _ rhs: Tensor<T>) -> Tensor<T>
 
 /// Computes the power of the scalar to the tensor, broadcasting the scalar.
 @inlinable @inline(__always)
+// @differentiable(where T : TensorFlowFloatingPoint)
 public func pow<T>(_ lhs: T, _ rhs: Tensor<T>) -> Tensor<T>
   where T : FloatingPoint {
   return pow(Tensor(lhs), rhs)
@@ -871,6 +886,7 @@ public func pow<T>(_ lhs: T, _ rhs: Tensor<T>) -> Tensor<T>
 
 /// Computes the power of the tensor to the scalar, broadcasting the scalar.
 @inlinable @inline(__always)
+// @differentiable(where T : TensorFlowFloatingPoint)
 public func pow<T>(_ lhs: Tensor<T>, _ rhs: T) -> Tensor<T>
   where T : FloatingPoint {
   return pow(lhs, Tensor(rhs))
@@ -888,6 +904,7 @@ public func max<T>(_ lhs: Tensor<T>, _ rhs: Tensor<T>) -> Tensor<T>
 /// Computes the element-wise maximum of the scalar and the tensor, broadcasting
 /// the scalar.
 @inlinable @inline(__always)
+//@differentiable(where T : TensorFlowFloatingPoint)
 public func max<T>(_ lhs: T, _ rhs: Tensor<T>) -> Tensor<T>
   where T : Numeric & Comparable {
   return max(Tensor(lhs), rhs)
@@ -896,6 +913,7 @@ public func max<T>(_ lhs: T, _ rhs: Tensor<T>) -> Tensor<T>
 /// Computes the element-wise maximum of the scalar and the tensor, broadcasting
 /// the scalar.
 @inlinable @inline(__always)
+// @differentiable(where T : TensorFlowFloatingPoint)
 public func max<T>(_ lhs: Tensor<T>, _ rhs: T) -> Tensor<T>
   where T : Numeric & Comparable {
   return max(lhs, Tensor(rhs))
@@ -913,6 +931,7 @@ public func min<T>(_ lhs: Tensor<T>, _ rhs: Tensor<T>) -> Tensor<T>
 /// Computes the element-wise minimum of the scalar and the tensor, broadcasting
 /// the scalar.
 @inlinable @inline(__always)
+// @differentiable(where T : TensorFlowFloatingPoint)
 public func min<T>(_ lhs: T, _ rhs: Tensor<T>) -> Tensor<T>
   where T : Numeric & Comparable {
   return min(Tensor(lhs), rhs)
@@ -921,6 +940,7 @@ public func min<T>(_ lhs: T, _ rhs: Tensor<T>) -> Tensor<T>
 /// Computes the element-wise minimum of the scalar and the tensor, broadcasting
 /// the scalar.
 @inlinable @inline(__always)
+// @differentiable(where T : TensorFlowFloatingPoint)
 public func min<T>(_ lhs: Tensor<T>, _ rhs: T) -> Tensor<T>
   where T : Numeric & Comparable {
   return min(lhs, Tensor(rhs))
@@ -953,7 +973,7 @@ public extension Tensor where Scalar == Bool {
   /// Returns a new tensor containing elements from either `left` or `right`,
   /// depending on the elements of `self`.
   ///
-  /// `self` acts as a amsk that chooses, based on the value at each scalar,
+  /// `self` acts as a mask that chooses, based on the value at each scalar,
   ///  whether the corresponding scalar in the output should be taken from
   /// `left` (if `true`) or `right` (if `false`).
   ///
@@ -962,30 +982,40 @@ public extension Tensor where Scalar == Bool {
   ///   `left` and `right` have rank greater than or equal to 1, then `self`
   ///   must be either have the same shape as `left` or be a 1-D `Tensor` such
   ///   that `self.scalarCount == left[0]`.
-  @inlinable @inline(__always)
+  @available(*, deprecated, message: "Use '.replacing(with:mask:)' instead")
+  @inlinable
   func selecting<T>(_ left: Tensor<T>, _ right: Tensor<T>) -> Tensor<T> {
-    return Raw.select(condition: self, t: left, e: right)
+    return left.replacing(with: right, where: self)
   }
+}
 
-  // FIXME: "Select" is non-broadcasting: `left` and `right` are required to
-  // have the same shapes. An explicit broadcast must be added.
-  @inlinable @inline(__always)
-  func selecting<T>(_ left: T, _ right: Tensor<T>) -> Tensor<T> {
-    return selecting(Tensor<T>(left), right)
+public extension Tensor {
+  /// Replaces elements of this tensor with `other` in the lanes where `mask` is
+  /// `true`.
+  ///
+  /// - Precondition: `self` and `other` must have the same shape. If
+  ///   `self` and `other` are scalar, then `mask` must also be scalar. If
+  ///   `self` and `other` have rank greater than or equal to `1`, then `mask`
+  ///   must be either have the same shape as `self` or be a 1-D `Tensor` such
+  ///   that `mask.scalarCount == self.shape[0]`.
+  @inlinable
+  @differentiable(wrt: (self, other),
+                  vjp: _vjpReplacing where Scalar : TensorFlowFloatingPoint)
+  func replacing(with other: Tensor,
+                 where mask: Tensor<Bool>) -> Tensor {
+    return Raw.select(condition: mask, t: self, e: other)
   }
+}
 
-  // FIXME: "Select" is non-broadcasting: `left` and `right` are required to
-  // have the same shapes. An explicit broadcast must be added.
-  @inlinable @inline(__always)
-  func selecting<T>(_ left: Tensor<T>, _ right: T) -> Tensor<T> {
-    return selecting(left, Tensor<T>(right))
-  }
-
-  // FIXME: "Select" is non-broadcasting: `left` and `right` are required to
-  // have the same shapes. An explicit broadcast must be added.
-  @inlinable @inline(__always)
-  func selecting<T>(_ left: T, _ right: T) -> Tensor<T> {
-    return selecting(Tensor<T>(left), Tensor<T>(right))
+public extension Tensor where Scalar : TensorFlowFloatingPoint {
+  @inlinable
+  internal func _vjpReplacing(with other: Tensor, where mask: Tensor<Bool>)
+    -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
+    return (replacing(with: other, where: mask), { v in
+      let zeros = Tensor(zeros: v.shape)
+      return (v.replacing(with: zeros, where: mask),
+              zeros.replacing(with: v, where: mask))
+    })
   }
 }
 
