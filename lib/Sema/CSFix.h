@@ -154,6 +154,10 @@ enum class FixKind : uint8_t {
   /// by adding new arguments to the list represented as type variables.
   AddMissingArguments,
 
+  /// If there are more arguments than parameters, let's fix that up
+  /// by removing extraneous arguments.
+  RemoveExtraneousArguments,
+
   /// Allow single tuple closure parameter destructuring into N arguments.
   AllowClosureParameterDestructuring,
 
@@ -1014,6 +1018,39 @@ public:
   static IgnoreDefaultArgumentTypeMismatch *create(ConstraintSystem &cs,
                                                    Type fromType, Type toType,
                                                    ConstraintLocator *locator);
+};
+
+class RemoveExtraneousArguments final
+  : public ConstraintFix,
+    private llvm::TrailingObjects<RemoveExtraneousArguments, unsigned> {
+  friend TrailingObjects;
+
+  unsigned NumExtraneous;
+
+  RemoveExtraneousArguments(ConstraintSystem &cs,
+                            llvm::ArrayRef<unsigned> extraArgs,
+                            ConstraintLocator *locator)
+    : ConstraintFix(cs, FixKind::RemoveExtraneousArguments, locator),
+      NumExtraneous(extraArgs.size()) {
+    std::uninitialized_copy(extraArgs.begin(), extraArgs.end(),
+                            getExtraArgumentsBuf().begin());
+  }
+
+  public:
+  std::string getName() const override { return "remove extraneous argument(s)"; }
+
+  ArrayRef<unsigned> getExtraArguments() {
+    return {getTrailingObjects<unsigned>(), NumExtraneous};
+  }
+
+  static RemoveExtraneousArguments *create(ConstraintSystem &cs,
+                                           llvm::ArrayRef<unsigned> extraArgs,
+                                           ConstraintLocator *locator);
+
+private:
+  MutableArrayRef<unsigned> getExtraArgumentsBuf() {
+    return {getTrailingObjects<unsigned>(), NumExtraneous};
+  }
 };
 
 class MoveOutOfOrderArgument final : public ConstraintFix {

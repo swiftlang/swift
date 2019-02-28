@@ -506,6 +506,19 @@ AddMissingArguments::create(ConstraintSystem &cs, FunctionType *funcType,
   return new (mem) AddMissingArguments(cs, funcType, synthesizedArgs, locator);
 }
 
+bool RemoveExtraneousArguments::diagnose(Expr *root, bool asNote) const {
+  return false;
+}
+
+RemoveExtraneousArguments *
+RemoveExtraneousArguments::create(ConstraintSystem &cs,
+                                  llvm::ArrayRef<unsigned> extraArgs,
+                                  ConstraintLocator *locator) {
+  unsigned size = totalSizeToAlloc<unsigned>(extraArgs.size());
+  void *mem = cs.getAllocator().Allocate(size, alignof(RemoveExtraneousArguments));
+  return new (mem) RemoveExtraneousArguments(cs, extraArgs, locator);
+}
+
 bool MoveOutOfOrderArgument::diagnose(Expr *root, bool asNote) const {
   OutOfOrderArgumentFailure failure(root, getConstraintSystem(), ArgIdx,
                                     PrevArgIdx, Bindings, getLocator());
