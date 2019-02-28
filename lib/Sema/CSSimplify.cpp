@@ -4777,7 +4777,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
   // By construction, the left hand side is a type that looks like the
   // following: $T1 -> $T2.
-  assert(type1->is<FunctionType>());
+  auto func1 = type1->castTo<FunctionType>();
 
   // Let's check if this member couldn't be found and is fixed
   // to exist based on its usage.
@@ -4821,6 +4821,16 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
   };
 
+  // If the right-hand side is a type variable, try to find a common result
+  // type in the overload set.
+  if (auto typeVar = desugar2->getAs<TypeVariableType>()) {
+    auto choices = getUnboundBindOverloads(typeVar);
+    if (Type resultType = findCommonResultType(choices)) {
+      addConstraint(ConstraintKind::Bind, func1->getResult(), resultType,
+                    locator);
+    }
+  }
+
   // If right-hand side is a type variable, the constraint is unsolved.
   if (desugar2->isTypeVariableOrMember())
     return formUnsolved();
@@ -4856,7 +4866,6 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   }
 
   // For a function, bind the output and convert the argument to the input.
-  auto func1 = type1->castTo<FunctionType>();
   if (auto func2 = dyn_cast<FunctionType>(desugar2)) {
     // The argument type must be convertible to the input type.
     if (::matchCallArguments(

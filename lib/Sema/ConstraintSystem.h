@@ -2326,6 +2326,12 @@ public:
                           const DeclRefExpr *base = nullptr,
                           OpenedTypeMap *replacements = nullptr);
 
+  /// Given a set of overload choices, try to find a common result type when
+  /// they are called.
+  ///
+  /// \returns the common type amongst the set of overload choices.
+  Type findCommonResultType(ArrayRef<OverloadChoice> choices);
+
   /// Given a set of overload choices, try to find a common structure amongst
   /// all of them.
   ///
@@ -3057,6 +3063,20 @@ private:
 
   /// Collect the current inactive disjunction constraints.
   void collectDisjunctions(SmallVectorImpl<Constraint *> &disjunctions);
+
+  // Given a type variable, attempt to find the disjunction of
+  // bind overloads associated with it. This may return null in cases where
+  // the disjunction has either not been created or binds the type variable
+  // in some manner other than by binding overloads.
+  Constraint *getUnboundBindOverloadDisjunction(TypeVariableType *tyvar);
+
+  /// Given a type variable that might represent an overload set, retrieve
+  ///
+  /// \returns the set of overload choices to which this type variable
+  /// could be bound, or an empty vector if the type variable is not
+  /// solely resolved by an overload set.
+  SmallVector<OverloadChoice, 2> getUnboundBindOverloads(
+                                                  TypeVariableType *tyvar);
 
   /// Solve the system of constraints after it has already been
   /// simplified.
