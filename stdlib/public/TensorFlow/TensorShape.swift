@@ -46,6 +46,11 @@ public struct TensorShape : ExpressibleByArrayLiteral {
     self.init(elements)
   }
 
+  @inlinable @inline(__always)
+  public init(repeating repeatedValue: Int32, count: Int32) {
+    self.init(Array(repeating: repeatedValue, count: Int(count)))
+  }
+
   /// The rank of the shape.
   @inlinable
   public var rank: Int32 {

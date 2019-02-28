@@ -16,7 +16,7 @@ public func testSelect(conds1: Tensor<Bool>, x1: Tensor<Float>, y1: Tensor<Float
   let x = x1.toAccelerator()
   let y = y1.toAccelerator()
 
-  let result = conds.selecting(x+x, y)*y
+  let result = (x+x).replacing(with: y, where: conds)*y
 
   return result.toHost()
 }
