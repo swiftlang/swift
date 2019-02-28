@@ -43,6 +43,18 @@ extension S : Differentiable, VectorNumeric {
 // expected-note @+1 {{property is not differentiable}}
 _ = gradient(at: S(p: 0)) { s in 2 * s.p }
 
+struct NoDerivativeProperty : Differentiable {
+  var x: Float
+  @noDerivative var y: Float
+}
+// expected-error @+1 {{function is not differentiable}}
+_ = gradient(at: NoDerivativeProperty(x: 1, y: 1)) { s -> Float in
+  var tmp = s
+  // expected-note @+1 {{cannot differentiate through a '@noDerivative' stored property; do you want to add '.withoutDerivative()'?}}
+  tmp.y = tmp.x
+  return tmp.x
+}
+
 //===----------------------------------------------------------------------===//
 // Function composition
 //===----------------------------------------------------------------------===//
