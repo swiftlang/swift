@@ -2550,6 +2550,9 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::Shared:
   case TypeReprKind::SILBox:
     return { };
+      
+  case TypeReprKind::OpaqueReturn:
+    return { };
 
   case TypeReprKind::Fixed:
     llvm_unreachable("Cannot get fixed TypeReprs in name lookup");

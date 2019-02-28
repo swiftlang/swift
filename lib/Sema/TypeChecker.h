@@ -271,6 +271,13 @@ enum class TypeCheckExprFlags {
   /// as part of the expression diagnostics, which is attempting to narrow
   /// down failure location.
   SubExpressionDiagnostics = 0x400,
+  
+  /// If set, the 'convertType' specified to typeCheckExpression is the opaque
+  /// return type of the declaration being checked. The archetype should be
+  /// opened into a type variable to provide context to the expression, and
+  /// the resulting type will be a candidate for binding the underlying
+  /// type.
+  ConvertTypeIsOpaqueReturnType = 0x800,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;

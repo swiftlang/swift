@@ -136,6 +136,7 @@ public:
   InitExistentialMetatypeInst *
   createInitExistentialMetatype(SILLocation loc, SILValue metatype,
                                 SILType existentialType,
+                                CanType formalConcreteInstanceType,
                                 ArrayRef<ProtocolConformanceRef> conformances);
 
   InitExistentialRefInst *
@@ -153,6 +154,37 @@ public:
                             CanType concreteType,
                             ArrayRef<ProtocolConformanceRef> conformances);
 
+  // Instructions that take formal AST types need to look through fragile
+  // opaque archetypes. For SIL types, type lowering normally takes care of
+  // this.
+  DeallocExistentialBoxInst *
+  createDeallocExistentialBox(SILLocation Loc, CanType concreteType,
+                              SILValue operand);
+  UncheckedRefCastAddrInst *createUncheckedRefCastAddr(SILLocation Loc,
+                                             SILValue src, CanType sourceType,
+                                             SILValue dest, CanType targetType);
+  UnconditionalCheckedCastAddrInst *
+  createUnconditionalCheckedCastAddr(SILLocation Loc, SILValue src,
+                                     CanType sourceType, SILValue dest,
+                                     CanType targetType);
+  WitnessMethodInst *createWitnessMethod(SILLocation Loc, CanType LookupTy,
+                                         ProtocolConformanceRef Conformance,
+                                         SILDeclRef Member, SILType MethodTy);
+  
+  static SILType getPartialApplyResultType(SILType Ty, unsigned ArgCount,
+                                           SILModule &M,
+                                           SubstitutionMap subs,
+                                           ParameterConvention calleeConvention);
+  KeyPathInst *createKeyPath(SILLocation Loc,
+                             KeyPathPattern *Pattern,
+                             SubstitutionMap Subs,
+                             ArrayRef<SILValue> Args,
+                             SILType Ty);
+  InitBlockStorageHeaderInst *
+  createInitBlockStorageHeader(SILLocation Loc, SILValue BlockStorage,
+                               SILValue InvokeFunction, SILType BlockType,
+                               SubstitutionMap Subs);
+  
   //===---
   // Ownership Endowed APIs
   //
