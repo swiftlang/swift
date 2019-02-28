@@ -1228,6 +1228,10 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     llvm_unreachable("Not a relational constraint");
   }
 
+  // Input types can be contravariant (or equal).
+  auto argumentLocator =
+      locator.withPathElement(ConstraintLocator::FunctionArgument);
+
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
   SmallVector<AnyFunctionType::Param, 8> func1Params;
@@ -1254,8 +1258,23 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   auto implodeParams = [&](SmallVectorImpl<AnyFunctionType::Param> &params) {
     auto input = AnyFunctionType::composeInput(getASTContext(), params,
                                                /*canonicalVararg=*/false);
+
     params.clear();
-    params.emplace_back(input);
+    // If fixes are disabled let's do an easy thing and implode
+    // tuple directly into parameters list.
+    if (!shouldAttemptFixes()) {
+      params.emplace_back(input);
+      return;
+    }
+
+    // Synthesize new argument and bind it to tuple formed from existing
+    // arguments, this makes it easier to diagnose cases where we attempt
+    // a single tuple element formed when no arguments were present.
+    auto argLoc = argumentLocator.withPathElement(
+        LocatorPathElt::getSynthesizedArgument(0));
+    auto *typeVar = createTypeVariable(getConstraintLocator(argLoc));
+    params.emplace_back(typeVar);
+    assignFixedType(typeVar, input);
   };
 
   {
@@ -1322,10 +1341,6 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       }
     }
   }
-
-  // Input types can be contravariant (or equal).
-  auto argumentLocator = locator.withPathElement(
-      ConstraintLocator::FunctionArgument);
 
   int diff = func1Params.size() - func2Params.size();
   if (diff != 0) {
@@ -1796,6 +1811,46 @@ repairFailures(ConstraintSystem &cs, Type lhs, Type rhs,
 
   auto &elt = path.back();
   switch (elt.getKind()) {
+  case ConstraintLocator::FunctionArgument: {
+    auto *argLoc = cs.getConstraintLocator(
+        locator.withPathElement(LocatorPathElt::getSynthesizedArgument(0)));
+
+    // Let's drop the last element which points to a single argument
+    // and see if this is a contextual mismatch.
+    path.pop_back();
+    if (path.empty() ||
+        !(path.back().getKind() == ConstraintLocator::ApplyArgToParam ||
+          path.back().getKind() == ConstraintLocator::ContextualType))
+      return;
+
+    auto arg = llvm::find_if(cs.getTypeVariables(),
+                             [&argLoc](const TypeVariableType *typeVar) {
+                               return typeVar->getImpl().getLocator() == argLoc;
+                             });
+
+    // What we have here is a form or tuple splat with no arguments
+    // demonstrated by following example:
+    //
+    // func foo<T: P>(_: T, _: (T.Element) -> Int) {}
+    // foo { 42 }
+    //
+    // In cases like this `T.Element` might be resolved to `Void`
+    // which means that we have to try a single empty tuple argument
+    // as a narrow exception to SE-0110, see `matchFunctionTypes`.
+    //
+    // But if `T.Element` didn't get resolved to `Void` we'd like
+    // to diagnose this as a missing argument which can't be ignored.
+    if (arg != cs.getTypeVariables().end()) {
+      auto fnType = FunctionType::get({FunctionType::Param(lhs)},
+                                      cs.getASTContext().TheEmptyTupleType);
+      conversionsOrFixes.push_back(AddMissingArguments::create(
+          cs, fnType, {FunctionType::Param(*arg)},
+          cs.getConstraintLocator(anchor, path,
+                                  /*summaryFlags=*/0)));
+    }
+    break;
+  }
+
   case ConstraintLocator::TypeParameterRequirement:
   case ConstraintLocator::ConditionalRequirement: {
     if (auto *fix = fixRequirementFailure(cs, lhs, rhs, anchor, path))
@@ -5707,7 +5762,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
 
   case FixKind::SkipSameTypeRequirement:
   case FixKind::SkipSuperclassRequirement:
-  case FixKind::ContextualMismatch: {
+  case FixKind::ContextualMismatch:
+  case FixKind::AddMissingArguments: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
@@ -5723,7 +5779,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowTypeOrInstanceMember:
   case FixKind::AllowInvalidPartialApplication:
   case FixKind::AllowInvalidInitRef:
-  case FixKind::AddMissingArguments:
     llvm_unreachable("handled elsewhere");
   }
 

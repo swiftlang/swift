@@ -894,12 +894,8 @@ do {
   }
 
   func foo(_ arr: [Int]) {
-    // FIXME: This behavior related to tuple splat being allowed
-    //        in conversion between a single dependent member
-    //        parameter and empty parameter functions e.g.
-    //        () -> Void `convertable to` (T.V) -> Void.
     _ = S(arr, id: \.self_) {
-      // expected-error@-1 {{type '_' has no member 'self_'}}
+      // expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{30-30=_ in }}
       return 42
     }
   }
