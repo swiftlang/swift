@@ -228,21 +228,6 @@ static LoadOwnershipQualifier getBufferLOQ(Type type, SILFunction &fn) {
   return LoadOwnershipQualifier::Unqualified;
 }
 
-/// Assuming the given type conforms to `Differentiable`, returns the associated
-/// cotangent space type.
-static SILType getCotangentType(CanType type, SILModule &mod) {
-  return SILType::getPrimitiveObjectType(
-      type->getAutoDiffAssociatedVectorSpace(
-          AutoDiffAssociatedVectorSpaceKind::Cotangent,
-          LookUpConformanceInModule(mod.getSwiftModule()))->getCanonicalType());
-}
-
-/// Assuming the given type conforms to `Differentiable`, returns the associated
-/// cotangent space type.
-static SILType getCotangentType(SILType type, SILModule &mod) {
-  return getCotangentType(type.getASTType(), mod).copyCategory(type);
-}
-
 // Return the expected generic signature for autodiff associated functions given
 // a SILDifferentiableAttr. The expected generic signature is built from the
 // original generic signature and the attribute's requirements.
@@ -3561,6 +3546,17 @@ private:
                     adjointGenEnv->getForwardingSubstitutionMap());
   }
 
+  /// Assuming the given type conforms to `Differentiable` after remapping,
+  /// returns the associated cotangent space type.
+  SILType getRemappedCotangentType(SILType type) {
+    return SILType::getPrimitiveObjectType(
+        remapType(type).getASTType()
+            ->getAutoDiffAssociatedVectorSpace(
+                AutoDiffAssociatedVectorSpaceKind::Cotangent,
+                LookUpConformanceInModule(getModule().getSwiftModule()))
+            ->getCanonicalType());
+  }
+
   //--------------------------------------------------------------------------//
   // Managed value mapping
   //--------------------------------------------------------------------------//
@@ -3590,7 +3586,7 @@ private:
     assert(originalValue->getFunction() == &getOriginal());
     auto insertion = valueMap.try_emplace(
         originalValue, makeZeroAdjointValue(
-            getCotangentType(originalValue->getType(), getModule())));
+            getRemappedCotangentType(originalValue->getType())));
     auto it = insertion.first;
     SWIFT_DEFER { valueMap.erase(it); };
     return std::move(it->getSecond());
@@ -3705,8 +3701,9 @@ private:
       localAllocBuilder.setInsertionPoint(
           localAllocations.back().getValue()->getDefiningInstruction());
     // Allocate local buffer and initialize to zero.
-    auto *newBuf = localAllocBuilder.createAllocStack(originalBuffer.getLoc(),
-        remapType(getCotangentType(originalBuffer->getType(), getModule())));
+    auto *newBuf = localAllocBuilder.createAllocStack(
+        originalBuffer.getLoc(),
+        getRemappedCotangentType(originalBuffer->getType()));
     auto *access = localAllocBuilder.createBeginAccess(
         newBuf->getLoc(), newBuf, SILAccessKind::Init,
         SILAccessEnforcement::Static, /*noNestedConflict*/ true,
@@ -3806,9 +3803,9 @@ public:
     SmallVector<SILValue, 8> origFormalResults;
     collectAllFormalResultsInTypeOrder(original, origFormalResults);
     auto origResult = origFormalResults[task->getIndices().source];
-    // Emit warning if original result is not varied, because it will always have
-    // a zero derivative.
-    if (!activityInfo.isVaried(origResult, task->getIndices().source)) {
+    // Emit warning if original result is not varied, because it will always
+    // have a zero derivative.
+    if (!activityInfo.isVaried(origResult, task->getIndices().parameters)) {
       // Emit fixit if original result has a valid source location.
       auto sourceLoc = origResult.getLoc().getSourceLoc();
       if (sourceLoc.isValid()) {
@@ -4181,7 +4178,7 @@ public:
       for (auto *field : structDecl->getStoredProperties()) {
         auto fv = si->getFieldValue(field);
         addAdjointValue(fv, makeZeroAdjointValue(
-            getCotangentType(fv->getType(), getModule())));
+            getRemappedCotangentType(fv->getType())));
       }
       break;
     case AdjointValueKind::Concrete: {
@@ -4343,7 +4340,7 @@ public:
     case AdjointValueKind::Zero:
       for (auto eltVal : ti->getElements())
         addAdjointValue(eltVal, makeZeroAdjointValue(
-            getCotangentType(eltVal->getType(), getModule())));
+            getRemappedCotangentType(eltVal->getType())));
       break;
     case AdjointValueKind::Concrete: {
       auto val = av.getConcreteValue();
@@ -4366,25 +4363,23 @@ public:
   ///                         |--- n-th element
   ///   adj[x] += tuple (0, 0, ..., adj[y], ..., 0, 0)
   void visitTupleExtractInst(TupleExtractInst *tei) {
-    auto *tupleTy = tei->getTupleType();
-    auto tupleCotanTy = getCotangentType(tupleTy->getCanonicalType(),
-                                         getModule());
+    auto tupleCotanTy = getRemappedCotangentType(tei->getOperand()->getType());
+    auto tupleCotanTupleTy = tupleCotanTy.castTo<TupleType>();
     auto av = takeAdjointValue(tei);
     switch (av.getKind()) {
     case AdjointValueKind::Zero:
-      addAdjointValue(tei->getOperand(),
-                      makeZeroAdjointValue(tupleCotanTy));
+      addAdjointValue(tei->getOperand(), makeZeroAdjointValue(tupleCotanTy));
       break;
     case AdjointValueKind::Aggregate:
     case AdjointValueKind::Concrete: {
       SmallVector<AdjointValue, 8> elements;
-      for (unsigned i : range(tupleTy->getNumElements())) {
+      for (unsigned i : range(tupleCotanTupleTy->getNumElements())) {
         if (tei->getFieldNo() == i)
           elements.push_back(av);
         else
           elements.push_back(makeZeroAdjointValue(
-              getCotangentType(tupleTy->getElementType(i)->getCanonicalType(),
-                               getModule())));
+              getRemappedCotangentType(SILType::getPrimitiveObjectType(
+                  tupleCotanTupleTy->getElementType(i)->getCanonicalType()))));
       }
       addAdjointValue(tei->getOperand(),
           makeAggregateAdjointValue(tupleCotanTy, elements));
@@ -4409,8 +4404,7 @@ public:
   //   Original: dealloc_stack y
   //    Adjoint: adj[y] = alloc_stack $T.CotangentVector
   void visitDeallocStackInst(DeallocStackInst *dsi) {
-    auto bufType =
-        remapType(getCotangentType(dsi->getOperand()->getType(), getModule()));
+    auto bufType = getRemappedCotangentType(dsi->getOperand()->getType());
     auto *adjBuf = builder.createAllocStack(dsi->getLoc(), bufType);
     auto *access = builder.createBeginAccess(dsi->getLoc(), adjBuf,
                                              SILAccessKind::Init,
