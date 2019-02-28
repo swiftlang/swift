@@ -46,12 +46,15 @@ public:
   /// the current process's environment will be used instead.
   ArrayRef<const char *> Env;
 
+  /// True if the errors of the Task should be stored in Errors instead of Output.
+  bool SeparateErrors;
+
   /// Context associated with this Task.
   void *Context;
 
   Task(const char *ExecPath, ArrayRef<const char *> Args,
-       ArrayRef<const char *> Env = llvm::None, void *Context = nullptr)
-      : ExecPath(ExecPath), Args(Args), Env(Env), Context(Context) {}
+       ArrayRef<const char *> Env = llvm::None, void *Context = nullptr, bool SeparateErrors = false)
+      : ExecPath(ExecPath), Args(Args), Env(Env), Context(Context), SeparateErrors(SeparateErrors) {}
 };
 
 } // end namespace sys
@@ -75,10 +78,7 @@ unsigned TaskQueue::getNumberOfParallelTasks() const {
 void TaskQueue::addTask(const char *ExecPath, ArrayRef<const char *> Args,
                         ArrayRef<const char *> Env, void *Context,
                         bool SeparateErrors) {
-  // This implementation of TaskQueue ignores SeparateErrors.
-  // We need to reference SeparateErrors to avoid warnings, though.
-  (void)SeparateErrors;
-  std::unique_ptr<Task> T(new Task(ExecPath, Args, Env, Context));
+  std::unique_ptr<Task> T(new Task(ExecPath, Args, Env, Context, SeparateErrors));
   QueuedTasks.push(std::move(T));
 }
 
@@ -104,16 +104,18 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
                        : decltype(Envp)(llvm::toStringRefArray(T->Env.data()));
 
     llvm::SmallString<64> stdoutPath;
-    llvm::SmallString<64> stderrPath;
-    if (fs::createTemporaryFile("stdout", "tmp",  stdoutPath)
-        || fs::createTemporaryFile("stderr", "tmp",  stderrPath)) {
+    if (fs::createTemporaryFile("stdout", "tmp",  stdoutPath))
       return true;
+    llvm::sys::RemoveFileOnSignal(stdoutPath);
+
+    llvm::SmallString<64> stderrPath;
+    if (T->SeparateErrors) {
+      if (fs::createTemporaryFile("stderr", "tmp", stdoutPath))
+        return true;
+      llvm::sys::RemoveFileOnSignal(stderrPath);
     }
 
-    llvm::sys::RemoveFileOnSignal(stdoutPath);
-    llvm::sys::RemoveFileOnSignal(stderrPath);
-
-    Optional<StringRef> redirects[] = {None, {stdoutPath}, {stderrPath}};
+    Optional<StringRef> redirects[] = {None, {stdoutPath}, {T->SeparateErrors ? stderrPath : stdoutPath}};
 
     bool ExecutionFailed = false;
     ProcessInfo PI = ExecuteNoWait(T->ExecPath,
@@ -133,10 +135,13 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
     int ReturnCode = PI.ReturnCode;
 
     auto stdoutBuffer = llvm::MemoryBuffer::getFile(stdoutPath);
-    auto stderrBuffer = llvm::MemoryBuffer::getFile(stderrPath);
-
     StringRef stdoutContents = stdoutBuffer.get()->getBuffer();
-    StringRef stderrContents = stderrBuffer.get()->getBuffer();
+
+    StringRef stderrContents;
+    if (T->SeparateErrors) {
+      auto stderrBuffer = llvm::MemoryBuffer::getFile(stderrPath);
+      stderrContents = stderrBuffer.get()->getBuffer();
+    }
 
     if (ReturnCode == -2) {
       // Wait() returning a return code of -2 indicates the process received
@@ -161,7 +166,8 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
       }
     }
     llvm::sys::fs::remove(stdoutPath);
-    llvm::sys::fs::remove(stderrPath);
+    if (T->SeparateErrors)
+      llvm::sys::fs::remove(stderrPath);
   }
 
   return !ContinueExecution;
