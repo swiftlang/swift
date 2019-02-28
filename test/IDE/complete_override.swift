@@ -110,6 +110,7 @@
 // RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD9_LET -code-completion-keywords=false | %FileCheck %s -check-prefix=OMIT_KEYWORD4
 // RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD10 -code-completion-keywords=false | %FileCheck %s -check-prefix=WITH_PA_NO_PROTOFUNCA
 
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=SR2560_WHERE_CLAUSE -code-completion-keywords=false | %FileCheck %s -check-prefix=SR2560_WHERE_CLAUSE
 // RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=HAS_THROWING -code-completion-keywords=false | %FileCheck %s -check-prefix=HAS_THROWING
 // RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=ASSOC_TYPE1 -code-completion-keywords=false | %FileCheck %s -check-prefix=ASSOC_TYPE1
 
@@ -510,6 +511,17 @@ class OmitKW10: ProtocolA {
   override func protoAFunc() {}; #^OMIT_KEYWORD10^#
 // WITH_PA
 }
+
+protocol SR2560Proto {
+  func foo<S : Sequence>(x: S) where S.Iterator.Element == Int
+}
+class SR2560Class: SR2560Proto {
+  #^SR2560_WHERE_CLAUSE^#
+}
+
+// SR2560_WHERE_CLAUSE: Begin completions
+// SR2560_WHERE_CLAUSE: Decl[InstanceMethod]/Super: func foo<S>(x: S) where S : Sequence, S.Element == Int {|};
+// SR2560_WHERE_CLAUSE: End completions
 
 protocol HasThrowingProtocol {
   func foo() throws
