@@ -206,6 +206,21 @@ TensorTests.testAllBackends("Concatenation") {
               concatenated1.array)
 }
 
+TensorTests.testAllBackends("VJPConcatenation") {
+  let a1 = Tensor<Float>([1,2,3,4])
+  let b1 = Tensor<Float>([5,6,7,8,9,10])
+
+  let a2 = Tensor<Float>([1,1,1,1])
+  let b2 = Tensor<Float>([1,1,1,1,1,1])
+
+  let grads = gradient(at: a2, b2) { a, b in
+    return ((a1 * a) ++ (b1 * b)).sum()
+  }
+
+  expectEqual(a1, grads.0)
+  expectEqual(b1, grads.1)
+}
+
 TensorTests.test("EwiseComparison") {
   let x = Tensor<Float>([0, 1, 2])
   let y = Tensor<Float>([2, 1, 3])

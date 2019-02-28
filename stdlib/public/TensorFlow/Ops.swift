@@ -663,21 +663,15 @@ public extension Tensor {
   }
 }
 
-public extension Tensor {
-  /// Concatenates tensors along the first dimension.
-  /// - Precondition: The tensors must have the same shape, except for the
-  ///   leading dimension.
-  @inlinable @inline(__always)
-  func concatenated(with other: Tensor) -> Tensor {
-    return Raw.concatV2([self, other], axis: Tensor<Int32>(0))
-  }
 
+public extension Tensor {
   /// Concatenates tensors along the specified axis.
   /// - Precondition: The tensors must have the same dimensions, except for the
   ///   specified axis.
   /// - Precondition: The axis must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
-  func concatenated(with other: Tensor, alongAxis axis: Int32) -> Tensor {
+  @differentiable(vjp: _vjpConcatenated where Scalar : TensorFlowFloatingPoint)
+  func concatenated(with other: Tensor, alongAxis axis: Int32 = 0) -> Tensor {
     return Raw.concatV2([self, other], axis: Tensor<Int32>(axis))
   }
 
@@ -687,8 +681,28 @@ public extension Tensor {
   ///   and may be controversial. The existence/naming of `++` will be discussed
   ///   during a later API design phase.
   @inlinable @inline(__always)
+  @differentiable(where Scalar : TensorFlowFloatingPoint)
   static func ++ (lhs: Tensor, rhs: Tensor) -> Tensor {
     return lhs.concatenated(with: rhs)
+  }
+}
+
+internal extension Tensor where Scalar : TensorFlowFloatingPoint {
+  @inlinable @inline(__always)
+  func _vjpConcatenated(with other: Tensor, alongAxis axis: Int32)
+    -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
+    let idx = axis >= 0 ? axis : rank - axis
+    let splits = Tensor<Int32>([shapeTensor[idx], other.shapeTensor[idx]])
+    return (Raw.concatV2([self, other], axis: Tensor<Int32>(axis)), { result in
+      let ret: (TensorHandle<Scalar>, TensorHandle<Scalar>) = #tfop("SplitV",
+        result,
+        splits,
+        Tensor<Int32>(axis),
+        num_split: Int64(2),
+        T$dtype: Scalar.tensorFlowDataType,
+        Tlen$dtype: Int32.tensorFlowDataType)
+      return (Tensor(handle: ret.0), Tensor(handle: ret.1))
+    })
   }
 }
 
