@@ -1791,7 +1791,7 @@ public:
 }
 
 Type ConstraintSystem::findCommonResultType(ArrayRef<OverloadChoice> choices) {
-  // Local function to consider this s new overload choice, updating the
+  // Local function to consider this new overload choice, updating the
   // "common type". Returns true if this overload cannot be integrated into
   // the common type, at which point there is no "common type".
   Type commonType;
@@ -1842,7 +1842,7 @@ Type ConstraintSystem::findCommonOverloadType(
     ArrayRef<OverloadChoice> choices,
     ArrayRef<OverloadChoice> outerAlternatives,
     ConstraintLocator *locator) {
-  // Local function to consider this s new overload choice, updating the
+  // Local function to consider this new overload choice, updating the
   // "common type". Returns true if this overload cannot be integrated into
   // the common type, at which point there is no "common type".
   Type commonType;
