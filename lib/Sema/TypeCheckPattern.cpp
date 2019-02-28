@@ -1393,9 +1393,9 @@ recur:
           // OptionalSomePattern that wraps the case. This uses recursion
           // to add multiple levels of OptionalSomePattern if the optional
           // is nested.
-          if (type->getOptionalObjectType()) {
+          if (auto baseType = type->getOptionalObjectType()) {
             if (lookupEnumMemberElement(*this, dc,
-                                        type->lookThroughAllOptionalTypes(),
+                                        baseType->lookThroughAllOptionalTypes(),
                                         EEP->getName(), EEP->getLoc())) {
               P = new (Context)
                   OptionalSomePattern(EEP, EEP->getEndLoc(), /*implicit*/true);
