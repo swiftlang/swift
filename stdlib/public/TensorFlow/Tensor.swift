@@ -632,7 +632,7 @@ public extension Tensor {
   /// Reshape to the shape of the specified `Tensor`.
   /// - Precondition: The number of scalars matches the new shape.
   @inlinable @inline(__always)
-  @differentiable(wrt: self)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func reshaped<T>(like other: Tensor<T>) -> Tensor {
     return reshaped(toShape: other.shapeTensor)
   }
@@ -640,7 +640,7 @@ public extension Tensor {
   /// Reshape to the specified shape.
   /// - Precondition: The number of scalars matches the new shape.
   @inlinable @inline(__always)
-  @differentiable
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func reshaped(to newShape: TensorShape) -> Tensor {
     return reshaped(toShape: Tensor<Int32>(newShape.dimensions))
   }
