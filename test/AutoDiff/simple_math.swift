@@ -183,6 +183,31 @@ SimpleMathTests.test("StructMemberwiseInitializer") {
   expectEqual(2, 𝛁foo)
 }
 
+// Tests TF-319: struct with non-differentiable constant stored property.
+SimpleMathTests.test("StructConstantStoredProperty") {
+  struct TF_319 : Differentiable {
+    var x: Float
+    @noDerivative let constant = Float(2)
+
+    @differentiable
+    init(x: Float) {
+      self.x = x
+    }
+
+    @differentiable(wrt: (self, input))
+    func applied(to input: Float) -> Float {
+      return x * constant * input
+    }
+  }
+  func testStructInit(to input: Float) -> Float {
+    let model = TF_319(x: 10)
+    return model.applied(to: input)
+  }
+  expectEqual(TF_319.CotangentVector(x: 6),
+              gradient(at: TF_319(x: 10), in: { $0.applied(to: 3) }))
+  expectEqual(20, gradient(at: 3, in: testStructInit))
+}
+
 SimpleMathTests.test("StructSideEffects") {
   struct Point : AdditiveArithmetic, Differentiable {
     var x: Float

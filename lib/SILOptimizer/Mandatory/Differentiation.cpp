@@ -1331,21 +1331,28 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
           if (isVaried(cai->getSrc(), i))
             recursivelySetVaried(cai->getDest(), i);
         }
-        // Handle `struct_extract`.
-        else if (auto *sei = dyn_cast<StructExtractInst>(&inst)) {
-          if (isVaried(sei->getOperand(), i)) {
-            // If `@noDerivative` exists on the field while the struct is
-            // `@_fieldwiseDifferentiable`, this field is not in the set of
-            // differentiable variables that we want to track the variedness of.
-            auto hasNoDeriv = sei->getField()->getAttrs()
-                .hasAttribute<NoDerivativeAttr>();
-            auto structIsFieldwiseDiffable = sei->getStructDecl()->getAttrs()
-                .hasAttribute<FieldwiseDifferentiableAttr>();
-            if (!(hasNoDeriv && structIsFieldwiseDiffable))
-              for (auto result : inst.getResults())
-                setVaried(result, i);
-          }
-        }
+
+// Handle `struct_extract` and `struct_element_addr` instructions.
+// - If the field is marked `@noDerivative` and belongs to a
+//   `@_fieldwiseDifferentiable` struct, do not set the result as varied because
+//   it is not in the set of differentiable variables.
+// - Otherwise, propagate variedness from operand to result as usual.
+#define PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION(INST) \
+  else if (auto *sei = dyn_cast<INST##Inst>(&inst)) { \
+    if (isVaried(sei->getOperand(), i)) { \
+      auto hasNoDeriv = sei->getField()->getAttrs() \
+          .hasAttribute<NoDerivativeAttr>(); \
+      auto structIsFieldwiseDiffable = sei->getStructDecl()->getAttrs() \
+          .hasAttribute<FieldwiseDifferentiableAttr>(); \
+      if (!(hasNoDeriv && structIsFieldwiseDiffable)) \
+        for (auto result : inst.getResults()) \
+          setVaried(result, i); \
+    } \
+  }
+  PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION(StructExtract)
+  PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION(StructElementAddr)
+#undef VISIT_STRUCT_ELEMENT_INNS
+
         // Handle everything else.
         else {
           for (auto &op : inst.getAllOperands())
@@ -3630,6 +3637,37 @@ private:
     assert(insertion.second); (void)insertion;
   }
 
+  SILValue getAdjointProjection(SILValue originalProjection) {
+    // Handle `struct_element_addr`.
+    if (auto *seai = dyn_cast<StructElementAddrInst>(originalProjection)) {
+      auto adjBase = getAdjointBuffer(seai->getOperand());
+      auto *cotangentVectorDecl =
+          adjBase.getType().getStructOrBoundGenericStruct();
+      auto cotanFieldLookup =
+          cotangentVectorDecl->lookupDirect(seai->getField()->getName());
+      assert(cotanFieldLookup.size() == 1);
+      auto *cotanField = cast<VarDecl>(cotanFieldLookup.front());
+      return builder.createStructElementAddr(
+         seai->getLoc(), adjBase.getValue(), cotanField);
+    }
+    // Handle `tuple_element_addr`.
+    if (auto *teai = dyn_cast<TupleElementAddrInst>(originalProjection)) {
+      auto adjBase = getAdjointBuffer(teai->getOperand());
+      return builder.createTupleElementAddr(
+          teai->getLoc(), adjBase.getValue(), teai->getFieldNo());
+    }
+    // Handle `begin_access`.
+    if (auto *bai = dyn_cast<BeginAccessInst>(originalProjection)) {
+      auto adjBase = getAdjointBuffer(bai->getOperand());
+      if (errorOccurred)
+        return (bufferMap[originalProjection] = ValueWithCleanup());
+      return builder.createBeginAccess(
+          bai->getLoc(), adjBase, bai->getAccessKind(), bai->getEnforcement(),
+          /*noNestedConflict*/ false, /*fromBuiltin*/ false);
+    }
+    return SILValue();
+  }
+
   ValueWithCleanup &getAdjointBuffer(SILValue originalBuffer) {
     assert(originalBuffer->getType().isAddress());
     assert(originalBuffer->getFunction() == &getOriginal());
@@ -3638,58 +3676,23 @@ private:
     if (!insertion.second) // not inserted
       return insertion.first->getSecond();
 
-    // Diagnose non-differentiable buffers.
-    if (!originalBuffer->getType().isDifferentiable(getModule())) {
-      getContext().emitNondifferentiabilityError(
-          originalBuffer, getDifferentiationTask());
-      errorOccurred = true;
-      return (bufferMap[originalBuffer] = ValueWithCleanup());
+    // Diagnose `struct_element_addr` instructions to `@noDerivative` fields.
+    if (auto *seai = dyn_cast<StructElementAddrInst>(originalBuffer)) {
+      if (seai->getField()->getAttrs().hasAttribute<NoDerivativeAttr>()) {
+        getContext().emitNondifferentiabilityError(
+            originalBuffer, getDifferentiationTask(),
+            diag::autodiff_noderivative_stored_property);
+        errorOccurred = true;
+        return (bufferMap[originalBuffer] = ValueWithCleanup());
+      }
     }
 
-    // Check whether the original buffer is an address-to-address projection.
-    // If so, recurse until the buffer is such a projection but its operand is
-    // not. Then, get the adjoint buffer of the operand and return a
-    // corresponding projection into it.
-    if (Projection::isAddressProjection(originalBuffer) &&
-        !Projection::isObjectToAddressProjection(originalBuffer)) {
-      // Get operand of the projection (i.e. the base memory).
-      auto *inst = cast<SingleValueInstruction>(originalBuffer);
-      Projection proj(inst);
-      auto loc = inst->getLoc();
-      auto base = inst->getOperand(0);
-      // Get the corresponding projection into the adjoint buffer.
-      SILValue adjProj;
-      auto adjBase = getAdjointBuffer(base);
-      if (proj.getKind() == ProjectionKind::Struct) {
-        auto *origField = proj.getVarDecl(base->getType());
-        auto *cotangentVectorDecl =
-            adjBase.getType().getStructOrBoundGenericStruct();
-        auto cotanFieldLookup =
-            cotangentVectorDecl->lookupDirect(origField->getName());
-        assert(cotanFieldLookup.size() == 1);
-        auto *cotanField = cast<VarDecl>(cotanFieldLookup.front());
-        adjProj = builder.createStructElementAddr(loc, adjBase.getValue(),
-                                                  cotanField);
-      } else {
-        adjProj = proj.createAddressProjection(builder, loc, adjBase.getValue())
-                      .get();
-      }
+    // If the original buffer is a projection, return a corresponding projection
+    // into the adjoint buffer.
+    if (auto adjProj = getAdjointProjection(originalBuffer)) {
       ValueWithCleanup projWithCleanup(
-          adjProj, makeCleanupFromChildren({adjBase.getCleanup()}));
+          adjProj, makeCleanup(adjProj, /*cleanup*/ nullptr));
       return (bufferMap[originalBuffer] = projWithCleanup);
-    }
-    // If the original buffer is a `begin_access` instruction, get the adjoint
-    // buffer of its operand and return a corresponding `begin_access` into it.
-    if (auto *bai = dyn_cast<BeginAccessInst>(originalBuffer)) {
-      auto adjBase = getAdjointBuffer(bai->getOperand());
-      if (errorOccurred)
-        return (bufferMap[originalBuffer] = ValueWithCleanup());
-      auto *adjAccess = builder.createBeginAccess(
-          bai->getLoc(), adjBase, bai->getAccessKind(), bai->getEnforcement(),
-          /*noNestedConflict*/ false, /*fromBuiltin*/ false);
-      ValueWithCleanup accessWithCleanup(
-          adjAccess, makeCleanupFromChildren({adjBase.getCleanup()}));
-      return (bufferMap[originalBuffer] = accessWithCleanup);
     }
 
     // Set insertion point for local allocation builder: before the last local
@@ -3803,6 +3806,17 @@ public:
     SmallVector<SILValue, 8> origFormalResults;
     collectAllFormalResultsInTypeOrder(original, origFormalResults);
     auto origResult = origFormalResults[task->getIndices().source];
+    // Emit warning if original result is not varied, because it will always have
+    // a zero derivative.
+    if (!activityInfo.isVaried(origResult, task->getIndices().source)) {
+      // Emit fixit if original result has a valid source location.
+      auto sourceLoc = origResult.getLoc().getSourceLoc();
+      if (sourceLoc.isValid()) {
+        getContext()
+            .diagnose(sourceLoc, diag::autodiff_nonvaried_result_fixit)
+            .fixItInsertAfter(sourceLoc, ".withoutDerivative()");
+      }
+    }
 
     builder.setInsertionPoint(adjointEntry);
     if (seed->getType().isAddress()) {
@@ -4229,6 +4243,9 @@ public:
   }
 
   void visitStructExtractInst(StructExtractInst *sei) {
+    assert(!sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>() &&
+           "`struct_extract` with `@noDerivative` field should not be "
+           "differentiated; activity analysis should not marked as varied");
     auto loc = sei->getLoc();
     auto &differentiationStrategies =
         getDifferentiationTask()->getStructExtractDifferentiationStrategies();
@@ -4562,6 +4579,17 @@ public:
                      ValueWithCleanup(adjAccess, makeCleanupFromChildren({})));
   }
 
+#define PROPAGATE_BUFFER_CLEANUP(INST) \
+  void visit##INST##Inst(INST##Inst *inst) { \
+    auto &adjBase = getAdjointBuffer(inst->getOperand()); \
+    auto &adjProj = getAdjointBuffer(inst); \
+    adjProj.setCleanup(makeCleanupFromChildren( \
+        {adjProj.getCleanup(), adjBase.getCleanup()})); \
+  }
+  PROPAGATE_BUFFER_CLEANUP(StructElementAddr)
+  PROPAGATE_BUFFER_CLEANUP(TupleElementAddr)
+#undef PROPAGATE_CLEANUP
+
 #define NOT_DIFFERENTIABLE(INST, DIAG) \
   void visit##INST##Inst(INST##Inst *inst) { \
     getContext().emitNondifferentiabilityError( \
@@ -4587,10 +4615,6 @@ public:
   NO_ADJOINT(StrongRetainUnowned)
   NO_ADJOINT(DestroyValue)
   NO_ADJOINT(DestroyAddr)
-  // Projection operations have no adjoint visitor.
-  // Corresponding adjoint projections are created in `getAdjointBuffer`.
-  NO_ADJOINT(StructElementAddr)
-  NO_ADJOINT(TupleElementAddr)
 #undef NO_DERIVATIVE
 };
 } // end anonymous namespace
