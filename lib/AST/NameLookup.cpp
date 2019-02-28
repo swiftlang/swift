@@ -75,12 +75,12 @@ void AccessFilteringDeclConsumer::foundDecl(ValueDecl *D,
 
 
 template <typename Fn>
-static void forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
+static bool forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
   DeclContext *moduleScope = DC->getModuleScopeContext();
   if (auto file = dyn_cast<FileUnit>(moduleScope))
-    file->forAllVisibleModules(fn);
-  else
-    cast<ModuleDecl>(moduleScope)->forAllVisibleModules(ModuleDecl::AccessPathTy(), fn);
+    return file->forAllVisibleModules(fn);
+  return cast<ModuleDecl>(moduleScope)->forAllVisibleModules(
+      ModuleDecl::AccessPathTy(), fn);
 }
 
 bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
@@ -785,6 +785,28 @@ bool shouldLookupMembers(D *decl, SourceLoc loc) {
 }
 } // end anonymous namespace
 
+/// If there's a module named \p Name visible from \p DC, returns it; otherwise
+/// returns \c nullptr.
+static ModuleDecl *lookupModuleByName(ASTContext &Ctx, DeclName Name,
+                                      DeclContext *DC) {
+  if (!Name.isSimpleName())
+    return nullptr;
+
+  ModuleDecl *desiredModule = Ctx.getLoadedModule(Name.getBaseIdentifier());
+  if (!desiredModule && Name == Ctx.TheBuiltinModule->getName())
+    desiredModule = Ctx.TheBuiltinModule;
+  if (!desiredModule)
+    return nullptr;
+
+  bool isVisible = !forAllVisibleModules(
+      DC, [desiredModule](const ModuleDecl::ImportedModule &import) -> bool {
+    // Continue if we *haven't* found the module we're looking for.
+    return import.second != desiredModule;
+  });
+
+  return isVisible ? desiredModule : nullptr;
+}
+
 UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                      LazyResolver *TypeResolver, SourceLoc Loc,
                                      Options options)
@@ -822,6 +844,16 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
     return !options.contains(Flags::IncludeOuterResults) || noMoreOuterResults;
   };
+
+  if (options.contains(Flags::PreferModuleNames)) {
+    // Look for a module with the given name.
+    ModuleDecl *foundModule = lookupModuleByName(Ctx, Name, DC);
+    if (foundModule) {
+      Results.push_back(LookupResultEntry(foundModule));
+      if (shouldReturnBasedOnResults(/*noMoreOuterResults=*/true))
+        return;
+    }
+  }
 
   if (Loc.isValid() &&
       DC->getParentSourceFile() &&
@@ -1264,28 +1296,16 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   if (shouldReturnBasedOnResults(/*noMoreOuterResults=*/true))
     return;
 
-  if (!Name.isSimpleName())
-    return;
-
-  // Look for a module with the given name.
-  if (Name.isSimpleName(M.getName())) {
-    Results.push_back(LookupResultEntry(&M));
-    if (shouldReturnBasedOnResults(/*noMoreOuterResults=*/true))
-      return;
+  if (!options.contains(Flags::PreferModuleNames)) {
+    // Look for a module with the given name if we didn't already.
+    ModuleDecl *foundModule = lookupModuleByName(Ctx, Name, DC);
+    if (foundModule) {
+      Results.push_back(LookupResultEntry(foundModule));
+      if (shouldReturnBasedOnResults(/*noMoreOuterResults=*/true))
+        return;
+    }
   }
 
-  ModuleDecl *desiredModule = Ctx.getLoadedModule(Name.getBaseIdentifier());
-  if (!desiredModule && Name == Ctx.TheBuiltinModule->getName())
-    desiredModule = Ctx.TheBuiltinModule;
-  if (desiredModule) {
-    forAllVisibleModules(DC, [&](const ModuleDecl::ImportedModule &import) -> bool {
-      if (import.second == desiredModule) {
-        Results.push_back(LookupResultEntry(import.second));
-        return false;
-      }
-      return true;
-    });
-  }
   // Make sure we've recorded the inner-result-boundary.
   (void)shouldReturnBasedOnResults(/*noMoreOuterResults=*/true);
 }

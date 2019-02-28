@@ -296,6 +296,8 @@ convertToUnqualifiedLookupOptions(NameLookupOptions options) {
     newOptions |= UnqualifiedLookup::Flags::IgnoreAccessControl;
   if (options.contains(NameLookupFlags::IncludeOuterResults))
     newOptions |= UnqualifiedLookup::Flags::IncludeOuterResults;
+  if (options.contains(NameLookupFlags::PreferModuleNames))
+    newOptions |= UnqualifiedLookup::Flags::PreferModuleNames;
 
   return newOptions;
 }

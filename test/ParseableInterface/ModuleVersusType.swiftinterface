@@ -1,0 +1,124 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags:
+
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -build-module-from-parseable-interface -o %t/ModuleVersusType.swiftmodule %s
+
+public struct Foo {
+  public static var topLevel: Foo { get }
+}
+
+public struct ModuleVersusType {
+  public struct Foo {
+    public static var nested: Foo { get }
+  }
+}
+
+@inlinable public func simple() -> ModuleVersusType.Foo { return .topLevel }
+@inlinable public func simple() -> ModuleVersusType.ModuleVersusType.Foo { return .nested }
+
+@inlinable public func qualifiedLookup() -> ModuleVersusType.Foo {
+  return Foo.topLevel
+}
+@inlinable public func qualifiedLookup2() -> ModuleVersusType.ModuleVersusType.Foo {
+  return ModuleVersusType.Foo.nested
+}
+@inlinable public func typeLookupInInlinableContext() -> ModuleVersusType.Foo {
+  let x: Foo = .topLevel
+  return x
+}
+@inlinable public func typeLookupInInlinableContext2() -> ModuleVersusType.ModuleVersusType.Foo {
+  let x: ModuleVersusType.Foo = .nested
+  return x
+}
+@inlinable public func typealiasInInlinableContext() -> ModuleVersusType.Foo {
+  typealias Bar = Foo
+  let x: Bar = .topLevel
+  return x
+}
+@inlinable public func typealiasInInlinableContext() -> ModuleVersusType.ModuleVersusType.Foo {
+  typealias Bar = ModuleVersusType.Foo
+  let x: Bar = .nested
+  return x
+}
+
+public func defaultArgs(
+  a: ModuleVersusType.Foo = .topLevel,
+  b: ModuleVersusType.ModuleVersusType.Foo = .nested,
+  c: ModuleVersusType.Foo = Foo.topLevel,
+  d: ((ModuleVersusType.Foo) -> Void) = { (_: Foo) -> Void in },
+  e: ((ModuleVersusType.ModuleVersusType.Foo) -> Void) = { (_: ModuleVersusType.Foo) -> Void in }
+)
+
+extension ModuleVersusType.ModuleVersusType {
+  @inlinable public func typeLookupInExtension() -> ModuleVersusType.ModuleVersusType.Foo {
+    let x: Foo = .nested
+    return x
+  }
+  @inlinable public func typealiasInExtension() -> ModuleVersusType.ModuleVersusType.Foo {
+    typealias Bar = Foo
+    let x: Bar = .nested
+    return x
+  }
+
+  public func defaultArgs(
+    a: ModuleVersusType.Foo = .topLevel,
+    b: ModuleVersusType.ModuleVersusType.Foo = .nested,
+    c: ModuleVersusType.ModuleVersusType.Foo = Foo.nested,
+    d: ((ModuleVersusType.ModuleVersusType.Foo) -> Void) = { (_: Foo) -> Void in },
+    e: ((ModuleVersusType.ModuleVersusType.Foo) -> Void) = { (_: ModuleVersusType.Foo) -> Void in }
+  )
+}
+
+public struct InitialValueTesting {
+  public var a: ModuleVersusType.Foo = .topLevel
+  public var b: ModuleVersusType.ModuleVersusType.Foo = .nested
+  public var c: ModuleVersusType.Foo = Foo.topLevel
+  public var d: ((ModuleVersusType.Foo) -> Void) = { (_: Foo) -> Void in }
+}
+
+@inlinable public func localFunction() {
+  func defaultArgs(a: Foo = .topLevel,
+                   b: ModuleVersusType.Foo = .nested) {}
+}
+
+public enum EnumPayloadTesting {
+  case t(ModuleVersusType.Foo)
+  case n(ModuleVersusType.ModuleVersusType.Foo)
+}
+@inlinable public func testEnum() {
+  let _: EnumPayloadTesting = .t(.topLevel)
+  let _: EnumPayloadTesting = .n(.nested)
+}
+
+public typealias TType = ModuleVersusType.Foo
+public typealias GenericTType<K: Hashable> = Dictionary<K, ModuleVersusType.Foo>
+
+public typealias NType = ModuleVersusType.ModuleVersusType.Foo
+public typealias GenericNType<K: Hashable> = Dictionary<K, ModuleVersusType.ModuleVersusType.Foo>
+
+@inlinable public func testTypealias() {
+  let _: TType = .topLevel
+  let _: NType = .nested
+  let _: GenericTType<Int> = [0: .topLevel]
+  let _: GenericNType<Int> = [0: .nested]
+}
+
+public struct TopLevelSubscriptTest {
+  @inlinable subscript(_: ModuleVersusType.Foo) -> Void { return }
+}
+public struct NestedSubscriptTest {
+  @inlinable subscript(_: ModuleVersusType.ModuleVersusType.Foo) -> Void { return }
+}
+@inlinable public func testSubscripts(t: TopLevelSubscriptTest, n: NestedSubscriptTest) {
+  _ = t[.topLevel]
+  _ = n[.nested]
+}
+
+public func constrainedTopLevel<C: Collection>(_: C) where C.Element == ModuleVersusType.Foo {}
+public func constrainedNested<C: Collection>(_: C) where C.Element == ModuleVersusType.ModuleVersusType.Foo {}
+
+@inlinable public func testConstraints() {
+  constrainedTopLevel([.topLevel])
+  constrainedNested([.nested])
+}

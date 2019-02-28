@@ -101,6 +101,9 @@ public:
     /// This lookup should include results from outside the innermost scope with
     /// results.
     IncludeOuterResults = 0x10,
+    /// Prefer module names over local lookup, i.e. assume names are qualified
+    /// when possible.
+    PreferModuleNames = 0x20
   };
   using Options = OptionSet<Flags>;
 

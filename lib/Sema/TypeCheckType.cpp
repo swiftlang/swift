@@ -1212,6 +1212,56 @@ static Type diagnoseUnknownType(TypeResolution resolution,
   return ErrorType::get(ctx);
 }
 
+static bool shouldPreferModulesForTopLevelIdentTypeComponent(
+    const DeclContext *DC, TypeResolutionOptions options) {
+
+  // FIXME: We have a problem when a module and a type have the same name; the
+  // underlying UnqualifiedLookup code assumes that the type is always what's
+  // meant, even when that might not be the case. Work around this for
+  // parseable interfaces by making the *opposite* assumption outside of
+  // expressions and function bodies.
+  const SourceFile *containingSF = DC->getParentSourceFile();
+  if (!containingSF || containingSF->Kind != SourceFileKind::Interface)
+    return false;
+
+  // If this is not a local context, just check whether we're /in/ a local
+  // context.
+  if (!DC->isLocalContext())
+    return DC->getLocalContext() == nullptr;
+
+  // We still want to return true for function parameters and result types, as
+  // long as they're not in *another* local context.
+  if (!DC->getAsDecl() || DC->getParent()->getLocalContext() != nullptr)
+    return false;
+
+  switch (options.getContext()) {
+  case TypeResolverContext::AbstractFunctionDecl:
+  case TypeResolverContext::FunctionInput:
+  case TypeResolverContext::VariadicFunctionInput:
+  case TypeResolverContext::FunctionResult:
+  case TypeResolverContext::DynamicSelfResult:
+  case TypeResolverContext::GenericRequirement:
+    return true;
+  case TypeResolverContext::None:
+  case TypeResolverContext::PatternBindingDecl:
+  case TypeResolverContext::TypeAliasDecl:
+  case TypeResolverContext::GenericTypeAliasDecl:
+  case TypeResolverContext::ClosureExpr:
+  case TypeResolverContext::ForEachStmt:
+  case TypeResolverContext::InExpression:
+  case TypeResolverContext::ExplicitCastExpr:
+  case TypeResolverContext::EnumPatternPayload:
+  case TypeResolverContext::EditorPlaceholderExpr:
+  case TypeResolverContext::ImmediateOptionalTypeArgument:
+    return false;
+  case TypeResolverContext::SubscriptDecl:
+  case TypeResolverContext::ProtocolWhereClause:
+  case TypeResolverContext::ExtensionBinding:
+  case TypeResolverContext::EnumElementDecl:
+    llvm_unreachable("cannot appear directly in a function context");
+  }
+}
+
 /// Resolve the given identifier type representation as an unqualified type,
 /// returning the type it references.
 ///
@@ -1260,6 +1310,15 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
   if (options.contains(TypeResolutionFlags::KnownNonCascadingDependency))
     lookupOptions |= NameLookupFlags::KnownPrivate;
+
+  // FIXME: We have a problem when a module and a type have the same name; the
+  // underlying UnqualifiedLookup code assumes that the type is always what's
+  // meant, even when that might not be the case. Work around this for
+  // parseable interfaces by making the *opposite* assumption outside of
+  // expressions and function bodies.
+  if (shouldPreferModulesForTopLevelIdentTypeComponent(lookupDC, options))
+    lookupOptions = NameLookupFlags::PreferModuleNames;
+
   auto globals = TypeChecker::lookupUnqualifiedType(lookupDC,
                                                     id,
                                                     comp->getIdLoc(),

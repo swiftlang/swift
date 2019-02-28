@@ -305,6 +305,9 @@ enum class NameLookupFlags {
   IncludeOuterResults = 0x20,
   /// Whether to consider synonyms declared through @_implements().
   IncludeAttributeImplements = 0x40,
+  /// Prefer module names over local lookup, i.e. assume names are qualified
+  /// when possible.
+  PreferModuleNames = 0x80
 };
 
 /// A set of options that control name lookup.
