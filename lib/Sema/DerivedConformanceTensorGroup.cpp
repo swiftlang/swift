@@ -180,11 +180,11 @@ deriveBodyTensorGroup_init(
 
   // Get references to `self` and parameter declarations.
   auto *selfDecl = funcDecl->getImplicitSelfDecl();
-  auto *selfDRE =
-      new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit*/ true);
+  auto *selfDRE = new (C) 
+      DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit*/ true);
   auto *paramDecl = funcDecl->getParameters()->get(0);
-  auto *paramDRE =
-      new (C) DeclRefExpr(paramDecl, DeclNameLoc(), /*Implicit*/ true);
+  auto *paramDRE = new (C) 
+      DeclRefExpr(paramDecl, DeclNameLoc(), /*Implicit*/ true);
 
   // Create an `if var` statement for the current address.
   VarDecl *currAddressDecl = new (C) VarDecl(
@@ -226,9 +226,9 @@ deriveBodyTensorGroup_init(
         member->getValueInterfaceType());
     auto *memberTypeExpr = TypeExpr::createImplicit(memberType, C);
     auto module = nominal->getModuleContext();
-    auto tensorGroupConfRef = module->lookupConformance(
+    auto confRef = module->lookupConformance(
         memberType, tensorGroupProto);
-    assert(tensorGroupConfRef && "Member does not conform to `TensorGroup`");
+    assert(confRef && "Member does not conform to `TensorGroup`");
 
     // Get member type's constructor, e.g. `MemberType.init(_owning:)`.
     // Use protocol requirement declaration for the method by default: this
@@ -236,8 +236,8 @@ deriveBodyTensorGroup_init(
     ValueDecl *memberInitDecl = initReq;
     // If conformance reference is concrete, then use concrete witness
     // declaration for the constructor.
-    if (tensorGroupConfRef->isConcrete())
-      memberInitDecl = tensorGroupConfRef->getConcrete()->getWitnessDecl(
+    if (confRef->isConcrete())
+      memberInitDecl = confRef->getConcrete()->getWitnessDecl(
           initReq, C.getLazyResolver());
     assert(memberInitDecl && "Member constructor declaration must exist");
     auto memberInitDRE = new (C) DeclRefExpr(

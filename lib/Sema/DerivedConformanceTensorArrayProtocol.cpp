@@ -83,11 +83,11 @@ deriveBodyTensorArrayProtocol_unpackTensorHandles(
 
   // Get references to `self` and parameter declarations.
   auto *selfDecl = funcDecl->getImplicitSelfDecl();
-  auto *selfDRE =
-      new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit*/ true);
+  auto *selfDRE = new (C) 
+      DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit*/ true);
   auto *paramDecl = funcDecl->getParameters()->get(0);
-  auto *paramDRE =
-      new (C) DeclRefExpr(paramDecl, DeclNameLoc(), /*Implicit*/ true);
+  auto *paramDRE = new (C) 
+      DeclRefExpr(paramDecl, DeclNameLoc(), /*Implicit*/ true);
 
   // Create an `if var` statement for the current address.
   VarDecl *currAddressDecl = new (C) VarDecl(
@@ -98,7 +98,7 @@ deriveBodyTensorArrayProtocol_unpackTensorHandles(
   currAddressDecl->setInterfaceType(baseAddressType);
   currAddressDecl->setValidationToChecked();
 
-  Pattern *currAddressPat = new (C) 
+  Pattern *currAddressPat = new (C)
       NamedPattern(currAddressDecl, /*implicit*/ true);
   currAddressPat = new (C) 
       VarPattern(SourceLoc(), /*isLet*/ false, currAddressPat, 
@@ -112,31 +112,22 @@ deriveBodyTensorArrayProtocol_unpackTensorHandles(
   // Get method protocol requirement.
   auto *tensorArrayProto = C.getProtocol(
       KnownProtocolKind::TensorArrayProtocol);
-  auto *methodReq = getProtocolRequirement(tensorArrayProto, 
-                                           C.Id_unpackTensorHandles);
-  auto *countReq = getProtocolRequirement(tensorArrayProto, 
-                                          C.Id_tensorHandleCount);
+  auto *methodReq = getProtocolRequirement(
+      tensorArrayProto, C.Id_unpackTensorHandles);
+  auto *countReq = getProtocolRequirement(
+      tensorArrayProto, C.Id_tensorHandleCount);
 
   Type intType = C.getIntDecl()->getDeclaredType();
-  TypeExpr *intTypeExpr = TypeExpr::createImplicit(intType, C);
+  TypeExpr *intTE = TypeExpr::createImplicit(intType, C);
 
   // Go through the member TensorArrayProtocols and call 
   // `_unpackTensorHandles(into:)`.
   llvm::SmallVector<ASTNode, 2> memberExprs;
   for (auto member : nominal->getStoredProperties()) {
-    // Find `Self` member corresponding to this member.
-    VarDecl *selfMember = nullptr;
-    for (auto candidate : nominal->getStoredProperties()) {
-      if (candidate->getName() == member->getName()) {
-        selfMember = candidate;
-        break;
-      }
-    }
-    assert(selfMember && "Could not find corresponding self member");
+    auto memberType = parentDC->mapTypeIntoContext(
+        member->getValueInterfaceType());
     auto module = nominal->getModuleContext();
-    auto selfMemberType =
-        parentDC->mapTypeIntoContext(selfMember->getValueInterfaceType());
-    auto confRef = module->lookupConformance(selfMemberType, tensorArrayProto);
+    auto confRef = module->lookupConformance(memberType, tensorArrayProto);
     assert(confRef && "Member does not conform to `TensorArrayProtocol`");
 
     // Get member type's method, e.g. `Member._unpackTensorHandles(into:)`.
@@ -149,20 +140,19 @@ deriveBodyTensorArrayProtocol_unpackTensorHandles(
       memberMethodDecl = confRef->getConcrete()->getWitnessDecl(
           methodReq, C.getLazyResolver());
     assert(memberMethodDecl && "Member method declaration must exist");
-    auto memberMethodDRE =
-        new (C) DeclRefExpr(memberMethodDecl, DeclNameLoc(), /*Implicit*/ true);
+    auto memberMethodDRE = new (C) DeclRefExpr(
+        memberMethodDecl, DeclNameLoc(), /*Implicit*/ true);
     memberMethodDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
 
     // Create reference to member method: `Member._unpackTensorHandles(into:)`.
-    auto memberExpr =
-        new (C) MemberRefExpr(selfDRE, SourceLoc(), selfMember, DeclNameLoc(),
-                              /*Implicit*/ true);
-    auto memberMethodExpr =
-        new (C) DotSyntaxCallExpr(memberMethodDRE, SourceLoc(), memberExpr);
+    auto *memberDRE = new (C) MemberRefExpr(
+        selfDRE, SourceLoc(), member, DeclNameLoc(), /*Implicit*/ true);
+    auto memberMethodExpr = new (C) 
+        DotSyntaxCallExpr(memberMethodDRE, SourceLoc(), memberDRE);
 
     // Obtain the method call argument.
-    auto *addressDRE = 
-        new (C) DeclRefExpr(currAddressDecl, DeclNameLoc(), /*implicit*/ true);
+    auto *addressDRE = new (C) DeclRefExpr(
+      currAddressDecl, DeclNameLoc(), /*implicit*/ true);
     auto *loadExpr = new (C) LoadExpr(addressDRE, baseAddressType);
     auto *injectExpr = new (C) InjectIntoOptionalExpr(loadExpr, addressType);
 
@@ -177,16 +167,25 @@ deriveBodyTensorArrayProtocol_unpackTensorHandles(
                                   advancedName, DeclNameLoc(), 
                                   /*Implicit*/ true);
     
+    // Get member type's property, e.g. `Member._tensorHandleCount(into:)`.
+    ValueDecl *memberCountDecl = countReq;
+    // If conformance reference is concrete, then use concrete witness
+    // declaration for the operator.
+    if (confRef->isConcrete())
+      memberCountDecl = confRef->getConcrete()->getWitnessDecl(
+          countReq, C.getLazyResolver());
+    assert(memberCountDecl && "Member property declaration must exist");
+
     // Obtain `Member._tensorHandleCount`.
-    auto *memberCountMRE = new (C) 
-        MemberRefExpr(selfDRE, SourceLoc(), countReq,
-                      DeclNameLoc(), /*Implicit*/ true);
+    auto *memberCountMRE = new (C) MemberRefExpr(
+        memberDRE, SourceLoc(), memberCountDecl, DeclNameLoc(), 
+        /*Implicit*/ true);
     
     // Cast the tensor handle count to Int.
     auto intInitName = DeclName(C, DeclBaseName::createConstructor(), 
-                                Identifier());
+                                {Identifier()});
     auto *intInitExpr = 
-        new (C) UnresolvedDotExpr(intTypeExpr, SourceLoc(), intInitName, 
+        new (C) UnresolvedDotExpr(intTE, SourceLoc(), intInitName, 
                                   DeclNameLoc(), /*Implicit*/ true);
     auto *intInitCallExpr = CallExpr::createImplicit(
         C, intInitExpr, {memberCountMRE}, {Identifier()});
