@@ -10,8 +10,9 @@
 
 import BaseModule
 
-public class Derived : Base {
-}
+public class Derived : Base {}
+
+public class MostDerived : Middle {}
 
 public class DerivedNested : Namespace.Nested {}
 public class DerivedExtNested : Namespace.ExtNested {}
