@@ -3082,16 +3082,6 @@ private:
 
   Constraint *selectApplyDisjunction();
 
-  bool simplifyForConstraintPropagation();
-  void collectNeighboringBindOverloadDisjunctions(
-      llvm::SetVector<Constraint *> &neighbors);
-  bool isBindOverloadConsistent(Constraint *bindConstraint,
-                                llvm::SetVector<Constraint *> &workList);
-  void reviseBindOverloadDisjunction(Constraint *disjunction,
-                                     llvm::SetVector<Constraint *> &workList,
-                                     bool *foundConsistent);
-  bool areBindPairConsistent(Constraint *first, Constraint *second);
-
   /// Solve the system of constraints generated from provided expression.
   ///
   /// \param expr The expression to generate constraints from.
