@@ -128,9 +128,7 @@ public:
   using Options = UnqualifiedLookup::Options;
   
 private:
-
-  // TODO: better name than DC
-  struct DCAndResolvedIsCascadingUse {
+  struct ContextAndResolvedIsCascadingUse {
     DeclContext *const DC;
     const bool isCascadingUse;
   };
@@ -146,7 +144,6 @@ private:
     DeclContext *const dynamicContext;
     /// Types are formally members of the metatype, i.e. the static type of the
     /// activation record.
-    // DOUG: can you help clarify the above comments?
     DeclContext *const staticContext;
     using NominalTypesThatSelfMustConformTo = SmallVector<NominalTypeDecl *, 2>;
     NominalTypesThatSelfMustConformTo nominalTypesThatSelfMustConformTo;
@@ -215,12 +212,12 @@ public:
   void performUnqualifiedLookup();
 
 private:
-  struct DCAndUnresolvedIsCascadingUse {
+  struct ContextAndUnresolvedIsCascadingUse {
     DeclContext *whereToLook;
     Optional<bool> isCascadingUse;
-    DCAndResolvedIsCascadingUse resolve(const bool resolution) const {
-      return DCAndResolvedIsCascadingUse{whereToLook,
-                                         isCascadingUse.getValueOr(resolution)};
+    ContextAndResolvedIsCascadingUse resolve(const bool resolution) const {
+      return ContextAndResolvedIsCascadingUse{
+          whereToLook, isCascadingUse.getValueOr(resolution)};
     }
   };
 
@@ -230,13 +227,13 @@ private:
 
 #pragma mark ASTScope-based-lookup declarations
 
-  void experimentallyLookInASTScopes(DCAndUnresolvedIsCascadingUse);
+  void experimentallyLookInASTScopes(ContextAndUnresolvedIsCascadingUse);
 
   std::pair<const ASTScope *, bool>
-      operatorScopeForASTScopeLookup(DCAndUnresolvedIsCascadingUse);
+      operatorScopeForASTScopeLookup(ContextAndUnresolvedIsCascadingUse);
 
-  std::pair<const ASTScope *, Optional<bool>>
-      nonoperatorScopeForASTScopeLookup(DCAndUnresolvedIsCascadingUse) const;
+  std::pair<const ASTScope *, Optional<bool>> nonoperatorScopeForASTScopeLookup(
+      ContextAndUnresolvedIsCascadingUse) const;
 
   struct ASTScopeLookupState {
     const ASTScope *scope;
@@ -285,10 +282,10 @@ private:
   }
 
 #pragma mark normal (non-ASTScope-based) lookup declarations
-  
-  void lookupOperatorInDeclContexts(DCAndUnresolvedIsCascadingUse);
 
-  void lookupNamesIntroducedBy(const DCAndUnresolvedIsCascadingUse);
+  void lookupOperatorInDeclContexts(ContextAndUnresolvedIsCascadingUse);
+
+  void lookupNamesIntroducedBy(const ContextAndUnresolvedIsCascadingUse);
 
   void finishLookingInContext(AddGenericParameters addGenericParameters,
                               DeclContext *lookupContextForThisContext,
@@ -376,7 +373,7 @@ private:
   static bool resolveIsCascadingUse(const DeclContext *const dc,
                                     Optional<bool> isCascadingUse,
                                     bool onlyCareAboutFunctionBody);
-  static bool resolveIsCascadingUse(DCAndUnresolvedIsCascadingUse x,
+  static bool resolveIsCascadingUse(ContextAndUnresolvedIsCascadingUse x,
                                     bool onlyCareAboutFunctionBody) {
     return resolveIsCascadingUse(x.whereToLook, x.isCascadingUse,
                                  onlyCareAboutFunctionBody);
@@ -405,20 +402,20 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
                                                    Options options,
                                                    UnqualifiedLookup &lookupToBeCreated)
 :
-Name(Name),
-DC(DC),
-M(*DC->getParentModule()),
-Ctx(M.getASTContext()),
-TypeResolver(TypeResolver ? TypeResolver : Ctx.getLazyResolver()),
-Loc(Loc),
-SM(Ctx.SourceMgr),
-DebugClient(M.getDebugClient()),
-options(options),
-isOriginallyTypeLookup(options.contains(Flags::TypeLookup)),
-baseNLOptions(computeBaseNLOptions(options, isOriginallyTypeLookup)),
-Consumer(Name, lookupToBeCreated.Results, isOriginallyTypeLookup),
-Results(lookupToBeCreated.Results),
-IndexOfFirstOuterResult(lookupToBeCreated.IndexOfFirstOuterResult)
+  Name(Name),
+  DC(DC),
+  M(*DC->getParentModule()),
+  Ctx(M.getASTContext()),
+  TypeResolver(TypeResolver ? TypeResolver : Ctx.getLazyResolver()),
+  Loc(Loc),
+  SM(Ctx.SourceMgr),
+  DebugClient(M.getDebugClient()),
+  options(options),
+  isOriginallyTypeLookup(options.contains(Flags::TypeLookup)),
+  baseNLOptions(computeBaseNLOptions(options, isOriginallyTypeLookup)),
+  Consumer(Name, lookupToBeCreated.Results, isOriginallyTypeLookup),
+  Results(lookupToBeCreated.Results),
+  IndexOfFirstOuterResult(lookupToBeCreated.IndexOfFirstOuterResult)
 {}
 // clang-format on
 
@@ -426,13 +423,14 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   const Optional<bool> isCascadingUseInitial =
   options.contains(Flags::KnownPrivate) ? Optional<bool>(false) : None;
 
-  DCAndUnresolvedIsCascadingUse dcAndIsCascadingUse{DC, isCascadingUseInitial};
+  ContextAndUnresolvedIsCascadingUse contextAndIsCascadingUse{
+      DC, isCascadingUseInitial};
   if (useASTScopesForExperimentalLookup())
-    experimentallyLookInASTScopes(dcAndIsCascadingUse);
+    experimentallyLookInASTScopes(contextAndIsCascadingUse);
   else if (Name.isOperator())
-    lookupOperatorInDeclContexts(dcAndIsCascadingUse);
+    lookupOperatorInDeclContexts(contextAndIsCascadingUse);
   else
-    lookupNamesIntroducedBy(dcAndIsCascadingUse);
+    lookupNamesIntroducedBy(contextAndIsCascadingUse);
 }
 
 void UnqualifiedLookupFactory::lookUpTopLevelNamesInModuleScopeContext(
@@ -465,26 +463,26 @@ bool UnqualifiedLookupFactory::useASTScopesForExperimentalLookup() const {
 #pragma mark ASTScope-based-lookup definitions
 
 void UnqualifiedLookupFactory::experimentallyLookInASTScopes(
-    const DCAndUnresolvedIsCascadingUse dcAndIsCascadingUseArg) {
+    const ContextAndUnresolvedIsCascadingUse contextAndIsCascadingUseArg) {
   const std::pair<const ASTScope *, Optional<bool>>
       lookupScopeAndIsCascadingUse =
           Name.isOperator()
-              ? operatorScopeForASTScopeLookup(dcAndIsCascadingUseArg)
-              : nonoperatorScopeForASTScopeLookup(dcAndIsCascadingUseArg);
+              ? operatorScopeForASTScopeLookup(contextAndIsCascadingUseArg)
+              : nonoperatorScopeForASTScopeLookup(contextAndIsCascadingUseArg);
   // Walk scopes outward from the innermost scope until we find something.
 
   ASTScopeLookupState state{lookupScopeAndIsCascadingUse.first, nullptr,
-                            dcAndIsCascadingUseArg.whereToLook,
+                            contextAndIsCascadingUseArg.whereToLook,
                             lookupScopeAndIsCascadingUse.second};
   lookInScopeForASTScopeLookup(state);
 }
 
 std::pair<const ASTScope *, bool>
 UnqualifiedLookupFactory::operatorScopeForASTScopeLookup(
-    const DCAndUnresolvedIsCascadingUse dcAndIsCascadingUseArg) {
+    const ContextAndUnresolvedIsCascadingUse contextAndIsCascadingUseArg) {
   // Find the source file in which we are performing the lookup.
   SourceFile &sourceFile =
-      *dcAndIsCascadingUseArg.whereToLook->getParentSourceFile();
+      *contextAndIsCascadingUseArg.whereToLook->getParentSourceFile();
 
   // Find the scope from which we will initiate unqualified name lookup.
   const ASTScope *lookupScope =
@@ -494,22 +492,24 @@ UnqualifiedLookupFactory::operatorScopeForASTScopeLookup(
   return std::make_pair(
       &sourceFile.getScope(),
       resolveIsCascadingUse(lookupScope->getInnermostEnclosingDeclContext(),
-                            dcAndIsCascadingUseArg.isCascadingUse,
+                            contextAndIsCascadingUseArg.isCascadingUse,
                             /*onlyCareAboutFunctionBody*/ true));
 }
 
 std::pair<const ASTScope *, Optional<bool>>
 UnqualifiedLookupFactory::nonoperatorScopeForASTScopeLookup(
-    const DCAndUnresolvedIsCascadingUse dcAndIsCascadingUseArg) const {
+    const ContextAndUnresolvedIsCascadingUse contextAndIsCascadingUseArg)
+    const {
   // Find the source file in which we are performing the lookup.
   SourceFile &sourceFile =
-      *dcAndIsCascadingUseArg.whereToLook->getParentSourceFile();
+      *contextAndIsCascadingUseArg.whereToLook->getParentSourceFile();
 
   // Find the scope from which we will initiate unqualified name lookup.
   const ASTScope *lookupScope =
       sourceFile.getScope().findInnermostEnclosingScope(Loc);
 
-  return std::make_pair(lookupScope, dcAndIsCascadingUseArg.isCascadingUse);
+  return std::make_pair(lookupScope,
+                        contextAndIsCascadingUseArg.isCascadingUse);
 }
 
 void UnqualifiedLookupFactory::lookInScopeForASTScopeLookup(
@@ -627,21 +627,22 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
 #pragma mark context-based lookup definitions
 
 void UnqualifiedLookupFactory::lookupOperatorInDeclContexts(
-    const DCAndUnresolvedIsCascadingUse dcAndUseArg) {
-  DCAndResolvedIsCascadingUse dcAndResolvedIsCascadingUse{
+    const ContextAndUnresolvedIsCascadingUse contextAndUseArg) {
+  ContextAndResolvedIsCascadingUse contextAndResolvedIsCascadingUse{
       // Operators are global
-      dcAndUseArg.whereToLook->getModuleScopeContext(),
-      resolveIsCascadingUse(dcAndUseArg, /*onlyCareAboutFunctionBody*/ true)};
-  lookupInModuleScopeContext(dcAndResolvedIsCascadingUse.DC,
-                             dcAndResolvedIsCascadingUse.isCascadingUse);
+      contextAndUseArg.whereToLook->getModuleScopeContext(),
+      resolveIsCascadingUse(contextAndUseArg,
+                            /*onlyCareAboutFunctionBody*/ true)};
+  lookupInModuleScopeContext(contextAndResolvedIsCascadingUse.DC,
+                             contextAndResolvedIsCascadingUse.isCascadingUse);
 }
 
 // TODO: Unify with LookupVisibleDecls.cpp::lookupVisibleDeclsImpl
 void UnqualifiedLookupFactory::lookupNamesIntroducedBy(
-    const DCAndUnresolvedIsCascadingUse dcAndIsCascadingUseArg) {
+    const ContextAndUnresolvedIsCascadingUse contextAndIsCascadingUseArg) {
 
-  DeclContext *const dc = dcAndIsCascadingUseArg.whereToLook;
-  const auto isCascadingUseSoFar = dcAndIsCascadingUseArg.isCascadingUse;
+  DeclContext *const dc = contextAndIsCascadingUseArg.whereToLook;
+  const auto isCascadingUseSoFar = contextAndIsCascadingUseArg.isCascadingUse;
   if (dc->isModuleScopeContext())
     lookupInModuleScopeContext(dc, isCascadingUseSoFar);
   else if (auto *PBI = dyn_cast<PatternBindingInitializer>(dc))
@@ -683,7 +684,7 @@ void UnqualifiedLookupFactory::finishLookingInContext(
       },
       // Recurse into the next context.
       [&] {
-        lookupNamesIntroducedBy(DCAndUnresolvedIsCascadingUse{
+        lookupNamesIntroducedBy(ContextAndUnresolvedIsCascadingUse{
             lookupContextForThisContext->getParentForLookup(), isCascadingUse});
       });
 }
