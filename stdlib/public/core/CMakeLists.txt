@@ -166,7 +166,6 @@ set(SWIFTLIB_ESSENTIAL
   StringUTF16View.swift
   StringUTF8View.swift
   StringUTF8Validation.swift
-  StringVariant.swift
   Substring.swift
   SwiftNativeNSArray.swift
   ThreadLocalStorage.swift
