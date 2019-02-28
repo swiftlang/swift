@@ -1663,22 +1663,6 @@ extension ${Self} : _HasCustomAnyHashableRepresentation {
   }
 }
 
-/// Conformances for character literals
-/// Users will need to opt-in for now.
-extension ${Self} :
-    _ExpressibleByBuiltinUnicodeScalarLiteral/*,
-    ExpressibleByUnicodeScalarLiteral*/ {
-  @_transparent
-  public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
-    self = ${Self}(truncatingIfNeeded: UInt32(value))
-  }
-  @_transparent
-  @available(swift 5.1)
-  public init(unicodeScalarLiteral value: ${Self}) {
-    self = value
-  }
-}
-
 // FIXME(integers): this section here is to help the typechecker,
 // as it seems to have problems with a pattern where the nonmutating operation
 // is defined on a protocol in terms of a mutating one that is itself defined
@@ -1848,6 +1832,17 @@ internal struct _IntegerAnyHashableBox<
     guard let value = _value as? T else { return false }
     result.initialize(to: value)
     return true
+  }
+}
+
+/// Intended for character literals. Per-integer type
+/// conformances to ExpressibleByUnicodeScalarLiteral
+/// will have to wait until they can be gated to 5.1.
+extension FixedWidthInteger {
+  @_transparent
+  @available(swift 5.1)
+  public init(unicodeScalarLiteral value: Unicode.Scalar) {
+    self.init(truncatingIfNeeded: value.value)
   }
 }
 
