@@ -410,11 +410,15 @@ public:
     StoredPointer InstanceAddress =
         InstanceMetadataAddressAddress + 2 * sizeof(StoredPointer);
 
+    // When built with Objective-C interop, the runtime also stores a conformance
+    // to Hashable and the base type introducing the Hashable conformance.
+    if (isObjC)
+      InstanceAddress += 2 * sizeof(StoredPointer);
+
     // Round up to alignment, and we have the start address of the
     // instance payload.
     auto AlignmentMask = VWT->getAlignmentMask();
-    auto Offset = (sizeof(HeapObject) + AlignmentMask) & ~AlignmentMask;
-    InstanceAddress += Offset;
+    InstanceAddress = (InstanceAddress + AlignmentMask) & ~AlignmentMask;
 
     return RemoteExistential(
         RemoteAddress(*InstanceMetadataAddress),
