@@ -356,7 +356,7 @@ private:
   void recordDependencyOnTopLevelName(DeclContext *topLevelContext,
                                       DeclName name, bool isCascadingUse);
 
-  void addPrivateImports(DeclContext *const dc);
+  void addImportedResults(DeclContext *const dc);
 
   void addNamesKnownToDebugClient(DeclContext *dc);
 
@@ -440,7 +440,7 @@ void UnqualifiedLookupFactory::lookUpTopLevelNamesInModuleScopeContext(
                                    isOriginallyTypeLookup, Results))
     return;
 
-  addPrivateImports(DC);
+  addImportedResults(DC);
   addNamesKnownToDebugClient(DC);
   if (Results.empty()) {
     // If we still haven't found anything, but we do have some
@@ -1042,7 +1042,7 @@ void UnqualifiedLookupFactory::recordDependencyOnTopLevelName(
   recordedIsCascadingUse = isCascadingUse;
 }
 
-void UnqualifiedLookupFactory::addPrivateImports(DeclContext *const dc) {
+void UnqualifiedLookupFactory::addImportedResults(DeclContext *const dc) {
   // Add private imports to the extra search list.
   SmallVector<ModuleDecl::ImportedModule, 8> extraImports;
   if (auto FU = dyn_cast<FileUnit>(dc))
