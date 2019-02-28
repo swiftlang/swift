@@ -1,3 +1,5 @@
+// Windows programs cannot fail due to a signal
+// UNSUPPORTED: windows
 // RUN: not %swiftc_driver -emit-executable -o %t.exe %s -Xfrontend -debug-assert-immediately 2>&1 | %FileCheck %s
 // RUN: not %swiftc_driver -emit-executable -o %t.exe %s -Xfrontend -debug-assert-after-parse 2>&1 | %FileCheck %s
 
