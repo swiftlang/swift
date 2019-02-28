@@ -138,26 +138,25 @@ private:
   /// But in addition, self could conform to any number of protocols.
   /// For example, when there's a protocol extension, e.g. extension P where
   /// self: P2, self also conforms to P2 so P2 must be searched.
-  class ResultFinderForSelfsConformances {
+  class ResultFinderForTypeContext {
     /// Nontypes are formally members of the base type, i.e. the dynamic type
     /// of the activation record.
     DeclContext *const dynamicContext;
     /// Types are formally members of the metatype, i.e. the static type of the
     /// activation record.
     DeclContext *const staticContext;
-    using NominalTypesThatSelfMustConformTo = SmallVector<NominalTypeDecl *, 2>;
-    NominalTypesThatSelfMustConformTo nominalTypesThatSelfMustConformTo;
+    using SelfBounds = SmallVector<NominalTypeDecl *, 2>;
+    SelfBounds selfBounds;
 
   public:
     /// \p staticContext is also the context from which to derive the self types
-    ResultFinderForSelfsConformances(DeclContext *dynamicContext,
-                                     DeclContext *staticContext);
+    ResultFinderForTypeContext(DeclContext *dynamicContext,
+                               DeclContext *staticContext);
 
     void dump() const;
 
   private:
-    NominalTypesThatSelfMustConformTo
-    findNominalTypesThatSelfMustConformTo(DeclContext *dc);
+    SelfBounds findSelfBounds(DeclContext *dc);
 
     // Classify this declaration.
     // Types are formally members of the metatype.
@@ -287,11 +286,11 @@ private:
 
   void lookupNamesIntroducedBy(const ContextAndUnresolvedIsCascadingUse);
 
-  void finishLookingInContext(AddGenericParameters addGenericParameters,
-                              DeclContext *lookupContextForThisContext,
-                              Optional<ResultFinderForSelfsConformances>
-                                  &&resultFinderForSelfsConformances,
-                              Optional<bool> isCascadingUse);
+  void finishLookingInContext(
+      AddGenericParameters addGenericParameters,
+      DeclContext *lookupContextForThisContext,
+      Optional<ResultFinderForTypeContext> &&resultFinderForTypeContext,
+      Optional<bool> isCascadingUse);
 
   void lookupInModuleScopeContext(DeclContext *, Optional<bool> isCascadingUse);
 
@@ -379,10 +378,10 @@ private:
                                  onlyCareAboutFunctionBody);
   }
 
-  void findResultsAndSaveUnavailables(ResultFinderForSelfsConformances &&PTS,
-                                      bool isCascadingUse,
-                                      NLOptions baseNLOptions,
-                                      DeclContext *lookupContextForThisContext);
+  void findResultsAndSaveUnavailables(
+      ResultFinderForTypeContext &&resultFinderForTypeContext,
+      bool isCascadingUse, NLOptions baseNLOptions,
+      DeclContext *lookupContextForThisContext);
 
   void dumpBreadcrumbs() const;
 
@@ -615,7 +614,7 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
   // Dig out the type we're looking into.
   // Perform lookup into the type
   findResultsAndSaveUnavailables(
-      ResultFinderForSelfsConformances(
+      ResultFinderForTypeContext(
           defaultNextState.selfDC ? defaultNextState.selfDC : scopeDC, scopeDC),
       isCascadingUseResult, baseNLOptions, scopeDC);
   // Forget the 'self' declaration.
@@ -664,8 +663,7 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedBy(
 void UnqualifiedLookupFactory::finishLookingInContext(
     const AddGenericParameters addGenericParameters,
     DeclContext *const lookupContextForThisContext,
-    Optional<ResultFinderForSelfsConformances>
-        &&resultFinderForSelfsConformances,
+    Optional<ResultFinderForTypeContext> &&resultFinderForTypeContext,
     const Optional<bool> isCascadingUse) {
 
   // When a generic has the same name as a member, Swift prioritizes the generic
@@ -677,10 +675,10 @@ void UnqualifiedLookupFactory::finishLookingInContext(
 
   ifNotDoneYet(
       [&] {
-        if (resultFinderForSelfsConformances)
-          findResultsAndSaveUnavailables(
-              std::move(*resultFinderForSelfsConformances), *isCascadingUse,
-              baseNLOptions, lookupContextForThisContext);
+        if (resultFinderForTypeContext)
+          findResultsAndSaveUnavailables(std::move(*resultFinderForTypeContext),
+                                         *isCascadingUse, baseNLOptions,
+                                         lookupContextForThisContext);
       },
       // Recurse into the next context.
       [&] {
@@ -690,11 +688,12 @@ void UnqualifiedLookupFactory::finishLookingInContext(
 }
 
 void UnqualifiedLookupFactory::findResultsAndSaveUnavailables(
-    ResultFinderForSelfsConformances &&PTS, bool isCascadingUse,
-    NLOptions baseNLOptions, DeclContext *lookupContextForThisContext) {
+    ResultFinderForTypeContext &&resultFinderForTypeContext,
+    bool isCascadingUse, NLOptions baseNLOptions,
+    DeclContext *lookupContextForThisContext) {
   auto firstPossiblyUnavailableResult = Results.size();
-  PTS.findResults(Name, isCascadingUse, baseNLOptions,
-                  lookupContextForThisContext, Results);
+  resultFinderForTypeContext.findResults(Name, isCascadingUse, baseNLOptions,
+                                         lookupContextForThisContext, Results);
   setAsideUnavailableResults(firstPossiblyUnavailableResult);
 }
 
@@ -735,7 +734,7 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByPatternBindingInitializer(
     finishLookingInContext(
       AddGenericParameters::Yes,
       patternContainer,
-      ResultFinderForSelfsConformances(PBI, patternContainer),
+      ResultFinderForTypeContext(PBI, patternContainer),
       resolveIsCascadingUse(PBI, isCascadingUse,
                            /*onlyCareAboutFunctionBody=*/false));
       // clang-format on
@@ -752,7 +751,7 @@ void UnqualifiedLookupFactory::
   finishLookingInContext(
     AddGenericParameters::Yes,
     storedPropertyContainer,
-    ResultFinderForSelfsConformances(storedPropertyContainer, storedPropertyContainer),
+    ResultFinderForTypeContext(storedPropertyContainer, storedPropertyContainer),
     resolveIsCascadingUse(storedPropertyContainer, None,
                           /*onlyCareAboutFunctionBody=*/false));
   // clang-format on
@@ -816,7 +815,7 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByMemberFunction(
       finishLookingInContext(
                              AddGenericParameters::Yes,
                              AFD->getParent(),
-                             ResultFinderForSelfsConformances(BaseDC, fnDeclContext),
+                             ResultFinderForTypeContext(BaseDC, fnDeclContext),
                              isCascadingUse);
         // clang-format on
       });
@@ -860,7 +859,7 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByNominalTypeOrExtension(
     AddGenericParameters::Yes,
     D,
     shouldLookupMembers(D, Loc)
-    ? Optional<ResultFinderForSelfsConformances>(ResultFinderForSelfsConformances(D, D))
+    ? Optional<ResultFinderForTypeContext>(ResultFinderForTypeContext(D, D))
     : None,
     resolveIsCascadingUse(D, isCascadingUse,
                           /*onlyCareAboutFunctionBody=*/false));
@@ -986,20 +985,19 @@ void UnqualifiedLookupFactory::addGenericParametersForFunction(
   }
 }
 
-void UnqualifiedLookupFactory::ResultFinderForSelfsConformances::findResults(
+void UnqualifiedLookupFactory::ResultFinderForTypeContext::findResults(
     const DeclName &Name, bool isCascadingUse, NLOptions baseNLOptions,
     DeclContext *contextForLookup,
     SmallVectorImpl<LookupResultEntry> &results) const {
   // An optimization:
-  if (nominalTypesThatSelfMustConformTo.empty())
+  if (selfBounds.empty())
     return;
   const NLOptions options =
       baseNLOptions | (isCascadingUse ? NL_KnownCascadingDependency
                                       : NL_KnownNonCascadingDependency);
 
   SmallVector<ValueDecl *, 4> Lookup;
-  contextForLookup->lookupQualified(nominalTypesThatSelfMustConformTo, Name,
-                                    options, Lookup);
+  contextForLookup->lookupQualified(selfBounds, Name, options, Lookup);
   for (auto Result : Lookup)
     results.push_back(LookupResultEntry(whereValueIsMember(Result), Result));
 }
@@ -1703,23 +1701,21 @@ TypeDecl *LegacyUnqualifiedLookup::getSingleTypeResult() const {
   return dyn_cast<TypeDecl>(Results.back().getValueDecl());
 }
 
-UnqualifiedLookupFactory::ResultFinderForSelfsConformances::
-    ResultFinderForSelfsConformances(DeclContext *dynamicContext,
-                                     DeclContext *staticContext)
+UnqualifiedLookupFactory::ResultFinderForTypeContext::
+    ResultFinderForTypeContext(DeclContext *dynamicContext,
+                               DeclContext *staticContext)
     : dynamicContext(dynamicContext), staticContext(staticContext),
-      nominalTypesThatSelfMustConformTo(
-          findNominalTypesThatSelfMustConformTo(staticContext)) {}
+      selfBounds(findSelfBounds(staticContext)) {}
 
-UnqualifiedLookupFactory::ResultFinderForSelfsConformances::
-    NominalTypesThatSelfMustConformTo
-    UnqualifiedLookupFactory::ResultFinderForSelfsConformances::
-        findNominalTypesThatSelfMustConformTo(DeclContext *dc) {
+UnqualifiedLookupFactory::ResultFinderForTypeContext::SelfBounds
+UnqualifiedLookupFactory::ResultFinderForTypeContext::findSelfBounds(
+    DeclContext *dc) {
   auto nominal = dc->getSelfNominalTypeDecl();
   if (!nominal)
     return {};
 
-  NominalTypesThatSelfMustConformTo lookupDecls;
-  lookupDecls.push_back(nominal);
+  SelfBounds selfBounds;
+  selfBounds.push_back(nominal);
 
   // For a protocol extension, check whether there are additional "Self"
   // constraints that can affect name lookup.
@@ -1727,9 +1723,9 @@ UnqualifiedLookupFactory::ResultFinderForSelfsConformances::
     auto ext = cast<ExtensionDecl>(dc);
     auto bounds = getSelfBoundsFromWhereClause(ext);
     for (auto bound : bounds.decls)
-      lookupDecls.push_back(bound);
+      selfBounds.push_back(bound);
   }
-  return lookupDecls;
+  return selfBounds;
 }
 
 void LegacyUnqualifiedLookup::populateLookupDeclsFromContext(
@@ -1750,13 +1746,13 @@ void LegacyUnqualifiedLookup::populateLookupDeclsFromContext(
   }
 }
 
-void UnqualifiedLookupFactory::ResultFinderForSelfsConformances::dump() const {
+void UnqualifiedLookupFactory::ResultFinderForTypeContext::dump() const {
   llvm::errs() << "dynamicContext: ";
   dynamicContext->dumpContext();
   llvm::errs() << "staticContext: ";
   staticContext->dumpContext();
-  llvm::errs() << "nominalTypesThatSelfMustConformTo: ";
-  for (const auto *D : nominalTypesThatSelfMustConformTo)
+  llvm::errs() << "selfBounds: ";
+  for (const auto *D : selfBounds)
     D->dump(llvm::errs(), 1);
   llvm::errs() << "\n";
 }
