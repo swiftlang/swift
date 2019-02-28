@@ -712,8 +712,7 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
 /// \param baseType - the type of the base on which this object
 ///   is being accessed; must be null if and only if this is not
 ///   a type member
-static bool doesStorageProduceLValue(TypeChecker &TC,
-                                     AbstractStorageDecl *storage,
+static bool doesStorageProduceLValue(AbstractStorageDecl *storage,
                                      Type baseType, DeclContext *useDC,
                                      const DeclRefExpr *base = nullptr) {
   // Unsettable storage decls always produce rvalues.
@@ -775,7 +774,7 @@ Type TypeChecker::getUnopenedTypeOfReference(
 
   // Qualify storage declarations with an lvalue when appropriate.
   // Otherwise, they yield rvalues (and the access must be a load).
-  if (doesStorageProduceLValue(*this, value, baseType, UseDC, base) &&
+  if (doesStorageProduceLValue(value, baseType, UseDC, base) &&
       !requestedType->hasError()) {
     return LValueType::get(requestedType);
   }
@@ -1247,7 +1246,7 @@ ConstraintSystem::getTypeOfMemberReference(
     if (auto *subscript = dyn_cast<SubscriptDecl>(value)) {
       auto elementTy = subscript->getElementInterfaceType();
 
-      if (doesStorageProduceLValue(TC, subscript, baseTy, useDC, base))
+      if (doesStorageProduceLValue(subscript, baseTy, useDC, base))
         elementTy = LValueType::get(elementTy);
 
       // See ConstraintSystem::resolveOverload() -- optional and dynamic
@@ -1467,7 +1466,8 @@ static ArrayRef<OverloadChoice> partitionSIMDOperators(
 
 /// Retrieve the type that will be used when matching the given overload.
 static Type getEffectiveOverloadType(const OverloadChoice &overload,
-                                     bool allowMembers) {
+                                     bool allowMembers,
+                                     DeclContext *useDC) {
   switch (overload.getKind()) {
   case OverloadChoiceKind::Decl:
     // Declaration choices are handled below.
@@ -1513,13 +1513,36 @@ static Type getEffectiveOverloadType(const OverloadChoice &overload,
     if (!allowMembers)
       return Type();
 
-    // FIXME: This is overly restrictive for now.
-    if ((!isa<FuncDecl>(decl) && !isa<EnumElementDecl>(decl)) ||
-        (decl->isInstanceMember() &&
-         (!overload.getBaseType() || !overload.getBaseType()->getAnyNominal())))
-      return Type();
+    if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+      auto elementTy = subscript->getElementInterfaceType();
 
-    type = type->castTo<FunctionType>()->getResult();
+      if (doesStorageProduceLValue(subscript, overload.getBaseType(), useDC))
+        elementTy = LValueType::get(elementTy);
+
+      // See ConstraintSystem::resolveOverload() -- optional and dynamic
+      // subscripts are a special case, because the optionality is
+      // applied to the result type and not the type of the reference.
+      if (subscript->getAttrs().hasAttribute<OptionalAttr>() ||
+          overload.getKind() == OverloadChoiceKind::DeclViaDynamic)
+        elementTy = OptionalType::get(elementTy->getRValueType());
+
+      auto indices = subscript->getInterfaceType()
+                       ->castTo<AnyFunctionType>()->getParams();
+      type = FunctionType::get(indices, elementTy);
+    } else if (auto var = dyn_cast<VarDecl>(decl)) {
+      type = var->getInterfaceType();
+      if (doesStorageProduceLValue(var, overload.getBaseType(), useDC))
+        type = LValueType::get(type);
+    } else if (isa<FuncDecl>(decl) || isa<EnumElementDecl>(decl)) {
+      if (decl->isInstanceMember() &&
+          (!overload.getBaseType() ||
+           !overload.getBaseType()->getAnyNominal()))
+        return Type();
+
+      type = type->castTo<FunctionType>()->getResult();
+    } else {
+      return type;
+    }
   }
 
   return type;
@@ -1776,7 +1799,7 @@ Type ConstraintSystem::findCommonResultType(ArrayRef<OverloadChoice> choices) {
     // If we can't even get a type for the overload, there's nothing more to
     // do.
     Type overloadType =
-        getEffectiveOverloadType(overload, /*allowMembers=*/true);
+        getEffectiveOverloadType(overload, /*allowMembers=*/true, /*FIXME:*/DC);
     if (!overloadType) {
       return true;
     }
@@ -1827,7 +1850,7 @@ Type ConstraintSystem::findCommonOverloadType(
     // If we can't even get a type for the overload, there's nothing more to
     // do.
     Type overloadType =
-      getEffectiveOverloadType(overload, /*allowMembers=*/false);
+    getEffectiveOverloadType(overload, /*allowMembers=*/false, /*FIXME:*/DC);
     if (!overloadType) {
       return true;
     }

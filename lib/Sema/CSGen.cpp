@@ -1123,10 +1123,6 @@ namespace {
       
       if (outputTy.isNull()) {
         outputTy = CS.createTypeVariable(resultLocator, TVO_CanBindToLValue);
-      } else {
-        // TODO: Generalize this for non-subscript-expr anchors, so that e.g.
-        // keypath lookup benefits from the peephole as well.
-        CS.setFavoredType(anchor, outputTy.getPointer());
       }
 
       // FIXME: This can only happen when diagnostics successfully type-checked
@@ -1170,6 +1166,13 @@ namespace {
                        FunctionType::get(params, outputTy),
                        memberTy,
                        fnLocator);
+
+      Type fixedOutputType =
+          CS.getFixedTypeRecursive(outputTy, /*wantRValue=*/false);
+      if (!fixedOutputType->isTypeVariableOrMember()) {
+        CS.setFavoredType(anchor, fixedOutputType.getPointer());
+        outputTy = fixedOutputType;
+      }
 
       return outputTy;
     }
