@@ -1085,11 +1085,11 @@ static bool isSingleTupleParam(ASTContext &ctx,
   if (!ctx.isSwiftVersionAtLeast(5))
     paramType = paramType->lookThroughAllOptionalTypes();
 
-  // Parameter should have a label and be either a tuple tuple type,
-  // or a type variable which might later be assigned a tuple type,
-  // e.g. opened generic parameter.
+  // Parameter should not have a label and be either a tuple,
+  // type variable or a dependent member, which might later be
+  // assigned (or resolved to) a tuple type, e.g. opened generic parameter.
   return !param.hasLabel() &&
-         (paramType->is<TupleType>() || paramType->is<TypeVariableType>());
+         (paramType->is<TupleType>() || paramType->isTypeVariableOrMember());
 }
 
 /// Attempt to fix missing arguments by introducing type variables

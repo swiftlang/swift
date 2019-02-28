@@ -1692,3 +1692,26 @@ do {
   func f(_: Int...) {}
   let _ = [(1, 2, 3)].map(f) // expected-error {{cannot invoke 'map' with an argument list of type '((Int...) -> ())'}}
 }
+
+// rdar://problem/48443263 - cannot convert value of type '() -> Void' to expected argument type '(_) -> Void'
+
+protocol P_48443263 {
+  associatedtype V
+}
+
+func rdar48443263() {
+  func foo<T : P_48443263>(_: T, _: (T.V) -> Void) {}
+
+  struct S1 : P_48443263 {
+    typealias V = Void
+  }
+
+  struct S2: P_48443263 {
+    typealias V = Int
+  }
+
+  func bar(_ s1: S1, _ s2: S2, _ fn: () -> Void) {
+    foo(s1, fn) // Ok because s.V is Void
+    foo(s2, fn) // expected-error {{cannot convert value of type '() -> Void' to expected argument type '(_) -> Void'}}
+  }
+}
