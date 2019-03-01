@@ -522,11 +522,6 @@ bool simplifyUsers(SingleValueInstruction *I);
 /// without a significant increase to code size.
 bool shouldExpand(SILModule &Module, SILType Ty);
 
-/// Check if a given type is a simple type, i.e. a builtin
-/// integer or floating point type or a struct/tuple whose members
-/// are of simple types.
-bool isSimpleType(SILType SILTy, SILModule& Module);
-
 /// Check if the value of V is computed by means of a simple initialization.
 /// Store the actual SILValue into \p Val and the reversed list of instructions
 /// initializing it in \p Insns.
