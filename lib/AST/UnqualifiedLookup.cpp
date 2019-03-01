@@ -669,7 +669,7 @@ void UnqualifiedLookupFactory::finishLookingInContext(
   // When a generic has the same name as a member, Swift prioritizes the generic
   // because the member could still be named by qualifying it. But there is no
   // corresponding way to qualify a generic parameter.
-  // So, look for genrics first.
+  // So, look for generics first.
   if (addGenericParameters == AddGenericParameters::Yes)
     addGenericParametersHereAndInEnclosingScopes(lookupContextForThisContext);
 
