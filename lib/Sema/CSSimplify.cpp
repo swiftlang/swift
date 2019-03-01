@@ -110,9 +110,12 @@ bool constraints::areConservativelyCompatibleArgumentLabels(
       baseType = baseType->getRValueType();
     break;
 
+  case OverloadChoiceKind::KeyPathApplication:
+    // Key path applications are written as if subscript[keyPath:].
+    return !hasTrailingClosure && labels.size() == 1 && labels[0].is("keyPath");
+
   case OverloadChoiceKind::BaseType:
   case OverloadChoiceKind::DynamicMemberLookup:
-  case OverloadChoiceKind::KeyPathApplication:
   case OverloadChoiceKind::TupleIndex:
     return true;
   }
