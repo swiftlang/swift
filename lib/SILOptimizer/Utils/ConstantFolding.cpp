@@ -1122,6 +1122,9 @@ static SILValue foldFPTrunc(BuiltinInst *BI, const BuiltinInfo &Builtin,
       tryExtractLiteralText(flitInst, fplitStr);
 
       auto userType = CE ? CE->getType() : destType;
+      if (auto *FLE = Loc.getAsASTNode<FloatLiteralExpr>()) {
+        userType = FLE->getType();
+      }
       auto diagId = overflow
                         ? diag::warning_float_trunc_overflow
                         : (hexnInexact ? diag::warning_float_trunc_hex_inexact
