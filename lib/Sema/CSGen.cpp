@@ -1123,10 +1123,6 @@ namespace {
       
       if (outputTy.isNull()) {
         outputTy = CS.createTypeVariable(resultLocator, TVO_CanBindToLValue);
-      } else {
-        // TODO: Generalize this for non-subscript-expr anchors, so that e.g.
-        // keypath lookup benefits from the peephole as well.
-        CS.setFavoredType(anchor, outputTy.getPointer());
       }
 
       // FIXME: This can only happen when diagnostics successfully type-checked
@@ -1170,6 +1166,13 @@ namespace {
                        FunctionType::get(params, outputTy),
                        memberTy,
                        fnLocator);
+
+      Type fixedOutputType =
+          CS.getFixedTypeRecursive(outputTy, /*wantRValue=*/false);
+      if (!fixedOutputType->isTypeVariableOrMember()) {
+        CS.setFavoredType(anchor, fixedOutputType.getPointer());
+        outputTy = fixedOutputType;
+      }
 
       return outputTy;
     }
@@ -2516,8 +2519,6 @@ namespace {
     }
 
     Type visitApplyExpr(ApplyExpr *expr) {
-      Type outputTy;
-
       auto fnExpr = expr->getFn();
 
       if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
@@ -2526,65 +2527,9 @@ namespace {
           return resultOfTypeOperation(typeOperation, expr->getArg());
       }
 
-      if (auto fnType = CS.getType(fnExpr)->getAs<AnyFunctionType>()) {
-        outputTy = fnType->getResult();
-      } else if (auto OSR = dyn_cast<OverloadedDeclRefExpr>(fnExpr)) {
-        // Determine if the overloads are all functions that share a common
-        // return type.
-        Type commonType;
-        for (auto OD : OSR->getDecls()) {
-          auto OFD = dyn_cast<AbstractFunctionDecl>(OD);
-          if (!OFD) {
-            commonType = Type();
-            break;
-          }
-
-          auto OFT = OFD->getInterfaceType()->getAs<AnyFunctionType>();
-          if (!OFT) {
-            commonType = Type();
-            break;
-          }
-
-          // Look past the self parameter.
-          if (OFD->getDeclContext()->isTypeContext()) {
-            OFT = OFT->getResult()->getAs<AnyFunctionType>();
-            if (!OFT) {
-              commonType = Type();
-              break;
-            }
-          }
-
-          Type resultType = OFT->getResult();
-
-          // If there are any type parameters in the result,
-          if (resultType->hasTypeParameter()) {
-            commonType = Type();
-            break;
-          }
-
-          if (commonType.isNull()) {
-            commonType = resultType;
-          } else if (!commonType->isEqual(resultType)) {
-            commonType = Type();
-            break;
-          }
-        }
-
-        if (commonType) {
-          outputTy = commonType;
-        }
-      }
-      
-      // The function subexpression has some rvalue type T1 -> T2 for fresh
-      // variables T1 and T2.
-      if (outputTy.isNull()) {
-        outputTy = CS.createTypeVariable(
-            CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult));
-      } else {
-        // Since we know what the output type is, we can set it as the favored
-        // type of this expression.
-        CS.setFavoredType(expr, outputTy.getPointer());
-      }
+      // The result type is a fresh type variable.
+      Type resultType = CS.createTypeVariable(
+          CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult));
 
       // A direct call to a ClosureExpr makes it noescape.
       FunctionType::ExtInfo extInfo;
@@ -2598,11 +2543,20 @@ namespace {
       AnyFunctionType::decomposeInput(CS.getType(expr->getArg()), params);
 
       CS.addConstraint(ConstraintKind::ApplicableFunction,
-                       FunctionType::get(params, outputTy, extInfo),
+                       FunctionType::get(params, resultType, extInfo),
                        CS.getType(expr->getFn()),
         CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
 
-      return outputTy;
+      // If we ended up resolving the result type variable to a concrete type,
+      // set it as the favored type for this expression.
+      Type fixedType =
+          CS.getFixedTypeRecursive(resultType, /*wantRvalue=*/true);
+      if (!fixedType->isTypeVariableOrMember()) {
+        CS.setFavoredType(expr, fixedType.getPointer());
+        resultType = fixedType;
+      }
+
+      return resultType;
     }
 
     Type getSuperType(VarDecl *selfDecl,

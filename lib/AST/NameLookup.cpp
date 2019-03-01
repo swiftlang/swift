@@ -325,7 +325,7 @@ static void recordShadowedDeclsAfterSignatureMatch(
 /// Look through the given set of declarations (that all have the same name),
 /// recording those that are shadowed by another declaration in the
 /// \c shadowed set.
-static void recordShadowDeclsAfterObjCInitMatch(
+static void recordShadowedDeclsForImportedInits(
                                 ArrayRef<ConstructorDecl *> ctors,
                                 llvm::SmallPtrSetImpl<ValueDecl *> &shadowed) {
   assert(ctors.size() > 1 && "No collisions");
@@ -363,18 +363,21 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
   llvm::SmallDenseMap<CanType, llvm::TinyPtrVector<ValueDecl *>> collisions;
   llvm::SmallVector<CanType, 2> collisionTypes;
   llvm::SmallDenseMap<NominalTypeDecl *, llvm::TinyPtrVector<ConstructorDecl *>>
-    objCInitializerCollisions;
-  llvm::TinyPtrVector<NominalTypeDecl *> objCInitializerCollisionNominals;
+    importedInitializerCollisions;
+  llvm::TinyPtrVector<NominalTypeDecl *> importedInitializerCollectionTypes;
 
   for (auto decl : decls) {
-    // Specifically keep track of Objective-C initializers, which can come from
-    // either init methods or factory methods.
-    if (decl->hasClangNode()) {
+    // Specifically keep track of imported initializers, which can come from
+    // Objective-C init methods, Objective-C factory methods, renamed C
+    // functions, or be synthesized by the importer.
+    if (decl->hasClangNode() ||
+        (isa<NominalTypeDecl>(decl->getDeclContext()) &&
+         cast<NominalTypeDecl>(decl->getDeclContext())->hasClangNode())) {
       if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
         auto nominal = ctor->getDeclContext()->getSelfNominalTypeDecl();
-        auto &knownInits = objCInitializerCollisions[nominal];
+        auto &knownInits = importedInitializerCollisions[nominal];
         if (knownInits.size() == 1) {
-          objCInitializerCollisionNominals.push_back(nominal);
+          importedInitializerCollectionTypes.push_back(nominal);
         }
         knownInits.push_back(ctor);
       }
@@ -422,9 +425,9 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
                                            shadowed);
   }
 
-  // Check whether we have shadowing for Objective-C initializer collisions.
-  for (auto nominal : objCInitializerCollisionNominals) {
-    recordShadowDeclsAfterObjCInitMatch(objCInitializerCollisions[nominal],
+  // Check whether we have shadowing for imported initializer collisions.
+  for (auto nominal : importedInitializerCollectionTypes) {
+    recordShadowedDeclsForImportedInits(importedInitializerCollisions[nominal],
                                         shadowed);
   }
 }

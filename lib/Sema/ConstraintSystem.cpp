@@ -712,8 +712,7 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
 /// \param baseType - the type of the base on which this object
 ///   is being accessed; must be null if and only if this is not
 ///   a type member
-static bool doesStorageProduceLValue(TypeChecker &TC,
-                                     AbstractStorageDecl *storage,
+static bool doesStorageProduceLValue(AbstractStorageDecl *storage,
                                      Type baseType, DeclContext *useDC,
                                      const DeclRefExpr *base = nullptr) {
   // Unsettable storage decls always produce rvalues.
@@ -775,7 +774,7 @@ Type TypeChecker::getUnopenedTypeOfReference(
 
   // Qualify storage declarations with an lvalue when appropriate.
   // Otherwise, they yield rvalues (and the access must be a load).
-  if (doesStorageProduceLValue(*this, value, baseType, UseDC, base) &&
+  if (doesStorageProduceLValue(value, baseType, UseDC, base) &&
       !requestedType->hasError()) {
     return LValueType::get(requestedType);
   }
@@ -1247,7 +1246,7 @@ ConstraintSystem::getTypeOfMemberReference(
     if (auto *subscript = dyn_cast<SubscriptDecl>(value)) {
       auto elementTy = subscript->getElementInterfaceType();
 
-      if (doesStorageProduceLValue(TC, subscript, baseTy, useDC, base))
+      if (doesStorageProduceLValue(subscript, baseTy, useDC, base))
         elementTy = LValueType::get(elementTy);
 
       // See ConstraintSystem::resolveOverload() -- optional and dynamic
@@ -1466,7 +1465,9 @@ static ArrayRef<OverloadChoice> partitionSIMDOperators(
 }
 
 /// Retrieve the type that will be used when matching the given overload.
-static Type getEffectiveOverloadType(const OverloadChoice &overload) {
+static Type getEffectiveOverloadType(const OverloadChoice &overload,
+                                     bool allowMembers,
+                                     DeclContext *useDC) {
   switch (overload.getKind()) {
   case OverloadChoiceKind::Decl:
     // Declaration choices are handled below.
@@ -1506,9 +1507,42 @@ static Type getEffectiveOverloadType(const OverloadChoice &overload) {
                              genericFn->getExtInfo());
   }
 
-  // If this declaration is within a type context, bail out.
+  // If this declaration is within a type context, we might not be able
+  // to handle it.
   if (decl->getDeclContext()->isTypeContext()) {
-    return Type();
+    if (!allowMembers)
+      return Type();
+
+    if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+      auto elementTy = subscript->getElementInterfaceType();
+
+      if (doesStorageProduceLValue(subscript, overload.getBaseType(), useDC))
+        elementTy = LValueType::get(elementTy);
+
+      // See ConstraintSystem::resolveOverload() -- optional and dynamic
+      // subscripts are a special case, because the optionality is
+      // applied to the result type and not the type of the reference.
+      if (subscript->getAttrs().hasAttribute<OptionalAttr>() ||
+          overload.getKind() == OverloadChoiceKind::DeclViaDynamic)
+        elementTy = OptionalType::get(elementTy->getRValueType());
+
+      auto indices = subscript->getInterfaceType()
+                       ->castTo<AnyFunctionType>()->getParams();
+      type = FunctionType::get(indices, elementTy);
+    } else if (auto var = dyn_cast<VarDecl>(decl)) {
+      type = var->getInterfaceType();
+      if (doesStorageProduceLValue(var, overload.getBaseType(), useDC))
+        type = LValueType::get(type);
+    } else if (isa<FuncDecl>(decl) || isa<EnumElementDecl>(decl)) {
+      if (decl->isInstanceMember() &&
+          (!overload.getBaseType() ||
+           !overload.getBaseType()->getAnyNominal()))
+        return Type();
+
+      type = type->castTo<FunctionType>()->getResult();
+    } else {
+      return type;
+    }
   }
 
   return type;
@@ -1756,18 +1790,67 @@ public:
 
 }
 
-Type ConstraintSystem::findCommonOverloadType(
-    ArrayRef<OverloadChoice> choices,
-    ArrayRef<OverloadChoice> outerAlternatives,
-    ConstraintLocator *locator) {
-  // Local function to consider this s new overload choice, updating the
+Type ConstraintSystem::findCommonResultType(ArrayRef<OverloadChoice> choices) {
+  // Local function to consider this new overload choice, updating the
   // "common type". Returns true if this overload cannot be integrated into
   // the common type, at which point there is no "common type".
   Type commonType;
   auto considerOverload = [&](const OverloadChoice &overload) -> bool {
     // If we can't even get a type for the overload, there's nothing more to
     // do.
-    Type overloadType = getEffectiveOverloadType(overload);
+    Type overloadType =
+        getEffectiveOverloadType(overload, /*allowMembers=*/true, /*FIXME:*/DC);
+    if (!overloadType) {
+      return true;
+    }
+
+    auto functionType = overloadType->getAs<FunctionType>();
+    if (!functionType) {
+      return true;
+    }
+
+    auto resultType = functionType->getResult();
+    if (resultType->hasTypeParameter()) {
+      return true;
+    }
+
+    // If this is the first overload, record it's type as the common type.
+    if (!commonType) {
+      commonType = resultType;
+      return false;
+    }
+
+    // Find the common type between the current common type and the new
+    // overload's type.
+    commonType = CommonTypeVisitor().visit(commonType, resultType);
+    if (!commonType) {
+      return true;
+    }
+
+    return false;
+  };
+
+  for (const auto &choice : choices) {
+    if (considerOverload(choice))
+      return Type();
+  }
+
+  return commonType;
+}
+
+Type ConstraintSystem::findCommonOverloadType(
+    ArrayRef<OverloadChoice> choices,
+    ArrayRef<OverloadChoice> outerAlternatives,
+    ConstraintLocator *locator) {
+  // Local function to consider this new overload choice, updating the
+  // "common type". Returns true if this overload cannot be integrated into
+  // the common type, at which point there is no "common type".
+  Type commonType;
+  auto considerOverload = [&](const OverloadChoice &overload) -> bool {
+    // If we can't even get a type for the overload, there's nothing more to
+    // do.
+    Type overloadType =
+    getEffectiveOverloadType(overload, /*allowMembers=*/false, /*FIXME:*/DC);
     if (!overloadType) {
       return true;
     }
