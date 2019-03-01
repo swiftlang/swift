@@ -1814,42 +1814,12 @@ public:
             "Operand of " #name "_to_ref does not have the " \
             "operand's type as its referent type"); \
   }
-#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
-  LOADABLE_REF_STORAGE_HELPER(Name, name) \
-  void checkStrongRetain##Name##Inst(StrongRetain##Name##Inst *RI) { \
-    requireObjectType(Name##StorageType, RI->getOperand(), \
-                      "Operand of strong_retain_" #name); \
-    require(!F.hasOwnership(), "strong_retain_" #name " is only in " \
-                                        "functions with unqualified " \
-                                        "ownership"); \
-  } \
-  void check##Name##RetainInst(Name##RetainInst *RI) { \
-    requireObjectType(Name##StorageType, RI->getOperand(), \
-                      "Operand of " #name "_retain"); \
-    require(!F.hasOwnership(), \
-            #name "_retain is only in functions with unqualified ownership"); \
-  } \
-  void check##Name##ReleaseInst(Name##ReleaseInst *RI) { \
-    requireObjectType(Name##StorageType, RI->getOperand(), \
-                      "Operand of " #name "_release"); \
-    require(!F.hasOwnership(), \
-            #name "_release is only in functions with unqualified ownership"); \
-  } \
-  void checkCopy##Name##ValueInst(Copy##Name##ValueInst *I) { \
-    requireObjectType(Name##StorageType, I->getOperand(), \
-                      "Operand of " #name "_retain"); \
-    require(F.hasOwnership(), \
-            "copy_" #name "_value is only valid in functions with qualified " \
-            "ownership"); \
-  }
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
-  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...") \
-  LOADABLE_REF_STORAGE_HELPER(Name, name) \
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name, closure) \
   void checkStrongRetain##Name##Inst(StrongRetain##Name##Inst *RI) { \
     auto ty = requireObjectType(Name##StorageType, RI->getOperand(), \
                                 "Operand of strong_retain_" #name); \
-    require(ty->isLoadable(ResilienceExpansion::Maximal), \
-          "strong_retain_" #name " requires '" #name "' type to be loadable"); \
+    closure(); \
+    (void)ty; \
     require(!F.hasOwnership(), "strong_retain_" #name " is only in " \
                                         "functions with unqualified " \
                                         "ownership"); \
@@ -1857,31 +1827,42 @@ public:
   void check##Name##RetainInst(Name##RetainInst *RI) { \
     auto ty = requireObjectType(Name##StorageType, RI->getOperand(), \
                                 "Operand of " #name "_retain"); \
-    require(ty->isLoadable(ResilienceExpansion::Maximal), \
-            #name "_retain requires '" #name "' type to be loadable"); \
+    closure(); \
+    (void)ty; \
     require(!F.hasOwnership(), \
             #name "_retain is only in functions with unqualified ownership"); \
   } \
   void check##Name##ReleaseInst(Name##ReleaseInst *RI) { \
     auto ty = requireObjectType(Name##StorageType, RI->getOperand(), \
                                 "Operand of " #name "_release"); \
-    require(ty->isLoadable(ResilienceExpansion::Maximal), \
-            #name "_release requires '" #name "' type to be loadable"); \
+    closure(); \
+    (void)ty; \
     require(!F.hasOwnership(), \
             #name "_release is only in functions with unqualified ownership"); \
   } \
   void checkCopy##Name##ValueInst(Copy##Name##ValueInst *I) { \
     auto ty = requireObjectType(Name##StorageType, I->getOperand(), \
                                 "Operand of " #name "_retain"); \
-    require(ty->isLoadable(ResilienceExpansion::Maximal), \
-            #name "_retain requires '" #name "' type to be loadable"); \
+    closure(); \
+    (void)ty; \
     /* *NOTE* We allow copy_##name##_value to be used throughout the entire */ \
     /* pipeline even though it is a higher level instruction. */ \
   }
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+  LOADABLE_REF_STORAGE_HELPER(Name, name) \
+  ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name, []{})
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+  LOADABLE_REF_STORAGE_HELPER(Name, name) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...") \
+  ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name, [&]{ \
+    require(ty->isLoadable(ResilienceExpansion::Maximal), \
+            "'" #name "' type must be loadable"); \
+  })
 #define UNCHECKED_REF_STORAGE(Name, name, ...) \
   LOADABLE_REF_STORAGE_HELPER(Name, name)
 #include "swift/AST/ReferenceStorage.def"
 #undef LOADABLE_REF_STORAGE_HELPER
+#undef ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER
 
   void checkMarkUninitializedInst(MarkUninitializedInst *MU) {
     SILValue Src = MU->getOperand();
