@@ -223,6 +223,7 @@
     "Equatable.swift",
     "Comparable.swift",
     "Codable.swift",
+    "LegacyABI.swift",
     "MigrationSupport.swift"
   ],
   "Result": [
