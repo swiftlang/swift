@@ -928,7 +928,10 @@ class _ParentProcess {
     let (_, stderrThread) = _stdlib_thread_create_block({
       while !self._childStderr.isEOF {
         self._childStderr.read()
-        while let line = self._childStderr.getline() {
+        while var line = self._childStderr.getline() {
+          if let cr = line.firstIndex(of: "\r") {
+            line.remove(at: cr)
+          }
           var done: Bool
           (done: done, ()) = onStderrLine(line)
           if done { return }
