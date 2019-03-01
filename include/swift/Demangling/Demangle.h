@@ -35,9 +35,9 @@ namespace Demangle {
 
 enum class SymbolicReferenceKind : uint8_t;
 
-/// A simple default implementation that assigns letters to archetypes in
+/// A simple default implementation that assigns letters to type parameters in
 /// alphabetic order.
-std::string archetypeName(uint64_t index, uint64_t depth);
+std::string genericParameterName(uint64_t depth, uint64_t index);
 
 /// Display style options for the demangler.
 struct DemangleOptions {
@@ -57,7 +57,8 @@ struct DemangleOptions {
   bool ShortenArchetype = false;
   bool ShowPrivateDiscriminators = true;
   bool ShowFunctionArgumentTypes = true;
-  std::function<std::string(uint64_t, uint64_t)> ArchetypeName = archetypeName;
+  std::function<std::string(uint64_t, uint64_t)> GenericParameterName =
+      genericParameterName;
 
   DemangleOptions() {}
 
