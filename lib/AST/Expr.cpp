@@ -974,8 +974,16 @@ llvm::APFloat FloatLiteralExpr::getValue() const {
   assert(!getType().isNull() && "Semantic analysis has not completed");
   assert(!getType()->hasError() && "Should have a valid type");
 
-  return getFloatLiteralValue(isNegative(), getDigitsText(),
-                  getType()->castTo<BuiltinFloatType>()->getAPFloatSemantics());
+  Type ty = getType();
+  if (!ty->is<BuiltinFloatType>()) {
+    assert(!getBuiltinType().isNull() && "Semantic analysis has not completed");
+    assert(!getBuiltinType()->hasError() && "Should have a valid type");
+    ty = getBuiltinType();
+  }
+
+  return getFloatLiteralValue(
+      isNegative(), getDigitsText(),
+      ty->castTo<BuiltinFloatType>()->getAPFloatSemantics());
 }
 
 StringLiteralExpr::StringLiteralExpr(StringRef Val, SourceRange Range,

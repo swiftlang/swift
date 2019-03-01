@@ -25,10 +25,10 @@ func testFPToIntConversion() {
   let uj: Float80 = 1.8446744073709551616E19
   _blackHole(UInt64(uj)) // expected-error {{invalid conversion: '1.8446744073709551616E19' overflows 'UInt64'}}
 
-  _blackHole(Int8(1E309))   // expected-error {{invalid conversion: '1E309' overflows 'Int8'}}
-  _blackHole(UInt8(-1E309)) // expected-error {{negative literal '-1E309' cannot be converted to 'UInt8'}}
-  _blackHole(Int64(1E309))  // expected-error {{invalid conversion: '1E309' overflows 'Int64'}}
-  _blackHole(UInt64(-1E309)) // expected-error {{negative literal '-1E309' cannot be converted to 'UInt64'}}
+  _blackHole(Int8(1E308))   // expected-error {{invalid conversion: '1E308' overflows 'Int8'}}
+  _blackHole(UInt8(-1E308)) // expected-error {{negative literal '-1E308' cannot be converted to 'UInt8'}}
+  _blackHole(Int64(1E308))  // expected-error {{invalid conversion: '1E308' overflows 'Int64'}}
+  _blackHole(UInt64(-1E308)) // expected-error {{negative literal '-1E308' cannot be converted to 'UInt64'}}
 }
 
 func testFloatConvertOverflow() {
@@ -37,11 +37,9 @@ func testFloatConvertOverflow() {
   _blackHole(f1)
   _blackHole(f2)
 
-  // FIXME: False Negative: overflow warning is not produced here. This case
-  // cannot be easily distinguished from explicit conversion at the SIL level.
-  let d4: Double = 1E309
-  let d6: Float64 = -1.0E999
-  let d8: Float64 = -1.7976931348623159E+308
+  let d4: Double = 1E309  // expected-warning {{'1E309' overflows to inf during conversion to 'Double'}}
+  let d6: Float64 = -1.0E999  // expected-warning {{'-1.0E999' overflows to -inf during conversion to 'Double'}}
+  let d8: Float64 = -1.7976931348623159E+308 // expected-warning {{'-1.7976931348623159E+308' overflows to -inf during conversion to 'Double'}}
   _blackHole(d4)
   _blackHole(d6)
   _blackHole(d8)
@@ -64,10 +62,9 @@ func testFloatConvertUnderflow() {
   let f1: Float = 1E-400 // expected-warning {{'1E-400' underflows and loses precision during conversion to 'Float'}}
   _blackHole(f1)
 
-  // FIXME: False Negative: warnings are not produced during Double assignments.
-  let d2: Double = 1E-309
+  let d2: Double = 1E-309  // expected-warning {{'1E-309' underflows and loses precision during conversion to 'Double'}}
   _blackHole(d2)
-  let d4: Double = 5E-324
+  let d4: Double = 5E-324  // expected-warning {{'5E-324' underflows and loses precision during conversion to 'Double'}}
   _blackHole(d4)
 
   // FIXME: if a number is so tiny that it underflows even Float80,
@@ -83,10 +80,9 @@ func testFloatConvertUnderflow() {
 }
 
 func testHexFloatImprecision() {
-  // FIXME: False Negative: warnings are not produced during Double assignments.
-  let d3: Double = 0x1.0000000000001p-1023
+  let d3: Double = 0x1.0000000000001p-1023  // expected-warning {{'0x1.0000000000001p-1023' loses precision during conversion to 'Double'}}
   _blackHole(d3)
-  let d4: Double = 0x1.00000000000001p-1000
+  let d4: Double = 0x1.00000000000001p-1000  // expected-warning {{'0x1.00000000000001p-1000' loses precision during conversion to 'Double'}}
   _blackHole(d4)
 
   // FIXME: if a number is so tiny that it underflows even Float80,

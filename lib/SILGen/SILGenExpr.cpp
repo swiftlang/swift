@@ -959,8 +959,11 @@ RValue RValueEmitter::visitIntegerLiteralExpr(IntegerLiteralExpr *E,
 }
 RValue RValueEmitter::visitFloatLiteralExpr(FloatLiteralExpr *E,
                                             SGFContext C) {
-  return RValue(SGF, E,
-                ManagedValue::forUnmanaged(SGF.B.createFloatLiteral(E)));
+  if (E->getType()->is<BuiltinFloatType>())
+    return RValue(SGF, E,
+                  ManagedValue::forUnmanaged(SGF.B.createFloatLiteral(E)));
+
+  return SGF.emitLiteral(E, C);
 }
 
 RValue RValueEmitter::visitBooleanLiteralExpr(BooleanLiteralExpr *E, 
