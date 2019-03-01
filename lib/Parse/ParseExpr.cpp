@@ -183,17 +183,14 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
     ParserResult<Expr> Primary =
       parseExprSequenceElement(Message, isExprBasic);
 
-    HasCodeCompletion |= Primary.hasCodeCompletion();
-    if (Primary.isNull()) {
-      if (Primary.hasCodeCompletion()) {
-        if (CodeCompletion) {
-          CodeCompletion->setLeadingSequenceExprs(SequencedExprs);
-        }
-        return Primary;
-      } else {
-        return nullptr;
-      }
+    if (Primary.hasCodeCompletion()) {
+      HasCodeCompletion = true;
+      if (CodeCompletion)
+        CodeCompletion->setLeadingSequenceExprs(SequencedExprs);
     }
+    if (Primary.isNull())
+      return Primary;
+
     SequencedExprs.push_back(Primary.get());
 
     // We know we can make a syntax node for ternary expression.
@@ -1338,7 +1335,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       }
       // Eat the code completion token because we handled it.
       consumeToken(tok::code_complete);
-      return makeParserCodeCompletionResult<Expr>();
+      Result.setHasCodeCompletion();
+      return Result;
     }
 
     // If we end up with an unknown token on this line, return an ErrorExpr

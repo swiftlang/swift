@@ -1292,9 +1292,14 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     // FIXME: if it's ErrorType but we've already typechecked we shouldn't
     // typecheck again. rdar://21466394
     if (CheckKind == CompletionTypeCheckKind::Normal &&
-        ParsedExpr->getType() && !ParsedExpr->getType()->is<ErrorType>())
-      return std::make_pair(ParsedExpr->getType(),
-                            ParsedExpr->getReferencedDecl());
+        ParsedExpr->getType() && !ParsedExpr->getType()->is<ErrorType>()) {
+      auto refDecl = ParsedExpr->getReferencedDecl();
+      if (!refDecl) {
+        if (auto apply = dyn_cast<ApplyExpr>(ParsedExpr))
+          refDecl = apply->getFn()->getReferencedDecl();
+      }
+      return std::make_pair(ParsedExpr->getType(), refDecl);
+    }
 
     prepareForRetypechecking(ParsedExpr);
 
@@ -3283,18 +3288,18 @@ public:
     if (leadingSequence.empty())
       return LHS;
 
-    assert(leadingSequence.size() % 2 == 0);
-    SmallVector<Expr *, 3> sequence(leadingSequence.begin(),
-                                    leadingSequence.end());
-    sequence.push_back(LHS);
+    SourceRange sequenceRange(leadingSequence.front()->getStartLoc(),
+                              LHS->getEndLoc());
+    auto *expr = findParsedExpr(CurrDeclContext, sequenceRange);
+    if (!expr)
+      return LHS;
 
-    Expr *expr =
-        SequenceExpr::create(CurrDeclContext->getASTContext(), sequence);
-    prepareForRetypechecking(expr);
-    if (!typeCheckExpression(const_cast<DeclContext *>(CurrDeclContext),
-                             expr)) {
+    if (expr->getType() && !expr->getType()->hasError())
       return expr;
-    }
+
+    prepareForRetypechecking(expr);
+    if (!typeCheckExpression(const_cast<DeclContext *>(CurrDeclContext), expr))
+      return expr;
     return LHS;
   }
 
@@ -4860,6 +4865,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   Optional<Type> ExprType;
   ConcreteDeclRef ReferencedDecl = nullptr;
   if (ParsedExpr) {
+    if (auto *checkedExpr = findParsedExpr(CurDeclContext,
+                                           ParsedExpr->getSourceRange())) {
+      ParsedExpr = checkedExpr;
+    }
+
     if (auto typechecked = typeCheckParsedExpr()) {
       ExprType = typechecked->first;
       ReferencedDecl = typechecked->second;

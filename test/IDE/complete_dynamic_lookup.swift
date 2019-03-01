@@ -475,7 +475,7 @@ func testAnyObject13(_ dl: AnyObject) {
   dl.returnsObjcClass!#^DL_FUNC_NAME_BANG_1^#
 }
 // DL_FUNC_NAME_BANG_1: Begin completions
-// DL_FUNC_NAME_BANG_1-NEXT: Pattern/CurrModule: ({#Int#})[#TopLevelObjcClass#]
+// DL_FUNC_NAME_BANG_1-NEXT: Pattern/CurrModule: ({#(i): Int#})[#TopLevelObjcClass#]
 // DL_FUNC_NAME_BANG_1-NEXT: Keyword[self]/CurrNominal: .self[#(Int) -> TopLevelObjcClass#]; name=self
 // DL_FUNC_NAME_BANG_1-NEXT: End completions
 
