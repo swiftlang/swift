@@ -1650,3 +1650,65 @@ bb0(%0 : $TestClass):
   %12 = tuple ()
   return %12 : $()
 }
+
+// public func testNestedReadMerging() {
+// Checks bailing on nested read scopes
+// We will create two scopes - nested conflict
+//
+// CHECK-LABEL: sil @testNestedReadMerging : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: [[BEGIN2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN2]] : $*X
+// CHECK-NEXT: end_access [[BEGIN2]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NOT: begin_access
+// CHECK-LABEL: } // end sil function 'testNestedReadMerging'
+sil @testNestedReadMerging : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [read] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  end_access %1 : $*X
+  %4 = begin_access [read] [dynamic] %0 : $*X
+  %5 = load %4 : $*X
+  %7 = begin_access [read] [dynamic] %0 : $*X
+  %8 = load %7 : $*X
+  end_access %7 : $*X
+  end_access %4 : $*X
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// public func testNestedWriteBailout() {
+// Same as testNestedReadBailout but with modify
+// We will create two scopes - nested conflict
+//
+// CHECK-LABEL: sil @testNestedWriteBailout : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: [[BEGIN2:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN2]] : $*X
+// CHECK-NEXT: end_access [[BEGIN2]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NOT: begin_access
+// CHECK-LABEL: } // end sil function 'testNestedWriteBailout'
+sil @testNestedWriteBailout : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [modify] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  end_access %1 : $*X
+  %4 = begin_access [modify] [dynamic] %0 : $*X
+  %5 = load %4 : $*X
+  %7 = begin_access [modify] [dynamic] %0 : $*X
+  %8 = load %7 : $*X
+  end_access %7 : $*X
+  end_access %4 : $*X
+  %10 = tuple ()
+  return %10 : $()
+}
