@@ -963,8 +963,11 @@ static ManagedValue emitBuiltinAllocWithTailElems(SILGenFunction &SGF,
   }
   ManagedValue Metatype = args[0];
   if (isa<MetatypeInst>(Metatype)) {
-    assert(Metatype.getType().getMetatypeInstanceType(SGF.SGM.M) == RefType &&
+    auto InstanceType =
+      Metatype.getType().castTo<MetatypeType>().getInstanceType();
+    assert(InstanceType == RefType.getASTType() &&
            "substituted type does not match operand metatype");
+    (void) InstanceType;
     return SGF.B.createAllocRef(loc, RefType, false, false,
                                 ElemTypes, Counts);
   } else {

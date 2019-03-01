@@ -306,12 +306,13 @@ static SILValue createIndexAddrFrom(IndexRawPointerInst *I,
                                     SILType RawPointerTy,
                                     SILBuilder &Builder) {
   Builder.setCurrentDebugScope(I->getDebugScope());
-  SILType InstanceType =
-    Metatype->getType().getMetatypeInstanceType(I->getModule());
+
+  CanType InstanceType =
+    Metatype->getType().castTo<MetatypeType>().getInstanceType();
 
   // index_raw_pointer's address type is currently always strict.
   auto *NewPTAI = Builder.createPointerToAddress(
-    I->getLoc(), Ptr, InstanceType.getAddressType(),
+    I->getLoc(), Ptr, SILType::getPrimitiveAddressType(InstanceType),
     /*isStrict*/ true, /*isInvariant*/ false);
 
   auto *DistanceAsWord =
