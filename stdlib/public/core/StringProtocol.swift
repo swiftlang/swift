@@ -173,4 +173,98 @@ extension StringProtocol {
   }
 }
 
+// Contiguous UTF-8 strings
+extension String {
+  /// Returns whether this string is capable of providing access to
+  /// validly-encoded UTF-8 contents in contiguous memory in O(1) time.
+  ///
+  /// Contiguous strings always operate in O(1) time for withUTF8 and always
+  /// give a result for String.UTF8View.withContiguousStorageIfAvailable.
+  /// Contiguous strings also benefit from fast-paths and better optimizations.
+  ///
+  @_alwaysEmitIntoClient
+  public var isContiguous: Bool { return _guts.isFastUTF8 }
 
+  /// If this string is not contiguous, make it so. If this mutates the string,
+  /// it will invalidate any pre-existing indices.
+  ///
+  /// Complexity: O(n) if non-contiguous, O(1) if already contiguous
+  ///
+  @_alwaysEmitIntoClient
+  public mutating func makeContiguous() {
+    if _fastPath(isContiguous) { return }
+    self = String._copying(self)
+  }
+
+  /// Runs `body` over the content of this string in contiguous memory. If this
+  /// string is not contiguous, this will first make it contiguous, which will
+  /// also speed up subsequent access. If this mutates the string,
+  /// it will invalidate any pre-existing indices.
+  ///
+  /// Note that it is unsafe to escape the pointer provided to `body`. For
+  /// example, strings of up to 15 UTF-8 code units in length may be represented
+  /// in a small-string representation, and thus will be spilled into
+  /// temporary stack space which is invalid after `withUTF8` finishes
+  /// execution.
+  ///
+  /// Complexity: O(n) if non-contiguous, O(1) if already contiguous
+  ///
+  @_alwaysEmitIntoClient
+  public mutating func withUTF8<R>(
+    _ body: (UnsafeBufferPointer<UInt8>) throws -> R
+  ) rethrows -> R {
+    makeContiguous()
+    return try _guts.withFastUTF8(body)
+  }
+}
+
+// Contiguous UTF-8 strings
+extension Substring {
+  /// Returns whether this string is capable of providing access to
+  /// validly-encoded UTF-8 contents in contiguous memory in O(1) time.
+  ///
+  /// Contiguous strings always operate in O(1) time for withUTF8 and always
+  /// give a result for String.UTF8View.withContiguousStorageIfAvailable.
+  /// Contiguous strings also benefit from fast-paths and better optimizations.
+  ///
+  @_alwaysEmitIntoClient
+  public var isContiguous: Bool { return _wholeString.isContiguous }
+
+  /// If this string is not contiguous, make it so. If this mutates the
+  /// substring, it will invalidate any pre-existing indices.
+  ///
+  /// Complexity: O(n) if non-contiguous, O(1) if already contiguous
+  ///
+  @_alwaysEmitIntoClient
+  public mutating func makeContiguous() {
+    if _fastPath(isContiguous) { return }
+    self = String._copying(self)[...]
+  }
+
+  /// Runs `body` over the content of this substring in contiguous memory. If
+  /// this substring is not contiguous, this will first make it contiguous,
+  /// which will also speed up subsequent access. If this mutates the substring,
+  /// it will invalidate any pre-existing indices.
+  ///
+  /// Note that it is unsafe to escape the pointer provided to `body`. For
+  /// example, strings of up to 15 UTF-8 code units in length may be represented
+  /// in a small-string representation, and thus will be spilled into
+  /// temporary stack space which is invalid after `withUTF8` finishes
+  /// execution.
+  ///
+  /// Complexity: O(n) if non-contiguous, O(1) if already contiguous
+  ///
+  @_alwaysEmitIntoClient
+  public mutating func withUTF8<R>(
+    _ body: (UnsafeBufferPointer<UInt8>) throws -> R
+  ) rethrows -> R {
+    if _fastPath(isContiguous) {
+      return try _wholeGuts.withFastUTF8(range: self._offsetRange) {
+        return try body($0)
+      }
+    }
+
+    makeContiguous()
+    return try _wholeGuts.withFastUTF8(body)
+  }
+}
