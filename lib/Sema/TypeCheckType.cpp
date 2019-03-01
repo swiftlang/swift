@@ -1253,28 +1253,28 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
     return ErrorType::get(ctx);
   }
 
-  if (comp->getIdentifier() == ctx.Id_Self &&
-      !isa<GenericIdentTypeRepr>(comp)) {
-    DeclContext *nominalDC = nullptr;
-    NominalTypeDecl *nominal = nullptr;
-    auto dc = resolution.getDeclContext();
-    if ((nominalDC = dc->getInnermostTypeContext()) &&
-        (nominal = nominalDC->getSelfNominalTypeDecl())) {
-      // Attempt to refer to 'Self' within a non-protocol nominal
-      // type. Fix this by replacing 'Self' with the nominal type name.
-      assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
-
-      return nominal->getDeclaredInterfaceType();
-    }
-    // Attempt to refer to 'Self' from a free function.
-    diags.diagnose(comp->getIdLoc(), diag::dynamic_self_non_method,
-                   dc->getParent()->isLocalContext());
-
-    return ErrorType::get(ctx);
-  }
-
   // If we found nothing, complain and give ourselves a chance to recover.
   if (current.isNull()) {
+    if (comp->getIdentifier() == ctx.Id_Self &&
+        !isa<GenericIdentTypeRepr>(comp)) {
+      DeclContext *nominalDC = nullptr;
+      NominalTypeDecl *nominal = nullptr;
+      auto dc = resolution.getDeclContext();
+      if ((nominalDC = dc->getInnermostTypeContext()) &&
+          (nominal = nominalDC->getSelfNominalTypeDecl())) {
+        // Attempt to refer to 'Self' within a non-protocol nominal
+        // type. Fix this by replacing 'Self' with the nominal type name.
+        assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
+
+        return nominal->getDeclaredInterfaceType();
+      }
+      // Attempt to refer to 'Self' from a free function.
+      diags.diagnose(comp->getIdLoc(), diag::dynamic_self_non_method,
+                     dc->getParent()->isLocalContext());
+
+      return ErrorType::get(ctx);
+    }
+
     // If we're not allowed to complain or we couldn't fix the
     // source, bail out.
     if (options.contains(TypeResolutionFlags::SilenceErrors))

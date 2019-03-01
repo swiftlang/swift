@@ -552,22 +552,12 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
 
     if (!isConfused) {
       if (Name == Context.Id_Self) {
-//        return new (Context) TypeExpr(TypeLoc::withoutLoc(
-//            DynamicSelfType::get(
-//              DC->getInnermostTypeContext()
-//                                 ->getSelfTypeInContext()
-//                                 //->getDeclaredInterfaceType()
-//                                 , Context)));
-//        return new (Context) TypeExpr(TypeLoc::withoutLoc(
-//            DC->getInnermostTypeContext()
-//                                 ->getSelfTypeInContext()));
-
-//        Type SelfType = DC->getInnermostTypeContext()->getSelfInterfaceType();
-//        if (ClassType::classof(SelfType.getPointer()))
-//          SelfType = DynamicSelfType::get(SelfType, Context);
-//        return new (Context) TypeExpr(TypeLoc(new (Context)
-//                FixedTypeRepr(DC//->getInnermostTypeContext()
-//                              ->mapTypeIntoContext(SelfType), Loc)));
+        Type SelfType = DC->getInnermostTypeContext()->getSelfInterfaceType();
+        if (SelfType->is<ClassType>() || SelfType->is<BoundGenericClassType>())
+          SelfType = DynamicSelfType::get(SelfType, Context);
+        SelfType = DC->mapTypeIntoContext(SelfType);
+        return new (Context) TypeExpr(TypeLoc(new (Context)
+                FixedTypeRepr(SelfType, Loc), SelfType));
 
         auto selfs = lookupUnqualified(DC, Context.Id_self, Loc, lookupOptions);
         if (!selfs.empty()) {

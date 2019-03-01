@@ -163,7 +163,7 @@ ERROR(cannot_pass_rvalue_mutating_getter,none,
       (Type))
 
 ERROR(invalid_generic_context,none,
-      "generic type can not be used in this context", ())
+      "generic type cannot be used in this context", ())
 
 ERROR(expression_too_complex,none,
       "the compiler is unable to type-check this expression in reasonable time; "
