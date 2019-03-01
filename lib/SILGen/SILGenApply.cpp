@@ -5543,10 +5543,21 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
             integerLiteral,
             SILType::getBuiltinIntegerLiteralType(getASTContext()),
             integerLiteral->getRawValue()));
-    CanType ty = integerManaged.getType().getASTType()->getCanonicalType();
+    CanType ty = integerManaged.getType().getASTType();
     builtinLiteralArgs = RValue(*this, {integerManaged}, ty);
     builtinInit = integerLiteral->getBuiltinInitializer();
     init = integerLiteral->getInitializer();
+  } else if (auto floatLiteral = dyn_cast<FloatLiteralExpr>(literal)) {
+    auto *litTy = floatLiteral->getBuiltinType()->castTo<BuiltinFloatType>();
+    ManagedValue floatManaged = ManagedValue::forUnmanaged(B.createFloatLiteral(
+        floatLiteral,
+        SILType::getBuiltinFloatType(litTy->getFPKind(), getASTContext()),
+        floatLiteral->getValue()));
+
+    CanType ty = floatManaged.getType().getASTType();
+    builtinLiteralArgs = RValue(*this, {floatManaged}, ty);
+    builtinInit = floatLiteral->getBuiltinInitializer();
+    init = floatLiteral->getInitializer();
   } else {
     ASTContext &ctx = getASTContext();
     SourceLoc loc = literal->getStartLoc();

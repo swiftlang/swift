@@ -1072,65 +1072,6 @@ namespace {
     /// \param type The literal type. This type conforms to \c protocol,
     /// and may also conform to \c builtinProtocol.
     ///
-    /// \param openedType The literal type as it was opened in the type system.
-    ///
-    /// \param protocol The protocol that describes the literal requirement.
-    ///
-    /// \param literalType Either the name of the associated type in
-    /// \c protocol that describes the argument type of the conversion function
-    /// (\c literalFuncName) or the argument type itself.
-    ///
-    /// \param literalFuncName The name of the conversion function requirement
-    /// in \c protocol.
-    ///
-    /// \param builtinProtocol The "builtin" form of the protocol, which
-    /// always takes builtin types and can only be properly implemented
-    /// by standard library types. If \c type does not conform to this
-    /// protocol, it's literal type will.
-    ///
-    /// \param builtinLiteralType Either the name of the associated type in
-    /// \c builtinProtocol that describes the argument type of the builtin
-    /// conversion function (\c builtinLiteralFuncName) or the argument type
-    /// itself.
-    ///
-    /// \param builtinLiteralFuncName The name of the conversion function
-    /// requirement in \c builtinProtocol.
-    ///
-    /// \param isBuiltinArgType Function that determines whether the given
-    /// type is acceptable as the argument type for the builtin conversion.
-    ///
-    /// \param brokenProtocolDiag The diagnostic to emit if the protocol
-    /// is broken.
-    ///
-    /// \param brokenBuiltinProtocolDiag The diagnostic to emit if the builtin
-    /// protocol is broken.
-    ///
-    /// \returns the converted literal expression.
-    Expr *convertLiteral(Expr *literal,
-                         Type type,
-                         Type openedType,
-                         ProtocolDecl *protocol,
-                         TypeOrName literalType,
-                         DeclName literalFuncName,
-                         ProtocolDecl *builtinProtocol,
-                         TypeOrName builtinLiteralType,
-                         DeclName builtinLiteralFuncName,
-                         bool (*isBuiltinArgType)(Type),
-                         Diag<> brokenProtocolDiag,
-                         Diag<> brokenBuiltinProtocolDiag);
-
-    /// Convert the given literal expression via a protocol pair.
-    ///
-    /// This routine handles the two-step literal conversion process used
-    /// by integer, float, character, extended grapheme cluster, and string
-    /// literals. The first step uses \c builtinProtocol while the second
-    /// step uses \c protocol.
-    ///
-    /// \param literal The literal expression.
-    ///
-    /// \param type The literal type. This type conforms to \c protocol,
-    /// and may also conform to \c builtinProtocol.
-    ///
     /// \param protocol The protocol that describes the literal requirement.
     ///
     /// \param literalType The name of the associated type in \c protocol that
@@ -1903,19 +1844,11 @@ namespace {
       DeclName builtinInitName(tc.Context, DeclBaseName::createConstructor(),
                                { tc.Context.Id_builtinFloatLiteral });
 
-      return convertLiteral(
-               expr,
-               type,
-               cs.getType(expr),
-               protocol,
-               tc.Context.Id_FloatLiteralType,
-               initName,
-               builtinProtocol,
-               maxType,
-               builtinInitName,
-               nullptr,
-               diag::float_literal_broken_proto,
-               diag::builtin_float_literal_broken_proto);
+      expr->setBuiltinType(maxType);
+      return convertLiteralInPlace(
+          expr, type, protocol, tc.Context.Id_FloatLiteralType, initName,
+          builtinProtocol, builtinInitName, diag::float_literal_broken_proto,
+          diag::builtin_float_literal_broken_proto);
     }
 
     Expr *visitBooleanLiteralExpr(BooleanLiteralExpr *expr) {
@@ -6863,157 +6796,6 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr,
   return cs.cacheType(new (ctx) InOutExpr(expr->getStartLoc(), expr, 
                                           toInOutTy->getInOutObjectType(),
                                           /*isImplicit*/ true));
-}
-
-Expr *ExprRewriter::convertLiteral(Expr *literal,
-                                   Type type,
-                                   Type openedType,
-                                   ProtocolDecl *protocol,
-                                   TypeOrName literalType,
-                                   DeclName literalFuncName,
-                                   ProtocolDecl *builtinProtocol,
-                                   TypeOrName builtinLiteralType,
-                                   DeclName builtinLiteralFuncName,
-                                   bool (*isBuiltinArgType)(Type),
-                                   Diag<> brokenProtocolDiag,
-                                   Diag<> brokenBuiltinProtocolDiag) {
-  auto &tc = cs.getTypeChecker();
-
-  auto getType = [&](const Expr *E) -> Type {
-    return cs.getType(E);
-  };
-
-  auto setType = [&](Expr *E, Type Ty) {
-    cs.setType(E, Ty);
-  };
-
-  // If coercing a literal to an unresolved type, we don't try to look up the
-  // witness members, just do it.
-  if (type->is<UnresolvedType>()) {
-    // Instead of updating the literal expr in place, allocate a new node.  This
-    // avoids issues where Builtin types end up on expr nodes and pollute
-    // diagnostics.
-    literal = cast<LiteralExpr>(literal)->shallowClone(tc.Context, setType,
-                                                       getType);
-
-    // The literal expression has this type.
-    cs.setType(literal, type);
-    return literal;
-  }
-  
-  // Check whether this literal type conforms to the builtin protocol.
-  Optional<ProtocolConformanceRef> builtinConformance;
-  if (builtinProtocol &&
-      (builtinConformance =
-         tc.conformsToProtocol(
-                      type, builtinProtocol, cs.DC,
-                      (ConformanceCheckFlags::InExpression)))) {
-
-    // Find the builtin argument type we'll use.
-    Type argType;
-    if (builtinLiteralType.is<Type>())
-      argType = builtinLiteralType.get<Type>();
-    else
-      argType = tc.getWitnessType(type, builtinProtocol,
-                                  *builtinConformance,
-                                  builtinLiteralType.get<Identifier>(),
-                                  brokenBuiltinProtocolDiag);
-
-    if (!argType)
-      return nullptr;
-
-    // Make sure it's of an appropriate builtin type.
-    if (isBuiltinArgType && !isBuiltinArgType(argType)) {
-      tc.diagnose(builtinProtocol->getLoc(), brokenBuiltinProtocolDiag);
-      return nullptr;
-    }
-
-    // Instead of updating the literal expr in place, allocate a new node.  This
-    // avoids issues where Builtin types end up on expr nodes and pollute
-    // diagnostics.
-    literal = cast<LiteralExpr>(literal)->shallowClone(tc.Context, setType,
-                                                       getType);
-
-    // The literal expression has this type.
-    cs.setType(literal, argType);
-
-    // Call the builtin conversion operation.
-    // FIXME: Bogus location info.
-    Expr *base =
-      TypeExpr::createImplicitHack(literal->getLoc(), type, tc.Context);
-
-    cs.cacheExprTypes(base);
-    cs.setExprTypes(base);
-    cs.setExprTypes(literal);
-    SmallVector<Expr *, 1> arguments = { literal };
-
-    Expr *result = tc.callWitness(base, dc,
-                                  builtinProtocol, *builtinConformance,
-                                  builtinLiteralFuncName,
-                                  arguments,
-                                  brokenBuiltinProtocolDiag);
-    if (result)
-      cs.cacheExprTypes(result);
-
-    return result;
-  }
-
-  // This literal type must conform to the (non-builtin) protocol.
-  assert(protocol && "requirements should have stopped recursion");
-  auto conformance = tc.conformsToProtocol(type, protocol, cs.DC,
-                                           ConformanceCheckFlags::InExpression);
-  assert(conformance && "must conform to literal protocol");
-
-  // Figure out the (non-builtin) argument type if there is one.
-  Type argType;
-  if (literalType.is<Identifier>() &&
-      literalType.get<Identifier>().empty()) {
-    // If there is no argument to the constructor function, then just pass in
-    // the empty tuple.
-    literal =
-      cs.cacheType(
-          TupleExpr::createEmpty(tc.Context, literal->getLoc(),
-                                 literal->getLoc(),
-                                 /*implicit*/!literal->getLoc().isValid()));
-  } else {
-    // Otherwise, figure out the type of the constructor function and coerce to
-    // it.
-    if (literalType.is<Type>())
-      argType = literalType.get<Type>();
-    else
-      argType = tc.getWitnessType(type, protocol, *conformance,
-                                  literalType.get<Identifier>(),
-                                  brokenProtocolDiag);
-    if (!argType)
-      return nullptr;
-
-    // Convert the literal to the non-builtin argument type via the
-    // builtin protocol, first.
-    // FIXME: Do we need an opened type here?
-    literal = convertLiteral(literal, argType, argType, nullptr, Identifier(),
-                             Identifier(), builtinProtocol,
-                             builtinLiteralType, builtinLiteralFuncName,
-                             isBuiltinArgType, brokenProtocolDiag,
-                             brokenBuiltinProtocolDiag);
-    if (!literal)
-      return nullptr;
-  }
-
-  // Convert the resulting expression to the final literal type.
-  // FIXME: Bogus location info.
-  Expr *base = TypeExpr::createImplicitHack(literal->getLoc(), type,
-                                            tc.Context);
-  cs.cacheExprTypes(base);
-  cs.setExprTypes(base);
-  cs.setExprTypes(literal);
-
-  literal = tc.callWitness(base, dc,
-                           protocol, *conformance, literalFuncName,
-                           literal, brokenProtocolDiag);
-  if (literal)
-    cs.cacheExprTypes(literal);
-
-  return literal;
 }
 
 Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,

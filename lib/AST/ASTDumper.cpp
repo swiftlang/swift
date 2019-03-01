@@ -1831,6 +1831,16 @@ public:
     printCommon(E, "float_literal_expr");
     PrintWithColorRAII(OS, LiteralValueColor)
       << " value=" << E->getDigitsText();
+    PrintWithColorRAII(OS, LiteralValueColor) << " builtin_initializer=";
+    E->getBuiltinInitializer().dump(
+        PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
+    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    if (!E->getBuiltinType().isNull()) {
+      PrintWithColorRAII(OS, TypeColor) << " builtin_type='";
+      E->getBuiltinType().print(PrintWithColorRAII(OS, TypeColor).getOS());
+      PrintWithColorRAII(OS, TypeColor) << "'";
+    }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
