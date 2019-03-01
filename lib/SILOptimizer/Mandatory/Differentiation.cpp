@@ -196,9 +196,9 @@ static FuncDecl *findOperatorDeclInProtocol(DeclName operatorName,
   assert(operatorName.isOperator());
   // Find the operator requirement in the `VectorNumeric` protocol
   // declaration and cache it.
-  auto opLookUp = protocol->lookupDirect(operatorName);
+  auto opLookup = protocol->lookupDirect(operatorName);
   // Find the `+` with type siguature `(Self, Self) -> Self`.
-  for (auto *decl : opLookUp) {
+  for (auto *decl : opLookup) {
     auto *fd = dyn_cast<FuncDecl>(decl);
     if (!fd || !fd->isStatic() || !fd->isOperator())
       continue;
@@ -1253,8 +1253,11 @@ public:
   PostDominanceInfo *postDomInfo;
 
   DifferentiableActivityInfo &getActivityInfo(GenericSignature *assocGenSig) {
-    DifferentiableActivityInfo info(*this, assocGenSig);
-    auto insertion = activityInfoMap.try_emplace(assocGenSig, info);
+    auto activityInfoLookup = activityInfoMap.find(assocGenSig);
+    if (activityInfoLookup != activityInfoMap.end())
+      return activityInfoLookup->getSecond();
+    auto insertion = activityInfoMap.insert(
+        {assocGenSig, DifferentiableActivityInfo(*this, assocGenSig)});
     return insertion.first->getSecond();
   }
 
@@ -1292,13 +1295,9 @@ DifferentiableActivityInfo::DifferentiableActivityInfo(
   analyze(parent.domInfo, parent.postDomInfo);
 }
 
-SILFunction &DifferentiableActivityInfo::getFunction() {
-  return parent.function;
-}
-
 void DifferentiableActivityInfo::analyze(DominanceInfo *di,
                                          PostDominanceInfo *pdi) {
-  auto &function = getFunction();
+  auto &function = parent.function;
   LLVM_DEBUG(getADDebugStream()
              << "Running activity analysis on @" << function.getName() << '\n');
   // Inputs are just function's arguments, count `n`.
@@ -4016,16 +4015,10 @@ public:
 #endif
     SILInstructionVisitor::visit(inst);
     LLVM_DEBUG({
-      // auto &s = getADDebugStream()
-      //     << "AdjointEmitter visited:\n[ORIG]" << *inst;
-      // s << "[ADJ] Emitted:\n";
-      // auto afterInsertion = builder.getInsertionPoint();
-      // for (auto it = ++beforeInsertion; it != afterInsertion; ++it)
-      //   s << *it;
-      llvm::dbgs() << "[ADJ] Emitted:\n";
+      auto &s = llvm::dbgs() << "[ADJ] Emitted:\n";
       auto afterInsertion = builder.getInsertionPoint();
       for (auto it = ++beforeInsertion; it != afterInsertion; ++it)
-        llvm::dbgs() << *it;
+        s << *it;
     });
   }
 
@@ -4041,16 +4034,16 @@ public:
     // Replace a call to a function with a call to its pullback.
     auto &nestedApplyInfo =
         getDifferentiationTask()->getNestedApplyInfo();
-    auto applyInfoLookUp = nestedApplyInfo.find(ai);
+    auto applyInfoLookup = nestedApplyInfo.find(ai);
     // If no `NestedApplyInfo` was found, then this task doesn't need to be
     // differentiated.
-    if (applyInfoLookUp == nestedApplyInfo.end()) {
+    if (applyInfoLookup == nestedApplyInfo.end()) {
       // Must not be active.
       assert(
           !activityInfo.isActive(ai, getDifferentiationTask()->getIndices()));
       return;
     }
-    auto applyInfo = applyInfoLookUp->getSecond();
+    auto applyInfo = applyInfoLookup->getSecond();
 
     // Get the pullback.
     auto *field = getPrimalInfo().lookUpPullbackDecl(ai);

@@ -2324,6 +2324,18 @@ void AttributeChecker::visitNonOverrideAttr(NonOverrideAttr *attr) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
+/// Returns true if the given type conforms to `Differentiable` in the given
+/// module.
+static bool conformsToDifferentiableInModule(Type type, ModuleDecl *module) {
+  auto &ctx = module->getASTContext();
+  auto *differentiableProto =
+      ctx.getProtocol(KnownProtocolKind::Differentiable);
+  return LookUpConformanceInModule(module)(
+      differentiableProto->getDeclaredInterfaceType()->getCanonicalType(),
+      type, differentiableProto).hasValue();
+};
+
+// SWIFT_ENABLE_TENSORFLOW
 static FuncDecl *resolveAutoDiffAssociatedFunction(
     TypeChecker &TC, DeclNameWithLoc specifier, AbstractFunctionDecl *original,
     Type expectedTy, std::function<bool(FuncDecl *)> isValid) {
@@ -2601,12 +2613,9 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       attr->getParameterIndices();
 
   // Returns true if a type conforms to `Differentiable`.
-  auto conformsToDifferentiable = [&](Type type) -> bool {
-    auto *differentiableProto =
-        ctx.getProtocol(KnownProtocolKind::Differentiable);
-    return LookUpConformanceInModule(original->getModuleContext())(
-        differentiableProto->getDeclaredInterfaceType()->getCanonicalType(),
-        type, differentiableProto).hasValue();
+  auto conformsToDifferentiable = [&](Type type) {
+    return conformsToDifferentiableInModule(
+        type, original->getModuleContext());
   };
 
   // If checked wrt param indices are not specified, compute them using parsed
@@ -3375,19 +3384,15 @@ void AttributeChecker::visitFieldwiseDifferentiableAttr(
         diag::fieldwise_differentiable_only_on_differentiable_structs);
     return;
   }
-  auto *differentiableProto =
-      TC.Context.getProtocol(KnownProtocolKind::Differentiable);
-  auto lookupConformance =
-      LookUpConformanceInModule(D->getModuleContext());
-  if (!lookupConformance(
-    differentiableProto->getDeclaredInterfaceType()->getCanonicalType(),
-    structDecl->getDeclaredInterfaceType(), differentiableProto).hasValue()) {
+  if (!conformsToDifferentiableInModule(
+          structDecl->getDeclaredInterfaceType(), D->getModuleContext())) {
     diagnoseAndRemoveAttr(attr,
         diag::fieldwise_differentiable_only_on_differentiable_structs);
     return;
   }
 }
 
+// SWIFT_ENABLE_TENSORFLOW
 void AttributeChecker::visitNoDerivativeAttr(NoDerivativeAttr *attr) {
   auto *vd = dyn_cast<VarDecl>(D);
   if (attr->isImplicit())
@@ -3403,12 +3408,12 @@ void AttributeChecker::visitNoDerivativeAttr(NoDerivativeAttr *attr) {
         diag::noderivative_only_on_stored_properties_in_differentiable_structs);
     return;
   }
-  if (!TC.conformsToProtocol(
-          structDecl->getDeclaredInterfaceType(),
-          TC.Context.getProtocol(KnownProtocolKind::Differentiable),
-          structDecl->getDeclContext(), ConformanceCheckFlags::Used))
+  if (!conformsToDifferentiableInModule(
+          structDecl->getDeclaredInterfaceType(), D->getModuleContext())) {
     diagnoseAndRemoveAttr(attr,
         diag::noderivative_only_on_stored_properties_in_differentiable_structs);
+    return;
+  }
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {
