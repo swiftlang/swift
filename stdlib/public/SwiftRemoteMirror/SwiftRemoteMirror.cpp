@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define SWIFT_CLASS_IS_SWIFT_MASK swift_reflection_classIsSwiftMask
+extern "C" unsigned long long swift_reflection_classIsSwiftMask = 2;
+
 #include "swift/Reflection/ReflectionContext.h"
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Remote/CMemoryReader.h"

@@ -96,7 +96,15 @@ Metadata *TargetSingletonMetadataInitialization<InProcess>::allocate(
   // If this is a class, we have to initialize the value witness table early
   // so that two-phase initialization can proceed as if this metadata is
   // complete for layout purposes when it appears as part of an aggregate type.
-  if (auto *classMetadata = dyn_cast<ClassMetadata>(metadata)) {
+  //
+  // Note that we can't use (dyn_)cast<ClassMetadata> here because the static
+  // template may have the "wrong" isSwift bit set in its Data pointer, if the
+  // binary was built to deploy back to pre-stable-Swift Objective-C runtimes.
+  // Such a template will fail the `isTypeMetadata` test and we'll think that it
+  // isn't Swift metadata but a plain old ObjC class instead.
+  if (metadata->getKind() == MetadataKind::Class) {
+    auto *classMetadata = static_cast<ClassMetadata*>(metadata);
+    classMetadata->setAsTypeMetadata();
     auto *fullMetadata = asFullMetadata(metadata);
 
     // Begin by initializing the value witness table; everything else is
