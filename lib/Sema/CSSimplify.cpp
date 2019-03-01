@@ -879,8 +879,19 @@ public:
     if (!CS.shouldAttemptFixes())
       return true;
 
+    // If alleged extraneous argument has a label, the problem
+    // should be diagnosed as non-matching arguments.
+    if (llvm::any_of(argIndices, [&](const unsigned idx) {
+          return Arguments[idx].hasLabel();
+        }))
+      return true;
+
+    SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4> extraneous;
+    for (const auto index : argIndices)
+      extraneous.push_back({index, Arguments[index]});
+
     return CS.recordFix(RemoveExtraneousArguments::create(
-        CS, ContextualType, argIndices, CS.getConstraintLocator(Locator)));
+        CS, ContextualType, extraneous, CS.getConstraintLocator(Locator)));
   }
 
   bool missingLabel(unsigned paramIndex) override {
@@ -1337,7 +1348,7 @@ static bool fixExtraneousArguments(ConstraintSystem &cs,
                                    int numExtraneous,
                                    ConstraintLocatorBuilder locator) {
   auto AnyType = cs.getASTContext().TheAnyType;
-  SmallVector<unsigned, 4> extraneous;
+  SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4> extraneous;
 
   auto argumentLocator =
       locator.withPathElement(ConstraintLocator::FunctionArgument);
@@ -1346,7 +1357,7 @@ static bool fixExtraneousArguments(ConstraintSystem &cs,
     auto param = args.pop_back_val();
     auto index = args.size();
 
-    extraneous.push_back(index);
+    extraneous.push_back({index, param});
     cs.addConstraint(ConstraintKind::Defaultable, param.getPlainType(), AnyType,
                      argumentLocator.withPathElement(
                          LocatorPathElt::getTupleElement(index)));

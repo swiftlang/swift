@@ -1021,16 +1021,19 @@ public:
 };
 
 class RemoveExtraneousArguments final
-  : public ConstraintFix,
-    private llvm::TrailingObjects<RemoveExtraneousArguments, unsigned> {
+    : public ConstraintFix,
+      private llvm::TrailingObjects<
+          RemoveExtraneousArguments,
+          std::pair<unsigned, AnyFunctionType::Param>> {
   friend TrailingObjects;
+
+  using IndexedParam = std::pair<unsigned, AnyFunctionType::Param>;
 
   FunctionType *ContextualType;
   unsigned NumExtraneous;
 
-  RemoveExtraneousArguments(ConstraintSystem &cs,
-                            FunctionType *contextualType,
-                            llvm::ArrayRef<unsigned> extraArgs,
+  RemoveExtraneousArguments(ConstraintSystem &cs, FunctionType *contextualType,
+                            llvm::ArrayRef<IndexedParam> extraArgs,
                             ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::RemoveExtraneousArguments, locator),
         ContextualType(contextualType), NumExtraneous(extraArgs.size()) {
@@ -1038,21 +1041,22 @@ class RemoveExtraneousArguments final
                             getExtraArgumentsBuf().begin());
   }
 
-  public:
+public:
   std::string getName() const override { return "remove extraneous argument(s)"; }
 
-  ArrayRef<unsigned> getExtraArguments() {
-    return {getTrailingObjects<unsigned>(), NumExtraneous};
+  ArrayRef<IndexedParam> getExtraArguments() const {
+    return {getTrailingObjects<IndexedParam>(), NumExtraneous};
   }
 
-  static RemoveExtraneousArguments *create(ConstraintSystem &cs,
-                                           FunctionType *contextualType,
-                                           llvm::ArrayRef<unsigned> extraArgs,
-                                           ConstraintLocator *locator);
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static RemoveExtraneousArguments *
+  create(ConstraintSystem &cs, FunctionType *contextualType,
+         llvm::ArrayRef<IndexedParam> extraArgs, ConstraintLocator *locator);
 
 private:
-  MutableArrayRef<unsigned> getExtraArgumentsBuf() {
-    return {getTrailingObjects<unsigned>(), NumExtraneous};
+  MutableArrayRef<IndexedParam> getExtraArgumentsBuf() {
+    return {getTrailingObjects<IndexedParam>(), NumExtraneous};
   }
 };
 
