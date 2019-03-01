@@ -512,11 +512,13 @@ bool RemoveExtraneousArguments::diagnose(Expr *root, bool asNote) const {
 
 RemoveExtraneousArguments *
 RemoveExtraneousArguments::create(ConstraintSystem &cs,
+                                  FunctionType *contextualType,
                                   llvm::ArrayRef<unsigned> extraArgs,
                                   ConstraintLocator *locator) {
   unsigned size = totalSizeToAlloc<unsigned>(extraArgs.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(RemoveExtraneousArguments));
-  return new (mem) RemoveExtraneousArguments(cs, extraArgs, locator);
+  return new (mem)
+      RemoveExtraneousArguments(cs, contextualType, extraArgs, locator);
 }
 
 bool MoveOutOfOrderArgument::diagnose(Expr *root, bool asNote) const {

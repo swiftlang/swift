@@ -858,26 +858,29 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
 
 class ArgumentFailureTracker : public MatchCallArgumentListener {
   ConstraintSystem &CS;
+  FunctionType *ContextualType;
+
   ArrayRef<AnyFunctionType::Param> Arguments;
   ArrayRef<AnyFunctionType::Param> Parameters;
+
   SmallVectorImpl<ParamBinding> &Bindings;
   ConstraintLocatorBuilder Locator;
 
 public:
-  ArgumentFailureTracker(ConstraintSystem &cs,
+  ArgumentFailureTracker(ConstraintSystem &cs, FunctionType *contextualType,
                          ArrayRef<AnyFunctionType::Param> args,
                          ArrayRef<AnyFunctionType::Param> params,
                          SmallVectorImpl<ParamBinding> &bindings,
                          ConstraintLocatorBuilder locator)
-      : CS(cs), Arguments(args), Parameters(params), Bindings(bindings),
-        Locator(locator) {}
+      : CS(cs), ContextualType(contextualType), Arguments(args),
+        Parameters(params), Bindings(bindings), Locator(locator) {}
 
   bool extraArguments(ArrayRef<unsigned> argIndices) override {
     if (!CS.shouldAttemptFixes())
       return true;
 
     return CS.recordFix(RemoveExtraneousArguments::create(
-        CS, argIndices, CS.getConstraintLocator(Locator)));
+        CS, ContextualType, argIndices, CS.getConstraintLocator(Locator)));
   }
 
   bool missingLabel(unsigned paramIndex) override {
@@ -937,7 +940,8 @@ public:
 
 // Match the argument of a call to the parameter.
 ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
-    ConstraintSystem &cs, ArrayRef<AnyFunctionType::Param> args,
+    ConstraintSystem &cs, FunctionType *contextualType,
+    ArrayRef<AnyFunctionType::Param> args,
     ArrayRef<AnyFunctionType::Param> params, ConstraintKind subKind,
     ConstraintLocatorBuilder locator) {
   // Extract the parameters.
@@ -959,13 +963,11 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
 
   // Match up the call arguments to the parameters.
   SmallVector<ParamBinding, 4> parameterBindings;
-  ArgumentFailureTracker listener(cs, argsWithLabels, params, parameterBindings,
-                                  locator);
-  if (constraints::matchCallArguments(argsWithLabels, params,
-                                      paramInfo,
-                                      hasTrailingClosure,
-                                      cs.shouldAttemptFixes(), listener,
-                                      parameterBindings)) {
+  ArgumentFailureTracker listener(cs, contextualType, argsWithLabels, params,
+                                  parameterBindings, locator);
+  if (constraints::matchCallArguments(
+          argsWithLabels, params, paramInfo, hasTrailingClosure,
+          cs.shouldAttemptFixes(), listener, parameterBindings)) {
     if (!cs.shouldAttemptFixes())
       return cs.getTypeMatchFailure(locator);
 
@@ -1330,6 +1332,7 @@ static bool fixMissingArguments(ConstraintSystem &cs, Expr *anchor,
 }
 
 static bool fixExtraneousArguments(ConstraintSystem &cs,
+                                   FunctionType *contextualType,
                                    SmallVectorImpl<AnyFunctionType::Param> &args,
                                    int numExtraneous,
                                    ConstraintLocatorBuilder locator) {
@@ -1350,7 +1353,7 @@ static bool fixExtraneousArguments(ConstraintSystem &cs,
   } while (--numExtraneous);
 
   return cs.recordFix(RemoveExtraneousArguments::create(
-      cs, extraneous, cs.getConstraintLocator(locator)));
+      cs, contextualType, extraneous, cs.getConstraintLocator(locator)));
 }
 
 ConstraintSystem::TypeMatchResult
@@ -1572,7 +1575,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     } else {
       // If there are extraneous arguments, let's remove
       // them from the list.
-      if (fixExtraneousArguments(*this, func1Params, diff, locator))
+      if (fixExtraneousArguments(*this, func2, func1Params, diff, locator))
         return getTypeMatchFailure(argumentLocator);
     }
   }
@@ -6220,7 +6223,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
     // The argument type must be convertible to the input type.
     if (::matchCallArguments(
-            *this, func1->getParams(), func2->getParams(), subKind,
+            *this, func2, func1->getParams(), func2->getParams(), subKind,
             outerLocator.withPathElement(ConstraintLocator::ApplyArgument))
             .isFailure())
       return SolutionKind::Error;

@@ -1270,8 +1270,9 @@ namespace {
       SmallVector<AnyFunctionType::Param, 8> params;
       AnyFunctionType::decomposeInput(constrParamType, params);
 
+      auto funcType = constr->getMethodInterfaceType()->castTo<FunctionType>();
       ::matchCallArguments(
-          CS, args, params, ConstraintKind::ArgumentConversion,
+          CS, funcType, args, params, ConstraintKind::ArgumentConversion,
           CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument));
 
       Type result = tv;

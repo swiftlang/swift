@@ -1025,13 +1025,15 @@ class RemoveExtraneousArguments final
     private llvm::TrailingObjects<RemoveExtraneousArguments, unsigned> {
   friend TrailingObjects;
 
+  FunctionType *ContextualType;
   unsigned NumExtraneous;
 
   RemoveExtraneousArguments(ConstraintSystem &cs,
+                            FunctionType *contextualType,
                             llvm::ArrayRef<unsigned> extraArgs,
                             ConstraintLocator *locator)
-    : ConstraintFix(cs, FixKind::RemoveExtraneousArguments, locator),
-      NumExtraneous(extraArgs.size()) {
+      : ConstraintFix(cs, FixKind::RemoveExtraneousArguments, locator),
+        ContextualType(contextualType), NumExtraneous(extraArgs.size()) {
     std::uninitialized_copy(extraArgs.begin(), extraArgs.end(),
                             getExtraArgumentsBuf().begin());
   }
@@ -1044,6 +1046,7 @@ class RemoveExtraneousArguments final
   }
 
   static RemoveExtraneousArguments *create(ConstraintSystem &cs,
+                                           FunctionType *contextualType,
                                            llvm::ArrayRef<unsigned> extraArgs,
                                            ConstraintLocator *locator);
 
