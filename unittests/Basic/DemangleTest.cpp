@@ -32,12 +32,12 @@ TEST(Demangle, IsObjCSymbol) {
   EXPECT_EQ(true, isObjCSymbol(llvm::StringRef("_$sSC3fooyS2d_SdtFTO")));
 }
 
-TEST(Demangle, CustomArchetypes) {
+TEST(Demangle, CustomGenericParameterNames) {
   std::string SymbolName = "_$s1a1gyq_q__xt_tr0_lF";
   std::string DemangledName = "a.g<Q, U>((U, Q)) -> U";
 
   DemangleOptions Options;
-  Options.ArchetypeName = [](uint64_t index, uint64_t depth) {
+  Options.GenericParameterName = [](uint64_t depth, uint64_t index) {
     return index ? "U" : "Q";
   };
   std::string Result = demangleSymbolAsString(SymbolName, Options);
