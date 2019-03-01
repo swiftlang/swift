@@ -38,6 +38,11 @@ class SILModule;
 class SILFunctionBuilder;
 class SILProfiler;
 
+namespace Lowering {
+class TypeLowering;
+class AbstractionPattern;
+}
+
 enum IsBare_t { IsNotBare, IsBare };
 enum IsTransparent_t { IsNotTransparent, IsTransparent };
 enum Inline_t { InlineDefault, NoInline, AlwaysInline };
@@ -463,6 +468,19 @@ public:
             ? ResilienceExpansion::Minimal
             : ResilienceExpansion::Maximal);
   }
+
+  const Lowering::TypeLowering &
+  getTypeLowering(Lowering::AbstractionPattern orig, Type subst);
+
+  const Lowering::TypeLowering &getTypeLowering(Type t) const;
+
+  SILType getLoweredType(Lowering::AbstractionPattern orig, Type subst) const;
+
+  SILType getLoweredType(Type t) const;
+
+  SILType getLoweredLoadableType(Type t) const;
+
+  const Lowering::TypeLowering &getTypeLowering(SILType type) const;
 
   /// Returns true if this function has a calling convention that has a self
   /// argument.
