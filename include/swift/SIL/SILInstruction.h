@@ -6332,9 +6332,8 @@ class Copy##Name##ValueInst \
                                   SingleValueInstruction> { \
   friend class SILBuilder; \
   Copy##Name##ValueInst(SILDebugLocation DebugLoc, SILValue operand, \
-                       SILModule &M) \
-      : UnaryInstructionBase(DebugLoc, operand, \
-                             operand->getType().getReferentType(M)) {} \
+                        SILType type) \
+      : UnaryInstructionBase(DebugLoc, operand, type) {} \
 };
 #include "swift/AST/ReferenceStorage.def"
 

@@ -395,11 +395,6 @@ SILType::canUseExistentialRepresentation(SILModule &M,
   llvm_unreachable("Unhandled ExistentialRepresentation in switch.");
 }
 
-SILType SILType::getReferentType(SILModule &M) const {
-  auto Ty = castTo<ReferenceStorageType>();
-  return M.Types.getLoweredType(Ty->getReferentType()->getCanonicalType());
-}
-
 SILType SILType::mapTypeOutOfContext() const {
   return SILType::getPrimitiveType(getASTType()->mapTypeOutOfContext()
                                                ->getCanonicalType(),

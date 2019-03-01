@@ -501,10 +501,6 @@ public:
 
   /// Returns true if this is the AnyObject SILType;
   bool isAnyObject() const { return getASTType()->isAnyObject(); }
-
-  /// Returns the underlying referent SILType of an @sil_unowned or @sil_weak
-  /// Type.
-  SILType getReferentType(SILModule &M) const;
   
   /// Returns a SILType with any archetypes mapped out of context.
   SILType mapTypeOutOfContext() const;
