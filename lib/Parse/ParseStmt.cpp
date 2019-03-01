@@ -92,6 +92,18 @@ bool Parser::isStartOfStmt() {
     // putting a label on something inappropriate in parseStmt().
     return isStartOfStmt();
   }
+
+  case tok::at_sign: {
+    // Might be a statement or case attribute. The only one of these we have
+    // right now is `@unknown default`, so hardcode a check for an attribute
+    // without any parens.
+    if (!peekToken().is(tok::identifier))
+      return false;
+    Parser::BacktrackingScope backtrack(*this);
+    consumeToken(tok::at_sign);
+    consumeToken(tok::identifier);
+    return isStartOfStmt();
+  }
   }
 }
 
