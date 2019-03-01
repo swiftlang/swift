@@ -535,7 +535,7 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
         RemarkPassed R("PartialSpecDevirt", *AI.getInstruction());
         R << "Partially devirtualized call with run-time checks for "
           << NV("NumSubTypesChecked", Subs.size()) << " subclasses of "
-          << NV("ClassType", &ClassType);
+          << NV("ClassType", ClassType);
         if (NotHandledSubsNum)
           R << ", number of subclasses not devirtualized: "
             << NV("NotHandledSubsNum", NotHandledSubsNum);
@@ -549,7 +549,7 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
   auto RB = [&]() {
     return RemarkPassed("SpecDevirt", *AI.getInstruction())
            << "Devirtualized call with run-time checks for the derived classes "
-              "of " << NV("ClassType", &ClassType);
+              "of " << NV("ClassType", ClassType);
   };
 
   // At this point it is known that there is only one remaining method
