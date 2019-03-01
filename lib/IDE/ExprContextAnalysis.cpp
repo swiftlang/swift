@@ -143,6 +143,58 @@ void swift::ide::typeCheckContextUntil(DeclContext *DC, SourceLoc Loc) {
 }
 
 //===----------------------------------------------------------------------===//
+// findParsedExpr(DeclContext, Expr)
+//===----------------------------------------------------------------------===//
+
+namespace {
+class ExprFinder : public ASTWalker {
+  SourceManager &SM;
+  SourceRange TargetRange;
+  Expr *FoundExpr = nullptr;
+
+  template <typename NodeType> bool isInterstingRange(NodeType *Node) {
+    return SM.rangeContains(Node->getSourceRange(), TargetRange);
+  }
+
+public:
+  ExprFinder(SourceManager &SM, SourceRange TargetRange)
+      : SM(SM), TargetRange(TargetRange) {}
+
+  Expr *get() const { return FoundExpr; }
+
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    if (TargetRange == E->getSourceRange() && !isa<ImplicitConversionExpr>(E) &&
+        !isa<AutoClosureExpr>(E) && !isa<ConstructorRefCallExpr>(E)) {
+      assert(!FoundExpr && "non-nullptr for found expr");
+      FoundExpr = E;
+      return {false, nullptr};
+    }
+    return {isInterstingRange(E), E};
+  }
+
+  std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
+    return {isInterstingRange(P), P};
+  }
+
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    return {isInterstingRange(S), S};
+  }
+
+  bool walkToDeclPre(Decl *D) override { return isInterstingRange(D); }
+
+  bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
+  bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+};
+} // anonymous namespace
+
+Expr *swift::ide::findParsedExpr(const DeclContext *DC,
+                                 SourceRange TargetRange) {
+  ExprFinder finder(DC->getASTContext().SourceMgr, TargetRange);
+  const_cast<DeclContext *>(DC)->walkContext(finder);
+  return finder.get();
+}
+
+//===----------------------------------------------------------------------===//
 // getReturnTypeFromContext(DeclContext)
 //===----------------------------------------------------------------------===//
 
