@@ -872,6 +872,14 @@ public:
       : CS(cs), Arguments(args), Parameters(params), Bindings(bindings),
         Locator(locator) {}
 
+  bool extraArguments(ArrayRef<unsigned> argIndices) override {
+    if (!CS.shouldAttemptFixes())
+      return true;
+
+    return CS.recordFix(RemoveExtraneousArguments::create(
+        CS, argIndices, CS.getConstraintLocator(Locator)));
+  }
+
   bool missingLabel(unsigned paramIndex) override {
     return !CS.shouldAttemptFixes();
   }
@@ -1321,6 +1329,30 @@ static bool fixMissingArguments(ConstraintSystem &cs, Expr *anchor,
   return false;
 }
 
+static bool fixExtraneousArguments(ConstraintSystem &cs,
+                                   SmallVectorImpl<AnyFunctionType::Param> &args,
+                                   int numExtraneous,
+                                   ConstraintLocatorBuilder locator) {
+  auto AnyType = cs.getASTContext().TheAnyType;
+  SmallVector<unsigned, 4> extraneous;
+
+  auto argumentLocator =
+      locator.withPathElement(ConstraintLocator::FunctionArgument);
+
+  do {
+    auto param = args.pop_back_val();
+    auto index = args.size();
+
+    extraneous.push_back(index);
+    cs.addConstraint(ConstraintKind::Defaultable, param.getPlainType(), AnyType,
+                     argumentLocator.withPathElement(
+                         LocatorPathElt::getTupleElement(index)));
+  } while (--numExtraneous);
+
+  return cs.recordFix(RemoveExtraneousArguments::create(
+      cs, extraneous, cs.getConstraintLocator(locator)));
+}
+
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintKind kind, TypeMatchOptions flags,
@@ -1538,8 +1570,10 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                               abs(diff), locator))
         return getTypeMatchFailure(argumentLocator);
     } else {
-      // TODO(diagnostics): Add handling of extraneous arguments.
-      return getTypeMatchFailure(argumentLocator);
+      // If there are extraneous arguments, let's remove
+      // them from the list.
+      if (fixExtraneousArguments(*this, func1Params, diff, locator))
+        return getTypeMatchFailure(argumentLocator);
     }
   }
 
