@@ -12,8 +12,8 @@
 //
 // This file defines the Swift runtime support for TensorFlow computation.
 //
-// This file should only contain internal details: related public APIs are
-// defined in `Execution.swift`.
+// This file should only contain internal details: runtime-related public APIs
+// should be defined in `Execution.swift`.
 //
 // Design notes on TF eager based runtime:
 //
