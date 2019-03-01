@@ -3929,21 +3929,19 @@ public:
 /// \param loc The location of the expression that caused the load.
 /// \param lvalue The SILValue representing the address to
 ///        use for the load.
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
 class Load##Name##Inst \
     : public LoadReferenceInstBase<SILInstructionKind::Load##Name##Inst> { \
   friend SILBuilder; \
   Load##Name##Inst(SILDebugLocation loc, SILValue lvalue, IsTake_t isTake) \
     : LoadReferenceInstBase(loc, lvalue, isTake) {} \
 };
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
 #include "swift/AST/ReferenceStorage.def"
 
 /// Represents a store to a dynamic reference storage memory location.
 /// This is only required for address-only scenarios; for loadable
 /// references, it's better to use a ref_to_##name and a store.
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
 class Store##Name##Inst \
     : public StoreReferenceInstBase<SILInstructionKind::Store##Name##Inst> { \
   friend SILBuilder; \
@@ -3951,8 +3949,6 @@ class Store##Name##Inst \
                 IsInitialization_t isInit) \
     : StoreReferenceInstBase(loc, src, dest, isInit) {} \
 };
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
 #include "swift/AST/ReferenceStorage.def"
 
 /// CopyAddrInst - Represents a copy from one memory location to another. This
