@@ -1,7 +1,8 @@
 #!/usr/bin/python
 # RUN: ${python} %s %target-swiftmodule-name %platform-sdk-overlay-dir \
-# RUN:              %target-sil-opt -sdk %sdk -enable-sil-verify-all \
-# RUN:                              -F "%xcode-extra-frameworks-dir"
+# RUN:     %target-sil-opt -sdk %sdk -enable-sil-verify-all \
+# RUN:       -Fsystem %sdk/System/Library/PrivateFrameworks \
+# RUN:       -F "%xcode-extra-frameworks-dir"
 
 # REQUIRES: long_test
 # REQUIRES: nonexecutable_test
