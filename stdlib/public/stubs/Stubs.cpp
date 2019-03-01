@@ -385,7 +385,7 @@ static const char *_swift_stdlib_strtoX_clocale_impl(
 
 #if defined(_WIN32)
 template <>
-static const char *
+const char *
 _swift_stdlib_strtoX_clocale_impl<float>(const char *str, float *result) {
   if (swift_stringIsSignalingNaN(str)) {
     *result = std::numeric_limits<float>::signaling_NaN();
@@ -398,7 +398,7 @@ _swift_stdlib_strtoX_clocale_impl<float>(const char *str, float *result) {
 }
 
 template <>
-static const char *
+const char *
 _swift_stdlib_strtoX_clocale_impl<double>(const char *str, double *result) {
   if (swift_stringIsSignalingNaN(str)) {
     *result = std::numeric_limits<double>::signaling_NaN();
@@ -411,7 +411,7 @@ _swift_stdlib_strtoX_clocale_impl<double>(const char *str, double *result) {
 }
 
 template <>
-static const char *
+const char *
 _swift_stdlib_strtoX_clocale_impl<long double>(const char *str, long double *result) {
   if (swift_stringIsSignalingNaN(str)) {
     *result = std::numeric_limits<long double>::signaling_NaN();
