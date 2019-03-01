@@ -769,13 +769,16 @@ public:
                                ResilienceExpansion::Minimal);
 
   // Returns the lowered SIL type for a Swift type.
-  SILType getLoweredType(Type t) {
-    return getTypeLowering(t, ResilienceExpansion::Minimal).getLoweredType();
+  SILType getLoweredType(Type t, ResilienceExpansion forExpansion
+                           = ResilienceExpansion::Minimal) {
+    return getTypeLowering(t, forExpansion).getLoweredType();
   }
 
   // Returns the lowered SIL type for a Swift type.
-  SILType getLoweredType(AbstractionPattern origType, Type substType) {
-    return getTypeLowering(origType, substType, ResilienceExpansion::Minimal)
+  SILType getLoweredType(AbstractionPattern origType, Type substType,
+                         ResilienceExpansion forExpansion =
+                           ResilienceExpansion::Minimal) {
+    return getTypeLowering(origType, substType, forExpansion)
       .getLoweredType();
   }
 

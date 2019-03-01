@@ -798,7 +798,7 @@ namespace {
 
   private:
     const TypeLowering &getTypeLowering(SILType type) {
-      return M.Types.getTypeLowering(type);
+      return B.getFunction().getTypeLowering(type);
     }
 
     SILValue getOwnedScalar(Source source, const TypeLowering &srcTL) {

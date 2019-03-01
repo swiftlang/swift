@@ -2050,10 +2050,9 @@ public:
       SILType exType = AEBI->getExistentialType();
       auto archetype = OpenedArchetypeType::get(exType.getASTType());
 
-      auto loweredTy = F.getModule().Types.getLoweredType(
-                                      Lowering::AbstractionPattern(archetype),
-                                      AEBI->getFormalConcreteType())
-                                        .getAddressType();
+      auto loweredTy = F.getLoweredType(Lowering::AbstractionPattern(archetype),
+                                        AEBI->getFormalConcreteType())
+                                          .getAddressType();
 
       requireSameType(loweredTy, PEBI->getType(),
               "project_existential_box result should be the lowered "
@@ -3082,7 +3081,7 @@ public:
             "alloc_existential_box must be used with a boxed existential "
             "type");
     
-    checkExistentialProtocolConformances(exType,
+    checkExistentialProtocolConformances(exType.getASTType(),
                                          AEBI->getFormalConcreteType(),
                                          AEBI->getConformances());
     verifyOpenedArchetype(AEBI, AEBI->getFormalConcreteType());
@@ -3101,9 +3100,8 @@ public:
     // The lowered type must be the properly-abstracted form of the AST type.
     auto archetype = OpenedArchetypeType::get(exType.getASTType());
     
-    auto loweredTy = F.getModule().Types.getLoweredType(
-                                Lowering::AbstractionPattern(archetype),
-                                AEI->getFormalConcreteType())
+    auto loweredTy = F.getLoweredType(Lowering::AbstractionPattern(archetype),
+                                      AEI->getFormalConcreteType())
                       .getAddressType();
     
     requireSameType(loweredTy, AEI->getLoweredConcreteType(),
@@ -3115,7 +3113,7 @@ public:
             "init_existential_addr payload must be a lowering of the formal "
             "concrete type");
     
-    checkExistentialProtocolConformances(exType,
+    checkExistentialProtocolConformances(exType.getASTType(),
                                          AEI->getFormalConcreteType(),
                                          AEI->getConformances());
     verifyOpenedArchetype(AEI, AEI->getFormalConcreteType());
@@ -3130,8 +3128,8 @@ public:
     // The operand must be at the right abstraction level for the existential.
     SILType exType = IEI->getType();
     auto archetype = OpenedArchetypeType::get(exType.getASTType());
-    auto loweredTy = F.getModule().Types.getLoweredType(
-        Lowering::AbstractionPattern(archetype), IEI->getFormalConcreteType());
+    auto loweredTy = F.getLoweredType(Lowering::AbstractionPattern(archetype),
+                                      IEI->getFormalConcreteType());
     requireSameType(
         concreteType, loweredTy,
         "init_existential_value operand must be lowered to the right "
@@ -3142,7 +3140,7 @@ public:
             "init_existential_value operand must be a lowering of the formal "
             "concrete type");
 
-    checkExistentialProtocolConformances(exType,
+    checkExistentialProtocolConformances(exType.getASTType(),
                                          IEI->getFormalConcreteType(),
                                          IEI->getConformances());
     verifyOpenedArchetype(IEI, IEI->getFormalConcreteType());
@@ -3162,9 +3160,8 @@ public:
     // The operand must be at the right abstraction level for the existential.
     SILType exType = IEI->getType();
     auto archetype = OpenedArchetypeType::get(exType.getASTType());
-    auto loweredTy = F.getModule().Types.getLoweredType(
-                                       Lowering::AbstractionPattern(archetype),
-                                       IEI->getFormalConcreteType());
+    auto loweredTy = F.getLoweredType(Lowering::AbstractionPattern(archetype),
+                                      IEI->getFormalConcreteType());
     requireSameType(concreteType, loweredTy,
                     "init_existential_ref operand must be lowered to the right "
                     "abstraction level for the existential");
@@ -3174,7 +3171,7 @@ public:
             "init_existential_ref operand must be a lowering of the formal "
             "concrete type");
     
-    checkExistentialProtocolConformances(exType,
+    checkExistentialProtocolConformances(exType.getASTType(),
                                          IEI->getFormalConcreteType(),
                                          IEI->getConformances());
     verifyOpenedArchetype(IEI, IEI->getFormalConcreteType());
@@ -3231,21 +3228,25 @@ public:
             "init_existential_metatype result must match representation of "
             "operand");
 
-    while (resultType.is<ExistentialMetatypeType>()) {
-      resultType = resultType.getMetatypeInstanceType(F.getModule());
-      operandType = operandType.getMetatypeInstanceType(F.getModule());
+    auto resultInstanceType = resultType.getASTType();
+    auto operandInstanceType = operandType.getASTType();
+    while (isa<ExistentialMetatypeType>(resultInstanceType)) {
+      resultInstanceType =
+          cast<ExistentialMetatypeType>(resultInstanceType).getInstanceType();
+      operandInstanceType =
+          cast<MetatypeType>(operandInstanceType).getInstanceType();
     }
 
-    checkExistentialProtocolConformances(resultType,
-                                         operandType.getASTType(),
+    checkExistentialProtocolConformances(resultInstanceType,
+                                         operandInstanceType,
                                          I->getConformances());
     verifyOpenedArchetype(I, MetaTy.getInstanceType());
   }
 
-  void checkExistentialProtocolConformances(SILType resultType,
+  void checkExistentialProtocolConformances(CanType resultType,
                                             CanType concreteType,
                                 ArrayRef<ProtocolConformanceRef> conformances) {
-    auto layout = resultType.getASTType().getExistentialLayout();
+    auto layout = resultType.getExistentialLayout();
     auto protocols = layout.getProtocols();
 
     require(conformances.size() == protocols.size(),
@@ -3314,8 +3315,7 @@ public:
               "downcast operand must be a class type");
       require(toCanTy.getClassOrBoundGenericClass(),
               "downcast must convert to a class type");
-      require(SILType::getPrimitiveObjectType(fromCanTy).
-              isBindableToSuperclassOf(SILType::getPrimitiveObjectType(toCanTy)),
+      require(fromCanTy->isBindableToSuperclassOf(toCanTy),
               "downcast must convert to a subclass");
     }
   }

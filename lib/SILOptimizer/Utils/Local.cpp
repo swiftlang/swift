@@ -1518,22 +1518,6 @@ bool swift::shouldExpand(SILModule &Module, SILType Ty) {
 
 /// Some support functions for the global-opt and let-properties-opts
 
-/// Check if a given type is a simple type, i.e. a builtin
-/// integer or floating point type or a struct/tuple whose members
-/// are of simple types.
-/// TODO: Cache the "simple" flag for types to avoid repeating checks.
-bool swift::isSimpleType(SILType SILTy, SILModule& Module) {
-  // Classes can never be initialized statically at compile-time.
-  if (SILTy.getClassOrBoundGenericClass()) {
-    return false;
-  }
-
-  if (!SILTy.isTrivial(Module))
-    return false;
-
-  return true;
-}
-
 // Encapsulate the state used for recursive analysis of a static
 // initializer. Discover all the instruction in a use-def graph and return them
 // in topological order.
@@ -1583,7 +1567,7 @@ protected:
   bool recursivelyAnalyzeInstruction(SILInstruction *I) {
     if (auto *SI = dyn_cast<StructInst>(I)) {
       // If it is not a struct which is a simple type, bail.
-      if (!isSimpleType(SI->getType(), SI->getModule()))
+      if (!SI->getType().isTrivial(SI->getModule()))
         return false;
 
       return llvm::all_of(SI->getAllOperands(), [&](Operand &Op) -> bool {
@@ -1592,7 +1576,7 @@ protected:
     }
     if (auto *TI = dyn_cast<TupleInst>(I)) {
       // If it is not a tuple which is a simple type, bail.
-      if (!isSimpleType(TI->getType(), TI->getModule()))
+      if (!TI->getType().isTrivial(TI->getModule()))
         return false;
 
       return llvm::all_of(TI->getAllOperands(), [&](Operand &Op) -> bool {
