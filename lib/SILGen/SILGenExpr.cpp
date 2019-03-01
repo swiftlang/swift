@@ -2577,7 +2577,7 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
     
     baseType = opened->getCanonicalType();
     auto openedOpaqueValue = subSGF.emitOpenExistential(loc, paramSubstValue,
-                                                        opened, subSGF.SGM.getLoweredType(baseType),
+                                                        opened, subSGF.getLoweredType(baseType),
                                                         AccessKind::Read);
     // Maybe we could peephole this if we know the property load can borrow the
     // base value…

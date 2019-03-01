@@ -668,6 +668,7 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
     Operand &ArgOperand) {
   SILInstruction *AI = ArgOperand.getUser();
   SILModule &M = AI->getModule();
+  SILFunction *F = AI->getFunction();
 
   // SoleConformingType is only applicable in whole-module compilation.
   if (!M.isWholeModule())
@@ -716,7 +717,7 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
     return COAI;
 
   // Create SIL type for the concrete type.
-  SILType concreteSILType = M.Types.getLoweredType(ConcreteType);
+  SILType concreteSILType = F->getLoweredType(ConcreteType);
 
   // Prepare the code by adding UncheckedCast instructions that cast opened
   // existentials to concrete types. Set the ConcreteValue of CEI.
@@ -729,7 +730,7 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
     // Bail if ConcreteSILType is not the same SILType as the type stored in the
     // existential after maximal reabstraction.
     auto abstractionPattern = Lowering::AbstractionPattern::getOpaque();
-    auto abstractTy = M.Types.getLoweredType(abstractionPattern, ConcreteType);
+    auto abstractTy = F->getLoweredType(abstractionPattern, ConcreteType);
     if (abstractTy != concreteSILType)
        return None;
 

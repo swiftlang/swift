@@ -816,7 +816,7 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
   if (GlobalVarSkipProcessing.count(SILG))
     return;
 
-  if (!isSimpleType(SILG->getLoweredType(), *Module)) {
+  if (!SILG->getLoweredType().isTrivial(*Module)) {
     GlobalVarSkipProcessing.insert(SILG);
     return;
   }

@@ -669,7 +669,7 @@ SILValue AddressMaterialization::materializeProjection(Operand *operand) {
     SILValue containerAddr = materializeAddress(initExistentialValue);
     auto canTy = initExistentialValue->getFormalConcreteType();
     auto opaque = Lowering::AbstractionPattern::getOpaque();
-    auto &concreteTL = pass.F->getModule().Types.getTypeLowering(opaque, canTy);
+    auto &concreteTL = pass.F->getTypeLowering(opaque, canTy);
     return B.createInitExistentialAddr(
         initExistentialValue->getLoc(), containerAddr, canTy,
         concreteTL.getLoweredType(), initExistentialValue->getConformances());
@@ -1134,8 +1134,8 @@ void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
          == pass.loweredFnConv.getNumDirectSILResults());
   SILValue newReturnVal;
   if (newDirectResults.empty()) {
-    SILType emptyTy = B.getModule().Types.getLoweredType(
-        TupleType::getEmpty(B.getModule().getASTContext()));
+    SILType emptyTy = SILType::getPrimitiveObjectType(
+        B.getModule().getASTContext().TheEmptyTupleType);
     newReturnVal = B.createTuple(returnInst->getLoc(), emptyTy, {});
   } else if (newDirectResults.size() == 1) {
     newReturnVal = newDirectResults[0];

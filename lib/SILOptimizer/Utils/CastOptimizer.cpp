@@ -73,6 +73,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
     SILInstruction *Inst, bool isConditional, SILValue Src, SILValue Dest,
     CanType Source, CanType Target, Type BridgedSourceTy, Type BridgedTargetTy,
     SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB) {
+  auto *F = Inst->getFunction();
   auto &M = Inst->getModule();
   auto Loc = Inst->getLoc();
 
@@ -146,7 +147,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
       // equal, there is no need to generate the conversion
       // from ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
       if (isConditional) {
-        SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
+        SILBasicBlock *CastSuccessBB = F->createBasicBlock();
         CastSuccessBB->createPhiArgument(SILBridgedTy,
                                          ValueOwnershipKind::Owned);
         Builder.createBranch(Loc, CastSuccessBB, SILValue(Load));
@@ -156,7 +157,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
         SrcOp = Load;
       }
     } else if (isConditional) {
-      SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
+      SILBasicBlock *CastSuccessBB = F->createBasicBlock();
       CastSuccessBB->createPhiArgument(SILBridgedTy, ValueOwnershipKind::Owned);
       auto *CCBI = Builder.createCheckedCastBranch(Loc, false, Load,
                                       SILBridgedTy, CastSuccessBB, ConvFailBB);
@@ -189,7 +190,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   auto *FuncRef = Builder.createFunctionRef(Loc, BridgedFunc);
 
   auto MetaTy = MetatypeType::get(Target, MetatypeRepresentation::Thick);
-  auto SILMetaTy = M.Types.getTypeLowering(MetaTy).getLoweredType();
+  auto SILMetaTy = F->getTypeLowering(MetaTy).getLoweredType();
   auto *MetaTyVal = Builder.createMetatype(Loc, SILMetaTy);
   SmallVector<SILValue, 1> Args;
 
@@ -219,7 +220,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
 
   (void)ParamTypes;
   assert(ParamTypes[0].getConvention() == ParameterConvention::Direct_Guaranteed &&
-	 "Parameter should be @guaranteed");
+        "Parameter should be @guaranteed");
 
   // Emit a retain.
   Builder.createRetainValue(Loc, SrcOp, Builder.getDefaultAtomicity());
@@ -1482,6 +1483,7 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
   auto SourceType = Inst->getSourceType();
   auto TargetType = Inst->getTargetType();
   auto &Mod = Inst->getModule();
+  auto *F = Inst->getFunction();
 
   bool isSourceTypeExact = isa<MetatypeInst>(Src);
 
@@ -1503,7 +1505,7 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
     // mem2reg's invariants get unhappy if we don't try to
     // initialize a loadable result.
     auto DestType = Dest->getType();
-    auto &resultTL = Mod.Types.getTypeLowering(DestType);
+    auto &resultTL = F->getTypeLowering(DestType);
     if (!resultTL.isAddressOnly()) {
       auto undef = SILValue(
           SILUndef::get(DestType.getObjectType(), Builder.getModule()));

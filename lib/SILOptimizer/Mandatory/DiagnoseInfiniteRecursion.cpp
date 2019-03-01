@@ -57,7 +57,7 @@ static bool hasRecursiveCallInPath(SILBasicBlock &Block,
 
       auto &M = FAI.getModule();
       if (auto *CMI = dyn_cast<ClassMethodInst>(FAI.getCallee())) {
-        auto ClassType = CMI->getOperand()->getType();
+        auto ClassType = CMI->getOperand()->getType().getASTType();
 
         // FIXME: If we're not inside the module context of the method,
         // we may have to deserialize vtables.  If the serialized tables
@@ -66,12 +66,12 @@ static bool hasRecursiveCallInPath(SILBasicBlock &Block,
         // Though, this has the added bonus of not looking into vtables
         // outside the current module.  Because we're not doing IPA, let
         // alone cross-module IPA, this is all well and good.
-        auto *BGC = ClassType.getNominalOrBoundGenericNominal();
-        if (BGC && BGC->getModuleContext() != TargetModule) {
+        auto *CD = ClassType.getClassOrBoundGenericClass();
+        if (CD && CD->getModuleContext() != TargetModule) {
           continue;
         }
 
-        auto *F = getTargetClassMethod(M, ClassType, CMI);
+        auto *F = getTargetClassMethod(M, CD, CMI);
         if (F == Target)
           return true;
 
