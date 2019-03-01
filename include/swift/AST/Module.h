@@ -46,7 +46,6 @@ namespace clang {
 namespace swift {
   enum class ArtificialMainKind : uint8_t;
   class ASTContext;
-  class ASTScope;
   class ASTWalker;
   class BraceStmt;
   class Decl;
@@ -80,9 +79,13 @@ namespace swift {
   class VarDecl;
   class VisibleDeclConsumer;
   class SyntaxParsingCache;
-  
-namespace syntax {
+  class ASTScope;
+
+  namespace syntax {
   class SourceFileSyntax;
+}
+namespace ast_scope {
+class ASTSourceFileScope;
 }
 
 /// Discriminator for file-units.
@@ -1189,7 +1192,7 @@ public:
   StringRef getFilename() const;
 
   /// Retrieve the scope that describes this source file.
-  ASTScope &getScope();
+  ASTScope *getScope();
 
   void dump() const;
   void dump(raw_ostream &os) const;

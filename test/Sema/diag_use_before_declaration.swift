@@ -1,3 +1,4 @@
+// XFAIL: enable-astscope-lookup
 // RUN: %target-typecheck-verify-swift
 
 // SR-5163

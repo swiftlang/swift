@@ -241,6 +241,9 @@ namespace swift {
     /// Should we use \c ASTScope-based resolution for unqualified name lookup?
     bool EnableASTScopeLookup = false;
 
+    /// Sound we compare to ASTScope-based resolution for debugging?
+    bool CompareToASTScopeLookup = false;
+
     /// Whether to use the import as member inference system
     ///
     /// When importing a global, try to infer whether we can import it as a

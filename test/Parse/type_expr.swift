@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -swift-version 4
-// RUN: %target-typecheck-verify-swift -enable-astscope-lookup -swift-version 4
+// not ready: dont_run: %target-typecheck-verify-swift -enable-astscope-lookup -swift-version 4
 
 // Types in expression contexts must be followed by a member access or
 // constructor call.

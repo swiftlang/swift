@@ -16,7 +16,6 @@
 
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTScope.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DebuggerClient.h"
@@ -72,6 +71,16 @@ void AccessFilteringDeclConsumer::foundDecl(
     return;
 
   ChainedConsumer.foundDecl(D, reason, dynamicLookupInfo);
+}
+
+void LookupResultEntry::print(llvm::raw_ostream& out) const {
+  getValueDecl()->print(out);
+  if (auto dc = getBaseDecl()) {
+    out << "\nbase: ";
+    dc->print(out);
+    out << "\n";
+  } else
+    out << "\n(no-base)\n";
 }
 
 

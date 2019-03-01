@@ -2385,6 +2385,7 @@ Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
   parseTypeForPlaceholder(TyLoc, ExpansionTyR);
   return new (Context) EditorPlaceholderExpr(PlaceholderId,
                                              PlaceholderTok.getLoc(),
+                                             PlaceholderTok.getRange().getEnd(),
                                              TyLoc, ExpansionTyR);
 }
 

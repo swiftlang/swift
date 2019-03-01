@@ -455,6 +455,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   // Make sure that name binding has been completed before doing any type
   // checking.
   performNameBinding(SF, StartElem);
+//#error build scope maps here
 
   {
     SharedTimer timer("Type checking and Semantic analysis");

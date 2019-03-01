@@ -1,12 +1,12 @@
-// XFAIL: enable-astscope-lookup
+// REQUIRES: enable-astscope-lookup
 // RUN: %target-typecheck-verify-swift
 
 func makeIncrementor(amount: Int) -> () -> Int {
   func incrementor() -> Int {
-    currentTotal += amount // expected-error{{cannot capture 'currentTotal' before it is declared}}
-    return currentTotal // note: redundant diagnostic suppressed
+    currentTotal += amount // expected-error{{use of unresolved identifier 'currentTotal'}}
+    return currentTotal // expected-error{{use of unresolved identifier 'currentTotal'}}
   }
-  var currentTotal = 0 // expected-note{{'currentTotal' declared here}}
+  var currentTotal = 0
   currentTotal = 1; _ = currentTotal
   return incrementor
 }
@@ -80,10 +80,10 @@ func outOfOrderEnum() {
 
 func captureInClosure() {
   let x = { (i: Int) in
-    currentTotal += i // expected-error{{cannot capture 'currentTotal' before it is declared}}
+    currentTotal += i // expected-error{{use of unresolved identifier 'currentTotal'}}
   }
 
-  var currentTotal = 0 // expected-note{{'currentTotal' declared here}}
+  var currentTotal = 0
 
   _ = x
   currentTotal += 1
