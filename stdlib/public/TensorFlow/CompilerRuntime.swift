@@ -11,6 +11,10 @@
 //===----------------------------------------------------------------------===//
 //
 // This file defines the Swift runtime support for TensorFlow computation.
+//
+// This file should only contain internal details: related public APIs are
+// defined in `Execution.swift`.
+//
 // Design notes on TF eager based runtime:
 //
 // 1. A global context (`_ExecutionContext.global`) is used to manage all tensor
