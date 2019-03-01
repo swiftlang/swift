@@ -145,6 +145,17 @@ bool DominatedAccessRemoval::visitInstruction(
   return true;
 }
 
+static EndAccessInst *getSingleEndAccess(BeginAccessInst *inst) {
+  EndAccessInst *end = nullptr;
+  for (auto *currEnd : inst->getEndAccesses()) {
+    if (end == nullptr)
+      end = currEnd;
+    else
+      return nullptr;
+  }
+  return end;
+}
+
 void DominatedAccessRemoval::visitBeginAccess(
     BeginAccessInst *beginAccess, AccessedStorage storage,
     AccessedStorageInfo &visitedDomAccessesToStorageInfo) {
@@ -185,6 +196,20 @@ void DominatedAccessRemoval::visitBeginAccess(
   }
 
   auto *parentBegin = visitedAccessesIt->first;
+
+  // If this beginAccess is a modify, and is nested inside parent
+  // then we have to bail: can't change it to static
+  // If, on the other hand, it is a read, we can continue.
+  if (beginAccess->getAccessKind() >= SILAccessKind::Modify) {
+    auto *endP = getSingleEndAccess(parentBegin);
+    if (!endP) {
+      return;
+    }
+    if (!domInfo->properlyDominates(endP, beginAccess)) {
+      return;
+    }
+  }
+
   if (beginAccess->getAccessKind() > parentBegin->getAccessKind()) {
     // we can't change to static: dominating access has a > access kind
     // change parent's access kind so we would be able to do so
