@@ -532,7 +532,7 @@ struct OwnershipQualifiedKindVisitor : SILInstructionVisitor<OwnershipQualifiedK
   QUALIFIED_INST(LoadBorrowInst)
   QUALIFIED_INST(CopyValueInst)
   QUALIFIED_INST(DestroyValueInst)
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   QUALIFIED_INST(Copy##Name##ValueInst)
 #include "swift/AST/ReferenceStorage.def"
 #undef QUALIFIED_INST
