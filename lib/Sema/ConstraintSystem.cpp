@@ -1464,10 +1464,9 @@ static ArrayRef<OverloadChoice> partitionSIMDOperators(
   return scratch;
 }
 
-/// Retrieve the type that will be used when matching the given overload.
-static Type getEffectiveOverloadType(const OverloadChoice &overload,
-                                     bool allowMembers,
-                                     DeclContext *useDC) {
+Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
+                                                bool allowMembers,
+                                                DeclContext *useDC) {
   switch (overload.getKind()) {
   case OverloadChoiceKind::Decl:
     // Declaration choices are handled below.
@@ -1788,54 +1787,6 @@ public:
 #undef FAILURE_CASE
 };
 
-}
-
-Type ConstraintSystem::findCommonResultType(ArrayRef<OverloadChoice> choices) {
-  // Local function to consider this new overload choice, updating the
-  // "common type". Returns true if this overload cannot be integrated into
-  // the common type, at which point there is no "common type".
-  Type commonType;
-  auto considerOverload = [&](const OverloadChoice &overload) -> bool {
-    // If we can't even get a type for the overload, there's nothing more to
-    // do.
-    Type overloadType =
-        getEffectiveOverloadType(overload, /*allowMembers=*/true, /*FIXME:*/DC);
-    if (!overloadType) {
-      return true;
-    }
-
-    auto functionType = overloadType->getAs<FunctionType>();
-    if (!functionType) {
-      return true;
-    }
-
-    auto resultType = functionType->getResult();
-    if (resultType->hasTypeParameter()) {
-      return true;
-    }
-
-    // If this is the first overload, record it's type as the common type.
-    if (!commonType) {
-      commonType = resultType;
-      return false;
-    }
-
-    // Find the common type between the current common type and the new
-    // overload's type.
-    commonType = CommonTypeVisitor().visit(commonType, resultType);
-    if (!commonType) {
-      return true;
-    }
-
-    return false;
-  };
-
-  for (const auto &choice : choices) {
-    if (considerOverload(choice))
-      return Type();
-  }
-
-  return commonType;
 }
 
 Type ConstraintSystem::findCommonOverloadType(

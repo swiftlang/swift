@@ -1308,12 +1308,32 @@ private:
       }
 
       generatedConstraints.erase(genStart, genEnd);
+
+      for (unsigned constraintIdx :
+             range(scope->numDisabledConstraints, disabledConstraints.size())) {
+        if (disabledConstraints[constraintIdx]->isDisabled())
+          disabledConstraints[constraintIdx]->setEnabled();
+      }
+      disabledConstraints.erase(
+          disabledConstraints.begin() + scope->numDisabledConstraints,
+          disabledConstraints.end());
     }
 
     /// Check whether constraint system is allowed to form solutions
     /// even with unbound type variables present.
     bool allowsFreeTypeVariables() const {
       return AllowFreeTypeVariables != FreeTypeVariableBinding::Disallow;
+    }
+
+    unsigned getNumDisabledConstraints() const {
+      return disabledConstraints.size();
+    }
+
+    /// Disable the given constraint; this change will be rolled back
+    /// when we exit the current solver scope.
+    void disableContraint(Constraint *constraint) {
+      constraint->setDisabled();
+      disabledConstraints.push_back(constraint);
     }
 
   private:
@@ -1336,6 +1356,8 @@ private:
     /// each of the registered scopes correct (LIFO) order.
     llvm::SmallVector<
       std::tuple<SolverScope *, ConstraintList::iterator, unsigned>, 4> scopes;
+
+    SmallVector<Constraint *, 4> disabledConstraints;
   };
 
   class CacheExprTypes : public ASTWalker {
@@ -1493,6 +1515,8 @@ public:
     unsigned numCheckedConformances;
 
     unsigned numMissingMembers;
+
+    unsigned numDisabledConstraints;
 
     /// The previous score.
     Score PreviousScore;
@@ -2326,11 +2350,32 @@ public:
                           const DeclRefExpr *base = nullptr,
                           OpenedTypeMap *replacements = nullptr);
 
-  /// Given a set of overload choices, try to find a common result type when
-  /// they are called.
+  /// Attempt to simplify the set of overloads corresponding to a given
+  /// function application constraint.
   ///
-  /// \returns the common type amongst the set of overload choices.
-  Type findCommonResultType(ArrayRef<OverloadChoice> choices);
+  /// \param fnType The type that describes the function being applied.
+  /// When there is a set of overloads, this will generally be a type
+  /// variable that can be used to find the set of overloads.
+  ///
+  /// \param argFnType The call signature, which includes the call arguments
+  /// (as the function parameters) and the expected result type of the
+  /// call.
+  ///
+  /// \param argumentLabels The argument labels provided at the call site,
+  /// if known.
+  ///
+  /// \returns \c fnType, or some simplified form of it if this function
+  /// was able to find a single overload or derive some common structure
+  /// among the overloads.
+  Type simplifyAppliedOverloads(Type fnType,
+                                const FunctionType *argFnType,
+                                Optional<ArgumentLabelState> argumentLabels,
+                                ConstraintLocatorBuilder locator);
+
+  /// Retrieve the type that will be used when matching the given overload.
+  Type getEffectiveOverloadType(const OverloadChoice &overload,
+                                bool allowMembers,
+                                DeclContext *useDC);
 
   /// Given a set of overload choices, try to find a common structure amongst
   /// all of them.
@@ -3064,6 +3109,30 @@ private:
   /// Collect the current inactive disjunction constraints.
   void collectDisjunctions(SmallVectorImpl<Constraint *> &disjunctions);
 
+  /// Record a particular disjunction choice of
+  void recordDisjunctionChoice(ConstraintLocator *disjunctionLocator,
+                               unsigned index) {
+    DisjunctionChoices.push_back({disjunctionLocator, index});
+  }
+
+  /// Filter the set of disjunction terms, keeping only those where the
+  /// predicate returns \c true.
+  ///
+  /// The terms of the disjunction that are filtered out will be marked as
+  /// "disabled" so they won't be visited later. If only one term remains
+  /// enabled, the disjunction itself will be returned and that term will
+  /// be made active.
+  ///
+  /// \param restoreOnFail If true, then all of the disabled terms will
+  /// be re-enabled when this function returns \c Error.
+  ///
+  /// \returns One of \c Solved (only a single term remained),
+  /// \c Unsolved (more than one disjunction terms remain), or
+  /// \c Error (all terms were filtered out).
+  SolutionKind filterDisjunctions(Constraint *disjunction,
+                                  bool restoreOnFail,
+                                  llvm::function_ref<bool(Constraint *)> pred);
+
   // Given a type variable, attempt to find the disjunction of
   // bind overloads associated with it. This may return null in cases where
   // the disjunction has either not been created or binds the type variable
@@ -3481,6 +3550,13 @@ matchCallArguments(ConstraintSystem &cs,
 /// If this cannot be proven, conservatively returns true.
 bool areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
                                                bool hasCurriedSelf,
+                                               ArrayRef<Identifier> labels,
+                                               bool hasTrailingClosure);
+
+/// Attempt to prove that arguments with the given labels at the
+/// given parameter depth cannot be used with the given value.
+/// If this cannot be proven, conservatively returns true.
+bool areConservativelyCompatibleArgumentLabels(OverloadChoice choice,
                                                ArrayRef<Identifier> labels,
                                                bool hasTrailingClosure);
 
