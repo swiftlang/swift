@@ -1,15 +1,15 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5
 
 struct S0<T> {
-  func foo(_ other: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'S0'?}}{{21-25=S0}}
+  func foo(_ other: Self) { }
 }
 
 class C0<T> {
-  func foo(_ other: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C0'?}}{{21-25=C0}}
+  func foo(_ other: Self) { }
 }
 
 enum E0<T> {
-  func foo(_ other: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'E0'?}}{{21-25=E0}}
+  func foo(_ other: Self) { }
 }
 
 // rdar://problem/21745221
@@ -23,7 +23,7 @@ extension X {
 }
 
 extension X.Inner {
-  func foo(_ other: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'X.Inner'?}}{{21-25=X.Inner}}
+  func foo(_ other: Self) { }
 }
 
 // SR-695

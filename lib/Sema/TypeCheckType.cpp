@@ -1255,6 +1255,11 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
 
   // If we found nothing, complain and give ourselves a chance to recover.
   if (current.isNull()) {
+    // If we're not allowed to complain or we couldn't fix the
+    // source, bail out.
+    if (options.contains(TypeResolutionFlags::SilenceErrors))
+      return ErrorType::get(ctx);
+
     if (comp->getIdentifier() == ctx.Id_Self &&
         !isa<GenericIdentTypeRepr>(comp)) {
       DeclContext *nominalDC = nullptr;
@@ -1274,11 +1279,6 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
 
       return ErrorType::get(ctx);
     }
-
-    // If we're not allowed to complain or we couldn't fix the
-    // source, bail out.
-    if (options.contains(TypeResolutionFlags::SilenceErrors))
-      return ErrorType::get(ctx);
 
     return diagnoseUnknownType(resolution, nullptr, SourceRange(), comp,
                                options, lookupOptions);

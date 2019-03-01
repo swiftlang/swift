@@ -552,22 +552,14 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
 
     if (!isConfused) {
       if (Name == Context.Id_Self) {
-        Type SelfType = DC->getInnermostTypeContext()->getSelfInterfaceType();
-        if (SelfType->is<ClassType>() || SelfType->is<BoundGenericClassType>())
-          SelfType = DynamicSelfType::get(SelfType, Context);
-        SelfType = DC->mapTypeIntoContext(SelfType);
-        return new (Context) TypeExpr(TypeLoc(new (Context)
-                FixedTypeRepr(SelfType, Loc), SelfType));
+        if (DeclContext *typeContext = DC->getInnermostTypeContext()){
+          Type SelfType = typeContext->getSelfInterfaceType();
 
-        auto selfs = lookupUnqualified(DC, Context.Id_self, Loc, lookupOptions);
-        if (!selfs.empty()) {
-          ValueDecl *D = selfs.front().getValueDecl();
-          Expr *E = new (Context) DeclRefExpr(D, nameLoc, /*Implicit=*/false);
-          if (auto func = dyn_cast<AbstractFunctionDecl>(
-                                        DC->getInnermostMethodContext()))
-            if (func->isStatic())
-              return E;
-          return new (Context) DynamicTypeExpr(Loc, Loc, E, Loc, Type());
+          if (typeContext->getSelfClassDecl())
+            SelfType = DynamicSelfType::get(SelfType, Context);
+          SelfType = DC->mapTypeIntoContext(SelfType);
+          return new (Context) TypeExpr(TypeLoc(new (Context)
+                                                FixedTypeRepr(SelfType, Loc)));
         }
       }
 

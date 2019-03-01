@@ -536,7 +536,9 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
 Type ConstraintSystem::openUnboundGenericType(
     Type type, ConstraintLocatorBuilder locator) {
   if (type->hasTypeParameter()) {
-    TC.diagnose(locator.getAnchor()->getLoc(), diag::invalid_generic_context);
+    auto castExpr = dyn_cast<ExplicitCastExpr>(locator.getAnchor());
+    TC.diagnose(castExpr ? castExpr->getCastTypeLoc().getLoc() :
+                locator.getAnchor()->getLoc(), diag::invalid_generic_context);
     return ErrorType::get(getASTContext());
   }
 

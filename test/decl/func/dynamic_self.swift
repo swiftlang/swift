@@ -10,23 +10,23 @@ func inFunction() {
 }
 
 struct S0 {
-  func f() -> Self { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'S0'?}}{{15-19=S0}}
+  func f() -> Self { }
 
-  func g(_ ds: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'S0'?}}{{16-20=S0}}
+  func g(_ ds: Self) { }
 }
 
 enum E0 {
-  func f() -> Self { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'E0'?}}{{15-19=E0}}
+  func f() -> Self { }
 
-  func g(_ ds: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'E0'?}}{{16-20=E0}}
+  func g(_ ds: Self) { }
 }
 
 class C0 {
   func f() -> Self { } // okay
 
-  func g(_ ds: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C0'?}}{{16-20=C0}}
+  func g(_ ds: Self) { }
 
-  func h(_ ds: Self) -> Self { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C0'?}}{{16-20=C0}}
+  func h(_ ds: Self) -> Self { }
 }
 
 protocol P0 {
@@ -73,7 +73,7 @@ class C1 {
     if !b { return type(of: self).init(int: 5) }
 
     // Can't utter Self within the body of a method.
-    var _: Self = self // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C1'?}} {{12-16=C1}}
+    var _: Self = self
 
     // Okay to return 'self', because it has the appropriate type.
     return self // okay
@@ -85,11 +85,11 @@ class C1 {
     var x: Int = self // expected-error{{cannot convert value of type 'Self.Type' to specified type 'Int'}}
 
     // Can't utter Self within the body of a method.
-    var c1 = C1(int: 5) as Self // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C1'?}} {{28-32=C1}}
+    var c1 = C1(int: 5) as Self
 
     if b { return self.init(int: 5) }
 
-    return Self() // expected-error{{non-nominal type 'Self.Type' does not support explicit initialization}}
+    return Self() // expected-error{{non-nominal type 'Self' does not support explicit initialization}}
   }
 
   // This used to crash because metatype construction went down a
@@ -419,27 +419,29 @@ func useSelfOperator() {
 class A<T> {
   let b: Int
   required init(a: Int) {
-    print("\(Self).\(#function)")
+    print("\(Self.self).\(#function)")
+    Self.y()
     b = a
   }
   static func z() {
     print("\(Self.self).\(#function)")
   }
   class func y() {
-    print("\(Self).\(#function)")
+    print("\(Self.self).\(#function)")
+    Self.z()
   }
-  func x() {
+  func x() -> A? {
     print("\(Self.self).\(#function)")
     Self.y()
     Self.z()
-    _ = Self.init(a: 77)
+    return Self.init(a: 77)
   }
 }
 
 class B: A<Int> {
   let a: Int
   required convenience init(a: Int) {
-    print("\(Self).\(#function)")
+    print("\(Self.self).\(#function)")
     self.init()
   }
   init() {
@@ -450,8 +452,48 @@ class B: A<Int> {
     super.init(a: 88)
   }
   override class func y() {
-    print("\(Self).\(#function)")
+    print("override \(Self.self).\(#function)")
   }
 }
 
-B().x()
+struct S2 {
+  let x = 99
+  static func x() {
+    Self.y()
+  }
+  static func y() {
+    print("y()")
+  }
+  func foo(a: [Self]) -> Self? {
+    Self.x()
+    return Self.init() as Self
+  }
+}
+
+struct S3<T> {
+  let x = 99
+  static func x() {
+    Self.y()
+  }
+  static func y() {
+    print("y()")
+  }
+  func foo(a: [Self]) -> Self? {
+    Self.x()
+    return Self.init() as? Self
+    // expected-error@-1 {{cannot convert return expression of type 'S3<T>?' to return type 'S3<T>?'}}
+    // expected-error@-2 {{generic type cannot be used in this context}}
+    // expected-error@-3 {{generic type cannot be used in this context}}
+  }
+}
+
+enum E {
+  static func f() {
+    print("f()")
+  }
+  case e
+  func h(h: Self) -> Self {
+    Self.f()
+    return .e
+  }
+}
