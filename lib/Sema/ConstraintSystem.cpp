@@ -1488,6 +1488,11 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
   if (isa<TypeDecl>(decl))
     return Type();
 
+  // Declarations returning unwrapped optionals don't have a single effective
+  // type.
+  if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+    return Type();
+
   // Retrieve the interface type.
   auto type = decl->getInterfaceType();
   if (!type) {
