@@ -614,7 +614,7 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
     // Check if the element type is a trivial type.
     if (Substs.getReplacementTypes().size() == 1) {
       Type ElemType = Substs.getReplacementTypes()[0];
-      auto &SILElemTy = I->getModule().Types.getTypeLowering(ElemType);
+      auto &SILElemTy = I->getFunction()->getTypeLowering(ElemType);
       // Destroying an array of trivial types is a no-op.
       if (SILElemTy.isTrivial())
         return eraseInstFromFunction(*I);

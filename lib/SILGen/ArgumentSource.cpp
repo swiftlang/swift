@@ -189,8 +189,8 @@ ManagedValue ArgumentSource::materialize(SILGenFunction &SGF,
                                          SILType destType) && {
   auto substFormalType = getSubstRValueType();
   assert(!destType || destType.getObjectType() ==
-               SGF.SGM.Types.getLoweredType(origFormalType,
-                                            substFormalType).getObjectType());
+               SGF.getLoweredType(origFormalType,
+                                  substFormalType).getObjectType());
 
   // Fast path: if the types match exactly, no abstraction difference
   // is possible and we can just materialize as normal.

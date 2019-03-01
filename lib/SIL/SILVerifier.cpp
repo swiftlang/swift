@@ -2069,10 +2069,9 @@ public:
       SILType exType = AEBI->getExistentialType();
       auto archetype = OpenedArchetypeType::get(exType.getASTType());
 
-      auto loweredTy = F.getModule().Types.getLoweredType(
-                                      Lowering::AbstractionPattern(archetype),
-                                      AEBI->getFormalConcreteType())
-                                        .getAddressType();
+      auto loweredTy = F.getLoweredType(Lowering::AbstractionPattern(archetype),
+                                        AEBI->getFormalConcreteType())
+                                          .getAddressType();
 
       requireSameType(loweredTy, PEBI->getType(),
               "project_existential_box result should be the lowered "
@@ -3120,9 +3119,8 @@ public:
     // The lowered type must be the properly-abstracted form of the AST type.
     auto archetype = OpenedArchetypeType::get(exType.getASTType());
     
-    auto loweredTy = F.getModule().Types.getLoweredType(
-                                Lowering::AbstractionPattern(archetype),
-                                AEI->getFormalConcreteType())
+    auto loweredTy = F.getLoweredType(Lowering::AbstractionPattern(archetype),
+                                      AEI->getFormalConcreteType())
                       .getAddressType();
     
     requireSameType(loweredTy, AEI->getLoweredConcreteType(),
@@ -3149,8 +3147,8 @@ public:
     // The operand must be at the right abstraction level for the existential.
     SILType exType = IEI->getType();
     auto archetype = OpenedArchetypeType::get(exType.getASTType());
-    auto loweredTy = F.getModule().Types.getLoweredType(
-        Lowering::AbstractionPattern(archetype), IEI->getFormalConcreteType());
+    auto loweredTy = F.getLoweredType(Lowering::AbstractionPattern(archetype),
+                                      IEI->getFormalConcreteType());
     requireSameType(
         concreteType, loweredTy,
         "init_existential_value operand must be lowered to the right "
@@ -3181,9 +3179,8 @@ public:
     // The operand must be at the right abstraction level for the existential.
     SILType exType = IEI->getType();
     auto archetype = OpenedArchetypeType::get(exType.getASTType());
-    auto loweredTy = F.getModule().Types.getLoweredType(
-                                       Lowering::AbstractionPattern(archetype),
-                                       IEI->getFormalConcreteType());
+    auto loweredTy = F.getLoweredType(Lowering::AbstractionPattern(archetype),
+                                      IEI->getFormalConcreteType());
     requireSameType(concreteType, loweredTy,
                     "init_existential_ref operand must be lowered to the right "
                     "abstraction level for the existential");
@@ -3333,8 +3330,7 @@ public:
               "downcast operand must be a class type");
       require(toCanTy.getClassOrBoundGenericClass(),
               "downcast must convert to a class type");
-      require(SILType::getPrimitiveObjectType(fromCanTy).
-              isBindableToSuperclassOf(SILType::getPrimitiveObjectType(toCanTy)),
+      require(fromCanTy->isBindableToSuperclassOf(toCanTy),
               "downcast must convert to a subclass");
     }
   }
