@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -35,6 +35,11 @@ namespace Demangle {
 
 enum class SymbolicReferenceKind : uint8_t;
 
+/// A simple default implementation that assigns letters to archetypes in
+/// alphabetic order.
+std::string archetypeName(uint64_t index, uint64_t depth);
+
+/// Display style options for the demangler.
 struct DemangleOptions {
   bool SynthesizeSugarOnTypes = false;
   bool DisplayDebuggerGeneratedModule = true;
@@ -52,6 +57,7 @@ struct DemangleOptions {
   bool ShortenArchetype = false;
   bool ShowPrivateDiscriminators = true;
   bool ShowFunctionArgumentTypes = true;
+  std::function<std::string(uint64_t, uint64_t)> ArchetypeName = archetypeName;
 
   DemangleOptions() {}
 
@@ -346,8 +352,9 @@ public:
   /// prefix: _T, _T0, $S, _$S.
   ///
   /// \returns The demangled string.
-  std::string demangleSymbolAsString(llvm::StringRef MangledName,
-                            const DemangleOptions &Options = DemangleOptions());
+  std::string demangleSymbolAsString(
+      llvm::StringRef MangledName,
+      const DemangleOptions &Options = DemangleOptions());
 
   /// Demangle the given type and return the readable name.
   ///
@@ -355,8 +362,9 @@ public:
   /// a mangling prefix.
   ///
   /// \returns The demangled string.
-  std::string demangleTypeAsString(llvm::StringRef MangledName,
-                            const DemangleOptions &Options = DemangleOptions());
+  std::string
+  demangleTypeAsString(llvm::StringRef MangledName,
+                       const DemangleOptions &Options = DemangleOptions());
 
   /// Returns true if the mangledName refers to a thunk function.
   ///
@@ -584,7 +592,6 @@ bool nodeConsumesGenericArgs(Node *node);
 bool isSpecialized(Node *node);
 
 NodePointer getUnspecialized(Node *node, NodeFactory &Factory);
-std::string archetypeName(Node::IndexType index, Node::IndexType depth);
 
 /// Returns true if the node \p kind refers to a context node, e.g. a nominal
 /// type or a function.
