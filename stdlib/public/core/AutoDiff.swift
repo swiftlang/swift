@@ -170,6 +170,39 @@ public func differentiableFunction<T, U, R>(
   return original
 }
 
+public extension Differentiable {
+  @differentiable(wrt: self, vjp: _vjpWithGrad)
+  func withGradient(_ body: @escaping (inout CotangentVector) -> Void) -> Self {
+    return self
+  }
+
+  @inlinable
+  internal func _vjpWithGrad(
+    _ body: @escaping (inout CotangentVector) -> Void
+  ) -> (Self, (CotangentVector) -> CotangentVector) {
+    return (self, { grad in
+      var grad = grad
+      body(&grad)
+      return grad
+    })
+  }
+
+  @differentiable(wrt: self, vjp: _vjpWithGrad)
+  func withGradient(_ body: @escaping (CotangentVector) -> Void) -> Self {
+    return self
+  }
+
+  @inlinable
+  internal func _vjpWithGrad(
+    _ body: @escaping (CotangentVector) -> Void
+  ) -> (Self, (CotangentVector) -> CotangentVector) {
+    return (self, { grad in
+      body(grad)
+      return grad
+    })
+  }
+}
+
 /// Make a function be recomputed in its pullback, known as "checkpointing" in
 /// traditional automatic differentiation.
 @inlinable
@@ -190,7 +223,7 @@ public extension Differentiable {
     return body(self)
   }
 
-  @usableFromInline
+  @inlinable
   internal func _vjp_withRecomputationInPullbacks<Result : Differentiable>(
     _ body: @escaping @differentiable (Self) -> Result
   ) -> (Result, (Result.CotangentVector) -> CotangentVector) {
