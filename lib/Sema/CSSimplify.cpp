@@ -4801,13 +4801,11 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
 }
 
 Type ConstraintSystem::simplifyAppliedOverloads(
-                                Type fnType,
+                                TypeVariableType *fnTypeVar,
                                 const FunctionType *argFnType,
                                 Optional<ArgumentLabelState> argumentLabels,
                                 ConstraintLocatorBuilder locator) {
-  auto fnTypeVar = fnType->getAs<TypeVariableType>();
-  if (!fnTypeVar)
-    return fnType;
+  Type fnType(fnTypeVar);
 
   // Always work on the representation.
   fnTypeVar = getRepresentative(fnTypeVar);
@@ -4850,25 +4848,12 @@ Type ConstraintSystem::simplifyAppliedOverloads(
 
   // Consider each of the constraints in the disjunction.
 retry_after_fail:
-  bool skippedAnyConstraints = false;
+  bool hasUnhandledConstraints = false;
   bool labelMismatch = false;
   auto filterResult =
-      filterDisjunctions(disjunction, /*restoreOnFail=*/shouldAttemptFixes(),
+      filterDisjunction(disjunction, /*restoreOnFail=*/shouldAttemptFixes(),
                          [&](Constraint *constraint) {
-        // We must have bind-overload constraints.
-        // FIXME: This isn't entirely true.
-        if (constraint->getKind() != ConstraintKind::BindOverload) {
-          skippedAnyConstraints = true;
-          return true;
-        }
-
-        // We must be binding the type variable (or a type variable
-        // equivalent to it).
-        auto boundTypeVar = constraint->getFirstType()->getAs<TypeVariableType>();
-        if (!boundTypeVar || getRepresentative(boundTypeVar) != fnTypeVar) {
-          skippedAnyConstraints = true;
-          return true;
-        }
+        assert(constraint->getKind() == ConstraintKind::BindOverload);
 
         auto choice = constraint->getOverloadChoice();
 
@@ -4887,7 +4872,7 @@ retry_after_fail:
             getEffectiveOverloadType(choice, /*allowMembers=*/true,
                                      constraint->getOverloadUseDC());
         if (!choiceType) {
-          skippedAnyConstraints = true;
+          hasUnhandledConstraints = true;
           return true;
         }
 
@@ -4917,7 +4902,7 @@ retry_after_fail:
 
   // If there was a constraint that we couldn't reason about, don't use the
   // results of any common-type computations.
-  if (skippedAnyConstraints)
+  if (hasUnhandledConstraints)
     return fnType;
 
   // If we have a common result type, bind the expected result type to it.
@@ -4997,7 +4982,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   if (auto typeVar = desugar2->getAs<TypeVariableType>()) {
     auto argumentLabels = getArgumentLabels(*this, locator);
     Type newType2 =
-        simplifyAppliedOverloads(type2, func1, argumentLabels, locator);
+        simplifyAppliedOverloads(typeVar, func1, argumentLabels, locator);
     if (!newType2)
       return SolutionKind::Error;
 

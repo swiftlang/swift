@@ -2353,9 +2353,8 @@ public:
   /// Attempt to simplify the set of overloads corresponding to a given
   /// function application constraint.
   ///
-  /// \param fnType The type that describes the function being applied.
-  /// When there is a set of overloads, this will generally be a type
-  /// variable that can be used to find the set of overloads.
+  /// \param fnTypeVar The type variable that describes the set of
+  /// overloads for the function.
   ///
   /// \param argFnType The call signature, which includes the call arguments
   /// (as the function parameters) and the expected result type of the
@@ -2367,7 +2366,7 @@ public:
   /// \returns \c fnType, or some simplified form of it if this function
   /// was able to find a single overload or derive some common structure
   /// among the overloads.
-  Type simplifyAppliedOverloads(Type fnType,
+  Type simplifyAppliedOverloads(TypeVariableType *fnTypeVar,
                                 const FunctionType *argFnType,
                                 Optional<ArgumentLabelState> argumentLabels,
                                 ConstraintLocatorBuilder locator);
@@ -3129,7 +3128,7 @@ private:
   /// \returns One of \c Solved (only a single term remained),
   /// \c Unsolved (more than one disjunction terms remain), or
   /// \c Error (all terms were filtered out).
-  SolutionKind filterDisjunctions(Constraint *disjunction,
+  SolutionKind filterDisjunction(Constraint *disjunction,
                                   bool restoreOnFail,
                                   llvm::function_ref<bool(Constraint *)> pred);
 

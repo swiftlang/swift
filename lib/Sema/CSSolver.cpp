@@ -1292,7 +1292,7 @@ void ConstraintSystem::collectDisjunctions(
 }
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::filterDisjunctions(
+ConstraintSystem::filterDisjunction(
     Constraint *disjunction, bool restoreOnFail,
     llvm::function_ref<bool(Constraint *)> pred) {
   assert(disjunction->getKind() == ConstraintKind::Disjunction);
@@ -1656,10 +1656,19 @@ Constraint *ConstraintSystem::getUnboundBindOverloadDisjunction(
   llvm::SetVector<Constraint *> disjunctions;
   getConstraintGraph().gatherConstraints(
       rep, disjunctions, ConstraintGraph::GatheringKind::EquivalenceClass,
-      [](Constraint *match) {
-        return match->getKind() == ConstraintKind::Disjunction &&
-               match->getNestedConstraints().front()->getKind() ==
-                   ConstraintKind::BindOverload;
+      [this, rep](Constraint *match) {
+        if (match->getKind() != ConstraintKind::Disjunction ||
+            match->getNestedConstraints().front()->getKind() !=
+                   ConstraintKind::BindOverload)
+          return false;
+
+        auto lhsTypeVar =
+            match->getNestedConstraints().front()->getFirstType()
+              ->getAs<TypeVariableType>();
+        if (!lhsTypeVar)
+          return false;
+
+        return getRepresentative(lhsTypeVar) == rep;
       });
 
   if (disjunctions.empty())

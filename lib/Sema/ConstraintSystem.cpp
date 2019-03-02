@@ -1534,7 +1534,7 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
                        ->castTo<AnyFunctionType>()->getParams();
       type = FunctionType::get(indices, elementTy);
     } else if (auto var = dyn_cast<VarDecl>(decl)) {
-      type = var->getInterfaceType();
+      type = var->getValueInterfaceType();
       if (doesStorageProduceLValue(var, overload.getBaseType(), useDC))
         type = LValueType::get(type);
     } else if (isa<FuncDecl>(decl) || isa<EnumElementDecl>(decl)) {
