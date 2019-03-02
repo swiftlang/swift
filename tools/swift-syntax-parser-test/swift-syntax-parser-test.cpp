@@ -20,6 +20,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Timer.h"
+#include "llvm/Support/SourceMgr.h"
 
 using namespace swift;
 using namespace llvm;
@@ -27,6 +28,7 @@ using namespace llvm;
 enum class ActionType {
   DumpTree,
   Time,
+  Diagnostics,
 };
 
 namespace options {
@@ -38,6 +40,9 @@ Action(cl::desc("Action (required):"),
         clEnumValN(ActionType::DumpTree,
                    "dump-tree",
                    "Parse the source file and dump syntax tree"),
+        clEnumValN(ActionType::Diagnostics,
+                   "dump-diags",
+                   "Parse the source file and dump parser diagnostics"),
         clEnumValN(ActionType::Time,
                    "time",
                    "Time parsing, use '-n' to specify number of invocations")));
@@ -131,9 +136,11 @@ makeNode(const swiftparse_syntax_node_t *raw_node, StringRef source) {
 }
 
 static swiftparse_client_node_t
-parse(const char *source, swiftparse_node_handler_t node_handler) {
+parse(const char *source, swiftparse_node_handler_t node_handler,
+      swiftparse_diagnostic_handler_t diag_handler = nullptr) {
   swiftparse_parser_t parser = swiftparse_parser_create();
   swiftparse_parser_set_node_handler(parser, node_handler);
+  swiftparse_parser_set_diagnostic_handler(parser, diag_handler);
   swiftparse_client_node_t top = swiftparse_parse_string(parser, source);
   swiftparse_parser_dispose(parser);
   return top;
@@ -148,6 +155,78 @@ static int dumpTree(const char *source) {
   std::unique_ptr<SPNode> top = convertClientNode(parse(source, nodeHandler));
   top->dump(outs());
 
+  return 0;
+}
+
+static void printLineColumn(SourceMgr &SM, unsigned BufferId, unsigned Offset,
+                            llvm::raw_ostream &OS) {
+  auto Pair = SM.getLineAndColumn(SMLoc::getFromPointer(SM.getBufferInfo(BufferId).
+    Buffer->getBuffer().data() + Offset));
+  OS << Pair.first << ":" << Pair.second;
+}
+
+static void printRange(SourceMgr &SM, unsigned BufferId, swiftparse_range_t Range,
+                       llvm::raw_ostream &OS) {
+  OS << "(";
+  printLineColumn(SM, BufferId, Range.offset, OS);
+  OS << ",";
+  printLineColumn(SM, BufferId, Range.offset + Range.length, OS);
+  OS << ")";
+}
+
+struct PrintDiagData {
+  unsigned Error = 0;
+  unsigned Warning = 0;
+  unsigned Note = 0;
+  ~PrintDiagData() {
+    outs() << Error << " error(s) " << Warning << " warnings(s) "
+           << Note << " note(s)\n";
+  }
+};
+
+static void printDiagInfo(const swiftparser_diagnostic_t diag,
+                          llvm::SourceMgr &SM, unsigned BufferId,
+                          PrintDiagData &Data) {
+  printLineColumn(SM, BufferId, swiftparse_diagnostic_get_source_loc(diag), outs());
+  switch(swiftparse_diagnostic_get_severity(diag)) {
+  case SWIFTPARSER_DIAGNOSTIC_SEVERITY_ERROR:
+    Data.Error ++;
+    outs() << " Error: ";
+    break;
+  case SWIFTPARSER_DIAGNOSTIC_SEVERITY_WARNING:
+    Data.Warning ++;
+    outs() << " Warning: ";
+    break;
+  case SWIFTPARSER_DIAGNOSTIC_SEVERITY_NOTE:
+    Data.Note ++;
+    outs() << " Note: ";
+    break;
+  }
+  outs() << swiftparse_diagnostic_get_message(diag) << "\n";
+  for(unsigned i = 0, n = swiftparse_diagnostic_get_range_count(diag); i < n; i ++) {
+    auto range = swiftparse_diagnostic_get_range(diag, i);
+    outs() << "Highlight range:";
+    printRange(SM, BufferId, range, outs());
+    outs() << "\n";
+  }
+  for(unsigned i = 0, n = swiftparse_diagnostic_get_fixit_count(diag); i < n; i ++) {
+    auto fixit = swiftparse_diagnostic_get_fixit(diag, i);
+    printRange(SM, BufferId, fixit.range, outs());
+    outs() << " Fixit: \"" << fixit.text << "\"\n";
+  }
+}
+
+static int dumpDiagnostics(const char* source, llvm::SourceMgr &SM,
+                           unsigned BufferId) {
+  swiftparse_node_handler_t nodeHandler =
+  ^swiftparse_client_node_t(const swiftparse_syntax_node_t *raw_node) {
+    return makeNode(raw_node, source);
+  };
+  std::shared_ptr<PrintDiagData> pData = std::make_shared<PrintDiagData>();
+  convertClientNode(parse(source, nodeHandler,
+      ^(const swiftparser_diagnostic_t diag) {
+    printDiagInfo(diag, SM, BufferId, const_cast<PrintDiagData&>(*pData));
+  }));
   return 0;
 }
 
@@ -198,6 +277,7 @@ int main(int argc, char *argv[]) {
   cl::ParseCommandLineOptions(argc, argv, "Swift Syntax Parser Test\n");
 
   StringRef fname = options::Filename[0];
+  llvm::SourceMgr SM;
   auto fileBufOrErr = MemoryBuffer::getFile(fname);
   if (!fileBufOrErr) {
     errs() << "error opening file '" << fname << "': "
@@ -205,11 +285,13 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   StringRef source = fileBufOrErr.get()->getBuffer();
-
+  auto BufferId = SM.AddNewSourceBuffer(std::move(*fileBufOrErr), SMLoc());
   switch (options::Action) {
   case ActionType::DumpTree:
     return dumpTree(source.data());
   case ActionType::Time:
     return timeParsing(source.data(), options::NumParses);
+  case ActionType::Diagnostics:
+    return dumpDiagnostics(source.data(), SM, BufferId);
   }
 }
