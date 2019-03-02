@@ -14,7 +14,7 @@
 
 // CHECK-BASIC-YAML-LABEL: depends-external:
 // CHECK-BASIC-YAML-NOT: empty\ file.swift
-// CHECK-BASIC-YAML: "{{.*}}{{/|\\}}Swift.swiftmodule"
+// CHECK-BASIC-YAML: "{{.*}}{{/|\\}}Swift.swiftmodule{{(/.+[.]swiftmodule)?}}"
 // CHECK-BASIC-YAML-NOT: {{:$}}
 
 
@@ -80,7 +80,7 @@
 
 // CHECK-IMPORT-YAML-LABEL: depends-external:
 // CHECK-IMPORT-YAML-NOT: dependencies.swift
-// CHECK-IMPORT-YAML-DAG: "{{.*}}{{/|\\}}Swift.swiftmodule"
+// CHECK-IMPORT-YAML-DAG: "{{.*}}{{/|\\}}Swift.swiftmodule{{(/.+[.]swiftmodule)?}}"
 // CHECK-IMPORT-YAML-DAG: "{{.*}}Inputs/dependencies/$$$$$.h"
 // CHECK-IMPORT-YAML-DAG: "{{.*}}Inputs/dependencies{{/|\\\\}}UserClangModule.h"
 // CHECK-IMPORT-YAML-DAG: "{{.*}}Inputs/dependencies/extra-header.h"
