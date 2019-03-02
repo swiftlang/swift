@@ -62,8 +62,8 @@ PrintOptions PrintOptions::printTypeInterface(Type T) {
   result.PrintExtensionFromConformingProtocols = true;
   result.TransformContext = TypeTransformContext(T);
   result.printExtensionContentAsMembers = [T](const ExtensionDecl *ED) {
-    return isExtensionApplied(*T->getNominalOrBoundGenericNominal()->
-                              getDeclContext(), T, ED);
+    return isExtensionApplied(
+        T->getNominalOrBoundGenericNominal()->getDeclContext(), T, ED);
   };
   result.CurrentPrintabilityChecker.reset(new ModulePrinterPrintableChecker());
   return result;

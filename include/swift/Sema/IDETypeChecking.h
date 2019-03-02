@@ -81,9 +81,15 @@ namespace swift {
   /// decide if the extension has been applied, i.e. if the requirements of the
   /// extension have been fulfilled.
   /// \returns True on applied, false on not applied.
-  bool isExtensionApplied(DeclContext &DC, Type Ty, const ExtensionDecl *ED);
+  bool isExtensionApplied(const DeclContext *DC, Type Ty,
+                          const ExtensionDecl *ED);
 
-/// The kind of type checking to perform for code completion.
+  /// Given a type and an member value decl , decide if the decl is applied,
+  /// i.e. if the \c where requirements of the decl have been fulfilled.
+  /// \returns True on applied, false on not applied.
+  bool isMemberDeclApplied(const DeclContext *DC, Type Ty, const ValueDecl *VD);
+
+  /// The kind of type checking to perform for code completion.
   enum class CompletionTypeCheckKind {
     /// Type check the expression as normal.
     Normal,
