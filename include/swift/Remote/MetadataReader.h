@@ -255,7 +255,7 @@ public:
   }
 
   /// Given a demangle tree, attempt to turn it into a type.
-  BuiltType decodeMangledType(const Demangle::NodePointer &Node) {
+  BuiltType decodeMangledType(NodePointer Node) {
     return swift::Demangle::decodeMangledType(Builder, Node);
   }
 
@@ -2129,9 +2129,10 @@ private:
     }
 
     if (importInfo && !importInfo->RelatedEntityName.empty()) {
-      auto relatedNode =
-        dem.createNode(Node::Kind::RelatedEntityDeclName,
-                               std::move(importInfo->RelatedEntityName));
+      auto kindNode = dem.createNode(Node::Kind::Identifier,
+                                 std::move(importInfo->RelatedEntityName));
+      auto relatedNode = dem.createNode(Node::Kind::RelatedEntityDeclName);
+      relatedNode->addChild(kindNode, dem);
       relatedNode->addChild(nameNode, dem);
       nameNode = relatedNode;
     }

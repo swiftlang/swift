@@ -132,7 +132,7 @@ public:
   /// new memory address.
   /// The \p Capacity is enlarged at least by \p MinGrowth, but can also be
   /// enlarged by a bigger value.
-  template<typename T> void Reallocate(T *&Objects, size_t &Capacity,
+  template<typename T> void Reallocate(T *&Objects, uint32_t &Capacity,
                                        size_t MinGrowth) {
     size_t OldAllocSize = Capacity * sizeof(T);
     size_t AdditionalAlloc = MinGrowth * sizeof(T);
@@ -203,8 +203,8 @@ template<typename T> class Vector {
 
 protected:
   T *Elems = nullptr;
-  size_t NumElems = 0;
-  size_t Capacity = 0;
+  uint32_t NumElems = 0;
+  uint32_t Capacity = 0;
 
 public:
   using iterator = T *;
@@ -469,7 +469,7 @@ protected:
   NodePointer demangleThunkOrSpecialization();
   NodePointer demangleGenericSpecialization(Node::Kind SpecKind);
   NodePointer demangleFunctionSpecialization();
-  NodePointer demangleFuncSpecParam(Node::IndexType ParamIdx);
+  NodePointer demangleFuncSpecParam(Node::Kind Kind);
   NodePointer addFuncSpecParamNumber(NodePointer Param,
                               FunctionSigSpecializationParamKind Kind);
 

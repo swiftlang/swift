@@ -169,8 +169,10 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
         auto nameNode = Dem.createNode(Node::Kind::Identifier,
                                        identity.getABIName());
         if (identity.isAnyRelatedEntity()) {
-          auto relatedName = Dem.createNode(Node::Kind::RelatedEntityDeclName,
-                                            identity.getRelatedEntityName());
+          auto kindNode = Dem.createNode(Node::Kind::Identifier,
+                                     identity.getRelatedEntityName());
+          auto relatedName = Dem.createNode(Node::Kind::RelatedEntityDeclName);
+          relatedName->addChild(kindNode, Dem);
           relatedName->addChild(nameNode, Dem);
           nameNode = relatedName;
         }
