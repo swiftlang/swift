@@ -143,12 +143,22 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
       stderrContents = stderrBuffer.get()->getBuffer();
     }
 
-    if (ReturnCode == -2) {
+#if defined(_WIN32)
+    // Wait() sets the upper two bits of the return code to indicate warnings
+    // (10) and errors (11).
+    //
+    // This isn't a true signal on Windows, but we'll treat it as such so that
+    // we clean up after it properly
+    bool crashed = ReturnCode & 0xC0000000;
+#else
       // Wait() returning a return code of -2 indicates the process received
       // a signal during execution.
+    bool crashed = ReturnCode == -2;
+#endif
+    if (crashed) {
       if (Signalled) {
         TaskFinishedResponse Response =
-            Signalled(PI.Pid, ErrMsg, stdoutContents, stderrContents, T->Context, None, TaskProcessInformation(PI.Pid));
+            Signalled(PI.Pid, ErrMsg, stdoutContents, stderrContents, T->Context, ReturnCode, TaskProcessInformation(PI.Pid));
         ContinueExecution = Response != TaskFinishedResponse::StopExecution;
       } else {
         // If we don't have a Signalled callback, unconditionally stop.
