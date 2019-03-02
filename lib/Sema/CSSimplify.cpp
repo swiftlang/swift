@@ -4828,10 +4828,10 @@ Type ConstraintSystem::simplifyAppliedOverloads(
   if (!disjunction) return fnType;
 
   /// The common result type amongst all function overloads.
-  Optional<Type> commonResultType;
+  Type commonResultType;
   auto updateCommonResultType = [&](Type choiceType) {
     auto markFailure = [&] {
-      commonResultType = Type();
+      commonResultType = ErrorType::get(getASTContext());
     };
 
     auto choiceFnType = choiceType->getAs<FunctionType>();
@@ -4850,12 +4850,8 @@ Type ConstraintSystem::simplifyAppliedOverloads(
       return;
     }
 
-    // If we already failed, we're done.
-    if (commonResultType->isNull())
-      return;
-
     // If we found something different, fail.
-    if (!commonResultType.getValue()->isEqual(choiceResultType))
+    if (!commonResultType->isEqual(choiceResultType))
       return markFailure();
   };
 
@@ -4919,19 +4915,19 @@ retry_after_fail:
     return fnType;
 
   // If we have a common result type, bind the expected result type to it.
-  if (commonResultType && *commonResultType) {
+  if (commonResultType && !commonResultType->is<ErrorType>()) {
     ASTContext &ctx = getASTContext();
     if (ctx.LangOpts.DebugConstraintSolver) {
       auto &log = ctx.TypeCheckerDebug->getStream();
       log.indent(solverState ? solverState->depth * 2 + 2 : 0)
         << "(common result type for $T" << fnTypeVar->getID() << " is "
-        << commonResultType->getString()
+        << commonResultType.getString()
         << ")\n";
     }
 
     // FIXME: Could also rewrite fnType to include this result type.
     addConstraint(ConstraintKind::Bind, argFnType->getResult(),
-                  *commonResultType, locator);
+                  commonResultType, locator);
   }
 
   return fnType;
