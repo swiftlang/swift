@@ -139,6 +139,25 @@ bool constraints::areConservativelyCompatibleArgumentLabels(
       decl, hasCurriedSelf, labels, hasTrailingClosure);
 }
 
+Expr *constraints::getArgumentLabelTargetExpr(Expr *fn) {
+  // Dig out the function, looking through, parentheses, ?, and !.
+  do {
+    fn = fn->getSemanticsProvidingExpr();
+
+    if (auto force = dyn_cast<ForceValueExpr>(fn)) {
+      fn = force->getSubExpr();
+      continue;
+    }
+
+    if (auto bind = dyn_cast<BindOptionalExpr>(fn)) {
+      fn = bind->getSubExpr();
+      continue;
+    }
+
+    return fn;
+  } while (true);
+}
+
 bool constraints::
 areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
                                           bool hasCurriedSelf,
@@ -3289,13 +3308,6 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
     }
 
     if (parts.back().getKind() == ConstraintLocator::ConstructorMember) {
-      // FIXME: Workaround for strange anchor on ConstructorMember locators.
-
-      if (auto optionalWrapper = dyn_cast<BindOptionalExpr>(anchor))
-        anchor = optionalWrapper->getSubExpr();
-      else if (auto forceWrapper = dyn_cast<ForceValueExpr>(anchor))
-        anchor = forceWrapper->getSubExpr();
-
       parts.pop_back();
       continue;
     }
@@ -3306,6 +3318,7 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
   if (!parts.empty())
     return None;
 
+  anchor = getArgumentLabelTargetExpr(anchor);
   auto known = cs.ArgumentLabels.find(cs.getConstraintLocator(anchor));
   if (known == cs.ArgumentLabels.end())
     return None;

@@ -3544,6 +3544,10 @@ matchCallArguments(ConstraintSystem &cs,
                    ArrayRef<AnyFunctionType::Param> params,
                    ConstraintLocatorBuilder locator);
 
+/// Given an expression that is the target of argument labels (for a call,
+/// subscript, etc.), find the underlying target expression.
+Expr *getArgumentLabelTargetExpr(Expr *fn);
+
 /// Attempt to prove that arguments with the given labels at the
 /// given parameter depth cannot be used with the given value.
 /// If this cannot be proven, conservatively returns true.
