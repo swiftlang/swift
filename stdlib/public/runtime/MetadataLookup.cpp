@@ -521,10 +521,11 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
         // Declarations synthesized by the Clang importer get a small tag
         // string in addition to their name.
         if (nameNode->getKind() == Demangle::Node::Kind::RelatedEntityDeclName){          
-          if (!getIdentity().isRelatedEntity(nameNode->getText()))
+          if (!getIdentity().isRelatedEntity(
+                                        nameNode->getFirstChild()->getText()))
             return false;
           
-          nameNode = nameNode->getChild(0);
+          nameNode = nameNode->getChild(1);
         } else if (getIdentity().isAnyRelatedEntity()) {
           return false;
         }
@@ -693,7 +694,7 @@ void swift::swift_registerProtocols(const ProtocolRecord *begin,
 
 static const ProtocolDescriptor *
 _searchProtocolRecords(ProtocolMetadataPrivateState &C,
-                       const Demangle::NodePointer &node) {
+                       NodePointer node) {
   for (auto &section : C.SectionsToScan.snapshot()) {
     for (const auto &record : section) {
       if (auto protocol = record.Protocol.getPointer()) {
@@ -707,7 +708,7 @@ _searchProtocolRecords(ProtocolMetadataPrivateState &C,
 }
 
 static const ProtocolDescriptor *
-_findProtocolDescriptor(const Demangle::NodePointer &node,
+_findProtocolDescriptor(NodePointer node,
                         Demangle::Demangler &Dem,
                         std::string &mangledName) {
   const ProtocolDescriptor *foundProtocol = nullptr;
@@ -944,14 +945,14 @@ public:
 
   Demangle::NodeFactory &getNodeFactory() { return demangler; }
 
-  BuiltTypeDecl createTypeDecl(const Demangle::NodePointer &node,
+  BuiltTypeDecl createTypeDecl(NodePointer node,
                                bool &typeAlias) const {
     // Look for a nominal type descriptor based on its mangled name.
     return _findNominalTypeDescriptor(node, demangler);
   }
 
   BuiltProtocolDecl createProtocolDecl(
-                                    const Demangle::NodePointer &node) const {
+                                    NodePointer node) const {
     // Look for a protocol descriptor based on its mangled name.
     std::string mangledName;
     if (auto protocol = _findProtocolDescriptor(node, demangler, mangledName))
@@ -1241,6 +1242,26 @@ public:
 
   TypeReferenceOwnership getReferenceOwnership() const {
     return ReferenceOwnership;
+  }
+
+  BuiltType createOptionalType(BuiltType base) {
+    // Mangled types for building metadata don't contain sugared types
+    return BuiltType();
+  }
+
+  BuiltType createArrayType(BuiltType base) {
+    // Mangled types for building metadata don't contain sugared types
+    return BuiltType();
+  }
+
+  BuiltType createDictionaryType(BuiltType key, BuiltType value) {
+    // Mangled types for building metadata don't contain sugared types
+    return BuiltType();
+  }
+
+  BuiltType createParenType(BuiltType base) {
+    // Mangled types for building metadata don't contain sugared types
+    return BuiltType();
   }
 };
 
