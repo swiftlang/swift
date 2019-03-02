@@ -60,12 +60,12 @@
 // RUN: %empty-directory(%t/Lib.swiftmodule)
 // RUN: touch %t/Lib.swiftmodule/garbage.swiftmodule
 // RUN: touch %t/Lib.swiftmodule/garbage.swiftinterface
-// RUN: not env SWIFT_FORCE_MODULE_LOADING=prefer-parseable %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=WRONG-ARCH -DARCH=%target-cpu %s
-// RUN: not env SWIFT_FORCE_MODULE_LOADING=prefer-serialized %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=WRONG-ARCH -DARCH=%target-cpu %s
+// RUN: not env SWIFT_FORCE_MODULE_LOADING=prefer-parseable %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=WRONG-ARCH -DARCH=%module-target-triple %s
+// RUN: not env SWIFT_FORCE_MODULE_LOADING=prefer-serialized %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=WRONG-ARCH -DARCH=%module-target-triple %s
 // RUN: not env SWIFT_FORCE_MODULE_LOADING=only-parseable %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=NO-SUCH-MODULE %s
-// RUN: not env SWIFT_FORCE_MODULE_LOADING=only-serialized %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=WRONG-ARCH -DARCH=%target-cpu %s
+// RUN: not env SWIFT_FORCE_MODULE_LOADING=only-serialized %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=WRONG-ARCH -DARCH=%module-target-triple %s
 // (default)
-// RUN: not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP -I %t %s 2>&1 | %FileCheck -check-prefix=WRONG-ARCH -DARCH=%target-cpu %s
+// RUN: not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP -I %t %s 2>&1 | %FileCheck -check-prefix=WRONG-ARCH -DARCH=%module-target-triple %s
 
 // 8. Only the interface is present but for the wrong architecture.
 // (Diagnostics for the module only are tested elsewhere.)
@@ -81,7 +81,7 @@
 import Lib
 // NO-SUCH-MODULE: [[@LINE-1]]:8: error: no such module 'Lib'
 // BAD-MODULE: [[@LINE-2]]:8: error: malformed module file: {{.*}}Lib.swiftmodule
-// WRONG-ARCH: [[@LINE-3]]:8: error: could not find module 'Lib' for architecture '[[ARCH]]'; found: garbage
+// WRONG-ARCH: [[@LINE-3]]:8: error: could not find module 'Lib' for target '[[ARCH]]'; found: garbage
 
 struct X {}
 let _: X = Lib.testValue
