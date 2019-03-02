@@ -24,16 +24,42 @@
 #include "ImageInspectionELF.h"
 #include <cstdint>
 #include <cstddef>
+#if defined(__cplusplus)
+#include <memory>
+#endif
 
 namespace swift {
 
 /// This is a platform independent version of Dl_info from dlfcn.h
+#if defined(__cplusplus)
+
+template <typename T>
+struct null_deleter {
+  void operator()(T *) const {}
+  void operator()(typename std::remove_cv<T>::type *value) const {}
+};
+
+template <typename T>
+struct free_deleter {
+  void operator()(T *value) const {
+    free(const_cast<typename std::remove_cv<T>::type *>(value));
+  }
+  void operator()(typename std::remove_cv<T>::type *value) const {
+    free(value);
+  }
+};
+
 struct SymbolInfo {
   const char *fileName;
   void *baseAddress;
-  const char *symbolName;
+#if defined(_WIN32)
+  std::unique_ptr<const char, free_deleter<const char>> symbolName;
+#else
+  std::unique_ptr<const char, null_deleter<const char>> symbolName;
+#endif
   void *symbolAddress;
 };
+#endif
 
 /// Load the metadata from the image necessary to find protocols by name.
 void initializeProtocolLookup();
