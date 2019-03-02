@@ -29,7 +29,6 @@
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Analysis/DomainSpecific/CocoaConventions.h"
-#include "clang/Basic/CharInfo.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
@@ -221,7 +220,7 @@ enum class ConventionsKind : uint8_t {
   ObjCMethod = 2,
   CFunctionType = 3,
   CFunction = 4,
-  SelectorFamily = 5,
+  ObjCSelectorFamily = 5,
   Deallocator = 6,
   Capture = 7,
 };
@@ -1710,64 +1709,27 @@ static const clang::Decl *findClangMethod(ValueDecl *method) {
 //                      Selector Family SILFunctionTypes
 //===----------------------------------------------------------------------===//
 
-/// Apply a macro FAMILY(Name, Prefix) to all ObjC selector families.
-#define FOREACH_FAMILY(FAMILY)       \
-  FAMILY(Alloc, "alloc")             \
-  FAMILY(Copy, "copy")               \
-  FAMILY(Init, "init")               \
-  FAMILY(MutableCopy, "mutableCopy") \
-  FAMILY(New, "new")
-
-namespace {
-  enum class SelectorFamily : unsigned {
-    None,
-#define GET_LABEL(LABEL, PREFIX) LABEL,
-FOREACH_FAMILY(GET_LABEL)
-#undef GET_LABEL
-  };
-} // end anonymous namespace
-
 /// Derive the ObjC selector family from an identifier.
 ///
 /// Note that this will never derive the Init family, which is too dangerous
 /// to leave to chance. Swift functions starting with "init" are always
 /// emitted as if they are part of the "none" family.
-static SelectorFamily getSelectorFamily(Identifier name) {
-  StringRef text = name.get();
-  while (!text.empty() && text[0] == '_') text = text.substr(1);
+static ObjCSelectorFamily getObjCSelectorFamily(ObjCSelector name) {
+  auto result = name.getSelectorFamily();
 
-  // Does the given selector start with the given string as a prefix, in the
-  // sense of the selector naming conventions?
-  // This implementation matches the one used by
-  // clang::Selector::getMethodFamily, to make sure we behave the same as Clang
-  // ARC. We're not just calling that method here because it means allocating a
-  // clang::IdentifierInfo, which requires a Clang ASTContext.
-  auto hasPrefix = [](StringRef text, StringRef prefix) {
-    if (!text.startswith(prefix)) return false;
-    if (text.size() == prefix.size()) return true;
-    assert(text.size() > prefix.size());
-    return !clang::isLowercase(text[prefix.size()]);
-  };
+  if (result == ObjCSelectorFamily::Init)
+    return ObjCSelectorFamily::None;
 
-  auto result = SelectorFamily::None;
-  if (false) /*for #define purposes*/;
-#define CHECK_PREFIX(LABEL, PREFIX) \
-  else if (hasPrefix(text, PREFIX)) result = SelectorFamily::LABEL;
-  FOREACH_FAMILY(CHECK_PREFIX)
-#undef CHECK_PREFIX
-
-  if (result == SelectorFamily::Init)
-    return SelectorFamily::None;
   return result;
 }
 
 /// Get the ObjC selector family a foreign SILDeclRef belongs to.
-static SelectorFamily getSelectorFamily(SILDeclRef c) {
+static ObjCSelectorFamily getObjCSelectorFamily(SILDeclRef c) {
   assert(c.isForeign);
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
     if (!c.hasDecl())
-      return SelectorFamily::None;
+      return ObjCSelectorFamily::None;
       
     auto *FD = cast<FuncDecl>(c.getDecl());
     if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
@@ -1783,11 +1745,11 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
       }
     }
 
-    return getSelectorFamily(FD->getObjCSelector().getSelectorPieces().front());
+    return getObjCSelectorFamily(FD->getObjCSelector());
   }
   case SILDeclRef::Kind::Initializer:
   case SILDeclRef::Kind::IVarInitializer:
-    return SelectorFamily::Init;
+    return ObjCSelectorFamily::Init;
 
   /// Currently IRGen wraps alloc/init methods into Swift constructors
   /// with Swift conventions.
@@ -1796,7 +1758,7 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator:
   case SILDeclRef::Kind::IVarDestroyer:
-    return SelectorFamily::None;
+    return ObjCSelectorFamily::None;
 
   case SILDeclRef::Kind::EnumElement:
   case SILDeclRef::Kind::GlobalAccessor:
@@ -1810,12 +1772,12 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
 
 namespace {
 
-class SelectorFamilyConventions : public Conventions {
-  SelectorFamily Family;
+class ObjCSelectorFamilyConventions : public Conventions {
+  ObjCSelectorFamily Family;
 
 public:
-  SelectorFamilyConventions(SelectorFamily family)
-    : Conventions(ConventionsKind::SelectorFamily), Family(family) {}
+  ObjCSelectorFamilyConventions(ObjCSelectorFamily family)
+    : Conventions(ConventionsKind::ObjCSelectorFamily), Family(family) {}
 
   ParameterConvention getIndirectParameter(unsigned index,
                                            const AbstractionPattern &type,
@@ -1836,14 +1798,14 @@ public:
 
   ResultConvention getResult(const TypeLowering &tl) const override {
     switch (Family) {
-    case SelectorFamily::Alloc:
-    case SelectorFamily::Copy:
-    case SelectorFamily::Init:
-    case SelectorFamily::MutableCopy:
-    case SelectorFamily::New:
+    case ObjCSelectorFamily::Alloc:
+    case ObjCSelectorFamily::Copy:
+    case ObjCSelectorFamily::Init:
+    case ObjCSelectorFamily::MutableCopy:
+    case ObjCSelectorFamily::New:
       return ResultConvention::Owned;
 
-    case SelectorFamily::None:
+    case ObjCSelectorFamily::None:
       // Defaults below.
       break;
     }
@@ -1860,7 +1822,7 @@ public:
 
   ParameterConvention
   getDirectSelfParameter(const AbstractionPattern &type) const override {
-    if (Family == SelectorFamily::Init)
+    if (Family == ObjCSelectorFamily::Init)
       return ParameterConvention::Direct_Owned;
     return ObjCSelfConvention;
   }
@@ -1872,21 +1834,21 @@ public:
   }
 
   static bool classof(const Conventions *C) {
-    return C->getKind() == ConventionsKind::SelectorFamily;
+    return C->getKind() == ConventionsKind::ObjCSelectorFamily;
   }
 };
 
 } // end anonymous namespace
 
 static CanSILFunctionType
-getSILFunctionTypeForSelectorFamily(SILModule &M, SelectorFamily family,
-                                    CanAnyFunctionType origType,
-                                    CanAnyFunctionType substInterfaceType,
-                                    AnyFunctionType::ExtInfo extInfo,
-                                    const ForeignInfo &foreignInfo,
-                                    Optional<SILDeclRef> constant) {
+getSILFunctionTypeForObjCSelectorFamily(SILModule &M, ObjCSelectorFamily family,
+                                        CanAnyFunctionType origType,
+                                        CanAnyFunctionType substInterfaceType,
+                                        AnyFunctionType::ExtInfo extInfo,
+                                        const ForeignInfo &foreignInfo,
+                                        Optional<SILDeclRef> constant) {
   return getSILFunctionType(M, AbstractionPattern(origType), substInterfaceType,
-                            extInfo, SelectorFamilyConventions(family),
+                            extInfo, ObjCSelectorFamilyConventions(family),
                             foreignInfo, constant, constant,
                             /*requirement subs*/None,
                             /*witnessMethodConformance=*/None);
@@ -1967,10 +1929,10 @@ getUncachedSILFunctionTypeForConstant(SILModule &M,
 
   // If the decl belongs to an ObjC method family, use that family's
   // ownership conventions.
-  return getSILFunctionTypeForSelectorFamily(M, getSelectorFamily(constant),
-                                             origLoweredInterfaceType,
-                                             origLoweredInterfaceType,
-                                             extInfo, foreignInfo, constant);
+  return getSILFunctionTypeForObjCSelectorFamily(
+      M, getObjCSelectorFamily(constant),
+      origLoweredInterfaceType, origLoweredInterfaceType,
+      extInfo, foreignInfo, constant);
 }
 
 CanSILFunctionType TypeConverter::
