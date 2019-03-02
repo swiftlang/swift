@@ -1526,8 +1526,7 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
       // See ConstraintSystem::resolveOverload() -- optional and dynamic
       // subscripts are a special case, because the optionality is
       // applied to the result type and not the type of the reference.
-      if (subscript->getAttrs().hasAttribute<OptionalAttr>() ||
-          overload.getKind() == OverloadChoiceKind::DeclViaDynamic)
+      if (subscript->getAttrs().hasAttribute<OptionalAttr>())
         elementTy = OptionalType::get(elementTy->getRValueType());
 
       auto indices = subscript->getInterfaceType()
@@ -1559,10 +1558,13 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
       }
 
       type = type->castTo<FunctionType>()->getResult();
-    } else {
-      return type;
     }
   }
+
+  // Handle "@objc optional" for non-subscripts; subscripts are handled above.
+  if (decl->getAttrs().hasAttribute<OptionalAttr>() &&
+      !isa<SubscriptDecl>(decl))
+    type = OptionalType::get(type->getRValueType());
 
   return type;
 }
@@ -1821,7 +1823,7 @@ Type ConstraintSystem::findCommonOverloadType(
     // If we can't even get a type for the overload, there's nothing more to
     // do.
     Type overloadType =
-    getEffectiveOverloadType(overload, /*allowMembers=*/false, /*FIXME:*/DC);
+      getEffectiveOverloadType(overload, /*allowMembers=*/false, /*FIXME:*/DC);
     if (!overloadType) {
       return true;
     }
