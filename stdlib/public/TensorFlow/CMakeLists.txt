@@ -37,6 +37,7 @@ set(SOURCES
   CompositeMath.swift
   Dataset.swift
   DataTypes.swift
+  Execution.swift
   Gradients.swift
   Ops.swift
   ShapedArray.swift
