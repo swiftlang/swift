@@ -224,6 +224,9 @@ private:
 
   bool useASTScopesForExperimentalLookup() const;
 
+  /// For testing, assume this lookup is enabled:
+  bool useASTScopesForExperimentalLookupIfEnabled() const;
+
   void lookUpTopLevelNamesInModuleScopeContext(DeclContext *);
 
 #pragma mark ASTScope-based-lookup declarations
@@ -386,6 +389,8 @@ private:
       DeclContext *lookupContextForThisContext);
 
   void dumpBreadcrumbs() const;
+
+  bool verifyEqualTo(const UnqualifiedLookupFactory &&) const;
 };
 } // namespace
 
@@ -453,9 +458,14 @@ void UnqualifiedLookupFactory::lookUpTopLevelNamesInModuleScopeContext(
 }
 
 bool UnqualifiedLookupFactory::useASTScopesForExperimentalLookup() const {
+  return Ctx.LangOpts.EnableASTScopeLookup &&
+         useASTScopesForExperimentalLookupIfEnabled();
+}
+
+bool UnqualifiedLookupFactory::useASTScopesForExperimentalLookupIfEnabled()
+    const {
   return Loc.isValid() && DC->getParentSourceFile() &&
-         DC->getParentSourceFile()->Kind != SourceFileKind::REPL &&
-         Ctx.LangOpts.EnableASTScopeLookup;
+         DC->getParentSourceFile()->Kind != SourceFileKind::REPL;
 }
 
 #pragma mark ASTScope-based-lookup definitions
@@ -1189,4 +1199,26 @@ TypeDecl *UnqualifiedLookup::getSingleTypeResult() const {
   if (Results.size() != 1)
     return nullptr;
   return dyn_cast<TypeDecl>(Results.back().getValueDecl());
+}
+
+bool UnqualifiedLookupFactory::verifyEqualTo(
+    const UnqualifiedLookupFactory &&other) const {
+  assert(Results.size() == other.Results.size());
+  for (size_t i : indices(Results)) {
+    const auto &e = Results[i];
+    const auto &oe = other.Results[i];
+    assert(e.getValueDecl() == oe.getValueDecl());
+    assert(e.getDeclContext() == oe.getDeclContext());
+    // unsigned printContext(llvm::raw_ostream &OS, unsigned indent = 0,
+    // bool onlyAPartialLine = false) const;
+    assert(e.getBaseDecl() == oe.getBaseDecl());
+  }
+  assert(IndexOfFirstOuterResult == other.IndexOfFirstOuterResult);
+  assert(recordedSF == other.recordedSF);
+  assert(recordedName == other.recordedName);
+  if (recordedIsCascadingUse)
+    assert(other.recordedIsCascadingUse);
+  else
+    assert(!other.recordedIsCascadingUse);
+  return true;
 }
