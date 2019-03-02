@@ -1537,11 +1537,26 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
       type = var->getValueInterfaceType();
       if (doesStorageProduceLValue(var, overload.getBaseType(), useDC))
         type = LValueType::get(type);
-    } else if (isa<FuncDecl>(decl) || isa<EnumElementDecl>(decl)) {
+    } else if (isa<AbstractFunctionDecl>(decl) || isa<EnumElementDecl>(decl)) {
       if (decl->isInstanceMember() &&
           (!overload.getBaseType() ||
            !overload.getBaseType()->getAnyNominal()))
         return Type();
+
+      // Cope with 'Self' returns.
+      if (!decl->getDeclContext()->getSelfProtocolDecl()) {
+        if ((isa<FuncDecl>(decl) && cast<FuncDecl>(decl)->hasDynamicSelf()) ||
+            (isa<ConstructorDecl>(decl) &&
+             !overload.getBaseType()->getOptionalObjectType())) {
+          if (!overload.getBaseType())
+            return Type();
+
+          Type selfType = overload.getBaseType()->getRValueType()
+              ->getMetatypeInstanceType()
+              ->lookThroughAllOptionalTypes();
+          type = type->replaceCovariantResultType(selfType, 2);
+        }
+      }
 
       type = type->castTo<FunctionType>()->getResult();
     } else {

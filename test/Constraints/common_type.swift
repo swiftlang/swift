@@ -48,3 +48,35 @@ func testCommonTypeIUO() {
   // CHECK-NOT: common result type
     _ = f(0).iuo(0)
 }
+
+struct Z {
+  init(a: Int) { }
+  init(a: Double) { }
+
+  init(b: Int) { }
+  init?(b: Double) { }
+}
+
+func testCommonTypeInit() {
+  // CHECK: common result type for {{.*}} is Z
+  _ = Z(a: 0)
+
+  // CHECK-NOT: common result type
+  _ = Z(b: 0)
+}
+
+class DynamicSelf {
+  func foo(_ a: Int) -> Self { return self }
+  func foo(_ a: Double) -> Self { return self }
+}
+
+class InheritsDynamicSelf: DynamicSelf {
+}
+
+func testCommonTypeDynamicSelf(ds: DynamicSelf, ids: InheritsDynamicSelf) {
+  // CHECK: common result type for {{.*}} is DynamicSelf
+  _ = ds.foo(0)
+  // CHECK: common result type for {{.*}} is InheritsDynamicSelf
+  _ = ids.foo(0)
+}
+
