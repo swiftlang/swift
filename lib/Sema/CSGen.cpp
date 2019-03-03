@@ -3582,22 +3582,7 @@ namespace {
 
     void associateArgumentLabels(Expr *fn, State labels,
                                  bool labelsArePermanent) {
-      // Dig out the function, looking through, parentheses, ?, and !.
-      do {
-        fn = fn->getSemanticsProvidingExpr();
-
-        if (auto force = dyn_cast<ForceValueExpr>(fn)) {
-          fn = force->getSubExpr();
-          continue;
-        }
-
-        if (auto bind = dyn_cast<BindOptionalExpr>(fn)) {
-          fn = bind->getSubExpr();
-          continue;
-        }
-
-        break;
-      } while (true);
+      fn = getArgumentLabelTargetExpr(fn);
 
       // Record the labels.
       if (!labelsArePermanent)
@@ -3610,6 +3595,22 @@ namespace {
         associateArgumentLabels(call->getFn(),
                                 { call->getArgumentLabels(),
                                   call->hasTrailingClosure() },
+                                /*labelsArePermanent=*/true);
+        return { true, expr };
+      }
+
+      if (auto subscript = dyn_cast<SubscriptExpr>(expr)) {
+        associateArgumentLabels(subscript,
+                                { subscript->getArgumentLabels(),
+                                  subscript->hasTrailingClosure() },
+                                /*labelsArePermanent=*/true);
+        return { true, expr };
+      }
+
+      if (auto unresolvedMember = dyn_cast<UnresolvedMemberExpr>(expr)) {
+        associateArgumentLabels(unresolvedMember,
+                                { unresolvedMember->getArgumentLabels(),
+                                  unresolvedMember->hasTrailingClosure() },
                                 /*labelsArePermanent=*/true);
         return { true, expr };
       }

@@ -93,16 +93,86 @@ static Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
   return dist;
 }
 
+bool constraints::areConservativelyCompatibleArgumentLabels(
+                                               OverloadChoice choice,
+                                               ArrayRef<Identifier> labels,
+                                               bool hasTrailingClosure) {
+  ValueDecl *decl = nullptr;
+  Type baseType;
+  switch (choice.getKind()) {
+  case OverloadChoiceKind::Decl:
+  case OverloadChoiceKind::DeclViaBridge:
+  case OverloadChoiceKind::DeclViaDynamic:
+  case OverloadChoiceKind::DeclViaUnwrappedOptional:
+    decl = choice.getDecl();
+    baseType = choice.getBaseType();
+    if (baseType)
+      baseType = baseType->getRValueType();
+    break;
+
+  case OverloadChoiceKind::KeyPathApplication:
+    // Key path applications are written as if subscript[keyPath:].
+    return !hasTrailingClosure && labels.size() == 1 && labels[0].is("keyPath");
+
+  case OverloadChoiceKind::BaseType:
+  case OverloadChoiceKind::DynamicMemberLookup:
+  case OverloadChoiceKind::TupleIndex:
+    return true;
+  }
+
+  // This is a member lookup, which generally means that the call arguments
+  // (if we have any) will apply to the second level of parameters, with
+  // the member lookup binding the first level.  But there are cases where
+  // we can get an unapplied declaration reference back.
+  bool hasCurriedSelf;
+  if (isa<SubscriptDecl>(decl)) {
+    hasCurriedSelf = false;
+  } else if (!baseType || baseType->is<ModuleType>()) {
+    hasCurriedSelf = false;
+  } else if (baseType->is<AnyMetatypeType>() && decl->isInstanceMember()) {
+    hasCurriedSelf = false;
+  } else {
+    hasCurriedSelf = true;
+  }
+
+  return areConservativelyCompatibleArgumentLabels(
+      decl, hasCurriedSelf, labels, hasTrailingClosure);
+}
+
+Expr *constraints::getArgumentLabelTargetExpr(Expr *fn) {
+  // Dig out the function, looking through, parentheses, ?, and !.
+  do {
+    fn = fn->getSemanticsProvidingExpr();
+
+    if (auto force = dyn_cast<ForceValueExpr>(fn)) {
+      fn = force->getSubExpr();
+      continue;
+    }
+
+    if (auto bind = dyn_cast<BindOptionalExpr>(fn)) {
+      fn = bind->getSubExpr();
+      continue;
+    }
+
+    return fn;
+  } while (true);
+}
+
 bool constraints::
 areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
                                           bool hasCurriedSelf,
                                           ArrayRef<Identifier> labels,
                                           bool hasTrailingClosure) {
-  // Bail out conservatively if this isn't a function declaration.
-  auto fn = dyn_cast<AbstractFunctionDecl>(decl);
-  if (!fn) return true;
-  
-  auto *fTy = fn->getInterfaceType()->castTo<AnyFunctionType>();
+  const AnyFunctionType *fTy;
+
+  if (auto fn = dyn_cast<AbstractFunctionDecl>(decl)) {
+    fTy = fn->getInterfaceType()->castTo<AnyFunctionType>();
+  } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+    assert(!hasCurriedSelf && "Subscripts never have curried 'self'");
+    fTy = subscript->getInterfaceType()->castTo<AnyFunctionType>();
+  } else {
+    return true;
+  }
   
   SmallVector<AnyFunctionType::Param, 8> argInfos;
   for (auto argLabel : labels) {
@@ -3293,13 +3363,6 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
     }
 
     if (parts.back().getKind() == ConstraintLocator::ConstructorMember) {
-      // FIXME: Workaround for strange anchor on ConstructorMember locators.
-
-      if (auto optionalWrapper = dyn_cast<BindOptionalExpr>(anchor))
-        anchor = optionalWrapper->getSubExpr();
-      else if (auto forceWrapper = dyn_cast<ForceValueExpr>(anchor))
-        anchor = forceWrapper->getSubExpr();
-
       parts.pop_back();
       continue;
     }
@@ -3310,6 +3373,7 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
   if (!parts.empty())
     return None;
 
+  anchor = getArgumentLabelTargetExpr(anchor);
   auto known = cs.ArgumentLabels.find(cs.getConstraintLocator(anchor));
   if (known == cs.ArgumentLabels.end())
     return None;
@@ -3485,31 +3549,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     }
   }
 
-  /// Determine whether the given declaration has compatible argument
-  /// labels.
-  auto hasCompatibleArgumentLabels = [&argumentLabels](Type baseObjTy,
-                                                       ValueDecl *decl) -> bool {
-    if (!argumentLabels)
-      return true;
-
-    // This is a member lookup, which generally means that the call arguments
-    // (if we have any) will apply to the second level of parameters, with
-    // the member lookup binding the first level.  But there are cases where
-    // we can get an unapplied declaration reference back.
-    bool hasCurriedSelf;
-    if (baseObjTy->is<ModuleType>()) {
-      hasCurriedSelf = false;
-    } else if (baseObjTy->is<AnyMetatypeType>() && decl->isInstanceMember()) {
-      hasCurriedSelf = false;
-    } else {
-      hasCurriedSelf = true;
-    }
-
-    return areConservativelyCompatibleArgumentLabels(decl, hasCurriedSelf,
-                                          argumentLabels->Labels,
-                                          argumentLabels->HasTrailingClosure);
-  };
-
   // Look for members within the base.
   LookupResult &lookup = lookupMember(instanceTy, memberName);
 
@@ -3612,7 +3651,13 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
 
     // If the argument labels for this result are incompatible with
     // the call site, skip it.
-    if (!hasCompatibleArgumentLabels(baseObjTy, decl)) {
+    // FIXME: The subscript check here forces the use of the
+    // function-application simplification logic to handle labels.
+    if (argumentLabels &&
+        (!candidate.isDecl() || !isa<SubscriptDecl>(candidate.getDecl())) &&
+        !areConservativelyCompatibleArgumentLabels(
+            candidate, argumentLabels->Labels,
+            argumentLabels->HasTrailingClosure)) {
       labelMismatch = true;
       result.addUnviable(candidate, MemberLookupResult::UR_LabelMismatch);
       return;
@@ -4823,6 +4868,126 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
   return unsolved();
 }
 
+Type ConstraintSystem::simplifyAppliedOverloads(
+                                TypeVariableType *fnTypeVar,
+                                const FunctionType *argFnType,
+                                Optional<ArgumentLabelState> argumentLabels,
+                                ConstraintLocatorBuilder locator) {
+  Type fnType(fnTypeVar);
+
+  // Always work on the representation.
+  fnTypeVar = getRepresentative(fnTypeVar);
+
+  // Dig out the disjunction that describes this overload.
+  auto disjunction = getUnboundBindOverloadDisjunction(fnTypeVar);
+  if (!disjunction) return fnType;
+
+  /// The common result type amongst all function overloads.
+  Type commonResultType;
+  auto updateCommonResultType = [&](Type choiceType) {
+    auto markFailure = [&] {
+      commonResultType = ErrorType::get(getASTContext());
+    };
+
+    auto choiceFnType = choiceType->getAs<FunctionType>();
+    if (!choiceFnType)
+      return markFailure();
+
+    // For now, don't attempt to establish a common result type when there
+    // are type parameters.
+    Type choiceResultType = choiceFnType->getResult();
+    if (choiceResultType->hasTypeParameter())
+      return markFailure();
+
+    // If we haven't seen a common result type yet, record what we found.
+    if (!commonResultType) {
+      commonResultType = choiceResultType;
+      return;
+    }
+
+    // If we found something different, fail.
+    if (!commonResultType->isEqual(choiceResultType))
+      return markFailure();
+  };
+
+  // Consider each of the constraints in the disjunction.
+retry_after_fail:
+  bool hasUnhandledConstraints = false;
+  bool labelMismatch = false;
+  auto filterResult =
+      filterDisjunction(disjunction, /*restoreOnFail=*/shouldAttemptFixes(),
+                         [&](Constraint *constraint) {
+        assert(constraint->getKind() == ConstraintKind::BindOverload);
+
+        auto choice = constraint->getOverloadChoice();
+
+        // Determine whether the argument labels we have conflict with those of
+        // this overload choice.
+        if (argumentLabels &&
+            !areConservativelyCompatibleArgumentLabels(
+                choice, argumentLabels->Labels,
+                argumentLabels->HasTrailingClosure)) {
+          labelMismatch = true;
+          return false;
+        }
+
+        // Determine the type that this choice will have.
+        Type choiceType =
+            getEffectiveOverloadType(choice, /*allowMembers=*/true,
+                                     constraint->getOverloadUseDC());
+        if (!choiceType) {
+          hasUnhandledConstraints = true;
+          return true;
+        }
+
+        // If we have a function type, we can compute a common result type.
+        updateCommonResultType(choiceType);
+        return true;
+      });
+
+  switch (filterResult) {
+  case SolutionKind::Error:
+    if (labelMismatch && shouldAttemptFixes()) {
+      argumentLabels = None;
+      goto retry_after_fail;
+    }
+
+    return Type();
+
+  case SolutionKind::Solved:
+    // We should now have a type for the one remaining overload.
+    fnType = getFixedTypeRecursive(fnType, /*wantRValue=*/true);
+    break;
+
+  case SolutionKind::Unsolved:
+    break;
+  }
+
+
+  // If there was a constraint that we couldn't reason about, don't use the
+  // results of any common-type computations.
+  if (hasUnhandledConstraints)
+    return fnType;
+
+  // If we have a common result type, bind the expected result type to it.
+  if (commonResultType && !commonResultType->is<ErrorType>()) {
+    ASTContext &ctx = getASTContext();
+    if (ctx.LangOpts.DebugConstraintSolver) {
+      auto &log = ctx.TypeCheckerDebug->getStream();
+      log.indent(solverState ? solverState->depth * 2 + 2 : 0)
+        << "(common result type for $T" << fnTypeVar->getID() << " is "
+        << commonResultType.getString()
+        << ")\n";
+    }
+
+    // FIXME: Could also rewrite fnType to include this result type.
+    addConstraint(ConstraintKind::Bind, argFnType->getResult(),
+                  commonResultType, locator);
+  }
+
+  return fnType;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyApplicableFnConstraint(
                                            Type type1,
@@ -4876,23 +5041,16 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
   };
 
-  // If the right-hand side is a type variable, try to find a common result
-  // type in the overload set.
+  // If the right-hand side is a type variable, try to simplify the overload
+  // set.
   if (auto typeVar = desugar2->getAs<TypeVariableType>()) {
-    auto choices = getUnboundBindOverloads(typeVar);
-    if (Type resultType = findCommonResultType(choices)) {
-      ASTContext &ctx = getASTContext();
-      if (ctx.LangOpts.DebugConstraintSolver) {
-        auto &log = ctx.TypeCheckerDebug->getStream();
-        log.indent(solverState ? solverState->depth * 2 + 2 : 0)
-          << "(common result type for $T" << typeVar->getID() << " is "
-          << resultType.getString()
-          << ")\n";
-      }
+    auto argumentLabels = getArgumentLabels(*this, locator);
+    Type newType2 =
+        simplifyAppliedOverloads(typeVar, func1, argumentLabels, locator);
+    if (!newType2)
+      return SolutionKind::Error;
 
-      addConstraint(ConstraintKind::Bind, func1->getResult(), resultType,
-                    locator);
-    }
+    desugar2 = newType2->getDesugaredType();
   }
 
   // If right-hand side is a type variable, the constraint is unsolved.
@@ -5047,7 +5205,7 @@ lookupDynamicCallableMethods(Type type, ConstraintSystem &CS,
 /// Returns the @dynamicCallable required methods (if they exist) implemented
 /// by a type.
 /// This function may be slow for deep class hierarchies and multiple protocol
-/// conformances, but it is invoked only after other constraint simplification
+/// conformances,  but it is invoked only after other constraint simplification
 /// rules fail.
 static DynamicCallableMethods
 getDynamicCallableMethods(Type type, ConstraintSystem &CS,
@@ -6225,11 +6383,13 @@ void ConstraintSystem::simplifyDisjunctionChoice(Constraint *choice) {
   case ConstraintSystem::SolutionKind::Error:
     if (!failedConstraint)
       failedConstraint = choice;
-    solverState->retireConstraint(choice);
+    if (solverState)
+      solverState->retireConstraint(choice);
     break;
 
   case ConstraintSystem::SolutionKind::Solved:
-    solverState->retireConstraint(choice);
+    if (solverState)
+      solverState->retireConstraint(choice);
     break;
 
   case ConstraintSystem::SolutionKind::Unsolved:
@@ -6239,5 +6399,6 @@ void ConstraintSystem::simplifyDisjunctionChoice(Constraint *choice) {
   }
 
   // Record this as a generated constraint.
-  solverState->addGeneratedConstraint(choice);
+  if (solverState)
+    solverState->addGeneratedConstraint(choice);
 }
