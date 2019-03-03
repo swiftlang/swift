@@ -272,7 +272,7 @@ public:
 
   void lookInScopeForASTScopeLookup(const ASTScopeLookupState);
 
-  void lookInParentScopeForASCScopeLookup(const ASTScopeLookupState state) {
+  void lookInParentScopeForASTScopeLookup(const ASTScopeLookupState state) {
     lookInScopeForASTScopeLookup(state.withParentScope());
   }
 
@@ -576,14 +576,14 @@ void UnqualifiedLookupFactory::lookInScopeForASTScopeLookup(
             ->getDeclContext()
             ->isTypeContext();
     if (inBody)
-      lookInParentScopeForASCScopeLookup(
+      lookInParentScopeForASTScopeLookup(
           state.withSelfDC(state.scope->getAbstractFunctionDecl()));
     // If there is a declaration context associated with this scope, we might
     // want to look in it.
     else if (auto *const scopeDC = state.scope->getDeclContext())
       lookIntoDeclarationContextForASTScopeLookup(state, scopeDC);
     else
-      lookInParentScopeForASCScopeLookup(state);
+      lookInParentScopeForASTScopeLookup(state);
   });
 }
 
@@ -605,7 +605,7 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
   }
 
   if (nothingToSeeHere(scopeDC)) {
-    lookInParentScopeForASCScopeLookup(defaultNextState);
+    lookInParentScopeForASTScopeLookup(defaultNextState);
     return;
   }
 
@@ -614,7 +614,7 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
   if (auto *bindingInit = dyn_cast<PatternBindingInitializer>(scopeDC)) {
     // Lazy variable initializer contexts have a 'self' parameter for
     // instance member lookup.
-    lookInParentScopeForASCScopeLookup(
+    lookInParentScopeForASTScopeLookup(
         bindingInit->getImplicitSelfDecl()
             ? defaultNextState.withSelfDC(bindingInit)
             : defaultNextState);
@@ -633,7 +633,7 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
                                  baseNLOptions, scopeDC);
   ifNotDoneYet([&] {
     // Forget the 'self' declaration.
-    lookInParentScopeForASCScopeLookup(defaultNextState.withSelfDC(nullptr));
+    lookInParentScopeForASTScopeLookup(defaultNextState.withSelfDC(nullptr));
   });
 }
 
