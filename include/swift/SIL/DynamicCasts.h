@@ -63,6 +63,9 @@ DynamicCastFeasibility classifyDynamicCast(
     bool isSourceTypeExact = false,
     bool isWholdModuleOpts = false);
 
+SILValue emitSuccessfulScalarUnconditionalCast(SILBuilder &B, SILLocation loc,
+                                               SILDynamicCastInst inst);
+
 SILValue emitSuccessfulScalarUnconditionalCast(
     SILBuilder &B, ModuleDecl *M, SILLocation loc, SILValue value,
     SILType loweredTargetType,
@@ -186,6 +189,7 @@ public:
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
       return CastConsumptionKind::TakeAlways;
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
+      return CastConsumptionKind::CopyOnSuccess;
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unsupported");
     }
@@ -210,8 +214,8 @@ public:
     case SILDynamicCastKind::CheckedCastValueBranchInst:
       llvm_unreachable("unsupported");
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
-      return nullptr;
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
+      return nullptr;
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unsupported");
     }
@@ -228,8 +232,8 @@ public:
     case SILDynamicCastKind::CheckedCastValueBranchInst:
       llvm_unreachable("unsupported");
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
-      return nullptr;
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
+      return nullptr;
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unsupported");
     }
@@ -248,6 +252,7 @@ public:
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
       return cast<UnconditionalCheckedCastAddrInst>(inst)->getSrc();
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
+      return cast<UnconditionalCheckedCastInst>(inst)->getOperand();
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unsupported");
     }
@@ -263,6 +268,10 @@ public:
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
       return cast<UnconditionalCheckedCastAddrInst>(inst)->getDest();
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
+      // TODO: Why isn't this:
+      //
+      // return cast<UnconditionalCheckedCastInst>(inst);
+      return SILValue();
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unimplemented");
     }
@@ -277,6 +286,7 @@ public:
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
       return cast<UnconditionalCheckedCastAddrInst>(inst)->getSourceType();
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
+      return cast<UnconditionalCheckedCastInst>(inst)->getSourceType();
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unsupported");
     }
@@ -293,6 +303,7 @@ public:
       return uccai->getSrc()->getType();
     }
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
+      return cast<UnconditionalCheckedCastInst>(inst)->getOperand()->getType();
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unsupported");
     }
@@ -307,6 +318,7 @@ public:
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
       return cast<UnconditionalCheckedCastAddrInst>(inst)->getTargetType();
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
+      return cast<UnconditionalCheckedCastInst>(inst)->getTargetType();
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unimplemented");
     }
@@ -322,7 +334,9 @@ public:
       auto *uccai = dyn_cast<UnconditionalCheckedCastAddrInst>(inst);
       return uccai->getDest()->getType();
     }
-    case SILDynamicCastKind::UnconditionalCheckedCastInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastInst: {
+      return cast<UnconditionalCheckedCastInst>(inst)->getType();
+    }
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unsupported");
     }
@@ -335,8 +349,8 @@ public:
     case SILDynamicCastKind::CheckedCastValueBranchInst:
       llvm_unreachable("unsupported");
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
-      return isa<MetatypeInst>(getSource());
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
+      return isa<MetatypeInst>(getSource());
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unsupported");
     }
@@ -368,8 +382,8 @@ public:
     case SILDynamicCastKind::CheckedCastValueBranchInst:
       llvm_unreachable("unsupported");
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
-      return false;
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
+      return false;
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unsupported");
     }

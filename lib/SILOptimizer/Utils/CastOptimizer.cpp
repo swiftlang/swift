@@ -45,19 +45,6 @@
 
 using namespace swift;
 
-/// Check if is a bridging cast, i.e. one of the sides is
-/// a bridged type.
-static bool isBridgingCast(CanType SourceType, CanType TargetType) {
-  // Bridging casts cannot be further simplified.
-  auto TargetIsBridgeable = TargetType->isBridgeableObjectType();
-  auto SourceIsBridgeable = SourceType->isBridgeableObjectType();
-
-  if (TargetIsBridgeable != SourceIsBridgeable)
-    return true;
-
-  return false;
-}
-
 /// If target is a Swift type bridging to an ObjC type,
 /// return the ObjC type it bridges to.
 /// If target is an ObjC type, return this type.
@@ -1270,18 +1257,12 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
 
 ValueBase *CastOptimizer::optimizeUnconditionalCheckedCastInst(
     UnconditionalCheckedCastInst *Inst) {
-  auto LoweredSourceType = Inst->getOperand()->getType();
-  auto LoweredTargetType = Inst->getType();
-  auto Loc = Inst->getLoc();
-  auto Op = Inst->getOperand();
-  auto &Mod = Inst->getModule();
-
-  bool isSourceTypeExact = isa<MetatypeInst>(Op);
+  SILDynamicCastInst dynamicCast(Inst);
+  auto Loc = dynamicCast.getLocation();
 
   // Check if we can statically predict the outcome of the cast.
   auto Feasibility =
-      classifyDynamicCast(Mod.getSwiftModule(), Inst->getSourceType(),
-                          Inst->getTargetType(), isSourceTypeExact);
+      dynamicCast.classifyFeasibility(false /*allowWholeModule*/);
 
   if (Feasibility == DynamicCastFeasibility::WillFail) {
     // Remove the cast and insert a trap, followed by an
@@ -1314,12 +1295,7 @@ ValueBase *CastOptimizer::optimizeUnconditionalCheckedCastInst(
   SILBuilderWithScope Builder(Inst, BuilderContext);
 
   // Try to apply the bridged casts optimizations
-  auto SourceType = LoweredSourceType.getASTType();
-  auto TargetType = LoweredTargetType.getASTType();
-  auto Src = Inst->getOperand();
-  auto NewI = optimizeBridgedCasts(Inst, CastConsumptionKind::CopyOnSuccess,
-                                   false, Src, SILValue(), SourceType,
-                                   TargetType, nullptr, nullptr);
+  auto NewI = optimizeBridgedCasts(dynamicCast);
   if (NewI) {
     // FIXME: I'm not sure why this is true!
     auto newValue = cast<SingleValueInstruction>(NewI);
@@ -1337,13 +1313,11 @@ ValueBase *CastOptimizer::optimizeUnconditionalCheckedCastInst(
 
   assert(Feasibility == DynamicCastFeasibility::WillSucceed);
 
-  if (isBridgingCast(SourceType, TargetType))
+  if (dynamicCast.isBridgingCast())
     return nullptr;
 
-  auto Result = emitSuccessfulScalarUnconditionalCast(
-      Builder, Mod.getSwiftModule(), Loc, Op, LoweredTargetType,
-      LoweredSourceType.getASTType(),
-      LoweredTargetType.getASTType(), Inst);
+  auto Result =
+      emitSuccessfulScalarUnconditionalCast(Builder, Loc, dynamicCast);
 
   if (!Result) {
     // No optimization was possible.
