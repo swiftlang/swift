@@ -624,7 +624,10 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
   // We have a nominal type or an extension thereof. Perform lookup into
   // the nominal type.
   auto nominal = scopeDC->getSelfNominalTypeDecl();
-  assert(nominal && "case should have been handled above");
+  if (!nominal) {
+    lookInParentScopeForASTScopeLookup(defaultNextState);
+    return;
+  }
   // Dig out the type we're looking into.
   // Perform lookup into the type
   auto resultFinder = ResultFinderForTypeContext(
@@ -653,7 +656,7 @@ bool UnqualifiedLookupFactory::nothingToSeeHere(
          // Top-level declarations have no lookup of their own.
          isa<TopLevelCodeDecl>(scopeDC) ||
          // Typealiases have no lookup of their own.
-         isa<TypeAliasDecl>(scopeDC) || !scopeDC->getSelfNominalTypeDecl();
+         isa<TypeAliasDecl>(scopeDC);
 }
 
 #pragma mark context-based lookup definitions
