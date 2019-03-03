@@ -647,6 +647,33 @@ extension __StringStorage {
   }
 }
 
+extension String {
+
+  /// Customizes how the backing store of a shared `String` is deallocated.
+  public enum Deallocator {
+    /// No action is taken on the backing store.
+    case none
+
+    /// Call `free` on the backing store.
+    case free
+
+    /// A custom deallocation action is taken.
+    case custom((UnsafePointer<UInt8>, Int) -> Void)
+
+    internal func apply(to ptr: UnsafePointer<UInt8>, count: Int) {
+      switch self {
+      case .none:
+        // Intentionally do nothing.
+        break
+      case .free:
+        _swift_stdlib_free(UnsafeMutableRawPointer(mutating: ptr))
+      case .custom(let deleter):
+        deleter(ptr, count)
+      }
+    }
+  }
+}
+
 // For shared storage and bridging literals
 // NOTE: older runtimes called this class _SharedStringStorage. The two
 // must coexist without conflicting ObjC class names, so it was
@@ -655,6 +682,7 @@ final internal class __SharedStringStorage
   : __SwiftNativeNSString, _AbstractStringStorage {
   internal var _owner: AnyObject?
   internal var start: UnsafePointer<UInt8>
+  internal let deallocator: String.Deallocator
 
 #if arch(i386) || arch(arm)
   internal var _count: Int
@@ -674,7 +702,8 @@ final internal class __SharedStringStorage
 
   internal init(
     immortal ptr: UnsafePointer<UInt8>,
-    countAndFlags: _StringObject.CountAndFlags
+    countAndFlags: _StringObject.CountAndFlags,
+    deallocator: String.Deallocator = .none
   ) {
     self._owner = nil
     self.start = ptr
@@ -684,8 +713,13 @@ final internal class __SharedStringStorage
 #else
     self._countAndFlags = countAndFlags
 #endif
+    self.deallocator = deallocator
     super.init()
     self._invariantCheck()
+  }
+
+  deinit {
+    deallocator.apply(to: start, count: count)
   }
 
   @inline(__always)

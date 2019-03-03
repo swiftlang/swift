@@ -10,6 +10,7 @@
     "CharacterProperties.swift",
     "ICU.swift",
     "NormalizedCodeUnitIterator.swift",
+    "SharedString.swift",
     "SmallString.swift",
     "StaticString.swift",
     "String.swift",

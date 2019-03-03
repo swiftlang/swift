@@ -132,6 +132,7 @@ set(SWIFTLIB_ESSENTIAL
   SetStorage.swift
   SetVariant.swift
   ShadowProtocols.swift
+  SharedString.swift
   Shims.swift
   Slice.swift
   SmallBuffer.swift
