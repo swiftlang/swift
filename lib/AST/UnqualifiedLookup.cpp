@@ -264,7 +264,8 @@ private:
 
   void lookInScopeForASTScopeLookup(const ASTScopeLookupState);
 
-  void lookIntoDeclarationContextForASTScopeLookup(ASTScopeLookupState);
+  void lookIntoDeclarationContextForASTScopeLookup(ASTScopeLookupState,
+                                                   DeclContext *const);
   /// Can lookup stop searching for results, assuming hasn't looked for outer
   /// results yet?
   bool isFirstResultEnough() const;
@@ -541,19 +542,15 @@ void UnqualifiedLookupFactory::lookInScopeForASTScopeLookup(
               .withParentScope());
     // If there is a declaration context associated with this scope, we might
     // want to look in it.
+    else if (auto *const scopeDC = state.scope->getDeclContext())
+      lookIntoDeclarationContextForASTScopeLookup(state, scopeDC);
     else
-      lookIntoDeclarationContextForASTScopeLookup(state);
+      lookInScopeForASTScopeLookup(state.withParentScope());
   });
 }
 
 void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
-    ASTScopeLookupState stateArg) {
-
-  DeclContext *scopeDC = stateArg.scope->getDeclContext();
-  if (!scopeDC) {
-    lookInScopeForASTScopeLookup(stateArg.withParentScope());
-    return;
-  }
+    ASTScopeLookupState stateArg, DeclContext *const scopeDC) {
 
   // If we haven't determined whether we have a cascading use, do so now.
   const bool isCascadingUseResult = resolveIsCascadingUse(
