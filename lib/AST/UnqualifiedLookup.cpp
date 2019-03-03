@@ -264,6 +264,10 @@ private:
 
   void lookInScopeForASTScopeLookup(const ASTScopeLookupState);
 
+  void lookInParentScopeForASCScopeLookup(const ASTScopeLookupState state) {
+    lookInScopeForASTScopeLookup(state.withParentScope());
+  }
+
   void lookIntoDeclarationContextForASTScopeLookup(ASTScopeLookupState,
                                                    DeclContext *const);
 
@@ -543,15 +547,14 @@ void UnqualifiedLookupFactory::lookInScopeForASTScopeLookup(
             ->getDeclContext()
             ->isTypeContext();
     if (inBody)
-      lookInScopeForASTScopeLookup(
-          state.withSelfDC(state.scope->getAbstractFunctionDecl())
-              .withParentScope());
+      lookInParentScopeForASCScopeLookup(
+          state.withSelfDC(state.scope->getAbstractFunctionDecl()));
     // If there is a declaration context associated with this scope, we might
     // want to look in it.
     else if (auto *const scopeDC = state.scope->getDeclContext())
       lookIntoDeclarationContextForASTScopeLookup(state, scopeDC);
     else
-      lookInScopeForASTScopeLookup(state.withParentScope());
+      lookInParentScopeForASCScopeLookup(state);
   });
 }
 
@@ -563,8 +566,7 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
       scopeDC, stateArg.isCascadingUse, /*onlyCareAboutFunctionBody=*/false);
 
   const ASTScopeLookupState defaultNextState =
-      stateArg.withResolvedIsCascadingUse(isCascadingUseResult)
-          .withParentScope();
+      stateArg.withResolvedIsCascadingUse(isCascadingUseResult);
 
   // Lookup in the source file's scope marks the end.
   if (isa<SourceFile>(scopeDC)) {
@@ -574,7 +576,7 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
   }
 
   if (nothingToSeeHere(scopeDC)) {
-    lookInScopeForASTScopeLookup(defaultNextState);
+    lookInParentScopeForASCScopeLookup(defaultNextState);
     return;
   }
 
@@ -583,9 +585,10 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
   if (auto *bindingInit = dyn_cast<PatternBindingInitializer>(scopeDC)) {
     // Lazy variable initializer contexts have a 'self' parameter for
     // instance member lookup.
-    lookInScopeForASTScopeLookup(bindingInit->getImplicitSelfDecl()
-                                     ? defaultNextState.withSelfDC(bindingInit)
-                                     : defaultNextState);
+    lookInParentScopeForASCScopeLookup(
+        bindingInit->getImplicitSelfDecl()
+            ? defaultNextState.withSelfDC(bindingInit)
+            : defaultNextState);
     return;
   }
 
@@ -601,7 +604,7 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
                                  baseNLOptions, scopeDC);
   ifNotDoneYet([&] {
     // Forget the 'self' declaration.
-    lookInScopeForASTScopeLookup(defaultNextState.withSelfDC(nullptr));
+    lookInParentScopeForASCScopeLookup(defaultNextState.withSelfDC(nullptr));
   });
 }
 
