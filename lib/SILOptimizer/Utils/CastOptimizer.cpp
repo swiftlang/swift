@@ -1098,11 +1098,21 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   if (Inst->isExact())
     return nullptr;
 
-  auto LoweredTargetType = Inst->getCastType();
-  auto Loc = Inst->getLoc();
-  auto *SuccessBB = Inst->getSuccessBB();
-  auto *FailureBB = Inst->getFailureBB();
-  auto Op = Inst->getOperand();
+  // Local helper we use to simplify replacing a checked_cast_branch with an
+  // optimized checked cast branch.
+  auto replaceCastHelper = [](SILBuilderWithScope &B,
+                              SILDynamicCastInst dynamicCast,
+                              MetatypeInst *mi) -> SILInstruction * {
+    return B.createCheckedCastBranch(
+        dynamicCast.getLocation(), false /*isExact*/, mi,
+        dynamicCast.getLoweredTargetType(), dynamicCast.getSuccessBlock(),
+        dynamicCast.getFailureBlock(), *dynamicCast.getSuccessBlockCount(),
+        *dynamicCast.getFailureBlockCount());
+  };
+
+  SILDynamicCastInst dynamicCast(Inst);
+
+  auto Op = dynamicCast.getSource();
 
   // Try to simplify checked_cond_br instructions using existential
   // metatypes by propagating a concrete type whenever it can be
@@ -1117,9 +1127,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   if (auto *IEMI = dyn_cast<InitExistentialMetatypeInst>(Op)) {
     if (auto *MI = dyn_cast<MetatypeInst>(IEMI->getOperand())) {
       SILBuilderWithScope B(Inst, BuilderContext);
-      auto *NewI = B.createCheckedCastBranch(
-          Loc, /* isExact */ false, MI, LoweredTargetType, SuccessBB, FailureBB,
-          Inst->getTrueBBCount(), Inst->getFalseBBCount());
+      auto *NewI = replaceCastHelper(B, dynamicCast, MI);
       EraseInstAction(Inst);
       return NewI;
     }
@@ -1183,10 +1191,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
         B.getOpenedArchetypes().addOpenedArchetypeOperands(
             FoundIEI->getTypeDependentOperands());
         auto *MI = B.createMetatype(FoundIEI->getLoc(), SILMetaTy);
-
-        auto *NewI = B.createCheckedCastBranch(
-            Loc, /* isExact */ false, MI, LoweredTargetType, SuccessBB,
-            FailureBB, Inst->getTrueBBCount(), Inst->getFalseBBCount());
+        auto *NewI = replaceCastHelper(B, dynamicCast, MI);
         EraseInstAction(Inst);
         return NewI;
       }
@@ -1242,10 +1247,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
         B.getOpenedArchetypes().addOpenedArchetypeOperands(
             FoundIERI->getTypeDependentOperands());
         auto *MI = B.createMetatype(FoundIERI->getLoc(), SILMetaTy);
-
-        auto *NewI = B.createCheckedCastBranch(
-            Loc, /* isExact */ false, MI, LoweredTargetType, SuccessBB,
-            FailureBB, Inst->getTrueBBCount(), Inst->getFalseBBCount());
+        auto *NewI = replaceCastHelper(B, dynamicCast, MI);
         EraseInstAction(Inst);
         return NewI;
       }

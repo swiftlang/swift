@@ -210,12 +210,30 @@ public:
   SILBasicBlock *getSuccessBlock() {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
+      llvm_unreachable("unsupported");
     case SILDynamicCastKind::CheckedCastBranchInst:
+      return cast<CheckedCastBranchInst>(inst)->getSuccessBB();
     case SILDynamicCastKind::CheckedCastValueBranchInst:
       llvm_unreachable("unsupported");
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
       return nullptr;
+    case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
+      llvm_unreachable("unsupported");
+    }
+  }
+
+  Optional<ProfileCounter> getSuccessBlockCount() {
+    switch (getKind()) {
+    case SILDynamicCastKind::CheckedCastAddrBranchInst:
+      llvm_unreachable("unsupported");
+    case SILDynamicCastKind::CheckedCastBranchInst:
+      return cast<CheckedCastBranchInst>(inst)->getTrueBBCount();
+    case SILDynamicCastKind::CheckedCastValueBranchInst:
+      llvm_unreachable("unsupported");
+    case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastInst:
+      return None;
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unsupported");
     }
@@ -228,12 +246,30 @@ public:
   SILBasicBlock *getFailureBlock() {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
+      llvm_unreachable("unsupported");
     case SILDynamicCastKind::CheckedCastBranchInst:
+      return cast<CheckedCastBranchInst>(inst)->getFailureBB();
     case SILDynamicCastKind::CheckedCastValueBranchInst:
       llvm_unreachable("unsupported");
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
       return nullptr;
+    case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
+      llvm_unreachable("unsupported");
+    }
+  }
+
+  Optional<ProfileCounter> getFailureBlockCount() {
+    switch (getKind()) {
+    case SILDynamicCastKind::CheckedCastAddrBranchInst:
+      llvm_unreachable("unsupported");
+    case SILDynamicCastKind::CheckedCastBranchInst:
+      return cast<CheckedCastBranchInst>(inst)->getFalseBBCount();
+    case SILDynamicCastKind::CheckedCastValueBranchInst:
+      llvm_unreachable("unsupported");
+    case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastInst:
+      return None;
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unsupported");
     }
@@ -246,7 +282,9 @@ public:
   SILValue getSource() const {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
+      llvm_unreachable("unsupported");
     case SILDynamicCastKind::CheckedCastBranchInst:
+      return cast<CheckedCastBranchInst>(inst)->getOperand();
     case SILDynamicCastKind::CheckedCastValueBranchInst:
       llvm_unreachable("unsupported");
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
@@ -327,7 +365,9 @@ public:
   SILType getLoweredTargetType() const {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
+      llvm_unreachable("unsupported");
     case SILDynamicCastKind::CheckedCastBranchInst:
+      return cast<CheckedCastBranchInst>(inst)->getCastType();
     case SILDynamicCastKind::CheckedCastValueBranchInst:
       llvm_unreachable("unsupported");
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst: {
