@@ -266,9 +266,9 @@ private:
 
   void lookIntoDeclarationContextForASTScopeLookup(ASTScopeLookupState,
                                                    DeclContext *const);
-  
-  static bool nothingToSeeHere(const DeclContext*);
-  
+
+  static bool nothingToSeeHere(const DeclContext *);
+
   /// Can lookup stop searching for results, assuming hasn't looked for outer
   /// results yet?
   bool isFirstResultEnough() const;
@@ -381,7 +381,8 @@ private:
   static bool resolveIsCascadingUse(const DeclContext *const dc,
                                     Optional<bool> isCascadingUse,
                                     bool onlyCareAboutFunctionBody) {
-    return isCascadingUse.getValueOr(dc->isCascadingContextForLookup(/*functionsAreNonCascading=*/onlyCareAboutFunctionBody));
+    return isCascadingUse.getValueOr(dc->isCascadingContextForLookup(
+        /*functionsAreNonCascading=*/onlyCareAboutFunctionBody));
   }
   static bool resolveIsCascadingUse(ContextAndUnresolvedIsCascadingUse x,
                                     bool onlyCareAboutFunctionBody) {
@@ -564,15 +565,15 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
   const ASTScopeLookupState defaultNextState =
       stateArg.withResolvedIsCascadingUse(isCascadingUseResult)
           .withParentScope();
-  
+
   // Lookup in the source file's scope marks the end.
   if (isa<SourceFile>(scopeDC)) {
     recordDependencyOnTopLevelName(scopeDC, Name, isCascadingUseResult);
     lookUpTopLevelNamesInModuleScopeContext(scopeDC);
     return;
   }
-  
-  if (nothingToSeeHere(scopeDC))  {
+
+  if (nothingToSeeHere(scopeDC)) {
     lookInScopeForASTScopeLookup(defaultNextState);
     return;
   }
@@ -595,32 +596,32 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
   // Dig out the type we're looking into.
   // Perform lookup into the type
   auto resultFinder = ResultFinderForTypeContext(
-                                                 defaultNextState.selfDC ? defaultNextState.selfDC : scopeDC, scopeDC);
-  findResultsAndSaveUnavailables( std::move(resultFinder), isCascadingUseResult,
+      defaultNextState.selfDC ? defaultNextState.selfDC : scopeDC, scopeDC);
+  findResultsAndSaveUnavailables(std::move(resultFinder), isCascadingUseResult,
                                  baseNLOptions, scopeDC);
   ifNotDoneYet([&] {
     // Forget the 'self' declaration.
-   lookInScopeForASTScopeLookup(defaultNextState.withSelfDC(nullptr));
+    lookInScopeForASTScopeLookup(defaultNextState.withSelfDC(nullptr));
   });
 }
 
-bool UnqualifiedLookupFactory::nothingToSeeHere(const DeclContext *const scopeDC) {
+bool UnqualifiedLookupFactory::nothingToSeeHere(
+    const DeclContext *const scopeDC) {
   // Default arguments only have 'static' access to the members of the
   // enclosing type, if there is one.
-  return
-    isa<DefaultArgumentInitializer>(scopeDC) ||
-    // Functions/initializers/deinitializers are only interesting insofar as
-    // they affect lookup in an enclosing nominal type or extension thereof.
-    isa<AbstractFunctionDecl>(scopeDC) ||
-    // Subscripts have no lookup of their own.
-    isa<SubscriptDecl>(scopeDC) ||
-    // Closures have no lookup of their own.
-    isa<AbstractClosureExpr>(scopeDC) ||
-    // Top-level declarations have no lookup of their own.
-    isa<TopLevelCodeDecl>(scopeDC) ||
-    // Typealiases have no lookup of their own.
-    isa<TypeAliasDecl>(scopeDC) ||
-    !scopeDC->getSelfNominalTypeDecl();
+  return isa<DefaultArgumentInitializer>(scopeDC) ||
+         // Functions/initializers/deinitializers are only interesting insofar
+         // as they affect lookup in an enclosing nominal type or extension
+         // thereof.
+         isa<AbstractFunctionDecl>(scopeDC) ||
+         // Subscripts have no lookup of their own.
+         isa<SubscriptDecl>(scopeDC) ||
+         // Closures have no lookup of their own.
+         isa<AbstractClosureExpr>(scopeDC) ||
+         // Top-level declarations have no lookup of their own.
+         isa<TopLevelCodeDecl>(scopeDC) ||
+         // Typealiases have no lookup of their own.
+         isa<TypeAliasDecl>(scopeDC) || !scopeDC->getSelfNominalTypeDecl();
 }
 
 #pragma mark context-based lookup definitions
