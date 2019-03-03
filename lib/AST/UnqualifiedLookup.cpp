@@ -208,6 +208,14 @@ public:
                              SourceLoc Loc,
                              Options options,
                              UnqualifiedLookup &lookupToBeCreated);
+  
+  UnqualifiedLookupFactory(DeclName Name,
+                           DeclContext *const DC,
+                           LazyResolver *TypeResolver,
+                           SourceLoc Loc,
+                           Options options,
+                           SmallVectorImpl<LookupResultEntry> &Results,
+                           size_t &IndexOfFirstOuterResult);
   // clang-format on
 
   void performUnqualifiedLookup();
@@ -415,6 +423,18 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
                                                    SourceLoc Loc,
                                                    Options options,
                                                    UnqualifiedLookup &lookupToBeCreated)
+: UnqualifiedLookupFactory(Name, DC, TypeResolver, Loc, options, lookupToBeCreated.Results, lookupToBeCreated.IndexOfFirstOuterResult)
+
+{}
+
+UnqualifiedLookupFactory::UnqualifiedLookupFactory(
+                                                   DeclName Name,
+                                                   DeclContext *const DC,
+                                                   LazyResolver *TypeResolver,
+                                                   SourceLoc Loc,
+                                                   Options options,
+                                                   SmallVectorImpl<LookupResultEntry> &Results,
+                                                   size_t &IndexOfFirstOuterResult)
 :
   Name(Name),
   DC(DC),
@@ -427,9 +447,9 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
   options(options),
   isOriginallyTypeLookup(options.contains(Flags::TypeLookup)),
   baseNLOptions(computeBaseNLOptions(options, isOriginallyTypeLookup)),
-  Consumer(Name, lookupToBeCreated.Results, isOriginallyTypeLookup),
-  Results(lookupToBeCreated.Results),
-  IndexOfFirstOuterResult(lookupToBeCreated.IndexOfFirstOuterResult)
+  Consumer(Name, Results, isOriginallyTypeLookup),
+  Results(Results),
+  IndexOfFirstOuterResult(IndexOfFirstOuterResult)
 {}
 // clang-format on
 
@@ -443,8 +463,16 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
     experimentallyLookInASTScopes(contextAndIsCascadingUse);
   else if (Name.isOperator())
     lookupOperatorInDeclContexts(contextAndIsCascadingUse);
-  else
+  else {
     lookupNamesIntroducedBy(contextAndIsCascadingUse);
+    if (useASTScopesForExperimentalLookupIfEnabled()) {
+      SmallVector<LookupResultEntry, 4> results;
+      size_t indexOfFirstOuterResult;
+      UnqualifiedLookupFactory scopeLookup(Name, DC, TypeResolver, Loc, options, results, indexOfFirstOuterResult);
+      scopeLookup.experimentallyLookInASTScopes(contextAndIsCascadingUse);
+      assert(verifyEqualTo(std::move(scopeLookup)));
+    }
+  }
 }
 
 void UnqualifiedLookupFactory::lookUpTopLevelNamesInModuleScopeContext(
