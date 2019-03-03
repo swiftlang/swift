@@ -2929,13 +2929,10 @@ WARNING(store_in_willset,none,
 ERROR(value_of_module_type,none,
       "expected module member name after module name", ())
 
-ERROR(value_of_metatype_type,none,
-      "expected member name or constructor call after type name", ())
-
-NOTE(add_parens_to_type,none,
-     "add arguments after the type to construct a value of the type", ())
-NOTE(add_self_to_type,none,
-     "use '.self' to reference the type object", ())
+WARNING(dot_self_expr_deprecated,none,
+        "use of '.self' to reference a type object is deprecated", ())
+NOTE(fix_dot_self_expr,none,
+     "remove '.self' to silence this warning", ())
 
 WARNING(warn_unqualified_access,none,
         "use of %0 treated as a reference to %1 in %2 %3",

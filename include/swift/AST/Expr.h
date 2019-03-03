@@ -1380,10 +1380,11 @@ public:
 /// MetaTypetype.
 class TypeExpr : public Expr {
   TypeLoc Info;
+  Expr *Unsimplified = nullptr;
   TypeExpr(Type Ty);
 public:
-  // Create a TypeExpr with location information.
-  TypeExpr(TypeLoc Ty);
+  // Create a TypeExpr with location information and an unsimplified version.
+  TypeExpr(TypeLoc Ty, Expr *Unsimplified = nullptr);
 
   // The type of a TypeExpr is always a metatype type.  Return the instance
   // type, ErrorType if an error, or null if not set yet.
@@ -1439,6 +1440,17 @@ public:
   
   SourceRange getSourceRange() const { return Info.getSourceRange(); }
   // TODO: optimize getStartLoc() and getEndLoc() when TypeLoc allows it.
+
+  /// Get the parsed version of this simplified type expr.
+  ///
+  /// This is useful in situations where, for example, the parser parsed an
+  /// ArrayExpr for [Int], but we simplified it down to a TypeExpr with an
+  /// ArrayTypeRepr.
+  Expr *getUnsimplified() const { return Unsimplified; }
+
+  void setUnsimplified(Expr *unsimplified) {
+    Unsimplified = unsimplified;
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Type;

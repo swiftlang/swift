@@ -45,25 +45,28 @@ struct Gen<T> {
 }
 
 func unqualifiedType() {
-  _ = Foo.self
-  _ = Foo.self
+  _ = Foo.self // expected-warning {{use of '.self' to reference a type object is deprecated}}
+               // expected-note@-1 {{remove '.self' to silence this warning}}
+  _ = Foo.self // expected-warning {{use of '.self' to reference a type object is deprecated}}
+               // expected-note@-1 {{remove '.self' to silence this warning}}
   _ = Foo()
   _ = Foo.prop
   _ = Foo.meth
   let _ : () = Foo.meth()
   _ = Foo.instMeth
 
-  _ = Foo // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments}} {{10-10=()}} expected-note{{use '.self'}} {{10-10=.self}}
+  _ = Foo // ok
   _ = Foo.dynamicType // expected-error {{type 'Foo' has no member 'dynamicType'}}
                       // expected-error@-1 {{'.dynamicType' is deprecated. Use 'type(of: ...)' instead}} {{7-7=type(of: }} {{10-22=)}}
 
-  _ = Bad // expected-error{{expected member name or constructor call after type name}}
-  // expected-note@-1{{use '.self' to reference the type object}}{{10-10=.self}}
+  _ = Bad // ok
 }
 
 func qualifiedType() {
-  _ = Foo.Bar.self
-  let _ : Foo.Bar.Type = Foo.Bar.self
+  _ = Foo.Bar.self // expected-warning {{use of '.self' to reference a type object is deprecated}}
+                   // expected-note@-1 {{remove '.self' to silence this warning}}
+  let _ : Foo.Bar.Type = Foo.Bar.self // expected-warning {{use of '.self' to reference a type object is deprecated}}
+                                      // expected-note@-1 {{remove '.self' to silence this warning}}
   let _ : Foo.Protocol = Foo.self // expected-error{{cannot use 'Protocol' with non-protocol type 'Foo'}}
   _ = Foo.Bar()
   _ = Foo.Bar.prop
@@ -71,46 +74,44 @@ func qualifiedType() {
   let _ : () = Foo.Bar.meth()
   _ = Foo.Bar.instMeth
 
-  _ = Foo.Bar // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments}} {{14-14=()}} expected-note{{use '.self'}} {{14-14=.self}}
+  _ = Foo.Bar // ok
   _ = Foo.Bar.dynamicType // expected-error {{type 'Foo.Bar' has no member 'dynamicType'}}
                           // expected-error@-1 {{'.dynamicType' is deprecated. Use 'type(of: ...)' instead}} {{7-7=type(of: }} {{14-26=)}}
 }
 
 // We allow '.Type' in expr context
 func metaType() {
-  let _ = Foo.Type.self
-  let _ = Foo.Type.self
+  let _ = Foo.Type.self // expected-warning {{use of '.self' to reference a type object is deprecated}}
+                        // expected-note@-1 {{remove '.self' to silence this warning}}
+  let _ = Foo.Type.self // expected-warning {{use of '.self' to reference a type object is deprecated}}
+                        // expected-note@-1 {{remove '.self' to silence this warning}}
 
-  let _ = Foo.Type // expected-error{{expected member name or constructor call after type name}}
-  // expected-note@-1 {{use '.self' to reference the type object}}
+  let _ = Foo.Type // ok
 
-  let _ = type(of: Foo.Type) // expected-error{{expected member name or constructor call after type name}}
-  // expected-note@-1 {{use '.self' to reference the type object}}
+  let _ = type(of: Foo.Type) // ok
 }
 
 func genType() {
-  _ = Gen<Foo>.self
+  _ = Gen<Foo>.self // expected-warning {{use of '.self' to reference a type object is deprecated}}
+                    // expected-note@-1 {{remove '.self' to silence this warning}}
   _ = Gen<Foo>()
   _ = Gen<Foo>.prop
   _ = Gen<Foo>.meth
   let _ : () = Gen<Foo>.meth()
   _ = Gen<Foo>.instMeth
-  _ = Gen<Foo> // expected-error{{expected member name or constructor call after type name}}
-               // expected-note@-1{{use '.self' to reference the type object}}
-               // expected-note@-2{{add arguments after the type to construct a value of the type}}
+  _ = Gen<Foo> // ok
 }
 
 func genQualifiedType() {
-  _ = Gen<Foo>.Bar.self
+  _ = Gen<Foo>.Bar.self // expected-warning {{use of '.self' to reference a type object is deprecated}}
+                        // expected-note@-1 {{remove '.self' to silence this warning}}
   _ = Gen<Foo>.Bar()
   _ = Gen<Foo>.Bar.prop
   _ = Gen<Foo>.Bar.meth
   let _ : () = Gen<Foo>.Bar.meth()
   _ = Gen<Foo>.Bar.instMeth
 
-  _ = Gen<Foo>.Bar // expected-error{{expected member name or constructor call after type name}}
-                   // expected-note@-1{{add arguments after the type to construct a value of the type}}
-                   // expected-note@-2{{use '.self' to reference the type object}}
+  _ = Gen<Foo>.Bar // ok
   _ = Gen<Foo>.Bar.dynamicType // expected-error {{type 'Gen<Foo>.Bar' has no member 'dynamicType'}}
                                // expected-error@-1 {{'.dynamicType' is deprecated. Use 'type(of: ...)' instead}} {{7-7=type(of: }} {{19-31=)}}
 }
@@ -136,32 +137,35 @@ func typeOfShadowing() {
   // TODO: Errors need improving here.
   _ = type(of: Gen<Foo>.Bar) // expected-error{{argument labels '(of:)' do not match any available overloads}}
                              // expected-note@-1{{overloads for 'type' exist with these partially matching parameter lists: (T.Type), (fo: T.Type)}}
-  _ = type(Gen<Foo>.Bar) // expected-error{{expected member name or constructor call after type name}}
-  // expected-note@-1{{add arguments after the type to construct a value of the type}}
-  // expected-note@-2{{use '.self' to reference the type object}}
-  _ = type(of: Gen<Foo>.Bar.self, flag: false) // No error here.
-  _ = type(fo: Foo.Bar.self) // No error here.
-  _ = type(of: Foo.Bar.self, [1, 2, 3]) // No error here.
+  _ = type(Gen<Foo>.Bar) // ok
+  _ = type(of: Gen<Foo>.Bar.self, flag: false) // // expected-warning {{use of '.self' to reference a type object is deprecated}}
+                                               // expected-note@-1 {{remove '.self' to silence this warning}}
+  _ = type(fo: Foo.Bar.self) // expected-warning {{use of '.self' to reference a type object is deprecated}}
+                             // expected-note@-1 {{remove '.self' to silence this warning}}
+  _ = type(of: Foo.Bar.self, [1, 2, 3]) // expected-warning {{use of '.self' to reference a type object is deprecated}}
+                                        // expected-note@-1 {{remove '.self' to silence this warning}}
 }
 
 func archetype<T: Zim>(_: T) {
-  _ = T.self
+  _ = T.self // expected-warning {{use of '.self' to reference a type object is deprecated}}
+             // expected-note@-1 {{remove '.self' to silence this warning}}
   _ = T()
   // TODO let prop = T.prop
   _ = T.meth
   let _ : () = T.meth()
 
-  _ = T // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments}} {{8-8=()}} expected-note{{use '.self'}} {{8-8=.self}}
+  _ = T // ok
 }
 
 func assocType<T: Zim>(_: T) where T.Zang: Zim {
-  _ = T.Zang.self
+  _ = T.Zang.self // expected-warning {{use of '.self' to reference a type object is deprecated}}
+                  // expected-note@-1 {{remove '.self' to silence this warning}}
   _ = T.Zang()
   // TODO _ = T.Zang.prop
   _ = T.Zang.meth
   let _ : () = T.Zang.meth()
 
-  _ = T.Zang // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments}} {{13-13=()}} expected-note{{use '.self'}} {{13-13=.self}}
+  _ = T.Zang // ok
 }
 
 class B {
@@ -172,16 +176,18 @@ class D: B {
 }
 
 func derivedType() {
-  let _: B.Type = D.self
+  let _: B.Type = D.self // expected-warning {{use of '.self' to reference a type object is deprecated}}
+                         // expected-note@-1 {{remove '.self' to silence this warning}}
   _ = D.baseMethod
   let _ : () = D.baseMethod()
 
-  let _: D.Type = D.self
+  let _: D.Type = D.self // expected-warning {{use of '.self' to reference a type object is deprecated}}
+                         // expected-note@-1 {{remove '.self' to silence this warning}}
   _ = D.derivedMethod
   let _ : () = D.derivedMethod()
 
-  let _: B.Type = D // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments}} {{20-20=()}} expected-note{{use '.self'}} {{20-20=.self}}
-  let _: D.Type = D // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments}} {{20-20=()}} expected-note{{use '.self'}} {{20-20=.self}}
+  let _: B.Type = D // ok
+  let _: D.Type = D // ok
 }
 
 // Referencing a nonexistent member or constructor should not trigger errors
@@ -195,12 +201,17 @@ func nonexistentMember() {
 protocol P {}
 
 func meta_metatypes() {
-  let _: P.Protocol = P.self
-  _ = P.Type.self
-  _ = P.Protocol.self
+  let _: P.Protocol = P.self // expected-warning {{use of '.self' to reference a type object is deprecated}}
+                             // expected-note@-1 {{remove '.self' to silence this warning}}
+  _ = P.Type.self // expected-warning {{use of '.self' to reference a type object is deprecated}}
+                  // expected-note@-1 {{remove '.self' to silence this warning}}
+  _ = P.Protocol.self // expected-warning {{use of '.self' to reference a type object is deprecated}}
+                      // expected-note@-1 {{remove '.self' to silence this warning}}
   _ = P.Protocol.Protocol.self // expected-error{{cannot use 'Protocol' with non-protocol type 'P.Protocol'}}
-  _ = P.Protocol.Type.self
-  _ = B.Type.self
+  _ = P.Protocol.Type.self // expected-warning {{use of '.self' to reference a type object is deprecated}}
+                           // expected-note@-1 {{remove '.self' to silence this warning}}
+  _ = B.Type.self // expected-warning {{use of '.self' to reference a type object is deprecated}}
+                  // expected-note@-1 {{remove '.self' to silence this warning}}
 }
 
 class E {
@@ -208,7 +219,7 @@ class E {
 }
 
 func inAccessibleInit() {
-  _ = E // expected-error {{expected member name or constructor call after type name}} expected-note {{use '.self'}} {{8-8=.self}}
+  _ = E // ok
 }
 
 enum F: Int {
@@ -220,8 +231,8 @@ struct G {
 }
 
 func implicitInit() {
-  _ = F // expected-error {{expected member name or constructor call after type name}} expected-note {{add arguments}} {{8-8=()}} expected-note {{use '.self'}} {{8-8=.self}}
-  _ = G // expected-error {{expected member name or constructor call after type name}} expected-note {{add arguments}} {{8-8=()}} expected-note {{use '.self'}} {{8-8=.self}}
+  _ = F // ok
+  _ = G // ok
 }
 
 // https://bugs.swift.org/browse/SR-502
@@ -246,13 +257,14 @@ func testFunctionCollectionTypes() {
 
   _ = 2 + () -> Int // expected-error {{expected type before '->'}}
   _ = () -> (Int, Int).2 // expected-error {{expected type after '->'}}
-  _ = (Int) -> Int // expected-error {{expected member name or constructor call after type name}} expected-note{{use '.self' to reference the type object}}
+  _ = (Int) -> Int // ok
 
-  _ = @convention(c) () -> Int // expected-error{{expected member name or constructor call after type name}} expected-note{{use '.self' to reference the type object}}
+  _ = @convention(c) () -> Int // ok
   _ = 1 + (@convention(c) () -> Int).self // expected-error{{binary operator '+' cannot be applied to operands of type 'Int' and '(@convention(c) () -> Int).Type'}} // expected-note {{expected an argument list of type '(Int, Int)'}}
   _ = (@autoclosure () -> Int) -> (Int, Int).2 // expected-error {{expected type after '->'}}
   _ = ((@autoclosure () -> Int) -> (Int, Int)).1 // expected-error {{type '(@autoclosure () -> Int) -> (Int, Int)' has no member '1'}}
-  _ = ((inout Int) -> Void).self
+  _ = ((inout Int) -> Void).self // expected-warning {{use of '.self' to reference a type object is deprecated}}
+                                 // expected-note@-1 {{remove '.self' to silence this warning}}
 
   _ = [(Int) throws -> Int]()
   _ = [@convention(swift) (Int) throws -> Int]().count
@@ -266,9 +278,10 @@ protocol P1 {}
 protocol P2 {}
 protocol P3 {}
 func compositionType() {
-  _ = P1 & P2 // expected-error {{expected member name or constructor call after type name}} expected-note{{use '.self'}} {{7-7=(}} {{14-14=).self}}
+  _ = P1 & P2 // ok
   _ = P1 & P2.self // expected-error {{binary operator '&' cannot be applied to operands of type 'P1.Protocol' and 'P2.Protocol'}} expected-note {{overloads}}
-  _ = (P1 & P2).self // Ok.
+  _ = (P1 & P2).self // expected-warning {{use of '.self' to reference a type object is deprecated}}
+                     // expected-note@-1 {{remove '.self' to silence this warning}}
   _ = (P1 & (P2)).self // FIXME: OK? while `typealias P = P1 & (P2)` is rejected.
   _ = (P1 & (P2, P3)).self // expected-error {{non-protocol, non-class type '(P2, P3)' cannot be used within a protocol-constrained type}}
   _ = (P1 & Int).self // expected-error {{non-protocol, non-class type 'Int' cannot be used within a protocol-constrained type}}
@@ -278,18 +291,16 @@ func compositionType() {
 
   _ = P1 & P2 -> P3
   // expected-error @-1 {{single argument function types require parentheses}} {{7-7=(}} {{14-14=)}}
-  // expected-error @-2 {{expected member name or constructor call after type name}}
-  // expected-note @-3 {{use '.self'}} {{7-7=(}} {{20-20=).self}}
 
   _ = P1 & P2 -> P3 & P1 -> Int
   // expected-error @-1 {{single argument function types require parentheses}} {{18-18=(}} {{25-25=)}}
   // expected-error @-2 {{single argument function types require parentheses}} {{7-7=(}} {{14-14=)}}
-  // expected-error @-3 {{expected member name or constructor call after type name}}
-  // expected-note @-4 {{use '.self'}} {{7-7=(}} {{32-32=).self}}
 
-  _ = (() -> P1 & P2).self // Ok
+  _ = (() -> P1 & P2).self // expected-warning {{use of '.self' to reference a type object is deprecated}}
+                           // expected-note@-1 {{remove '.self' to silence this warning}}
   _ = (P1 & P2 -> P3 & P2).self // expected-error {{single argument function types require parentheses}} {{8-8=(}} {{15-15=)}}
-  _ = ((P1 & P2) -> (P3 & P2) -> P1 & Any).self // Ok
+  _ = ((P1 & P2) -> (P3 & P2) -> P1 & Any).self // expected-warning {{use of '.self' to reference a type object is deprecated}}
+                                                // expected-note@-1 {{remove '.self' to silence this warning}}
 }
 
 func complexSequence() {
@@ -300,8 +311,6 @@ func complexSequence() {
   _ = try P1 & P2 throws -> P3 & P1
   // expected-warning @-1 {{no calls to throwing functions occur within 'try' expression}}
   // expected-error @-2 {{single argument function types require parentheses}} {{none}} {{11-11=(}} {{18-18=)}}
-  // expected-error @-3 {{expected member name or constructor call after type name}}
-  // expected-note @-4 {{use '.self' to reference the type object}} {{11-11=(}} {{36-36=).self}}
 }
 
 func takesVoid(f: Void -> ()) {} // expected-error {{single argument function types require parentheses}} {{19-23=()}}
@@ -313,33 +322,15 @@ func testMissingSelf() {
   // None of these were not caught in Swift 3.
   // See test/Compatibility/type_expr.swift.
 
-  takesOneArg(Int)
-  // expected-error@-1 {{expected member name or constructor call after type name}}
-  // expected-note@-2 {{add arguments after the type to construct a value of the type}}
-  // expected-note@-3 {{use '.self' to reference the type object}}
+  takesOneArg(Int) // ok
 
-  takesOneArg(Swift.Int)
-  // expected-error@-1 {{expected member name or constructor call after type name}}
-  // expected-note@-2 {{add arguments after the type to construct a value of the type}}
-  // expected-note@-3 {{use '.self' to reference the type object}}
+  takesOneArg(Swift.Int) // ok
 
-  takesTwoArgs(Int, 0)
-  // expected-error@-1 {{expected member name or constructor call after type name}}
-  // expected-note@-2 {{add arguments after the type to construct a value of the type}}
-  // expected-note@-3 {{use '.self' to reference the type object}}
+  takesTwoArgs(Int, 0) // ok
 
-  takesTwoArgs(Swift.Int, 0)
-  // expected-error@-1 {{expected member name or constructor call after type name}}
-  // expected-note@-2 {{add arguments after the type to construct a value of the type}}
-  // expected-note@-3 {{use '.self' to reference the type object}}
+  takesTwoArgs(Swift.Int, 0) // ok
 
   Swift.Int // expected-warning {{expression of type 'Int.Type' is unused}}
-  // expected-error@-1 {{expected member name or constructor call after type name}}
-  // expected-note@-2 {{add arguments after the type to construct a value of the type}}
-  // expected-note@-3 {{use '.self' to reference the type object}}
 
-  _ = Swift.Int
-  // expected-error@-1 {{expected member name or constructor call after type name}}
-  // expected-note@-2 {{add arguments after the type to construct a value of the type}}
-  // expected-note@-3 {{use '.self' to reference the type object}}
+  _ = Swift.Int // ok
 }

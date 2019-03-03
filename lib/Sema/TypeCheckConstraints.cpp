@@ -910,6 +910,8 @@ namespace {
 
     Expr *ParentExpr;
 
+    bool SkipTypeSimplification;
+
     /// A stack of expressions being walked, used to determine where to
     /// insert RebindSelfInConstructorExpr nodes.
     llvm::SmallVector<Expr *, 8> ExprStack;
@@ -942,8 +944,10 @@ namespace {
     Expr *simplifyTypeConstructionWithLiteralArg(Expr *E);
 
   public:
-    PreCheckExpression(TypeChecker &tc, DeclContext *dc, Expr *parent)
-        : TC(tc), DC(dc), ParentExpr(parent) {}
+    PreCheckExpression(TypeChecker &tc, DeclContext *dc, Expr *parent,
+                       bool skipTypeSimplification)
+        : TC(tc), DC(dc), ParentExpr(parent),
+          SkipTypeSimplification(skipTypeSimplification) {}
 
     bool walkToClosureExprPre(ClosureExpr *expr);
 
@@ -1212,8 +1216,18 @@ namespace {
 
       // If this is a sugared type that needs to be folded into a single
       // TypeExpr, do it.
-      if (auto *simplified = simplifyTypeExpr(expr))
-        return simplified;
+      if (!SkipTypeSimplification) {
+        if (auto *simplified = simplifyTypeExpr(expr)) {
+          // In the case of [T](), we need to remove the unsimplified expr, but
+          // we want to preserve it if it's an argument, i.e, type(of: [T]).
+          if (auto AE = dyn_cast<ApplyExpr>(ParentExpr)) {
+            if (AE->getFn() == simplified->getUnsimplified())
+              simplified->setUnsimplified(nullptr);
+          }
+
+          return simplified;
+        }
+      }
 
       if (auto KPE = dyn_cast<KeyPathExpr>(expr)) {
         resolveKeyPathExpr(KPE);
@@ -1494,9 +1508,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     auto *NewTypeRepr = TupleTypeRepr::create(TC.Context, Elts,
                                               TE->getSourceRange(),
                                               SourceLoc(), Elts.size());
-    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()), E);
   }
-  
 
   // Fold [T] into an array type.
   if (auto *AE = dyn_cast<ArrayExpr>(E)) {
@@ -1511,7 +1524,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       new (TC.Context) ArrayTypeRepr(TyExpr->getTypeRepr(), 
                                      SourceRange(AE->getLBracketLoc(),
                                                  AE->getRBracketLoc()));
-    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()), E);
 
   }
 
@@ -1554,7 +1567,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
                                           /*FIXME:colonLoc=*/SourceLoc(),
                                           SourceRange(DE->getLBracketLoc(),
                                                       DE->getRBracketLoc()));
-    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()), E);
   }
 
   // Reinterpret arrow expr T1 -> T2 as function type.
@@ -1698,7 +1711,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
 
       auto CompRepr = CompositionTypeRepr::create(TC.Context, Types,
           lhsExpr->getStartLoc(), binaryExpr->getSourceRange());
-      return new (TC.Context) TypeExpr(TypeLoc(CompRepr, Type()));
+      return new (TC.Context) TypeExpr(TypeLoc(CompRepr, Type()), E);
     }
   }
 
@@ -1891,8 +1904,9 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
 
 /// Pre-check the expression, validating any types that occur in the
 /// expression and folding sequence expressions.
-bool TypeChecker::preCheckExpression(Expr *&expr, DeclContext *dc) {
-  PreCheckExpression preCheck(*this, dc, expr);
+bool TypeChecker::preCheckExpression(Expr *&expr, DeclContext *dc,
+                                     bool skipTypeSimplification) {
+  PreCheckExpression preCheck(*this, dc, expr, skipTypeSimplification);
   // Perform the pre-check.
   if (auto result = expr->walk(preCheck)) {
     expr = result;
@@ -2052,7 +2066,9 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
 
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
-  if (preCheckExpression(expr, dc)) {
+  bool skipTypeSimplification =
+      options.contains(TypeCheckExprFlags::SkipTypeSimplification);
+  if (preCheckExpression(expr, dc, skipTypeSimplification)) {
     listener.preCheckFailed(expr);
     return Type();
   }

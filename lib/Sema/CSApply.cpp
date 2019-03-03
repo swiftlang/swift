@@ -2268,6 +2268,10 @@ namespace {
       auto toType = simplifyType(cs.getType(expr->getTypeLoc()));
       expr->getTypeLoc().setType(toType);
       cs.setType(expr, MetatypeType::get(toType));
+
+      if (expr->getUnsimplified() && toType->is<MetatypeType>())
+        cs.setType(expr, toType);
+
       return expr;
     }
 
@@ -6706,6 +6710,52 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::LValue:
   case TypeKind::InOut:
     break;
+  }
+
+  // Handle type expressions where they have an unsimplified version.
+  if (auto TE = dyn_cast<TypeExpr>(expr)) {
+    // Coercion from metatype to tuple. We can just construct the tuple expr.
+    if (fromType->is<MetatypeType>() &&
+        toType->is<TupleType>()) {
+      auto tuple = cast<TupleExpr>(TE->getUnsimplified());
+      auto tupleTy = toType->castTo<TupleType>();
+      tuple->setType(tupleTy);
+
+      for (unsigned i = 0; i < tuple->getNumElements(); i++) {
+        auto elt = tuple->getElement(i);
+        elt->setType(tupleTy->getElementType(i));
+      }
+
+      cs.cacheExprTypes(tuple);
+      return tuple;
+    }
+
+    // Coercion from metatype to array. (Note this is always sugared).
+    // Coercion from metatype to binary.
+    if (fromType->is<MetatypeType>() &&
+        (toType->getKind() == TypeKind::ArraySlice ||
+         toType->is<ProtocolCompositionType>())) {
+      auto unsimplified = TE->getUnsimplified();
+      auto convertType = cs.getContextualTypeLoc();
+      auto convertTypePurpose = cs.getContextualTypePurpose();
+
+      // We need to skip simplifys into type expressions.
+      auto options = TypeCheckExprOptions();
+      options |= TypeCheckExprFlags::SkipTypeSimplification;
+
+      // Just typecheck this.
+      tc.typeCheckExpression(unsimplified, cs.DC, convertType,
+                             convertTypePurpose, options, nullptr, &cs);
+      cs.cacheExprTypes(unsimplified);
+      return unsimplified;
+    }
+
+    // Coercion from metatype to dictionary. (Note this is always sugared).
+    if (fromType->is<MetatypeType>() &&
+        toType->getKind() == TypeKind::Dictionary) {
+      // We should have diagnosed that metatypes can't be keys by now.
+      return nullptr;
+    }
   }
 
   // Unresolved types come up in diagnostics for lvalue and inout types.

@@ -138,10 +138,12 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         // Verify that `unsafeBitCast` isn't misused.
         checkForSuspiciousBitCasts(DRE, nullptr);
       }
+
       if (auto *MRE = dyn_cast<MemberRefExpr>(Base)) {
         if (isa<TypeDecl>(MRE->getMember().getDecl()))
           checkUseOfMetaTypeName(Base);
       }
+
       if (isa<TypeExpr>(Base))
         checkUseOfMetaTypeName(Base);
 
@@ -647,7 +649,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       if (auto *ParentExpr = Parent.getAsExpr()) {
         // This is an exhaustive list of the accepted syntactic forms.
         if (isa<ErrorExpr>(ParentExpr) ||
-            isa<DotSelfExpr>(ParentExpr) ||               // T.self
             isa<CallExpr>(ParentExpr) ||                  // T()
             isa<MemberRefExpr>(ParentExpr) ||             // T.foo
             isa<UnresolvedMemberExpr>(ParentExpr) ||
@@ -660,32 +661,19 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         }
       }
 
-      // Is this a protocol metatype?
-
-      TC.diagnose(E->getStartLoc(), diag::value_of_metatype_type);
-
-      // Add fix-it to insert '()', only if this is a metatype of
-      // non-existential type and has any initializers.
-      bool isExistential = false;
-      if (auto metaTy = E->getType()->getAs<MetatypeType>()) {
-        auto instanceTy = metaTy->getInstanceType();
-        isExistential = instanceTy->isExistentialType();
-        if (!isExistential &&
-            instanceTy->mayHaveMembers() &&
-            !TC.lookupConstructors(const_cast<DeclContext *>(DC),
-                                   instanceTy).empty()) {
-          TC.diagnose(E->getEndLoc(), diag::add_parens_to_type)
-            .fixItInsertAfter(E->getEndLoc(), "()");
+      // Add fix-it to remove ".self" on metatypes.
+      if (auto *parentExpr = Parent.getAsExpr()) {
+        if (auto *dotSelf = dyn_cast<DotSelfExpr>(parentExpr)) {
+          TC.diagnose(E->getEndLoc(), diag::dot_self_expr_deprecated);
+          auto diag = TC.diagnose(dotSelf->getDotLoc(),
+                                  diag::fix_dot_self_expr);
+          diag.fixItRemoveChars(dotSelf->getDotLoc(), dotSelf->getSelfLoc());
+          if (isa<ParenExpr>(E)) {
+            diag.fixItReplace(E->getStartLoc(), "");
+            diag.fixItReplace(E->getEndLoc(), "");
+          }
+          return;
         }
-      }
-
-      // Add fix-it to insert ".self".
-      auto diag = TC.diagnose(E->getEndLoc(), diag::add_self_to_type);
-      if (E->canAppendPostfixExpression()) {
-        diag.fixItInsertAfter(E->getEndLoc(), ".self");
-      } else {
-        diag.fixItInsert(E->getStartLoc(), "(");
-        diag.fixItInsertAfter(E->getEndLoc(), ").self");
       }
     }
 

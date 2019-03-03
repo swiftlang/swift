@@ -1448,6 +1448,55 @@ namespace {
       return hadError ? Type() : loc.getType();
     }
 
+    Type typeOfUnsimplifiedTypeExpression(Expr *expr, Type type) {
+      // Possible expressions to appear here are:
+      // TupleExpr, ArrayExpr, DictionaryExpr, and BinaryExpr.
+      //
+      // Note that the array and dictionary cases are always sugared.
+
+      if (isa<TupleExpr>(expr)) {
+        // Subtle edge with things such as (foo: Int)
+        if (type->hasParenSugar())
+          return type;
+
+        // We have (T, T), we want (T.Type, T.Type)
+        auto tupleTy = type->getAs<TupleType>();
+
+        SmallVector<TupleTypeElt, 4> elts;
+        for (auto elt : tupleTy->getElements()) {
+          auto newElt = TupleTypeElt(MetatypeType::get(elt.getType()),
+                                     elt.getName(), elt.getParameterFlags());
+          elts.push_back(newElt);
+        }
+
+        return TupleType::get(elts, CS.TC.Context);
+      }
+
+      if (isa<ArrayExpr>(expr)) {
+        // We have [T], we want [T.Type]
+        auto arrayTy = cast<ArraySliceType>(type.getPointer());
+        return ArraySliceType::get(MetatypeType::get(arrayTy->getBaseType()));
+      }
+
+      // Note that metatypes can't be keys for dictionaries, thus continuing is
+      // useless for dictionaries, but implement the logic now so that one day
+      // when metatypes can be keys this doesn't need to be updated.
+      // FIXME: Metatypes implement Hashable.
+      if (isa<DictionaryExpr>(expr)) {
+        // We have [T: U], we want [T.Type: U.Type]
+        auto dictTy = cast<DictionaryType>(type.getPointer());
+        auto keyTy = MetatypeType::get(dictTy->getKeyType());
+        auto valueTy = MetatypeType::get(dictTy->getValueType());
+        return DictionaryType::get(keyTy, valueTy);
+      }
+
+      if (isa<BinaryExpr>(expr)) {
+        llvm_unreachable("Implement protocol composition metatypes");
+      }
+
+      llvm_unreachable("Unknown unsimplified expression in type_expr");
+    }
+
     Type visitTypeExpr(TypeExpr *E) {
       Type type;
       // If this is an implicit TypeExpr, don't validate its contents.
@@ -1462,6 +1511,20 @@ namespace {
       
       auto locator = CS.getConstraintLocator(E);
       type = CS.openUnboundGenericType(type, locator);
+
+      // Is this a potential simplify vs. unsimplify?
+      if (auto unsimplified = E->getUnsimplified()) {
+        auto tv = CS.createTypeVariable(locator, TVO_PrefersSubtypeBinding);
+        auto simpl = Constraint::create(CS, ConstraintKind::Bind, tv,
+                                        MetatypeType::get(type), locator);
+        auto unsimplType = typeOfUnsimplifiedTypeExpression(unsimplified, type);
+        auto unsimpl = Constraint::create(CS, ConstraintKind::Bind, tv,
+                                          unsimplType, locator);
+        CS.addDisjunctionConstraint({simpl, unsimpl}, locator);
+        CS.setType(E->getTypeLoc(), tv);
+        return tv;
+      }
+      
       CS.setType(E->getTypeLoc(), type);
       return MetatypeType::get(type);
     }

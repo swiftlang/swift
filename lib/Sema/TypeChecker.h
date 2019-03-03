@@ -271,6 +271,9 @@ enum class TypeCheckExprFlags {
   /// as part of the expression diagnostics, which is attempting to narrow
   /// down failure location.
   SubExpressionDiagnostics = 0x400,
+
+  /// If set, skip simplification of potential type expressions.
+  SkipTypeSimplification = 0x800,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;
@@ -1265,7 +1268,8 @@ public:
 
   /// Pre-check the expression, validating any types that occur in the
   /// expression and folding sequence expressions.
-  bool preCheckExpression(Expr *&expr, DeclContext *dc);
+  bool preCheckExpression(Expr *&expr, DeclContext *dc,
+                          bool skipTypeSimplification = false);
 
   /// \name Name lookup
   ///

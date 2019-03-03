@@ -1949,8 +1949,9 @@ Expr *AutoClosureExpr::getSingleExpressionBody() const {
 
 FORWARD_SOURCE_LOCS_TO(UnresolvedPatternExpr, subPattern)
 
-TypeExpr::TypeExpr(TypeLoc TyLoc)
-  : Expr(ExprKind::Type, /*implicit*/false), Info(TyLoc) {
+TypeExpr::TypeExpr(TypeLoc TyLoc, Expr *Unsimplified)
+  : Expr(ExprKind::Type, /*implicit*/false), Info(TyLoc),
+    Unsimplified(Unsimplified) {
   Type Ty = TyLoc.getType();
   if (Ty && Ty->hasCanonicalTypeComputed())
     setType(MetatypeType::get(Ty, Ty->getASTContext()));
