@@ -377,6 +377,8 @@ public:
   void recordDependencyOnTopLevelName(DeclContext *topLevelContext,
                                       DeclName name, bool isCascadingUse);
 
+  void recordDependencyOnTopLevelNameIfNeeded(Optional<bool> isCascadingUse);
+
   void addImportedResults(DeclContext *const dc);
 
   void addNamesKnownToDebugClient(DeclContext *dc);
@@ -523,6 +525,7 @@ void UnqualifiedLookupFactory::experimentallyLookInASTScopes(
                             contextAndIsCascadingUseArg.whereToLook,
                             lookupScopeAndIsCascadingUse.second};
   lookInScopeForASTScopeLookup(state);
+  recordDependencyOnTopLevelNameIfNeeded(true); // WRONG
 }
 
 std::pair<const ASTScope *, bool>
@@ -565,9 +568,9 @@ void UnqualifiedLookupFactory::lookInScopeForASTScopeLookup(
 
   // Perform local lookup within this scope.
   auto localBindings = state.scope->getLocalBindings();
-  for (auto local : localBindings) {
+  for (auto local : localBindings)
     Consumer.foundDecl(local, getLocalDeclVisibilityKind(state.scope));
-  }
+
   ifNotDoneYet([&] {
     // When we are in the body of a method, get the 'self' declaration.
     const bool inBody =
@@ -599,7 +602,6 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
 
   // Lookup in the source file's scope marks the end.
   if (isa<SourceFile>(scopeDC)) {
-    recordDependencyOnTopLevelName(scopeDC, Name, isCascadingUseResult);
     lookUpTopLevelNamesInModuleScopeContext(scopeDC);
     return;
   }
@@ -1068,6 +1070,18 @@ void UnqualifiedLookupFactory::setAsideUnavailableResults(
   // in order to support lookup relative to the place where
   // execution is suspended.
   filterForDiscriminator(Results, DebugClient);
+}
+
+void UnqualifiedLookupFactory::recordDependencyOnTopLevelNameIfNeeded(
+    Optional<bool> isCascadingUse) {
+  for (const auto &result : Results) {
+    auto *const resultContext = result.getValueDecl()->getDeclContext();
+    if (isa<SourceFile>(resultContext)) {
+      const bool isCascadingUseResult = resolveIsCascadingUse(
+          resultContext, isCascadingUse, /*onlyCareAboutFunctionBody=*/false);
+      recordDependencyOnTopLevelName(resultContext, Name, isCascadingUseResult);
+    }
+  }
 }
 
 void UnqualifiedLookupFactory::recordDependencyOnTopLevelName(
