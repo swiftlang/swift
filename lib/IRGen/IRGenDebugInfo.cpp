@@ -179,8 +179,7 @@ public:
                                      bool IsLocalToUnit, bool InFixedBuffer,
                                      Optional<SILLocation> Loc);
   void emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
-                        unsigned Depth, unsigned Index, StringRef ArchetypeName,
-                        StringRef AssocType);
+                        unsigned Depth, unsigned Index, StringRef Name);
 
   /// Return the DIBuilder.
   llvm::DIBuilder &getBuilder() { return DBuilder; }
@@ -2256,8 +2255,7 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
 void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
                                           llvm::Value *Metadata, unsigned Depth,
                                           unsigned Index,
-                                          StringRef ArchetypeName,
-                                          StringRef AssocType) {
+                                          StringRef Name) {
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
     return;
 
@@ -2269,9 +2267,9 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
   llvm::SmallString<8> Buf;
   static const char *Tau = u8"\u03C4";
   llvm::raw_svector_ostream OS(Buf);
-  OS << '$' << Tau << '_' << Depth << '_' << Index << AssocType;
+  OS << '$' << Tau << '_' << Depth << '_' << Index;
   auto DbgTy = DebugTypeInfo::getArchetype(
-      getMetadataType(ArchetypeName)->getDeclaredInterfaceType().getPointer(),
+      getMetadataType(Name)->getDeclaredInterfaceType().getPointer(),
       Metadata->getType(), Size(CI.getTargetInfo().getPointerWidth(0)),
       Alignment(CI.getTargetInfo().getPointerAlign(0)));
   emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
@@ -2394,10 +2392,9 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(
 
 void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
                                       unsigned Depth, unsigned Index,
-                                      StringRef ArchetypeName,
-                                      StringRef AssocType) {
+                                      StringRef Name) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitTypeMetadata(
-    IGF, Metadata, Depth, Index, ArchetypeName, AssocType);
+    IGF, Metadata, Depth, Index, Name);
 }
 
 llvm::DIBuilder &IRGenDebugInfo::getBuilder() {
