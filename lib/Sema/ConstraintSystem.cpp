@@ -1464,10 +1464,9 @@ static ArrayRef<OverloadChoice> partitionSIMDOperators(
   return scratch;
 }
 
-/// Retrieve the type that will be used when matching the given overload.
-static Type getEffectiveOverloadType(const OverloadChoice &overload,
-                                     bool allowMembers,
-                                     DeclContext *useDC) {
+Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
+                                                bool allowMembers,
+                                                DeclContext *useDC) {
   switch (overload.getKind()) {
   case OverloadChoiceKind::Decl:
     // Declaration choices are handled below.
@@ -1487,6 +1486,11 @@ static Type getEffectiveOverloadType(const OverloadChoice &overload,
 
   // Ignore type declarations.
   if (isa<TypeDecl>(decl))
+    return Type();
+
+  // Declarations returning unwrapped optionals don't have a single effective
+  // type.
+  if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
     return Type();
 
   // Retrieve the interface type.
@@ -1522,28 +1526,45 @@ static Type getEffectiveOverloadType(const OverloadChoice &overload,
       // See ConstraintSystem::resolveOverload() -- optional and dynamic
       // subscripts are a special case, because the optionality is
       // applied to the result type and not the type of the reference.
-      if (subscript->getAttrs().hasAttribute<OptionalAttr>() ||
-          overload.getKind() == OverloadChoiceKind::DeclViaDynamic)
+      if (subscript->getAttrs().hasAttribute<OptionalAttr>())
         elementTy = OptionalType::get(elementTy->getRValueType());
 
       auto indices = subscript->getInterfaceType()
                        ->castTo<AnyFunctionType>()->getParams();
       type = FunctionType::get(indices, elementTy);
     } else if (auto var = dyn_cast<VarDecl>(decl)) {
-      type = var->getInterfaceType();
+      type = var->getValueInterfaceType();
       if (doesStorageProduceLValue(var, overload.getBaseType(), useDC))
         type = LValueType::get(type);
-    } else if (isa<FuncDecl>(decl) || isa<EnumElementDecl>(decl)) {
+    } else if (isa<AbstractFunctionDecl>(decl) || isa<EnumElementDecl>(decl)) {
       if (decl->isInstanceMember() &&
           (!overload.getBaseType() ||
            !overload.getBaseType()->getAnyNominal()))
         return Type();
 
+      // Cope with 'Self' returns.
+      if (!decl->getDeclContext()->getSelfProtocolDecl()) {
+        if ((isa<FuncDecl>(decl) && cast<FuncDecl>(decl)->hasDynamicSelf()) ||
+            (isa<ConstructorDecl>(decl) &&
+             !overload.getBaseType()->getOptionalObjectType())) {
+          if (!overload.getBaseType())
+            return Type();
+
+          Type selfType = overload.getBaseType()->getRValueType()
+              ->getMetatypeInstanceType()
+              ->lookThroughAllOptionalTypes();
+          type = type->replaceCovariantResultType(selfType, 2);
+        }
+      }
+
       type = type->castTo<FunctionType>()->getResult();
-    } else {
-      return type;
     }
   }
+
+  // Handle "@objc optional" for non-subscripts; subscripts are handled above.
+  if (decl->getAttrs().hasAttribute<OptionalAttr>() &&
+      !isa<SubscriptDecl>(decl))
+    type = OptionalType::get(type->getRValueType());
 
   return type;
 }
@@ -1790,54 +1811,6 @@ public:
 
 }
 
-Type ConstraintSystem::findCommonResultType(ArrayRef<OverloadChoice> choices) {
-  // Local function to consider this new overload choice, updating the
-  // "common type". Returns true if this overload cannot be integrated into
-  // the common type, at which point there is no "common type".
-  Type commonType;
-  auto considerOverload = [&](const OverloadChoice &overload) -> bool {
-    // If we can't even get a type for the overload, there's nothing more to
-    // do.
-    Type overloadType =
-        getEffectiveOverloadType(overload, /*allowMembers=*/true, /*FIXME:*/DC);
-    if (!overloadType) {
-      return true;
-    }
-
-    auto functionType = overloadType->getAs<FunctionType>();
-    if (!functionType) {
-      return true;
-    }
-
-    auto resultType = functionType->getResult();
-    if (resultType->hasTypeParameter()) {
-      return true;
-    }
-
-    // If this is the first overload, record it's type as the common type.
-    if (!commonType) {
-      commonType = resultType;
-      return false;
-    }
-
-    // Find the common type between the current common type and the new
-    // overload's type.
-    commonType = CommonTypeVisitor().visit(commonType, resultType);
-    if (!commonType) {
-      return true;
-    }
-
-    return false;
-  };
-
-  for (const auto &choice : choices) {
-    if (considerOverload(choice))
-      return Type();
-  }
-
-  return commonType;
-}
-
 Type ConstraintSystem::findCommonOverloadType(
     ArrayRef<OverloadChoice> choices,
     ArrayRef<OverloadChoice> outerAlternatives,
@@ -1850,7 +1823,7 @@ Type ConstraintSystem::findCommonOverloadType(
     // If we can't even get a type for the overload, there's nothing more to
     // do.
     Type overloadType =
-    getEffectiveOverloadType(overload, /*allowMembers=*/false, /*FIXME:*/DC);
+      getEffectiveOverloadType(overload, /*allowMembers=*/false, /*FIXME:*/DC);
     if (!overloadType) {
       return true;
     }

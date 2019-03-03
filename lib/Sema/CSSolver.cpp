@@ -423,6 +423,8 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numDefaultedConstraints = cs.DefaultedConstraints.size();
   numCheckedConformances = cs.CheckedConformances.size();
   numMissingMembers = cs.MissingMembers.size();
+  numDisabledConstraints = cs.solverState->getNumDisabledConstraints();
+
   PreviousScore = cs.CurrentScore;
 
   cs.solverState->registerScope(this);
@@ -1289,6 +1291,85 @@ void ConstraintSystem::collectDisjunctions(
   }
 }
 
+ConstraintSystem::SolutionKind
+ConstraintSystem::filterDisjunction(
+    Constraint *disjunction, bool restoreOnFail,
+    llvm::function_ref<bool(Constraint *)> pred) {
+  assert(disjunction->getKind() == ConstraintKind::Disjunction);
+
+  SmallVector<Constraint *, 4> constraintsToRestoreOnFail;
+  unsigned choiceIdx = 0;
+  unsigned numEnabledTerms = 0;
+  ASTContext &ctx = getASTContext();
+  for (unsigned constraintIdx : indices(disjunction->getNestedConstraints())) {
+    auto constraint = disjunction->getNestedConstraints()[constraintIdx];
+
+    // Skip already-disabled constraints.
+    if (constraint->isDisabled())
+      continue;
+
+    if (pred(constraint)) {
+      ++numEnabledTerms;
+      choiceIdx = constraintIdx;
+      continue;
+    }
+
+    if (ctx.LangOpts.DebugConstraintSolver) {
+      auto &log = ctx.TypeCheckerDebug->getStream();
+      log.indent(solverState ? solverState->depth * 2 + 2 : 0)
+        << "(disabled disjunction term ";
+      constraint->print(log, &ctx.SourceMgr);
+      log << ")\n";
+    }
+
+    if (restoreOnFail)
+      constraintsToRestoreOnFail.push_back(constraint);
+
+    if (solverState)
+      solverState->disableContraint(constraint);
+    else
+      constraint->setDisabled();
+  }
+
+  switch (numEnabledTerms) {
+  case 0:
+    for (auto constraint : constraintsToRestoreOnFail) {
+      constraint->setEnabled();
+    }
+    return SolutionKind::Error;
+
+  case 1: {
+    // Only a single constraint remains. Retire the disjunction and make
+    // the remaining constraint active.
+
+    // Retire the disjunction. It's been solved.
+    retireConstraint(disjunction);
+
+    // Note the choice we made and simplify it. This introduces the
+    // new constraint into the system.
+    auto choice = disjunction->getNestedConstraints()[choiceIdx];
+    if (disjunction->shouldRememberChoice()) {
+      recordDisjunctionChoice(disjunction->getLocator(), choiceIdx);
+    }
+
+    if (ctx.LangOpts.DebugConstraintSolver) {
+      auto &log = ctx.TypeCheckerDebug->getStream();
+      log.indent(solverState ? solverState->depth * 2 + 2 : 0)
+        << "(introducing single enabled disjunction term ";
+      choice->print(log, &ctx.SourceMgr);
+      log << ")\n";
+    }
+
+    simplifyDisjunctionChoice(choice);
+
+    return failedConstraint ? SolutionKind::Unsolved : SolutionKind::Solved;
+  }
+
+  default:
+    return SolutionKind::Unsolved;
+  }
+}
+
 // Attempt to find a disjunction of bind constraints where all options
 // in the disjunction are binding the same type variable.
 //
@@ -1575,10 +1656,19 @@ Constraint *ConstraintSystem::getUnboundBindOverloadDisjunction(
   llvm::SetVector<Constraint *> disjunctions;
   getConstraintGraph().gatherConstraints(
       rep, disjunctions, ConstraintGraph::GatheringKind::EquivalenceClass,
-      [](Constraint *match) {
-        return match->getKind() == ConstraintKind::Disjunction &&
-               match->getNestedConstraints().front()->getKind() ==
-                   ConstraintKind::BindOverload;
+      [this, rep](Constraint *match) {
+        if (match->getKind() != ConstraintKind::Disjunction ||
+            match->getNestedConstraints().front()->getKind() !=
+                   ConstraintKind::BindOverload)
+          return false;
+
+        auto lhsTypeVar =
+            match->getNestedConstraints().front()->getFirstType()
+              ->getAs<TypeVariableType>();
+        if (!lhsTypeVar)
+          return false;
+
+        return getRepresentative(lhsTypeVar) == rep;
       });
 
   if (disjunctions.empty())
