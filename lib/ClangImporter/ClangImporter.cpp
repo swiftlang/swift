@@ -1703,7 +1703,7 @@ PlatformAvailability::PlatformAvailability(LangOptions &langOpts)
   case PlatformKind::OSX:
   case PlatformKind::OSXApplicationExtension:
     deprecatedAsUnavailableMessage =
-        "APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift";
+        "APIs deprecated as of macOS 10.9 and earlier are unavailable in Swift";
     break;
 
   default:
