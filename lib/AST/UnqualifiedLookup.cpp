@@ -216,18 +216,18 @@ public:
                            Options options,
                            SmallVectorImpl<LookupResultEntry> &Results,
                            size_t &IndexOfFirstOuterResult);
-  // clang-format on
+    // clang-format on
 
-  void performUnqualifiedLookup();
+    void performUnqualifiedLookup();
 
-private:
-  struct ContextAndUnresolvedIsCascadingUse {
-    DeclContext *whereToLook;
-    Optional<bool> isCascadingUse;
-    ContextAndResolvedIsCascadingUse resolve(const bool resolution) const {
-      return ContextAndResolvedIsCascadingUse{
-          whereToLook, isCascadingUse.getValueOr(resolution)};
-    }
+  private:
+    struct ContextAndUnresolvedIsCascadingUse {
+      DeclContext *whereToLook;
+      Optional<bool> isCascadingUse;
+      ContextAndResolvedIsCascadingUse resolve(const bool resolution) const {
+        return ContextAndResolvedIsCascadingUse{
+            whereToLook, isCascadingUse.getValueOr(resolution)};
+      }
   };
 
   bool useASTScopesForExperimentalLookup() const;
@@ -467,8 +467,9 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
     lookupNamesIntroducedBy(contextAndIsCascadingUse);
     if (useASTScopesForExperimentalLookupIfEnabled()) {
       SmallVector<LookupResultEntry, 4> results;
-      size_t indexOfFirstOuterResult;
-      UnqualifiedLookupFactory scopeLookup(Name, DC, TypeResolver, Loc, options, results, indexOfFirstOuterResult);
+      size_t indexOfFirstOuterResult = 0;
+      UnqualifiedLookupFactory scopeLookup(Name, DC, TypeResolver, Loc, options,
+                                           results, indexOfFirstOuterResult);
       scopeLookup.experimentallyLookInASTScopes(contextAndIsCascadingUse);
       assert(verifyEqualTo(std::move(scopeLookup)));
     }
