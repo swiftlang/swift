@@ -610,15 +610,11 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
 }
 
 SILInstruction *CastOptimizer::optimizeBridgedCasts(SILDynamicCastInst cast) {
-  switch (cast.getKind()) {
-  case SILDynamicCastKind::CheckedCastAddrBranchInst:
-  case SILDynamicCastKind::CheckedCastBranchInst:
-  case SILDynamicCastKind::CheckedCastValueBranchInst:
-  case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
-  case SILDynamicCastKind::UnconditionalCheckedCastInst:
-  case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
-    llvm_unreachable("unsupported");
-  }
+  return optimizeBridgedCasts(
+      cast.getInstruction(), cast.getBridgedConsumptionKind(),
+      cast.isConditional(), cast.getSource(), cast.getDest(),
+      cast.getSourceType(), cast.getTargetType(), cast.getSuccessBlock(),
+      cast.getFailureBlock());
 }
 
 /// Make use of the fact that some of these casts cannot fail.
@@ -1477,24 +1473,17 @@ static bool optimizeStaticallyKnownProtocolConformance(
 
 SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
     UnconditionalCheckedCastAddrInst *Inst) {
-  auto Loc = Inst->getLoc();
-  auto Src = Inst->getSrc();
-  auto Dest = Inst->getDest();
-  auto SourceType = Inst->getSourceType();
-  auto TargetType = Inst->getTargetType();
-  auto &Mod = Inst->getModule();
-  auto *F = Inst->getFunction();
-
-  bool isSourceTypeExact = isa<MetatypeInst>(Src);
+  SILDynamicCastInst dynamicCast(Inst);
+  auto Loc = dynamicCast.getLocation();
 
   // Check if we can statically predict the outcome of the cast.
-  auto Feasibility = classifyDynamicCast(Mod.getSwiftModule(), SourceType,
-                                         TargetType, isSourceTypeExact);
+  auto Feasibility =
+      dynamicCast.classifyFeasibility(false /*allow whole module*/);
 
   if (Feasibility == DynamicCastFeasibility::MaySucceed) {
     // Forced bridged casts can be still simplified here.
     // If they fail, they fail inside the conversion function.
-    if (!isBridgingCast(SourceType, TargetType))
+    if (!dynamicCast.isBridgingCast())
       return nullptr;
   }
 
@@ -1504,12 +1493,12 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
     SILBuilderWithScope Builder(Inst, BuilderContext);
     // mem2reg's invariants get unhappy if we don't try to
     // initialize a loadable result.
-    auto DestType = Dest->getType();
-    auto &resultTL = F->getTypeLowering(DestType);
-    if (!resultTL.isAddressOnly()) {
+    if (!dynamicCast.getLoweredTargetType().isAddressOnly(
+            Builder.getModule())) {
       auto undef = SILValue(
-          SILUndef::get(DestType.getObjectType(), Builder.getModule()));
-      Builder.emitStoreValueOperation(Loc, undef, Dest,
+          SILUndef::get(dynamicCast.getLoweredTargetType().getObjectType(),
+                        Builder.getModule()));
+      Builder.emitStoreValueOperation(Loc, undef, dynamicCast.getDest(),
                                       StoreOwnershipQualifier::Init);
     }
     auto *TrapI = Builder.createBuiltinTrap(Loc);
@@ -1531,10 +1520,11 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
     // Check if a result of a cast is unused. If this is the case, the cast can
     // be removed even if the cast may fail at runtime.
     // Swift optimizer does not claim to be crash-preserving.
-    bool ResultNotUsed = isa<AllocStackInst>(Dest);
+    SILValue dest = dynamicCast.getDest();
+    bool ResultNotUsed = isa<AllocStackInst>(dest);
     DestroyAddrInst *DestroyDestInst = nullptr;
     if (ResultNotUsed) {
-      for (auto Use : Dest->getUses()) {
+      for (auto Use : dest->getUses()) {
         auto *User = Use->getUser();
         if (isa<DeallocStackInst>(User) || User == Inst)
           continue;
@@ -1550,7 +1540,7 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
 
     if (ResultNotUsed) {
       SILBuilderWithScope B(Inst, BuilderContext);
-      B.createDestroyAddr(Inst->getLoc(), Inst->getSrc());
+      B.createDestroyAddr(Loc, dynamicCast.getSource());
       if (DestroyDestInst)
         EraseInstAction(DestroyDestInst);
       EraseInstAction(Inst);
@@ -1559,9 +1549,7 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
     }
 
     // Try to apply the bridged casts optimizations.
-    auto NewI =
-        optimizeBridgedCasts(Inst, CastConsumptionKind::TakeAlways, false, Src,
-                             Dest, SourceType, TargetType, nullptr, nullptr);
+    auto NewI = optimizeBridgedCasts(dynamicCast);
     if (NewI) {
       WillSucceedAction();
       return nullptr;
@@ -1578,13 +1566,11 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
       return nullptr;
     }
 
-    if (isBridgingCast(SourceType, TargetType))
+    if (dynamicCast.isBridgingCast())
       return nullptr;
 
     SILBuilderWithScope Builder(Inst, BuilderContext);
-    if (!emitSuccessfulIndirectUnconditionalCast(Builder, Mod.getSwiftModule(),
-                                                 Loc, Src, SourceType, Dest,
-                                                 TargetType, Inst)) {
+    if (!emitSuccessfulIndirectUnconditionalCast(Builder, Loc, dynamicCast)) {
       // No optimization was possible.
       return nullptr;
     }
