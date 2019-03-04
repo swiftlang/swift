@@ -160,8 +160,19 @@ class Remangler {
 
   static const size_t MaxNumWords = 26;
 
+  // An efficient hash-map implementation in the spirit of llvm's SmallPtrSet:
+  // The first 16 substitutions are stored in an inline-allocated array to avoid
+  // malloc calls in the common case.
+  // Lookup is still reasonable fast because there are max 16 elements in the
+  // array.
+  static const size_t InlineSubstCapacity = 16;
+  SubstitutionEntry InlineSubstitutions[InlineSubstCapacity];
+  size_t NumInlineSubsts = 0;
+
+  // The "overflow" for InlineSubstitutions. Only if InlineSubstitutions is
+  // full, new substitutions are stored in OverflowSubstitutions.
   std::unordered_map<SubstitutionEntry, unsigned,
-                     SubstitutionEntry::Hasher> Substitutions;
+                     SubstitutionEntry::Hasher> OverflowSubstitutions;
 
   SubstitutionMerging SubstMerging;
 
@@ -178,6 +189,24 @@ class Remangler {
 
   void addWord(const SubstitutionWord &word) {
     Words.push_back(word, Factory);
+  }
+
+  // Find a substitution and return its index.
+  // Returns -1 if no substitution is found.
+  int findSubstitution(const SubstitutionEntry &entry) {
+    // First search in InlineSubstitutions.
+    SubstitutionEntry *result
+      = std::find(InlineSubstitutions, InlineSubstitutions + NumInlineSubsts,
+                  entry);
+    if (result != InlineSubstitutions + NumInlineSubsts)
+      return result - InlineSubstitutions;
+
+    // Then search in OverflowSubstitutions.
+    auto it = OverflowSubstitutions.find(entry);
+    if (it == OverflowSubstitutions.end())
+      return -1;
+
+    return it->second;
   }
 
   StringRef getBufferStr() const { return Buffer.getStringRef(); }
@@ -343,11 +372,10 @@ bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry,
   // Go ahead and initialize the substitution entry.
   entry.setNode(node, treatAsIdentifier);
 
-  auto it = Substitutions.find(entry);
-  if (it == Substitutions.end())
+  int Idx = findSubstitution(entry);
+  if (Idx < 0)
     return false;
 
-  unsigned Idx = it->second;
   if (Idx >= 26) {
     Buffer << 'A';
     mangleIndex(Idx - 26);
@@ -361,17 +389,16 @@ bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry,
 }
 
 void Remangler::addSubstitution(const SubstitutionEntry &entry) {
-  unsigned Idx = Substitutions.size();
-#if false
-  llvm::outs() << "add subst ";
-  if (Idx < 26) {
-    llvm::outs() << char('A' + Idx);
-  } else {
-    llvm::outs() << Idx;
+  assert(findSubstitution(entry) < 0);
+  if (NumInlineSubsts < InlineSubstCapacity) {
+    // There is still free space in NumInlineSubsts.
+    assert(OverflowSubstitutions.empty());
+    InlineSubstitutions[NumInlineSubsts++] = entry;
+    return;
   }
-  llvm::outs() << " at pos " << getBufferStr().size() << '\n';
-#endif
-  auto result = Substitutions.insert({entry, Idx});
+  // We have to add the entry to OverflowSubstitutions.
+  unsigned Idx = OverflowSubstitutions.size() + InlineSubstCapacity;
+  auto result = OverflowSubstitutions.insert({entry, Idx});
   assert(result.second);
   (void) result;
 }
