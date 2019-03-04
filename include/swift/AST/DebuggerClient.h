@@ -61,9 +61,10 @@ public:
                                SourceLoc Loc, bool IsTypeLookup,
                                ResultVector &RV) = 0;
 
-  /// The following functions allow the debugger to prune the results of a a
-  /// qualfied lookup as needed. See the corresponding finishLookupInXYZ
-  /// functions defined in NameLookup.cpp.
+  /// The following functions allow the debugger to modify the results of a
+  /// qualfied lookup as needed. These methods may add, remove or modify the
+  /// entries in `decls`. See the corresponding DeclContext::lookupInXYZ
+  /// functions defined in NameLookup.cpp for more context.
   ///
 
   virtual void finishLookupInNominals(const DeclContext *dc,

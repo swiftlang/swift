@@ -1357,8 +1357,8 @@ static bool isAcceptableLookupResult(const DeclContext *dc,
   return true;
 }
 
-bool namelookup::finishLookup(const DeclContext *dc, NLOptions options,
-                              SmallVectorImpl<ValueDecl *> &decls) {
+bool namelookup::pruneLookupResultSet(const DeclContext *dc, NLOptions options,
+                                      SmallVectorImpl<ValueDecl *> &decls) {
   // If we're supposed to remove overridden declarations, do so now.
   if (options & NL_RemoveOverridden)
     removeOverriddenDecls(decls);
@@ -1369,40 +1369,6 @@ bool namelookup::finishLookup(const DeclContext *dc, NLOptions options,
     removeShadowedDecls(decls, M);
 
   filterForDiscriminator(decls, M->getDebugClient());
-}
-
-static bool finishLookupInNominals(const DeclContext *dc,
-                                   ArrayRef<NominalTypeDecl *> types,
-                                   DeclName member, NLOptions options,
-                                   SmallVectorImpl<ValueDecl *> &decls) {
-  finishLookup(dc, options, decls);
-  if (auto *debugClient = dc->getParentModule()->getDebugClient()) {
-    debugClient->finishLookupInNominals(dc, types, member, options, decls);
-  }
-  // We're done. Report success/failure.
-  return !decls.empty();
-}
-
-static bool finishLookupInModule(const DeclContext *dc, ModuleDecl *module,
-                                 DeclName member, NLOptions options,
-                                 SmallVectorImpl<ValueDecl *> &decls) {
-  finishLookup(dc, options, decls);
-  if (auto *debugClient = dc->getParentModule()->getDebugClient()) {
-    debugClient->finishLookupInModule(dc, module, member, options, decls);
-  }
-  // We're done. Report success/failure.
-  return !decls.empty();
-}
-
-static bool finishLookupInAnyObject(const DeclContext *dc, DeclName member,
-                                    NLOptions options,
-                                    SmallVectorImpl<ValueDecl *> &decls) {
-  finishLookup(dc, options, decls);
-  if (auto *debugClient = dc->getParentModule()->getDebugClient()) {
-    debugClient->finishLookupInAnyObject(dc, member, options, decls);
-  }
-  // We're done. Report success/failure.
-  return !decls.empty();
 }
 
 /// Inspect the given type to determine which nominal type declarations it
@@ -1606,7 +1572,13 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
     }
   }
 
-  return finishLookupInNominals(this, typeDecls, member, options, decls);
+  pruneLookupResultSet(this, options, decls);
+  if (auto *debugClient = this->getParentModule()->getDebugClient()) {
+    debugClient->finishLookupInNominals(this, typeDecls, member, options,
+                                        decls);
+  }
+  // We're done. Report success/failure.
+  return !decls.empty();
 }
 
 bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
@@ -1658,7 +1630,13 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
     return !knownDecls.insert(vd).second;
   }), decls.end());
 
-  return finishLookupInModule(this, module, member, options, decls);
+  pruneLookupResultSet(this, options, decls);
+
+  if (auto *debugClient = this->getParentModule()->getDebugClient()) {
+    debugClient->finishLookupInModule(this, module, member, options, decls);
+  }
+  // We're done. Report success/failure.
+  return !decls.empty();
 }
 
 bool DeclContext::lookupAnyObject(DeclName member, NLOptions options,
@@ -1713,7 +1691,12 @@ bool DeclContext::lookupAnyObject(DeclName member, NLOptions options,
       decls.push_back(decl);
   }
 
-  return finishLookupInAnyObject(this, member, options, decls);
+  pruneLookupResultSet(this, options, decls);
+  if (auto *debugClient = this->getParentModule()->getDebugClient()) {
+    debugClient->finishLookupInAnyObject(this, member, options, decls);
+  }
+  // We're done. Report success/failure.
+  return !decls.empty();
 }
 
 void DeclContext::lookupAllObjCMethods(

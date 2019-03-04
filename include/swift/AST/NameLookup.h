@@ -369,8 +369,8 @@ void forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
 
 /// Only name lookup has gathered a set of results, perform any necessary
 /// steps to prune the result set before returning it to the caller.
-bool finishLookup(const DeclContext *dc, NLOptions options,
-                  SmallVectorImpl<ValueDecl *> &decls);
+bool pruneLookupResultSet(const DeclContext *dc, NLOptions options,
+                          SmallVectorImpl<ValueDecl *> &decls);
 
 /// Do nothing if debugClient is null.
 template <typename Result>
@@ -441,7 +441,7 @@ public:
   }
 
   void checkPattern(const Pattern *Pat, DeclVisibilityKind Reason);
-  
+
   void checkParameterList(const ParameterList *params);
 
   void checkGenericParams(GenericParamList *Params);
@@ -477,7 +477,7 @@ private:
   void visitForEachStmt(ForEachStmt *S);
 
   void visitBraceStmt(BraceStmt *S, bool isTopLevelCode = false);
-  
+
   void visitSwitchStmt(SwitchStmt *S);
 
   void visitCaseStmt(CaseStmt *S);
@@ -485,7 +485,7 @@ private:
   void visitDoCatchStmt(DoCatchStmt *S);
   void visitCatchClauses(ArrayRef<CatchStmt*> clauses);
   void visitCatchStmt(CatchStmt *S);
-  
+
 };
 
 } // end namespace namelookup
