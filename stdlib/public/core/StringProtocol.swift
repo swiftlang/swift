@@ -117,6 +117,42 @@ public protocol StringProtocol
     encodedAs targetEncoding: Encoding.Type,
     _ body: (UnsafePointer<Encoding.CodeUnit>) throws -> Result
   ) rethrows -> Result
+
+  /// Returns whether this string is capable of providing access to
+  /// validly-encoded UTF-8 contents in contiguous memory in O(1) time.
+  ///
+  /// Contiguous strings always operate in O(1) time for withUTF8 and always
+  /// give a result for String.UTF8View.withContiguousStorageIfAvailable.
+  /// Contiguous strings also benefit from fast-paths and better optimizations.
+  ///
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+   var isContiguous: Bool  { get }
+
+  /// If this string is not contiguous, make it so. If this mutates the
+  /// substring, it will invalidate any pre-existing indices.
+  ///
+  /// Complexity: O(n) if non-contiguous, O(1) if already contiguous
+  ///
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+   mutating func makeContiguous()
+
+  /// Runs `body` over the content of this substring in contiguous memory. If
+  /// this substring is not contiguous, this will first make it contiguous,
+  /// which will also speed up subsequent access. If this mutates the substring,
+  /// it will invalidate any pre-existing indices.
+  ///
+  /// Note that it is unsafe to escape the pointer provided to `body`. For
+  /// example, strings of up to 15 UTF-8 code units in length may be represented
+  /// in a small-string representation, and thus will be spilled into
+  /// temporary stack space which is invalid after `withUTF8` finishes
+  /// execution.
+  ///
+  /// Complexity: O(n) if non-contiguous, O(1) if already contiguous
+  ///
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+   mutating func withUTF8<R>(
+    _ body: (UnsafeBufferPointer<UInt8>) throws -> R
+  ) rethrows -> R
 }
 
 extension StringProtocol {
@@ -171,6 +207,44 @@ extension StringProtocol {
       return String(self)._guts
     }
   }
+
+
+  /// Returns whether this string is capable of providing access to
+  /// validly-encoded UTF-8 contents in contiguous memory in O(1) time.
+  ///
+  /// Contiguous strings always operate in O(1) time for withUTF8 and always
+  /// give a result for String.UTF8View.withContiguousStorageIfAvailable.
+  /// Contiguous strings also benefit from fast-paths and better optimizations.
+  ///
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  public var isContiguous: Bool  { fatalError() }
+
+  /// If this string is not contiguous, make it so. If this mutates the
+  /// substring, it will invalidate any pre-existing indices.
+  ///
+  /// Complexity: O(n) if non-contiguous, O(1) if already contiguous
+  ///
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  public mutating func makeContiguous() { fatalError() }
+
+  /// Runs `body` over the content of this substring in contiguous memory. If
+  /// this substring is not contiguous, this will first make it contiguous,
+  /// which will also speed up subsequent access. If this mutates the substring,
+  /// it will invalidate any pre-existing indices.
+  ///
+  /// Note that it is unsafe to escape the pointer provided to `body`. For
+  /// example, strings of up to 15 UTF-8 code units in length may be represented
+  /// in a small-string representation, and thus will be spilled into
+  /// temporary stack space which is invalid after `withUTF8` finishes
+  /// execution.
+  ///
+  /// Complexity: O(n) if non-contiguous, O(1) if already contiguous
+  ///
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  public mutating func withUTF8<R>(
+    _ body: (UnsafeBufferPointer<UInt8>) throws -> R
+  ) rethrows -> R { fatalError() }
+
 }
 
 // Contiguous UTF-8 strings
