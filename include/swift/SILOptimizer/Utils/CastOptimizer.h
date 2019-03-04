@@ -147,13 +147,6 @@ public:
   /// Check if it is a bridged cast and optimize it.
   ///
   /// May change the control flow.
-  SILInstruction *optimizeBridgedCasts(SILInstruction *Inst,
-                                       CastConsumptionKind ConsumptionKind,
-                                       bool isConditional, SILValue Src,
-                                       SILValue Dest, CanType Source,
-                                       CanType Target, SILBasicBlock *SuccessBB,
-                                       SILBasicBlock *FailureBB);
-
   SILInstruction *optimizeBridgedCasts(SILDynamicCastInst cast);
 
   SILValue optimizeMetatypeConversion(ConversionInst *mci,
