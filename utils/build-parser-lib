@@ -110,13 +110,15 @@ class Builder(object):
             cmake_args += ['-DCMAKE_INSTALL_PREFIX:PATH='+self.install_prefix]
         if self.version:
             cmake_args += ['-DSWIFT_LIBPARSER_VER:STRING='+self.version]
-        cmake_args += ['-DLLVM_ENABLE_PROJECTS=clang;cmark;swift', '-DLLVM_EXTERNAL_PROJECTS=cmark;swift']
+        cmake_args += ['-DLLVM_ENABLE_PROJECTS=clang;swift', '-DLLVM_EXTERNAL_PROJECTS=swift']
         cmake_args += ['-DSWIFT_BUILD_ONLY_SYNTAXPARSERLIB=TRUE']
         cmake_args += ['-DSWIFT_BUILD_PERF_TESTSUITE=NO', '-DSWIFT_INCLUDE_DOCS=NO']
         cmake_args += ['-DSWIFT_BUILD_REMOTE_MIRROR=FALSE', '-DSWIFT_BUILD_DYNAMIC_STDLIB=FALSE',
             '-DSWIFT_BUILD_STATIC_STDLIB=FALSE', '-DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY=FALSE',
             '-DSWIFT_BUILD_STATIC_SDK_OVERLAY=FALSE']
-        cmake_args += ['-DCMARK_TESTS=FALSE', '-DLLVM_INCLUDE_TESTS=FALSE', '-DCLANG_INCLUDE_TESTS=FALSE', '-DSWIFT_INCLUDE_TESTS=FALSE']
+        # We are not using cmark but initialize the CMARK variables to something so that configure can succeed.
+        cmake_args += ['-DCMARK_MAIN_INCLUDE_DIR='+os.path.join(SWIFT_SOURCE_ROOT, 'cmark'), '-DCMARK_BUILD_INCLUDE_DIR='+os.path.join(self.build_dir, 'cmark')]
+        cmake_args += ['-DLLVM_INCLUDE_TESTS=FALSE', '-DCLANG_INCLUDE_TESTS=FALSE', '-DSWIFT_INCLUDE_TESTS=FALSE']
         cmake_args += [os.path.join(SWIFT_SOURCE_ROOT, 'llvm')]
         self.call(cmake_args)
 
