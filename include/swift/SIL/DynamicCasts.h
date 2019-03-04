@@ -183,6 +183,7 @@ public:
   CastConsumptionKind getBridgedConsumptionKind() const {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
+      return cast<CheckedCastAddrBranchInst>(inst)->getConsumptionKind();
     case SILDynamicCastKind::CheckedCastBranchInst:
     case SILDynamicCastKind::CheckedCastValueBranchInst:
       llvm_unreachable("unsupported");
@@ -210,7 +211,7 @@ public:
   SILBasicBlock *getSuccessBlock() {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
-      llvm_unreachable("unsupported");
+      return cast<CheckedCastAddrBranchInst>(inst)->getSuccessBB();
     case SILDynamicCastKind::CheckedCastBranchInst:
       return cast<CheckedCastBranchInst>(inst)->getSuccessBB();
     case SILDynamicCastKind::CheckedCastValueBranchInst:
@@ -246,7 +247,7 @@ public:
   SILBasicBlock *getFailureBlock() {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
-      llvm_unreachable("unsupported");
+      return cast<CheckedCastAddrBranchInst>(inst)->getFailureBB();
     case SILDynamicCastKind::CheckedCastBranchInst:
       return cast<CheckedCastBranchInst>(inst)->getFailureBB();
     case SILDynamicCastKind::CheckedCastValueBranchInst:
@@ -282,7 +283,7 @@ public:
   SILValue getSource() const {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
-      llvm_unreachable("unsupported");
+      return cast<CheckedCastAddrBranchInst>(inst)->getSrc();
     case SILDynamicCastKind::CheckedCastBranchInst:
       return cast<CheckedCastBranchInst>(inst)->getOperand();
     case SILDynamicCastKind::CheckedCastValueBranchInst:
@@ -300,6 +301,7 @@ public:
   SILValue getDest() const {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
+      return cast<CheckedCastAddrBranchInst>(inst)->getDest();
     case SILDynamicCastKind::CheckedCastBranchInst:
     case SILDynamicCastKind::CheckedCastValueBranchInst:
       llvm_unreachable("unsupported");
@@ -318,6 +320,7 @@ public:
   CanType getSourceType() const {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
+      return cast<CheckedCastAddrBranchInst>(inst)->getSourceType();
     case SILDynamicCastKind::CheckedCastBranchInst:
     case SILDynamicCastKind::CheckedCastValueBranchInst:
       llvm_unreachable("unsupported");
@@ -350,6 +353,7 @@ public:
   CanType getTargetType() const {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
+      return cast<CheckedCastAddrBranchInst>(inst)->getTargetType();
     case SILDynamicCastKind::CheckedCastBranchInst:
     case SILDynamicCastKind::CheckedCastValueBranchInst:
       llvm_unreachable("unsupported");
@@ -384,10 +388,10 @@ public:
 
   bool isSourceTypeExact() const {
     switch (getKind()) {
-    case SILDynamicCastKind::CheckedCastAddrBranchInst:
     case SILDynamicCastKind::CheckedCastBranchInst:
     case SILDynamicCastKind::CheckedCastValueBranchInst:
       llvm_unreachable("unsupported");
+    case SILDynamicCastKind::CheckedCastAddrBranchInst:
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
       return isa<MetatypeInst>(getSource());
@@ -417,16 +421,24 @@ public:
 
   bool isConditional() const {
     switch (getKind()) {
-    case SILDynamicCastKind::CheckedCastAddrBranchInst:
     case SILDynamicCastKind::CheckedCastBranchInst:
     case SILDynamicCastKind::CheckedCastValueBranchInst:
       llvm_unreachable("unsupported");
+    case SILDynamicCastKind::CheckedCastAddrBranchInst: {
+      auto f = classifyFeasibility(true /*allow wmo*/);
+      return f == DynamicCastFeasibility::MaySucceed;
+    }
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
       return false;
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unsupported");
     }
+  }
+
+  bool canUseScalarCheckedCastInstructions() const {
+    return swift::canUseScalarCheckedCastInstructions(
+        getModule(), getSourceType(), getTargetType());
   }
 };
 

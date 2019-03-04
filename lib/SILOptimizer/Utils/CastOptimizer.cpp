@@ -689,25 +689,18 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
   if (!Inst)
     return nullptr;
 
-  auto Loc = Inst->getLoc();
-  auto Src = Inst->getSrc();
-  auto Dest = Inst->getDest();
-  auto SourceType = Inst->getSourceType();
-  auto TargetType = Inst->getTargetType();
-  auto *SuccessBB = Inst->getSuccessBB();
-  auto *FailureBB = Inst->getFailureBB();
-  auto &Mod = Inst->getModule();
+  SILDynamicCastInst dynamicCast(Inst);
+  auto Loc = dynamicCast.getLocation();
+  auto Src = dynamicCast.getSource();
+  auto Dest = dynamicCast.getDest();
+  auto *SuccessBB = dynamicCast.getSuccessBlock();
+  auto *FailureBB = dynamicCast.getFailureBlock();
 
   SILBuilderWithScope Builder(Inst, BuilderContext);
 
-  // Try to determine the outcome of the cast from a known type
-  // to a protocol type at compile-time.
-  bool isSourceTypeExact = isa<MetatypeInst>(Inst->getSrc());
-
   // Check if we can statically predict the outcome of the cast.
   auto Feasibility =
-      classifyDynamicCast(Mod.getSwiftModule(), SourceType, TargetType,
-                          isSourceTypeExact, Mod.isWholeModule());
+      dynamicCast.classifyFeasibility(true /*allow whole module*/);
 
   if (Feasibility == DynamicCastFeasibility::WillFail) {
     if (shouldDestroyOnFailure(Inst->getConsumptionKind())) {
@@ -738,10 +731,7 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
   // To apply the bridged optimizations, we should
   // ensure that types are not existential,
   // and that not both types are classes.
-  BridgedI = optimizeBridgedCasts(
-      Inst, Inst->getConsumptionKind(),
-      /* isConditional */ Feasibility == DynamicCastFeasibility::MaySucceed,
-      Src, Dest, SourceType, TargetType, SuccessBB, FailureBB);
+  BridgedI = optimizeBridgedCasts(dynamicCast);
 
   if (!BridgedI) {
     // If the cast may succeed or fail, and it can't be optimized into a
@@ -787,9 +777,7 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
       break;
     }
 
-    if (!emitSuccessfulIndirectUnconditionalCast(Builder, Mod.getSwiftModule(),
-                                                 Loc, Src, SourceType, Dest,
-                                                 TargetType, Inst)) {
+    if (!emitSuccessfulIndirectUnconditionalCast(Builder, Loc, dynamicCast)) {
       // No optimization was possible.
       return nullptr;
     }
