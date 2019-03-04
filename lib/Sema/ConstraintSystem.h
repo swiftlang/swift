@@ -3551,14 +3551,6 @@ Expr *getArgumentLabelTargetExpr(Expr *fn);
 /// Attempt to prove that arguments with the given labels at the
 /// given parameter depth cannot be used with the given value.
 /// If this cannot be proven, conservatively returns true.
-bool areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
-                                               bool hasCurriedSelf,
-                                               ArrayRef<Identifier> labels,
-                                               bool hasTrailingClosure);
-
-/// Attempt to prove that arguments with the given labels at the
-/// given parameter depth cannot be used with the given value.
-/// If this cannot be proven, conservatively returns true.
 bool areConservativelyCompatibleArgumentLabels(OverloadChoice choice,
                                                ArrayRef<Identifier> labels,
                                                bool hasTrailingClosure);

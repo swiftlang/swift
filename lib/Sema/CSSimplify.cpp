@@ -135,8 +135,39 @@ bool constraints::areConservativelyCompatibleArgumentLabels(
     hasCurriedSelf = true;
   }
 
-  return areConservativelyCompatibleArgumentLabels(
-      decl, hasCurriedSelf, labels, hasTrailingClosure);
+  const AnyFunctionType *fTy;
+
+  if (auto fn = dyn_cast<AbstractFunctionDecl>(decl)) {
+    fTy = fn->getInterfaceType()->castTo<AnyFunctionType>();
+  } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+    assert(!hasCurriedSelf && "Subscripts never have curried 'self'");
+    fTy = subscript->getInterfaceType()->castTo<AnyFunctionType>();
+  } else {
+    return true;
+  }
+
+  SmallVector<AnyFunctionType::Param, 8> argInfos;
+  for (auto argLabel : labels) {
+    argInfos.push_back(AnyFunctionType::Param(Type(), argLabel, {}));
+  }
+
+  const AnyFunctionType *levelTy = fTy;
+  if (hasCurriedSelf) {
+    levelTy = levelTy->getResult()->getAs<AnyFunctionType>();
+    assert(levelTy && "Parameter list curry level does not match type");
+  }
+
+  auto params = levelTy->getParams();
+  SmallBitVector defaultMap =
+    computeDefaultMap(params, decl, hasCurriedSelf);
+
+  MatchCallArgumentListener listener;
+  SmallVector<ParamBinding, 8> unusedParamBindings;
+
+  return !matchCallArguments(argInfos, params, defaultMap,
+                             hasTrailingClosure,
+                             /*allow fixes*/ false,
+                             listener, unusedParamBindings);
 }
 
 Expr *constraints::getArgumentLabelTargetExpr(Expr *fn) {
@@ -156,46 +187,6 @@ Expr *constraints::getArgumentLabelTargetExpr(Expr *fn) {
 
     return fn;
   } while (true);
-}
-
-bool constraints::
-areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
-                                          bool hasCurriedSelf,
-                                          ArrayRef<Identifier> labels,
-                                          bool hasTrailingClosure) {
-  const AnyFunctionType *fTy;
-
-  if (auto fn = dyn_cast<AbstractFunctionDecl>(decl)) {
-    fTy = fn->getInterfaceType()->castTo<AnyFunctionType>();
-  } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
-    assert(!hasCurriedSelf && "Subscripts never have curried 'self'");
-    fTy = subscript->getInterfaceType()->castTo<AnyFunctionType>();
-  } else {
-    return true;
-  }
-  
-  SmallVector<AnyFunctionType::Param, 8> argInfos;
-  for (auto argLabel : labels) {
-    argInfos.push_back(AnyFunctionType::Param(Type(), argLabel, {}));
-  }
-
-  const AnyFunctionType *levelTy = fTy;
-  if (hasCurriedSelf) {
-    levelTy = levelTy->getResult()->getAs<AnyFunctionType>();
-    assert(levelTy && "Parameter list curry level does not match type");
-  }
-  
-  auto params = levelTy->getParams();
-  SmallBitVector defaultMap =
-    computeDefaultMap(params, decl, hasCurriedSelf);
-
-  MatchCallArgumentListener listener;
-  SmallVector<ParamBinding, 8> unusedParamBindings;
-
-  return !matchCallArguments(argInfos, params, defaultMap,
-                             hasTrailingClosure,
-                             /*allow fixes*/ false,
-                             listener, unusedParamBindings);
 }
 
 /// Determine the default type-matching options to use when decomposing a
