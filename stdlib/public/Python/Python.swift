@@ -847,7 +847,7 @@ extension UInt : PythonConvertible {
 
   public var pythonObject: PythonObject {
     _ = Python // Ensure Python is initialized.
-    return PythonObject(owning: PyInt_FromSize_t(Int(self)))
+    return PythonObject(owning: PyInt_FromSize_t(self))
   }
 }
 
