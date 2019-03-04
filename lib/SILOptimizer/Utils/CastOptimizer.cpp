@@ -596,28 +596,25 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
   return NewI;
 }
 
-SILInstruction *CastOptimizer::optimizeBridgedCasts(SILDynamicCastInst cast) {
-  return optimizeBridgedCasts(
-      cast.getInstruction(), cast.getBridgedConsumptionKind(),
-      cast.isConditional(), cast.getSource(), cast.getDest(),
-      cast.getSourceType(), cast.getTargetType(), cast.getSuccessBlock(),
-      cast.getFailureBlock());
-}
-
-/// Make use of the fact that some of these casts cannot fail.
-/// For example, if the ObjC type is exactly the expected
-/// _ObjectiveCType type, then it would always succeed for
-/// NSString, NSNumber, etc.
-/// Casts from NSArray, NSDictionary and NSSet may fail.
+/// Make use of the fact that some of these casts cannot fail.  For example, if
+/// the ObjC type is exactly the expected _ObjectiveCType type, then it would
+/// always succeed for NSString, NSNumber, etc.  Casts from NSArray,
+/// NSDictionary and NSSet may fail.
 ///
-/// If ObjC class is not exactly _ObjectiveCType, then
-/// its conversion to a required _ObjectiveCType may fail.
-SILInstruction *CastOptimizer::optimizeBridgedCasts(
-    SILInstruction *Inst, CastConsumptionKind ConsumptionKind,
-    bool isConditional, SILValue Src, SILValue Dest, CanType source,
-    CanType target, SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB) {
-
-  auto &M = Inst->getModule();
+/// If ObjC class is not exactly _ObjectiveCType, then its conversion to a
+/// required _ObjectiveCType may fail.
+SILInstruction *
+CastOptimizer::optimizeBridgedCasts(SILDynamicCastInst dynamicCast) {
+  SILInstruction *Inst = dynamicCast.getInstruction();
+  CastConsumptionKind ConsumptionKind = dynamicCast.getBridgedConsumptionKind();
+  bool isConditional = dynamicCast.isConditional();
+  SILValue Src = dynamicCast.getSource();
+  SILValue Dest = dynamicCast.getDest();
+  CanType source = dynamicCast.getSourceType();
+  CanType target = dynamicCast.getTargetType();
+  SILBasicBlock *SuccessBB = dynamicCast.getSuccessBlock();
+  SILBasicBlock *FailureBB = dynamicCast.getFailureBlock();
+  auto &M = dynamicCast.getModule();
 
   // To apply the bridged optimizations, we should ensure that types are not
   // existential (and keep in mind that generic parameters can be existentials),
