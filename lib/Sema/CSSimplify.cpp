@@ -1358,8 +1358,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
           return elt.getKind() != ConstraintLocator::OptionalPayload;
         });
 
+    auto &ctx = getASTContext();
     if (last != path.rend()) {
-      auto &ctx = getASTContext();
       if (last->getKind() == ConstraintLocator::ApplyArgToParam) {
         if (isSingleTupleParam(ctx, func2Params) &&
             canImplodeParams(func1Params)) {
@@ -1378,6 +1378,20 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
             implodeParams(func2Params);
           }
         }
+      }
+    }
+
+    if (shouldAttemptFixes()) {
+      auto *anchor = locator.trySimplifyToExpr();
+      if (anchor && isa<ClosureExpr>(anchor) &&
+          isSingleTupleParam(ctx, func2Params) &&
+          canImplodeParams(func1Params)) {
+        auto *fix = AllowClosureParamDestructuring::create(
+            *this, func2, getConstraintLocator(anchor));
+        if (recordFix(fix))
+          return getTypeMatchFailure(argumentLocator);
+
+        implodeParams(func1Params);
       }
     }
   }
@@ -5955,6 +5969,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowTypeOrInstanceMember:
   case FixKind::AllowInvalidPartialApplication:
   case FixKind::AllowInvalidInitRef:
+  case FixKind::AllowClosureParameterDestructuring:
     llvm_unreachable("handled elsewhere");
   }
 

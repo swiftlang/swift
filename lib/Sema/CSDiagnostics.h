@@ -899,6 +899,30 @@ private:
   bool diagnoseTrailingClosure(ClosureExpr *closure);
 };
 
+/// Diagnose an attempt to destructure a single tuple closure parameter
+/// into a multiple (possibly anonymous) arguments e.g.
+///
+/// ```swift
+/// let _: ((Int, Int)) -> Void = { $0 + $1 }
+/// ```
+class ClosureParamDestructuringFailure final : public FailureDiagnostic {
+  FunctionType *ContextualType;
+
+public:
+  ClosureParamDestructuringFailure(Expr *root, ConstraintSystem &cs,
+                                   FunctionType *contextualType,
+                                   ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), ContextualType(contextualType) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  Type getParameterType() const {
+    const auto &param = ContextualType->getParams().front();
+    return resolveType(param.getPlainType());
+  }
+};
+
 } // end namespace constraints
 } // end namespace swift
 
