@@ -40,7 +40,6 @@ namespace swift {
 /// LookupResultEntry - One result of unqualified lookup.
 struct LookupResultEntry {
 private:
-
   /// The declaration context through which we found Value. For instance,
   /// class BaseClass {
   ///   func foo() {}
@@ -61,6 +60,35 @@ private:
   ///
   /// When finding bar() from the function body of foo(), BaseDC is the method
   /// foo().
+  ///
+  /// BaseDC will be the method if self is needed for the lookup,
+  /// and will be the type if not.
+  /// In other words: Ff baseDC is a method, it means you found an instance
+  /// member and you should add an implicit 'self.' (Each method has its own
+  /// implicit self decl.) There's one other kind of non-method context that has
+  /// a 'self.' -- a lazy property initializer, which unlike a non-lazy property
+  /// can reference self) Hence:
+  ///  class Outer {
+  ///    static func s()
+  ///    func i()
+  ///    class Inner {
+  ///      static func ss()
+  ///      func ii() {
+  ///        func F() {
+  ///          ii() // OK! implicitly self.ii; BaseDC is the method
+  ///          s()  // OK! s() is defined in an outer type; BaseDC is the type
+  ///          ss() // error: must write /Inner.ss() here since its static
+  ///          i()  // error: there's no outer 'self.'
+  ///        }
+  ///      }
+  ///
+  /// To sum up:  The distinction is whether you need to know the run-time value
+  /// of "self". It might be clearer if baseDC was always a type, and there was
+  /// an additional ParamDecl field in LookupResult which would store the
+  /// implicit self, if any.
+  /// BaseDC is always one of your outer DCs. if you're inside a type it should
+  /// never be an extension of that type. And if you're inside an extension it
+  /// will always be an extension (if it found something at that level)
   DeclContext *BaseDC;
 
   /// The declaration corresponds to the given name; i.e. the decl we are
