@@ -792,6 +792,14 @@ public:
     return ti.getLoweredType();
   }
 
+  CanType getLoweredRValueType(Type t) {
+    return getLoweredType(t).getASTType();
+  }
+
+  CanType getLoweredRValueType(AbstractionPattern origType, Type substType) {
+    return getLoweredType(origType, substType).getASTType();
+  }
+
   AbstractionPattern getAbstractionPattern(AbstractStorageDecl *storage,
                                            bool isNonObjC = false);
   AbstractionPattern getAbstractionPattern(VarDecl *var,
