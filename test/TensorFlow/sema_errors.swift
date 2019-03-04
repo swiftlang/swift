@@ -16,7 +16,7 @@ public func testExpressibleByLiteral() {
   let _: Tensor<Int32> = [1, 2, 3, 4] // ok
   let _: Tensor<Float> = [1, 2.0, 3, 4] // ok
   let _: Tensor<Bool> = [[[true, false, false, true]]] // ok
-  let _: Tensor<Float> = [[[true, false, false, true]]] // expected-error {{cannot convert value of type 'Bool' to expected element type 'TensorElementLiteral<Float>'}}
+  let _: Tensor<Float> = [[[true, false, false, true]]] // expected-error {{cannot convert value of type 'Bool' to expected element type '_TensorElementLiteral<Float>'}}
   let _: Tensor<Float> = Tensor([[[true, false, false, true]]]) // ok
 }
 
