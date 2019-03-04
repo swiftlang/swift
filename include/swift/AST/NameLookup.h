@@ -369,7 +369,7 @@ void forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
 
 /// Only name lookup has gathered a set of results, perform any necessary
 /// steps to prune the result set before returning it to the caller.
-bool pruneLookupResultSet(const DeclContext *dc, NLOptions options,
+void pruneLookupResultSet(const DeclContext *dc, NLOptions options,
                           SmallVectorImpl<ValueDecl *> &decls);
 
 /// Do nothing if debugClient is null.

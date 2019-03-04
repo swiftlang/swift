@@ -20,7 +20,6 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DebuggerClient.h"
-#include "swift/AST/DeclContext.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Initializer.h"
@@ -1357,7 +1356,7 @@ static bool isAcceptableLookupResult(const DeclContext *dc,
   return true;
 }
 
-bool namelookup::pruneLookupResultSet(const DeclContext *dc, NLOptions options,
+void namelookup::pruneLookupResultSet(const DeclContext *dc, NLOptions options,
                                       SmallVectorImpl<ValueDecl *> &decls) {
   // If we're supposed to remove overridden declarations, do so now.
   if (options & NL_RemoveOverridden)
