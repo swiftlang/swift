@@ -241,14 +241,14 @@ private:
     if (!D)
       return L;
 
-    if (auto *ClangDecl = D->getClangDecl()) {
-      auto ClangSrcLoc = ClangDecl->getBeginLoc();
-      clang::SourceManager &ClangSM =
-          CI.getClangASTContext().getSourceManager();
-      L.Line = ClangSM.getPresumedLineNumber(ClangSrcLoc);
-      L.Filename = ClangSM.getBufferName(ClangSrcLoc);
-      return L;
-    }
+    // If D is a clang::Decl, it would be nice to query the clang::SourceManager
+    // for the source location of the clang::Decl here, but module out-of-date
+    // rebuilds may unload previously loaded clang::Modules and thus also
+    // invalidate source locations pointed to, leading to a use-after-free
+    // here. If this functionality is desired, the source location must be
+    // captured by ClangImporter and stored on the side.
+    // LLDB only uses the DW_AT_decl_file / DW_AT_decl_line for C++ types.
+
     return getSwiftDebugLoc(DI, D, End);
   }
 
