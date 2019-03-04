@@ -26,6 +26,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Parse/Lexer.h"
@@ -2007,5 +2008,128 @@ bool MissingArgumentsFailure::diagnoseTrailingClosure(ClosureExpr *closure) {
     diag.fixItInsertAfter(params->getEndLoc(), OS.str());
   }
 
+  return true;
+}
+
+bool ClosureParamDestructuringFailure::diagnoseAsError() {
+  auto *closure = cast<ClosureExpr>(getAnchor());
+  auto params = closure->getParameters();
+
+  // In case of implicit parameters e.g. $0, $1 we
+  // can't really provide good fix-it because
+  // structure of parameter type itself is unclear.
+  for (auto *param : params->getArray()) {
+    if (param->isImplicit()) {
+      emitDiagnostic(params->getStartLoc(),
+                     diag::closure_tuple_parameter_destructuring_implicit,
+                     getParameterType());
+      return true;
+    }
+  }
+
+  auto diag = emitDiagnostic(params->getStartLoc(),
+                             diag::closure_tuple_parameter_destructuring,
+                             getParameterType());
+
+  auto *closureBody = closure->getBody();
+  if (!closureBody)
+    return true;
+
+  auto &sourceMgr = getASTContext().SourceMgr;
+  auto bodyStmts = closureBody->getElements();
+
+  SourceLoc bodyLoc;
+  // If the body is empty let's put the cursor
+  // right after "in", otherwise make it start
+  // location of the first statement in the body.
+  if (bodyStmts.empty())
+    bodyLoc = Lexer::getLocForEndOfToken(sourceMgr, closure->getInLoc());
+  else
+    bodyLoc = bodyStmts.front().getStartLoc();
+
+  SmallString<64> fixIt;
+  llvm::raw_svector_ostream OS(fixIt);
+
+  // If this is multi-line closure we'd have to insert new lines
+  // in the suggested 'let' to keep the structure of the code intact,
+  // otherwise just use ';' to keep everything on the same line.
+  auto inLine = sourceMgr.getLineNumber(closure->getInLoc());
+  auto bodyLine = sourceMgr.getLineNumber(bodyLoc);
+  auto isMultiLineClosure = bodyLine > inLine;
+  auto indent =
+      bodyStmts.empty() ? "" : Lexer::getIndentationForLine(sourceMgr, bodyLoc);
+
+  SmallString<16> parameter;
+  llvm::raw_svector_ostream parameterOS(parameter);
+
+  parameterOS << "(";
+  interleave(
+      params->getArray(),
+      [&](const ParamDecl *param) { parameterOS << param->getNameStr(); },
+      [&] { parameterOS << ", "; });
+  parameterOS << ")";
+
+  // Check if there are any explicit types associated
+  // with parameters, if there are, we'll have to add
+  // type information to the replacement argument.
+  bool explicitTypes =
+      llvm::any_of(params->getArray(), [](const ParamDecl *param) {
+        return param->getTypeLoc().getTypeRepr();
+      });
+
+  if (isMultiLineClosure)
+    OS << '\n' << indent;
+
+  // Let's form 'let <name> : [<type>]? = arg' expression.
+  OS << "let " << parameterOS.str() << " = arg"
+     << (isMultiLineClosure ? "\n" + indent : "; ");
+
+  SmallString<64> argName;
+  llvm::raw_svector_ostream nameOS(argName);
+  if (explicitTypes) {
+    nameOS << "(arg: " << getParameterType()->getString() << ")";
+  } else {
+    nameOS << "(arg)";
+  }
+
+  if (closure->hasSingleExpressionBody()) {
+    // Let's see if we need to add result type to the argument/fix-it:
+    //  - if the there is a result type associated with the closure;
+    //  - and it's not a void type;
+    //  - and it hasn't been explicitly written.
+    auto resultType = resolveType(ContextualType->getResult());
+    auto hasResult = [](Type resultType) -> bool {
+      return resultType && !resultType->isVoid();
+    };
+
+    auto isValidType = [](Type resultType) -> bool {
+      return resultType && !resultType->hasUnresolvedType() &&
+             !resultType->hasTypeVariable();
+    };
+
+    // If there an expected result type but it hasn't been explicitly
+    // provided, let's add it to the argument.
+    if (hasResult(resultType) && !closure->hasExplicitResultType()) {
+      nameOS << " -> ";
+      if (isValidType(resultType))
+        nameOS << resultType->getString();
+      else
+        nameOS << "<#Result#>";
+    }
+
+    if (auto stmt = bodyStmts.front().get<Stmt *>()) {
+      // If the body is a single expression with implicit return.
+      if (isa<ReturnStmt>(stmt) && stmt->isImplicit()) {
+        // And there is non-void expected result type,
+        // because we add 'let' expression to the body
+        // we need to make such 'return' explicit.
+        if (hasResult(resultType))
+          OS << "return ";
+      }
+    }
+  }
+
+  diag.fixItReplace(params->getSourceRange(), nameOS.str())
+      .fixItInsert(bodyLoc, OS.str());
   return true;
 }
