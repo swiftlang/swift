@@ -377,7 +377,7 @@ public:
   void recordDependencyOnTopLevelName(DeclContext *topLevelContext,
                                       DeclName name, bool isCascadingUse);
 
-  void recordDependencyOnTopLevelNameIfNeeded(Optional<bool> isCascadingUse);
+  void recordDependencyOnTopLevelNameIfNeeded();
 
   void addImportedResults(DeclContext *const dc);
 
@@ -472,16 +472,16 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
     lookupNamesIntroducedBy(contextAndIsCascadingUse);
     assert(!recordedSF || isCascadingUse == recordedIsCascadingUse);
 
-    //    if (useASTScopesForExperimentalLookupIfEnabled()) {
-    //      SmallVector<LookupResultEntry, 4> results;
-    //      size_t indexOfFirstOuterResult = 0;
-    //      UnqualifiedLookupFactory scopeLookup(Name, DC, TypeResolver, Loc,
-    //      options,
-    //                                           results,
-    //                                           indexOfFirstOuterResult);
-    //      scopeLookup.experimentallyLookInASTScopes(contextAndIsCascadingUse);
-    //      assert(verifyEqualTo(std::move(scopeLookup)));
-    //    }
+    if (useASTScopesForExperimentalLookupIfEnabled()) {
+      SmallVector<LookupResultEntry, 4> results;
+      size_t indexOfFirstOuterResult = 0;
+      UnqualifiedLookupFactory scopeLookup(Name, DC, TypeResolver, Loc,
+      options,
+                                           results,
+                                           indexOfFirstOuterResult);
+      scopeLookup.experimentallyLookInASTScopes(contextAndIsCascadingUse);
+      assert(verifyEqualTo(std::move(scopeLookup)));
+    }
   }
 }
 
@@ -532,7 +532,7 @@ void UnqualifiedLookupFactory::experimentallyLookInASTScopes(
                             contextAndIsCascadingUseArg.whereToLook,
                             lookupScopeAndIsCascadingUse.second};
   lookInScopeForASTScopeLookup(state);
-  recordDependencyOnTopLevelNameIfNeeded(true); // WRONG
+  recordDependencyOnTopLevelNameIfNeeded();
 }
 
 std::pair<const ASTScope *, bool>
@@ -1079,15 +1079,11 @@ void UnqualifiedLookupFactory::setAsideUnavailableResults(
   filterForDiscriminator(Results, DebugClient);
 }
 
-void UnqualifiedLookupFactory::recordDependencyOnTopLevelNameIfNeeded(
-    Optional<bool> isCascadingUse) {
+void UnqualifiedLookupFactory::recordDependencyOnTopLevelNameIfNeeded() {
   for (const auto &result : Results) {
     auto *const resultContext = result.getValueDecl()->getDeclContext();
-    if (isa<SourceFile>(resultContext)) {
-      const bool isCascadingUseResult = resolveIsCascadingUse(
-          resultContext, isCascadingUse, /*onlyCareAboutFunctionBody=*/false);
-      recordDependencyOnTopLevelName(resultContext, Name, isCascadingUseResult);
-    }
+    if (isa<SourceFile>(resultContext))
+      recordDependencyOnTopLevelName(resultContext, Name, computeIsCascadingUse());
   }
 }
 
