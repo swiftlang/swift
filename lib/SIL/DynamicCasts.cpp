@@ -1036,6 +1036,15 @@ namespace {
   };
 } // end anonymous namespace
 
+SILValue
+swift::emitSuccessfulScalarUnconditionalCast(SILBuilder &B, SILLocation loc,
+                                             SILDynamicCastInst dynamicCast) {
+  return emitSuccessfulScalarUnconditionalCast(
+      B, B.getModule().getSwiftModule(), loc, dynamicCast.getSource(),
+      dynamicCast.getLoweredTargetType(), dynamicCast.getSourceType(),
+      dynamicCast.getTargetType(), dynamicCast.getInstruction());
+}
+
 /// Emit an unconditional scalar cast that's known to succeed.
 SILValue
 swift::emitSuccessfulScalarUnconditionalCast(SILBuilder &B, ModuleDecl *M,
