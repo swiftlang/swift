@@ -343,6 +343,18 @@ AllowInvalidInitRef::create(RefKind kind, ConstraintSystem &cs, Type baseTy,
       cs, kind, baseTy, init, isStaticallyDerived, baseRange, locator);
 }
 
+bool AllowClosureParamDestructuring::diagnose(Expr *root, bool asNote) const {
+  return false;
+}
+
+AllowClosureParamDestructuring *
+AllowClosureParamDestructuring::create(ConstraintSystem &cs,
+                                       FunctionType *contextualType,
+                                       ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowClosureParamDestructuring(cs, contextualType, locator);
+}
+
 bool AddMissingArguments::diagnose(Expr *root, bool asNote) const {
   MissingArgumentsFailure failure(root, getConstraintSystem(), Fn,
                                   NumSynthesized, getLocator());

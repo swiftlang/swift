@@ -105,7 +105,7 @@ enum class FixKind : uint8_t {
   /// fix this issue by pretending that member exists and matches
   /// given arguments/result types exactly.
   DefineMemberBasedOnUse,
-	
+
   /// Allow access to type member on instance or instance member on type
   AllowTypeOrInstanceMember,
 
@@ -126,6 +126,9 @@ enum class FixKind : uint8_t {
   /// If there are fewer arguments than parameters, let's fix that up
   /// by adding new arguments to the list represented as type variables.
   AddMissingArguments,
+
+  /// Allow single tuple closure parameter destructuring into N arguments.
+  AllowClosureParameterDestructuring,
 };
 
 class ConstraintFix {
@@ -616,6 +619,27 @@ private:
                                      bool isStaticallyDerived,
                                      SourceRange baseRange,
                                      ConstraintLocator *locator);
+};
+
+class AllowClosureParamDestructuring final : public ConstraintFix {
+  FunctionType *ContextualType;
+
+  AllowClosureParamDestructuring(ConstraintSystem &cs,
+                                 FunctionType *contextualType,
+                                 ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowClosureParameterDestructuring, locator),
+        ContextualType(contextualType) {}
+
+public:
+  std::string getName() const override {
+    return "allow closure parameter destructuring";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowClosureParamDestructuring *create(ConstraintSystem &cs,
+                                                FunctionType *contextualType,
+                                                ConstraintLocator *locator);
 };
 
 class AddMissingArguments final
