@@ -717,8 +717,17 @@ public extension Tensor {
   /// Reshape to scalar.
   /// - Precondition: The tensor has exactly one scalar.
   @inlinable
+  @differentiable(wrt: self,
+                  vjp: _vjpScalarized where Scalar : TensorFlowFloatingPoint)
   func scalarized() -> Scalar {
     return _TFGetScalarOrDie(reshaped(to: []).handle)
+  }
+}
+
+extension Tensor where Scalar : TensorFlowFloatingPoint {
+  @inlinable
+  func _vjpScalarized() -> (Scalar, (Scalar) -> Tensor) {
+    return (scalarized(), { v in Tensor(v) })
   }
 }
 
