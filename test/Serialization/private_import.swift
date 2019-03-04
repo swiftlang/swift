@@ -41,6 +41,13 @@
   @_private(sourceFile: "private_import_other.swift") import private_import
   @_private(sourceFile: "private_import.swift") import client
 
+  extension Internal {
+    mutating func set() {
+      self.internalVarWithPrivateSetter = 1
+      self.internalVarWithFilePrivateSetter = 1
+    }
+  }
+
   Base().foo()
   // This should not be ambigious.
   Base().bar()
