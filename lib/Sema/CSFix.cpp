@@ -344,7 +344,9 @@ AllowInvalidInitRef::create(RefKind kind, ConstraintSystem &cs, Type baseTy,
 }
 
 bool AllowClosureParamDestructuring::diagnose(Expr *root, bool asNote) const {
-  return false;
+  ClosureParamDestructuringFailure failure(root, getConstraintSystem(),
+                                           ContextualType, getLocator());
+  return failure.diagnose(asNote);
 }
 
 AllowClosureParamDestructuring *
