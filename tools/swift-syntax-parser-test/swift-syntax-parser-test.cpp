@@ -32,6 +32,7 @@ enum class ActionType {
 };
 
 namespace options {
+static llvm::cl::OptionCategory Category("swift-syntax-parser-test Options");
 
 static cl::opt<ActionType>
 Action(cl::desc("Action (required):"),
@@ -53,6 +54,9 @@ Filename(cl::Positional, cl::desc("source file"), cl::Required);
 static cl::opt<unsigned>
 NumParses("n", cl::desc("number of invocations"), cl::init(1));
 
+static llvm::cl::opt<bool>
+ParseAsMainFile("main", llvm::cl::desc("whether to parse as a main file"),
+                llvm::cl::cat(Category), llvm::cl::init(true));
 }
 
 namespace {
@@ -141,6 +145,7 @@ parse(const char *source, swiftparse_node_handler_t node_handler,
   swiftparse_parser_t parser = swiftparse_parser_create();
   swiftparse_parser_set_node_handler(parser, node_handler);
   swiftparse_parser_set_diagnostic_handler(parser, diag_handler);
+  swiftparse_parser_set_is_mainfile(parser, options::ParseAsMainFile);
   swiftparse_client_node_t top = swiftparse_parse_string(parser, source);
   swiftparse_parser_dispose(parser);
   return top;

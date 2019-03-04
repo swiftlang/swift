@@ -59,6 +59,10 @@ class SynParser {
   swiftparse_node_lookup_t NodeLookup = nullptr;
   swiftparse_diagnostic_handler_t DiagHandler = nullptr;
 
+  // By default, we need to use SourceFileKind::Main to avoid diagnostics like
+  // illegal_top_level_expr.
+  bool IsMainFile = true;
+
 public:
   swiftparse_node_handler_t getNodeHandler() const {
     return NodeHandler;
@@ -88,6 +92,10 @@ public:
     auto prevBlk = DiagHandler;
     DiagHandler = Block_copy(hdl);
     Block_release(prevBlk);
+  }
+
+  void setIsMainFile(bool value) {
+    IsMainFile = value;
   }
 
   ~SynParser() {
@@ -279,10 +287,8 @@ swiftparse_client_node_t SynParser::parse(const char *source) {
 
   auto parseActions =
     std::make_shared<CLibParseActions>(*this, SM, bufID);
-  // We have to use SourceFileKind::Main to avoid diagnostics like
-  // illegal_top_level_expr
-  ParserUnit PU(SM, SourceFileKind::Main, bufID, langOpts,
-                "syntax_parse_module", std::move(parseActions),
+  ParserUnit PU(SM, IsMainFile ? SourceFileKind::Main : SourceFileKind::Library,
+                bufID, langOpts, "syntax_parse_module", std::move(parseActions),
                 /*SyntaxCache=*/nullptr);
   std::unique_ptr<SynParserDiagConsumer> pConsumer;
   if (DiagHandler) {
@@ -369,4 +375,9 @@ swiftparse_diagnostic_get_severity(swiftparser_diagnostic_t diag) {
 
 unsigned swiftparse_diagnostic_get_source_loc(swiftparser_diagnostic_t diag) {
   return static_cast<const DiagnosticDetail*>(diag)->Offset;
+}
+
+void swiftparse_parser_set_is_mainfile(swiftparse_parser_t c_parser,
+                                       bool isMain) {
+  static_cast<SynParser*>(c_parser)->setIsMainFile(isMain);
 }

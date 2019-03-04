@@ -232,6 +232,10 @@ swiftparse_parse_string(swiftparse_parser_t, const char *source);
 /// declarations, etc.
 SWIFTPARSE_PUBLIC const char* swiftparse_syntax_structure_versioning_identifier(void);
 
+/// Set whether the source code under parsing is from a main file, true by default.
+SWIFTPARSE_PUBLIC void
+swiftparse_parser_set_is_mainfile(swiftparse_parser_t, bool);
+
 typedef struct {
   /// Represents the range for the fixit.
   swiftparse_range_t range;
