@@ -3035,10 +3035,10 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   }
   if (funcResultElt.getName().str() == "differential") {
     kind = AutoDiffAssociatedFunctionKind::JVP;
-    autoDiffAssocTyId = ctx.Id_TangentVector;
+    autoDiffAssocTyId = ctx.Id_Derivative;
   } else if (funcResultElt.getName().str() == "pullback") {
     kind = AutoDiffAssociatedFunctionKind::VJP;
-    autoDiffAssocTyId = ctx.Id_CotangentVector;
+    autoDiffAssocTyId = ctx.Id_Derivative;
   } else {
     TC.diagnose(attr->getLocation(),
                 diag::differentiating_attr_expected_result_tuple_func_label);

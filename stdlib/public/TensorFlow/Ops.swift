@@ -120,11 +120,11 @@ extension Tensor : VectorNumeric where Scalar : Numeric {
 extension Tensor : ShapedVectorNumeric where Scalar : Numeric {}
 
 extension Tensor : Differentiable where Scalar : TensorFlowFloatingPoint {
-  public typealias TangentVector = Tensor
-  public typealias CotangentVector = Tensor
+  public typealias Derivative = Tensor
+  public typealias Gradient = Tensor
   public typealias AllDifferentiableVariables = Tensor
   @inlinable @inline(__always)
-  public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
+  public func tangentVector(from cotangent: Gradient) -> Derivative {
     return cotangent
   }
 }

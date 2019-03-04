@@ -4157,10 +4157,10 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedVectorSpace(
   Identifier associatedTypeIdentifier;
   switch (kind) {
   case AutoDiffAssociatedVectorSpaceKind::Tangent:
-    associatedTypeIdentifier = ctx.Id_TangentVector;
+    associatedTypeIdentifier = ctx.Id_Derivative;
     break;
   case AutoDiffAssociatedVectorSpaceKind::Cotangent:
-    associatedTypeIdentifier = ctx.Id_CotangentVector;
+    associatedTypeIdentifier = ctx.Id_Gradient;
     break;
   }
   auto associatedTypeLookup =

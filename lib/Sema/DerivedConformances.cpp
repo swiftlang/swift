@@ -326,11 +326,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       return getRequirement(KnownProtocolKind::KeyPathIterable);
 
     // SWIFT_ENABLE_TENSORFLOW
-    // Differentiable.TangentVector
-    // Differentiable.CotangentVector
+    // Differentiable.Derivative
+    // Differentiable.Gradient
     // Differentiable.AllDifferentiableVariables
-    if (name.isSimpleName(ctx.Id_TangentVector) ||
-        name.isSimpleName(ctx.Id_CotangentVector) ||
+    if (name.isSimpleName(ctx.Id_Derivative) ||
+        name.isSimpleName(ctx.Id_Gradient) ||
         name.isSimpleName(ctx.Id_AllDifferentiableVariables))
       return getRequirement(KnownProtocolKind::__Differentiable);
 
