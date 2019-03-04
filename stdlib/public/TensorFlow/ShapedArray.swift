@@ -549,7 +549,7 @@ extension ShapedArray : ExpressibleByArrayLiteral
   public typealias ArrayLiteralElement = _TensorElementLiteral<Scalar>
   @inlinable @inline(__always)
   public init(arrayLiteral elements: _TensorElementLiteral<Scalar>...) {
-    self = Tensor<Scalar>(tensorElementLiterals: elements).array
+    self = Tensor<Scalar>(_tensorElementLiterals: elements).array
   }
 }
 
@@ -891,7 +891,7 @@ extension ShapedArraySlice : ExpressibleByArrayLiteral
   public typealias ArrayLiteralElement = _TensorElementLiteral<Scalar>
   @inlinable @inline(__always)
   public init(arrayLiteral elements: _TensorElementLiteral<Scalar>...) {
-    self.init(base: Tensor(tensorElementLiterals: elements).array)
+    self.init(base: Tensor(_tensorElementLiterals: elements).array)
   }
 }
 

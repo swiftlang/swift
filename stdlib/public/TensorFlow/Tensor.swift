@@ -400,15 +400,15 @@ public extension Tensor {
 // Background story on `TensorElementLiteral` and why it's necessary:
 //
 // Very importantly, we want users to be able to implicitly convert an array
-// literal to a tensor. At a first glance, a straightfoward implementation would
+// literal to a tensor. At first glance, a straightfoward implementation would
 // be conforming `Tensor` to `ExpressibleByArrayLiteral` with
 // `ExpressibleBy(Float|Int|Bool)Literal` as a base case. However, it is not
 // that simple. We have binary operators that take `(Tensor, Scalar)`, `(Scalar,
-// Tensor)` as well as `(Tensor, Tensor)`. When `Tensor` are convertible from
+// Tensor)` as well as `(Tensor, Tensor)`. When `Tensor`s are convertible from
 // both a scalar and an array literal, a scalar-tensor binary operator like `+`
 // will not type check.
 //
-// One way to word around is to define all tensor-tensor operators on a
+// One way to work around it is to define all tensor-tensor operators in a
 // protocol extension, and all tensor-scalar and scalar-tensor operators on
 // concrete `Tensor`. Protocol extensions are less favorable than concrete
 // implementations, so the compiler will prefer the concrete implementation for
@@ -422,16 +422,15 @@ public extension Tensor {
 // `ArrayLiteralElement` be if we want to support both `[1,2,3]` and `[[[1,2],
 // [1,2]]]`? In the first case the array literal element is an interger, while
 // in the second case the array literal itself should be a tensor. Based on this
-// observation, we can come up with an intermediate type: `TensorLiteralElement`
-// as the `ArrayLiteralElement` of `Tensor`. By making `TensorLiteralElement`
+// observation, we come up with an intermediate type: `TensorElementLiteral` as
+// the `ArrayLiteralElement` of `Tensor`. By making `TensorElementLiteral`
 // expressible by both array literal and scalar literal, `Tensor` can now be
 // converted from an arbitrary-dimensional array literal.
 //
 // Due to protocol requirements, `TensorElementLiteral` has to be
 // public. It is never supposed to be used directly by any user, so the library
 // convention is to prepend an underscore to its name, making it
-// `_TensorElementLiteral`. However, we chose not to do that because underscored
-// types are ugly in error messages involving literal conversions to tensors.
+// `_TensorElementLiteral`.
 //
 // It would be nice to be able to remove this type when we can systematically
 // resolve tensor-scalar/scalar-tensor op ambiguity someday, either through an
