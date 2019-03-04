@@ -67,7 +67,7 @@ template<> void ProtocolConformanceDescriptor::dump() const {
     int ok = lookupSymbol(addr, &info);
     if (!ok)
       return "<unknown addr>";
-    return info.symbolName;
+    return info.symbolName.get();
   };
 
   switch (auto kind = getTypeKind()) {
