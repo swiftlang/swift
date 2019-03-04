@@ -184,9 +184,12 @@ public:
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
       return cast<CheckedCastAddrBranchInst>(inst)->getConsumptionKind();
+    // TODO: Bridged casts cannot be expressed by checked_cast_br or
+    // checked_cast_value_br yet. Should we ever support it, please
+    // review this code.
     case SILDynamicCastKind::CheckedCastBranchInst:
     case SILDynamicCastKind::CheckedCastValueBranchInst:
-      llvm_unreachable("unsupported");
+      return CastConsumptionKind::CopyOnSuccess;
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
       return CastConsumptionKind::TakeAlways;
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
@@ -215,7 +218,7 @@ public:
     case SILDynamicCastKind::CheckedCastBranchInst:
       return cast<CheckedCastBranchInst>(inst)->getSuccessBB();
     case SILDynamicCastKind::CheckedCastValueBranchInst:
-      llvm_unreachable("unsupported");
+      return cast<CheckedCastValueBranchInst>(inst)->getSuccessBB();
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
       return nullptr;
@@ -251,7 +254,7 @@ public:
     case SILDynamicCastKind::CheckedCastBranchInst:
       return cast<CheckedCastBranchInst>(inst)->getFailureBB();
     case SILDynamicCastKind::CheckedCastValueBranchInst:
-      llvm_unreachable("unsupported");
+      return cast<CheckedCastValueBranchInst>(inst)->getFailureBB();
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
       return nullptr;
@@ -287,7 +290,7 @@ public:
     case SILDynamicCastKind::CheckedCastBranchInst:
       return cast<CheckedCastBranchInst>(inst)->getOperand();
     case SILDynamicCastKind::CheckedCastValueBranchInst:
-      llvm_unreachable("unsupported");
+      return cast<CheckedCastValueBranchInst>(inst)->getOperand();
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
       return cast<UnconditionalCheckedCastAddrInst>(inst)->getSrc();
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
@@ -304,7 +307,8 @@ public:
       return cast<CheckedCastAddrBranchInst>(inst)->getDest();
     case SILDynamicCastKind::CheckedCastBranchInst:
     case SILDynamicCastKind::CheckedCastValueBranchInst:
-      llvm_unreachable("unsupported");
+      // TODO: Shouldn't this return getSuccessBlock()->getArgument(0)?
+      return SILValue();
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
       return cast<UnconditionalCheckedCastAddrInst>(inst)->getDest();
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
@@ -322,8 +326,9 @@ public:
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
       return cast<CheckedCastAddrBranchInst>(inst)->getSourceType();
     case SILDynamicCastKind::CheckedCastBranchInst:
+      return cast<CheckedCastBranchInst>(inst)->getSourceType();
     case SILDynamicCastKind::CheckedCastValueBranchInst:
-      llvm_unreachable("unsupported");
+      return cast<CheckedCastValueBranchInst>(inst)->getSourceType();
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
       return cast<UnconditionalCheckedCastAddrInst>(inst)->getSourceType();
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
@@ -355,8 +360,9 @@ public:
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
       return cast<CheckedCastAddrBranchInst>(inst)->getTargetType();
     case SILDynamicCastKind::CheckedCastBranchInst:
+      return cast<CheckedCastBranchInst>(inst)->getTargetType();
     case SILDynamicCastKind::CheckedCastValueBranchInst:
-      llvm_unreachable("unsupported");
+      return cast<CheckedCastValueBranchInst>(inst)->getTargetType();
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
       return cast<UnconditionalCheckedCastAddrInst>(inst)->getTargetType();
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
@@ -373,7 +379,7 @@ public:
     case SILDynamicCastKind::CheckedCastBranchInst:
       return cast<CheckedCastBranchInst>(inst)->getCastType();
     case SILDynamicCastKind::CheckedCastValueBranchInst:
-      llvm_unreachable("unsupported");
+      return cast<CheckedCastValueBranchInst>(inst)->getCastType();
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst: {
       auto *uccai = dyn_cast<UnconditionalCheckedCastAddrInst>(inst);
       return uccai->getDest()->getType();
@@ -388,9 +394,8 @@ public:
 
   bool isSourceTypeExact() const {
     switch (getKind()) {
-    case SILDynamicCastKind::CheckedCastBranchInst:
     case SILDynamicCastKind::CheckedCastValueBranchInst:
-      llvm_unreachable("unsupported");
+    case SILDynamicCastKind::CheckedCastBranchInst:
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
@@ -421,11 +426,16 @@ public:
 
   bool isConditional() const {
     switch (getKind()) {
-    case SILDynamicCastKind::CheckedCastBranchInst:
-    case SILDynamicCastKind::CheckedCastValueBranchInst:
-      llvm_unreachable("unsupported");
     case SILDynamicCastKind::CheckedCastAddrBranchInst: {
       auto f = classifyFeasibility(true /*allow wmo*/);
+      return f == DynamicCastFeasibility::MaySucceed;
+    }
+    case SILDynamicCastKind::CheckedCastBranchInst: {
+      auto f = classifyFeasibility(false /*allow wmo*/);
+      return f == DynamicCastFeasibility::MaySucceed;
+    }
+    case SILDynamicCastKind::CheckedCastValueBranchInst: {
+      auto f = classifyFeasibility(false /*allow wmo opts*/);
       return f == DynamicCastFeasibility::MaySucceed;
     }
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
