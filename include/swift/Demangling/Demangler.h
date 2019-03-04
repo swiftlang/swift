@@ -279,7 +279,11 @@ public:
     Capacity = 0;
     Elems = 0;
   }
-  
+
+  void clear() {
+    NumElems = 0;
+  }
+
   iterator begin() { return Elems; }
   iterator end() { return Elems + NumElems; }
   

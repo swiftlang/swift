@@ -155,8 +155,8 @@ class Remangler {
 
   DemanglerPrinter &Buffer;
 
-  std::vector<SubstitutionWord> Words;
-  std::vector<WordReplacement> SubstWordsInIdent;
+  Vector<SubstitutionWord> Words;
+  Vector<WordReplacement> SubstWordsInIdent;
 
   static const size_t MaxNumWords = 26;
 
@@ -171,6 +171,14 @@ class Remangler {
 
   // A callback for resolving symbolic references.
   SymbolicResolver Resolver;
+
+  void addSubstWordsInIdent(const WordReplacement &repl) {
+    SubstWordsInIdent.push_back(repl, Factory);
+  }
+
+  void addWord(const SubstitutionWord &word) {
+    Words.push_back(word, Factory);
+  }
 
   StringRef getBufferStr() const { return Buffer.getStringRef(); }
 
