@@ -1343,9 +1343,9 @@ void TypeConverter::insert(TypeKey k, const TypeLowering *tl) {
 
 /// Lower each of the elements of the substituted type according to
 /// the abstraction pattern of the given original type.
-static CanTupleType getLoweredTupleType(TypeConverter &tc,
-                                        AbstractionPattern origType,
-                                        CanTupleType substType) {
+static CanTupleType computeLoweredTupleType(TypeConverter &tc,
+                                            AbstractionPattern origType,
+                                            CanTupleType substType) {
   assert(origType.matchesTuple(substType));
 
   // Does the lowered tuple type differ from the substituted type in
@@ -1388,10 +1388,10 @@ static CanTupleType getLoweredTupleType(TypeConverter &tc,
   return cast<TupleType>(CanType(TupleType::get(loweredElts, tc.Context)));
 }
 
-static CanType getLoweredOptionalType(TypeConverter &tc,
-                                      AbstractionPattern origType,
-                                      CanType substType,
-                                      CanType substObjectType) {
+static CanType computeLoweredOptionalType(TypeConverter &tc,
+                                          AbstractionPattern origType,
+                                          CanType substType,
+                                          CanType substObjectType) {
   assert(substType.getOptionalObjectType() == substObjectType);
 
   CanType loweredObjectType =
@@ -1407,9 +1407,10 @@ static CanType getLoweredOptionalType(TypeConverter &tc,
   return CanType(BoundGenericEnumType::get(optDecl, Type(), loweredObjectType));
 }
 
-static CanType getLoweredReferenceStorageType(TypeConverter &tc,
-                                              AbstractionPattern origType,
-                                           CanReferenceStorageType substType) {
+static CanType
+computeLoweredReferenceStorageType(TypeConverter &tc,
+                                   AbstractionPattern origType,
+                                   CanReferenceStorageType substType) {
   CanType loweredReferentType =
     tc.getLoweredType(origType.getReferenceStorageReferentType(),
                       substType.getReferentType())
@@ -1445,7 +1446,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
 
   // Lower the type.
   CanType loweredSubstType =
-    getLoweredRValueType(origType, substType);
+    computeLoweredRValueType(origType, substType);
 
   // If that didn't change the type and the key is cacheable, there's no
   // point in re-checking the table, so just construct a type lowering
@@ -1467,8 +1468,8 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
   return lowering;
 }
 
-CanType TypeConverter::getLoweredRValueType(AbstractionPattern origType,
-                                            CanType substType) {
+CanType TypeConverter::computeLoweredRValueType(AbstractionPattern origType,
+                                                CanType substType) {
   assert(!substType->hasError() &&
          "Error types should not appear in type-checked AST");
 
@@ -1559,17 +1560,18 @@ CanType TypeConverter::getLoweredRValueType(AbstractionPattern origType,
 
   // Lower tuple element types.
   if (auto substTupleType = dyn_cast<TupleType>(substType)) {
-    return getLoweredTupleType(*this, origType, substTupleType);
+    return computeLoweredTupleType(*this, origType, substTupleType);
   }
 
   // Lower the referent type of reference storage types.
   if (auto substRefType = dyn_cast<ReferenceStorageType>(substType)) {
-    return getLoweredReferenceStorageType(*this, origType, substRefType);
+    return computeLoweredReferenceStorageType(*this, origType, substRefType);
   }
 
   // Lower the object type of optional types.
   if (auto substObjectType = substType.getOptionalObjectType()) {
-    return getLoweredOptionalType(*this, origType, substType, substObjectType);
+    return computeLoweredOptionalType(*this, origType,
+                                      substType, substObjectType);
   }
 
   // The Swift type directly corresponds to the lowered type.

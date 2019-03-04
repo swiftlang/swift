@@ -1001,7 +1001,8 @@ public:
                                          EnumElementDecl *elt);
 
 private:
-  CanType getLoweredRValueType(AbstractionPattern origType, CanType substType);
+  CanType computeLoweredRValueType(AbstractionPattern origType,
+                                   CanType substType);
 
   Type getLoweredCBridgedType(AbstractionPattern pattern, Type t,
                               Bridgeability bridging,
