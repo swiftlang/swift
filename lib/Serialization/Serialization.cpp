@@ -2710,7 +2710,7 @@ void Serializer::writeDecl(const Decl *D) {
         !value->getDeclContext()->isLocalContext() &&
         (access <= swift::AccessLevel::FilePrivate ||
          (storage &&
-          storage->getAccessLevel() == swift::AccessLevel::Internal &&
+          storage->getFormalAccess() == swift::AccessLevel::Internal &&
           storage->hasPrivateAccessor()));
 
     if (shouldEmitFilenameForPrivate || shouldEmitPrivateDescriminator) {
