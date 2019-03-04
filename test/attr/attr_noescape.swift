@@ -223,10 +223,9 @@ func overloadedEach<P: P2, T>(_ source: P, _ transform: @escaping (P.Element) ->
 struct S : P2 {
   typealias Element = Int
   func each(_ transform: @noescape (Int) -> ()) { // expected-error{{@noescape is the default and has been removed}} {{26-36=}}
-    // expected-note@-1{{parameter 'transform' is implicitly non-escaping}}
-    overloadedEach(self,
-      transform, // expected-error{{passing non-escaping parameter 'transform' to function expecting an @escaping closure}}
-      1)
+    overloadedEach(self,  // expected-error {{cannot invoke 'overloadedEach' with an argument list of type '(S, (Int) -> (), Int)'}}
+                   transform, 1)
+    // expected-note @-2 {{overloads for 'overloadedEach' exist with these partially matching parameter lists: (O, @escaping (O.Element) -> (), T), (P, @escaping (P.Element) -> (), T)}}
   }
 }
 
