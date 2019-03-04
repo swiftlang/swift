@@ -205,8 +205,7 @@ public:
     if (AFR.hasType() &&
         !AFR.getType()->hasError() &&
         VD->hasInterfaceType() &&
-        VD->getInterfaceType()->is<AnyFunctionType>() &&
-        VD->getInterfaceType()->castTo<AnyFunctionType>()->isNoEscape() &&
+        VD->getInterfaceType()->hasNoEscape() &&
         !capture.isNoEscape() &&
         // Don't repeatedly diagnose the same thing.
         Diagnosed.insert(VD).second) {

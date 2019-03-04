@@ -500,10 +500,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       static NoEscapeArgument find(TypeChecker &tc, ValueDecl *decl,
                                    bool isCapture) {
         if (auto param = dyn_cast<ParamDecl>(decl)) {
-          if (auto fnType =
-                param->getInterfaceType()->getAs<AnyFunctionType>()) {
-            if (fnType->isNoEscape())
-              return { param, isCapture };
+          if (param->getInterfaceType()->hasNoEscape()) {
+            return { param, isCapture };
           }
           return {};
         }
@@ -552,8 +550,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         arg = lookThroughArgument(arg);
 
         // If the argument isn't noescape, ignore it.
-        auto fnType = arg->getType()->getAs<AnyFunctionType>();
-        if (!fnType || !fnType->isNoEscape())
+        if (!arg->getType()->hasNoEscape())
           return;
 
         // Okay, it should be a closure or a decl ref.
@@ -875,14 +872,14 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         return;
       }
       
+     // Casting a nonescaping value to escaping is UB.
+     // `withoutActuallyEscaping` ought to be used instead.
+     if (fromTy->hasNoEscape() && !toTy->hasNoEscape()) {
+       TC.diagnose(DRE->getLoc(), diag::bitcasting_away_noescape, fromTy, toTy);
+     }
+
      if (auto fromFnTy = fromTy->getAs<FunctionType>()) {
         if (auto toFnTy = toTy->getAs<FunctionType>()) {
-          // Casting a nonescaping function to escaping is UB.
-          // `withoutActuallyEscaping` ought to be used instead.
-          if (fromFnTy->isNoEscape() && !toFnTy->isNoEscape()) {
-            TC.diagnose(DRE->getLoc(), diag::bitcasting_away_noescape,
-                        fromTy, toTy);
-          }
           // Changing function representation (say, to try to force a
           // @convention(c) function pointer to exist) is also unlikely to work.
           if (fromFnTy->getRepresentation() != toFnTy->getRepresentation()) {

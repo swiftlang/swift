@@ -2032,52 +2032,78 @@ static bool addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem &CS,
   return false;
 }
 
-/// Try to diagnose common errors involving implicitly non-escaping parameters
-/// of function type, giving more specific and simpler diagnostics, attaching
-/// notes on the parameter, and offering fixits to insert @escaping. Returns
-/// true if it detects and issues an error, false if it does nothing.
+/// Try to diagnose common errors involving non-escaping types, giving more
+/// specific and simpler diagnostics, attaching / notes on the parameter if it
+/// is one, and offering fixits to insert / @escaping. Returns true if it
+/// detects and issues an error, false if it does / nothing.
 bool FailureDiagnosis::diagnoseNonEscapingParameterToEscaping(
     Expr *expr, Type srcType, Type dstType, ContextualTypePurpose dstPurpose) {
   assert(expr);
-  // Need to be referencing a parameter of function type
+  if (!CS.getType(expr)->hasNoEscape())
+    return false;
+
+  // Must be from non-escaping value to escaping value.
+  if (!srcType->hasNoEscape() || dstType->hasNoEscape())
+    return false;
+
+  // Type mismatches are handled elsewhere.
+  if (srcType->getDesugaredType()->getKind() !=
+      dstType->lookThroughAllOptionalTypes()->getDesugaredType()->getKind())
+    return false;
+
+  // See if we have a reference to a parameter of function type
   auto declRef = dyn_cast<DeclRefExpr>(expr);
-  if (!declRef || !isa<ParamDecl>(declRef->getDecl()) ||
-      !CS.getType(declRef)->is<AnyFunctionType>())
-    return false;
-
-  // Must be from non-escaping function to escaping function. For the
-  // destination type, we read through optionality to give better diagnostics in
-  // the event of an implicit promotion.
-  auto srcFT = srcType->getAs<AnyFunctionType>();
-  auto dstFT =
-      dstType->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
-
-  if (!srcFT || !dstFT || !srcFT->isNoEscape() || dstFT->isNoEscape())
-    return false;
+  auto varDecl = declRef ? dyn_cast<VarDecl>(declRef->getDecl()) : nullptr;
 
   // Pick a specific diagnostic for the specific use
-  auto paramDecl = cast<ParamDecl>(declRef->getDecl());
-  switch (dstPurpose) {
-  case CTP_CallArgument:
-    CS.TC.diagnose(declRef->getLoc(), diag::passing_noescape_to_escaping,
-                   paramDecl->getName());
-    break;
-  case CTP_AssignSource:
-    CS.TC.diagnose(declRef->getLoc(), diag::assigning_noescape_to_escaping,
-                   paramDecl->getName());
-    break;
+  if (varDecl) {
+    switch (dstPurpose) {
+    case CTP_CallArgument:
+      CS.TC.diagnose(expr->getLoc(), diag::passing_noescape_declref_to_escaping,
+                     varDecl->getName());
+      break;
+    case CTP_AssignSource:
+      CS.TC.diagnose(expr->getLoc(),diag::assigning_noescape_declref_to_escaping,
+                     varDecl->getName());
+      break;
 
-  default:
-    CS.TC.diagnose(declRef->getLoc(), diag::general_noescape_to_escaping,
-                   paramDecl->getName());
-    break;
+    default:
+      CS.TC.diagnose(expr->getLoc(), diag::general_noescape_declref_to_escaping,
+                     varDecl->getName());
+      break;
+    }
+  } else {
+    switch (dstPurpose) {
+    case CTP_CallArgument:
+      CS.TC.diagnose(expr->getLoc(), diag::passing_noescape_to_escaping,
+                     dstType);
+      break;
+    case CTP_AssignSource:
+      CS.TC.diagnose(expr->getLoc(), diag::assigning_noescape_to_escaping,
+                     dstType);
+      break;
+
+    default:
+      CS.TC.diagnose(expr->getLoc(), diag::general_noescape_to_escaping,
+                     dstType);
+      break;
+    }
   }
 
-  // Give a note and fixit
+  if (!declRef)
+    return true;
+  auto paramDecl = dyn_cast<ParamDecl>(declRef->getDecl());
+  if (!paramDecl)
+    return true;
+
+  // Give a note and fixit. For the destination type, we read through
+  // optionality to give better diagnostics in the event of an implicit
+  // promotion.
   InFlightDiagnostic note = CS.TC.diagnose(
       paramDecl->getLoc(), diag::noescape_parameter, paramDecl->getName());
 
-  if (!paramDecl->isAutoClosure()) {
+  if (dstType->lookThroughAllOptionalTypes()->is<AnyFunctionType>() &&
+      !paramDecl->isAutoClosure()) {
     note.fixItInsert(paramDecl->getTypeLoc().getSourceRange().Start,
                      "@escaping ");
   } // TODO: add in a fixit for autoclosure

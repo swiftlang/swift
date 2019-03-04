@@ -1634,11 +1634,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   // we need to disallow conversions from @noescape functions to Any.
 
   // Conformance to 'Any' always holds.
-  if (type2->isAny()) {
-    auto *fnTy = type1->getAs<FunctionType>();
-    if (!fnTy || !fnTy->isNoEscape())
-      return getTypeMatchSuccess();
-
+  if (type2->isAny() && type1->hasNoEscape()) {
     if (shouldAttemptFixes()) {
       auto &ctx = getASTContext();
       auto *fix = MarkExplicitlyEscaping::create(
@@ -1825,21 +1821,19 @@ ConstraintSystem::matchTypesBindTypeVar(
     return getTypeMatchFailure(locator);
   }
 
-  // Disallow bindings of noescape functions to type variables that
+  // Disallow bindings of borrowed references to type variables that
   // represent an opened archetype. If we allowed this it would allow
-  // the noescape function to potentially escape.
-  if (auto *fnTy = type->getAs<FunctionType>()) {
-    if (fnTy->isNoEscape() && typeVar->getImpl().getGenericParameter()) {
-      if (shouldAttemptFixes()) {
-        auto *fix = MarkExplicitlyEscaping::create(
-            *this, getConstraintLocator(locator));
-        if (recordFix(fix))
-          return getTypeMatchFailure(locator);
-
-        // Allow no-escape function to be bound with recorded fix.
-      } else {
+  // the value to potentially escape.
+  if (type->hasNoEscape() && typeVar->getImpl().getGenericParameter()) {
+    if (shouldAttemptFixes()) {
+      auto *fix = MarkExplicitlyEscaping::create(
+          *this, getConstraintLocator(locator));
+      if (recordFix(fix))
         return getTypeMatchFailure(locator);
-      }
+
+      // Allow no-escape function to be bound with recorded fix.
+    } else {
+      return getTypeMatchFailure(locator);
     }
   }
 
@@ -2380,24 +2374,22 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     if (!type1->is<LValueType>() &&
         type2->isExistentialType()) {
 
-      // Penalize conversions to Any, and disallow conversions of
-      // noescape functions to Any.
+      // Penalize conversions to Any, and disallow conversions of noescape types
+      // to Any.
       if (kind >= ConstraintKind::Conversion && type2->isAny()) {
-        if (auto *fnTy = type1->getAs<FunctionType>()) {
-          if (fnTy->isNoEscape()) {
-            if (shouldAttemptFixes()) {
-              auto &ctx = getASTContext();
-              auto *fix = MarkExplicitlyEscaping::create(
-                  *this, getConstraintLocator(locator), ctx.TheAnyType);
-              if (recordFix(fix))
-                return getTypeMatchFailure(locator);
-
-              // Allow 'no-escape' functions to be converted to 'Any'
-              // with a recorded fix that helps us to properly diagnose
-              // such situations.
-            } else {
+        if (type1->hasNoEscape()) {
+          if (shouldAttemptFixes()) {
+            auto &ctx = getASTContext();
+            auto *fix = MarkExplicitlyEscaping::create(
+                *this, getConstraintLocator(locator), ctx.TheAnyType);
+            if (recordFix(fix))
               return getTypeMatchFailure(locator);
-            }
+
+            // Allow 'no-escape' functions to be converted to 'Any'
+            // with a recorded fix that helps us to properly diagnose
+            // such situations.
+          } else {
+            return getTypeMatchFailure(locator);
           }
         }
 

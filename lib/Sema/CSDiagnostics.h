@@ -454,15 +454,14 @@ public:
   bool diagnoseAsError() override;
 };
 
-/// Diagnose errors related to converting function type which
-/// isn't explicitly '@escaping' to some other type.
-class NoEscapeFuncToTypeConversionFailure final : public FailureDiagnostic {
+/// Diagnose errors related to converting to type which is potentially escaping.
+class NoEscapeConversionFailure final : public FailureDiagnostic {
   Type ConvertTo;
 
 public:
-  NoEscapeFuncToTypeConversionFailure(Expr *expr, ConstraintSystem &cs,
-                                      ConstraintLocator *locator,
-                                      Type toType = Type())
+  NoEscapeConversionFailure(Expr *expr, ConstraintSystem &cs,
+                            ConstraintLocator *locator,
+                            Type toType = Type())
       : FailureDiagnostic(expr, cs, locator), ConvertTo(toType) {}
 
   bool diagnoseAsError() override;

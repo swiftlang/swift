@@ -3056,15 +3056,24 @@ ERROR(closure_noescape_use,none,
 ERROR(decl_closure_noescape_use,none,
       "declaration closing over non-escaping parameter %0 may allow it to escape",
       (Identifier))
-ERROR(passing_noescape_to_escaping,none,
+ERROR(passing_noescape_declref_to_escaping,none,
       "passing non-escaping parameter %0 to function expecting an @escaping closure",
       (Identifier))
-ERROR(assigning_noescape_to_escaping,none,
+ERROR(assigning_noescape_declref_to_escaping,none,
       "assigning non-escaping parameter %0 to an @escaping closure",
       (Identifier))
-ERROR(general_noescape_to_escaping,none,
+ERROR(general_noescape_declref_to_escaping,none,
       "using non-escaping parameter %0 in a context expecting an @escaping closure",
       (Identifier))
+ERROR(passing_noescape_to_escaping,none,
+      "passing non-escaping value to function expecting an escaping %0",
+      (Type))
+ERROR(assigning_noescape_to_escaping,none,
+      "assigning non-escaping value to an escaping %0",
+      (Type))
+ERROR(general_noescape_to_escaping,none,
+      "using non-escaping value in a context expecting an escaping %0",
+      (Type))
 ERROR(converting_noescape_to_type,none,
       "converting non-escaping value to %0 may allow it to escape",
       (Type))

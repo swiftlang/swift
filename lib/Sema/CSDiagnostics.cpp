@@ -391,7 +391,7 @@ bool LabelingFailure::diagnoseAsError() {
                                     isa<SubscriptExpr>(anchor));
 }
 
-bool NoEscapeFuncToTypeConversionFailure::diagnoseAsError() {
+bool NoEscapeConversionFailure::diagnoseAsError() {
   auto *anchor = getAnchor();
 
   if (ConvertTo) {

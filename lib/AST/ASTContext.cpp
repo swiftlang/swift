@@ -3577,6 +3577,7 @@ getFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
     properties |= param.getPlainType()->getRecursiveProperties();
   properties |= result->getRecursiveProperties();
   properties &= ~RecursiveTypeProperties::IsLValue;
+  properties &= ~RecursiveTypeProperties::HasNoEscape;
   return properties;
 }
 
@@ -3597,7 +3598,7 @@ isFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
 static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                                       Type result) {
-  static_assert(RecursiveTypeProperties::BitWidth == 10,
+  static_assert(RecursiveTypeProperties::BitWidth == 11,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
 
@@ -3754,6 +3755,8 @@ void FunctionType::Profile(llvm::FoldingSetNodeID &ID,
 FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
                                 Type result, ExtInfo info) {
   auto properties = getFunctionRecursiveProperties(params, result);
+  if (info.isNoEscape())
+    properties |= RecursiveTypeProperties::HasNoEscape;
   auto arena = getArena(properties);
 
   llvm::FoldingSetNodeID id;
@@ -4071,7 +4074,7 @@ CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 10,
+  static_assert(RecursiveTypeProperties::BitWidth == 11,
                 "revisit this if you add new recursive type properties");
   for (auto &param : params)
     properties |= param.getType()->getRecursiveProperties();

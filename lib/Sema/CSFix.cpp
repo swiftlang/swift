@@ -132,8 +132,8 @@ CoerceToCheckedCast *CoerceToCheckedCast::create(ConstraintSystem &cs,
 }
 
 bool MarkExplicitlyEscaping::diagnose(Expr *root, bool asNote) const {
-  NoEscapeFuncToTypeConversionFailure failure(root, getConstraintSystem(),
-                                              getLocator(), ConvertTo);
+  NoEscapeConversionFailure failure(root, getConstraintSystem(),
+                                    getLocator(), ConvertTo);
   return failure.diagnose(asNote);
 }
 

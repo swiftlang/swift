@@ -126,7 +126,11 @@ public:
     /// This type contains a DependentMemberType.
     HasDependentMember   = 0x200,
 
-    Last_Property = HasDependentMember
+    /// This type expression contains a borrowed reference and therefore
+    /// cannot escape to the heap or be returned to a caller.
+    HasNoEscape       = 0x400,
+
+    Last_Property = HasNoEscape
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -157,6 +161,9 @@ public:
   
   /// Is a type with these properties an lvalue?
   bool isLValue() const { return Bits & IsLValue; }
+
+  /// Does this type contain a non-escaping reference?
+  bool hasNoEscape() const { return Bits & HasNoEscape; }
 
   /// Does this type contain an error?
   bool hasError() const { return Bits & HasError; }
@@ -621,7 +628,12 @@ public:
   bool hasLValueType() {
     return getRecursiveProperties().isLValue();
   }
-  
+
+  /// Determines whether this type contains a non-escaping reference.
+  bool hasNoEscape() const {
+    return getRecursiveProperties().hasNoEscape();
+  }
+
   /// Is a type with these properties materializable: that is, is it a
   /// first-class value type?
   bool isMaterializable();
