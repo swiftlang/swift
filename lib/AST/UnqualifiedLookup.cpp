@@ -256,14 +256,11 @@ public:
     ASTScopeLookupState withParentScope() const {
       return ASTScopeLookupState{scope->getParent(), selfDC, dc, isCascadingUse};
     }
-    ASTScopeLookupState withNoScope() const {
-      return ASTScopeLookupState{nullptr, selfDC, dc, isCascadingUse};
-    }
     ASTScopeLookupState withSelfDC(DeclContext *selfDC) const {
       return ASTScopeLookupState{scope, selfDC, dc, isCascadingUse};
     }
-    ASTScopeLookupState withDC(DeclContext *dc) const {
-      return ASTScopeLookupState{scope, selfDC, dc, isCascadingUse};
+    ASTScopeLookupState withoutSelfDC() const {
+      return ASTScopeLookupState{scope, nullptr, dc, isCascadingUse};
     }
     ASTScopeLookupState withResolvedIsCascadingUse(bool isCascadingUse) const {
       return ASTScopeLookupState{scope, selfDC, dc, isCascadingUse};
@@ -280,6 +277,15 @@ public:
                                                    DeclContext *const);
 
   static bool nothingToSeeHere(const DeclContext *);
+
+  /// Lookup departs from lexical ordering by searching for generic parameters
+  /// before members of a type. This anomaly is justified because members
+  /// that collide with a generic parameter can still be found with a qualified
+  /// name, but there is no way to qualify a reference to generic parameter.
+  ///
+  /// Without this method, normal scope traversal would eventually find the
+  /// generic parameters.
+  void lookForGenericsBeforeMembersInViolationOfLexicalOrdering(DeclContext *);
 
   /// Can lookup stop searching for results, assuming hasn't looked for outer
   /// results yet?
@@ -580,12 +586,12 @@ void UnqualifiedLookupFactory::lookInScopeForASTScopeLookup(
 
   ifNotDoneYet([&] {
     // When we are in the body of a method, get the 'self' declaration.
-    const bool inBody =
+    const bool inMethodBody =
         state.scope->getKind() == ASTScopeKind::AbstractFunctionBody &&
         state.scope->getAbstractFunctionDecl()
             ->getDeclContext()
             ->isTypeContext();
-    if (inBody)
+    if (inMethodBody)
       lookInParentScopeForASTScopeLookup(
           state.withSelfDC(state.scope->getAbstractFunctionDecl()));
     // If there is a declaration context associated with this scope, we might
@@ -638,12 +644,7 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
     lookInParentScopeForASTScopeLookup(defaultNextState);
     return;
   }
-  // CRAZY HACK TO find GENERICS first
-  auto *params = getGenericParams(scopeDC);
-  if (params)
-    for (auto *param: params->getParams()) {
-      Consumer.foundDecl(param, DeclVisibilityKind::GenericParameter);
-    }
+  lookForGenericsBeforeMembersInViolationOfLexicalOrdering(scopeDC);
   ifNotDoneYet([&] {
     // Dig out the type we're looking into.
     // Perform lookup into the type
@@ -654,7 +655,7 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
   },
   [&] {
     // Forget the 'self' declaration.
-    lookInParentScopeForASTScopeLookup(defaultNextState.withSelfDC(nullptr));
+    lookInParentScopeForASTScopeLookup(defaultNextState.withoutSelfDC());
   });
 }
 
@@ -675,6 +676,16 @@ bool UnqualifiedLookupFactory::nothingToSeeHere(
          isa<TopLevelCodeDecl>(scopeDC) ||
          // Typealiases have no lookup of their own.
          isa<TypeAliasDecl>(scopeDC);
+}
+
+void UnqualifiedLookupFactory::
+    lookForGenericsBeforeMembersInViolationOfLexicalOrdering(
+        DeclContext *const scopeDC) {
+  auto *params = getGenericParams(scopeDC);
+  if (params)
+    for (auto *param : params->getParams()) {
+      Consumer.foundDecl(param, DeclVisibilityKind::GenericParameter);
+    }
 }
 
 #pragma mark context-based lookup definitions
