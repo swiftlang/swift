@@ -440,10 +440,11 @@ public extension Tensor {
 
 /// Represents a literal element for conversion to a `Tensor`.
 ///
-/// - NOTE: Do not use this API directly. This is implicitly created during the
-/// conversion from an array literal to a `Tensor`.
+/// - Note: Do not ever use this API directly. This is implicitly created
+///   during the conversion from an array literal to a `Tensor`, and is purely
+///   for implementation purposes.
 @_fixed_layout
-public struct TensorElementLiteral<Scalar> : TensorProtocol
+public struct _TensorElementLiteral<Scalar> : TensorProtocol
   where Scalar : TensorFlowScalar {
 
   @usableFromInline let tensor: Tensor<Scalar>
@@ -459,7 +460,7 @@ public struct TensorElementLiteral<Scalar> : TensorProtocol
   }
 }
 
-extension TensorElementLiteral : ExpressibleByBooleanLiteral
+extension _TensorElementLiteral : ExpressibleByBooleanLiteral
   where Scalar : ExpressibleByBooleanLiteral {
   public typealias BooleanLiteralType = Scalar.BooleanLiteralType
   @inlinable @inline(__always)
@@ -468,7 +469,7 @@ extension TensorElementLiteral : ExpressibleByBooleanLiteral
   }
 }
 
-extension TensorElementLiteral : ExpressibleByIntegerLiteral
+extension _TensorElementLiteral : ExpressibleByIntegerLiteral
   where Scalar : ExpressibleByIntegerLiteral {
   public typealias IntegerLiteralType = Scalar.IntegerLiteralType
   @inlinable @inline(__always)
@@ -477,7 +478,7 @@ extension TensorElementLiteral : ExpressibleByIntegerLiteral
   }
 }
 
-extension TensorElementLiteral : ExpressibleByFloatLiteral
+extension _TensorElementLiteral : ExpressibleByFloatLiteral
   where Scalar : ExpressibleByFloatLiteral {
   public typealias FloatLiteralType = Scalar.FloatLiteralType
   @inlinable @inline(__always)
@@ -486,10 +487,10 @@ extension TensorElementLiteral : ExpressibleByFloatLiteral
   }
 }
 
-extension TensorElementLiteral : ExpressibleByArrayLiteral {
-  public typealias ArrayLiteralElement = TensorElementLiteral<Scalar>
+extension _TensorElementLiteral : ExpressibleByArrayLiteral {
+  public typealias ArrayLiteralElement = _TensorElementLiteral<Scalar>
   @inlinable @inline(__always)
-  public init(arrayLiteral elements: TensorElementLiteral<Scalar>...) {
+  public init(arrayLiteral elements: _TensorElementLiteral<Scalar>...) {
     // Attr T (non-optional in the op definition) need not be specified when we
     // run the op as part of a graph function, but need to be specified when we
     // run it via eager C API.
@@ -501,14 +502,14 @@ extension TensorElementLiteral : ExpressibleByArrayLiteral {
 
 extension Tensor : ExpressibleByArrayLiteral {
   /// The type of the elements of an array literal.
-  public typealias ArrayLiteralElement = TensorElementLiteral<Scalar>
+  public typealias ArrayLiteralElement = _TensorElementLiteral<Scalar>
 
   /// Creates a tensor initialized with the given elements.
   /// - Note: This is for conversion from tensor element literals. This is a
   /// separate method because `ShapedArray` initializers need to call it.
   @inlinable @inline(__always)
   internal init(
-    tensorElementLiterals elements: [TensorElementLiteral<Scalar>]
+    _tensorElementLiterals elements: [_TensorElementLiteral<Scalar>]
   ) {
     self.init(handle: #tfop("Pack", elements,
                             T$dtype: Scalar.tensorFlowDataType))
@@ -516,8 +517,8 @@ extension Tensor : ExpressibleByArrayLiteral {
 
   /// Creates a tensor initialized with the given elements.
   @inlinable @inline(__always)
-  public init(arrayLiteral elements: TensorElementLiteral<Scalar>...) {
-    self.init(tensorElementLiterals: elements)
+  public init(arrayLiteral elements: _TensorElementLiteral<Scalar>...) {
+    self.init(_tensorElementLiterals: elements)
   }
 }
 

@@ -156,7 +156,7 @@ extension Tensor : TensorGroup {
   }
 }
 
-extension TensorElementLiteral : TensorGroup {
+extension _TensorElementLiteral : TensorGroup {
   @inlinable
   public static var _unknownShapeList: [TensorShape?] {
     return [nil]
