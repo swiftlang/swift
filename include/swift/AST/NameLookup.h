@@ -63,7 +63,7 @@ private:
   ///
   /// BaseDC will be the method if self is needed for the lookup,
   /// and will be the type if not.
-  /// In other words: Ff baseDC is a method, it means you found an instance
+  /// In other words: If baseDC is a method, it means you found an instance
   /// member and you should add an implicit 'self.' (Each method has its own
   /// implicit self decl.) There's one other kind of non-method context that has
   /// a 'self.' -- a lazy property initializer, which unlike a non-lazy property
