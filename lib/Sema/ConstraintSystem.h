@@ -3122,12 +3122,14 @@ private:
                                   bool restoreOnFail,
                                   llvm::function_ref<bool(Constraint *)> pred);
 
+public:
   // Given a type variable, attempt to find the disjunction of
   // bind overloads associated with it. This may return null in cases where
   // the disjunction has either not been created or binds the type variable
   // in some manner other than by binding overloads.
   Constraint *getUnboundBindOverloadDisjunction(TypeVariableType *tyvar);
 
+private:
   /// Given a type variable that might represent an overload set, retrieve
   ///
   /// \returns the set of overload choices to which this type variable
@@ -3748,7 +3750,7 @@ private:
 /// easy to work with disjunction and encapsulates
 /// some other important information such as locator.
 class DisjunctionChoiceProducer : public BindingProducer<DisjunctionChoice> {
-  // The disjunciton choices that this producer will iterate through.
+  // The disjunction choices that this producer will iterate through.
   ArrayRef<Constraint *> Choices;
 
   // The ordering of disjunction choices. We index into Choices

@@ -605,98 +605,79 @@ namespace {
                               mustConsider = nullptr) {
     // Find the type variable associated with the function, if any.
     auto tyvarType = CS.getType(expr->getFn())->getAs<TypeVariableType>();
-    if (!tyvarType)
+    if (!tyvarType || CS.getFixedType(tyvarType))
       return;
     
     // This type variable is only currently associated with the function
     // being applied, and the only constraint attached to it should
     // be the disjunction constraint for the overload group.
-    auto &CG = CS.getConstraintGraph();
-    llvm::SetVector<Constraint *> disjunctions;
-    CG.gatherConstraints(tyvarType, disjunctions,
-                         ConstraintGraph::GatheringKind::EquivalenceClass,
-                         [](Constraint *constraint) -> bool {
-                           return constraint->getKind() ==
-                                  ConstraintKind::Disjunction;
-                         });
-    if (disjunctions.empty())
+    auto disjunction = CS.getUnboundBindOverloadDisjunction(tyvarType);
+    if (!disjunction)
       return;
     
-    // Look for the disjunction that binds the overload set.
-    for (auto *disjunction : disjunctions) {
-      auto oldConstraints = disjunction->getNestedConstraints();
-      auto csLoc = CS.getConstraintLocator(expr->getFn());
+    auto oldConstraints = disjunction->getNestedConstraints();
+    auto csLoc = CS.getConstraintLocator(expr->getFn());
       
-      // Only replace the disjunctive overload constraint.
-      if (oldConstraints[0]->getKind() != ConstraintKind::BindOverload) {
-        continue;
-      }
-
-      if (mustConsider) {
-        bool hasMustConsider = false;
-        for (auto oldConstraint : oldConstraints) {
-          auto overloadChoice = oldConstraint->getOverloadChoice();
-          if (overloadChoice.isDecl() &&
-              mustConsider(overloadChoice.getDecl()))
-            hasMustConsider = true;
-        }
-        if (hasMustConsider) {
-          continue;
-        }
-      }
-
-      // Copy over the existing bindings, dividing the constraints up
-      // into "favored" and non-favored lists.
-      SmallVector<Constraint *, 4> favoredConstraints;
-      SmallVector<Constraint *, 4> fallbackConstraints;
+    if (mustConsider) {
+      bool hasMustConsider = false;
       for (auto oldConstraint : oldConstraints) {
-        if (!oldConstraint->getOverloadChoice().isDecl())
-          continue;
-        auto decl = oldConstraint->getOverloadChoice().getDecl();
-        if (!decl->getAttrs().isUnavailable(CS.getASTContext()) &&
-            isFavored(decl))
-          favoredConstraints.push_back(oldConstraint);
-        else
-          fallbackConstraints.push_back(oldConstraint);
+        auto overloadChoice = oldConstraint->getOverloadChoice();
+        if (overloadChoice.isDecl() &&
+            mustConsider(overloadChoice.getDecl()))
+          hasMustConsider = true;
       }
-
-      // If we did not find any favored constraints, we're done.
-      if (favoredConstraints.empty()) break;
-
-      if (favoredConstraints.size() == 1) {
-        auto overloadChoice = favoredConstraints[0]->getOverloadChoice();
-        auto overloadType = overloadChoice.getDecl()->getInterfaceType();
-        auto resultType = overloadType->getAs<AnyFunctionType>()->getResult();
-        CS.setFavoredType(expr, resultType.getPointer());
+      if (hasMustConsider) {
+        return;
       }
-
-      // Remove the original constraint from the inactive constraint
-      // list and add the new one.
-      CS.removeInactiveConstraint(disjunction);
-
-      // Create the disjunction of favored constraints.
-      auto favoredConstraintsDisjunction =
-          Constraint::createDisjunction(CS,
-                                        favoredConstraints,
-                                        csLoc);
-      
-      favoredConstraintsDisjunction->setFavored();
-      
-      llvm::SmallVector<Constraint *, 2> aggregateConstraints;
-      aggregateConstraints.push_back(favoredConstraintsDisjunction);
-
-      if (!fallbackConstraints.empty()) {
-        // Find the disjunction of fallback constraints. If any
-        // constraints were added here, create a new disjunction.
-        Constraint *fallbackConstraintsDisjunction =
-          Constraint::createDisjunction(CS, fallbackConstraints, csLoc);
-
-        aggregateConstraints.push_back(fallbackConstraintsDisjunction);
-      }
-
-      CS.addDisjunctionConstraint(aggregateConstraints, csLoc);
-      break;
     }
+
+    // Copy over the existing bindings, dividing the constraints up
+    // into "favored" and non-favored lists.
+    SmallVector<Constraint *, 4> favoredConstraints;
+    SmallVector<Constraint *, 4> fallbackConstraints;
+    for (auto oldConstraint : oldConstraints) {
+      if (!oldConstraint->getOverloadChoice().isDecl())
+        return;
+      auto decl = oldConstraint->getOverloadChoice().getDecl();
+      if (!decl->getAttrs().isUnavailable(CS.getASTContext()) &&
+          isFavored(decl))
+        favoredConstraints.push_back(oldConstraint);
+      else
+        fallbackConstraints.push_back(oldConstraint);
+    }
+
+    // If we did not find any favored constraints, we're done.
+    if (favoredConstraints.empty()) return;
+
+    if (favoredConstraints.size() == 1) {
+      auto overloadChoice = favoredConstraints[0]->getOverloadChoice();
+      auto overloadType = overloadChoice.getDecl()->getInterfaceType();
+      auto resultType = overloadType->getAs<AnyFunctionType>()->getResult();
+      CS.setFavoredType(expr, resultType.getPointer());
+    }
+
+    // Remove the original constraint from the inactive constraint
+    // list and add the new one.
+    CS.removeInactiveConstraint(disjunction);
+
+    // Create the disjunction of favored constraints.
+    auto favoredConstraintsDisjunction =
+        Constraint::createDisjunction(CS, favoredConstraints, csLoc);
+    favoredConstraintsDisjunction->setFavored();
+
+    llvm::SmallVector<Constraint *, 2> aggregateConstraints;
+    aggregateConstraints.push_back(favoredConstraintsDisjunction);
+
+    if (!fallbackConstraints.empty()) {
+      // Find the disjunction of fallback constraints. If any
+      // constraints were added here, create a new disjunction.
+      Constraint *fallbackConstraintsDisjunction =
+        Constraint::createDisjunction(CS, fallbackConstraints, csLoc);
+
+      aggregateConstraints.push_back(fallbackConstraintsDisjunction);
+    }
+
+    CS.addDisjunctionConstraint(aggregateConstraints, csLoc);
   }
   
   size_t getOperandCount(Type t) {
