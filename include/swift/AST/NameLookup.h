@@ -88,7 +88,7 @@ private:
   /// implicit self, if any.
   /// BaseDC is always one of your outer DCs. if you're inside a type it should
   /// never be an extension of that type. And if you're inside an extension it
-  /// will always be an extension (if it found something at that level)
+  /// will always be an extension (if it found something at that level).
   DeclContext *BaseDC;
 
   /// The declaration corresponds to the given name; i.e. the decl we are
