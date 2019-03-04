@@ -485,8 +485,15 @@ extension _StringObject {
     _internalInvariant(isLarge)
     return (discriminatedObjectRawBits & 0x4000_0000_0000_0000) != 0
   }
-}
 
+  // Whether this string is in one of our fastest representations:
+  // small or tail-allocated (i.e. mortal/immortal native)
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal var isPreferredRepresentation: Bool {
+    return _fastPath(isSmall || _countAndFlags.isTailAllocated)
+  }
+}
 
 /*
 

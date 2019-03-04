@@ -491,6 +491,8 @@ extension __StringStorage {
     _internalInvariant(rawSelf + Int(_StringObject.nativeBias) == rawStart)
     _internalInvariant(self._realCapacity > self.count, "no room for nul-terminator")
     _internalInvariant(self.terminator.pointee == 0, "not nul terminated")
+    let str = asString
+    _internalInvariant(str._guts._object.isPreferredRepresentation)
 
     _countAndFlags._invariantCheck()
     if isASCII {
@@ -803,6 +805,8 @@ extension __SharedStringStorage {
     _countAndFlags._invariantCheck()
     _internalInvariant(!_countAndFlags.isNativelyStored)
     _internalInvariant(!_countAndFlags.isTailAllocated)
+    let str = asString
+    _internalInvariant(!str._guts._object.isPreferredRepresentation)
   }
 #endif // INTERNAL_CHECKS_ENABLED
 }
