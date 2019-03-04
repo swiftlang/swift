@@ -857,8 +857,8 @@ static void destructureYieldsForCoroutine(SILModule &M,
 
   // 'modify' yields an inout of the target type.
   if (accessor->getAccessorKind() == AccessorKind::Modify) {
-    auto loweredValueTy = M.Types.getLoweredType(origType, canValueType);
-    yields.push_back(SILYieldInfo(loweredValueTy.getASTType(),
+    auto loweredValueTy = M.Types.getLoweredRValueType(origType, canValueType);
+    yields.push_back(SILYieldInfo(loweredValueTy,
                                   ParameterConvention::Indirect_Inout));
     return;
   }
@@ -2411,8 +2411,7 @@ public:
     }
 
     AbstractionPattern abstraction(Sig, origType);
-    return TheSILModule.Types.getLoweredType(abstraction, substType)
-             .getASTType();
+    return TheSILModule.Types.getLoweredRValueType(abstraction, substType);
   }
 };
 

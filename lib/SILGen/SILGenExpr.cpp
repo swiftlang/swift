@@ -5159,8 +5159,7 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
   case PTK_AutoreleasingUnsafeMutablePointer: {
     // Set up a writeback through a +0 buffer.
     LValueTypeData typeData = lv.getTypeData();
-    SILType rvalueType = SILType::getPrimitiveObjectType(
-      CanUnmanagedStorageType::get(typeData.TypeOfRValue.getASTType()));
+    auto rvalueType = CanUnmanagedStorageType::get(typeData.TypeOfRValue);
 
     LValueTypeData unownedTypeData(
       lv.getAccessKind(),

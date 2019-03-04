@@ -808,7 +808,7 @@ public:
                                            bool isNonObjC = false);
   AbstractionPattern getAbstractionPattern(EnumElementDecl *element);
 
-  SILType getLoweredTypeOfGlobal(VarDecl *var);
+  CanType getLoweredTypeOfGlobal(VarDecl *var);
 
   /// Return the SILFunctionType for a native function value of the
   /// given type.
