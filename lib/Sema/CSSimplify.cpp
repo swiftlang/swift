@@ -131,6 +131,8 @@ bool constraints::areConservativelyCompatibleArgumentLabels(
     hasCurriedSelf = false;
   } else if (baseType->is<AnyMetatypeType>() && decl->isInstanceMember()) {
     hasCurriedSelf = false;
+  } else if (isa<EnumElementDecl>(decl)) {
+    hasCurriedSelf = false;
   } else {
     hasCurriedSelf = true;
   }
@@ -142,6 +144,8 @@ bool constraints::areConservativelyCompatibleArgumentLabels(
   } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
     assert(!hasCurriedSelf && "Subscripts never have curried 'self'");
     fTy = subscript->getInterfaceType()->castTo<AnyFunctionType>();
+  } else if (auto enumElement = dyn_cast<EnumElementDecl>(decl)) {
+    fTy = enumElement->getInterfaceType()->castTo<AnyFunctionType>();
   } else {
     return true;
   }
