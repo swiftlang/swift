@@ -1080,12 +1080,16 @@ void UnqualifiedLookupFactory::setAsideUnavailableResults(
 }
 
 void UnqualifiedLookupFactory::recordDependencyOnTopLevelNameIfNeeded() {
-  for (const auto &result : Results) {
-    auto *const resultContext = result.getValueDecl()->getDeclContext();
-    if (resultContext->isModuleScopeContext())
-      recordDependencyOnTopLevelName(DC->getParentSourceFile(), Name,
-                                     computeIsCascadingUse());
-  }
+  const bool hasTopLevelResult =
+      llvm::any_of(Results, [&](const LookupResultEntry &entry) {
+        auto *const entryDC = entry.getValueDecl()->getDeclContext();
+        return entryDC->isModuleContext() ||
+               entryDC->getParentModule() != DC->getParentModule();
+      });
+  // Legacy code records a dependency for a failed lookup
+  if (hasTopLevelResult || Results.empty())
+    recordDependencyOnTopLevelName(DC->getParentSourceFile(), Name,
+                                   computeIsCascadingUse());
 }
 
 void UnqualifiedLookupFactory::recordDependencyOnTopLevelName(
