@@ -2376,16 +2376,6 @@ public:
                                 bool allowMembers,
                                 DeclContext *useDC);
 
-  /// Given a set of overload choices, try to find a common structure amongst
-  /// all of them.
-  ///
-  /// \returns the common type amongst the various overloads, which may contain
-  /// fresh type variables that abstract over differences between the different
-  /// overloads in the set.
-  Type findCommonOverloadType(ArrayRef<OverloadChoice> choices,
-                              ArrayRef<OverloadChoice> outerAlternatives,
-                              ConstraintLocator *locator);
-
   /// Add a new overload set to the list of unresolved overload
   /// sets.
   void addOverloadSet(Type boundType, ArrayRef<OverloadChoice> choices,
