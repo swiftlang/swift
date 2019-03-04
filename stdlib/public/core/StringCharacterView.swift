@@ -63,8 +63,10 @@ extension String: BidirectionalCollection {
   /// - Returns: The index value immediately after `i`.
   public func index(after i: Index) -> Index {
     _precondition(i < endIndex, "String index is out of bounds")
-
-    // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
+    
+    if _fastPath(_guts.isASCII) { return i.nextEncoded }
+    
+    // TODO: single-scalar-grapheme fast path, etc.
     let stride = _characterStride(startingAt: i)
     let nextOffset = i._encodedOffset &+ stride
     let nextStride = _characterStride(
@@ -82,7 +84,9 @@ extension String: BidirectionalCollection {
   public func index(before i: Index) -> Index {
     _precondition(i > startIndex, "String index is out of bounds")
 
-    // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
+    if _fastPath(_guts.isASCII) { return i.priorEncoded }
+    
+    // TODO: single-scalar-grapheme fast path, etc.
     let stride = _characterStride(endingAt: i)
     let priorOffset = i._encodedOffset &- stride
     return Index(encodedOffset: priorOffset, characterStride: stride)
@@ -111,7 +115,10 @@ extension String: BidirectionalCollection {
   /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
   @inlinable @inline(__always)
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
-    // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
+    // TODO: single-scalar-grapheme fast path, etc.
+    if _fastPath(_guts.isASCII) {
+      return String(_guts).utf8.index(i, offsetBy: n)
+    }
     return _index(i, offsetBy: n)
   }
 
@@ -156,7 +163,10 @@ extension String: BidirectionalCollection {
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
-    // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
+    // TODO: single-scalar-grapheme fast path, etc.
+    if _fastPath(_guts.isASCII) {
+      return String(_guts).utf8.index(i, offsetBy: n, limitedBy: limit)
+    }
     return _index(i, offsetBy: n, limitedBy: limit)
   }
 
@@ -171,7 +181,10 @@ extension String: BidirectionalCollection {
   /// - Complexity: O(*n*), where *n* is the resulting distance.
   @inlinable @inline(__always)
   public func distance(from start: Index, to end: Index) -> IndexDistance {
-    // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
+    // TODO: single-scalar-grapheme fast path, etc.
+    if _fastPath(_guts.isASCII) {
+      return String(_guts).utf8.distance(from: start, to: end)
+    }
     return _distance(from: start, to: end)
   }
 
@@ -194,7 +207,11 @@ extension String: BidirectionalCollection {
   public subscript(i: Index) -> Character {
     @inline(__always) get {
       _boundsCheck(i)
-
+      if _fastPath(_guts.isFastASCII) {
+        return _guts.withFastUTF8 {
+          return Character(unchecked: String._fromASCII($0))
+        }
+      }
       let i = _guts.scalarAlign(i)
       let distance = _characterStride(startingAt: i)
       return _guts.errorCorrectedCharacter(
