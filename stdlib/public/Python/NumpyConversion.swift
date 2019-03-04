@@ -98,8 +98,8 @@ extension Array : ConvertibleFromNumpyArray
   ///
   /// - Parameter numpyArray: The `numpy.ndarray` instance to convert.
   /// - Precondition: The `numpy` Python package must be installed.
-  /// - Precondition: `numpyArray` must be 1-D and have a compatible scalar
-  ///   datatype.
+  /// - Returns: `numpyArray` converted to an `Array`. Returns `nil` if
+  ///   `numpyArray` is not 1-D or does not have a compatible scalar `dtype`.
   public init?(numpy numpyArray: PythonObject) {
     // Check if input is a `numpy.ndarray` instance.
     guard Python.isinstance(numpyArray, np.ndarray) == true else {
