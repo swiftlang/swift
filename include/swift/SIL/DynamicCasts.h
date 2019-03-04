@@ -18,6 +18,7 @@
 #ifndef SWIFT_SIL_DYNAMICCASTS_H
 #define SWIFT_SIL_DYNAMICCASTS_H
 
+#include "swift/AST/Module.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
@@ -420,8 +421,31 @@ public:
     // Bridging casts cannot be further simplified.
     auto TargetIsBridgeable = getTargetType()->isBridgeableObjectType();
     auto SourceIsBridgeable = getSourceType()->isBridgeableObjectType();
-
     return TargetIsBridgeable != SourceIsBridgeable;
+  }
+
+  /// If getSourceType() is a Swift type that can bridge to an ObjC type, return
+  /// the ObjC type it bridges to. If the source type is an objc type, an empty
+  /// CanType() is returned.
+  CanType getBridgedSourceType() const {
+    SILModule &mod = getModule();
+    Type t = mod.getASTContext().getBridgedToObjC(mod.getSwiftModule(),
+                                                  getSourceType());
+    if (!t)
+      return CanType();
+    return t->getCanonicalType();
+  }
+
+  /// If getTargetType() is a Swift type that can bridge to an ObjC type, return
+  /// the ObjC type it bridges to. If the target type is an objc type, an empty
+  /// CanType() is returned.
+  CanType getBridgedTargetType() const {
+    SILModule &mod = getModule();
+    Type t = mod.getASTContext().getBridgedToObjC(mod.getSwiftModule(),
+                                                  getTargetType());
+    if (!t)
+      return CanType();
+    return t->getCanonicalType();
   }
 
   bool isConditional() const {
