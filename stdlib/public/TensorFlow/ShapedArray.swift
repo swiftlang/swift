@@ -546,10 +546,10 @@ public extension Tensor {
 /// Array literal conversion.
 extension ShapedArray : ExpressibleByArrayLiteral
   where Scalar : TensorFlowScalar {
-  public typealias ArrayLiteralElement = TensorElementLiteral<Scalar>
+  public typealias ArrayLiteralElement = _TensorElementLiteral<Scalar>
   @inlinable @inline(__always)
-  public init(arrayLiteral elements: TensorElementLiteral<Scalar>...) {
-    self = Tensor<Scalar>(tensorElementLiterals: elements).array
+  public init(arrayLiteral elements: _TensorElementLiteral<Scalar>...) {
+    self = Tensor<Scalar>(_tensorElementLiterals: elements).array
   }
 }
 
@@ -888,10 +888,10 @@ public extension ShapedArraySlice where Scalar : TensorFlowScalar {
 /// Array literal conversion.
 extension ShapedArraySlice : ExpressibleByArrayLiteral
   where Scalar : TensorFlowScalar {
-  public typealias ArrayLiteralElement = TensorElementLiteral<Scalar>
+  public typealias ArrayLiteralElement = _TensorElementLiteral<Scalar>
   @inlinable @inline(__always)
-  public init(arrayLiteral elements: TensorElementLiteral<Scalar>...) {
-    self.init(base: Tensor(tensorElementLiterals: elements).array)
+  public init(arrayLiteral elements: _TensorElementLiteral<Scalar>...) {
+    self.init(base: Tensor(_tensorElementLiterals: elements).array)
   }
 }
 
