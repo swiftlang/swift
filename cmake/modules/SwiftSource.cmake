@@ -195,6 +195,7 @@ function(_compile_swift_files
 
   # Compute flags for the Swift compiler.
   set(swift_flags)
+  set(swift_module_flags)
 
   _add_variant_swift_compile_flags(
       "${SWIFTFILE_SDK}"
@@ -309,6 +310,8 @@ function(_compile_swift_files
     if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
       set(specific_module_dir "${module_base}.swiftmodule")
       set(module_base "${module_base}.swiftmodule/${SWIFTFILE_ARCHITECTURE}")
+    else()
+      set(specific_module_dir)
     endif()
     set(module_file "${module_base}.swiftmodule")
     set(module_doc_file "${module_base}.swiftdoc")
@@ -321,14 +324,8 @@ function(_compile_swift_files
 
     if(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES)
       set(interface_file "${module_base}.swiftinterface")
-      list(APPEND swift_flags
-          "-emit-parseable-module-interface-path" "${interface_file}")
-    endif()
-
-    if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
-      list(APPEND dirs_to_create "${specific_module_dir}")
-    else()
-      list(APPEND dirs_to_create "${module_dir}")
+      list(APPEND swift_module_flags
+           "-emit-parseable-module-interface-path" "${interface_file}")
     endif()
 
     # If we have extra regexp flags, check if we match any of the regexps. If so
@@ -495,9 +492,12 @@ function(_compile_swift_files
         COMMAND
           "${CMAKE_COMMAND}" "-E" "remove" "-f" ${module_outputs}
         COMMAND
+          "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir}
+          ${specific_module_dir}
+        COMMAND
           "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}"
-          ${swift_flags} "@${file_path}"
+          ${swift_flags} ${swift_module_flags} "@${file_path}"
         ${command_touch_module_outputs}
         OUTPUT ${module_outputs}
         DEPENDS
