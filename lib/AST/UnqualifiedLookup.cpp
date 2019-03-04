@@ -403,6 +403,8 @@ public:
     return resolveIsCascadingUse(x.whereToLook, x.isCascadingUse,
                                  onlyCareAboutFunctionBody);
   }
+  
+  bool computeIsCascadingUse() const;
 
   void findResultsAndSaveUnavailables(
       ResultFinderForTypeContext &&resultFinderForTypeContext,
@@ -466,15 +468,18 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   else if (Name.isOperator())
     lookupOperatorInDeclContexts(contextAndIsCascadingUse);
   else {
+    const bool isCascadingUse = computeIsCascadingUse();
     lookupNamesIntroducedBy(contextAndIsCascadingUse);
-    if (useASTScopesForExperimentalLookupIfEnabled()) {
-      SmallVector<LookupResultEntry, 4> results;
-      size_t indexOfFirstOuterResult = 0;
-      UnqualifiedLookupFactory scopeLookup(Name, DC, TypeResolver, Loc, options,
-                                           results, indexOfFirstOuterResult);
-      scopeLookup.experimentallyLookInASTScopes(contextAndIsCascadingUse);
-      assert(verifyEqualTo(std::move(scopeLookup)));
-    }
+    assert(!recordedSF || isCascadingUse == recordedIsCascadingUse);
+    
+//    if (useASTScopesForExperimentalLookupIfEnabled()) {
+//      SmallVector<LookupResultEntry, 4> results;
+//      size_t indexOfFirstOuterResult = 0;
+//      UnqualifiedLookupFactory scopeLookup(Name, DC, TypeResolver, Loc, options,
+//                                           results, indexOfFirstOuterResult);
+//      scopeLookup.experimentallyLookInASTScopes(contextAndIsCascadingUse);
+//      assert(verifyEqualTo(std::move(scopeLookup)));
+//    }
   }
 }
 
@@ -1202,6 +1207,38 @@ UnqualifiedLookupFactory::ResultFinderForTypeContext::findSelfBounds(
       selfBounds.push_back(bound);
   }
   return selfBounds;
+}
+
+bool UnqualifiedLookupFactory::computeIsCascadingUse() const {
+  if (options.contains(Flags::KnownPrivate))
+    return false;
+  if (Name.isOperator())
+    return true;
+  auto *dc = DC;
+  if (dc->isModuleScopeContext())
+    return true;
+  if (auto I = dyn_cast<DefaultArgumentInitializer>(dc))
+    return false;
+  
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(dc)) {
+    if (!Loc.isInvalid() && AFD->getBody() && SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc))
+      return false;
+  }
+  else if (auto *PBI = dyn_cast<PatternBindingInitializer>(dc)) {
+    if (PBI->getBinding()->getDeclContext()->isTypeContext()) //lookupNamesIntroducedByInitializerOfStoredPropertyOfAType
+      dc = PBI->getParent();
+  }
+  // clang-format off
+  else
+    assert(isa<AbstractClosureExpr>(dc) ||
+           isa<ExtensionDecl>(dc) ||
+           isa<NominalTypeDecl>(dc) ||
+           isa<TopLevelCodeDecl>(dc) ||
+           isa<Initializer>(dc) ||
+           isa<TypeAliasDecl>(dc) ||
+           isa<SubscriptDecl>(dc));
+  // clang-format on
+  return dc->isCascadingContextForLookup(/*onlyCareAboutFunctionBody*/false);
 }
 
 void UnqualifiedLookupFactory::ResultFinderForTypeContext::dump() const {
