@@ -88,10 +88,7 @@ extension String: _HasContiguousBytes {
         try body($0)
       }
     }
-
-    return try ContiguousArray(self.utf8).withUnsafeBufferPointer {
-      try body($0)
-    }
+    return try String._copying(self)._guts.withFastUTF8 { try body($0) }
   }
 
   @inlinable @inline(__always)
@@ -116,10 +113,7 @@ extension Substring: _HasContiguousBytes {
         return try body($0)
       }
     }
-
-    return try ContiguousArray(self.utf8).withUnsafeBufferPointer {
-      try body($0)
-    }
+    return try String._copying(self)._guts.withFastUTF8 { try body($0) }
   }
 
   @inlinable @inline(__always)

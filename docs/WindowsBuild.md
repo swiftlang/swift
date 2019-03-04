@@ -41,6 +41,7 @@ it provides some of the needed headers and libraries.
 1. Clone `apple/swift-corelibs-foundation` into a folder named `swift-corelibs-foundation`
 1. Clone `apple/swift-corelibs-xctest` into a folder name `swift-corelibs-xctest`
 1. Clone `apple/swift-lldb` into a folder named `lldb`
+1. Clone `curl` into a folder named `curl`
 1. Clone `libxml2` into a folder named `libxml2`
 
 - Currently, other repositories in the Swift project have not been tested and
@@ -64,6 +65,7 @@ git clone https://github.com/apple/swift-corelibs-libdispatch
 git clone https://github.com/apple/swift-corelibs-foundation
 git clone https://github.com/apple/swift-corelibs-xctest
 git clone https://github.com/apple/swift-lldb lldb
+git clone https://github.com/curl/curl.git curl
 git clone https://gitlab.gnome.org/GNOME/libxml2.git libxml2
 ```
 
@@ -248,7 +250,17 @@ cmake --build S:\b\libdispatch
 path S:\b\libdispatch;S:\b\libdispatch\src;%PATH%
 ```
 
-### 11. Build libxml2
+### 11. Build curl
+
+```cmd
+pushd "S:\curl"
+.\buildconf.bat
+cd winbuild
+nmake /f Makefile.vc mode=static VC=15 MACHINE=x64
+popd
+```
+
+### 12. Build libxml2
 
 ```cmd
 pushd "S:\libxml2\win32"
@@ -257,11 +269,7 @@ nmake /f Makefile.msvc
 popd
 ```
 
-### 12. Build swift-corelibs-foundation
-
-To build Foundation you will need builds of:
-
-- `libcurl` (https://curl.haxx.se, download the source, `cd` into `winbuild`, and run `nmake /f Makefile.vc mode=static VC=15 MACHINE=x64`)
+### 13. Build swift-corelibs-foundation
 
 ```cmd
 mkdir "S:\b\foundation"
@@ -288,7 +296,7 @@ cmake -G Ninja^
 path S:\b\foundation;%PATH%
 ```
 
-### 13. Build swift-corelibs-xctest
+### 14. Build swift-corelibs-xctest
 
 ```cmd
 mkdir "S:\b\xctest"
@@ -313,7 +321,7 @@ cmake --build S:\b\xctest
 path S:\b\xctest;%PATH%
 ```
 
-### 14. Install Swift on Windows
+### 15. Install Swift on Windows
 
 - Run ninja install:
 

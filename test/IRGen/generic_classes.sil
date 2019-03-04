@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/generic_classes.sil
-// RUN: %target-swift-frontend %t/generic_classes.sil -emit-ir | %FileCheck %t/generic_classes.sil --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend %t/generic_classes.sil -emit-ir | %FileCheck %t/generic_classes.sil --check-prefix=CHECK --check-prefix=CHECK-%target-runtime -check-prefix CHECK-%target-import-type
 // RUN: %target-swift-frontend -Osize %t/generic_classes.sil -emit-ir | %FileCheck %t/generic_classes.sil --check-prefix=OSIZE
 
 // REQUIRES: CPU=x86_64
@@ -80,7 +80,8 @@ import Swift
 // CHECK: [[ROOTNONGENERIC_NAME:@.*]] = private constant [15 x i8] c"RootNonGeneric\00"
 // CHECK: @"$s15generic_classes14RootNonGenericCMn" = hidden constant <{ {{.*}} %swift.method_descriptor }> <{
 // --       flags: class, unique, has vtable
-// CHECK-SAME:   <i32 0x8000_0050>
+// CHECK-DIRECT-SAME:   <i32 0x8000_0050>
+// CHECK-INDIRECT-SAME:   <i32 0x8001_0050>
 // --       name
 // CHECK-SAME:   [15 x i8]* [[ROOTNONGENERIC_NAME]]
 // --       num fields
@@ -91,7 +92,8 @@ import Swift
 
 // CHECK: @"$s15generic_classes14RootNonGenericCMf" = internal global <{ {{.*}} }> <{
 // CHECK-SAME:   void (%T15generic_classes14RootNonGenericC*)* @"$s15generic_classes14RootNonGenericCfD",
-// CHECK-SAME:   i8** @"$sBoWV",
+// CHECK-DIRECT-SAME:   i8** @"$sBoWV",
+// CHECK-INDIRECT-SAME:   i8** null,
 // CHECK-SAME-native: i64 0,
 // CHECK-SAME-native: %swift.type* null,
 // CHECK-SAME-native: %swift.opaque* null,

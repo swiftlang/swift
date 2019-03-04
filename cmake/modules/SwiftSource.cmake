@@ -195,6 +195,7 @@ function(_compile_swift_files
 
   # Compute flags for the Swift compiler.
   set(swift_flags)
+  set(swift_module_flags)
 
   _add_variant_swift_compile_flags(
       "${SWIFTFILE_SDK}"
@@ -283,17 +284,10 @@ function(_compile_swift_files
 
   list(APPEND swift_flags ${SWIFTFILE_FLAGS})
 
-  set(obj_dirs)
+  set(dirs_to_create)
   foreach(output ${SWIFTFILE_OUTPUT})
     get_filename_component(objdir "${output}" PATH)
-    list(APPEND obj_dirs "${objdir}")
-  endforeach()
-  list(REMOVE_DUPLICATES obj_dirs)
-
-  set(command_create_dirs)
-  foreach(objdir ${obj_dirs})
-    list(APPEND command_create_dirs
-      COMMAND "${CMAKE_COMMAND}" -E make_directory "${objdir}")
+    list(APPEND dirs_to_create "${objdir}")
   endforeach()
 
   set(module_file)
@@ -316,6 +310,8 @@ function(_compile_swift_files
     if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
       set(specific_module_dir "${module_base}.swiftmodule")
       set(module_base "${module_base}.swiftmodule/${SWIFTFILE_ARCHITECTURE}")
+    else()
+      set(specific_module_dir)
     endif()
     set(module_file "${module_base}.swiftmodule")
     set(module_doc_file "${module_base}.swiftdoc")
@@ -328,16 +324,8 @@ function(_compile_swift_files
 
     if(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES)
       set(interface_file "${module_base}.swiftinterface")
-      list(APPEND swift_flags
-          "-emit-parseable-module-interface-path" "${interface_file}")
-    endif()
-
-    if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
-      list(APPEND command_create_dirs
-          COMMAND "${CMAKE_COMMAND}" -E make_directory "${specific_module_dir}")
-    else()
-      list(APPEND command_create_dirs
-          COMMAND "${CMAKE_COMMAND}" -E make_directory "${module_dir}")
+      list(APPEND swift_module_flags
+           "-emit-parseable-module-interface-path" "${interface_file}")
     endif()
 
     # If we have extra regexp flags, check if we match any of the regexps. If so
@@ -398,7 +386,7 @@ function(_compile_swift_files
   endif()
 
   if (SWIFT_REPORT_STATISTICS)
-    list(GET obj_dirs 0 first_obj_dir)
+    list(GET dirs_to_create 0 first_obj_dir)
     list(APPEND swift_flags "-stats-output-dir" ${first_obj_dir})
   endif()
 
@@ -433,12 +421,12 @@ function(_compile_swift_files
   endif()
 
   # First generate the obj dirs
+  list(REMOVE_DUPLICATES dirs_to_create)
   add_custom_command_target(
-      obj_dirs_dependency_target
-      ${command_create_dirs}
-      COMMAND ""
-      OUTPUT ${obj_dirs}
-      COMMENT "Generating obj dirs for ${first_output}")
+      create_dirs_dependency_target
+      COMMAND "${CMAKE_COMMAND}" -E make_directory ${dirs_to_create}
+      OUTPUT ${dirs_to_create}
+      COMMENT "Generating dirs for ${first_output}")
 
   # Then we can compile both the object files and the swiftmodule files
   # in parallel in this target for the object file, and ...
@@ -478,7 +466,7 @@ function(_compile_swift_files
         ${swift_compiler_tool_dep}
         ${file_path} ${source_files} ${SWIFTFILE_DEPENDS}
         ${swift_ide_test_dependency}
-        ${obj_dirs_dependency_target}
+        ${create_dirs_dependency_target}
         ${copy_legacy_layouts_dep}
       COMMENT "Compiling ${first_output}")
   set("${dependency_target_out_var_name}" "${dependency_target}" PARENT_SCOPE)
@@ -504,16 +492,19 @@ function(_compile_swift_files
         COMMAND
           "${CMAKE_COMMAND}" "-E" "remove" "-f" ${module_outputs}
         COMMAND
+          "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir}
+          ${specific_module_dir}
+        COMMAND
           "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}"
-          ${swift_flags} "@${file_path}"
+          ${swift_flags} ${swift_module_flags} "@${file_path}"
         ${command_touch_module_outputs}
         OUTPUT ${module_outputs}
         DEPENDS
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${swift_ide_test_dependency}
-          ${obj_dirs_dependency_target}
+          ${create_dirs_dependency_target}
         COMMENT "Generating ${module_file}")
     set("${dependency_module_target_out_var_name}" "${module_dependency_target}" PARENT_SCOPE)
 
@@ -529,7 +520,7 @@ function(_compile_swift_files
         DEPENDS
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
-          ${obj_dirs_dependency_target}
+          ${create_dirs_dependency_target}
         COMMENT "Generating ${sib_file}"
         EXCLUDE_FROM_ALL)
     set("${dependency_sib_target_out_var_name}" "${sib_dependency_target}" PARENT_SCOPE)
@@ -545,7 +536,7 @@ function(_compile_swift_files
         DEPENDS
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
-          ${obj_dirs_dependency_target}
+          ${create_dirs_dependency_target}
         COMMENT "Generating ${sibopt_file}"
         EXCLUDE_FROM_ALL)
     set("${dependency_sibopt_target_out_var_name}" "${sibopt_dependency_target}" PARENT_SCOPE)
@@ -562,7 +553,7 @@ function(_compile_swift_files
         DEPENDS
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
-          ${obj_dirs_dependency_target}
+          ${create_dirs_dependency_target}
           COMMENT "Generating ${sibgen_file}"
           EXCLUDE_FROM_ALL)
     set("${dependency_sibgen_target_out_var_name}" "${sibgen_dependency_target}" PARENT_SCOPE)

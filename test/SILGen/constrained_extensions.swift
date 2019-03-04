@@ -212,6 +212,15 @@ extension Array where Element == AnyObject {
     // CHECK-LABEL: sil hidden [ossa] @$sSa22constrained_extensionsyXlRszlE12DerivedClassCfE : $@convention(method) (@guaranteed Array<AnyObject>.DerivedClass) -> ()
     var e: Element? = nil
   }
+
+  enum NestedEnum {
+    case hay
+    case grain
+
+    func makeHay() -> NestedEnum {
+      return .hay
+    }
+  }
 }
 
 func referenceNestedTypes() {
