@@ -441,7 +441,7 @@ public:
   }
 
   void checkPattern(const Pattern *Pat, DeclVisibilityKind Reason);
-
+  
   void checkParameterList(const ParameterList *params);
 
   void checkGenericParams(GenericParamList *Params);
@@ -477,7 +477,7 @@ private:
   void visitForEachStmt(ForEachStmt *S);
 
   void visitBraceStmt(BraceStmt *S, bool isTopLevelCode = false);
-
+  
   void visitSwitchStmt(SwitchStmt *S);
 
   void visitCaseStmt(CaseStmt *S);
@@ -485,7 +485,7 @@ private:
   void visitDoCatchStmt(DoCatchStmt *S);
   void visitCatchClauses(ArrayRef<CatchStmt*> clauses);
   void visitCatchStmt(CatchStmt *S);
-
+  
 };
 
 } // end namespace namelookup
