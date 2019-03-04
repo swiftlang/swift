@@ -1,4 +1,7 @@
 // RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
+
+// REQUIRES: objc_interop
+
 import Swift
 import Foundation
 
