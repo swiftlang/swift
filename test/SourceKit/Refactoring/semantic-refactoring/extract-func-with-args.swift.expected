@@ -1,6 +1,6 @@
 source.edit.kind.active:
   1:1-1:1 "fileprivate func new_name(_ a: inout Int) {
-a = a + 1
+  a = a + 1
 }
 
 "

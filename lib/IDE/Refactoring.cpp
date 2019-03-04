@@ -1213,10 +1213,32 @@ bool RefactoringActionExtractFunction::performChange() {
 
     OS << " {\n";
 
+    SourceLoc RangeStart = RangeInfo.ContentRange.getStart();
+    auto ContentIndentation = SM.getLineAndColumn(RangeStart).second;
+
+    // Add spaces to match the original range's indentation.
+    for (size_t i = 1; i < ContentIndentation; ++i) {
+      OS << " ";
+    }
+
     // Add "return" if the extracted entity is an expression.
     if (RangeInfo.Kind == RangeKind::SingleExpression && InsertedReturnType)
       OS << tok::kw_return << " ";
-    OS << RangeInfo.ContentRange.str() << "\n}\n\n";
+    OS << RangeInfo.ContentRange.str() << "\n";
+
+    auto BracketIndentation = SM.getLineAndColumn(InsertLoc).second;
+
+    // Add spaces to position the bracket in the function decl's indentation.
+    for (size_t i = 1; i < BracketIndentation; ++i) {
+      OS << " ";
+    }
+
+    OS << "}\n\n";
+
+    // Add spaces to re-position the range's original parent function.
+    for (size_t i = 1; i < BracketIndentation; ++i) {
+      OS << " ";
+    }
   }
   unsigned FuncEnd = Buffer.size();
 
@@ -1225,7 +1247,7 @@ bool RefactoringActionExtractFunction::performChange() {
   {
     llvm::raw_svector_ostream OS(Buffer);
     if (RangeInfo.exit() == ExitState::Positive)
-      OS << tok::kw_return <<" ";
+      OS << tok::kw_return << " ";
     CallNameOffset = Buffer.size() - ReplaceBegin;
     OS << PreferredName << "(";
     for (auto &RD : Parameters) {
