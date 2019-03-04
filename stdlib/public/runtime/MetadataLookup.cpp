@@ -1084,8 +1084,13 @@ public:
                                                           genericParamCounts);
       bool failed =
         _checkGenericRequirements(genericContext->getGenericRequirements(),
-                                  allGenericArgsVec, substitutions,
-                                  substitutions);
+          allGenericArgsVec,
+          [&substitutions](unsigned depth, unsigned index) {
+            return substitutions.getMetadata(depth, index);
+          },
+          [&substitutions](const Metadata *type, unsigned index) {
+            return substitutions.getWitnessTable(type, index);
+          });
       if (failed)
         return BuiltType();
 
@@ -1357,7 +1362,12 @@ swift_getTypeByMangledNameInEnvironment(
   llvm::StringRef typeName(typeNameStart, typeNameLength);
   SubstGenericParametersFromMetadata substitutions(environment, genericArgs);
   return swift_getTypeByMangledName(MetadataState::Complete, typeName,
-                                    substitutions, substitutions).getMetadata();
+    [&substitutions](unsigned depth, unsigned index) {
+      return substitutions.getMetadata(depth, index);
+    },
+    [&substitutions](const Metadata *type, unsigned index) {
+      return substitutions.getWitnessTable(type, index);
+    }).getMetadata();
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
@@ -1370,7 +1380,12 @@ swift_getTypeByMangledNameInContext(
   llvm::StringRef typeName(typeNameStart, typeNameLength);
   SubstGenericParametersFromMetadata substitutions(context, genericArgs);
   return swift_getTypeByMangledName(MetadataState::Complete, typeName,
-                                    substitutions, substitutions).getMetadata();
+    [&substitutions](unsigned depth, unsigned index) {
+      return substitutions.getMetadata(depth, index);
+    },
+    [&substitutions](const Metadata *type, unsigned index) {
+      return substitutions.getWitnessTable(type, index);
+    }).getMetadata();
 }
 
 /// Demangle a mangled name, but don't allow symbolic references.
@@ -1536,7 +1551,7 @@ void SubstGenericParametersFromMetadata::setup() const {
 }
 
 const Metadata *
-SubstGenericParametersFromMetadata::operator()(
+SubstGenericParametersFromMetadata::getMetadata(
                                         unsigned depth, unsigned index) const {
   // On first access, compute the descriptor path.
   setup();
@@ -1577,17 +1592,16 @@ SubstGenericParametersFromMetadata::operator()(
 }
 
 const WitnessTable *
-SubstGenericParametersFromMetadata::operator()(const Metadata *type,
-                                               unsigned index) const {
+SubstGenericParametersFromMetadata::getWitnessTable(const Metadata *type,
+                                                    unsigned index) const {
   // On first access, compute the descriptor path.
   setup();
 
   return (const WitnessTable *)genericArgs[index + numKeyGenericParameters];
 }
 
-const Metadata *SubstGenericParametersFromWrittenArgs::operator()(
-                                                        unsigned depth,
-                                                        unsigned index) const {
+const Metadata *SubstGenericParametersFromWrittenArgs::getMetadata(
+                                        unsigned depth, unsigned index) const {
   if (auto flatIndex =
           _depthIndexToFlatIndex(depth, index, genericParamCounts)) {
     if (*flatIndex < allGenericArgs.size())
@@ -1598,8 +1612,8 @@ const Metadata *SubstGenericParametersFromWrittenArgs::operator()(
 }
 
 const WitnessTable *
-SubstGenericParametersFromWrittenArgs::operator()(const Metadata *type,
-                                                  unsigned index) const {
+SubstGenericParametersFromWrittenArgs::getWitnessTable(const Metadata *type,
+                                                       unsigned index) const {
   return nullptr;
 }
 
@@ -1708,8 +1722,13 @@ void swift::gatherWrittenGenericArgs(
                                                           genericParamCounts);
       allGenericArgs[*lhsFlatIndex] =
           swift_getTypeByMangledName(MetadataState::Abstract,
-                                     req.getMangledTypeName(), substitutions,
-                                     substitutions).getMetadata();
+            req.getMangledTypeName(),
+            [&substitutions](unsigned depth, unsigned index) {
+              return substitutions.getMetadata(depth, index);
+            },
+            [&substitutions](const Metadata *type, unsigned index) {
+              return substitutions.getWitnessTable(type, index);
+            }).getMetadata();
       continue;
     }
 

@@ -167,7 +167,12 @@ ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
     SubstGenericParametersFromMetadata substitutions(type);
     bool failed =
       _checkGenericRequirements(getConditionalRequirements(), conditionalArgs,
-                                substitutions, substitutions);
+        [&substitutions](unsigned depth, unsigned index) {
+          return substitutions.getMetadata(depth, index);
+        },
+        [&substitutions](const Metadata *type, unsigned index) {
+          return substitutions.getWitnessTable(type, index);
+        });
     if (failed) return nullptr;
   }
 

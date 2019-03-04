@@ -318,8 +318,9 @@ public:
       : sourceIsMetadata(false), environment(environment),
         genericArgs(arguments) { }
 
-    const Metadata *operator()(unsigned depth, unsigned index) const;
-    const WitnessTable *operator()(const Metadata *type, unsigned index) const;
+    const Metadata *getMetadata(unsigned depth, unsigned index) const;
+    const WitnessTable *getWitnessTable(const Metadata *type,
+                                        unsigned index) const;
   };
 
   /// Retrieve the type metadata described by the given demangled type name.
@@ -378,8 +379,9 @@ public:
       : allGenericArgs(allGenericArgs), genericParamCounts(genericParamCounts) {
     }
 
-    const Metadata *operator()(unsigned depth, unsigned index) const;
-    const WitnessTable *operator()(const Metadata *type, unsigned index) const;
+    const Metadata *getMetadata(unsigned depth, unsigned index) const;
+    const WitnessTable *getWitnessTable(const Metadata *type,
+                                        unsigned index) const;
   };
 
   /// Gather generic parameter counts from a context descriptor.

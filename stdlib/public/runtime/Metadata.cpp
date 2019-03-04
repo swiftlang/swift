@@ -2601,7 +2601,12 @@ getSuperclassMetadata(ClassMetadata *self, bool allowDependency) {
                             /*non-blocking*/ allowDependency);
     MetadataResponse response =
       swift_getTypeByMangledName(request, superclassName,
-                                 substitutions, substitutions).getResponse();
+        [&substitutions](unsigned depth, unsigned index) {
+          return substitutions.getMetadata(depth, index);
+        },
+        [&substitutions](const Metadata *type, unsigned index) {
+          return substitutions.getWitnessTable(type, index);
+        }).getResponse();
     auto superclass = response.Value;
     if (!superclass) {
       fatalError(0,
@@ -4292,8 +4297,13 @@ swift_getAssociatedTypeWitnessSlowImpl(
     auto originalConformingType = findConformingSuperclass(conformingType,
                                                            conformance);
     SubstGenericParametersFromMetadata substitutions(originalConformingType);
-    response = swift_getTypeByMangledName(request, mangledName, substitutions,
-                                          substitutions).getResponse();
+    response = swift_getTypeByMangledName(request, mangledName,
+      [&substitutions](unsigned depth, unsigned index) {
+        return substitutions.getMetadata(depth, index);
+      },
+      [&substitutions](const Metadata *type, unsigned index) {
+        return substitutions.getWitnessTable(type, index);
+      }).getResponse();
   }
   auto assocTypeMetadata = response.Value;
 
