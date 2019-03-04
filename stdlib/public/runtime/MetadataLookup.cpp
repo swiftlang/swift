@@ -821,7 +821,7 @@ Optional<unsigned> swift::_depthIndexToFlatIndex(
 /// \returns true if the innermost descriptor is generic.
 bool swift::_gatherGenericParameterCounts(
                                  const ContextDescriptor *descriptor,
-                                 std::vector<unsigned> &genericParamCounts,
+                                 SmallVectorImpl<unsigned> &genericParamCounts,
                                  Demangler &BorrowFrom) {
   // If we have an extension descriptor, extract the extended type and use
   // that.
@@ -1027,7 +1027,7 @@ public:
 
     // Figure out the various levels of generic parameters we have in
     // this type.
-    std::vector<unsigned> genericParamCounts;
+    SmallVector<unsigned, 8> genericParamCounts;
     (void)_gatherGenericParameterCounts(typeDecl, genericParamCounts, demangler);
     unsigned numTotalGenericParams =
         genericParamCounts.empty() ? 0 : genericParamCounts.back();
@@ -1041,13 +1041,13 @@ public:
       return BuiltType();
     }
 
-    std::vector<const void *> allGenericArgsVec;
+    SmallVector<const void *, 8> allGenericArgsVec;
 
     // If there are generic parameters at any level, check the generic
     // requirements and fill in the generic arguments vector.
     if (!genericParamCounts.empty()) {
       // Compute the set of generic arguments "as written".
-      std::vector<const Metadata *> allGenericArgs;
+      SmallVector<const Metadata *, 8> allGenericArgs;
 
       // If we have a parent, gather it's generic arguments "as written".
       if (parent) {
@@ -1159,8 +1159,8 @@ public:
   BuiltType createFunctionType(
                            ArrayRef<Demangle::FunctionParam<BuiltType>> params,
                            BuiltType result, FunctionTypeFlags flags) const {
-    std::vector<BuiltType> paramTypes;
-    std::vector<uint32_t> paramFlags;
+    SmallVector<BuiltType, 8> paramTypes;
+    SmallVector<uint32_t, 8> paramFlags;
 
     // Fill in the parameters.
     paramTypes.reserve(params.size());
@@ -1625,7 +1625,7 @@ demangleToGenericParamRef(StringRef typeName) {
 void swift::gatherWrittenGenericArgs(
                              const Metadata *metadata,
                              const TypeContextDescriptor *description,
-                             std::vector<const Metadata *> &allGenericArgs,
+                             SmallVectorImpl<const Metadata *> &allGenericArgs,
                              Demangler &BorrowFrom) {
   auto generics = description->getGenericContext();
   if (!generics)
@@ -1679,7 +1679,7 @@ void swift::gatherWrittenGenericArgs(
   // canonicalized away. Use same-type requirements to reconstitute them.
 
   // Retrieve the mapping information needed for depth/index -> flat index.
-  std::vector<unsigned> genericParamCounts;
+  SmallVector<unsigned, 8> genericParamCounts;
   (void)_gatherGenericParameterCounts(description, genericParamCounts,
                                       BorrowFrom);
 

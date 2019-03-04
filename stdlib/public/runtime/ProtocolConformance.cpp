@@ -162,7 +162,7 @@ template<>
 const WitnessTable *
 ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
   // If needed, check the conditional requirements.
-  std::vector<const void *> conditionalArgs;
+  SmallVector<const void *, 8> conditionalArgs;
   if (hasConditionalRequirements()) {
     SubstGenericParametersFromMetadata substitutions(type);
     bool failed =
@@ -626,7 +626,7 @@ swift::_searchConformancesByMangledTypeName(Demangle::NodePointer node) {
 
 bool swift::_checkGenericRequirements(
                       llvm::ArrayRef<GenericRequirementDescriptor> requirements,
-                      std::vector<const void *> &extraArguments,
+                      SmallVectorImpl<const void *> &extraArguments,
                       SubstGenericParameterFn substGenericParam,
                       SubstDependentWitnessTableFn substWitnessTable) {
   for (const auto &req : requirements) {
