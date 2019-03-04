@@ -71,7 +71,7 @@ public protocol __Differentiable {
   /// The type of all differentiable variables in this type.
   associatedtype AllDifferentiableVariables : Differentiable
 
-  /// All differentiable variables in this type.
+  /// All differentiable variables of this value.
   var allDifferentiableVariables: AllDifferentiableVariables { get set }
 
   /// Returns `self` moved along the value space towards the given tangent

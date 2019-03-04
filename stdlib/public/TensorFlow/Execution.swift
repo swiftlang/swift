@@ -40,6 +40,16 @@ public func enableCPU() {
   #tfop("tfc.configureCPU") as Void
 }
 
+/// A TensorFlow device kind.
+public enum DeviceKind {
+  /// The CPU device kind.
+  case cpu
+  /// The GPU device kind.
+  case gpu
+  /// The TPU device kind.
+  case tpu
+}
+
 /// Executes a closure, making TensorFlow operations run on a specific kind of
 /// device.
 ///
@@ -48,7 +58,7 @@ public func enableCPU() {
 ///   - index: The device to run the ops on.
 ///   - body: A closure whose TensorFlow operations are to be executed on the
 ///     specified kind of device.
-// Use inline never to ensure correctness in scoped device placement. See
+// Use `@inline(never)` to ensure correctness in scoped device placement. See
 // https://bugs.swift.org/browse/SR-9535 for more context.
 @inline(never)
 public func withDevice<R>(_ kind: DeviceKind, _ index: UInt = 0,
