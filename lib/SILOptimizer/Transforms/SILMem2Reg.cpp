@@ -188,7 +188,8 @@ static bool isAddressForLoad(SILInstruction *I, SILBasicBlock *&singleBlock) {
   if (isa<LoadInst>(I))
     return true;
 
-  if (!isa<StructElementAddrInst>(I) && !isa<TupleElementAddrInst>(I))
+  if (!isa<UncheckedAddrCastInst>(I) && !isa<StructElementAddrInst>(I) &&
+      !isa<TupleElementAddrInst>(I))
     return false;
   
   // Recursively search for other (non-)loads in the instruction's uses.
@@ -205,7 +206,8 @@ static bool isAddressForLoad(SILInstruction *I, SILBasicBlock *&singleBlock) {
 
 /// Returns true if \p I is a dead struct_element_addr or tuple_element_addr.
 static bool isDeadAddrProjection(SILInstruction *I) {
-  if (!isa<StructElementAddrInst>(I) && !isa<TupleElementAddrInst>(I))
+  if (!isa<UncheckedAddrCastInst>(I) && !isa<StructElementAddrInst>(I) &&
+      !isa<TupleElementAddrInst>(I))
     return false;
 
   // Recursively search for uses which are dead themselves.
@@ -311,7 +313,8 @@ static bool isLoadFromStack(SILInstruction *I, AllocStackInst *ASI) {
   // Skip struct and tuple address projections.
   ValueBase *op = I->getOperand(0);
   while (op != ASI) {
-    if (!isa<StructElementAddrInst>(op) && !isa<TupleElementAddrInst>(op))
+    if (!isa<UncheckedAddrCastInst>(op) && !isa<StructElementAddrInst>(op) &&
+        !isa<TupleElementAddrInst>(op))
       return false;
     
     op = cast<SingleValueInstruction>(op)->getOperand(0);
@@ -325,7 +328,8 @@ static void collectLoads(SILInstruction *I, SmallVectorImpl<LoadInst *> &Loads) 
     Loads.push_back(load);
     return;
   }
-  if (!isa<StructElementAddrInst>(I) && !isa<TupleElementAddrInst>(I))
+  if (!isa<UncheckedAddrCastInst>(I) && !isa<StructElementAddrInst>(I) &&
+      !isa<TupleElementAddrInst>(I))
     return;
   
   // Recursively search for other loads in the instruction's uses.
@@ -339,7 +343,8 @@ static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
   ProjectionPath projections(val->getType());
   SILValue op = LI->getOperand();
   while (op != ASI) {
-    assert(isa<StructElementAddrInst>(op) || isa<TupleElementAddrInst>(op));
+    assert(isa<UncheckedAddrCastInst>(op) || isa<StructElementAddrInst>(op) ||
+           isa<TupleElementAddrInst>(op));
     auto *Inst = cast<SingleValueInstruction>(op);
     projections.push_back(Projection(Inst));
     op = Inst->getOperand(0);
@@ -353,7 +358,8 @@ static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
   LI->replaceAllUsesWith(val);
   LI->eraseFromParent();
   while (op != ASI && op->use_empty()) {
-    assert(isa<StructElementAddrInst>(op) || isa<TupleElementAddrInst>(op));
+    assert(isa<UncheckedAddrCastInst>(op) || isa<StructElementAddrInst>(op) ||
+           isa<TupleElementAddrInst>(op));
     auto *Inst = cast<SingleValueInstruction>(op);
     SILValue next = Inst->getOperand(0);
     Inst->eraseFromParent();
@@ -541,7 +547,8 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
     // Remove dead address instructions that may be uses of the allocation.
     SILNode *Node = Inst;
     while (isa<StructElementAddrInst>(Node) ||
-           isa<TupleElementAddrInst>(Node)) {
+           isa<TupleElementAddrInst>(Node) ||
+           isa<UncheckedAddrCastInst>(Node)) {
       auto *I = cast<SingleValueInstruction>(Node);
       if (!I->use_empty()) break;
       Node = I->getOperand(0);
