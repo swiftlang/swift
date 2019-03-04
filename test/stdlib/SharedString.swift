@@ -66,9 +66,7 @@ SharedStringTests.test("String.init(sharedUTF8:deallocator:)") {
   ptr.initialize(repeating: UInt8(ascii: "a"), count: 4)
   let buf = UnsafeBufferPointer<UInt8>(start: ptr, count: 4)
 
-  let str = String(sharingUTF8: buf, deallocator: .custom({ ptr, _ in
-    ptr.deallocate()
-  }))
+  let str = String(sharingUTF8: buf)
   expectNotNil(str)
   expectEqual(str!, "aaaa")
 
@@ -87,7 +85,7 @@ SharedStringTests.test("String.withSharedUTF8 invalid UTF8") {
   ptr.pointee = 0x80  // orphaned continuation byte
   let buf = UnsafeBufferPointer<UInt8>(start: ptr, count: 1)
 
-  expectNil(String(sharingUTF8: buf, deallocator: .none))
+  expectNil(String(sharingUTF8: buf))
 }
 
 SharedStringTests.test("String.init(sharingNullTerminatedUTF8:deallocator:)") {
@@ -95,9 +93,7 @@ SharedStringTests.test("String.init(sharingNullTerminatedUTF8:deallocator:)") {
   ptr.initialize(repeating: UInt8(ascii: "a"), count: 4)
   ptr[4] = 0
 
-  let str = String(sharingNullTerminatedUTF8: ptr, deallocator: .custom({ ptr, _ in
-    ptr.deallocate()
-  }))
+  let str = String(sharingNullTerminatedUTF8: ptr)
   expectNotNil(str)
   expectEqual(str!, "aaaa")
 
@@ -116,7 +112,7 @@ SharedStringTests.test("String.init(sharingNullTerminatedUTF8:deallocator:) inva
   ptr[0] = 0x80  // orphaned continuation byte
   ptr[1] = 0
 
-  expectNil(String(sharingNullTerminatedUTF8: ptr, deallocator: .none))
+  expectNil(String(sharingNullTerminatedUTF8: ptr))
 }
 
 runAllTests()
