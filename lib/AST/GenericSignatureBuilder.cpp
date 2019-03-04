@@ -2940,11 +2940,7 @@ Type GenericSignatureBuilder::PotentialArchetype::getDependentType(
     if (parentType->hasError())
       return parentType;
 
-    // If we've resolved to an associated type, use it.
-    if (auto assocType = getResolvedType())
-      return getResolvedDependentMemberType(parentType);
-
-    return DependentMemberType::get(parentType, getNestedName());
+    return getResolvedDependentMemberType(parentType);
   }
   
   assert(isGenericParam() && "Not a generic parameter?");

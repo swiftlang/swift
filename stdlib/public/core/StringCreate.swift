@@ -197,7 +197,25 @@ extension String {
       return substring._wholeString
     }
 
-    return substring._withUTF8 { return String._uncheckedFromUTF8($0) }
+    return String._copying(substring)
+  }
+
+  @_alwaysEmitIntoClient
+  @inline(never) // slow-path
+  internal static func _copying(_ str: String) -> String {
+    return String._copying(str[...])
+  }
+  @_alwaysEmitIntoClient
+  @inline(never) // slow-path
+  internal static func _copying(_ str: Substring) -> String {
+    if _fastPath(str._wholeGuts.isFastUTF8) {
+      return str._wholeGuts.withFastUTF8(range: str._offsetRange) {
+        String._uncheckedFromUTF8($0)
+      }
+    }
+    return Array(str.utf8).withUnsafeBufferPointer {
+      String._uncheckedFromUTF8($0)
+    }
   }
 }
 
