@@ -211,8 +211,17 @@ public extension _ShapedArrayProtocol {
   /// Returns the single scalar element if the array has rank 0 and `nil`
   /// otherwise.
   var scalar: Scalar? {
-    guard rank == 0 else { return nil }
-    return scalars.first
+    get {
+      guard rank == 0 else { return nil }
+      return scalars.first
+    }
+    set {
+      precondition(isScalar, "Array does not have shape [].")
+      guard let newValue = newValue else {
+        preconditionFailure("New scalar value cannot be nil.")
+      }
+      scalars[0] = newValue
+    }
   }
 }
 
