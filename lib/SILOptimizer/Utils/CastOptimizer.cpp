@@ -654,7 +654,7 @@ CastOptimizer::optimizeBridgedCasts(SILDynamicCastInst dynamicCast) {
 
   if ((CanBridgedSourceTy && CanBridgedSourceTy->getAnyNominal() ==
                                  M.getASTContext().getNSErrorDecl()) ||
-      (CanBridgedTargetTy && CanBridgedSourceTy->getAnyNominal() ==
+      (CanBridgedTargetTy && CanBridgedTargetTy->getAnyNominal() ==
                                  M.getASTContext().getNSErrorDecl())) {
     // FIXME: Can't optimize bridging with NSError.
     return nullptr;
