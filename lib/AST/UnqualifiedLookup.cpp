@@ -1082,8 +1082,9 @@ void UnqualifiedLookupFactory::setAsideUnavailableResults(
 void UnqualifiedLookupFactory::recordDependencyOnTopLevelNameIfNeeded() {
   for (const auto &result : Results) {
     auto *const resultContext = result.getValueDecl()->getDeclContext();
-    if (isa<SourceFile>(resultContext))
-      recordDependencyOnTopLevelName(resultContext, Name, computeIsCascadingUse());
+    if (resultContext->isModuleScopeContext())
+      recordDependencyOnTopLevelName(DC->getParentSourceFile(), Name,
+                                     computeIsCascadingUse());
   }
 }
 
