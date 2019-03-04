@@ -403,7 +403,7 @@ public:
     return resolveIsCascadingUse(x.whereToLook, x.isCascadingUse,
                                  onlyCareAboutFunctionBody);
   }
-  
+
   bool computeIsCascadingUse() const;
 
   void findResultsAndSaveUnavailables(
@@ -471,15 +471,17 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
     const bool isCascadingUse = computeIsCascadingUse();
     lookupNamesIntroducedBy(contextAndIsCascadingUse);
     assert(!recordedSF || isCascadingUse == recordedIsCascadingUse);
-    
-//    if (useASTScopesForExperimentalLookupIfEnabled()) {
-//      SmallVector<LookupResultEntry, 4> results;
-//      size_t indexOfFirstOuterResult = 0;
-//      UnqualifiedLookupFactory scopeLookup(Name, DC, TypeResolver, Loc, options,
-//                                           results, indexOfFirstOuterResult);
-//      scopeLookup.experimentallyLookInASTScopes(contextAndIsCascadingUse);
-//      assert(verifyEqualTo(std::move(scopeLookup)));
-//    }
+
+    //    if (useASTScopesForExperimentalLookupIfEnabled()) {
+    //      SmallVector<LookupResultEntry, 4> results;
+    //      size_t indexOfFirstOuterResult = 0;
+    //      UnqualifiedLookupFactory scopeLookup(Name, DC, TypeResolver, Loc,
+    //      options,
+    //                                           results,
+    //                                           indexOfFirstOuterResult);
+    //      scopeLookup.experimentallyLookInASTScopes(contextAndIsCascadingUse);
+    //      assert(verifyEqualTo(std::move(scopeLookup)));
+    //    }
   }
 }
 
@@ -1219,13 +1221,15 @@ bool UnqualifiedLookupFactory::computeIsCascadingUse() const {
     return true;
   if (auto I = dyn_cast<DefaultArgumentInitializer>(dc))
     return false;
-  
+
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(dc)) {
-    if (!Loc.isInvalid() && AFD->getBody() && SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc))
+    if (!Loc.isInvalid() && AFD->getBody() &&
+        SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc))
       return false;
-  }
-  else if (auto *PBI = dyn_cast<PatternBindingInitializer>(dc)) {
-    if (PBI->getBinding()->getDeclContext()->isTypeContext()) //lookupNamesIntroducedByInitializerOfStoredPropertyOfAType
+  } else if (auto *PBI = dyn_cast<PatternBindingInitializer>(dc)) {
+    if (PBI->getBinding()
+            ->getDeclContext()
+            ->isTypeContext()) // InitializerOfStoredPropertyOfAType
       dc = PBI->getParent();
   }
   // clang-format off
@@ -1238,7 +1242,7 @@ bool UnqualifiedLookupFactory::computeIsCascadingUse() const {
            isa<TypeAliasDecl>(dc) ||
            isa<SubscriptDecl>(dc));
   // clang-format on
-  return dc->isCascadingContextForLookup(/*onlyCareAboutFunctionBody*/false);
+  return dc->isCascadingContextForLookup(/*onlyCareAboutFunctionBody*/ false);
 }
 
 void UnqualifiedLookupFactory::ResultFinderForTypeContext::dump() const {
