@@ -163,6 +163,9 @@ private:
     // Classify this declaration.
     // Types are formally members of the metatype.
     DeclContext *whereValueIsMember(const ValueDecl *const member) const {
+     //HERE12  return isa<TypeDecl>(member) && !isa<ExtensionDecl>(staticContext) ? staticContext : dynamicContext;
+      //HERE12
+      assert(!isa<ExtensionDecl>(staticContext) || staticContext == dynamicContext || !isa<TypeDecl>(member));
       return isa<TypeDecl>(member) ? staticContext : dynamicContext;
     }
 
@@ -247,23 +250,45 @@ public:
   std::pair<const ASTScope *, Optional<bool>> nonoperatorScopeForASTScopeLookup(
       ContextAndUnresolvedIsCascadingUse) const;
 
-  struct ASTScopeLookupState {
+  class ASTScopeLookupState {
+  public:
+    /// The scope we are looking in:
     const ASTScope *scope;
+    /// If the lookup depends on implicit self, selfDC is its context.
+    /// (Names in extensions never depend on self.)
     DeclContext *selfDC;
-    DeclContext *dc;
+    /// The original context for the lookup.
+    DeclContext *startingDC;
     Optional<bool> isCascadingUse;
     
     ASTScopeLookupState withParentScope() const {
-      return ASTScopeLookupState{scope->getParent(), selfDC, dc, isCascadingUse};
+      auto *const parent = scope->getParent();
+      return ASTScopeLookupState{
+        parent,
+        selfDCIfValidForScope(parent, selfDC),
+        startingDC, isCascadingUse};
     }
     ASTScopeLookupState withSelfDC(DeclContext *selfDC) const {
-      return ASTScopeLookupState{scope, selfDC, dc, isCascadingUse};
+      return ASTScopeLookupState{scope,
+        selfDCIfValidForScope(scope, selfDC),
+        startingDC, isCascadingUse};
     }
     ASTScopeLookupState withoutSelfDC() const {
-      return ASTScopeLookupState{scope, nullptr, dc, isCascadingUse};
+      return ASTScopeLookupState{scope, nullptr, startingDC, isCascadingUse};
     }
     ASTScopeLookupState withResolvedIsCascadingUse(bool isCascadingUse) const {
-      return ASTScopeLookupState{scope, selfDC, dc, isCascadingUse};
+      return ASTScopeLookupState{scope, selfDC, startingDC, isCascadingUse};
+    }
+  private:
+    static DeclContext *selfDCIfValidForScope(const ASTScope *scope, DeclContext *selfDC) {
+      return selfDC; // HERE disable this fix
+      //HERE12
+      return scope && !isExtension(*scope) ? selfDC : nullptr;
+    }
+    // TODO: Should this be a method on ASTScope?
+    static bool isExtension(const ASTScope &scope) {
+      return scope.getKind() == ASTScopeKind::TypeOrExtensionBody &&
+        isa<ExtensionDecl>(scope.getDeclContext());
     }
   };
 
@@ -577,8 +602,11 @@ void UnqualifiedLookupFactory::lookInScopeForASTScopeLookup(
 
   // Perform local lookup within this scope.
   auto localBindings = state.scope->getLocalBindings();
+  auto xxx = Results.empty();
   for (auto local : localBindings)
     Consumer.foundDecl(local, getLocalDeclVisibilityKind(state.scope));
+  if (xxx && !Results.empty())
+    llvm::errs() << "HERE1 " << Results.size() << "\n";
 
   ifNotDoneYet([&] {
     // When we are in the body of a method, get the 'self' declaration.
@@ -646,8 +674,11 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
     // Perform lookup into the type
     auto resultFinder = ResultFinderForTypeContext(
       stateArg.selfDC ? stateArg.selfDC : scopeDC, scopeDC);
+    auto xxx = Results.empty();
     findResultsAndSaveUnavailables(std::move(resultFinder), isCascadingUseResult,
                                    baseNLOptions, scopeDC);
+    if (xxx && !Results.empty())
+      llvm::errs() << "HERE2 " << Results.size() << "\n";
   },
   [&] {
     // Forget the 'self' declaration.
