@@ -1843,9 +1843,21 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
   assert((QuoteChar == '"' || QuoteChar == '\'') && "Unexpected start");
 
   bool IsMultilineString = advanceIfMultilineDelimiter(CurPtr, Diags);
-  if (IsMultilineString && *CurPtr != '\n' && *CurPtr != '\r')
-    diagnose(CurPtr, diag::lex_illegal_multiline_string_start)
+  // Test for single-line Strings that may resemble multiline delimiter
+  if (IsMultilineString && *CurPtr != '\n' && *CurPtr != '\r') {
+    const char *TmpPtr = CurPtr + 1;
+    TmpPtr = skipToEndOfInterpolatedExpression(TmpPtr, BufferEnd, false);
+    TmpPtr = TmpPtr - CustomDelimiterLen;
+    if (CustomDelimiterLen != 0
+      && delimiterMatches(CustomDelimiterLen, TmpPtr, Diags)) {
+      // Undo effects from falsely detecting multiline delimiter
+      CurPtr = CurPtr - 2;
+      IsMultilineString = false;
+    } else {
+      diagnose(CurPtr, diag::lex_illegal_multiline_string_start)
         .fixItInsert(Lexer::getSourceLoc(CurPtr), "\n");
+    }
+  }
 
   bool wasErroneous = false;
   while (true) {

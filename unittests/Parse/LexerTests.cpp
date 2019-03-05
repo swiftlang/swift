@@ -124,6 +124,32 @@ TEST_F(LexerTest, StringLiteralWithNUL1) {
   EXPECT_EQ(Toks[1].getLength(), 0U);
 }
 
+TEST_F(LexerTest, StringLiteralFalseMultilineDelimiter) {
+    const char *Source =
+    "#\"\"\"meow\"#\n"
+    "#\"\"\"#"
+    ;
+    std::vector<tok> ExpectedTokens{
+        tok::string_literal, tok::string_literal
+    };
+    std::vector<Token> Toks = checkLex(Source, ExpectedTokens);
+    EXPECT_EQ(Toks[0].getLength(), 10U);
+    EXPECT_EQ(Toks[1].getLength(), 5U);
+}
+
+TEST_F(LexerTest, StringLiteralInvalidMultilineDelimiter) {
+    const char *Source =
+    "#\"\"\"meow#\n"
+    "#\"\"\"meow"
+    ;
+    std::vector<tok> ExpectedTokens{
+        tok::unknown, tok::unknown
+    };
+    std::vector<Token> Toks = checkLex(Source, ExpectedTokens);
+    EXPECT_EQ(Toks[0].getLength(), 9U);
+    EXPECT_EQ(Toks[1].getLength(), 8U);
+}
+
 TEST_F(LexerTest, ContentStartHashbangSkip) {
   const char *Source = "#!/usr/bin/swift\naaa";
   
