@@ -626,6 +626,7 @@ void UnqualifiedLookupFactory::lookInASTScope(
           state.withParentScope().withSelfDC(state.scope->getAbstractFunctionDecl()));
     // If there is a declaration context associated with this scope, we might
     // want to look in it.
+#error need to go into lookInASTScopeContext with scopeDC the extensionDecl even though this is the ExtensionGenericParams so that finder can find the name
     else if (auto *const scopeDC = state.scope->getDeclContext())
       lookInASTScopeContext(state, scopeDC);
     else
