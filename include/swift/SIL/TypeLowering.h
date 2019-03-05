@@ -216,26 +216,29 @@ public:
   };
 
 private:
+  friend class TypeConverter;
+
   /// The SIL type of values with this Swift type.
   SILType LoweredType;
 
   RecursiveProperties Properties;
   unsigned ReferenceCounted : 1;
 
-public:
   /// The resilience expansion for this type lowering.
   /// If the type is not resilient at all, this is always Minimal.
-  ResilienceExpansion forExpansion = ResilienceExpansion::Minimal;
+  unsigned ForExpansion : 1;
 
   /// A single linked list of lowerings for different resilience expansions.
   /// The first lowering is always for ResilientExpansion::Minimal.
-  mutable const TypeLowering *nextExpansion = nullptr;
+  mutable const TypeLowering *NextExpansion = nullptr;
 
 protected:
   TypeLowering(SILType type, RecursiveProperties properties,
-               IsReferenceCounted_t isRefCounted)
+               IsReferenceCounted_t isRefCounted,
+               ResilienceExpansion forExpansion)
     : LoweredType(type), Properties(properties),
-      ReferenceCounted(isRefCounted) {}
+      ReferenceCounted(isRefCounted),
+      ForExpansion(unsigned(forExpansion)) {}
 
 public:
   TypeLowering(const TypeLowering &) = delete;
@@ -304,6 +307,10 @@ public:
 
   bool isResilient() const {
     return Properties.isResilient();
+  }
+
+  ResilienceExpansion getResilienceExpansion() const {
+    return ResilienceExpansion(ForExpansion);
   }
 
   /// Produce an exact copy of the value in the given address as a

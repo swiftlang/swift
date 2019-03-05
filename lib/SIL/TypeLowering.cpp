@@ -519,8 +519,9 @@ namespace {
   class LoadableTypeLowering : public TypeLowering {
   protected:
     LoadableTypeLowering(SILType type, RecursiveProperties properties,
-                         IsReferenceCounted_t isRefCounted)
-      : TypeLowering(type, properties, isRefCounted) {}
+                         IsReferenceCounted_t isRefCounted,
+                         ResilienceExpansion forExpansion)
+      : TypeLowering(type, properties, isRefCounted, forExpansion) {}
 
   public:
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,
@@ -545,9 +546,9 @@ namespace {
   /// A class for trivial, fixed-layout, loadable types.
   class TrivialTypeLowering final : public LoadableTypeLowering {
   public:
-    TrivialTypeLowering(SILType type)
+    TrivialTypeLowering(SILType type, ResilienceExpansion forExpansion)
       : LoadableTypeLowering(type, {IsTrivial, IsFixedABI, IsNotAddressOnly},
-                             IsNotReferenceCounted) {}
+                             IsNotReferenceCounted, forExpansion) {}
 
     SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc, SILValue addr,
                             IsTake_t isTake) const override {
@@ -609,16 +610,18 @@ namespace {
   class NonTrivialLoadableTypeLowering : public LoadableTypeLowering {
   public:
     NonTrivialLoadableTypeLowering(SILType type,
-                                   IsReferenceCounted_t isRefCounted)
+                                   IsReferenceCounted_t isRefCounted,
+                                   ResilienceExpansion forExpansion)
       : NonTrivialLoadableTypeLowering(type,
                                    {IsNotTrivial, IsFixedABI, IsNotAddressOnly},
-                                       isRefCounted) {}
+                                       isRefCounted, forExpansion) {}
 
     /// This constructor is necessary because of opaque-values.
     NonTrivialLoadableTypeLowering(SILType type,
                                    RecursiveProperties properties,
-                                   IsReferenceCounted_t isRefCounted)
-      : LoadableTypeLowering(type, properties, isRefCounted) {
+                                   IsReferenceCounted_t isRefCounted,
+                                   ResilienceExpansion forExpansion)
+      : LoadableTypeLowering(type, properties, isRefCounted, forExpansion) {
       assert(!properties.isTrivial());
     }
 
@@ -709,9 +712,9 @@ namespace {
       const = 0;
     
   public:
-    LoadableAggTypeLowering(CanType type)
+    LoadableAggTypeLowering(CanType type, ResilienceExpansion forExpansion)
       : NonTrivialLoadableTypeLowering(SILType::getPrimitiveObjectType(type),
-                                       IsNotReferenceCounted) {
+                                       IsNotReferenceCounted, forExpansion) {
     }
 
     virtual SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
@@ -826,8 +829,8 @@ namespace {
   class LoadableTupleTypeLowering final
       : public LoadableAggTypeLowering<LoadableTupleTypeLowering, unsigned> {
   public:
-    LoadableTupleTypeLowering(CanType type)
-      : LoadableAggTypeLowering(type) {}
+    LoadableTupleTypeLowering(CanType type, ResilienceExpansion forExpansion)
+      : LoadableAggTypeLowering(type, forExpansion) {}
 
     SILValue emitRValueProject(SILBuilder &B, SILLocation loc,
                                SILValue tupleValue, unsigned index,
@@ -862,8 +865,8 @@ namespace {
   class LoadableStructTypeLowering final
       : public LoadableAggTypeLowering<LoadableStructTypeLowering, VarDecl*> {
   public:
-    LoadableStructTypeLowering(CanType type)
-      : LoadableAggTypeLowering(type) {}
+    LoadableStructTypeLowering(CanType type, ResilienceExpansion forExpansion)
+      : LoadableAggTypeLowering(type, forExpansion) {}
 
     SILValue emitRValueProject(SILBuilder &B, SILLocation loc,
                                SILValue structValue, VarDecl *field,
@@ -895,9 +898,10 @@ namespace {
   /// A lowering for loadable but non-trivial enum types.
   class LoadableEnumTypeLowering final : public NonTrivialLoadableTypeLowering {
   public:
-    LoadableEnumTypeLowering(CanType type)
+    LoadableEnumTypeLowering(CanType type, ResilienceExpansion forExpansion)
       : NonTrivialLoadableTypeLowering(SILType::getPrimitiveObjectType(type),
-                                       IsNotReferenceCounted) {}
+                                       IsNotReferenceCounted,
+                                       forExpansion) {}
 
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
@@ -935,8 +939,10 @@ namespace {
   class LeafLoadableTypeLowering : public NonTrivialLoadableTypeLowering {
   public:
     LeafLoadableTypeLowering(SILType type, RecursiveProperties properties,
-                             IsReferenceCounted_t isRefCounted)
-      : NonTrivialLoadableTypeLowering(type, properties, isRefCounted) {}
+                             IsReferenceCounted_t isRefCounted,
+                             ResilienceExpansion forExpansion)
+      : NonTrivialLoadableTypeLowering(type, properties, isRefCounted,
+                                       forExpansion) {}
 
     SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
                                   SILValue value,
@@ -954,9 +960,9 @@ namespace {
   /// loadable.
   class ReferenceTypeLowering : public LeafLoadableTypeLowering {
   public:
-    ReferenceTypeLowering(SILType type)
+    ReferenceTypeLowering(SILType type, ResilienceExpansion forExpansion)
       : LeafLoadableTypeLowering(type, RecursiveProperties::forReference(),
-                                 IsReferenceCounted) {}
+                                 IsReferenceCounted, forExpansion) {}
 
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
@@ -985,9 +991,11 @@ namespace {
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   class Loadable##Name##TypeLowering final : public LeafLoadableTypeLowering { \
   public: \
-    Loadable##Name##TypeLowering(SILType type) \
+    Loadable##Name##TypeLowering(SILType type, \
+                                 ResilienceExpansion forExpansion) \
       : LeafLoadableTypeLowering(type, RecursiveProperties::forReference(), \
-                                 IsReferenceCounted) {} \
+                                 IsReferenceCounted, \
+                                 forExpansion) {} \
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc, \
                            SILValue value) const override { \
       if (B.getFunction().hasOwnership()) \
@@ -1009,8 +1017,10 @@ namespace {
   /// A class for non-trivial, address-only types.
   class AddressOnlyTypeLowering : public TypeLowering {
   public:
-    AddressOnlyTypeLowering(SILType type, RecursiveProperties properties)
-      : TypeLowering(type, properties, IsNotReferenceCounted)
+    AddressOnlyTypeLowering(SILType type, RecursiveProperties properties,
+                            ResilienceExpansion forExpansion)
+      : TypeLowering(type, properties, IsNotReferenceCounted,
+                     forExpansion)
     {}
 
     void emitCopyInto(SILBuilder &B, SILLocation loc,
@@ -1078,9 +1088,11 @@ namespace {
   /// to catch obviously broken attempts to copy or destroy the buffer.
   class UnsafeValueBufferTypeLowering : public AddressOnlyTypeLowering {
   public:
-    UnsafeValueBufferTypeLowering(SILType type)
+    UnsafeValueBufferTypeLowering(SILType type,
+                                  ResilienceExpansion forExpansion)
       : AddressOnlyTypeLowering(type,
-                                {IsNotTrivial, IsFixedABI, IsAddressOnly}) {}
+                                {IsNotTrivial, IsFixedABI, IsAddressOnly},
+                                forExpansion) {}
 
     void emitCopyInto(SILBuilder &B, SILLocation loc,
                       SILValue src, SILValue dest, IsTake_t isTake,
@@ -1106,8 +1118,10 @@ namespace {
   /// FIXME: When you remove an unreachable, just delete the method.
   class OpaqueValueTypeLowering : public LeafLoadableTypeLowering {
   public:
-    OpaqueValueTypeLowering(SILType type, RecursiveProperties properties)
-      : LeafLoadableTypeLowering(type, properties, IsNotReferenceCounted) {}
+    OpaqueValueTypeLowering(SILType type, RecursiveProperties properties,
+                            ResilienceExpansion forExpansion)
+      : LeafLoadableTypeLowering(type, properties, IsNotReferenceCounted,
+                                 forExpansion) {}
 
     void emitCopyInto(SILBuilder &B, SILLocation loc,
                       SILValue src, SILValue dest, IsTake_t isTake,
@@ -1152,45 +1166,49 @@ namespace {
       : TypeClassifierBase(TC.M, Sig, Expansion),
         TC(TC), Dependent(Dependent) {}
 
-    TypeLowering *
-    handleTrivial(CanType type) {
+    TypeLowering *handleTrivial(CanType type) {
       auto silType = SILType::getPrimitiveObjectType(type);
-      return new (TC, Dependent) TrivialTypeLowering(silType);
+      return new (TC, Dependent) TrivialTypeLowering(silType, Expansion);
     }
 
     TypeLowering *handleReference(CanType type) {
       auto silType = SILType::getPrimitiveObjectType(type);
-      return new (TC, Dependent) ReferenceTypeLowering(silType);
+      return new (TC, Dependent) ReferenceTypeLowering(silType, Expansion);
     }
 
     TypeLowering *handleAddressOnly(CanType type,
                                     RecursiveProperties properties) {
       if (SILModuleConventions(M).useLoweredAddresses()) {
         auto silType = SILType::getPrimitiveAddressType(type);
-        return new (TC, Dependent) AddressOnlyTypeLowering(silType, properties);
+        return new (TC, Dependent) AddressOnlyTypeLowering(silType, properties,
+                                                           Expansion);
       }
       auto silType = SILType::getPrimitiveObjectType(type);
-      return new (TC, Dependent) OpaqueValueTypeLowering(silType, properties);
+      return new (TC, Dependent) OpaqueValueTypeLowering(silType, properties,
+                                                         Expansion);
     }
 
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
     TypeLowering * \
     visit##Name##StorageType(Can##Name##StorageType type) { \
       return new (TC, Dependent) Loadable##Name##TypeLowering( \
-                                  SILType::getPrimitiveObjectType(type)); \
+                                  SILType::getPrimitiveObjectType(type), \
+                                  Expansion); \
     }
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
     TypeLowering * \
     visitLoadable##Name##StorageType(Can##Name##StorageType type) { \
       return new (TC, Dependent) Loadable##Name##TypeLowering( \
-                                  SILType::getPrimitiveObjectType(type)); \
+                                  SILType::getPrimitiveObjectType(type), \
+                                  Expansion); \
     }
 #include "swift/AST/ReferenceStorage.def"
 
     TypeLowering *
     visitBuiltinUnsafeValueBufferType(CanBuiltinUnsafeValueBufferType type) {
       auto silType = SILType::getPrimitiveAddressType(type);
-      return new (TC, Dependent) UnsafeValueBufferTypeLowering(silType);
+      return new (TC, Dependent) UnsafeValueBufferTypeLowering(silType,
+                                                               Expansion);
     }
 
     TypeLowering *visitTupleType(CanTupleType tupleType) {
@@ -1237,7 +1255,7 @@ namespace {
       // is still address only, because we don't know how many bits
       // are used for the discriminator.
       if (D->isIndirect()) {
-        return new (TC, Dependent) LoadableEnumTypeLowering(enumType);
+        return new (TC, Dependent) LoadableEnumTypeLowering(enumType, Expansion);
       }
 
       // Accumulate the properties of all direct payloads.
@@ -1275,7 +1293,7 @@ namespace {
       if (props.isTrivial()) {
         return handleTrivial(type);
       }
-      return new (TC, Dependent) LoadableLoweringClass(type);
+      return new (TC, Dependent) LoadableLoweringClass(type, Expansion);
     }
   };
 } // end anonymous namespace
@@ -1615,11 +1633,11 @@ getTypeLoweringForExpansion(TypeKey key,
 
   // Search for a matching lowering in the linked list of lowerings.
   while (true) {
-    if (lowering->forExpansion == forExpansion)
+    if (lowering->getResilienceExpansion() == forExpansion)
       return *lowering;
-    if (lowering->nextExpansion) {
+    if (lowering->NextExpansion) {
       // Continue searching.
-      lowering = lowering->nextExpansion;
+      lowering = lowering->NextExpansion;
       continue;
     }
 
@@ -1629,8 +1647,7 @@ getTypeLoweringForExpansion(TypeKey key,
                               forExpansion,
                               key.isDependent()).visit(key.SubstType);
 
-    lowering->nextExpansion = theInfo;
-    theInfo->forExpansion = forExpansion;
+    lowering->NextExpansion = theInfo;
     return *theInfo;
   }
 }
@@ -1652,8 +1669,6 @@ getTypeLoweringForUncachedLoweredType(TypeKey key,
                             CanGenericSignature(),
                             forExpansion,
                             key.isDependent()).visit(key.SubstType);
-
-  theInfo->forExpansion = forExpansion;
 
   if (key.OrigType.isForeign()) {
     assert(theInfo->isLoadable() && "Cannot lower address-only type with "
