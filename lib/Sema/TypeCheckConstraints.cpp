@@ -3908,8 +3908,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
   auto toConstrainedArchetype = false;
   if (toArchetypeType) {
-    auto archetype = toType->getAs<ArchetypeType>();
-    toConstrainedArchetype = !archetype->getConformsTo().empty();
+    auto archetype = toType->castTo<ArchetypeType>();
+    toConstrainedArchetype = archetype && !archetype->getConformsTo().empty();
   }
 
   if (fromFunctionType &&
