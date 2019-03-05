@@ -69,6 +69,7 @@ public extension Tensor where Scalar : Numeric {
 //===----------------------------------------------------------------------===//
 
 extension Tensor : AdditiveArithmetic where Scalar : Numeric {
+  /// A scalar zero tensor.
   @inlinable
   public static var zero: Tensor {
     @inline(__always)

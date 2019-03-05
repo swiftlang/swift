@@ -14,8 +14,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A 2-tuple-like struct that conforms to TensorGroup so that you can use
-/// 2-tuples in APIs that require TensorGroups.
+/// A pair of two `TensorGroup` elements.
+///
+/// `TensorPair` is designed for use with `TensorGroup` APIs to represent
+/// tuples of tensors.
 public struct TensorPair<T : TensorGroup, U : TensorGroup> {
   public var first: T
   public var second: U

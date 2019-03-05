@@ -42,8 +42,8 @@ func _tensorSeeds(_ seed: Tensor<Int64>) -> (Tensor<Int64>, Tensor<Int64>) {
 
 /// Represents a potentially large set of elements.
 ///
-/// A `Dataset` can be used to represent an input pipeline as a
-/// collection of element tensors.
+/// A `Dataset` can be used to represent an input pipeline as a collection of
+/// element tensors.
 @_fixed_layout
 public struct Dataset<Element : TensorGroup> {
   @usableFromInline let _handle: VariantHandle
@@ -96,10 +96,8 @@ extension Dataset : Sequence {
 }
 
 public extension Dataset {
-
   // Note that this Dataset API implementation uses an experimental tracing
   // feature, which is not robust and does not have great diagnostics yet.
-
   @inlinable @inline(__always)
   func map<ResultElement : TensorGroup>(
     _ transform: (Element) -> ResultElement
@@ -158,7 +156,7 @@ public extension Dataset {
   }
 }
 
-/// Represents the state of iterating through a `Dataset`.
+/// The type that allows iteration over a dataset's elements.
 @_fixed_layout
 public struct DatasetIterator<Element : TensorGroup> {
   @usableFromInline let _handle: ResourceHandle
@@ -170,8 +168,8 @@ public struct DatasetIterator<Element : TensorGroup> {
 }
 
 extension DatasetIterator : IteratorProtocol {
-  // Advances to the next element and returns it, or nil if no next element
-  // exists.
+  /// Advances to the next element and returns it, or `nil` if no next element
+  /// exists.
   @inlinable @inline(__always)
   public mutating func next() -> Element? {
     let optional: VariantHandle =

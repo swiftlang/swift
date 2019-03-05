@@ -96,6 +96,9 @@ public protocol _Differentiable : __Differentiable
 
 /// A type that mathematically represents a differentiable manifold whose
 /// tangent spaces are finite-dimensional.
+// BEGIN DIFFERENTIABLE
+// - Note: these marks are identified during API doc generation and the
+//   contents are replaced with the ideal `Differentiable` protocol design.
 public protocol Differentiable : _Differentiable
   where TangentVector.TangentVector == TangentVector,
         TangentVector.CotangentVector == CotangentVector,
@@ -106,6 +109,7 @@ public protocol Differentiable : _Differentiable
         AllDifferentiableVariables.TangentVector == TangentVector,
         AllDifferentiableVariables.CotangentVector == CotangentVector {
 }
+// END DIFFERENTIABLE
 
 public extension Differentiable where AllDifferentiableVariables == Self {
   var allDifferentiableVariables: AllDifferentiableVariables {

@@ -164,4 +164,4 @@ extension Tensor where Scalar : NumpyScalarCompatible {
   public func makeNumpyArray() -> PythonObject { return array.makeNumpyArray() }
 }
 
-#endif
+#endif // canImport(Python)
