@@ -111,55 +111,53 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
     Builder.setInsertionPoint(CurrInsPoint);
   }
 
-  if (SILBridgedTy != Src->getType()) {
-    // Check if we can simplify a cast into:
-    // - ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
-    // - then convert _ObjectiveCBridgeable._ObjectiveCType to
-    // a Swift type using _forceBridgeFromObjectiveC.
+  // We know this is always true since SILBridgedTy is an object and Src is an
+  // address.
+  assert(SILBridgedTy != Src->getType());
 
-    if (!Src->getType().isLoadable(M)) {
-      // This code path is never reached in current test cases
-      // If reached, we'd have to convert from an ObjC Any* to a loadable type
-      // Should use check_addr / make a source we can actually load
-      return nullptr;
-    }
+  // Check if we can simplify a cast into:
+  // - ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
+  // - then convert _ObjectiveCBridgeable._ObjectiveCType to
+  // a Swift type using _forceBridgeFromObjectiveC.
 
-    // Generate a load for the source argument.
-    auto *Load =
-        Builder.createLoad(Loc, Src, LoadOwnershipQualifier::Unqualified);
-    // Try to convert the source into the expected ObjC type first.
+  if (!Src->getType().isLoadable(M)) {
+    // This code path is never reached in current test cases
+    // If reached, we'd have to convert from an ObjC Any* to a loadable type
+    // Should use check_addr / make a source we can actually load
+    return nullptr;
+  }
 
-    if (Load->getType() == SILBridgedTy) {
-      // If type of the source and the expected ObjC type are
-      // equal, there is no need to generate the conversion
-      // from ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
-      if (isConditional) {
-        SILBasicBlock *CastSuccessBB = F->createBasicBlock();
-        CastSuccessBB->createPhiArgument(SILBridgedTy,
-                                         ValueOwnershipKind::Owned);
-        Builder.createBranch(Loc, CastSuccessBB, SILValue(Load));
-        Builder.setInsertionPoint(CastSuccessBB);
-        SrcOp = CastSuccessBB->getArgument(0);
-      } else {
-        SrcOp = Load;
-      }
-    } else if (isConditional) {
+  // Generate a load for the source argument.
+  auto *Load =
+      Builder.createLoad(Loc, Src, LoadOwnershipQualifier::Unqualified);
+  // Try to convert the source into the expected ObjC type first.
+
+  if (Load->getType() == SILBridgedTy) {
+    // If type of the source and the expected ObjC type are
+    // equal, there is no need to generate the conversion
+    // from ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
+    if (isConditional) {
       SILBasicBlock *CastSuccessBB = F->createBasicBlock();
       CastSuccessBB->createPhiArgument(SILBridgedTy, ValueOwnershipKind::Owned);
-      auto *CCBI = Builder.createCheckedCastBranch(Loc, false, Load,
-                                      SILBridgedTy, CastSuccessBB, ConvFailBB);
-      NewI = CCBI;
-      splitEdge(CCBI, /* EdgeIdx to ConvFailBB */ 1);
+      Builder.createBranch(Loc, CastSuccessBB, SILValue(Load));
       Builder.setInsertionPoint(CastSuccessBB);
       SrcOp = CastSuccessBB->getArgument(0);
     } else {
-      auto cast =
-          Builder.createUnconditionalCheckedCast(Loc, Load, SILBridgedTy);
-      NewI = cast;
-      SrcOp = cast;
+      SrcOp = Load;
     }
+  } else if (isConditional) {
+    SILBasicBlock *CastSuccessBB = F->createBasicBlock();
+    CastSuccessBB->createPhiArgument(SILBridgedTy, ValueOwnershipKind::Owned);
+    auto *CCBI = Builder.createCheckedCastBranch(Loc, false, Load, SILBridgedTy,
+                                                 CastSuccessBB, ConvFailBB);
+    NewI = CCBI;
+    splitEdge(CCBI, /* EdgeIdx to ConvFailBB */ 1);
+    Builder.setInsertionPoint(CastSuccessBB);
+    SrcOp = CastSuccessBB->getArgument(0);
   } else {
-    SrcOp = Src;
+    auto cast = Builder.createUnconditionalCheckedCast(Loc, Load, SILBridgedTy);
+    NewI = cast;
+    SrcOp = cast;
   }
 
   // Now emit the a cast from the casted ObjC object into a target type.
