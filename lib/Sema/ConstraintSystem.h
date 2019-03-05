@@ -1317,6 +1317,15 @@ private:
       disabledConstraints.erase(
           disabledConstraints.begin() + scope->numDisabledConstraints,
           disabledConstraints.end());
+
+      for (unsigned constraintIdx :
+             range(scope->numFavoredConstraints, favoredConstraints.size())) {
+        if (favoredConstraints[constraintIdx]->isFavored())
+          favoredConstraints[constraintIdx]->setFavored(false);
+      }
+      favoredConstraints.erase(
+          favoredConstraints.begin() + scope->numFavoredConstraints,
+          favoredConstraints.end());
     }
 
     /// Check whether constraint system is allowed to form solutions
@@ -1334,6 +1343,19 @@ private:
     void disableContraint(Constraint *constraint) {
       constraint->setDisabled();
       disabledConstraints.push_back(constraint);
+    }
+
+    unsigned getNumFavoredConstraints() const {
+      return favoredConstraints.size();
+    }
+
+    /// Favor the given constraint; this change will be rolled back
+    /// when we exit the current solver scope.
+    void favorConstraint(Constraint *constraint) {
+      if (!constraint->isFavored()) {
+        constraint->setFavored();
+        favoredConstraints.push_back(constraint);
+      }
     }
 
   private:
@@ -1358,6 +1380,7 @@ private:
       std::tuple<SolverScope *, ConstraintList::iterator, unsigned>, 4> scopes;
 
     SmallVector<Constraint *, 4> disabledConstraints;
+    SmallVector<Constraint *, 4> favoredConstraints;
   };
 
   class CacheExprTypes : public ASTWalker {
@@ -1517,6 +1540,8 @@ public:
     unsigned numMissingMembers;
 
     unsigned numDisabledConstraints;
+
+    unsigned numFavoredConstraints;
 
     /// The previous score.
     Score PreviousScore;
@@ -3122,12 +3147,14 @@ private:
                                   bool restoreOnFail,
                                   llvm::function_ref<bool(Constraint *)> pred);
 
+public:
   // Given a type variable, attempt to find the disjunction of
   // bind overloads associated with it. This may return null in cases where
   // the disjunction has either not been created or binds the type variable
   // in some manner other than by binding overloads.
   Constraint *getUnboundBindOverloadDisjunction(TypeVariableType *tyvar);
 
+private:
   /// Given a type variable that might represent an overload set, retrieve
   ///
   /// \returns the set of overload choices to which this type variable
@@ -3159,6 +3186,11 @@ private:
   Constraint *selectDisjunction();
 
   Constraint *selectApplyDisjunction();
+
+  /// Look at the set of overload choices to determine if there is a best
+  /// generic overload to favor.
+  OverloadChoice *tryOptimizeGenericDisjunction(
+                                            ArrayRef<OverloadChoice> choices);
 
   /// Solve the system of constraints generated from provided expression.
   ///
@@ -3751,7 +3783,7 @@ private:
 /// easy to work with disjunction and encapsulates
 /// some other important information such as locator.
 class DisjunctionChoiceProducer : public BindingProducer<DisjunctionChoice> {
-  // The disjunciton choices that this producer will iterate through.
+  // The disjunction choices that this producer will iterate through.
   ArrayRef<Constraint *> Choices;
 
   // The ordering of disjunction choices. We index into Choices
