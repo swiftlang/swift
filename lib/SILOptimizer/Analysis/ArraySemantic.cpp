@@ -694,7 +694,7 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
     return false;
 
   SILBuilderWithScope Builder(SemanticsCall);
-  auto &ValLowering = Builder.getModule().getTypeLowering(V->getType());
+  auto &ValLowering = Builder.getTypeLowering(V->getType());
   if (hasGetElementDirectResult()) {
     ValLowering.emitCopyValue(Builder, SemanticsCall->getLoc(), V);
     SemanticsCall->replaceAllUsesWith(V);
@@ -756,7 +756,7 @@ bool swift::ArraySemanticsCall::replaceByAppendingValues(
 
   for (SILValue V : Vals) {
     auto SubTy = V->getType();
-    auto &ValLowering = Builder.getModule().getTypeLowering(SubTy);
+    auto &ValLowering = Builder.getTypeLowering(SubTy);
     auto CopiedVal = ValLowering.emitCopyValue(Builder, Loc, V);
     auto *AllocStackInst = Builder.createAllocStack(Loc, SubTy);
 

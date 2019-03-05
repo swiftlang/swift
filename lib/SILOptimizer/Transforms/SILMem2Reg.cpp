@@ -376,7 +376,8 @@ static void replaceDestroy(DestroyAddrInst *DAI, SILValue NewValue) {
   SILBuilderWithScope Builder(DAI);
 
   auto Ty = DAI->getOperand()->getType();
-  auto &TL = DAI->getModule().getTypeLowering(Ty);
+  SILFunction *F = DAI->getFunction();
+  auto &TL = F->getTypeLowering(Ty);
 
   bool expand = shouldExpand(DAI->getModule(),
                              DAI->getOperand()->getType().getObjectType());

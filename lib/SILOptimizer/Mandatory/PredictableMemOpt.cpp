@@ -1154,7 +1154,9 @@ void AvailableValueDataflowContext::explodeCopyAddr(CopyAddrInst *CAI) {
   LLVM_DEBUG(llvm::dbgs() << "  -- Exploding copy_addr: " << *CAI << "\n");
 
   SILType ValTy = CAI->getDest()->getType().getObjectType();
-  auto &TL = getModule().getTypeLowering(ValTy);
+
+  SILFunction *F = CAI->getFunction();
+  auto &TL = F->getTypeLowering(ValTy);
 
   // Keep track of the new instructions emitted.
   SmallVector<SILInstruction *, 4> NewInsts;

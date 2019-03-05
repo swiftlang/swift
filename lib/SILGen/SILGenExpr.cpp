@@ -2698,28 +2698,26 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
     : nullptr;
 
   // Build the signature of the thunk as expected by the keypath runtime.
-  SILType loweredBaseTy, loweredPropTy;
+  CanType loweredBaseTy, loweredPropTy;
   {
     GenericContextScope scope(SGM.Types, genericSig);
-    loweredBaseTy = SGM.Types.getLoweredType(AbstractionPattern::getOpaque(),
-                                             baseType);
-    loweredPropTy = SGM.Types.getLoweredType(AbstractionPattern::getOpaque(),
-                                             propertyType);
+    AbstractionPattern opaque = AbstractionPattern::getOpaque();
+
+    loweredBaseTy = SGM.Types.getLoweredRValueType(opaque, baseType);
+    loweredPropTy = SGM.Types.getLoweredRValueType(opaque, propertyType);
   }
   
   auto paramConvention = ParameterConvention::Indirect_In_Guaranteed;
 
   SmallVector<SILParameterInfo, 2> params;
-  params.push_back({loweredBaseTy.getASTType(),
-                    paramConvention});
+  params.push_back({loweredBaseTy, paramConvention});
   auto &C = SGM.getASTContext();
   if (!indexes.empty())
     params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredType()
                                                  ->getCanonicalType(),
                       ParameterConvention::Direct_Unowned});
   
-  SILResultInfo result(loweredPropTy.getASTType(),
-                       ResultConvention::Indirect);
+  SILResultInfo result(loweredPropTy, ResultConvention::Indirect);
   
   auto signature = SILFunctionType::get(genericSig,
     SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
@@ -2828,13 +2826,13 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
     : nullptr;
 
   // Build the signature of the thunk as expected by the keypath runtime.
-  SILType loweredBaseTy, loweredPropTy;
+  CanType loweredBaseTy, loweredPropTy;
   {
     GenericContextScope scope(SGM.Types, genericSig);
-    loweredBaseTy = SGM.Types.getLoweredType(AbstractionPattern::getOpaque(),
-                                             baseType);
-    loweredPropTy = SGM.Types.getLoweredType(AbstractionPattern::getOpaque(),
-                                             propertyType);
+    AbstractionPattern opaque = AbstractionPattern::getOpaque();
+
+    loweredBaseTy = SGM.Types.getLoweredRValueType(opaque, baseType);
+    loweredPropTy = SGM.Types.getLoweredRValueType(opaque, propertyType);
   }
   
   auto &C = SGM.getASTContext();
@@ -2843,10 +2841,9 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
 
   SmallVector<SILParameterInfo, 3> params;
   // property value
-  params.push_back({loweredPropTy.getASTType(),
-                    paramConvention});
+  params.push_back({loweredPropTy, paramConvention});
   // base
-  params.push_back({loweredBaseTy.getASTType(),
+  params.push_back({loweredBaseTy,
                     property->isSetterMutating()
                       ? ParameterConvention::Indirect_Inout
                       : paramConvention});
@@ -3007,7 +3004,10 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
                         ->getCanonicalType();
   RValue indexValue(indexTupleTy);
 
-  auto indexLoweredTy = SGM.Types.getLoweredType(indexTupleTy);
+  auto indexLoweredTy =
+    SILType::getPrimitiveAddressType(
+      SGM.Types.getLoweredRValueType(indexTupleTy));
+
   // Get or create the equals witness
   [unsafeRawPointerTy, boolTy, genericSig, &C, &indexTypes, &equals, loc,
    &SGM, genericEnv, expansion, indexLoweredTy, indexes]{
@@ -3052,10 +3052,10 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     Scope scope(subSGF, loc);
 
     auto lhsAddr = subSGF.B.createPointerToAddress(loc, lhsPtr,
-                                             indexLoweredTy.getAddressType(),
+                                             indexLoweredTy,
                                              /*isStrict*/ false);
     auto rhsAddr = subSGF.B.createPointerToAddress(loc, rhsPtr,
-                                             indexLoweredTy.getAddressType(),
+                                             indexLoweredTy,
                                              /*isStrict*/ false);
 
     // Compare each pair of index values using the == witness from the
@@ -3229,7 +3229,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       
       // Extract the index value.
       SILValue indexAddr = subSGF.B.createPointerToAddress(loc, indexPtr,
-                                             indexLoweredTy.getAddressType(),
+                                             indexLoweredTy,
                                              /*isStrict*/ false);
       if (indexes.size() > 1) {
         indexAddr = subSGF.B.createTupleElementAddr(loc, indexAddr, 0);
