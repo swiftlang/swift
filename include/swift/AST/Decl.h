@@ -4621,6 +4621,9 @@ public:
   /// other modules.
   bool exportsPropertyDescriptor() const;
 
+  /// True if any of the accessors to the storage is private or fileprivate.
+  bool hasPrivateAccessor() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractStorageDecl &&
