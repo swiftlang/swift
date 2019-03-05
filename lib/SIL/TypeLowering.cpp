@@ -854,8 +854,8 @@ namespace {
       unsigned index = 0;
       for (auto elt : tupleTy.getElementTypes()) {
         auto silElt = SILType::getPrimitiveType(elt, silTy.getCategory());
-        // FIXME: Expansion
-        children.push_back(Child{index, M.Types.getTypeLowering(silElt)});
+        auto &eltTL = M.Types.getTypeLowering(silElt, getResilienceExpansion());
+        children.push_back(Child{index, eltTL});
         ++index;
       }
     }
@@ -888,9 +888,9 @@ namespace {
       assert(structDecl);
       
       for (auto prop : structDecl->getStoredProperties()) {
-        SILType propTy = silTy.getFieldType(prop, M);        
-        // FIXME: Expansion
-        children.push_back(Child{prop, M.Types.getTypeLowering(propTy)});
+        SILType propTy = silTy.getFieldType(prop, M);
+        auto &propTL = M.Types.getTypeLowering(propTy, getResilienceExpansion());
+        children.push_back(Child{prop, propTL});
       }
     }
   };
