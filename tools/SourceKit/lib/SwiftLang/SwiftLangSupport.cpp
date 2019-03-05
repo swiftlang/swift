@@ -62,7 +62,7 @@ using swift::index::SymbolRoleSet;
 #define KIND(NAME, CONTENT) static UIdent Kind##NAME(CONTENT);
 #include "SourceKit/Core/ProtocolUIDs.def"
 
-#define REFACTORING(KIND, NAME, ID) static UIdent Kind##Refactoring##KIND("source.refactoring.kind."#ID);
+#define REFACTORING(KIND, NAME, ID, LSPKIND) static UIdent Kind##Refactoring##KIND("source.refactoring.kind."#ID);
 #include "swift/IDE/RefactoringKinds.def"
 
 static UIdent Attr_IBAction("source.decl.attribute.ibaction");
@@ -342,8 +342,18 @@ SourceKit::UIdent SwiftLangSupport::getUIDForObjCAttr() {
 UIdent SwiftLangSupport::getUIDForRefactoringKind(ide::RefactoringKind Kind){
   switch(Kind) {
   case ide::RefactoringKind::None: llvm_unreachable("cannot end up here.");
-#define REFACTORING(KIND, NAME, ID)                                            \
+#define REFACTORING(KIND, NAME, ID, LSPKIND)                                \
   case ide::RefactoringKind::KIND: return KindRefactoring##KIND;
+#include "swift/IDE/RefactoringKinds.def"
+  }
+}
+
+LSPRefactoringKind 
+SwiftLangSupport::getLSPKindForRefactoringKind(ide::RefactoringKind Kind) {
+  switch(Kind) {
+  case ide::RefactoringKind::None: llvm_unreachable("cannot end up here.");
+#define REFACTORING(KIND, NAME, ID, LSPKIND)                                   \
+  case ide::RefactoringKind::KIND: return LSPRefactoringKind::LSPKIND; 
 #include "swift/IDE/RefactoringKinds.def"
   }
 }

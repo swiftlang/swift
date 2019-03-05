@@ -28,7 +28,7 @@ namespace ide {
 
 enum class RefactoringKind : int8_t {
   None,
-#define REFACTORING(KIND, NAME, ID) KIND,
+#define REFACTORING(KIND, NAME, ID, LSPKIND) KIND,
 #include "RefactoringKinds.def"
 };
 

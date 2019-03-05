@@ -94,7 +94,7 @@ struct SKEditorConsumerOptions {
 #define KIND(NAME, CONTENT) static LazySKDUID Kind##NAME(CONTENT);
 #include "SourceKit/Core/ProtocolUIDs.def"
 
-#define REFACTORING(KIND, NAME, ID) static LazySKDUID Kind##Refactoring##KIND("source.refactoring.kind."#ID);
+#define REFACTORING(KIND, NAME, ID, LSPKIND) static LazySKDUID Kind##Refactoring##KIND("source.refactoring.kind."#ID);
 #include "swift/IDE/RefactoringKinds.def"
 
 static void onDocumentUpdateNotification(StringRef DocumentName) {
@@ -1074,8 +1074,10 @@ static void handleSemanticRequest(
     SemanticRefactoringInfo Info;
     Info.Kind = SemanticRefactoringKind::None;
 
-#define SEMANTIC_REFACTORING(KIND, NAME, ID)                                   \
-  if (KA == KindRefactoring##KIND) Info.Kind = SemanticRefactoringKind::KIND;
+#define SEMANTIC_REFACTORING(KIND, NAME, ID, LSPKIND)                          \
+  if (KA == KindRefactoring##KIND) {                                           \
+    Info.Kind = SemanticRefactoringKind::KIND;                                 \
+  }
 #include "swift/IDE/RefactoringKinds.def"
 
     if (Info.Kind == SemanticRefactoringKind::None)
@@ -1754,6 +1756,15 @@ static void reportCursorInfo(const RequestResult<CursorInfoData> &Result,
       auto Entry = Actions.appendDictionary();
       Entry.set(KeyActionUID, Info.Kind);
       Entry.set(KeyActionName, Info.KindName);
+      switch(Info.LSPKind) {
+        case LSPRefactoringKind::None: break;
+#define LSP_REFACTORING_KIND(KIND, NAME) case LSPRefactoringKind::KIND:        \
+          {                                                                    \
+            Entry.set(KeyLSPRefactoringKind, NAME);                            \
+            break;                                                             \
+          }
+#include "swift/IDE/RefactoringKinds.def"
+      }
       if (!Info.UnavailableReason.empty())
         Entry.set(KeyActionUnavailableReason, Info.UnavailableReason);
     }

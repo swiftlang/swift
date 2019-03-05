@@ -644,7 +644,8 @@ collectAvailableRenameInfo(const ValueDecl *VD,
                            Optional<RenameRefInfo> RefInfo,
                            std::vector<UIdent> &RefactoringIds,
                            DelayedStringRetriever &RefactroingNameOS,
-                           DelayedStringRetriever &RefactoringReasonOS) {
+                           DelayedStringRetriever &RefactoringReasonOS,
+                           std::vector<LSPRefactoringKind> &RefactoringLSPKinds) {
   std::vector<ide::RenameAvailabiliyInfo> Scratch;
   for (auto Info : ide::collectRenameAvailabilityInfo(VD, RefInfo,
                                                       Scratch)){
@@ -657,6 +658,8 @@ collectAvailableRenameInfo(const ValueDecl *VD,
     RefactoringReasonOS << ide::getDescriptiveRenameUnavailableReason(Info.
       AvailableKind);
     RefactoringReasonOS.endPiece();
+    RefactoringLSPKinds.push_back(SwiftLangSupport::
+      getLSPKindForRefactoringKind(Info.Kind));
   }
 }
 
@@ -664,7 +667,8 @@ static void
 serializeRefactoringKinds(ArrayRef<RefactoringKind> AllKinds,
                           std::vector<UIdent> &RefactoringIds,
                           DelayedStringRetriever &RefactroingNameOS,
-                          DelayedStringRetriever &RefactoringReasonOS) {
+                          DelayedStringRetriever &RefactoringReasonOS,
+                         std::vector<LSPRefactoringKind>& RefactoringLSPKinds) {
   for (auto Kind : AllKinds) {
     RefactoringIds.push_back(SwiftLangSupport::getUIDForRefactoringKind(Kind));
     RefactroingNameOS.startPiece();
@@ -672,6 +676,8 @@ serializeRefactoringKinds(ArrayRef<RefactoringKind> AllKinds,
     RefactroingNameOS.endPiece();
     RefactoringReasonOS.startPiece();
     RefactoringReasonOS.endPiece();
+    RefactoringLSPKinds.push_back(SwiftLangSupport::
+    getLSPKindForRefactoringKind(Kind));
   }
 }
 
@@ -680,11 +686,12 @@ collectAvailableRefactoringsOtherThanRename(SourceFile *SF,
                                             ResolvedCursorInfo CursorInfo,
                                             std::vector<UIdent> &RefactoringIds,
                                       DelayedStringRetriever &RefactroingNameOS,
-                                  DelayedStringRetriever &RefactoringReasonOS) {
+                                    DelayedStringRetriever &RefactoringReasonOS,
+                         std::vector<LSPRefactoringKind> &RefactoringLSPKinds) {
   std::vector<RefactoringKind> Scratch;
   serializeRefactoringKinds(collectAvailableRefactorings(SF, CursorInfo, Scratch,
     /*ExcludeRename*/true), RefactoringIds, RefactroingNameOS,
-    RefactoringReasonOS);
+    RefactoringReasonOS, RefactoringLSPKinds);
 }
 
 static Optional<unsigned>
@@ -839,6 +846,7 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   std::vector<UIdent> RefactoringIds;
   DelayedStringRetriever RefactoringNameOS(SS);
   DelayedStringRetriever RefactoringReasonOS(SS);
+  std::vector<LSPRefactoringKind> RefactoringLSPKinds;
 
   if (RetrieveRefactoring) {
     Optional<RenameRefInfo> RefInfo;
@@ -846,9 +854,9 @@ static bool passCursorInfoForDecl(SourceFile* SF,
       RefInfo = {TheTok.SF, TheTok.Loc, TheTok.IsKeywordArgument};
     collectAvailableRenameInfo(VD, RefInfo,
                                RefactoringIds, RefactoringNameOS,
-                               RefactoringReasonOS);
+                               RefactoringReasonOS, RefactoringLSPKinds);
     collectAvailableRefactoringsOtherThanRename(SF, TheTok, RefactoringIds,
-      RefactoringNameOS, RefactoringReasonOS);
+      RefactoringNameOS, RefactoringReasonOS, RefactoringLSPKinds);
   }
 
   DelayedStringRetriever OverUSRsStream(SS);
@@ -970,7 +978,8 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   SmallVector<RefactoringInfo, 4> RefactoringInfoBuffer;
   for (unsigned I = 0, N = RefactoringIds.size(); I < N; I ++) {
     RefactoringInfoBuffer.push_back({RefactoringIds[I], RefactoringNameOS[I],
-                                     RefactoringReasonOS[I]});
+                                     RefactoringReasonOS[I], 
+                                     RefactoringLSPKinds[I]});
   }
 
   // Add available refactoring inheritted from range.
@@ -1306,7 +1315,8 @@ static void resolveCursor(
           AvailableRefactorings.push_back({
             SwiftLangSupport::getUIDForRefactoringKind(Kind),
             getDescriptiveRefactoringKindName(Kind),
-            /*UnavailableReason*/ StringRef()
+            /*UnavailableReason*/ StringRef(),
+            SwiftLangSupport::getLSPKindForRefactoringKind(Kind)
           });
         }
         if (!RangeStartMayNeedRename) {
@@ -1388,9 +1398,10 @@ static void resolveCursor(
           std::vector<UIdent> RefactoringIds;
           DelayedStringRetriever NameRetriever(SS);
           DelayedStringRetriever ReasonRetriever(SS);
+          std::vector<LSPRefactoringKind> RefactoringLSPKinds;
           collectAvailableRefactoringsOtherThanRename(
             &AstUnit->getPrimarySourceFile(), CursorInfo, RefactoringIds,
-            NameRetriever, ReasonRetriever);
+            NameRetriever, ReasonRetriever, RefactoringLSPKinds);
           if (auto Size = RefactoringIds.size()) {
             CursorInfoData Info;
 
@@ -1398,7 +1409,8 @@ static void resolveCursor(
             Info.Kind = SwiftLangSupport::getUIDForModuleRef();
             for (unsigned I = 0; I < Size; I ++) {
               AvailableRefactorings.push_back({RefactoringIds[I],
-                NameRetriever[I], ReasonRetriever[I]});
+                NameRetriever[I], ReasonRetriever[I], 
+                RefactoringLSPKinds[I]});
             }
             Info.AvailableActions = llvm::makeArrayRef(AvailableRefactorings);
             Receiver(RequestResult<CursorInfoData>::fromResult(Info));
@@ -2129,7 +2141,7 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
 static RefactoringKind getIDERefactoringKind(SemanticRefactoringInfo Info) {
   switch(Info.Kind) {
     case SemanticRefactoringKind::None: return RefactoringKind::None;
-#define SEMANTIC_REFACTORING(KIND, NAME, ID)                                   \
+#define SEMANTIC_REFACTORING(KIND, NAME, ID, LSPKIND)                          \
     case SemanticRefactoringKind::KIND: return RefactoringKind::KIND;
 #include "swift/IDE/RefactoringKinds.def"
   }

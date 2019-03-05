@@ -171,6 +171,7 @@ UID_KEYS = [
     KEY('ExpressionOffset', 'key.expression_offset'),
     KEY('ExpressionLength', 'key.expression_length'),
     KEY('ExpressionType', 'key.expression_type'),
+    KEY('LSPRefactoringKind', 'key.lsp_refactoring_kind'),
     KEY('CanonicalizeType', 'key.canonicalize_type'),
     KEY('InternalDiagnostic', "key.internal_diagnostic"),
     KEY('VFSName', 'key.vfs.name'),

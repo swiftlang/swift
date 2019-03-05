@@ -306,6 +306,12 @@ public:
 struct Statistic;
 typedef std::function<void(ArrayRef<Statistic *> stats)> StatisticsReceiver;
 
+enum class LSPRefactoringKind {
+  None,
+#define LSP_REFACTORING_KIND(KIND, NAME) KIND,
+#include "swift/IDE/RefactoringKinds.def"
+};
+
 /// Options for configuring a virtual file system provider.
 struct VFSOptions {
   /// The name of the virtual file system to use.
@@ -373,6 +379,7 @@ struct RefactoringInfo {
   UIdent Kind;
   StringRef KindName;
   StringRef UnavailableReason;
+  LSPRefactoringKind LSPKind;
 };
 
 struct CursorInfoData {
@@ -440,7 +447,7 @@ struct NameTranslatingInfo {
 
 enum class SemanticRefactoringKind {
   None,
-#define SEMANTIC_REFACTORING(KIND, NAME, ID) KIND,
+#define SEMANTIC_REFACTORING(KIND, NAME, ID, LSPKIND) KIND,
 #include "swift/IDE/RefactoringKinds.def"
 };
 

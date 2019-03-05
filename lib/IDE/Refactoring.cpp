@@ -713,7 +713,7 @@ public:
   }
 };
 
-#define CURSOR_REFACTORING(KIND, NAME, ID)                                    \
+#define CURSOR_REFACTORING(KIND, NAME, ID, LSPKIND)                           \
 class RefactoringAction##KIND: public TokenBasedRefactoringAction {           \
   public:                                                                     \
   RefactoringAction##KIND(ModuleDecl *MD, RefactoringOptions &Opts,           \
@@ -741,7 +741,7 @@ public:
                               ResolvedRangeInfo())) {}
 };
 
-#define RANGE_REFACTORING(KIND, NAME, ID)                                     \
+#define RANGE_REFACTORING(KIND, NAME, ID, LSPKIND)                            \
 class RefactoringAction##KIND: public RangeBasedRefactoringAction {           \
   public:                                                                     \
   RefactoringAction##KIND(ModuleDecl *MD, RefactoringOptions &Opts,           \
@@ -3561,7 +3561,8 @@ getDescriptiveRefactoringKindName(RefactoringKind Kind) {
     switch(Kind) {
       case RefactoringKind::None:
         llvm_unreachable("Should be a valid refactoring kind");
-#define REFACTORING(KIND, NAME, ID) case RefactoringKind::KIND: return NAME;
+#define REFACTORING(KIND, NAME, ID, LSPKIND) case RefactoringKind::KIND:       \
+        return NAME;
 #include "swift/IDE/RefactoringKinds.def"
     }
     llvm_unreachable("unhandled kind");
@@ -3745,7 +3746,7 @@ collectAvailableRefactorings(SourceFile *SF,
     }
   }
   DiagnosticEngine DiagEngine(SF->getASTContext().SourceMgr);
-#define CURSOR_REFACTORING(KIND, NAME, ID)                                     \
+#define CURSOR_REFACTORING(KIND, NAME, ID, LSPKIND)                            \
   if (RefactoringAction##KIND::isApplicable(CursorInfo, DiagEngine))           \
     AllKinds.push_back(RefactoringKind::KIND);
 #include "swift/IDE/RefactoringKinds.def"
@@ -3792,12 +3793,12 @@ collectAvailableRefactorings(SourceFile *SF, RangeConfig Range,
 
   bool enableInternalRefactoring = getenv("SWIFT_ENABLE_INTERNAL_REFACTORING_ACTIONS");
 
-#define RANGE_REFACTORING(KIND, NAME, ID)                                     \
+#define RANGE_REFACTORING(KIND, NAME, ID, LSPKIND)                            \
   if (RefactoringAction##KIND::isApplicable(Result, DiagEngine))              \
     Scratch.push_back(RefactoringKind::KIND);
-#define INTERNAL_RANGE_REFACTORING(KIND, NAME, ID)                            \
+#define INTERNAL_RANGE_REFACTORING(KIND, NAME, ID, LSPKIND)                   \
   if (enableInternalRefactoring)                                              \
-    RANGE_REFACTORING(KIND, NAME, ID)
+    RANGE_REFACTORING(KIND, NAME, ID, LSPKIND)
 #include "swift/IDE/RefactoringKinds.def"
 
   RangeStartMayNeedRename = rangeStartMayNeedRename(Result);
@@ -3816,7 +3817,7 @@ refactorSwiftModule(ModuleDecl *M, RefactoringOptions Opts,
   }
 
   switch (Opts.Kind) {
-#define SEMANTIC_REFACTORING(KIND, NAME, ID)                                   \
+#define SEMANTIC_REFACTORING(KIND, NAME, ID, LSPKIND)                          \
 case RefactoringKind::KIND: {                                                  \
       RefactoringAction##KIND Action(M, Opts, EditConsumer, DiagConsumer);     \
       if (RefactoringKind::KIND == RefactoringKind::LocalRename ||             \

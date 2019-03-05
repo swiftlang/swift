@@ -1,70 +1,88 @@
+#ifndef LSP_REFACTORING_KIND
+#define LSP_REFACTORING_KIND(KIND, NAME)
+#endif
+
+LSP_REFACTORING_KIND(Refactor, "refactor")
+
+LSP_REFACTORING_KIND(RefactorExtract, "refactor.extract")
+
+LSP_REFACTORING_KIND(RefactorInline, "refactor.inline")
+
+LSP_REFACTORING_KIND(RefactorRewrite, "refactor.rewrite")
+
+LSP_REFACTORING_KIND(Source, "source")
+
+LSP_REFACTORING_KIND(SourceOrganizeImports, "source.organizeImports")
+
+#undef LSP_REFACTORING_KIND
+
 #ifndef REFACTORING
-#define REFACTORING(KIND, NAME, ID)
+#define REFACTORING(KIND, NAME, ID, LSPKIND)
 #endif
 
 #ifndef SEMANTIC_REFACTORING
-#define SEMANTIC_REFACTORING(KIND, NAME, ID) REFACTORING(KIND, NAME, ID)
+#define SEMANTIC_REFACTORING(KIND, NAME, ID, LSPKIND) REFACTORING(KIND, NAME, ID, LSPKIND)
 #endif
 
 #ifndef RANGE_REFACTORING
-#define RANGE_REFACTORING(KIND, NAME, ID) SEMANTIC_REFACTORING(KIND, NAME, ID)
+#define RANGE_REFACTORING(KIND, NAME, ID, LSPKIND) SEMANTIC_REFACTORING(KIND, NAME, ID, LSPKIND)
 #endif
 
 #ifndef INTERNAL_RANGE_REFACTORING
-#define INTERNAL_RANGE_REFACTORING(KIND, NAME, ID) RANGE_REFACTORING(KIND, NAME, ID)
+#define INTERNAL_RANGE_REFACTORING(KIND, NAME, ID, LSPKIND) RANGE_REFACTORING(KIND, NAME, ID, LSPKIND)
 #endif
 
 #ifndef CURSOR_REFACTORING
-#define CURSOR_REFACTORING(KIND, NAME, ID) SEMANTIC_REFACTORING(KIND, NAME, ID)
+#define CURSOR_REFACTORING(KIND, NAME, ID, LSPKIND) SEMANTIC_REFACTORING(KIND, NAME, ID, LSPKIND)
 #endif
 
 /// Rename and categorise the symbol occurrences at provided locations
 /// (syntactically).
-REFACTORING(GlobalRename, "Global Rename", rename.global)
+REFACTORING(GlobalRename, "Global Rename", rename.global, Refactor)
 
 /// Categorize source ranges for symbol occurrences at provided locations
 /// (syntactically).
-REFACTORING(FindGlobalRenameRanges, "Find Global Rename Ranges", rename.global.find-ranges)
+REFACTORING(FindGlobalRenameRanges, "Find Global Rename Ranges", rename.global.find-ranges, Refactor)
 
 /// Find and categorize all occurences of the file-local symbol at a given
 /// location.
-REFACTORING(FindLocalRenameRanges, "Find Local Rename Ranges", rename.local.find-ranges)
+REFACTORING(FindLocalRenameRanges, "Find Local Rename Ranges", rename.local.find-ranges, Refactor)
 
 /// Find and rename all occurences of the file-local symbol at a given
 /// location.
-CURSOR_REFACTORING(LocalRename, "Local Rename", rename.local)
+CURSOR_REFACTORING(LocalRename, "Local Rename", rename.local, Refactor)
 
-CURSOR_REFACTORING(FillProtocolStub, "Add Missing Protocol Requirements", fillstub)
+CURSOR_REFACTORING(FillProtocolStub, "Add Missing Protocol Requirements", fillstub, Refactor)
 
-CURSOR_REFACTORING(ExpandDefault, "Expand Default", expand.default)
+CURSOR_REFACTORING(ExpandDefault, "Expand Default", expand.default, Refactor)
 
-CURSOR_REFACTORING(ExpandSwitchCases, "Expand Switch Cases", expand.switch.cases)
+CURSOR_REFACTORING(ExpandSwitchCases, "Expand Switch Cases", expand.switch.cases, Refactor)
 
-CURSOR_REFACTORING(LocalizeString, "Localize String", localize.string)
+CURSOR_REFACTORING(LocalizeString, "Localize String", localize.string, RefactorRewrite)
 
-CURSOR_REFACTORING(SimplifyNumberLiteral, "Simplify Long Number Literal", simplify.long.number.literal)
+CURSOR_REFACTORING(SimplifyNumberLiteral, "Simplify Long Number Literal", simplify.long.number.literal, RefactorRewrite)
 
-CURSOR_REFACTORING(CollapseNestedIfStmt, "Collapse Nested If Statements", collapse.nested.ifstmt)
+CURSOR_REFACTORING(CollapseNestedIfStmt, "Collapse Nested If Statements", collapse.nested.ifstmt, RefactorRewrite)
 
-CURSOR_REFACTORING(ConvertToDoCatch, "Convert To Do/Catch", convert.do.catch)
+CURSOR_REFACTORING(ConvertToDoCatch, "Convert To Do/Catch", convert.do.catch, RefactorRewrite)
 
-CURSOR_REFACTORING(TrailingClosure, "Convert To Trailing Closure", trailingclosure)
+CURSOR_REFACTORING(TrailingClosure, "Convert To Trailing Closure", trailingclosure, RefactorRewrite)
 
-CURSOR_REFACTORING(MemberwiseInitLocalRefactoring, "Generate Memberwise Initializer", memberwise.init.local.refactoring)
+CURSOR_REFACTORING(MemberwiseInitLocalRefactoring, "Generate Memberwise Initializer", memberwise.init.local.refactoring, Refactor)
 
-RANGE_REFACTORING(ExtractExpr, "Extract Expression", extract.expr)
+RANGE_REFACTORING(ExtractExpr, "Extract Expression", extract.expr, RefactorExtract)
 
-RANGE_REFACTORING(ExtractFunction, "Extract Method", extract.function)
+RANGE_REFACTORING(ExtractFunction, "Extract Method", extract.function, RefactorExtract)
 
-RANGE_REFACTORING(ExtractRepeatedExpr, "Extract Repeated Expression", extract.expr.repeated)
+RANGE_REFACTORING(ExtractRepeatedExpr, "Extract Repeated Expression", extract.expr.repeated, RefactorExtract)
 
-RANGE_REFACTORING(MoveMembersToExtension, "Move To Extension", move.members.to.extension)
+RANGE_REFACTORING(MoveMembersToExtension, "Move To Extension", move.members.to.extension, RefactorRewrite)
 
-RANGE_REFACTORING(ConvertStringsConcatenationToInterpolation, "Convert to String Interpolation", convert.string-concatenation.interpolation)
+RANGE_REFACTORING(ConvertStringsConcatenationToInterpolation, "Convert to String Interpolation", convert.string-concatenation.interpolation, RefactorRewrite)
 
-RANGE_REFACTORING(ExpandTernaryExpr, "Expand Ternary Expression", expand.ternary.expr)
+RANGE_REFACTORING(ExpandTernaryExpr, "Expand Ternary Expression", expand.ternary.expr, Refactor)
 
-RANGE_REFACTORING(ConvertToTernaryExpr, "Convert To Ternary Expression", convert.ternary.expr)
+RANGE_REFACTORING(ConvertToTernaryExpr, "Convert To Ternary Expression", convert.ternary.expr, RefactorRewrite)
 
 RANGE_REFACTORING(ConvertIfLetExprToGuardExpr, "Convert To Guard Expression", convert.iflet.to.guard.expr)
 
@@ -78,7 +96,7 @@ RANGE_REFACTORING(ConvertToSwitchStmt, "Convert To Switch Statement", convert.sw
 // the compiler/standard library, etc., but are likely to be just confusing and
 // noise for general development.
 
-INTERNAL_RANGE_REFACTORING(ReplaceBodiesWithFatalError, "Replace Function Bodies With 'fatalError()'", replace.bodies.with.fatalError)
+INTERNAL_RANGE_REFACTORING(ReplaceBodiesWithFatalError, "Replace Function Bodies With 'fatalError()'", replace.bodies.with.fatalError, RefactorRewrite)
 
 #undef CURSOR_REFACTORING
 #undef INTERNAL_RANGE_REFACTORING

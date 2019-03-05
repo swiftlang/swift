@@ -65,7 +65,7 @@ enum class SourceKitRequest {
   EnableCompileNotifications,
   CollectExpresstionType,
   GlobalConfiguration,
-#define SEMANTIC_REFACTORING(KIND, NAME, ID) KIND,
+#define SEMANTIC_REFACTORING(KIND, NAME, ID, LSPKIND) KIND,
 #include "swift/IDE/RefactoringKinds.def"
 };
 

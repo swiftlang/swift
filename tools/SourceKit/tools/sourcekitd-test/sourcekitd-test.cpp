@@ -121,7 +121,7 @@ static SourceKitRequest ActiveRequest = SourceKitRequest::None;
 #define KIND(NAME, CONTENT) static sourcekitd_uid_t Kind##NAME;
 #include "SourceKit/Core/ProtocolUIDs.def"
 
-#define REFACTORING(KIND, NAME, ID) static sourcekitd_uid_t Kind##Refactoring##KIND;
+#define REFACTORING(KIND, NAME, ID, LSPKIND) static sourcekitd_uid_t Kind##Refactoring##KIND;
 #include "swift/IDE/RefactoringKinds.def"
 
 static sourcekitd_uid_t SemaDiagnosticStage;
@@ -234,7 +234,7 @@ static void skt_main(skt_args *args) {
 #define KIND(NAME, CONTENT) Kind##NAME = sourcekitd_uid_get_from_cstr(CONTENT);
 #include "SourceKit/Core/ProtocolUIDs.def"
 
-#define REFACTORING(KIND, NAME, ID) Kind##Refactoring##KIND = sourcekitd_uid_get_from_cstr("source.refactoring.kind."#ID);
+#define REFACTORING(KIND, NAME, ID, LSPKIND) Kind##Refactoring##KIND = sourcekitd_uid_get_from_cstr("source.refactoring.kind."#ID);
 #include "swift/IDE/RefactoringKinds.def"
 
   // A test invocation may initialize the options to be used for subsequent
@@ -709,7 +709,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     break;
   }
 
-#define SEMANTIC_REFACTORING(KIND, NAME, ID) case SourceKitRequest::KIND:                 \
+#define SEMANTIC_REFACTORING(KIND, NAME, ID, LSPKIND) case SourceKitRequest::KIND:        \
     {                                                                                     \
       sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestSemanticRefactoring); \
       sourcekitd_request_dictionary_set_uid(Req, KeyActionUID, KindRefactoring##KIND);    \
@@ -1317,7 +1317,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       case SourceKitRequest::ModuleGroups:
         printModuleGroupNames(Info, llvm::outs());
         break;
-#define SEMANTIC_REFACTORING(KIND, NAME, ID) case SourceKitRequest::KIND:
+#define SEMANTIC_REFACTORING(KIND, NAME, ID, LSPKIND) case SourceKitRequest::KIND:
 #include "swift/IDE/RefactoringKinds.def"
       case SourceKitRequest::SyntacticRename:
         printSyntacticRenameEdits(Info, llvm::outs());
@@ -1569,6 +1569,7 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
     const char* KindUID;
     const char* KindName;
     const char* UnavailReason;
+    const char* LSPKind;
   };
   std::vector<ActionInfo> AvailableActions;
   sourcekitd_variant_t ActionsObj =
@@ -1581,7 +1582,8 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
       sourcekitd_uid_get_string_ptr(sourcekitd_variant_dictionary_get_uid(Entry,
                                                                 KeyActionUID)),
       sourcekitd_variant_dictionary_get_string(Entry, KeyActionName),
-      sourcekitd_variant_dictionary_get_string(Entry, KeyActionUnavailableReason)
+      sourcekitd_variant_dictionary_get_string(Entry, KeyActionUnavailableReason),
+      sourcekitd_variant_dictionary_get_string(Entry, KeyLSPRefactoringKind)
     });
   }
 
@@ -1644,6 +1646,7 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   OS << "ACTIONS BEGIN\n";
   for (auto Action : AvailableActions) {
     OS << Action.KindUID << '\n';
+    OS << "LSP KIND \"" << Action.LSPKind << "\"" << '\n';
     OS << Action.KindName << '\n';
     if (Action.UnavailReason) {
       OS << Action.UnavailReason << '\n';

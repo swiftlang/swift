@@ -354,6 +354,8 @@ public:
   static SourceKit::UIdent getUIDForLocalVar(bool IsRef = false);
   static SourceKit::UIdent getUIDForRefactoringKind(
       swift::ide::RefactoringKind Kind);
+  static SourceKit::LSPRefactoringKind getLSPKindForRefactoringKind(
+      swift::ide::RefactoringKind Kind);
   static SourceKit::UIdent getUIDForCodeCompletionDeclKind(
       swift::ide::CodeCompletionDeclKind Kind, bool IsRef = false);
   static SourceKit::UIdent getUIDForAccessor(const swift::ValueDecl *D,
