@@ -386,43 +386,50 @@ SourceLoc CaseLabelItem::getEndLoc() const {
 }
 
 CaseStmt::CaseStmt(SourceLoc caseLoc, ArrayRef<CaseLabelItem> caseLabelItems,
-                   bool hasBoundDecls, SourceLoc unknownAttrLoc,
-                   SourceLoc colonLoc, Stmt *body, Optional<bool> implicit,
+                   SourceLoc unknownAttrLoc, SourceLoc colonLoc, Stmt *body,
+                   Optional<MutableArrayRef<VarDecl *>> caseBodyVariables,
+                   Optional<bool> implicit,
                    NullablePtr<FallthroughStmt> fallthroughStmt)
     : Stmt(StmtKind::Case, getDefaultImplicitFlag(implicit, caseLoc)),
       UnknownAttrLoc(unknownAttrLoc), CaseLoc(caseLoc), ColonLoc(colonLoc),
-      BodyAndHasBoundDecls(body, hasBoundDecls),
-      hasFallthrough(fallthroughStmt.isNonNull()) {
+      BodyAndHasFallthrough(body, fallthroughStmt.isNonNull()),
+      CaseBodyVariables(caseBodyVariables) {
   Bits.CaseStmt.NumPatterns = caseLabelItems.size();
   assert(Bits.CaseStmt.NumPatterns > 0 &&
          "case block must have at least one pattern");
 
-  if (hasFallthrough) {
+  if (hasFallthroughDest()) {
     *getTrailingObjects<FallthroughStmt *>() = fallthroughStmt.get();
   }
 
   MutableArrayRef<CaseLabelItem> items{getTrailingObjects<CaseLabelItem>(),
                                        Bits.CaseStmt.NumPatterns};
 
+  // At the beginning mark all of our var decls as being owned by this
+  // statement. In the typechecker we wireup the case stmt var decl list since
+  // we know everything is lined up/typechecked then.
   for (unsigned i : range(Bits.CaseStmt.NumPatterns)) {
     new (&items[i]) CaseLabelItem(caseLabelItems[i]);
     items[i].getPattern()->markOwnedByStatement(this);
+  }
+  for (auto *vd : caseBodyVariables.getValueOr(MutableArrayRef<VarDecl *>())) {
+    vd->setParentPatternStmt(this);
   }
 }
 
 CaseStmt *CaseStmt::create(ASTContext &ctx, SourceLoc caseLoc,
                            ArrayRef<CaseLabelItem> caseLabelItems,
-                           bool hasBoundDecls, SourceLoc unknownAttrLoc,
-                           SourceLoc colonLoc, Stmt *body,
+                           SourceLoc unknownAttrLoc, SourceLoc colonLoc,
+                           Stmt *body,
+                           Optional<MutableArrayRef<VarDecl *>> caseVarDecls,
                            Optional<bool> implicit,
                            NullablePtr<FallthroughStmt> fallthroughStmt) {
   void *mem =
       ctx.Allocate(totalSizeToAlloc<FallthroughStmt *, CaseLabelItem>(
                        fallthroughStmt.isNonNull(), caseLabelItems.size()),
                    alignof(CaseStmt));
-  return ::new (mem)
-      CaseStmt(caseLoc, caseLabelItems, hasBoundDecls, unknownAttrLoc, colonLoc,
-               body, implicit, fallthroughStmt);
+  return ::new (mem) CaseStmt(caseLoc, caseLabelItems, unknownAttrLoc, colonLoc,
+                              body, caseVarDecls, implicit, fallthroughStmt);
 }
 
 SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,

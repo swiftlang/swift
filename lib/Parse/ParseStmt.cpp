@@ -2295,10 +2295,11 @@ Parser::parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive) {
   return Status;
 }
 
-static ParserStatus parseStmtCase(Parser &P, SourceLoc &CaseLoc,
-                                  SmallVectorImpl<CaseLabelItem> &LabelItems,
-                                  SmallVectorImpl<VarDecl *> &BoundDecls,
-                                  SourceLoc &ColonLoc) {
+static ParserStatus
+parseStmtCase(Parser &P, SourceLoc &CaseLoc,
+              SmallVectorImpl<CaseLabelItem> &LabelItems,
+              SmallVectorImpl<VarDecl *> &BoundDecls, SourceLoc &ColonLoc,
+              Optional<MutableArrayRef<VarDecl *>> &CaseBodyDecls) {
   SyntaxParsingContext CaseContext(P.SyntaxContext,
                                    SyntaxKind::SwitchCaseLabel);
   ParserStatus Status;
@@ -2314,13 +2315,28 @@ static ParserStatus parseStmtCase(Parser &P, SourceLoc &CaseLoc,
       GuardedPattern PatternResult;
       parseGuardedPattern(P, PatternResult, Status, BoundDecls,
                           GuardedPatternContext::Case, isFirst);
-      LabelItems.push_back(
-          CaseLabelItem(PatternResult.ThePattern, PatternResult.WhereLoc,
-                        PatternResult.Guard));
+      LabelItems.emplace_back(PatternResult.ThePattern, PatternResult.WhereLoc,
+                              PatternResult.Guard);
       isFirst = false;
       if (!P.consumeIf(tok::comma))
         break;
     }
+
+    // Grab the first case label item pattern and use it to initialize the case
+    // body var decls.
+    SmallVector<VarDecl *, 4> tmp;
+    LabelItems.front().getPattern()->collectVariables(tmp);
+    auto Result = P.Context.AllocateUninitialized<VarDecl *>(tmp.size());
+    for (unsigned i : indices(tmp)) {
+      auto *vOld = tmp[i];
+      auto *vNew = new (P.Context) VarDecl(
+          /*IsStatic*/ false, vOld->getSpecifier(), false /*IsCaptureList*/,
+          vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
+      vNew->setHasNonPatternBindingInit();
+      vNew->setImplicit();
+      Result[i] = vNew;
+    }
+    CaseBodyDecls.emplace(Result);
   }
 
   ColonLoc = P.Tok.getLoc();
@@ -2448,9 +2464,10 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
 
   SourceLoc CaseLoc;
   SourceLoc ColonLoc;
+  Optional<MutableArrayRef<VarDecl *>> CaseBodyDecls;
   if (Tok.is(tok::kw_case)) {
-    Status |=
-        ::parseStmtCase(*this, CaseLoc, CaseLabelItems, BoundDecls, ColonLoc);
+    Status |= ::parseStmtCase(*this, CaseLoc, CaseLabelItems, BoundDecls,
+                              ColonLoc, CaseBodyDecls);
   } else if (Tok.is(tok::kw_default)) {
     Status |= parseStmtCaseDefault(*this, CaseLoc, CaseLabelItems, ColonLoc);
   } else {
@@ -2480,10 +2497,9 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
   }
 
   return makeParserResult(
-      Status,
-      CaseStmt::create(Context, CaseLoc, CaseLabelItems, !BoundDecls.empty(),
-                       UnknownAttrLoc, ColonLoc, Body, None,
-                       FallthroughFinder::findFallthrough(Body)));
+      Status, CaseStmt::create(Context, CaseLoc, CaseLabelItems, UnknownAttrLoc,
+                               ColonLoc, Body, CaseBodyDecls, None,
+                               FallthroughFinder::findFallthrough(Body)));
 }
 
 /// stmt-pound-assert:
