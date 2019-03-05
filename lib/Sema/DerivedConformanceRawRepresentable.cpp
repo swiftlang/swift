@@ -131,7 +131,8 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl,
 
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
                                      /*HasBoundDecls=*/false, SourceLoc(),
-                                     SourceLoc(), body));
+                                     SourceLoc(), body,
+                                     /*case body var decls*/ None));
   }
 
   auto selfRef = DerivedConformance::createSelfDeclRef(toRawDecl);
@@ -369,7 +370,8 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
     // cases.append("case \(litPat): \(body)")
     cases.push_back(CaseStmt::create(C, SourceLoc(), CaseLabelItem(litPat),
                                      /*HasBoundDecls=*/false, SourceLoc(),
-                                     SourceLoc(), body));
+                                     SourceLoc(), body,
+                                     /*case body var decls*/ None));
     Idx++;
   }
 
@@ -382,7 +384,8 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
                                     ASTNode(dfltReturnStmt), SourceLoc());
   cases.push_back(CaseStmt::create(C, SourceLoc(), dfltLabelItem,
                                    /*HasBoundDecls=*/false, SourceLoc(),
-                                   SourceLoc(), dfltBody));
+                                   SourceLoc(), dfltBody,
+                                   /*case body var decls*/ None));
 
   auto rawDecl = initDecl->getParameters()->get(0);
   auto rawRef = new (C) DeclRefExpr(rawDecl, DeclNameLoc(), /*implicit*/true);

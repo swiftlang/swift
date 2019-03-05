@@ -17,12 +17,13 @@
 #ifndef SWIFT_AST_STMT_H
 #define SWIFT_AST_STMT_H
 
+#include "swift/AST/ASTNode.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/AvailabilitySpec.h"
-#include "swift/AST/ASTNode.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/NullablePtr.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
@@ -943,16 +944,20 @@ class CaseStmt final : public Stmt,
 
   llvm::PointerIntPair<Stmt *, 1, bool> BodyAndHasBoundDecls;
 
+  Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables;
+
   CaseStmt(SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
            bool HasBoundDecls, SourceLoc UnknownAttrLoc, SourceLoc ColonLoc,
-           Stmt *Body, Optional<bool> Implicit);
+           Stmt *Body, Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
+           Optional<bool> Implicit);
 
 public:
-  static CaseStmt *create(ASTContext &C, SourceLoc CaseLoc,
-                          ArrayRef<CaseLabelItem> CaseLabelItems,
-                          bool HasBoundDecls, SourceLoc UnknownAttrLoc,
-                          SourceLoc ColonLoc, Stmt *Body,
-                          Optional<bool> Implicit = None);
+  static CaseStmt *
+  create(ASTContext &C, SourceLoc CaseLoc,
+         ArrayRef<CaseLabelItem> CaseLabelItems, bool HasBoundDecls,
+         SourceLoc UnknownAttrLoc, SourceLoc ColonLoc, Stmt *Body,
+         Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
+         Optional<bool> Implicit = None);
 
   ArrayRef<CaseLabelItem> getCaseLabelItems() const {
     return {getTrailingObjects<CaseLabelItem>(), Bits.CaseStmt.NumPatterns};
@@ -988,6 +993,17 @@ public:
     // diagnosing otherwise-non-exhaustive switches, and the user can't edit
     // a synthesized case.
     return UnknownAttrLoc.isValid();
+  }
+
+  Optional<ArrayRef<VarDecl *>> getCaseBodyVariables() const {
+    if (!CaseBodyVariables)
+      return None;
+    ArrayRef<VarDecl *> a = *CaseBodyVariables;
+    return a;
+  }
+
+  Optional<MutableArrayRef<VarDecl *>> getCaseBodyVariables() {
+    return CaseBodyVariables;
   }
 
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Case; }

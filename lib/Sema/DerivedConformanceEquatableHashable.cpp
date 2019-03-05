@@ -248,7 +248,8 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
                                   SourceLoc());
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
                                      /*HasBoundDecls=*/false, SourceLoc(),
-                                     SourceLoc(), body));
+                                     SourceLoc(), body,
+                                     /*case body vardecls*/ None));
   }
 
   // generate: switch enumVar { }
@@ -434,6 +435,10 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     rhsElemPat->setImplicit();
 
     auto hasBoundDecls = !lhsPayloadVars.empty();
+    Optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
+    if (hasBoundDecls) {
+      caseBodyVarDecls.emplace(C.AllocateCopy(lhsPayloadVars));
+    }
 
     // case (.<elt>(let l0, let l1, ...), .<elt>(let r0, let r1, ...))
     auto caseTuplePattern = TuplePattern::create(C, SourceLoc(), {
@@ -470,7 +475,8 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     auto body = BraceStmt::create(C, SourceLoc(), statementsInCase,
                                   SourceLoc());
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, hasBoundDecls,
-                                     SourceLoc(), SourceLoc(), body));
+                                     SourceLoc(), SourceLoc(), body,
+                                     caseBodyVarDecls));
   }
 
   // default: result = false
@@ -487,8 +493,9 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                                   SourceLoc());
     cases.push_back(CaseStmt::create(C, SourceLoc(), defaultItem,
-                                     /*HasBoundDecls*/ false,
-                                     SourceLoc(), SourceLoc(), body));
+                                     /*HasBoundDecls*/ false, SourceLoc(),
+                                     SourceLoc(), body,
+                                     /*case body var decls*/ None));
   }
 
   // switch (a, b) { <case statements> }
@@ -960,9 +967,13 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
     }
 
     auto hasBoundDecls = !payloadVars.empty();
+    Optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
+    if (hasBoundDecls)
+      caseBodyVarDecls.emplace(C.AllocateCopy(payloadVars));
     auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, hasBoundDecls,
                                      SourceLoc(), SourceLoc(), body,
+                                     caseBodyVarDecls,
                                      /*implicit*/ true));
   }
 

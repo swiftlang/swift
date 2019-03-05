@@ -387,10 +387,13 @@ SourceLoc CaseLabelItem::getEndLoc() const {
 
 CaseStmt::CaseStmt(SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
                    bool HasBoundDecls, SourceLoc UnknownAttrLoc,
-                   SourceLoc ColonLoc, Stmt *Body, Optional<bool> Implicit)
+                   SourceLoc ColonLoc, Stmt *Body,
+                   Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
+                   Optional<bool> Implicit)
     : Stmt(StmtKind::Case, getDefaultImplicitFlag(Implicit, CaseLoc)),
       UnknownAttrLoc(UnknownAttrLoc), CaseLoc(CaseLoc), ColonLoc(ColonLoc),
-      BodyAndHasBoundDecls(Body, HasBoundDecls) {
+      BodyAndHasBoundDecls(Body, HasBoundDecls),
+      CaseBodyVariables(CaseBodyVariables) {
   Bits.CaseStmt.NumPatterns = CaseLabelItems.size();
   assert(Bits.CaseStmt.NumPatterns > 0 &&
          "case block must have at least one pattern");
@@ -403,15 +406,21 @@ CaseStmt::CaseStmt(SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
   }
 }
 
-CaseStmt *CaseStmt::create(ASTContext &C, SourceLoc CaseLoc,
-                           ArrayRef<CaseLabelItem> CaseLabelItems,
-                           bool HasBoundDecls, SourceLoc UnknownAttrLoc,
-                           SourceLoc ColonLoc, Stmt *Body,
-                           Optional<bool> Implicit) {
+CaseStmt *
+CaseStmt::create(ASTContext &C, SourceLoc CaseLoc,
+                 ArrayRef<CaseLabelItem> CaseLabelItems, bool HasBoundDecls,
+                 SourceLoc UnknownAttrLoc, SourceLoc ColonLoc, Stmt *Body,
+                 Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
+                 Optional<bool> Implicit) {
+  assert((!HasBoundDecls || (CaseBodyVariables.hasValue() &&
+                             CaseBodyVariables.getValue().size())) &&
+         "If we have bound decls, we must also have a non-empty case body "
+         "variable array");
   void *Mem = C.Allocate(totalSizeToAlloc<CaseLabelItem>(CaseLabelItems.size()),
                          alignof(CaseStmt));
-  return ::new (Mem) CaseStmt(CaseLoc, CaseLabelItems, HasBoundDecls,
-                              UnknownAttrLoc, ColonLoc, Body, Implicit);
+  return ::new (Mem)
+      CaseStmt(CaseLoc, CaseLabelItems, HasBoundDecls, UnknownAttrLoc, ColonLoc,
+               Body, CaseBodyVariables, Implicit);
 }
 
 SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,

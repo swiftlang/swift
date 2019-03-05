@@ -237,7 +237,8 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl, void *) {
                                          SourceLoc());
       cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
                                        /*HasBoundDecls=*/false, SourceLoc(),
-                                       SourceLoc(), caseBody));
+                                       SourceLoc(), caseBody,
+                                       /*case body var decls*/ None));
     }
 
     auto *selfRef = DerivedConformance::createSelfDeclRef(strValDecl);
@@ -305,7 +306,8 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl, void *) {
                                    SourceLoc());
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
                                      /*HasBoundDecls=*/false, SourceLoc(),
-                                     SourceLoc(), body));
+                                     SourceLoc(), body,
+                                     /*case body var decls*/ None));
   }
 
   auto *anyPat = new (C) AnyPattern(SourceLoc());
@@ -317,7 +319,8 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl, void *) {
                                      SourceLoc());
   cases.push_back(CaseStmt::create(C, SourceLoc(), dfltLabelItem,
                                    /*HasBoundDecls=*/false, SourceLoc(),
-                                   SourceLoc(), dfltBody));
+                                   SourceLoc(), dfltBody,
+                                   /*case body var decls*/ None));
 
   auto *stringValueDecl = initDecl->getParameters()->get(0);
   auto *stringValueRef = new (C) DeclRefExpr(stringValueDecl, DeclNameLoc(),

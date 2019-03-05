@@ -997,12 +997,13 @@ public:
             });
           }
           labelItem.setPattern(pattern);
-          
-          // For each variable in the pattern, make sure its type is identical to what it
-          // was in the first label item's pattern.
+
+          // For each variable in the pattern, make sure its type is identical
+          // to what it was in the first label item's pattern.
           auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
           SmallVector<VarDecl *, 4> vars;
           firstPattern->collectVariables(vars);
+
           pattern->forEachVariable([&](VarDecl *VD) {
             if (!VD->hasName())
               return;
@@ -1037,6 +1038,26 @@ public:
             }
           });
         }
+
+        if (auto caseBodyVars = caseBlock->getCaseBodyVariables()) {
+          auto *firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
+          SmallVector<VarDecl *, 4> vars;
+          firstPattern->collectVariables(vars);
+          for (auto *expected : *caseBodyVars) {
+            assert(expected->hasName());
+            for (auto *v : vars) {
+              if (!v->hasName() || v->getName() != expected->getName())
+                continue;
+
+              if (v->hasType())
+                expected->setType(v->getType());
+              if (v->hasInterfaceType())
+                expected->setInterfaceType(v->getInterfaceType());
+              break;
+            }
+          }
+        }
+
         // Check the guard expression, if present.
         if (auto *guard = labelItem.getGuardExpr()) {
           limitExhaustivityChecks |= TC.typeCheckCondition(guard, DC);
