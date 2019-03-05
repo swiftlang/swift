@@ -513,11 +513,8 @@ CompilerInstance::getInputBufferAndModuleDocBufferIfPresent(
                               b->getBuffer(), b->getBufferIdentifier()),
                           nullptr);
   }
-  // FIXME: Working with filenames is fragile, maybe use the real path
-  // or have some kind of FileManager.
-  using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
-  FileOrError inputFileOrErr = swift::vfs::getFileOrSTDIN(getFileSystem(),
-                                                          input.file());
+
+  auto inputFileOrErr = FileMgr->getBufferForFileOrSTDIN(input.file());
   if (!inputFileOrErr) {
     Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file, input.file(),
                          inputFileOrErr.getError().message());
@@ -540,9 +537,8 @@ CompilerInstance::openModuleDoc(const InputFile &input) {
   llvm::sys::path::replace_extension(
       moduleDocFilePath,
       file_types::getExtension(file_types::TY_SwiftModuleDocFile));
-  using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
-  FileOrError moduleDocFileOrErr =
-      swift::vfs::getFileOrSTDIN(getFileSystem(), moduleDocFilePath);
+
+  auto moduleDocFileOrErr = FileMgr->getBufferForFileOrSTDIN(moduleDocFilePath);
   if (moduleDocFileOrErr)
     return std::move(*moduleDocFileOrErr);
 

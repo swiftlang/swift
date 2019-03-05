@@ -15,6 +15,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/FileManager.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/STLExtras.h"
@@ -247,12 +248,10 @@ std::error_code SerializedModuleLoaderBase::openModuleDocFile(
   if (!ModuleDocBuffer)
     return std::error_code();
 
-  llvm::vfs::FileSystem &FS = *Ctx.SourceMgr.getFileSystem();
-
   // Try to open the module documentation file.  If it does not exist, ignore
   // the error.  However, pass though all other errors.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleDocOrErr =
-    FS.getBufferForFile(ModuleDocPath);
+    Ctx.FileMgr.getBufferForFile(ModuleDocPath);
   if (ModuleDocOrErr) {
     *ModuleDocBuffer = std::move(*ModuleDocOrErr);
   } else if (ModuleDocOrErr.getError() !=
@@ -271,15 +270,13 @@ std::error_code SerializedModuleLoaderBase::openModuleFiles(
           (!ModuleBuffer && !ModuleDocBuffer)) &&
          "Module and Module Doc buffer must both be initialized or NULL");
 
-  llvm::vfs::FileSystem &FS = *Ctx.SourceMgr.getFileSystem();
-
   // Try to open the module file first.  If we fail, don't even look for the
   // module documentation file.
 
   // If there are no buffers to load into, simply check for the existence of
   // the module file.
   if (!(ModuleBuffer || ModuleDocBuffer)) {
-    llvm::ErrorOr<llvm::vfs::Status> statResult = FS.status(ModulePath);
+    llvm::ErrorOr<llvm::vfs::Status> statResult = Ctx.FileMgr.status(ModulePath);
     if (!statResult)
       return statResult.getError();
     if (!statResult->exists())
@@ -290,7 +287,7 @@ std::error_code SerializedModuleLoaderBase::openModuleFiles(
   }
 
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleOrErr =
-      FS.getBufferForFile(ModulePath);
+      Ctx.FileMgr.getBufferForFile(ModulePath);
   if (!ModuleOrErr)
     return ModuleOrErr.getError();
 
@@ -326,7 +323,7 @@ std::error_code SerializedModuleLoader::findModuleFilesInDirectory(
 bool SerializedModuleLoader::maybeDiagnoseTargetMismatch(
     SourceLoc sourceLocation, StringRef moduleName, StringRef archName,
     StringRef directoryPath) {
-  llvm::vfs::FileSystem &fs = *Ctx.SourceMgr.getFileSystem();
+  llvm::vfs::FileSystem &fs = Ctx.FileMgr.getFileSystem();
 
   std::error_code errorCode;
   std::string foundArchs;
@@ -389,7 +386,7 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
       primaryTargetSpecificName = targetName;
   });
 
-  auto &fs = *Ctx.SourceMgr.getFileSystem();
+  auto &fs = Ctx.FileMgr.getFileSystem();
 
   llvm::SmallString<256> currPath;
 

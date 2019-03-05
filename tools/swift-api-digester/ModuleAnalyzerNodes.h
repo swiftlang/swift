@@ -154,6 +154,7 @@ class SDKContext {
   llvm::StringSet<> TextData;
   llvm::BumpPtrAllocator Allocator;
   SourceManager SourceMgr;
+  FileManager FileMgr;
   DiagnosticEngine Diags;
   UpdatedNodesMap UpdateMap;
   NodeMap TypeAliasUpdateMap;
@@ -190,6 +191,9 @@ public:
   }
   SourceManager &getSourceMgr() {
     return SourceMgr;
+  }
+  FileManager &getFileMgr() {
+    return FileMgr;
   }
   DiagnosticEngine &getDiags() {
     return Diags;

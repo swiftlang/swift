@@ -21,6 +21,7 @@
 #include "swift/AST/Module.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/PersistentParserState.h"
+#include "swift/Basic/FileManager.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -42,7 +43,7 @@ static FileOrError findModule(ASTContext &ctx, StringRef moduleID,
     llvm::sys::path::append(inputFilename, moduleID);
     inputFilename.append(".swift");
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      ctx.SourceMgr.getFileSystem()->getBufferForFile(inputFilename.str());
+      ctx.FileMgr.getBufferForFile(inputFilename.str());
 
     // Return if we loaded a file
     if (FileBufOrErr)
