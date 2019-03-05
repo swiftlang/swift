@@ -2696,19 +2696,37 @@ void Serializer::writeDecl(const Decl *D) {
   }
 
   if (auto *value = dyn_cast<ValueDecl>(D)) {
-    if (value->getFormalAccess() <= swift::AccessLevel::FilePrivate &&
-        !value->getDeclContext()->isLocalContext()) {
+    auto *storage = dyn_cast<AbstractStorageDecl>(value);
+    auto access = value->getFormalAccess();
+    // Emit the private descriminator for private decls.
+    // FIXME: We shouldn't need to encode this for /all/ private decls.
+    // In theory we can follow the same rules as mangling and only include
+    // the outermost private context.
+    bool shouldEmitPrivateDescriminator =
+        access <= swift::AccessLevel::FilePrivate &&
+        !value->getDeclContext()->isLocalContext();
+
+    // Emit the the filename for private mapping for private decls and
+    // decls with private accessors if compiled with -enable-private-imports.
+    bool shouldEmitFilenameForPrivate =
+        M->arePrivateImportsEnabled() &&
+        !value->getDeclContext()->isLocalContext() &&
+        (access <= swift::AccessLevel::FilePrivate ||
+         (storage &&
+          storage->getFormalAccess() >= swift::AccessLevel::Internal &&
+          storage->hasPrivateAccessor()));
+
+    if (shouldEmitFilenameForPrivate || shouldEmitPrivateDescriminator) {
       auto topLevelContext = value->getDeclContext()->getModuleScopeContext();
       if (auto *enclosingFile = dyn_cast<FileUnit>(topLevelContext)) {
-        // FIXME: We shouldn't need to encode this for /all/ private decls.
-        // In theory we can follow the same rules as mangling and only include
-        // the outermost private context.
-        Identifier discriminator =
-          enclosingFile->getDiscriminatorForPrivateValue(value);
-        unsigned abbrCode =
-          DeclTypeAbbrCodes[PrivateDiscriminatorLayout::Code];
-        PrivateDiscriminatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                        addDeclBaseNameRef(discriminator));
+        if (shouldEmitPrivateDescriminator) {
+          Identifier discriminator =
+              enclosingFile->getDiscriminatorForPrivateValue(value);
+          unsigned abbrCode =
+              DeclTypeAbbrCodes[PrivateDiscriminatorLayout::Code];
+          PrivateDiscriminatorLayout::emitRecord(
+              Out, ScratchRecord, abbrCode, addDeclBaseNameRef(discriminator));
+        }
         auto getFilename = [](FileUnit *enclosingFile,
                               const ValueDecl *decl) -> StringRef {
           if (auto *SF = dyn_cast<SourceFile>(enclosingFile)) {
@@ -2718,8 +2736,7 @@ void Serializer::writeDecl(const Decl *D) {
           }
           return StringRef();
         };
-        // Only if compiled with -enable-private-imports.
-        if (M->arePrivateImportsEnabled()) {
+        if (shouldEmitFilenameForPrivate) {
           auto filename = getFilename(enclosingFile, value);
           if (!filename.empty()) {
             auto filenameID = addFilename(filename);
