@@ -1909,21 +1909,6 @@ void ConstraintSystem::partitionForDesignatedTypes(
 void ConstraintSystem::partitionDisjunction(
     ArrayRef<Constraint *> Choices, SmallVectorImpl<unsigned> &Ordering,
     SmallVectorImpl<unsigned> &PartitionBeginning) {
-  // Maintain the original ordering, and make a single partition of
-  // disjunction choices.
-  auto originalOrdering = [&]() {
-    for (unsigned long i = 0, e = Choices.size(); i != e; ++i)
-      Ordering.push_back(i);
-
-    PartitionBeginning.push_back(0);
-  };
-
-  if (!TC.getLangOpts().SolverEnableOperatorDesignatedTypes ||
-      !isOperatorBindOverload(Choices[0])) {
-    originalOrdering();
-    return;
-  }
-
   SmallSet<Constraint *, 16> taken;
 
   // Local function used to iterate over the untaken choices from the
@@ -1937,33 +1922,45 @@ void ConstraintSystem::partitionDisjunction(
           if (taken.count(constraint))
             continue;
 
-          assert(constraint->getKind() == ConstraintKind::BindOverload);
-          assert(constraint->getOverloadChoice().isDecl());
-
           if (fn(index, constraint))
             taken.insert(constraint);
         }
       };
 
-  // First collect some things that we'll generally put near the end
-  // of the partitioning.
+  // First collect some things that we'll generally put near the beginning or
+  // end of the partitioning.
 
+  SmallVector<unsigned, 4> favored;
   SmallVector<unsigned, 4> disabled;
   SmallVector<unsigned, 4> unavailable;
 
-  // First collect disabled constraints.
+  // First collect disabled and favored constraints.
   forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
-    if (!constraint->isDisabled())
-      return false;
-    disabled.push_back(index);
-    return true;
+    if (constraint->isDisabled()) {
+      disabled.push_back(index);
+      return true;
+    }
+
+    if (constraint->isFavored()) {
+      favored.push_back(index);
+      return true;
+    }
+
+    return false;
   });
 
   // Then unavailable constraints if we're skipping them.
   if (!shouldAttemptFixes()) {
     forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
+      if (constraint->getKind() != ConstraintKind::BindOverload)
+        return false;
+      if (!constraint->getOverloadChoice().isDecl())
+        return false;
+
       auto *decl = constraint->getOverloadChoice().getDecl();
-      auto *funcDecl = cast<FuncDecl>(decl);
+      auto *funcDecl = dyn_cast<FuncDecl>(decl);
+      if (!funcDecl)
+        return false;
 
       if (!funcDecl->getAttrs().isUnavailable(getASTContext()))
         return false;
@@ -1983,7 +1980,10 @@ void ConstraintSystem::partitionDisjunction(
         }
       };
 
-  partitionForDesignatedTypes(Choices, forEachChoice, appendPartition);
+  if (TC.getLangOpts().SolverEnableOperatorDesignatedTypes &&
+      isOperatorBindOverload(Choices[0])) {
+    partitionForDesignatedTypes(Choices, forEachChoice, appendPartition);
+  }
 
   SmallVector<unsigned, 4> everythingElse;
   // Gather the remaining options.
@@ -1991,6 +1991,7 @@ void ConstraintSystem::partitionDisjunction(
     everythingElse.push_back(index);
     return true;
   });
+  appendPartition(favored);
   appendPartition(everythingElse);
 
   // Now create the remaining partitions from what we previously collected.
