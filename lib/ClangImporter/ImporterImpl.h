@@ -248,14 +248,19 @@ enum class FactoryAsInitKind {
 
 namespace importer {
 struct PlatformAvailability {
-  /// A predicate that indicates if the given platform should be
-  /// considered for availability.
-  std::function<bool(StringRef PlatformName)> filter;
+private:
+  PlatformKind platformKind;
 
-  /// A predicate that indicates if the given platform version should
-  /// should be included in the cutoff of deprecated APIs marked unavailable.
-  std::function<bool(unsigned major, llvm::Optional<unsigned> minor)>
-      deprecatedAsUnavailableFilter;
+public:
+  /// Returns true when the given platform should be considered for
+  /// availabilityon imported declarations.
+  bool isPlatformRelevant(StringRef platform) const;
+
+  /// Returns true when the given declaration with the given deprecation
+  /// should be inlucded in the cutoff of imported deprecated APIs marked
+  /// unavailable.
+  bool treatDeprecatedAsUnavailable(const clang::Decl *clangDecl,
+                                    const llvm::VersionTuple &version) const;
 
   /// The message to embed for implicitly unavailability if a deprecated
   /// API is now unavailable.
