@@ -345,12 +345,12 @@ internal extension ShapedArray where Scalar : _TensorFlowDataTypeCompatible {
 }
 
 public extension ShapedArray {
-  /// The number of dimensions of the `ShapedArray`.
+  /// The number of dimensions of the array.
   var rank: Int {
     return shape.count
   }
 
-  /// The total number of scalars in the `ShapedArray`.
+  /// The total number of scalars in the array.
   var scalarCount: Int {
     return buffer.count
   }
@@ -499,13 +499,13 @@ extension ShapedArray : RandomAccessCollection, MutableCollection {
 }
 
 public extension ShapedArray {
-  /// Calls a closure with a pointer to the `ShapedArray`’s contiguous storage.
+  /// Calls a closure with a pointer to the array’s contiguous storage.
   /// - Parameter body: A closure with an `UnsafeBufferPointer` parameter that
-  ///   points to the contiguous storage for the `ShapedArray`. If no such
-  ///   storage exists, it is created. If body has a return value, that value is
-  ///   also used as the return value for the `withUnsafeBufferPointer(_:)`
-  ///   method. The pointer argument is valid only for the duration of the
-  ///   method’ execution.
+  ///   points to the contiguous storage for the array. If no such storage
+  ///   exists, it is created. If body has a return value, that value is also
+  ///   used as the return value for the `withUnsafeBufferPointer(_:)` method.
+  ///   The pointer argument is valid only for the duration of the method’s
+  ///   execution.
   func withUnsafeBufferPointer<Result>(
     _ body: (UnsafeBufferPointer<Scalar>) throws -> Result
   ) rethrows -> Result {
@@ -514,14 +514,14 @@ public extension ShapedArray {
     }
   }
 
-  /// Calls the given closure with a pointer to the `ShapedArray`’s mutable
-  /// contiguous storage.
+  /// Calls the given closure with a pointer to the array’s mutable contiguous
+  /// storage.
   /// - Parameter body: A closure with an `UnsafeMutableBufferPointer` parameter
-  ///   that points to the contiguous storage for the `ShapedArray`. If no such
-  ///   storage exists, it is created. If body has a return value, that value is
-  ///   also used as the return value for the
-  ///   `withUnsafeMutableBufferPointer(_:)` method. The pointer argument is
-  ///   valid only for the duration of the method’s execution.
+  ///   that points to the contiguous storage for the array. If no such storage
+  ///   exists, it is created. If body has a return value, that value is also
+  ///   used as the return value for the `withUnsafeMutableBufferPointer(_:)`
+  ///   method. The pointer argument is valid only for the duration of the
+  /// method’s execution.
   mutating func withUnsafeMutableBufferPointer<Result>(
     _ body: (inout UnsafeMutableBufferPointer<Scalar>) throws -> Result
   ) rethrows -> Result {
@@ -722,12 +722,12 @@ public extension ShapedArraySlice {
     return baseIndices.count
   }
 
-  /// The number of dimensions of the `ShapedArraySlice`.
+  /// The number of dimensions of the array.
   var rank: Int {
     return base.rank - indexingDepth
   }
 
-  /// The dimensions of the `ShapedArraySlice`.
+  /// The dimensions of the array.
   var shape: [Int] {
     if let bounds = bounds {
       return [bounds.count] + Array(base.shape.dropFirst(indexingDepth + 1))
@@ -735,7 +735,7 @@ public extension ShapedArraySlice {
     return Array(base.shape.dropFirst(indexingDepth))
   }
 
-  /// The total number of scalars in the `ShapedArraySlice`.
+  /// The total number of scalars in the array.
   var scalarCount: Int {
     return shape.reduce(1, *)
   }
