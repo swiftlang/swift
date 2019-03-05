@@ -14,7 +14,7 @@ from .cmark import CMark
 from .foundation import Foundation
 from .indexstoredb import IndexStoreDB
 from .libcxx import LibCXX
-from .libdispatch import LibDispatch
+from .libdispatch import (LibDispatch, LibDispatchStatic)
 from .libicu import LibICU
 from .llbuild import LLBuild
 from .lldb import LLDB
@@ -34,6 +34,7 @@ __all__ = [
     'Foundation',
     'LibCXX',
     'LibDispatch',
+    'LibDispatchStatic',
     'LibICU',
     'LLBuild',
     'LLDB',
