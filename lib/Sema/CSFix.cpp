@@ -373,7 +373,9 @@ AddMissingArguments::create(ConstraintSystem &cs, FunctionType *funcType,
 }
 
 bool MoveOutOfOrderArgument::diagnose(Expr *root, bool asNote) const {
-  return false;
+  OutOfOrderArgumentFailure failure(root, getConstraintSystem(), ArgIdx,
+                                    PrevArgIdx, Bindings, getLocator());
+  return failure.diagnose(asNote);
 }
 
 MoveOutOfOrderArgument *MoveOutOfOrderArgument::create(
