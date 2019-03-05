@@ -1974,16 +1974,6 @@ func _TFCOpSetAttrStringArray(_ op: CTFEOp,
   }
 }
 
-/// A TensorFlow device kind.
-public enum DeviceKind {
-  /// Central processing units.
-  case cpu
-  /// Graphics processing units.
-  case gpu
-  /// Tensor processing units.
-  case tpu
-}
-
 @usableFromInline
 class _ThreadLocalState {
   var deviceScopes: [(kind: DeviceKind, index: UInt)?] = []

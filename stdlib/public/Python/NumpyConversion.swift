@@ -93,6 +93,13 @@ extension Double : NumpyScalarCompatible {
 
 extension Array : ConvertibleFromNumpyArray
   where Element : NumpyScalarCompatible {
+  /// Creates an `Array` with the same shape and scalars as the specified
+  /// `numpy.ndarray` instance.
+  ///
+  /// - Parameter numpyArray: The `numpy.ndarray` instance to convert.
+  /// - Precondition: The `numpy` Python package must be installed.
+  /// - Returns: `numpyArray` converted to an `Array`. Returns `nil` if
+  ///   `numpyArray` is not 1-D or does not have a compatible scalar `dtype`.
   public init?(numpy numpyArray: PythonObject) {
     // Check if input is a `numpy.ndarray` instance.
     guard Python.isinstance(numpyArray, np.ndarray) == true else {
@@ -136,6 +143,10 @@ extension Array : ConvertibleFromNumpyArray
 }
 
 public extension Array where Element : NumpyScalarCompatible {
+  /// Creates a 1-D `numpy.ndarray` instance with the same scalars as this
+  /// `Array`.
+  ///
+  /// - Precondition: The `numpy` Python package must be installed.
   func makeNumpyArray() -> PythonObject {
     return withUnsafeBytes { bytes in
       let data = ctypes.cast(Int(bitPattern: bytes.baseAddress),
