@@ -86,6 +86,20 @@ Expr *FailureDiagnostic::findParentExpr(Expr *subExpr) const {
   return E ? E->getParentMap()[subExpr] : nullptr;
 }
 
+Expr *FailureDiagnostic::getArgumentExprFor(Expr *anchor) const {
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
+    if (auto *call = dyn_cast_or_null<CallExpr>(findParentExpr(UDE)))
+      return call->getArg();
+  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
+    return UME->getArgument();
+  } else if (auto *call = dyn_cast<CallExpr>(anchor)) {
+    return call->getArg();
+  } else if (auto *SE = dyn_cast<SubscriptExpr>(anchor)) {
+    return SE->getIndex();
+  }
+  return nullptr;
+}
+
 Type RequirementFailure::getOwnerType() const {
   return getType(getRawAnchor())
       ->getInOutObjectType()
@@ -369,18 +383,7 @@ bool LabelingFailure::diagnoseAsError() {
   auto &cs = getConstraintSystem();
   auto *anchor = getRawAnchor();
 
-  Expr *argExpr = nullptr;
-  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
-    if (auto *call = dyn_cast_or_null<CallExpr>(findParentExpr(UDE)))
-      argExpr = call->getArg();
-  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
-    argExpr = UME->getArgument();
-  } else if (auto *call = dyn_cast<CallExpr>(anchor)) {
-    argExpr = call->getArg();
-  } else if (auto *SE = dyn_cast<SubscriptExpr>(anchor)) {
-    argExpr = SE->getIndex();
-  }
-
+  auto *argExpr = getArgumentExprFor(anchor);
   if (!argExpr)
     return false;
 
@@ -2131,5 +2134,80 @@ bool ClosureParamDestructuringFailure::diagnoseAsError() {
 
   diag.fixItReplace(params->getSourceRange(), nameOS.str())
       .fixItInsert(bodyLoc, OS.str());
+  return true;
+}
+
+bool OutOfOrderArgumentFailure::diagnoseAsError() {
+  auto *anchor = getRawAnchor();
+  auto *argExpr = isa<TupleExpr>(anchor) ? anchor : getArgumentExprFor(anchor);
+  if (!argExpr)
+    return false;
+
+  auto *tuple = cast<TupleExpr>(argExpr);
+
+  Identifier first = tuple->getElementName(ArgIdx);
+  Identifier second = tuple->getElementName(PrevArgIdx);
+
+  // Build a mapping from arguments to parameters.
+  SmallVector<unsigned, 4> argBindings(tuple->getNumElements());
+  for (unsigned paramIdx = 0; paramIdx != Bindings.size(); ++paramIdx) {
+    for (auto argIdx : Bindings[paramIdx])
+      argBindings[argIdx] = paramIdx;
+  }
+
+  auto argRange = [&](unsigned argIdx, Identifier label) -> SourceRange {
+    auto range = tuple->getElement(argIdx)->getSourceRange();
+    if (!label.empty())
+      range.Start = tuple->getElementNameLoc(argIdx);
+
+    unsigned paramIdx = argBindings[argIdx];
+    if (Bindings[paramIdx].size() > 1)
+      range.End = tuple->getElement(Bindings[paramIdx].back())->getEndLoc();
+
+    return range;
+  };
+
+  auto firstRange = argRange(ArgIdx, first);
+  auto secondRange = argRange(PrevArgIdx, second);
+
+  SourceLoc diagLoc = firstRange.Start;
+
+  auto addFixIts = [&](InFlightDiagnostic diag) {
+    diag.highlight(firstRange).highlight(secondRange);
+
+    // Move the misplaced argument by removing it from one location and
+    // inserting it in another location. To maintain argument comma
+    // separation, since the argument is always moving to an earlier index
+    // the preceding comma and whitespace is removed and a new trailing
+    // comma and space is inserted with the moved argument.
+    auto &SM = getASTContext().SourceMgr;
+    auto text = SM.extractText(
+        Lexer::getCharSourceRangeFromSourceRange(SM, firstRange));
+
+    auto removalRange =
+        SourceRange(Lexer::getLocForEndOfToken(
+                        SM, tuple->getElement(ArgIdx - 1)->getEndLoc()),
+                    firstRange.End);
+    diag.fixItRemove(removalRange);
+    diag.fixItInsert(secondRange.Start, text.str() + ", ");
+  };
+
+  // There are 4 diagnostic messages variations depending on
+  // labeled/unlabeled arguments.
+  if (first.empty() && second.empty()) {
+    addFixIts(emitDiagnostic(diagLoc,
+                             diag::argument_out_of_order_unnamed_unnamed,
+                             ArgIdx + 1, PrevArgIdx + 1));
+  } else if (first.empty() && !second.empty()) {
+    addFixIts(emitDiagnostic(diagLoc, diag::argument_out_of_order_unnamed_named,
+                             ArgIdx + 1, second));
+  } else if (!first.empty() && second.empty()) {
+    addFixIts(emitDiagnostic(diagLoc, diag::argument_out_of_order_named_unnamed,
+                             first, PrevArgIdx + 1));
+  } else {
+    addFixIts(emitDiagnostic(diagLoc, diag::argument_out_of_order_named_named,
+                             first, second));
+  }
+
   return true;
 }

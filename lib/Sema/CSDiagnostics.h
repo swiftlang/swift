@@ -151,6 +151,10 @@ protected:
   /// in the root expression or `nullptr` otherwise.
   Expr *findParentExpr(Expr *subExpr) const;
 
+  /// \returns An argument expression if given anchor is a call, member
+  /// reference or subscript, nullptr otherwise.
+  Expr *getArgumentExprFor(Expr *anchor) const;
+
 private:
   /// Compute anchor expression associated with current diagnostic.
   std::pair<Expr *, bool> computeAnchor() const;
@@ -897,6 +901,26 @@ private:
   /// If missing arguments come from trailing closure,
   /// let's produce tailored diagnostics.
   bool diagnoseTrailingClosure(ClosureExpr *closure);
+};
+
+class OutOfOrderArgumentFailure final : public FailureDiagnostic {
+  using ParamBinding = SmallVector<unsigned, 1>;
+
+  unsigned ArgIdx;
+  unsigned PrevArgIdx;
+
+  SmallVector<ParamBinding, 4> Bindings;
+
+public:
+  OutOfOrderArgumentFailure(Expr *root, ConstraintSystem &cs,
+                            unsigned argIdx,
+                            unsigned prevArgIdx,
+                            ArrayRef<ParamBinding> bindings,
+                            ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), ArgIdx(argIdx),
+        PrevArgIdx(prevArgIdx), Bindings(bindings.begin(), bindings.end()) {}
+
+  bool diagnoseAsError() override;
 };
 
 /// Diagnose an attempt to destructure a single tuple closure parameter
