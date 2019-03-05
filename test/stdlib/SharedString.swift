@@ -9,110 +9,53 @@ import StdlibUnittest
 
 var SharedStringTests = TestSuite("SharedStringTests")
 
-SharedStringTests.test("String.withSharedUTF8") {
+func makeValidUTF8Buffer() -> UnsafeBufferPointer<UInt8> {
   let ptr = UnsafeMutablePointer<UInt8>.allocate(capacity: 4)
-  defer { ptr.deallocate() }
   ptr.initialize(repeating: UInt8(ascii: "a"), count: 4)
-  let buf = UnsafeBufferPointer<UInt8>(start: ptr, count: 4)
-
-  String.withSharedUTF8(buf) { str in
-    expectNotNil(str)
-    expectEqual(str!, "aaaa")
-
-    ptr.pointee = UInt8(ascii: "b")
-    expectEqual(str!, "baaa")
-  }
+  return UnsafeBufferPointer<UInt8>(start: ptr, count: 4)
 }
 
-SharedStringTests.test("String.withSharedUTF8 invalid UTF8") {
+func makeInvalidUTF8Buffer() -> UnsafeBufferPointer<UInt8> {
   let ptr = UnsafeMutablePointer<UInt8>.allocate(capacity: 1)
-  defer { ptr.deallocate() }
   ptr.pointee = 0x80  // orphaned continuation byte
-  let buf = UnsafeBufferPointer<UInt8>(start: ptr, count: 1)
+  return UnsafeBufferPointer<UInt8>(start: ptr, count: 1)
+}
 
-  String.withSharedUTF8(buf) { str in
-    expectNil(str)
+class BufferDeallocator {
+  let buffer: UnsafeBufferPointer<UInt8>
+
+  init(_ buffer: UnsafeBufferPointer<UInt8>) {
+    self.buffer = buffer
+  }
+
+  deinit {
+    buffer.deallocate()
   }
 }
 
-SharedStringTests.test("String.withSharedNullTerminatedUTF8") {
-  let ptr = UnsafeMutablePointer<UInt8>.allocate(capacity: 5)
-  defer { ptr.deallocate() }
-  ptr.initialize(repeating: UInt8(ascii: "a"), count: 4)
-  ptr[4] = 0
+SharedStringTests.test("String.init(sharing:owner:)") {
+  let buf = makeValidUTF8Buffer()
+  let str = String(sharingContent: buf, owner: BufferDeallocator(buf))
 
-  String.withSharedNullTerminatedUTF8(ptr) { str in
-    expectNotNil(str)
-    expectEqual(str!, "aaaa")
-
-    ptr.pointee = UInt8(ascii: "b")
-    expectEqual(str!, "baaa")
-  }
-}
-
-SharedStringTests.test("String.withSharedNullTerminatedUTF8 invalid UTF8") {
-  let ptr = UnsafeMutablePointer<UInt8>.allocate(capacity: 2)
-  defer { ptr.deallocate() }
-  ptr[0] = 0x80  // orphaned continuation byte
-  ptr[1] = 0
-
-  String.withSharedNullTerminatedUTF8(ptr) { str in
-    expectNil(str)
-  }
-}
-
-SharedStringTests.test("String.init(sharedUTF8:deallocator:)") {
-  let ptr = UnsafeMutablePointer<UInt8>.allocate(capacity: 4)
-  ptr.initialize(repeating: UInt8(ascii: "a"), count: 4)
-  let buf = UnsafeBufferPointer<UInt8>(start: ptr, count: 4)
-
-  let str = String(sharingUTF8: buf)
   expectNotNil(str)
   expectEqual(str!, "aaaa")
 
-  ptr.pointee = UInt8(ascii: "b")
+  // Show that the string didn't copy the buffer by modifying it in-place.
+  UnsafeMutableBufferPointer(mutating: buf)[0] = UInt8(ascii: "b")
   expectEqual(str!, "baaa")
 
-  // Verify that the deallocator was called by trying to free the memory again.
-  // If a crash occurs, that means the deallocator already did it.
-  expectCrashLater()
-  ptr.deallocate()
-}
-
-SharedStringTests.test("String.withSharedUTF8 invalid UTF8") {
-  let ptr = UnsafeMutablePointer<UInt8>.allocate(capacity: 1)
-  defer { ptr.deallocate() }
-  ptr.pointee = 0x80  // orphaned continuation byte
-  let buf = UnsafeBufferPointer<UInt8>(start: ptr, count: 1)
-
-  expectNil(String(sharingUTF8: buf))
-}
-
-SharedStringTests.test("String.init(sharingNullTerminatedUTF8:deallocator:)") {
-  let ptr = UnsafeMutablePointer<UInt8>.allocate(capacity: 5)
-  ptr.initialize(repeating: UInt8(ascii: "a"), count: 4)
-  ptr[4] = 0
-
-  let str = String(sharingNullTerminatedUTF8: ptr)
-  expectNotNil(str)
-  expectEqual(str!, "aaaa")
-
-  ptr.pointee = UInt8(ascii: "b")
+  // Show that mutating a copy works as expected.
+  var copy = str!
+  copy.append("c")
+  expectEqual(copy, "baaac")
   expectEqual(str!, "baaa")
-
-  // Verify that the deallocator was called by trying to free the memory again.
-  // If a crash occurs, that means the deallocator already did it.
-  expectCrashLater()
-  ptr.deallocate()
 }
 
-SharedStringTests.test("String.init(sharingNullTerminatedUTF8:deallocator:) invalid UTF8") {
-  let ptr = UnsafeMutablePointer<UInt8>.allocate(capacity: 2)
-  defer { ptr.deallocate() }
-  ptr[0] = 0x80  // orphaned continuation byte
-  ptr[1] = 0
+SharedStringTests.test("String.init(sharing:owner:) invalid UTF8") {
+  let buf = makeInvalidUTF8Buffer()
+  let str = String(sharingContent: buf, owner: BufferDeallocator(buf))
 
-  expectNil(String(sharingNullTerminatedUTF8: ptr))
+  expectNil(str)
 }
 
 runAllTests()
