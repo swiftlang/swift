@@ -113,6 +113,12 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   if (!bridgingFunc)
     return nullptr;
 
+  auto paramTypes = bridgingFunc->getLoweredFunctionType()->getParameters();
+  (void)paramTypes;
+  assert(paramTypes[0].getConvention() ==
+             ParameterConvention::Direct_Guaranteed &&
+         "Parameter should be @guaranteed");
+
   CanType CanBridgedTy = BridgedTargetTy->getCanonicalType();
   SILType silBridgedTy = SILType::getPrimitiveObjectType(CanBridgedTy);
 
@@ -181,19 +187,15 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   auto BridgedProto =
       mod.getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
   auto Conf = *mod.getSwiftModule()->lookupConformance(target, BridgedProto);
-
-  auto ParamTypes = bridgingFunc->getLoweredFunctionType()->getParameters();
+  // Add substitutions
+  auto SubMap = SubstitutionMap::getProtocolSubstitutions(Conf.getRequirement(),
+                                                          target, Conf);
 
   auto *FuncRef = Builder.createFunctionRef(Loc, bridgingFunc);
 
   auto MetaTy = MetatypeType::get(target, MetatypeRepresentation::Thick);
   auto SILMetaTy = F->getTypeLowering(MetaTy).getLoweredType();
   auto *MetaTyVal = Builder.createMetatype(Loc, SILMetaTy);
-  SmallVector<SILValue, 1> Args;
-
-  // Add substitutions
-  auto SubMap = SubstitutionMap::getProtocolSubstitutions(Conf.getRequirement(),
-                                                          target, Conf);
 
   // Temporary to hold the intermediate result.
   AllocStackInst *Tmp = nullptr;
@@ -211,13 +213,10 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
     InOutOptionalParam = Dest;
   }
 
-  (void)ParamTypes;
-  assert(ParamTypes[0].getConvention() == ParameterConvention::Direct_Guaranteed &&
-        "Parameter should be @guaranteed");
-
   // Emit a retain.
   Builder.createRetainValue(Loc, srcOp, Builder.getDefaultAtomicity());
 
+  SmallVector<SILValue, 1> Args;
   Args.push_back(InOutOptionalParam);
   Args.push_back(srcOp);
   Args.push_back(MetaTyVal);
