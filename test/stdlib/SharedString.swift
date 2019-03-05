@@ -38,17 +38,17 @@ SharedStringTests.test("String.init(sharingContent:owner:)") {
   let str = String(sharingContent: buf, owner: BufferDeallocator(buf))
 
   expectNotNil(str)
-  expectEqual(str!, "aaaa")
+  expectEqual("aaaa", str!)
 
   // Show that the string didn't copy the buffer by modifying it in-place.
   UnsafeMutableBufferPointer(mutating: buf)[0] = UInt8(ascii: "b")
-  expectEqual(str!, "baaa")
+  expectEqual("baaa", str!)
 
   // Show that mutating a copy works as expected.
   var copy = str!
   copy.append("c")
-  expectEqual(copy, "baaac")
-  expectEqual(str!, "baaa")
+  expectEqual("baaac", copy)
+  expectEqual("baaa", str!)
 }
 
 SharedStringTests.test("String.init(sharingContent:owner:) invalid UTF8") {
@@ -63,7 +63,7 @@ SharedStringTests.test("Substring.withSharedString(_:)") {
   let substr = original.dropFirst().dropLast()
 
   substr.withSharedString { shared in
-    expectEqual(shared, "bcd")
+    expectEqual("bcd", shared)
   }
 }
 
@@ -72,12 +72,12 @@ SharedStringTests.test("String.init(sharing:)") {
   let str = String(sharing: array)
 
   expectNotNil(str)
-  expectEqual(str!, "aaaa")
+  expectEqual("aaaa", str!)
 
   // Show that mutating the array causes CoW and the original string isn't
   // modified.
   array[0] = UInt8(ascii: "b")
-  expectEqual(str!, "aaaa")
+  expectEqual("aaaa", str!)
 }
 
 SharedStringTests.test("String.init(sharing:) invalid UTF8") {
