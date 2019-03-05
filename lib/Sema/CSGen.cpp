@@ -595,12 +595,13 @@ namespace {
   /// of the overload set and call arguments.
   ///
   /// \param expr The application.
-  /// \param isFavored Determine whether the given overload is favored.
+  /// \param isFavored Determine whether the given overload is favored, passing
+  /// it the "effective" overload type when it's being called.
   /// \param mustConsider If provided, a function to detect the presence of
   /// overloads which inhibit any overload from being favored.
   void favorCallOverloads(ApplyExpr *expr,
                           ConstraintSystem &CS,
-                          llvm::function_ref<bool(ValueDecl *)> isFavored,
+                          llvm::function_ref<bool(ValueDecl *, Type)> isFavored,
                           std::function<bool(ValueDecl *)>
                               mustConsider = nullptr) {
     // Find the type variable associated with the function, if any.
@@ -621,7 +622,7 @@ namespace {
     Constraint *firstFavored = nullptr;
     for (auto constraint : disjunction->getNestedConstraints()) {
       if (!constraint->getOverloadChoice().isDecl())
-        return;
+        continue;
       auto decl = constraint->getOverloadChoice().getDecl();
 
       if (mustConsider && mustConsider(decl)) {
@@ -632,8 +633,14 @@ namespace {
         return;
       }
 
+      Type overloadType =
+          CS.getEffectiveOverloadType(constraint->getOverloadChoice(),
+                                      /*allowMembers=*/true, CS.DC);
+      if (!overloadType)
+        continue;
+
       if (!decl->getAttrs().isUnavailable(CS.getASTContext()) &&
-          isFavored(decl)) {
+          isFavored(decl, overloadType)) {
         // If we might need to roll back the favored constraints, keep
         // track of those we are favoring.
         if (mustConsider && !constraint->isFavored())
@@ -650,9 +657,12 @@ namespace {
     // result type.
     if (numFavoredConstraints == 1) {
       auto overloadChoice = firstFavored->getOverloadChoice();
-      auto overloadType = overloadChoice.getDecl()->getInterfaceType();
-      auto resultType = overloadType->getAs<AnyFunctionType>()->getResult();
-      CS.setFavoredType(expr, resultType.getPointer());
+      auto overloadType =
+        CS.getEffectiveOverloadType(overloadChoice, /*allowMembers=*/true,
+                                    CS.DC);
+      auto resultType = overloadType->castTo<AnyFunctionType>()->getResult();
+      if (!resultType->hasTypeParameter())
+        CS.setFavoredType(expr, resultType.getPointer());
     }
   }
   
@@ -695,18 +705,11 @@ namespace {
   void favorMatchingUnaryOperators(ApplyExpr *expr,
                                    ConstraintSystem &CS) {
     // Determine whether the given declaration is favored.
-    auto isFavoredDecl = [&](ValueDecl *value) -> bool {
-      auto valueTy = value->getInterfaceType();
-      
-      auto fnTy = valueTy->getAs<AnyFunctionType>();
+    auto isFavoredDecl = [&](ValueDecl *value, Type type) -> bool {
+      auto fnTy = type->getAs<AnyFunctionType>();
       if (!fnTy)
         return false;
       
-      // Figure out the parameter type.
-      if (value->getDeclContext()->isTypeContext()) {
-        fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
-      }
-
       Type paramTy = FunctionType::composeInput(CS.getASTContext(),
                                                 fnTy->getParams(), false);
       auto resultTy = fnTy->getResult();
@@ -748,10 +751,8 @@ namespace {
       }
       
       // Determine whether the given declaration is favored.
-      auto isFavoredDecl = [&](ValueDecl *value) -> bool {
-        auto valueTy = value->getInterfaceType();
-        
-        if (!valueTy->is<AnyFunctionType>())
+      auto isFavoredDecl = [&](ValueDecl *value, Type type) -> bool {
+        if (!type->is<AnyFunctionType>())
           return false;
 
         auto paramCount = getParamCount(value);
@@ -766,22 +767,10 @@ namespace {
     
     if (auto favoredTy = CS.getFavoredType(expr->getArg())) {
       // Determine whether the given declaration is favored.
-      auto isFavoredDecl = [&](ValueDecl *value) -> bool {
-        auto valueTy = value->getInterfaceType();
-        
-        auto fnTy = valueTy->getAs<AnyFunctionType>();
+      auto isFavoredDecl = [&](ValueDecl *value, Type type) -> bool {
+        auto fnTy = type->getAs<AnyFunctionType>();
         if (!fnTy)
           return false;
-
-        // Figure out the parameter type, accounting for the implicit 'self' if
-        // necessary.
-        if (auto *FD = dyn_cast<AbstractFunctionDecl>(value)) {
-          if (FD->hasImplicitSelfDecl()) {
-            if (auto resFnTy = fnTy->getResult()->getAs<AnyFunctionType>()) {
-              fnTy = resFnTy;
-            }
-          }
-        }
 
         auto paramTy =
             AnyFunctionType::composeInput(CS.getASTContext(), fnTy->getParams(),
@@ -841,10 +830,8 @@ namespace {
     };
 
     // Determine whether the given declaration is favored.
-    auto isFavoredDecl = [&](ValueDecl *value) -> bool {
-      auto valueTy = value->getInterfaceType();
-      
-      auto fnTy = valueTy->getAs<AnyFunctionType>();
+    auto isFavoredDecl = [&](ValueDecl *value, Type type) -> bool {
+      auto fnTy = type->getAs<AnyFunctionType>();
       if (!fnTy)
         return false;
 
@@ -870,11 +857,6 @@ namespace {
         }
       }
       
-      // Figure out the parameter type.
-      if (value->getDeclContext()->isTypeContext()) {
-        fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
-      }
-
       auto params = fnTy->getParams();
       if (params.size() != 2)
         return false;
