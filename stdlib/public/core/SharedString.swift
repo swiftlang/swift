@@ -48,5 +48,35 @@ extension String {
 }
 
 extension Substring {
+  /// Calls the given closure, passing it a `String` whose contents are equal to
+  /// the substring but which shares the substring's storage instead of copying
+  /// it.
+  ///
+  /// The `String` value passed into the closure is only valid durings its
+  /// execution.
+  ///
+  /// - Parameter body: A closure with a `String` parameter that shares the
+  ///   storage of the substring. If `body` has a return value, that value is
+  ///   also used as the return value for the `withSharedString(_:)` method. The
+  ///   argument is valid only for the duration of the closure's execution.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
+  public func withSharedString<Result>(
+    _ body: (String) throws -> Result
+  ) rethrows -> Result {
+    guard _wholeGuts.isFastUTF8 else {
+      // TODO: What's the right way to get the pointer for a non-fast-UTF-8
+      // string here?
+      return try body(String(self))
+    }
 
+    return try _wholeGuts.withFastUTF8 { utf8 in
+      let storage = __SharedStringStorage(
+        immortal: utf8.baseAddress! + self._offsetRange.lowerBound,
+        countAndFlags: _StringObject.CountAndFlags(
+          sharedCount: self._offsetRange.count,
+          isASCII: _wholeGuts.isASCII))
+      let str = String(_StringGuts(storage))
+      return try body(str)
+    }
+  }
 }

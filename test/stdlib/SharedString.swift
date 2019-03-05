@@ -58,4 +58,13 @@ SharedStringTests.test("String.init(sharing:owner:) invalid UTF8") {
   expectNil(str)
 }
 
+SharedStringTests.test("Substring.withSharedString(_:)") {
+  let original = "abcde"
+  let substr = original.dropFirst().dropLast()
+
+  substr.withSharedString { shared in
+    expectEqual(shared, "bcd")
+  }
+}
+
 runAllTests()
