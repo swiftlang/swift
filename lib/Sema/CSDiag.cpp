@@ -3369,8 +3369,6 @@ class ArgumentMatcher : public MatchCallArgumentListener {
   // Stores parameter bindings determined by call to matchCallArguments.
   SmallVector<ParamBinding, 4> Bindings;
 
-  unsigned NumLabelFailures = 0;
-
 public:
   ArgumentMatcher(Expr *fnExpr, Expr *argExpr,
                   ArrayRef<AnyFunctionType::Param> &params,
@@ -3547,130 +3545,23 @@ public:
   }
 
   bool missingLabel(unsigned paramIdx) override {
-    ++NumLabelFailures;
     return false;
   }
 
   bool extraneousLabel(unsigned paramIdx) override {
-    ++NumLabelFailures;
     return false;
   }
 
   bool incorrectLabel(unsigned paramIdx) override {
-    ++NumLabelFailures;
     return false;
   }
 
-  void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {
-    auto tuple = cast<TupleExpr>(ArgExpr);
-    Identifier first = tuple->getElementName(argIdx);
-    Identifier second = tuple->getElementName(prevArgIdx);
-
-    // If we've seen label failures and now there is an out-of-order
-    // parameter (or even worse - OoO parameter with label re-naming),
-    // we most likely have no idea what would be the best
-    // diagnostic for this situation, so let's just try to re-label.
-    auto shouldDiagnoseOoO = [&](Identifier newLabel, Identifier oldLabel) {
-      if (NumLabelFailures > 0)
-        return false;
-
-      unsigned actualIndex = prevArgIdx;
-      for (; actualIndex != argIdx; ++actualIndex) {
-        // Looks like new position (excluding defaulted parameters),
-        // has a valid label.
-        if (newLabel == Parameters[actualIndex].getLabel())
-          break;
-
-        // If we are moving the the position with a different label
-        // and there is no default value for it, can't diagnose the
-        // problem as a simple re-ordering.
-        if (!DefaultMap.test(actualIndex))
-          return false;
-      }
-
-      for (unsigned i = actualIndex + 1, n = Parameters.size(); i != n; ++i) {
-        if (oldLabel == Parameters[i].getLabel())
-          break;
-
-        if (!DefaultMap.test(i))
-          return false;
-      }
-
-      return true;
-    };
-
-    if (!shouldDiagnoseOoO(first, second)) {
-      SmallVector<Identifier, 8> paramLabels;
-      llvm::transform(Parameters, std::back_inserter(paramLabels),
-                      [](const AnyFunctionType::Param &param) {
-                        return param.getLabel();
-                      });
-      relabelArguments(paramLabels);
-      return;
-    }
-
-    // Build a mapping from arguments to parameters.
-    SmallVector<unsigned, 4> argBindings(tuple->getNumElements());
-    for (unsigned paramIdx = 0; paramIdx != Bindings.size(); ++paramIdx) {
-      for (auto argIdx : Bindings[paramIdx])
-        argBindings[argIdx] = paramIdx;
-    }
-
-    auto argRange = [&](unsigned argIdx, Identifier label) -> SourceRange {
-      auto range = tuple->getElement(argIdx)->getSourceRange();
-      if (!label.empty())
-        range.Start = tuple->getElementNameLoc(argIdx);
-
-      unsigned paramIdx = argBindings[argIdx];
-      if (Bindings[paramIdx].size() > 1)
-        range.End = tuple->getElement(Bindings[paramIdx].back())->getEndLoc();
-
-      return range;
-    };
-
-    auto firstRange = argRange(argIdx, first);
-    auto secondRange = argRange(prevArgIdx, second);
-
-    SourceLoc diagLoc = firstRange.Start;
-
-    auto addFixIts = [&](InFlightDiagnostic diag) {
-      diag.highlight(firstRange).highlight(secondRange);
-
-      // Move the misplaced argument by removing it from one location and
-      // inserting it in another location. To maintain argument comma
-      // separation, since the argument is always moving to an earlier index
-      // the preceding comma and whitespace is removed and a new trailing
-      // comma and space is inserted with the moved argument.
-      auto &SM = TC.Context.SourceMgr;
-      auto text = SM.extractText(
-          Lexer::getCharSourceRangeFromSourceRange(SM, firstRange));
-
-      auto removalRange =
-          SourceRange(Lexer::getLocForEndOfToken(
-                          SM, tuple->getElement(argIdx - 1)->getEndLoc()),
-                      firstRange.End);
-      diag.fixItRemove(removalRange);
-      diag.fixItInsert(secondRange.Start, text.str() + ", ");
-    };
-
-    // There are 4 diagnostic messages variations depending on
-    // labeled/unlabeled arguments.
-    if (first.empty() && second.empty()) {
-      addFixIts(TC.diagnose(diagLoc,
-                            diag::argument_out_of_order_unnamed_unnamed,
-                            argIdx + 1, prevArgIdx + 1));
-    } else if (first.empty() && !second.empty()) {
-      addFixIts(TC.diagnose(diagLoc, diag::argument_out_of_order_unnamed_named,
-                            argIdx + 1, second));
-    } else if (!first.empty() && second.empty()) {
-      addFixIts(TC.diagnose(diagLoc, diag::argument_out_of_order_named_unnamed,
-                            first, prevArgIdx + 1));
-    } else {
-      addFixIts(TC.diagnose(diagLoc, diag::argument_out_of_order_named_named,
-                            first, second));
-    }
-
-    Diagnosed = true;
+  bool outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {
+    auto &cs = CandidateInfo.CS;
+    OutOfOrderArgumentFailure failure(nullptr, cs, argIdx, prevArgIdx, Bindings,
+                                      cs.getConstraintLocator(ArgExpr));
+    Diagnosed = failure.diagnoseAsError();
+    return true;
   }
 
   bool relabelArguments(ArrayRef<Identifier> newNames) override {
