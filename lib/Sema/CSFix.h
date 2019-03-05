@@ -129,6 +129,9 @@ enum class FixKind : uint8_t {
 
   /// Allow single tuple closure parameter destructuring into N arguments.
   AllowClosureParameterDestructuring,
+
+  /// If there is out-of-order argument, let's fix that by re-ordering.
+  MoveOutOfOrderArgument,
 };
 
 class ConstraintFix {
@@ -679,6 +682,35 @@ private:
   MutableArrayRef<Param> getSynthesizedArgumentsBuf() {
     return {getTrailingObjects<Param>(), NumSynthesized};
   }
+};
+
+class MoveOutOfOrderArgument final : public ConstraintFix {
+  using ParamBinding = SmallVector<unsigned, 1>;
+
+  unsigned ArgIdx;
+  unsigned PrevArgIdx;
+
+  SmallVector<ParamBinding, 4> Bindings;
+
+  MoveOutOfOrderArgument(ConstraintSystem &cs, unsigned argIdx,
+                         unsigned prevArgIdx, ArrayRef<ParamBinding> bindings,
+                         ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::MoveOutOfOrderArgument, locator),
+        ArgIdx(argIdx), PrevArgIdx(prevArgIdx),
+        Bindings(bindings.begin(), bindings.end()) {}
+
+public:
+  std::string getName() const override {
+    return "move out-of-order argument to correct position";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static MoveOutOfOrderArgument *create(ConstraintSystem &cs,
+                                        unsigned argIdx,
+                                        unsigned prevArgIdx,
+                                        ArrayRef<ParamBinding> bindings,
+                                        ConstraintLocator *locator);
 };
 
 } // end namespace constraints

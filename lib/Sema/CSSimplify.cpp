@@ -855,11 +855,14 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
 
 class ArgumentFailureTracker : public MatchCallArgumentListener {
   ConstraintSystem &CS;
+  SmallVectorImpl<ParamBinding> &Bindings;
   ConstraintLocatorBuilder Locator;
 
 public:
-  ArgumentFailureTracker(ConstraintSystem &cs, ConstraintLocatorBuilder locator)
-    : CS(cs), Locator(locator) {}
+  ArgumentFailureTracker(ConstraintSystem &cs,
+                         SmallVectorImpl<ParamBinding> &bindings,
+                         ConstraintLocatorBuilder locator)
+      : CS(cs), Bindings(bindings), Locator(locator) {}
 
   bool missingLabel(unsigned paramIndex) override {
     return !CS.shouldAttemptFixes();
@@ -871,6 +874,16 @@ public:
 
   bool incorrectLabel(unsigned paramIndex) override {
     return !CS.shouldAttemptFixes();
+  }
+
+  bool outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {
+    if (CS.shouldAttemptFixes()) {
+      auto *fix = MoveOutOfOrderArgument::create(
+          CS, argIdx, prevArgIdx, Bindings, CS.getConstraintLocator(Locator));
+      return CS.recordFix(fix);
+    }
+
+    return true;
   }
 
   bool relabelArguments(ArrayRef<Identifier> newLabels) override {
@@ -940,8 +953,8 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   }
 
   // Match up the call arguments to the parameters.
-  ArgumentFailureTracker listener(cs, locator);
   SmallVector<ParamBinding, 4> parameterBindings;
+  ArgumentFailureTracker listener(cs, parameterBindings, locator);
   if (constraints::matchCallArguments(argsWithLabels, params,
                                       defaultMap,
                                       hasTrailingClosure,
@@ -6022,6 +6035,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowInvalidPartialApplication:
   case FixKind::AllowInvalidInitRef:
   case FixKind::AllowClosureParameterDestructuring:
+  case FixKind::MoveOutOfOrderArgument:
     llvm_unreachable("handled elsewhere");
   }
 
