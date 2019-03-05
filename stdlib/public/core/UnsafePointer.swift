@@ -544,6 +544,27 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
     guard let unwrapped = other else { return nil }
     self.init(mutating: unwrapped)
   }
+  
+  /// Creates an immutable typed pointer referencing the same memory as the		
+  /// given mutable pointer.		
+  ///		
+  /// - Parameter other: The pointer to convert.		
+  @_transparent		
+  public init(_ other: UnsafeMutablePointer<Pointee>) {		
+   self._rawValue = other._rawValue		
+  }		
+
+  /// Creates an immutable typed pointer referencing the same memory as the		
+  /// given mutable pointer.		
+  ///		
+  /// - Parameter other: The pointer to convert. If `other` is `nil`, the		
+  ///   result is `nil`.		
+  @_transparent		
+  public init?(_ other: UnsafeMutablePointer<Pointee>?) {		
+   guard let unwrapped = other else { return nil }		
+   self.init(unwrapped)		
+  }		
+  
 
   /// Allocates uninitialized memory for the specified number of instances of
   /// type `Pointee`.

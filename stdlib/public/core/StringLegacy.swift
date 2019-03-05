@@ -64,10 +64,10 @@ extension StringProtocol {
   ///     print(cafe.hasPrefix("café"))
   ///     // Prints "false"
   ///
-  /// The Unicode-safe comparison matches Unicode scalar values rather than the
-  /// code points used to compose them. The example below uses two strings
-  /// with different forms of the `"é"` character---the first uses the composed
-  /// form and the second uses the decomposed form.
+  /// The Unicode-safe comparison matches Unicode extended grapheme clusters
+  /// rather than the code points used to compose them. The example below uses
+  /// two strings with different forms of the `"é"` character---the first uses
+  /// the composed form and the second uses the decomposed form.
   ///
   ///     // Unicode safe
   ///     let composedCafe = "Café"
@@ -98,10 +98,10 @@ extension StringProtocol {
   ///     print(plans.hasSuffix("Café"))
   ///     // Prints "false"
   ///
-  /// The Unicode-safe comparison matches Unicode scalar values rather than the
-  /// code points used to compose them. The example below uses two strings
-  /// with different forms of the `"é"` character---the first uses the composed
-  /// form and the second uses the decomposed form.
+  /// The Unicode-safe comparison matches Unicode extended grapheme clusters
+  /// rather than the code points used to compose them. The example below uses
+  /// two strings with different forms of the `"é"` character---the first uses
+  /// the composed form and the second uses the decomposed form.
   ///
   ///     // Unicode safe
   ///     let composedCafe = "café"

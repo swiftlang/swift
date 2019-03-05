@@ -259,6 +259,12 @@ class BuildScriptInvocation(object):
                     "--android-icu-i18n-include, and --android-icu-data "
                     "must be specified")
 
+        if args.legacy_impl and (args.build_indexstoredb or
+                                 args.build_sourcekitlsp):
+            diagnostics.fatal(
+                "--legacy-impl is incompatible with building packages needing "
+                "a toolchain (indexstore-db or sourcekit-lsp)")
+
     @staticmethod
     def apply_default_arguments(toolchain, args):
         # Infer if ninja is required
@@ -291,6 +297,11 @@ class BuildScriptInvocation(object):
         if args.build_subdir is None:
             args.build_subdir = \
                 workspace.compute_build_subdir(args)
+
+        if args.install_destdir is None:
+            args.install_destdir = os.path.join(
+                SWIFT_BUILD_ROOT, args.build_subdir,
+                '{}-{}'.format('toolchain', args.host_target))
 
         # Add optional stdlib-deployment-targets
         if args.android:
@@ -404,6 +415,7 @@ class BuildScriptInvocation(object):
         if not args.test_watchos_host:
             self.platforms_to_skip_test_host.add(
                 StdlibDeploymentTarget.AppleWatch)
+        self.build_libparser_only = args.build_libparser_only
 
     def initialize_runtime_environment(self):
         """Change the program environment for building."""
@@ -420,6 +432,9 @@ class BuildScriptInvocation(object):
                 'TVOS_DEPLOYMENT_TARGET',
                 'WATCHOS_DEPLOYMENT_TARGET']:
             os.environ.pop(v, None)
+
+        # Set NINJA_STATUS to format ninja output
+        os.environ['NINJA_STATUS'] = '[%f/%t][%p][%es] '
 
     def build_ninja(self):
         if not os.path.exists(self.workspace.source_dir("ninja")):
@@ -502,6 +517,9 @@ class BuildScriptInvocation(object):
 
         # Compute any product specific cmake arguments.
         for product_class in self.compute_product_classes():
+            if not product_class.is_build_script_impl_product():
+                continue
+
             product_name = product_class.product_name()
             product_source_name = product_class.product_source_name()
             source_dir = self.workspace.source_dir(product_source_name)
@@ -527,9 +545,11 @@ class BuildScriptInvocation(object):
             # just invoke cmake from build-script directly rather than futzing
             # with build-script-impl. This makes even more sense since there
             # really isn't a security issue here.
-            impl_args += [
-                "--%s-cmake-options=%s" % (product_name, ' '.join(cmake_opts))
-            ]
+            if cmake_opts:
+                impl_args += [
+                    "--{}-cmake-options={}".format(
+                        product_name, ' '.join(cmake_opts))
+                ]
 
         if args.build_stdlib_deployment_targets:
             impl_args += [
@@ -575,6 +595,10 @@ class BuildScriptInvocation(object):
             impl_args += [
                 "--install-symroot", os.path.abspath(args.install_symroot)
             ]
+        if args.install_destdir:
+            impl_args += [
+                "--install-destdir", os.path.abspath(args.install_destdir)
+            ]
 
         if args.skip_build:
             impl_args += ["--skip-build-cmark",
@@ -593,6 +617,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build-lldb"]
         if not args.build_llbuild:
             impl_args += ["--skip-build-llbuild"]
+        if not args.build_libcxx:
+            impl_args += ["--skip-build-libcxx"]
         if not args.build_libdispatch:
             impl_args += ["--skip-build-libdispatch"]
         if not args.build_libicu:
@@ -694,7 +720,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-test-optimized"]
         if not args.test_optimize_for_size:
             impl_args += ["--skip-test-optimize-for-size"]
-
+        if args.build_libparser_only:
+            impl_args += ["--build-libparser-only"]
         if args.android:
             impl_args += [
                 "--android-arch", args.android_arch,
@@ -834,21 +861,33 @@ class BuildScriptInvocation(object):
         product_classes = []
         product_classes.append(products.CMark)
         product_classes.append(products.LLVM)
+        if self.args.build_libcxx:
+            product_classes.append(products.LibCXX)
         if self.args.build_libicu:
             product_classes.append(products.LibICU)
         product_classes.append(products.Swift)
         if self.args.build_lldb:
             product_classes.append(products.LLDB)
-        if self.args.build_llbuild:
-            product_classes.append(products.LLBuild)
         if self.args.build_libdispatch:
             product_classes.append(products.LibDispatch)
         if self.args.build_foundation:
             product_classes.append(products.Foundation)
         if self.args.build_xctest:
             product_classes.append(products.XCTest)
+        if self.args.build_llbuild:
+            product_classes.append(products.LLBuild)
         if self.args.build_swiftpm:
             product_classes.append(products.SwiftPM)
+        if self.args.build_swiftsyntax:
+            product_classes.append(products.SwiftSyntax)
+        if self.args.build_skstresstester:
+            product_classes.append(products.SKStressTester)
+        if self.args.build_swiftevolve:
+            product_classes.append(products.SwiftEvolve)
+        if self.args.build_indexstoredb:
+            product_classes.append(products.IndexStoreDB)
+        if self.args.build_sourcekitlsp:
+            product_classes.append(products.SourceKitLSP)
         return product_classes
 
     def execute(self):
@@ -873,7 +912,7 @@ class BuildScriptInvocation(object):
                         name == "merged-hosts-lipo"), "invalid action"
                 action_name = name
             elif product_class is None:
-                assert name == "package", "invalid action"
+                assert name in ("package", "extractsymbols"), "invalid action"
                 action_name = "{}-{}".format(host.name, name)
             else:
                 assert name is not None, "invalid action"
@@ -896,6 +935,9 @@ class BuildScriptInvocation(object):
         # matches that of `build-script-impl`.
         product_classes = self.compute_product_classes()
 
+        impl_product_classes = [cls for cls in product_classes
+                                if cls.is_build_script_impl_product()]
+
         # Execute each "pass".
 
         # Build...
@@ -912,18 +954,39 @@ class BuildScriptInvocation(object):
                 print("Running Swift benchmarks for: {}".format(
                     " ".join(config.swift_benchmark_run_targets)))
 
-            for product_class in product_classes:
+            for product_class in impl_product_classes:
                 execute_one_impl_action(host_target, product_class, "build")
 
         # Test...
         for host_target in all_hosts:
-            for product_class in product_classes:
+            for product_class in impl_product_classes:
                 execute_one_impl_action(host_target, product_class, "test")
 
         # Install...
         for host_target in all_hosts:
-            for product_class in product_classes:
+            for product_class in impl_product_classes:
                 execute_one_impl_action(host_target, product_class, "install")
+
+        # Non-build-script-impl products...
+        # Note: currently only supports building for the host.
+        for host_target in [self.args.host_target]:
+            for product_class in product_classes:
+                if product_class.is_build_script_impl_product():
+                    continue
+                product_source = product_class.product_source_name()
+                product_name = product_class.product_name()
+                product = product_class(
+                    args=self.args,
+                    toolchain=self.toolchain,
+                    source_dir=self.workspace.source_dir(product_source),
+                    build_dir=self.workspace.build_dir(
+                        host_target, product_name))
+                product.do_build(host_target)
+                product.do_test(host_target)
+
+        # Extract symbols...
+        for host_target in all_hosts:
+            execute_one_impl_action(host_target, name="extractsymbols")
 
         # Package...
         for host_target in all_hosts:
@@ -974,6 +1037,14 @@ def main_preset():
         help="use distcc",
         action=arguments.action.optional_bool)
     parser.add_argument(
+        "--cmake-c-launcher",
+        help="the absolute path to set CMAKE_C_COMPILER_LAUNCHER",
+        metavar="PATH")
+    parser.add_argument(
+        "--cmake-cxx-launcher",
+        help="the absolute path to set CMAKE_CXX_COMPILER_LAUNCHER",
+        metavar="PATH")
+    parser.add_argument(
         "-j", "--jobs",
         help="the number of parallel build jobs to use",
         type=int,
@@ -988,8 +1059,13 @@ def main_preset():
         help="Print the expanded build-script invocation generated "
              "by the preset, but do not run the preset",
         action=arguments.action.optional_bool)
+    parser.add_argument(
+        "--swiftsyntax-install-prefix",
+        help="specify the directory to where SwiftSyntax should be installed")
+    parser.add_argument(
+        "--build-dir",
+        help="specify the directory where build artifact should be stored")
     args = parser.parse_args()
-
     if len(args.preset_file_names) == 0:
         args.preset_file_names = [
             os.path.join(
@@ -1030,6 +1106,11 @@ def main_preset():
 
     preset_args = migrate_swift_sdks(preset.format_args())
 
+    if args.distcc and (args.cmake_c_launcher or args.cmake_cxx_launcher):
+        diagnostics.fatal(
+            '--distcc can not be used with' +
+            ' --cmake-c-launcher or --cmake-cxx-launcher')
+
     build_script_args = [sys.argv[0]]
     if args.dry_run:
         build_script_args += ["--dry-run"]
@@ -1039,6 +1120,16 @@ def main_preset():
         build_script_args += ["--distcc"]
     if args.build_jobs:
         build_script_args += ["--jobs", str(args.build_jobs)]
+    if args.swiftsyntax_install_prefix:
+        build_script_args += ["--install-swiftsyntax",
+                              "--install-destdir",
+                              args.swiftsyntax_install_prefix]
+    if args.build_dir:
+        build_script_args += ["--build-dir", args.build_dir]
+    if args.cmake_c_launcher:
+        build_script_args += ["--cmake-c-launcher", args.cmake_c_launcher]
+    if args.cmake_cxx_launcher:
+        build_script_args += ["--cmake-cxx-launcher", args.cmake_cxx_launcher]
 
     diagnostics.note('using preset "{}", which expands to \n\n{}\n'.format(
         args.preset, shell.quote_command(build_script_args)))

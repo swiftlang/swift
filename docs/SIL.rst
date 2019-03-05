@@ -1,4 +1,3 @@
-.. @raise litre.TestsAreMissing
 .. highlight:: none
 
 Swift Intermediate Language (SIL)
@@ -29,7 +28,7 @@ representation that can be used for code distribution, but it can also express
 target-specific concepts as well as LLVM can.
 
 For more information on developing the implementation of SIL and SIL passes, see
-SILProgrammersManual.md.
+`SILProgrammersManual.md <SILProgrammersManual.md>`_.
 
 SIL in the Swift Compiler
 -------------------------
@@ -123,7 +122,7 @@ IR.
   high-level optimizations on basic Swift containers such as Array or String.
   Domain specific optimizations require a defined interface between
   the standard library and the optimizer. More details can be found here:
-  :ref:`HighLevelSILOptimizations`
+  `HighLevelSILOptimizations <HighLevelSILOptimizations.rst>`_
 
 Syntax
 ------
@@ -2345,6 +2344,7 @@ mark_uninitialized
   mu_kind ::= 'derivedself'
   mu_kind ::= 'derivedselfonly'
   mu_kind ::= 'delegatingself'
+  mu_kind ::= 'delegatingselfallocated'
 
   %2 = mark_uninitialized [var] %1 : $*T
   // $T must be an address
@@ -2365,6 +2365,7 @@ the mark_uninitialized instruction refers to:
 - ``derivedself``: designates ``self`` in a derived (non-root) class
 - ``derivedselfonly``: designates ``self`` in a derived (non-root) class whose stored properties have already been initialized
 - ``delegatingself``: designates ``self`` on a struct, enum, or class in a delegating constructor (one that calls self.init)
+- ``delegatingselfallocated``: designates ``self`` on a class convenience initializer's initializing entry point
 
 The purpose of the ``mark_uninitialized`` instruction is to enable
 definitive initialization analysis for global variables (when marked as
@@ -2708,7 +2709,7 @@ strong reference type have ownership semantics for the referenced heap
 object. Retain and release operations, however,
 are never implicit in SIL and always must be explicitly performed where needed.
 Retains and releases on the value may be freely moved, and balancing
-retains and releases may deleted, so long as an owning retain count is
+retains and releases may be deleted, so long as an owning retain count is
 maintained for the uses of the value.
 
 All reference-counting operations are defined to work correctly on
@@ -2826,6 +2827,13 @@ which must be an initialized weak reference.  The result is value of type
 ``$Optional<T>``, except that it is ``null`` if the heap object has begun
 deallocation.
 
+If ``[take]`` is specified then the underlying weak reference is invalidated
+implying that the weak reference count of the loaded value is decremented. If
+``[take]`` is not specified then the underlying weak reference count is not
+affected by this operation (i.e. it is a +0 weak ref count operation). In either
+case, the strong reference count will be incremented before any changes to the
+weak reference count.
+
 This operation must be atomic with respect to the final ``strong_release`` on
 the operand heap object.  It need not be atomic with respect to ``store_weak``
 operations on the same address.
@@ -2844,7 +2852,13 @@ Initializes or reassigns a weak reference.  The operand may be ``nil``.
 
 If ``[initialization]`` is given, the weak reference must currently either be
 uninitialized or destroyed.  If it is not given, the weak reference must
-currently be initialized.
+currently be initialized. After the evaluation:
+
+* The value that was originally referenced by the weak reference will have
+  its weak reference count decremented by 1.
+* If the optionally typed operand is non-nil, the strong reference wrapped in
+  the optional has its weak reference count incremented by 1. In contrast, the reference's
+  strong reference count is not touched.
 
 This operation must be atomic with respect to the final ``strong_release`` on
 the operand (source) heap object.  It need not be atomic with respect to
@@ -2923,6 +2937,7 @@ is_escaping_closure
 ```````````````````
 
 ::
+
   sil-instruction ::= 'is_escaping_closure' sil-operand
 
   %1 = is_escaping_closure %0 : $@callee_guaranteed () -> ()
@@ -2934,6 +2949,7 @@ true if it is.
 
 copy_block
 ``````````
+
 ::
 
   sil-instruction :: 'copy_block' sil-operand
@@ -2946,6 +2962,7 @@ if the block is copied from the stack to the heap.
 
 copy_block_without_escaping
 ```````````````````````````
+
 ::
 
   sil-instruction :: 'copy_block_without_escaping' sil-operand 'withoutEscaping' sil-operand
@@ -2977,7 +2994,7 @@ Asserts that there exists another reference of the value ``%0`` for the scope
 delineated by the call of this builtin up to the first call of a ``builtin
 "unsafeGuaranteedEnd"`` instruction that uses the second element ``%1.1`` of the
 returned value. If no such instruction can be found nothing can be assumed. This
-assertions holds for uses of the first tuple element of the returned value
+assertion holds for uses of the first tuple element of the returned value
 ``%1.0`` within this scope. The returned reference value equals the input
 ``%0``.
 
@@ -3346,11 +3363,12 @@ partial_apply
 `````````````
 ::
 
-  sil-instruction ::= 'partial_apply' callee-ownership-attr? sil-value
+  sil-instruction ::= 'partial_apply' callee-ownership-attr? on-stack-attr? sil-value
                         sil-apply-substitution-list?
                         '(' (sil-value (',' sil-value)*)? ')'
                         ':' sil-type
   callee-ownership-attr ::= '[callee_guaranteed]'
+  on-stack-attr ::= '[on_stack]'
 
   %c = partial_apply %0(%1, %2, ...) : $(Z..., A, B, ...) -> R
   // Note that the type of the callee '%0' is specified *after* the arguments
@@ -3368,12 +3386,18 @@ partial_apply
 Creates a closure by partially applying the function ``%0`` to a partial
 sequence of its arguments. In the instruction syntax, the type of the callee is
 specified after the argument list; the types of the argument and of the defined
-value are derived from the function type of the callee. The closure context will
-be allocated with retain count 1 and initialized to contain the values ``%1``,
+value are derived from the function type of the callee. If the ``partial_apply``
+has an escaping function type (not ``[on_stack]``) the closure context will be
+allocated with retain count 1 and initialized to contain the values ``%1``,
 ``%2``, etc.  The closed-over values will not be retained; that must be done
-separately before the ``partial_apply``. The closure does however take
-ownership of the partially applied arguments; when the closure reference
-count reaches zero, the contained values will be destroyed.
+separately before the ``partial_apply``. The closure does however take ownership
+of the partially applied arguments; when the closure reference count reaches
+zero, the contained values will be destroyed. If the ``partial_apply`` has a
+``@noescape`` function type (``partial_apply [on_stack]``) the closure context
+is allocated on the stack and initialized to contain the closed-over values. The
+closed-over values are not retained, lifetime of the closed-over values must be
+managed separately. The lifetime of the stack context of a ``partial_apply
+[on_stack]`` must be terminated with a ``dealloc_stack``.
 
 If the callee is generic, all of its generic parameters must be bound by the
 given substitution list. The arguments are given with these generic

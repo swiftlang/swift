@@ -211,6 +211,7 @@ where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
   override subscript(bounds: Range<Index>) -> SubSequence { get }
 
   // FIXME: Only needed for associated type inference.
+  @_borrowed
   override subscript(position: Index) -> Element { get }
   override var startIndex: Index { get }
   override var endIndex: Index { get }

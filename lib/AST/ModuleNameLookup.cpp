@@ -258,8 +258,8 @@ void namelookup::lookupInModule(ModuleDecl *startModule,
                                 ArrayRef<ModuleDecl::ImportedModule> extraImports) {
   assert(moduleScopeContext && moduleScopeContext->isModuleScopeContext());
   ModuleLookupCache cache;
-  bool respectAccessControl = startModule->getASTContext().LangOpts
-                                .EnableAccessControl;
+  bool respectAccessControl =
+      !startModule->getASTContext().isAccessControlDisabled();
   ::lookupInModule<CanTypeSet>(startModule, topAccessPath, decls,
                                resolutionKind, /*canReturnEarly=*/true,
                                typeResolver, cache, moduleScopeContext,
@@ -282,7 +282,7 @@ void namelookup::lookupVisibleDeclsInModule(
     ArrayRef<ModuleDecl::ImportedModule> extraImports) {
   assert(moduleScopeContext && moduleScopeContext->isModuleScopeContext());
   ModuleLookupCache cache;
-  bool respectAccessControl = M->getASTContext().LangOpts.EnableAccessControl;
+  bool respectAccessControl = !M->getASTContext().isAccessControlDisabled();
   ::lookupInModule<NamedCanTypeSet>(M, accessPath, decls,
                                     resolutionKind, /*canReturnEarly=*/false,
                                     typeResolver, cache, moduleScopeContext,

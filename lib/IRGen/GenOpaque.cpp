@@ -555,7 +555,10 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
 /// location before the dynamic alloca's call.
 void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address) {
   // In coroutines, unconditionally call llvm.coro.alloca.free.
-  if (isCoroutine()) {
+  // Except if the address is invalid, this happens when this is a StackAddress
+  // for a partial_apply [stack] that did not need a context object on the
+  // stack.
+  if (isCoroutine() && address.getAddress().isValid()) {
     auto allocToken = address.getExtraInfo();
     assert(allocToken && "dynamic alloca in coroutine without alloc token?");
     auto freeFn = llvm::Intrinsic::getDeclaration(
@@ -563,7 +566,6 @@ void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address) {
     Builder.CreateCall(freeFn, allocToken);
     return;
   }
-
   // Otherwise, call llvm.stackrestore if an address was saved.
   auto savedSP = address.getExtraInfo();
   if (savedSP == nullptr)

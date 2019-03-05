@@ -14,20 +14,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if defined(__CYGWIN__) || defined(__ANDROID__) || defined(_WIN32) || defined(__HAIKU__)
-#  define SWIFT_SUPPORTS_BACKTRACE_REPORTING 0
+#if defined(__CYGWIN__) || defined(__ANDROID__) || defined(__HAIKU__)
+#define SWIFT_SUPPORTS_BACKTRACE_REPORTING 0
 #else
-#  define SWIFT_SUPPORTS_BACKTRACE_REPORTING 1
+#define SWIFT_SUPPORTS_BACKTRACE_REPORTING 1
 #endif
 
 #if defined(_WIN32)
 #include <mutex>
 #endif
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
 #if defined(_WIN32)
 #include <io.h>
 #else
@@ -48,9 +48,7 @@
 #include <cxxabi.h>
 #endif
 
-#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
-// execinfo.h is not available on Android. Checks in this file ensure that
-// fatalError behaves as expected, but without stack traces.
+#if __has_include(<execinfo.h>)
 #include <execinfo.h>
 #endif
 
@@ -69,7 +67,8 @@ enum: uint32_t {
 using namespace swift;
 
 #if SWIFT_SUPPORTS_BACKTRACE_REPORTING
-static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
+static bool getSymbolNameAddr(llvm::StringRef libraryName,
+                              const SymbolInfo &syminfo,
                               std::string &symbolName, uintptr_t &addrOut) {
   // If we failed to find a symbol and thus dlinfo->dli_sname is nullptr, we
   // need to use the hex address.
@@ -97,8 +96,8 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
   DWORD dwResult;
 
   {
-    std::lock_guard<std::mutex> lock(m);
-    dwResult = UnDecorateSymbolName(syminfo.symbolName, szUndName,
+    std::lock_guard<std::mutex> lock(mutex);
+    dwResult = UnDecorateSymbolName(syminfo.symbolName.get(), szUndName,
                                     sizeof(szUndName), dwFlags);
   }
 
@@ -108,7 +107,8 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
   }
 #else
   int status;
-  char *demangled = abi::__cxa_demangle(syminfo.symbolName, 0, 0, &status);
+  char *demangled =
+      abi::__cxa_demangle(syminfo.symbolName.get(), 0, 0, &status);
   if (status == 0) {
     assert(demangled != nullptr &&
            "If __cxa_demangle succeeds, demangled should never be nullptr");
@@ -123,7 +123,7 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
   // Otherwise, try to demangle with swift. If swift fails to demangle, it will
   // just pass through the original output.
   symbolName = demangleSymbolAsString(
-      syminfo.symbolName, strlen(syminfo.symbolName),
+      syminfo.symbolName.get(), strlen(syminfo.symbolName.get()),
       Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
   return true;
 }
@@ -193,8 +193,11 @@ void swift::printCurrentBacktrace(unsigned framesToSkip) {
 #if SWIFT_SUPPORTS_BACKTRACE_REPORTING
   constexpr unsigned maxSupportedStackDepth = 128;
   void *addrs[maxSupportedStackDepth];
-
+#if defined(_WIN32)
+  int symbolCount = CaptureStackBackTrace(0, maxSupportedStackDepth, addrs, NULL);
+#else
   int symbolCount = backtrace(addrs, maxSupportedStackDepth);
+#endif
   for (int i = framesToSkip; i < symbolCount; ++i) {
     dumpStackTraceEntry(i - framesToSkip, addrs[i]);
   }

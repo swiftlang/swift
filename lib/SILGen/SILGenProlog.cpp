@@ -362,7 +362,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     if (VD->isSettable(VD->getDeclContext())) {
       auto addr = SGF.emitTemporaryAllocation(VD, ty);
       // We have created a copy that needs to be destroyed.
-      val = SGF.B.createCopyValue(Loc, val);
+      val = SGF.B.emitCopyValueOperation(Loc, val);
       NeedToDestroyValueAtExit = true;
       lowering.emitStore(SGF.B, VD, val, addr, StoreOwnershipQualifier::Init);
       val = addr;

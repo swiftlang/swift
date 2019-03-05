@@ -21,7 +21,9 @@
 // RUN: fi
 // RUN: %target-codesign %t/Mirror
 // RUN: %target-run %t/Mirror
+
 // REQUIRES: executable_test
+// REQUIRES: shell
 
 import StdlibUnittest
 

@@ -15,14 +15,14 @@
 import Foundation
 
 enum SourceKitdError: Error, CustomStringConvertible {
-  case EditorOpenError(message: String)
-  case EditorCloseError(message: String)
+  case editorOpenError(message: String)
+  case editorCloseError(message: String)
 
   var description: String {
     switch self {
-    case .EditorOpenError(let message):
+    case .editorOpenError(let message):
       return "cannot open document: \(message)"
-    case .EditorCloseError(let message):
+    case .editorCloseError(let message):
       return "cannot close document: \(message)"
     }
   }
@@ -161,14 +161,14 @@ extension SwiftLang {
     // FIXME: SourceKitd error handling.
     let Resp = Service.sendSyn(request: Request)
     if Resp.isError {
-      throw SourceKitdError.EditorOpenError(message: Resp.description)
+      throw SourceKitdError.editorOpenError(message: Resp.description)
     }
 
     let CloseReq = SourceKitdRequest(uid: .request_EditorClose)
     CloseReq.addParameter(.key_Name, value: content.name)
     let CloseResp = Service.sendSyn(request: CloseReq)
     if CloseResp.isError {
-      throw SourceKitdError.EditorCloseError(message: CloseResp.description)
+      throw SourceKitdError.editorCloseError(message: CloseResp.description)
     }
     return try format.makeTree(Resp.value)
   }

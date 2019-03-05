@@ -25,7 +25,7 @@ public typealias SKColor = UIColor
 // since that method only exists in a private header in SpriteKit, the lookup
 // mechanism by default fails to accept it as a valid AnyObject call
 //
-// NOTE: older runtimes called this _SpriteKitMethodProvider. The two must
+// NOTE: older overlays called this _SpriteKitMethodProvider. The two must
 // coexist, so it was renamed. The old name must not be used in the new
 // runtime.
 @objc class __SpriteKitMethodProvider : NSObject {

@@ -23,6 +23,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -314,6 +315,18 @@ namespace {
       case clang::BuiltinType::OCLClkEvent:
       case clang::BuiltinType::OCLQueue:
       case clang::BuiltinType::OCLReserveID:
+      case clang::BuiltinType::OCLIntelSubgroupAVCMcePayload:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImePayload:
+      case clang::BuiltinType::OCLIntelSubgroupAVCRefPayload:
+      case clang::BuiltinType::OCLIntelSubgroupAVCSicPayload:
+      case clang::BuiltinType::OCLIntelSubgroupAVCMceResult:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeResult:
+      case clang::BuiltinType::OCLIntelSubgroupAVCRefResult:
+      case clang::BuiltinType::OCLIntelSubgroupAVCSicResult:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultSingleRefStreamout:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultDualRefStreamout:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeSingleRefStreamin:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeDualRefStreamin:
         return Type();
 
       // OpenMP types that don't have Swift equivalents.
@@ -1452,7 +1465,7 @@ ImportedType ClangImporter::Implementation::importType(
   // This bans some trickery that the redefinition types enable, but is a more
   // sane model overall.
   auto &clangContext = getClangASTContext();
-  if (clangContext.getLangOpts().ObjC1) {
+  if (clangContext.getLangOpts().ObjC) {
     if (clangContext.hasSameUnqualifiedType(
           type, clangContext.getObjCIdRedefinitionType()) &&
         !clangContext.hasSameUnqualifiedType(
@@ -2442,13 +2455,21 @@ bool ClangImporter::Implementation::matchesHashableBound(Type type) {
   // Match generic parameters against their bounds.
   if (auto *genericTy = type->getAs<GenericTypeParamType>()) {
     if (auto *generic = genericTy->getDecl()) {
-      type = generic->getSuperclass();
-      if (!type)
-        return false;
+      auto genericSig =
+        generic->getDeclContext()->getGenericSignatureOfContext();
+      if (genericSig && genericSig->getConformsTo(type).empty()) {
+        type = genericSig->getSuperclassBound(type);
+        if (!type)
+          return false;
+      }
     }
   }
 
-  // Class type or existential that inherits from NSObject.
+  // Existentials cannot match the Hashable bound.
+  if (type->isAnyExistentialType())
+    return false;
+
+  // Class type that inherits from NSObject.
   if (NSObjectType->isExactSuperclassOf(type))
     return true;
 

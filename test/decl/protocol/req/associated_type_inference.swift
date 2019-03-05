@@ -200,6 +200,7 @@ public class CorePromise<U> : Thenable { // expected-error{{type 'CorePromise<U>
     public func then(_ success: @escaping (_ t: U, _: CorePromise<U>) -> U) -> Self {
         return self.then() { (t: U) -> U in // expected-error{{contextual closure type '(U, CorePromise<U>) -> U' expects 2 arguments, but 1 was used in closure body}}
             return success(t: t, self)
+            // expected-error@-1 {{extraneous argument label 't:' in call}}
         }
     }
 }

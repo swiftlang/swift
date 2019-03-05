@@ -13,6 +13,7 @@ add_swift_host_library(swiftParse STATIC
   ParsedSyntaxBuilders.cpp.gyb
   ParsedSyntaxNodes.cpp.gyb
   ParsedSyntaxRecorder.cpp.gyb
+  ParsedTrivia.cpp
   ParseExpr.cpp
   ParseGeneric.cpp
   ParseIfConfig.cpp
@@ -23,10 +24,9 @@ add_swift_host_library(swiftParse STATIC
   PersistentParserState.cpp
   Scope.cpp
   SyntaxParsingCache.cpp
-  SyntaxParsingContext.cpp
-  LINK_LIBRARIES
-    swiftAST
-    swiftSyntax
-)
+  SyntaxParsingContext.cpp)
+target_link_libraries(swiftParse PRIVATE
+  swiftAST
+  swiftSyntax)
 
 add_dependencies(swiftParse swift-parse-syntax-generated-headers)

@@ -540,3 +540,47 @@ bb4:
   %10 = tuple ()
   return %10 : $()
 }
+
+// public func testBailOnNestedDomWrite() {
+// Checks that we bail when the dominated begin comes before the dominating begin
+//
+// CHECK-LABEL: sil @testBailOnNestedDomWrite : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
+// CHECK: [[BEGIN2:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-LABEL: } // end sil function 'testBailOnNestedDomWrite'
+sil @testBailOnNestedDomWrite : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %4 = begin_access [modify] [dynamic] %0 : $*X
+  %5 = load %4 : $*X
+  %7 = begin_access [modify] [dynamic] [no_nested_conflict] %0 : $*X
+  %8 = load %7 : $*X
+  end_access %7 : $*X
+  end_access %4 : $*X
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// public func testOptOnNestedDomRead() {
+// Checks that we bail when the dominated begin comes before the dominating begin
+//
+// CHECK-LABEL: sil @testOptOnNestedDomRead : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK: [[BEGIN:%.*]] = begin_access [read] [dynamic] [[GLOBAL]] : $*X
+// CHECK: [[BEGIN2:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-LABEL: } // end sil function 'testOptOnNestedDomRead'
+sil @testOptOnNestedDomRead : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %4 = begin_access [read] [dynamic] %0 : $*X
+  %5 = load %4 : $*X
+  %7 = begin_access [read] [dynamic] [no_nested_conflict] %0 : $*X
+  %8 = load %7 : $*X
+  end_access %7 : $*X
+  end_access %4 : $*X
+  %10 = tuple ()
+  return %10 : $()
+}

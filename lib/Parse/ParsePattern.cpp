@@ -91,6 +91,7 @@ static ParserStatus parseDefaultArgument(
   case Parser::ParameterContextKind::Function:
   case Parser::ParameterContextKind::Operator:
   case Parser::ParameterContextKind::Initializer:
+  case Parser::ParameterContextKind::EnumElement:
     break;
   case Parser::ParameterContextKind::Closure:
     diagID = diag::no_default_arg_closure;
@@ -100,9 +101,6 @@ static ParserStatus parseDefaultArgument(
     break;
   case Parser::ParameterContextKind::Curried:
     diagID = diag::no_default_arg_curried;
-    break;
-  case Parser::ParameterContextKind::EnumElement:
-    diagID = diag::no_default_arg_enum_elt;
     break;
   }
   
@@ -360,8 +358,10 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     }
                         
     // '...'?
-    if (Tok.isEllipsis())
+    if (Tok.isEllipsis()) {
+      Tok.setKind(tok::ellipsis);
       param.EllipsisLoc = consumeToken();
+    }
 
     // ('=' expr)?
     if (Tok.is(tok::equal)) {
@@ -489,6 +489,10 @@ mapParsedParameters(Parser &parser,
       // belongs to both type flags and declaration.
       if (auto *ATR = dyn_cast<AttributedTypeRepr>(type)) {
         auto &attrs = ATR->getAttrs();
+        // At this point we actually don't know if that's valid to mark
+        // this parameter declaration as `autoclosure` because type has
+        // not been resolved yet - it should either be a function type
+        // or typealias with underlying function type.
         param->setAutoClosure(attrs.has(TypeAttrKind::TAK_autoclosure));
       }
     } else if (paramContext != Parser::ParameterContextKind::Closure) {

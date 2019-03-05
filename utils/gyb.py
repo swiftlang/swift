@@ -751,7 +751,7 @@ class Code(ASTNode):
 
 
 def expand(filename, line_directive=_default_line_directive, **local_bindings):
-    r"""Return the contents of the givepn template file, executed with the given
+    r"""Return the contents of the given template file, executed with the given
     local bindings.
 
     >>> from tempfile import NamedTemporaryFile

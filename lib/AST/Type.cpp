@@ -2368,12 +2368,23 @@ ArchetypeType::ArchetypeType(TypeKind Kind,
                           getSubclassTrailingObjects<ProtocolDecl *>());
 }
 
-PrimaryArchetypeType *ArchetypeType::getPrimary() const {
-  ArchetypeType *archetype = const_cast<ArchetypeType*>(this);
-  while (auto child = dyn_cast<NestedArchetypeType>(archetype)) {
-    archetype = child->getParent();
+GenericEnvironment *ArchetypeType::getGenericEnvironment() const {
+  auto root = getRoot();
+  if (auto primary = dyn_cast<PrimaryArchetypeType>(root)) {
+    return primary->getGenericEnvironment();
   }
-  return dyn_cast<PrimaryArchetypeType>(archetype);
+  if (auto opened = dyn_cast<OpenedArchetypeType>(root)) {
+    return opened->getGenericEnvironment();
+  }
+  llvm_unreachable("unhandled root archetype kind?!");
+}
+
+ArchetypeType *ArchetypeType::getRoot() const {
+  auto parent = this;
+  while (auto nested = dyn_cast<NestedArchetypeType>(parent)) {
+    parent = nested->getParent();
+  }
+  return const_cast<ArchetypeType*>(parent);
 }
 
 PrimaryArchetypeType::PrimaryArchetypeType(const ASTContext &Ctx,
@@ -2681,6 +2692,12 @@ GenericFunctionType::substGenericArgs(SubstitutionMap subs) {
   auto substFn = Type(this).subst(subs)->castTo<AnyFunctionType>();
   return FunctionType::get(substFn->getParams(),
                            substFn->getResult(), getExtInfo());
+}
+
+CanFunctionType
+CanGenericFunctionType::substGenericArgs(SubstitutionMap subs) const {
+  return cast<FunctionType>(
+           getPointer()->substGenericArgs(subs)->getCanonicalType());
 }
 
 static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
@@ -3362,10 +3379,10 @@ Type Type::transformRec(
     if (Optional<Type> transformed = fn(getPointer()))
       return *transformed;
 
-    // Recurse.
+    // Recur.
   }
 
-  // Recursive into children of this type.
+  // Recur into children of this type.
   TypeBase *base = getPointer();
   switch (base->getKind()) {
 #define ALWAYS_CANONICAL_TYPE(Id, Parent) \

@@ -19,8 +19,14 @@ sil_global @x : $Bar
 
 // CHECK-LABEL: sil @function_with_cm_with_cast
 // CHECK: [[SELF:%.*]] = alloc_ref $Foo
+// CHECK: [[CAST_1_SELF:%.*]] = upcast [[SELF]]
+// CHECK: [[CAST_2_SELF:%.*]] = unconditional_checked_cast [[CAST_1_SELF]]
+// CHECK: [[CAST_3_SELF:%.*]] = upcast [[CAST_2_SELF]]
+// CHECK: store [[CAST_3_SELF]] to [[GLOBAL:%.*]] :
+// CHECK-NEXT: [[RELOADED_SELF:%.*]] = load [[GLOBAL]]
 // CHECK-NOT: class_method
 // CHECK: [[REF:%.*]] = function_ref @_TFC4main3Foo4pingfS0_FT_T_
+// CHECK: [[SELF:%.*]] = unchecked_ref_cast [[RELOADED_SELF]]
 // CHECK: apply [[REF]]([[SELF]])
 // CHECK: return
 sil @function_with_cm_with_cast : $@convention(thin) () -> () {
@@ -43,7 +49,7 @@ bb0:
 
 // CHECK-LABEL: sil @function_with_cm_with_dynamic_type_known_from_checked_cast_br
 // CHECK-NOT: class_method
-// CHECK: bb1([[SELF:%.*]] : $Bar):
+// CHECK: bb4([[SELF:%.*]] : $Bar):
 // CHECK: [[REF:%.*]] = function_ref @_TFC4main3Bar4pingfS0_FT_T_
 // CHECK: apply [[REF]]([[SELF]])
 // CHECK: return

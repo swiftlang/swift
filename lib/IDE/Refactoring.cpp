@@ -935,6 +935,7 @@ ExtractCheckResult checkExtractConditions(ResolvedRangeInfo &RangeInfo,
   switch (RangeInfo.RangeContext->getContextKind()) {
   case swift::DeclContextKind::Initializer:
   case swift::DeclContextKind::SubscriptDecl:
+  case swift::DeclContextKind::EnumElementDecl:
   case swift::DeclContextKind::AbstractFunctionDecl:
   case swift::DeclContextKind::AbstractClosureExpr:
   case swift::DeclContextKind::TopLevelCodeDecl:
@@ -1908,8 +1909,7 @@ public:
   IfExpr *getIf() {
     if (!Assign)
       return nullptr;
-
-    return dyn_cast<IfExpr>(Assign->getSrc());
+    return dyn_cast_or_null<IfExpr>(Assign->getSrc());
   }
 
   SourceRange getNameRange() {

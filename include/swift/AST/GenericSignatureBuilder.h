@@ -314,6 +314,10 @@ public:
     /// \c ConstraintResult::Unresolved so the caller knows what happened.
     GenerateUnresolved = 1,
   };
+  
+  /// The set of constraints that are invalid because the constraint
+  /// type isn't constrained to a protocol or a class
+  std::vector<Constraint<Type>> invalidIsaConstraints;
 
 private:
   class InferRequirementsWalker;
@@ -931,6 +935,11 @@ private:
     AssociatedTypeDecl,
   };
 
+  /// Cache DependentMemberType results instead of calling
+  /// DependentMemberType::get(). The much smaller hash table is more
+  /// processor cache efficient.
+  mutable llvm::DenseMap<Type, Type> ReplacedSelfCache;
+
   /// The kind of storage we have.
   const StorageKind storageKind;
 
@@ -950,8 +959,9 @@ private:
     /// A protocol conformance used to satisfy the requirement.
     void *conformance;
 
-    /// An associated type to which a requirement is being applied.
-    AssociatedTypeDecl *assocType;
+    /// A precomputed dependent member of an associated type to which a
+    /// requirement is being applied.
+    DependentMemberType *dependentMember;
   } storage;
 
   friend TrailingObjects;
@@ -1089,7 +1099,8 @@ public:
     assert(isAcceptableStorageKind(kind, storageKind) &&
            "RequirementSource kind/storageKind mismatch");
 
-    storage.assocType = assocType;
+    auto ty = assocType->getDeclaredInterfaceType();
+    storage.dependentMember = cast<DependentMemberType>(ty.getPointer());
   }
 
   RequirementSource(Kind kind, const RequirementSource *parent)
@@ -1311,11 +1322,18 @@ public:
     return ProtocolConformanceRef::getFromOpaqueValue(storage.conformance);
   }
 
+  /// Retrieve the precomputed dependent member for the associated type
+  /// declaration for this requirement, if there is one.
+  DependentMemberType *getDependentMember() const {
+    if (storageKind != StorageKind::AssociatedTypeDecl) return nullptr;
+    return storage.dependentMember;
+  }
+
   /// Retrieve the associated type declaration for this requirement, if there
   /// is one.
   AssociatedTypeDecl *getAssociatedType() const {
     if (storageKind != StorageKind::AssociatedTypeDecl) return nullptr;
-    return storage.assocType;
+    return storage.dependentMember->getAssocType();
   }
 
   /// Profiling support for \c FoldingSet.
@@ -1554,6 +1572,11 @@ class GenericSignatureBuilder::PotentialArchetype {
   /// that share a name.
   llvm::MapVector<Identifier, StoredNestedType> NestedTypes;
 
+  /// Cache DependentMemberType results instead of calling
+  /// DependentMemberType::get(). The much smaller hash table is more
+  /// processor cache efficient.
+  mutable llvm::DenseMap<Type, DependentMemberType*> CachedDMTs;
+
   /// Construct a new potential archetype for a concrete declaration.
   PotentialArchetype(PotentialArchetype *parent, AssociatedTypeDecl *assocType)
       : parentOrContext(parent), identifier(assocType) {
@@ -1591,6 +1614,14 @@ public:
   AssociatedTypeDecl *getResolvedType() const {
     assert(getParent() && "Not an associated type");
     return identifier.assocType;
+  }
+
+  /// Retrieve the type declaration to which this nested type was resolved.
+  DependentMemberType *getResolvedDependentMemberType(Type Parent) const {
+    auto *&known = CachedDMTs[Parent];
+    if (!known)
+      known = DependentMemberType::get(Parent, getResolvedType());
+    return known;
   }
 
   /// Determine whether this is a generic parameter.

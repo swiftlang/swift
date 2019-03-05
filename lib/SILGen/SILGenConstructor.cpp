@@ -35,7 +35,9 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &SGF,
   auto ctorFnType = ctor->getInterfaceType()->castTo<AnyFunctionType>();
   assert(ctorFnType->getParams().size() == 1 &&
          "more than one self parameter?");
-  Type metatype = ctorFnType->getParams()[0].getOldType();
+  auto param = ctorFnType->getParams()[0];
+  assert(!param.isVariadic() && !param.isInOut());
+  Type metatype = param.getPlainType();
   auto *DC = ctor->getInnermostDeclContext();
   auto &AC = SGF.getASTContext();
   auto VD =
@@ -409,10 +411,9 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
   // Emit the exploded constructor argument.
   ArgumentSource payload;
   if (element->hasAssociatedValues()) {
-    RValue arg = emitImplicitValueConstructorArg
-      (*this, Loc, element->getArgumentInterfaceType()->getCanonicalType(),
-       element->getDeclContext());
-   payload = ArgumentSource(Loc, std::move(arg));
+    auto eltArgTy = element->getArgumentInterfaceType()->getCanonicalType();
+    RValue arg = emitImplicitValueConstructorArg(*this, Loc, eltArgTy, element);
+    payload = ArgumentSource(Loc, std::move(arg));
   }
 
   // Emit the metatype argument.
@@ -481,9 +482,10 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   // Allocate the 'self' value.
   bool useObjCAllocation = usesObjCAllocator(selfClassDecl);
 
-  if (ctor->hasClangNode()) {
-    // For an allocator thunk synthesized for an Objective-C init method,
-    // allocate using the metatype.
+  if (ctor->hasClangNode() || ctor->isConvenienceInit()) {
+    assert(ctor->hasClangNode() || ctor->isObjC());
+    // For an allocator thunk synthesized for an @objc convenience initializer
+    // or imported Objective-C init method, allocate using the metatype.
     SILValue allocArg = selfMetaValue;
 
     // When using Objective-C allocation, convert the metatype
@@ -572,10 +574,13 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // enforce its DI properties on stored properties.
   MarkUninitializedInst::Kind MUKind;
 
-  if (isDelegating)
-    MUKind = MarkUninitializedInst::DelegatingSelf;
-  else if (selfClassDecl->requiresStoredPropertyInits() &&
-           usesObjCAllocator) {
+  if (isDelegating) {
+    if (ctor->isObjC())
+      MUKind = MarkUninitializedInst::DelegatingSelfAllocated;
+    else
+      MUKind = MarkUninitializedInst::DelegatingSelf;
+  } else if (selfClassDecl->requiresStoredPropertyInits() &&
+             usesObjCAllocator) {
     // Stored properties will be initialized in a separate
     // .cxx_construct method called by the Objective-C runtime.
     assert(selfClassDecl->hasSuperclass() &&
@@ -904,7 +909,7 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
 
               return Type(type);
             },
-            MakeAbstractConformanceForGenericType());
+            LookUpConformanceInModule(dc->getParentModule()));
         }
 
         // Get the type of the initialization result, in terms

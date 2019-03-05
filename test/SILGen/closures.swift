@@ -842,3 +842,11 @@ func rdar37790062() {
   // CHECK: function_ref @$s8closures12rdar37790062yyF1SL_VyADyxGxyXE_xyXEtcfC
   _ = S({ faz(C2()) }, { bar() })
 }
+
+// Make sure that if we capture a trivial value, we do not try to copy it. This
+// violates SIL invariants and the SILVerifier will explode as such.
+func closeOverStructDontCopyTrivial() {
+  let a : StructWithMutatingMethod
+  a = StructWithMutatingMethod()
+  takeClosure { a.x }
+}

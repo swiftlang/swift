@@ -767,6 +767,7 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
             case DeclContextKind::AbstractClosureExpr:
             case DeclContextKind::AbstractFunctionDecl:
             case DeclContextKind::SubscriptDecl:
+            case DeclContextKind::EnumElementDecl:
               break;
             }
 

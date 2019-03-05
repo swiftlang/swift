@@ -46,7 +46,6 @@ import Chars
 import ClassArrayGetter
 import Codable
 import Combos
-import CountAlgo
 import DataBenchmarks
 import DeadArray
 import DictOfArraysToArrayOfDicts
@@ -66,7 +65,6 @@ import DictionaryOfAnyHashableStrings
 import DictionaryRemove
 import DictionarySubscriptDefault
 import DictionarySwap
-import DoubleWidthDivision
 import DropFirst
 import DropLast
 import DropWhile
@@ -78,7 +76,6 @@ import FlattenList
 import FloatingPointPrinting
 import Hanoi
 import Hash
-import HashQuadratic
 import Histogram
 import InsertCharacter
 import Integrate
@@ -215,8 +212,8 @@ registerBenchmark(CharacterPropertiesStashed)
 registerBenchmark(CharacterPropertiesStashedMemo)
 registerBenchmark(CharacterPropertiesPrecomputed)
 registerBenchmark(Chars)
+registerBenchmark(Codable)
 registerBenchmark(Combos)
-registerBenchmark(CountAlgo)
 registerBenchmark(ClassArrayGetter)
 registerBenchmark(DataBenchmarks)
 registerBenchmark(DeadArray)
@@ -237,7 +234,6 @@ registerBenchmark(DictionaryOfAnyHashableStrings)
 registerBenchmark(DictionaryRemove)
 registerBenchmark(DictionarySubscriptDefault)
 registerBenchmark(DictionarySwap)
-registerBenchmark(DoubleWidthDivision)
 registerBenchmark(DropFirst)
 registerBenchmark(DropLast)
 registerBenchmark(DropWhile)
@@ -250,12 +246,10 @@ registerBenchmark(FlattenListFlatMap)
 registerBenchmark(FloatingPointPrinting)
 registerBenchmark(Hanoi)
 registerBenchmark(HashTest)
-registerBenchmark(HashQuadratic)
 registerBenchmark(Histogram)
 registerBenchmark(InsertCharacter)
 registerBenchmark(IntegrateTest)
 registerBenchmark(IterateData)
-registerBenchmark(Codable)
 registerBenchmark(Join)
 registerBenchmark(LazyFilter)
 registerBenchmark(LinkedList)

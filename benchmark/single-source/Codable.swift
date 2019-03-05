@@ -109,15 +109,19 @@ public func setup_json() {
 
 @inline(never)
 public func run_JSONPerfEncode(_ N: Int) {
-  for _ in 0 ..< N {
-    JSONTester.encode()
+  autoreleasepool {
+    for _ in 0 ..< N {
+      JSONTester.encode()
+    }
   }
 }
 
 @inline(never)
 public func run_JSONPerfDecode(_ N: Int) {
-  for _ in 0 ..< N {
-    JSONTester.decode()
+  autoreleasepool {
+    for _ in 0 ..< N {
+      JSONTester.decode()
+    }
   }
 }
 
@@ -131,15 +135,19 @@ public func setup_plist() {
 
 @inline(never)
 public func run_PlistPerfEncode(_ N: Int) {
-  for _ in 0 ..< N {
-    plistTester.encode()
+  autoreleasepool {
+    for _ in 0 ..< N {
+      plistTester.encode()
+    }
   }
 }
 
 @inline(never)
 public func run_PlistPerfDecode(_ N: Int) {
-  for _ in 0 ..< N {
-    plistTester.decode()
+  autoreleasepool {
+    for _ in 0 ..< N {
+      plistTester.decode()
+    }
   }
 }
 

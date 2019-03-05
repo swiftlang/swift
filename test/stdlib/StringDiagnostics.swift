@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-// XFAIL: linux
+// REQUIRES: objc_interop
 
 import Foundation
 

@@ -96,6 +96,7 @@ public:
   enum { NumVOKindBits = 3 };
   enum { NumStoreOwnershipQualifierBits = 2 };
   enum { NumLoadOwnershipQualifierBits = 2 };
+  enum { NumAssignOwnershipQualifierBits = 2 };
   enum { NumSILAccessKindBits = 2 };
   enum { NumSILAccessEnforcementBits = 2 };
 
@@ -279,6 +280,10 @@ protected:
   SWIFT_INLINE_BITFIELD(LoadInst, SingleValueInstruction,
                         NumLoadOwnershipQualifierBits,
     OwnershipQualifier : NumLoadOwnershipQualifierBits
+  );
+  SWIFT_INLINE_BITFIELD(AssignInst, NonValueInstruction,
+                        NumAssignOwnershipQualifierBits,
+    OwnershipQualifier : NumAssignOwnershipQualifierBits
   );
 
   SWIFT_INLINE_BITFIELD(UncheckedOwnershipConversionInst,SingleValueInstruction,

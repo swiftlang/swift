@@ -1078,11 +1078,11 @@ public:
   /// created for various dynamic purposes like KVO?
   bool isArtificialSubclass() const {
     assert(isTypeMetadata());
-    return Description == 0;
+    return Description == nullptr;
   }
   void setArtificialSubclass() {
     assert(isTypeMetadata());
-    Description = 0;
+    Description = nullptr;
   }
 
   ClassFlags getFlags() const {
@@ -1321,7 +1321,7 @@ struct TargetStructMetadata : public TargetValueMetadata<Runtime> {
   }
 
   static constexpr int32_t getGenericArgumentOffset() {
-    return sizeof(TargetStructMetadata<Runtime>) / sizeof(void*);
+    return sizeof(TargetStructMetadata<Runtime>) / sizeof(StoredPointer);
   }
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
@@ -1369,7 +1369,7 @@ struct TargetEnumMetadata : public TargetValueMetadata<Runtime> {
   }
 
   static constexpr int32_t getGenericArgumentOffset() {
-    return sizeof(TargetEnumMetadata<Runtime>) / sizeof(void*);
+    return sizeof(TargetEnumMetadata<Runtime>) / sizeof(StoredPointer);
   }
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
@@ -1547,10 +1547,10 @@ class TargetProtocolDescriptorRef {
   /// is clear).
   StoredPointer storage;
 
+public:
   constexpr TargetProtocolDescriptorRef(StoredPointer storage)
     : storage(storage) { }
 
-public:
   constexpr TargetProtocolDescriptorRef() : storage() { }
 
   TargetProtocolDescriptorRef(
@@ -1645,7 +1645,11 @@ public:
     assert(!isObjC());
 #endif
 
-    return reinterpret_cast<ProtocolDescriptorPointer>(storage & ~IsObjCBit);
+    // NOTE: we explicitly use a C-style cast here because cl objects to the
+    // reinterpret_cast from a uintptr_t type to an unsigned type which the
+    // Pointer type may be depending on the instantiation.  Using the C-style
+    // cast gives us a single path irrespective of the template type parameters.
+    return (ProtocolDescriptorPointer)(storage & ~IsObjCBit);
   }
 
   /// Retrieve the raw stored pointer and discriminator bit.
@@ -2039,7 +2043,8 @@ struct TargetGenericWitnessTable {
     return WitnessTablePrivateSizeInWordsAndRequiresInstantiation >> 1;
   }
 
-  /// Whether the witness table is known to require instantiation.
+  /// This bit doesn't really mean anything. Currently, the compiler always
+  /// sets it when emitting a generic witness table.
   uint16_t requiresInstantiation() const {
     return WitnessTablePrivateSizeInWordsAndRequiresInstantiation & 0x01;
   }
@@ -2519,7 +2524,6 @@ public:
   /// The type that's constrained, described as a mangled name.
   RelativeDirectPointer<const char, /*nullable*/ false> Param;
 
-private:
   union {
     /// A mangled representation of the same-type or base class the param is
     /// constrained to.
@@ -2544,7 +2548,6 @@ private:
     GenericRequirementLayoutKind Layout;
   };
 
-public:
   constexpr GenericRequirementFlags getFlags() const {
     return Flags;
   }
@@ -2784,6 +2787,7 @@ private:
   using TrailingGenericContextObjects
     = TrailingGenericContextObjects<TargetExtensionContextDescriptor<Runtime>>;
 
+public:
   /// A mangling of the `Self` type context that the extension extends.
   /// The mangled name represents the type in the generic context encoded by
   /// this descriptor. For example, a nongeneric nominal type extension will
@@ -2794,7 +2798,6 @@ private:
   /// extension is declared inside.
   RelativeDirectPointer<const char> ExtendedContext;
 
-public:
   using TrailingGenericContextObjects::getGenericContext;
 
   StringRef getMangledExtendedContext() const {
@@ -2809,21 +2812,79 @@ public:
 using ExtensionContextDescriptor = TargetExtensionContextDescriptor<InProcess>;
 
 template<typename Runtime>
+struct TargetMangledContextName {
+  /// The mangled name of the context.
+  TargetRelativeDirectPointer<Runtime, const char, /*nullable*/ false> name;
+};
+
+template<typename Runtime>
 struct TargetAnonymousContextDescriptor final
     : TargetContextDescriptor<Runtime>,
-      TrailingGenericContextObjects<TargetAnonymousContextDescriptor<Runtime>>
+      TrailingGenericContextObjects<TargetAnonymousContextDescriptor<Runtime>,
+                                    TargetGenericContextDescriptorHeader,
+                                    TargetMangledContextName<Runtime>>
 {
 private:
   using TrailingGenericContextObjects
-    = TrailingGenericContextObjects<TargetAnonymousContextDescriptor<Runtime>>;
+    = TrailingGenericContextObjects<TargetAnonymousContextDescriptor<Runtime>,
+                                    TargetGenericContextDescriptorHeader,
+                                    TargetMangledContextName<Runtime>>;
+  using TrailingObjects =
+    typename TrailingGenericContextObjects::TrailingObjects;
+  friend TrailingObjects;
 
 public:
-  using TrailingGenericContextObjects::getGenericContext;
+  using MangledContextName = TargetMangledContextName<Runtime>;
 
+  using TrailingGenericContextObjects::getGenericContext;
+  using TrailingGenericContextObjects::getGenericContextHeader;
+  using TrailingGenericContextObjects::getFullGenericContextHeader;
+  using TrailingGenericContextObjects::getGenericParams;
+
+  AnonymousContextDescriptorFlags getAnonymousContextDescriptorFlags() const {
+    return AnonymousContextDescriptorFlags(this->Flags.getKindSpecificFlags());
+  }
+
+  /// Whether this anonymous context descriptor contains a full mangled name,
+  /// which can be used to match the anonymous type to its textual form.
+  bool hasMangledName() const {
+    return getAnonymousContextDescriptorFlags().hasMangledName();
+  }
+
+  /// Retrieve the mangled name of this context, or NULL if it was not
+  /// recorded in the metadata.
+  ConstTargetPointer<Runtime, char> getMangledName() const {
+    if (!hasMangledName())
+      return ConstTargetPointer<Runtime, char>();
+
+    return this->template getTrailingObjects<MangledContextName>()->name;
+  }
+
+  /// Retrieve a pointer to the mangled context name structure.
+  const MangledContextName *getMangledContextName() const {
+    if (!hasMangledName())
+      return nullptr;
+
+    return this->template getTrailingObjects<MangledContextName>();
+  }
+
+private:
+  template<typename T>
+  using OverloadToken =
+    typename TrailingGenericContextObjects::template OverloadToken<T>;
+
+  using TrailingGenericContextObjects::numTrailingObjects;
+
+  size_t numTrailingObjects(OverloadToken<MangledContextName>) const {
+    return this->hasMangledNam() ? 1 : 0;
+  }
+
+public:
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Anonymous;
   }
 };
+using AnonymousContextDescriptor = TargetAnonymousContextDescriptor<InProcess>;
 
 /// A protocol descriptor.
 ///
@@ -3480,11 +3541,11 @@ public:
   llvm::ArrayRef<GenericParamDescriptor> getGenericParams() const;
 
   /// Return the offset of the start of generic arguments in the nominal
-  /// type's metadata. The returned value is measured in sizeof(void*).
+  /// type's metadata. The returned value is measured in sizeof(StoredPointer).
   int32_t getGenericArgumentOffset() const;
 
   /// Return the start of the generic arguments array in the nominal
-  /// type's metadata. The returned value is measured in sizeof(void*).
+  /// type's metadata. The returned value is measured in sizeof(StoredPointer).
   const TargetMetadata<Runtime> * const *getGenericArguments(
                                const TargetMetadata<Runtime> *metadata) const {
     auto offset = getGenericArgumentOffset();

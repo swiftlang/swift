@@ -4,7 +4,7 @@
 enum List<T> {
   case Nil
   // rdar://21927124
-  // CHECK: <attr-builtin>indirect</attr-builtin> <kw>case</kw> Cons(T, List)
+  // CHECK: <attr-builtin>indirect</attr-builtin> <kw>case</kw> Cons(<type>T</type>, <type>List</type>)
   indirect case Cons(T, List)
 }
 
@@ -197,6 +197,25 @@ class SubCls : MyCls, Prot {}
 func genFn<T : Prot where T.Blarg : Prot2>(_: T) -> Int {}
 
 func f(x: Int) -> Int {
+
+  // CHECK: <str>#"This is a raw string"#</str>
+  #"This is a raw string"#
+
+  // CHECK: <str>##"This is also a raw string"##</str>
+  ##"This is also a raw string"##
+
+  // CHECK: <str>###"This is an unterminated raw string"</str>
+  ###"This is an unterminated raw string"
+
+  // CHECK: <str>#"""This is a multiline raw string"""#</str>
+  #"""This is a multiline raw string"""#
+
+  // CHECK: <str>#"This is an </str>\#<anchor>(</anchor>interpolated<anchor>)</anchor><str> raw string"#</str>
+  #"This is an \#(interpolated) raw string"#
+
+  // CHECK: <str>#"This is a raw string with an invalid \##() interpolation"#</str>
+  #"This is a raw string with an invalid \##() interpolation"#
+
   // CHECK: <str>"This is string </str>\<anchor>(</anchor>genFn({(a:<type>Int</type> -> <type>Int</type>) <kw>in</kw> a})<anchor>)</anchor><str> interpolation"</str>
   "This is string \(genFn({(a:Int -> Int) in a})) interpolation"
 
@@ -377,6 +396,9 @@ func keywordInCaseAndLocalArgLabel(_ for: Int, for in: Int, class _: Int) {
   case (let x, let y):
 // CHECK: <kw>case</kw> (<kw>let</kw> x, <kw>let</kw> y):
     print(x, y)
+  @unknown default:
+// CHECK: <attr-id>@unknown</attr-id> <kw>default</kw>:
+    ()
   }
 }
 

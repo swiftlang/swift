@@ -19,11 +19,9 @@ import TestsUtils
 
 public let RandomShuffle = [
   BenchmarkInfo(name: "RandomShuffleDef2", runFunction: run_RandomShuffleDef,
-    tags: [.api],
-    setUpFunction: { blackHole(numbersDef) }),
+    tags: [.api], setUpFunction: { blackHole(numbersDef) }, legacyFactor: 4),
   BenchmarkInfo(name: "RandomShuffleLCG2", runFunction: run_RandomShuffleLCG,
-    tags: [.api],
-    setUpFunction: { blackHole(numbersLCG) }),
+    tags: [.api], setUpFunction: { blackHole(numbersLCG) }, legacyFactor: 16),
 ]
 
 /// A linear congruential PRNG.
@@ -41,8 +39,8 @@ struct LCRNG: RandomNumberGenerator {
   }
 }
 
-var numbersDef: [Int] = Array(0...10_000)
-var numbersLCG: [Int] = Array(0...100_000)
+var numbersDef: [Int] = Array(0...2_500)
+var numbersLCG: [Int] = Array(0...6_250)
 
 @inline(never)
 public func run_RandomShuffleDef(_ N: Int) {

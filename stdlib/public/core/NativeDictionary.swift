@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A wrapper around _RawDictionaryStorage that provides most of the
+/// A wrapper around __RawDictionaryStorage that provides most of the
 /// implementation of Dictionary.
 @usableFromInline
 @_fixed_layout
@@ -18,43 +18,51 @@ internal struct _NativeDictionary<Key: Hashable, Value> {
   @usableFromInline
   internal typealias Element = (key: Key, value: Value)
 
-  /// See this comments on _RawDictionaryStorage and its subclasses to
+  /// See this comments on __RawDictionaryStorage and its subclasses to
   /// understand why we store an untyped storage here.
   @usableFromInline
-  internal var _storage: _RawDictionaryStorage
+  internal var _storage: __RawDictionaryStorage
 
   /// Constructs an instance from the empty singleton.
   @inlinable
   internal init() {
-    self._storage = _RawDictionaryStorage.empty
+    self._storage = __RawDictionaryStorage.empty
   }
 
   /// Constructs a dictionary adopting the given storage.
   @inlinable
-  internal init(_ storage: __owned _RawDictionaryStorage) {
+  internal init(_ storage: __owned __RawDictionaryStorage) {
     self._storage = storage
   }
 
   @inlinable
   internal init(capacity: Int) {
-    self._storage = _DictionaryStorage<Key, Value>.allocate(capacity: capacity)
+    if capacity == 0 {
+      self._storage = __RawDictionaryStorage.empty
+    } else {
+      self._storage = _DictionaryStorage<Key, Value>.allocate(capacity: capacity)
+    }
   }
 
 #if _runtime(_ObjC)
   @inlinable
-  internal init(_ cocoa: __owned _CocoaDictionary) {
+  internal init(_ cocoa: __owned __CocoaDictionary) {
     self.init(cocoa, capacity: cocoa.count)
   }
 
   @inlinable
-  internal init(_ cocoa: __owned _CocoaDictionary, capacity: Int) {
-    _internalInvariant(cocoa.count <= capacity)
-    self._storage =
-      _DictionaryStorage<Key, Value>.convert(cocoa, capacity: capacity)
-    for (key, value) in cocoa {
-      insertNew(
-        key: _forceBridgeFromObjectiveC(key, Key.self),
-        value: _forceBridgeFromObjectiveC(value, Value.self))
+  internal init(_ cocoa: __owned __CocoaDictionary, capacity: Int) {
+    if capacity == 0 {
+      self._storage = __RawDictionaryStorage.empty
+    } else {
+      _internalInvariant(cocoa.count <= capacity)
+      self._storage =
+        _DictionaryStorage<Key, Value>.convert(cocoa, capacity: capacity)
+      for (key, value) in cocoa {
+        insertNew(
+          key: _forceBridgeFromObjectiveC(key, Key.self),
+          value: _forceBridgeFromObjectiveC(value, Value.self))
+      }
     }
   }
 #endif
@@ -591,7 +599,7 @@ extension _NativeDictionary where Value: Equatable {
 
 #if _runtime(_ObjC)
   @inlinable
-  func isEqual(to other: _CocoaDictionary) -> Bool {
+  func isEqual(to other: __CocoaDictionary) -> Bool {
     if self.count != other.count { return false }
 
     defer { _fixLifetime(self) }

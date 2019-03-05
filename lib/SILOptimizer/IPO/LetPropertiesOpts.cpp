@@ -210,22 +210,18 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
       // Replace the access to a let property by the value
       // computed by this initializer.
       SILValue clonedInit = cloneInitAt(proj);
-      SILBuilderWithScope B(proj);
       for (auto UI = proj->use_begin(), E = proj->use_end(); UI != E;) {
         auto *User = UI->getUser();
         ++UI;
-
-        if (isIncidentalUse(User))
-          continue;
 
         // A nested begin_access will be mapped as a separate "Load".
         if (isa<BeginAccessInst>(User))
           continue;
 
-        if (isa<StoreInst>(User))
+        if (!canReplaceLoadSequence(User))
           continue;
 
-        replaceLoadSequence(User, clonedInit, B);
+        replaceLoadSequence(User, clonedInit);
         eraseUsesOfInstruction(User);
         User->eraseFromParent();
         ++NumReplaced;
@@ -376,7 +372,11 @@ bool LetPropertiesOpt::isConstantLetProperty(VarDecl *Property) {
                           << "' has no unknown uses\n");
 
   // Only properties of simple types can be optimized.
-  if (!isSimpleType(Module->Types.getLoweredType(Property->getType()), *Module)) {
+
+  // FIXME: Expansion
+  auto &TL = Module->Types.getTypeLowering(Property->getType(),
+                                           ResilienceExpansion::Minimal);
+  if (!TL.isTrivial()) {
      LLVM_DEBUG(llvm::dbgs() << "Property '" << *Property
                              << "' is not of trivial type\n");
     SkipProcessing.insert(Property);
@@ -580,6 +580,9 @@ void LetPropertiesOpt::run(SILModuleTransform *T) {
     // optimized, because they may contain access to the let
     // properties.
     bool NonRemovable = !F.shouldOptimize();
+
+    // FIXME: We should be able to handle ownership.
+    NonRemovable &= !F.hasOwnership();
 
     for (auto &BB : F) {
       for (auto &I : BB)

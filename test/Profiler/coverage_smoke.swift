@@ -189,4 +189,20 @@ let _ = Class3()
 let _ = Struct1(field: 1)
 let _ = Struct1()
 
+struct Struct2 {
+  func visible() {
+    hidden()
+  }
+  private func hidden() {
+    var x: Int = 0 // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+    func helper() {
+      x += 1 // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+    }
+    helper() // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+  }
+}
+
+var s2 = Struct2()
+s2.visible()
+
 // CHECK-REPORT: TOTAL {{.*}} 100.00% {{.*}} 100.00%

@@ -59,17 +59,6 @@ getScalarizedElementAddresses(SILValue Pointer, SILBuilder &B, SILLocation Loc,
   }
 }
 
-/// Given an RValue of aggregate type, compute the values of the elements by
-/// emitting a series of tuple_element instructions.
-static void getScalarizedElements(SILValue V,
-                                  SmallVectorImpl<SILValue> &ElementVals,
-                                  SILLocation Loc, SILBuilder &B) {
-  TupleType *TT = V->getType().castTo<TupleType>();
-  for (auto Index : indices(TT->getElements())) {
-    ElementVals.push_back(B.emitTupleExtract(Loc, V, Index));
-  }
-}
-
 /// Scalarize a load down to its subelements.  If NewLoads is specified, this
 /// can return the newly generated sub-element loads.
 static SILValue scalarizeLoad(LoadInst *LI,
@@ -78,14 +67,60 @@ static SILValue scalarizeLoad(LoadInst *LI,
   SmallVector<SILValue, 4> ElementTmps;
 
   for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i) {
-    auto *SubLI = B.createLoad(LI->getLoc(), ElementAddrs[i],
-                               LoadOwnershipQualifier::Unqualified);
+    auto *SubLI = B.createTrivialLoadOr(LI->getLoc(), ElementAddrs[i],
+                                        LI->getOwnershipQualifier(),
+                                        true /*supports unqualified*/);
     ElementTmps.push_back(SubLI);
   }
 
   if (LI->getType().is<TupleType>())
     return B.createTuple(LI->getLoc(), LI->getType(), ElementTmps);
   return B.createStruct(LI->getLoc(), LI->getType(), ElementTmps);
+}
+
+/// Scalarize a load_borrow down to its subelements. It will scalarize each of
+/// the end_borrows of the load_borrow as well.
+static void scalarizeLoadBorrow(LoadBorrowInst *lbi,
+                                SmallVectorImpl<SILValue> &elementAddrs) {
+  // First gather all of our end_borrows. We are going to scalarize them as
+  // well.
+  SmallVector<EndBorrowInst *, 8> endBorrows;
+  for (auto *op : lbi->getUses()) {
+    if (auto *ebi = dyn_cast<EndBorrowInst>(op->getUser())) {
+      endBorrows.push_back(ebi);
+    }
+  }
+
+  SILBuilderWithScope b(lbi);
+  SmallVector<SILValue, 4> elementTmps;
+
+  for (unsigned i : indices(elementAddrs)) {
+    if (elementAddrs[i]->getType().isTrivial(lbi->getModule())) {
+      elementTmps.push_back(b.createLoad(lbi->getLoc(), elementAddrs[i],
+                                         LoadOwnershipQualifier::Trivial));
+      continue;
+    }
+
+    SILValue v = b.createLoadBorrow(lbi->getLoc(), elementAddrs[i]);
+    for (auto *ebi : endBorrows) {
+      SILBuilderWithScope(ebi).createEndBorrow(lbi->getLoc(), v);
+    }
+    elementTmps.push_back(v);
+  }
+
+  // Inline constructor.
+  auto result = ([&]() -> SILValue {
+    if (lbi->getType().is<TupleType>())
+      return b.createTuple(lbi->getLoc(), lbi->getType(), elementTmps);
+    return b.createStruct(lbi->getLoc(), lbi->getType(), elementTmps);
+  })();
+
+  // Delete all of the end borrows, rauw, and we are done!
+  for (auto *ebi : endBorrows) {
+    ebi->eraseFromParent();
+  }
+  lbi->replaceAllUsesWith(result);
+  lbi->eraseFromParent();
 }
 
 //===----------------------------------------------------------------------===//
@@ -118,7 +153,7 @@ public:
 
 private:
   LLVM_NODISCARD bool collectUses(SILValue Pointer);
-  LLVM_NODISCARD bool collectContainerUses(AllocBoxInst *ABI);
+  LLVM_NODISCARD bool collectContainerUses(SILValue boxValue);
 };
 } // end anonymous namespace
 
@@ -130,8 +165,10 @@ bool ElementUseCollector::collectFrom() {
   return collectUses(TheMemory.getAddress());
 }
 
-bool ElementUseCollector::collectContainerUses(AllocBoxInst *abi) {
-  for (auto *ui : abi->getUses()) {
+bool ElementUseCollector::collectContainerUses(SILValue boxValue) {
+  assert(isa<AllocBoxInst>(boxValue) || isa<CopyValueInst>(boxValue));
+
+  for (auto *ui : boxValue->getUses()) {
     auto *user = ui->getUser();
 
     // dealloc_box deallocated a box containing uninitialized memory. This can
@@ -142,6 +179,14 @@ bool ElementUseCollector::collectContainerUses(AllocBoxInst *abi) {
     // Retaining the box doesn't effect the value inside the box.
     if (isa<StrongRetainInst>(user) || isa<RetainValueInst>(user))
       continue;
+
+    // Like retaining, copies do not effect the underlying value. We do need to
+    // recursively visit the copies users though.
+    if (auto *cvi = dyn_cast<CopyValueInst>(user)) {
+      if (!collectContainerUses(cvi))
+        return false;
+      continue;
+    }
 
     // Since we are trying to promote loads/stores, any releases of the box are
     // not considered uses of the underlying value due to:
@@ -162,7 +207,8 @@ bool ElementUseCollector::collectContainerUses(AllocBoxInst *abi) {
     // FIXME: Since we do not support promoting strong_release or release_value
     // today this will cause the underlying allocation to never be
     // eliminated. That should be implemented and fixed.
-    if (isa<StrongReleaseInst>(user) || isa<ReleaseValueInst>(user)) {
+    if (isa<StrongReleaseInst>(user) || isa<ReleaseValueInst>(user) ||
+        isa<DestroyValueInst>(user)) {
       Releases.push_back(user);
       continue;
     }
@@ -229,7 +275,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
     }
 
     // Loads are a use of the value.
-    if (isa<LoadInst>(User)) {
+    if (isa<LoadInst>(User) || isa<LoadBorrowInst>(User)) {
       if (PointeeType.is<TupleType>())
         UsesToScalarize.push_back(User);
       else
@@ -237,49 +283,38 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       continue;
     }
 
-#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)             \
-  if (isa<Load##Name##Inst>(User)) {                                           \
-    Uses.emplace_back(User, PMOUseKind::Load);                                 \
-    continue;                                                                  \
-  }
-#include "swift/AST/ReferenceStorage.def"
-
     // Stores *to* the allocation are writes.
-    if (isa<StoreInst>(User) && UI->getOperandNumber() == 1) {
-      if (PointeeType.is<TupleType>()) {
-        UsesToScalarize.push_back(User);
+    if (auto *si = dyn_cast<StoreInst>(User)) {
+      if (UI->getOperandNumber() == StoreInst::Dest) {
+        if (PointeeType.is<TupleType>()) {
+          UsesToScalarize.push_back(User);
+          continue;
+        }
+
+        auto kind = ([&]() -> PMOUseKind {
+          switch (si->getOwnershipQualifier()) {
+          // Coming out of SILGen, we assume that raw stores are
+          // initializations, unless they have trivial type (which we classify
+          // as InitOrAssign).
+          case StoreOwnershipQualifier::Unqualified:
+            if (PointeeType.isTrivial(User->getModule()))
+              return PMOUseKind::InitOrAssign;
+            return PMOUseKind::Initialization;
+
+          case StoreOwnershipQualifier::Init:
+            return PMOUseKind::Initialization;
+
+          case StoreOwnershipQualifier::Assign:
+            return PMOUseKind::Assign;
+
+          case StoreOwnershipQualifier::Trivial:
+            return PMOUseKind::InitOrAssign;
+          }
+        })();
+        Uses.emplace_back(si, kind);
         continue;
       }
-
-      // Coming out of SILGen, we assume that raw stores are initializations,
-      // unless they have trivial type (which we classify as InitOrAssign).
-      PMOUseKind Kind;
-      if (InStructSubElement)
-        Kind = PMOUseKind::PartialStore;
-      else if (PointeeType.isTrivial(User->getModule()))
-        Kind = PMOUseKind::InitOrAssign;
-      else
-        Kind = PMOUseKind::Initialization;
-
-      Uses.emplace_back(User, Kind);
-      continue;
     }
-
-#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)             \
-  if (auto *SI = dyn_cast<Store##Name##Inst>(User)) {                          \
-    if (UI->getOperandNumber() == 1) {                                         \
-      PMOUseKind Kind;                                                         \
-      if (InStructSubElement)                                                  \
-        Kind = PMOUseKind::PartialStore;                                       \
-      else if (SI->isInitializationOfDest())                                   \
-        Kind = PMOUseKind::Initialization;                                     \
-      else                                                                     \
-        Kind = PMOUseKind::Assign;                                             \
-      Uses.emplace_back(User, Kind);                                           \
-      continue;                                                                \
-    }                                                                          \
-  }
-#include "swift/AST/ReferenceStorage.def"
 
     if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
       // If this is a copy of a tuple, we should scalarize it so that we don't
@@ -293,16 +328,17 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       // the destination, then this is an unknown assignment.  Note that we'll
       // revisit this instruction and add it to Uses twice if it is both a load
       // and store to the same aggregate.
-      PMOUseKind Kind;
-      if (UI->getOperandNumber() == 0)
-        Kind = PMOUseKind::Load;
-      else if (InStructSubElement)
-        Kind = PMOUseKind::PartialStore;
-      else if (CAI->isInitializationOfDest())
-        Kind = PMOUseKind::Initialization;
-      else
-        Kind = PMOUseKind::Assign;
-
+      //
+      // Inline constructor.
+      auto Kind = ([&]() -> PMOUseKind {
+        if (UI->getOperandNumber() == CopyAddrInst::Src)
+          return PMOUseKind::Load;
+        if (PointeeType.isTrivial(CAI->getModule()))
+          return PMOUseKind::InitOrAssign;
+        if (CAI->isInitializationOfDest())
+          return PMOUseKind::Initialization;
+        return PMOUseKind::Assign;
+      })();
       Uses.emplace_back(User, Kind);
       continue;
     }
@@ -427,14 +463,22 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
         continue;
       }
 
+      // Scalarize LoadBorrowInst
+      if (auto *LBI = dyn_cast<LoadBorrowInst>(User)) {
+        scalarizeLoadBorrow(LBI, ElementAddrs);
+        continue;
+      }
+
       // Scalarize StoreInst
       if (auto *SI = dyn_cast<StoreInst>(User)) {
         SILBuilderWithScope B(User, SI);
-        getScalarizedElements(SI->getOperand(0), ElementTmps, SI->getLoc(), B);
-
+        B.emitDestructureValueOperation(
+            SI->getLoc(), SI->getSrc(),
+            [&](unsigned index, SILValue v) { ElementTmps.push_back(v); });
         for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
-          B.createStore(SI->getLoc(), ElementTmps[i], ElementAddrs[i],
-                        StoreOwnershipQualifier::Unqualified);
+          B.createTrivialStoreOr(SI->getLoc(), ElementTmps[i], ElementAddrs[i],
+                                 SI->getOwnershipQualifier(),
+                                 true /*supports unqualified*/);
         SI->eraseFromParent();
         continue;
       }

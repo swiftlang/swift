@@ -84,6 +84,7 @@ where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
   override subscript(bounds: Range<Index>) -> SubSequence { get }
 
   // FIXME: Associated type inference requires these.
+  @_borrowed
   override subscript(position: Index) -> Element { get }
   override var startIndex: Index { get }
   override var endIndex: Index { get }

@@ -169,8 +169,10 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
         auto nameNode = Dem.createNode(Node::Kind::Identifier,
                                        identity.getABIName());
         if (identity.isAnyRelatedEntity()) {
-          auto relatedName = Dem.createNode(Node::Kind::RelatedEntityDeclName,
-                                            identity.getRelatedEntityName());
+          auto kindNode = Dem.createNode(Node::Kind::Identifier,
+                                     identity.getRelatedEntityName());
+          auto relatedName = Dem.createNode(Node::Kind::RelatedEntityDeclName);
+          relatedName->addChild(kindNode, Dem);
           relatedName->addChild(nameNode, Dem);
           nameNode = relatedName;
         }
@@ -282,7 +284,7 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
   // Gather the complete set of generic arguments that must be written to
   // form this type.
   std::vector<const Metadata *> allGenericArgs;
-  gatherWrittenGenericArgs(type, description, allGenericArgs);
+  gatherWrittenGenericArgs(type, description, allGenericArgs, Dem);
 
   // Demangle the generic arguments.
   std::vector<NodePointer> demangledGenerics;

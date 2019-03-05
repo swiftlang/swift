@@ -20,8 +20,8 @@ using namespace swift;
 using namespace swift::reflection;
 using namespace swift::remote;
 
-using NativeReflectionContext
-  = ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>;
+using NativeReflectionContext = swift::reflection::ReflectionContext<
+    External<RuntimeTarget<sizeof(uintptr_t)>>>;
 
 struct SwiftReflectionContext {
   NativeReflectionContext *nativeContext;

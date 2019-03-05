@@ -1077,6 +1077,50 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     return false;
   }
 
+  void handleResultTypeChange(ValueDecl *FD, Expr *Call) {
+    Optional<NodeAnnotation> ChangeKind;
+
+    // look for related change item for the function decl.
+    for (auto Item: getRelatedDiffItems(FD)) {
+      if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {
+        // check if the function's return type has been changed from nonnull
+        // to nullable.
+        if (CI->DiffKind == NodeAnnotation::WrapOptional &&
+            CI->getChildIndices().size() == 1 &&
+            CI->getChildIndices().front() == 0) {
+          ChangeKind = NodeAnnotation::WrapOptional;
+          break;
+        }
+      }
+    }
+    if (!ChangeKind.hasValue())
+      return;
+    // If a function's return type has been changed from nonnull to nullable,
+    // append ! to the original call expression.
+    if (*ChangeKind == NodeAnnotation::WrapOptional) {
+      Editor.insertAfterToken(Call->getSourceRange().End, "!");
+    }
+  }
+
+  // If a property has changed from nonnull to nullable, we should add ! to the
+  // reference of the property.
+  bool handlePropertyTypeChange(Expr *E) {
+    if (auto MRE = dyn_cast<MemberRefExpr>(E)) {
+      if (auto *VD = MRE->getReferencedDecl().getDecl()) {
+        for (auto *I: getRelatedDiffItems(VD)) {
+          if (auto *Item = dyn_cast<CommonDiffItem>(I)) {
+            if (Item->DiffKind == NodeAnnotation::WrapOptional &&
+                Item->NodeKind == SDKNodeKind::DeclVar) {
+              Editor.insertAfterToken(E->getEndLoc(), "!");
+              return true;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
   bool walkToExprPre(Expr *E) override {
     if (E->getSourceRange().isInvalid())
       return false;
@@ -1090,6 +1134,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       return false;
     if (handleAttributeReference(E))
       return false;
+    if (handlePropertyTypeChange(E))
+      return false;
     if (auto *CE = dyn_cast<CallExpr>(E)) {
       auto Fn = CE->getFn();
       auto Args = CE->getArg();
@@ -1100,6 +1146,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
           handleTypeHoist(FD, CE, Args);
           handleSpecialCases(FD, CE, Args);
           handleStringRepresentableArg(FD, Args, CE);
+          handleResultTypeChange(FD, CE);
         }
         break;
       }
@@ -1110,15 +1157,16 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
           handleFunctionCallToPropertyChange(FD, DSC->getFn(), Args);
           handleSpecialCases(FD, CE, Args);
           handleStringRepresentableArg(FD, Args, CE);
+          handleResultTypeChange(FD, CE);
         }
         break;
       }
       case ExprKind::ConstructorRefCall: {
         auto CCE = cast<ConstructorRefCallExpr>(Fn);
         if (auto FD = CCE->getFn()->getReferencedDecl().getDecl()) {
-          auto *CE = CCE->getFn();
           handleFuncRename(FD, CE, Args);
           handleStringRepresentableArg(FD, Args, CE);
+          handleResultTypeChange(FD, CE);
         }
         break;
       }

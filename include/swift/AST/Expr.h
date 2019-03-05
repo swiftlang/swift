@@ -157,8 +157,9 @@ protected:
     HasTrailingClosure : 1
   );
 
-  SWIFT_INLINE_BITFIELD(NumberLiteralExpr, LiteralExpr, 1,
-    IsNegative : 1
+  SWIFT_INLINE_BITFIELD(NumberLiteralExpr, LiteralExpr, 1+1,
+    IsNegative : 1,
+    IsExplicitConversion : 1
   );
 
   SWIFT_INLINE_BITFIELD(StringLiteralExpr, LiteralExpr, 3+1+1,
@@ -466,9 +467,11 @@ public:
   /// This distinguishes static references to types, like Int, from metatype
   /// values, "someTy: Any.Type".
   bool isTypeReference(llvm::function_ref<Type(const Expr *)> getType =
-                           [](const Expr *E) -> Type {
-    return E->getType();
-  }) const;
+                           [](const Expr *E) -> Type { return E->getType(); },
+                       llvm::function_ref<Decl *(const Expr *)> getDecl =
+                           [](const Expr *E) -> Decl * {
+                         return nullptr;
+                       }) const;
 
   /// Determine whether this expression refers to a statically-derived metatype.
   ///
@@ -476,7 +479,9 @@ public:
   /// is not an archetype or dependent type.
   bool isStaticallyDerivedMetatype(
       llvm::function_ref<Type(const Expr *)> getType =
-          [](const Expr *E) -> Type { return E->getType(); }) const;
+          [](const Expr *E) -> Type { return E->getType(); },
+      llvm::function_ref<bool(const Expr *)> isTypeReference =
+          [](const Expr *E) { return E->isTypeReference(); }) const;
 
   /// isImplicit - Determines whether this expression was implicitly-generated,
   /// rather than explicitly written in the AST.
@@ -524,10 +529,10 @@ public:
   /// the parent map.
   llvm::DenseMap<Expr *, Expr *> getParentMap();
 
-  /// Produce a mapping from each subexpression to its depth in the root
-  /// expression. The root expression has depth 0, its children have depth
-  /// 1, etc.
-  llvm::DenseMap<Expr *, unsigned> getDepthMap();
+  /// Produce a mapping from each subexpression to its depth and parent,
+  /// in the root expression. The root expression has depth 0, its children have
+  /// depth 1, etc.
+  llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> getDepthMap();
 
   /// Produce a mapping from each expression to its index according to a
   /// preorder traversal of the expressions. The parent has index 0, its first
@@ -711,6 +716,7 @@ public:
 ///
 class NilLiteralExpr : public LiteralExpr {
   SourceLoc Loc;
+  ConcreteDeclRef Initializer;
 public:
   NilLiteralExpr(SourceLoc Loc, bool Implicit = false)
   : LiteralExpr(ExprKind::NilLiteral, Implicit), Loc(Loc) {
@@ -718,6 +724,15 @@ public:
   
   SourceRange getSourceRange() const {
     return Loc;
+  }
+
+  /// Retrieve the initializer that will be used to construct the 'nil'
+  /// literal from the result of the initializer.
+  ConcreteDeclRef getInitializer() const { return Initializer; }
+
+  /// Set the initializer that will be used to construct the 'nil' literal.
+  void setInitializer(ConcreteDeclRef initializer) {
+    Initializer = initializer;
   }
   
   static bool classof(const Expr *E) {
@@ -730,7 +745,9 @@ class NumberLiteralExpr : public LiteralExpr {
   /// The value of the literal as an ASTContext-owned string. Underscores must
   /// be stripped.
   StringRef Val;  // Use StringRef instead of APInt or APFloat, which leak.
-  
+  ConcreteDeclRef BuiltinInitializer;
+  ConcreteDeclRef Initializer;
+
 protected:
   SourceLoc MinusLoc;
   SourceLoc DigitsLoc;
@@ -741,12 +758,20 @@ public:
        : LiteralExpr(Kind, Implicit), Val(Val), DigitsLoc(DigitsLoc)
    {
      Bits.NumberLiteralExpr.IsNegative = false;
+     Bits.NumberLiteralExpr.IsExplicitConversion = false;
    }
   
   bool isNegative() const { return Bits.NumberLiteralExpr.IsNegative; }
   void setNegative(SourceLoc Loc) {
     MinusLoc = Loc;
     Bits.NumberLiteralExpr.IsNegative = true;
+  }
+
+  bool isExplicitConversion() const {
+    return Bits.NumberLiteralExpr.IsExplicitConversion;
+  }
+  void setExplicitConversion(bool isExplicitConversion = true) {
+    Bits.NumberLiteralExpr.IsExplicitConversion = isExplicitConversion;
   }
 
   StringRef getDigitsText() const { return Val; }
@@ -766,17 +791,43 @@ public:
     return DigitsLoc;
   }
 
+  /// Retrieve the builtin initializer that will be used to construct the
+  /// boolean literal.
+  ///
+  /// Any type-checked boolean literal will have a builtin initializer, which is
+  /// called first to form a concrete Swift type.
+  ConcreteDeclRef getBuiltinInitializer() const { return BuiltinInitializer; }
+
+  /// Set the builtin initializer that will be used to construct the boolean
+  /// literal.
+  void setBuiltinInitializer(ConcreteDeclRef builtinInitializer) {
+    BuiltinInitializer = builtinInitializer;
+  }
+
+  /// Retrieve the initializer that will be used to construct the boolean
+  /// literal from the result of the initializer.
+  ///
+  /// Only boolean literals that have no builtin literal conformance will have
+  /// this initializer, which will be called on the result of the builtin
+  /// initializer.
+  ConcreteDeclRef getInitializer() const { return Initializer; }
+
+  /// Set the initializer that will be used to construct the boolean literal.
+  void setInitializer(ConcreteDeclRef initializer) {
+    Initializer = initializer;
+  }
+
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_NumberLiteralExpr
       && E->getKind() <= ExprKind::Last_NumberLiteralExpr;
   }
 };
 
-  
 /// Integer literal with a '+' or '-' sign, like '+4' or '- 2'.
 ///
-/// After semantic analysis assigns types, this is guaranteed to only have
-/// a BuiltinIntegerType.
+/// After semantic analysis assigns types, this is guaranteed to have
+/// a BuiltinIntegerType or be a normal type and implicitly be
+/// AnyBuiltinIntegerType.
 class IntegerLiteralExpr : public NumberLiteralExpr {
 public:
   IntegerLiteralExpr(StringRef Val, SourceLoc DigitsLoc, bool Implicit = false)
@@ -804,9 +855,12 @@ public:
 };
 
 /// FloatLiteralExpr - Floating point literal, like '4.0'.  After semantic
-/// analysis assigns types, this is guaranteed to only have a
+/// analysis assigns types, BuiltinTy is guaranteed to only have a
 /// BuiltinFloatingPointType.
 class FloatLiteralExpr : public NumberLiteralExpr {
+  /// This is the type of the builtin literal.
+  Type BuiltinTy;
+
 public:
   FloatLiteralExpr(StringRef Val, SourceLoc Loc, bool Implicit = false)
     : NumberLiteralExpr(ExprKind::FloatLiteral, Val, Loc, Implicit)
@@ -819,12 +873,17 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::FloatLiteral;
   }
+
+  Type getBuiltinType() const { return BuiltinTy; }
+  void setBuiltinType(Type ty) { BuiltinTy = ty; }
 };
 
 /// A Boolean literal ('true' or 'false')
 ///
 class BooleanLiteralExpr : public LiteralExpr {
   SourceLoc Loc;
+  ConcreteDeclRef BuiltinInitializer;
+  ConcreteDeclRef Initializer;
 
 public:
   BooleanLiteralExpr(bool Value, SourceLoc Loc, bool Implicit = false)
@@ -838,7 +897,33 @@ public:
   SourceRange getSourceRange() const {
     return Loc;
   }
-  
+
+  /// Retrieve the builtin initializer that will be used to construct the
+  /// boolean literal.
+  ///
+  /// Any type-checked boolean literal will have a builtin initializer, which is
+  /// called first to form a concrete Swift type.
+  ConcreteDeclRef getBuiltinInitializer() const { return BuiltinInitializer; }
+
+  /// Set the builtin initializer that will be used to construct the boolean
+  /// literal.
+  void setBuiltinInitializer(ConcreteDeclRef builtinInitializer) {
+    BuiltinInitializer = builtinInitializer;
+  }
+
+  /// Retrieve the initializer that will be used to construct the boolean
+  /// literal from the result of the initializer.
+  ///
+  /// Only boolean literals that have no builtin literal conformance will have
+  /// this initializer, which will be called on the result of the builtin
+  /// initializer.
+  ConcreteDeclRef getInitializer() const { return Initializer; }
+
+  /// Set the initializer that will be used to construct the boolean literal.
+  void setInitializer(ConcreteDeclRef initializer) {
+    Initializer = initializer;
+  }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::BooleanLiteral;
   }
@@ -946,8 +1031,11 @@ public:
   BraceStmt * getBody() const { return Body; }
   void setBody(BraceStmt * b) { Body = b; }
 
-  SourceLoc getLoc() const { return SourceLoc(); }
-  SourceRange getSourceRange() const { return SourceRange(); }
+  SourceLoc getLoc() const { return SubExpr ? SubExpr->getLoc() : SourceLoc(); }
+
+  SourceRange getSourceRange() const {
+    return SubExpr ? SubExpr->getSourceRange() : SourceRange();
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Tap;
@@ -1080,37 +1168,32 @@ public:
       = static_cast<unsigned>(encoding);
   }
 
-  /// Retrieve the builtin initializer that will be used to construct the string
+  /// Retrieve the builtin initializer that will be used to construct the
   /// literal.
   ///
-  /// Any type-checked string literal will have a builtin initializer, which is
+  /// Any type-checked literal will have a builtin initializer, which is
   /// called first to form a concrete Swift type.
   ConcreteDeclRef getBuiltinInitializer() const {
-    assert(isString() && "Magic identifier literal is not a string");
     return BuiltinInitializer;
   }
 
-  /// Set the builtin initializer that will be used to construct the string
-  /// literal.
+  /// Set the builtin initializer that will be used to construct the literal.
   void setBuiltinInitializer(ConcreteDeclRef builtinInitializer) {
-    assert(isString() && "Magic identifier literal is not a string");
     BuiltinInitializer = builtinInitializer;
   }
 
-  /// Retrieve the initializer that will be used to construct the string
-  /// literal from the result of the initializer.
+  /// Retrieve the initializer that will be used to construct the literal from
+  /// the result of the initializer.
   ///
-  /// Only string literals that have no builtin literal conformance will have
+  /// Only literals that have no builtin literal conformance will have
   /// this initializer, which will be called on the result of the builtin
   /// initializer.
   ConcreteDeclRef getInitializer() const {
-    assert(isString() && "Magic identifier literal is not a string");
     return Initializer;
   }
 
-  /// Set the initializer that will be used to construct the string literal.
+  /// Set the initializer that will be used to construct the literal.
   void setInitializer(ConcreteDeclRef initializer) {
-    assert(isString() && "Magic identifier literal is not a string");
     Initializer = initializer;
   }
 
@@ -4829,6 +4912,7 @@ public:
       OptionalChain,
       OptionalWrap,
       Identity,
+      TupleElement,
     };
   
   private:
@@ -4845,7 +4929,12 @@ public:
     Expr *SubscriptIndexExpr;
     const Identifier *SubscriptLabelsData;
     const ProtocolConformanceRef *SubscriptHashableConformancesData;
-    unsigned SubscriptSize;
+    
+    union {
+      unsigned SubscriptSize;
+      unsigned TupleIndex;
+    };
+      
     Kind KindValue;
     Type ComponentType;
     SourceLoc Loc;
@@ -4858,6 +4947,13 @@ public:
                        Kind kind,
                        Type type,
                        SourceLoc loc);
+
+    // Private constructor for tuple element kind
+    Component(unsigned tupleIndex, Type elementType, SourceLoc loc)
+      : Component(nullptr, {}, nullptr, {}, {}, Kind::TupleElement,
+        elementType, loc) {
+      TupleIndex = tupleIndex;
+    }
     
   public:
     Component()
@@ -4977,6 +5073,13 @@ public:
                        selfLoc);
     }
     
+    static Component forTupleElement(unsigned fieldNumber,
+                                     Type elementType,
+                                     SourceLoc loc) {
+      return Component(fieldNumber, elementType, loc);
+    }
+      
+      
     SourceLoc getLoc() const {
       return Loc;
     }
@@ -5000,6 +5103,7 @@ public:
       case Kind::OptionalForce:
       case Kind::Property:
       case Kind::Identity:
+      case Kind::TupleElement:
         return true;
 
       case Kind::UnresolvedSubscript:
@@ -5023,6 +5127,7 @@ public:
       case Kind::UnresolvedProperty:
       case Kind::Property:
       case Kind::Identity:
+      case Kind::TupleElement:
         return nullptr;
       }
       llvm_unreachable("unhandled kind");
@@ -5041,6 +5146,7 @@ public:
       case Kind::UnresolvedProperty:
       case Kind::Property:
       case Kind::Identity:
+      case Kind::TupleElement:
         llvm_unreachable("no subscript labels for this kind");
       }
       llvm_unreachable("unhandled kind");
@@ -5062,6 +5168,7 @@ public:
       case Kind::UnresolvedProperty:
       case Kind::Property:
       case Kind::Identity:
+      case Kind::TupleElement:
         return {};
       }
       llvm_unreachable("unhandled kind");
@@ -5083,6 +5190,7 @@ public:
       case Kind::OptionalForce:
       case Kind::Property:
       case Kind::Identity:
+      case Kind::TupleElement:
         llvm_unreachable("no unresolved name for this kind");
       }
       llvm_unreachable("unhandled kind");
@@ -5101,7 +5209,27 @@ public:
       case Kind::OptionalWrap:
       case Kind::OptionalForce:
       case Kind::Identity:
+      case Kind::TupleElement:
         llvm_unreachable("no decl ref for this kind");
+      }
+      llvm_unreachable("unhandled kind");
+    }
+      
+    unsigned getTupleIndex() const {
+      switch (getKind()) {
+        case Kind::TupleElement:
+          return TupleIndex;
+                
+        case Kind::Invalid:
+        case Kind::UnresolvedProperty:
+        case Kind::UnresolvedSubscript:
+        case Kind::OptionalChain:
+        case Kind::OptionalWrap:
+        case Kind::OptionalForce:
+        case Kind::Identity:
+        case Kind::Property:
+        case Kind::Subscript:
+          llvm_unreachable("no field number for this kind");
       }
       llvm_unreachable("unhandled kind");
     }

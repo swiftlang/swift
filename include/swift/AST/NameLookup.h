@@ -118,19 +118,24 @@ public:
   /// That is, \c makeArrayRef(Results).take_front(IndexOfFirstOuterResults)
   /// will be Results from the innermost scope that had results, and the
   /// remaining elements of Results will be from parent scopes of this one.
+  ///
+  /// Allows unqualified name lookup to return results from outer scopes.
+  /// This is necessary for disambiguating calls to functions like `min` and
+  /// `max`.
   size_t IndexOfFirstOuterResult;
 
   /// Return true if anything was found by the name lookup.
   bool isSuccess() const { return !Results.empty(); }
 
   /// Get the result as a single type, or a null type if that fails.
-  TypeDecl *getSingleTypeResult();
+  TypeDecl *getSingleTypeResult() const;
 };
 
 inline UnqualifiedLookup::Options operator|(UnqualifiedLookup::Flags flag1,
                                             UnqualifiedLookup::Flags flag2) {
   return UnqualifiedLookup::Options(flag1) | flag2;
 }
+
 
 /// Describes the reason why a certain declaration is visible.
 enum class DeclVisibilityKind {
@@ -351,6 +356,29 @@ void lookupInModule(ModuleDecl *module, ModuleDecl::AccessPathTy accessPath,
                     LazyResolver *typeResolver,
                     const DeclContext *moduleScopeContext,
                     ArrayRef<ModuleDecl::ImportedModule> extraImports = {});
+
+template <typename Fn>
+void forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
+  DeclContext *moduleScope = DC->getModuleScopeContext();
+  if (auto file = dyn_cast<FileUnit>(moduleScope))
+    file->forAllVisibleModules(fn);
+  else
+    cast<ModuleDecl>(moduleScope)
+        ->forAllVisibleModules(ModuleDecl::AccessPathTy(), fn);
+}
+
+/// Only name lookup has gathered a set of results, perform any necessary
+/// steps to prune the result set before returning it to the caller.
+bool finishLookup(const DeclContext *dc, NLOptions options,
+                  SmallVectorImpl<ValueDecl *> &decls);
+
+/// Do nothing if debugClient is null.
+template <typename Result>
+void filterForDiscriminator(SmallVectorImpl<Result> &results,
+                            DebuggerClient *debugClient);
+
+void recordLookupOfTopLevelName(DeclContext *topLevelContext, DeclName name,
+                                bool isCascading);
 
 } // end namespace namelookup
 

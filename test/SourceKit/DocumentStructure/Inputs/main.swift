@@ -127,3 +127,5 @@ enum MyEnum {
 enum MySecondEnum {
   case One = 1
 }
+
+func someFunc(input :Int?, completion: () throws -> Void) rethrows {}

@@ -79,8 +79,7 @@ static void addDefiniteInitialization(SILPassPipelinePlan &P) {
   P.addRawSILInstLowering();
 }
 
-static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
-                                    const SILOptions &Options) {
+static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("Guaranteed Passes");
   P.addDiagnoseStaticExclusivity();
   P.addCapturePromotion();
@@ -99,22 +98,33 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
   // pass. This will happen when OSSA is no longer eliminated before the
   // optimizer pipeline is run implying we can put a pass that requires OSSA
   // there.
+  const auto &Options = P.getOptions();
   if (Options.EnableMandatorySemanticARCOpts && Options.shouldOptimize()) {
     P.addSemanticARCOpts();
   }
   P.addClosureLifetimeFixup();
-  P.addOwnershipModelEliminator();
+  if (Options.StripOwnershipDuringDiagnosticsPipeline)
+    P.addOwnershipModelEliminator();
   P.addMandatoryInlining();
   P.addMandatorySILLinker();
-  P.addPredictableMemoryOptimizations();
+
+  // Promote loads as necessary to ensure we have enough SSA formation to emit
+  // SSA based diagnostics.
+  P.addPredictableMemoryAccessOptimizations();
 
   // Diagnostic ConstantPropagation must be rerun on deserialized functions
   // because it is sensitive to the assert configuration.
   // Consequently, certain optimization passes beyond this point will also rerun.
   P.addDiagnosticConstantPropagation();
+
+  // Now that we have emitted constant propagation diagnostics, try to eliminate
+  // dead allocations.
+  P.addPredictableDeadAllocationElimination();
+
   P.addGuaranteedARCOpts();
   P.addDiagnoseUnreachable();
   P.addDiagnoseInfiniteRecursion();
+  P.addYieldOnceCheck();
   P.addEmitDFDiagnostics();
   // Canonical swift requires all non cond_br critical edges to be split.
   P.addSplitNonCondBrCriticalEdges();
@@ -122,7 +132,7 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
 
 SILPassPipelinePlan
 SILPassPipelinePlan::getDiagnosticPassPipeline(const SILOptions &Options) {
-  SILPassPipelinePlan P;
+  SILPassPipelinePlan P(Options);
 
   if (SILViewSILGenCFG) {
     addCFGPrinterPipeline(P, "SIL View SILGen CFG");
@@ -137,7 +147,7 @@ SILPassPipelinePlan::getDiagnosticPassPipeline(const SILOptions &Options) {
   }
 
   // Otherwise run the rest of diagnostics.
-  addMandatoryOptPipeline(P, Options);
+  addMandatoryOptPipeline(P);
 
   if (SILViewGuaranteedCFG) {
     addCFGPrinterPipeline(P, "SIL View Guaranteed CFG");
@@ -149,8 +159,9 @@ SILPassPipelinePlan::getDiagnosticPassPipeline(const SILOptions &Options) {
 //                       Ownership Eliminator Pipeline
 //===----------------------------------------------------------------------===//
 
-SILPassPipelinePlan SILPassPipelinePlan::getOwnershipEliminatorPassPipeline() {
-  SILPassPipelinePlan P;
+SILPassPipelinePlan SILPassPipelinePlan::getOwnershipEliminatorPassPipeline(
+    const SILOptions &Options) {
+  SILPassPipelinePlan P(Options);
   addOwnershipModelEliminatorPipeline(P);
   return P;
 }
@@ -232,8 +243,7 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
 }
 
 // Perform classic SSA optimizations.
-void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel,
-                  bool stopAfterSerialization = false) {
+void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   // Promote box allocations to stack allocations.
   P.addAllocBoxToStack();
 
@@ -286,7 +296,12 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel,
     // which reduces the ability of the compiler to optimize clients
     // importing this module.
     P.addSerializeSILPass();
-    if (stopAfterSerialization)
+
+    // Now strip any transparent functions that still have ownership.
+    if (!P.getOptions().StripOwnershipDuringDiagnosticsPipeline)
+      P.addOwnershipModelEliminator();
+
+    if (P.getOptions().StopOptimizationAfterSerialization)
       return;
 
     // Does inline semantics-functions (except "availability"), but not
@@ -362,6 +377,11 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // Get rid of apparently dead functions as soon as possible so that
   // we do not spend time optimizing them.
   P.addDeadFunctionElimination();
+
+  // Strip ownership from non-transparent functions.
+  if (!P.getOptions().StripOwnershipDuringDiagnosticsPipeline)
+    P.addNonTransparentFunctionOwnershipModelEliminator();
+
   // Start by cloning functions from stdlib.
   P.addPerformanceSILLinker();
 
@@ -391,11 +411,10 @@ static void addMidModulePassesStackPromotePassPipeline(SILPassPipelinePlan &P) {
   P.addStackPromotion();
 }
 
-static bool addMidLevelPassPipeline(SILPassPipelinePlan &P,
-                                    bool stopAfterSerialization) {
+static bool addMidLevelPassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("MidLevel");
-  addSSAPasses(P, OptimizationLevelKind::MidLevel, stopAfterSerialization);
-  if (stopAfterSerialization)
+  addSSAPasses(P, OptimizationLevelKind::MidLevel);
+  if (P.getOptions().StopOptimizationAfterSerialization)
     return true;
 
   // Specialize partially applied functions with dead arguments as a preparation
@@ -530,8 +549,8 @@ static void addSILDebugInfoGeneratorPipeline(SILPassPipelinePlan &P) {
 /// Mandatory IRGen preparation. It is the caller's job to set the set stage to
 /// "lowered" after running this pipeline.
 SILPassPipelinePlan
-SILPassPipelinePlan::getLoweringPassPipeline() {
-  SILPassPipelinePlan P;
+SILPassPipelinePlan::getLoweringPassPipeline(const SILOptions &Options) {
+  SILPassPipelinePlan P(Options);
   P.startPipeline("Address Lowering");
   P.addIRGenPrepare();
   P.addAddressLowering();
@@ -541,7 +560,7 @@ SILPassPipelinePlan::getLoweringPassPipeline() {
 
 SILPassPipelinePlan
 SILPassPipelinePlan::getIRGenPreparePassPipeline(const SILOptions &Options) {
-  SILPassPipelinePlan P;
+  SILPassPipelinePlan P(Options);
   P.startPipeline("IRGen Preparation");
   // Insert SIL passes to run during IRGen.
   // Hoist generic alloc_stack instructions to the entry block to enable better
@@ -555,7 +574,7 @@ SILPassPipelinePlan::getIRGenPreparePassPipeline(const SILOptions &Options) {
 
 SILPassPipelinePlan
 SILPassPipelinePlan::getSILOptPreparePassPipeline(const SILOptions &Options) {
-  SILPassPipelinePlan P;
+  SILPassPipelinePlan P(Options);
 
   if (Options.DebugSerialization) {
     addPerfDebugSerializationPipeline(P);
@@ -570,7 +589,7 @@ SILPassPipelinePlan::getSILOptPreparePassPipeline(const SILOptions &Options) {
 
 SILPassPipelinePlan
 SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
-  SILPassPipelinePlan P;
+  SILPassPipelinePlan P(Options);
 
   if (Options.DebugSerialization) {
     addPerfDebugSerializationPipeline(P);
@@ -586,7 +605,7 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   addMidModulePassesStackPromotePassPipeline(P);
 
   // Run an iteration of the mid-level SSA passes.
-  if (addMidLevelPassPipeline(P, Options.StopOptimizationAfterSerialization))
+  if (addMidLevelPassPipeline(P))
     return P;
 
   // Perform optimizations that specialize.
@@ -616,8 +635,9 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
 //                            Onone Pass Pipeline
 //===----------------------------------------------------------------------===//
 
-SILPassPipelinePlan SILPassPipelinePlan::getOnonePassPipeline() {
-  SILPassPipelinePlan P;
+SILPassPipelinePlan
+SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
+  SILPassPipelinePlan P(Options);
 
   // First specialize user-code.
   P.startPipeline("Prespecialization");
@@ -631,6 +651,13 @@ SILPassPipelinePlan SILPassPipelinePlan::getOnonePassPipeline() {
   // Has only an effect if the -gsil option is specified.
   P.addSILDebugInfoGenerator();
 
+  // Finally serialize the SIL if we are asked to.
+  P.addSerializeSILPass();
+
+  // And then strip ownership before we IRGen.
+  if (!Options.StripOwnershipDuringDiagnosticsPipeline)
+    P.addOwnershipModelEliminator();
+
   return P;
 }
 
@@ -638,8 +665,9 @@ SILPassPipelinePlan SILPassPipelinePlan::getOnonePassPipeline() {
 //                          Inst Count Pass Pipeline
 //===----------------------------------------------------------------------===//
 
-SILPassPipelinePlan SILPassPipelinePlan::getInstCountPassPipeline() {
-  SILPassPipelinePlan P;
+SILPassPipelinePlan
+SILPassPipelinePlan::getInstCountPassPipeline(const SILOptions &Options) {
+  SILPassPipelinePlan P(Options);
   P.startPipeline("Inst Count");
   P.addInstCount();
   return P;
@@ -669,8 +697,9 @@ void SILPassPipelinePlan::addPasses(ArrayRef<PassKind> PassKinds) {
 }
 
 SILPassPipelinePlan
-SILPassPipelinePlan::getPassPipelineForKinds(ArrayRef<PassKind> PassKinds) {
-  SILPassPipelinePlan P;
+SILPassPipelinePlan::getPassPipelineForKinds(const SILOptions &Options,
+                                             ArrayRef<PassKind> PassKinds) {
+  SILPassPipelinePlan P(Options);
   P.startPipeline("Pass List Pipeline");
   P.addPasses(PassKinds);
   return P;
@@ -706,7 +735,8 @@ void SILPassPipelinePlan::print(llvm::raw_ostream &os) {
 }
 
 SILPassPipelinePlan
-SILPassPipelinePlan::getPassPipelineFromFile(StringRef Filename) {
+SILPassPipelinePlan::getPassPipelineFromFile(const SILOptions &Options,
+                                             StringRef Filename) {
   namespace yaml = llvm::yaml;
   LLVM_DEBUG(llvm::dbgs() << "Parsing Pass Pipeline from " << Filename << "\n");
 
@@ -725,7 +755,7 @@ SILPassPipelinePlan::getPassPipelineFromFile(StringRef Filename) {
   yaml::Node *N = DI->getRoot();
   assert(N && "Failed to find a root");
 
-  SILPassPipelinePlan P;
+  SILPassPipelinePlan P(Options);
 
   auto *RootList = cast<yaml::SequenceNode>(N);
   llvm::SmallVector<PassKind, 32> Passes;

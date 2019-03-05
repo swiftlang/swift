@@ -677,6 +677,10 @@ class DeadObjectElimination : public SILFunctionTransform {
   }
 
   void run() override {
+    // FIXME: We should support ownership eventually.
+    if (getFunction()->hasOwnership())
+      return;
+
     if (processFunction(*getFunction())) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
     }

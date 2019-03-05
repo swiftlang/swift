@@ -3,8 +3,6 @@
 .. title:: Lexicon
 .. default-role:: term
 
-.. @raise litre.TestsAreMissing
-
 This file defines several terms used by the Swift compiler and standard library
 source code, tests, and commit messages. See also the `LLVM lexicon`_.
 

@@ -362,7 +362,9 @@ static AccessedStorageResult getAccessedStorageFromAddress(SILValue sourceAddr) 
 
   // Access to a Builtin.RawPointer. Treat this like the inductive cases
   // above because some RawPointers originate from identified locations. See
-  // the special case for global addressors, which return RawPointer, above.
+  // the special case for global addressors, which return RawPointer,
+  // above. AddressToPointer is also handled because it results from inlining a
+  // global addressor without folding the AddressToPointer->PointerToAddress.
   //
   // If the inductive search does not find a valid addressor, it will
   // eventually reach the default case that returns in invalid location. This
@@ -381,6 +383,7 @@ static AccessedStorageResult getAccessedStorageFromAddress(SILValue sourceAddr) 
   // marks debug VarDecl access as 'Unsafe' and SIL passes don't need the
   // AccessedStorage for 'Unsafe' access.
   case ValueKind::PointerToAddressInst:
+  case ValueKind::AddressToPointerInst:
     return AccessedStorageResult::incomplete(
       cast<SingleValueInstruction>(sourceAddr)->getOperand(0));
 
@@ -420,6 +423,8 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
       storage = result.getStorage();
       continue;
     }
+    // `storage` may still be invalid. If both `storage` and `result` are
+    // invalid, this check passes, but we return an invalid storage below.
     if (!accessingIdenticalLocations(storage.getValue(), result.getStorage()))
       return AccessedStorage();
   }
@@ -476,10 +481,7 @@ bool swift::memInstMustInitialize(Operand *memOper) {
     return cast<StoreInst>(memInst)->getOwnershipQualifier()
            == StoreOwnershipQualifier::Init;
 
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  case SILInstructionKind::Store##Name##Inst: \
-    return cast<Store##Name##Inst>(memInst)->isInitializationOfDest();
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Store##Name##Inst: \
     return cast<Store##Name##Inst>(memInst)->isInitializationOfDest();
 #include "swift/AST/ReferenceStorage.def"
@@ -689,9 +691,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
     visitor(&I->getAllOperands()[CopyAddrInst::Dest]);
     return;
 
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  case SILInstructionKind::Store##Name##Inst:
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Store##Name##Inst:
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::StoreInst:
@@ -703,9 +703,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
     visitor(&I->getAllOperands()[0]);
     return;
 
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  case SILInstructionKind::Load##Name##Inst:
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Load##Name##Inst:
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::InitExistentialAddrInst:
@@ -727,7 +725,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
   }
   // Non-access cases: these are marked with memory side effects, but, by
   // themselves, do not access formal memory.
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Copy##Name##ValueInst:
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::AbortApplyInst:

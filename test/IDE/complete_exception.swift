@@ -107,7 +107,7 @@ func test003() {
   do {} catch Error4.#^CATCH2^#
 // CATCH2: Begin completions
 // CATCH2: Decl[EnumElement]/CurrNominal: E1[#Error4#]{{; name=.+$}}
-// CATCH2: Decl[EnumElement]/CurrNominal: E2({#Int32#})[#(Int32) -> Error4#]{{; name=.+$}}
+// CATCH2: Decl[EnumElement]/CurrNominal: E2({#Int32#})[#Error4#]{{; name=.+$}}
 // CATCH2: End completions
 }
 
@@ -115,7 +115,7 @@ func test004() {
   throw Error4.#^THROW2^#
 // THROW2: Begin completions
 // THROW2: Decl[EnumElement]/CurrNominal: E1[#Error4#]{{; name=.+$}}
-// THROW2: Decl[EnumElement]/CurrNominal: E2({#Int32#})[#(Int32) -> Error4#]{{; name=.+$}}
+// THROW2: Decl[EnumElement]/CurrNominal: E2({#Int32#})[#Error4#]{{; name=.+$}}
 // THROW2: End completions
 }
 

@@ -374,6 +374,7 @@ class IRGenSILFunction :
 {
 public:
   llvm::DenseMap<SILValue, LoweredValue> LoweredValues;
+  llvm::DenseMap<SILValue, StackAddress> LoweredPartialApplyAllocations;
   llvm::DenseMap<SILType, LoweredValue> LoweredUndefs;
 
   /// All alloc_ref instructions which allocate the object on the stack.
@@ -1225,13 +1226,17 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
   }
   if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread) {
     auto declContext = f->getDeclContext();
-    if (declContext && isa<DestructorDecl>(declContext))
+    if (f->getLoweredFunctionType()->isCoroutine()) {
+      // Disable TSan in coroutines; the instrumentation currently interferes
+      // with coroutine structural invariants.
+    } else if (declContext && isa<DestructorDecl>(declContext)) {
       // Do not report races in deinit and anything called from it
       // because TSan does not observe synchronization between retain
       // count dropping to '0' and the object deinitialization.
       CurFn->addFnAttr("sanitize_thread_no_checking_at_run_time");
-    else
+    } else {
       CurFn->addFnAttr(llvm::Attribute::SanitizeThread);
+    }
   }
 
   // Disable inlining of coroutine functions until we split.
@@ -2527,11 +2532,16 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
 
   // Create the thunk and function value.
   Explosion function;
-  emitFunctionPartialApplication(
+  auto closureStackAddr = emitFunctionPartialApplication(
       *this, *CurSILFn, calleeFn, innerContext, llArgs, params,
       i->getSubstitutionMap(), origCalleeTy, i->getSubstCalleeType(),
       i->getType().castTo<SILFunctionType>(), function, false);
   setLoweredExplosion(v, function);
+
+  if (closureStackAddr) {
+    assert(i->isOnStack());
+    LoweredPartialApplyAllocations[v] = *closureStackAddr;
+  }
 }
 
 void IRGenSILFunction::visitIntegerLiteralInst(swift::IntegerLiteralInst *i) {
@@ -3635,12 +3645,12 @@ void IRGenSILFunction::emitErrorResultVar(SILResultInfo ErrorInfo,
                              Var->Name, Var->ArgNo, false);
   if (!IGM.DebugInfo)
     return;
-  DebugTypeInfo DTI(nullptr, nullptr, ErrorInfo.getType(),
-                    ErrorResultSlot->getType(), IGM.getPointerSize(),
-                    IGM.getPointerAlignment(), true);
-  IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, DTI, getDebugScope(),
-                                         nullptr, Var->Name, Var->ArgNo,
-                                         IndirectValue, ArtificialValue);
+  auto DbgTy = DebugTypeInfo::getErrorResult(
+      ErrorInfo.getType(), ErrorResultSlot->getType(), IGM.getPointerSize(),
+      IGM.getPointerAlignment());
+  IGM.DebugInfo->emitVariableDeclaration(
+      Builder, Storage, DbgTy, getDebugScope(), nullptr, Var->Name, Var->ArgNo,
+      IndirectValue, ArtificialValue);
 }
 
 void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
@@ -3667,14 +3677,11 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   auto RealTy = SILVal->getType().getASTType();
   if (VarDecl *Decl = i->getDecl()) {
     DbgTy = DebugTypeInfo::getLocalVariable(
-        CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
-        RealTy, getTypeInfo(SILVal->getType()));
+        Decl, RealTy, getTypeInfo(SILVal->getType()));
   } else if (i->getFunction()->isBare() &&
              !SILTy.hasArchetype() && !Name.empty()) {
     // Preliminary support for .sil debug information.
-    DbgTy = DebugTypeInfo::getFromTypeInfo(CurSILFn->getDeclContext(),
-                                           CurSILFn->getGenericEnvironment(),
-                                           RealTy, getTypeInfo(SILTy));
+    DbgTy = DebugTypeInfo::getFromTypeInfo(RealTy, getTypeInfo(SILTy));
   } else
     return;
 
@@ -3712,8 +3719,7 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   auto RealType = SILTy.getASTType();
 
   auto DbgTy = DebugTypeInfo::getLocalVariable(
-      CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
-      RealType, getTypeInfo(SILVal->getType()));
+      Decl, RealType, getTypeInfo(SILVal->getType()));
   bindArchetypes(DbgTy.getType());
   if (!IGM.DebugInfo)
     return;
@@ -3988,9 +3994,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
 
   SILType SILTy = i->getType();
   auto RealType = SILTy.getASTType();
-  auto DbgTy = DebugTypeInfo::getLocalVariable(
-      CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
-      RealType, type);
+  auto DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealType, type);
 
   bindArchetypes(DbgTy.getType());
   if (IGM.DebugInfo)
@@ -4074,6 +4078,13 @@ void IRGenSILFunction::visitAllocRefDynamicInst(swift::AllocRefDynamicInst *i) {
 }
 
 void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
+  if (auto *closure = dyn_cast<PartialApplyInst>(i->getOperand())) {
+    assert(closure->isOnStack());
+    auto stackAddr = LoweredPartialApplyAllocations[i->getOperand()];
+    emitDeallocateDynamicAlloca(stackAddr);
+    return;
+  }
+
   auto allocatedType = i->getOperand()->getType();
   const TypeInfo &allocatedTI = getTypeInfo(allocatedType);
   StackAddress stackAddr = getLoweredStackAddress(i->getOperand());
@@ -4181,9 +4192,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
          "box for a local variable should only have one field");
   auto SILTy = i->getBoxType()->getFieldType(IGM.getSILModule(), 0);
   auto RealType = SILTy.getASTType();
-  auto DbgTy = DebugTypeInfo::getLocalVariable(
-      CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
-      RealType, type);
+  auto DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealType, type);
 
   auto Storage = emitShadowCopyIfNeeded(
       boxWithAddr.getAddress(), i->getDebugScope(), Name, 0, IsAnonymous);

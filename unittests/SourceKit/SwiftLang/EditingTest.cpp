@@ -19,8 +19,11 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/TargetSelect.h"
 #include "gtest/gtest.h"
-#include <mutex>
+
+#include <chrono>
 #include <condition_variable>
+#include <mutex>
+#include <thread>
 
 using namespace SourceKit;
 using namespace llvm;
@@ -177,7 +180,7 @@ public:
     DocUpdState->HasUpdate = false;
   }
 
-  void doubleOpenWithDelay(useconds_t delay, bool close);
+  void doubleOpenWithDelay(std::chrono::microseconds delay, bool close);
 
 private:
   std::vector<const char *> makeArgs(const char *DocName,
@@ -229,7 +232,8 @@ TEST_F(EditTest, DiagsAfterEdit) {
   EXPECT_EQ(SemaDiagStage, Consumer.DiagStage);
 }
 
-void EditTest::doubleOpenWithDelay(useconds_t delay, bool closeDoc) {
+void EditTest::doubleOpenWithDelay(std::chrono::microseconds delay,
+                                   bool closeDoc) {
   const char *DocName = "/test.swift";
   const char *Contents =
     "func foo() { _ = unknown_name }\n";
@@ -239,8 +243,8 @@ void EditTest::doubleOpenWithDelay(useconds_t delay, bool closeDoc) {
   open(DocName, Contents, Args, Consumer);
   ASSERT_EQ(0u, Consumer.Diags.size());
   // Open again without closing; this reinitializes the semantic info on the doc
-  if (delay)
-    usleep(delay);
+  if (delay > std::chrono::microseconds(0))
+    std::this_thread::sleep_for(delay);
   if (closeDoc)
     close(DocName);
   reset(Consumer);
@@ -277,10 +281,10 @@ TEST_F(EditTest, DISABLED_DiagsAfterCloseAndReopen) {
   // The middle case in particular verifies the ASTManager is only calling the
   // correct ASTConsumers.
 
-  doubleOpenWithDelay(0, true);
-  doubleOpenWithDelay(1000, true);   // 1 ms
-  doubleOpenWithDelay(10000, true);  // 10 ms
-  doubleOpenWithDelay(100000, true); // 100 ms
+  doubleOpenWithDelay(std::chrono::microseconds(0), true);
+  doubleOpenWithDelay(std::chrono::milliseconds(1), true);
+  doubleOpenWithDelay(std::chrono::milliseconds(10), true);
+  doubleOpenWithDelay(std::chrono::milliseconds(100), true);
 }
 
 TEST_F(EditTest, DiagsAfterReopen) {
@@ -288,8 +292,8 @@ TEST_F(EditTest, DiagsAfterReopen) {
   // close the original document, causing it to reinitialize instead of create
   // a fresh document.
 
-  doubleOpenWithDelay(0, false);
-  doubleOpenWithDelay(1000, false);   // 1 ms
-  doubleOpenWithDelay(10000, false);  // 10 ms
-  doubleOpenWithDelay(100000, false); // 100 ms
+  doubleOpenWithDelay(std::chrono::microseconds(0), false);
+  doubleOpenWithDelay(std::chrono::milliseconds(1), false);
+  doubleOpenWithDelay(std::chrono::milliseconds(10), false);
+  doubleOpenWithDelay(std::chrono::milliseconds(100), false);
 }

@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
@@ -23,6 +24,11 @@
 #include <map>
 
 using namespace swift;
+
+AvailabilityContext AvailabilityContext::forDeploymentTarget(ASTContext &Ctx) {
+  return AvailabilityContext(
+      VersionRange::allGTE(Ctx.LangOpts.getMinPlatformVersion()));
+}
 
 namespace {
 

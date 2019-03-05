@@ -517,3 +517,51 @@ func rdar46211109() {
   let _: MyIntSequenceStruct? = foo(Int.Self)
   // expected-error@-1 {{type 'Int' has no member 'Self'}}
 }
+
+class A {}
+
+enum B {
+  static func foo() {
+    bar(A()) // expected-error {{'A' is not convertible to 'B'}}
+  }
+
+  func bar(_: A) {}
+}
+
+class C {
+  static func foo() {
+    bar(0) // expected-error {{instance member 'bar' cannot be used on type 'C'}}
+  }
+
+  func bar(_: Int) {}
+}
+
+class D {
+  static func foo() {}
+
+  func bar() {
+    foo() // expected-error {{static member 'foo' cannot be used on instance of type 'D'}}
+  }
+}
+
+func rdar_48114578() {
+  struct S<T> {
+    var value: T
+
+    static func valueOf<T>(_ v: T) -> S<T> {
+      return S<T>(value: v)
+    }
+  }
+
+  typealias A = (a: [String]?, b: Int)
+
+  func foo(_ a: [String], _ b: Int) -> S<A> {
+    let v = (a, b)
+    return .valueOf(v)
+    // expected-error@-1 {{cannot express tuple conversion '([String], Int)' to '(a: [String]?, b: Int)'}}
+  }
+
+  func bar(_ a: [String], _ b: Int) -> S<A> {
+    return .valueOf((a, b)) // Ok
+  }
+}

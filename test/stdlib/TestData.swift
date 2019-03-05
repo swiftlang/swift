@@ -238,6 +238,68 @@ class TestData : TestDataSuper {
         let data3 = Data(bytes: [1, 2, 3, 4, 5][1..<3])
         expectEqual(2, data3.count)
     }
+
+    func testInitializationWithBufferPointer() {
+        let nilBuffer = UnsafeBufferPointer<UInt8>(start: nil, count: 0)
+        let data = Data(buffer: nilBuffer)
+        expectEqual(data, Data())
+
+        let validPointer = UnsafeMutablePointer<UInt8>.allocate(capacity: 2)
+        validPointer[0] = 0xCA
+        validPointer[1] = 0xFE
+        defer { validPointer.deallocate() }
+
+        let emptyBuffer = UnsafeBufferPointer<UInt8>(start: validPointer, count: 0)
+        let data2 = Data(buffer: emptyBuffer)
+        expectEqual(data2, Data())
+
+        let shortBuffer = UnsafeBufferPointer<UInt8>(start: validPointer, count: 1)
+        let data3 = Data(buffer: shortBuffer)
+        expectEqual(data3, Data([0xCA]))
+
+        let fullBuffer = UnsafeBufferPointer<UInt8>(start: validPointer, count: 2)
+        let data4 = Data(buffer: fullBuffer)
+        expectEqual(data4, Data([0xCA, 0xFE]))
+
+        let tuple: (UInt16, UInt16, UInt16, UInt16) = (0xFF, 0xFE, 0xFD, 0xFC)
+        withUnsafeBytes(of: tuple) {
+            // If necessary, port this to big-endian.
+            let tupleBuffer: UnsafeBufferPointer<UInt8> = $0.bindMemory(to: UInt8.self)
+            let data5 = Data(buffer: tupleBuffer)
+            expectEqual(data5, Data([0xFF, 0x00, 0xFE, 0x00, 0xFD, 0x00, 0xFC, 0x00]))
+        }
+    }
+
+    func testInitializationWithMutableBufferPointer() {
+        let nilBuffer = UnsafeMutableBufferPointer<UInt8>(start: nil, count: 0)
+        let data = Data(buffer: nilBuffer)
+        expectEqual(data, Data())
+
+        let validPointer = UnsafeMutablePointer<UInt8>.allocate(capacity: 2)
+        validPointer[0] = 0xCA
+        validPointer[1] = 0xFE
+        defer { validPointer.deallocate() }
+
+        let emptyBuffer = UnsafeMutableBufferPointer<UInt8>(start: validPointer, count: 0)
+        let data2 = Data(buffer: emptyBuffer)
+        expectEqual(data2, Data())
+
+        let shortBuffer = UnsafeMutableBufferPointer<UInt8>(start: validPointer, count: 1)
+        let data3 = Data(buffer: shortBuffer)
+        expectEqual(data3, Data([0xCA]))
+
+        let fullBuffer = UnsafeMutableBufferPointer<UInt8>(start: validPointer, count: 2)
+        let data4 = Data(buffer: fullBuffer)
+        expectEqual(data4, Data([0xCA, 0xFE]))
+
+        var tuple: (UInt16, UInt16, UInt16, UInt16) = (0xFF, 0xFE, 0xFD, 0xFC)
+        withUnsafeMutableBytes(of: &tuple) {
+            // If necessary, port this to big-endian.
+            let tupleBuffer: UnsafeMutableBufferPointer<UInt8> = $0.bindMemory(to: UInt8.self)
+            let data5 = Data(buffer: tupleBuffer)
+            expectEqual(data5, Data([0xFF, 0x00, 0xFE, 0x00, 0xFD, 0x00, 0xFC, 0x00]))
+        }
+    }
     
     func testMutableData() {
         let hello = dataFrom("hello")
@@ -671,12 +733,6 @@ class TestData : TestDataSuper {
         let data = "Hello World".data(using: .utf8)!
         let base64 = data.base64EncodedString()
         expectEqual("SGVsbG8gV29ybGQ=", base64, "trivial base64 conversion should work")
-    }
-
-    func test_dataHash() {
-        let dataStruct = "Hello World".data(using: .utf8)!
-        let dataObj = dataStruct as NSData
-        expectEqual(dataObj.hashValue, dataStruct.hashValue, "Data and NSData should have the same hash value")
     }
 
     func test_base64Data_medium() {
@@ -1187,6 +1243,49 @@ class TestData : TestDataSuper {
         var d2 = Data()
         d2.append(slice)
         expectEqual(Data(bytes: [1]), slice)
+    }
+
+    // This test uses `repeatElement` to produce a sequence -- the produced sequence reports its actual count as its `.underestimatedCount`.
+    func test_appendingNonContiguousSequence_exactCount() {
+        var d = Data()
+
+        // d should go from .empty representation to .inline.
+        // Appending a small enough sequence to fit in .inline should actually be copied.
+        d.append(contentsOf: 0x00...0x01)
+        expectEqual(Data([0x00, 0x01]), d)
+
+        // Appending another small sequence should similarly still work.
+        d.append(contentsOf: 0x02...0x02)
+        expectEqual(Data([0x00, 0x01, 0x02]), d)
+
+        // If we append a sequence of elements larger than a single InlineData, the internal append here should buffer.
+        // We want to make sure that buffering in this way does not accidentally drop trailing elements on the floor.
+        d.append(contentsOf: 0x03...0x17)
+        expectEqual(Data([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                          0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+                          0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17]), d)
+    }
+
+    // This test is like test_appendingNonContiguousSequence_exactCount but uses a sequence which reports 0 for its `.underestimatedCount`.
+    // This attempts to hit the worst-case scenario of `Data.append<S>(_:)` -- a discontiguous sequence of unknown length.
+    func test_appendingNonContiguousSequence_underestimatedCount() {
+        var d = Data()
+
+        // d should go from .empty representation to .inline.
+        // Appending a small enough sequence to fit in .inline should actually be copied.
+        d.append(contentsOf: (0x00...0x01).makeIterator()) // `.makeIterator()` produces a sequence whose `.underestimatedCount` is 0.
+        expectEqual(Data([0x00, 0x01]), d)
+
+        // Appending another small sequence should similarly still work.
+        d.append(contentsOf: (0x02...0x02).makeIterator()) // `.makeIterator()` produces a sequence whose `.underestimatedCount` is 0.
+        expectEqual(Data([0x00, 0x01, 0x02]), d)
+
+        // If we append a sequence of elements larger than a single InlineData, the internal append here should buffer.
+        // We want to make sure that buffering in this way does not accidentally drop trailing elements on the floor.
+        d.append(contentsOf: (0x03...0x17).makeIterator()) // `.makeIterator()` produces a sequence whose `.underestimatedCount` is 0.
+        expectEqual(Data([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                          0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+                          0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17]), d)
     }
 
     func test_sequenceInitializers() {
@@ -3705,6 +3804,8 @@ class TestData : TestDataSuper {
 var DataTests = TestSuite("TestData")
 DataTests.test("testBasicConstruction") { TestData().testBasicConstruction() }
 DataTests.test("testInitializationWithArray") { TestData().testInitializationWithArray() }
+DataTests.test("testInitializationWithBufferPointer") { TestData().testInitializationWithBufferPointer() }
+DataTests.test("testInitializationWithMutableBufferPointer") { TestData().testInitializationWithMutableBufferPointer() }
 DataTests.test("testMutableData") { TestData().testMutableData() }
 DataTests.test("testCustomData") { TestData().testCustomData() }
 DataTests.test("testBridgingDefault") { TestData().testBridgingDefault() }
@@ -3728,7 +3829,6 @@ DataTests.test("testCopyBytes_oversized") { TestData().testCopyBytes_oversized()
 DataTests.test("testCopyBytes_ranges") { TestData().testCopyBytes_ranges() }
 DataTests.test("test_base64Data_small") { TestData().test_base64Data_small() }
 DataTests.test("test_base64Data_medium") { TestData().test_base64Data_medium() }
-DataTests.test("test_dataHash") { TestData().test_dataHash() }
 DataTests.test("test_discontiguousEnumerateBytes") { TestData().test_discontiguousEnumerateBytes() }
 DataTests.test("test_basicReadWrite") { TestData().test_basicReadWrite() }
 DataTests.test("test_writeFailure") { TestData().test_writeFailure() }
@@ -3760,6 +3860,8 @@ DataTests.test("test_copyBytes1") { TestData().test_copyBytes1() }
 DataTests.test("test_copyBytes2") { TestData().test_copyBytes2() }
 DataTests.test("test_sliceOfSliceViaRangeExpression") { TestData().test_sliceOfSliceViaRangeExpression() }
 DataTests.test("test_appendingSlices") { TestData().test_appendingSlices() }
+DataTests.test("test_appendingNonContiguousSequence_exactCount") { TestData().test_appendingNonContiguousSequence_exactCount() }
+DataTests.test("test_appendingNonContiguousSequence_underestimatedCount") { TestData().test_appendingNonContiguousSequence_underestimatedCount() }
 DataTests.test("test_sequenceInitializers") { TestData().test_sequenceInitializers() }
 DataTests.test("test_reversedDataInit") { TestData().test_reversedDataInit() }
 DataTests.test("test_replaceSubrangeReferencingMutable") { TestData().test_replaceSubrangeReferencingMutable() }

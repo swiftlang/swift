@@ -251,6 +251,9 @@ struct PrintOptions {
 
   bool PrintImplicitAttrs = true;
 
+  /// Whether to skip keywords with a prefix of underscore such as __consuming.
+  bool SkipUnderscoredKeywords = false;
+
   /// Whether to print decl attributes that are only used internally,
   /// such as _silgen_name, transparent, etc.
   bool PrintUserInaccessibleAttrs = true;
@@ -258,6 +261,7 @@ struct PrintOptions {
   /// List of attribute kinds that should not be printed.
   std::vector<AnyAttrKind> ExcludeAttrList = {DAK_Transparent, DAK_Effects,
                                               DAK_FixedLayout,
+                                              DAK_ShowInInterface,
                                               DAK_ImplicitlyUnwrappedOptional};
 
   /// List of attribute kinds that should be printed exclusively.
@@ -270,6 +274,9 @@ struct PrintOptions {
   /// Whether to print storage representation attributes on types, e.g.
   /// '@sil_weak', '@sil_unmanaged'.
   bool PrintStorageRepresentationAttrs = false;
+
+  /// Whether to print 'static' or 'class' on static decls.
+  bool PrintStaticKeyword = true;
 
   /// Whether to print 'override' keyword on overridden decls.
   bool PrintOverrideKeyword = true;

@@ -2063,6 +2063,9 @@ public:
   explicit DeclChecker(TypeChecker &TC) : TC(TC) {}
 
   void visit(Decl *decl) {
+    if (TC.Context.Stats)
+      TC.Context.Stats->getFrontendCounters().NumDeclsTypechecked++;
+
     FrontendStatsTracer StatsTracer(TC.Context.Stats, "typecheck-decl", decl);
     PrettyStackTraceDecl StackTrace("type-checking", decl);
     
@@ -2775,7 +2778,7 @@ public:
         }
       }
 
-      if (TC.getLangOpts().EnableAccessControl) {
+      if (!TC.Context.isAccessControlDisabled()) {
         // Require the superclass to be open if this is outside its
         // defining module.  But don't emit another diagnostic if we
         // already complained about the class being inherently
@@ -3862,13 +3865,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       auto valueParams = accessor->getParameters();
 
       // Determine the value type.
-      Type valueIfaceTy;
-      if (auto VD = dyn_cast<VarDecl>(storage)) {
-        valueIfaceTy = VD->getInterfaceType()->getReferenceStorageReferent();
-      } else {
-        auto SD = cast<SubscriptDecl>(storage);
-        valueIfaceTy = SD->getElementInterfaceType();
-
+      Type valueIfaceTy = storage->getValueInterfaceType();
+      if (auto SD = dyn_cast<SubscriptDecl>(storage)) {
         // Copy the index types instead of re-validating them.
         auto indices = SD->getIndices();
         for (size_t i = 0, e = indices->size(); i != e; ++i) {
@@ -3997,7 +3995,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     }
 
     checkDeclAttributes(FD);
-
     break;
   }
 
@@ -4049,7 +4046,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       // (or the same file) to add vtable entries, we can re-evaluate this
       // restriction.
       if (extType->getClassOrBoundGenericClass() &&
-          isa<ExtensionDecl>(CD->getDeclContext())) {
+          isa<ExtensionDecl>(CD->getDeclContext()) &&
+          !(CD->getAttrs().hasAttribute<DynamicReplacementAttr>())) {
         diagnose(CD->getLoc(), diag::designated_init_in_extension, extType)
           .fixItInsert(CD->getLoc(), "convenience ");
         CD->setInitKind(CtorInitializerKind::Convenience);
@@ -4413,6 +4411,9 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
 }
 
 void TypeChecker::finalizeDecl(ValueDecl *decl) {
+  if (Context.Stats)
+    Context.Stats->getFrontendCounters().NumDeclsFinalized++;
+
   validateDecl(decl);
 
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {

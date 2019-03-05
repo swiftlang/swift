@@ -16,10 +16,13 @@ import SwiftShims
 /// Enough bytes are allocated to hold the bitmap for marking valid entries,
 /// keys, and values. The data layout starts with the bitmap, followed by the
 /// keys, followed by the values.
+// NOTE: older runtimes called this class _RawSetStorage. The two
+// must coexist without a conflicting ObjC class name, so it was
+// renamed. The old name must not be used in the new runtime.
 @_fixed_layout
 @usableFromInline
 @_objc_non_lazy_realization
-internal class _RawSetStorage: __SwiftNativeNSSet {
+internal class __RawSetStorage: __SwiftNativeNSSet {
   // NOTE: The precise layout of this type is relied on in the runtime to
   // provide a statically allocated empty singleton.  See
   // stdlib/public/stubs/GlobalObjects.cpp for details.
@@ -104,9 +107,12 @@ internal class _RawSetStorage: __SwiftNativeNSSet {
 
 /// The storage class for the singleton empty set.
 /// The single instance of this class is created by the runtime.
+// NOTE: older runtimes called this class _EmptySetSingleton. The two
+// must coexist without conflicting ObjC class names, so it was renamed.
+// The old names must not be used in the new runtime.
 @_fixed_layout
 @usableFromInline
-internal class _EmptySetSingleton: _RawSetStorage {
+internal class __EmptySetSingleton: __RawSetStorage {
   @nonobjc
   override internal init(_doNotCallMe: ()) {
     _internalInvariantFailure("This class cannot be directly initialized")
@@ -120,18 +126,18 @@ internal class _EmptySetSingleton: _RawSetStorage {
 #endif
 }
 
-extension _RawSetStorage {
+extension __RawSetStorage {
   /// The empty singleton that is used for every single Set that is created
   /// without any elements. The contents of the storage must never be mutated.
   @inlinable
   @nonobjc
-  internal static var empty: _EmptySetSingleton {
+  internal static var empty: __EmptySetSingleton {
     return Builtin.bridgeFromRawPointer(
       Builtin.addressof(&_swiftEmptySetSingleton))
   }
 }
 
-extension _EmptySetSingleton: _NSSetCore {
+extension __EmptySetSingleton: _NSSetCore {
 #if _runtime(_ObjC)
   //
   // NSSet implementation, assuming Self is the empty singleton
@@ -153,7 +159,7 @@ extension _EmptySetSingleton: _NSSetCore {
 
   @objc
   internal func objectEnumerator() -> _NSEnumerator {
-    return _SwiftEmptyNSEnumerator()
+    return __SwiftEmptyNSEnumerator()
   }
 
   @objc(countByEnumeratingWithState:objects:count:)
@@ -177,7 +183,7 @@ extension _EmptySetSingleton: _NSSetCore {
 
 @usableFromInline
 final internal class _SetStorage<Element: Hashable>
-  : _RawSetStorage, _NSSetCore {
+  : __RawSetStorage, _NSSetCore {
   // This type is made with allocWithTailElems, so no init is ever called.
   // But we still need to have an init to satisfy the compiler.
   @nonobjc
@@ -284,7 +290,7 @@ final internal class _SetStorage<Element: Hashable>
 extension _SetStorage {
   @usableFromInline
   @_effects(releasenone)
-  internal static func copy(original: _RawSetStorage) -> _SetStorage {
+  internal static func copy(original: __RawSetStorage) -> _SetStorage {
     return .allocate(
       scale: original._scale,
       age: original._age,
@@ -294,7 +300,7 @@ extension _SetStorage {
   @usableFromInline
   @_effects(releasenone)
   static internal func resize(
-    original: _RawSetStorage,
+    original: __RawSetStorage,
     capacity: Int,
     move: Bool
   ) -> _SetStorage {
@@ -313,7 +319,7 @@ extension _SetStorage {
   @usableFromInline
   @_effects(releasenone)
   static internal func convert(
-    _ cocoa: _CocoaSet,
+    _ cocoa: __CocoaSet,
     capacity: Int
   ) -> _SetStorage {
     let scale = _HashTable.scale(forCapacity: capacity)

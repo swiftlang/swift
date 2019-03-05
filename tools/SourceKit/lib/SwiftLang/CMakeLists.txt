@@ -2,12 +2,14 @@ add_sourcekit_library(SourceKitSwiftLang
   CodeCompletionOrganizer.cpp
   SwiftASTManager.cpp
   SwiftCompletion.cpp
+  SwiftConformingMethodList.cpp
   SwiftDocSupport.cpp
   SwiftEditor.cpp
   SwiftEditorInterfaceGen.cpp
   SwiftIndexing.cpp
   SwiftLangSupport.cpp
   SwiftSourceDocInfo.cpp
+  SwiftTypeContextInfo.cpp
   LINK_LIBS
     SourceKitCore swiftDriver swiftFrontend
     swiftDWARFImporter swiftClangImporter swiftIDE

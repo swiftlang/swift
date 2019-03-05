@@ -180,6 +180,14 @@ option(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES
        "Generate .swiftinterface files alongside .swiftmodule files"
        TRUE)
 
+# Allow building Swift with Clang's Profile Guided Optimization
+if(SWIFT_PROFDATA_FILE AND EXISTS ${SWIFT_PROFDATA_FILE})
+  if(NOT CMAKE_C_COMPILER_ID MATCHES Clang)
+    message(FATAL_ERROR "SWIFT_PROFDATA_FILE can only be specified when compiling with clang")
+  endif()
+  add_definitions("-fprofile-instr-use=${SWIFT_PROFDATA_FILE}")
+endif()
+
 #
 # User-configurable Android specific options.
 #
@@ -311,10 +319,6 @@ option(SWIFT_STDLIB_ENABLE_SIL_OWNERSHIP
   "Build the standard libraries and overlays with sil ownership enabled."
   FALSE)
 
-option(SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
-  "Build the standard libraries, overlays, and runtime with normal arguments at +0"
-  TRUE)
-
 option(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS
   "Enable runtime function counters and expose the API."
   FALSE)
@@ -409,6 +413,15 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
     set(SWIFT_BUILD_SYNTAXPARSERLIB_default FALSE)
     set(SWIFT_BUILD_SOURCEKIT_default FALSE)
   endif()
+elseif(CMAKE_SYSTEM_NAME STREQUAL Windows)
+  if(EXISTS ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE} AND
+     CMAKE_CXX_COMPILER_ID STREQUAL Clang)
+    set(SWIFT_BUILD_SYNTAXPARSERLIB_default TRUE)
+    set(SWIFT_BUILD_SOURCEKIT_default TRUE)
+  else()
+    set(SWIFT_BUILD_SYNTAXPARSERLIB_default FALSE)
+    set(SWIFT_BUILD_SOURCEKIT_default FALSE)
+  endif()
 else()
     set(SWIFT_BUILD_SYNTAXPARSERLIB_default FALSE)
     set(SWIFT_BUILD_SOURCEKIT_default FALSE)
@@ -416,6 +429,8 @@ endif()
 option(SWIFT_BUILD_SYNTAXPARSERLIB
     "Build the Swift Syntax Parser library"
     ${SWIFT_BUILD_SYNTAXPARSERLIB_default})
+option(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+    "Only build the Swift Syntax Parser library" FALSE)
 option(SWIFT_BUILD_SOURCEKIT
     "Build SourceKit"
     ${SWIFT_BUILD_SOURCEKIT_default})
@@ -492,13 +507,9 @@ include(SwiftSharedCMakeConfig)
 # Support building Swift as a standalone project, using LLVM as an
 # external library.
 if(SWIFT_BUILT_STANDALONE)
-  swift_common_standalone_build_config(SWIFT SWIFT_CROSS_COMPILING)
+  swift_common_standalone_build_config(SWIFT)
 else()
   swift_common_unified_build_config(SWIFT)
-endif()
-
-if(NOT EXISTS "${CLANG_MAIN_INCLUDE_DIR}/clang/AST/Decl.h")
-  message(FATAL_ERROR "Clang is missing from llvm/tools subdirectory.")
 endif()
 
 set(SWIFT_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -803,7 +814,6 @@ message(STATUS "Building host Swift tools for ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_
 message(STATUS "  Build type:     ${CMAKE_BUILD_TYPE}")
 message(STATUS "  Assertions:     ${LLVM_ENABLE_ASSERTIONS}")
 message(STATUS "  LTO:            ${SWIFT_TOOLS_ENABLE_LTO}")
-message(STATUS "  +0 Normal Args: ${SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS}")
 message(STATUS "")
 
 if (SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
@@ -811,12 +821,10 @@ if (SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Building Swift standard library and overlays for SDKs: ${SWIFT_SDKS}")
   message(STATUS "  Build type:       ${SWIFT_STDLIB_BUILD_TYPE}")
   message(STATUS "  Assertions:       ${SWIFT_STDLIB_ASSERTIONS}")
-  message(STATUS "  +0 Normal Args:   ${SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS}")
   message(STATUS "")
 
   message(STATUS "Building Swift runtime with:")
   message(STATUS "  Leak Detection Checker Entrypoints: ${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
-  message(STATUS "  +0 Normal Args:                     ${SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS}")
   message(STATUS "")
 
 else()
@@ -901,8 +909,18 @@ if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
     set(SWIFT_LIBDISPATCH_C_COMPILER ${CMAKE_C_COMPILER})
     set(SWIFT_LIBDISPATCH_CXX_COMPILER ${CMAKE_CXX_COMPILER})
   elseif(${CMAKE_SYSTEM_NAME} STREQUAL ${CMAKE_HOST_SYSTEM_NAME})
-    set(SWIFT_LIBDISPATCH_C_COMPILER ${PATH_TO_CLANG_BUILD}/bin/clang)
-    set(SWIFT_LIBDISPATCH_CXX_COMPILER ${PATH_TO_CLANG_BUILD}/bin/clang++)
+    get_target_property(CLANG_LOCATION clang LOCATION)
+    get_filename_component(CLANG_LOCATION ${CLANG_LOCATION} DIRECTORY)
+
+    if(CMAKE_SYSTEM_NAME STREQUAL Windows)
+      set(SWIFT_LIBDISPATCH_C_COMPILER
+          ${CLANG_LOCATION}/clang-cl${CMAKE_EXECUTABLE_SUFFIX})
+      set(SWIFT_LIBDISPATCH_CXX_COMPILER
+          ${CLANG_LOCATION}/clang-cl${CMAKE_EXECUTABLE_SUFFIX})
+    else()
+      set(SWIFT_LIBDISPATCH_C_COMPILER ${CLANG_LOCATION}/clang)
+      set(SWIFT_LIBDISPATCH_CXX_COMPILER ${CLANG_LOCATION}/clang++)
+    endif()
   else()
     message(SEND_ERROR "libdispatch requires a newer clang compiler (${CMAKE_C_COMPILER_VERSION} < 3.9)")
   endif()
@@ -977,12 +995,24 @@ if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
   add_dependencies(dispatch libdispatch-install)
   add_dependencies(BlocksRuntime libdispatch-install)
 
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
+    set(SOURCEKIT_RUNTIME_DIR bin)
+  else()
+    set(SOURCEKIT_RUNTIME_DIR lib)
+  endif()
   swift_install_in_component(sourcekit-inproc
                              FILES
                                $<TARGET_FILE:dispatch>
                                $<TARGET_FILE:BlocksRuntime>
-                             DESTINATION
-                               lib${LLVM_LIBDIR_SUFFIX})
+                             DESTINATION ${SOURCEKIT_RUNTIME_DIR})
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
+    swift_install_in_component(sourcekit-inproc
+                               FILES
+                                 $<TARGET_LINKER_FILE:dispatch>
+                                 $<TARGET_LINKER_FILE:BlocksRuntime>
+                               DESTINATION lib)
+  endif()
+
 
   # FIXME(compnerd) this should be taken care of by the
   # INTERFACE_INCLUDE_DIRECTORIES above

@@ -47,6 +47,7 @@ namespace swift {
   enum class AccessSemantics : unsigned char;
   class AccessorDecl;
   class ApplyExpr;
+  class AvailabilityContext;
   class GenericEnvironment;
   class ArchetypeType;
   class ASTContext;
@@ -493,7 +494,7 @@ protected:
     HasLazyConformances : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+2+8+16,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+2+1+8+16,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -518,6 +519,9 @@ protected:
 
     /// The stage of the circularity check for this protocol.
     Circularity : 2,
+
+    /// Whether we've computed the inherited protocols list yet.
+    InheritedProtocolsValid : 1,
 
     : NumPadBits,
 
@@ -937,7 +941,8 @@ public:
   bool isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic = true) const;
 
   /// Whether this declaration is weak-imported.
-  bool isWeakImported(ModuleDecl *fromModule) const;
+  bool isWeakImported(ModuleDecl *fromModule,
+                      AvailabilityContext fromContext) const;
 
   /// Returns true if the nature of this declaration allows overrides.
   /// Note that this does not consider whether it is final or whether
@@ -2412,6 +2417,10 @@ public:
 
   bool isUsableFromInline() const;
 
+  /// Returns \c true if this declaration is *not* intended to be used directly
+  /// by application developers despite the visibility.
+  bool shouldHideFromEditor() const;
+
   bool hasAccess() const {
     return TypeAndAccess.getInt().hasValue();
   }
@@ -3558,11 +3567,16 @@ class ClassDecl final : public NominalTypeDecl {
   void createObjCMethodLookup();
 
   struct {
+    /// The superclass decl and a bit to indicate whether the
+    /// superclass was computed yet or not.
+    llvm::PointerIntPair<ClassDecl *, 1, bool> SuperclassDecl;
+
     /// The superclass type and a bit to indicate whether the
     /// superclass was computed yet or not.
-    llvm::PointerIntPair<Type, 1, bool> Superclass;
+    llvm::PointerIntPair<Type, 1, bool> SuperclassType;
   } LazySemanticInfo;
 
+  friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
   friend class TypeChecker;
 
@@ -3884,6 +3898,18 @@ private:
 class ProtocolDecl final : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
 
+  ArrayRef<ProtocolDecl *> InheritedProtocols;
+
+  struct {
+    /// The superclass decl and a bit to indicate whether the
+    /// superclass was computed yet or not.
+    llvm::PointerIntPair<ClassDecl *, 1, bool> SuperclassDecl;
+
+    /// The superclass type and a bit to indicate whether the
+    /// superclass was computed yet or not.
+    llvm::PointerIntPair<Type, 1, bool> SuperclassType;
+  } LazySemanticInfo;
+
   /// The generic signature representing exactly the new requirements introduced
   /// by this protocol.
   const Requirement *RequirementSignature = nullptr;
@@ -3894,12 +3920,9 @@ class ProtocolDecl final : public NominalTypeDecl {
 
   bool existentialTypeSupportedSlow(LazyResolver *resolver);
 
-  struct {
-    /// The superclass type and a bit to indicate whether the
-    /// superclass was computed yet or not.
-    llvm::PointerIntPair<Type, 1, bool> Superclass;
-  } LazySemanticInfo;
+  ArrayRef<ProtocolDecl *> getInheritedProtocolsSlow();
 
+  friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
   friend class TypeChecker;
 
@@ -3911,7 +3934,12 @@ public:
   using Decl::getASTContext;
 
   /// Retrieve the set of protocols inherited from this protocol.
-  llvm::TinyPtrVector<ProtocolDecl *> getInheritedProtocols() const;
+  ArrayRef<ProtocolDecl *> getInheritedProtocols() const {
+    if (Bits.ProtocolDecl.InheritedProtocolsValid)
+      return InheritedProtocols;
+
+    return const_cast<ProtocolDecl *>(this)->getInheritedProtocolsSlow();
+  }
 
   /// Determine whether this protocol has a superclass.
   bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
@@ -4027,14 +4055,20 @@ public:
     Bits.ProtocolDecl.ExistentialTypeSupportedValid = true;
   }
 
+private:
+  void computeKnownProtocolKind() const;
+
+public:
   /// If this is known to be a compiler-known protocol, returns the kind.
   /// Otherwise returns None.
-  ///
-  /// Note that this is only valid after type-checking.
   Optional<KnownProtocolKind> getKnownProtocolKind() const {
     if (Bits.ProtocolDecl.KnownProtocol == 0)
+      computeKnownProtocolKind();
+
+    if (Bits.ProtocolDecl.KnownProtocol == 1)
       return None;
-    return static_cast<KnownProtocolKind>(Bits.ProtocolDecl.KnownProtocol - 1);
+    
+    return static_cast<KnownProtocolKind>(Bits.ProtocolDecl.KnownProtocol - 2);
   }
 
   /// Check whether this protocol is of a specific, known protocol kind.
@@ -4043,15 +4077,6 @@ public:
       return *knownKind == kind;
 
     return false;
-  }
-
-  /// Records that this is a compiler-known protocol.
-  void setKnownProtocolKind(KnownProtocolKind kind) {
-    assert((!getKnownProtocolKind() || *getKnownProtocolKind() == kind) &&
-           "can't reset known protocol kind");
-    Bits.ProtocolDecl.KnownProtocol = static_cast<unsigned>(kind) + 1;
-    assert(getKnownProtocolKind() && *getKnownProtocolKind() == kind &&
-           "not enough bits");
   }
 
   /// Retrieve the status of circularity checking for protocol inheritance.
@@ -5692,12 +5717,12 @@ class AccessorDecl final : public FuncDecl {
                AccessorKind accessorKind, AbstractStorageDecl *storage,
                SourceLoc staticLoc, StaticSpellingKind staticSpelling,
                bool throws, SourceLoc throwsLoc,
-               unsigned numParameterLists, GenericParamList *genericParams,
+               bool hasImplicitSelfDecl, GenericParamList *genericParams,
                DeclContext *parent)
     : FuncDecl(DeclKind::Accessor,
                staticLoc, staticSpelling, /*func loc*/ declLoc,
                /*name*/ Identifier(), /*name loc*/ declLoc,
-               throws, throwsLoc, numParameterLists, genericParams, parent),
+               throws, throwsLoc, hasImplicitSelfDecl, genericParams, parent),
       AccessorKeywordLoc(accessorKeywordLoc),
       Storage(storage) {
     Bits.AccessorDecl.AccessorKind = unsigned(accessorKind);
@@ -5871,7 +5896,7 @@ public:
 /// enum. EnumElementDecls are represented in the AST as members of their
 /// parent EnumDecl, although syntactically they are subordinate to the
 /// EnumCaseDecl.
-class EnumElementDecl : public ValueDecl {
+class EnumElementDecl : public DeclContext, public ValueDecl {
   /// This is the type specified with the enum element, for
   /// example 'Int' in 'case Y(Int)'.  This is null if there is no type
   /// associated with this element, as in 'case Z' or in all elements of enum
@@ -5891,7 +5916,8 @@ public:
                   SourceLoc EqualsLoc,
                   LiteralExpr *RawValueExpr,
                   DeclContext *DC)
-  : ValueDecl(DeclKind::EnumElement, DC, Name, IdentifierLoc),
+  : DeclContext(DeclContextKind::EnumElementDecl, DC),
+    ValueDecl(DeclKind::EnumElement, DC, Name, IdentifierLoc),
     Params(Params),
     EqualsLoc(EqualsLoc),
     RawValueExpr(RawValueExpr)
@@ -5959,14 +5985,23 @@ public:
     return getParameterList() != nullptr;
   }
 
-  static bool classof(const Decl *D) {
-    return D->getKind() == DeclKind::EnumElement;
-  }
-
   /// True if the case is marked 'indirect'.
   bool isIndirect() const {
     return getAttrs().hasAttribute<IndirectAttr>();
   }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::EnumElement;
+  }
+
+  static bool classof(const DeclContext *DC) {
+    if (auto D = DC->getAsDecl())
+      return classof(D);
+    return false;
+  }
+
+  using DeclContext::operator new;
+  using Decl::getASTContext;
 };
   
 inline SourceRange EnumCaseDecl::getSourceRange() const {

@@ -58,7 +58,7 @@ constexpr static const char BUILTIN_TYPE_NAME_INT512[] = "Builtin.Int512";
 constexpr static const char BUILTIN_TYPE_NAME_INTLITERAL[] =
     "Builtin.IntLiteral";
 /// The name of the Builtin type for Float
-constexpr static const char BUILTIN_TYPE_NAME_FLOAT[] = "Builtin.Float";
+constexpr static const char BUILTIN_TYPE_NAME_FLOAT[] = "Builtin.FPIEEE";
 /// The name of the Builtin type for NativeObject
 constexpr static const char BUILTIN_TYPE_NAME_NATIVEOBJECT[] =
     "Builtin.NativeObject";

@@ -229,6 +229,10 @@ namespace {
 // configuration.
 struct GuaranteedARCOpts : SILFunctionTransform {
   void run() override {
+    // Skip ownership SIL. We are going to have a run of semantic arc opts here.
+    if (getFunction()->hasOwnership())
+      return;
+
     GuaranteedARCOptsVisitor Visitor;
 
     bool MadeChange = false;

@@ -306,23 +306,6 @@ public:
     return Properties.isResilient();
   }
 
-  /// Return the semantic type.
-  ///
-  /// The semantic type is what a type pretends to be during
-  /// type-checking: that is, the type that getTypeOfRValue would
-  /// return on a variable of this type.
-  SILType getSemanticType() const {
-    // If you change this, change getSemanticTypeLowering() too.
-    auto storageType = getLoweredType().getASTType();
-    if (auto refType = dyn_cast<ReferenceStorageType>(storageType))
-      return SILType::getPrimitiveType(refType.getReferentType(),
-                                       SILValueCategory::Object);
-    return getLoweredType();
-  }
-  
-  /// Return the lowering for the semantic type.
-  inline const TypeLowering &getSemanticTypeLowering(TypeConverter &TC) const;
-
   /// Produce an exact copy of the value in the given address as a
   /// scalar.  The caller is responsible for destroying this value,
   /// e.g. by releasing it.
@@ -582,13 +565,6 @@ class TypeConverter {
 
   llvm::BumpPtrAllocator IndependentBPA;
 
-  enum : unsigned {
-    /// There is a unique entry with this uncurry level in the
-    /// type-lowering map for every TLI we create.  The map has the
-    /// responsibility to call the destructor for these entries.
-    UniqueLoweringEntry = ~0U
-  };
-
   struct CachingTypeKey {
     GenericSignature *Sig;
     AbstractionPattern::CachingKey OrigType;
@@ -700,8 +676,16 @@ class TypeConverter {
 #include "swift/SIL/BridgedTypes.def"
 
   const TypeLowering &
-  getTypeLoweringForLoweredType(TypeKey key, ResilienceExpansion forExpansion);
-  const TypeLowering &getTypeLoweringForUncachedLoweredType(TypeKey key);
+  getTypeLoweringForLoweredType(TypeKey key,
+                                ResilienceExpansion forExpansion);
+  const TypeLowering &
+  getTypeLoweringForUncachedLoweredType(TypeKey key,
+                                        ResilienceExpansion forExpansion);
+
+  const TypeLowering &
+  getTypeLoweringForExpansion(TypeKey key,
+                              ResilienceExpansion forExpansion,
+                              const TypeLowering *lowering);
 
 public:
   SILModule &M;
@@ -763,15 +747,19 @@ public:
   
   /// Lowers a Swift type to a SILType, and returns the SIL TypeLowering
   /// for that type.
-  const TypeLowering &getTypeLowering(Type t) {
+  const TypeLowering &
+  getTypeLowering(Type t, ResilienceExpansion forExpansion =
+                            ResilienceExpansion::Minimal) {
     AbstractionPattern pattern(getCurGenericContext(), t->getCanonicalType());
-    return getTypeLowering(pattern, t);
+    return getTypeLowering(pattern, t, forExpansion);
   }
 
   /// Lowers a Swift type to a SILType according to the abstraction
   /// patterns of the given original type.
   const TypeLowering &getTypeLowering(AbstractionPattern origType,
-                                      Type substType);
+                                      Type substType,
+                                      ResilienceExpansion forExpansion =
+                                        ResilienceExpansion::Minimal);
 
   /// Returns the SIL TypeLowering for an already lowered SILType. If the
   /// SILType is an address, returns the TypeLowering for the pointed-to
@@ -781,21 +769,35 @@ public:
                                ResilienceExpansion::Minimal);
 
   // Returns the lowered SIL type for a Swift type.
-  SILType getLoweredType(Type t) {
-    return getTypeLowering(t).getLoweredType();
+  SILType getLoweredType(Type t, ResilienceExpansion forExpansion
+                           = ResilienceExpansion::Minimal) {
+    return getTypeLowering(t, forExpansion).getLoweredType();
   }
 
   // Returns the lowered SIL type for a Swift type.
-  SILType getLoweredType(AbstractionPattern origType, Type substType) {
-    return getTypeLowering(origType, substType).getLoweredType();
+  SILType getLoweredType(AbstractionPattern origType, Type substType,
+                         ResilienceExpansion forExpansion =
+                           ResilienceExpansion::Minimal) {
+    return getTypeLowering(origType, substType, forExpansion)
+      .getLoweredType();
   }
 
-  SILType getLoweredLoadableType(Type t) {
-    const TypeLowering &ti = getTypeLowering(t);
+  SILType getLoweredLoadableType(Type t,
+                                 ResilienceExpansion forExpansion =
+                                   ResilienceExpansion::Minimal) {
+    const TypeLowering &ti = getTypeLowering(t, forExpansion);
     assert(
         (ti.isLoadable() || !SILModuleConventions(M).useLoweredAddresses()) &&
         "unexpected address-only type");
     return ti.getLoweredType();
+  }
+
+  CanType getLoweredRValueType(Type t) {
+    return getLoweredType(t).getASTType();
+  }
+
+  CanType getLoweredRValueType(AbstractionPattern origType, Type substType) {
+    return getLoweredType(origType, substType).getASTType();
   }
 
   AbstractionPattern getAbstractionPattern(AbstractStorageDecl *storage,
@@ -806,7 +808,7 @@ public:
                                            bool isNonObjC = false);
   AbstractionPattern getAbstractionPattern(EnumElementDecl *element);
 
-  SILType getLoweredTypeOfGlobal(VarDecl *var);
+  CanType getLoweredTypeOfGlobal(VarDecl *var);
 
   /// Return the SILFunctionType for a native function value of the
   /// given type.
@@ -1007,7 +1009,8 @@ public:
                                          EnumElementDecl *elt);
 
 private:
-  CanType getLoweredRValueType(AbstractionPattern origType, CanType substType);
+  CanType computeLoweredRValueType(AbstractionPattern origType,
+                                   CanType substType);
 
   Type getLoweredCBridgedType(AbstractionPattern pattern, Type t,
                               Bridgeability bridging,
@@ -1032,15 +1035,6 @@ private:
                                Bridgeability bridging,
                                bool suppressOptional);
 };
-
-inline const TypeLowering &
-TypeLowering::getSemanticTypeLowering(TypeConverter &TC) const {
-  // If you change this, change getSemanticType() too.
-  auto storageType = getLoweredType().getASTType();
-  if (auto refType = dyn_cast<ReferenceStorageType>(storageType))
-    return TC.getTypeLowering(refType.getReferentType());
-  return *this;
-}
 
 /// RAII interface to push a generic context.
 class GenericContextScope {

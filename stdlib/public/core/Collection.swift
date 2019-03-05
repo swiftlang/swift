@@ -382,7 +382,7 @@ public protocol Collection: Sequence {
   // we get an `IndexingIterator` rather than properly deducing the
   // Iterator type from makeIterator(). <rdar://problem/21539115>
   /// Returns an iterator over the elements of the collection.
-  override func makeIterator() -> Iterator
+  override __consuming func makeIterator() -> Iterator
 
   /// A sequence that represents a contiguous subrange of the collection's
   /// elements.

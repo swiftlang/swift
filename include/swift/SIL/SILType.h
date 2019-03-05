@@ -477,12 +477,6 @@ public:
   /// representation. Class existentials do not always qualify.
   bool isHeapObjectReferenceType() const;
 
-  /// Return the SILType corresponding to the underlying type of the given
-  /// metatype type.
-  ///
-  /// *NOTE* Only call on SILTypes for metatype types.
-  SILType getMetatypeInstanceType(SILModule& M) const;
-
   /// Returns true if this SILType is an aggregate that contains \p Ty
   bool aggregateContainsRecord(SILType Ty, SILModule &SILMod) const;
   
@@ -501,10 +495,6 @@ public:
 
   /// Returns true if this is the AnyObject SILType;
   bool isAnyObject() const { return getASTType()->isAnyObject(); }
-
-  /// Returns the underlying referent SILType of an @sil_unowned or @sil_weak
-  /// Type.
-  SILType getReferentType(SILModule &M) const;
   
   /// Returns a SILType with any archetypes mapped out of context.
   SILType mapTypeOutOfContext() const;

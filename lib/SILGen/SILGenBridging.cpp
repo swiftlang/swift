@@ -350,8 +350,10 @@ static void expandTupleTypes(CanType type, SmallVectorImpl<CanType> &results) {
 static SmallVector<CanType, 8>
 expandTupleTypes(AnyFunctionType::CanParamArrayRef params) {
   SmallVector<CanType, 8> results;
-  for (auto param : params)
-    expandTupleTypes(param.getOldType(), results);
+  for (auto param : params) {
+    assert(!param.isInOut() && !param.isVariadic());
+    expandTupleTypes(param.getPlainType(), results);
+  }
   return results;
 }
 
@@ -1390,7 +1392,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   bool isInitializingToAllocatingInitThunk = false;
   if (native.kind == SILDeclRef::Kind::Initializer) {
     if (auto ctor = dyn_cast<ConstructorDecl>(native.getDecl())) {
-      if (!ctor->isDesignatedInit()) {
+      if (!ctor->isDesignatedInit() && !ctor->isObjC()) {
         isInitializingToAllocatingInitThunk = true;
         native = SILDeclRef(ctor, SILDeclRef::Kind::Allocator);
       }

@@ -172,30 +172,7 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
   auto wtable = IGF.tryGetLocalTypeData(archetype, localDataKind);
   if (wtable) return wtable;
 
-  // If we don't have an environment, this must be an implied witness table
-  // reference.
-  // FIXME: eliminate this path when opened types have generic environments.
-  if (auto opened = dyn_cast<OpenedArchetypeType>(archetype)) {
-    SmallVector<ProtocolEntry, 4> entries;
-    for (auto p : archetype->getConformsTo()) {
-      const ProtocolInfo &impl =
-          IGF.IGM.getProtocolInfo(p, ProtocolInfoKind::RequirementSignature);
-      entries.push_back(ProtocolEntry(p, impl));
-    }
-
-    return emitImpliedWitnessTableRef(IGF, entries, protocol,
-        [&](unsigned index) -> llvm::Value* {
-      auto localDataKind =
-         LocalTypeDataKind::forAbstractProtocolWitnessTable(
-                                                  entries[index].getProtocol());
-      auto wtable = IGF.tryGetLocalTypeData(archetype, localDataKind);
-      assert(wtable &&
-             "opened type without local type data for direct conformance?");
-      return wtable;
-    });
-  }
-  
-  auto environment = archetype->getPrimary()->getGenericEnvironment();
+  auto environment = archetype->getGenericEnvironment();
 
   // Otherwise, ask the generic signature for the environment for the best
   // path to the conformance.

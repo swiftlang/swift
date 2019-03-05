@@ -1641,6 +1641,10 @@ public:
   /// The entry point to the transformation.
   void run() override {
     SILFunction *F = getFunction();
+    // FIXME: Handle ownership.
+    if (F->hasOwnership())
+      return;
+
     LLVM_DEBUG(llvm::dbgs() << "*** RLE on function: " << F->getName()
                             << " ***\n");
 

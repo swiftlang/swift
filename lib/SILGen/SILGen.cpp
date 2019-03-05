@@ -470,27 +470,14 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
 
 
 SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
-  ASTContext &C = M.getASTContext();
+  ASTContext &C = getASTContext();
   auto extInfo = SILFunctionType::ExtInfo()
     .withRepresentation(SILFunctionType::Representation::CFunctionPointer);
-
-  auto findStdlibDecl = [&](StringRef name) -> ValueDecl* {
-    if (!getASTContext().getStdlibModule())
-      return nullptr;
-    SmallVector<ValueDecl*, 1> lookupBuffer;
-    getASTContext().getStdlibModule()->lookupValue({},
-                                       getASTContext().getIdentifier(name),
-                                       NLKind::QualifiedLookup,
-                                       lookupBuffer);
-    if (lookupBuffer.size() == 1)
-      return lookupBuffer[0];
-    return nullptr;
-  };
 
   // Use standard library types if we have them; otherwise, fall back to
   // builtins.
   CanType Int32Ty;
-  if (auto Int32Decl = dyn_cast_or_null<TypeDecl>(findStdlibDecl("Int32"))) {
+  if (auto Int32Decl = C.getInt32Decl()) {
     Int32Ty = Int32Decl->getDeclaredInterfaceType()->getCanonicalType();
   } else {
     Int32Ty = CanType(BuiltinIntegerType::get(32, C));
@@ -498,7 +485,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
 
   CanType PtrPtrInt8Ty = C.TheRawPointerType;
   if (auto PointerDecl = C.getUnsafeMutablePointerDecl()) {
-    if (auto Int8Decl = cast<TypeDecl>(findStdlibDecl("Int8"))) {
+    if (auto Int8Decl = C.getInt8Decl()) {
       Type Int8Ty = Int8Decl->getDeclaredInterfaceType();
       Type PointerInt8Ty = BoundGenericType::get(PointerDecl,
                                                  nullptr,
@@ -606,20 +593,12 @@ SILGenModule::getOrCreateProfilerForConstructors(DeclContext *ctx,
   return profiler;
 }
 
-SILFunction *SILGenModule::getFunction(SILDeclRef constant,
-                                       ForDefinition_t forDefinition) {
-  // If we already emitted the function, return it (potentially preparing it
-  // for definition).
-  if (auto emitted = getEmittedFunction(constant, forDefinition))
-    return emitted;
+/// Set up the function for profiling instrumentation.
+static void setUpForProfiling(SILDeclRef constant, SILFunction *F,
+                              ForDefinition_t forDefinition) {
+  if (!forDefinition)
+    return;
 
-  // Note: Do not provide any SILLocation. You can set it afterwards.
-  SILGenFunctionBuilder builder(*this);
-  auto *F = builder.getOrCreateFunction(constant.hasDecl() ? constant.getDecl()
-                                                           : (Decl *)nullptr,
-                                        constant, forDefinition);
-
-  // Set up the function for profiling instrumentation.
   ASTNode profiledNode;
   if (!haveProfiledAssociatedFunction(constant)) {
     if (constant.hasDecl()) {
@@ -637,6 +616,23 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
     if (SILProfiler *SP = F->getProfiler())
       F->setEntryCount(SP->getExecutionCount(profiledNode));
   }
+}
+
+SILFunction *SILGenModule::getFunction(SILDeclRef constant,
+                                       ForDefinition_t forDefinition) {
+  // If we already emitted the function, return it (potentially preparing it
+  // for definition).
+  if (auto emitted = getEmittedFunction(constant, forDefinition)) {
+    setUpForProfiling(constant, emitted, forDefinition);
+    return emitted;
+  }
+
+  // Note: Do not provide any SILLocation. You can set it afterwards.
+  SILGenFunctionBuilder builder(*this);
+  auto *F = builder.getOrCreateFunction(constant.hasDecl() ? constant.getDecl()
+                                                           : (Decl *)nullptr,
+                                        constant, forDefinition);
+  setUpForProfiling(constant, F, forDefinition);
 
   assert(F && "SILFunction should have been defined");
 
@@ -854,33 +850,18 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
 
   bool ForCoverageMapping = doesASTRequireProfiling(M, decl);
 
-  auto emitClassAllocatorThunk = [&]{
-    emitOrDelayFunction(
-        *this, constant, [this, constant, decl](SILFunction *f) {
-          preEmitFunction(constant, decl, f, decl);
-          PrettyStackTraceSILFunction X("silgen emitConstructor", f);
-          SILGenFunction(*this, *f, decl).emitClassConstructorAllocator(decl);
-          postEmitFunction(constant, f);
-        });
-  };
-  auto emitValueConstructorIfHasBody = [&]{
-    if (decl->hasBody()) {
+  if (declCtx->getSelfClassDecl()) {
+    // Designated initializers for classes, as well as @objc convenience
+    // initializers, have have separate entry points for allocation and
+    // initialization.
+    if (decl->isDesignatedInit() || decl->isObjC()) {
       emitOrDelayFunction(
-          *this, constant, [this, constant, decl, declCtx](SILFunction *f) {
+          *this, constant, [this, constant, decl](SILFunction *f) {
             preEmitFunction(constant, decl, f, decl);
             PrettyStackTraceSILFunction X("silgen emitConstructor", f);
-            f->setProfiler(getOrCreateProfilerForConstructors(declCtx, decl));
-            SILGenFunction(*this, *f, decl).emitValueConstructor(decl);
+            SILGenFunction(*this, *f, decl).emitClassConstructorAllocator(decl);
             postEmitFunction(constant, f);
           });
-    }
-  };
-  
-  if (declCtx->getSelfClassDecl()) {
-    // Designated initializers for classes have have separate entry points for
-    // allocation and initialization.
-    if (decl->isDesignatedInit()) {
-      emitClassAllocatorThunk();
 
       // Constructors may not have bodies if they've been imported, or if they've
       // been parsed from a parseable interface.
@@ -900,21 +881,21 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
             },
             /*forceEmission=*/ForCoverageMapping);
       }
-    // Convenience initializers for classes behave more like value constructors
-    // in that there's only an allocating entry point that effectively
-    // "constructs" the self reference by invoking another initializer.
-    } else {
-      emitValueConstructorIfHasBody();
-      
-      // If the convenience initializer was imported from ObjC, we still have to
-      // emit the allocator thunk.
-      if (decl->hasClangNode()) {
-        emitClassAllocatorThunk();
-      }
+      return;
     }
-  } else {
-    // Struct and enum constructors do everything in a single function.
-    emitValueConstructorIfHasBody();
+  }
+
+  // Struct and enum constructors do everything in a single function, as do
+  // non-@objc convenience initializers for classes.
+  if (decl->hasBody()) {
+    emitOrDelayFunction(
+        *this, constant, [this, constant, decl, declCtx](SILFunction *f) {
+          preEmitFunction(constant, decl, f, decl);
+          PrettyStackTraceSILFunction X("silgen emitConstructor", f);
+          f->setProfiler(getOrCreateProfilerForConstructors(declCtx, decl));
+          SILGenFunction(*this, *f, decl).emitValueConstructor(decl);
+          postEmitFunction(constant, f);
+        });
   }
 }
 
@@ -1142,7 +1123,8 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto *type = blockParam->getType()->castTo<FunctionType>();
   Type initType = FunctionType::get({}, TupleType::getEmpty(C),
                                     type->getExtInfo());
-  auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
+  auto initSILType = cast<SILFunctionType>(
+      Types.getLoweredRValueType(initType));
 
   SILGenFunctionBuilder builder(*this);
   auto *f = builder.createFunction(
@@ -1356,9 +1338,10 @@ SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
       componentObjTy = genericEnv->mapTypeIntoContext(componentObjTy);
     auto storageTy = M.Types.getSubstitutedStorageType(decl, componentObjTy);
     auto opaqueTy =
-      M.Types.getLoweredType(AbstractionPattern::getOpaque(), componentObjTy);
+      M.Types.getLoweredRValueType(AbstractionPattern::getOpaque(),
+                                   componentObjTy);
     
-    return storageTy.getAddressType() == opaqueTy.getAddressType();
+    return storageTy.getASTType() == opaqueTy;
   }
   case AccessStrategy::DirectToAccessor:
   case AccessStrategy::DispatchToAccessor:

@@ -74,6 +74,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case ImplicitlyUnwrappedDisjunctionChoice:
     case DynamicLookupResult:
     case ContextualType:
+    case SynthesizedArgument:
       if (unsigned numValues = numNumericValuesInPathElement(elt.getKind())) {
         id.AddInteger(elt.getValue());
         if (numValues > 1)
@@ -105,6 +106,25 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       anchor->getLoc().print(out, *sm);
     }
   }
+
+  auto dumpReqKind = [&out](RequirementKind kind) {
+    out << " (";
+    switch (kind) {
+    case RequirementKind::Conformance:
+      out << "conformance";
+      break;
+    case RequirementKind::Superclass:
+      out << "superclass";
+      break;
+    case RequirementKind::SameType:
+      out << "same-type";
+      break;
+    case RequirementKind::Layout:
+      out << "layout";
+      break;
+    }
+    out << ")";
+  };
 
   for (auto elt : getPath()) {
     out << " -> ";
@@ -222,26 +242,12 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case ConditionalRequirement:
       out << "conditional requirement #" << llvm::utostr(elt.getValue());
+      dumpReqKind(static_cast<RequirementKind>(elt.getValue2()));
       break;
 
     case TypeParameterRequirement: {
-      out << "type parameter requirement #" << llvm::utostr(elt.getValue())
-          << " (";
-      switch (static_cast<RequirementKind>(elt.getValue2())) {
-      case RequirementKind::Conformance:
-        out << "conformance";
-        break;
-      case RequirementKind::Superclass:
-        out << "superclass";
-        break;
-      case RequirementKind::SameType:
-        out << "same-type";
-        break;
-      case RequirementKind::Layout:
-        out << "layout";
-        break;
-      }
-      out << ")";
+      out << "type parameter requirement #" << llvm::utostr(elt.getValue());
+      dumpReqKind(static_cast<RequirementKind>(elt.getValue2()));
       break;
     }
 
@@ -255,6 +261,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case ContextualType:
       out << "contextual type";
+      break;
+
+    case SynthesizedArgument:
+      out << " synthesized argument #" << llvm::utostr(elt.getValue());
       break;
     }
   }

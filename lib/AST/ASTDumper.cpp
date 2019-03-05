@@ -1331,6 +1331,10 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
   case DeclContextKind::SubscriptDecl:
     printName(os, cast<SubscriptDecl>(dc)->getFullName());
     break;
+
+  case DeclContextKind::EnumElementDecl:
+    printName(os, cast<EnumElementDecl>(dc)->getFullName());
+    break;
   }
 }
 
@@ -1801,6 +1805,8 @@ public:
 
   void visitNilLiteralExpr(NilLiteralExpr *E) {
     printCommon(E, "nil_literal_expr");
+    PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
+    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
@@ -1814,19 +1820,39 @@ public:
       PrintWithColorRAII(OS, LiteralValueColor) << E->getDigitsText();
     else
       PrintWithColorRAII(OS, LiteralValueColor) << E->getValue();
+    PrintWithColorRAII(OS, LiteralValueColor) << " builtin_initializer=";
+    E->getBuiltinInitializer().dump(
+        PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
+    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitFloatLiteralExpr(FloatLiteralExpr *E) {
     printCommon(E, "float_literal_expr");
     PrintWithColorRAII(OS, LiteralValueColor)
       << " value=" << E->getDigitsText();
+    PrintWithColorRAII(OS, LiteralValueColor) << " builtin_initializer=";
+    E->getBuiltinInitializer().dump(
+        PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
+    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    if (!E->getBuiltinType().isNull()) {
+      PrintWithColorRAII(OS, TypeColor) << " builtin_type='";
+      E->getBuiltinType().print(PrintWithColorRAII(OS, TypeColor).getOS());
+      PrintWithColorRAII(OS, TypeColor) << "'";
+    }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
   void visitBooleanLiteralExpr(BooleanLiteralExpr *E) {
     printCommon(E, "boolean_literal_expr");
     PrintWithColorRAII(OS, LiteralValueColor)
-      << " value=" << (E->getValue() ? "true" : "false");
+      << " value=" << (E->getValue() ? "true" : "false")
+      << " builtin_initializer=";
+    E->getBuiltinInitializer().dump(
+      PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
+    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
@@ -1857,12 +1883,12 @@ public:
 
     if (E->isString()) {
       OS << " encoding="
-         << getStringLiteralExprEncodingString(E->getStringEncoding())
-         << " builtin_initializer=";
-      E->getBuiltinInitializer().dump(OS);
-      OS << " initializer=";
-      E->getInitializer().dump(OS);
+         << getStringLiteralExprEncodingString(E->getStringEncoding());
     }
+    OS << " builtin_initializer=";
+    E->getBuiltinInitializer().dump(OS);
+    OS << " initializer=";
+    E->getInitializer().dump(OS);
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
@@ -2618,6 +2644,11 @@ public:
       case KeyPathExpr::Component::Kind::Identity:
         OS << "identity";
         OS << '\n';
+        break;
+      case KeyPathExpr::Component::Kind::TupleElement:
+        OS << "tuple_element ";
+        OS << "#" << component.getTupleIndex();
+        OS << " ";
         break;
       }
       OS << "type=";

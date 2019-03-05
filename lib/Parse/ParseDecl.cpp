@@ -2281,9 +2281,18 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
       {
         BacktrackingScope Scope(*this);
         consumeToken(tok::kw_class);
-        if (!isStartOfDecl())
+        // When followed by an 'override' or CC token inside a class,
+        // treat 'class' as a modifier; in the case of a following CC
+        // token, we cannot be sure there is no intention to override
+        // or witness something static.
+        if (isStartOfDecl() || (isa<ClassDecl>(CurDeclContext) &&
+                                (Tok.is(tok::code_complete) ||
+                                 Tok.getRawText().equals("override")))) {
+          /* We're OK */
+        } else {
           // This 'class' is a real ClassDecl introducer.
           break;
+        }
       }
       if (StaticLoc.isValid()) {
         diagnose(Tok, diag::decl_already_static,
@@ -2932,6 +2941,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
       // specified so that we do not duplicate them in code completion
       // strings.
       SmallVector<StringRef, 3> Keywords;
+      SourceLoc introducerLoc;
       switch (OrigTok.getKind()) {
       case tok::kw_func:
       case tok::kw_subscript:
@@ -2939,15 +2949,22 @@ Parser::parseDecl(ParseDeclOptions Flags,
       case tok::kw_let:
       case tok::kw_typealias:
         Keywords.push_back(OrigTok.getText());
+        introducerLoc = OrigTok.getLoc();
         break;
       default:
         // Other tokens are already accounted for.
         break;
       }
+      if (StaticSpelling == StaticSpellingKind::KeywordStatic) {
+        Keywords.push_back(getTokenText(tok::kw_static));
+      } else if (StaticSpelling == StaticSpellingKind::KeywordClass) {
+        Keywords.push_back(getTokenText(tok::kw_class));
+      }
       for (auto attr : Attributes) {
         Keywords.push_back(attr->getAttrName());
       }
-      CodeCompletion->completeNominalMemberBeginning(Keywords);
+      CodeCompletion->completeNominalMemberBeginning(Keywords,
+                                                     introducerLoc);
     }
 
     DeclResult = makeParserCodeCompletionStatus();
@@ -3045,22 +3062,13 @@ void Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
   if (auto *ext = dyn_cast<ExtensionDecl>(D)) {
     parseDeclList(ext->getBraces().Start, RBLoc, Id,
                   ParseDeclOptions(DelayedState->Flags),
-                  [&] (Decl *D) { ext->addMember(D); });
+                  ext);
     ext->setBraces({LBLoc, RBLoc});
-  } else if (auto *cd = dyn_cast<ClassDecl>(D)) {
-    auto handler = [&] (Decl *D) {
-      cd->addMember(D);
-      if (isa<DestructorDecl>(D))
-        cd->setHasDestructor();
-    };
-    parseDeclList(cd->getBraces().Start, RBLoc, Id,
-                  ParseDeclOptions(DelayedState->Flags), handler);
-    cd->setBraces({LBLoc, RBLoc});
   } else {
     auto *ntd = cast<NominalTypeDecl>(D);
     parseDeclList(ntd->getBraces().Start, RBLoc, Id,
                   ParseDeclOptions(DelayedState->Flags),
-                  [&] (Decl *D) { ntd->addMember(D); });
+                  ntd);
     ntd->setBraces({LBLoc, RBLoc});
   }
 }
@@ -3477,13 +3485,14 @@ ParserStatus Parser::parseDeclItem(bool &PreviousHadSemi,
 /// \endverbatim
 bool Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
                            Diag<> ErrorDiag, ParseDeclOptions Options,
-                           llvm::function_ref<void(Decl*)> handler) {
+                           IterableDeclContext *IDC) {
   ParserStatus Status;
   bool PreviousHadSemi = true;
   {
     SyntaxParsingContext ListContext(SyntaxContext, SyntaxKind::MemberDeclList);
     while (Tok.isNot(tok::r_brace)) {
-      Status |= parseDeclItem(PreviousHadSemi, Options, handler);
+      Status |= parseDeclItem(PreviousHadSemi, Options,
+                              [&](Decl *D) { IDC->addMember(D); });
       if (Tok.isAny(tok::eof, tok::pound_endif, tok::pound_else,
                     tok::pound_elseif)) {
         IsInputIncomplete = true;
@@ -3504,36 +3513,38 @@ bool Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
 
 bool Parser::canDelayMemberDeclParsing() {
   // If explicitly disabled, respect the flag.
-  if (DisableDelayedParsing)
+  if (!DelayBodyParsing)
     return false;
-  // There's no fundamental reasons that SIL cannnot be lasily parsed. We need
-  // to keep SILParserTUStateBase persistent to make it happen.
-  if (isInSILMode())
-    return false;
-  // Calculating interface hash requires tokens consumed in the original order.
-  if (SF.hasInterfaceHash())
-    return false;
-  if (SF.Kind == SourceFileKind::REPL)
-    return false;
-  // We always collect the entire syntax tree for IDE uses.
-  if (SF.shouldCollectToken())
-    return false;
-  if (SF.shouldBuildSyntaxTree())
-    return false;
-  // Recovering parser status later for #sourceLocaion is not-trivial and
+  // Recovering parser status later for #sourceLocation is not-trivial and
   // it may not worth it.
   if (InPoundLineEnvironment)
     return false;
-  // The first code completion pass looks for code completion tokens extensively,
-  // so we cannot lazily parse members.
-  if (isCodeCompletionFirstPass())
-    return false;
+
+  // Skip until the matching right curly bracket; if we find a pound directive,
+  // we can't lazily parse.
   BacktrackingScope BackTrack(*this);
   bool HasPoundDirective;
   skipUntilMatchingRBrace(*this, HasPoundDirective, SyntaxContext);
   if (!HasPoundDirective)
     BackTrack.cancelBacktrack();
   return !BackTrack.willBacktrack();
+}
+
+bool Parser::delayParsingDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
+                                  SourceLoc PosBeforeLB,
+                                  ParseDeclOptions Options,
+                                  IterableDeclContext *IDC) {
+  bool error = false;
+
+  if (Tok.is(tok::r_brace)) {
+    RBLoc = consumeToken();
+  } else {
+    RBLoc = Tok.getLoc();
+    error = true;
+  }
+  State->delayDeclList(IDC, Options.toRaw(), CurDeclContext, { LBLoc, RBLoc },
+                        PosBeforeLB);
+  return error;
 }
 
 /// Parse an 'extension' declaration.
@@ -3600,17 +3611,11 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     Scope S(this, ScopeKind::Extension);
     ParseDeclOptions Options(PD_HasContainerType | PD_InExtension);
     if (canDelayMemberDeclParsing()) {
-      if (Tok.is(tok::r_brace)) {
-        RBLoc = consumeToken();
-      } else {
-        RBLoc = Tok.getLoc();
+      if (delayParsingDeclList(LBLoc, RBLoc, PosBeforeLB, Options, ext))
         status.setIsParseError();
-      }
-      State->delayDeclList(ext, Options.toRaw(), CurDeclContext, { LBLoc, RBLoc },
-                           PosBeforeLB);
     } else {
       if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_extension,
-                        Options, [&] (Decl *D) { ext->addMember(D); }))
+                        Options, ext))
         status.setIsParseError();
     }
 
@@ -5395,7 +5400,8 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
 
   BodyRange.End = PreviousLoc;
 
-  if (DelayedParseCB->shouldDelayFunctionBodyParsing(*this, AFD, Attrs,
+  if (DelayedParseCB &&
+      DelayedParseCB->shouldDelayFunctionBodyParsing(*this, AFD, Attrs,
                                                      BodyRange)) {
     State->delayFunctionBodyParsing(AFD, BodyRange,
                                     BeginParserPosition.PreviousLoc);
@@ -5737,20 +5743,14 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
     RBLoc = LBLoc;
     Status.setIsParseError();
   } else {
-    Scope S(this, ScopeKind::ClassBody);
+    Scope S(this, ScopeKind::EnumBody);
     ParseDeclOptions Options(PD_HasContainerType | PD_AllowEnumElement | PD_InEnum);
     if (canDelayMemberDeclParsing()) {
-      if (Tok.is(tok::r_brace)) {
-        RBLoc = consumeToken();
-      } else {
-        RBLoc = Tok.getLoc();
+      if (delayParsingDeclList(LBLoc, RBLoc, PosBeforeLB, Options, ED))
         Status.setIsParseError();
-      }
-      State->delayDeclList(ED, Options.toRaw(), CurDeclContext, { LBLoc, RBLoc },
-                           PosBeforeLB);
     } else {
       if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_enum,
-                        Options, [&] (Decl *D) { ED->addMember(D); }))
+                        Options, ED))
         Status.setIsParseError();
     }
   }
@@ -5840,13 +5840,14 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     // See if there's a following argument type.
     ParserResult<ParameterList> ArgParams;
     SmallVector<Identifier, 4> argumentNames;
+    DefaultArgumentInfo DefaultArgs;
     if (Tok.isFollowingLParen()) {
       ArgParams = parseSingleParameterClause(ParameterContextKind::EnumElement,
-                                             &argumentNames);
+                                             &argumentNames, &DefaultArgs);
       if (ArgParams.isNull() || ArgParams.hasCodeCompletion())
         return ParserStatus(ArgParams);
     }
-    
+
     // See if there's a raw value expression.
     SourceLoc EqualsLoc;
     ParserResult<Expr> RawValueExpr;
@@ -5912,6 +5913,8 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
                                                  EqualsLoc,
                                                  LiteralRawValueExpr,
                                                  CurDeclContext);
+
+    DefaultArgs.setFunctionContext(result, result->getParameterList());
 
     if (NameLoc == CaseLoc) {
       result->setImplicit(); // Parse error
@@ -6025,17 +6028,11 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
     Scope S(this, ScopeKind::StructBody);
     ParseDeclOptions Options(PD_HasContainerType | PD_InStruct);
     if (canDelayMemberDeclParsing()) {
-      if (Tok.is(tok::r_brace)) {
-        RBLoc = consumeToken();
-      } else {
-        RBLoc = Tok.getLoc();
+      if (delayParsingDeclList(LBLoc, RBLoc, PosBeforeLB, Options, SD))
         Status.setIsParseError();
-      }
-      State->delayDeclList(SD, Options.toRaw(), CurDeclContext, { LBLoc, RBLoc },
-                           PosBeforeLB);
     } else {
       if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_struct,
-                        Options, [&](Decl *D) {SD->addMember(D);}))
+                        Options,SD))
         Status.setIsParseError();
     }
   }
@@ -6149,22 +6146,11 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
     ParseDeclOptions Options(PD_HasContainerType | PD_AllowDestructor |
                              PD_InClass);
     if (canDelayMemberDeclParsing()) {
-      if (Tok.is(tok::r_brace)) {
-        RBLoc = consumeToken();
-      } else {
-        RBLoc = Tok.getLoc();
+      if (delayParsingDeclList(LBLoc, RBLoc, PosBeforeLB, Options, CD))
         Status.setIsParseError();
-      }
-      State->delayDeclList(CD, Options.toRaw(), CurDeclContext, { LBLoc, RBLoc },
-                           PosBeforeLB);
     } else {
-      auto Handler = [&] (Decl *D) {
-        CD->addMember(D);
-        if (isa<DestructorDecl>(D))
-          CD->setHasDestructor();
-      };
       if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_class,
-                        Options, Handler))
+                        Options, CD))
         Status.setIsParseError();
     }
   }
@@ -6259,18 +6245,11 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
                                PD_DisallowInit |
                                PD_InProtocol);
       if (canDelayMemberDeclParsing()) {
-        if (Tok.is(tok::r_brace)) {
-          RBraceLoc = consumeToken();
-        } else {
-          RBraceLoc = Tok.getLoc();
+        if (delayParsingDeclList(LBraceLoc, RBraceLoc, PosBeforeLB, Options, Proto))
           Status.setIsParseError();
-        }
-        State->delayDeclList(Proto, Options.toRaw(), CurDeclContext,
-                             { LBraceLoc, RBraceLoc },
-                             PosBeforeLB);
       } else {
         if (parseDeclList(LBraceLoc, RBraceLoc, diag::expected_rbrace_protocol,
-                          Options, [&](Decl *D) {Proto->addMember(D);}))
+                          Options, Proto))
           Status.setIsParseError();
       }
     }

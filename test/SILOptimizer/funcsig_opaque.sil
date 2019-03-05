@@ -7,7 +7,7 @@ struct R<T> {
 }
 
 struct S {
-  var val: Builtin.Int32
+  var val: Builtin.NativeObject
 }
 
 sil @testAggregateArgHelper : $@convention(thin) (@owned R<S>) -> ()

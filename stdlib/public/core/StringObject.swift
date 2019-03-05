@@ -485,8 +485,15 @@ extension _StringObject {
     _internalInvariant(isLarge)
     return (discriminatedObjectRawBits & 0x4000_0000_0000_0000) != 0
   }
-}
 
+  // Whether this string is in one of our fastest representations:
+  // small or tail-allocated (i.e. mortal/immortal native)
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal var isPreferredRepresentation: Bool {
+    return _fastPath(isSmall || _countAndFlags.isTailAllocated)
+  }
+}
 
 /*
 
@@ -499,28 +506,32 @@ extension _StringObject {
  ├───┬───┬───┬───┬───┬───┬───┬───┼───┬───┬────┬────┬────┬────┬────┬────────────┤
  │ 0 │ 1 │ 2 │ 3 │ 4 │ 5 │ 6 │ 7 │ 8 │ 9 │ 10 │ 11 │ 12 │ 13 │ 14 │     15     │
  ├───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼────┼────┼────┼────┼────┼────────────┤
- │ a │ b │ c │ d │ e │ f │ g │ h │ i │ j │ k  │ l  │ m  │ n  │ o  │ 1x0x count │
+ │ a │ b │ c │ d │ e │ f │ g │ h │ i │ j │ k  │ l  │ m  │ n  │ o  │ 1x10 count │
  └───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴────┴────┴────┴────┴────┴────────────┘
 
  On 32-bit platforms, we have less space to store code units, and it isn't
  contiguous. However, we still use the above layout for the RawBitPattern
  representation.
 
- ┌───────────────┬───────────────────┬───────┬─────────┐
- │ _count        │_variant .immortal │_discr │ _flags  │
- ├───┬───┬───┬───┼───┬───┬───┬───┬───┼───────┼────┬────┤
- │ 0 │ 1 │ 2 │ 3 │ 4 │ 5 │ 6 │ 7 │ 8 │   9   │ 10 │ 11 │
- ├───┼───┼───┼───┼───┴───┴───┴───┴───┼───────┼────┼────┤
- │ a │ b │ c │ d │   e   f   g   h   │x10 cnt│ i  │ j  │
- └───┴───┴───┴───┴───────────────────┴───────┴────┴────┘
+ ┌───────────────┬───────────────────┬────────┬─────────┐
+ │ _count        │_variant .immortal │ _discr │ _flags  │
+ ├───┬───┬───┬───┼───┬───┬───┬───┬───┼────────┼────┬────┤
+ │ 0 │ 1 │ 2 │ 3 │ 4 │ 5 │ 6 │ 7 │ 8 │   9    │ 10 │ 11 │
+ ├───┼───┼───┼───┼───┴───┴───┴───┴───┼────────┼────┼────┤
+ │ a │ b │ c │ d │   e   f   g   h   │1x10 cnt│ i  │ j  │
+ └───┴───┴───┴───┴───────────────────┴────────┴────┴────┘
 
  */
 extension _StringObject {
-#if arch(i386) || arch(arm)
   @inlinable @inline(__always)
   internal init(_ small: _SmallString) {
+    // Small strings are encoded as _StringObjects in reverse byte order
+    // on big-endian platforms. This is to match the discriminator to the
+    // spare bits (the most significant nibble) in a pointer.
+    let word1 = small.rawBits.0.littleEndian
+    let word2 = small.rawBits.1.littleEndian
+#if arch(i386) || arch(arm)
     // On 32-bit, we need to unpack the small string.
-    let (word1, word2) = small.rawBits
     let smallStringDiscriminatorAndCount: UInt64 = 0xFF00_0000_0000_0000
 
     let leadingFour = Int(truncatingIfNeeded: word1)
@@ -532,15 +543,12 @@ extension _StringObject {
       variant: .immortal(nextFour),
       discriminator: smallDiscriminatorAndCount,
       flags: trailingTwo)
-    _internalInvariant(isSmall)
-  }
 #else
-  @inlinable @inline(__always)
-  internal init(_ small: _SmallString) {
-    self.init(rawValue: small.rawBits)
+    // On 64-bit, we copy the raw bits (to host byte order).
+    self.init(rawValue: (word1, word2))
+#endif
     _internalInvariant(isSmall)
   }
-#endif
 
   @inlinable
   internal static func getSmallCount(fromRaw x: UInt64) -> Int {
@@ -616,9 +624,10 @@ extension _StringObject {
  isNativelyStored: set for native stored strings
    - `largeAddressBits` holds an instance of `_StringStorage`.
    - I.e. the start of the code units is at the stored address + `nativeBias`
- isTailAllocated: start of the code units is at the stored address + `nativeBias`
+ isTailAllocated: contiguous UTF-8 code units starts at address + `nativeBias`
    - `isNativelyStored` always implies `isTailAllocated`, but not vice versa
       (e.g. literals)
+   - `isTailAllocated` always implies `isFastUTF8`
  TBD: Reserved for future usage
    - Setting a TBD bit to 1 must be semantically equivalent to 0
    - I.e. it can only be used to "cache" fast-path information in the future
@@ -838,13 +847,13 @@ extension _StringObject {
     }
   }
 
-  internal var nativeStorage: _StringStorage {
+  internal var nativeStorage: __StringStorage {
     @inline(__always) get {
 #if arch(i386) || arch(arm)
       guard case .native(let storage) = _variant else {
         _internalInvariantFailure()
       }
-      return _unsafeUncheckedDowncast(storage, to: _StringStorage.self)
+      return _unsafeUncheckedDowncast(storage, to: __StringStorage.self)
 #else
       _internalInvariant(hasNativeStorage)
       return Builtin.reinterpretCast(largeAddressBits)
@@ -852,13 +861,13 @@ extension _StringObject {
     }
   }
 
-  internal var sharedStorage: _SharedStringStorage {
+  internal var sharedStorage: __SharedStringStorage {
     @inline(__always) get {
 #if arch(i386) || arch(arm)
       guard case .native(let storage) = _variant else {
         _internalInvariantFailure()
       }
-      return _unsafeUncheckedDowncast(storage, to: _SharedStringStorage.self)
+      return _unsafeUncheckedDowncast(storage, to: __SharedStringStorage.self)
 #else
       _internalInvariant(largeFastIsShared && !largeIsCocoa)
       _internalInvariant(hasSharedStorage)
@@ -982,7 +991,7 @@ extension _StringObject {
   }
 
   @inline(__always)
-  internal init(_ storage: _StringStorage) {
+  internal init(_ storage: __StringStorage) {
 #if arch(i386) || arch(arm)
     self.init(
       variant: .native(storage),
@@ -996,7 +1005,7 @@ extension _StringObject {
 #endif
   }
 
-  internal init(_ storage: _SharedStringStorage) {
+  internal init(_ storage: __SharedStringStorage) {
 #if arch(i386) || arch(arm)
     self.init(
       variant: .native(storage),
@@ -1072,6 +1081,9 @@ extension _StringObject {
     } else {
       _internalInvariant(isLarge)
       _internalInvariant(largeCount == count)
+      if _countAndFlags.isTailAllocated {
+        _internalInvariant(providesFastUTF8)
+      }
       if providesFastUTF8 && largeFastIsTailAllocated {
         _internalInvariant(!isSmall)
         _internalInvariant(!largeIsCocoa)
@@ -1100,7 +1112,7 @@ extension _StringObject {
       }
       if _countAndFlags.isNativelyStored {
         let anyObj = Builtin.reinterpretCast(largeAddressBits) as AnyObject
-        _internalInvariant(anyObj is _StringStorage)
+        _internalInvariant(anyObj is __StringStorage)
       }
     }
 

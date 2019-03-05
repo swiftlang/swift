@@ -15,6 +15,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/NullablePtr.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -41,14 +42,25 @@ enum class WellKnownFunction {
   // String.init()
   StringInitEmpty,
   // String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
-  StringMakeUTF8
+  StringMakeUTF8,
+  // static String.+= infix(_: inout String, _: String)
+  StringAppend,
+  // static String.== infix(_: String)
+  StringEquals
 };
 
 static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
   if (fn->hasSemanticsAttr("string.init_empty"))
     return WellKnownFunction::StringInitEmpty;
+  // There are two string initializers in the standard library with the
+  // semantics "string.makeUTF8". They are identical from the perspective of
+  // the interpreter. One of those functions is probably redundant and not used.
   if (fn->hasSemanticsAttr("string.makeUTF8"))
     return WellKnownFunction::StringMakeUTF8;
+  if (fn->hasSemanticsAttr("string.append"))
+    return WellKnownFunction::StringAppend;
+  if (fn->hasSemanticsAttr("string.equals"))
+    return WellKnownFunction::StringEquals;
   return None;
 }
 
@@ -202,11 +214,39 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     return val;
   }
 
+  // If this is an unchecked_enum_data from a fragile type, then we can return
+  // the enum case value.
+  if (auto *uedi = dyn_cast<UncheckedEnumDataInst>(value)) {
+    auto aggValue = uedi->getOperand();
+    auto val = getConstantValue(aggValue);
+    if (val.isConstant()) {
+      assert(val.getKind() == SymbolicValue::EnumWithPayload);
+      return val.getEnumPayloadValue();
+    }
+    // Not a const.
+    return val;
+  }
+
+  // If this is a destructure_result, then we can return the element being
+  // extracted.
+  if (isa<DestructureStructResult>(value) ||
+      isa<DestructureTupleResult>(value)) {
+    auto *result = cast<MultipleValueInstructionResult>(value);
+    SILValue aggValue = result->getParent()->getOperand(0);
+    auto val = getConstantValue(aggValue);
+    if (val.isConstant()) {
+      assert(val.getKind() == SymbolicValue::Aggregate);
+      return val.getAggregateValue()[result->getIndex()];
+    }
+    // Not a const.
+    return val;
+  }
+
   // TODO: If this is a single element struct, we can avoid creating an
   // aggregate to reduce # allocations.  This is extra silly in the case of zero
   // element tuples.
   if (isa<StructInst>(value) || isa<TupleInst>(value)) {
-    auto inst = cast<SingleValueInstruction>(value);
+    auto *inst = cast<SingleValueInstruction>(value);
     SmallVector<SymbolicValue, 4> elts;
 
     for (unsigned i = 0, e = inst->getNumOperands(); i != e; ++i) {
@@ -285,6 +325,25 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
 
     assert(calculatedValues.count(apply));
     return calculatedValues[apply];
+  }
+
+  if (auto *enumVal = dyn_cast<EnumInst>(value)) {
+    if (!enumVal->hasOperand())
+      return SymbolicValue::getEnum(enumVal->getElement());
+
+    auto payload = getConstantValue(enumVal->getOperand());
+    if (!payload.isConstant())
+      return payload;
+    return SymbolicValue::getEnumWithPayload(enumVal->getElement(), payload,
+                                             evaluator.getASTContext());
+  }
+
+  // This one returns the address of its enum payload.
+  if (auto *dai = dyn_cast<UncheckedTakeEnumDataAddrInst>(value)) {
+    auto enumVal = getConstAddrAndLoadResult(dai->getOperand());
+    if (!enumVal.isConstant())
+      return enumVal;
+    return createMemoryObject(value, enumVal.getEnumPayloadValue());
   }
 
   // This instruction is a marker that returns its first operand.
@@ -568,15 +627,74 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
            conventions.getNumIndirectSILResults() == 0 &&
            conventions.getNumParameters() == 4 && "unexpected signature");
     auto literal = getConstantValue(apply->getOperand(1));
-    if (literal.getKind() != SymbolicValue::String)
-      break;
+    if (literal.getKind() != SymbolicValue::String) {
+      return evaluator.getUnknown((SILInstruction *)apply,
+                                  UnknownReason::Default);
+    }
     auto literalVal = literal.getStringValue();
 
     auto byteCount = getConstantValue(apply->getOperand(2));
     if (byteCount.getKind() != SymbolicValue::Integer ||
-        byteCount.getIntegerValue().getLimitedValue() != literalVal.size())
-      break;
+        byteCount.getIntegerValue().getLimitedValue() != literalVal.size()) {
+      return evaluator.getUnknown((SILInstruction *)apply,
+                                  UnknownReason::Default);
+    }
     setValue(apply, literal);
+    return None;
+  }
+  case WellKnownFunction::StringAppend: {
+    // static String.+= infix(_: inout String, _: String)
+    assert(conventions.getNumDirectSILResults() == 0 &&
+           conventions.getNumIndirectSILResults() == 0 &&
+           conventions.getNumParameters() == 3 &&
+           "unexpected String.+=() signature");
+
+    auto firstOperand = apply->getOperand(1);
+    auto firstString = getConstAddrAndLoadResult(firstOperand);
+    if (firstString.getKind() != SymbolicValue::String) {
+      return evaluator.getUnknown((SILInstruction *)apply,
+                                  UnknownReason::Default);
+    }
+
+    auto otherString = getConstantValue(apply->getOperand(2));
+    if (otherString.getKind() != SymbolicValue::String) {
+      return evaluator.getUnknown((SILInstruction *)apply,
+                                  UnknownReason::Default);
+    }
+
+    auto result = SmallString<8>(firstString.getStringValue());
+    result.append(otherString.getStringValue());
+    auto resultVal =
+        SymbolicValue::getString(result, evaluator.getASTContext());
+    computeFSStore(resultVal, firstOperand);
+    return None;
+  }
+  case WellKnownFunction::StringEquals: {
+    // static String.== infix(_: String, _: String)
+    assert(conventions.getNumDirectSILResults() == 1 &&
+           conventions.getNumIndirectSILResults() == 0 &&
+           conventions.getNumParameters() == 3 &&
+           "unexpected String.==() signature");
+
+    auto firstString = getConstantValue(apply->getOperand(1));
+    if (firstString.getKind() != SymbolicValue::String) {
+      return evaluator.getUnknown((SILInstruction *)apply,
+                                  UnknownReason::Default);
+    }
+
+    auto otherString = getConstantValue(apply->getOperand(2));
+    if (otherString.getKind() != SymbolicValue::String) {
+      return evaluator.getUnknown((SILInstruction *)apply,
+                                  UnknownReason::Default);
+    }
+
+    // The result is a Swift.Bool which is a struct that wraps an Int1.
+    int isEqual = firstString.getStringValue() == otherString.getStringValue();
+    auto intVal =
+        SymbolicValue::getInteger(APInt(1, isEqual), evaluator.getASTContext());
+    auto result = SymbolicValue::getAggregate(ArrayRef<SymbolicValue>(intVal),
+                                              evaluator.getASTContext());
+    setValue(apply, result);
     return None;
   }
   }
@@ -1241,6 +1359,48 @@ static llvm::Optional<SymbolicValue> evaluateAndCacheCall(
         return evaluator.getUnknown(cbr, UnknownReason::Loop);
 
       nextInst = destBB->begin();
+      continue;
+    }
+
+    if (isa<SwitchEnumAddrInst>(inst) || isa<SwitchEnumInst>(inst)) {
+      SymbolicValue value;
+      SwitchEnumInstBase *switchInst = dyn_cast<SwitchEnumInst>(inst);
+      if (switchInst) {
+        value = state.getConstantValue(switchInst->getOperand());
+      } else {
+        switchInst = cast<SwitchEnumAddrInst>(inst);
+        value = state.getConstAddrAndLoadResult(switchInst->getOperand());
+      }
+      if (!value.isConstant())
+        return value;
+
+      assert(value.getKind() == SymbolicValue::Enum ||
+             value.getKind() == SymbolicValue::EnumWithPayload);
+
+      auto *caseBB = switchInst->getCaseDestination(value.getEnumValue());
+
+      // Prepare to subsequently visit the case blocks instructions.
+      nextInst = caseBB->begin();
+      // Then set up the arguments.
+      if (caseBB->getParent()->hasOwnership() &&
+          switchInst->getDefaultBBOrNull() == caseBB) {
+        // If we are visiting the default block and we are in ossa, then we may
+        // have uses of the failure parameter. That means we need to map the
+        // original value to the argument.
+        state.setValue(caseBB->getArgument(0), value);
+        continue;
+      }
+
+      if (caseBB->getNumArguments() == 0)
+        continue;
+
+      assert(value.getKind() == SymbolicValue::EnumWithPayload);
+      // When there are multiple payload components, they form a single
+      // tuple-typed argument.
+      assert(caseBB->getNumArguments() == 1);
+      auto argument = value.getEnumPayloadValue();
+      assert(argument.isConstant());
+      state.setValue(caseBB->getArgument(0), argument);
       continue;
     }
 

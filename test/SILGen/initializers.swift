@@ -1129,3 +1129,21 @@ class SubVariadic : SuperVariadic { }
 // CHECK:         [[SUPER_INIT:%.*]] = function_ref @$s21failable_initializers13SuperVariadicC4intsACSid_tcfc
 // CHECK:         apply [[SUPER_INIT]]([[T1]], [[SELF_UPCAST]])
 // CHECK-LABEL: } // end sil function
+
+
+public struct MemberInits<Value : Equatable> {
+  private var box: MemberInitsHelper<Value>?
+  fileprivate var value: String = "default"
+}
+
+class MemberInitsHelper<T> { }
+
+extension MemberInits {
+  // CHECK-LABEL: sil [ossa] @$s21failable_initializers11MemberInitsVyACySayqd__GGSayACyqd__GGcADRszSQRd__lufC : $@convention(method) <Value><T where Value == Array<T>, T : Equatable> (@owned Array<MemberInits<T>>, @thin MemberInits<Array<T>>.Type) -> @owned MemberInits<Array<T>> {
+  public init<T>(_ array: [MemberInits<T>]) where Value == [T] {
+    box = nil
+
+    // CHECK: [[INIT_FN:%.*]] = function_ref @$s21failable_initializers11MemberInitsV5value33_4497B2E9306011E5BAC13C07BEAC2557LLSSvpfi : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> () -> @owned String
+    // CHECK-NEXT:  = apply [[INIT_FN]]<Array<T>>() : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> () -> @owned String
+  }
+}

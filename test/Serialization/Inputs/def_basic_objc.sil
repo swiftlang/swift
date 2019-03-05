@@ -49,7 +49,8 @@ sil [transparent] [serialized] [ossa] @protocol_conversion : $@convention(thin) 
 entry:
   // CHECK: {{%.*}} = objc_protocol #ObjCProto : $Protocol
   %p = objc_protocol #ObjCProto : $Protocol
-  return %p : $Protocol
+  %p_copy = copy_value %p : $Protocol
+  return %p_copy : $Protocol
 }
 
 @_transparent public func serialize_all() {

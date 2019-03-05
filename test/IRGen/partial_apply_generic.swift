@@ -91,3 +91,13 @@ let g = dietaryFad(Chicken())
 do {
   try g()
 } catch {}
+
+//
+// Incorrect assertion regarding inout parameters in NecessaryBindings
+//
+
+func coyote<T, U>(_ t: T, _ u: U) {}
+
+func hawk<A, B, C>(_: A, _ b: B, _ c: C) {
+  let fn: (Optional<(A) -> B>, @escaping (inout B, C) -> ()) -> () = coyote
+}

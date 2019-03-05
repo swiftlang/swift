@@ -23,6 +23,7 @@
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/Type.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -31,7 +32,6 @@
 namespace swift {
 class ASTContext;
 class NominalTypeDecl;
-class Type;
 
 namespace remoteAST {
 
@@ -136,6 +136,21 @@ public:
   }
 };
 
+/// A structure representing an opened existential value.
+struct OpenedExistential {
+  /// The concrete type of the value inside the existential.
+  Type InstanceType;
+
+  /// The address of the payload.
+  ///
+  /// Note: If the concrete type is a class type, this is the address of the
+  /// instance and not the address of the reference to the instance.
+  remote::RemoteAddress PayloadAddress;
+
+  OpenedExistential(Type InstanceType, remote::RemoteAddress PayloadAddress)
+      : InstanceType(InstanceType), PayloadAddress(PayloadAddress) {}
+};
+
 /// A context for performing an operation relating the remote process with
 /// the AST.  This may be discarded and recreated at any time without danger,
 /// but reusing a context across multiple calls may allow some redundant work
@@ -212,11 +227,17 @@ public:
   Result<remote::RemoteAddress>
   getHeapMetadataForObject(remote::RemoteAddress address);
 
+  /// Resolve the dynamic type and the value address of an error existential
+  /// object, Unlike getDynamicTypeAndAddressForExistential(), this function
+  /// takes the address of the instance and not the address of the reference.
+  Result<OpenedExistential>
+  getDynamicTypeAndAddressForError(remote::RemoteAddress object);
+
   /// Given an existential and its static type, resolve its dynamic
   /// type and address. A single step of unwrapping is performed, i.e. if the
   /// value stored inside the existential is itself an existential, the
   /// caller can decide whether to iterate itself.
-  Result<std::pair<Type, remote::RemoteAddress>>
+  Result<OpenedExistential>
   getDynamicTypeAndAddressForExistential(remote::RemoteAddress address,
                                          Type staticType);
 };

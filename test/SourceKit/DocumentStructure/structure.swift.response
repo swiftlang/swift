@@ -1,6 +1,6 @@
 {
   key.offset: 0,
-  key.length: 2065,
+  key.length: 2136,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.substructure: [
     {
@@ -1286,6 +1286,44 @@
               ]
             }
           ]
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.function.free,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "someFunc(input:completion:)",
+      key.offset: 2066,
+      key.length: 69,
+      key.nameoffset: 2071,
+      key.namelength: 52,
+      key.bodyoffset: 2134,
+      key.bodylength: 0,
+      key.attributes: [
+        {
+          key.offset: 2124,
+          key.length: 8,
+          key.attribute: source.decl.attribute.rethrows
+        }
+      ],
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.var.parameter,
+          key.name: "input",
+          key.offset: 2080,
+          key.length: 11,
+          key.typename: "Int?",
+          key.nameoffset: 2080,
+          key.namelength: 5
+        },
+        {
+          key.kind: source.lang.swift.decl.var.parameter,
+          key.name: "completion",
+          key.offset: 2093,
+          key.length: 29,
+          key.typename: "() throws -> Void",
+          key.nameoffset: 2093,
+          key.namelength: 10
         }
       ]
     }

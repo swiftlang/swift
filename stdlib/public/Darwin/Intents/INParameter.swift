@@ -13,12 +13,13 @@
 @_exported import Intents
 import Foundation
 
-#if os(iOS) || os(watchOS)
-@available(iOS 11.0, watchOS 4.0, *)
+#if os(iOS)
+@available(iOS 11.0, *)
 extension INParameter {
   @nonobjc
   public convenience init?<Root, Value>(keyPath: KeyPath<Root, Value>) {
-    if let aClass = Root.self as? AnyClass, let keyPathString = keyPath._kvcKeyPathString {
+    if let aClass = Root.self as? AnyClass,
+       let keyPathString = keyPath._kvcKeyPathString {
       self.init(for: aClass, keyPath: keyPathString)
     } else {
       return nil

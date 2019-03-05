@@ -215,8 +215,8 @@ protected:
     PartialApplyInst *N = getBuilder().createPartialApply(
         getOpLocation(Inst->getLoc()), Helper.getCallee(),
         Helper.getSubstitutions(), Helper.getArguments(), ParamConvention,
-        GenericSpecializationInformation::create(
-          Inst, getBuilder()));
+        Inst->isOnStack(),
+        GenericSpecializationInformation::create(Inst, getBuilder()));
     recordClonedInstruction(Inst, N);
   }
 

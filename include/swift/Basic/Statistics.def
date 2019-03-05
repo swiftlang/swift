@@ -179,6 +179,12 @@ FRONTEND_STATISTIC(Sema, NumDeclsDeserialized)
 /// Number of declarations validated.
 FRONTEND_STATISTIC(Sema, NumDeclsValidated)
 
+/// Number of declarations type checked.
+FRONTEND_STATISTIC(Sema, NumDeclsTypechecked)
+
+/// Number of declarations finalized.
+FRONTEND_STATISTIC(Sema, NumDeclsFinalized)
+
 /// Number of full function bodies typechecked.
 FRONTEND_STATISTIC(Sema, NumFunctionsTypechecked)
 

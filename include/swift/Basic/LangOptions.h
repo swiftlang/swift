@@ -295,6 +295,11 @@ namespace swift {
     /// and faster rebuilds.
     bool EnableExperimentalDependencies = false;
 
+    /// To mimic existing system, set to false.
+    /// To experiment with including file-private and private dependency info,
+    /// set to true.
+    bool ExperimentalDependenciesIncludeIntrafileOnes = false;
+
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///

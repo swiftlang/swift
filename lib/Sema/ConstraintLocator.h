@@ -125,6 +125,8 @@ public:
     DynamicLookupResult,
     /// The desired contextual type passed in to the constraint system.
     ContextualType,
+    /// The missing argument synthesized by the solver.
+    SynthesizedArgument,
   };
 
   /// Determine the number of numeric values used for the given path
@@ -152,20 +154,21 @@ public:
     case AutoclosureResult:
     case Requirement:
     case Witness:
-    case OpenedGeneric:
     case ImplicitlyUnwrappedDisjunctionChoice:
     case DynamicLookupResult:
     case ContextualType:
       return 0;
 
+    case OpenedGeneric:
     case GenericArgument:
     case NamedTupleElement:
     case TupleElement:
     case KeyPathComponent:
-    case ConditionalRequirement:
+    case SynthesizedArgument:
       return 1;
 
     case TypeParameterRequirement:
+    case ConditionalRequirement:
     case ApplyArgToParam:
       return 2;
     }
@@ -217,6 +220,7 @@ public:
     case ImplicitlyUnwrappedDisjunctionChoice:
     case DynamicLookupResult:
     case ContextualType:
+    case SynthesizedArgument:
       return 0;
 
     case FunctionArgument:
@@ -236,6 +240,7 @@ public:
       StoredGenericParameter,
       StoredRequirement,
       StoredWitness,
+      StoredGenericSignature,
       StoredKindAndValue
     };
 
@@ -249,11 +254,11 @@ public:
     /// kind. Use \c encodeStorage and \c decodeStorage to work with this value.
     ///
     /// \note The "storage kind" is stored in the  \c storedKind field.
-    uint64_t storage : 62;
+    uint64_t storage : 61;
 
     /// The kind of value stored in \c storage. Valid values are those
     /// from the StoredKind enum.
-    uint64_t storedKind : 2;
+    uint64_t storedKind : 3;
 
     /// Encode a path element kind and a value into the storage format.
     static uint64_t encodeStorage(PathElementKind kind, unsigned value) {
@@ -281,6 +286,10 @@ public:
              "Path element kind does not require 2 values");
     }
 
+    PathElement(GenericSignature *sig)
+        : storage((reinterpret_cast<uintptr_t>(sig) >> 3)),
+          storedKind(StoredGenericSignature) {}
+
     friend class ConstraintLocator;
 
   public:
@@ -292,7 +301,7 @@ public:
     }
 
     PathElement(GenericTypeParamType *type)
-      : storage((reinterpret_cast<uintptr_t>(type) >> 2)),
+      : storage((reinterpret_cast<uintptr_t>(type) >> 3)),
         storedKind(StoredGenericParameter)
     {
       static_assert(alignof(GenericTypeParamType) >= 4,
@@ -301,7 +310,7 @@ public:
     }
 
     PathElement(PathElementKind kind, ValueDecl *decl)
-      : storage((reinterpret_cast<uintptr_t>(decl) >> 2)),
+      : storage((reinterpret_cast<uintptr_t>(decl) >> 3)),
         storedKind(kind == Witness ? StoredWitness : StoredRequirement)
     {
       assert((kind == Witness || kind == Requirement) &&
@@ -339,15 +348,25 @@ public:
       return PathElement(KeyPathComponent, position);
     }
 
+    static PathElement getOpenedGeneric(GenericSignature *sig) {
+      return PathElement(sig);
+    }
+
     /// Get a path element for a conditional requirement.
-    static PathElement getConditionalRequirementComponent(unsigned index) {
-      return PathElement(ConditionalRequirement, index);
+    static PathElement
+    getConditionalRequirementComponent(unsigned index, RequirementKind kind) {
+      return PathElement(ConditionalRequirement, index,
+                         static_cast<unsigned>(kind));
     }
 
     static PathElement getTypeRequirementComponent(unsigned index,
                                                    RequirementKind kind) {
       return PathElement(TypeParameterRequirement, index,
                          static_cast<unsigned>(kind));
+    }
+
+    static PathElement getSynthesizedArgument(unsigned position) {
+      return PathElement(SynthesizedArgument, position);
     }
 
     /// Retrieve the kind of path element.
@@ -361,6 +380,9 @@ public:
 
       case StoredWitness:
         return Witness;
+
+      case StoredGenericSignature:
+        return OpenedGeneric;
 
       case StoredKindAndValue:
         return decodeStorage(storage).first;
@@ -397,7 +419,7 @@ public:
     /// Retrieve the declaration for a witness path element.
     ValueDecl *getWitness() const {
       assert(getKind() == Witness && "Is not a witness");
-      return reinterpret_cast<ValueDecl *>(storage << 2);
+      return reinterpret_cast<ValueDecl *>(storage << 3);
     }
 
     /// Retrieve the actual archetype for a generic parameter path
@@ -405,19 +427,37 @@ public:
     GenericTypeParamType *getGenericParameter() const {
       assert(getKind() == GenericParameter &&
              "Not a generic parameter path element");
-      return reinterpret_cast<GenericTypeParamType *>(storage << 2);
+      return reinterpret_cast<GenericTypeParamType *>(storage << 3);
     }
 
     /// Retrieve the declaration for a requirement path element.
     ValueDecl *getRequirement() const {
       assert((static_cast<StoredKind>(storedKind) == StoredRequirement) &&
              "Is not a requirement");
-      return reinterpret_cast<ValueDecl *>(storage << 2);
+      return reinterpret_cast<ValueDecl *>(storage << 3);
+    }
+
+    GenericSignature *getGenericSignature() const {
+      assert((static_cast<StoredKind>(storedKind) == StoredGenericSignature) &&
+             "Is not an opened generic");
+      return reinterpret_cast<GenericSignature *>(storage << 3);
     }
 
     /// Return the summary flags for this particular element.
     unsigned getNewSummaryFlags() const {
       return getSummaryFlagsForPathElement(getKind());
+    }
+
+    bool isTypeParameterRequirement() const {
+      return getKind() == PathElementKind::TypeParameterRequirement;
+    }
+
+    bool isConditionalRequirement() const {
+      return getKind() == PathElementKind::ConditionalRequirement;
+    }
+
+    bool isSynthesizedArgument() const {
+      return getKind() == PathElementKind::SynthesizedArgument;
     }
   };
 

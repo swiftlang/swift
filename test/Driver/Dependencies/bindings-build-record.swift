@@ -1,3 +1,4 @@
+// REQUIRES: shell
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/bindings-build-record/* %t
 // RUN: %{python} %S/Inputs/touch.py 443865900 %t/*

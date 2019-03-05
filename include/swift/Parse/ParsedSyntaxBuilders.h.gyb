@@ -34,17 +34,20 @@ class SyntaxParsingContext;
 %   if node.is_buildable():
 %     child_count = len(node.children)
 class Parsed${node.name}Builder {
-  ParsedRawSyntaxRecorder &Rec;
-  bool IsBacktracking;
-  ParsedRawSyntaxNode Layout[${child_count}] = {
+  SyntaxParsingContext &SPCtx;
+  ParsedRawSyntaxNode Layout[${child_count}];
 %     for child in node.children:
-    ParsedRawSyntaxNode::null(),
+%       child_node = NODE_MAP.get(child.syntax_kind)
+%       if child_node and child_node.is_syntax_collection():
+%         child_elt = child_node.collection_element_name
+%         child_elt_type = child_node.collection_element_type
+  SmallVector<ParsedRawSyntaxNode, 8> ${child_elt}Nodes;
+%       end
 %     end
-  };
 
 public:
   explicit Parsed${node.name}Builder(SyntaxParsingContext &SPCtx)
-    : Rec(SPCtx.getRecorder()), IsBacktracking(SPCtx.isBacktracking()) {}
+    : SPCtx(SPCtx) {}
 
 %     for child in node.children:
   Parsed${node.name}Builder &use${child.name}(Parsed${child.type_name} ${child.name});
@@ -61,7 +64,7 @@ public:
 
 private:
   Parsed${node.name} record();
-  void finishLayout();
+  void finishLayout(bool deferred);
 };
 
 %   end

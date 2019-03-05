@@ -45,7 +45,9 @@ syn keyword silAttributes contained containedin=silAttribute
       \ exact
       \ init
       \ modify
+      \ mutating
       \ objc
+      \ open
       \ read
       \ rootself
       \ stack

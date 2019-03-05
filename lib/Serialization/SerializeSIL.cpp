@@ -684,6 +684,10 @@ SILSerializer::writeKeyPathPatternComponent(
   case KeyPathPatternComponent::Kind::OptionalWrap:
     handleComponentCommon(KeyPathComponentKindEncoding::OptionalWrap);
     break;
+  case KeyPathPatternComponent::Kind::TupleElement:
+    handleComponentCommon(KeyPathComponentKindEncoding::TupleElement);
+    ListOfValues.push_back((unsigned)component.getTupleIndex());
+    break;
   }
 }
 
@@ -1668,6 +1672,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       value = cast<Store##Name##Inst>(&SI)->getSrc();
 #include "swift/AST/ReferenceStorage.def"
     } else if (SI.getKind() == SILInstructionKind::AssignInst) {
+      Attr = unsigned(cast<AssignInst>(&SI)->getOwnershipQualifier());
       operand = cast<AssignInst>(&SI)->getDest();
       value = cast<AssignInst>(&SI)->getSrc();
     } else if (SI.getKind() == SILInstructionKind::CopyAddrInst) {

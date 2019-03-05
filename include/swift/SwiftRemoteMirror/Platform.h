@@ -23,7 +23,11 @@ extern "C" {
 # elif defined(__MACH__)
 #   define SWIFT_REMOTE_MIRROR_LINKAGE __attribute__((__visibility__("default")))
 # else
-#   define SWIFT_REMOTE_MIRROR_LINKAGE __declspec(dllexport)
+#   if defined(_WINDLL)
+#     define SWIFT_REMOTE_MIRROR_LINKAGE __declspec(dllexport)
+#   else
+#     define SWIFT_REMOTE_MIRROR_LINKAGE
+#   endif
 # endif
 #else
 # if defined(__ELF__)
@@ -31,7 +35,11 @@ extern "C" {
 # elif defined(__MACH__)
 #   define SWIFT_REMOTE_MIRROR_LINKAGE __attribute__((__visibility__("default")))
 # else
-#   define SWIFT_REMOTE_MIRROR_LINKAGE __declspec(dllimport)
+#   if defined(_WINDLL)
+#     define SWIFT_REMOTE_MIRROR_LINKAGE __declspec(dllimport)
+#   else
+#     define SWIFT_REMOTE_MIRROR_LINKAGE
+#   endif
 # endif
 #endif
 

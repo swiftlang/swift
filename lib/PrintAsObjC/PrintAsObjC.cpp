@@ -1122,7 +1122,7 @@ private:
 
     ASTContext &ctx = M.getASTContext();
     bool isSettable = VD->isSettable(nullptr);
-    if (isSettable && ctx.LangOpts.EnableAccessControl)
+    if (isSettable && !ctx.isAccessControlDisabled())
       isSettable = (VD->getSetterFormalAccess() >= minRequiredAccess);
     if (!isSettable)
       os << ", readonly";

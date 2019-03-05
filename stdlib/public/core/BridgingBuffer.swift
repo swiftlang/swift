@@ -15,7 +15,10 @@ internal struct _BridgingBufferHeader {
   internal var count: Int
 }
 
-internal final class _BridgingBufferStorage
+// NOTE: older runtimes called this class _BridgingBufferStorage.
+// The two must coexist without a conflicting ObjC class name, so it
+// was renamed. The old name must not be used in the new runtime.
+internal final class __BridgingBufferStorage
   : ManagedBuffer<_BridgingBufferHeader, AnyObject> {
 }
 
@@ -26,7 +29,7 @@ extension ManagedBufferPointer
 where Header == _BridgingBufferHeader, Element == AnyObject {
   internal init(_ count: Int) {
     self.init(
-      _uncheckedBufferClass: _BridgingBufferStorage.self,
+      _uncheckedBufferClass: __BridgingBufferStorage.self,
       minimumCapacity: count)
     self.withUnsafeMutablePointerToHeader {
       $0.initialize(to: Header(count))

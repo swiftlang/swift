@@ -2066,7 +2066,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
     csOptions |= ConstraintSystemFlags::AllowUnresolvedTypeVariables;
 
-  ConstraintSystem cs(*this, dc, csOptions);
+  ConstraintSystem cs(*this, dc, csOptions, expr);
   cs.baseCS = baseCS;
 
   // Verify that a purpose was specified if a convertType was.  Note that it is
@@ -2466,7 +2466,8 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       assert(!expr->isSemanticallyInOutExpr());
 
       // Save the locator we're using for the expression.
-      Locator = cs.getConstraintLocator(expr);
+      Locator =
+          cs.getConstraintLocator(expr, ConstraintLocator::ContextualType);
 
       // Collect constraints from the pattern.
       initType = cs.generateConstraints(pattern, Locator);
@@ -2949,9 +2950,13 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
       if (found != types.end())
         return found->second;
 
-      if (isa<NestedArchetypeType>(origType))
-        return Type();
-      else if (auto archetypeType = dyn_cast<ArchetypeType>(origType)) {
+      if (auto archetypeType = dyn_cast<ArchetypeType>(origType)) {
+        auto root = archetypeType->getRoot();
+        // For other nested types, fail here so the default logic in subst()
+        // for nested types applies.
+        if (root != archetypeType)
+          return Type();
+        
         auto locator = cs.getConstraintLocator(nullptr);
         auto replacement = cs.createTypeVariable(locator);
 

@@ -323,11 +323,6 @@ macro(add_sourcekit_framework name)
 
 
   if (SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")
-    swift_install_in_component(${SOURCEKITFW_INSTALL_IN_COMPONENT}
-        TARGETS ${name}
-        LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-        ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-        RUNTIME DESTINATION bin)
     set_output_directory(${name}
         BINARY_DIR ${SOURCEKIT_RUNTIME_OUTPUT_INTDIR}
         LIBRARY_DIR ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
@@ -341,11 +336,13 @@ macro(add_sourcekit_framework name)
                           MACOSX_FRAMEWORK_SHORT_VERSION_STRING "1.0"
                           MACOSX_FRAMEWORK_BUNDLE_VERSION "${SOURCEKIT_VERSION_STRING}"
                           PUBLIC_HEADER "${headers}")
-  else()
     swift_install_in_component(${SOURCEKITFW_INSTALL_IN_COMPONENT}
-        DIRECTORY ${framework_location}
-        DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-        USE_SOURCE_PERMISSIONS)
+        TARGETS ${name}
+        FRAMEWORK DESTINATION lib${LLVM_LIBDIR_SUFFIX}
+        LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
+        ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}
+        RUNTIME DESTINATION bin)
+  else()
     set_output_directory(${name}
         BINARY_DIR ${framework_location}
         LIBRARY_DIR ${framework_location})
@@ -355,6 +352,10 @@ macro(add_sourcekit_framework name)
                           INSTALL_NAME_DIR "@rpath/${name}.framework"
                           PREFIX ""
                           SUFFIX "")
+    swift_install_in_component(${SOURCEKITFW_INSTALL_IN_COMPONENT}
+        DIRECTORY ${framework_location}
+        DESTINATION lib${LLVM_LIBDIR_SUFFIX}
+        USE_SOURCE_PERMISSIONS)
 
     foreach(hdr ${headers})
       get_filename_component(hdrname ${hdr} NAME)

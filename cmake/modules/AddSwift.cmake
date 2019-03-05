@@ -30,7 +30,11 @@ endfunction()
 # Compute the library subdirectory to use for the given sdk and
 # architecture, placing the result in 'result_var_name'.
 function(compute_library_subdir result_var_name sdk arch)
-  set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}" PARENT_SCOPE)
+  if(sdk IN_LIST SWIFT_APPLE_PLATFORMS)
+    set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}" PARENT_SCOPE)
+  else()
+    set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}" PARENT_SCOPE)
+  endif()
 endfunction()
 
 function(_compute_lto_flag option out_var)
@@ -369,10 +373,6 @@ function(_add_variant_swift_compile_flags
     list(APPEND result "-D" "INTERNAL_CHECKS_ENABLED")
   endif()
 
-  if (NOT SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS)
-    list(APPEND result "-Xfrontend" "-disable-guaranteed-normal-arguments")
-  endif()
-  
   if(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
     list(APPEND result "-D" "SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS")
   endif()
@@ -485,6 +485,20 @@ function(_add_variant_link_flags)
     elseif(SWIFT_ENABLE_GOLD_LINKER AND
        "${SWIFT_SDK_${LFLAGS_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
       list(APPEND result "-fuse-ld=gold")
+    endif()
+  endif()
+
+  # Enable dead stripping. Portions of this logic were copied from llvm's
+  # `add_link_opts` function (which, perhaps, should have been used here in the
+  # first place, but at this point it's hard to say whether that's feasible).
+  #
+  # TODO: Evaluate/enable -f{function,data}-sections --gc-sections for bfd,
+  # gold, and lld.
+  if(NOT CMAKE_BUILD_TYPE STREQUAL Debug)
+    if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+      # See rdar://48283130: This gives 6MB+ size reductions for swift and
+      # SourceKitService, and much larger size reductions for sil-opt etc.
+      list(APPEND result "-Wl,-dead_strip")
     endif()
   endif()
 
@@ -755,9 +769,10 @@ function(_add_swift_library_single target name)
     endif()
   endif()
 
-  if (SWIFT_COMPILER_VERSION)
-    if(${SWIFTLIB_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
-      list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-current_version" "-Xlinker" "${SWIFT_COMPILER_VERSION}" "-Xlinker" "-compatibility_version" "-Xlinker" "1")
+  if(${SWIFTLIB_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
+    list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-compatibility_version" "-Xlinker" "1")
+    if (SWIFT_COMPILER_VERSION)
+      list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-current_version" "-Xlinker" "${SWIFT_COMPILER_VERSION}" )
     endif()
   endif()
 
@@ -824,10 +839,10 @@ function(_add_swift_library_single target name)
     endif()
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-autolink-library;-Xfrontend;oldnames)
     # TODO(compnerd) handle /MT and /MTd
-    if("${CMAKE_BUILD_TYPE}" STREQUAL "RELEASE")
-      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-autolink-library;-Xfrontend;msvcrt)
-    else()
+    if(CMAKE_BUILD_TYPE MATCHES Debug)
       list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-autolink-library;-Xfrontend;msvcrtd)
+    else()
+      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-autolink-library;-Xfrontend;msvcrt)
     endif()
   endif()
 
@@ -1159,6 +1174,8 @@ function(_add_swift_library_single target name)
   # Don't set PROPERTY COMPILE_FLAGS or LINK_FLAGS directly.
   set(c_compile_flags ${SWIFTLIB_SINGLE_C_COMPILE_FLAGS})
   set(link_flags ${SWIFTLIB_SINGLE_LINK_FLAGS})
+
+  set(library_search_subdir "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
   set(library_search_directories
       "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}"
       "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}"
@@ -1189,9 +1206,14 @@ function(_add_swift_library_single target name)
     DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
     DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
     DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
-    "${SWIFTLIB_FORCE_BUILD_OPTIMIZED_keyword}"
+    "${SWIFTLIB_SINGLE_FORCE_BUILD_OPTIMIZED_keyword}"
     RESULT_VAR_NAME c_compile_flags
     )
+  if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS)
+    if(libkind STREQUAL SHARED)
+      list(APPEND c_compile_flags -D_WINDLL)
+    endif()
+  endif()
   _add_variant_link_flags(
     SDK "${SWIFTLIB_SINGLE_SDK}"
     ARCH "${SWIFTLIB_SINGLE_ARCHITECTURE}"
@@ -1303,6 +1325,7 @@ function(_add_swift_library_single target name)
   if(target_static)
     set_property(TARGET "${target_static}" APPEND_STRING PROPERTY
         COMPILE_FLAGS " ${c_compile_flags}")
+    # FIXME: The fallback paths here are going to be dynamic libraries.
     set(library_search_directories
         "${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}"
         "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}"
@@ -1399,6 +1422,7 @@ function(add_swift_host_library name)
     ${ASHL_SHARED_keyword}
     ${ASHL_STATIC_keyword}
     ${ASHL_SOURCES}
+    ${ASHL_FORCE_BUILD_OPTIMIZED_keyword}
     SDK ${SWIFT_HOST_VARIANT_SDK}
     ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
     DEPENDS ${ASHL_DEPENDS}
@@ -1769,7 +1793,7 @@ function(add_swift_target_library name)
       # building both simultaneously.  Effectively, only shared builds are
       # supported on windows currently.
       if(SWIFTLIB_SHARED)
-        list(APPEND swiftlib_swift_compile_flags_all -D_USRDLL)
+        list(APPEND swiftlib_swift_compile_flags_all -D_WINDLL)
         if(SWIFTLIB_IS_STDLIB_CORE)
           list(APPEND swiftlib_swift_compile_flags_all -DswiftCore_EXPORTS)
         endif()
@@ -1845,12 +1869,6 @@ function(add_swift_target_library name)
       # Add PrivateFrameworks, rdar://28466433
       if(sdk IN_LIST SWIFT_APPLE_PLATFORMS AND SWIFTLIB_IS_SDK_OVERLAY)
         set(swiftlib_swift_compile_private_frameworks_flag "-Fsystem" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/System/Library/PrivateFrameworks/")
-      endif()
-
-      if("${sdk}" STREQUAL WINDOWS)
-        if(arch STREQUAL x86_64)
-          set(swiftlib_swift_compile_flags_arch -Xcc -D_AMD64_)
-        endif()
       endif()
 
       # Add this library variant.
@@ -1972,6 +1990,12 @@ function(add_swift_target_library name)
             WORLD_READ)
       endif()
 
+      set(optional_arg)
+      if(sdk IN_LIST SWIFT_APPLE_PLATFORMS)
+        # Allow installation of stdlib without building all variants on Darwin.
+        set(optional_arg "OPTIONAL")
+      endif()
+
       if(sdk STREQUAL WINDOWS AND CMAKE_SYSTEM_NAME STREQUAL Windows)
         swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
           TARGETS ${name}-windows-${SWIFT_PRIMARY_VARIANT_ARCH}
@@ -1983,7 +2007,8 @@ function(add_swift_target_library name)
         swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
             FILES "${UNIVERSAL_LIBRARY_NAME}"
             DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
-            PERMISSIONS ${file_permissions})
+            PERMISSIONS ${file_permissions}
+            "${optional_arg}")
       endif()
       if(sdk STREQUAL WINDOWS)
         foreach(arch ${SWIFT_SDK_WINDOWS_ARCHITECTURES})
@@ -2030,7 +2055,8 @@ function(add_swift_target_library name)
             PERMISSIONS
               OWNER_READ OWNER_WRITE
               GROUP_READ
-              WORLD_READ)
+              WORLD_READ
+            "${optional_arg}")
       endif()
 
       # Add Swift standard library targets as dependencies to the top-level
@@ -2136,6 +2162,10 @@ function(_add_swift_executable_single name)
         "${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES}"
         "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}"
         SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS)
+    _list_add_string_suffix(
+        "${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES}"
+        "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
+        SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES)
   else()
     _list_add_string_suffix(
         "${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES}"
@@ -2199,83 +2229,6 @@ function(_add_swift_executable_single name)
       PROPERTIES FOLDER "Swift executables")
 endfunction()
 
-# Add an executable for the host machine.
-#
-# Usage:
-#   add_swift_executable(name
-#     [DEPENDS dep1 ...]
-#     [LLVM_COMPONENT_DEPENDS comp1 ...]
-#     [FILE_DEPENDS target1 ...]
-#     [LINK_LIBRARIES target1 ...]
-#     [EXCLUDE_FROM_ALL]
-#     [DONT_STRIP_NON_MAIN_SYMBOLS]
-#     [DISABLE_ASLR]
-#     source1 [source2 source3 ...])
-#
-#   name
-#     Name of the executable (e.g., swift).
-#
-#   LIBRARIES
-#     Libraries this executable depends on, without variant suffixes.
-#
-#   LLVM_COMPONENT_DEPENDS
-#     LLVM components this executable depends on.
-#
-#   FILE_DEPENDS
-#     Additional files this executable depends on.
-#
-#   LINK_LIBRARIES
-#     Libraries to link with.
-#
-#   EXCLUDE_FROM_ALL
-#     Whether to exclude this executable from the ALL_BUILD target.
-#
-#   DONT_STRIP_NON_MAIN_SYMBOLS
-#     Should we not strip non main symbols.
-#
-#   DISABLE_ASLR
-#     Should we compile with -Wl,-no_pie so that ASLR is disabled?
-#
-#   source1 ...
-#     Sources to add into this executable.
-#
-# Note:
-#   Host executables are not given a variant suffix. To build an executable for
-#   each SDK and ARCH variant, use add_swift_target_executable.
-function(add_swift_executable name)
-  # Parse the arguments we were given.
-  cmake_parse_arguments(SWIFTEXE
-    "EXCLUDE_FROM_ALL;DONT_STRIP_NON_MAIN_SYMBOLS;DISABLE_ASLR"
-    ""
-    "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_LIBRARIES;COMPILE_FLAGS"
-    ${ARGN})
-
-  translate_flag(${SWIFTEXE_EXCLUDE_FROM_ALL}
-      "EXCLUDE_FROM_ALL"
-      SWIFTEXE_EXCLUDE_FROM_ALL_FLAG)
-  translate_flag(${SWIFTEXE_DONT_STRIP_NON_MAIN_SYMBOLS}
-      "DONT_STRIP_NON_MAIN_SYMBOLS"
-      SWIFTEXE_DONT_STRIP_NON_MAIN_SYMBOLS_FLAG)
-  translate_flag(${SWIFTEXE_DISABLE_ASLR}
-      "DISABLE_ASLR"
-      SWIFTEXE_DISABLE_ASLR_FLAG)
-
-  set(SWIFTEXE_SOURCES ${SWIFTEXE_UNPARSED_ARGUMENTS})
-
-  _add_swift_executable_single(
-      ${name}
-      ${SWIFTEXE_SOURCES}
-      DEPENDS ${SWIFTEXE_DEPENDS}
-      LLVM_COMPONENT_DEPENDS ${SWIFTEXE_LLVM_COMPONENT_DEPENDS}
-      LINK_LIBRARIES ${SWIFTEXE_LINK_LIBRARIES}
-      SDK ${SWIFT_HOST_VARIANT_SDK}
-      ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
-      COMPILE_FLAGS ${SWIFTEXE_COMPILE_FLAGS}
-      ${SWIFTEXE_EXCLUDE_FROM_ALL_FLAG}
-      ${SWIFTEXE_DONT_STRIP_NON_MAIN_SYMBOLS_FLAG}
-      ${SWIFTEXE_DISABLE_ASLR_FLAG})
-endfunction()
-
 macro(add_swift_tool_subdirectory name)
   add_llvm_subdirectory(SWIFT TOOL ${name})
 endmacro()
@@ -2299,7 +2252,9 @@ function(add_swift_host_tool executable)
                MESSAGE "Swift Component is required to add a host tool")
 
   # Create the executable rule.
-  add_swift_executable(${executable}
+  _add_swift_executable_single(${executable}
+    SDK ${SWIFT_HOST_VARIANT_SDK}
+    ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
     ${ASHT_UNPARSED_ARGUMENTS})
 
   swift_install_in_component(${ASHT_SWIFT_COMPONENT}

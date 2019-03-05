@@ -10,6 +10,7 @@
     - [Validation Testing](#validation-testing)
     - [Linting](#linting)
     - [Source Compatibility Testing](#source-compatibility-testing)
+    - [Sourcekit Stress Testing](#sourcekit-stress-testing)
     - [Specific Preset Testing](#specific-preset-testing)
     - [Build Swift Toolchain](#build-swift-toolchain)
     - [Testing Compiler Performance](#testing-compiler-performance)
@@ -138,6 +139,12 @@ Platform       | Comment | Check Status
 macOS platform | @swift-ci Please Test Source Compatibility | Swift Source Compatibility Suite on macOS Platform (Release and Debug)
 macOS platform | @swift-ci Please Test Source Compatibility Release | Swift Source Compatibility Suite on macOS Platform (Release)
 macOS platform | @swift-ci Please Test Source Compatibility Debug | Swift Source Compatibility Suite on macOS Platform (Debug)
+
+### Sourcekit Stress Testing
+
+Platform       | Comment | Check Status
+------------   | ------- | ------------
+macOS platform | @swift-ci Please Sourcekit Stress test | Swift Sourcekit Stress Tester on macOS Platform
 
 ### Specific Preset Testing
 

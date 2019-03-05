@@ -10,12 +10,20 @@
 //
 //===----------------------------------------------------------------------===//
 
+// NOTE: older overlays had Network.NWProtocolTLS as the ObjC name.
+// The two must coexist, so it was renamed. The old name must not be
+// used in the new runtime. _TtC7Network14_NWProtocolTLS is the
+// mangled name for Network._NWProtocolTLS.
+@_objcRuntimeName(_TtC7Network14_NWProtocolTLS)
 @available(macOS 10.14, iOS 12.0, watchOS 5.0, tvOS 12.0, *)
 public class NWProtocolTLS : NWProtocol {
 	public static let definition: NWProtocolDefinition = {
 		NWProtocolDefinition(nw_protocol_copy_tls_definition(), "tls")
 	}()
 
+  // Set the ObjC name of this class to be nested in the customized ObjC
+  // name of NWProtocolTLS.
+  @_objcRuntimeName(_TtCC7Network14_NWProtocolTLS7Options)
 	public class Options : NWProtocolOptions {
 		/// Access the sec_protocol_options_t for a given network protocol
 		/// options instance. See <Security/SecProtocolOptions.h> for functions
@@ -36,6 +44,9 @@ public class NWProtocolTLS : NWProtocol {
 
 	/// Access TLS metadata using NWConnection.metadata(protocolDefinition: NWProtocolTLS.definition)
 	/// or in received ContentContext
+  // Set the ObjC name of this class to be nested in the customized ObjC
+  // name of NWNWProtocolTLSProtocolIP.
+  @_objcRuntimeName(_TtCC7Network14_NWProtocolTLS8Metadata)
 	public class Metadata: NWProtocolMetadata {
 		/// Access the sec_protocol_metadata_t for a given network protocol
 		/// metadata instance. See <Security/SecProtocolMetadata.h> for functions

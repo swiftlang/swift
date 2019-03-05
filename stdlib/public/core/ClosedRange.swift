@@ -433,6 +433,7 @@ extension ClosedRange where Bound: Strideable, Bound.Stride : SignedInteger {
   /// An equivalent range must be representable as a closed range.
   /// For example, passing an empty range as `other` triggers a runtime error,
   /// because an empty range cannot be represented by a closed range instance.
+  @inlinable
   public init(_ other: Range<Bound>) {
     _precondition(!other.isEmpty, "Can't form an empty closed range")
     let upperBound = other.upperBound.advanced(by: -1)
@@ -456,3 +457,26 @@ extension ClosedRange {
 // shorthand. TODO: Add documentation
 public typealias CountableClosedRange<Bound: Strideable> = ClosedRange<Bound>
   where Bound.Stride : SignedInteger
+
+extension ClosedRange: Decodable where Bound: Decodable {
+  public init(from decoder: Decoder) throws {
+    var container = try decoder.unkeyedContainer()
+    let lowerBound = try container.decode(Bound.self)
+    let upperBound = try container.decode(Bound.self)
+    guard lowerBound <= upperBound else {
+      throw DecodingError.dataCorrupted(
+        DecodingError.Context(
+          codingPath: decoder.codingPath,
+          debugDescription: "Cannot initialize \(ClosedRange.self) with a lowerBound (\(lowerBound)) greater than upperBound (\(upperBound))"))
+    }
+    self.init(uncheckedBounds: (lower: lowerBound, upper: upperBound))
+  }
+}
+
+extension ClosedRange: Encodable where Bound: Encodable {
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.unkeyedContainer()
+    try container.encode(self.lowerBound)
+    try container.encode(self.upperBound)
+  }
+}

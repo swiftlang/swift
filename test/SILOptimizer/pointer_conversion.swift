@@ -84,17 +84,17 @@ public func testMutableArrayToOptional() {
 
 // CHECK-LABEL: sil @$s18pointer_conversion21arrayLiteralPromotionyyF
 public func arrayLiteralPromotion() {
-  takesConstRawPointer([41,42,43,44])
+  takesConstRawPointer([-41,-42,-43,-44])
   
   // Stack allocate the array.
   // TODO: When stdlib checks are enabled, this becomes heap allocated... :-(
   // CHECK: alloc_ref {{.*}}[tail_elems $Int * {{.*}} : $Builtin.Word] $_ContiguousArrayStorage<Int>
   
   // Store the elements.
-  // CHECK: [[ELT:%.+]] = integer_literal $Builtin.Int{{.*}}, 41
-  // CHECK: [[ELT:%.+]] = integer_literal $Builtin.Int{{.*}}, 42
-  // CHECK: [[ELT:%.+]] = integer_literal $Builtin.Int{{.*}}, 43
-  // CHECK: [[ELT:%.+]] = integer_literal $Builtin.Int{{.*}}, 44
+  // CHECK: [[ELT:%.+]] = integer_literal $Builtin.Int{{.*}}, -41
+  // CHECK: [[ELT:%.+]] = integer_literal $Builtin.Int{{.*}}, -42
+  // CHECK: [[ELT:%.+]] = integer_literal $Builtin.Int{{.*}}, -43
+  // CHECK: [[ELT:%.+]] = integer_literal $Builtin.Int{{.*}}, -44
   
   // Call the function.
   // CHECK: [[PTR:%.+]] = mark_dependence

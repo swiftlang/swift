@@ -40,7 +40,6 @@
     "StringUTF8View.swift",
     "StringUTF8Validation.swift",
     "StringUnicodeScalarView.swift",
-    "StringVariant.swift",
     "Substring.swift",
     "Unicode.swift",
     "UnicodeEncoding.swift",

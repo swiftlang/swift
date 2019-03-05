@@ -12,7 +12,6 @@
 
 #define DEBUG_TYPE "definite-init"
 #include "DIMemoryUseCollector.h"
-#include "MandatoryOptUtils.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
@@ -1884,20 +1883,16 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
     Use.Inst = nullptr;
     NonLoadUses.erase(Inst);
 
-    PartialInitializationKind PartialInitKind;
-
     if (TheMemory.isClassInitSelf() &&
         Use.Kind == DIUseKind::SelfInit) {
       assert(InitKind == IsInitialization);
-      PartialInitKind = PartialInitializationKind::IsReinitialization;
+      AI->setOwnershipQualifier(AssignOwnershipQualifier::Reinit);
     } else {
-      PartialInitKind = (InitKind == IsInitialization
-                         ? PartialInitializationKind::IsInitialization
-                         : PartialInitializationKind::IsNotInitialization);
+      AI->setOwnershipQualifier((InitKind == IsInitialization
+                                ? AssignOwnershipQualifier::Init
+                                : AssignOwnershipQualifier::Reassign));
     }
 
-    SILBuilderWithScope B(Inst);
-    lowerAssignInstruction(B, AI, PartialInitKind);
     return;
   }
 
@@ -1950,13 +1945,12 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
     auto SILMetatypeTy = SILType::getPrimitiveObjectType(MetatypeTy);
     SILValue Metatype;
 
-    // A convenience initializer should never deal in partially allocated
-    // objects.
-    assert(!TheMemory.isDelegatingInit());
-
-    // In a designated initializer, we know the class of the thing
-    // we're cleaning up statically.
-    Metatype = B.createMetatype(Loc, SILMetatypeTy);
+    // In an inherited convenience initializer, we must use the dynamic
+    // type of the object since nothing is initialized yet.
+    if (TheMemory.isDelegatingInit())
+      Metatype = B.createValueMetatype(Loc, SILMetatypeTy, Pointer);
+    else
+      Metatype = B.createMetatype(Loc, SILMetatypeTy);
 
     // We've already destroyed any instance variables initialized by this
     // constructor, now destroy instance variables initialized by subclass

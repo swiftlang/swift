@@ -17,6 +17,7 @@
 
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/Path.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
@@ -1076,7 +1077,7 @@ RESULT IRGenFunction::emit##KIND(TYPE1 val1, ReferenceCounting style) {        \
   llvm_unreachable("bad refcounting style");                                   \
 }
 
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   DEFINE_BINARY_OPERATION(Name##CopyInit, void, Address, Address) \
   DEFINE_BINARY_OPERATION(Name##TakeInit, void, Address, Address) \
   DEFINE_BINARY_OPERATION(Name##CopyAssign, void, Address, Address) \
@@ -1086,8 +1087,6 @@ RESULT IRGenFunction::emit##KIND(TYPE1 val1, ReferenceCounting style) {        \
   DEFINE_BINARY_OPERATION(Name##LoadStrong, llvm::Value *, Address,llvm::Type*)\
   DEFINE_BINARY_OPERATION(Name##TakeStrong, llvm::Value *, Address,llvm::Type*)\
   DEFINE_UNARY_OPERATION(Name##Destroy, void, Address)
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
 #include "swift/AST/ReferenceStorage.def"
 
 
@@ -1332,7 +1331,12 @@ llvm::Value *IRGenFunction::emitIsEscapingClosureCall(
   auto loc = SILLocation::decode(sourceLoc, IGM.Context.SourceMgr);
   auto line = llvm::ConstantInt::get(IGM.Int32Ty, loc.Line);
   auto col = llvm::ConstantInt::get(IGM.Int32Ty, loc.Column);
-  auto filename = IGM.getAddrOfGlobalString(loc.Filename);
+
+  // Only output the filepath in debug mode. It is going to leak into the
+  // executable. This is the same behavior as asserts.
+  auto filename = IGM.IRGen.Opts.shouldOptimize()
+                      ? IGM.getAddrOfGlobalString("")
+                      : IGM.getAddrOfGlobalString(loc.Filename);
   auto filenameLength =
       llvm::ConstantInt::get(IGM.Int32Ty, loc.Filename.size());
   auto type = llvm::ConstantInt::get(IGM.Int32Ty, verificationType);

@@ -149,9 +149,9 @@ internal enum _KnownCocoaString {
 #endif
     
     switch _unsafeAddressOfCocoaStringClass(str) {
-    case unsafeBitCast(_StringStorage.self, to: UInt.self):
+    case unsafeBitCast(__StringStorage.self, to: UInt.self):
       self = .storage
-    case unsafeBitCast(_SharedStringStorage.self, to: UInt.self):
+    case unsafeBitCast(__SharedStringStorage.self, to: UInt.self):
       self = .shared
     default:
       self = .cocoa
@@ -216,10 +216,10 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
   switch _KnownCocoaString(cocoaString) {
   case .storage:
     return _unsafeUncheckedDowncast(
-      cocoaString, to: _StringStorage.self).asString._guts
+      cocoaString, to: __StringStorage.self).asString._guts
   case .shared:
     return _unsafeUncheckedDowncast(
-      cocoaString, to: _SharedStringStorage.self).asString._guts
+      cocoaString, to: __SharedStringStorage.self).asString._guts
 #if !(arch(i386) || arch(arm))
   case .tagged:
     return _StringGuts(_SmallString(taggedCocoa: cocoaString))
@@ -284,7 +284,7 @@ extension String {
       // TODO: We'd rather emit a valid ObjC object statically than create a
       // shared string class instance.
       let gutsCountAndFlags = _guts._object._countAndFlags
-      return _SharedStringStorage(
+      return __SharedStringStorage(
         immortal: _guts._object.fastUTF8.baseAddress!,
         countAndFlags: _StringObject.CountAndFlags(
           sharedCount: _guts.count, isASCII: gutsCountAndFlags.isASCII))

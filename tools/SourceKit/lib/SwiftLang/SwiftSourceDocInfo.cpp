@@ -16,6 +16,7 @@
 #include "SourceKit/Support/ImmutableTextBuffer.h"
 #include "SourceKit/Support/Logging.h"
 
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
@@ -1724,8 +1725,7 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
       }
 
       auto &context = CompIns.getASTContext();
-      std::string error;
-      Decl *D = ide::getDeclFromUSR(context, USR, error);
+      TypeDecl *D = Demangle::getTypeDeclForUSR(context, USR);
 
       if (!D) {
         Receiver(CursorInfoData());
@@ -1738,15 +1738,15 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
       if (auto *M = dyn_cast<ModuleDecl>(D)) {
         passCursorInfoForModule(M, Lang.getIFaceGenContexts(), CompInvok,
                                 Receiver);
-      } else if (auto *VD = dyn_cast<ValueDecl>(D)) {
-        auto *DC = VD->getDeclContext();
+      } else {
+        auto *DC = D->getDeclContext();
         Type selfTy;
         if (DC->isTypeContext()) {
           selfTy = DC->getSelfInterfaceType();
-          selfTy = VD->getInnermostDeclContext()->mapTypeIntoContext(selfTy);
+          selfTy = D->getInnermostDeclContext()->mapTypeIntoContext(selfTy);
         }
         bool Failed =
-            passCursorInfoForDecl(/*SourceFile*/nullptr, VD, MainModule, selfTy,
+            passCursorInfoForDecl(/*SourceFile*/nullptr, D, MainModule, selfTy,
                                   /*IsRef=*/false, false, ResolvedCursorInfo(),
                                   BufferID, SourceLoc(), {}, Lang, CompInvok,
                                   PreviousASTSnaps, Receiver);
@@ -2031,4 +2031,49 @@ semanticRefactoring(StringRef Filename, SemanticRefactoringInfo Info,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
   getASTManager()->processASTAsync(Invok, std::move(Consumer), &OncePerASTToken);
+}
+
+void SwiftLangSupport::collectExpressionTypes(StringRef FileName,
+                                              ArrayRef<const char *> Args,
+                  std::function<void(const ExpressionTypesInFile&)> Receiver) {
+  std::string Error;
+  SwiftInvocationRef Invok = ASTMgr->getInvocation(Args, FileName, Error);
+  if (!Invok) {
+    // FIXME: Report it as failed request.
+    LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
+    Receiver({});
+    return;
+  }
+  assert(Invok);
+  class ExpressionTypeCollector: public SwiftASTConsumer {
+    std::function<void(const ExpressionTypesInFile&)> Receiver;
+  public:
+    ExpressionTypeCollector(std::function<void(const ExpressionTypesInFile&)> Receiver):
+      Receiver(std::move(Receiver)) {}
+    void handlePrimaryAST(ASTUnitRef AstUnit) override {
+      auto *SF = AstUnit->getCompilerInstance().getPrimarySourceFile();
+      std::vector<ExpressionTypeInfo> Scratch;
+      llvm::SmallString<256> TypeBuffer;
+      llvm::raw_svector_ostream OS(TypeBuffer);
+      ExpressionTypesInFile Result;
+      for (auto Item: collectExpressionType(*SF, Scratch, OS)) {
+        Result.Results.push_back({Item.offset, Item.length, Item.typeOffset});
+      }
+      Result.TypeBuffer = OS.str();
+      Receiver(Result);
+    }
+
+    void cancelled() override {
+      Receiver({});
+    }
+
+    void failed(StringRef Error) override {
+      Receiver({});
+    }
+  };
+  auto Collector = std::make_shared<ExpressionTypeCollector>(Receiver);
+  /// FIXME: When request cancellation is implemented and Xcode adopts it,
+  /// don't use 'OncePerASTToken'.
+  static const char OncePerASTToken = 0;
+  getASTManager()->processASTAsync(Invok, std::move(Collector), &OncePerASTToken);
 }

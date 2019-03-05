@@ -148,19 +148,41 @@ bb5:
 // CHECK-NEXT: Consuming User:   end_borrow %1 : $Builtin.NativeObject
 // CHECK-NEXT: Non Consuming User:   end_borrow %4 : $Builtin.NativeObject
 // CHECK-NEXT: Block: bb2
-
+//
 // CHECK-LABEL: Function: 'bad_order_add_a_level'
 // CHECK-NEXT: Found over consume?!
 // CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject
 // CHECK-NEXT: User:   end_borrow %1 : $Builtin.NativeObject
 // CHECK-NEXT: Block: bb2
-
+//
+// CHECK-LABEL: Function: 'bad_order_add_a_level'
+// CHECK-NEXT: Error! Found a leak due to a consuming post-dominance failure!
+// CHECK-NEXT: Value: %1 = begin_borrow %0
+// CHECK-NEXT: Post Dominating Failure Blocks:
+// CHECK-NEXT: bb3
+//
+// This error is a "use after free" error b/c we are accessing the argument
+// /after/ we end the parent borrow. We /could/ improve the error message here.
+//
+// CHECK-LABEL: Function: 'bad_order_add_a_level'
+// CHECK-NEXT: Found use after free due to unvisited non lifetime ending uses?!
+// CHECK-NEXT: Value: %1 = begin_borrow
+// CHECK-NEXT: Remaining Users:
+// CHECK-NEXT: User: end_borrow %4
+// CHECK-NEXT: Block: bb2
+//
 // CHECK-LABEL: Function: 'bad_order_add_a_level'
 // CHECK-NEXT: Found over consume?!
 // CHECK-NEXT: Value: %4 = argument of bb2 : $Builtin.NativeObject
 // CHECK-NEXT: User:   end_borrow %4 : $Builtin.NativeObject
 // CHECK-NEXT: Block: bb2
-
+//
+// CHECK-LABEL: Function: 'bad_order_add_a_level'
+// CHECK-NEXT: Error! Found a leak due to a consuming post-dominance failure!
+//
+// CHECK-LABEL: Function: 'bad_order_add_a_level'
+// CHECK-NEXT: Found use after free due to unvisited non lifetime ending uses?!
+//
 // CHECK-LABEL: Function: 'bad_order_add_a_level'
 // CHECK-NEXT: Non trivial values, non address values, and non guaranteed function args must have at least one lifetime ending use?!
 // CHECK-NEXT: Value: %9 = argument of bb4 : $Builtin.NativeObject
@@ -235,6 +257,19 @@ bb7:
 // CHECK-NEXT: User:   end_borrow %1 : $Builtin.NativeObject
 // CHECK-NEXT: Block: bb2
 //
+// This comes from the dataflow, but we already actually identified this error.
+//
+// CHECK-LABEL: Function: 'bad_order_add_a_level_2'
+// CHECK-NEXT: Found over consume?!
+//
+// These are handled via other checks.
+// CHECK-LABEL: Function: 'bad_order_add_a_level_2'
+// CHECK-NEXT: Found use after free due to unvisited non lifetime ending uses?!
+// CHECK-LABEL: Function: 'bad_order_add_a_level_2'
+// CHECK-NEXT: Found use after free due to unvisited non lifetime ending uses?!
+// CHECK-LABEL: Function: 'bad_order_add_a_level_2'
+// CHECK-NEXT: Found use after free due to unvisited non lifetime ending uses?!
+//
 // CHECK-LABEL: Function: 'bad_order_add_a_level_2'
 // CHECK-NEXT: Found use after free?!
 // CHECK-NEXT: Value: %4 = argument of bb2 : $Builtin.NativeObject
@@ -247,7 +282,6 @@ bb7:
 // CHECK-NEXT: Value: %4 = argument of bb2 : $Builtin.NativeObject
 // CHECK-NEXT: User:   end_borrow %4 : $Builtin.NativeObject
 // CHECK-NEXT: Block: bb2
-// CHECK-NOT: Block
 sil [ossa] @bad_order_add_a_level_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   %1 = begin_borrow %0 : $Builtin.NativeObject
@@ -329,6 +363,13 @@ bb1(%1 : @owned $Builtin.NativeObject):
 // CHECK-NEXT: Value: %0 = argument of bb0 : $Builtin.NativeObject
 // CHECK-NEXT: User:   cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2
 // CHECK-NEXT: Block: bb0
+//
+// CHECK-LABEL: Function: 'owned_argument_overuse_condbr1'
+// CHECK-NEXT: Error! Found a leak due to a consuming post-dominance failure!
+// CHECK-NEXT: Value: %0 = argument of bb0
+// CHECK-NEXT: Post Dominating Failure Blocks:
+// CHECK-NEXT: bb2
+//
 // CHECK-LABEL: Function: 'owned_argument_overuse_condbr1'
 // CHECK-NEXT: Error! Found a leaked owned value that was never consumed.
 // CHECK-NEXT: Value: %3 = argument of bb1 : $Builtin.NativeObject
@@ -351,8 +392,6 @@ bb2:
 // CHECK-NEXT: Value: %0 = argument of bb0 : $Builtin.NativeObject
 // CHECK-NEXT: User:   cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2
 // CHECK-NEXT: Block: bb0
-// CHECK-NOT: Block
-// CHECK-NOT: Function: 'owned_argument_overuse_condbr2'
 sil [ossa] @owned_argument_overuse_condbr2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   destroy_value %0 : $Builtin.NativeObject

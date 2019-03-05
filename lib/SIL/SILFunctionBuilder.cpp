@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILFunctionBuilder.h"
+#include "swift/AST/Availability.h"
 #include "swift/AST/Decl.h"
 using namespace swift;
 
@@ -85,7 +86,7 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
     return;
   }
 
-  if (constant.isInitializerOrDestroyer())
+  if (!constant.canBeDynamicReplacement())
     return;
 
   SILDeclRef declRef(replacedDecl, constant.kind, false);
@@ -154,7 +155,7 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
     if (constant.isForeign && decl->hasClangNode())
       F->setClangNodeOwner(decl);
 
-    if (decl->isWeakImported(/*fromModule=*/nullptr))
+    if (decl->isWeakImported(/*forModule=*/nullptr, availCtx))
       F->setWeakLinked();
 
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {

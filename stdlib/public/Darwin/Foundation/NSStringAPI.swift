@@ -178,6 +178,10 @@ extension String {
   /// Creates a string by copying the data from a given
   /// C array of UTF8-encoded bytes.
   public init?(utf8String bytes: UnsafePointer<CChar>) {
+    if let str = String(validatingUTF8: bytes) {
+      self = str
+      return
+    }
     if let ns = NSString(utf8String: bytes) {
       self = String._unconditionallyBridgeFromObjectiveC(ns)
     } else {
@@ -202,12 +206,18 @@ extension String {
   /// - Parameters:
   ///   - bytes: A sequence of bytes to interpret using `encoding`.
   ///   - encoding: The ecoding to use to interpret `bytes`.
-  public init? <S: Sequence>(bytes: __shared S, encoding: Encoding)
-    where S.Iterator.Element == UInt8 {
+  public init?<S: Sequence>(bytes: __shared S, encoding: Encoding)
+  where S.Iterator.Element == UInt8 {
     let byteArray = Array(bytes)
+    if encoding == .utf8,
+       let str = byteArray.withUnsafeBufferPointer({ String._tryFromUTF8($0) })
+    {
+      self = str
+      return
+    }
+
     if let ns = NSString(
       bytes: byteArray, length: byteArray.count, encoding: encoding.rawValue) {
-
       self = String._unconditionallyBridgeFromObjectiveC(ns)
     } else {
       return nil
@@ -365,6 +375,10 @@ extension String {
     cString: UnsafePointer<CChar>,
     encoding enc: Encoding
   ) {
+    if enc == .utf8, let str = String(validatingUTF8: cString) {
+      self = str
+      return
+    }
     if let ns = NSString(cString: cString, encoding: enc.rawValue) {
       self = String._unconditionallyBridgeFromObjectiveC(ns)
     } else {
@@ -381,6 +395,14 @@ extension String {
   /// Returns a `String` initialized by converting given `data` into
   /// Unicode characters using a given `encoding`.
   public init?(data: __shared Data, encoding: Encoding) {
+    if encoding == .utf8,
+       let str = data.withUnsafeBytes({
+         String._tryFromUTF8($0.bindMemory(to: UInt8.self))
+    }) {
+      self = str
+      return
+    }
+
     guard let s = NSString(data: data, encoding: encoding.rawValue) else { return nil }
     self = String._unconditionallyBridgeFromObjectiveC(s)
   }

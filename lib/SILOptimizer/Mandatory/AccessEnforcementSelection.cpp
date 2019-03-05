@@ -508,6 +508,8 @@ void SelectEnforcement::updateCapture(AddressCapture capture) {
     case SILInstructionKind::RetainValueInst:
     case SILInstructionKind::ReleaseValueInst:
     case SILInstructionKind::EndBorrowInst:
+    // partial_apply [stack] is matched with dealloc_stack.
+    case SILInstructionKind::DeallocStackInst:
       // Benign use.
       return;
     case SILInstructionKind::TupleExtractInst:

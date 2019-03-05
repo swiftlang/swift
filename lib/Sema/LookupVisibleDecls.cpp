@@ -129,8 +129,7 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
 
   // Check access when relevant.
   if (!Member->getDeclContext()->isLocalContext() &&
-      !isa<GenericTypeParamDecl>(Member) && !isa<ParamDecl>(Member) &&
-      FromContext->getASTContext().LangOpts.EnableAccessControl) {
+      !isa<GenericTypeParamDecl>(Member) && !isa<ParamDecl>(Member)) {
     if (!Member->isAccessibleFrom(FromContext))
       return false;
   }
@@ -295,9 +294,9 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
 
       // These cases are probably impossible here but can also just
       // be safely ignored.
-      case DeclKind::EnumElement:
       case DeclKind::Param:
       case DeclKind::Module:
+      case DeclKind::EnumElement:
         return;
 
       // For other kinds of values, check if we already reported a decl

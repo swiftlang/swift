@@ -21,6 +21,8 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
+#include "swift/SILOptimizer/Utils/StackNesting.h"
 
 #include "llvm/Support/CommandLine.h"
 
@@ -87,8 +89,33 @@ static SILInstruction *getDeinitSafeClosureDestructionPoint(TermInst *Term) {
   return Term;
 }
 
+static void findReachableExitBlocks(SILInstruction *i,
+                                    SmallVectorImpl<SILBasicBlock *> &result) {
+  SmallVector<SILBasicBlock *, 32> worklist;
+  SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
+
+  visitedBlocks.insert(i->getParent());
+  worklist.push_back(i->getParent());
+
+  while (!worklist.empty()) {
+    auto *bb = worklist.pop_back_val();
+    if (bb->getTerminator()->isFunctionExiting()) {
+      result.push_back(bb);
+      continue;
+    }
+    copy_if(bb->getSuccessorBlocks(), std::back_inserter(worklist),
+            [&](SILBasicBlock *bb) { return visitedBlocks.insert(bb).second; });
+  }
+}
+
 /// Extend the lifetime of the convert_escape_to_noescape's operand to the end
 /// of the function.
+///
+/// NOTE: Since we are lifetime extending a copy that we have introduced, we do
+/// not need to consider destroy_value emitted by SILGen unlike
+/// copy_block_without_escaping which consumes its sentinel parameter. Unlike
+/// that case where we have to consider that destroy_value, we have a simpler
+/// time here.
 static void extendLifetimeToEndOfFunction(SILFunction &Fn,
                                           ConvertEscapeToNoEscapeInst *Cvt) {
   auto EscapingClosure = Cvt->getOperand();
@@ -103,40 +130,78 @@ static void extendLifetimeToEndOfFunction(SILFunction &Fn,
   Cvt->eraseFromParent();
   Cvt = NewCvt;
 
-  // Create an alloc_stack Optional<() -> ()> at the beginning of the function.
-  AllocStackInst *Slot;
-  auto &Context = Cvt->getModule().getASTContext();
-  {
-    SILBuilderWithScope B(Fn.getEntryBlock()->begin());
-    Slot = B.createAllocStack(loc, OptionalEscapingClosureTy);
-    auto *NoneDecl = Context.getOptionalNoneDecl();
-    // Store None to it.
-    B.createStore(
-        loc, B.createEnum(loc, SILValue(), NoneDecl, OptionalEscapingClosureTy),
-        Slot, StoreOwnershipQualifier::Init);
-  }
-  // Insert a copy before the convert_escape_to_noescape and store it to the
-  // alloc_stack location.
-  {
+  // If our Cvt is in the initial block, we do not need to use the SSA updater
+  // since we know Cvt can not be in a loop and must dominate all exits
+  // (*). Just insert a copy of the escaping closure at the Cvt and destroys at
+  // the exit blocks of the function.
+  //
+  // (*) In fact we can't use the SILSSAUpdater::GetValueInMiddleOfBlock.
+  if (Cvt->getParent() == Cvt->getFunction()->getEntryBlock()) {
     SILBuilderWithScope B(Cvt);
-    auto *SomeDecl = Context.getOptionalSomeDecl();
-    B.createDestroyAddr(loc, Slot);
-    auto ClosureCopy = B.createCopyValue(loc, EscapingClosure);
-    B.createStore(
-        loc,
-        B.createEnum(loc, ClosureCopy, SomeDecl, OptionalEscapingClosureTy),
-        Slot, StoreOwnershipQualifier::Init);
+    CopyValueInst *InnerCVI = B.createCopyValue(loc, EscapingClosure);
+    SmallVector<SILBasicBlock *, 4> ExitingBlocks;
+    Fn.findExitingBlocks(ExitingBlocks);
+
+    for (auto *Exit : ExitingBlocks) {
+      auto *Term = Exit->getTerminator();
+      auto *SafeClosureDestructionPt =
+          getDeinitSafeClosureDestructionPoint(Term);
+      SILBuilderWithScope B(SafeClosureDestructionPt);
+      B.createDestroyValue(loc, InnerCVI);
+    }
+    return;
   }
-  // Insert destroys at the function exits.
+
+  // Ok. At this point we know that Cvt is not in the entry block... so we can
+  // use SILSSAUpdater::GetValueInMiddleOfBlock() to extend the object's
+  // lifetime respecting loops.
+  SILSSAUpdater Updater(Cvt->getModule());
+  Updater.Initialize(OptionalEscapingClosureTy);
+
+  // Create an Optional<() -> ()>.none in the entry block of the function and
+  // add it as an available value to the SSAUpdater.
+  //
+  // Since we know that Cvt is not in the entry block and this must be, we know
+  // that it is safe to use the SSAUpdater's getValueInMiddleOfBlock with this
+  // value.
+  Updater.AddAvailableValue(Fn.getEntryBlock(), [&]() -> SILValue {
+    SILBuilderWithScope B(Fn.getEntryBlock()->begin());
+    return B.createOptionalNone(loc, OptionalEscapingClosureTy);
+  }());
+
+  // Create a copy of the convert_escape_to_no_escape and add it as an available
+  // value to the SSA updater.
+  //
+  // NOTE: The SSAUpdater does not support providing multiple values in the same
+  // block without extra work. So the fact that Cvt is not in the entry block
+  // means that we don't have to worry about overwriting the .none value.
+  auto *CVI = [&]() -> CopyValueInst * {
+    SILBuilderWithScope B(Cvt);
+    CopyValueInst *InnerCVI = B.createCopyValue(loc, EscapingClosure);
+    Updater.AddAvailableValue(
+        Cvt->getParent(),
+        B.createOptionalSome(loc, InnerCVI, OptionalEscapingClosureTy));
+    return InnerCVI;
+  }();
+
+  // Then we use the SSA updater to insert a destroy_value before the cvt and at
+  // the reachable exit blocks.
   SmallVector<SILBasicBlock *, 4> ExitingBlocks;
-  Fn.findExitingBlocks(ExitingBlocks);
+  findReachableExitBlocks(Cvt, ExitingBlocks);
+
+  {
+    // Before the copy value, insert an extra destroy_value to handle
+    // loops. Since we used our enum value this is safe.
+    SILBuilderWithScope B(CVI);
+    B.createDestroyValue(loc,
+                         Updater.GetValueInMiddleOfBlock(CVI->getParent()));
+  }
+
   for (auto *Exit : ExitingBlocks) {
     auto *Term = Exit->getTerminator();
     auto *SafeClosureDestructionPt = getDeinitSafeClosureDestructionPoint(Term);
     SILBuilderWithScope B(SafeClosureDestructionPt);
-    B.createDestroyAddr(loc, Slot);
-    SILBuilderWithScope B2(Term);
-    B2.createDeallocStack(loc, Slot);
+    B.createDestroyValue(loc, Updater.GetValueAtEndOfBlock(Exit));
   }
 }
 
@@ -186,9 +251,148 @@ static SILInstruction *lookThroughRebastractionUsers(
                                  SingleNonDebugNonRefCountUser, Memoized));
 }
 
+/// Insert a mark_dependence for any non-trivial argument of a partial_apply.
+static SILValue insertMarkDependenceForCapturedArguments(PartialApplyInst *PAI,
+                                                         SILBuilder &B) {
+  SILValue curr(PAI);
+  // Mark dependence on all non-trivial arguments.
+  for (auto &arg : PAI->getArgumentOperands()) {
+    if (arg.get()->getType().isTrivial(PAI->getModule()))
+      continue;
+    curr = B.createMarkDependence(PAI->getLoc(), curr, arg.get());
+  }
+
+  return curr;
+}
+
+/// Rewrite a partial_apply convert_escape_to_noescape sequence with a single
+/// apply/try_apply user to a partial_apply [stack] terminated with a
+/// dealloc_stack placed after the apply.
+///
+///   %p = partial_apply %f(%a, %b)
+///   %ne = convert_escape_to_noescape %p
+///   apply %f2(%p)
+///   destroy_value %p
+///
+///    =>
+///
+///   %p = partial_apply [stack] %f(%a, %b)
+///   %md = mark_dependence %p on %a
+///   %md2 = mark_dependence %md on %b
+///   apply %f2(%md2)
+///   dealloc_stack %p
+///   destroy_value %a
+///   destroy_value %b
+///
+/// Note: If the rewrite succeeded we have inserted a dealloc_stack. This
+/// dealloc_stack still needs to be balanced with other dealloc_stacks i.e the
+/// caller needs to use the StackNesting utility to update the dealloc_stack
+/// nesting.
+static bool tryRewriteToPartialApplyStack(
+    SILLocation &loc, PartialApplyInst *origPA,
+    ConvertEscapeToNoEscapeInst *cvt, SILInstruction *singleApplyUser,
+    SILBasicBlock::iterator &advanceIfDelete,
+    llvm::DenseMap<SILInstruction *, SILInstruction *> &Memoized) {
+
+  auto *convertOrPartialApply = cast<SingleValueInstruction>(origPA);
+  if (cvt->getOperand() != origPA)
+    convertOrPartialApply = cast<ConvertFunctionInst>(cvt->getOperand());
+
+  // Whenever we delete an instruction advance the iterator and remove the
+  // instruction from the memoized map.
+  auto saveDeleteInst = [&](SILInstruction *I) {
+    if (&*advanceIfDelete == I)
+      advanceIfDelete++;
+    Memoized.erase(I);
+    I->eraseFromParent();
+  };
+
+  // Look for a single non ref count user of the partial_apply.
+  SmallVector<SILInstruction *, 8> refCountInsts;
+  SILInstruction *singleNonDebugNonRefCountUser = nullptr;
+  for (auto *Usr : getNonDebugUses(convertOrPartialApply)) {
+    auto *I = Usr->getUser();
+    if (onlyAffectsRefCount(I)) {
+      refCountInsts.push_back(I);
+      continue;
+    }
+    if (singleNonDebugNonRefCountUser)
+      return false;
+    singleNonDebugNonRefCountUser = I;
+  }
+
+  SILBuilderWithScope B(cvt);
+
+  // The convert_escape_to_noescape is the only user of the partial_apply.
+  // Convert to a partial_apply [stack].
+  SmallVector<SILValue, 8> args;
+  for (auto &arg : origPA->getArgumentOperands())
+    args.push_back(arg.get());
+  auto newPA = B.createPartialApply(
+      origPA->getLoc(), origPA->getCallee(), origPA->getSubstitutionMap(), args,
+      origPA->getType().getAs<SILFunctionType>()->getCalleeConvention(),
+      PartialApplyInst::OnStackKind::OnStack);
+
+  // Insert mark_dependence for any non-trivial operand to the partial_apply.
+  auto closure = insertMarkDependenceForCapturedArguments(newPA, B);
+
+  // Optionally, replace the convert_function instruction.
+  if (auto *convert = dyn_cast<ConvertFunctionInst>(convertOrPartialApply)) {
+    auto origTy = convert->getType().castTo<SILFunctionType>();
+    auto origWithNoEscape = SILType::getPrimitiveObjectType(
+        origTy->getWithExtInfo(origTy->getExtInfo().withNoEscape()));
+    closure = B.createConvertFunction(convert->getLoc(), closure, origWithNoEscape, false);
+    convert->replaceAllUsesWith(closure);
+  }
+
+  // Replace the convert_escape_to_noescape uses with the new
+  // partial_apply [stack].
+  cvt->replaceAllUsesWith(closure);
+  saveDeleteInst(cvt);
+
+  // Delete the ref count operations on the original partial_apply.
+  for (auto *refInst : refCountInsts)
+    saveDeleteInst(refInst);
+  convertOrPartialApply->replaceAllUsesWith(newPA);
+  if (convertOrPartialApply != origPA)
+    saveDeleteInst(convertOrPartialApply);
+  saveDeleteInst(origPA);
+
+  // Insert destroys of arguments after the apply and the dealloc_stack.
+  if (auto *Apply = dyn_cast<ApplyInst>(singleApplyUser)) {
+    auto InsertPt = std::next(SILBasicBlock::iterator(Apply));
+    // Don't insert dealloc_stacks at unreachable.
+    if (isa<UnreachableInst>(*InsertPt))
+      return true;
+    SILBuilderWithScope B3(InsertPt);
+    B3.createDeallocStack(loc, newPA);
+    insertDestroyOfCapturedArguments(newPA, B3);
+  } else if (auto *Try = dyn_cast<TryApplyInst>(singleApplyUser)) {
+    for (auto *SuccBB : Try->getSuccessorBlocks()) {
+      SILBuilderWithScope B3(SuccBB->begin());
+      B3.createDeallocStack(loc, newPA);
+      insertDestroyOfCapturedArguments(newPA, B3);
+    }
+  } else {
+    llvm_unreachable("Unknown FullApplySite instruction kind");
+  }
+  return true;
+}
+
+static SILValue skipConvert(SILValue v) {
+  auto cvt = dyn_cast<ConvertFunctionInst>(v);
+  if (!cvt)
+    return v;
+  auto *pa = dyn_cast<PartialApplyInst>(cvt->getOperand());
+  if (!pa || !pa->hasOneUse())
+    return v;
+  return pa;
+}
+
 static bool tryExtendLifetimeToLastUse(
     ConvertEscapeToNoEscapeInst *Cvt,
-    llvm::DenseMap<SILInstruction *, SILInstruction *> &Memoized) {
+    llvm::DenseMap<SILInstruction *, SILInstruction *> &Memoized,
+    SILBasicBlock::iterator &AdvanceIfDelete) {
   // If there is a single user that is an apply this is simple: extend the
   // lifetime of the operand until after the apply.
   auto SingleUser = lookThroughRebastractionUsers(Cvt, Memoized);
@@ -203,6 +407,12 @@ static bool tryExtendLifetimeToLastUse(
     }
 
     auto loc = RegularLocation::getAutoGeneratedLocation();
+    auto origPA = dyn_cast<PartialApplyInst>(skipConvert(Cvt->getOperand()));
+    if (origPA && tryRewriteToPartialApplyStack(
+                      loc, origPA, Cvt, SingleApplyUser.getInstruction(),
+                      AdvanceIfDelete,
+                      Memoized))
+      return true;
 
     // Insert a copy at the convert_escape_to_noescape [not_guaranteed] and
     // change the instruction to the guaranteed form.
@@ -392,88 +602,171 @@ static SILInstruction *getOnlyDestroy(CopyBlockWithoutEscapingInst *CB) {
 ///      %e = is_escaping %closure
 ///      cond_fail %e
 ///      destroy_value %closure
-static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *CB) {
-  SmallVector<SILInstruction *, 4> LifetimeEndPoints;
-
+static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *CB,
+                                          bool &modifiedCFG) {
   // Find the end of the lifetime of the copy_block_without_escaping
   // instruction.
   auto &Fn  = *CB->getFunction();
+
+  // If we find a single destroy, this destroy is going to be a destroy that may
+  // be in the same block as CB. It is important that we make sure that the
+  // destroy is in a different block than CB or any terminating blocks to ensure
+  // that we can use the SSAUpdater if needed.
   auto *SingleDestroy = getOnlyDestroy(CB);
-  SmallVector<SILBasicBlock *, 4> ExitingBlocks;
-  Fn.findExitingBlocks(ExitingBlocks);
-  if (SingleDestroy) {
-    LifetimeEndPoints.push_back(
-        &*std::next(SILBasicBlock::iterator(SingleDestroy)));
-  } else {
-    // Otherwise, conservatively insert verification at the end of the function.
-    for (auto *Exit : ExitingBlocks)
-      LifetimeEndPoints.push_back(Exit->getTerminator());
+  if (SingleDestroy && SingleDestroy->getParent() == CB->getParent()) {
+    modifiedCFG = true;
+    {
+      SILBuilderWithScope B(SingleDestroy);
+      splitBasicBlockAndBranch(B, SingleDestroy, nullptr, nullptr);
+    }
+
+    {
+      SILBuilderWithScope B(SingleDestroy);
+      auto *Term = SingleDestroy->getParent()->getTerminator();
+      if (Term->isFunctionExiting()) {
+        splitBasicBlockAndBranch(B, &*std::next(SingleDestroy->getIterator()),
+                                 nullptr, nullptr);
+      }
+    }
   }
 
   auto SentinelClosure = CB->getClosure();
   auto Loc = CB->getLoc();
 
+  // At this point, we transform our copy_block_without_escaping into a
+  // copy_block. This has a few important implications:
+  //
+  // 1. copy_block_without_escaping takes the sentinel value at +1. We will need
+  //    to balance that +1.
+  // 2. The destroy_value associated with the copy_block_without_escaping will
+  //    be on the copy_block value.
   SILBuilderWithScope B(CB);
   auto *NewCB = B.createCopyBlock(Loc, CB->getBlock());
   CB->replaceAllUsesWith(NewCB);
   CB->eraseFromParent();
 
-  // Create an stack slot for the closure sentinel and store the sentinel (or
-  // none on other paths.
   auto generatedLoc = RegularLocation::getAutoGeneratedLocation();
-  AllocStackInst *Slot;
-  auto &Context = NewCB->getModule().getASTContext();
+
+  // If CB is in the entry block, we know that our definition of SentinelClosure
+  // must be as well. Thus we know that we do not need to worry about loops or
+  // dominance issues and can just insert destroy_values for the sentinel at the
+  // lifetime end points.
+  if (NewCB->getParent() == NewCB->getFunction()->getEntryBlock()) {
+    // Our single destroy must not be in the entry block since if so, we would
+    // have inserted an edge to appease the SSA updater.
+    if (SingleDestroy) {
+      SILBuilderWithScope B(std::next(SingleDestroy->getIterator()));
+      SILValue V = SentinelClosure;
+      SILValue isEscaping = B.createIsEscapingClosure(
+          Loc, V, IsEscapingClosureInst::ObjCEscaping);
+      B.createCondFail(Loc, isEscaping);
+      B.createDestroyValue(Loc, V);
+      return true;
+    }
+
+    // If we couldn't find a specific destroy_value, lifetime extend to the end
+    // of the function.
+    SmallVector<SILBasicBlock *, 4> ExitingBlocks;
+    Fn.findExitingBlocks(ExitingBlocks);
+    for (auto *Block : ExitingBlocks) {
+      SILBuilderWithScope B(Block->getTerminator());
+      SILValue V = SentinelClosure;
+      SILValue isEscaping = B.createIsEscapingClosure(
+          Loc, V, IsEscapingClosureInst::ObjCEscaping);
+      B.createCondFail(Loc, isEscaping);
+      B.createDestroyValue(Loc, V);
+    }
+
+    return true;
+  }
+
+  // Otherwise, we need to be more careful since we can have loops and may not
+  // transitively dominate all uses of the closure. So we:
+  //
+  // 1. Create an Optional<T>.none at the entry.
+  // 2. Create a destroy_value(val), val = Optional<T>.some(sentinel) in the cvt
+  // block.
+  // 3. Create a destroy_value at all exits of the value.
+  //
+  // and then use the SSAUpdater to ensure that we handle loops correctly.
   auto OptionalEscapingClosureTy =
       SILType::getOptionalType(SentinelClosure->getType());
-  auto *NoneDecl = Context.getOptionalNoneDecl();
+
+  SILSSAUpdater Updater(Fn.getModule());
+  Updater.Initialize(OptionalEscapingClosureTy);
+
+  // Create the Optional.none as the beginning available value.
   {
     SILBuilderWithScope B(Fn.getEntryBlock()->begin());
-    Slot = B.createAllocStack(generatedLoc, OptionalEscapingClosureTy);
-    // Store None to it.
-    B.createStore(generatedLoc,
-                  B.createEnum(generatedLoc, SILValue(), NoneDecl,
-                               OptionalEscapingClosureTy),
-                  Slot, StoreOwnershipQualifier::Init);
+    Updater.AddAvailableValue(
+        Fn.getEntryBlock(),
+        B.createOptionalNone(generatedLoc, OptionalEscapingClosureTy));
   }
-  {
+
+  // Then create the Optional.some(closure sentinel).
+  //
+  // NOTE: We return the appropriate insertion point to insert the destroy_value
+  // before the value (to ensure we handle loops). We need to get all available
+  // values first though.
+  auto *InitialValue = [&]() -> EnumInst * {
     SILBuilderWithScope B(NewCB);
-    // Store the closure sentinel (the copy_block_without_escaping closure
+    // Create the closure sentinel (the copy_block_without_escaping closure
     // operand consumed at +1, so we don't need a copy) to it.
-    B.createDestroyAddr(generatedLoc, Slot); // We could be in a loop.
-    auto *SomeDecl = Context.getOptionalSomeDecl();
-    B.createStore(generatedLoc,
-                  B.createEnum(generatedLoc, SentinelClosure, SomeDecl,
-                               OptionalEscapingClosureTy),
-                  Slot, StoreOwnershipQualifier::Init);
+    auto *Result = B.createOptionalSome(generatedLoc, SentinelClosure,
+                                        OptionalEscapingClosureTy);
+    Updater.AddAvailableValue(Result->getParent(), Result);
+    return Result;
+  }();
+
+  // If we had a single destroy, creating a .none after it and add that as a
+  // value to the SSA updater.
+  if (SingleDestroy) {
+    SILBuilderWithScope B(std::next(SingleDestroy->getIterator()));
+    auto *Result =
+        B.createOptionalNone(generatedLoc, OptionalEscapingClosureTy);
+    Updater.AddAvailableValue(Result->getParent(), Result);
   }
 
-  for (auto LifetimeEndPoint : LifetimeEndPoints) {
-    SILBuilderWithScope B(LifetimeEndPoint);
-    SILValue isEscaping;
-    B.emitScopedBorrowOperation(generatedLoc, Slot, [&](SILValue value) {
-      isEscaping = B.createIsEscapingClosure(
-          Loc, value, IsEscapingClosureInst::ObjCEscaping);
-    });
+  // Now that we have all of our available values, insert a destroy_value before
+  // the initial Optional.some value using the SSA updater to ensure that we
+  // handle loops correctly.
+  {
+    SILBuilderWithScope B(InitialValue);
+    B.createDestroyValue(generatedLoc, Updater.GetValueInMiddleOfBlock(
+                                           InitialValue->getParent()));
+  }
+
+  // And insert an is_escaping_closure, cond_fail, destroy_value at each of the
+  // lifetime end points. This ensures we do not expand our lifetime too much.
+  if (SingleDestroy) {
+    SILBuilderWithScope B(std::next(SingleDestroy->getIterator()));
+    SILValue V = Updater.GetValueInMiddleOfBlock(SingleDestroy->getParent());
+    SILValue isEscaping =
+        B.createIsEscapingClosure(Loc, V, IsEscapingClosureInst::ObjCEscaping);
     B.createCondFail(Loc, isEscaping);
-    B.createDestroyAddr(generatedLoc, Slot);
-    // Store None to it.
-    B.createStore(generatedLoc,
-                  B.createEnum(generatedLoc, SILValue(), NoneDecl,
-                               OptionalEscapingClosureTy),
-                  Slot, StoreOwnershipQualifier::Init);
+    B.createDestroyValue(Loc, V);
   }
 
-  // Insert the dealloc_stack in all exiting blocks.
-  for (auto *ExitBlock: ExitingBlocks) {
-    auto *Terminator = ExitBlock->getTerminator();
-    SILBuilderWithScope B(Terminator);
-    B.createDeallocStack(generatedLoc, Slot);
+  // Then to be careful with regards to loops, insert at each of the destroy
+  // blocks destroy_value to ensure that we obey ownership invariants.
+  {
+    SmallVector<SILBasicBlock *, 4> ExitingBlocks;
+    findReachableExitBlocks(NewCB, ExitingBlocks);
+
+    for (auto *Exit : ExitingBlocks) {
+      auto *Term = Exit->getTerminator();
+      auto *SafeClosureDestructionPt =
+          getDeinitSafeClosureDestructionPoint(Term);
+      SILBuilderWithScope B(SafeClosureDestructionPt);
+      B.createDestroyValue(generatedLoc, Updater.GetValueInMiddleOfBlock(Exit));
+    }
   }
 
   return true;
 }
 
-static bool fixupClosureLifetimes(SILFunction &Fn) {
+static bool fixupClosureLifetimes(SILFunction &Fn, bool &checkStackNesting,
+                                  bool &modifiedCFG) {
   bool Changed = false;
 
   // tryExtendLifetimeToLastUse uses a cache of recursive instruction use
@@ -488,7 +781,7 @@ static bool fixupClosureLifetimes(SILFunction &Fn) {
 
       // Handle, copy_block_without_escaping instructions.
       if (auto *CB = dyn_cast<CopyBlockWithoutEscapingInst>(Inst)) {
-        Changed |= fixupCopyBlockWithoutEscaping(CB);
+        Changed |= fixupCopyBlockWithoutEscaping(CB, modifiedCFG);
         continue;
       }
 
@@ -505,8 +798,9 @@ static bool fixupClosureLifetimes(SILFunction &Fn) {
         continue;
       }
 
-      if (tryExtendLifetimeToLastUse(Cvt, MemoizedQueries)) {
+      if (tryExtendLifetimeToLastUse(Cvt, MemoizedQueries, I)) {
         Changed |= true;
+        checkStackNesting = true;
         continue;
       }
 
@@ -537,8 +831,21 @@ class ClosureLifetimeFixup : public SILFunctionTransform {
 
     // Fixup convert_escape_to_noescape [not_guaranteed] and
     // copy_block_without_escaping instructions.
-    if (fixupClosureLifetimes(*getFunction()))
-      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+
+    bool checkStackNesting = false;
+    bool modifiedCFG = false;
+
+    if (fixupClosureLifetimes(*getFunction(), checkStackNesting, modifiedCFG)) {
+      if (checkStackNesting){
+        StackNesting SN;
+        modifiedCFG =
+            SN.correctStackNesting(getFunction()) == StackNesting::Changes::CFG;
+      }
+      if (modifiedCFG)
+        invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+      else
+        invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
+    }
     LLVM_DEBUG(getFunction()->verify());
 
   }

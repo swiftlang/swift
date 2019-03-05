@@ -38,6 +38,10 @@ protected:
   /// Optimize out protocol names if a type only conforms to one protocol.
   bool OptimizeProtocolNames = true;
 
+  /// If enabled, use Objective-C runtime names when mangling @objc Swift
+  /// protocols.
+  bool UseObjCProtocolNames = false;
+
   /// If enabled, non-canonical types are allowed and type alias types get a
   /// special mangling.
   bool DWARFMangling;
@@ -75,6 +79,15 @@ public:
 
   ASTMangler(bool DWARFMangling = false)
     : DWARFMangling(DWARFMangling) {}
+
+  void addTypeSubstitution(Type type) {
+    type = dropProtocolsFromAssociatedTypes(type);
+    addSubstitution(type.getPointer());
+  }
+  bool tryMangleTypeSubstitution(Type type) {
+    type = dropProtocolsFromAssociatedTypes(type);
+    return tryMangleSubstitution(type.getPointer());
+  }
 
   std::string mangleClosureEntity(const AbstractClosureExpr *closure,
                                   SymbolKind SKind);
@@ -155,9 +168,12 @@ public:
   
   std::string mangleObjCRuntimeName(const NominalTypeDecl *Nominal);
 
-  std::string mangleTypeAsUSR(Type type) {
-    return mangleTypeWithoutPrefix(type);
+  std::string mangleTypeWithoutPrefix(Type type) {
+    appendType(type);
+    return finalize();
   }
+
+  std::string mangleTypeAsUSR(Type decl);
 
   std::string mangleTypeAsContextUSR(const NominalTypeDecl *type);
 
@@ -167,13 +183,15 @@ public:
                                         const AbstractStorageDecl *decl,
                                         StringRef USRPrefix);
 
+  std::string mangleLocalTypeDecl(const TypeDecl *type);
+
   enum SpecialContext {
     ObjCContext,
     ClangImporterContext,
   };
   
   static Optional<SpecialContext>
-  getSpecialManglingContext(const ValueDecl *decl);
+  getSpecialManglingContext(const ValueDecl *decl, bool useObjCProtocolNames);
 
   static const clang::NamedDecl *
   getClangDeclForMangling(const ValueDecl *decl);
@@ -195,14 +213,6 @@ protected:
   void bindGenericParameters(const DeclContext *DC);
 
   void bindGenericParameters(CanGenericSignature sig);
-
-  /// Mangles a sugared type iff we are mangling for the debugger.
-  template <class T> void appendSugaredType(Type type) {
-    assert(DWARFMangling &&
-           "sugared types are only legal when mangling for the debugger");
-    auto *BlandTy = cast<T>(type.getPointer())->getSinglyDesugaredType();
-    appendType(BlandTy);
-  }
 
   void appendBoundGenericArgs(Type type, bool &isFirstArgList);
 
@@ -261,6 +271,9 @@ protected:
                                    unsigned initialParamDepth,
                                    ArrayRef<Requirement> requirements);
 
+  DependentMemberType *dropProtocolFromAssociatedType(DependentMemberType *dmt);
+  Type dropProtocolsFromAssociatedTypes(Type type);
+
   void appendAssociatedTypeName(DependentMemberType *dmt);
 
   void appendClosureEntity(const SerializedAbstractClosureExpr *closure);
@@ -305,11 +318,6 @@ protected:
   void appendOpParamForLayoutConstraint(LayoutConstraint Layout);
   
   void appendSymbolicReference(SymbolicReferent referent);
-  
-  std::string mangleTypeWithoutPrefix(Type type) {
-    appendType(type);
-    return finalize();
-  }
 };
 
 } // end namespace Mangle

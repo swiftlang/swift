@@ -22,8 +22,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/LexerState.h"
 #include "swift/Parse/Token.h"
-#include "swift/Syntax/References.h"
-#include "swift/Syntax/Trivia.h"
+#include "swift/Parse/ParsedTrivia.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -54,6 +53,12 @@ enum class TriviaRetentionMode {
 enum class HashbangMode : bool {
   Disallowed,
   Allowed,
+};
+
+enum class LexerMode {
+  Swift,
+  SwiftInterface,
+  SIL
 };
 
 /// Kinds of conflict marker which the lexer might encounter.
@@ -99,9 +104,10 @@ class Lexer {
 
   Token NextToken;
   
-  /// This is true if we're lexing a .sil file instead of a .swift
-  /// file.  This enables the 'sil' keyword.
-  const bool InSILMode;
+  /// The kind of source we're lexing. This either enables special behavior for
+  /// parseable interfaces, or enables things like the 'sil' keyword if lexing
+  /// a .sil file.
+  const LexerMode LexMode;
 
   /// True if we should skip past a `#!` line at the start of the file.
   const bool IsHashbangAllowed;
@@ -118,13 +124,13 @@ class Lexer {
   ///
   /// This is only preserved if this Lexer was constructed with
   /// `TriviaRetentionMode::WithTrivia`.
-  syntax::Trivia LeadingTrivia;
+  ParsedTrivia LeadingTrivia;
 
   /// The current trailing trivia for the next token.
   ///
   /// This is only preserved if this Lexer was constructed with
   /// `TriviaRetentionMode::WithTrivia`.
-  syntax::Trivia TrailingTrivia;
+  ParsedTrivia TrailingTrivia;
   
   Lexer(const Lexer&) = delete;
   void operator=(const Lexer&) = delete;
@@ -136,8 +142,8 @@ class Lexer {
   /// everything.
   Lexer(const PrincipalTag &, const LangOptions &LangOpts,
         const SourceManager &SourceMgr, unsigned BufferID,
-        DiagnosticEngine *Diags, bool InSILMode, HashbangMode HashbangAllowed,
-        CommentRetentionMode RetainComments,
+        DiagnosticEngine *Diags, LexerMode LexMode,
+        HashbangMode HashbangAllowed, CommentRetentionMode RetainComments,
         TriviaRetentionMode TriviaRetention);
 
   void initialize(unsigned Offset, unsigned EndOffset);
@@ -151,21 +157,21 @@ public:
   ///   identifier), but not things like how many characters are
   ///   consumed.  If that changes, APIs like getLocForEndOfToken will
   ///   need to take a LangOptions explicitly.
-  /// \param InSILMode - whether we're parsing a SIL source file.
+  /// \param LexMode - the kind of source file we're lexing.
   ///   Unlike language options, this does affect primitive lexing, which
   ///   means that APIs like getLocForEndOfToken really ought to take
   ///   this flag; it's just that we don't care that much about fidelity
   ///   when parsing SIL files.
   Lexer(
       const LangOptions &Options, const SourceManager &SourceMgr,
-      unsigned BufferID, DiagnosticEngine *Diags, bool InSILMode,
+      unsigned BufferID, DiagnosticEngine *Diags, LexerMode LexMode,
       HashbangMode HashbangAllowed = HashbangMode::Disallowed,
       CommentRetentionMode RetainComments = CommentRetentionMode::None,
       TriviaRetentionMode TriviaRetention = TriviaRetentionMode::WithoutTrivia);
 
   /// Create a lexer that scans a subrange of the source buffer.
   Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
-        unsigned BufferID, DiagnosticEngine *Diags, bool InSILMode,
+        unsigned BufferID, DiagnosticEngine *Diags, LexerMode LexMode,
         HashbangMode HashbangAllowed, CommentRetentionMode RetainComments,
         TriviaRetentionMode TriviaRetention, unsigned Offset,
         unsigned EndOffset);
@@ -185,8 +191,8 @@ public:
 
   /// Lex a token. If \c TriviaRetentionMode is \c WithTrivia, passed pointers
   /// to trivias are populated.
-  void lex(Token &Result, syntax::Trivia &LeadingTriviaResult,
-           syntax::Trivia &TrailingTriviaResult) {
+  void lex(Token &Result, ParsedTrivia &LeadingTriviaResult,
+           ParsedTrivia &TrailingTriviaResult) {
     Result = NextToken;
     if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
       LeadingTriviaResult = {LeadingTrivia};
@@ -197,7 +203,7 @@ public:
   }
 
   void lex(Token &Result) {
-    syntax::Trivia LeadingTrivia, TrailingTrivia;
+    ParsedTrivia LeadingTrivia, TrailingTrivia;
     lex(Result, LeadingTrivia, TrailingTrivia);
   }
 
@@ -229,7 +235,7 @@ public:
   /// After restoring the state, lexer will return this token and continue from
   /// there.
   State getStateForBeginningOfToken(const Token &Tok,
-                                    const syntax::Trivia &LeadingTrivia = {}) const {
+                                    const ParsedTrivia &LeadingTrivia = {}) const {
 
     // If the token has a comment attached to it, rewind to before the comment,
     // not just the start of the token.  This ensures that we will re-lex and
@@ -529,7 +535,7 @@ private:
   void lexOperatorIdentifier();
   void lexHexNumber();
   void lexNumber();
-  void lexTrivia(syntax::Trivia &T, bool IsForTrailingTrivia);
+  void lexTrivia(ParsedTrivia &T, bool IsForTrailingTrivia);
   static unsigned lexUnicodeEscape(const char *&CurPtr, Lexer *Diags);
 
   unsigned lexCharacter(const char *&CurPtr, char StopQuote,

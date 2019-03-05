@@ -33,10 +33,10 @@ internal func _stringCompareWithSmolCheck(
 
     if lhsRaw.0 != rhsRaw.0 {
       return _lexicographicalCompare(
-        lhsRaw.0.byteSwapped, rhsRaw.0.byteSwapped, expecting: expecting)
+        lhsRaw.0.bigEndian, rhsRaw.0.bigEndian, expecting: expecting)
     }
     return _lexicographicalCompare(
-      lhsRaw.1.byteSwapped, rhsRaw.1.byteSwapped, expecting: expecting)
+      lhsRaw.1.bigEndian, rhsRaw.1.bigEndian, expecting: expecting)
   }
 
   return _stringCompareInternal(lhs, rhs, expecting: expecting)
@@ -328,10 +328,10 @@ extension _StringGutsSlice {
     if _fastPath(self.isFastUTF8 && other.isFastUTF8) {
       return self.withFastUTF8 { leftUTF8 in
         other.withFastUTF8 { rightUTF8 in
-          let leftStartIndex = String.Index(encodedOffset: 0)
-          let rightStartIndex = String.Index(encodedOffset: 0)
-          let leftEndIndex = String.Index(encodedOffset: leftUTF8.count)
-          let rightEndIndex = String.Index(encodedOffset: rightUTF8.count)
+          let leftStartIndex = String.Index(_encodedOffset: 0)
+          let rightStartIndex = String.Index(_encodedOffset: 0)
+          let leftEndIndex = String.Index(_encodedOffset: leftUTF8.count)
+          let rightEndIndex = String.Index(_encodedOffset: rightUTF8.count)
           return _normalizedCompareImpl(
             left_outputBuffer: _castOutputBuffer(&left_output),
             left_icuInputBuffer: _castOutputBuffer(&left_icuInput),

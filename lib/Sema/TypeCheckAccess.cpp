@@ -160,7 +160,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     Type type, TypeRepr *typeRepr, AccessScope contextAccessScope,
     const DeclContext *useDC, bool mayBeInferred,
     llvm::function_ref<CheckTypeAccessCallback> diagnose) {
-  if (!TC.getLangOpts().EnableAccessControl)
+  if (TC.Context.isAccessControlDisabled())
     return;
   if (!type)
     return;

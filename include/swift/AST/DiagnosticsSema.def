@@ -508,10 +508,6 @@ ERROR(expr_swift_keypath_empty, none,
       "key path must have at least one component", ())
 ERROR(expr_string_interpolation_outside_string,none,
       "string interpolation can only appear inside a string literal", ())
-ERROR(unsupported_keypath_tuple_element_reference,none,
-      "key path cannot reference tuple elements", ())
-ERROR(expr_keypath_unimplemented_tuple,none,
-      "key path support for tuples is not implemented", ())
 ERROR(expr_keypath_subscript_index_not_hashable, none,
       "subscript index of type %0 in a key path must be Hashable", (Type))
 ERROR(expr_smart_keypath_application_type_mismatch,none,
@@ -590,8 +586,8 @@ ERROR(cannot_return_value_from_void_func,none,
 
 ERROR(sema_no_import,Fatal,
       "no such module '%0'", (StringRef))
-ERROR(sema_no_import_arch,Fatal,
-      "could not find module '%0' for architecture '%1'; "
+ERROR(sema_no_import_target,Fatal,
+      "could not find module '%0' for target '%1'; "
       "found: %2", (StringRef, StringRef, StringRef))
 ERROR(sema_no_import_repl,none,
       "no such module '%0'", (StringRef))
@@ -761,7 +757,7 @@ ERROR(imported_decl_is_wrong_kind_typealias,none,
 ERROR(ambiguous_decl_in_module,none,
       "ambiguous name %0 in module %1", (Identifier, Identifier))
 
-ERROR(module_not_testable,none,
+ERROR(module_not_testable,Fatal,
       "module %0 was not compiled for testing", (Identifier))
 
 ERROR(module_not_compiled_for_private_import,none,
@@ -1210,9 +1206,10 @@ WARNING(access_control_setter_redundant,none,
       "%1",
       (AccessLevel, DescriptiveDeclKind, AccessLevel))
 WARNING(access_control_ext_member_more,none,
-    "declaring %select{%error|a fileprivate|an internal|a public|open}0 %1 in "
-    "%select{a private|a fileprivate|an internal|a public|%error}2 extension",
-    (AccessLevel, DescriptiveDeclKind, AccessLevel))
+    "'%select{%error|fileprivate|internal|public|open}0' modifier conflicts "
+    "with extension's default access of "
+    "'%select{private|fileprivate|internal|public|%error}1'",
+    (AccessLevel, AccessLevel))
 WARNING(access_control_ext_member_redundant,none,
     "'%select{%error|fileprivate|internal|public|%error}0' modifier is redundant "
     "for %1 declared in %select{a private (equivalent to fileprivate)|a fileprivate"
@@ -1507,9 +1504,6 @@ WARNING(function_type_usable_from_inline_warn,none,
         "'@usableFromInline' %select{function|method|initializer}0 "
         "should be '@usableFromInline' or public",
         (unsigned, bool))
-ERROR(noreturn_not_supported,none,
-      "'@noreturn' has been removed; functions that never return should have a "
-      "return type of 'Never' instead", ())
 
 // Extensions
 ERROR(non_nominal_extension,none,
@@ -1724,6 +1718,10 @@ ERROR(type_witness_objc_generic_parameter,none,
       (Type, Type, bool, DeclName, DeclName))
 NOTE(witness_fix_access,none,
      "mark the %0 as '%select{%error|fileprivate|internal|public|%error}1' to "
+     "satisfy the requirement", (DescriptiveDeclKind, AccessLevel))
+NOTE(witness_move_to_another_extension,none,
+     "move the %0 to another extension where it can be declared "
+     "'%select{%error|%error|internal|public|%error}1' to "
      "satisfy the requirement", (DescriptiveDeclKind, AccessLevel))
 WARNING(assoc_type_default_conformance_failed,none,
         "default type %0 for associated type %1 does not satisfy constraint "
@@ -1981,6 +1979,9 @@ ERROR(protocol_composition_one_class,none,
 ERROR(requires_conformance_nonprotocol,none,
       "type %0 constrained to non-protocol, non-class type %1",
       (Type, Type))
+NOTE(requires_conformance_nonprotocol_fixit,none,
+     "use '%0 == %1' to require '%0' to be '%1'",
+     (StringRef, StringRef))
 ERROR(requires_not_suitable_archetype,none,
       "type %0 in conformance requirement does not refer to a "
       "generic parameter or associated type",
@@ -2777,7 +2778,7 @@ ERROR(specific_type_of_expression_is_ambiguous,none,
 
 ERROR(failed_to_produce_diagnostic,Fatal,
       "failed to produce diagnostic for expression; "
-      "please file a bug report with your project", ())
+      "please file a bug report", ())
 
 
 ERROR(missing_protocol,none,
@@ -3171,6 +3172,12 @@ ERROR(continue_outside_loop,none,
       "'continue' is only allowed inside a loop", ())
 ERROR(continue_not_in_this_stmt,none,
       "'continue' cannot be used with %0 statements", (StringRef))
+
+ERROR(unresolved_label,none,
+      "use of unresolved label %0", (Identifier))
+ERROR(unresolved_label_corrected,none,
+      "use of unresolved label %0; did you mean %1?",
+      (Identifier, Identifier))
 
 // Switch Stmt
 ERROR(no_match_operator,none,
@@ -3910,6 +3917,14 @@ ERROR(dynamic_replacement_not_in_extension, none,
       "dynamicReplacement(for:) of %0 is not defined in an extension or at the file level", (DeclName))
 ERROR(dynamic_replacement_must_not_be_dynamic, none,
       "dynamicReplacement(for:) of %0 must not be dynamic itself", (DeclName))
+ERROR(dynamic_replacement_replaced_not_objc_dynamic, none,
+      "%0 is not marked @objc dynamic", (DeclName))
+ERROR(dynamic_replacement_replacement_not_objc_dynamic, none,
+      "%0 is marked @objc dynamic", (DeclName))
+ERROR(dynamic_replacement_replaced_constructor_is_convenience, none,
+      "replaced constructor %0 is marked as convenience", (DeclName))
+ERROR(dynamic_replacement_replaced_constructor_is_not_convenience, none,
+      "replaced constructor %0 is not marked as convenience", (DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: @available
@@ -4068,6 +4083,7 @@ ERROR(usable_from_inline_attr_in_protocol,none,
 #define FRAGILE_FUNC_KIND \
   "%select{a '@_transparent' function|" \
   "an '@inlinable' function|" \
+  "an '@_alwaysEmitIntoClient' function|" \
   "a default argument value|" \
   "a property initializer in a '@_fixed_layout' type}"
 
@@ -4101,7 +4117,7 @@ NOTE(resilience_decl_declared_here,
 
 ERROR(class_designated_init_inlinable_resilient,none,
       "initializer for class %0 is "
-      "'%select{@_transparent|@inlinable|%error}1' and must "
+      "'%select{@_transparent|@inlinable|@_alwaysEmitIntoClient|%error}1' and must "
       "delegate to another initializer", (Type, unsigned))
 
 ERROR(attribute_invalid_on_stored_property,
@@ -4181,8 +4197,8 @@ WARNING(immutable_value_never_used_but_assigned, none,
         (Identifier))
 WARNING(variable_never_mutated, none,
         "%select{variable|parameter}1 %0 was never mutated; "
-        "consider changing to 'let' constant",
-        (Identifier, unsigned))
+        "consider %select{removing 'var' to make it|changing to 'let'}2 constant",
+        (Identifier, unsigned, bool))
 WARNING(variable_never_read, none,
         "%select{variable|parameter}1 %0 was written to, but never read",
         (Identifier, unsigned))
@@ -4239,9 +4255,13 @@ WARNING(non_exhaustive_switch_unknown_only,none,
         "switch covers known cases, but %0 may have additional unknown values"
         "%select{|, possibly added in future versions}1", (Type, bool))
 
-WARNING(override_nsobject_hashvalue,none,
+WARNING(override_nsobject_hashvalue_warning,none,
         "override of 'NSObject.hashValue' is deprecated; "
-        "override 'NSObject.hash' to get consistent hashing behavior", ())
+        "did you mean to override 'NSObject.hash'?", ())
+ERROR(override_nsobject_hashvalue_error,none,
+      "'NSObject.hashValue' is not overridable; "
+      "did you mean to override 'NSObject.hash'?", ())
+
 WARNING(hashvalue_implementation,none,
         "'Hashable.hashValue' is deprecated as a protocol requirement; "
         "conform type %0 to 'Hashable' by implementing 'hash(into:)' instead",

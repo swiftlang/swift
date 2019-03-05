@@ -23,6 +23,8 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/IDE/SourceEntityWalker.h"
+#include "swift/Parse/Lexer.h"
 
 using namespace swift;
 
@@ -77,6 +79,7 @@ PrintOptions PrintOptions::printDocInterface() {
   result.PrintDocumentationComments = false;
   result.PrintRegularClangComments = false;
   result.PrintFunctionRepresentationAttrs = false;
+  result.SkipUnderscoredKeywords = true;
   return result;
 }
 
@@ -575,4 +578,85 @@ collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
   // protocols.
   for (auto *IP : PD->getInheritedProtocols())
     HandleMembers(IP->getMembers());
+}
+
+/// This walker will traverse the AST and report types for every expression.
+class ExpressionTypeCollector: public SourceEntityWalker {
+  SourceManager &SM;
+  unsigned int BufferId;
+  std::vector<ExpressionTypeInfo> &Results;
+
+  // This is to where we print all types.
+  llvm::raw_ostream &OS;
+
+  // Map from a printed type to the offset in OS where the type starts.
+  llvm::StringMap<uint32_t> TypeOffsets;
+
+  // This keeps track of whether we have a type reported for a given
+  // [offset, length].
+  llvm::DenseMap<unsigned, llvm::DenseSet<unsigned>> AllPrintedTypes;
+
+  bool shouldReport(unsigned Offset, unsigned Length, Expr *E) {
+    // We shouldn't report null types.
+    if (E->getType().isNull())
+      return false;
+
+    // If we have already reported types for this source range, we shouldn't
+    // report again. This makes sure we always report the outtermost type of
+    // several overlapping expressions.
+    auto &Bucket = AllPrintedTypes[Offset];
+    return Bucket.find(Length) == Bucket.end();
+  }
+
+  // Find an existing offset in the type buffer otherwise print the type to
+  // the buffer.
+  uint32_t getTypeOffsets(StringRef PrintedType) {
+    auto It = TypeOffsets.find(PrintedType);
+    if (It == TypeOffsets.end()) {
+      TypeOffsets[PrintedType] = OS.tell();
+      OS << PrintedType;
+    }
+    return TypeOffsets[PrintedType];
+  }
+
+public:
+  ExpressionTypeCollector(SourceFile &SF, std::vector<ExpressionTypeInfo> &Results,
+    llvm::raw_ostream &OS): SM(SF.getASTContext().SourceMgr),
+                            BufferId(*SF.getBufferID()),
+                            Results(Results), OS(OS) {}
+  bool walkToExprPre(Expr *E) override {
+    if (E->getSourceRange().isInvalid())
+      return true;
+    CharSourceRange Range =
+      Lexer::getCharSourceRangeFromSourceRange(SM, E->getSourceRange());
+    unsigned Offset = SM.getLocOffsetInBuffer(Range.getStart(), BufferId);
+    unsigned Length = Range.getByteLength();
+    if (!shouldReport(Offset, Length, E))
+      return true;
+    // Print the type to a temporary buffer.
+    SmallString<64> Buffer;
+    {
+      llvm::raw_svector_ostream OS(Buffer);
+      E->getType()->getRValueType()->reconstituteSugar(true)->print(OS);
+      // Ensure the end user can directly use the char*
+      OS << '\0';
+    }
+
+    // Add the type information to the result list.
+    Results.push_back({Offset, Length, getTypeOffsets(Buffer.str()),
+      static_cast<uint32_t>(Buffer.size()) - 1});
+
+    // Keep track of that we have a type reported for this range.
+    AllPrintedTypes[Offset].insert(Length);
+    return true;
+  }
+};
+
+ArrayRef<ExpressionTypeInfo>
+swift::collectExpressionType(SourceFile &SF,
+                             std::vector<ExpressionTypeInfo> &Scratch,
+                             llvm::raw_ostream &OS) {
+  ExpressionTypeCollector Walker(SF, Scratch, OS);
+  Walker.walk(SF);
+  return Scratch;
 }

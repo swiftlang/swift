@@ -106,8 +106,7 @@ func testMethods(_ i: Int, x: Y) {
 
 func testSubscripts(_ i: Int, s: String, x: Y) {
   var i2 = x[i]
-  var i3 = x[x: i] // expected-error{{cannot subscript a value of type 'Y' with an index of type '(x: Int)'}}
-  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (Int), (y: String)}}
+  var i3 = x[x: i] // expected-error{{extraneous argument label 'x:' in subscript}}
   var s2 = x[y: s]
   var s3 = x[s]  // expected-error{{cannot convert value of type 'String' to expected argument type 'Int'}}
 }
