@@ -51,7 +51,7 @@ public struct TensorShape : ExpressibleByArrayLiteral {
     self.init(Array(repeating: repeatedValue, count: Int(count)))
   }
 
-  /// The rank of the shape.
+  /// The rank of the shape (i.e. the number of dimensions).
   @inlinable
   public var rank: Int32 {
     @inline(__always)
@@ -71,6 +71,7 @@ public struct TensorShape : ExpressibleByArrayLiteral {
 }
 
 public extension TensorShape {
+  /// The rank of the shape (i.e. the number of dimensions).
   @inlinable
   var count: Int32 {
     @inline(__always)

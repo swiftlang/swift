@@ -36,9 +36,9 @@ public class _AnyTensorHandle {
 }
 
 /// `TensorHandle` is the type used by ops and the `#tfop()` syntax
-/// specifically. It includes a `Scalar` type, which compiler internals depend
-/// on to determine the datatypes of parameters when they are extracted
-/// into a tensor program.
+/// specifically. It includes a `Scalar` type, which compiler internals use to
+/// determine the datatypes of parameters when they are extracted into a tensor
+/// program.
 @_fixed_layout // required because the compiler accesses _cTensorHandle directly.
 public final class TensorHandle<Scalar> : _AnyTensorHandle
   where Scalar : _TensorFlowDataTypeCompatible {
@@ -64,10 +64,10 @@ public final class TensorHandle<Scalar> : _AnyTensorHandle
   /// Create a `TensorHandle` with a closure that initializes the underlying
   /// buffer.
   ///
-  /// Users initializing TensorHandles with non-String scalars should use the
-  /// `init(shape:scalarsInitializer:)` initializer instead of this one.  It
+  /// Users initializing `TensorHandle`s with non-`String` scalars should use
+  /// the `init(shape:scalarsInitializer:)` initializer instead of this one. It
   /// enforces additional constraints on the buffer that hold for all
-  /// non-String scalars.
+  /// non-`String` scalars.
   ///
   /// `bufferInitializer` receives a buffer with exactly `byteCount` bytes of
   /// capacity. `bufferInitializer` must initialize the entire buffer.
@@ -101,7 +101,7 @@ extension TensorHandle where Scalar : TensorFlowScalar {
   /// buffer.
   ///
   /// `scalarsInitializer` receives a buffer with exactly enough capacity to
-  /// hold the scalars in a tensor with shape `shape`.  `scalarsInitializer`
+  /// hold the scalars in a tensor with shape `shape`. `scalarsInitializer`
   /// must initialize the entire buffer, with contiguous scalars in row-major
   /// order.
   @usableFromInline
@@ -239,8 +239,8 @@ extension ResourceHandle : TensorSendableReceivable {
     debugLog("Done sending resource tensor of id \(tensorID).")
   }
 
-  // TODO: remove this dummy Scalar typealias, currently required in order to
-  // conform to TensorSendableReceivable.
+  // TODO: Remove this dummy `Scalar` typealias, currently required in order to
+  // conform to `TensorSendableReceivable`.
   typealias Scalar = Float
   @inlinable
   static func scalar(_ scalar: Scalar) -> ResourceHandle {
@@ -292,8 +292,8 @@ extension VariantHandle : TensorSendableReceivable {
     debugLog("Done sending variant tensor of id \(tensorID).")
   }
 
-  // TODO: remove this dummy Scalar typealias, currently required in order to
-  // conform to TensorSendableReceivable.
+  // TODO: Remove this dummy `Scalar` typealias, currently required in order to
+  // conform to `TensorSendableReceivable`.
   typealias Scalar = Float
   @inlinable
   static func scalar(_ scalar: Scalar) -> VariantHandle {

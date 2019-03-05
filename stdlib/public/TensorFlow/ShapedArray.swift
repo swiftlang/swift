@@ -148,7 +148,7 @@ public protocol _ShapedArrayProtocol
 
   /// The number of dimensions of the array.
   var rank: Int { get }
-  /// The dimensions of the array.
+  /// The shape of the array.
   var shape: [Int] { get }
   /// The total number of scalars in the array.
   var scalarCount: Int { get }
@@ -345,19 +345,27 @@ internal extension ShapedArray where Scalar : _TensorFlowDataTypeCompatible {
 }
 
 public extension ShapedArray {
+  /// The number of dimensions of the array.
   var rank: Int {
     return shape.count
   }
 
+  /// The total number of scalars in the array.
   var scalarCount: Int {
     return buffer.count
   }
 
+  /// Creates a `ShapedArray` with the same shape and scalars as the specified
+  /// instance.
   init(_ other: ShapedArray) {
     debugLog("Initializing from another ShapedArray.")
     self.init(buffer: other.buffer, shape: other.shape)
   }
 
+  /// Creates a `ShapedArray` with the specified shape and contiguous scalars in
+  /// row-major order.
+  /// - Precondition: The number of scalars must equal the product of the
+  ///   dimensions of the shape.
   init(shape: __owned [Int], scalars: __owned [Scalar]) {
     precondition(shape.reduce(1, *) == scalars.count, "Scalar count mismatch.")
     let buffer = TensorBuffer<Scalar>(allocation: .native(.init(scalars)),
@@ -365,6 +373,10 @@ public extension ShapedArray {
     self.init(buffer: buffer, shape: shape)
   }
 
+  /// Creates a `ShapedArray` with the specified shape and sequence of scalars
+  /// in row-major order.
+  /// - Precondition: The number of scalars must equal the product of the
+  ///   dimensions of the shape.
   init<S : Sequence>(shape: __owned [Int],
                      scalars: __shared S) where S.Element == Scalar {
     let scalarCount = shape.reduce(1, *)
@@ -396,7 +408,7 @@ public extension ShapedArray {
   /// Creates a `ShapedArray` with the specified shape and a single, repeated
   /// value.
   /// - Parameters:
-  ///   - shape: The dimensions of the array.
+  ///   - shape: The shape of the `ShapedArray`.
   ///   - repeatedValue: The scalar value to repeat.
   init(shape: __owned [Int], repeating repeatedValue: __owned Scalar) {
     let scalarCount = shape.reduce(1, *)
@@ -487,6 +499,13 @@ extension ShapedArray : RandomAccessCollection, MutableCollection {
 }
 
 public extension ShapedArray {
+  /// Calls a closure with a pointer to the array’s contiguous storage.
+  /// - Parameter body: A closure with an `UnsafeBufferPointer` parameter that
+  ///   points to the contiguous storage for the array. If no such storage
+  ///   exists, it is created. If body has a return value, that value is also
+  ///   used as the return value for the `withUnsafeBufferPointer(_:)` method.
+  ///   The pointer argument is valid only for the duration of the method’s
+  ///   execution.
   func withUnsafeBufferPointer<Result>(
     _ body: (UnsafeBufferPointer<Scalar>) throws -> Result
   ) rethrows -> Result {
@@ -495,6 +514,14 @@ public extension ShapedArray {
     }
   }
 
+  /// Calls the given closure with a pointer to the array’s mutable contiguous
+  /// storage.
+  /// - Parameter body: A closure with an `UnsafeMutableBufferPointer` parameter
+  ///   that points to the contiguous storage for the array. If no such storage
+  ///   exists, it is created. If body has a return value, that value is also
+  ///   used as the return value for the `withUnsafeMutableBufferPointer(_:)`
+  ///   method. The pointer argument is valid only for the duration of the
+  /// method’s execution.
   mutating func withUnsafeMutableBufferPointer<Result>(
     _ body: (inout UnsafeMutableBufferPointer<Scalar>) throws -> Result
   ) rethrows -> Result {
@@ -661,7 +688,6 @@ extension ShapedArray : Codable where Scalar : Codable {
 ///     matrix[0..<2] = zeros.prefix(2)
 ///     // The first 2 elements in `matrix` have been mutated.
 ///     // `matrix` now represents [[0, 0], [0, 0], [4, 5]].
-
 @_fixed_layout
 public struct ShapedArraySlice<Scalar> : _ShapedArrayProtocol {
   /// The underlying `ShapedArray` of the slice.
@@ -696,10 +722,12 @@ public extension ShapedArraySlice {
     return baseIndices.count
   }
 
+  /// The number of dimensions of the array.
   var rank: Int {
     return base.rank - indexingDepth
   }
 
+  /// The shape of the array.
   var shape: [Int] {
     if let bounds = bounds {
       return [bounds.count] + Array(base.shape.dropFirst(indexingDepth + 1))
@@ -707,6 +735,7 @@ public extension ShapedArraySlice {
     return Array(base.shape.dropFirst(indexingDepth))
   }
 
+  /// The total number of scalars in the array.
   var scalarCount: Int {
     return shape.reduce(1, *)
   }
@@ -714,10 +743,18 @@ public extension ShapedArraySlice {
 
 /// Slice initializers.
 public extension ShapedArraySlice {
+  /// Creates a `ShapedArraySlice` with the specified shape and contiguous
+  /// scalars in row-major order.
+  /// - Precondition: The number of scalars must equal the product of the
+  ///   dimensions of the shape.
   init(shape: __owned [Int], scalars: __owned [Scalar]) {
     self.init(base: ShapedArray(shape: shape, scalars: scalars))
   }
 
+  /// Creates an `ShapedArraySlice` with the specified shape and sequence of
+  /// scalars in row-major order.
+  /// - Precondition: The number of scalars must equal the product of the
+  ///   dimensions of the shape.
   init<S : Sequence>(shape: __owned [Int],
                      scalars: __shared S) where S.Element == Scalar {
     self.init(base: ShapedArray(shape: shape, scalars: scalars))
@@ -731,7 +768,7 @@ public extension ShapedArraySlice {
   /// Creates a `ShapedArraySlice` with the specified shape and a single,
   /// repeated value.
   /// - Parameters:
-  ///   - shape: The dimensions of the array.
+  ///   - shape: The shape of the `ShapedArraySlice`.
   ///   - repeatedValue: The scalar value to repeat.
   init(shape: __owned [Int], repeating repeatedValue: __owned Scalar) {
     self.init(base: ShapedArray(shape: shape, repeating: repeatedValue))
@@ -763,6 +800,14 @@ internal extension ShapedArraySlice {
 }
 
 public extension ShapedArraySlice {
+  /// Calls a closure with a pointer to the `ShapedArraySlice`’s contiguous
+  /// storage.
+  /// - Parameter body: A closure with an `UnsafeBufferPointer` parameter that
+  ///   points to the contiguous storage for the `ShapedArraySlice`. If no such
+  ///   storage exists, it is created. If body has a return value, that value is
+  ///   also used as the return value for the `withUnsafeBufferPointer(_:)`
+  ///   method. The pointer argument is valid only for the duration of the
+  ///   method’s execution.
   func withUnsafeBufferPointer<Result>(
     _ body: (UnsafeBufferPointer<Scalar>) throws -> Result
   ) rethrows -> Result {
@@ -776,6 +821,14 @@ public extension ShapedArraySlice {
     }
   }
 
+  /// Calls the given closure with a pointer to the `ShapedArraySlice`’s mutable
+  /// contiguous storage.
+  /// - Parameter body: A closure with an `UnsafeMutableBufferPointer` parameter
+  ///   that points to the contiguous storage for the `ShapedArraySlice`. If no
+  ///   such storage exists, it is created. If body has a return value, that
+  ///   value is also used as the return value for the
+  ///   `withUnsafeMutableBufferPointer(_:)` method. The pointer argument is
+  ///   valid only for the duration of the method’s execution.
   mutating func withUnsafeMutableBufferPointer<Result>(
     _ body: (inout UnsafeMutableBufferPointer<Scalar>) throws -> Result
   ) rethrows -> Result {
