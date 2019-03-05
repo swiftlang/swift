@@ -1509,7 +1509,10 @@ bool swift::shouldExpand(SILModule &Module, SILType Ty) {
   if (EnableExpandAll) {
     return true;
   }
-  unsigned numFields = Module.Types.countNumberOfFields(Ty);
+
+  // FIXME: Expansion
+  unsigned numFields =
+    Module.Types.countNumberOfFields(Ty, ResilienceExpansion::Minimal);
   if (numFields > 6) {
     return false;
   }

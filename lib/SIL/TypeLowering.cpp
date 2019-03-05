@@ -2529,17 +2529,15 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(SILType enumType,
 }
 
 static void countNumberOfInnerFields(unsigned &fieldsCount, SILModule &Module,
-                                     SILType Ty) {
+                                     SILType Ty, ResilienceExpansion expansion) {
   if (auto *structDecl = Ty.getStructOrBoundGenericStruct()) {
-    // FIXME: Expansion
-    assert(!structDecl->isResilient(Module.getSwiftModule(),
-                                    ResilienceExpansion::Minimal) &&
+    assert(!structDecl->isResilient(Module.getSwiftModule(), expansion) &&
            " FSO should not be trying to explode resilient (ie address-only) "
            "types at all");
     for (auto *prop : structDecl->getStoredProperties()) {
       SILType propTy = Ty.getFieldType(prop, Module);
       unsigned fieldsCountBefore = fieldsCount;
-      countNumberOfInnerFields(fieldsCount, Module, propTy);
+      countNumberOfInnerFields(fieldsCount, Module, propTy, expansion);
       if (fieldsCount == fieldsCountBefore) {
         // size of Struct(BigStructType) == size of BigStructType()
         // prevent counting its size as BigStructType()+1
@@ -2549,9 +2547,9 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, SILModule &Module,
     return;
   }
   if (auto tupleTy = Ty.getAs<TupleType>()) {
-    for (auto elt : tupleTy->getElementTypes()) {
-      auto silElt = SILType::getPrimitiveObjectType(elt->getCanonicalType());
-      countNumberOfInnerFields(fieldsCount, Module, silElt);
+    for (auto elt : tupleTy.getElementTypes()) {
+      auto silElt = SILType::getPrimitiveObjectType(elt);
+      countNumberOfInnerFields(fieldsCount, Module, silElt, expansion);
     }
     return;
   }
@@ -2559,9 +2557,7 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, SILModule &Module,
     if (enumDecl->isIndirect()) {
       return;
     }
-    // FIXME: Expansion
-    assert(!enumDecl->isResilient(Module.getSwiftModule(),
-                                  ResilienceExpansion::Minimal) &&
+    assert(!enumDecl->isResilient(Module.getSwiftModule(), expansion) &&
            " FSO should not be trying to explode resilient (ie address-only) "
            "types at all");
     unsigned fieldsCountBefore = fieldsCount;
@@ -2580,7 +2576,7 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, SILModule &Module,
       // In case it is used by a pass that tries to explode enums.
       auto payloadTy = Ty.getEnumElementType(elt, Module);
       fieldsCount = 0;
-      countNumberOfInnerFields(fieldsCount, Module, payloadTy);
+      countNumberOfInnerFields(fieldsCount, Module, payloadTy, expansion);
       if (fieldsCount > maxEnumCount) {
         maxEnumCount = fieldsCount;
       }
@@ -2590,13 +2586,15 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, SILModule &Module,
   }
 }
 
-unsigned TypeConverter::countNumberOfFields(SILType Ty) {
-  auto Iter = TypeFields.find(Ty);
+unsigned TypeConverter::countNumberOfFields(SILType Ty,
+                                            ResilienceExpansion expansion) {
+  auto key = std::make_pair(Ty, unsigned(expansion));
+  auto Iter = TypeFields.find(key);
   if (Iter != TypeFields.end()) {
     return std::max(Iter->second, 1U);
   }
   unsigned fieldsCount = 0;
-  countNumberOfInnerFields(fieldsCount, M, Ty);
-  TypeFields[Ty] = fieldsCount;
+  countNumberOfInnerFields(fieldsCount, M, Ty, expansion);
+  TypeFields[key] = fieldsCount;
   return std::max(fieldsCount, 1U);
 }

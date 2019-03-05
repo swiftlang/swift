@@ -683,7 +683,9 @@ class TypeConverter {
   llvm::DenseMap<AnyFunctionRef, CaptureInfo> LoweredCaptures;
 
   /// Cache of loadable SILType to number of (estimated) fields
-  llvm::DenseMap<SILType, unsigned> TypeFields;
+  ///
+  /// Second element is a ResilienceExpansion.
+  llvm::DenseMap<std::pair<SILType, unsigned>, unsigned> TypeFields;
 
   CanAnyFunctionType makeConstantInterfaceType(SILDeclRef constant);
   
@@ -739,7 +741,7 @@ public:
   static ProtocolDispatchStrategy getProtocolDispatchStrategy(ProtocolDecl *P);
 
   /// Count the total number of fields inside the given SIL Type
-  unsigned countNumberOfFields(SILType Ty);
+  unsigned countNumberOfFields(SILType Ty, ResilienceExpansion expansion);
 
   /// True if a protocol uses witness tables for dynamic dispatch.
   static bool protocolRequiresWitnessTable(ProtocolDecl *P) {
