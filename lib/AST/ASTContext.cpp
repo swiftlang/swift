@@ -515,6 +515,7 @@ void ASTContext::operator delete(void *Data) throw() {
 ASTContext *ASTContext::get(LangOptions &langOpts,
                             SearchPathOptions &SearchPathOpts,
                             SourceManager &SourceMgr,
+                            FileManager &FileMgr,
                             DiagnosticEngine &Diags) {
   // If more than two data structures are concatentated, then the aggregate
   // size math needs to become more complicated due to per-struct alignment
@@ -525,14 +526,17 @@ ASTContext *ASTContext::get(LangOptions &langOpts,
   auto impl = reinterpret_cast<void*>((char*)mem + sizeof(ASTContext));
   impl = reinterpret_cast<void*>(llvm::alignAddr(impl,alignof(Implementation)));
   new (impl) Implementation();
-  return new (mem) ASTContext(langOpts, SearchPathOpts, SourceMgr, Diags);
+  return new (mem) ASTContext(langOpts, SearchPathOpts, SourceMgr,
+                              FileMgr, Diags);
 }
 
 ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
-                       SourceManager &SourceMgr, DiagnosticEngine &Diags)
+                       SourceManager &SourceMgr, FileManager &FileMgr,
+                       DiagnosticEngine &Diags)
   : LangOpts(langOpts),
     SearchPathOpts(SearchPathOpts),
     SourceMgr(SourceMgr),
+    FileMgr(FileMgr),
     Diags(Diags),
     evaluator(Diags, langOpts.DebugDumpCycles),
     TheBuiltinModule(createBuiltinModule(*this)),

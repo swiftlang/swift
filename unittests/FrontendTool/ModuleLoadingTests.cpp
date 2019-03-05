@@ -84,20 +84,23 @@ protected:
         "// swift-module-flags: -module-name TestModule -parse-stdlib\n"
         "public func foo()\n"));
 
+    llvm::IntrusiveRefCntPtr<FileManager> fileMgr = new FileManager();
     SourceManager sourceMgr;
+    sourceMgr.setFileManager(fileMgr);
 
     // Create a file system that tracks how many times a file has been opened.
     llvm::IntrusiveRefCntPtr<OpenTrackingFileSystem> fs(
-      new OpenTrackingFileSystem(sourceMgr.getFileSystem()));
+      new OpenTrackingFileSystem(&fileMgr->getFileSystem()));
 
-    sourceMgr.setFileSystem(fs);
+    fileMgr->setFileSystem(fs);
     PrintingDiagnosticConsumer printingConsumer;
     DiagnosticEngine diags(sourceMgr);
     diags.addConsumer(printingConsumer);
     LangOptions langOpts;
     langOpts.Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
     SearchPathOptions searchPathOpts;
-    auto ctx = ASTContext::get(langOpts, searchPathOpts, sourceMgr, diags);
+    auto ctx = ASTContext::get(langOpts, searchPathOpts, sourceMgr,
+                               *fileMgr, diags);
 
     auto loader = ParseableInterfaceModuleLoader::create(
         *ctx, cacheDir, prebuiltCacheDir,

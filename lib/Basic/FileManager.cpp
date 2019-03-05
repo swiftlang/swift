@@ -19,11 +19,12 @@ using namespace swift;
 llvm::ErrorOr<llvm::vfs::Status>
 FileManager::status(StringRef path) {
   llvm::vfs::Status status;
-  bool result = clang::FileSystemStatCache::get(path, status, /*isFile*/true,
-                                                /*File*/nullptr, &cachedStats,
-                                                *fileSystem);
-  if (result)
-    return std::make_error_code(std::errc::no_such_file_or_directory);
+  auto error = clang::FileSystemStatCache::get(path, status, /*isFile*/true,
+                                               /*File*/nullptr, &cachedStats,
+                                               *fileSystem);
+  if (error)
+    return error;
+
   return status;
 }
 
@@ -42,12 +43,13 @@ FileManager::getBufferForFile(StringRef path, int64_t fileSize,
 
   llvm::vfs::Status status;
   std::unique_ptr<llvm::vfs::File> file;
-  bool pathDoesNotExist =
+  auto error =
     clang::FileSystemStatCache::get(path, status, /*isFile*/true,
                                     &file, &cachedStats,
                                     *fileSystem);
-  if (pathDoesNotExist)
-    return std::make_error_code(std::errc::no_such_file_or_directory);
+  if (error)
+    return error;
+
   auto buf = file->getBuffer(path, fileSize, requiresNullTerminator,
                              isVolatile);
   if (!buf) return buf.getError();

@@ -47,6 +47,7 @@ namespace swift {
   class DiagnosticConsumer;
   class DiagnosticEngine;
   class Evaluator;
+  class FileManager;
   class FileUnit;
   class GenericEnvironment;
   class GenericParamList;
@@ -357,12 +358,15 @@ namespace swift {
   /// A convenience wrapper for Parser functionality.
   class ParserUnit {
   public:
-    ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
+    ParserUnit(SourceManager &SM, FileManager &FM,
+               SourceFileKind SFKind, unsigned BufferID,
                const LangOptions &LangOpts, StringRef ModuleName,
                std::shared_ptr<SyntaxParseActions> spActions = nullptr,
                SyntaxParsingCache *SyntaxCache = nullptr);
-    ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID);
-    ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
+    ParserUnit(SourceManager &SM, FileManager &FM,
+               SourceFileKind SFKind, unsigned BufferID);
+    ParserUnit(SourceManager &SM, FileManager &FM,
+               SourceFileKind SFKind, unsigned BufferID,
                unsigned Offset, unsigned EndOffset);
 
     ~ParserUnit();

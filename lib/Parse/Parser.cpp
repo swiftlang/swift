@@ -1123,13 +1123,14 @@ struct ParserUnit::Implementation {
   SourceFile *SF;
   std::unique_ptr<Parser> TheParser;
 
-  Implementation(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
+  Implementation(SourceManager &SM, FileManager &FM,
+                 SourceFileKind SFKind, unsigned BufferID,
                  const LangOptions &Opts, StringRef ModuleName,
                  std::shared_ptr<SyntaxParseActions> spActions)
     : SPActions(std::move(spActions)),
       LangOpts(Opts),
       Diags(SM),
-      Ctx(*ASTContext::get(LangOpts, SearchPathOpts, SM, Diags)),
+      Ctx(*ASTContext::get(LangOpts, SearchPathOpts, SM, FM, Diags)),
       SF(new (Ctx) SourceFile(
             *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx),
             SFKind, BufferID,
@@ -1146,15 +1147,17 @@ struct ParserUnit::Implementation {
   }
 };
 
-ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID)
-  : ParserUnit(SM, SFKind, BufferID, LangOptions(), "input") {
+ParserUnit::ParserUnit(SourceManager &SM, FileManager &FM,
+                       SourceFileKind SFKind, unsigned BufferID)
+  : ParserUnit(SM, FM, SFKind, BufferID, LangOptions(), "input") {
 }
 
-ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
+ParserUnit::ParserUnit(SourceManager &SM, FileManager &FM,
+                       SourceFileKind SFKind, unsigned BufferID,
                        const LangOptions &LangOpts, StringRef ModuleName,
                        std::shared_ptr<SyntaxParseActions> spActions,
                        SyntaxParsingCache *SyntaxCache)
-    : Impl(*new Implementation(SM, SFKind, BufferID, LangOpts, ModuleName,
+    : Impl(*new Implementation(SM, FM, SFKind, BufferID, LangOpts, ModuleName,
                                std::move(spActions))) {
 
   Impl.SF->SyntaxParsingCache = SyntaxCache;
@@ -1163,9 +1166,10 @@ ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned Buffer
                                   /*DelayBodyParsing=*/false));
 }
 
-ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
+ParserUnit::ParserUnit(SourceManager &SM, FileManager &FM,
+                       SourceFileKind SFKind, unsigned BufferID,
                        unsigned Offset, unsigned EndOffset)
-  : Impl(*new Implementation(SM, SFKind, BufferID, LangOptions(), "input",
+  : Impl(*new Implementation(SM, FM, SFKind, BufferID, LangOptions(), "input",
                              nullptr)) {
 
   std::unique_ptr<Lexer> Lex;

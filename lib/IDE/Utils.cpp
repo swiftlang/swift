@@ -102,8 +102,9 @@ SourceCompleteResult
 ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf,
                            SourceFileKind SFKind) {
   SourceManager SM;
+  FileManager FM;
   auto BufferID = SM.addNewSourceBuffer(std::move(MemBuf));
-  ParserUnit Parse(SM, SFKind, BufferID);
+  ParserUnit Parse(SM, FM, SFKind, BufferID);
   Parse.parse();
   SourceCompleteResult SCR;
   SCR.IsComplete = !Parse.getParser().isInputIncomplete();

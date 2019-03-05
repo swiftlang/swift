@@ -17,6 +17,7 @@
 
 #include "swift-c/SyntaxParser/SwiftSyntaxParser.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/FileManager.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Parser.h"
@@ -270,6 +271,7 @@ struct SynParserDiagConsumer: public DiagnosticConsumer {
 
 swiftparse_client_node_t SynParser::parse(const char *source) {
   SourceManager SM;
+  FileManager FM;
   unsigned bufID = SM.addNewSourceBuffer(
     llvm::MemoryBuffer::getMemBuffer(source, "syntax_parse_source"));
   LangOptions langOpts;
@@ -283,7 +285,7 @@ swiftparse_client_node_t SynParser::parse(const char *source) {
     std::make_shared<CLibParseActions>(*this, SM, bufID);
   // We have to use SourceFileKind::Main to avoid diagnostics like
   // illegal_top_level_expr
-  ParserUnit PU(SM, SourceFileKind::Main, bufID, langOpts,
+  ParserUnit PU(SM, FM, SourceFileKind::Main, bufID, langOpts,
                 "syntax_parse_module", std::move(parseActions),
                 /*SyntaxCache=*/nullptr);
   // Evaluating pound conditions may lead to unknown syntax.

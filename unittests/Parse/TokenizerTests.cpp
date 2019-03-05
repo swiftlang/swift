@@ -1,4 +1,5 @@
 #include "swift/AST/Module.h"
+#include "swift/Basic/FileManager.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
@@ -15,6 +16,7 @@ class TokenizerTest : public ::testing::Test {
 public:
   LangOptions LangOpts;
   SourceManager SM;
+  FileManager FM;
 
   unsigned makeBuffer(StringRef Source) {
     return SM.addMemBufferCopy(Source);
@@ -82,7 +84,8 @@ public:
   }
   
   std::vector<Token> parseAndGetSplitTokens(unsigned BufID) {
-    swift::ParserUnit PU(SM, SourceFileKind::Main, BufID, LangOpts, "unknown");
+    swift::ParserUnit PU(SM, FM, SourceFileKind::Main, BufID, LangOpts,
+                         "unknown");
 
     bool Done = false;
     while (!Done) {

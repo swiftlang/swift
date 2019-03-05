@@ -1026,7 +1026,7 @@ ClangImporter::create(ASTContext &ctx,
       if (!instance.getHeaderSearchOpts().VFSOverlayFiles.empty()) {
         ctx.Diags.diagnose(SourceLoc(), diag::clang_vfs_overlay_is_ignored);
       }
-      instance.setVirtualFileSystem(ctx.SourceMgr.getFileSystem());
+      instance.setVirtualFileSystem(&ctx.FileMgr.getFileSystem());
     }
     instance.createFileManager();
   }

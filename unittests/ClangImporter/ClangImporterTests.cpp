@@ -72,9 +72,11 @@ TEST(ClangImporterTest, emitPCHInMemory) {
   INITIALIZE_LLVM();
   swift::SearchPathOptions searchPathOpts;
   swift::SourceManager sourceMgr;
+  llvm::IntrusiveRefCntPtr<FileManager> fileMgr = new FileManager();
+  sourceMgr.setFileManager(fileMgr);
   swift::DiagnosticEngine diags(sourceMgr);
   std::unique_ptr<ASTContext> context(
-      ASTContext::get(langOpts, searchPathOpts, sourceMgr, diags));
+      ASTContext::get(langOpts, searchPathOpts, sourceMgr, *fileMgr, diags));
   auto importer = ClangImporter::create(*context, options);
 
   std::string PCH = createFilename(cache, "bridging.h.pch");

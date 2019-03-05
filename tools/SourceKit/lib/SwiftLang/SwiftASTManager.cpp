@@ -374,6 +374,7 @@ struct SwiftASTManager::Implementation {
   std::shared_ptr<SwiftStatistics> Stats;
   std::string RuntimeResourcePath;
   SourceManager SourceMgr;
+  FileManager FileMgr;
   Cache<ASTKey, ASTProducerRef> ASTCache{ "sourcekit.swift.ASTCache" };
   llvm::sys::Mutex CacheMtx;
 

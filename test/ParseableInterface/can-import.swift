@@ -1,4 +1,3 @@
-// RUN: %empty-directory(%t)
 // RUN: echo 'public func externalFunc() {}' | %target-swift-frontend -typecheck -emit-parseable-module-interface-path %t/Library.swiftinterface -
 // RUN: %target-swift-frontend -typecheck %s -I %t
 

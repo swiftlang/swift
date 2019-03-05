@@ -167,10 +167,11 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   SearchPathOpts.RuntimeResourcePath = RuntimeResourcePath.str();
 
   SourceManager SrcMgr;
+  FileManager FileMgr;
   LangOptions LangOpts;
   LangOpts.Target = Invocation.getTargetTriple();
   ASTContext &ASTCtx = *ASTContext::get(LangOpts, SearchPathOpts, SrcMgr,
-                                        Instance.getDiags());
+                                        FileMgr, Instance.getDiags());
   registerTypeCheckerRequestFunctions(ASTCtx.evaluator);
   
   ClangImporterOptions ClangImporterOpts;

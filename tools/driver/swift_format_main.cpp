@@ -37,6 +37,7 @@ using namespace llvm::opt;
 class FormatterDocument {
 private:
   SourceManager SM;
+  FileManager FM;
   unsigned BufferID;
   CompilerInvocation CompInv;
   std::unique_ptr<ParserUnit> Parser;
@@ -62,7 +63,7 @@ public:
 
   void updateCode(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
     BufferID = SM.addNewSourceBuffer(std::move(Buffer));
-    Parser.reset(new ParserUnit(SM, SourceFileKind::Main,
+    Parser.reset(new ParserUnit(SM, FM, SourceFileKind::Main,
                                 BufferID, CompInv.getLangOptions(),
                                 CompInv.getModuleName()));
     Parser->getDiagnosticEngine().addConsumer(DiagConsumer);

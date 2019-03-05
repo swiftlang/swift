@@ -13,6 +13,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/FileManager.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 
@@ -28,6 +29,7 @@ public:
   LangOptions LangOpts;
   SearchPathOptions SearchPathOpts;
   SourceManager SourceMgr;
+  FileManager FileMgr;
   DiagnosticEngine Diags;
 
   TestContextBase() : Diags(SourceMgr) {

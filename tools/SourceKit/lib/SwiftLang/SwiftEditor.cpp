@@ -668,6 +668,7 @@ private:
 
 class SwiftDocumentSyntaxInfo {
   SourceManager SM;
+  FileManager FM;
   EditorDiagConsumer DiagConsumer;
   std::shared_ptr<SyntaxTreeCreator> SynTreeCreator;
   std::unique_ptr<ParserUnit> Parser;
@@ -699,7 +700,7 @@ public:
     }
 
     Parser.reset(
-                 new ParserUnit(SM, SourceFileKind::Main, BufferID,
+                 new ParserUnit(SM, FM, SourceFileKind::Main, BufferID,
                      CompInv.getLangOptions(),
                      CompInv.getModuleName(),
                      SynTreeCreator,

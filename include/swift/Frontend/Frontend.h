@@ -26,6 +26,7 @@
 #include "swift/AST/SILOptions.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/Basic/DiagnosticOptions.h"
+#include "swift/Basic/FileManager.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -364,6 +365,7 @@ public:
 class CompilerInstance {
   CompilerInvocation Invocation;
   SourceManager SourceMgr;
+  llvm::IntrusiveRefCntPtr<FileManager> FileMgr;
   DiagnosticEngine Diagnostics{SourceMgr};
   std::unique_ptr<ASTContext> Context;
   std::unique_ptr<SILModule> TheSILModule;
@@ -428,9 +430,11 @@ public:
 
   SourceManager &getSourceMgr() { return SourceMgr; }
 
+  FileManager &getFileMgr() { return *FileMgr; }
+
   DiagnosticEngine &getDiags() { return Diagnostics; }
 
-  llvm::vfs::FileSystem &getFileSystem() { return *SourceMgr.getFileSystem(); }
+  llvm::vfs::FileSystem &getFileSystem() { return FileMgr->getFileSystem(); }
 
   ASTContext &getASTContext() {
     return *Context;

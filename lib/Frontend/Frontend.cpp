@@ -275,8 +275,14 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
 
   // If we successfully loaded all the overlays, let the source manager and
   // diagnostic engine take advantage of the overlay file system.
+<<<<<<< HEAD
   if (!hadAnyFailure && hasOverlays) {
     SourceMgr.setFileSystem(OverlayFS);
+=======
+  if (!hadAnyFailure &&
+      (OverlayFS->overlays_begin() != OverlayFS->overlays_end())) {
+    FileMgr->setFileSystem(OverlayFS);
+>>>>>>> [Frontend] Add FileManager to CompilerInstance
   }
 
   return hadAnyFailure;

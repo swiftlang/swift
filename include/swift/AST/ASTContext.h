@@ -60,6 +60,7 @@ namespace swift {
   class DeclContext;
   class DefaultArgumentInitializer;
   class ExtensionDecl;
+  class FileManager;
   class ForeignRepresentationInfo;
   class FuncDecl;
   class GenericContext;
@@ -197,7 +198,8 @@ class ASTContext final {
   void operator=(const ASTContext&) = delete;
 
   ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
-             SourceManager &SourceMgr, DiagnosticEngine &Diags);
+             SourceManager &SourceMgr, FileManager &FileMgr,
+             DiagnosticEngine &Diags);
 
 public:
   // Members that should only be used by ASTContext.cpp.
@@ -211,6 +213,7 @@ public:
   static ASTContext *get(LangOptions &langOpts,
                          SearchPathOptions &SearchPathOpts,
                          SourceManager &SourceMgr,
+                         FileManager &FileMgr,
                          DiagnosticEngine &Diags);
   ~ASTContext();
 
@@ -228,6 +231,9 @@ public:
 
   /// The source manager object.
   SourceManager &SourceMgr;
+
+  /// The file manager object.
+  FileManager &FileMgr;
 
   /// Diags - The diagnostics engine.
   DiagnosticEngine &Diags;

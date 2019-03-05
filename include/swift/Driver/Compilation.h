@@ -40,6 +40,7 @@ namespace opt {
 
 namespace swift {
   class DiagnosticEngine;
+  class FileManager;
   namespace sys {
     class TaskQueue;
   }
