@@ -4404,7 +4404,6 @@ ConstraintSystem::simplifyEscapableFunctionOfConstraint(
     return SolutionKind::Unsolved;
   };
 
-
   type2 = getFixedTypeRecursive(type2, flags, /*wantRValue=*/true);
   if (auto fn2 = type2->getAs<FunctionType>()) {
     // Solve forward by binding the other type variable to the escapable
@@ -4901,6 +4900,34 @@ retry_after_fail:
 
   case SolutionKind::Unsolved:
     break;
+  }
+
+  // Collect the active overload choices.
+  SmallVector<OverloadChoice, 4> choices;
+  for (auto constraint : disjunction->getNestedConstraints()) {
+    if (constraint->isDisabled())
+      continue;
+    choices.push_back(constraint->getOverloadChoice());
+  }
+
+  // If we can favor one generic result over another, do so.
+  if (auto favoredChoice = tryOptimizeGenericDisjunction(choices)) {
+    unsigned favoredIndex = favoredChoice - choices.data();
+    for (auto constraint : disjunction->getNestedConstraints()) {
+      if (constraint->isDisabled())
+        continue;
+
+      if (favoredIndex == 0) {
+        if (solverState)
+          solverState->favorConstraint(constraint);
+        else
+          constraint->setFavored();
+
+        break;
+      } else {
+        --favoredIndex;
+      }
+    }
   }
 
   // If there was a constraint that we couldn't reason about, don't use the
