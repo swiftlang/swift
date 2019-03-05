@@ -4885,11 +4885,22 @@ static bool isVarInPattern(const VarDecl *vd, Pattern *p) {
 static Optional<std::pair<CaseStmt *, Pattern *>>
 findParentPatternCaseStmtAndPattern(const VarDecl *inputVD) {
   auto getMatchingPattern = [&](CaseStmt *cs) -> Pattern * {
+    // Check if inputVD is in our case body var decls if we have any. If we do,
+    // treat its pattern as our first case label item pattern.
+    for (auto *vd : cs->getCaseBodyVariablesOrEmptyArray()) {
+      if (vd == inputVD) {
+        return cs->getMutableCaseLabelItems().front().getPattern();
+      }
+    }
+
+    // Then check the rest of our case label items.
     for (auto &item : cs->getMutableCaseLabelItems()) {
       if (isVarInPattern(inputVD, item.getPattern())) {
         return item.getPattern();
       }
     }
+
+    // Otherwise return false if we do not find anything.
     return nullptr;
   };
 
@@ -4923,9 +4934,16 @@ VarDecl *VarDecl::getCanonicalVarDecl() const {
   if (!vd)
     return cur;
 
+#ifndef NDEBUG
+  // Make sure that we don't get into an infinite loop.
+  SmallPtrSet<VarDecl *, 8> visitedDecls;
+  visitedDecls.insert(vd);
+  visitedDecls.insert(cur);
+#endif
   while (vd) {
     cur = vd;
     vd = vd->getParentVarDecl();
+    assert((!vd || visitedDecls.insert(vd).second) && "Infinite loop ?!");
   }
 
   return cur;

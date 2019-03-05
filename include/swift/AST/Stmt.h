@@ -17,12 +17,13 @@
 #ifndef SWIFT_AST_STMT_H
 #define SWIFT_AST_STMT_H
 
+#include "swift/AST/ASTNode.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/AvailabilitySpec.h"
-#include "swift/AST/ASTNode.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/NullablePtr.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
@@ -984,24 +985,22 @@ class CaseStmt final
   SourceLoc CaseLoc;
   SourceLoc ColonLoc;
 
-  llvm::PointerIntPair<Stmt *, 1, bool> BodyAndHasBoundDecls;
+  llvm::PointerIntPair<Stmt *, 1, bool> BodyAndHasFallthrough;
 
-  /// Set to true if we have a fallthrough.
-  ///
-  /// TODO: Once we have CaseBodyVarDecls, use the bit in BodyAndHasBoundDecls
-  /// for this instead. This is separate now for staging reasons.
-  bool hasFallthrough;
+  Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables;
 
   CaseStmt(SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
-           bool HasBoundDecls, SourceLoc UnknownAttrLoc, SourceLoc ColonLoc,
-           Stmt *Body, Optional<bool> Implicit,
+           SourceLoc UnknownAttrLoc, SourceLoc ColonLoc, Stmt *Body,
+           Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
+           Optional<bool> Implicit,
            NullablePtr<FallthroughStmt> fallthroughStmt);
 
 public:
   static CaseStmt *
   create(ASTContext &C, SourceLoc CaseLoc,
-         ArrayRef<CaseLabelItem> CaseLabelItems, bool HasBoundDecls,
-         SourceLoc UnknownAttrLoc, SourceLoc ColonLoc, Stmt *Body,
+         ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,
+         SourceLoc ColonLoc, Stmt *Body,
+         Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
          Optional<bool> Implicit = None,
          NullablePtr<FallthroughStmt> fallthroughStmt = nullptr);
 
@@ -1020,18 +1019,18 @@ public:
   }
 
   NullablePtr<CaseStmt> getFallthroughDest() {
-    if (!hasFallthrough)
+    if (!hasFallthroughDest())
       return nullptr;
     return (*getTrailingObjects<FallthroughStmt *>())->getFallthroughDest();
   }
 
-  bool hasFallthroughDest() const { return hasFallthrough; }
+  bool hasFallthroughDest() const { return BodyAndHasFallthrough.getInt(); }
 
-  Stmt *getBody() const { return BodyAndHasBoundDecls.getPointer(); }
-  void setBody(Stmt *body) { BodyAndHasBoundDecls.setPointer(body); }
+  Stmt *getBody() const { return BodyAndHasFallthrough.getPointer(); }
+  void setBody(Stmt *body) { BodyAndHasFallthrough.setPointer(body); }
 
   /// True if the case block declares any patterns with local variable bindings.
-  bool hasBoundDecls() const { return BodyAndHasBoundDecls.getInt(); }
+  bool hasBoundDecls() const { return CaseBodyVariables.hasValue(); }
 
   /// Get the source location of the 'case' or 'default' of the first label.
   SourceLoc getLoc() const { return CaseLoc; }
@@ -1056,6 +1055,30 @@ public:
     return UnknownAttrLoc.isValid();
   }
 
+  Optional<ArrayRef<VarDecl *>> getCaseBodyVariables() const {
+    if (!CaseBodyVariables)
+      return None;
+    ArrayRef<VarDecl *> a = *CaseBodyVariables;
+    return a;
+  }
+
+  Optional<MutableArrayRef<VarDecl *>> getCaseBodyVariables() {
+    return CaseBodyVariables;
+  }
+
+  ArrayRef<VarDecl *> getCaseBodyVariablesOrEmptyArray() const {
+    if (!CaseBodyVariables)
+      return ArrayRef<VarDecl *>();
+    ArrayRef<VarDecl *> a = *CaseBodyVariables;
+    return a;
+  }
+
+  MutableArrayRef<VarDecl *> getCaseBodyVariablesOrEmptyArray() {
+    if (!CaseBodyVariables)
+      return MutableArrayRef<VarDecl *>();
+    return *CaseBodyVariables;
+  }
+
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Case; }
 
   size_t numTrailingObjects(OverloadToken<CaseLabelItem>) const {
@@ -1063,7 +1086,7 @@ public:
   }
 
   size_t numTrailingObjects(OverloadToken<FallthroughStmt *>) const {
-    return hasFallthrough ? 1 : 0;
+    return hasFallthroughDest() ? 1 : 0;
   }
 };
 
