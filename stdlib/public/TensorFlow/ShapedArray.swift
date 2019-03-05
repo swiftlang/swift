@@ -148,7 +148,7 @@ public protocol _ShapedArrayProtocol
 
   /// The number of dimensions of the array.
   var rank: Int { get }
-  /// The dimensions of the array.
+  /// The shape of the array.
   var shape: [Int] { get }
   /// The total number of scalars in the array.
   var scalarCount: Int { get }
@@ -408,7 +408,7 @@ public extension ShapedArray {
   /// Creates a `ShapedArray` with the specified shape and a single, repeated
   /// value.
   /// - Parameters:
-  ///   - shape: The dimensions of the `ShapedArray`.
+  ///   - shape: The shape of the `ShapedArray`.
   ///   - repeatedValue: The scalar value to repeat.
   init(shape: __owned [Int], repeating repeatedValue: __owned Scalar) {
     let scalarCount = shape.reduce(1, *)
@@ -727,7 +727,7 @@ public extension ShapedArraySlice {
     return base.rank - indexingDepth
   }
 
-  /// The dimensions of the array.
+  /// The shape of the array.
   var shape: [Int] {
     if let bounds = bounds {
       return [bounds.count] + Array(base.shape.dropFirst(indexingDepth + 1))
@@ -768,7 +768,7 @@ public extension ShapedArraySlice {
   /// Creates a `ShapedArraySlice` with the specified shape and a single,
   /// repeated value.
   /// - Parameters:
-  ///   - shape: The dimensions of the `ShapedArraySlice`.
+  ///   - shape: The shape of the `ShapedArraySlice`.
   ///   - repeatedValue: The scalar value to repeat.
   init(shape: __owned [Int], repeating repeatedValue: __owned Scalar) {
     self.init(base: ShapedArray(shape: shape, repeating: repeatedValue))
