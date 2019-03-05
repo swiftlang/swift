@@ -204,6 +204,9 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   Invocation = Invok;
 
+  FileMgr = new FileManager();
+  SourceMgr.setFileManager(FileMgr);
+
   // If initializing the overlay file system fails there's no sense in
   // continuing because the compiler will read the wrong files.
   if (setUpVirtualFileSystemOverlays())

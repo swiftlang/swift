@@ -15,7 +15,8 @@
 
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/SourceLoc.h"
-#include "clang/Basic/FileManager.h"
+#include "swift/Basic/FileManager.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/SourceMgr.h"
@@ -26,18 +27,12 @@ namespace swift {
 /// This class manages and owns source buffers.
 class SourceManager {
   llvm::SourceMgr LLVMSourceMgr;
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem;
+  llvm::IntrusiveRefCntPtr<FileManager> FileMgr = new FileManager();
   unsigned CodeCompletionBufferID = 0U;
   unsigned CodeCompletionOffset;
 
   /// Associates buffer identifiers to buffer IDs.
   llvm::DenseMap<StringRef, unsigned> BufIdentIDMap;
-
-  /// A cache mapping buffer identifiers to vfs Status entries.
-  ///
-  /// This is as much a hack to prolong the lifetime of status objects as it is
-  /// to speed up stats.
-  mutable llvm::DenseMap<StringRef, llvm::vfs::Status> StatusCache;
 
   // \c #sourceLocation directive handling.
   struct VirtualFile {
@@ -49,9 +44,7 @@ class SourceManager {
   mutable std::pair<const char *, const VirtualFile*> CachedVFile = {nullptr, nullptr};
 
 public:
-  SourceManager(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS =
-                    llvm::vfs::getRealFileSystem())
-    : FileSystem(FS) {}
+  SourceManager() = default;
 
   llvm::SourceMgr &getLLVMSourceMgr() {
     return LLVMSourceMgr;
@@ -60,12 +53,8 @@ public:
     return LLVMSourceMgr;
   }
 
-  void setFileSystem(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) {
-    FileSystem = FS;
-  }
-
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getFileSystem() {
-    return FileSystem;
+  void setFileManager(llvm::IntrusiveRefCntPtr<FileManager> fm) {
+    FileMgr = fm;
   }
 
   void setCodeCompletionPoint(unsigned BufferID, unsigned Offset) {

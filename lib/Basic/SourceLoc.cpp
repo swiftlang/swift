@@ -44,20 +44,9 @@ StringRef SourceManager::getDisplayNameForLoc(SourceLoc Loc) const {
   if (auto VFile = getVirtualFile(Loc))
     return VFile->Name;
 
-  // Next, try the stat cache
+  // Otherwise, ask the file manager and cache the result
   auto Ident = getIdentifierForBuffer(findBufferContainingLoc(Loc));
-  auto found = StatusCache.find(Ident);
-  if (found != StatusCache.end()) {
-    return found->second.getName();
-  }
-
-  // Populate the cache with a (virtual) stat.
-  if (auto Status = FileSystem->status(Ident)) {
-    return (StatusCache[Ident] = Status.get()).getName();
-  }
-
-  // Finally, fall back to the buffer identifier.
-  return Ident;
+  return FileMgr->getCachedFilename(Ident);
 }
 
 unsigned
