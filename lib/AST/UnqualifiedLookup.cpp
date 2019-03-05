@@ -163,9 +163,6 @@ private:
     // Classify this declaration.
     // Types are formally members of the metatype.
     DeclContext *whereValueIsMember(const ValueDecl *const member) const {
-     //HERE12  return isa<TypeDecl>(member) && !isa<ExtensionDecl>(staticContext) ? staticContext : dynamicContext;
-      //HERE12
-      assert(!isa<ExtensionDecl>(staticContext) || staticContext == dynamicContext || !isa<TypeDecl>(member));
       return isa<TypeDecl>(member) ? staticContext : dynamicContext;
     }
 
@@ -254,7 +251,6 @@ public:
   public:
     /// The scope we are looking in:
     const ASTScope *scope;
-    ///xxxx Optional<ResultFinderForTypeContext>
     /// If the lookup depends on implicit self, selfDC is its context.
     /// (Names in extensions never depend on self.)
     DeclContext *selfDC;
@@ -282,11 +278,11 @@ public:
     }
   private:
     static DeclContext *selfDCIfValidForScope(const ASTScope *scope, DeclContext *selfDC) {
-      return selfDC; // HERE disable this fix
-      //HERE12
-      return scope && !isExtension(*scope) ? selfDC : nullptr;
+      return selfDC; // disable this fix
+      // TODO: See if something like below is needed
+      // return scope && !isExtension(*scope) ? selfDC : nullptr;
     }
-    // TODO: Should this be a method on ASTScope?
+    // TODO: Should this be a method on ASTScope? (if needed)
     static bool isExtension(const ASTScope &scope) {
       return scope.getKind() == ASTScopeKind::TypeOrExtensionBody &&
         isa<ExtensionDecl>(scope.getDeclContext());
@@ -592,10 +588,21 @@ UnqualifiedLookupFactory::nonoperatorScopeForASTScopeLookup(
       *contextAndIsCascadingUseArg.whereToLook->getParentSourceFile();
 
   // Find the scope from which we will initiate unqualified name lookup.
-  const ASTScope *lookupScope =
+  const ASTScope *innermostScope =
       sourceFile.getScope().findInnermostEnclosingScope(Loc);
+  // Sometimes UnqualifiedLookup gets invoked with a DeclContext that is
+  // the extension surrounding the method that the location is in.
+  // We can't start the lookup in the method in that case, so
+  // use the first scope with a matching context:
+  const ASTScope *startingScope = innermostScope;
+  for (;
+       startingScope && startingScope->getInnermostEnclosingDeclContext() != DC;
+       startingScope = startingScope->getParent()) {
+  }
+  if (!startingScope)
+    startingScope = innermostScope;
 
-  return std::make_pair(lookupScope,
+  return std::make_pair(startingScope,
                         contextAndIsCascadingUseArg.isCascadingUse);
 }
 
@@ -604,11 +611,8 @@ void UnqualifiedLookupFactory::lookInASTScope(
 
   // Perform local lookup within this scope.
   auto localBindings = state.scope->getLocalBindings();
-  auto xxx = Results.empty();
   for (auto local : localBindings)
     Consumer.foundDecl(local, getLocalDeclVisibilityKind(state.scope));
-  if (xxx && !Results.empty())
-    llvm::errs() << "HERE1 " << Results.size() << "\n";
 
   ifNotDoneYet([&] {
     // When we are in the body of a method, get the 'self' declaration.
@@ -676,13 +680,11 @@ void UnqualifiedLookupFactory::lookInASTScopeContext(
     // Perform lookup into the type
     auto resultFinder = ResultFinderForTypeContext(
       stateArg.selfDC ? stateArg.selfDC : scopeDC, scopeDC);
-    auto xxx = Results.empty();
+
     findResultsAndSaveUnavailables(scopeDC,
                                    std::move(resultFinder),
                                    isCascadingUseResult,
                                    baseNLOptions);
-    if (xxx && !Results.empty())
-      llvm::errs() << "HERE2 " << Results.size() << "\n";
   },
   [&] {
     // Forget the 'self' declaration.
