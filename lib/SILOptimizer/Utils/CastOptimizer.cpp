@@ -195,10 +195,6 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   auto SubMap = SubstitutionMap::getProtocolSubstitutions(Conf.getRequirement(),
                                                           target, Conf);
 
-  auto SILFnTy = FuncRef->getType();
-  SILType SubstFnTy = SILFnTy.substGenericArgs(mod, SubMap);
-  SILFunctionConventions substConv(SubstFnTy.castTo<SILFunctionType>(), mod);
-
   // Temporary to hold the intermediate result.
   AllocStackInst *Tmp = nullptr;
   CanType OptionalTy;
