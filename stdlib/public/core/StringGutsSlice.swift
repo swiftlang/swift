@@ -74,8 +74,8 @@ internal struct _StringGutsSlice {
   @inlinable
   internal var range: Range<String.Index> {
     @inline(__always) get {
-      return String.Index(encodedOffset: _offsetRange.lowerBound)
-         ..< String.Index(encodedOffset: _offsetRange.upperBound)
+      return String.Index(_encodedOffset: _offsetRange.lowerBound)
+         ..< String.Index(_encodedOffset: _offsetRange.upperBound)
     }
   }
 
