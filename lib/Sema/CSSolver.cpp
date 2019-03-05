@@ -1996,6 +1996,7 @@ void ConstraintSystem::partitionDisjunction(
   // end of the partitioning.
 
   SmallVector<unsigned, 4> favored;
+  SmallVector<unsigned, 4> simdOperators;
   SmallVector<unsigned, 4> disabled;
   SmallVector<unsigned, 4> unavailable;
 
@@ -2035,6 +2036,22 @@ void ConstraintSystem::partitionDisjunction(
     });
   }
 
+  // Partition SIMD operators.
+  if (!TC.getLangOpts().SolverEnableOperatorDesignatedTypes &&
+      isOperatorBindOverload(Choices[0])) {
+    forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
+      if (!isOperatorBindOverload(constraint))
+        return false;
+
+      if (isSIMDOperator(constraint->getOverloadChoice().getDecl())) {
+        simdOperators.push_back(index);
+        return true;
+      }
+
+      return false;
+    });
+  }
+
   // Local function to create the next partition based on the options
   // passed in.
   PartitionAppendCallback appendPartition =
@@ -2058,6 +2075,7 @@ void ConstraintSystem::partitionDisjunction(
   });
   appendPartition(favored);
   appendPartition(everythingElse);
+  appendPartition(simdOperators);
 
   // Now create the remaining partitions from what we previously collected.
   appendPartition(unavailable);

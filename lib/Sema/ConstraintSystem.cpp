@@ -1371,40 +1371,6 @@ ConstraintSystem::getTypeOfMemberReference(
   return { openedType, type };
 }
 
-/// If there are any SIMD operators in the overload set, partition the set so
-/// that the SIMD operators come at the end.
-static ArrayRef<OverloadChoice> partitionSIMDOperators(
-                                  ArrayRef<OverloadChoice> choices,
-                                  SmallVectorImpl<OverloadChoice> &scratch) {
-  // If the first element isn't an operator, none of them are.
-  if (!choices[0].isDecl() ||
-      !isa<FuncDecl>(choices[0].getDecl()) ||
-      !cast<FuncDecl>(choices[0].getDecl())->isOperator() ||
-      choices[0].getDecl()->getASTContext().LangOpts
-        .SolverEnableOperatorDesignatedTypes)
-    return choices;
-
-  // Check whether we have any SIMD operators.
-  bool foundSIMDOperator = false;
-  for (const auto &choice : choices) {
-    if (isSIMDOperator(choice.getDecl())) {
-      foundSIMDOperator = true;
-      break;
-    }
-  }
-
-  if (!foundSIMDOperator)
-    return choices;
-
-  scratch.assign(choices.begin(), choices.end());
-  std::stable_partition(scratch.begin(), scratch.end(),
-                        [](const OverloadChoice &choice) {
-                          return !isSIMDOperator(choice.getDecl());
-                        });
-
-  return scratch;
-}
-
 Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
                                                 bool allowMembers,
                                                 DeclContext *useDC) {
@@ -1523,9 +1489,6 @@ void ConstraintSystem::addOverloadSet(Type boundType,
     addBindOverloadConstraint(boundType, choices.front(), locator, useDC);
     return;
   }
-
-  SmallVector<OverloadChoice, 4> scratchChoices;
-  choices = partitionSIMDOperators(choices, scratchChoices);
 
   SmallVector<Constraint *, 4> overloads;
   
