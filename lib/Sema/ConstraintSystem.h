@@ -1317,6 +1317,15 @@ private:
       disabledConstraints.erase(
           disabledConstraints.begin() + scope->numDisabledConstraints,
           disabledConstraints.end());
+
+      for (unsigned constraintIdx :
+             range(scope->numFavoredConstraints, favoredConstraints.size())) {
+        if (favoredConstraints[constraintIdx]->isFavored())
+          favoredConstraints[constraintIdx]->setFavored(false);
+      }
+      favoredConstraints.erase(
+          favoredConstraints.begin() + scope->numFavoredConstraints,
+          favoredConstraints.end());
     }
 
     /// Check whether constraint system is allowed to form solutions
@@ -1334,6 +1343,19 @@ private:
     void disableContraint(Constraint *constraint) {
       constraint->setDisabled();
       disabledConstraints.push_back(constraint);
+    }
+
+    unsigned getNumFavoredConstraints() const {
+      return favoredConstraints.size();
+    }
+
+    /// Favor the given constraint; this change will be rolled back
+    /// when we exit the current solver scope.
+    void favorConstraint(Constraint *constraint) {
+      if (!constraint->isFavored()) {
+        constraint->setFavored();
+        favoredConstraints.push_back(constraint);
+      }
     }
 
   private:
@@ -1358,6 +1380,7 @@ private:
       std::tuple<SolverScope *, ConstraintList::iterator, unsigned>, 4> scopes;
 
     SmallVector<Constraint *, 4> disabledConstraints;
+    SmallVector<Constraint *, 4> favoredConstraints;
   };
 
   class CacheExprTypes : public ASTWalker {
@@ -1517,6 +1540,8 @@ public:
     unsigned numMissingMembers;
 
     unsigned numDisabledConstraints;
+
+    unsigned numFavoredConstraints;
 
     /// The previous score.
     Score PreviousScore;
@@ -3161,6 +3186,11 @@ private:
   Constraint *selectDisjunction();
 
   Constraint *selectApplyDisjunction();
+
+  /// Look at the set of overload choices to determine if there is a best
+  /// generic overload to favor.
+  OverloadChoice *tryOptimizeGenericDisjunction(
+                                            ArrayRef<OverloadChoice> choices);
 
   /// Solve the system of constraints generated from provided expression.
   ///

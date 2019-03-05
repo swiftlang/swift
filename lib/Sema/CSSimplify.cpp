@@ -4903,7 +4903,6 @@ retry_after_fail:
     break;
   }
 
-
   // If there was a constraint that we couldn't reason about, don't use the
   // results of any common-type computations.
   if (hasUnhandledConstraints)

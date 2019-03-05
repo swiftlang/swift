@@ -1373,17 +1373,16 @@ ConstraintSystem::getTypeOfMemberReference(
 
 // Performance hack: if there are two generic overloads, and one is
 // more specialized than the other, prefer the more-specialized one.
-static void tryOptimizeGenericDisjunction(ConstraintSystem &cs,
-                                          ArrayRef<OverloadChoice> choices,
-                                          OverloadChoice *&favoredChoice) {
-  if (favoredChoice || choices.size() != 2)
-    return;
+OverloadChoice *ConstraintSystem::tryOptimizeGenericDisjunction(
+                                          ArrayRef<OverloadChoice> choices) {
+  if (choices.size() != 2)
+    return nullptr;
 
   const auto &choiceA = choices[0];
   const auto &choiceB = choices[1];
 
   if (!choiceA.isDecl() || !choiceB.isDecl())
-    return;
+    return nullptr;
 
   auto isViable = [](ValueDecl *decl) -> bool {
     assert(decl);
@@ -1410,22 +1409,17 @@ static void tryOptimizeGenericDisjunction(ConstraintSystem &cs,
   auto *declB = choiceB.getDecl();
 
   if (!isViable(declA) || !isViable(declB))
-    return;
-
-  auto &TC = cs.TC;
-  auto *DC = cs.DC;
+    return nullptr;
 
   switch (TC.compareDeclarations(DC, declA, declB)) {
   case Comparison::Better:
-    favoredChoice = const_cast<OverloadChoice *>(&choiceA);
-    break;
+    return const_cast<OverloadChoice *>(&choiceA);
 
   case Comparison::Worse:
-    favoredChoice = const_cast<OverloadChoice *>(&choiceB);
-    break;
+    return const_cast<OverloadChoice *>(&choiceB);
 
   case Comparison::Unordered:
-    break;
+    return nullptr;
   }
 }
 
@@ -1582,7 +1576,8 @@ void ConstraintSystem::addOverloadSet(Type boundType,
     return;
   }
 
-  tryOptimizeGenericDisjunction(*this, choices, favoredChoice);
+  if (!favoredChoice)
+    favoredChoice = tryOptimizeGenericDisjunction(choices);
 
   SmallVector<OverloadChoice, 4> scratchChoices;
   choices = partitionSIMDOperators(choices, scratchChoices);

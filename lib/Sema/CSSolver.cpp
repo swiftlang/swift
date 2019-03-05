@@ -424,6 +424,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numCheckedConformances = cs.CheckedConformances.size();
   numMissingMembers = cs.MissingMembers.size();
   numDisabledConstraints = cs.solverState->getNumDisabledConstraints();
+  numFavoredConstraints = cs.solverState->getNumFavoredConstraints();
 
   PreviousScore = cs.CurrentScore;
 
