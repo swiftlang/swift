@@ -1913,7 +1913,7 @@ public:
             "Dest address should be lvalue");
     require(SI->getDest()->getType() == SI->getSrc()->getType(),
             "Store operand type and dest type mismatch");
-    require(F.getModule().isTypeABIAccessible(SI->getDest()->getType()),
+    require(F.isTypeABIAccessible(SI->getDest()->getType()),
             "cannot directly copy type with inaccessible ABI");
   }
 
@@ -2328,7 +2328,7 @@ public:
   void checkDestroyAddrInst(DestroyAddrInst *DI) {
     require(DI->getOperand()->getType().isAddress(),
             "Operand of destroy_addr must be address");
-    require(F.getModule().isTypeABIAccessible(DI->getOperand()->getType()),
+    require(F.isTypeABIAccessible(DI->getOperand()->getType()),
             "cannot directly destroy type with inaccessible ABI");
   }
 
