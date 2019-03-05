@@ -72,17 +72,25 @@ getObjCToSwiftBridgingFunction(SILOptFunctionBuilder &funcBuilder,
 /// _ObjectiveCBridgeable.
 SILInstruction *
 CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
+  CanType target = dynamicCast.getTargetType();
+  auto &mod = dynamicCast.getModule();
+
+  // AnyHashable is a special case that we do not handle since we only handle
+  // objc targets in this function. Bailout early.
+  if (auto dt = target.getNominalOrBoundGenericNominal()) {
+    if (dt == mod.getASTContext().getAnyHashableDecl()) {
+      return nullptr;
+    }
+  }
 
   SILInstruction *Inst = dynamicCast.getInstruction();
   bool isConditional = dynamicCast.isConditional();
   SILValue Src = dynamicCast.getSource();
   SILValue Dest = dynamicCast.getDest();
-  CanType Target = dynamicCast.getTargetType();
   CanType BridgedTargetTy = dynamicCast.getBridgedTargetType();
   SILBasicBlock *SuccessBB = dynamicCast.getSuccessBlock();
   SILBasicBlock *FailureBB = dynamicCast.getFailureBlock();
   auto *F = Inst->getFunction();
-  auto &M = Inst->getModule();
   auto Loc = Inst->getLoc();
 
   // The conformance to _BridgedToObjectiveC is statically known.
@@ -103,14 +111,6 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   assert(Src->getType().isAddress() && "Source should have an address type");
   assert(Dest->getType().isAddress() && "Source should have an address type");
 
-  // AnyHashable is a special case - it does not conform to NSObject -
-  // If AnyHashable - Bail out of the optimization
-  if (auto DT = Target.getNominalOrBoundGenericNominal()) {
-    if (DT == M.getASTContext().getAnyHashableDecl()) {
-      return nullptr;
-    }
-  }
-
   // If this is a conditional cast:
   // We need a new fail BB in order to add a dealloc_stack to it
   SILBasicBlock *ConvFailBB = nullptr;
@@ -130,7 +130,7 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   // - then convert _ObjectiveCBridgeable._ObjectiveCType to
   // a Swift type using _forceBridgeFromObjectiveC.
 
-  if (!Src->getType().isLoadable(M)) {
+  if (!Src->getType().isLoadable(mod)) {
     // This code path is never reached in current test cases
     // If reached, we'd have to convert from an ObjC Any* to a loadable type
     // Should use check_addr / make a source we can actually load
@@ -177,25 +177,25 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
 
   // Lookup the _ObjectiveCBridgeable protocol.
   auto BridgedProto =
-      M.getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
-  auto Conf = *M.getSwiftModule()->lookupConformance(Target, BridgedProto);
+      mod.getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
+  auto Conf = *mod.getSwiftModule()->lookupConformance(target, BridgedProto);
 
   auto ParamTypes = bridgingFunc->getLoweredFunctionType()->getParameters();
 
   auto *FuncRef = Builder.createFunctionRef(Loc, bridgingFunc);
 
-  auto MetaTy = MetatypeType::get(Target, MetatypeRepresentation::Thick);
+  auto MetaTy = MetatypeType::get(target, MetatypeRepresentation::Thick);
   auto SILMetaTy = F->getTypeLowering(MetaTy).getLoweredType();
   auto *MetaTyVal = Builder.createMetatype(Loc, SILMetaTy);
   SmallVector<SILValue, 1> Args;
 
   // Add substitutions
   auto SubMap = SubstitutionMap::getProtocolSubstitutions(Conf.getRequirement(),
-                                                          Target, Conf);
+                                                          target, Conf);
 
   auto SILFnTy = FuncRef->getType();
-  SILType SubstFnTy = SILFnTy.substGenericArgs(M, SubMap);
-  SILFunctionConventions substConv(SubstFnTy.castTo<SILFunctionType>(), M);
+  SILType SubstFnTy = SILFnTy.substGenericArgs(mod, SubMap);
+  SILFunctionConventions substConv(SubstFnTy.castTo<SILFunctionType>(), mod);
 
   // Temporary to hold the intermediate result.
   AllocStackInst *Tmp = nullptr;
@@ -263,7 +263,7 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
     SILBasicBlock *ConvSuccessBB = Inst->getFunction()->createBasicBlock();
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> CaseBBs;
     CaseBBs.push_back(
-        std::make_pair(M.getASTContext().getOptionalNoneDecl(), FailureBB));
+        std::make_pair(mod.getASTContext().getOptionalNoneDecl(), FailureBB));
     Builder.createSwitchEnumAddr(Loc, InOutOptionalParam, ConvSuccessBB,
                                  CaseBBs);
 
