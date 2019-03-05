@@ -1771,6 +1771,9 @@ func _getAtKeyPath<Root, Value>(
   return keyPath._projectReadOnly(from: root)
 }
 
+// The release that ends the access scope is guaranteed to happen
+// immediate at the end_apply call because the continuation is a
+// runtime call with a manual release (access scopes cannot be extended).
 @_silgen_name("_swift_modifyAtWritableKeyPath_impl")
 public // runtime entrypoint
 func _modifyAtWritableKeyPath_impl<Root, Value>(
@@ -1780,6 +1783,9 @@ func _modifyAtWritableKeyPath_impl<Root, Value>(
   return keyPath._projectMutableAddress(from: &root)
 }
 
+// The release that ends the access scope is guaranteed to happen
+// immediate at the end_apply call because the continuation is a
+// runtime call with a manual release (access scopes cannot be extended).
 @_silgen_name("_swift_modifyAtReferenceWritableKeyPath_impl")
 public // runtime entrypoint
 func _modifyAtReferenceWritableKeyPath_impl<Root, Value>(
@@ -1800,6 +1806,8 @@ func _setAtWritableKeyPath<Root, Value>(
   let (addr, owner) = keyPath._projectMutableAddress(from: &root)
   addr.pointee = value
   _fixLifetime(owner)
+  // FIXME: this needs a deallocation barrier to ensure that the
+  // release isn't extended, along with the access scope.
 }
 
 @_silgen_name("swift_setAtReferenceWritableKeyPath")
@@ -1813,6 +1821,8 @@ func _setAtReferenceWritableKeyPath<Root, Value>(
   let (addr, owner) = keyPath._projectMutableAddress(from: root)
   addr.pointee = value
   _fixLifetime(owner)
+  // FIXME: this needs a deallocation barrier to ensure that the
+  // release isn't extended, along with the access scope.
 }
 
 // MARK: Appending type system
