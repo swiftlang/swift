@@ -369,7 +369,7 @@ public extension ShapedArray {
   init(shape: __owned [Int], scalars: __owned [Scalar]) {
     precondition(shape.reduce(1, *) == scalars.count, "Scalar count mismatch.")
     let buffer = TensorBuffer<Scalar>(allocation: .native(.init(scalars)),
-                                      count: scalars.co
+                                      count: scalars.count)
     self.init(buffer: buffer, shape: shape)
   }
 
