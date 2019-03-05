@@ -45,21 +45,21 @@
 
 using namespace swift;
 
-/// If target is a Swift type bridging to an ObjC type,
-/// return the ObjC type it bridges to.
-/// If target is an ObjC type, return this type.
-static Type getCastFromObjC(SILModule &M, CanType source, CanType target) {
-  return M.getASTContext().getBridgedToObjC(M.getSwiftModule(), target);
-}
-
 /// Create a call of _forceBridgeFromObjectiveC_bridgeable or
 /// _conditionallyBridgeFromObjectiveC_bridgeable which converts an ObjC
 /// instance into a corresponding Swift type, conforming to
 /// _ObjectiveCBridgeable.
-SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
-    SILInstruction *Inst, bool isConditional, SILValue Src, SILValue Dest,
-    CanType Source, CanType Target, Type BridgedSourceTy, Type BridgedTargetTy,
-    SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB) {
+SILInstruction *
+CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
+
+  SILInstruction *Inst = dynamicCast.getInstruction();
+  bool isConditional = dynamicCast.isConditional();
+  SILValue Src = dynamicCast.getSource();
+  SILValue Dest = dynamicCast.getDest();
+  CanType Target = dynamicCast.getTargetType();
+  CanType BridgedTargetTy = dynamicCast.getBridgedTargetType();
+  SILBasicBlock *SuccessBB = dynamicCast.getSuccessBlock();
+  SILBasicBlock *FailureBB = dynamicCast.getFailureBlock();
   auto *F = Inst->getFunction();
   auto &M = Inst->getModule();
   auto Loc = Inst->getLoc();
@@ -111,55 +111,53 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
     Builder.setInsertionPoint(CurrInsPoint);
   }
 
-  if (SILBridgedTy != Src->getType()) {
-    // Check if we can simplify a cast into:
-    // - ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
-    // - then convert _ObjectiveCBridgeable._ObjectiveCType to
-    // a Swift type using _forceBridgeFromObjectiveC.
+  // We know this is always true since SILBridgedTy is an object and Src is an
+  // address.
+  assert(SILBridgedTy != Src->getType());
 
-    if (!Src->getType().isLoadable(M)) {
-      // This code path is never reached in current test cases
-      // If reached, we'd have to convert from an ObjC Any* to a loadable type
-      // Should use check_addr / make a source we can actually load
-      return nullptr;
-    }
+  // Check if we can simplify a cast into:
+  // - ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
+  // - then convert _ObjectiveCBridgeable._ObjectiveCType to
+  // a Swift type using _forceBridgeFromObjectiveC.
 
-    // Generate a load for the source argument.
-    auto *Load =
-        Builder.createLoad(Loc, Src, LoadOwnershipQualifier::Unqualified);
-    // Try to convert the source into the expected ObjC type first.
+  if (!Src->getType().isLoadable(M)) {
+    // This code path is never reached in current test cases
+    // If reached, we'd have to convert from an ObjC Any* to a loadable type
+    // Should use check_addr / make a source we can actually load
+    return nullptr;
+  }
 
-    if (Load->getType() == SILBridgedTy) {
-      // If type of the source and the expected ObjC type are
-      // equal, there is no need to generate the conversion
-      // from ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
-      if (isConditional) {
-        SILBasicBlock *CastSuccessBB = F->createBasicBlock();
-        CastSuccessBB->createPhiArgument(SILBridgedTy,
-                                         ValueOwnershipKind::Owned);
-        Builder.createBranch(Loc, CastSuccessBB, SILValue(Load));
-        Builder.setInsertionPoint(CastSuccessBB);
-        SrcOp = CastSuccessBB->getArgument(0);
-      } else {
-        SrcOp = Load;
-      }
-    } else if (isConditional) {
+  // Generate a load for the source argument.
+  auto *Load =
+      Builder.createLoad(Loc, Src, LoadOwnershipQualifier::Unqualified);
+  // Try to convert the source into the expected ObjC type first.
+
+  if (Load->getType() == SILBridgedTy) {
+    // If type of the source and the expected ObjC type are
+    // equal, there is no need to generate the conversion
+    // from ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
+    if (isConditional) {
       SILBasicBlock *CastSuccessBB = F->createBasicBlock();
       CastSuccessBB->createPhiArgument(SILBridgedTy, ValueOwnershipKind::Owned);
-      auto *CCBI = Builder.createCheckedCastBranch(Loc, false, Load,
-                                      SILBridgedTy, CastSuccessBB, ConvFailBB);
-      NewI = CCBI;
-      splitEdge(CCBI, /* EdgeIdx to ConvFailBB */ 1);
+      Builder.createBranch(Loc, CastSuccessBB, SILValue(Load));
       Builder.setInsertionPoint(CastSuccessBB);
       SrcOp = CastSuccessBB->getArgument(0);
     } else {
-      auto cast =
-          Builder.createUnconditionalCheckedCast(Loc, Load, SILBridgedTy);
-      NewI = cast;
-      SrcOp = cast;
+      SrcOp = Load;
     }
+  } else if (isConditional) {
+    SILBasicBlock *CastSuccessBB = F->createBasicBlock();
+    CastSuccessBB->createPhiArgument(SILBridgedTy, ValueOwnershipKind::Owned);
+    auto *CCBI = Builder.createCheckedCastBranch(Loc, false, Load, SILBridgedTy,
+                                                 CastSuccessBB, ConvFailBB);
+    NewI = CCBI;
+    splitEdge(CCBI, /* EdgeIdx to ConvFailBB */ 1);
+    Builder.setInsertionPoint(CastSuccessBB);
+    SrcOp = CastSuccessBB->getArgument(0);
   } else {
-    SrcOp = Src;
+    auto cast = Builder.createUnconditionalCheckedCast(Loc, Load, SILBridgedTy);
+    NewI = cast;
+    SrcOp = cast;
   }
 
   // Now emit the a cast from the casted ObjC object into a target type.
@@ -313,12 +311,17 @@ static bool canOptimizeCast(const swift::Type &BridgedTargetTy,
 
 /// Create a call of _bridgeToObjectiveC which converts an _ObjectiveCBridgeable
 /// instance into a bridged ObjC type.
-SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
-    SILInstruction *Inst, CastConsumptionKind ConsumptionKind,
-    bool isConditional, SILValue Src, SILValue Dest, CanType Source,
-    CanType Target, Type BridgedSourceTy, Type BridgedTargetTy,
-    SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB) {
-
+SILInstruction *
+CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
+  SILInstruction *Inst = dynamicCast.getInstruction();
+  CastConsumptionKind ConsumptionKind = dynamicCast.getBridgedConsumptionKind();
+  bool isConditional = dynamicCast.isConditional();
+  SILValue Src = dynamicCast.getSource();
+  SILValue Dest = dynamicCast.getDest();
+  CanType Source = dynamicCast.getSourceType();
+  CanType BridgedTargetTy = dynamicCast.getBridgedTargetType();
+  SILBasicBlock *SuccessBB = dynamicCast.getSuccessBlock();
+  SILBasicBlock *FailureBB = dynamicCast.getFailureBlock();
   auto &M = Inst->getModule();
   auto Loc = Inst->getLoc();
 
@@ -596,24 +599,17 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
   return NewI;
 }
 
-/// Make use of the fact that some of these casts cannot fail.  For example, if
-/// the ObjC type is exactly the expected _ObjectiveCType type, then it would
-/// always succeed for NSString, NSNumber, etc.  Casts from NSArray,
-/// NSDictionary and NSSet may fail.
+/// Make use of the fact that some of these casts cannot fail.  For
+/// example, if the ObjC type is exactly the expected _ObjectiveCType
+/// type, then it would always succeed for NSString, NSNumber, etc.
+/// Casts from NSArray, NSDictionary and NSSet may fail.
 ///
-/// If ObjC class is not exactly _ObjectiveCType, then its conversion to a
-/// required _ObjectiveCType may fail.
+/// If ObjC class is not exactly _ObjectiveCType, then its conversion
+/// to a required _ObjectiveCType may fail.
 SILInstruction *
 CastOptimizer::optimizeBridgedCasts(SILDynamicCastInst dynamicCast) {
-  SILInstruction *Inst = dynamicCast.getInstruction();
-  CastConsumptionKind ConsumptionKind = dynamicCast.getBridgedConsumptionKind();
-  bool isConditional = dynamicCast.isConditional();
-  SILValue Src = dynamicCast.getSource();
-  SILValue Dest = dynamicCast.getDest();
   CanType source = dynamicCast.getSourceType();
   CanType target = dynamicCast.getTargetType();
-  SILBasicBlock *SuccessBB = dynamicCast.getSuccessBlock();
-  SILBasicBlock *FailureBB = dynamicCast.getFailureBlock();
   auto &M = dynamicCast.getModule();
 
   // To apply the bridged optimizations, we should ensure that types are not
@@ -631,16 +627,13 @@ CastOptimizer::optimizeBridgedCasts(SILDynamicCastInst dynamicCast) {
   if (source->hasArchetype() || target->hasArchetype())
     return nullptr;
 
-  auto BridgedTargetTy = getCastFromObjC(M, source, target);
-  if (!BridgedTargetTy)
-    return nullptr;
+  CanType CanBridgedSourceTy = dynamicCast.getBridgedSourceType();
+  CanType CanBridgedTargetTy = dynamicCast.getBridgedTargetType();
 
-  auto BridgedSourceTy = getCastFromObjC(M, target, source);
-  if (!BridgedSourceTy)
+  // If we were unable to bridge either of our source/target types, return
+  // nullptr.
+  if (!CanBridgedSourceTy || !CanBridgedTargetTy)
     return nullptr;
-
-  CanType CanBridgedTargetTy = BridgedTargetTy->getCanonicalType();
-  CanType CanBridgedSourceTy = BridgedSourceTy->getCanonicalType();
 
   if (CanBridgedSourceTy == source && CanBridgedTargetTy == target) {
     // Both source and target type are ObjC types.
@@ -660,19 +653,13 @@ CastOptimizer::optimizeBridgedCasts(SILDynamicCastInst dynamicCast) {
     return nullptr;
   }
 
-  if (CanBridgedSourceTy || CanBridgedTargetTy) {
-    // Check what kind of conversion it is? ObjC->Swift or Swift-ObjC?
-    if (CanBridgedTargetTy != target) {
-      // This is an ObjC to Swift cast.
-      return optimizeBridgedObjCToSwiftCast(
-          Inst, isConditional, Src, Dest, source, target, BridgedSourceTy,
-          BridgedTargetTy, SuccessBB, FailureBB);
-    } else {
-      // This is a Swift to ObjC cast
-      return optimizeBridgedSwiftToObjCCast(
-          Inst, ConsumptionKind, isConditional, Src, Dest, source, target,
-          BridgedSourceTy, BridgedTargetTy, SuccessBB, FailureBB);
-    }
+  // Check what kind of conversion it is? ObjC->Swift or Swift-ObjC?
+  if (CanBridgedTargetTy != target) {
+    // This is an ObjC to Swift cast.
+    return optimizeBridgedObjCToSwiftCast(dynamicCast);
+  } else {
+    // This is a Swift to ObjC cast
+    return optimizeBridgedSwiftToObjCCast(dynamicCast);
   }
 
   llvm_unreachable("Unknown kind of bridging");
