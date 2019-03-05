@@ -2703,14 +2703,14 @@ void Serializer::writeDecl(const Decl *D) {
         access <= swift::AccessLevel::FilePrivate &&
         !value->getDeclContext()->isLocalContext();
 
-    // Emit the the filename for private mapping for private decls or internal
+    // Emit the the filename for private mapping for private decls and
     // decls with private accessors if compiled with -enable-private-imports.
     bool shouldEmitFilenameForPrivate =
         M->arePrivateImportsEnabled() &&
         !value->getDeclContext()->isLocalContext() &&
         (access <= swift::AccessLevel::FilePrivate ||
          (storage &&
-          storage->getFormalAccess() == swift::AccessLevel::Internal &&
+          storage->getFormalAccess() >= swift::AccessLevel::Internal &&
           storage->hasPrivateAccessor()));
 
     if (shouldEmitFilenameForPrivate || shouldEmitPrivateDescriminator) {

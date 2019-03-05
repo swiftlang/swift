@@ -45,6 +45,8 @@
     mutating func set() {
       self.internalVarWithPrivateSetter = 1
       self.internalVarWithFilePrivateSetter = 1
+      self.publicVarWithPrivateSetter = 1
+      self.publicVarWithFilePrivateSetter = 1
     }
   }
 
