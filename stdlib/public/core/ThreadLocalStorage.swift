@@ -51,7 +51,7 @@ func _loadDestroyTLSCounter() -> Int {
 // _initializeThreadLocalStorage.
 //
 internal struct _ThreadLocalStorage {
-  // TODO: might be best to absract uBreakIterator handling and caching into
+  // TODO: might be best to abstract uBreakIterator handling and caching into
   // separate struct. That would also make it easier to maintain multiple ones
   // and other TLS entries side-by-side.
 
