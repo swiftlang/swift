@@ -640,9 +640,10 @@ namespace {
         return;
       auto decl = oldConstraint->getOverloadChoice().getDecl();
       if (!decl->getAttrs().isUnavailable(CS.getASTContext()) &&
-          isFavored(decl))
+          isFavored(decl)) {
         favoredConstraints.push_back(oldConstraint);
-      else
+        oldConstraint->setFavored();
+      } else
         fallbackConstraints.push_back(oldConstraint);
     }
 
@@ -660,23 +661,13 @@ namespace {
     // list and add the new one.
     CS.removeInactiveConstraint(disjunction);
 
-    // Create the disjunction of favored constraints.
-    auto favoredConstraintsDisjunction =
-        Constraint::createDisjunction(CS, favoredConstraints, csLoc);
-    favoredConstraintsDisjunction->setFavored();
-
     llvm::SmallVector<Constraint *, 2> aggregateConstraints;
-    aggregateConstraints.push_back(favoredConstraintsDisjunction);
-
-    if (!fallbackConstraints.empty()) {
-      // Find the disjunction of fallback constraints. If any
-      // constraints were added here, create a new disjunction.
-      Constraint *fallbackConstraintsDisjunction =
-        Constraint::createDisjunction(CS, fallbackConstraints, csLoc);
-
-      aggregateConstraints.push_back(fallbackConstraintsDisjunction);
-    }
-
+    aggregateConstraints.insert(aggregateConstraints.end(),
+                                favoredConstraints.begin(),
+                                favoredConstraints.end());
+    aggregateConstraints.insert(aggregateConstraints.end(),
+                                fallbackConstraints.begin(),
+                                fallbackConstraints.end());
     CS.addDisjunctionConstraint(aggregateConstraints, csLoc);
   }
   
