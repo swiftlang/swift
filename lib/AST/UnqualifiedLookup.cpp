@@ -254,6 +254,7 @@ public:
   public:
     /// The scope we are looking in:
     const ASTScope *scope;
+    ///xxxx Optional<ResultFinderForTypeContext>
     /// If the lookup depends on implicit self, selfDC is its context.
     /// (Names in extensions never depend on self.)
     DeclContext *selfDC;
@@ -434,9 +435,10 @@ public:
   bool computeIsCascadingUse() const;
 
   void findResultsAndSaveUnavailables(
+      DeclContext *lookupContextForThisContext,
       ResultFinderForTypeContext &&resultFinderForTypeContext,
-      bool isCascadingUse, NLOptions baseNLOptions,
-      DeclContext *lookupContextForThisContext);
+      bool isCascadingUse, NLOptions baseNLOptions
+      );
 
   void dumpBreadcrumbs() const;
 
@@ -675,8 +677,10 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
     auto resultFinder = ResultFinderForTypeContext(
       stateArg.selfDC ? stateArg.selfDC : scopeDC, scopeDC);
     auto xxx = Results.empty();
-    findResultsAndSaveUnavailables(std::move(resultFinder), isCascadingUseResult,
-                                   baseNLOptions, scopeDC);
+    findResultsAndSaveUnavailables(scopeDC,
+                                   std::move(resultFinder),
+                                   isCascadingUseResult,
+                                   baseNLOptions);
     if (xxx && !Results.empty())
       llvm::errs() << "HERE2 " << Results.size() << "\n";
   },
@@ -768,9 +772,9 @@ void UnqualifiedLookupFactory::finishLookingInContext(
   ifNotDoneYet(
       [&] {
         if (resultFinderForTypeContext)
-          findResultsAndSaveUnavailables(std::move(*resultFinderForTypeContext),
-                                         *isCascadingUse, baseNLOptions,
-                                         lookupContextForThisContext);
+          findResultsAndSaveUnavailables(lookupContextForThisContext,
+                                         std::move(*resultFinderForTypeContext),
+                                         *isCascadingUse, baseNLOptions);
       },
       // Recurse into the next context.
       [&] {
@@ -780,9 +784,9 @@ void UnqualifiedLookupFactory::finishLookingInContext(
 }
 
 void UnqualifiedLookupFactory::findResultsAndSaveUnavailables(
+    DeclContext *lookupContextForThisContext,
     ResultFinderForTypeContext &&resultFinderForTypeContext,
-    bool isCascadingUse, NLOptions baseNLOptions,
-    DeclContext *lookupContextForThisContext) {
+    bool isCascadingUse, NLOptions baseNLOptions) {
   auto firstPossiblyUnavailableResult = Results.size();
   resultFinderForTypeContext.findResults(Name, isCascadingUse, baseNLOptions,
                                          lookupContextForThisContext, Results);
