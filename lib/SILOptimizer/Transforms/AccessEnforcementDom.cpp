@@ -110,6 +110,8 @@ private:
 // Returns a bool: If we should bail on this function
 // we return false - else true
 // See the discussion in DominatedAccessRemoval::analyze() below
+//
+// FIXME: Handle KeyPath access.
 bool DominatedAccessRemoval::visitInstruction(
     SILInstruction *instr,
     AccessedStorageInfo &visitedDomAccessesToStorageInfo) {
@@ -123,18 +125,6 @@ bool DominatedAccessRemoval::visitInstruction(
     }
 
     visitBeginAccess(BAI, storage, visitedDomAccessesToStorageInfo);
-  } else if (auto fullApply = FullApplySite::isa(instr)) {
-    SILFunction *callee = fullApply.getReferencedFunction();
-    if (!callee)
-      return true;
-    if (!callee->hasSemanticsAttr("keypath.entry"))
-      return true;
-    // we can't eliminate dominated checks even when we can prove that
-    // the dominated scope has no internal nested conflicts.
-    // We just bail on these functions.
-    // Aprevious commit handled them, you can see the full support there,
-    // but, to simplify the code, assuming key-paths are rare for now, bail.
-    return false;
   } else if (auto *BUAI = dyn_cast<BeginUnpairedAccessInst>(instr)) {
     // We have an Implementation that handles this in the analyzer
     // and optimizer in a previous commit, However,
