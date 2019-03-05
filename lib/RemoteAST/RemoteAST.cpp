@@ -224,7 +224,7 @@ private:
   getOffsetOfFieldFromIRGen(irgen::IRGenModule &IGM, Type type,
                             NominalTypeDecl *typeDecl,
                             RemoteAddress optMetadata, VarDecl *member) {
-    SILType loweredTy = IGM.getSILTypes().getLoweredType(type);
+    SILType loweredTy = IGM.getLoweredType(type);
 
     MemberAccessStrategy strategy =
       (isa<StructDecl>(typeDecl)
@@ -334,7 +334,7 @@ private:
     if (!irgen) return Result<uint64_t>::emplaceFailure(Failure::Unknown);
     auto &IGM = irgen->IGM;
 
-    SILType loweredTy = IGM.getSILTypes().getLoweredType(type);
+    SILType loweredTy = IGM.getLoweredType(type);
 
     // If the type has a statically fixed offset, return that.
     if (auto offset =

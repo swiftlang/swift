@@ -207,7 +207,7 @@ static LValueTypeData getAbstractedTypeData(SILGenModule &SGM,
     accessKind,
     origFormalType,
     substFormalType,
-    SGM.Types.getLoweredType(origFormalType, substFormalType).getObjectType()
+    SGM.Types.getLoweredRValueType(origFormalType, substFormalType)
   };
 }
 
@@ -455,13 +455,13 @@ static LValueTypeData getValueTypeData(SGFAccessKind accessKind,
     accessKind,
     AbstractionPattern(formalType),
     formalType,
-    value->getType().getObjectType()
+    value->getType().getASTType(),
   };
 }
 static LValueTypeData getValueTypeData(SILGenFunction &SGF,
                                        SGFAccessKind accessKind, Expr *e) {
   CanType formalType = getSubstFormalRValueType(e);
-  SILType loweredType = SGF.getLoweredType(formalType).getObjectType();
+  CanType loweredType = SGF.getLoweredType(formalType).getASTType();
 
   return {
     accessKind,
@@ -488,7 +488,8 @@ static ManagedValue getAddressOfOptionalValue(SILGenFunction &SGF,
   // embedded in the payload.
   SILValue valueAddr =
     SGF.B.createUncheckedTakeEnumDataAddr(loc, optAddr.forward(SGF), someDecl,
-                                  valueTypeData.TypeOfRValue.getAddressType());
+                                          SILType::getPrimitiveAddressType(
+                                            valueTypeData.TypeOfRValue));
 
   // Return the value as +1 if the optional was +1.
   if (hadCleanup) {
@@ -2080,7 +2081,7 @@ LValue LValue::forAddress(SGFAccessKind accessKind, ManagedValue address,
   assert(address.isLValue());
   LValueTypeData typeData = {
     accessKind, origFormalType, substFormalType,
-    address.getType().getObjectType()
+    address.getType().getASTType()
   };
 
   LValue lv;
@@ -2133,7 +2134,7 @@ void LValue::addOrigToSubstComponent(SILType loweredSubstType) {
     getAccessKind(),
     AbstractionPattern(substFormalType),
     substFormalType,
-    loweredSubstType
+    loweredSubstType.getASTType()
   };
   add<OrigToSubstComponent>(typeData, getOrigFormalType());
 }
@@ -2161,7 +2162,7 @@ void LValue::addSubstToOrigComponent(AbstractionPattern origType,
     getAccessKind(),
     origType,
     getSubstFormalType(),
-    loweredSubstType
+    loweredSubstType.getASTType()
   };
   add<SubstToOrigComponent>(typeData);
 }
@@ -2674,7 +2675,9 @@ LValue SILGenLValue::visitDiscardAssignmentExpr(DiscardAssignmentExpr *e,
                                                 LValueOptions options) {
   LValueTypeData typeData = getValueTypeData(SGF, accessKind, e);
 
-  SILValue address = SGF.emitTemporaryAllocation(e, typeData.TypeOfRValue);
+  SILValue address = SGF.emitTemporaryAllocation(e,
+                                               SILType::getPrimitiveObjectType(
+                                                 typeData.TypeOfRValue));
   address = SGF.B.createMarkUninitialized(e, address,
                                           MarkUninitializedInst::Var);
   LValue lv;
@@ -3133,7 +3136,7 @@ LValue SILGenLValue::visitKeyPathApplicationExpr(KeyPathApplicationExpr *e,
 
     // Reabstract to the substituted abstraction level if necessary.
     auto substResultSILTy = SGF.getLoweredType(substFormalType);
-    if (typeData.TypeOfRValue != substResultSILTy.getObjectType()) {
+    if (typeData.TypeOfRValue != substResultSILTy.getASTType()) {
       lv.addOrigToSubstComponent(substResultSILTy);
     }
   }
@@ -3191,7 +3194,7 @@ LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e,
     accessKind,
     baseTypeData.OrigFormalType.getTupleElementType(index),
     cast<TupleType>(baseTypeData.SubstFormalType).getElementType(index),
-    baseTypeData.TypeOfRValue.getTupleElementType(index)
+    cast<TupleType>(baseTypeData.TypeOfRValue).getElementType(index)
   };
 
   lv.add<TupleElementComponent>(index, typeData);
@@ -3229,13 +3232,11 @@ LValue SILGenLValue::visitOpenExistentialExpr(OpenExistentialExpr *e,
 static LValueTypeData
 getOptionalObjectTypeData(SILGenFunction &SGF, SGFAccessKind accessKind,
                           const LValueTypeData &baseTypeData) {
-  EnumElementDecl *someDecl = SGF.getASTContext().getOptionalSomeDecl();
-
   return {
       accessKind,
       baseTypeData.OrigFormalType.getOptionalObjectType(),
       baseTypeData.SubstFormalType.getOptionalObjectType(),
-      baseTypeData.TypeOfRValue.getEnumElementType(someDecl, SGF.SGM.M),
+      baseTypeData.TypeOfRValue.getOptionalObjectType(),
   };
 }
 
@@ -4077,7 +4078,7 @@ SILGenFunction::emitOpenExistentialLValue(SILLocation loc,
   assert(!formalRValueType->hasLValueType());
   LValueTypeData typeData = {
     accessKind, AbstractionPattern::getOpaque(), formalRValueType,
-    getLoweredType(formalRValueType).getObjectType()
+    getLoweredType(formalRValueType).getASTType()
   };
 
   // Open up the existential.

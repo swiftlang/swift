@@ -54,7 +54,8 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
     return gv;
   }
 
-  SILType silTy = M.Types.getLoweredTypeOfGlobal(gDecl);
+  SILType silTy = SILType::getPrimitiveObjectType(
+    M.Types.getLoweredTypeOfGlobal(gDecl));
 
   auto *silGlobal = SILGlobalVariable::create(M, silLinkage, IsNotSerialized,
                                               mangledName, silTy,

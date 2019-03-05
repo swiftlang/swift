@@ -792,6 +792,14 @@ public:
     return ti.getLoweredType();
   }
 
+  CanType getLoweredRValueType(Type t) {
+    return getLoweredType(t).getASTType();
+  }
+
+  CanType getLoweredRValueType(AbstractionPattern origType, Type substType) {
+    return getLoweredType(origType, substType).getASTType();
+  }
+
   AbstractionPattern getAbstractionPattern(AbstractStorageDecl *storage,
                                            bool isNonObjC = false);
   AbstractionPattern getAbstractionPattern(VarDecl *var,
@@ -800,7 +808,7 @@ public:
                                            bool isNonObjC = false);
   AbstractionPattern getAbstractionPattern(EnumElementDecl *element);
 
-  SILType getLoweredTypeOfGlobal(VarDecl *var);
+  CanType getLoweredTypeOfGlobal(VarDecl *var);
 
   /// Return the SILFunctionType for a native function value of the
   /// given type.
@@ -1001,7 +1009,8 @@ public:
                                          EnumElementDecl *elt);
 
 private:
-  CanType getLoweredRValueType(AbstractionPattern origType, CanType substType);
+  CanType computeLoweredRValueType(AbstractionPattern origType,
+                                   CanType substType);
 
   Type getLoweredCBridgedType(AbstractionPattern pattern, Type t,
                               Bridgeability bridging,
