@@ -2471,8 +2471,13 @@ private:
     TaggedPointerExtendedClasses =
         TaggedPointerExtendedClassesAddr.getAddressData();
 
-    tryFindAndReadSymbol(TaggedPointerObfuscator,
-                         "objc_debug_taggedpointer_obfuscator");
+    // The tagged pointer obfuscator is not present on older OSes, in
+    // which case we can treat it as zero.
+    TaggedPointerObfuscator = 0;
+    auto TaggedPointerObfuscatorAddr = Reader->getSymbolAddress(
+      "objc_debug_taggedpointer_obfuscator");
+    if (TaggedPointerObfuscatorAddr)
+      tryReadSymbol(TaggedPointerObfuscatorAddr, TaggedPointerObfuscator);
 
 #   undef tryFindSymbol
 #   undef tryReadSymbol
