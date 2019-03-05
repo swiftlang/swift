@@ -1674,15 +1674,15 @@ namespace {
       B.addRelativeAddress(IGM.getTypeRef(underlyingType,
                                           MangledTypeRefRole::Metadata));
       
-      auto opaqueType = O->getDeclaredInterfaceType()->castTo<MetatypeType>()
-        ->getInstanceType()->castTo<OpaqueTypeArchetypeType>();
-      for (auto proto : opaqueType->getProtocols()) {
+      auto opaqueType = O->getDeclaredInterfaceType()
+                         ->castTo<OpaqueTypeArchetypeType>();
+      for (auto proto : opaqueType->getConformsTo()) {
         auto conformance = ProtocolConformanceRef(proto);
         auto underlyingConformance = conformance
           .subst(O->getUnderlyingInterfaceType(),
                  *O->getUnderlyingTypeSubstitutions());
         
-        // fixme
+        // fixme: mangle conformance references
         B.addInt32(0);
       }
     }
@@ -1710,18 +1710,21 @@ namespace {
     }
     
     ConstantReference getParent() {
+      DeclContext *parent = O->getNamingDecl()->getInnermostDeclContext();
+
       // If we have debug mangled names enabled for anonymous contexts, nest
       // the opaque type descriptor inside an anonymous context for the
       // defining function. This will let type reconstruction in the debugger
       // match the opaque context back into the AST.
-      if (IGM.IRGen.Opts.EnableAnonymousContextMangledNames) {
-        IGM.getAddrOfParentContextDescriptor
-        O->getParent();
+      //
+      // Otherwise, we can use the module context for nongeneric contexts.
+      if (!IGM.IRGen.Opts.EnableAnonymousContextMangledNames
+          && !parent->isGenericContext()) {
+        parent = parent->getParentModule();
       }
-
-      // Use the innermost generic context, or the module.
-      // In debug mode, use an anonymous context with debug name for type
-      // reconstruction
+      
+      return IGM.getAddrOfContextDescriptorForParent(parent, parent,
+                                                     /*fromAnonymous*/ false);
     }
     
     ContextDescriptorKind getContextKind() {
@@ -1731,7 +1734,12 @@ namespace {
     void emit() {
       asImpl().layout();
       
-      // getAddrOfOpaqueTypeDescriptor etc.
+      auto addr = IGM.getAddrOfOpaqueTypeDescriptor(O,
+                                                    B.finishAndCreateFuture());
+      auto var = cast<llvm::GlobalVariable>(addr);
+      
+      var->setConstant(true);
+      IGM.setTrueConstGlobal(var);
     }
     
     uint16_t getKindSpecificFlags() {
@@ -4322,4 +4330,9 @@ llvm::Value *irgen::emitMetatypeInstanceType(IRGenFunction &IGF,
   // the isa field.
   return emitInvariantLoadFromMetadataAtIndex(IGF, metatypeMetadata, 1,
                                               IGF.IGM.TypeMetadataPtrTy);
+}
+
+void IRGenModule::emitOpaqueTypeDecl(OpaqueTypeDecl *D) {
+  // Emit the opaque type descriptor.
+  OpaqueTypeDescriptorBuilder(*this, D).emit();
 }
