@@ -44,8 +44,9 @@ bool MatchCallArgumentListener::incorrectLabel(unsigned paramIdx) {
   return true;
 }
 
-void MatchCallArgumentListener::outOfOrderArgument(unsigned argIdx,
+bool MatchCallArgumentListener::outOfOrderArgument(unsigned argIdx,
                                                    unsigned prevArgIdx) {
+  return true;
 }
 
 bool MatchCallArgumentListener::relabelArguments(ArrayRef<Identifier> newNames){
@@ -578,9 +579,47 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
   // If any arguments were provided out-of-order, check whether we have
   // violated any of the reordering rules.
   if (potentiallyOutOfOrder) {
+    // If we've seen label failures and now there is an out-of-order
+    // parameter (or even worse - OoO parameter with label re-naming),
+    // we most likely have no idea what would be the best
+    // diagnostic for this situation, so let's just try to re-label.
+    auto isOutOfOrderArgument = [&](bool hadLabelMismatch, unsigned argIdx,
+                                    unsigned prevArgIdx) {
+      if (hadLabelMismatch)
+        return false;
+
+      auto newLabel = args[argIdx].getLabel();
+      auto oldLabel = args[prevArgIdx].getLabel();
+
+      unsigned actualIndex = prevArgIdx;
+      for (; actualIndex != argIdx; ++actualIndex) {
+        // Looks like new position (excluding defaulted parameters),
+        // has a valid label.
+        if (newLabel == params[actualIndex].getLabel())
+          break;
+
+        // If we are moving the the position with a different label
+        // and there is no default value for it, can't diagnose the
+        // problem as a simple re-ordering.
+        if (!defaultMap.test(actualIndex))
+          return false;
+      }
+
+      for (unsigned i = actualIndex + 1, n = params.size(); i != n; ++i) {
+        if (oldLabel == params[i].getLabel())
+          break;
+
+        if (!defaultMap.test(i))
+          return false;
+      }
+
+      return true;
+    };
+
     unsigned argIdx = 0;
     // Enumerate the parameters and their bindings to see if any arguments are
     // our of order
+    bool hadLabelMismatch = false;
     for (auto binding : parameterBindings) {
       for (auto boundArgIdx : binding) {
         // We've found the parameter that has an out of order
@@ -611,17 +650,20 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
           // - The parameter is unnamed, in which case we try to fix the
           //   problem by removing the name.
           if (expectedLabel.empty()) {
+            hadLabelMismatch = true;
             if (listener.extraneousLabel(toArgIdx))
               return true;
           // - The argument is unnamed, in which case we try to fix the
           //   problem by adding the name.
           } else if (argumentLabel.empty()) {
+            hadLabelMismatch = true;
             if (listener.missingLabel(toArgIdx))
               return true;
           // - The argument label has a typo at the same position.
-          } else if (fromArgIdx == toArgIdx &&
-                     listener.incorrectLabel(toArgIdx)) {
-            return true;
+          } else if (fromArgIdx == toArgIdx) {
+            hadLabelMismatch = true;
+            if (listener.incorrectLabel(toArgIdx))
+                return true;
           }
         }
 
@@ -631,8 +673,18 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
           continue;
         }
 
-        listener.outOfOrderArgument(fromArgIdx, toArgIdx);
-        return true;
+        // This situation looks like out-of-order argument but it's hard
+        // to say exactly without considering other factors, because it
+        // could be invalid labeling too.
+        if (isOutOfOrderArgument(hadLabelMismatch, fromArgIdx, toArgIdx))
+          return listener.outOfOrderArgument(fromArgIdx, toArgIdx);
+
+        SmallVector<Identifier, 8> expectedLabels;
+        llvm::transform(params, std::back_inserter(expectedLabels),
+                        [](const AnyFunctionType::Param &param) {
+                          return param.getLabel();
+                        });
+        return listener.relabelArguments(expectedLabels);
       }
     }
   }

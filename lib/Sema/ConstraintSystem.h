@@ -3506,7 +3506,10 @@ public:
   ///
   /// \param argIdx The argument that came too late in the argument list.
   /// \param prevArgIdx The argument that the \c argIdx should have preceded.
-  virtual void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx);
+  ///
+  /// \returns true to indicate that this should cause a failure, false
+  /// otherwise.
+  virtual bool outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx);
 
   /// Indicates that the arguments need to be relabeled to match the parameters.
   ///
