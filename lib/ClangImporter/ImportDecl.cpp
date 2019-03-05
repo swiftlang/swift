@@ -5913,10 +5913,10 @@ SwiftDeclConverter::findLatestIntroduction(const clang::Decl *D) {
 
     // Does this availability attribute map to the platform we are
     // currently targeting?
-    if (!Impl.platformAvailability.filter ||
-        !Impl.platformAvailability.filter(attr->getPlatform()->getName()))
+    if (!Impl.platformAvailability.isPlatformRelevant(
+            attr->getPlatform()->getName())) {
       continue;
-
+    }
     // Take advantage of the empty version being 0.0.0.0.
     result = std::max(result, attr->getIntroduced());
   }
@@ -7321,8 +7321,7 @@ void ClangImporter::Implementation::importAttributes(
 
       // Does this availability attribute map to the platform we are
       // currently targeting?
-      if (!platformAvailability.filter ||
-          !platformAvailability.filter(Platform))
+      if (!platformAvailability.isPlatformRelevant(Platform))
         continue;
 
       auto platformK =
@@ -7354,9 +7353,8 @@ void ClangImporter::Implementation::importAttributes(
       llvm::VersionTuple deprecated = avail->getDeprecated();
 
       if (!deprecated.empty()) {
-        if (platformAvailability.deprecatedAsUnavailableFilter &&
-            platformAvailability.deprecatedAsUnavailableFilter(
-                deprecated.getMajor(), deprecated.getMinor())) {
+        if (platformAvailability.treatDeprecatedAsUnavailable(ClangDecl,
+                                                              deprecated)) {
           AnyUnavailable = true;
           PlatformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
           if (message.empty())
