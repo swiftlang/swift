@@ -615,60 +615,45 @@ namespace {
     if (!disjunction)
       return;
     
-    auto oldConstraints = disjunction->getNestedConstraints();
-    auto csLoc = CS.getConstraintLocator(expr->getFn());
-      
-    if (mustConsider) {
-      bool hasMustConsider = false;
-      for (auto oldConstraint : oldConstraints) {
-        auto overloadChoice = oldConstraint->getOverloadChoice();
-        if (overloadChoice.isDecl() &&
-            mustConsider(overloadChoice.getDecl()))
-          hasMustConsider = true;
-      }
-      if (hasMustConsider) {
+    // Find the favored constraints and mark them.
+    SmallVector<Constraint *, 4> newlyFavoredConstraints;
+    unsigned numFavoredConstraints = 0;
+    Constraint *firstFavored = nullptr;
+    for (auto constraint : disjunction->getNestedConstraints()) {
+      if (!constraint->getOverloadChoice().isDecl())
         return;
-      }
-    }
+      auto decl = constraint->getOverloadChoice().getDecl();
 
-    // Copy over the existing bindings, dividing the constraints up
-    // into "favored" and non-favored lists.
-    SmallVector<Constraint *, 4> favoredConstraints;
-    SmallVector<Constraint *, 4> fallbackConstraints;
-    for (auto oldConstraint : oldConstraints) {
-      if (!oldConstraint->getOverloadChoice().isDecl())
+      if (mustConsider && mustConsider(decl)) {
+        // Roll back any constraints we favored.
+        for (auto favored : newlyFavoredConstraints)
+          favored->setFavored(false);
+
         return;
-      auto decl = oldConstraint->getOverloadChoice().getDecl();
+      }
+
       if (!decl->getAttrs().isUnavailable(CS.getASTContext()) &&
           isFavored(decl)) {
-        favoredConstraints.push_back(oldConstraint);
-        oldConstraint->setFavored();
-      } else
-        fallbackConstraints.push_back(oldConstraint);
+        // If we might need to roll back the favored constraints, keep
+        // track of those we are favoring.
+        if (mustConsider && !constraint->isFavored())
+          newlyFavoredConstraints.push_back(constraint);
+
+        constraint->setFavored();
+        ++numFavoredConstraints;
+        if (!firstFavored)
+          firstFavored = constraint;
+      }
     }
 
-    // If we did not find any favored constraints, we're done.
-    if (favoredConstraints.empty()) return;
-
-    if (favoredConstraints.size() == 1) {
-      auto overloadChoice = favoredConstraints[0]->getOverloadChoice();
+    // If there was one favored constraint, set the favored type based on its
+    // result type.
+    if (numFavoredConstraints == 1) {
+      auto overloadChoice = firstFavored->getOverloadChoice();
       auto overloadType = overloadChoice.getDecl()->getInterfaceType();
       auto resultType = overloadType->getAs<AnyFunctionType>()->getResult();
       CS.setFavoredType(expr, resultType.getPointer());
     }
-
-    // Remove the original constraint from the inactive constraint
-    // list and add the new one.
-    CS.removeInactiveConstraint(disjunction);
-
-    llvm::SmallVector<Constraint *, 2> aggregateConstraints;
-    aggregateConstraints.insert(aggregateConstraints.end(),
-                                favoredConstraints.begin(),
-                                favoredConstraints.end());
-    aggregateConstraints.insert(aggregateConstraints.end(),
-                                fallbackConstraints.begin(),
-                                fallbackConstraints.end());
-    CS.addDisjunctionConstraint(aggregateConstraints, csLoc);
   }
   
   size_t getOperandCount(Type t) {
