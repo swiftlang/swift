@@ -595,107 +595,74 @@ namespace {
   /// of the overload set and call arguments.
   ///
   /// \param expr The application.
-  /// \param isFavored Determine whether the given overload is favored.
+  /// \param isFavored Determine whether the given overload is favored, passing
+  /// it the "effective" overload type when it's being called.
   /// \param mustConsider If provided, a function to detect the presence of
   /// overloads which inhibit any overload from being favored.
   void favorCallOverloads(ApplyExpr *expr,
                           ConstraintSystem &CS,
-                          llvm::function_ref<bool(ValueDecl *)> isFavored,
+                          llvm::function_ref<bool(ValueDecl *, Type)> isFavored,
                           std::function<bool(ValueDecl *)>
                               mustConsider = nullptr) {
     // Find the type variable associated with the function, if any.
     auto tyvarType = CS.getType(expr->getFn())->getAs<TypeVariableType>();
-    if (!tyvarType)
+    if (!tyvarType || CS.getFixedType(tyvarType))
       return;
     
     // This type variable is only currently associated with the function
     // being applied, and the only constraint attached to it should
     // be the disjunction constraint for the overload group.
-    auto &CG = CS.getConstraintGraph();
-    llvm::SetVector<Constraint *> disjunctions;
-    CG.gatherConstraints(tyvarType, disjunctions,
-                         ConstraintGraph::GatheringKind::EquivalenceClass,
-                         [](Constraint *constraint) -> bool {
-                           return constraint->getKind() ==
-                                  ConstraintKind::Disjunction;
-                         });
-    if (disjunctions.empty())
+    auto disjunction = CS.getUnboundBindOverloadDisjunction(tyvarType);
+    if (!disjunction)
       return;
     
-    // Look for the disjunction that binds the overload set.
-    for (auto *disjunction : disjunctions) {
-      auto oldConstraints = disjunction->getNestedConstraints();
-      auto csLoc = CS.getConstraintLocator(expr->getFn());
-      
-      // Only replace the disjunctive overload constraint.
-      if (oldConstraints[0]->getKind() != ConstraintKind::BindOverload) {
+    // Find the favored constraints and mark them.
+    SmallVector<Constraint *, 4> newlyFavoredConstraints;
+    unsigned numFavoredConstraints = 0;
+    Constraint *firstFavored = nullptr;
+    for (auto constraint : disjunction->getNestedConstraints()) {
+      if (!constraint->getOverloadChoice().isDecl())
         continue;
+      auto decl = constraint->getOverloadChoice().getDecl();
+
+      if (mustConsider && mustConsider(decl)) {
+        // Roll back any constraints we favored.
+        for (auto favored : newlyFavoredConstraints)
+          favored->setFavored(false);
+
+        return;
       }
 
-      if (mustConsider) {
-        bool hasMustConsider = false;
-        for (auto oldConstraint : oldConstraints) {
-          auto overloadChoice = oldConstraint->getOverloadChoice();
-          if (overloadChoice.isDecl() &&
-              mustConsider(overloadChoice.getDecl()))
-            hasMustConsider = true;
-        }
-        if (hasMustConsider) {
-          continue;
-        }
+      Type overloadType =
+          CS.getEffectiveOverloadType(constraint->getOverloadChoice(),
+                                      /*allowMembers=*/true, CS.DC);
+      if (!overloadType)
+        continue;
+
+      if (!decl->getAttrs().isUnavailable(CS.getASTContext()) &&
+          isFavored(decl, overloadType)) {
+        // If we might need to roll back the favored constraints, keep
+        // track of those we are favoring.
+        if (mustConsider && !constraint->isFavored())
+          newlyFavoredConstraints.push_back(constraint);
+
+        constraint->setFavored();
+        ++numFavoredConstraints;
+        if (!firstFavored)
+          firstFavored = constraint;
       }
+    }
 
-      // Copy over the existing bindings, dividing the constraints up
-      // into "favored" and non-favored lists.
-      SmallVector<Constraint *, 4> favoredConstraints;
-      SmallVector<Constraint *, 4> fallbackConstraints;
-      for (auto oldConstraint : oldConstraints) {
-        if (!oldConstraint->getOverloadChoice().isDecl())
-          continue;
-        auto decl = oldConstraint->getOverloadChoice().getDecl();
-        if (!decl->getAttrs().isUnavailable(CS.getASTContext()) &&
-            isFavored(decl))
-          favoredConstraints.push_back(oldConstraint);
-        else
-          fallbackConstraints.push_back(oldConstraint);
-      }
-
-      // If we did not find any favored constraints, we're done.
-      if (favoredConstraints.empty()) break;
-
-      if (favoredConstraints.size() == 1) {
-        auto overloadChoice = favoredConstraints[0]->getOverloadChoice();
-        auto overloadType = overloadChoice.getDecl()->getInterfaceType();
-        auto resultType = overloadType->getAs<AnyFunctionType>()->getResult();
+    // If there was one favored constraint, set the favored type based on its
+    // result type.
+    if (numFavoredConstraints == 1) {
+      auto overloadChoice = firstFavored->getOverloadChoice();
+      auto overloadType =
+        CS.getEffectiveOverloadType(overloadChoice, /*allowMembers=*/true,
+                                    CS.DC);
+      auto resultType = overloadType->castTo<AnyFunctionType>()->getResult();
+      if (!resultType->hasTypeParameter())
         CS.setFavoredType(expr, resultType.getPointer());
-      }
-
-      // Remove the original constraint from the inactive constraint
-      // list and add the new one.
-      CS.removeInactiveConstraint(disjunction);
-
-      // Create the disjunction of favored constraints.
-      auto favoredConstraintsDisjunction =
-          Constraint::createDisjunction(CS,
-                                        favoredConstraints,
-                                        csLoc);
-      
-      favoredConstraintsDisjunction->setFavored();
-      
-      llvm::SmallVector<Constraint *, 2> aggregateConstraints;
-      aggregateConstraints.push_back(favoredConstraintsDisjunction);
-
-      if (!fallbackConstraints.empty()) {
-        // Find the disjunction of fallback constraints. If any
-        // constraints were added here, create a new disjunction.
-        Constraint *fallbackConstraintsDisjunction =
-          Constraint::createDisjunction(CS, fallbackConstraints, csLoc);
-
-        aggregateConstraints.push_back(fallbackConstraintsDisjunction);
-      }
-
-      CS.addDisjunctionConstraint(aggregateConstraints, csLoc);
-      break;
     }
   }
   
@@ -738,18 +705,11 @@ namespace {
   void favorMatchingUnaryOperators(ApplyExpr *expr,
                                    ConstraintSystem &CS) {
     // Determine whether the given declaration is favored.
-    auto isFavoredDecl = [&](ValueDecl *value) -> bool {
-      auto valueTy = value->getInterfaceType();
-      
-      auto fnTy = valueTy->getAs<AnyFunctionType>();
+    auto isFavoredDecl = [&](ValueDecl *value, Type type) -> bool {
+      auto fnTy = type->getAs<AnyFunctionType>();
       if (!fnTy)
         return false;
       
-      // Figure out the parameter type.
-      if (value->getDeclContext()->isTypeContext()) {
-        fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
-      }
-
       Type paramTy = FunctionType::composeInput(CS.getASTContext(),
                                                 fnTy->getParams(), false);
       auto resultTy = fnTy->getResult();
@@ -791,10 +751,8 @@ namespace {
       }
       
       // Determine whether the given declaration is favored.
-      auto isFavoredDecl = [&](ValueDecl *value) -> bool {
-        auto valueTy = value->getInterfaceType();
-        
-        if (!valueTy->is<AnyFunctionType>())
+      auto isFavoredDecl = [&](ValueDecl *value, Type type) -> bool {
+        if (!type->is<AnyFunctionType>())
           return false;
 
         auto paramCount = getParamCount(value);
@@ -809,22 +767,10 @@ namespace {
     
     if (auto favoredTy = CS.getFavoredType(expr->getArg())) {
       // Determine whether the given declaration is favored.
-      auto isFavoredDecl = [&](ValueDecl *value) -> bool {
-        auto valueTy = value->getInterfaceType();
-        
-        auto fnTy = valueTy->getAs<AnyFunctionType>();
+      auto isFavoredDecl = [&](ValueDecl *value, Type type) -> bool {
+        auto fnTy = type->getAs<AnyFunctionType>();
         if (!fnTy)
           return false;
-
-        // Figure out the parameter type, accounting for the implicit 'self' if
-        // necessary.
-        if (auto *FD = dyn_cast<AbstractFunctionDecl>(value)) {
-          if (FD->hasImplicitSelfDecl()) {
-            if (auto resFnTy = fnTy->getResult()->getAs<AnyFunctionType>()) {
-              fnTy = resFnTy;
-            }
-          }
-        }
 
         auto paramTy =
             AnyFunctionType::composeInput(CS.getASTContext(), fnTy->getParams(),
@@ -884,10 +830,8 @@ namespace {
     };
 
     // Determine whether the given declaration is favored.
-    auto isFavoredDecl = [&](ValueDecl *value) -> bool {
-      auto valueTy = value->getInterfaceType();
-      
-      auto fnTy = valueTy->getAs<AnyFunctionType>();
+    auto isFavoredDecl = [&](ValueDecl *value, Type type) -> bool {
+      auto fnTy = type->getAs<AnyFunctionType>();
       if (!fnTy)
         return false;
 
@@ -913,11 +857,6 @@ namespace {
         }
       }
       
-      // Figure out the parameter type.
-      if (value->getDeclContext()->isTypeContext()) {
-        fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
-      }
-
       auto params = fnTy->getParams();
       if (params.size() != 2)
         return false;
