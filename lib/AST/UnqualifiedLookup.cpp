@@ -293,9 +293,9 @@ public:
     }
   };
 
-  void lookInScopeForASTScopeLookup(const ASTScopeLookupState);
+  void lookInASTScope(const ASTScopeLookupState);
 
-  void lookIntoDeclarationContextForASTScopeLookup(ASTScopeLookupState,
+  void lookInASTScopeContext(ASTScopeLookupState,
                                                    DeclContext *const);
 
   static bool nothingToSeeHere(const DeclContext *);
@@ -560,7 +560,7 @@ void UnqualifiedLookupFactory::experimentallyLookInASTScopes(
   ASTScopeLookupState state{lookupScopeAndIsCascadingUse.first, nullptr,
                             contextAndIsCascadingUseArg.whereToLook,
                             lookupScopeAndIsCascadingUse.second};
-  lookInScopeForASTScopeLookup(state);
+  lookInASTScope(state);
   recordDependencyOnTopLevelNameIfNeeded();
 }
 
@@ -599,7 +599,7 @@ UnqualifiedLookupFactory::nonoperatorScopeForASTScopeLookup(
                         contextAndIsCascadingUseArg.isCascadingUse);
 }
 
-void UnqualifiedLookupFactory::lookInScopeForASTScopeLookup(
+void UnqualifiedLookupFactory::lookInASTScope(
     const ASTScopeLookupState state) {
 
   // Perform local lookup within this scope.
@@ -618,18 +618,18 @@ void UnqualifiedLookupFactory::lookInScopeForASTScopeLookup(
             ->getDeclContext()
             ->isTypeContext();
     if (inMethodBody)
-      lookInScopeForASTScopeLookup(
+      lookInASTScope(
           state.withParentScope().withSelfDC(state.scope->getAbstractFunctionDecl()));
     // If there is a declaration context associated with this scope, we might
     // want to look in it.
     else if (auto *const scopeDC = state.scope->getDeclContext())
-      lookIntoDeclarationContextForASTScopeLookup(state, scopeDC);
+      lookInASTScopeContext(state, scopeDC);
     else
-      lookInScopeForASTScopeLookup(state.withParentScope());
+      lookInASTScope(state.withParentScope());
   });
 }
 
-void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
+void UnqualifiedLookupFactory::lookInASTScopeContext(
     ASTScopeLookupState stateArg, DeclContext *const scopeDC) {
 
   // If we haven't determined whether we have a cascading use, do so now.
@@ -646,7 +646,7 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
   }
 
   if (nothingToSeeHere(scopeDC)) {
-    lookInScopeForASTScopeLookup(defaultNextState);
+    lookInASTScope(defaultNextState);
     return;
   }
 
@@ -655,7 +655,7 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
   if (auto *bindingInit = dyn_cast<PatternBindingInitializer>(scopeDC)) {
     // Lazy variable initializer contexts have a 'self' parameter for
     // instance member lookup.
-    lookInScopeForASTScopeLookup(
+    lookInASTScope(
         bindingInit->getImplicitSelfDecl()
             ? defaultNextState.withSelfDC(bindingInit)
             : defaultNextState);
@@ -667,7 +667,7 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
   // the nominal type.
   auto nominal = scopeDC->getSelfNominalTypeDecl();
   if (!nominal) {
-    lookInScopeForASTScopeLookup(defaultNextState);
+    lookInASTScope(defaultNextState);
     return;
   }
   lookForGenericsBeforeMembersInViolationOfLexicalOrdering(scopeDC);
@@ -686,7 +686,7 @@ void UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
   },
   [&] {
     // Forget the 'self' declaration.
-    lookInScopeForASTScopeLookup(defaultNextState.withoutSelfDC());
+    lookInASTScope(defaultNextState.withoutSelfDC());
   });
 }
 
@@ -754,43 +754,6 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedBy(
     lookupNamesIntroducedByDefaultArgumentInitializer(I, isCascadingUseSoFar);
   else
     lookupNamesIntroducedByMiscContext(dc, isCascadingUseSoFar);
-}
-
-void UnqualifiedLookupFactory::finishLookingInContext(
-    const AddGenericParameters addGenericParameters,
-    DeclContext *const lookupContextForThisContext,
-    Optional<ResultFinderForTypeContext> &&resultFinderForTypeContext,
-    const Optional<bool> isCascadingUse) {
-
-  // When a generic has the same name as a member, Swift prioritizes the generic
-  // because the member could still be named by qualifying it. But there is no
-  // corresponding way to qualify a generic parameter.
-  // So, look for generics first.
-  if (addGenericParameters == AddGenericParameters::Yes)
-    addGenericParametersHereAndInEnclosingScopes(lookupContextForThisContext);
-
-  ifNotDoneYet(
-      [&] {
-        if (resultFinderForTypeContext)
-          findResultsAndSaveUnavailables(lookupContextForThisContext,
-                                         std::move(*resultFinderForTypeContext),
-                                         *isCascadingUse, baseNLOptions);
-      },
-      // Recurse into the next context.
-      [&] {
-        lookupNamesIntroducedBy(ContextAndUnresolvedIsCascadingUse{
-            lookupContextForThisContext->getParentForLookup(), isCascadingUse});
-      });
-}
-
-void UnqualifiedLookupFactory::findResultsAndSaveUnavailables(
-    DeclContext *lookupContextForThisContext,
-    ResultFinderForTypeContext &&resultFinderForTypeContext,
-    bool isCascadingUse, NLOptions baseNLOptions) {
-  auto firstPossiblyUnavailableResult = Results.size();
-  resultFinderForTypeContext.findResults(Name, isCascadingUse, baseNLOptions,
-                                         lookupContextForThisContext, Results);
-  setAsideUnavailableResults(firstPossiblyUnavailableResult);
 }
 
 void UnqualifiedLookupFactory::lookupInModuleScopeContext(
@@ -986,6 +949,35 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByMiscContext(
                           /*onlyCareAboutFunctionBody=*/false));
   // clang-format on
 }
+
+
+void UnqualifiedLookupFactory::finishLookingInContext(
+                                                      const AddGenericParameters addGenericParameters,
+                                                      DeclContext *const lookupContextForThisContext,
+                                                      Optional<ResultFinderForTypeContext> &&resultFinderForTypeContext,
+                                                      const Optional<bool> isCascadingUse) {
+  
+  // When a generic has the same name as a member, Swift prioritizes the generic
+  // because the member could still be named by qualifying it. But there is no
+  // corresponding way to qualify a generic parameter.
+  // So, look for generics first.
+  if (addGenericParameters == AddGenericParameters::Yes)
+    addGenericParametersHereAndInEnclosingScopes(lookupContextForThisContext);
+  
+  ifNotDoneYet(
+               [&] {
+                 if (resultFinderForTypeContext)
+                   findResultsAndSaveUnavailables(lookupContextForThisContext,
+                                                  std::move(*resultFinderForTypeContext),
+                                                  *isCascadingUse, baseNLOptions);
+               },
+               // Recurse into the next context.
+               [&] {
+                 lookupNamesIntroducedBy(ContextAndUnresolvedIsCascadingUse{
+                   lookupContextForThisContext->getParentForLookup(), isCascadingUse});
+               });
+}
+
 
 void UnqualifiedLookupFactory::lookForLocalVariablesIn(
     AbstractFunctionDecl *AFD, Optional<bool> isCascadingUse) {
@@ -1211,6 +1203,19 @@ void UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
 }
 
 #pragma mark common helper definitions
+
+
+void UnqualifiedLookupFactory::findResultsAndSaveUnavailables(
+                                                              DeclContext *lookupContextForThisContext,
+                                                              ResultFinderForTypeContext &&resultFinderForTypeContext,
+                                                              bool isCascadingUse, NLOptions baseNLOptions) {
+  auto firstPossiblyUnavailableResult = Results.size();
+  resultFinderForTypeContext.findResults(Name, isCascadingUse, baseNLOptions,
+                                         lookupContextForThisContext, Results);
+  setAsideUnavailableResults(firstPossiblyUnavailableResult);
+}
+
+
 NLOptions UnqualifiedLookupFactory::computeBaseNLOptions(
     const UnqualifiedLookup::Options options,
     const bool isOriginallyTypeLookup) {
