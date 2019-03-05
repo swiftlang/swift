@@ -250,12 +250,22 @@ public:
   /// convention?
   ///
   /// This is independent of whether the SIL argument is address type.
-  bool isFormallyPassedIndirectly() const { return isAddressOnly(); }
+  bool isFormallyPassedIndirectly() const {
+    assert(!isResilient() ||
+           getResilienceExpansion() == ResilienceExpansion::Minimal &&
+           "calling convention uses minimal resilience expansion");
+    return isAddressOnly();
+  }
 
   /// Are r-values of this type returned indirectly by formal convention?
   ///
   /// This is independent of whether the SIL result is address type.
-  bool isFormallyReturnedIndirectly() const { return isAddressOnly(); }
+  bool isFormallyReturnedIndirectly() const {
+    assert(!isResilient() ||
+           getResilienceExpansion() == ResilienceExpansion::Minimal &&
+           "calling convention uses minimal resilience expansion");
+    return isAddressOnly();
+  }
 
   RecursiveProperties getRecursiveProperties() const {
     return Properties;
