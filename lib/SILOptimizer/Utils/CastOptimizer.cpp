@@ -89,9 +89,15 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
     }
   }
 
+  SILValue src = dynamicCast.getSource();
+  // Check if we have a source type that is address only. We do not support that
+  // today.
+  if (src->getType().isAddressOnly(mod)) {
+    return nullptr;
+  }
+
   SILInstruction *Inst = dynamicCast.getInstruction();
   bool isConditional = dynamicCast.isConditional();
-  SILValue Src = dynamicCast.getSource();
   SILValue Dest = dynamicCast.getDest();
   CanType BridgedTargetTy = dynamicCast.getBridgedTargetType();
   SILBasicBlock *SuccessBB = dynamicCast.getSuccessBlock();
@@ -127,20 +133,13 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   // - then convert _ObjectiveCBridgeable._ObjectiveCType to
   // a Swift type using _forceBridgeFromObjectiveC.
 
-  if (!Src->getType().isLoadable(mod)) {
-    // This code path is never reached in current test cases
-    // If reached, we'd have to convert from an ObjC Any* to a loadable type
-    // Should use check_addr / make a source we can actually load
-    return nullptr;
-  }
-
   // Inline constructor.
   SILValue srcOp;
   SILInstruction *newI;
   std::tie(srcOp, newI) = [&]() -> std::pair<SILValue, SILInstruction *> {
     // Generate a load for the source argument.
     SILValue load =
-        Builder.createLoad(Loc, Src, LoadOwnershipQualifier::Unqualified);
+        Builder.createLoad(Loc, src, LoadOwnershipQualifier::Unqualified);
 
     // If type of the source and the expected ObjC type are equal, there is no
     // need to generate the conversion from ObjCTy to
