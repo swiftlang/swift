@@ -4419,6 +4419,14 @@ void AbstractStorageDecl::overwriteImplInfo(StorageImplInfo implInfo) {
   Accessors.getPointer()->overwriteImplInfo(implInfo);
 }
 
+bool AbstractStorageDecl::hasPrivateAccessor() const {
+  for (auto accessor : getAllAccessors()) {
+    if (hasPrivateOrFilePrivateFormalAccess(accessor))
+      return true;
+  }
+  return false;
+}
+
 void AbstractStorageDecl::setAccessors(StorageImplInfo implInfo,
                                        SourceLoc lbraceLoc,
                                        ArrayRef<AccessorDecl *> accessors,
