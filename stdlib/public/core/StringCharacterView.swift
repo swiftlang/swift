@@ -63,8 +63,7 @@ extension String: BidirectionalCollection {
   /// - Returns: The index value immediately after `i`.
   public func index(after i: Index) -> Index {
     _precondition(i < endIndex, "String index is out of bounds")
-
-    // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
+    
     let stride = _characterStride(startingAt: i)
     let nextOffset = i._encodedOffset &+ stride
     let nextStride = _characterStride(
@@ -208,6 +207,17 @@ extension String: BidirectionalCollection {
     if let d = i.characterStride { return d }
 
     if i == endIndex { return 0 }
+    
+    if _fastPath(_guts.isFastUTF8) {
+      let isSingleByteGrapheme = _guts.withFastUTF8 {
+        _fastIsSingleByteGrapheme($0, at: i._encodedOffset)
+      }
+      if isSingleByteGrapheme {
+        return 1
+      } else if _guts.isASCII {
+        return 2
+      }
+    }
 
     return _guts._opaqueCharacterStride(startingAt: i._encodedOffset)
   }

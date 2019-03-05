@@ -190,9 +190,39 @@ internal func _numUTF8CodeUnits(_ scalar: Unicode.Scalar) -> Int {
     default: return 4
   }
 }
+
 @inline(__always)
 internal func _numUTF16CodeUnits(_ scalar: Unicode.Scalar) -> Int {
   return scalar.value <= UInt16.max ? 1 : 2
+}
+
+@inline(__always) @inlinable
+internal func _quickIsNFCScalarPrecheck(_ byte:UInt8) -> Bool {
+  // Fast-path: All scalars up through U+02FF are NFC and have boundaries
+  // before them. UTF8 encoding of >=U+0300 has a first byte >= 0XCC.
+  return byte < 0xCC
+}
+
+@inline(__always) @inlinable
+internal func _fastIsSingleByteGrapheme(
+  _ utf8: UnsafeBufferPointer<UInt8>, at i: Int
+  ) -> Bool {
+  _internalInvariant(i < utf8.count)
+  if _slowPath(i == utf8.count &- 1) {
+    _internalInvariant(_isASCII(utf8[i]))
+    return true
+  }
+  let byte = utf8[i]
+  guard _isASCII(byte) else { return false }
+  
+  let secondByte = utf8[i &+ 1]
+  
+  // Fast-path: All scalars up through U+02FF are NFC and have boundaries
+  // before them
+  guard _fastPath(_quickIsNFCScalarPrecheck(secondByte)) else { return false }
+  
+  
+  return _fastPath(!(byte == _CR && secondByte == _LF))
 }
 
 @inlinable @inline(__always)
@@ -215,8 +245,8 @@ extension _StringGuts {
   @inlinable
   @inline(__always) // fast-path: fold common fastUTF8 check
   internal func scalarAlign(_ idx: Index) -> Index {
-    // TODO(String performance): isASCII check
-
+    if _fastPath(isASCII) { return idx }
+    
     if _slowPath(idx.transcodedOffset != 0 || idx._encodedOffset == 0) {
       // Transcoded indices are already scalar aligned
       return String.Index(_encodedOffset: idx._encodedOffset)

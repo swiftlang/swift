@@ -111,7 +111,7 @@ extension UnsafeBufferPointer where Element == UInt8 {
     assert(!_isContinuation(self[_unchecked: index]))
 
     // Sub-300 latiny fast-path
-    if self[_unchecked: index] < 0xCC { return true }
+    if _quickIsNFCScalarPrecheck(self[_unchecked: index]) { return true }
 
     let cu = _decodeScalar(self, startingAt: index).0
     return cu._hasNormalizationBoundaryBefore
