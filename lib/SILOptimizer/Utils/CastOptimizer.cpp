@@ -72,6 +72,12 @@ getObjCToSwiftBridgingFunction(SILOptFunctionBuilder &funcBuilder,
 /// _ObjectiveCBridgeable.
 SILInstruction *
 CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
+  auto kind = dynamicCast.getKind();
+  (void)kind;
+  assert(((kind == SILDynamicCastKind::CheckedCastAddrBranchInst) ||
+          (kind == SILDynamicCastKind::UnconditionalCheckedCastAddrInst)) &&
+         "Unsupported dynamic cast kind");
+
   CanType target = dynamicCast.getTargetType();
   auto &mod = dynamicCast.getModule();
 
@@ -108,9 +114,6 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   SILValue SrcOp;
   SILInstruction *NewI = nullptr;
 
-  assert(Src->getType().isAddress() && "Source should have an address type");
-  assert(Dest->getType().isAddress() && "Source should have an address type");
-
   // If this is a conditional cast:
   // We need a new fail BB in order to add a dealloc_stack to it
   SILBasicBlock *ConvFailBB = nullptr;
@@ -120,10 +123,6 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
                                           nullptr, nullptr);
     Builder.setInsertionPoint(CurrInsPoint);
   }
-
-  // We know this is always true since SILBridgedTy is an object and Src is an
-  // address.
-  assert(SILBridgedTy != Src->getType());
 
   // Check if we can simplify a cast into:
   // - ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
