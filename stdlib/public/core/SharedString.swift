@@ -45,6 +45,28 @@ extension String {
     storage._owner = owner
     self.init(String(_StringGuts(storage)))
   }
+
+  /// Creates a `String` whose backing store is shared with the UTF-8 data in
+  /// the given array.
+  ///
+  /// The new `String` instance shares ownership of the array's underlying
+  /// storage, guaranteeing that the `String` remains valid even if the `array`
+  /// is released.
+  ///
+  /// This initializer does not try to repair ill-formed UTF-8 code unit
+  /// sequences. If any are found, the result of the initializer is `nil`.
+  ///
+  /// - Parameter array: An `Array` containing the UTF-8 bytes that should be
+  ///   shared with the created `String`.
+  public init?(sharing array: [UInt8]) {
+    guard case (let owner, let rawPtr?) = array._cPointerArgs() else {
+      self = ""
+      return
+    }
+    let baseAddress = rawPtr.assumingMemoryBound(to: UInt8.self)
+    let buffer = UnsafeBufferPointer(start: baseAddress, count: array.count)
+    self.init(sharingContent: buffer, owner: owner)
+  }
 }
 
 extension Substring {

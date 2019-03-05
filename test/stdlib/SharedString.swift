@@ -33,7 +33,7 @@ class BufferDeallocator {
   }
 }
 
-SharedStringTests.test("String.init(sharing:owner:)") {
+SharedStringTests.test("String.init(sharingContent:owner:)") {
   let buf = makeValidUTF8Buffer()
   let str = String(sharingContent: buf, owner: BufferDeallocator(buf))
 
@@ -51,7 +51,7 @@ SharedStringTests.test("String.init(sharing:owner:)") {
   expectEqual(str!, "baaa")
 }
 
-SharedStringTests.test("String.init(sharing:owner:) invalid UTF8") {
+SharedStringTests.test("String.init(sharingContent:owner:) invalid UTF8") {
   let buf = makeInvalidUTF8Buffer()
   let str = String(sharingContent: buf, owner: BufferDeallocator(buf))
 
@@ -65,6 +65,26 @@ SharedStringTests.test("Substring.withSharedString(_:)") {
   substr.withSharedString { shared in
     expectEqual(shared, "bcd")
   }
+}
+
+SharedStringTests.test("String.init(sharing:)") {
+  var array = [UInt8](repeating: UInt8(ascii: "a"), count: 4)
+  let str = String(sharing: array)
+
+  expectNotNil(str)
+  expectEqual(str!, "aaaa")
+
+  // Show that mutating the array causes CoW and the original string isn't
+  // modified.
+  array[0] = UInt8(ascii: "b")
+  expectEqual(str!, "aaaa")
+}
+
+SharedStringTests.test("String.init(sharing:) invalid UTF8") {
+  let array: [UInt8] = [0x80]  // orphaned continuation byte
+  let str = String(sharing: array)
+
+  expectNil(str)
 }
 
 runAllTests()
