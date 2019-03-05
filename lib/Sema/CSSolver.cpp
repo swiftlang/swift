@@ -1907,9 +1907,73 @@ void ConstraintSystem::partitionForDesignatedTypes(
   }
 }
 
+// Performance hack: if there are two generic overloads, and one is
+// more specialized than the other, prefer the more-specialized one.
+static Constraint *tryOptimizeGenericDisjunction(
+                                          TypeChecker &tc,
+                                          DeclContext *dc,
+                                          ArrayRef<Constraint *> constraints) {
+  if (constraints.size() != 2 ||
+      constraints[0]->getKind() != ConstraintKind::BindOverload ||
+      constraints[1]->getKind() != ConstraintKind::BindOverload ||
+      constraints[0]->isFavored() ||
+      constraints[1]->isFavored())
+    return nullptr;
+
+  OverloadChoice choiceA = constraints[0]->getOverloadChoice();
+  OverloadChoice choiceB = constraints[1]->getOverloadChoice();
+
+  if (!choiceA.isDecl() || !choiceB.isDecl())
+    return nullptr;
+
+  auto isViable = [](ValueDecl *decl) -> bool {
+    assert(decl);
+
+    auto *AFD = dyn_cast<AbstractFunctionDecl>(decl);
+    if (!AFD || !AFD->isGeneric())
+      return false;
+
+    auto funcType = AFD->getInterfaceType();
+    auto hasAnyOrOptional = funcType.findIf([](Type type) -> bool {
+      if (type->getOptionalObjectType())
+        return true;
+
+      return type->isAny();
+    });
+
+    // If function declaration references `Any` or `Any?` type
+    // let's not attempt it, because it's unclear
+    // without solving which overload is going to be better.
+    return !hasAnyOrOptional;
+  };
+
+  auto *declA = choiceA.getDecl();
+  auto *declB = choiceB.getDecl();
+
+  if (!isViable(declA) || !isViable(declB))
+    return nullptr;
+
+  switch (tc.compareDeclarations(dc, declA, declB)) {
+  case Comparison::Better:
+    return constraints[0];
+
+  case Comparison::Worse:
+    return constraints[1];
+
+  case Comparison::Unordered:
+    return nullptr;
+  }
+}
+
 void ConstraintSystem::partitionDisjunction(
     ArrayRef<Constraint *> Choices, SmallVectorImpl<unsigned> &Ordering,
     SmallVectorImpl<unsigned> &PartitionBeginning) {
+  // Apply a special-case rule for favoring one generic function over
+  // another.
+  if (auto favored = tryOptimizeGenericDisjunction(TC, DC, Choices)) {
+    favorConstraint(favored);
+  }
+
   SmallSet<Constraint *, 16> taken;
 
   // Local function used to iterate over the untaken choices from the

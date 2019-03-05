@@ -5036,34 +5036,6 @@ retry_after_fail:
     break;
   }
 
-  // Collect the active overload choices.
-  SmallVector<OverloadChoice, 4> choices;
-  for (auto constraint : disjunction->getNestedConstraints()) {
-    if (constraint->isDisabled())
-      continue;
-    choices.push_back(constraint->getOverloadChoice());
-  }
-
-  // If we can favor one generic result over another, do so.
-  if (auto favoredChoice = tryOptimizeGenericDisjunction(choices)) {
-    unsigned favoredIndex = favoredChoice - choices.data();
-    for (auto constraint : disjunction->getNestedConstraints()) {
-      if (constraint->isDisabled())
-        continue;
-
-      if (favoredIndex == 0) {
-        if (solverState)
-          solverState->favorConstraint(constraint);
-        else
-          constraint->setFavored();
-
-        break;
-      } else {
-        --favoredIndex;
-      }
-    }
-  }
-
   // If there was a constraint that we couldn't reason about, don't use the
   // results of any common-type computations.
   if (hasUnhandledConstraints)

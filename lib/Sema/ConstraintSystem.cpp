@@ -1371,58 +1371,6 @@ ConstraintSystem::getTypeOfMemberReference(
   return { openedType, type };
 }
 
-// Performance hack: if there are two generic overloads, and one is
-// more specialized than the other, prefer the more-specialized one.
-OverloadChoice *ConstraintSystem::tryOptimizeGenericDisjunction(
-                                          ArrayRef<OverloadChoice> choices) {
-  if (choices.size() != 2)
-    return nullptr;
-
-  const auto &choiceA = choices[0];
-  const auto &choiceB = choices[1];
-
-  if (!choiceA.isDecl() || !choiceB.isDecl())
-    return nullptr;
-
-  auto isViable = [](ValueDecl *decl) -> bool {
-    assert(decl);
-
-    auto *AFD = dyn_cast<AbstractFunctionDecl>(decl);
-    if (!AFD || !AFD->isGeneric())
-      return false;
-
-    auto funcType = AFD->getInterfaceType();
-    auto hasAnyOrOptional = funcType.findIf([](Type type) -> bool {
-      if (type->getOptionalObjectType())
-        return true;
-
-      return type->isAny();
-    });
-
-    // If function declaration references `Any` or `Any?` type
-    // let's not attempt it, because it's unclear
-    // without solving which overload is going to be better.
-    return !hasAnyOrOptional;
-  };
-
-  auto *declA = choiceA.getDecl();
-  auto *declB = choiceB.getDecl();
-
-  if (!isViable(declA) || !isViable(declB))
-    return nullptr;
-
-  switch (TC.compareDeclarations(DC, declA, declB)) {
-  case Comparison::Better:
-    return const_cast<OverloadChoice *>(&choiceA);
-
-  case Comparison::Worse:
-    return const_cast<OverloadChoice *>(&choiceB);
-
-  case Comparison::Unordered:
-    return nullptr;
-  }
-}
-
 /// If there are any SIMD operators in the overload set, partition the set so
 /// that the SIMD operators come at the end.
 static ArrayRef<OverloadChoice> partitionSIMDOperators(
@@ -1575,9 +1523,6 @@ void ConstraintSystem::addOverloadSet(Type boundType,
     addBindOverloadConstraint(boundType, choices.front(), locator, useDC);
     return;
   }
-
-  if (!favoredChoice)
-    favoredChoice = tryOptimizeGenericDisjunction(choices);
 
   SmallVector<OverloadChoice, 4> scratchChoices;
   choices = partitionSIMDOperators(choices, scratchChoices);
