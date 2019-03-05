@@ -875,3 +875,28 @@ struct rdar43866352<Options> {
     callback = { (options: Options) in } // expected-error {{cannot assign value of type '(inout Options) -> ()' to type '(inout _) -> Void'}}
   }
 }
+
+extension Hashable {
+  var self_: Self {
+    return self
+  }
+}
+
+do {
+  struct S<
+      C : Collection,
+      I : Hashable,
+      R : Numeric
+  > {
+    init(_ arr: C,
+         id: KeyPath<C.Element, I>,
+         content: @escaping (C.Element) -> R) {}
+  }
+
+  func foo(_ arr: [Int]) {
+    _ = S(arr, id: \.self_) {
+      // expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{30-30=_ in }}
+      return 42
+    }
+  }
+}

@@ -867,7 +867,6 @@ static bool hasDependentTypeWitness(
 static bool isDependentConformance(
               IRGenModule &IGM,
               const RootProtocolConformance *rootConformance,
-              bool considerResilience,
               llvm::SmallPtrSet<const NormalProtocolConformance *, 4> &visited){
   // Self-conformances are never dependent.
   auto conformance = dyn_cast<NormalProtocolConformance>(rootConformance);
@@ -880,7 +879,7 @@ static bool isDependentConformance(
     return false;
 
   // If the conformance is resilient, this is always true.
-  if (considerResilience && IGM.isResilientConformance(conformance))
+  if (IGM.isResilientConformance(conformance))
     return true;
 
   // Check whether any of the conformances are dependent.
@@ -899,7 +898,6 @@ static bool isDependentConformance(
         isDependentConformance(IGM,
                                assocConformance.getConcrete()
                                  ->getRootConformance(),
-                               considerResilience,
                                visited))
       return true;
   }
@@ -916,11 +914,9 @@ static bool isDependentConformance(
 /// Is there anything about the given conformance that requires witness
 /// tables to be dependently-generated?
 bool IRGenModule::isDependentConformance(
-    const RootProtocolConformance *conformance,
-    bool considerResilience) {
+    const RootProtocolConformance *conformance) {
   llvm::SmallPtrSet<const NormalProtocolConformance *, 4> visited;
-  return ::isDependentConformance(*this, conformance, considerResilience,
-                                  visited);
+  return ::isDependentConformance(*this, conformance, visited);
 }
 
 static bool isSynthesizedNonUnique(const RootProtocolConformance *conformance) {
@@ -1140,7 +1136,6 @@ public:
     // offsets, with conditional conformances closest to 0.
     unsigned NextPrivateDataIndex = 0;
     bool ResilientConformance;
-    bool RequiresSpecialization = false;
 
     const ProtocolInfo &PI;
 
@@ -1162,20 +1157,13 @@ public:
           PI(IGM.getProtocolInfo(SILWT->getConformance()->getProtocol(),
                                  (ResilientConformance
                                   ? ProtocolInfoKind::RequirementSignature
-                                  : ProtocolInfoKind::Full))) {
-      // If the conformance is resilient, we require runtime instantiation.
-      if (ResilientConformance)
-        RequiresSpecialization = true;
-    }
+                                  : ProtocolInfoKind::Full))) {}
 
     /// The number of entries in the witness table.
     unsigned getTableSize() const { return TableSize; }
 
     /// The number of private entries in the witness table.
     unsigned getTablePrivateSize() const { return NextPrivateDataIndex; }
-
-    /// Whether this witness table must be specialized at runtime.
-    bool requiresSpecialization() const { return RequiresSpecialization; }
 
     /// The top-level entry point.
     void build();
@@ -1226,7 +1214,6 @@ public:
       }
 
       // Otherwise, we'll need to derive it at instantiation time.
-      RequiresSpecialization = true;
       SpecializedBaseConformances.push_back({Table.size(), &conf});
       Table.addNullPointer(IGM.Int8PtrTy);
     }
@@ -1293,8 +1280,6 @@ public:
       auto associate =
         Conformance.getTypeWitness(requirement.getAssociation(), nullptr)
           ->getCanonicalType();
-      if (associate->hasTypeParameter())
-        RequiresSpecialization = true;
       llvm::Constant *witness =
           IGM.getAssociatedTypeWitness(associate, /*inProtocolContext=*/false);
       Table.addBitCast(witness, IGM.Int8PtrTy);
@@ -1318,9 +1303,6 @@ public:
         ConformanceInContext.getAssociatedConformance(
           requirement.getAssociation(),
           requirement.getAssociatedRequirement());
-
-      if (requirement.getAssociation()->hasTypeParameter())
-        RequiresSpecialization = true;
 
 #ifndef NDEBUG
       assert(entry.getKind() == SILWitnessTable::AssociatedTypeProtocol
@@ -1372,7 +1354,6 @@ public:
 
     /// Allocate another word of private data storage in the conformance table.
     unsigned getNextPrivateDataIndex() {
-      RequiresSpecialization = true;
       return NextPrivateDataIndex++;
     }
 
@@ -1911,7 +1892,7 @@ namespace {
       // WitnessTablePrivateSizeInWordsAndRequiresInstantiation
       B.addInt(IGM.Int16Ty,
                (Description.witnessTablePrivateSize << 1) |
-                Description.hasDependentAssociatedTypeWitnesses);
+                Description.requiresSpecialization);
       // Instantiation function
       B.addRelativeAddressOrNull(Description.instantiationFn);
       // Private data
@@ -2065,13 +2046,12 @@ IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
 
   const ConformanceInfo *info;
   // If the conformance is dependent in any way, we need to unique it.
-  // TODO: maybe this should apply whenever it's out of the module?
-  // TODO: actually enable this
+  //
   // FIXME: Both implementations of ConformanceInfo are trivially-destructible,
   // so in theory we could allocate them on a BumpPtrAllocator. But there's not
   // a good one for us to use. (The ASTContext's outlives the IRGenModule in
   // batch mode.)
-  if (isDependentConformance(rootConformance, /*considerResilience=*/true) ||
+  if (isDependentConformance(rootConformance) ||
       // Foreign types need to go through the accessor to unique the witness
       // table.
       isSynthesizedNonUnique(rootConformance)) {
@@ -2143,13 +2123,13 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // Produce the initializer value.
   auto initializer = wtableContents.finishAndCreateFuture();
 
+  bool isDependent = isDependentConformance(conf);
+
   llvm::GlobalVariable *global = nullptr;
   unsigned tableSize;
   if (!isResilientConformance(conf)) {
-    bool isDependent =
-      isDependentConformance(conf, /*considerResilience=*/false);
     global = cast<llvm::GlobalVariable>(
-      isDependent
+      (isDependent && conf->getDeclContext()->isGenericContext())
         ? getAddrOfWitnessTablePattern(cast<NormalProtocolConformance>(conf),
                                        initializer)
         : getAddrOfWitnessTable(conf, initializer));
@@ -2165,10 +2145,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // descriptor.
   ConformanceDescription description(conf, wt, global, tableSize,
                                      wtableBuilder.getTablePrivateSize(),
-                                     wtableBuilder.requiresSpecialization(),
-                                     isDependentConformance(
-                                       conf,
-                                       /*considerResilience=*/false));
+                                     isDependent);
 
   // Build the instantiation function, we if need one.
   description.instantiationFn = wtableBuilder.buildInstantiationFunction();

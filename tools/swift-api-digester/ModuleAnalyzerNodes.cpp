@@ -477,7 +477,7 @@ SDKNodeType *SDKNodeDeclType::getRawValueType() const {
   return nullptr;
 }
 
-bool SDKNodeDeclType::isConformingTo(KnownProtocolKind Kind) const {
+bool SDKNodeDeclType::isConformingTo(swift::ide::api::KnownProtocolKind Kind) const {
   switch (Kind) {
 #define KNOWN_PROTOCOL(NAME)                                                \
     case KnownProtocolKind::NAME:                                           \

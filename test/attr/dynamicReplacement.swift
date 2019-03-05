@@ -38,3 +38,11 @@ extension TheReplaceables {
   @_dynamicReplacement(for: subscript(_:))
   subscript (string_string i: String) -> String { return "" }
 }
+
+extension K {
+  @_dynamicReplacement(for: init(i:)) // expected-error{{replaced constructor 'init(i:)' is not marked as convenience}}
+  convenience init(ri: Int) { }
+
+  @_dynamicReplacement(for: init(c:)) // expected-error{{replaced constructor 'init(c:)' is marked as convenience}})
+  init(rc: Int) { }
+}

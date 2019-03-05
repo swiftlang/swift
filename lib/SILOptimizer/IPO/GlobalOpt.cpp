@@ -816,7 +816,7 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
   if (GlobalVarSkipProcessing.count(SILG))
     return;
 
-  if (!isSimpleType(SILG->getLoweredType(), *Module)) {
+  if (!SILG->getLoweredType().isTrivial(*Module)) {
     GlobalVarSkipProcessing.insert(SILG);
     return;
   }
@@ -895,6 +895,11 @@ bool SILGlobalOpt::run() {
     // Don't optimize functions that are marked with the opt.never attribute.
     if (!F.shouldOptimize())
       continue;
+
+    // TODO: Add support for ownership.
+    if (F.hasOwnership()) {
+      continue;
+    }
 
     // Cache cold blocks per function.
     ColdBlockInfo ColdBlocks(DA);

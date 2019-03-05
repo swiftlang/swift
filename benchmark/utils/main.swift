@@ -65,7 +65,6 @@ import DictionaryOfAnyHashableStrings
 import DictionaryRemove
 import DictionarySubscriptDefault
 import DictionarySwap
-import DoubleWidthDivision
 import DropFirst
 import DropLast
 import DropWhile
@@ -235,7 +234,6 @@ registerBenchmark(DictionaryOfAnyHashableStrings)
 registerBenchmark(DictionaryRemove)
 registerBenchmark(DictionarySubscriptDefault)
 registerBenchmark(DictionarySwap)
-registerBenchmark(DoubleWidthDivision)
 registerBenchmark(DropFirst)
 registerBenchmark(DropLast)
 registerBenchmark(DropWhile)

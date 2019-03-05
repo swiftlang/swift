@@ -2221,8 +2221,8 @@ static void rewriteFunction(StructLoweringState &pass,
       retBuilder.createStore(regLoc, retOp, retArg,
                              getStoreInitOwnership(pass, retOp->getType()));
     }
-    auto emptyTy = retBuilder.getModule().Types.getLoweredType(
-        TupleType::getEmpty(retBuilder.getModule().getASTContext()));
+    auto emptyTy = SILType::getPrimitiveObjectType(
+        retBuilder.getModule().getASTContext().TheEmptyTupleType);
     auto newRetTuple = retBuilder.createTuple(regLoc, emptyTy, {});
     retBuilder.createReturn(newRetTuple->getLoc(), newRetTuple);
     instr->eraseFromParent();

@@ -540,7 +540,6 @@ namespace {
   /// "favored" because they match exactly.
   bool isFavoredParamAndArg(ConstraintSystem &CS,
                             Type paramTy,
-                            Expr *arg,
                             Type argTy,
                             Type otherArgTy = Type()) {
     // Determine the argument type.
@@ -550,31 +549,44 @@ namespace {
     if (paramTy->isEqual(argTy))
       return true;
 
-    // If the argument is a literal, this is a favored param/arg pair if
-    // the parameter is of that default type.
-    auto &tc = CS.getTypeChecker();
-    auto literalProto = tc.getLiteralProtocol(arg->getSemanticsProvidingExpr());
-    if (!literalProto) return false;
+    llvm::SmallSetVector<ProtocolDecl *, 2> literalProtos;
+    if (auto argTypeVar = argTy->getAs<TypeVariableType>()) {
+      llvm::SetVector<Constraint *> constraints;
+      CS.getConstraintGraph().gatherConstraints(
+          argTypeVar, constraints,
+          ConstraintGraph::GatheringKind::EquivalenceClass,
+          [](Constraint *constraint) {
+            return constraint->getKind() == ConstraintKind::LiteralConformsTo;
+          });
+
+      for (auto constraint : constraints) {
+        literalProtos.insert(constraint->getProtocol());
+      }
+    }
 
     // Dig out the second argument type.
     if (otherArgTy)
       otherArgTy = otherArgTy->getWithoutSpecifierType();
 
-    // If there is another, concrete argument, check whether it's type
-    // conforms to the literal protocol and test against it directly.
-    // This helps to avoid 'widening' the favored type to the default type for
-    // the literal.
-    if (otherArgTy && otherArgTy->getAnyNominal()) {
-      return otherArgTy->isEqual(paramTy) &&
-             tc.conformsToProtocol(otherArgTy, literalProto, CS.DC,
-                                   ConformanceCheckFlags::InExpression);
+    auto &tc = CS.getTypeChecker();
+    for (auto literalProto : literalProtos) {
+      // If there is another, concrete argument, check whether it's type
+      // conforms to the literal protocol and test against it directly.
+      // This helps to avoid 'widening' the favored type to the default type for
+      // the literal.
+      if (otherArgTy && otherArgTy->getAnyNominal()) {
+        if (otherArgTy->isEqual(paramTy) &&
+            tc.conformsToProtocol(otherArgTy, literalProto, CS.DC,
+                                  ConformanceCheckFlags::InExpression))
+          return true;
+      } else if (Type defaultType = tc.getDefaultType(literalProto, CS.DC)) {
+        // If there is a default type for the literal protocol, check whether
+        // it is the same as the parameter type.
+        // Check whether there is a default type to compare against.
+        if (paramTy->isEqual(defaultType))
+          return true;
+      }
     }
-
-    // If there is a default type for the literal protocol, check whether
-    // it is the same as the parameter type.
-    // Check whether there is a default type to compare against.
-    if (Type defaultType = tc.getDefaultType(literalProto, CS.DC))
-      return paramTy->isEqual(defaultType);
 
     return false;
   }
@@ -744,7 +756,7 @@ namespace {
       auto contextualTy = CS.getContextualType(expr);
 
       return isFavoredParamAndArg(
-                 CS, paramTy, expr->getArg(),
+                 CS, paramTy,
                  CS.getType(expr->getArg())->getWithoutParens()) &&
              (!contextualTy || contextualTy->isEqual(resultTy));
     };
@@ -899,14 +911,6 @@ namespace {
           CS.setFavoredType(argTupleExpr->getElement(1), favoredExprTy);
           secondFavoredTy = favoredExprTy;
         }
-        
-        if (firstFavoredTy && firstArgTy->is<TypeVariableType>()) {
-          firstArgTy = firstFavoredTy;
-        }
-        
-        if (secondFavoredTy && secondArgTy->is<TypeVariableType>()) {
-          secondArgTy = secondFavoredTy;
-        }
       }
       
       // Figure out the parameter type.
@@ -924,9 +928,8 @@ namespace {
       auto resultTy = fnTy->getResult();
       auto contextualTy = CS.getContextualType(expr);
 
-      return (isFavoredParamAndArg(CS, firstParamTy, firstArg, firstArgTy,
-                                   secondArgTy) ||
-              isFavoredParamAndArg(CS, secondParamTy, secondArg, secondArgTy,
+      return (isFavoredParamAndArg(CS, firstParamTy, firstArgTy, secondArgTy) ||
+              isFavoredParamAndArg(CS, secondParamTy, secondArgTy,
                                    firstArgTy)) &&
              firstParamTy->isEqual(secondParamTy) &&
              !isPotentialForcingOpportunity(firstArgTy, secondArgTy) &&
@@ -1109,7 +1112,7 @@ namespace {
           auto keyTy = dictTy->first;
           auto valueTy = dictTy->second;
 
-          if (isFavoredParamAndArg(CS, keyTy, index, CS.getType(index))) {
+          if (isFavoredParamAndArg(CS, keyTy, CS.getType(index))) {
             outputTy = OptionalType::get(valueTy);
             
             if (isLValueBase)
@@ -1120,10 +1123,6 @@ namespace {
       
       if (outputTy.isNull()) {
         outputTy = CS.createTypeVariable(resultLocator, TVO_CanBindToLValue);
-      } else {
-        // TODO: Generalize this for non-subscript-expr anchors, so that e.g.
-        // keypath lookup benefits from the peephole as well.
-        CS.setFavoredType(anchor, outputTy.getPointer());
       }
 
       // FIXME: This can only happen when diagnostics successfully type-checked
@@ -1167,6 +1166,13 @@ namespace {
                        FunctionType::get(params, outputTy),
                        memberTy,
                        fnLocator);
+
+      Type fixedOutputType =
+          CS.getFixedTypeRecursive(outputTy, /*wantRValue=*/false);
+      if (!fixedOutputType->isTypeVariableOrMember()) {
+        CS.setFavoredType(anchor, fixedOutputType.getPointer());
+        outputTy = fixedOutputType;
+      }
 
       return outputTy;
     }
@@ -2513,8 +2519,6 @@ namespace {
     }
 
     Type visitApplyExpr(ApplyExpr *expr) {
-      Type outputTy;
-
       auto fnExpr = expr->getFn();
 
       if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
@@ -2523,67 +2527,9 @@ namespace {
           return resultOfTypeOperation(typeOperation, expr->getArg());
       }
 
-      if (isa<DeclRefExpr>(fnExpr)) {
-        if (auto fnType = CS.getType(fnExpr)->getAs<AnyFunctionType>()) {
-          outputTy = fnType->getResult();
-        }
-      } else if (auto OSR = dyn_cast<OverloadedDeclRefExpr>(fnExpr)) {
-        // Determine if the overloads are all functions that share a common
-        // return type.
-        Type commonType;
-        for (auto OD : OSR->getDecls()) {
-          auto OFD = dyn_cast<AbstractFunctionDecl>(OD);
-          if (!OFD) {
-            commonType = Type();
-            break;
-          }
-
-          auto OFT = OFD->getInterfaceType()->getAs<AnyFunctionType>();
-          if (!OFT) {
-            commonType = Type();
-            break;
-          }
-
-          // Look past the self parameter.
-          if (OFD->getDeclContext()->isTypeContext()) {
-            OFT = OFT->getResult()->getAs<AnyFunctionType>();
-            if (!OFT) {
-              commonType = Type();
-              break;
-            }
-          }
-
-          Type resultType = OFT->getResult();
-
-          // If there are any type parameters in the result,
-          if (resultType->hasTypeParameter()) {
-            commonType = Type();
-            break;
-          }
-
-          if (commonType.isNull()) {
-            commonType = resultType;
-          } else if (!commonType->isEqual(resultType)) {
-            commonType = Type();
-            break;
-          }
-        }
-
-        if (commonType) {
-          outputTy = commonType;
-        }
-      }
-      
-      // The function subexpression has some rvalue type T1 -> T2 for fresh
-      // variables T1 and T2.
-      if (outputTy.isNull()) {
-        outputTy = CS.createTypeVariable(
-            CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult));
-      } else {
-        // Since we know what the output type is, we can set it as the favored
-        // type of this expression.
-        CS.setFavoredType(expr, outputTy.getPointer());
-      }
+      // The result type is a fresh type variable.
+      Type resultType = CS.createTypeVariable(
+          CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult));
 
       // A direct call to a ClosureExpr makes it noescape.
       FunctionType::ExtInfo extInfo;
@@ -2597,11 +2543,20 @@ namespace {
       AnyFunctionType::decomposeInput(CS.getType(expr->getArg()), params);
 
       CS.addConstraint(ConstraintKind::ApplicableFunction,
-                       FunctionType::get(params, outputTy, extInfo),
+                       FunctionType::get(params, resultType, extInfo),
                        CS.getType(expr->getFn()),
         CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
 
-      return outputTy;
+      // If we ended up resolving the result type variable to a concrete type,
+      // set it as the favored type for this expression.
+      Type fixedType =
+          CS.getFixedTypeRecursive(resultType, /*wantRvalue=*/true);
+      if (!fixedType->isTypeVariableOrMember()) {
+        CS.setFavoredType(expr, fixedType.getPointer());
+        resultType = fixedType;
+      }
+
+      return resultType;
     }
 
     Type getSuperType(VarDecl *selfDecl,
@@ -3067,7 +3022,12 @@ namespace {
                                          /*decl*/ nullptr, locator);
           break;
         }
-        
+
+        case KeyPathExpr::Component::Kind::TupleElement: {
+          llvm_unreachable("not implemented");
+          break;
+        }
+                
         case KeyPathExpr::Component::Kind::OptionalChain: {
           didOptionalChain = true;
           
@@ -3622,22 +3582,7 @@ namespace {
 
     void associateArgumentLabels(Expr *fn, State labels,
                                  bool labelsArePermanent) {
-      // Dig out the function, looking through, parentheses, ?, and !.
-      do {
-        fn = fn->getSemanticsProvidingExpr();
-
-        if (auto force = dyn_cast<ForceValueExpr>(fn)) {
-          fn = force->getSubExpr();
-          continue;
-        }
-
-        if (auto bind = dyn_cast<BindOptionalExpr>(fn)) {
-          fn = bind->getSubExpr();
-          continue;
-        }
-
-        break;
-      } while (true);
+      fn = getArgumentLabelTargetExpr(fn);
 
       // Record the labels.
       if (!labelsArePermanent)
@@ -3650,6 +3595,22 @@ namespace {
         associateArgumentLabels(call->getFn(),
                                 { call->getArgumentLabels(),
                                   call->hasTrailingClosure() },
+                                /*labelsArePermanent=*/true);
+        return { true, expr };
+      }
+
+      if (auto subscript = dyn_cast<SubscriptExpr>(expr)) {
+        associateArgumentLabels(subscript,
+                                { subscript->getArgumentLabels(),
+                                  subscript->hasTrailingClosure() },
+                                /*labelsArePermanent=*/true);
+        return { true, expr };
+      }
+
+      if (auto unresolvedMember = dyn_cast<UnresolvedMemberExpr>(expr)) {
+        associateArgumentLabels(unresolvedMember,
+                                { unresolvedMember->getArgumentLabels(),
+                                  unresolvedMember->hasTrailingClosure() },
                                 /*labelsArePermanent=*/true);
         return { true, expr };
       }

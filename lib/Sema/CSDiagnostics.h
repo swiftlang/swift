@@ -749,6 +749,34 @@ private:
                                           DeclName memberName);
 };
 
+/// Diagnose situations when we use an instance member on a type
+/// or a type member on an instance
+///
+/// ```swift
+/// class Bar {}
+///
+/// enum Foo {
+///
+///   static func f() {
+///     g(Bar())
+///   }
+///
+///   func g(_: Bar) {}
+///
+/// }
+/// ```
+class AllowTypeOrInstanceMemberFailure final : public FailureDiagnostic {
+  Type BaseType;
+  DeclName Name;
+
+public:
+  AllowTypeOrInstanceMemberFailure(Expr *root, ConstraintSystem &cs, Type baseType,
+                                   DeclName memberName, ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), BaseType(baseType),
+        Name(memberName) {}
+    
+  bool diagnoseAsError() override;
+};
 class PartialApplicationFailure final : public FailureDiagnostic {
   enum RefKind : unsigned {
     MutatingMethod,
@@ -847,6 +875,28 @@ public:
       : InvalidInitRefFailure(root, cs, baseTy, init, SourceRange(), locator) {}
 
   bool diagnoseAsError() override;
+};
+
+class MissingArgumentsFailure final : public FailureDiagnostic {
+  using Param = AnyFunctionType::Param;
+
+  FunctionType *Fn;
+  unsigned NumSynthesized;
+
+public:
+  MissingArgumentsFailure(Expr *root, ConstraintSystem &cs,
+                          FunctionType *funcType,
+                          unsigned numSynthesized,
+                          ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), Fn(funcType),
+        NumSynthesized(numSynthesized) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  /// If missing arguments come from trailing closure,
+  /// let's produce tailored diagnostics.
+  bool diagnoseTrailingClosure(ClosureExpr *closure);
 };
 
 } // end namespace constraints

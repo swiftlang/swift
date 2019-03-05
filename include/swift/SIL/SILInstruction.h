@@ -2410,6 +2410,7 @@ public:
     StoredProperty,
     GettableProperty,
     SettableProperty,
+    TupleElement,
     OptionalChain,
     OptionalForce,
     OptionalWrap,
@@ -2436,6 +2437,7 @@ private:
   static unsigned getPackedKind(Kind k) {
     switch (k) {
     case Kind::StoredProperty:
+    case Kind::TupleElement:
       return PackedStored;
     case Kind::GettableProperty:
     case Kind::SettableProperty:
@@ -2452,7 +2454,15 @@ private:
   llvm::PointerIntPair<void *, KindPackingBits, unsigned> ValueAndKind;
   llvm::PointerIntPair<SILFunction *, 2,
                        ComputedPropertyId::KindType> SetterAndIdKind;
-  ComputedPropertyId::ValueType IdValue;
+
+  // If this component refers to a tuple element then TupleIndex is the
+  // 1-based index of the element in the tuple, in order to allow the
+  // discrimination of the TupleElement Kind from the StoredProperty Kind
+  union {
+    unsigned TupleIndex = 0;
+    ComputedPropertyId::ValueType IdValue;
+  };
+
   ArrayRef<Index> Indices;
   struct {
     SILFunction *Equal;
@@ -2497,6 +2507,14 @@ private:
            && "not an optional component");
   }
 
+  /// Constructor for tuple element.
+  KeyPathPatternComponent(unsigned tupleIndex, CanType componentType)
+    : ValueAndKind((void*)((uintptr_t)Kind::TupleElement << KindPackingBits), PackedStored),
+    TupleIndex(tupleIndex + 1),
+    ComponentType(componentType)
+  {
+  }
+
 public:
   KeyPathPatternComponent() : ValueAndKind(nullptr, 0) {}
 
@@ -2508,7 +2526,8 @@ public:
     auto packedKind = ValueAndKind.getInt();
     switch ((PackedKind)packedKind) {
     case PackedStored:
-      return Kind::StoredProperty;
+      return TupleIndex
+        ? Kind::TupleElement : Kind::StoredProperty;
     case PackedComputed:
       return SetterAndIdKind.getPointer()
         ? Kind::SettableProperty : Kind::GettableProperty;
@@ -2531,6 +2550,7 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
+    case Kind::TupleElement:
       llvm_unreachable("not a stored property");
     }
     llvm_unreachable("unhandled kind");
@@ -2542,6 +2562,7 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
+    case Kind::TupleElement:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
@@ -2557,6 +2578,7 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
+    case Kind::TupleElement:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
@@ -2572,6 +2594,7 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
+    case Kind::TupleElement:
       llvm_unreachable("not a settable computed property");
     case Kind::SettableProperty:
       return SetterAndIdKind.getPointer();
@@ -2585,6 +2608,7 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
+    case Kind::TupleElement:
       return {};
     case Kind::GettableProperty:
     case Kind::SettableProperty:
@@ -2599,6 +2623,7 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
+    case Kind::TupleElement:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
@@ -2612,6 +2637,7 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
+    case Kind::TupleElement:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
@@ -2633,6 +2659,7 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
+    case Kind::TupleElement:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
@@ -2647,10 +2674,26 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
+    case Kind::TupleElement:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
       return ExternalSubstitutions;
+    }
+    llvm_unreachable("unhandled kind");
+  }
+    
+  unsigned getTupleIndex() const {
+    switch (getKind()) {
+    case Kind::StoredProperty:
+    case Kind::OptionalChain:
+    case Kind::OptionalForce:
+    case Kind::OptionalWrap:
+    case Kind::GettableProperty:
+    case Kind::SettableProperty:
+      llvm_unreachable("not a tuple element");
+    case Kind::TupleElement:
+      return TupleIndex - 1;
     }
     llvm_unreachable("unhandled kind");
   }
@@ -2701,9 +2744,15 @@ public:
     case Kind::StoredProperty:
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::TupleElement:
       llvm_unreachable("not an optional kind");
     }
     return KeyPathPatternComponent(kind, ty);
+  }
+    
+  static KeyPathPatternComponent forTupleElement(unsigned tupleIndex,
+                                                 CanType ty) {
+    return KeyPathPatternComponent(tupleIndex, ty);
   }
   
   void incrementRefCounts() const;
@@ -3880,21 +3929,19 @@ public:
 /// \param loc The location of the expression that caused the load.
 /// \param lvalue The SILValue representing the address to
 ///        use for the load.
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
 class Load##Name##Inst \
     : public LoadReferenceInstBase<SILInstructionKind::Load##Name##Inst> { \
   friend SILBuilder; \
   Load##Name##Inst(SILDebugLocation loc, SILValue lvalue, IsTake_t isTake) \
     : LoadReferenceInstBase(loc, lvalue, isTake) {} \
 };
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
 #include "swift/AST/ReferenceStorage.def"
 
 /// Represents a store to a dynamic reference storage memory location.
 /// This is only required for address-only scenarios; for loadable
 /// references, it's better to use a ref_to_##name and a store.
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
 class Store##Name##Inst \
     : public StoreReferenceInstBase<SILInstructionKind::Store##Name##Inst> { \
   friend SILBuilder; \
@@ -3902,8 +3949,6 @@ class Store##Name##Inst \
                 IsInitialization_t isInit) \
     : StoreReferenceInstBase(loc, src, dest, isInit) {} \
 };
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
 #include "swift/AST/ReferenceStorage.def"
 
 /// CopyAddrInst - Represents a copy from one memory location to another. This
@@ -6283,9 +6328,8 @@ class Copy##Name##ValueInst \
                                   SingleValueInstruction> { \
   friend class SILBuilder; \
   Copy##Name##ValueInst(SILDebugLocation DebugLoc, SILValue operand, \
-                       SILModule &M) \
-      : UnaryInstructionBase(DebugLoc, operand, \
-                             operand->getType().getReferentType(M)) {} \
+                        SILType type) \
+      : UnaryInstructionBase(DebugLoc, operand, type) {} \
 };
 #include "swift/AST/ReferenceStorage.def"
 

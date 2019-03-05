@@ -31,6 +31,7 @@
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/ManglingMacros.h"
 
 using namespace swift;
 
@@ -45,6 +46,53 @@ Type swift::Demangle::getTypeForMangling(ASTContext &ctx,
   return swift::Demangle::decodeMangledType(builder, node);
 }
 
+TypeDecl *swift::Demangle::getTypeDeclForMangling(ASTContext &ctx,
+                                                  StringRef mangling) {
+  Demangle::Context Dem;
+  auto node = Dem.demangleSymbolAsNode(mangling);
+  if (!node)
+    return nullptr;
+
+  ASTBuilder builder(ctx);
+  return builder.createTypeDecl(node);
+}
+
+TypeDecl *swift::Demangle::getTypeDeclForUSR(ASTContext &ctx,
+                                             StringRef usr) {
+  if (!usr.startswith("s:"))
+    return nullptr;
+
+  std::string mangling(usr);
+  mangling.replace(0, 2, MANGLING_PREFIX_STR);
+
+  return getTypeDeclForMangling(ctx, mangling);
+}
+
+TypeDecl *ASTBuilder::createTypeDecl(NodePointer node) {
+  if (node->getKind() == Node::Kind::Global)
+    return createTypeDecl(node->getChild(0));
+
+  // Special case: associated types are not DeclContexts.
+  if (node->getKind() == Node::Kind::AssociatedTypeRef) {
+    if (node->getNumChildren() != 2)
+      return nullptr;
+
+    auto *DC = findDeclContext(node->getChild(0));
+    auto *proto = dyn_cast_or_null<ProtocolDecl>(DC);
+    if (proto == nullptr)
+      return nullptr;
+
+    auto name = Ctx.getIdentifier(node->getChild(1)->getText());
+    auto results = proto->lookupDirect(name);
+    if (results.size() != 1)
+      return nullptr;
+
+    return dyn_cast<AssociatedTypeDecl>(results[0]);
+  }
+
+  auto *DC = findDeclContext(node);
+  return dyn_cast_or_null<GenericTypeDecl>(DC);
+}
 
 Type
 ASTBuilder::createBuiltinType(StringRef builtinName,

@@ -944,21 +944,32 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   if (!hasDecl())
     return SubclassScope::NotApplicable;
 
+  auto *decl = getDecl();
+
+  if (!isa<AbstractFunctionDecl>(decl))
+    return SubclassScope::NotApplicable;
+
   // If this declaration is a function which goes into a vtable, then it's
   // symbol must be as visible as its class, because derived classes have to put
   // all less visible methods of the base class into their vtables.
 
-  if (auto *CD = dyn_cast<ConstructorDecl>(getDecl()))
-    if (!CD->isRequired())
+  if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
+    // Initializing entry points do not appear in the vtable.
+    if (kind == SILDeclRef::Kind::Initializer)
       return SubclassScope::NotApplicable;
-
-  auto *FD = dyn_cast<FuncDecl>(getDecl());
-  if (!FD)
+    // Non-required convenience inits do not apper in the vtable.
+    if (!CD->isRequired() && !CD->isDesignatedInit())
+      return SubclassScope::NotApplicable;
+  } else if (isa<DestructorDecl>(decl)) {
+    // Detructors do not appear in the vtable.
     return SubclassScope::NotApplicable;
+  } else {
+    assert(isa<FuncDecl>(decl));
+  }
 
-  DeclContext *context = FD->getDeclContext();
+  DeclContext *context = decl->getDeclContext();
 
-  // Methods from extensions don't go into vtables (yet).
+  // Methods from extensions don't go in the vtable.
   if (isa<ExtensionDecl>(context))
     return SubclassScope::NotApplicable;
 
@@ -966,25 +977,29 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   if (isThunk() || isForeign)
     return SubclassScope::NotApplicable;
 
-  // Default arg generators are not visible.
+  // Default arg generators don't go in the vtable.
   if (isDefaultArgGenerator())
     return SubclassScope::NotApplicable;
 
+  // Only non-final methods in non-final classes go in the vtable.
   auto *classType = context->getSelfClassDecl();
   if (!classType || classType->isFinal())
     return SubclassScope::NotApplicable;
 
-  if (FD->isFinal())
+  if (decl->isFinal())
     return SubclassScope::NotApplicable;
 
-  assert(FD->getEffectiveAccess() <= classType->getEffectiveAccess() &&
+  assert(decl->getEffectiveAccess() <= classType->getEffectiveAccess() &&
          "class must be as visible as its members");
 
   // FIXME: This is too narrow. Any class with resilient metadata should
   // probably have this, at least for method overrides that don't add new
   // vtable entries.
-  if (classType->isResilient())
+  if (classType->isResilient()) {
+    if (isa<ConstructorDecl>(decl))
+      return SubclassScope::NotApplicable;
     return SubclassScope::Resilient;
+  }
 
   switch (classType->getEffectiveAccess()) {
   case AccessLevel::Private:
@@ -1019,12 +1034,35 @@ unsigned SILDeclRef::getParameterListCount() const {
   }
 }
 
+static bool isDesignatedConstructorForClass(ValueDecl *decl) {
+  if (auto *ctor = dyn_cast_or_null<ConstructorDecl>(decl))
+    if (ctor->getDeclContext()->getSelfClassDecl())
+      return ctor->isDesignatedInit();
+  return false;
+}
+
+bool SILDeclRef::canBeDynamicReplacement() const {
+  if (kind == SILDeclRef::Kind::Destroyer)
+    return false;
+  if (kind == SILDeclRef::Kind::Initializer)
+    return isDesignatedConstructorForClass(getDecl());
+  if (kind == SILDeclRef::Kind::Allocator)
+    return !isDesignatedConstructorForClass(getDecl());
+  return true;
+}
+
 bool SILDeclRef::isDynamicallyReplaceable() const {
   if (isStoredPropertyInitializer())
     return false;
 
+  // Class allocators are not dynamic replaceable.
+  if (kind == SILDeclRef::Kind::Allocator &&
+      isDesignatedConstructorForClass(getDecl()))
+    return false;
+
   if (kind == SILDeclRef::Kind::Destroyer ||
-      kind == SILDeclRef::Kind::Initializer ||
+      (kind == SILDeclRef::Kind::Initializer &&
+       !isDesignatedConstructorForClass(getDecl())) ||
       kind == SILDeclRef::Kind::GlobalAccessor) {
     return false;
   }

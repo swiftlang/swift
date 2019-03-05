@@ -508,10 +508,6 @@ ERROR(expr_swift_keypath_empty, none,
       "key path must have at least one component", ())
 ERROR(expr_string_interpolation_outside_string,none,
       "string interpolation can only appear inside a string literal", ())
-ERROR(unsupported_keypath_tuple_element_reference,none,
-      "key path cannot reference tuple elements", ())
-ERROR(expr_keypath_unimplemented_tuple,none,
-      "key path support for tuples is not implemented", ())
 ERROR(expr_keypath_subscript_index_not_hashable, none,
       "subscript index of type %0 in a key path must be Hashable", (Type))
 ERROR(expr_smart_keypath_application_type_mismatch,none,
@@ -590,8 +586,8 @@ ERROR(cannot_return_value_from_void_func,none,
 
 ERROR(sema_no_import,Fatal,
       "no such module '%0'", (StringRef))
-ERROR(sema_no_import_arch,Fatal,
-      "could not find module '%0' for architecture '%1'; "
+ERROR(sema_no_import_target,Fatal,
+      "could not find module '%0' for target '%1'; "
       "found: %2", (StringRef, StringRef, StringRef))
 ERROR(sema_no_import_repl,none,
       "no such module '%0'", (StringRef))
@@ -3923,6 +3919,14 @@ ERROR(dynamic_replacement_not_in_extension, none,
       "dynamicReplacement(for:) of %0 is not defined in an extension or at the file level", (DeclName))
 ERROR(dynamic_replacement_must_not_be_dynamic, none,
       "dynamicReplacement(for:) of %0 must not be dynamic itself", (DeclName))
+ERROR(dynamic_replacement_replaced_not_objc_dynamic, none,
+      "%0 is not marked @objc dynamic", (DeclName))
+ERROR(dynamic_replacement_replacement_not_objc_dynamic, none,
+      "%0 is marked @objc dynamic", (DeclName))
+ERROR(dynamic_replacement_replaced_constructor_is_convenience, none,
+      "replaced constructor %0 is marked as convenience", (DeclName))
+ERROR(dynamic_replacement_replaced_constructor_is_not_convenience, none,
+      "replaced constructor %0 is not marked as convenience", (DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: @available

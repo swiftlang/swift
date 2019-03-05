@@ -2084,3 +2084,29 @@ func testExistential() {
 // PROTOCOLTYPE_DOT_3-DAG: Keyword/CurrNominal:                Type[#ExistentialProto.Protocol.Type#]; name=Type
 // PROTOCOLTYPE_DOT_3: End completions
 }
+
+// rdar://problem/48141174
+class TestChain {
+  class Child {
+    var value: Struct1
+  }
+  class Struct1 {
+    var value: Struct2
+  }
+  class Struct2 {
+    var prop1: Int
+    var prop2: Int
+  }
+
+  var child: Child!
+
+  func foo() {
+    let _ = self.child.value.value.#^COMPLEX_CHAIN_1^#
+    let _ = child.value.value.#^COMPLEX_CHAIN_2^#
+// COMPLEX_CHAIN_1: Begin completions, 3 items
+// COMPLEX_CHAIN_1-DAG: Keyword[self]/CurrNominal:          self[#Container.Struct2#]
+// COMPLEX_CHAIN_1-DAG: Decl[InstanceVar]/CurrNominal:      prop1[#Int#]
+// COMPLEX_CHAIN_1-DAG: Decl[InstanceVar]/CurrNominal:      prop2[#Int#]
+// COMPLEX_CHAIN_1: End completions
+  }
+}

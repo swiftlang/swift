@@ -1345,7 +1345,7 @@ public:
     printDebugVar(DVAI->getVarInfo());
   }
 
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   void visitLoad##Name##Inst(Load##Name##Inst *LI) { \
     if (LI->isTake()) \
       *this << "[take] "; \
@@ -1357,8 +1357,6 @@ public:
       *this << "[initialization] "; \
     *this << getIDAndType(SI->getDest()); \
   }
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
 #include "swift/AST/ReferenceStorage.def"
 
   void visitCopyAddrInst(CopyAddrInst *CI) {
@@ -2156,6 +2154,11 @@ public:
         llvm_unreachable("out of sync");
       }
       *this << component.getComponentType();
+      break;
+    }
+    case KeyPathPatternComponent::Kind::TupleElement: {
+      *this << "tuple_element #" << component.getTupleIndex();
+      *this << " : $" << component.getComponentType();
       break;
     }
     }

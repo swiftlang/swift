@@ -488,6 +488,20 @@ function(_add_variant_link_flags)
     endif()
   endif()
 
+  # Enable dead stripping. Portions of this logic were copied from llvm's
+  # `add_link_opts` function (which, perhaps, should have been used here in the
+  # first place, but at this point it's hard to say whether that's feasible).
+  #
+  # TODO: Evaluate/enable -f{function,data}-sections --gc-sections for bfd,
+  # gold, and lld.
+  if(NOT CMAKE_BUILD_TYPE STREQUAL Debug)
+    if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+      # See rdar://48283130: This gives 6MB+ size reductions for swift and
+      # SourceKitService, and much larger size reductions for sil-opt etc.
+      list(APPEND result "-Wl,-dead_strip")
+    endif()
+  endif()
+
   set("${LFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
   set("${LFLAGS_LINK_LIBRARIES_VAR_NAME}" "${link_libraries}" PARENT_SCOPE)
   set("${LFLAGS_LIBRARY_SEARCH_DIRECTORIES_VAR_NAME}" "${library_search_directories}" PARENT_SCOPE)
@@ -1195,6 +1209,11 @@ function(_add_swift_library_single target name)
     "${SWIFTLIB_SINGLE_FORCE_BUILD_OPTIMIZED_keyword}"
     RESULT_VAR_NAME c_compile_flags
     )
+  if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS)
+    if(libkind STREQUAL SHARED)
+      list(APPEND c_compile_flags -D_WINDLL)
+    endif()
+  endif()
   _add_variant_link_flags(
     SDK "${SWIFTLIB_SINGLE_SDK}"
     ARCH "${SWIFTLIB_SINGLE_ARCHITECTURE}"
@@ -1774,7 +1793,7 @@ function(add_swift_target_library name)
       # building both simultaneously.  Effectively, only shared builds are
       # supported on windows currently.
       if(SWIFTLIB_SHARED)
-        list(APPEND swiftlib_swift_compile_flags_all -D_USRDLL)
+        list(APPEND swiftlib_swift_compile_flags_all -D_WINDLL)
         if(SWIFTLIB_IS_STDLIB_CORE)
           list(APPEND swiftlib_swift_compile_flags_all -DswiftCore_EXPORTS)
         endif()

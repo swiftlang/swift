@@ -58,9 +58,14 @@ Argument::Argument(StringRef Key, SILFunction *F)
         Loc = F->getLocation().getSourceLoc();
 }
 
-Argument::Argument(StringRef Key, SILType *Ty) : Key(Key) {
+Argument::Argument(StringRef Key, SILType Ty) : Key(Key) {
   llvm::raw_string_ostream OS(Val);
-  Ty->print(OS);
+  Ty.print(OS);
+}
+
+Argument::Argument(StringRef Key, CanType Ty) : Key(Key) {
+  llvm::raw_string_ostream OS(Val);
+  Ty.print(OS);
 }
 
 template <typename DerivedT> std::string Remark<DerivedT>::getMsg() const {

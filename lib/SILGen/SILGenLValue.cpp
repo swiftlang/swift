@@ -2452,7 +2452,7 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
     void emitUsingAddressor(SILDeclRef addressor, bool isDirect,
                             LValueTypeData typeData) {
       SILType storageType =
-        SGF.SGM.Types.getLoweredType(Storage->getType()).getAddressType();
+        SGF.getLoweredType(Storage->getType()).getAddressType();
       LV.add<AddressorComponent>(Storage, addressor,
                                  /*isSuper=*/false, isDirect, getSubs(),
                                  CanType(), typeData, storageType, nullptr,

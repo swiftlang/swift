@@ -1250,6 +1250,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   Optional<StmtKind> ParentStmtKind;
 
   SmallVector<StringRef, 3> ParsedKeywords;
+  SourceLoc introducerLoc;
 
   std::vector<std::pair<std::string, bool>> SubModuleNameVisibilityPairs;
 
@@ -1291,9 +1292,14 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     // FIXME: if it's ErrorType but we've already typechecked we shouldn't
     // typecheck again. rdar://21466394
     if (CheckKind == CompletionTypeCheckKind::Normal &&
-        ParsedExpr->getType() && !ParsedExpr->getType()->is<ErrorType>())
-      return std::make_pair(ParsedExpr->getType(),
-                            ParsedExpr->getReferencedDecl());
+        ParsedExpr->getType() && !ParsedExpr->getType()->is<ErrorType>()) {
+      auto refDecl = ParsedExpr->getReferencedDecl();
+      if (!refDecl) {
+        if (auto apply = dyn_cast<ApplyExpr>(ParsedExpr))
+          refDecl = apply->getFn()->getReferencedDecl();
+      }
+      return std::make_pair(ParsedExpr->getType(), refDecl);
+    }
 
     prepareForRetypechecking(ParsedExpr);
 
@@ -1348,7 +1354,7 @@ public:
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
   void completeInPrecedenceGroup(SyntaxKind SK) override;
   void completeNominalMemberBeginning(
-      SmallVectorImpl<StringRef> &Keywords) override;
+      SmallVectorImpl<StringRef> &Keywords, SourceLoc introducerLoc) override;
   void completeAccessorBeginning() override;
 
   void completePoundAvailablePlatform() override;
@@ -2661,23 +2667,24 @@ public:
     setClangDeclKeywords(EED, Pairs, Builder);
     addLeadingDot(Builder);
     Builder.addTextChunk(EED->getName().str());
-    if (auto *params = EED->getParameterList()) {
+
+    // Enum element is of function type; (Self.type) -> Self or
+    // (Self.Type) -> (Args...) -> Self.
+    Type EnumType = getTypeOfMember(EED);
+    if (EnumType->is<AnyFunctionType>())
+      EnumType = EnumType->castTo<AnyFunctionType>()->getResult();
+
+    if (EnumType->is<FunctionType>()) {
       Builder.addLeftParen();
-      addParameters(Builder, params);
+      addParamPatternFromFunction(Builder, EnumType->castTo<FunctionType>(),
+                                  nullptr);
       Builder.addRightParen();
+
+      // Extract result as the enum type.
+      EnumType = EnumType->castTo<FunctionType>()->getResult();
     }
 
-    // Enum element is of function type such as EnumName.type -> Int ->
-    // EnumName; however we should show Int -> EnumName as the type
-    Type EnumType;
-    if (EED->hasInterfaceType()) {
-      EnumType = EED->getInterfaceType();
-      if (auto FuncType = EnumType->getAs<AnyFunctionType>()) {
-        EnumType = FuncType->getResult();
-      }
-    }
-    if (EnumType)
-      addTypeAnnotation(Builder, EnumType);
+    addTypeAnnotation(Builder, EnumType);
   }
 
   void addKeyword(StringRef Name, Type TypeAnnotation = Type(),
@@ -3281,18 +3288,18 @@ public:
     if (leadingSequence.empty())
       return LHS;
 
-    assert(leadingSequence.size() % 2 == 0);
-    SmallVector<Expr *, 3> sequence(leadingSequence.begin(),
-                                    leadingSequence.end());
-    sequence.push_back(LHS);
+    SourceRange sequenceRange(leadingSequence.front()->getStartLoc(),
+                              LHS->getEndLoc());
+    auto *expr = findParsedExpr(CurrDeclContext, sequenceRange);
+    if (!expr)
+      return LHS;
 
-    Expr *expr =
-        SequenceExpr::create(CurrDeclContext->getASTContext(), sequence);
-    prepareForRetypechecking(expr);
-    if (!typeCheckExpression(const_cast<DeclContext *>(CurrDeclContext),
-                             expr)) {
+    if (expr->getType() && !expr->getType()->hasError())
       return expr;
-    }
+
+    prepareForRetypechecking(expr);
+    if (!typeCheckExpression(const_cast<DeclContext *>(CurrDeclContext), expr))
+      return expr;
     return LHS;
   }
 
@@ -3676,6 +3683,7 @@ public:
     auto Ty = Switch->getSubjectExpr()->getType();
     if (!Ty)
       return;
+    ExprType = Ty;
     auto *TheEnumDecl = dyn_cast_or_null<EnumDecl>(Ty->getAnyNominal());
     if (!TheEnumDecl)
       return;
@@ -3856,9 +3864,11 @@ public:
 
 class CompletionOverrideLookup : public swift::VisibleDeclConsumer {
   CodeCompletionResultSink &Sink;
+  ASTContext &Ctx;
   const DeclContext *CurrDeclContext;
   LazyResolver *TypeResolver;
   SmallVectorImpl<StringRef> &ParsedKeywords;
+  SourceLoc introducerLoc;
 
   bool hasFuncIntroducer = false;
   bool hasVarIntroducer = false;
@@ -3867,13 +3877,15 @@ class CompletionOverrideLookup : public swift::VisibleDeclConsumer {
   bool hasAccessModifier = false;
   bool hasOverride = false;
   bool hasOverridabilityModifier = false;
+  bool hasStaticOrClass = false;
 
 public:
   CompletionOverrideLookup(CodeCompletionResultSink &Sink, ASTContext &Ctx,
                            const DeclContext *CurrDeclContext,
-                           SmallVectorImpl<StringRef> &ParsedKeywords)
-      : Sink(Sink),
-        CurrDeclContext(CurrDeclContext), ParsedKeywords(ParsedKeywords) {
+                           SmallVectorImpl<StringRef> &ParsedKeywords,
+                           SourceLoc introducerLoc)
+      : Sink(Sink), Ctx(Ctx), CurrDeclContext(CurrDeclContext),
+        ParsedKeywords(ParsedKeywords), introducerLoc(introducerLoc) {
     (void)createTypeChecker(Ctx);
     TypeResolver = Ctx.getLazyResolver();
 
@@ -3891,6 +3903,8 @@ public:
     hasOverride = isKeywordSpecified("override");
     hasOverridabilityModifier = isKeywordSpecified("final") ||
                                 isKeywordSpecified("open");
+    hasStaticOrClass = isKeywordSpecified(getTokenText(tok::kw_class)) ||
+                       isKeywordSpecified(getTokenText(tok::kw_static));
   }
 
   bool isKeywordSpecified(StringRef Word) {
@@ -3940,8 +3954,10 @@ public:
         Options.setBaseType(transformType);
       Options.PrintImplicitAttrs = false;
       Options.ExclusiveAttrList.push_back(TAK_escaping);
+      Options.ExclusiveAttrList.push_back(TAK_autoclosure);
       Options.PrintOverrideKeyword = false;
       Options.PrintPropertyAccessors = false;
+      Options.PrintStaticKeyword = !hasStaticOrClass;
       VD->print(Printer, Options);
       NameOffset = Printer.NameOffset.getValue();
     }
@@ -3949,10 +3965,17 @@ public:
     if (!hasDeclIntroducer && !hasAccessModifier)
       addAccessControl(VD, Builder);
 
-    // FIXME: if we're missing 'override', but have the decl introducer we
-    // should delete it and re-add both in the correct order.
-    if (!hasDeclIntroducer && missingOverride(Reason))
-      Builder.addOverrideKeyword();
+    if (missingOverride(Reason)) {
+      if (!hasDeclIntroducer)
+        Builder.addOverrideKeyword();
+      else {
+        auto dist = Ctx.SourceMgr.getByteDistance(
+                      introducerLoc, Ctx.SourceMgr.getCodeCompletionLoc());
+        Builder.setNumBytesToErase(dist);
+        Builder.addOverrideKeyword();
+        Builder.addDeclIntroducer(DeclStr.str().substr(0, NameOffset));
+      }
+    }
 
     if (!hasDeclIntroducer)
       Builder.addDeclIntroducer(DeclStr.str().substr(0, NameOffset));
@@ -4048,7 +4071,9 @@ public:
     if (D->shouldHideFromEditor())
       return;
 
-    if (D->getAttrs().hasAttribute<FinalAttr>())
+    if (D->getAttrs().hasAttribute<FinalAttr>() ||
+        // A 'class' member with an initial value cannot be overriden either.
+        (D->isStatic() && D->getAttrs().hasAttribute<HasInitialValueAttr>()))
       return;
 
     if (!D->hasInterfaceType())
@@ -4057,6 +4082,15 @@ public:
     bool hasIntroducer = hasFuncIntroducer ||
                          hasVarIntroducer ||
                          hasTypealiasIntroducer;
+
+    if (hasStaticOrClass && !D->isStatic())
+      return;
+
+    // As per the current convention, only instance members are
+    // suggested if an introducer is not accompanied by a 'static' or
+    // 'class' modifier.
+    if (hasIntroducer && !hasStaticOrClass && D->isStatic())
+      return;
 
     if (auto *FD = dyn_cast<FuncDecl>(D)) {
       // We cannot override operators as members.
@@ -4081,7 +4115,8 @@ public:
     if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
       if (!isa<ProtocolDecl>(CD->getDeclContext()))
         return;
-      if (hasIntroducer || hasOverride || hasOverridabilityModifier)
+      if (hasIntroducer || hasOverride || hasOverridabilityModifier ||
+          hasStaticOrClass)
         return;
       if (CD->isRequired() || CD->isDesignatedInit())
         addConstructor(CD, Reason);
@@ -4091,7 +4126,7 @@ public:
 
   void addDesignatedInitializers(NominalTypeDecl *NTD) {
     if (hasFuncIntroducer || hasVarIntroducer || hasTypealiasIntroducer ||
-        hasOverridabilityModifier)
+        hasOverridabilityModifier || hasStaticOrClass)
       return;
 
     const auto *CD = dyn_cast<ClassDecl>(NTD);
@@ -4114,7 +4149,7 @@ public:
   void addAssociatedTypes(NominalTypeDecl *NTD) {
     if (!hasTypealiasIntroducer &&
         (hasFuncIntroducer || hasVarIntroducer || hasInitializerModifier ||
-         hasOverride || hasOverridabilityModifier))
+         hasOverride || hasOverridabilityModifier || hasStaticOrClass))
       return;
 
     for (auto Conformance : NTD->getAllConformances()) {
@@ -4145,9 +4180,11 @@ public:
     Type CurrTy = CurrDeclContext->getSelfTypeInContext();
     auto *NTD = CurrDeclContext->getSelfNominalTypeDecl();
     if (CurrTy && !CurrTy->is<ErrorType>()) {
-      lookupVisibleMemberDecls(*this, CurrTy, CurrDeclContext,
+      // Look for overridable static members too.
+      Type Meta = MetatypeType::get(CurrTy);
+      lookupVisibleMemberDecls(*this, Meta, CurrDeclContext,
                                TypeResolver,
-                               /*includeInstanceMembers=*/false);
+                               /*includeInstanceMembers=*/true);
       addDesignatedInitializers(NTD);
       addAssociatedTypes(NTD);
     }
@@ -4469,8 +4506,9 @@ void CodeCompletionCallbacksImpl::completeGenericParams(TypeLoc TL) {
 }
 
 void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
-    SmallVectorImpl<StringRef> &Keywords) {
+    SmallVectorImpl<StringRef> &Keywords, SourceLoc introducerLoc) {
   assert(!InEnumElementRawValue);
+  this->introducerLoc = introducerLoc;
   ParsedKeywords.clear();
   ParsedKeywords.append(Keywords.begin(), Keywords.end());
   Kind = CompletionKind::NominalMemberBeginning;
@@ -4649,10 +4687,11 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     break;
       
   case CompletionKind::NominalMemberBeginning: {
-    bool HasDeclIntroducer = llvm::find_if(ParsedKeywords, [](const StringRef kw) {
+    bool HasDeclIntroducer = llvm::find_if(ParsedKeywords,
+                                           [this](const StringRef kw) {
       return llvm::StringSwitch<bool>(kw)
         .Case("associatedtype", true)
-        .Case("class", true)
+        .Case("class", !CurDeclContext || !isa<ClassDecl>(CurDeclContext))
         .Case("deinit", true)
         .Case("enum", true)
         .Case("extension", true)
@@ -4826,6 +4865,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   Optional<Type> ExprType;
   ConcreteDeclRef ReferencedDecl = nullptr;
   if (ParsedExpr) {
+    if (auto *checkedExpr = findParsedExpr(CurDeclContext,
+                                           ParsedExpr->getSourceRange())) {
+      ParsedExpr = checkedExpr;
+    }
+
     if (auto typechecked = typeCheckParsedExpr()) {
       ExprType = typechecked->first;
       ReferencedDecl = typechecked->second;
@@ -5025,7 +5069,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::NominalMemberBeginning: {
     CompletionOverrideLookup OverrideLookup(CompletionContext.getResultSink(),
                                             P.Context, CurDeclContext,
-                                            ParsedKeywords);
+                                            ParsedKeywords, introducerLoc);
     OverrideLookup.getOverrideCompletions(SourceLoc());
     break;
   }

@@ -34,6 +34,10 @@ void prepareForRetypechecking(Expr *E);
 /// given context until \c Loc if the context is a function body.
 void typeCheckContextUntil(DeclContext *DC, SourceLoc Loc);
 
+/// From \p DC, find and returns the outer most expression which source range is
+/// exact the same as \p TargetRange. Returns \c nullptr if not found.
+Expr *findParsedExpr(const DeclContext *DC, SourceRange TargetRange);
+
 /// Returns expected return type of the given decl context.
 /// \p DC should be an \c AbstractFunctionDecl or an \c AbstractClosureExpr.
 Type getReturnTypeFromContext(const DeclContext *DC);

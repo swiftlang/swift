@@ -423,6 +423,8 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numDefaultedConstraints = cs.DefaultedConstraints.size();
   numCheckedConformances = cs.CheckedConformances.size();
   numMissingMembers = cs.MissingMembers.size();
+  numDisabledConstraints = cs.solverState->getNumDisabledConstraints();
+
   PreviousScore = cs.CurrentScore;
 
   cs.solverState->registerScope(this);
@@ -1289,6 +1291,85 @@ void ConstraintSystem::collectDisjunctions(
   }
 }
 
+ConstraintSystem::SolutionKind
+ConstraintSystem::filterDisjunction(
+    Constraint *disjunction, bool restoreOnFail,
+    llvm::function_ref<bool(Constraint *)> pred) {
+  assert(disjunction->getKind() == ConstraintKind::Disjunction);
+
+  SmallVector<Constraint *, 4> constraintsToRestoreOnFail;
+  unsigned choiceIdx = 0;
+  unsigned numEnabledTerms = 0;
+  ASTContext &ctx = getASTContext();
+  for (unsigned constraintIdx : indices(disjunction->getNestedConstraints())) {
+    auto constraint = disjunction->getNestedConstraints()[constraintIdx];
+
+    // Skip already-disabled constraints.
+    if (constraint->isDisabled())
+      continue;
+
+    if (pred(constraint)) {
+      ++numEnabledTerms;
+      choiceIdx = constraintIdx;
+      continue;
+    }
+
+    if (ctx.LangOpts.DebugConstraintSolver) {
+      auto &log = ctx.TypeCheckerDebug->getStream();
+      log.indent(solverState ? solverState->depth * 2 + 2 : 0)
+        << "(disabled disjunction term ";
+      constraint->print(log, &ctx.SourceMgr);
+      log << ")\n";
+    }
+
+    if (restoreOnFail)
+      constraintsToRestoreOnFail.push_back(constraint);
+
+    if (solverState)
+      solverState->disableContraint(constraint);
+    else
+      constraint->setDisabled();
+  }
+
+  switch (numEnabledTerms) {
+  case 0:
+    for (auto constraint : constraintsToRestoreOnFail) {
+      constraint->setEnabled();
+    }
+    return SolutionKind::Error;
+
+  case 1: {
+    // Only a single constraint remains. Retire the disjunction and make
+    // the remaining constraint active.
+
+    // Retire the disjunction. It's been solved.
+    retireConstraint(disjunction);
+
+    // Note the choice we made and simplify it. This introduces the
+    // new constraint into the system.
+    auto choice = disjunction->getNestedConstraints()[choiceIdx];
+    if (disjunction->shouldRememberChoice()) {
+      recordDisjunctionChoice(disjunction->getLocator(), choiceIdx);
+    }
+
+    if (ctx.LangOpts.DebugConstraintSolver) {
+      auto &log = ctx.TypeCheckerDebug->getStream();
+      log.indent(solverState ? solverState->depth * 2 + 2 : 0)
+        << "(introducing single enabled disjunction term ";
+      choice->print(log, &ctx.SourceMgr);
+      log << ")\n";
+    }
+
+    simplifyDisjunctionChoice(choice);
+
+    return failedConstraint ? SolutionKind::Unsolved : SolutionKind::Solved;
+  }
+
+  default:
+    return SolutionKind::Unsolved;
+  }
+}
+
 // Attempt to find a disjunction of bind constraints where all options
 // in the disjunction are binding the same type variable.
 //
@@ -1567,30 +1648,65 @@ bool ConstraintSystem::haveTypeInformationForAllArguments(
                       });
 }
 
-// Given a type variable representing the RHS of an ApplicableFunction
-// constraint, attempt to find the disjunction of bind overloads
-// associated with it. This may return null in cases where have not
-// yet created a disjunction because we need to resolve a base type,
-// e.g.: [1].map{ ... } does not have a disjunction until we decide on
-// a type for [1].
-static Constraint *getUnboundBindOverloadDisjunction(TypeVariableType *tyvar,
-                                                     ConstraintSystem &cs) {
-  auto *rep = cs.getRepresentative(tyvar);
-  assert(!cs.getFixedType(rep));
+Constraint *ConstraintSystem::getUnboundBindOverloadDisjunction(
+                                                  TypeVariableType *tyvar) {
+  auto *rep = getRepresentative(tyvar);
+  assert(!getFixedType(rep));
 
   llvm::SetVector<Constraint *> disjunctions;
-  cs.getConstraintGraph().gatherConstraints(
+  getConstraintGraph().gatherConstraints(
       rep, disjunctions, ConstraintGraph::GatheringKind::EquivalenceClass,
-      [](Constraint *match) {
-        return match->getKind() == ConstraintKind::Disjunction &&
-               match->getNestedConstraints().front()->getKind() ==
-                   ConstraintKind::BindOverload;
+      [this, rep](Constraint *match) {
+        if (match->getKind() != ConstraintKind::Disjunction ||
+            match->getNestedConstraints().front()->getKind() !=
+                   ConstraintKind::BindOverload)
+          return false;
+
+        auto lhsTypeVar =
+            match->getNestedConstraints().front()->getFirstType()
+              ->getAs<TypeVariableType>();
+        if (!lhsTypeVar)
+          return false;
+
+        return getRepresentative(lhsTypeVar) == rep;
       });
 
   if (disjunctions.empty())
     return nullptr;
 
   return disjunctions[0];
+}
+
+/// solely resolved by an overload set.
+SmallVector<OverloadChoice, 2> ConstraintSystem::getUnboundBindOverloads(
+                                                     TypeVariableType *tyvar) {
+  // Always work on the representation.
+  tyvar = getRepresentative(tyvar);
+
+  SmallVector<OverloadChoice, 2> choices;
+
+  auto disjunction = getUnboundBindOverloadDisjunction(tyvar);
+  if (!disjunction) return choices;
+
+  for (auto constraint : disjunction->getNestedConstraints()) {
+    // We must have bind-overload constraints.
+    if (constraint->getKind() != ConstraintKind::BindOverload) {
+      choices.clear();
+      return choices;
+    }
+
+    // We must be binding the type variable (or a type variable equivalent to
+    // it).
+    auto boundTypeVar = constraint->getFirstType()->getAs<TypeVariableType>();
+    if (!boundTypeVar || getRepresentative(boundTypeVar) != tyvar) {
+      choices.clear();
+      return choices;
+    }
+
+    choices.push_back(constraint->getOverloadChoice());
+  }
+
+  return choices;
 }
 
 // Find a disjunction associated with an ApplicableFunction constraint
@@ -1608,7 +1724,7 @@ Constraint *ConstraintSystem::selectApplyDisjunction() {
       auto *tyvar = applicable->getSecondType()->castTo<TypeVariableType>();
 
       // If we have created the disjunction for this apply, find it.
-      auto *disjunction = getUnboundBindOverloadDisjunction(tyvar, *this);
+      auto *disjunction = getUnboundBindOverloadDisjunction(tyvar);
       if (disjunction)
         return disjunction;
     }

@@ -105,6 +105,9 @@ enum class FixKind : uint8_t {
   /// fix this issue by pretending that member exists and matches
   /// given arguments/result types exactly.
   DefineMemberBasedOnUse,
+	
+  /// Allow access to type member on instance or instance member on type
+  AllowTypeOrInstanceMember,
 
   /// Allow expressions where 'mutating' method is only partially applied,
   /// which means either not applied at all e.g. `Foo.bar` or only `Self`
@@ -119,6 +122,10 @@ enum class FixKind : uint8_t {
   /// derived (rather than an arbitrary value of metatype type) or the
   /// referenced constructor must be required.
   AllowInvalidInitRef,
+
+  /// If there are fewer arguments than parameters, let's fix that up
+  /// by adding new arguments to the list represented as type variables.
+  AddMissingArguments,
 };
 
 class ConstraintFix {
@@ -523,6 +530,27 @@ public:
                                         DeclName member,
                                         ConstraintLocator *locator);
 };
+	
+class AllowTypeOrInstanceMember final : public ConstraintFix {
+  Type BaseType;
+  DeclName Name;
+
+public:
+  AllowTypeOrInstanceMember(ConstraintSystem &cs, Type baseType, DeclName member,
+                            ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowTypeOrInstanceMember, locator),
+        BaseType(baseType), Name(member) {}
+
+  std::string getName() const override {
+    return "allow access to instance member on type or a type member on instance";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowTypeOrInstanceMember *create(ConstraintSystem &cs, Type baseType,
+                                           DeclName member,
+                                           ConstraintLocator *locator);
+};
 
 class AllowInvalidPartialApplication final : public ConstraintFix {
   AllowInvalidPartialApplication(bool isWarning, ConstraintSystem &cs,
@@ -588,6 +616,45 @@ private:
                                      bool isStaticallyDerived,
                                      SourceRange baseRange,
                                      ConstraintLocator *locator);
+};
+
+class AddMissingArguments final
+    : public ConstraintFix,
+      private llvm::TrailingObjects<AddMissingArguments,
+                                    AnyFunctionType::Param> {
+  friend TrailingObjects;
+
+  using Param = AnyFunctionType::Param;
+
+  FunctionType *Fn;
+  unsigned NumSynthesized;
+
+  AddMissingArguments(ConstraintSystem &cs, FunctionType *funcType,
+                      llvm::ArrayRef<AnyFunctionType::Param> synthesizedArgs,
+                      ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AddMissingArguments, locator), Fn(funcType),
+        NumSynthesized(synthesizedArgs.size()) {
+    std::uninitialized_copy(synthesizedArgs.begin(), synthesizedArgs.end(),
+                            getSynthesizedArgumentsBuf().begin());
+  }
+
+public:
+  std::string getName() const override { return "synthesize missing argument(s)"; }
+
+  ArrayRef<Param> getSynthesizedArguments() const {
+    return {getTrailingObjects<Param>(), NumSynthesized};
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AddMissingArguments *create(ConstraintSystem &cs, FunctionType *fnType,
+                                     llvm::ArrayRef<Param> synthesizedArgs,
+                                     ConstraintLocator *locator);
+
+private:
+  MutableArrayRef<Param> getSynthesizedArgumentsBuf() {
+    return {getTrailingObjects<Param>(), NumSynthesized};
+  }
 };
 
 } // end namespace constraints

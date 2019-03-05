@@ -1645,7 +1645,11 @@ public:
     assert(!isObjC());
 #endif
 
-    return reinterpret_cast<ProtocolDescriptorPointer>(storage & ~IsObjCBit);
+    // NOTE: we explicitly use a C-style cast here because cl objects to the
+    // reinterpret_cast from a uintptr_t type to an unsigned type which the
+    // Pointer type may be depending on the instantiation.  Using the C-style
+    // cast gives us a single path irrespective of the template type parameters.
+    return (ProtocolDescriptorPointer)(storage & ~IsObjCBit);
   }
 
   /// Retrieve the raw stored pointer and discriminator bit.
@@ -2039,7 +2043,8 @@ struct TargetGenericWitnessTable {
     return WitnessTablePrivateSizeInWordsAndRequiresInstantiation >> 1;
   }
 
-  /// Whether the witness table is known to require instantiation.
+  /// This bit doesn't really mean anything. Currently, the compiler always
+  /// sets it when emitting a generic witness table.
   uint16_t requiresInstantiation() const {
     return WitnessTablePrivateSizeInWordsAndRequiresInstantiation & 0x01;
   }

@@ -42,7 +42,7 @@ STATISTIC(NumWitnessDevirt, "Number of witness_method applies devirtualized");
 
 void swift::getAllSubclasses(ClassHierarchyAnalysis *CHA,
                              ClassDecl *CD,
-                             SILType ClassType,
+                             CanType ClassType,
                              SILModule &M,
                              ClassHierarchyAnalysis::ClassList &Subs) {
   // Collect the direct and indirect subclasses for the class.
@@ -57,7 +57,9 @@ void swift::getAllSubclasses(ClassHierarchyAnalysis *CHA,
   Subs.append(DirectSubs.begin(), DirectSubs.end());
   Subs.append(IndirectSubs.begin(), IndirectSubs.end());
 
-  if (ClassType.is<BoundGenericClassType>()) {
+  // FIXME: This is wrong -- we could have a non-generic class nested
+  // inside a generic class
+  if (isa<BoundGenericClassType>(ClassType)) {
     // Filter out any subclasses that do not inherit from this
     // specific bound class.
     auto RemovedIt = std::remove_if(Subs.begin(), Subs.end(),
@@ -68,8 +70,8 @@ void swift::getAllSubclasses(ClassHierarchyAnalysis *CHA,
           auto SubCanTy = Sub->getDeclaredInterfaceType()->getCanonicalType();
           // Handle the usual case here: the class in question
           // should be a real subclass of a bound generic class.
-          return !ClassType.isBindableToSuperclassOf(
-              SILType::getPrimitiveObjectType(SubCanTy));
+          return !ClassType->isBindableToSuperclassOf(
+              SubCanTy);
         });
     Subs.erase(RemovedIt, Subs.end());
   }
@@ -85,7 +87,7 @@ void swift::getAllSubclasses(ClassHierarchyAnalysis *CHA,
 /// \p CD  static class of the instance whose method is being invoked
 /// \p CHA class hierarchy analysis
 static bool isEffectivelyFinalMethod(FullApplySite AI,
-                                     SILType ClassType,
+                                     CanType ClassType,
                                      ClassDecl *CD,
                                      ClassHierarchyAnalysis *CHA) {
   if (CD && CD->isFinal())
@@ -638,17 +640,23 @@ void swift::deleteDevirtualizedApply(ApplySite Old) {
 }
 
 SILFunction *swift::getTargetClassMethod(SILModule &M,
-                                         SILType ClassOrMetatypeType,
+                                         ClassDecl *CD,
                                          MethodInst *MI) {
   assert((isa<ClassMethodInst>(MI) || isa<SuperMethodInst>(MI)) &&
          "Only class_method and super_method instructions are supported");
 
   SILDeclRef Member = MI->getMember();
-  if (ClassOrMetatypeType.is<MetatypeType>())
-    ClassOrMetatypeType = ClassOrMetatypeType.getMetatypeInstanceType(M);
-
-  auto *CD = ClassOrMetatypeType.getClassOrBoundGenericClass();
   return M.lookUpFunctionInVTable(CD, Member);
+}
+
+CanType swift::getSelfInstanceType(CanType ClassOrMetatypeType) {
+  if (auto MetaType = dyn_cast<MetatypeType>(ClassOrMetatypeType))
+    ClassOrMetatypeType = MetaType.getInstanceType();
+
+  if (auto SelfType = dyn_cast<DynamicSelfType>(ClassOrMetatypeType))
+    ClassOrMetatypeType = SelfType.getSelfType();
+  
+  return ClassOrMetatypeType;
 }
 
 /// Check if it is possible to devirtualize an Apply instruction
@@ -656,11 +664,10 @@ SILFunction *swift::getTargetClassMethod(SILModule &M,
 /// a direct call to a specific member of a specific class.
 ///
 /// \p AI is the apply to devirtualize.
-/// \p ClassOrMetatypeType is the class type or metatype type we are
-///    devirtualizing for.
+/// \p CD is the class declaration we are devirtualizing for.
 /// return true if it is possible to devirtualize, false - otherwise.
 bool swift::canDevirtualizeClassMethod(FullApplySite AI,
-                                       SILType ClassOrMetatypeType,
+                                       ClassDecl *CD,
                                        OptRemark::Emitter *ORE,
                                        bool isEffectivelyFinalMethod) {
 
@@ -669,14 +676,10 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
 
   SILModule &Mod = AI.getModule();
 
-  // First attempt to lookup the origin for our class method. The origin should
-  // either be a metatype or an alloc_ref.
-  LLVM_DEBUG(llvm::dbgs() << "        Origin Type: " << ClassOrMetatypeType);
-
   auto *MI = cast<MethodInst>(AI.getCallee());
 
   // Find the implementation of the member which should be invoked.
-  auto *F = getTargetClassMethod(Mod, ClassOrMetatypeType, MI);
+  auto *F = getTargetClassMethod(Mod, CD, MI);
 
   // If we do not find any such function, we have no function to devirtualize
   // to... so bail.
@@ -733,20 +736,21 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
 /// return the result value of the new ApplyInst if created one or null.
 FullApplySite swift::devirtualizeClassMethod(FullApplySite AI,
                                              SILValue ClassOrMetatype,
+                                             ClassDecl *CD,
                                              OptRemark::Emitter *ORE) {
   LLVM_DEBUG(llvm::dbgs() << "    Trying to devirtualize : "
                           << *AI.getInstruction());
 
   SILModule &Mod = AI.getModule();
   auto *MI = cast<MethodInst>(AI.getCallee());
-  auto ClassOrMetatypeType = ClassOrMetatype->getType();
-  auto *F = getTargetClassMethod(Mod, ClassOrMetatypeType, MI);
+
+  auto *F = getTargetClassMethod(Mod, CD, MI);
 
   CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
 
   SubstitutionMap Subs =
     getSubstitutionsForCallee(Mod, GenCalleeType,
-                              ClassOrMetatypeType.getASTType(),
+                              ClassOrMetatype->getType().getASTType(),
                               AI);
   CanSILFunctionType SubstCalleeType = GenCalleeType;
   if (GenCalleeType->isPolymorphic())
@@ -813,12 +817,12 @@ FullApplySite swift::devirtualizeClassMethod(FullApplySite AI,
 
 FullApplySite
 swift::tryDevirtualizeClassMethod(FullApplySite AI, SILValue ClassInstance,
+                                  ClassDecl *CD,
                                   OptRemark::Emitter *ORE,
                                   bool isEffectivelyFinalMethod) {
-  if (!canDevirtualizeClassMethod(AI, ClassInstance->getType(), ORE,
-                                  isEffectivelyFinalMethod))
+  if (!canDevirtualizeClassMethod(AI, CD, ORE, isEffectivelyFinalMethod))
     return FullApplySite();
-  return devirtualizeClassMethod(AI, ClassInstance, ORE);
+  return devirtualizeClassMethod(AI, ClassInstance, CD, ORE);
 }
 
 
@@ -1121,16 +1125,12 @@ ApplySite swift::tryDevirtualizeApply(ApplySite AI,
   ///
   /// %YY = function_ref @...
   if (auto *CMI = dyn_cast<ClassMethodInst>(FAS.getCallee())) {
-    auto &M = FAS.getModule();
     auto Instance = stripUpCasts(CMI->getOperand());
-    auto ClassType = Instance->getType();
-    if (ClassType.is<MetatypeType>())
-      ClassType = ClassType.getMetatypeInstanceType(M);
-
+    auto ClassType = getSelfInstanceType(Instance->getType().getASTType());
     auto *CD = ClassType.getClassOrBoundGenericClass();
 
     if (isEffectivelyFinalMethod(FAS, ClassType, CD, CHA))
-      return tryDevirtualizeClassMethod(FAS, Instance, ORE,
+      return tryDevirtualizeClassMethod(FAS, Instance, CD, ORE,
                                         true /*isEffectivelyFinalMethod*/);
 
     // Try to check if the exact dynamic type of the instance is statically
@@ -1138,23 +1138,21 @@ ApplySite swift::tryDevirtualizeApply(ApplySite AI,
     if (auto Instance = getInstanceWithExactDynamicType(CMI->getOperand(),
                                                         CMI->getModule(),
                                                         CHA))
-      return tryDevirtualizeClassMethod(FAS, Instance, ORE);
+      return tryDevirtualizeClassMethod(FAS, Instance, CD, ORE);
 
     if (auto ExactTy = getExactDynamicType(CMI->getOperand(), CMI->getModule(),
                                            CHA)) {
       if (ExactTy == CMI->getOperand()->getType())
-        return tryDevirtualizeClassMethod(FAS, CMI->getOperand(), ORE);
+        return tryDevirtualizeClassMethod(FAS, CMI->getOperand(), CD, ORE);
     }
   }
 
   if (isa<SuperMethodInst>(FAS.getCallee())) {
-    if (FAS.hasSelfArgument()) {
-      return tryDevirtualizeClassMethod(FAS, FAS.getSelfArgument(), ORE);
-    }
+    auto Instance = FAS.getArguments().back();
+    auto ClassType = getSelfInstanceType(Instance->getType().getASTType());
+    auto *CD = ClassType.getClassOrBoundGenericClass();
 
-    // It is an invocation of a class method.
-    // Last operand is the metatype that should be used for dispatching.
-    return tryDevirtualizeClassMethod(FAS, FAS.getArguments().back(), ORE);
+    return tryDevirtualizeClassMethod(FAS, Instance, CD, ORE);
   }
 
   return ApplySite();
@@ -1189,16 +1187,12 @@ bool swift::canDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA) 
   ///
   /// %YY = function_ref @...
   if (auto *CMI = dyn_cast<ClassMethodInst>(AI.getCallee())) {
-    auto &M = AI.getModule();
     auto Instance = stripUpCasts(CMI->getOperand());
-    auto ClassType = Instance->getType();
-    if (ClassType.is<MetatypeType>())
-      ClassType = ClassType.getMetatypeInstanceType(M);
-
+    auto ClassType = getSelfInstanceType(Instance->getType().getASTType());
     auto *CD = ClassType.getClassOrBoundGenericClass();
 
     if (isEffectivelyFinalMethod(AI, ClassType, CD, CHA))
-      return canDevirtualizeClassMethod(AI, Instance->getType(),
+      return canDevirtualizeClassMethod(AI, CD,
                                         nullptr /*ORE*/,
                                         true /*isEffectivelyFinalMethod*/);
 
@@ -1207,23 +1201,21 @@ bool swift::canDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA) 
     if (auto Instance = getInstanceWithExactDynamicType(CMI->getOperand(),
                                                         CMI->getModule(),
                                                         CHA))
-      return canDevirtualizeClassMethod(AI, Instance->getType());
+      return canDevirtualizeClassMethod(AI, CD);
 
     if (auto ExactTy = getExactDynamicType(CMI->getOperand(), CMI->getModule(),
                                            CHA)) {
       if (ExactTy == CMI->getOperand()->getType())
-        return canDevirtualizeClassMethod(AI, CMI->getOperand()->getType());
+        return canDevirtualizeClassMethod(AI, CD);
     }
   }
 
   if (isa<SuperMethodInst>(AI.getCallee())) {
-    if (AI.hasSelfArgument()) {
-      return canDevirtualizeClassMethod(AI, AI.getSelfArgument()->getType());
-    }
+    auto Instance = AI.getArguments().back();
+    auto ClassType = getSelfInstanceType(Instance->getType().getASTType());
+    auto *CD = ClassType.getClassOrBoundGenericClass();
 
-    // It is an invocation of a class method.
-    // Last operand is the metatype that should be used for dispatching.
-    return canDevirtualizeClassMethod(AI, AI.getArguments().back()->getType());
+    return canDevirtualizeClassMethod(AI, CD);
   }
 
   return false;

@@ -485,6 +485,8 @@ ERROR(expected_sil_value_ownership_kind,none,
       "expected value ownership kind in SIL code", ())
 ERROR(expected_sil_colon,none,
       "expected ':' before %0", (StringRef))
+ERROR(expected_sil_tuple_index,none,
+      "expected tuple element index", ())
 
 // SIL Values
 ERROR(sil_value_redefinition,none,

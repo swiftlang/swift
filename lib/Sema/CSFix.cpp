@@ -264,6 +264,18 @@ DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
       DefineMemberBasedOnUse(cs, baseType, member, locator);
 }
 
+bool AllowTypeOrInstanceMember::diagnose(Expr *root, bool asNote) const {
+  auto failure = AllowTypeOrInstanceMemberFailure(root, getConstraintSystem(),
+                                                  BaseType, Name, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowTypeOrInstanceMember *AllowTypeOrInstanceMember::create(ConstraintSystem &cs,
+                                                             Type baseType,
+                                                             DeclName member,
+                                                             ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowTypeOrInstanceMember(cs, baseType, member, locator);
+}
 bool AllowInvalidPartialApplication::diagnose(Expr *root, bool asNote) const {
   auto failure = PartialApplicationFailure(root, isWarning(),
                                            getConstraintSystem(), getLocator());
@@ -329,4 +341,19 @@ AllowInvalidInitRef::create(RefKind kind, ConstraintSystem &cs, Type baseTy,
                             SourceRange baseRange, ConstraintLocator *locator) {
   return new (cs.getAllocator()) AllowInvalidInitRef(
       cs, kind, baseTy, init, isStaticallyDerived, baseRange, locator);
+}
+
+bool AddMissingArguments::diagnose(Expr *root, bool asNote) const {
+  MissingArgumentsFailure failure(root, getConstraintSystem(), Fn,
+                                  NumSynthesized, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AddMissingArguments *
+AddMissingArguments::create(ConstraintSystem &cs, FunctionType *funcType,
+                            llvm::ArrayRef<Param> synthesizedArgs,
+                            ConstraintLocator *locator) {
+  unsigned size = totalSizeToAlloc<Param>(synthesizedArgs.size());
+  void *mem = cs.getAllocator().Allocate(size, alignof(AddMissingArguments));
+  return new (mem) AddMissingArguments(cs, funcType, synthesizedArgs, locator);
 }

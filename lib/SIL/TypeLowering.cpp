@@ -982,7 +982,7 @@ namespace {
   };
 
 /// A type lowering for loadable @unowned types.
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   class Loadable##Name##TypeLowering final : public LeafLoadableTypeLowering { \
   public: \
     Loadable##Name##TypeLowering(SILType type) \
@@ -1173,6 +1173,12 @@ namespace {
       return new (TC, Dependent) OpaqueValueTypeLowering(silType, properties);
     }
 
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    TypeLowering * \
+    visit##Name##StorageType(Can##Name##StorageType type) { \
+      return new (TC, Dependent) Loadable##Name##TypeLowering( \
+                                  SILType::getPrimitiveObjectType(type)); \
+    }
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
     TypeLowering * \
     visitLoadable##Name##StorageType(Can##Name##StorageType type) { \
@@ -1834,8 +1840,15 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     return getFunctionInterfaceTypeWithCaptures(funcTy, func);
   }
 
-  case SILDeclRef::Kind::EnumElement:
-    return cast<AnyFunctionType>(vd->getInterfaceType()->getCanonicalType());
+  case SILDeclRef::Kind::EnumElement: {
+    auto funcTy = cast<AnyFunctionType>(
+                                   vd->getInterfaceType()->getCanonicalType());
+    auto sig = getEffectiveGenericSignature(vd->getDeclContext());
+    return CanAnyFunctionType::get(sig,
+                                   funcTy->getParams(),
+                                   funcTy.getResult(),
+                                   funcTy->getExtInfo());
+  }
   
   case SILDeclRef::Kind::Allocator: {
     auto *cd = cast<ConstructorDecl>(vd);

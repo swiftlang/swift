@@ -216,17 +216,6 @@ bool SILType::isHeapObjectReferenceType() const {
   return false;
 }
 
-SILType SILType::getMetatypeInstanceType(SILModule &M) const {
-  CanType MetatypeType = getASTType();
-  assert(MetatypeType->is<AnyMetatypeType>() &&
-         "This method should only be called on SILTypes with an underlying "
-         "metatype type.");
-  Type instanceType =
-    MetatypeType->castTo<AnyMetatypeType>()->getInstanceType();
-
-  return M.Types.getLoweredType(instanceType->getCanonicalType());
-}
-
 bool SILType::aggregateContainsRecord(SILType Record, SILModule &Mod) const {
   assert(!hasArchetype() && "Agg should be proven to not be generic "
                              "before passed to this function.");
@@ -395,11 +384,6 @@ SILType::canUseExistentialRepresentation(SILModule &M,
   llvm_unreachable("Unhandled ExistentialRepresentation in switch.");
 }
 
-SILType SILType::getReferentType(SILModule &M) const {
-  auto Ty = castTo<ReferenceStorageType>();
-  return M.Types.getLoweredType(Ty->getReferentType()->getCanonicalType());
-}
-
 SILType SILType::mapTypeOutOfContext() const {
   return SILType::getPrimitiveType(getASTType()->mapTypeOutOfContext()
                                                ->getCanonicalType(),
@@ -556,8 +540,7 @@ bool SILType::hasAbstractionDifference(SILFunctionTypeRepresentation rep,
 bool SILType::isLoweringOf(SILModule &Mod, CanType formalType) {
   SILType loweredType = *this;
 
-  // Optional lowers its contained type. The difference between Optional
-  // and IUO is lowered away.
+  // Optional lowers its contained type.
   SILType loweredObjectType = loweredType.getOptionalObjectType();
   CanType formalObjectType = formalType.getOptionalObjectType();
 
@@ -567,10 +550,9 @@ bool SILType::isLoweringOf(SILModule &Mod, CanType formalType) {
   }
 
   // Metatypes preserve their instance type through lowering.
-  if (loweredType.is<MetatypeType>()) {
+  if (auto loweredMT = loweredType.getAs<MetatypeType>()) {
     if (auto formalMT = dyn_cast<MetatypeType>(formalType)) {
-      return loweredType.getMetatypeInstanceType(Mod).isLoweringOf(
-          Mod, formalMT.getInstanceType());
+      return loweredMT.getInstanceType() == formalMT.getInstanceType();
     }
   }
 

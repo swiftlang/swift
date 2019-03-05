@@ -959,8 +959,11 @@ RValue RValueEmitter::visitIntegerLiteralExpr(IntegerLiteralExpr *E,
 }
 RValue RValueEmitter::visitFloatLiteralExpr(FloatLiteralExpr *E,
                                             SGFContext C) {
-  return RValue(SGF, E,
-                ManagedValue::forUnmanaged(SGF.B.createFloatLiteral(E)));
+  if (E->getType()->is<BuiltinFloatType>())
+    return RValue(SGF, E,
+                  ManagedValue::forUnmanaged(SGF.B.createFloatLiteral(E)));
+
+  return SGF.emitLiteral(E, C);
 }
 
 RValue RValueEmitter::visitBooleanLiteralExpr(BooleanLiteralExpr *E, 
@@ -2577,7 +2580,7 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
     
     baseType = opened->getCanonicalType();
     auto openedOpaqueValue = subSGF.emitOpenExistential(loc, paramSubstValue,
-                                                        opened, subSGF.SGM.getLoweredType(baseType),
+                                                        opened, subSGF.getLoweredType(baseType),
                                                         AccessKind::Read);
     // Maybe we could peephole this if we know the property load can borrow the
     // base value…
@@ -3657,7 +3660,23 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
 
       break;
     }
-        
+
+    case KeyPathExpr::Component::Kind::TupleElement: {
+      assert(baseTy->is<TupleType>() && "baseTy is expected to be a TupleType");
+
+      auto tupleIndex = component.getTupleIndex();
+      auto elementTy = baseTy->getAs<TupleType>()
+        ->getElementType(tupleIndex)
+        ->getCanonicalType();
+
+      loweredComponents.push_back(
+        KeyPathPatternComponent::forTupleElement(tupleIndex, elementTy));
+
+      baseTy = loweredComponents.back().getComponentType();
+
+      break;
+    }
+
     case KeyPathExpr::Component::Kind::OptionalChain:
     case KeyPathExpr::Component::Kind::OptionalForce:
     case KeyPathExpr::Component::Kind::OptionalWrap: {

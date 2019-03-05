@@ -11,14 +11,14 @@ add_swift_host_library(swiftFrontend STATIC
   PrintingDiagnosticConsumer.cpp
   SerializedDiagnosticConsumer.cpp
   DEPENDS
-    SwiftOptions
-  LINK_LIBRARIES
-    swiftSIL
-    swiftMigrator
-    swiftOption
-    swiftParseSIL
-    swiftSILGen
-    swiftSILOptimizer
-    swiftSema
-    swiftSerialization)
+    SwiftOptions)
+target_link_libraries(swiftFrontend PRIVATE
+  swiftSIL
+  swiftMigrator
+  swiftOption
+  swiftParseSIL
+  swiftSILGen
+  swiftSILOptimizer
+  swiftSema
+  swiftSerialization)
 

@@ -2762,6 +2762,8 @@ public:
     bool operator!=(Param const &b) const { return !(*this == b); }
 
     Param getWithoutLabel() const { return Param(Ty, Identifier(), Flags); }
+
+    Param withType(Type newType) const { return Param(newType, Label, Flags); }
   };
 
   class CanParam : public Param {

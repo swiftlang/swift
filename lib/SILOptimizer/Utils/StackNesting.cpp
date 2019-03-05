@@ -97,7 +97,7 @@ bool StackNesting::solve() {
   bool initVal = false;
   for (BlockInfo &BI : BlockInfos) {
     BI.AliveStackLocsAtEntry.resize(StackLocs.size(), initVal);
-    initVal = false;
+    initVal = true;
   }
 
   // First step: do a forward dataflow analysis to get the live stack locations

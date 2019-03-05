@@ -222,4 +222,19 @@ SwitchTestSuite.test("TupleUnforwarding") {
   }
 }
 
+protocol P {}
+
+SwitchTestSuite.test("Protocol Conformance Check Leaks") {
+  do {
+    let x = LifetimeTracked(0)
+    let y = LifetimeTracked(1)
+    switch (x, y) {
+    case (is P, is P):
+      break
+    default:
+      break
+    }
+  }
+}
+
 runAllTests()

@@ -71,6 +71,8 @@ SILInstruction *SILCombiner::visitUpcastInst(UpcastInst *UCI) {
 SILInstruction *
 SILCombiner::
 visitPointerToAddressInst(PointerToAddressInst *PTAI) {
+  auto *F = PTAI->getFunction();
+
   Builder.setCurrentDebugScope(PTAI->getDebugScope());
 
   // If we reach this point, we know that the types must be different since
@@ -127,8 +129,11 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
                                 m_ApplyInst(BuiltinValueKind::Strideof,
                                             m_MetatypeInst(Metatype))),
                     m_SILValue(Distance)))) {
+
         SILType InstanceType =
-            Metatype->getType().getMetatypeInstanceType(PTAI->getModule());
+            F->getLoweredType(Metatype->getType()
+                .castTo<MetatypeType>().getInstanceType());
+
         auto *Trunc = cast<BuiltinInst>(TruncOrBitCast);
 
         // Make sure that the type of the metatype matches the type that we are
@@ -168,8 +173,10 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
                                  m_ApplyInst(BuiltinValueKind::Strideof,
                                              m_MetatypeInst(Metatype)),
                                  m_ValueBase()))) {
+
       SILType InstanceType =
-        Metatype->getType().getMetatypeInstanceType(PTAI->getModule());
+          F->getLoweredType(Metatype->getType()
+              .castTo<MetatypeType>().getInstanceType());
 
       // Make sure that the type of the metatype matches the type that we are
       // casting to so we stride by the correct amount.

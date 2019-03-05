@@ -382,6 +382,25 @@ void verifyKeyPathComponent(SILModule &M,
             "wrapping component should wrap optional");
     break;
   }
+  case KeyPathPatternComponent::Kind::TupleElement: {
+    require(loweredBaseTy.is<TupleType>(),
+            "invalid baseTy, should have been a TupleType");
+      
+    auto tupleTy = loweredBaseTy.getAs<TupleType>();
+    auto eltIdx = component.getTupleIndex();
+      
+    require(eltIdx < tupleTy->getNumElements(),
+            "invalid element index, greater than # of tuple elements");
+
+    auto eltTy = tupleTy->getElementType(eltIdx)
+      ->getReferenceStorageReferent()
+      ->getCanonicalType();
+    
+    require(eltTy == componentTy,
+            "tuple element type should match the type of the component");
+
+    break;
+  }
   }
   
   baseTy = componentTy;
@@ -1795,42 +1814,12 @@ public:
             "Operand of " #name "_to_ref does not have the " \
             "operand's type as its referent type"); \
   }
-#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
-  LOADABLE_REF_STORAGE_HELPER(Name, name) \
-  void checkStrongRetain##Name##Inst(StrongRetain##Name##Inst *RI) { \
-    requireObjectType(Name##StorageType, RI->getOperand(), \
-                      "Operand of strong_retain_" #name); \
-    require(!F.hasOwnership(), "strong_retain_" #name " is only in " \
-                                        "functions with unqualified " \
-                                        "ownership"); \
-  } \
-  void check##Name##RetainInst(Name##RetainInst *RI) { \
-    requireObjectType(Name##StorageType, RI->getOperand(), \
-                      "Operand of " #name "_retain"); \
-    require(!F.hasOwnership(), \
-            #name "_retain is only in functions with unqualified ownership"); \
-  } \
-  void check##Name##ReleaseInst(Name##ReleaseInst *RI) { \
-    requireObjectType(Name##StorageType, RI->getOperand(), \
-                      "Operand of " #name "_release"); \
-    require(!F.hasOwnership(), \
-            #name "_release is only in functions with unqualified ownership"); \
-  } \
-  void checkCopy##Name##ValueInst(Copy##Name##ValueInst *I) { \
-    requireObjectType(Name##StorageType, I->getOperand(), \
-                      "Operand of " #name "_retain"); \
-    require(F.hasOwnership(), \
-            "copy_" #name "_value is only valid in functions with qualified " \
-            "ownership"); \
-  }
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
-  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...") \
-  LOADABLE_REF_STORAGE_HELPER(Name, name) \
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name, closure) \
   void checkStrongRetain##Name##Inst(StrongRetain##Name##Inst *RI) { \
     auto ty = requireObjectType(Name##StorageType, RI->getOperand(), \
                                 "Operand of strong_retain_" #name); \
-    require(ty->isLoadable(ResilienceExpansion::Maximal), \
-          "strong_retain_" #name " requires '" #name "' type to be loadable"); \
+    closure(); \
+    (void)ty; \
     require(!F.hasOwnership(), "strong_retain_" #name " is only in " \
                                         "functions with unqualified " \
                                         "ownership"); \
@@ -1838,31 +1827,42 @@ public:
   void check##Name##RetainInst(Name##RetainInst *RI) { \
     auto ty = requireObjectType(Name##StorageType, RI->getOperand(), \
                                 "Operand of " #name "_retain"); \
-    require(ty->isLoadable(ResilienceExpansion::Maximal), \
-            #name "_retain requires '" #name "' type to be loadable"); \
+    closure(); \
+    (void)ty; \
     require(!F.hasOwnership(), \
             #name "_retain is only in functions with unqualified ownership"); \
   } \
   void check##Name##ReleaseInst(Name##ReleaseInst *RI) { \
     auto ty = requireObjectType(Name##StorageType, RI->getOperand(), \
                                 "Operand of " #name "_release"); \
-    require(ty->isLoadable(ResilienceExpansion::Maximal), \
-            #name "_release requires '" #name "' type to be loadable"); \
+    closure(); \
+    (void)ty; \
     require(!F.hasOwnership(), \
             #name "_release is only in functions with unqualified ownership"); \
   } \
   void checkCopy##Name##ValueInst(Copy##Name##ValueInst *I) { \
     auto ty = requireObjectType(Name##StorageType, I->getOperand(), \
                                 "Operand of " #name "_retain"); \
-    require(ty->isLoadable(ResilienceExpansion::Maximal), \
-            #name "_retain requires '" #name "' type to be loadable"); \
+    closure(); \
+    (void)ty; \
     /* *NOTE* We allow copy_##name##_value to be used throughout the entire */ \
     /* pipeline even though it is a higher level instruction. */ \
   }
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+  LOADABLE_REF_STORAGE_HELPER(Name, name) \
+  ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name, []{})
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+  LOADABLE_REF_STORAGE_HELPER(Name, name) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...") \
+  ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name, [&]{ \
+    require(ty->isLoadable(ResilienceExpansion::Maximal), \
+            "'" #name "' type must be loadable"); \
+  })
 #define UNCHECKED_REF_STORAGE(Name, name, ...) \
   LOADABLE_REF_STORAGE_HELPER(Name, name)
 #include "swift/AST/ReferenceStorage.def"
 #undef LOADABLE_REF_STORAGE_HELPER
+#undef ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER
 
   void checkMarkUninitializedInst(MarkUninitializedInst *MU) {
     SILValue Src = MU->getOperand();
@@ -2050,10 +2050,9 @@ public:
       SILType exType = AEBI->getExistentialType();
       auto archetype = OpenedArchetypeType::get(exType.getASTType());
 
-      auto loweredTy = F.getModule().Types.getLoweredType(
-                                      Lowering::AbstractionPattern(archetype),
-                                      AEBI->getFormalConcreteType())
-                                        .getAddressType();
+      auto loweredTy = F.getLoweredType(Lowering::AbstractionPattern(archetype),
+                                        AEBI->getFormalConcreteType())
+                                          .getAddressType();
 
       requireSameType(loweredTy, PEBI->getType(),
               "project_existential_box result should be the lowered "
@@ -3082,7 +3081,7 @@ public:
             "alloc_existential_box must be used with a boxed existential "
             "type");
     
-    checkExistentialProtocolConformances(exType,
+    checkExistentialProtocolConformances(exType.getASTType(),
                                          AEBI->getFormalConcreteType(),
                                          AEBI->getConformances());
     verifyOpenedArchetype(AEBI, AEBI->getFormalConcreteType());
@@ -3101,9 +3100,8 @@ public:
     // The lowered type must be the properly-abstracted form of the AST type.
     auto archetype = OpenedArchetypeType::get(exType.getASTType());
     
-    auto loweredTy = F.getModule().Types.getLoweredType(
-                                Lowering::AbstractionPattern(archetype),
-                                AEI->getFormalConcreteType())
+    auto loweredTy = F.getLoweredType(Lowering::AbstractionPattern(archetype),
+                                      AEI->getFormalConcreteType())
                       .getAddressType();
     
     requireSameType(loweredTy, AEI->getLoweredConcreteType(),
@@ -3115,7 +3113,7 @@ public:
             "init_existential_addr payload must be a lowering of the formal "
             "concrete type");
     
-    checkExistentialProtocolConformances(exType,
+    checkExistentialProtocolConformances(exType.getASTType(),
                                          AEI->getFormalConcreteType(),
                                          AEI->getConformances());
     verifyOpenedArchetype(AEI, AEI->getFormalConcreteType());
@@ -3130,8 +3128,8 @@ public:
     // The operand must be at the right abstraction level for the existential.
     SILType exType = IEI->getType();
     auto archetype = OpenedArchetypeType::get(exType.getASTType());
-    auto loweredTy = F.getModule().Types.getLoweredType(
-        Lowering::AbstractionPattern(archetype), IEI->getFormalConcreteType());
+    auto loweredTy = F.getLoweredType(Lowering::AbstractionPattern(archetype),
+                                      IEI->getFormalConcreteType());
     requireSameType(
         concreteType, loweredTy,
         "init_existential_value operand must be lowered to the right "
@@ -3142,7 +3140,7 @@ public:
             "init_existential_value operand must be a lowering of the formal "
             "concrete type");
 
-    checkExistentialProtocolConformances(exType,
+    checkExistentialProtocolConformances(exType.getASTType(),
                                          IEI->getFormalConcreteType(),
                                          IEI->getConformances());
     verifyOpenedArchetype(IEI, IEI->getFormalConcreteType());
@@ -3162,9 +3160,8 @@ public:
     // The operand must be at the right abstraction level for the existential.
     SILType exType = IEI->getType();
     auto archetype = OpenedArchetypeType::get(exType.getASTType());
-    auto loweredTy = F.getModule().Types.getLoweredType(
-                                       Lowering::AbstractionPattern(archetype),
-                                       IEI->getFormalConcreteType());
+    auto loweredTy = F.getLoweredType(Lowering::AbstractionPattern(archetype),
+                                      IEI->getFormalConcreteType());
     requireSameType(concreteType, loweredTy,
                     "init_existential_ref operand must be lowered to the right "
                     "abstraction level for the existential");
@@ -3174,7 +3171,7 @@ public:
             "init_existential_ref operand must be a lowering of the formal "
             "concrete type");
     
-    checkExistentialProtocolConformances(exType,
+    checkExistentialProtocolConformances(exType.getASTType(),
                                          IEI->getFormalConcreteType(),
                                          IEI->getConformances());
     verifyOpenedArchetype(IEI, IEI->getFormalConcreteType());
@@ -3231,21 +3228,25 @@ public:
             "init_existential_metatype result must match representation of "
             "operand");
 
-    while (resultType.is<ExistentialMetatypeType>()) {
-      resultType = resultType.getMetatypeInstanceType(F.getModule());
-      operandType = operandType.getMetatypeInstanceType(F.getModule());
+    auto resultInstanceType = resultType.getASTType();
+    auto operandInstanceType = operandType.getASTType();
+    while (isa<ExistentialMetatypeType>(resultInstanceType)) {
+      resultInstanceType =
+          cast<ExistentialMetatypeType>(resultInstanceType).getInstanceType();
+      operandInstanceType =
+          cast<MetatypeType>(operandInstanceType).getInstanceType();
     }
 
-    checkExistentialProtocolConformances(resultType,
-                                         operandType.getASTType(),
+    checkExistentialProtocolConformances(resultInstanceType,
+                                         operandInstanceType,
                                          I->getConformances());
     verifyOpenedArchetype(I, MetaTy.getInstanceType());
   }
 
-  void checkExistentialProtocolConformances(SILType resultType,
+  void checkExistentialProtocolConformances(CanType resultType,
                                             CanType concreteType,
                                 ArrayRef<ProtocolConformanceRef> conformances) {
-    auto layout = resultType.getASTType().getExistentialLayout();
+    auto layout = resultType.getExistentialLayout();
     auto protocols = layout.getProtocols();
 
     require(conformances.size() == protocols.size(),
@@ -3314,8 +3315,7 @@ public:
               "downcast operand must be a class type");
       require(toCanTy.getClassOrBoundGenericClass(),
               "downcast must convert to a class type");
-      require(SILType::getPrimitiveObjectType(fromCanTy).
-              isBindableToSuperclassOf(SILType::getPrimitiveObjectType(toCanTy)),
+      require(fromCanTy->isBindableToSuperclassOf(toCanTy),
               "downcast must convert to a subclass");
     }
   }
@@ -4297,6 +4297,7 @@ public:
         case KeyPathPatternComponent::Kind::OptionalChain:
         case KeyPathPatternComponent::Kind::OptionalWrap:
         case KeyPathPatternComponent::Kind::OptionalForce:
+        case KeyPathPatternComponent::Kind::TupleElement:
           hasIndices = false;
           break;
         }

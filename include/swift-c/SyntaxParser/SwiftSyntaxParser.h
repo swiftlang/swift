@@ -232,6 +232,64 @@ swiftparse_parse_string(swiftparse_parser_t, const char *source);
 /// declarations, etc.
 SWIFTPARSE_PUBLIC const char* swiftparse_syntax_structure_versioning_identifier(void);
 
+typedef struct {
+  /// Represents the range for the fixit.
+  swiftparse_range_t range;
+  /// Represent the text for replacement.
+  const char* text;
+} swiftparse_diagnostic_fixit_t;
+
+typedef enum {
+  SWIFTPARSER_DIAGNOSTIC_SEVERITY_ERROR = 0,
+  SWIFTPARSER_DIAGNOSTIC_SEVERITY_WARNING = 1,
+  SWIFTPARSER_DIAGNOSTIC_SEVERITY_NOTE = 2,
+} swiftparser_diagnostic_severity_t;
+
+/// This is for the client to ask further information about a diagnostic that is
+/// associated with the pointer.
+/// This pointer is only valid to access from within the
+/// swiftparse_diagnostic_handler_t block
+typedef const void* swiftparser_diagnostic_t;
+
+/// Invoked by the parser when a diagnostic is emitted.
+typedef void(^swiftparse_diagnostic_handler_t)(swiftparser_diagnostic_t);
+
+/// Set the \c swiftparse_diagnostic_handler_t block to be used by the parser.
+///
+/// It isn't required to set a \c swiftparse_diagnostic_handler_t block.
+SWIFTPARSE_PUBLIC void
+swiftparse_parser_set_diagnostic_handler(swiftparse_parser_t,
+                                         swiftparse_diagnostic_handler_t);
+
+/// Get the message of a swiftparser_diagnostic_t
+SWIFTPARSE_PUBLIC const char*
+swiftparse_diagnostic_get_message(swiftparser_diagnostic_t);
+
+/// Get the source location in byte offset to where the diagnostic is issued
+/// in the source buffer.
+SWIFTPARSE_PUBLIC
+unsigned swiftparse_diagnostic_get_source_loc(swiftparser_diagnostic_t diag);
+
+/// Get the number of fixits of a swiftparser_diagnostic_t
+SWIFTPARSE_PUBLIC unsigned
+swiftparse_diagnostic_get_fixit_count(swiftparser_diagnostic_t);
+
+/// Get the fixit at the specified index of a swiftparser_diagnostic_t
+SWIFTPARSE_PUBLIC swiftparse_diagnostic_fixit_t
+swiftparse_diagnostic_get_fixit(swiftparser_diagnostic_t, unsigned);
+
+/// Get the number of highlight ranges of a swiftparser_diagnostic_t
+SWIFTPARSE_PUBLIC unsigned
+swiftparse_diagnostic_get_range_count(swiftparser_diagnostic_t);
+
+/// Get the highlight range at the specified index of a swiftparser_diagnostic_t
+SWIFTPARSE_PUBLIC swiftparse_range_t
+swiftparse_diagnostic_get_range(swiftparser_diagnostic_t, unsigned);
+
+/// Get the severity of a swiftparser_diagnostic_t
+SWIFTPARSE_PUBLIC swiftparser_diagnostic_severity_t
+swiftparse_diagnostic_get_severity(swiftparser_diagnostic_t diag);
+
 SWIFTPARSE_END_DECLS
 
 #endif

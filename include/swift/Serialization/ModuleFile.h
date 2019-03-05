@@ -49,6 +49,7 @@ class ModuleFile
     public LazyConformanceLoader {
   friend class SerializedASTFile;
   friend class DeclDeserializer;
+  friend class TypeDeserializer;
   friend class SILDeserializer;
   using Status = serialization::Status;
   using TypeID = serialization::TypeID;

@@ -936,6 +936,9 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
   case KeyPathComponentKindEncoding::OptionalWrap:
     return KeyPathPatternComponent::forOptional(
         KeyPathPatternComponent::Kind::OptionalWrap, type);
+  case KeyPathComponentKindEncoding::TupleElement:
+    return KeyPathPatternComponent::forTupleElement(
+        ListOfValues[nextValue++], type);
   case KeyPathComponentKindEncoding::Trivial:
     llvm_unreachable("handled above");
   }

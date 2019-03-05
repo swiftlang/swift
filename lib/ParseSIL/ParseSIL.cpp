@@ -2326,6 +2326,19 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
     
     component = KeyPathPatternComponent::forOptional(kind, ty);
     return false;
+  } else if (componentKind.str() == "tuple_element") {
+    unsigned tupleIndex;
+    CanType ty;
+
+    if (P.parseToken(tok::pound, diag::expected_sil_constant)
+        || parseInteger(tupleIndex, diag::expected_sil_tuple_index)
+        || P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
+        || P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$")
+        || parseASTType(ty, patternEnv))
+      return true;
+      
+    component = KeyPathPatternComponent::forTupleElement(tupleIndex, ty);
+    return false;
   } else {
     P.diagnose(componentLoc, diag::sil_keypath_unknown_component_kind,
                componentKind);
@@ -4754,8 +4767,9 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       = OpenedArchetypeType::get(Val->getType().getASTType())
         ->getCanonicalType();
     
-    SILType LoweredTy = SILMod.Types.getLoweredType(
-                                    Lowering::AbstractionPattern(archetype), Ty)
+    auto &F = B.getFunction();
+    SILType LoweredTy = F.getLoweredType(
+        Lowering::AbstractionPattern(archetype), Ty)
       .getAddressType();
     
     // Collect conformances for the type.

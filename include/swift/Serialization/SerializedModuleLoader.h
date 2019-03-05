@@ -68,10 +68,10 @@ protected:
   /// to list the architectures that \e are present.
   ///
   /// \returns true if an error diagnostic was emitted
-  virtual bool maybeDiagnoseArchitectureMismatch(SourceLoc sourceLocation,
-                                                 StringRef moduleName,
-                                                 StringRef archName,
-                                                 StringRef directoryPath) {
+  virtual bool maybeDiagnoseTargetMismatch(SourceLoc sourceLocation,
+                                           StringRef moduleName,
+                                           StringRef archName,
+                                           StringRef directoryPath) {
     return false;
   }
 
@@ -139,10 +139,10 @@ class SerializedModuleLoader : public SerializedModuleLoaderBase {
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) override;
 
-  bool maybeDiagnoseArchitectureMismatch(SourceLoc sourceLocation,
-                                         StringRef moduleName,
-                                         StringRef archName,
-                                         StringRef directoryPath) override;
+  bool maybeDiagnoseTargetMismatch(SourceLoc sourceLocation,
+                                   StringRef moduleName,
+                                   StringRef archName,
+                                   StringRef directoryPath) override;
 
 public:
   virtual ~SerializedModuleLoader();
