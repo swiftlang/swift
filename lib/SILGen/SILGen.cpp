@@ -1123,7 +1123,8 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto *type = blockParam->getType()->castTo<FunctionType>();
   Type initType = FunctionType::get({}, TupleType::getEmpty(C),
                                     type->getExtInfo());
-  auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
+  auto initSILType = cast<SILFunctionType>(
+      Types.getLoweredRValueType(initType));
 
   SILGenFunctionBuilder builder(*this);
   auto *f = builder.createFunction(
@@ -1337,9 +1338,10 @@ SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
       componentObjTy = genericEnv->mapTypeIntoContext(componentObjTy);
     auto storageTy = M.Types.getSubstitutedStorageType(decl, componentObjTy);
     auto opaqueTy =
-      M.Types.getLoweredType(AbstractionPattern::getOpaque(), componentObjTy);
+      M.Types.getLoweredRValueType(AbstractionPattern::getOpaque(),
+                                   componentObjTy);
     
-    return storageTy.getAddressType() == opaqueTy.getAddressType();
+    return storageTy.getASTType() == opaqueTy;
   }
   case AccessStrategy::DirectToAccessor:
   case AccessStrategy::DispatchToAccessor:

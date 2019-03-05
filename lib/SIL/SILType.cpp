@@ -138,11 +138,12 @@ SILType SILType::getFieldType(VarDecl *field, SILModule &M) const {
       baseTy->getTypeOfMember(M.getSwiftModule(),
                               field, nullptr)->getCanonicalType();
   }
-  auto loweredTy = M.Types.getLoweredType(origFieldTy, substFieldTy);
+
+  auto loweredTy = M.Types.getLoweredRValueType(origFieldTy, substFieldTy);
   if (isAddress() || getClassOrBoundGenericClass() != nullptr) {
-    return loweredTy.getAddressType();
+    return SILType::getPrimitiveAddressType(loweredTy);
   } else {
-    return loweredTy.getObjectType();
+    return SILType::getPrimitiveObjectType(loweredTy);
   }
 }
 
@@ -166,9 +167,10 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
     getASTType()->getTypeOfMember(M.getSwiftModule(), elt,
                                           elt->getArgumentInterfaceType());
   auto loweredTy =
-    M.Types.getLoweredType(M.Types.getAbstractionPattern(elt), substEltTy);
+    M.Types.getLoweredRValueType(M.Types.getAbstractionPattern(elt),
+                                 substEltTy);
 
-  return SILType(loweredTy.getASTType(), getCategory());
+  return SILType(loweredTy, getCategory());
 }
 
 bool SILType::isLoadableOrOpaque(SILModule &M) const {
