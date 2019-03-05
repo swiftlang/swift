@@ -66,6 +66,15 @@ getObjCToSwiftBridgingFunction(SILOptFunctionBuilder &funcBuilder,
                                          ForDefinition_t::NotForDefinition);
 }
 
+static SubstitutionMap lookupBridgeToObjCProtocolSubs(SILModule &mod,
+                                                      CanType target) {
+  auto bridgedProto =
+      mod.getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
+  auto conf = *mod.getSwiftModule()->lookupConformance(target, bridgedProto);
+  return SubstitutionMap::getProtocolSubstitutions(conf.getRequirement(),
+                                                   target, conf);
+}
+
 /// Create a call of _forceBridgeFromObjectiveC_bridgeable or
 /// _conditionallyBridgeFromObjectiveC_bridgeable which converts an ObjC
 /// instance into a corresponding Swift type, conforming to
@@ -181,17 +190,8 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   // Now emit the a cast from the casted ObjC object into a target type.
   // This is done by means of calling _forceBridgeFromObjectiveC or
   // _conditionallyBridgeFromObjectiveC_bridgeable from the Target type.
-  // Lookup the required function in the Target type.
-
-  // Lookup the _ObjectiveCBridgeable protocol.
-  auto BridgedProto =
-      mod.getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
-  auto Conf = *mod.getSwiftModule()->lookupConformance(target, BridgedProto);
-  // Add substitutions
-  auto SubMap = SubstitutionMap::getProtocolSubstitutions(Conf.getRequirement(),
-                                                          target, Conf);
-
-  auto *FuncRef = Builder.createFunctionRef(Loc, bridgingFunc);
+  auto *funcRef = Builder.createFunctionRef(Loc, bridgingFunc);
+  SubstitutionMap subMap = lookupBridgeToObjCProtocolSubs(mod, target);
 
   auto MetaTy = MetatypeType::get(target, MetatypeRepresentation::Thick);
   auto SILMetaTy = F->getTypeLowering(MetaTy).getLoweredType();
@@ -221,7 +221,7 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   Args.push_back(srcOp);
   Args.push_back(MetaTyVal);
 
-  auto *AI = Builder.createApply(Loc, FuncRef, SubMap, Args, false);
+  auto *AI = Builder.createApply(Loc, funcRef, subMap, Args, false);
 
   // If we have guaranteed normal arguments, insert the destroy.
   //
