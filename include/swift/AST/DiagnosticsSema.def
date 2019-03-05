@@ -213,7 +213,7 @@ ERROR(cannot_apply_lvalue_binop_to_rvalue,none,
       "left side of mutating operator has immutable type %0", (Type))
 
 ERROR(cannot_subscript_with_index,none,
-      "cannot subscript a value of type %0 with a value of type %1",
+      "cannot subscript a value of type %0 with an argument of type %1",
       (Type, Type))
 
 ERROR(cannot_subscript_base,none,
