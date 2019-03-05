@@ -1295,6 +1295,10 @@ WARNING(expr_dynamic_lookup_swift3_objc_inference,none,
 ERROR(alignment_not_power_of_two,none,
       "alignment value must be a power of two", ())
 
+// Literal attributes
+ERROR(missing_tupleLiteral,none,
+      "tuple literal initialization requires '@tupleLiteral' on %0", (DeclName))
+
 // Enum annotations
 ERROR(indirect_case_without_payload,none,
       "enum case %0 without associated value cannot be 'indirect'", (Identifier))

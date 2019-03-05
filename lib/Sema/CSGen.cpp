@@ -1772,7 +1772,7 @@ namespace {
 
     Type visitTupleExpr(TupleExpr *expr) {
       // The type of a tuple expression is simply a tuple of the types of
-      // its subexpressions.
+      // its subexpressions, unless a type has a @tupleLiteral init.
       SmallVector<TupleTypeElt, 4> elements;
       elements.reserve(expr->getNumElements());
       for (unsigned i = 0, n = expr->getNumElements(); i != n; ++i) {
@@ -1783,7 +1783,53 @@ namespace {
                                         expr->getElementName(i), flags));
       }
 
-      return TupleType::get(elements, CS.getASTContext());
+      auto &ctx = CS.getASTContext();
+      auto locator = CS.getConstraintLocator(expr);
+      auto contextualTy = CS.getContextualType(expr);
+      auto tupleTy = TupleType::get(elements, ctx);
+
+      // Somewhat Fast path: if contextual type is a tuple, return the tuple.
+      if (contextualTy && contextualTy->is<TupleType>()) {
+        return tupleTy;
+      }
+
+      SmallVector<Identifier, 4> argLabels;
+      SmallVector<AnyFunctionType::Param, 4> argTys;
+
+      for (unsigned i = 0; i != expr->getNumElements(); i++) {
+        auto elt = expr->getElement(i);
+        auto eltName = expr->getElementName(i);
+
+        if (eltName.empty()) {
+          eltName = ctx.getIdentifier("_");
+        }
+
+        argLabels.push_back(eltName);
+        argTys.push_back(AnyFunctionType::Param(CS.getType(elt), eltName));
+      }
+
+      auto declName = DeclName(ctx, DeclBaseName::createConstructor(),
+                               argLabels);
+
+      if (contextualTy && !contextualTy->is<TupleType>()) {
+        auto resultTy = FunctionType::get(argTys, contextualTy);
+        CS.addValueMemberConstraint(MetatypeType::get(contextualTy), declName,
+                                    resultTy, CS.DC,
+                                    FunctionRefKind::SingleApply, {}, locator);
+        return contextualTy;
+      }
+
+      auto tv = CS.createTypeVariable(locator, TVO_PrefersSubtypeBinding);
+      auto resultTy = FunctionType::get(argTys, tv);
+      auto member = Constraint::createMember(CS,
+                                          ConstraintKind::UnresolvedValueMember,
+                                          tv, resultTy, declName, CS.DC,
+                                          FunctionRefKind::SingleApply, locator);
+      auto tuple = Constraint::create(CS, ConstraintKind::Bind, tv, tupleTy,
+                                      locator);
+      tuple->setFavored();
+      CS.addDisjunctionConstraint({member, tuple}, locator);
+      return tv;
     }
 
     Type visitSubscriptExpr(SubscriptExpr *expr) {

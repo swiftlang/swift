@@ -122,6 +122,7 @@ public:
   IGNORED_ATTR(WeakLinked)
   IGNORED_ATTR(DynamicReplacement)
   IGNORED_ATTR(PrivateImport)
+  IGNORED_ATTR(TupleLiteral)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -782,6 +783,7 @@ public:
     IGNORED_ATTR(SynthesizedProtocol)
     IGNORED_ATTR(Testable)
     IGNORED_ATTR(Transparent)
+    IGNORED_ATTR(TupleLiteral)
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(WeakLinked)
     IGNORED_ATTR(DynamicReplacement)

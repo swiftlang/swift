@@ -1320,6 +1320,9 @@ namespace  {
     UNINTERESTING_ATTR(WeakLinked)
     UNINTERESTING_ATTR(Frozen)
     UNINTERESTING_ATTR(HasInitialValue)
+
+    // Literal attributes
+    UNINTERESTING_ATTR(TupleLiteral)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

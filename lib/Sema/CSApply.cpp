@@ -2759,7 +2759,54 @@ namespace {
     }
 
     Expr *visitTupleExpr(TupleExpr *expr) {
-      return simplifyExprType(expr);
+      simplifyExprType(expr);
+      auto type = cs.getType(expr);
+
+      // If the type we receive is not a tuple, this is @tupleLiteral
+      // initialization.
+      if (!type->is<TupleType>()) {
+        auto member = cs.findResolvedMemberRef(cs.getConstraintLocator(expr));
+        auto init = cast<ConstructorDecl>(member);
+
+        // Check for @tupleLiteral now. Bail out if we don't have it.
+        if (!init->getAttrs().hasAttribute<TupleLiteralAttr>()) {
+          cs.TC.diagnose(init->getLoc(), diag::missing_tupleLiteral,
+                         init->getFullName());
+          return nullptr;
+        }
+
+        // Build out the constructor call.
+        auto &ctx = cs.TC.Context;
+        auto initTy = init->getInterfaceType()->castTo<FunctionType>();
+
+        auto declRef = new (ctx) DeclRefExpr(init, DeclNameLoc(),
+                                             /*implicit*/ true);
+        declRef->setType(initTy);
+
+        auto typeExpr = TypeExpr::createImplicit(type, ctx);
+        typeExpr->setType(MetatypeType::get(type));
+
+        auto resultTy = initTy->getResult()->castTo<FunctionType>();
+        auto constructorRef = new (ctx) ConstructorRefCallExpr(declRef,
+                                                               typeExpr,
+                                                               resultTy);
+        auto inputTy = AnyFunctionType::composeInput(ctx, resultTy->getParams(),
+                                                     false)->castTo<TupleType>();
+
+        for (unsigned i = 0; i != inputTy->getNumElements(); i++) {
+          expr->getElement(i)->setType(inputTy->getElementType(i));
+        }
+
+        auto call = CallExpr::createImplicit(ctx, constructorRef,
+                                             expr->getElements(),
+                                        init->getFullName().getArgumentNames());
+        call->setType(type);
+        call->getArg()->setType(inputTy);
+        cs.cacheExprTypes(call);
+        return call;
+      }
+
+      return expr;
     }
 
     Expr *visitSubscriptExpr(SubscriptExpr *expr) {
