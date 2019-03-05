@@ -45,6 +45,27 @@
 
 using namespace swift;
 
+static SILFunction *
+getObjCToSwiftBridgingFunction(SILOptFunctionBuilder &funcBuilder,
+                               SILDynamicCastInst dynamicCast) {
+  // inline constructor.
+  auto *bridgeFuncDecl = [&]() -> FuncDecl * {
+    auto &astContext = dynamicCast.getModule().getASTContext();
+    if (dynamicCast.isConditional()) {
+      return astContext.getConditionallyBridgeFromObjectiveCBridgeable();
+    }
+    return astContext.getForceBridgeFromObjectiveCBridgeable();
+  }();
+
+  assert(bridgeFuncDecl && "Bridging function doesn't exist?!");
+
+  SILDeclRef funcDeclRef(bridgeFuncDecl, SILDeclRef::Kind::Func);
+
+  // Lookup a function from the stdlib.
+  return funcBuilder.getOrCreateFunction(dynamicCast.getLocation(), funcDeclRef,
+                                         ForDefinition_t::NotForDefinition);
+}
+
 /// Create a call of _forceBridgeFromObjectiveC_bridgeable or
 /// _conditionallyBridgeFromObjectiveC_bridgeable which converts an ObjC
 /// instance into a corresponding Swift type, conforming to
@@ -67,20 +88,9 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   // The conformance to _BridgedToObjectiveC is statically known.
   // Retrieve the bridging operation to be used if a static conformance
   // to _BridgedToObjectiveC can be proven.
-  FuncDecl *BridgeFuncDecl =
-      isConditional
-          ? M.getASTContext().getConditionallyBridgeFromObjectiveCBridgeable()
-          : M.getASTContext().getForceBridgeFromObjectiveCBridgeable();
-
-  assert(BridgeFuncDecl && "_forceBridgeFromObjectiveC should exist");
-
-  SILDeclRef FuncDeclRef(BridgeFuncDecl, SILDeclRef::Kind::Func);
-
-  // Lookup a function from the stdlib.
-  SILFunction *BridgedFunc = FunctionBuilder.getOrCreateFunction(
-      Loc, FuncDeclRef, ForDefinition_t::NotForDefinition);
-
-  if (!BridgedFunc)
+  SILFunction *bridgingFunc =
+      getObjCToSwiftBridgingFunction(FunctionBuilder, dynamicCast);
+  if (!bridgingFunc)
     return nullptr;
 
   CanType CanBridgedTy = BridgedTargetTy->getCanonicalType();
@@ -170,9 +180,9 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
       M.getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
   auto Conf = *M.getSwiftModule()->lookupConformance(Target, BridgedProto);
 
-  auto ParamTypes = BridgedFunc->getLoweredFunctionType()->getParameters();
+  auto ParamTypes = bridgingFunc->getLoweredFunctionType()->getParameters();
 
-  auto *FuncRef = Builder.createFunctionRef(Loc, BridgedFunc);
+  auto *FuncRef = Builder.createFunctionRef(Loc, bridgingFunc);
 
   auto MetaTy = MetatypeType::get(Target, MetatypeRepresentation::Thick);
   auto SILMetaTy = F->getTypeLowering(MetaTy).getLoweredType();
