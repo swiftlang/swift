@@ -1064,7 +1064,10 @@ public:
       auto genericContext = typeDecl->getGenericContext();
       {
         auto genericParams = genericContext->getGenericParams();
-        for (unsigned i = 0, n = genericParams.size(); i != n; ++i) {
+        unsigned n = genericParams.size();
+        if (allGenericArgs.size() != n)
+          return BuiltType();
+        for (unsigned i = 0; i != n; ++i) {
           const auto &param = genericParams[i];
           if (param.getKind() != GenericParamKind::Type)
             return BuiltType();
