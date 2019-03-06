@@ -2320,19 +2320,21 @@ void PatternMatchEmission::initSharedCaseBlockDest(CaseStmt *caseBlock,
   result.first->second.first = block;
     
   // Add args for any pattern variables
-  if (caseBlock->hasBoundDecls()) {
-    auto pattern = caseBlock->getCaseLabelItems()[0].getPattern();
-    pattern->forEachVariable([&](VarDecl *V) {
-      if (!V->hasName())
-        return;
-
-      // We don't pass address-only values in basic block arguments.
-      SILType ty = SGF.getLoweredType(V->getType());
-      if (ty.isAddressOnly(SGF.F.getModule()))
-        return;
-      block->createPhiArgument(ty, ValueOwnershipKind::Owned, V);
-    });
+  if (!caseBlock->hasBoundDecls()) {
+    return;
   }
+
+  auto pattern = caseBlock->getCaseLabelItems()[0].getPattern();
+  pattern->forEachVariable([&](VarDecl *V) {
+    if (!V->hasName())
+      return;
+
+    // We don't pass address-only values in basic block arguments.
+    SILType ty = SGF.getLoweredType(V->getType());
+    if (ty.isAddressOnly(SGF.F.getModule()))
+      return;
+    block->createPhiArgument(ty, ValueOwnershipKind::Owned, V);
+  });
 }
 
 /// Retrieve the jump destination for a shared case block.
