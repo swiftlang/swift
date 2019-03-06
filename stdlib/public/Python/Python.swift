@@ -124,14 +124,12 @@ extension PythonObject : CustomStringConvertible {
   }
 }
 
-#if !swift(>=5)
 // Make `PythonObject` show up nicely in the Xcode Playground results sidebar.
-extension PythonObject : CustomPlaygroundQuickLookable {
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .text(description)
+extension PythonObject : CustomPlaygroundDisplayConvertible {
+  public var playgroundDescription: Any {
+    return description
   }
 }
-#endif
 
 // Mirror representation, used by debugger/REPL.
 extension PythonObject : CustomReflectable {
@@ -320,7 +318,7 @@ public struct ThrowingPythonObject {
   @discardableResult
   public func dynamicallyCall(
     withKeywordArguments args:
-      DictionaryLiteral<String, PythonConvertible> = [:]
+      KeyValuePairs<String, PythonConvertible> = [:]
   ) throws -> PythonObject {
     // Make sure there are no state errors.
     if PyErr_Occurred() != nil {
@@ -612,7 +610,7 @@ public extension PythonObject {
   @discardableResult
   func dynamicallyCall(
     withKeywordArguments args:
-      DictionaryLiteral<String, PythonConvertible> = [:]
+      KeyValuePairs<String, PythonConvertible> = [:]
   ) -> PythonObject {
     return try! throwing.dynamicallyCall(withKeywordArguments: args)
   }
@@ -1173,7 +1171,7 @@ extension PythonObject : Strideable {
   }
 }
 
-extension PythonObject : Equatable, Comparable, Hashable {
+extension PythonObject : Equatable, Comparable {
   // `Equatable` and `Comparable` are implemented using rich comparison.
   // This is consistent with how Python handles comparisons.
   private func compared(to other: PythonObject, byOp: Int32) -> Bool {
@@ -1218,12 +1216,14 @@ extension PythonObject : Equatable, Comparable, Hashable {
   public static func >= (lhs: PythonObject, rhs: PythonObject) -> Bool {
     return lhs.compared(to: rhs, byOp: Py_GE)
   }
+}
 
-  public var hashValue: Int {
+extension PythonObject : Hashable {
+  public func hash(into hasher: inout Hasher) {
     guard let hash = Int(self.__hash__()) else {
       fatalError("Cannot use '__hash__' on \(self)")
     }
-    return hash
+    hasher.combine(hash)
   }
 }
 
