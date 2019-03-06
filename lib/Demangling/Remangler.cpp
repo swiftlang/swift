@@ -146,14 +146,54 @@ bool SubstitutionEntry::deepEquals(Node *lhs, Node *rhs) const {
   return true;
 }
 
+/// The output string of the Demangler.
+///
+/// It's allocating the string with the provided Factory.
+struct RemanglerBuffer {
+  CharVector Stream;
+  NodeFactory &Factory;
+
+  RemanglerBuffer(NodeFactory &Factory) : Factory(Factory) {
+    Stream.init(Factory, 32);
+  }
+
+  RemanglerBuffer &operator<<(char c) & {
+    Stream.push_back(c, Factory);
+    return *this;
+  }
+
+  RemanglerBuffer &operator<<(llvm::StringRef Value) & {
+    Stream.append(Value, Factory);
+    return *this;
+  }
+
+  RemanglerBuffer &operator<<(int n) & {
+    Stream.append(n, Factory);
+    return *this;
+  }
+
+  RemanglerBuffer &operator<<(unsigned n) & {
+    Stream.append((unsigned long long)n, Factory);
+    return *this;
+  }
+
+  RemanglerBuffer &operator<<(unsigned long n) & {
+    Stream.append((unsigned long long)n, Factory);
+    return *this;
+  }
+
+  RemanglerBuffer &operator<<(unsigned long long n) & {
+    Stream.append(n, Factory);
+    return *this;
+  }
+};
+
 class Remangler {
   template <typename Mangler>
   friend void Mangle::mangleIdentifier(Mangler &M, StringRef ident);
   friend class Mangle::SubstitutionMerging;
 
   const bool UsePunycode = true;
-
-  DemanglerPrinter &Buffer;
 
   Vector<SubstitutionWord> Words;
   Vector<WordReplacement> SubstWordsInIdent;
@@ -178,7 +218,9 @@ class Remangler {
 
   // We have to cons up temporary nodes sometimes when remangling
   // nested generics. This factory owns them.
-  NodeFactory Factory;
+  NodeFactory &Factory;
+
+  RemanglerBuffer Buffer;
 
   // A callback for resolving symbolic references.
   SymbolicResolver Resolver;
@@ -209,9 +251,9 @@ class Remangler {
     return it->second;
   }
 
-  StringRef getBufferStr() const { return Buffer.getStringRef(); }
+  StringRef getBufferStr() const { return Buffer.Stream.str(); }
 
-  void resetBuffer(size_t toPos) { Buffer.resetSize(toPos); }
+  void resetBuffer(size_t toPos) { Buffer.Stream.resetSize(toPos); }
 
   template <typename Mangler>
   friend void mangleIdentifier(Mangler &M, StringRef ident);
@@ -348,12 +390,8 @@ class Remangler {
 #include "swift/Demangling/DemangleNodes.def"
 
 public:
-  Remangler(DemanglerPrinter &Buffer, SymbolicResolver Resolver,
-            NodeFactory *BorrowFrom)
-       : Buffer(Buffer), Resolver(Resolver) {
-    if (BorrowFrom)
-      Factory.providePreallocatedMemory(*BorrowFrom);
-  }
+  Remangler(SymbolicResolver Resolver, NodeFactory &Factory)
+       : Factory(Factory), Buffer(Factory), Resolver(Resolver) { }
 
   void mangle(Node *node) {
     switch (node->getKind()) {
@@ -361,6 +399,14 @@ public:
 #include "swift/Demangling/DemangleNodes.def"
     }
     unreachable("bad demangling tree node");
+  }
+
+  StringRef strRef() {
+    return Buffer.Stream.str();
+  }
+
+  std::string str() {
+    return strRef().str();
   }
 };
 
@@ -2373,22 +2419,34 @@ void Remangler::mangleSugaredParen(Node *node) {
 } // anonymous namespace
 
 /// The top-level interface to the remangler.
-std::string Demangle::mangleNode(NodePointer node, NodeFactory *BorrowFrom) {
+std::string Demangle::mangleNode(NodePointer node) {
   return mangleNode(node, [](SymbolicReferenceKind, const void *) -> NodePointer {
     unreachable("should not try to mangle a symbolic reference; "
                 "resolve it to a non-symbolic demangling tree instead");
-  }, BorrowFrom);
+  });
 }
 
 std::string
-Demangle::mangleNode(NodePointer node, SymbolicResolver resolver,
-                     NodeFactory *BorrowFrom) {
+Demangle::mangleNode(NodePointer node, SymbolicResolver resolver) {
   if (!node) return "";
 
-  DemanglerPrinter printer;
-  Remangler(printer, resolver, BorrowFrom).mangle(node);
+  NodeFactory Factory;
+  Remangler remangler(resolver, Factory);
+  remangler.mangle(node);
 
-  return std::move(printer).str();
+  return remangler.str();
+}
+
+llvm::StringRef
+Demangle::mangleNode(NodePointer node, SymbolicResolver resolver,
+                     NodeFactory &Factory) {
+  if (!node)
+    return StringRef();
+
+  Remangler remangler(resolver, Factory);
+  remangler.mangle(node);
+
+  return remangler.strRef();
 }
 
 bool Demangle::isSpecialized(Node *node) {

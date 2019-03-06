@@ -593,8 +593,8 @@ _findNominalTypeDescriptor(Demangle::NodePointer node,
     return cast<TypeContextDescriptor>(
       (const ContextDescriptor *)symbolicNode->getIndex());
 
-  auto mangledName =
-    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), &Dem);
+  StringRef mangledName =
+    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem);
 
   // Look for an existing entry.
   // Find the bucket for the metadata entry.
@@ -724,7 +724,7 @@ _findProtocolDescriptor(NodePointer node,
       (const ContextDescriptor *)symbolicNode->getIndex());
 
   mangledName =
-    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), &Dem);
+    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem).str();
 
   // Look for an existing entry.
   // Find the bucket for the metadata entry.

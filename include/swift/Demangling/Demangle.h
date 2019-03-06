@@ -490,11 +490,7 @@ void mangleIdentifier(const char *data, size_t length,
                       bool usePunycode = true);
 
 /// Remangle a demangled parse tree.
-///
-/// If \p BorrowFrom is specified, the initial bump pointer memory is
-/// borrowed from the free memory of BorrowFrom.
-std::string mangleNode(NodePointer root,
-                       NodeFactory *BorrowFrom = nullptr);
+std::string mangleNode(NodePointer root);
 
 using SymbolicResolver =
   llvm::function_ref<Demangle::NodePointer (SymbolicReferenceKind,
@@ -502,11 +498,15 @@ using SymbolicResolver =
 
 /// Remangle a demangled parse tree, using a callback to resolve
 /// symbolic references.
+std::string mangleNode(NodePointer root, SymbolicResolver resolver);
+
+/// Remangle a demangled parse tree, using a callback to resolve
+/// symbolic references.
 ///
-/// If \p BorrowFrom is specified, the initial bump pointer memory is
-/// borrowed from the free memory of BorrowFrom.
-std::string mangleNode(NodePointer root, SymbolicResolver resolver,
-                       NodeFactory *BorrowFrom = nullptr);
+/// The returned string is owned by \p Factory. This means \p Factory must stay
+/// alive as long as the returned string is used.
+llvm::StringRef mangleNode(NodePointer root, SymbolicResolver resolver,
+                           NodeFactory &Factory);
 
 /// Remangle in the old mangling scheme.
 ///

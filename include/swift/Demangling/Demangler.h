@@ -303,6 +303,11 @@ public:
 
   T &back() { return (*this)[NumElems - 1]; }
 
+  void resetSize(size_t toPos) {
+    assert(toPos <= NumElems);
+    NumElems = toPos;
+  }
+
   void push_back(const T &NewElem, NodeFactory &Factory) {
     if (NumElems >= Capacity)
       Factory.Reallocate(Elems, Capacity, /*Growth*/ 1);
@@ -330,6 +335,9 @@ public:
 
   // Append an integer as readable number.
   void append(int Number, NodeFactory &Factory);
+
+  // Append an unsigned 64 bit integer as readable number.
+  void append(unsigned long long Number, NodeFactory &Factory);
 
   StringRef str() const {
     return StringRef(Elems, NumElems);
