@@ -149,15 +149,17 @@ OVERRIDE_METADATALOOKUP(getTypeByMangledNode, TypeInfo, , SWIFT_CC(swift), swift
                         (MetadataRequest request,
                          Demangler &demangler,
                          Demangle::NodePointer node,
+                         const void * const *arguments,
                          SubstGenericParameterFn substGenericParam,
                          SubstDependentWitnessTableFn substWitnessTable),
-                        (request, demangler, node, substGenericParam, substWitnessTable))
+                        (request, demangler, node, arguments, substGenericParam, substWitnessTable))
 OVERRIDE_METADATALOOKUP(getTypeByMangledName, TypeInfo, , SWIFT_CC(swift), swift::,
                         (MetadataRequest request,
                          StringRef typeName,
+                         const void * const *arguments,
                          SubstGenericParameterFn substGenericParam,
                          SubstDependentWitnessTableFn substWitnessTable),
-                        (request, typeName, substGenericParam, substWitnessTable))
+                        (request, typeName, arguments, substGenericParam, substWitnessTable))
 
 OVERRIDE_WITNESSTABLE(getAssociatedTypeWitnessSlow, MetadataResponse,
                       SWIFT_RUNTIME_STDLIB_INTERNAL, SWIFT_CC(swift), swift::,

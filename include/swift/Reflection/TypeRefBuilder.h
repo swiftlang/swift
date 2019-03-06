@@ -476,6 +476,10 @@ public:
       switch (kind) {
       case Demangle::SymbolicReferenceKind::Context:
         return reader.readDemanglingForContextDescriptor(address, Dem);
+      case Demangle::SymbolicReferenceKind::AccessorFunctionReference:
+        // The symbolic reference points at a resolver function, but we can't
+        // execute code in the target process to resolve it from here.
+        return nullptr;
       }
       
       return nullptr;

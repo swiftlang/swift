@@ -2340,6 +2340,9 @@ void Remangler::mangleOpaqueType(Node *node) {
   mangle(node->getChild(1));
   Buffer << "Qo";
 }
+void Remangler::mangleAccessorFunctionReference(Node *node) {
+  unreachable("can't remangle");
+}
 
 } // anonymous namespace
 
