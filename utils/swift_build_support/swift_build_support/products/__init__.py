@@ -11,7 +11,7 @@
 # ----------------------------------------------------------------------------
 
 from .cmark import CMark
-from .foundation import Foundation
+from .foundation import (Foundation, FoundationStatic)
 from .indexstoredb import IndexStoreDB
 from .libcxx import LibCXX
 from .libdispatch import (LibDispatch, LibDispatchStatic)
@@ -32,6 +32,7 @@ __all__ = [
     'CMark',
     'Ninja',
     'Foundation',
+    'FoundationStatic',
     'LibCXX',
     'LibDispatch',
     'LibDispatchStatic',
