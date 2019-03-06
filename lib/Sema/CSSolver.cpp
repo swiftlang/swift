@@ -1944,7 +1944,7 @@ static Constraint *tryOptimizeGenericDisjunction(
       return type->isAny();
     });
 
-    // If function declaration references `Any` or `Any?` type
+    // If function declaration references `Any` or an optional type,
     // let's not attempt it, because it's unclear
     // without solving which overload is going to be better.
     return !hasAnyOrOptional;
