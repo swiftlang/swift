@@ -4952,7 +4952,9 @@ Type ConstraintSystem::simplifyAppliedOverloads(
   fnTypeVar = getRepresentative(fnTypeVar);
 
   // Dig out the disjunction that describes this overload.
-  auto disjunction = getUnboundBindOverloadDisjunction(fnTypeVar);
+  unsigned numOptionalUnwraps = 0;
+  auto disjunction =
+      getUnboundBindOverloadDisjunction(fnTypeVar, &numOptionalUnwraps);
   if (!disjunction) return fnType;
 
   /// The common result type amongst all function overloads.
@@ -5011,6 +5013,13 @@ retry_after_fail:
         if (!choiceType) {
           hasUnhandledConstraints = true;
           return true;
+        }
+
+        // Account for any optional unwrapping/binding
+        for (unsigned i : range(numOptionalUnwraps)) {
+          (void)i;
+          if (Type objectType = choiceType->getOptionalObjectType())
+            choiceType = objectType;
         }
 
         // If we have a function type, we can compute a common result type.
