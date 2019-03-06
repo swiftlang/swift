@@ -26,6 +26,15 @@ Swift 5.1
 
 * Key path expressions can now include references to tuple elements.
 
+* Single-parameter functions accepting values of type `Any` are no
+  longer preferred over other functions.
+
+```swift
+func foo(_: Any) { print("Any") }
+func foo<T>(_: T) { print("T") }
+foo(0) // prints "Any" in Swift < 5.1, "T" in Swift 5.1
+```
+
 Swift 5.0
 ---------
 
