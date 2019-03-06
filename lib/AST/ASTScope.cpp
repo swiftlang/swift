@@ -1694,6 +1694,8 @@ DeclContext *ASTScope::getDeclContext() const {
     return topLevelCode;
 
   case ASTScopeKind::ExtensionGenericParams:
+    return extension;
+      
   case ASTScopeKind::GenericParams:
   case ASTScopeKind::AbstractFunctionParams:
   case ASTScopeKind::PatternBinding:

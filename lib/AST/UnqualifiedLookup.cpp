@@ -277,7 +277,8 @@ public:
       return ASTScopeLookupState{scope, selfDC, startingDC, isCascadingUse};
     }
   private:
-    static DeclContext *selfDCIfValidForScope(const ASTScope *scope, DeclContext *selfDC) {
+    static DeclContext *selfDCIfValidForScope(const ASTScope *scope,
+                                              DeclContext *selfDC) {
       return selfDC; // disable this fix
       // TODO: See if something like below is needed
       // return scope && !isExtension(*scope) ? selfDC : nullptr;
@@ -446,24 +447,26 @@ public:
 
 // clang-format off
 UnqualifiedLookupFactory::UnqualifiedLookupFactory(
-                                                   DeclName Name,
-                                                   DeclContext *const DC,
-                                                   LazyResolver *TypeResolver,
-                                                   SourceLoc Loc,
-                                                   Options options,
-                                                   UnqualifiedLookup &lookupToBeCreated)
-: UnqualifiedLookupFactory(Name, DC, TypeResolver, Loc, options, lookupToBeCreated.Results, lookupToBeCreated.IndexOfFirstOuterResult)
+                            DeclName Name,
+                            DeclContext *const DC,
+                            LazyResolver *TypeResolver,
+                            SourceLoc Loc,
+                            Options options,
+                            UnqualifiedLookup &lookupToBeCreated)
+: UnqualifiedLookupFactory(Name, DC, TypeResolver, Loc, options,
+    lookupToBeCreated.Results,
+    lookupToBeCreated.IndexOfFirstOuterResult)
 
 {}
 
 UnqualifiedLookupFactory::UnqualifiedLookupFactory(
-                                                   DeclName Name,
-                                                   DeclContext *const DC,
-                                                   LazyResolver *TypeResolver,
-                                                   SourceLoc Loc,
-                                                   Options options,
-                                                   SmallVectorImpl<LookupResultEntry> &Results,
-                                                   size_t &IndexOfFirstOuterResult)
+                            DeclName Name,
+                            DeclContext *const DC,
+                            LazyResolver *TypeResolver,
+                            SourceLoc Loc,
+                            Options options,
+                            SmallVectorImpl<LookupResultEntry> &Results,
+                            size_t &IndexOfFirstOuterResult)
 :
   Name(Name),
   DC(DC),
@@ -623,10 +626,10 @@ void UnqualifiedLookupFactory::lookInASTScope(
             ->isTypeContext();
     if (inMethodBody)
       lookInASTScope(
-          state.withParentScope().withSelfDC(state.scope->getAbstractFunctionDecl()));
+          state.withParentScope()
+               .withSelfDC(state.scope->getAbstractFunctionDecl()));
     // If there is a declaration context associated with this scope, we might
     // want to look in it.
-#error need to go into lookInASTScopeContext with scopeDC the extensionDecl even though this is the ExtensionGenericParams so that finder can find the name
     else if (auto *const scopeDC = state.scope->getDeclContext())
       lookInASTScopeContext(state, scopeDC);
     else
@@ -642,7 +645,8 @@ void UnqualifiedLookupFactory::lookInASTScopeContext(
       scopeDC, stateArg.isCascadingUse, /*onlyCareAboutFunctionBody=*/false);
 
   const ASTScopeLookupState defaultNextState =
-      stateArg.withParentScope().withResolvedIsCascadingUse(isCascadingUseResult);
+      stateArg.withParentScope()
+              .withResolvedIsCascadingUse(isCascadingUseResult);
 
   // Lookup in the source file's scope marks the end.
   if (isa<SourceFile>(scopeDC)) {
@@ -955,10 +959,10 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByMiscContext(
 
 
 void UnqualifiedLookupFactory::finishLookingInContext(
-                                                      const AddGenericParameters addGenericParameters,
-                                                      DeclContext *const lookupContextForThisContext,
-                                                      Optional<ResultFinderForTypeContext> &&resultFinderForTypeContext,
-                                                      const Optional<bool> isCascadingUse) {
+       const AddGenericParameters addGenericParameters,
+       DeclContext *const lookupContextForThisContext,
+       Optional<ResultFinderForTypeContext> &&resultFinderForTypeContext,
+       const Optional<bool> isCascadingUse) {
   
   // When a generic has the same name as a member, Swift prioritizes the generic
   // because the member could still be named by qualifying it. But there is no
@@ -968,17 +972,17 @@ void UnqualifiedLookupFactory::finishLookingInContext(
     addGenericParametersHereAndInEnclosingScopes(lookupContextForThisContext);
   
   ifNotDoneYet(
-               [&] {
-                 if (resultFinderForTypeContext)
-                   findResultsAndSaveUnavailables(lookupContextForThisContext,
-                                                  std::move(*resultFinderForTypeContext),
-                                                  *isCascadingUse, baseNLOptions);
-               },
-               // Recurse into the next context.
-               [&] {
-                 lookupNamesIntroducedBy(ContextAndUnresolvedIsCascadingUse{
-                   lookupContextForThisContext->getParentForLookup(), isCascadingUse});
-               });
+    [&] {
+      if (resultFinderForTypeContext)
+        findResultsAndSaveUnavailables(lookupContextForThisContext,
+                                      std::move(*resultFinderForTypeContext),
+                                      *isCascadingUse, baseNLOptions);
+    },
+    // Recurse into the next context.
+    [&] {
+      lookupNamesIntroducedBy(ContextAndUnresolvedIsCascadingUse{
+        lookupContextForThisContext->getParentForLookup(), isCascadingUse});
+    });
 }
 
 
@@ -1209,9 +1213,9 @@ void UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
 
 
 void UnqualifiedLookupFactory::findResultsAndSaveUnavailables(
-                                                              DeclContext *lookupContextForThisContext,
-                                                              ResultFinderForTypeContext &&resultFinderForTypeContext,
-                                                              bool isCascadingUse, NLOptions baseNLOptions) {
+       DeclContext *lookupContextForThisContext,
+       ResultFinderForTypeContext &&resultFinderForTypeContext,
+       bool isCascadingUse, NLOptions baseNLOptions) {
   auto firstPossiblyUnavailableResult = Results.size();
   resultFinderForTypeContext.findResults(Name, isCascadingUse, baseNLOptions,
                                          lookupContextForThisContext, Results);

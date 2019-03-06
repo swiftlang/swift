@@ -573,6 +573,13 @@ public:
            getKind() == ASTScopeKind::AbstractFunctionBody);
     return abstractFunction;
   }
+  
+  /// Retrieve the extension declaration when
+  /// \c getKind() == ASTScopeKind::ExtensionGenericParams;
+  ExtensionDecl *getExtensionDecl() const {
+    assert(getKind() == ASTScopeKind::ExtensionGenericParams);
+    return extension;
+  }
 
   /// Retrieve the abstract storage declaration when
   /// \c getKind() == ASTScopeKind::Accessors;
