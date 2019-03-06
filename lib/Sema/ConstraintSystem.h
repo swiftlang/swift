@@ -3176,14 +3176,6 @@ public:
     unsigned *numOptionalUnwraps = nullptr);
 
 private:
-  /// Given a type variable that might represent an overload set, retrieve
-  ///
-  /// \returns the set of overload choices to which this type variable
-  /// could be bound, or an empty vector if the type variable is not
-  /// solely resolved by an overload set.
-  SmallVector<OverloadChoice, 2> getUnboundBindOverloads(
-                                                  TypeVariableType *tyvar);
-
   /// Solve the system of constraints after it has already been
   /// simplified.
   ///

@@ -1713,38 +1713,6 @@ Constraint *ConstraintSystem::getUnboundBindOverloadDisjunction(
   return nullptr;
 }
 
-/// solely resolved by an overload set.
-SmallVector<OverloadChoice, 2> ConstraintSystem::getUnboundBindOverloads(
-                                                     TypeVariableType *tyvar) {
-  // Always work on the representation.
-  tyvar = getRepresentative(tyvar);
-
-  SmallVector<OverloadChoice, 2> choices;
-
-  auto disjunction = getUnboundBindOverloadDisjunction(tyvar);
-  if (!disjunction) return choices;
-
-  for (auto constraint : disjunction->getNestedConstraints()) {
-    // We must have bind-overload constraints.
-    if (constraint->getKind() != ConstraintKind::BindOverload) {
-      choices.clear();
-      return choices;
-    }
-
-    // We must be binding the type variable (or a type variable equivalent to
-    // it).
-    auto boundTypeVar = constraint->getFirstType()->getAs<TypeVariableType>();
-    if (!boundTypeVar || getRepresentative(boundTypeVar) != tyvar) {
-      choices.clear();
-      return choices;
-    }
-
-    choices.push_back(constraint->getOverloadChoice());
-  }
-
-  return choices;
-}
-
 // Find a disjunction associated with an ApplicableFunction constraint
 // where we have some information about all of the types of in the
 // function application (even if we only know something about what the
