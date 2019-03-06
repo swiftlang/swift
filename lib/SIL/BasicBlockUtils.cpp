@@ -50,8 +50,10 @@ void swift::changeBranchTarget(TermInst *T, unsigned edgeIdx,
   case TermKind::BranchInst: {
     auto *BI = cast<BranchInst>(T);
     SmallVector<SILValue, 8> args;
-    for (auto arg : BI->getArgs())
-      args.push_back(arg);
+    if (preserveArgs) {
+      for (auto arg : BI->getArgs())
+        args.push_back(arg);
+    }
     B.createBranch(T->getLoc(), newDest, args);
     BI->dropAllReferences();
     BI->eraseFromParent();
