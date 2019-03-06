@@ -2530,8 +2530,15 @@ for host in "${ALL_HOSTS[@]}"; do
                       call xcodebuild -target desktop -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
                   continue
                 else
+                  if [[ "$(uname -s)" == "Darwin" ]] ; then
+                    cmake_cache="Apple-lldb-macOS.cmake"
+                  else
+                    cmake_cache="Apple-lldb-linux.cmake"
+                  fi
+
                   cmake_options=(
                       "${cmake_options[@]}"
+                      -C${LLDB_SOURCE_DIR}/cmake/caches/${cmake_cache}
                       -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
                       -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
                       -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
@@ -2549,10 +2556,8 @@ for host in "${ALL_HOSTS[@]}"; do
 
                   if [[ "$(uname -s)" == "Darwin" ]] ; then
                     cmake_options+=(
-                      -DLLDB_BUILD_FRAMEWORK:BOOL=TRUE
                       -DLLDB_CODESIGN_IDENTITY=""
                       -DLLDB_USE_SYSTEM_DEBUGSERVER:BOOL="${LLDB_USE_SYSTEM_DEBUGSERVER}"
-                      -DLLDB_FRAMEWORK_TOOLS="darwin-debug;lldb-argdumper;lldb-server;repl_swift"
                     )
                   fi
                 fi
