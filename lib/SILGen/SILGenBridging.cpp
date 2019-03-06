@@ -1370,6 +1370,15 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &SGF,
                         /*isCallResult*/ true);
     SILValue argValue;
 
+    // This can happen if the value is resilient in the calling convention
+    // but not resilient locally.
+    if (nativeInputs[i].isFormalIndirect() &&
+        !native.getType().isAddress()) {
+      auto buf = SGF.emitTemporaryAllocation(loc, native.getType());
+      native.forwardInto(SGF, loc, buf);
+      native = SGF.emitManagedBufferWithCleanup(buf);
+    }
+
     if (nativeInputs[i].isConsumed()) {
       argValue = native.forward(SGF);
     } else if (nativeInputs[i].isGuaranteed()) {

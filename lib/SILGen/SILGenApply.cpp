@@ -5985,20 +5985,19 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
   return Preparer.prepare();
 }
 
-static void collectFakeIndexParameters(SILGenModule &SGM,
+static void collectFakeIndexParameters(SILGenFunction &SGF,
                                        CanType substType,
                                     SmallVectorImpl<SILParameterInfo> &params) {
   if (auto tuple = dyn_cast<TupleType>(substType)) {
     for (auto substEltType : tuple.getElementTypes())
-      collectFakeIndexParameters(SGM, substEltType, params);
+      collectFakeIndexParameters(SGF, substEltType, params);
     return;
   }
 
   // Use conventions that will produce a +1 value.
-  auto &tl = SGM.Types.getTypeLowering(substType,
-                                       ResilienceExpansion::Minimal);
+  auto &tl = SGF.getTypeLowering(substType);
   ParameterConvention convention;
-  if (tl.isFormallyPassedIndirectly()) {
+  if (tl.isAddressOnly()) {
     convention = ParameterConvention::Indirect_In;
   } else if (tl.isTrivial()) {
     convention = ParameterConvention::Direct_Unowned;
@@ -6019,7 +6018,7 @@ static void emitPseudoFunctionArguments(SILGenFunction &SGF,
   SmallVector<SILParameterInfo, 4> substParamTys;
   for (auto substParam : substParams) {
     auto substParamType = substParam.getParameterType()->getCanonicalType();
-    collectFakeIndexParameters(SGF.SGM, substParamType, substParamTys);
+    collectFakeIndexParameters(SGF, substParamType, substParamTys);
   }
 
   SmallVector<ManagedValue, 4> argValues;
