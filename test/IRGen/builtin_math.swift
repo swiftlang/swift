@@ -29,7 +29,7 @@ public func test1(f : Float) -> Float {
 // CHECK: call double @llvm.exp.f64
 
 public func test2(f : Double) -> Double {
-  return _exp(f)
+  return exp(f)
 }
 
 // CHECK-LABEL: define {{.*}}test3

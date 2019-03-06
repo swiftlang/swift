@@ -18,7 +18,6 @@ add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_
     SWIFT_COMPILE_FLAGS -Xfrontend -disable-objc-attr-requires-foundation-module "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS ALL_APPLE_PLATFORMS
-    SWIFT_MODULE_DEPENDS Maths
 
     # This is overly conservative, but we have so few API notes files that
     # haven't migrated to the Swift repo that it's probably fine in practice.
@@ -34,7 +33,6 @@ add_swift_target_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_O
     SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS ANDROID CYGWIN FREEBSD LINUX HAIKU
-    SWIFT_MODULE_DEPENDS Maths
     DEPENDS glibc_modulemap)
 
 add_swift_target_library(swiftMSVCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
@@ -46,8 +44,7 @@ add_swift_target_library(swiftMSVCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_
 
     SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-    TARGET_SDKS WINDOWS
-    SWIFT_MODULE_DEPENDS Maths)
+    TARGET_SDKS WINDOWS)
 
 set(glibc_modulemap_target_list)
 foreach(sdk ${SWIFT_SDKS})
