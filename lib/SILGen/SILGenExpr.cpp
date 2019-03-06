@@ -3423,6 +3423,10 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
              storage->isResilient(SwiftModule, expansion)) &&
             // Protocol requirements don't have nor need property descriptors.
             !isa<ProtocolDecl>(storage->getDeclContext()) &&
+            // FIXME: The property descriptor for a protocol extension property
+            // doesn't properly accommodate existentials. In principle we
+            // ought to have a separate "open existential" component.
+            !baseTy->isExistentialType() &&
             // Properties that only dispatch via ObjC lookup do not have nor
             // need property descriptors, since the selector identifies the
             // storage.
