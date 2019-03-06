@@ -319,7 +319,7 @@ protected:
 private:
   void addInScopeAccess(RegionState &state, BeginAccessInst *beginAccess);
   void removeInScopeAccess(RegionState &state, BeginAccessInst *beginAccess);
-  void recordConflict(RegionState &state, const AccessedStorage &storage);
+  void recordConflicts(RegionState &state, const AccessedStorage &currStorage);
   void addOutOfScopeAccessInsert(RegionState &state,
                                  BeginAccessInst *beginAccess);
   void addOutOfScopeAccessMerge(RegionState &state, BeginAccessInst *beginAccess);
@@ -360,32 +360,32 @@ void AccessConflictAndMergeAnalysis::removeInScopeAccess(
   state.inScopeConflictFreeAccesses.conflictFreeAccesses.erase(it);
 }
 
-void AccessConflictAndMergeAnalysis::removeConflictFromStruct(
-    RegionState &state, RegionState::AccessSummary &accessStruct,
-    const AccessedStorage &storage, bool isInScope) {
-  auto pred = [&](BeginAccessInst *it) {
-    auto &currStorage = result.getAccessInfo(it);
-    return !currStorage.isDistinctFrom(storage);
-  };
-  auto it = std::find_if(accessStruct.conflictFreeAccesses.begin(),
-                         accessStruct.conflictFreeAccesses.end(), pred);
-  while (it != accessStruct.conflictFreeAccesses.end()) {
-    if (isInScope) {
-      auto &ai = result.getAccessInfo(*it);
-      ai.setSeenNestedConflict();
-    }
-    accessStruct.conflictFreeAccesses.erase(it);
-    it = std::find_if(accessStruct.conflictFreeAccesses.begin(),
-                      accessStruct.conflictFreeAccesses.end(), pred);
-  }
-}
+// Update data flow `state` by removing accesses that conflict with the
+// currently accessed `storage`. For in-scope accesses, also mark conflicting
+// scopes with SeenNestedConflict.
+void AccessConflictAndMergeAnalysis::recordConflicts(
+    RegionState &state, const AccessedStorage &currStorage) {
+  // Remove any out-of-scope conflicts.
+  state.outOfScopeConflictFreeAccesses.conflictFreeAccesses.remove_if(
+    [&](BeginAccessInst *bai) {
+      auto &storage = result.getAccessInfo(bai);
+      return !storage.isDistinctFrom(currStorage);
+    });
 
-void AccessConflictAndMergeAnalysis::recordConflict(
-    RegionState &state, const AccessedStorage &storage) {
-  removeConflictFromStruct(state, state.outOfScopeConflictFreeAccesses, storage,
-                           false /*isInScope*/);
-  removeConflictFromStruct(state, state.inScopeConflictFreeAccesses, storage,
-                           true /*isInScope*/);
+  // Since SetVector does not support `llvm::erase_if`, we use two loops. One to
+  // mark conflicts and another to remove them all via `remove_if`.
+  llvm::for_each(state.inScopeConflictFreeAccesses.conflictFreeAccesses,
+                 [&](BeginAccessInst *bai) {
+                   auto &ai = result.getAccessInfo(bai);
+                   if (!ai.isDistinctFrom(currStorage))
+                     ai.setSeenNestedConflict();
+                 });
+
+  state.inScopeConflictFreeAccesses.conflictFreeAccesses.remove_if(
+    [&](BeginAccessInst *bai) {
+      auto &storage = result.getAccessInfo(bai);
+      return !storage.isDistinctFrom(currStorage);
+    });
 }
 
 void AccessConflictAndMergeAnalysis::addOutOfScopeAccessInsert(
@@ -681,7 +681,7 @@ void AccessConflictAndMergeAnalysis::visitBeginAccess(
                  llvm::dbgs() << "  may conflict with:\n";
                  outerAccessInfo.dump());
 
-      recordConflict(state, outerAccessInfo);
+      recordConflicts(state, outerAccessInfo);
       changed = true;
       break;
     }
@@ -763,7 +763,7 @@ void AccessConflictAndMergeAnalysis::detectApplyConflicts(
           callSiteAccesses.dump(); llvm::dbgs() << "  may conflict with:\n";
           outerAccessInfo.dump());
 
-      recordConflict(state, outerAccessInfo);
+      recordConflicts(state, outerAccessInfo);
       changed = true;
       break;
     }
@@ -803,7 +803,7 @@ void AccessConflictAndMergeAnalysis::detectMayReleaseConflicts(
       LLVM_DEBUG(llvm::dbgs() << "MayRelease Instruction: " << *instr
                               << "  may conflict with:\n";
                  outerAccessInfo.dump());
-      recordConflict(state, outerAccessInfo);
+      recordConflicts(state, outerAccessInfo);
       changed = true;
       break;
     }
@@ -867,7 +867,7 @@ void AccessConflictAndMergeAnalysis::visitSetForConflicts(
         if (loopAccess.isDistinctFrom(accessInfo) && !state.unidentifiedAccess)
           continue;
 
-        recordConflict(state, loopAccess);
+        recordConflicts(state, loopAccess);
         changed = true;
         break;
       }
