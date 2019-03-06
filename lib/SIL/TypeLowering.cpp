@@ -154,24 +154,21 @@ namespace {
     // The subclass should implement:
     //   // Trivial, fixed-layout, and non-address-only.
     //   RetTy handleTrivial(CanType);
+    //   RetTy handleTrivial(CanType. RecursiveProperties properties);
     //   // A reference type.
     //   RetTy handleReference(CanType);
     //   // Non-trivial and address-only.
     //   RetTy handleAddressOnly(CanType, RecursiveProperties properties);
     // and, if it doesn't override handleTupleType,
     //   // An aggregate type that's non-trivial.
-    //   RetTy handleNonTrivialAggregate(CanType, IsFixedABI_t fixed);
+    //   RetTy handleNonTrivialAggregate(CanType, RecursiveProperties properties);
     //
     // Alternatively, it can just implement:
     //   RetTy handle(CanType, RecursiveProperties properties);
 
     /// Handle a trivial, fixed-size, loadable type.
-    RetTy handleTrivial(CanType type) {
-      return asImpl().handle(type, RecursiveProperties());
-    }
-
-    RetTy handleReference(CanType type) {
-      return asImpl().handle(type, RecursiveProperties::forReference());
+    RetTy handleTrivial(CanType type, RecursiveProperties properties) {
+      return asImpl().handle(type, properties);
     }
 
     RetTy handleAddressOnly(CanType type, RecursiveProperties properties) {
@@ -181,6 +178,13 @@ namespace {
     RetTy handleNonTrivialAggregate(CanType type,
                                     RecursiveProperties properties) {
       return asImpl().handle(type, properties);
+    }
+
+    RetTy handleTrivial(CanType type) {
+      return asImpl().handleTrivial(type, RecursiveProperties::forTrivial());
+    }
+    RetTy handleReference(CanType type) {
+      return asImpl().handle(type, RecursiveProperties::forReference());
     }
 
 #define IMPL(TYPE, LOWERING)                            \
@@ -207,7 +211,7 @@ namespace {
     RetTy visitBuiltinUnsafeValueBufferType(
                                          CanBuiltinUnsafeValueBufferType type) {
       return asImpl().handleAddressOnly(type, {IsNotTrivial, IsFixedABI,
-                                               IsAddressOnly});
+                                               IsAddressOnly, IsNotResilient});
     }
 
     RetTy visitAnyFunctionType(CanAnyFunctionType type) {
@@ -305,7 +309,8 @@ namespace {
     RetTy visit##Name##StorageType(Can##Name##StorageType type) { \
       return asImpl().handleAddressOnly(type, {IsNotTrivial, \
                                                IsFixedABI, \
-                                               IsAddressOnly}); \
+                                               IsAddressOnly, \
+                                               IsNotResilient}); \
     }
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
     RetTy visit##Name##StorageType(Can##Name##StorageType type) { \
@@ -318,7 +323,8 @@ namespace {
     RetTy visitAddressOnly##Name##StorageType(Can##Name##StorageType type) { \
       return asImpl().handleAddressOnly(type, {IsNotTrivial, \
                                                IsFixedABI, \
-                                               IsAddressOnly}); \
+                                               IsAddressOnly, \
+                                               IsNotResilient}); \
     } \
     RetTy visit##Name##StorageType(Can##Name##StorageType type) { \
       auto referentType = type->getReferentType(); \
@@ -349,8 +355,9 @@ namespace {
         }
 
         if (LayoutInfo->isAddressOnlyTrivial()) {
-          return asImpl().handleAddressOnly(type,
-                                     {IsTrivial, IsNotFixedABI, IsAddressOnly});
+          auto properties = RecursiveProperties::forTrivial();
+          properties.setAddressOnly();
+          return asImpl().handleAddressOnly(type, properties);
         }
 
         if (LayoutInfo->isRefCounted())
@@ -368,7 +375,8 @@ namespace {
       case ExistentialRepresentation::Opaque:
         return asImpl().handleAddressOnly(type, {IsNotTrivial,
                                                  IsFixedABI,
-                                                 IsAddressOnly});
+                                                 IsAddressOnly,
+                                                 IsNotResilient});
       // Class-constrained and boxed existentials are refcounted.
       case ExistentialRepresentation::Class:
       case ExistentialRepresentation::Boxed:
@@ -418,8 +426,10 @@ namespace {
     
     RetTy visitSILBlockStorageType(CanSILBlockStorageType type) {
       // Should not be loaded.
-      return asImpl().handleAddressOnly(type, {IsNotTrivial, IsFixedABI,
-                                               IsAddressOnly});
+      return asImpl().handleAddressOnly(type, {IsNotTrivial,
+                                               IsFixedABI,
+                                               IsAddressOnly,
+                                               IsNotResilient});
     }
 
     RetTy visitSILBoxType(CanSILBoxType type) {
@@ -547,9 +557,14 @@ namespace {
   /// A class for trivial, fixed-layout, loadable types.
   class TrivialTypeLowering final : public LoadableTypeLowering {
   public:
-    TrivialTypeLowering(SILType type, ResilienceExpansion forExpansion)
-      : LoadableTypeLowering(type, {IsTrivial, IsFixedABI, IsNotAddressOnly},
-                             IsNotReferenceCounted, forExpansion) {}
+    TrivialTypeLowering(SILType type, RecursiveProperties properties,
+                        ResilienceExpansion forExpansion)
+      : LoadableTypeLowering(type, properties, IsNotReferenceCounted,
+                             forExpansion) {
+      assert(properties.isFixedABI());
+      assert(properties.isTrivial());
+      assert(!properties.isAddressOnly());
+    }
 
     SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc, SILValue addr,
                             IsTake_t isTake) const override {
@@ -610,14 +625,6 @@ namespace {
 
   class NonTrivialLoadableTypeLowering : public LoadableTypeLowering {
   public:
-    NonTrivialLoadableTypeLowering(SILType type,
-                                   IsReferenceCounted_t isRefCounted,
-                                   ResilienceExpansion forExpansion)
-      : NonTrivialLoadableTypeLowering(type,
-                                   {IsNotTrivial, IsFixedABI, IsNotAddressOnly},
-                                       isRefCounted, forExpansion) {}
-
-    /// This constructor is necessary because of opaque-values.
     NonTrivialLoadableTypeLowering(SILType type,
                                    RecursiveProperties properties,
                                    IsReferenceCounted_t isRefCounted,
@@ -713,9 +720,11 @@ namespace {
       const = 0;
     
   public:
-    LoadableAggTypeLowering(CanType type, ResilienceExpansion forExpansion)
+    LoadableAggTypeLowering(CanType type, RecursiveProperties properties,
+                            ResilienceExpansion forExpansion)
       : NonTrivialLoadableTypeLowering(SILType::getPrimitiveObjectType(type),
-                                       IsNotReferenceCounted, forExpansion) {
+                                       properties, IsNotReferenceCounted,
+                                       forExpansion) {
     }
 
     virtual SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
@@ -830,8 +839,9 @@ namespace {
   class LoadableTupleTypeLowering final
       : public LoadableAggTypeLowering<LoadableTupleTypeLowering, unsigned> {
   public:
-    LoadableTupleTypeLowering(CanType type, ResilienceExpansion forExpansion)
-      : LoadableAggTypeLowering(type, forExpansion) {}
+    LoadableTupleTypeLowering(CanType type, RecursiveProperties properties,
+                              ResilienceExpansion forExpansion)
+      : LoadableAggTypeLowering(type, properties, forExpansion) {}
 
     SILValue emitRValueProject(SILBuilder &B, SILLocation loc,
                                SILValue tupleValue, unsigned index,
@@ -866,8 +876,9 @@ namespace {
   class LoadableStructTypeLowering final
       : public LoadableAggTypeLowering<LoadableStructTypeLowering, VarDecl*> {
   public:
-    LoadableStructTypeLowering(CanType type, ResilienceExpansion forExpansion)
-      : LoadableAggTypeLowering(type, forExpansion) {}
+    LoadableStructTypeLowering(CanType type, RecursiveProperties properties,
+                               ResilienceExpansion forExpansion)
+      : LoadableAggTypeLowering(type, properties, forExpansion) {}
 
     SILValue emitRValueProject(SILBuilder &B, SILLocation loc,
                                SILValue structValue, VarDecl *field,
@@ -899,8 +910,10 @@ namespace {
   /// A lowering for loadable but non-trivial enum types.
   class LoadableEnumTypeLowering final : public NonTrivialLoadableTypeLowering {
   public:
-    LoadableEnumTypeLowering(CanType type, ResilienceExpansion forExpansion)
+    LoadableEnumTypeLowering(CanType type, RecursiveProperties properties,
+                             ResilienceExpansion forExpansion)
       : NonTrivialLoadableTypeLowering(SILType::getPrimitiveObjectType(type),
+                                       properties,
                                        IsNotReferenceCounted,
                                        forExpansion) {}
 
@@ -1021,8 +1034,9 @@ namespace {
     AddressOnlyTypeLowering(SILType type, RecursiveProperties properties,
                             ResilienceExpansion forExpansion)
       : TypeLowering(type, properties, IsNotReferenceCounted,
-                     forExpansion)
-    {}
+                     forExpansion) {
+      assert(properties.isAddressOnly());
+    }
 
     void emitCopyInto(SILBuilder &B, SILLocation loc,
                       SILValue src, SILValue dest, IsTake_t isTake,
@@ -1092,7 +1106,8 @@ namespace {
     UnsafeValueBufferTypeLowering(SILType type,
                                   ResilienceExpansion forExpansion)
       : AddressOnlyTypeLowering(type,
-                                {IsNotTrivial, IsFixedABI, IsAddressOnly},
+                                {IsNotTrivial, IsFixedABI,
+                                 IsAddressOnly, IsNotResilient},
                                 forExpansion) {}
 
     void emitCopyInto(SILBuilder &B, SILLocation loc,
@@ -1168,8 +1183,14 @@ namespace {
         TC(TC), Dependent(Dependent) {}
 
     TypeLowering *handleTrivial(CanType type) {
+      return handleTrivial(type, RecursiveProperties::forTrivial());
+    }
+
+    TypeLowering *handleTrivial(CanType type,
+                                RecursiveProperties properties) {
       auto silType = SILType::getPrimitiveObjectType(type);
-      return new (TC, Dependent) TrivialTypeLowering(silType, Expansion);
+      return new (TC, Dependent) TrivialTypeLowering(silType, properties,
+                                                     Expansion);
     }
 
     TypeLowering *handleReference(CanType type) {
@@ -1223,16 +1244,37 @@ namespace {
                                                                     properties);
     }
 
-    TypeLowering *visitAnyStructType(CanType structType, StructDecl *D) {
+    bool handleResilience(CanType type, NominalTypeDecl *D,
+                          RecursiveProperties &properties) {
+      if (D->isResilient()) {
+        // If the type is resilient and defined in our module, make a note of
+        // that, since our lowering now depends on the resilience expansion.
+        bool sameModule = (D->getModuleContext() == M.getSwiftModule());
+        if (sameModule)
+          properties.addSubobject(RecursiveProperties::forResilient());
 
-      // For now, if the type does not have a fixed layout in all resilience
-      // domains, we will treat it as address-only in SIL.
-      if (D->isResilient(M.getSwiftModule(), Expansion))
-        return handleAddressOnly(structType,
-                                 RecursiveProperties::forResilient());
+        // If the type is in a different module, or if we're using a minimal
+        // expansion, the type is address only and completely opaque to us.
+        //
+        // Note: if the type is in a different module, the lowering does
+        // not depend on the resilience expansion, so we do not need to set
+        // the isResilent() flag above.
+        if (!sameModule || Expansion == ResilienceExpansion::Minimal) {
+          properties.addSubobject(RecursiveProperties::forOpaque());
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    TypeLowering *visitAnyStructType(CanType structType, StructDecl *D) {
+      RecursiveProperties properties;
+
+      if (handleResilience(structType, D, properties))
+        return handleAddressOnly(structType, properties);
 
       // Classify the type according to its stored properties.
-      RecursiveProperties properties;
       for (auto field : D->getStoredProperties()) {
         auto substFieldType =
           structType->getTypeOfMember(D->getModuleContext(), field, nullptr);
@@ -1245,22 +1287,24 @@ namespace {
     }
         
     TypeLowering *visitAnyEnumType(CanType enumType, EnumDecl *D) {
-      // For now, if the type does not have a fixed layout in all resilience
-      // domains, we will treat it as address-only in SIL.
-      if (D->isResilient(M.getSwiftModule(), Expansion))
-        return handleAddressOnly(enumType, RecursiveProperties::forResilient());
+      RecursiveProperties properties;
+
+      if (handleResilience(enumType, D, properties))
+        return handleAddressOnly(enumType, properties);
 
       // If the whole enum is indirect, we lower it as if all payload
       // cases were indirect. This means a fixed-layout indirect enum
       // is always loadable and nontrivial. A resilient indirect enum
       // is still address only, because we don't know how many bits
-      // are used for the discriminator.
+      // are used for the discriminator, and new non-indirect cases
+      // may be added resiliently later.
       if (D->isIndirect()) {
-        return new (TC, Dependent) LoadableEnumTypeLowering(enumType, Expansion);
+        properties.setNonTrivial();
+        return new (TC, Dependent) LoadableEnumTypeLowering(enumType, properties,
+                                                            Expansion);
       }
 
       // Accumulate the properties of all direct payloads.
-      RecursiveProperties properties;
       for (auto elt : D->getAllElements()) {
         // No-payload elements do not affect any recursive properties.
         if (!elt->hasAssociatedValues())
@@ -1292,9 +1336,9 @@ namespace {
       }
       assert(props.isFixedABI());
       if (props.isTrivial()) {
-        return handleTrivial(type);
+        return handleTrivial(type, props);
       }
-      return new (TC, Dependent) LoadableLoweringClass(type, Expansion);
+      return new (TC, Dependent) LoadableLoweringClass(type, props, Expansion);
     }
   };
 } // end anonymous namespace
@@ -1664,6 +1708,9 @@ getTypeLoweringForExpansion(TypeKey key,
   if (!lowering->isResilient()) {
     // Don't try to refine the lowering for other resilience expansions if
     // we don't expect to get a different lowering anyway.
+    //
+    // See LowerType::handleResilience() for the gory details; we only
+    // set this flag if the type is resilient *and* inside our module.
     return lowering;
   }
 

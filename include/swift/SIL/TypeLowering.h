@@ -175,11 +175,15 @@ public:
     constexpr RecursiveProperties(IsTrivial_t isTrivial,
                                   IsFixedABI_t isFixedABI,
                                   IsAddressOnly_t isAddressOnly,
-                                  IsResilient_t isResilient = IsNotResilient)
+                                  IsResilient_t isResilient)
       : Flags((isTrivial ? 0U : NonTrivialFlag) | 
-              (isAddressOnly ? AddressOnlyFlag : 0U) |
               (isFixedABI ? 0U : NonFixedABIFlag) |
+              (isAddressOnly ? AddressOnlyFlag : 0U) |
               (isResilient ? ResilientFlag : 0U)) {}
+
+    static constexpr RecursiveProperties forTrivial() {
+      return {IsTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient};
+    }
 
     static constexpr RecursiveProperties forReference() {
       return {IsNotTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient };
@@ -190,7 +194,7 @@ public:
     }
 
     static constexpr RecursiveProperties forResilient() {
-      return {IsNotTrivial, IsNotFixedABI, IsAddressOnly, IsResilient};
+      return {IsTrivial, IsFixedABI, IsNotAddressOnly, IsResilient};
     }
 
     void addSubobject(RecursiveProperties other) {
