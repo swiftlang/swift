@@ -101,7 +101,7 @@ func testDefaultArgs6() {
 // DEFAULT_ARGS_6: Begin completions
 // DEFAULT_ARGS_6-DAG: Decl[StaticMethod]/CurrNominal:      staticMethodWithDefaultArgs1()[#Void#]{{; name=.+$}}
 // DEFAULT_ARGS_6-DAG: Decl[StaticMethod]/CurrNominal:      staticMethodWithDefaultArgs1({#a: Int#})[#Void#]{{; name=.+$}}
-// DEFAULT_ARGS_6-DAG: Decl[InstanceMethod]/CurrNominal:   methodWithDefaultArgs1({#self: A#})[#(a: Int) -> Void#]{{; name=.+$}}
+// DEFAULT_ARGS_6-DAG: Decl[InstanceMethod]/CurrNominal:   methodWithDefaultArgs1({#(self): A#})[#(a: Int) -> Void#]{{; name=.+$}}
 // DEFAULT_ARGS_6: End completions
 
 func testDefaultArgs7() {
