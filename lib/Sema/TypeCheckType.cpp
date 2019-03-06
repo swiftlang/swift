@@ -1267,11 +1267,16 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
       auto dc = resolution.getDeclContext();
       if ((nominalDC = dc->getInnermostTypeContext()) &&
           (nominal = nominalDC->getSelfNominalTypeDecl())) {
-        // Attempt to refer to 'Self' within a non-protocol nominal
-        // type. Fix this by replacing 'Self' with the nominal type name.
         assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
 
-        return nominal->getDeclaredInterfaceType();
+        Type SelfType = nominal->getDeclaredInterfaceType();
+
+// Causes assertion failure:
+// Assertion failed: (hasSelfMetadataParam() && "This method can only be called if the " "SILFunction has a self-metadata parameter"), function getSelfMetadataArgument, file /Volumes/Elements/swift-self/swift/include/swift/SIL/SILFunction.h, line 935.
+//        if (nominalDC->getSelfClassDecl())
+//          SelfType = DynamicSelfType::get(SelfType, ctx);
+
+        return resolution.mapTypeIntoContext(SelfType);
       }
       // Attempt to refer to 'Self' from a free function.
       diags.diagnose(comp->getIdLoc(), diag::dynamic_self_non_method,

@@ -162,9 +162,6 @@ ERROR(cannot_pass_rvalue_mutating_getter,none,
       "cannot use mutating getter on immutable value of type %0",
       (Type))
 
-ERROR(invalid_generic_context,none,
-      "generic type cannot be used in this context", ())
-
 ERROR(expression_too_complex,none,
       "the compiler is unable to type-check this expression in reasonable time; "
       "try breaking up the expression into distinct sub-expressions", ())
