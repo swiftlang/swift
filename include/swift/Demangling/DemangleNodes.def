@@ -148,10 +148,6 @@ NODE(Number)
 NODE(ObjCAttribute)
 NODE(ObjCBlock)
 CONTEXT_NODE(OtherNominalType)
-NODE(OpaqueType)
-NODE(OpaqueTypeDescriptor)
-NODE(OpaqueReturnType)
-NODE(OpaqueReturnTypeOf)
 CONTEXT_NODE(OwningAddressor)
 CONTEXT_NODE(OwningMutableAddressor)
 NODE(PartialApplyForwarder)
@@ -264,5 +260,13 @@ NODE(SugaredOptional)
 NODE(SugaredArray)
 NODE(SugaredDictionary)
 NODE(SugaredParen)
+
+// Added in Swift 5.1
+NODE(OpaqueType)
+NODE(OpaqueTypeDescriptor)
+NODE(OpaqueReturnType)
+NODE(OpaqueReturnTypeOf)
+NODE(AccessorFunctionReference)
+
 #undef CONTEXT_NODE
 #undef NODE
