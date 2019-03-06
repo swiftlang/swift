@@ -3423,6 +3423,10 @@ public:
 
   bool haveTypeInformationForAllArguments(FunctionType *fnType);
 
+  /// Determine whether the given parameter type and argument should be
+  /// "favored" because they match exactly.
+  bool isFavoredParamAndArg(Type paramTy, Type argTy);
+
   typedef std::function<bool(unsigned index, Constraint *)> ConstraintMatcher;
   typedef std::function<void(ArrayRef<Constraint *>, ConstraintMatcher)>
       ConstraintMatchLoop;

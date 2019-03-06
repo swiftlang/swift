@@ -1649,6 +1649,42 @@ bool ConstraintSystem::haveTypeInformationForAllArguments(
                       });
 }
 
+bool ConstraintSystem::isFavoredParamAndArg(Type paramTy, Type argTy) {
+  // Determine the argument type.
+  argTy = argTy->getWithoutSpecifierType();
+
+  // Do the types match exactly?
+  if (paramTy->isEqual(argTy))
+    return true;
+
+  llvm::SmallSetVector<ProtocolDecl *, 2> literalProtos;
+  if (auto argTypeVar = argTy->getAs<TypeVariableType>()) {
+    llvm::SetVector<Constraint *> constraints;
+    getConstraintGraph().gatherConstraints(
+        argTypeVar, constraints,
+        ConstraintGraph::GatheringKind::EquivalenceClass,
+        [](Constraint *constraint) {
+          return constraint->getKind() == ConstraintKind::LiteralConformsTo;
+        });
+
+    for (auto constraint : constraints) {
+      literalProtos.insert(constraint->getProtocol());
+    }
+  }
+
+  for (auto literalProto : literalProtos) {
+    if (Type defaultType = TC.getDefaultType(literalProto, DC)) {
+      // If there is a default type for the literal protocol, check whether
+      // it is the same as the parameter type.
+      // Check whether there is a default type to compare against.
+      if (paramTy->isEqual(defaultType))
+        return true;
+    }
+  }
+
+  return false;
+}
+
 Constraint *ConstraintSystem::getUnboundBindOverloadDisjunction(
     TypeVariableType *tyvar, unsigned *numOptionalUnwraps) {
   if (numOptionalUnwraps)

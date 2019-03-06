@@ -536,61 +536,6 @@ namespace {
     return false;
   }
   
-  /// Determine whether the given parameter type and argument should be
-  /// "favored" because they match exactly.
-  bool isFavoredParamAndArg(ConstraintSystem &CS,
-                            Type paramTy,
-                            Type argTy,
-                            Type otherArgTy = Type()) {
-    // Determine the argument type.
-    argTy = argTy->getWithoutSpecifierType();
-
-    // Do the types match exactly?
-    if (paramTy->isEqual(argTy))
-      return true;
-
-    llvm::SmallSetVector<ProtocolDecl *, 2> literalProtos;
-    if (auto argTypeVar = argTy->getAs<TypeVariableType>()) {
-      llvm::SetVector<Constraint *> constraints;
-      CS.getConstraintGraph().gatherConstraints(
-          argTypeVar, constraints,
-          ConstraintGraph::GatheringKind::EquivalenceClass,
-          [](Constraint *constraint) {
-            return constraint->getKind() == ConstraintKind::LiteralConformsTo;
-          });
-
-      for (auto constraint : constraints) {
-        literalProtos.insert(constraint->getProtocol());
-      }
-    }
-
-    // Dig out the second argument type.
-    if (otherArgTy)
-      otherArgTy = otherArgTy->getWithoutSpecifierType();
-
-    auto &tc = CS.getTypeChecker();
-    for (auto literalProto : literalProtos) {
-      // If there is another, concrete argument, check whether it's type
-      // conforms to the literal protocol and test against it directly.
-      // This helps to avoid 'widening' the favored type to the default type for
-      // the literal.
-      if (otherArgTy && otherArgTy->getAnyNominal()) {
-        if (otherArgTy->isEqual(paramTy) &&
-            tc.conformsToProtocol(otherArgTy, literalProto, CS.DC,
-                                  ConformanceCheckFlags::InExpression))
-          return true;
-      } else if (Type defaultType = tc.getDefaultType(literalProto, CS.DC)) {
-        // If there is a default type for the literal protocol, check whether
-        // it is the same as the parameter type.
-        // Check whether there is a default type to compare against.
-        if (paramTy->isEqual(defaultType))
-          return true;
-      }
-    }
-
-    return false;
-  }
-  
   /// Favor certain overloads in a call based on some basic analysis
   /// of the overload set and call arguments.
   ///
@@ -715,8 +660,8 @@ namespace {
       auto resultTy = fnTy->getResult();
       auto contextualTy = CS.getContextualType(expr);
 
-      return isFavoredParamAndArg(
-                 CS, paramTy,
+      return CS.isFavoredParamAndArg(
+                 paramTy,
                  CS.getType(expr->getArg())->getWithoutParens()) &&
              (!contextualTy || contextualTy->isEqual(resultTy));
     };
@@ -867,9 +812,8 @@ namespace {
       auto resultTy = fnTy->getResult();
       auto contextualTy = CS.getContextualType(expr);
 
-      return (isFavoredParamAndArg(CS, firstParamTy, firstArgTy, secondArgTy) ||
-              isFavoredParamAndArg(CS, secondParamTy, secondArgTy,
-                                   firstArgTy)) &&
+      return (CS.isFavoredParamAndArg(firstParamTy, firstArgTy) ||
+              CS.isFavoredParamAndArg(secondParamTy, secondArgTy)) &&
              firstParamTy->isEqual(secondParamTy) &&
              !isPotentialForcingOpportunity(firstArgTy, secondArgTy) &&
              (!contextualTy || contextualTy->isEqual(resultTy));
@@ -1051,7 +995,7 @@ namespace {
           auto keyTy = dictTy->first;
           auto valueTy = dictTy->second;
 
-          if (isFavoredParamAndArg(CS, keyTy, CS.getType(index))) {
+          if (CS.isFavoredParamAndArg(keyTy, CS.getType(index))) {
             outputTy = OptionalType::get(valueTy);
             
             if (isLValueBase)
