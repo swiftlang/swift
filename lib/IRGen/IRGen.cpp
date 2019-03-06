@@ -870,26 +870,109 @@ performIRGeneration(IRGenOptions &Opts, ModuleDecl *M,
   return std::unique_ptr<llvm::Module>(IGM.releaseModule());
 }
 
-static void ThreadEntryPoint(IRGenerator *irgen,
-                             llvm::sys::Mutex *DiagMutex, int ThreadIdx) {
-  while (IRGenModule *IGM = irgen->fetchFromQueue()) {
-    LLVM_DEBUG(DiagMutex->lock(); dbgs() << "thread " << ThreadIdx
-                                         << ": fetched "
-                                         << IGM->OutputFilename << "\n";
-               DiagMutex->unlock(););
-    embedBitcode(IGM->getModule(), irgen->Opts);
-    performLLVM(irgen->Opts, &IGM->Context.Diags, DiagMutex, IGM->ModuleHash,
-                IGM->getModule(), IGM->TargetMachine.get(),
-                IGM->Context.LangOpts.EffectiveLanguageVersion,
-                IGM->OutputFilename, IGM->Context.Stats);
-    if (IGM->Context.Diags.hadAnyError())
+namespace {
+struct LLVMCodeGenThreads {
+
+  struct Thread {
+    LLVMCodeGenThreads &parent;
+    unsigned threadIndex;
+#ifdef __APPLE__
+    pthread_t threadId;
+#else
+    std::thread *thread;
+#endif
+
+    Thread(LLVMCodeGenThreads &parent, unsigned threadIndex)
+        : parent(parent), threadIndex(threadIndex)
+#ifndef __APPLE__
+          , thread(nullptr)
+#endif
+    {}
+
+    /// Run llvm codegen.
+    void run() {
+      auto *diagMutex = parent.diagMutex;
+      while (IRGenModule *IGM = parent.irgen->fetchFromQueue()) {
+        LLVM_DEBUG(diagMutex->lock();
+                   dbgs() << "thread " << threadIndex << ": fetched "
+                          << IGM->OutputFilename << "\n";
+                   diagMutex->unlock(););
+        embedBitcode(IGM->getModule(), parent.irgen->Opts);
+        performLLVM(parent.irgen->Opts, &IGM->Context.Diags, diagMutex,
+                    IGM->ModuleHash, IGM->getModule(), IGM->TargetMachine.get(),
+                    IGM->Context.LangOpts.EffectiveLanguageVersion,
+                    IGM->OutputFilename, IGM->Context.Stats);
+        if (IGM->Context.Diags.hadAnyError())
+          return;
+      }
+      LLVM_DEBUG(diagMutex->lock();
+                 dbgs() << "thread " << threadIndex << ": done\n";
+                 diagMutex->unlock(););
       return;
+    }
+  };
+
+  IRGenerator *irgen;
+  llvm::sys::Mutex *diagMutex;
+  std::vector<Thread> threads;
+
+  LLVMCodeGenThreads(IRGenerator *irgen, llvm::sys::Mutex *diagMutex,
+                     unsigned numThreads)
+      : irgen(irgen), diagMutex(diagMutex) {
+    threads.reserve(numThreads);
+    for (unsigned idx = 0; idx < numThreads; ++idx) {
+      // the 0-th thread is executed by the main thread.
+      threads.push_back(Thread(*this, idx + 1));
+    }
   }
-  LLVM_DEBUG(
-    DiagMutex->lock();
-    dbgs() << "thread " << ThreadIdx << ": done\n";
-    DiagMutex->unlock();
-  );
+
+  static void *runThread(void *arg) {
+    auto *thread = reinterpret_cast<Thread *>(arg);
+    thread->run();
+    return nullptr;
+  }
+
+  void startThreads() {
+#ifdef __APPLE__
+    // Increase the thread stack size on macosx to 8MB (default is 512KB). This
+    // matches the main thread.
+    pthread_attr_t stackSizeAttribute;
+    int err = pthread_attr_init(&stackSizeAttribute);
+    assert(!err);
+    err = pthread_attr_setstacksize(&stackSizeAttribute, 8 * 1024 * 1024);
+    assert(!err);
+
+    for (auto &thread : threads) {
+      pthread_create(&thread.threadId, &stackSizeAttribute,
+                     LLVMCodeGenThreads::runThread, &thread);
+    }
+
+    pthread_attr_destroy(&stackSizeAttribute);
+#else
+    for (auto &thread : threads) {
+      thread.thread = new std::thread(runThread, &thread);
+    }
+#endif
+
+  }
+
+  void runMainThread() {
+    Thread mainThread(*this, 0);
+    mainThread.run();
+  }
+
+  void join() {
+#ifdef __APPLE__
+    for (auto &thread : threads)
+      pthread_join(thread.threadId, 0);
+#else
+    for (auto &thread: threads) {
+      thread.thread->join();
+      delete thread.thread;
+    }
+#endif
+  }
+};
 }
 
 /// Generates LLVM IR, runs the LLVM passes and produces the output files.
@@ -1068,26 +1151,22 @@ static void performParallelIRGeneration(
 
   SharedTimer timer("LLVM pipeline");
 
-  std::vector<std::thread> Threads;
   llvm::sys::Mutex DiagMutex;
 
   // Start all the threads and do the LLVM compilation.
-  for (int ThreadIdx = 1; ThreadIdx < numThreads; ++ThreadIdx) {
-    Threads.push_back(std::thread(ThreadEntryPoint, &irgen, &DiagMutex,
-                                  ThreadIdx));
-  }
+  LLVMCodeGenThreads codeGenThreads(&irgen, &DiagMutex, numThreads - 1);
+  codeGenThreads.startThreads();
 
   // Free the memory occupied by the SILModule.
   // Execute this task in parallel to the LLVM compilation.
   auto SILModuleRelease = [&SILMod]() { SILMod.reset(nullptr); };
-  Threads.push_back(std::thread(SILModuleRelease));
+  auto releaseModuleThread = std::thread(SILModuleRelease);
 
-  ThreadEntryPoint(&irgen, &DiagMutex, 0);
+  codeGenThreads.runMainThread();
 
   // Wait for all threads.
-  for (std::thread &Thread : Threads) {
-    Thread.join();
-  }
+  releaseModuleThread.join();
+  codeGenThreads.join();
 }
 
 std::unique_ptr<llvm::Module> swift::performIRGeneration(
