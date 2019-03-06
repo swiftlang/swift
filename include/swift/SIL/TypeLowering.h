@@ -216,26 +216,29 @@ public:
   };
 
 private:
+  friend class TypeConverter;
+
   /// The SIL type of values with this Swift type.
   SILType LoweredType;
 
   RecursiveProperties Properties;
   unsigned ReferenceCounted : 1;
 
-public:
   /// The resilience expansion for this type lowering.
   /// If the type is not resilient at all, this is always Minimal.
-  ResilienceExpansion forExpansion = ResilienceExpansion::Minimal;
+  unsigned ForExpansion : 1;
 
   /// A single linked list of lowerings for different resilience expansions.
   /// The first lowering is always for ResilientExpansion::Minimal.
-  mutable const TypeLowering *nextExpansion = nullptr;
+  mutable const TypeLowering *NextExpansion = nullptr;
 
 protected:
   TypeLowering(SILType type, RecursiveProperties properties,
-               IsReferenceCounted_t isRefCounted)
+               IsReferenceCounted_t isRefCounted,
+               ResilienceExpansion forExpansion)
     : LoweredType(type), Properties(properties),
-      ReferenceCounted(isRefCounted) {}
+      ReferenceCounted(isRefCounted),
+      ForExpansion(unsigned(forExpansion)) {}
 
 public:
   TypeLowering(const TypeLowering &) = delete;
@@ -247,12 +250,22 @@ public:
   /// convention?
   ///
   /// This is independent of whether the SIL argument is address type.
-  bool isFormallyPassedIndirectly() const { return isAddressOnly(); }
+  bool isFormallyPassedIndirectly() const {
+    assert(!isResilient() ||
+           getResilienceExpansion() == ResilienceExpansion::Minimal &&
+           "calling convention uses minimal resilience expansion");
+    return isAddressOnly();
+  }
 
   /// Are r-values of this type returned indirectly by formal convention?
   ///
   /// This is independent of whether the SIL result is address type.
-  bool isFormallyReturnedIndirectly() const { return isAddressOnly(); }
+  bool isFormallyReturnedIndirectly() const {
+    assert(!isResilient() ||
+           getResilienceExpansion() == ResilienceExpansion::Minimal &&
+           "calling convention uses minimal resilience expansion");
+    return isAddressOnly();
+  }
 
   RecursiveProperties getRecursiveProperties() const {
     return Properties;
@@ -304,6 +317,10 @@ public:
 
   bool isResilient() const {
     return Properties.isResilient();
+  }
+
+  ResilienceExpansion getResilienceExpansion() const {
+    return ResilienceExpansion(ForExpansion);
   }
 
   /// Produce an exact copy of the value in the given address as a
@@ -748,8 +765,7 @@ public:
   /// Lowers a Swift type to a SILType, and returns the SIL TypeLowering
   /// for that type.
   const TypeLowering &
-  getTypeLowering(Type t, ResilienceExpansion forExpansion =
-                            ResilienceExpansion::Minimal) {
+  getTypeLowering(Type t, ResilienceExpansion forExpansion) {
     AbstractionPattern pattern(getCurGenericContext(), t->getCanonicalType());
     return getTypeLowering(pattern, t, forExpansion);
   }
@@ -758,33 +774,28 @@ public:
   /// patterns of the given original type.
   const TypeLowering &getTypeLowering(AbstractionPattern origType,
                                       Type substType,
-                                      ResilienceExpansion forExpansion =
-                                        ResilienceExpansion::Minimal);
+                                      ResilienceExpansion forExpansion);
 
   /// Returns the SIL TypeLowering for an already lowered SILType. If the
   /// SILType is an address, returns the TypeLowering for the pointed-to
   /// type.
   const TypeLowering &
-  getTypeLowering(SILType t, ResilienceExpansion forExpansion =
-                               ResilienceExpansion::Minimal);
+  getTypeLowering(SILType t, ResilienceExpansion forExpansion);
 
   // Returns the lowered SIL type for a Swift type.
-  SILType getLoweredType(Type t, ResilienceExpansion forExpansion
-                           = ResilienceExpansion::Minimal) {
+  SILType getLoweredType(Type t, ResilienceExpansion forExpansion) {
     return getTypeLowering(t, forExpansion).getLoweredType();
   }
 
   // Returns the lowered SIL type for a Swift type.
   SILType getLoweredType(AbstractionPattern origType, Type substType,
-                         ResilienceExpansion forExpansion =
-                           ResilienceExpansion::Minimal) {
+                         ResilienceExpansion forExpansion) {
     return getTypeLowering(origType, substType, forExpansion)
       .getLoweredType();
   }
 
   SILType getLoweredLoadableType(Type t,
-                                 ResilienceExpansion forExpansion =
-                                   ResilienceExpansion::Minimal) {
+                                 ResilienceExpansion forExpansion) {
     const TypeLowering &ti = getTypeLowering(t, forExpansion);
     assert(
         (ti.isLoadable() || !SILModuleConventions(M).useLoweredAddresses()) &&
@@ -793,11 +804,16 @@ public:
   }
 
   CanType getLoweredRValueType(Type t) {
-    return getLoweredType(t).getASTType();
+    // We're ignoring the category (object vs address), so the resilience
+    // expansion does not matter.
+    return getLoweredType(t, ResilienceExpansion::Minimal).getASTType();
   }
 
   CanType getLoweredRValueType(AbstractionPattern origType, Type substType) {
-    return getLoweredType(origType, substType).getASTType();
+    // We're ignoring the category (object vs address), so the resilience
+    // expansion does not matter.
+    return getLoweredType(origType, substType,
+                          ResilienceExpansion::Minimal).getASTType();
   }
 
   AbstractionPattern getAbstractionPattern(AbstractStorageDecl *storage,

@@ -705,7 +705,7 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
 
   if (Feasibility == DynamicCastFeasibility::WillFail) {
     if (shouldDestroyOnFailure(Inst->getConsumptionKind())) {
-      auto &srcTL = Builder.getModule().getTypeLowering(Src->getType());
+      auto &srcTL = Builder.getTypeLowering(Src->getType());
       srcTL.emitDestroyAddress(Builder, Loc, Src);
     }
     auto NewI = Builder.createBranch(Loc, FailureBB);
@@ -748,7 +748,7 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
     // is not used afterwards.
     if (ResultNotUsed) {
       if (shouldTakeOnSuccess(Inst->getConsumptionKind())) {
-        auto &srcTL = Builder.getModule().getTypeLowering(Src->getType());
+        auto &srcTL = Builder.getTypeLowering(Src->getType());
         srcTL.emitDestroyAddress(Builder, Loc, Src);
       }
       EraseInstAction(Inst);

@@ -81,11 +81,15 @@ SILType SILType::getSILTokenType(const ASTContext &C) {
 }
 
 bool SILType::isTrivial(SILModule &M) const {
-  return M.getTypeLowering(*this).isTrivial();
+  return M.Types.getTypeLowering(*this,
+                                 ResilienceExpansion::Minimal)
+    .isTrivial();
 }
 
 bool SILType::isReferenceCounted(SILModule &M) const {
-  return M.getTypeLowering(*this).isReferenceCounted();
+  return M.Types.getTypeLowering(*this,
+                                 ResilienceExpansion::Minimal)
+    .isReferenceCounted();
 }
 
 bool SILType::isNoReturnFunction() const {
@@ -187,11 +191,12 @@ bool SILType::isLoadableOrOpaque(SILFunction *inFunction) const {
 /// address-only. For example, it could be a resilient struct or something of
 /// unknown size.
 bool SILType::isAddressOnly(SILModule &M) const {
-  return M.getTypeLowering(*this).isAddressOnly();
+  return M.Types.getTypeLowering(*this, ResilienceExpansion::Minimal)
+    .isAddressOnly();
 }
 
 bool SILType::isAddressOnly(SILFunction *inFunction) const {
-  return inFunction->getModule().getTypeLowering(*this,
+  return inFunction->getModule().Types.getTypeLowering(*this,
                         inFunction->getResilienceExpansion()).isAddressOnly();
 }
 
