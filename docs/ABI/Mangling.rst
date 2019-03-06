@@ -92,10 +92,16 @@ The following symbolic reference kinds are currently implemented:
    associated-conformance-access-function ::= '\x07' .{4}  // Reference points directly to associated conformance access function relative to the protocol
    associated-conformance-access-function ::= '\x08' .{4}  // Reference points directly to associated conformance access function relative to the conforming type
 
-   keypath-metadata-access-function ::= '\x09' .{4}  // Reference points directly to keypath conformance access function
+   // keypaths only in Swift 5.0, generalized in Swift 5.1
+   metadata-access-function ::= '\x09' .{4}  // Reference points directly to metadata access function that can be invoked to produce referenced object
 
+   // begin added in Swift 5.1
    any-generic-type ::= '\x0B' .{4} // Reference points directly to an opaque type descriptor
    any-generic-type ::= '\x0C' .{4} // Reference points indirectly to an opaque type descriptor
+   // end added in Swift 5.1
+
+A mangled name may also include ``\xFF`` bytes, which are only used for alignment
+padding. They can be skipped over and ignored.
 
 Globals
 ~~~~~~~
@@ -114,7 +120,7 @@ Globals
   global ::= nominal-type 'Ml'           // in-place type initialization cache
   global ::= nominal-type 'Mm'           // class metaclass
   global ::= nominal-type 'Mn'           // nominal type descriptor
-  global ::= opaque-type-decl-name 'MQ'  // opaque type descriptor
+  global ::= opaque-type-decl-name 'MQ'  // opaque type descriptor -- added in Swift 5.1
   global ::= nominal-type 'Mu'           // class method lookup function
   global ::= nominal-type 'MU'           // ObjC metadata update callback function
   global ::= nominal-type 'Ms'           // ObjC resilient class stub
@@ -607,10 +613,14 @@ implementation details of a function type.
 
 ::
 
+  // begin added in Swift 5.1
+
   type ::= 'Qr'                         // opaque result type (of current decl)
   type ::= opaque-type-decl-name bound-generic-args 'Qo' // opaque type
 
   opaque-type-decl-name ::= entity 'QO' // opaque result type of specified decl
+
+  // end added in Swift 5.1
 
 Opaque return types have a special short representation in the mangling of
 their defining entity. In structural position, opaque types are fully qualified

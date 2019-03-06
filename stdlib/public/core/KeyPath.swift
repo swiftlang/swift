@@ -2461,27 +2461,11 @@ internal func _resolveKeyPathGenericArgReference(
     -> UnsafeRawPointer {
   // If the low bit is clear, it's a direct reference to the argument.
   if (UInt(bitPattern: reference) & 0x01 == 0) {
-    return reference;
+    return reference
   }
 
   // Adjust the reference.
   let referenceStart = reference - 1
-
-  // If we have a symbolic reference to an accessor, call it.
-  let first = referenceStart.load(as: UInt8.self)
-  if first == 255 && reference.load(as: UInt8.self) == 9 {
-    typealias MetadataAccessor =
-      @convention(c) (UnsafeRawPointer?) -> UnsafeRawPointer
-
-    // Unaligned load of the offset.
-    let pointerReference = reference + 1
-    var offset: Int32 = 0
-    _memcpy(dest: &offset, src: pointerReference, size: 4)
-
-    let accessorPtr = _resolveRelativeAddress(pointerReference, offset)
-    let accessor = unsafeBitCast(accessorPtr, to: MetadataAccessor.self)
-    return accessor(arguments)
-  }
 
   let nameLength = _getSymbolicMangledNameLength(referenceStart)
   let namePtr = referenceStart.bindMemory(to: UInt8.self,
@@ -2491,13 +2475,13 @@ internal func _resolveKeyPathGenericArgReference(
     _getTypeByMangledNameInEnvironmentOrContext(namePtr, UInt(nameLength),
                          genericEnvironmentOrContext: genericEnvironment,
                          genericArguments: arguments)
-    else {
-      let nameStr = String._fromUTF8Repairing(
-        UnsafeBufferPointer(start: namePtr, count: nameLength)
-      ).0
+  else {
+    let nameStr = String._fromUTF8Repairing(
+      UnsafeBufferPointer(start: namePtr, count: nameLength)
+    ).0
 
-      fatalError("could not demangle keypath type from '\(nameStr)'")
-    }
+    fatalError("could not demangle keypath type from '\(nameStr)'")
+  }
 
   return unsafeBitCast(result, to: UnsafeRawPointer.self)
 }

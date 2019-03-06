@@ -651,7 +651,7 @@ NodePointer Demangler::demangleTypeMangling() {
   TypeMangling = addChild(TypeMangling, Type);
   return TypeMangling;
 }
-  
+
 NodePointer Demangler::demangleSymbolicReference(unsigned char rawKind,
                                                  const void *at) {
   // The symbolic reference is a 4-byte machine integer encoded in the following
@@ -671,6 +671,10 @@ NodePointer Demangler::demangleSymbolicReference(unsigned char rawKind,
   case 2:
     kind = SymbolicReferenceKind::Context;
     direct = Directness::Indirect;
+    break;
+  case 9:
+    kind = SymbolicReferenceKind::AccessorFunctionReference;
+    direct = Directness::Direct;
     break;
   default:
     return nullptr;
@@ -692,11 +696,15 @@ NodePointer Demangler::demangleSymbolicReference(unsigned char rawKind,
 }
 
 NodePointer Demangler::demangleOperator() {
-  switch (char c = nextChar()) {
-    case '\1':
-    case '\2':
-    case '\3':
-    case '\4':
+recur:
+  switch (unsigned char c = nextChar()) {
+    case 0xFF:
+      // A 0xFF byte is used as alignment padding for symbolic references
+      // when the platform toolchain has alignment restrictions for the
+      // relocations that form the reference value. It can be skipped.
+      goto recur;
+    case 1: case 2:   case 3:   case 4:   case 5: case 6: case 7: case 8:
+    case 9: case 0xA: case 0xB: case 0xC:
       return demangleSymbolicReference((unsigned char)c, Text.data() + Pos);
     case 'A': return demangleMultiSubstitutions();
     case 'B': return demangleBuiltinType();
