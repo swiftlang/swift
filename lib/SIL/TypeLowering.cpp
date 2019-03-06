@@ -1458,31 +1458,47 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
          && "dependent type outside of generic context?!");
   assert(!substType->is<InOutType>());
 
-  if (auto existing = find(key))
-    return getTypeLoweringForExpansion(key, forExpansion, existing);
+  auto *prev = find(key);
+  auto *lowering = getTypeLoweringForExpansion(key, forExpansion, prev);
+  if (lowering != nullptr)
+    return *lowering;
+
+#ifndef NDEBUG
+  // Catch reentrancy bugs.
+  if (prev == nullptr)
+    insert(key, nullptr);
+#endif
 
   // Lower the type.
-  CanType loweredSubstType =
-    computeLoweredRValueType(origType, substType);
+  auto loweredSubstType = computeLoweredRValueType(origType, substType);
 
   // If that didn't change the type and the key is cacheable, there's no
   // point in re-checking the table, so just construct a type lowering
   // and cache it.
   if (loweredSubstType == substType && key.isCacheable()) {
-    return getTypeLoweringForUncachedLoweredType(key, forExpansion);
-  }
+    lowering = LowerType(*this,
+                         CanGenericSignature(),
+                         forExpansion,
+                         key.isDependent()).visit(key.SubstType);
 
   // Otherwise, check the table at a key that would be used by the
   // SILType-based lookup path for the type we just lowered to, then cache
   // that same result at this key if possible.
-  AbstractionPattern origTypeForCaching =
-    AbstractionPattern(getCurGenericContext(), loweredSubstType);
-  auto loweredKey = getTypeKey(origTypeForCaching, loweredSubstType);
+  } else {
+    AbstractionPattern origTypeForCaching =
+      AbstractionPattern(getCurGenericContext(), loweredSubstType);
+    auto loweredKey = getTypeKey(origTypeForCaching, loweredSubstType);
 
-  auto &lowering = getTypeLoweringForLoweredType(loweredKey,
-                                                 forExpansion);
-  insert(key, &lowering);
-  return lowering;
+    lowering = &getTypeLoweringForLoweredType(loweredKey,
+                                              forExpansion);
+  }
+
+  if (prev == nullptr)
+    insert(key, lowering);
+  else
+    prev->NextExpansion = lowering;
+
+  return *lowering;
 }
 
 CanType TypeConverter::computeLoweredRValueType(AbstractionPattern origType,
@@ -1611,73 +1627,57 @@ TypeConverter::getTypeLoweringForLoweredType(TypeKey key,
   assert(type->isLegalSILType() && "type is not lowered!");
   (void)type;
 
-  const TypeLowering *lowering = find(key);
-  if (!lowering)
-    lowering = &getTypeLoweringForUncachedLoweredType(key, forExpansion);
+  auto *prev = find(key);
+  auto *lowering = getTypeLoweringForExpansion(key, forExpansion, prev);
+  if (lowering != nullptr)
+    return *lowering;
 
-  return getTypeLoweringForExpansion(key, forExpansion, lowering);
+#ifndef NDEBUG
+  // Catch reentrancy bugs.
+  if (prev == nullptr)
+    insert(key, nullptr);
+#endif
+
+  lowering = LowerType(*this,
+                       CanGenericSignature(),
+                       forExpansion,
+                       key.isDependent()).visit(key.SubstType);
+
+  if (prev)
+    prev->NextExpansion = lowering;
+  else
+    insert(key, lowering);
+  return *lowering;
 }
 
 /// When we've found a type lowering for one resilience expansion,
 /// check if its the one we want; if not, walk the list until we
-/// find the right one, or create a new lowering and add it to
-/// the end of the list.
-const TypeLowering & TypeConverter::
+/// find the right one, returning nullptr if the caller needs to
+/// go ahead and lower the type with the correct expansion.
+const TypeLowering *TypeConverter::
 getTypeLoweringForExpansion(TypeKey key,
                             ResilienceExpansion forExpansion,
                             const TypeLowering *lowering) {
+  if (lowering == nullptr)
+    return nullptr;
+
   if (!lowering->isResilient()) {
     // Don't try to refine the lowering for other resilience expansions if
     // we don't expect to get a different lowering anyway.
-    return *lowering;
+    return lowering;
   }
 
   // Search for a matching lowering in the linked list of lowerings.
-  while (true) {
+  while (lowering) {
     if (lowering->getResilienceExpansion() == forExpansion)
-      return *lowering;
-    if (lowering->NextExpansion) {
-      // Continue searching.
-      lowering = lowering->NextExpansion;
-      continue;
-    }
+      return lowering;
 
-    // Create a new lowering for the resilience expansion.
-    TypeLowering *theInfo = LowerType(*this,
-                              CanGenericSignature(),
-                              forExpansion,
-                              key.isDependent()).visit(key.SubstType);
-
-    lowering->NextExpansion = theInfo;
-    return *theInfo;
-  }
-}
-
-/// Do type-lowering for a lowered type which is not already in the cache,
-/// then insert it into the cache.
-const TypeLowering & TypeConverter::
-getTypeLoweringForUncachedLoweredType(TypeKey key,
-                                      ResilienceExpansion forExpansion) {
-  assert(!find(key) && "re-entrant or already cached");
-  assert(key.SubstType->isLegalSILType() && "type is not already lowered");
-
-#ifndef NDEBUG
-  // Catch reentrancy bugs.
-  insert(key, nullptr);
-#endif
-
-  auto *theInfo = LowerType(*this,
-                            CanGenericSignature(),
-                            forExpansion,
-                            key.isDependent()).visit(key.SubstType);
-
-  if (key.OrigType.isForeign()) {
-    assert(theInfo->isLoadable() && "Cannot lower address-only type with "
-           "foreign abstraction pattern");
+    // Continue searching.
+    lowering = lowering->NextExpansion;
   }
 
-  insert(key, theInfo);
-  return *theInfo;
+  // We have to create a new one.
+  return nullptr;
 }
 
 /// Get the type of a global variable accessor function, () -> RawPointer.

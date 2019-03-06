@@ -697,11 +697,8 @@ class TypeConverter {
   const TypeLowering &
   getTypeLoweringForLoweredType(TypeKey key,
                                 ResilienceExpansion forExpansion);
-  const TypeLowering &
-  getTypeLoweringForUncachedLoweredType(TypeKey key,
-                                        ResilienceExpansion forExpansion);
 
-  const TypeLowering &
+  const TypeLowering *
   getTypeLoweringForExpansion(TypeKey key,
                               ResilienceExpansion forExpansion,
                               const TypeLowering *lowering);
