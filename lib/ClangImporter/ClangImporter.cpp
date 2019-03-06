@@ -757,7 +757,6 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
                          *clangDiags,
                          CI.getLangOpts(),
                          clangSrcMgr,
-                         CI.getPCMCache(),
                          headerSearchInfo,
                          (clang::ModuleLoader &)CI,
                          /*IILookup=*/nullptr,
@@ -770,7 +769,7 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   // Note: Reusing the PCHContainerReader or ModuleFileExtensions could be
   // dangerous.
   std::unique_ptr<clang::ASTReader> Reader(new clang::ASTReader(
-      PP, &ctx, CI.getPCHContainerReader(),
+      PP, CI.getModuleCache(), &ctx, CI.getPCHContainerReader(),
       CI.getFrontendOpts().ModuleFileExtensions,
       CI.getHeaderSearchOpts().Sysroot,
       /*DisableValidation*/ false,
