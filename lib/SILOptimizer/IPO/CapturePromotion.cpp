@@ -365,7 +365,8 @@ computeNewArgInterfaceTypes(SILFunction *F,
     assert(paramBoxTy->getLayout()->getFields().size() == 1
            && "promoting compound box not implemented yet");
     auto paramBoxedTy = paramBoxTy->getFieldType(F->getModule(), 0);
-    auto &paramTL = Types.getTypeLowering(paramBoxedTy);
+    auto &paramTL = Types.getTypeLowering(paramBoxedTy,
+                                          ResilienceExpansion::Minimal);
     ParameterConvention convention;
     if (paramTL.isFormallyPassedIndirectly()) {
       convention = ParameterConvention::Indirect_In;
@@ -544,8 +545,7 @@ ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
     if (I != BoxArgumentMap.end()) {
       // Releases of the box arguments get replaced with ReleaseValue of the new
       // object type argument.
-      SILFunction &F = getBuilder().getFunction();
-      auto &typeLowering = F.getModule().getTypeLowering(I->second->getType());
+      auto &typeLowering = getBuilder().getTypeLowering(I->second->getType());
       SILBuilderWithPostProcess<ClosureCloner, 1> B(this, Inst);
       typeLowering.emitDestroyValue(B, Inst->getLoc(), I->second);
       return;
@@ -567,7 +567,7 @@ void ClosureCloner::visitDestroyValueInst(DestroyValueInst *Inst) {
       // Releases of the box arguments get replaced with an end_borrow,
       // destroy_value of the new object type argument.
       SILFunction &F = getBuilder().getFunction();
-      auto &typeLowering = F.getModule().getTypeLowering(I->second->getType());
+      auto &typeLowering = F.getTypeLowering(I->second->getType());
       SILBuilderWithPostProcess<ClosureCloner, 1> B(this, Inst);
 
       SILValue Value = I->second;
@@ -1240,6 +1240,7 @@ static SILFunction *
 processPartialApplyInst(SILOptFunctionBuilder &FuncBuilder,
                         PartialApplyInst *PAI, IndicesSet &PromotableIndices,
                         SmallVectorImpl<SILFunction*> &Worklist) {
+  SILFunction *F = PAI->getFunction();
   SILModule &M = PAI->getModule();
 
   auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
@@ -1284,7 +1285,7 @@ processPartialApplyInst(SILOptFunctionBuilder &FuncBuilder,
     SILValue Box = PAI->getOperand(OpNo);
     SILValue Addr = getOrCreateProjectBoxHelper(Box);
 
-    auto &typeLowering = M.getTypeLowering(Addr->getType());
+    auto &typeLowering = F->getTypeLowering(Addr->getType());
     auto newCaptured =
         typeLowering.emitLoadOfCopy(B, PAI->getLoc(), Addr, IsNotTake);
     Args.push_back(newCaptured);

@@ -841,7 +841,7 @@ void ApplyRewriter::canonicalizeResults(
       }
       SILBuilder B(destroyInst);
       B.setSILConventions(SILModuleConventions::getLoweredAddressConventions());
-      auto &TL = pass.F->getModule().getTypeLowering(result->getType());
+      auto &TL = pass.F->getTypeLowering(result->getType());
       TL.emitDestroyValue(B, destroyInst->getLoc(), result);
     }
     destroyInst->eraseFromParent();

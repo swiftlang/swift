@@ -128,13 +128,14 @@ void verifyKeyPathComponent(SILModule &M,
                             bool forPropertyDescriptor,
                             bool hasIndices) {
   auto &C = M.getASTContext();
-  
+
+  auto opaque = AbstractionPattern::getOpaque();
   auto loweredBaseTy =
-    M.Types.getLoweredType(AbstractionPattern::getOpaque(), baseTy);
+    M.Types.getLoweredType(opaque, baseTy, expansion);
   auto componentTy = component.getComponentType().subst(patternSubs)
     ->getCanonicalType();
   auto loweredComponentTy =
-    M.Types.getLoweredType(AbstractionPattern::getOpaque(), componentTy);
+    M.Types.getLoweredType(opaque, componentTy, expansion);
 
   auto checkIndexEqualsAndHash = [&]{
     if (!component.getSubscriptIndices().empty()) {
@@ -386,15 +387,14 @@ void verifyKeyPathComponent(SILModule &M,
     require(loweredBaseTy.is<TupleType>(),
             "invalid baseTy, should have been a TupleType");
       
-    auto tupleTy = loweredBaseTy.getAs<TupleType>();
+    auto tupleTy = loweredBaseTy.castTo<TupleType>();
     auto eltIdx = component.getTupleIndex();
       
     require(eltIdx < tupleTy->getNumElements(),
             "invalid element index, greater than # of tuple elements");
 
-    auto eltTy = tupleTy->getElementType(eltIdx)
-      ->getReferenceStorageReferent()
-      ->getCanonicalType();
+    auto eltTy = tupleTy.getElementType(eltIdx)
+      .getReferenceStorageReferent();
     
     require(eltTy == componentTy,
             "tuple element type should match the type of the component");

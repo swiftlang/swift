@@ -5995,7 +5995,8 @@ static void collectFakeIndexParameters(SILGenModule &SGM,
   }
 
   // Use conventions that will produce a +1 value.
-  auto &tl = SGM.Types.getTypeLowering(substType);
+  auto &tl = SGM.Types.getTypeLowering(substType,
+                                       ResilienceExpansion::Minimal);
   ParameterConvention convention;
   if (tl.isFormallyPassedIndirectly()) {
     convention = ParameterConvention::Indirect_In;
