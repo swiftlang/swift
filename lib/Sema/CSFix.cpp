@@ -507,7 +507,10 @@ AddMissingArguments::create(ConstraintSystem &cs, FunctionType *funcType,
 }
 
 bool RemoveExtraneousArguments::diagnose(Expr *root, bool asNote) const {
-  return false;
+  ExtraneousArgumentsFailure failure(root, getConstraintSystem(),
+                                     ContextualType, getExtraArguments(),
+                                     getLocator());
+  return failure.diagnose(asNote);
 }
 
 RemoveExtraneousArguments *RemoveExtraneousArguments::create(

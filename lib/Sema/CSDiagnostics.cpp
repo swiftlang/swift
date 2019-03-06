@@ -3036,7 +3036,98 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
     addFixIts(emitDiagnostic(diagLoc, diag::argument_out_of_order_named_named,
                              first, second));
   }
+  return true;
+}
 
+bool ExtraneousArgumentsFailure::diagnoseAsError() {
+  // Simplified anchor would point directly to the
+  // argument in case of contextual mismatch.
+  auto *anchor = getAnchor();
+  if (auto *closure = dyn_cast<ClosureExpr>(anchor)) {
+    auto fnType = ContextualType;
+    auto params = closure->getParameters();
+
+    auto diag = emitDiagnostic(
+        params->getStartLoc(), diag::closure_argument_list_tuple, fnType,
+        fnType->getNumParams(), params->size(), (params->size() == 1));
+
+    bool onlyAnonymousParams =
+        std::all_of(params->begin(), params->end(),
+                    [](ParamDecl *param) { return !param->hasName(); });
+
+    // If closure expects no parameters but N was given,
+    // and all of them are anonymous let's suggest removing them.
+    if (fnType->getNumParams() == 0 && onlyAnonymousParams) {
+      auto inLoc = closure->getInLoc();
+      auto &sourceMgr = getASTContext().SourceMgr;
+
+      if (inLoc.isValid())
+        diag.fixItRemoveChars(params->getStartLoc(),
+                              Lexer::getLocForEndOfToken(sourceMgr, inLoc));
+    }
+    return true;
+  }
+
+  if (isContextualMismatch()) {
+    emitDiagnostic(anchor->getLoc(), diag::cannot_convert_argument_value,
+                   getType(anchor), ContextualType);
+    return true;
+  }
+
+  if (ExtraArgs.size() == 1) {
+    return diagnoseSingleExtraArgument();
+  }
+
+  return false;
+}
+
+bool ExtraneousArgumentsFailure::diagnoseAsNote() {
+  auto *anchor = getAnchor();
+  auto numArgs = getTotalNumArguments();
+  emitDiagnostic(anchor->getLoc(), diag::candidate_with_extraneous_args,
+                 ContextualType, ContextualType->getNumParams(), numArgs,
+                 (numArgs == 1), isa<ClosureExpr>(anchor));
+  return true;
+}
+
+bool ExtraneousArgumentsFailure::diagnoseSingleExtraArgument() const {
+  auto *arguments = getArgumentExprFor(getRawAnchor());
+  if (!arguments)
+    return false;
+
+  const auto &e = ExtraArgs.front();
+  auto index = e.first;
+  auto argument = e.second;
+
+  auto tuple = dyn_cast<TupleExpr>(arguments);
+  auto argExpr = tuple ? tuple->getElement(index)
+                       : cast<ParenExpr>(arguments)->getSubExpr();
+
+  auto loc = argExpr->getLoc();
+  if (tuple && index == tuple->getNumElements() - 1 &&
+      tuple->hasTrailingClosure()) {
+    emitDiagnostic(loc, diag::extra_trailing_closure_in_call)
+        .highlight(argExpr->getSourceRange());
+  } else if (ContextualType->getNumParams() == 0) {
+    auto *PE = dyn_cast<ParenExpr>(arguments);
+    Expr *subExpr = nullptr;
+    if (PE)
+      subExpr = PE->getSubExpr();
+
+    if (subExpr && argument.getPlainType()->isVoid()) {
+      emitDiagnostic(loc, diag::extra_argument_to_nullary_call)
+          .fixItRemove(subExpr->getSourceRange());
+    } else {
+      emitDiagnostic(loc, diag::extra_argument_to_nullary_call)
+          .highlight(argExpr->getSourceRange());
+    }
+  } else if (argument.hasLabel()) {
+    emitDiagnostic(loc, diag::extra_argument_named, argument.getLabel())
+        .highlight(argExpr->getSourceRange());
+  } else {
+    emitDiagnostic(loc, diag::extra_argument_positional)
+        .highlight(argExpr->getSourceRange());
+  }
   return true;
 }
 
