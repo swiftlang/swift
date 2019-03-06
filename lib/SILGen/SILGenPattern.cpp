@@ -2325,16 +2325,18 @@ void PatternMatchEmission::initSharedCaseBlockDest(CaseStmt *caseBlock,
   }
 
   auto pattern = caseBlock->getCaseLabelItems()[0].getPattern();
-  pattern->forEachVariable([&](VarDecl *V) {
-    if (!V->hasName())
-      return;
+  SmallVector<VarDecl *, 4> patternVarDecls;
+  pattern->collectVariables(patternVarDecls);
+  for (auto *vd : patternVarDecls) {
+    if (!vd->hasName())
+      continue;
 
     // We don't pass address-only values in basic block arguments.
-    SILType ty = SGF.getLoweredType(V->getType());
+    SILType ty = SGF.getLoweredType(vd->getType());
     if (ty.isAddressOnly(SGF.F.getModule()))
-      return;
-    block->createPhiArgument(ty, ValueOwnershipKind::Owned, V);
-  });
+      continue;
+    block->createPhiArgument(ty, ValueOwnershipKind::Owned, vd);
+  }
 }
 
 /// Retrieve the jump destination for a shared case block.
@@ -2362,9 +2364,11 @@ void PatternMatchEmission::emitAddressOnlyAllocations() {
     // to point to the incoming args and setup initialization so any args needing
     // cleanup will get that as well.
     auto pattern = caseBlock->getCaseLabelItems()[0].getPattern();
-    pattern->forEachVariable([&](VarDecl *vd) {
+    SmallVector<VarDecl *, 4> patternVarDecls;
+    pattern->collectVariables(patternVarDecls);
+    for (auto *vd : patternVarDecls) {
       if (!vd->hasName())
-        return;
+        continue;
 
       SILType ty = SGF.getLoweredType(vd->getType());
       if (ty.isNull()) {
@@ -2383,12 +2387,11 @@ void PatternMatchEmission::emitAddressOnlyAllocations() {
         }
       }
 
-      if (ty.isAddressOnly(SGF.F.getModule())) {
-        assert(!Temporaries[vd]);
-        Temporaries[vd] = SGF.emitTemporaryAllocation(vd, ty);
-        return;
-      }
-    });
+      if (!ty.isAddressOnly(SGF.F.getModule()))
+        continue;
+      assert(!Temporaries[vd]);
+      Temporaries[vd] = SGF.emitTemporaryAllocation(vd, ty);
+    }
   }
 
   // Now we have all of our cleanups entered, so we can record the
@@ -2458,12 +2461,14 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
     // needing cleanup will get that as well.
     Scope scope(SGF.Cleanups, CleanupLocation(caseBlock));
     auto pattern = caseBlock->getCaseLabelItems()[0].getPattern();
+    SmallVector<VarDecl *, 4> patternVarDecls;
+    pattern->collectVariables(patternVarDecls);
     unsigned argIndex = 0;
-    pattern->forEachVariable([&](VarDecl *V) {
-      if (!V->hasName())
-        return;
+    for (auto *vd : patternVarDecls) {
+      if (!vd->hasName())
+        continue;
 
-      SILType ty = SGF.getLoweredType(V->getType());
+      SILType ty = SGF.getLoweredType(vd->getType());
 
       // Initialize mv at +1. We always pass values in at +1 for today into
       // shared blocks.
@@ -2478,7 +2483,7 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
         //
         // There's nothing to do here, since the value should already have
         // been initialized on entry.
-        auto found = Temporaries.find(V);
+        auto found = Temporaries.find(vd);
         assert(found != Temporaries.end());
         mv = SGF.emitManagedRValueWithCleanup(found->second);
       } else {
@@ -2488,20 +2493,20 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
         mv = SGF.emitManagedRValueWithCleanup(arg);
       }
 
-      if (V->isLet()) {
+      if (vd->isLet()) {
         // Just emit a let and leave the cleanup alone.
-        SGF.VarLocs[V].value = mv.getValue();
-        return;
+        SGF.VarLocs[vd].value = mv.getValue();
+        continue;
       }
 
       // Otherwise, the pattern variables were all emitted as lets and one got
       // passed in. Since we have a var, alloc a box for the var and forward in
       // the chosen value.
-      SGF.VarLocs.erase(V);
-      auto newVar = SGF.emitInitializationForVarDecl(V, V->isLet());
-      newVar->copyOrInitValueInto(SGF, V, mv, /*isInit*/ true);
+      SGF.VarLocs.erase(vd);
+      auto newVar = SGF.emitInitializationForVarDecl(vd, vd->isLet());
+      newVar->copyOrInitValueInto(SGF, vd, mv, /*isInit*/ true);
       newVar->finishInitialization(SGF);
-    });
+    }
 
     // Now that we have setup all of the VarLocs correctly, emit the shared case
     // body.
