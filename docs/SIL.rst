@@ -4311,7 +4311,7 @@ open_existential_addr
   //   type P
   // $*@opened P must be a unique archetype that refers to an opened
   // existential type P.
-  // %1 will be of type $*P
+  // %1 will be of type $*@opened P
 
 Obtains the address of the concrete value inside the existential
 container referenced by ``%0``. The protocol conformances associated
@@ -4334,7 +4334,7 @@ open_existential_value
   //   type P
   // $@opened P must be a unique archetype that refers to an opened
   // existential type P.
-  // %1 will be of type $P
+  // %1 will be of type $@opened P
 
 Loadable version of the above: Opens-up the existential
 container associated with ``%0``. The protocol conformances associated
