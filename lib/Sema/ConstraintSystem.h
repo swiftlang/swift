@@ -1352,10 +1352,10 @@ private:
     /// Favor the given constraint; this change will be rolled back
     /// when we exit the current solver scope.
     void favorConstraint(Constraint *constraint) {
-      if (!constraint->isFavored()) {
-        constraint->setFavored();
-        favoredConstraints.push_back(constraint);
-      }
+      assert(!constraint->isFavored());
+
+      constraint->setFavored();
+      favoredConstraints.push_back(constraint);
     }
 
   private:
@@ -2083,6 +2083,20 @@ public:
     if (constraint->isActive())
       deactivateConstraint(constraint);
     removeInactiveConstraint(constraint);
+  }
+
+  /// Note that this constraint is "favored" within its disjunction, and
+  /// should be tried first to the exclusion of non-favored constraints in
+  /// the same disjunction.
+  void favorConstraint(Constraint *constraint) {
+    if (constraint->isFavored())
+      return;
+
+    if (solverState) {
+      solverState->favorConstraint(constraint);
+    } else {
+      constraint->setFavored();
+    }
   }
 
   /// Retrieve the list of inactive constraints.
@@ -3186,11 +3200,6 @@ private:
   Constraint *selectDisjunction();
 
   Constraint *selectApplyDisjunction();
-
-  /// Look at the set of overload choices to determine if there is a best
-  /// generic overload to favor.
-  OverloadChoice *tryOptimizeGenericDisjunction(
-                                            ArrayRef<OverloadChoice> choices);
 
   /// Solve the system of constraints generated from provided expression.
   ///

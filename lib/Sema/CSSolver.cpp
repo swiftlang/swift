@@ -1907,9 +1907,73 @@ void ConstraintSystem::partitionForDesignatedTypes(
   }
 }
 
+// Performance hack: if there are two generic overloads, and one is
+// more specialized than the other, prefer the more-specialized one.
+static Constraint *tryOptimizeGenericDisjunction(
+                                          TypeChecker &tc,
+                                          DeclContext *dc,
+                                          ArrayRef<Constraint *> constraints) {
+  if (constraints.size() != 2 ||
+      constraints[0]->getKind() != ConstraintKind::BindOverload ||
+      constraints[1]->getKind() != ConstraintKind::BindOverload ||
+      constraints[0]->isFavored() ||
+      constraints[1]->isFavored())
+    return nullptr;
+
+  OverloadChoice choiceA = constraints[0]->getOverloadChoice();
+  OverloadChoice choiceB = constraints[1]->getOverloadChoice();
+
+  if (!choiceA.isDecl() || !choiceB.isDecl())
+    return nullptr;
+
+  auto isViable = [](ValueDecl *decl) -> bool {
+    assert(decl);
+
+    auto *AFD = dyn_cast<AbstractFunctionDecl>(decl);
+    if (!AFD || !AFD->isGeneric())
+      return false;
+
+    auto funcType = AFD->getInterfaceType();
+    auto hasAnyOrOptional = funcType.findIf([](Type type) -> bool {
+      if (type->getOptionalObjectType())
+        return true;
+
+      return type->isAny();
+    });
+
+    // If function declaration references `Any` or `Any?` type
+    // let's not attempt it, because it's unclear
+    // without solving which overload is going to be better.
+    return !hasAnyOrOptional;
+  };
+
+  auto *declA = choiceA.getDecl();
+  auto *declB = choiceB.getDecl();
+
+  if (!isViable(declA) || !isViable(declB))
+    return nullptr;
+
+  switch (tc.compareDeclarations(dc, declA, declB)) {
+  case Comparison::Better:
+    return constraints[0];
+
+  case Comparison::Worse:
+    return constraints[1];
+
+  case Comparison::Unordered:
+    return nullptr;
+  }
+}
+
 void ConstraintSystem::partitionDisjunction(
     ArrayRef<Constraint *> Choices, SmallVectorImpl<unsigned> &Ordering,
     SmallVectorImpl<unsigned> &PartitionBeginning) {
+  // Apply a special-case rule for favoring one generic function over
+  // another.
+  if (auto favored = tryOptimizeGenericDisjunction(TC, DC, Choices)) {
+    favorConstraint(favored);
+  }
+
   SmallSet<Constraint *, 16> taken;
 
   // Local function used to iterate over the untaken choices from the
@@ -1932,6 +1996,7 @@ void ConstraintSystem::partitionDisjunction(
   // end of the partitioning.
 
   SmallVector<unsigned, 4> favored;
+  SmallVector<unsigned, 4> simdOperators;
   SmallVector<unsigned, 4> disabled;
   SmallVector<unsigned, 4> unavailable;
 
@@ -1971,6 +2036,22 @@ void ConstraintSystem::partitionDisjunction(
     });
   }
 
+  // Partition SIMD operators.
+  if (!TC.getLangOpts().SolverEnableOperatorDesignatedTypes &&
+      isOperatorBindOverload(Choices[0])) {
+    forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
+      if (!isOperatorBindOverload(constraint))
+        return false;
+
+      if (isSIMDOperator(constraint->getOverloadChoice().getDecl())) {
+        simdOperators.push_back(index);
+        return true;
+      }
+
+      return false;
+    });
+  }
+
   // Local function to create the next partition based on the options
   // passed in.
   PartitionAppendCallback appendPartition =
@@ -1994,6 +2075,7 @@ void ConstraintSystem::partitionDisjunction(
   });
   appendPartition(favored);
   appendPartition(everythingElse);
+  appendPartition(simdOperators);
 
   // Now create the remaining partitions from what we previously collected.
   appendPartition(unavailable);
