@@ -91,15 +91,16 @@
 using namespace swift;
 
 namespace swift {
-/// Represents the identity of a storage location being accessed.
+/// Information about each dynamic access with valid storage.
 ///
-/// A value-based subclass of AccessedStorage with identical layout. This
-/// provides access to pass-specific data in reserved bits.
+/// This is a pass-specific subclass of AccessedStorage with identical layout.
+/// An instance is created for each BeginAccess in the current function. In
+/// additional to identifying the access' storage location, it associates that
+/// access with pass-specific data in reserved bits. The reserved bits do not
+/// participate in equality or hash lookup.
 ///
-/// The fully descriptive class name allows forward declaration in order to
-/// define bitfields in AccessedStorage.
-///
-/// Aliased to AccessInfo in this file.
+/// Aliased to AccessInfo in this file; the fully descriptive class name allows
+/// forward declaration in order to define bitfields in AccessedStorage.
 class AccessEnforcementOptsInfo : public AccessedStorage {
 public:
   AccessEnforcementOptsInfo(const AccessedStorage &storage)
