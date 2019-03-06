@@ -3336,9 +3336,12 @@ lowerKeyPathSubscriptIndexTypes(
     if (sig) {
       indexTy = indexTy.subst(subscriptSubs);
     }
+
+    // FIXME: Expansion
     auto indexLoweredTy = SGM.Types.getLoweredType(
                                                 AbstractionPattern::getOpaque(),
-                                                indexTy);
+                                                indexTy,
+                                                ResilienceExpansion::Minimal);
     indexLoweredTy = indexLoweredTy.mapTypeOutOfContext();
     indexPatterns.push_back({indexTy->mapTypeOutOfContext()
                                     ->getCanonicalType(),

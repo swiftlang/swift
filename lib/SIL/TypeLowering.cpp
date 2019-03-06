@@ -98,7 +98,8 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
     if (var->isImmutable() &&
         (!SILModuleConventions(M).useLoweredAddresses() ||
          // FIXME: Expansion
-         !getTypeLowering(var->getType()).isAddressOnly()))
+         !getTypeLowering(var->getType(),
+                          ResilienceExpansion::Minimal).isAddressOnly()))
       return CaptureKind::Constant;
 
     // In-out parameters are captured by address.

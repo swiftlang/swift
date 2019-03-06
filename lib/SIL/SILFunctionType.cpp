@@ -315,7 +315,8 @@ public:
       return;
     }
 
-    auto &substResultTL = M.Types.getTypeLowering(origType, substType);
+    auto &substResultTL = M.Types.getTypeLowering(origType, substType,
+                                                  ResilienceExpansion::Minimal);
 
     // Determine the result convention.
     ResultConvention convention;
@@ -590,7 +591,8 @@ private:
 
     unsigned origParamIndex = NextOrigParamIndex++;
 
-    auto &substTL = M.Types.getTypeLowering(origType, substType);
+    auto &substTL = M.Types.getTypeLowering(origType, substType,
+                                            ResilienceExpansion::Minimal);
     ParameterConvention convention;
     if (ownership == ValueOwnership::InOut) {
       convention = ParameterConvention::Indirect_Inout;
@@ -748,8 +750,11 @@ lowerCaptureContextParameters(SILModule &M, AnyFunctionRef function,
     auto type = VD->getInterfaceType();
     auto canType = type->getCanonicalType(origGenericSig);
 
+    // FIXME: Could be changed to Maximal at some point without impacting ABI,
+    // as long as we make sure all call sites are non inlinable.
     auto &loweredTL =
-        Types.getTypeLowering(AbstractionPattern(genericSig, canType), canType);
+        Types.getTypeLowering(AbstractionPattern(genericSig, canType), canType,
+                              ResilienceExpansion::Minimal);
     auto loweredTy = loweredTL.getLoweredType();
     switch (Types.getDeclCaptureKind(capture)) {
     case CaptureKind::None:
@@ -806,7 +811,8 @@ static void destructureYieldsForReadAccessor(SILModule &M,
     return;
   }
 
-  auto &tl = M.Types.getTypeLowering(origType, valueType);
+  auto &tl = M.Types.getTypeLowering(origType, valueType,
+                                     ResilienceExpansion::Minimal);
   auto convention = [&] {
     if (isFormallyPassedIndirectly(M, origType, valueType, tl))
       return ParameterConvention::Indirect_In_Guaranteed;
