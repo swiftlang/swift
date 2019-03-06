@@ -95,7 +95,7 @@ static SILBasicBlock *getNthEdgeBlock(SwitchInstTy *S, unsigned edgeIdx) {
   return S->getCase(edgeIdx).second;
 }
 
-void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
+void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx,
                         llvm::SmallVectorImpl<SILValue> &args) {
   switch (T->getKind()) {
   case SILInstructionKind::BranchInst: {
@@ -131,8 +131,7 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     assert(succBB->getNumArguments() < 2 && "Can take at most one argument");
     if (!succBB->getNumArguments())
       return;
-    args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
+    args.push_back(succBB->getArgument(0));
     return;
   }
 
@@ -143,8 +142,7 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
         (edgeIdx == 0) ? DMBI->getHasMethodBB() : DMBI->getNoMethodBB();
     if (!succBB->getNumArguments())
       return;
-    args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
+    args.push_back(succBB->getArgument(0));
     return;
   }
 
@@ -154,8 +152,7 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     auto succBB = edgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
     if (!succBB->getNumArguments())
       return;
-    args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
+    args.push_back(succBB->getArgument(0));
     return;
   }
   case SILInstructionKind::CheckedCastAddrBranchInst: {
@@ -163,8 +160,7 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     auto succBB = edgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
     if (!succBB->getNumArguments())
       return;
-    args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
+    args.push_back(succBB->getArgument(0));
     return;
   }
   case SILInstructionKind::CheckedCastValueBranchInst: {
@@ -172,8 +168,7 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     auto succBB = edgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
     if (!succBB->getNumArguments())
       return;
-    args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
+    args.push_back(succBB->getArgument(0));
     return;
   }
 
@@ -182,8 +177,7 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     auto *succBB = edgeIdx == 0 ? TAI->getNormalBB() : TAI->getErrorBB();
     if (!succBB->getNumArguments())
       return;
-    args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
+    args.push_back(succBB->getArgument(0));
     return;
   }
 
@@ -215,8 +209,15 @@ SILBasicBlock *swift::splitEdge(TermInst *T, unsigned edgeIdx,
   // Create a new basic block in the edge, and insert it after the srcBB.
   auto *edgeBB = F->createBasicBlockAfter(srcBB);
 
+  SmallVector<SILValue, 16> oldArgs;
+  getEdgeArgs(T, edgeIdx, oldArgs);
+
   SmallVector<SILValue, 16> args;
-  getEdgeArgs(T, edgeIdx, edgeBB, args);
+  // create new SILPHIArguments, args are already sorted, go front to back:
+  for (auto arg : oldArgs) {
+    args.push_back(
+        edgeBB->createPhiArgument(arg->getType(), ValueOwnershipKind::Owned));
+  }
 
   SILBuilder(edgeBB).createBranch(T->getLoc(), destBB, args);
 

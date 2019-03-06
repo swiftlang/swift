@@ -34,9 +34,8 @@ class SILLoopInfo;
 void changeBranchTarget(TermInst *T, unsigned edgeIdx, SILBasicBlock *newDest,
                         bool preserveArgs);
 
-/// Returns the arguments values on the specified CFG edge. If necessary, may
-/// add create new SILPHIArguments, using `NewEdgeBB` as the placeholder.
-void getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
+/// Returns the arguments values on the specified CFG edge.
+void getEdgeArgs(TermInst *T, unsigned edgeIdx,
                  llvm::SmallVectorImpl<SILValue> &args);
 
 /// Splits the edge from terminator.
