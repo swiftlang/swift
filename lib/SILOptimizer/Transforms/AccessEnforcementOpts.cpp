@@ -323,10 +323,9 @@ private:
   void addOutOfScopeAccessInsert(RegionState &state,
                                  BeginAccessInst *beginAccess);
   void addOutOfScopeAccessMerge(RegionState &state, BeginAccessInst *beginAccess);
-  void mergeAccessStruct(RegionState &state,
-                         RegionState::AccessSummary &accessStruct,
-                         const RegionState::AccessSummary &RHSAccessStruct);
-  void merge(RegionState &state, const RegionState &RHS);
+  void mergeAccessSummary(RegionState::AccessSummary &accessSummary,
+                          const RegionState::AccessSummary &otherSummary);
+  void mergeState(RegionState &state, const RegionState &otherState);
   void removeConflictFromStruct(RegionState &state,
                                 RegionState::AccessSummary &accessStruct,
                                 const AccessedStorage &storage, bool isInScope);
@@ -476,30 +475,30 @@ void AccessConflictAndMergeAnalysis::addOutOfScopeAccessMerge(
   }
 }
 
-void AccessConflictAndMergeAnalysis::mergeAccessStruct(
-    RegionState &state, RegionState::AccessSummary &accessStruct,
-    const RegionState::AccessSummary &RHSAccessStruct) {
-  if (!accessStruct.merged) {
-    accessStruct.conflictFreeAccesses.insert(
-        RHSAccessStruct.conflictFreeAccesses.begin(),
-        RHSAccessStruct.conflictFreeAccesses.end());
-    accessStruct.merged = true;
+// Merge the data flow result in `otherSummary` into `accessSummary`.
+void AccessConflictAndMergeAnalysis::mergeAccessSummary(
+    RegionState::AccessSummary &accessSummary,
+    const RegionState::AccessSummary &otherSummary) {
+  const DenseAccessSet &otherAccesses = otherSummary.conflictFreeAccesses;
+  if (!accessSummary.merged) {
+    accessSummary.conflictFreeAccesses.insert(otherAccesses.begin(),
+                                              otherAccesses.end());
+    accessSummary.merged = true;
     return;
   }
-
-  auto pred = [&](BeginAccessInst *it) {
-    return RHSAccessStruct.conflictFreeAccesses.count(it) == 0;
-  };
-  accessStruct.conflictFreeAccesses.remove_if(pred);
+  accessSummary.conflictFreeAccesses.remove_if([&](BeginAccessInst *bai) {
+    return !otherAccesses.count(bai);
+  });
 }
 
-void AccessConflictAndMergeAnalysis::merge(RegionState &state,
-                                           const RegionState &RHS) {
-  state.unidentifiedAccess |= RHS.unidentifiedAccess;
-  mergeAccessStruct(state, state.inScopeConflictFreeAccesses,
-                    RHS.inScopeConflictFreeAccesses);
-  mergeAccessStruct(state, state.outOfScopeConflictFreeAccesses,
-                    RHS.outOfScopeConflictFreeAccesses);
+// Merge the data flow result in `otherState` into `state`.
+void AccessConflictAndMergeAnalysis::mergeState(RegionState &state,
+                                                const RegionState &otherState) {
+  state.unidentifiedAccess |= otherState.unidentifiedAccess;
+  mergeAccessSummary(state.inScopeConflictFreeAccesses,
+                     otherState.inScopeConflictFreeAccesses);
+  mergeAccessSummary(state.outOfScopeConflictFreeAccesses,
+                     otherState.outOfScopeConflictFreeAccesses);
 }
 
 // Top-level driver for AccessConflictAndMergeAnalysis
@@ -846,7 +845,7 @@ void AccessConflictAndMergeAnalysis::mergePredAccesses(
     }
     const RegionState &predState = localRegionStates.find(pred)->getSecond();
     changed = true;
-    merge(state, predState);
+    mergeState(state, predState);
   }
   if (!changed) {
     // If there are no predecessors
