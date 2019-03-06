@@ -11,11 +11,12 @@
 //===----------------------------------------------------------------------===//
 // SWIFT_ENABLE_TENSORFLOW
 
+#include "swift/AST/TensorFlow.h"
 #include "TestContext.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Type.h"
-#include "swift/AST/TensorFlow.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "gtest/gtest.h"
 
 using namespace swift;
@@ -33,16 +34,20 @@ protected:
       : Ctx(testContext.Ctx), floatType(createFloatType()),
         tensorHandleType(createTensorHandleType(floatType)) {}
 
-  Type createStructWithField(const char *name, Type fieldType) {
+  Type createStructWithFields(const char *name, Type fieldType,
+                              int numFields = 1) {
     auto *structDecl = testContext.makeNominal<StructDecl>(name);
     structDecl->computeType();
     auto *structType = StructType::get(structDecl, Type(), Ctx);
-    auto *varDecl = new (Ctx) VarDecl(
-        /*IsStatic*/ false, VarDecl::Specifier::Var,
-        /*IsCaptureList*/ false, SourceLoc(), Ctx.getIdentifier("field"),
-        structDecl);
-    varDecl->setInterfaceType(fieldType);
-    structDecl->addMember(varDecl);
+    for (int fieldId = 0; fieldId < numFields; ++fieldId) {
+      std::string fieldName = llvm::formatv("field{0}", fieldId);
+      auto *varDecl = new (Ctx) VarDecl(
+          /*IsStatic*/ false, VarDecl::Specifier::Var,
+          /*IsCaptureList*/ false, SourceLoc(), Ctx.getIdentifier(fieldName),
+          structDecl);
+      varDecl->setInterfaceType(fieldType);
+      structDecl->addMember(varDecl);
+    }
     return structType;
   }
 
@@ -77,9 +82,9 @@ private:
 TEST_F(TypeContainsTensorFlowValueTest, ClassifiesCorrectly) {
   EXPECT_TRUE(containsTensorFlowValue(tensorHandleType));
   EXPECT_TRUE(containsTensorFlowValue(
-      createStructWithField("StructWithTensor", tensorHandleType)));
+      createStructWithFields("StructWithTensor", tensorHandleType)));
   EXPECT_FALSE(containsTensorFlowValue(
-      createStructWithField("StructWithNoTensor", floatType)));
+      createStructWithFields("StructWithNoTensor", floatType)));
 }
 
 TEST_F(TypeContainsTensorFlowValueTest, WorksForRecursiveTypes) {
@@ -98,4 +103,79 @@ TEST_F(TypeContainsTensorFlowValueTest, WorksForRecursiveTypes) {
   varDecl->setInterfaceType(recursiveType);
   recursiveDecl->addMember(varDecl);
   EXPECT_FALSE(containsTensorFlowValue(recursiveType));
+}
+
+TEST_F(TypeContainsTensorFlowValueTest, TensorFlowType) {
+  EXPECT_TRUE(tf::isTensorHandle(tensorHandleType));
+  EXPECT_FALSE(tf::isTensorHandle(floatType));
+}
+
+TEST_F(TypeContainsTensorFlowValueTest, TensorHandleElementType) {
+  EXPECT_TRUE(tf::getTensorHandleElementType(floatType).isNull());
+  EXPECT_FALSE(tf::getTensorHandleElementType(tensorHandleType).isNull());
+}
+
+TEST_F(TypeContainsTensorFlowValueTest, ClassifyTensorFlowTypes) {
+  EXPECT_EQ(tf::TFValueKind::TensorHandle,
+            tf::classifyTensorFlowValue(tensorHandleType));
+
+  auto *resourceHandleDecl =
+      testContext.makeNominal<ClassDecl>("ResourceHandle");
+  Type resourceHandleType = resourceHandleDecl->getDeclaredInterfaceType();
+  EXPECT_EQ(tf::TFValueKind::ResourceHandle,
+            tf::classifyTensorFlowValue(resourceHandleType));
+
+  auto *variantHandleDecl = testContext.makeNominal<ClassDecl>("VariantHandle");
+  Type variantHandleType = variantHandleDecl->getDeclaredInterfaceType();
+  EXPECT_EQ(tf::TFValueKind::VariantHandle,
+            tf::classifyTensorFlowValue(variantHandleType));
+
+  EXPECT_EQ(tf::TFValueKind::Nope, tf::classifyTensorFlowValue(floatType));
+
+  auto *classDecl = testContext.makeNominal<ClassDecl>("SomeClass");
+  Type classType = classDecl->getDeclaredInterfaceType();
+  EXPECT_EQ(tf::TFValueKind::Nope, tf::classifyTensorFlowValue(classType));
+
+  // We test all functions defined around classifyTensorFlowValue
+  EXPECT_TRUE(tf::isTensorHandle(tensorHandleType));
+  EXPECT_FALSE(tf::isTensorHandle(floatType));
+
+  EXPECT_TRUE(tf::isOpaqueHandle(resourceHandleType) &&
+              tf::isOpaqueHandle(variantHandleType));
+  EXPECT_FALSE(tf::isOpaqueHandle(classType));
+
+  EXPECT_TRUE(tf::isTensorFlowValue(tensorHandleType) &&
+              tf::isTensorFlowValue(resourceHandleType) &&
+              tf::isTensorFlowValue(variantHandleType));
+  EXPECT_FALSE(tf::isTensorFlowValue(floatType));
+}
+
+TEST_F(TypeContainsTensorFlowValueTest, flattenTensorFlowValueAggregate) {
+  SmallVector<Type, 4> flattenedTensorFlowTypes;
+
+  auto *anyDecl = testContext.makeNominal<ClassDecl>("AnyHandle");
+  EXPECT_FALSE(tf::flattenTensorFlowValueAggregate(
+      anyDecl->getDeclaredInterfaceType(), flattenedTensorFlowTypes));
+  EXPECT_EQ(0ul, flattenedTensorFlowTypes.size());
+
+  EXPECT_TRUE(
+      tf::flattenTensorFlowValueAggregate(floatType, flattenedTensorFlowTypes));
+  EXPECT_EQ(0ul, flattenedTensorFlowTypes.size());
+
+  EXPECT_TRUE(tf::flattenTensorFlowValueAggregate(tensorHandleType,
+                                                  flattenedTensorFlowTypes));
+  EXPECT_EQ(1ul, flattenedTensorFlowTypes.size());
+  flattenedTensorFlowTypes.clear();
+
+  Type twoFieldStructType = createStructWithFields(
+      "TwoFieldStruct", tensorHandleType, /*numFields*/ 2);
+  EXPECT_TRUE(tf::flattenTensorFlowValueAggregate(twoFieldStructType,
+                                                  flattenedTensorFlowTypes));
+  EXPECT_EQ(2ul, flattenedTensorFlowTypes.size());
+  flattenedTensorFlowTypes.clear();
+
+  EXPECT_TRUE(tf::flattenTensorFlowValueAggregate(
+      TupleType::get({twoFieldStructType, twoFieldStructType}, testContext.Ctx),
+      flattenedTensorFlowTypes));
+  EXPECT_EQ(4ul, flattenedTensorFlowTypes.size());
 }
