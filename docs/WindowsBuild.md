@@ -53,18 +53,19 @@ This guide assumes your sources live at the root of `S:`. If your sources live e
 subst S: <path to sources>
 ```
 
+**WARNING**: The `core.autocrlf` setting for the Swift repositories is critical on Windows; Git's default configuration will result in repositories whose tests will not run correctly. `git-clone`'s `-c` option will make this setting the default for the cloned repository without affecting your global Git configuration. (Note that this is different from the global `-c` option to `git` itself - `git -c core.autocrlf=input clone ...` is not the same as `git clone -c core.autocrlf=input ...`!)
+
 ```cmd
-git config --global core.autocrlf input
 S:
-git clone https://github.com/apple/swift-cmark cmark
-git clone https://github.com/apple/swift-clang clang
-git clone https://github.com/apple/swift-llvm llvm
-git clone https://github.com/apple/swift-compiler-rt compiler-rt
-git clone https://github.com/apple/swift
-git clone https://github.com/apple/swift-corelibs-libdispatch
-git clone https://github.com/apple/swift-corelibs-foundation
-git clone https://github.com/apple/swift-corelibs-xctest
-git clone https://github.com/apple/swift-lldb lldb
+git clone -c core.autocrlf=input https://github.com/apple/swift-cmark cmark
+git clone -c core.autocrlf=input https://github.com/apple/swift-clang clang
+git clone -c core.autocrlf=input https://github.com/apple/swift-llvm llvm
+git clone -c core.autocrlf=input https://github.com/apple/swift-compiler-rt compiler-rt
+git clone -c core.autocrlf=input https://github.com/apple/swift
+git clone -c core.autocrlf=input https://github.com/apple/swift-corelibs-libdispatch
+git clone -c core.autocrlf=input https://github.com/apple/swift-corelibs-foundation
+git clone -c core.autocrlf=input https://github.com/apple/swift-corelibs-xctest
+git clone -c core.autocrlf=input https://github.com/apple/swift-lldb lldb
 git clone https://github.com/curl/curl.git curl
 git clone https://gitlab.gnome.org/GNOME/libxml2.git libxml2
 ```
@@ -108,15 +109,14 @@ mklink "%VCToolsInstallDir%\include\visualc.apinotes" S:\swift\stdlib\public\Pla
 
 Warning: Creating the above links usually requires administrator privileges. The quick and easy way to do this is to open a second developer prompt by right clicking whatever shortcut you used to open the first one, choosing Run As Administrator, and pasting the above commands into the resulting window. You can then close the privileged prompt; this is the only step which requires elevation.
 
+**All commands from this point forward must be done from within a developer command prompt.**
+
 ### 5. Build LLVM/Clang
-- This must be done from within a developer command prompt. LLVM and Clang are
-  large projects, so building might take a few hours. Make sure that the build
-  type for LLVM/Clang is compatbile with the build type for Swift. That is,
-  either build everything `Debug` or some variant of `Release` (e.g. `Release`,
-  `RelWithDebInfo`).
+- LLVM and Clang are large projects, so building might take a few hours. Make sure that the build type for LLVM/Clang is compatbile with the build type for Swift. That is, either build everything `Debug` or some variant of `Release` (e.g. `Release`, `RelWithDebInfo`). However, be aware that `Debug` builds of LLVM and Clang are _extremely_ slow.
+
 ```cmd
-mkdir "S:\b\llvm"
-pushd "S:\b\llvm"
+md "S:\b\llvm"
+cd "S:\b\llvm"
 cmake -G Ninja^
  -DCMAKE_BUILD_TYPE=Release^
  -DCMAKE_C_COMPILER=cl^
@@ -125,10 +125,9 @@ cmake -G Ninja^
  -DLLVM_ENABLE_ASSERTIONS=ON^
  -DLLVM_ENABLE_PDB=YES^
  -DLLVM_ENABLE_PROJECTS=clang^
- -DLLVM_TARGETS_TO_BUILD=X86^
+ -DLLVM_TARGETS_TO_BUILD=X86;ARM;AArch64^
  S:/llvm
-popd
-cmake --build "S:\b\llvm"
+cmake --build %CD%
 ```
 
 - Update your path to include the LLVM tools.
@@ -138,27 +137,25 @@ path S:\b\llvm\bin;%PATH%
 ```
 
 ### 6. Build CMark
-- This must be done from within a developer command prompt. CMark is a fairly
-  small project and should only take a few minutes to build.
+- CMark is a fairly small project and should only take a minute to build.
+
 ```cmd
-mkdir "S:\b\cmark"
-pushd "S:\b\cmark"
+md "S:\b\cmark"
+cd "S:\b\cmark"
 cmake -G Ninja^
   -DCMAKE_BUILD_TYPE=RelWithDebInfo^
   -DCMAKE_C_COMPILER=cl^
   -DCMAKE_CXX_COMPILER=cl^
   S:\cmark
-popd
-cmake --build "S:\b\cmark"
+cmake --build %CD%
 ```
 
 ### 7. Build Swift
-- This must be done from within a developer command prompt
-- Note that Visual Studio vends a 32-bit python 2.7 installation in `C:\Python27` and a 64-bit python in `C:\Python27amd64`.  You may use either one based on your installation.
+- Note that Visual Studio vends both a 32-bit python 2.7 installation in `C:\Python27` and a 64-bit python in `C:\Python27amd64`.  You may use either one based on your installation.
 
 ```cmd
-mkdir "S:\b\swift"
-pushd "S:\b\swift"
+md "S:\b\swift"
+cd "S:\b\swift"
 cmake -G Ninja^
  -DCMAKE_BUILD_TYPE=RelWithDebInfo^
  -DCMAKE_C_COMPILER=cl^
@@ -168,22 +165,21 @@ cmake -G Ninja^
  -DSWIFT_INCLUDE_DOCS=OFF^
  -DSWIFT_PATH_TO_CMARK_SOURCE="S:\cmark"^
  -DSWIFT_PATH_TO_CMARK_BUILD="S:\b\cmark"^
- -DLLVM_DIR=S:\b\llvm\lib\cmake\llvm^
- -DClang_DIR=S:\b\llvm\lib\cmake\clang^
+ -DLLVM_DIR="S:\b\llvm\lib\cmake\llvm"^
+ -DClang_DIR="S:\b\llvm\lib\cmake\clang"^
  -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE="S:\swift-corelibs-libdispatch"^
  -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="S:/thirdparty/icu4c-63_1-Win64-MSVC2017/include"^
  -DSWIFT_WINDOWS_x86_64_ICU_UC="S:/thirdparty/icu4c-63_1-Win64-MSVC2017/lib64/icuuc.lib"^
  -DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="S:/thirdparty/icu4c-63_1-Win64-MSVC2017/include"^
  -DSWIFT_WINDOWS_x86_64_ICU_I18N="S:/thirdparty/icu4c-63_1-Win64-MSVC2017/lib64/icuin.lib"^
  -DCMAKE_INSTALL_PREFIX="C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr"^
- -DPYTHON_EXECUTABLE=C:\Python27\python.exe^
+ -DPYTHON_EXECUTABLE="C:\Python27\python.exe"^
  S:\swift
-popd
-cmake --build "S:\b\swift"
+cmake --build %CD%
 ```
 
 - To create a Visual Studio project, you'll need to change the generator and,
-  if you have a 64 bit processor, specify the generator platform. Note that you
+  if you have a 64-bit processor, specify the generator platform. Note that you
   may get multiple build errors compiling the `swift` project due to an MSBuild
   limitation that file paths cannot exceed 260 characters. These can be
   ignored, as they occur after the build when writing the last build status to
@@ -194,11 +190,11 @@ cmake -G "Visual Studio 2017" -A x64 -T "host=x64"^ ...
 ```
 
 ### 8. Build lldb
-- This must be done from within a developer command prompt and could take hours
-  depending on your system.
+- LLDB is a large project and could take hours depending on your system.
+
 ```cmd
-mkdir "S:\b\lldb"
-pushd "S:\b\lldb"
+md "S:\b\lldb"
+cd "S:\b\lldb"
 cmake -G Ninja^
   -DCMAKE_BUILD_TYPE=RelWithDebInfo^
   -DLLDB_ALLOW_STATIC_BINDINGS=YES^
@@ -210,8 +206,7 @@ cmake -G Ninja^
   -DLLVM_ENABLE_ASSERTIONS=ON^
   -DPYTHON_HOME=%ProgramFiles(x86)%\Microsoft Visual Studio\Shared\Python37_64^
   S:\lldb
-popd
-cmake --build S:\b\lldb
+cmake --build %CD%
 ```
 
 ### 9. Running tests on Windows
@@ -231,18 +226,17 @@ ninja -C S:\b\swift check-swift
 ### 10. Build swift-corelibs-libdispatch
 
 ```cmd
-mkdir "S:\b\libdispatch"
-pushd "S:\b\libdispatch"
+md "S:\b\libdispatch"
+cd "S:\b\libdispatch"
 cmake -G Ninja^
   -DCMAKE_BUILD_TYPE=RelWithDebInfo^
   -DCMAKE_C_COMPILER=clang-cl^
   -DCMAKE_CXX_COMPILER=clang-cl^
-  -DCMAKE_SWIFT_COMPILER=S:\b\swift\bin\swiftc.exe^
+  -DCMAKE_SWIFT_COMPILER="S:\b\swift\bin\swiftc.exe"^
   -DENABLE_SWIFT=ON^
   -DENABLE_TESTING=OFF^
   S:\swift-corelibs-libdispatch
-popd
-cmake --build S:\b\libdispatch
+cmake --build %CD%
 ```
 
 - Add libdispatch to your path:
@@ -253,42 +247,38 @@ path S:\b\libdispatch;S:\b\libdispatch\src;%PATH%
 ### 11. Build curl
 
 ```cmd
-pushd "S:\curl"
+cd "S:\curl"
 .\buildconf.bat
 cd winbuild
 nmake /f Makefile.vc mode=static VC=15 MACHINE=x64
-popd
 ```
 
 ### 12. Build libxml2
 
 ```cmd
-pushd "S:\libxml2\win32"
-cscript configure.js iconv=no
+cd "S:\libxml2\win32"
+cscript configure.js iconv=no static=no
 nmake /f Makefile.msvc
-popd
 ```
 
 ### 13. Build swift-corelibs-foundation
 
 ```cmd
-mkdir "S:\b\foundation"
-pushd "S:\b\foundation
+md "S:\b\foundation"
+cd "S:\b\foundation"
 cmake -G Ninja^
   -DCMAKE_BUILD_TYPE=RelWithDebInfo^
   -DCMAKE_C_COMPILER=clang-cl^
-  -DCMAKE_SWIFT_COMPILER=S:\b\swift\bin\swiftc.exe^
+  -DCMAKE_SWIFT_COMPILER="S:\b\swift\bin\swiftc.exe"^
   -DCURL_LIBRARY="S:/curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/lib/libcurl_a.lib"^
   -DCURL_INCLUDE_DIR="S:/curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/include"^
   -DICU_ROOT="S:/thirdparty/icu4c-63_1-Win64-MSVC2017"^
   -DLIBXML2_LIBRARY="S:/libxml2/win32/bin.msvc/libxml2_a.lib"^
   -DLIBXML2_INCLUDE_DIR="S:/libxml2/include"^
-  -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch^
-  -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=S:\b\libdispatch^
+  -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE="S:\swift-corelibs-libdispatch"^
+  -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD="S:\b\libdispatch"^
    S:\swift-corelibs-foundation
- popd
- cmake --build S:\b\foundation
-
+cmake --build %CD%
 ```
 
 - Add Foundation to your path:
@@ -299,21 +289,20 @@ path S:\b\foundation;%PATH%
 ### 14. Build swift-corelibs-xctest
 
 ```cmd
-mkdir "S:\b\xctest"
-pushd "S:\b\xctest"
+md "S:\b\xctest"
+cd "S:\b\xctest"
 cmake -G Ninja^
   -DBUILD_SHARED_LIBS=YES^
   -DCMAKE_BUILD_TYPE=RelWithDebInfo^
-  -DCMAKE_SWIFT_COMPILER=S:\b\swift\bin\swiftc.exe^
-  -DXCTEST_PATH_TO_COREFOUNDATION_BUILD=S:\b\foundation\CoreFoundation-prefix^
-  -DXCTEST_PATH_TO_FOUNDATION_BUILD=S:\b\foundation^
-  -DXCTEST_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch^
-  -DXCTEST_PATH_TO_LIBDISPATCH_BUILD=S:\b\libdispatch^
-  -DLIT_COMMAND=S:\llvm\utils\lit\lit.py^
-  -DPYTHON_EXECUTABLE=C:\Python27\python.exe^
+  -DCMAKE_SWIFT_COMPILER="S:\b\swift\bin\swiftc.exe"^
+  -DXCTEST_PATH_TO_COREFOUNDATION_BUILD="S:\b\foundation\CoreFoundation-prefix"^
+  -DXCTEST_PATH_TO_FOUNDATION_BUILD="S:\b\foundation"^
+  -DXCTEST_PATH_TO_LIBDISPATCH_SOURCE="S:\swift-corelibs-libdispatch"^
+  -DXCTEST_PATH_TO_LIBDISPATCH_BUILD="S:\b\libdispatch"^
+  -DLIT_COMMAND="S:\llvm\utils\lit\lit.py"^
+  -DPYTHON_EXECUTABLE="C:\Python27\python.exe"^
   S:\swift-corelibs-xctest
-popd
-cmake --build S:\b\xctest
+cmake --build %CD%
 ```
 
 - Add XCTest to your path:
