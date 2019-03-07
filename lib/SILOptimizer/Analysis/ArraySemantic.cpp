@@ -168,7 +168,7 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() const {
         llvm::StringSwitch<ArrayCallKind>(Attrs)
             .Case("array.props.isNativeTypeChecked",
                   ArrayCallKind::kArrayPropsIsNativeTypeChecked)
-            .Case("array.init", ArrayCallKind::kArrayInit)
+            .StartsWith("array.init", ArrayCallKind::kArrayInit)
             .Case("array.uninitialized", ArrayCallKind::kArrayUninitialized)
             .Case("array.check_subscript", ArrayCallKind::kCheckSubscript)
             .Case("array.check_index", ArrayCallKind::kCheckIndex)
