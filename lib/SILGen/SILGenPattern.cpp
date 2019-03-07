@@ -2318,8 +2318,9 @@ void PatternMatchEmission::initSharedCaseBlockDest(CaseStmt *caseBlock,
 
   auto *block = SGF.createBasicBlock();
   result.first->second.first = block;
-    
-  // Add args for any pattern variables
+
+  // If we do not have any bound decls, we do not need to setup any phi
+  // arguments for the shared case block. Just bail early.
   if (!caseBlock->hasBoundDecls()) {
     return;
   }
@@ -2353,6 +2354,7 @@ void PatternMatchEmission::emitAddressOnlyAllocations() {
   for (auto &entry : SharedCases) {
     CaseStmt *caseBlock = entry.first;
 
+    // If we do not have any bound decls, we can bail early.
     if (!caseBlock->hasBoundDecls()) {
       continue;
     }
@@ -2426,11 +2428,9 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
       SGF.B.setInsertionPoint(predBB);
       
     } else {
-      // FIXME: Figure out why this is necessary.
-      if (caseBB->pred_empty()) {
-        SGF.eraseBasicBlock(caseBB);
-        continue;
-      }
+      // If we did not need a shared case block, we shouldn't have emitted one.
+      assert(!caseBB->pred_empty() &&
+             "Shared case block without predecessors?!");
 
       // Otherwise, move the block to after the first predecessor.
       auto predBB = *caseBB->pred_begin();
@@ -2646,32 +2646,36 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
   auto caseBlock = row.getClientData<CaseStmt>();
   SGF.emitProfilerIncrement(caseBlock);
 
-  // Certain case statements can be entered along multiple paths, either
-  // because they have multiple labels or because of fallthrough.  When we
-  // need multiple entrance path, we factor the paths with a shared block.
-  if (!caseBlock->hasBoundDecls()) {
-    // Don't emit anything yet, we emit it at the cleanup level of the switch
-    // statement.
-    JumpDest sharedDest = emission.getSharedCaseBlockDest(caseBlock);
-    SGF.Cleanups.emitBranchAndCleanups(sharedDest, caseBlock);
-    return;
-  }
-
-  // If we don't have a fallthrough or a multi-pattern 'case', we can just
-  // emit the body inline and save some dead blocks. Emit the statement here.
+  // Certain case statements can be entered along multiple paths, either because
+  // they have multiple labels or because of fallthrough. When we need multiple
+  // entrance path, we factor the paths with a shared block. If we don't have a
+  // fallthrough or a multi-pattern 'case', we can just emit the body inline and
+  // save some dead blocks. Emit the statement here and bail early.
   if (!row.hasFallthroughTo() && caseBlock->getCaseLabelItems().size() == 1) {
     emission.emitCaseBody(caseBlock);
     return;
   }
 
+  // Ok, at this point we know that we have a multiple entrance block. Grab our
+  // shared destination in preperation for branching to it.
+  //
+  // NOTE: We do not emit anything yet, since we will emit the shared block
+  // later.
   JumpDest sharedDest = emission.getSharedCaseBlockDest(caseBlock);
 
-  // Generate the arguments from this row's pattern in the case block's
-  // expected order, and keep those arguments from being cleaned up, as
-  // we're passing the +1 along to the shared case block dest. (The
-  // cleanups still happen, as they are threaded through here messily,
-  // but the explicit retains here counteract them, and then the
-  // retain/release pair gets optimized out.)
+  // If we do not have any bound decls, we do not need to setup any
+  // variables. Just jump to the shared destination.
+  if (!caseBlock->hasBoundDecls()) {
+    JumpDest sharedDest = emission.getSharedCaseBlockDest(caseBlock);
+    SGF.Cleanups.emitBranchAndCleanups(sharedDest, caseBlock);
+    return;
+  }
+
+  // Generate the arguments from this row's pattern in the case block's expected
+  // order, and keep those arguments from being cleaned up, as we're passing the
+  // +1 along to the shared case block dest. (The cleanups still happen, as they
+  // are threaded through here messily, but the explicit retains here counteract
+  // them, and then the retain/release pair gets optimized out.)
   ArrayRef<CaseLabelItem> labelItems = caseBlock->getCaseLabelItems();
   SmallVector<SILValue, 4> args;
   SmallVector<VarDecl *, 4> expectedVarOrder;
@@ -2741,9 +2745,10 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   clauseRows.reserve(S->getRawCases().size());
   bool hasFallthrough = false;
   for (auto caseBlock : S->getCases()) {
-    if (!caseBlock->hasBoundDecls() ||
-        caseBlock->getCaseLabelItems().size() > 1 ||
-        hasFallthrough) {
+    // If the previous block falls through into this block or we have multiple
+    // case label itmes, create a shared case block to generate the shared
+    // block.
+    if (hasFallthrough || caseBlock->getCaseLabelItems().size() > 1) {
       emission.initSharedCaseBlockDest(caseBlock, hasFallthrough);
     }
 
