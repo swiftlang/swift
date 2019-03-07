@@ -86,6 +86,12 @@ bool SILType::isTrivial(SILModule &M) const {
     .isTrivial();
 }
 
+bool SILType::isTrivial(const SILFunction &F) const {
+  // FIXME: Should just call F.getTypeLowering()
+  return F.getModule().Types.getTypeLowering(*this,
+                                       F.getResilienceExpansion()).isTrivial();
+}
+
 bool SILType::isReferenceCounted(SILModule &M) const {
   return M.Types.getTypeLowering(*this,
                                  ResilienceExpansion::Minimal)
@@ -181,9 +187,9 @@ bool SILType::isLoadableOrOpaque(SILModule &M) const {
   return isLoadable(M) || !SILModuleConventions(M).useLoweredAddresses();
 }
 
-bool SILType::isLoadableOrOpaque(SILFunction *inFunction) const {
-  SILModule &M = inFunction->getModule();
-  return isLoadable(inFunction) ||
+bool SILType::isLoadableOrOpaque(const SILFunction &F) const {
+  SILModule &M = F.getModule();
+  return isLoadable(F) ||
          !SILModuleConventions(M).useLoweredAddresses();
 }
 
@@ -195,9 +201,10 @@ bool SILType::isAddressOnly(SILModule &M) const {
     .isAddressOnly();
 }
 
-bool SILType::isAddressOnly(SILFunction *inFunction) const {
-  return inFunction->getModule().Types.getTypeLowering(*this,
-                        inFunction->getResilienceExpansion()).isAddressOnly();
+bool SILType::isAddressOnly(const SILFunction &F) const {
+  // FIXME: Should just call F.getTypeLowering()
+  return F.getModule().Types.getTypeLowering(*this,
+                                   F.getResilienceExpansion()).isAddressOnly();
 }
 
 SILType SILType::substGenericArgs(SILModule &M,
@@ -414,6 +421,7 @@ SILBoxType::getFieldLoweredType(SILModule &M, unsigned index) const {
   return fieldTy;
 }
 
+// FIXME: This should take a SILFunction, or a SILModule + ResilienceExpansion
 ValueOwnershipKind
 SILResultInfo::getOwnershipKind(SILModule &M,
                                 CanGenericSignature signature) const {
