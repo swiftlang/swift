@@ -917,36 +917,6 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   argsWithLabels.append(args.begin(), args.end());
   AnyFunctionType::relabelParams(argsWithLabels, argLabels);
 
-  // FIXME: Remove this. It's functionally identical to the real code
-  // path below, except for some behavioral differences in solution ranking
-  // that I don't understand.
-  if (params.size() == 1 &&
-      args.size() == 1 &&
-      params[0].getLabel().empty() &&
-      args[0].getLabel().empty() &&
-      !params[0].getParameterFlags().isInOut() &&
-      !args[0].getParameterFlags().isInOut() &&
-      params[0].getPlainType()->isAny()) {
-    auto argType = args[0].getPlainType();
-
-    // Disallow assignment of noescape function to parameter of type
-    // Any. Allowing this would allow these functions to escape.
-    if (auto *fnTy = argType->getAs<AnyFunctionType>()) {
-      if (fnTy->isNoEscape()) {
-        auto *loc = cs.getConstraintLocator(locator);
-        // Allow assigned of 'no-escape' function with recorded fix.
-        if (cs.shouldAttemptFixes()) {
-          if (!cs.recordFix(MarkExplicitlyEscaping::create(cs, loc)))
-            return cs.getTypeMatchSuccess();
-        }
-
-        return cs.getTypeMatchFailure(locator);
-      }
-    }
-
-    return cs.getTypeMatchSuccess();
-  }
-
   // Match up the call arguments to the parameters.
   SmallVector<ParamBinding, 4> parameterBindings;
   ArgumentFailureTracker listener(cs, parameterBindings, locator);
