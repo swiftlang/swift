@@ -92,7 +92,7 @@
 // --       ivar destroyer:
 // CHECK-SAME:   i32 0,
 // --       flags:
-// CHECK-SAME:   i32 3,
+// CHECK-SAME:   i32 2,
 // --       RO data:
 // CHECK-objc-SAME: @_DATA__TtC16class_resilience14ResilientChild
 // CHECK-native-SAME: i32 0,
