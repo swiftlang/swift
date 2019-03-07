@@ -269,28 +269,6 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         expectEqual(quadrature.absoluteTolerance, 101)
         expectEqual(quadrature.relativeTolerance, 102)
     }
-    
-    AccelerateTests.test("Quadrature/MaxIntervalsProperty") {
-        let quadrature = Quadrature(integrator: .qags(maxIntervals: 100))
-        
-        expectEqual(quadrature.maxIntervals, 100)
-        
-        quadrature.maxIntervals = 50
-        
-        expectEqual(quadrature.maxIntervals, 50)
-    }
-    
-    AccelerateTests.test("Quadrature/PointsPerIntervalProperty") {
-        let quadrature = Quadrature(integrator: .qag(pointsPerInterval: .fifteen, maxIntervals: 0))
-        
-        expectEqual(quadrature.qagPointsPerInterval,
-                    Quadrature.QAGPointsPerInterval.fifteen)
-        
-        quadrature.qagPointsPerInterval = Quadrature.QAGPointsPerInterval.sixtyOne
-        
-        expectEqual(quadrature.qagPointsPerInterval,
-                    Quadrature.QAGPointsPerInterval.sixtyOne)
-    }
 }
 
 runAllTests()

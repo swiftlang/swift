@@ -42,8 +42,7 @@ public class Quadrature {
     
     private var integrateOptions = quadrature_integrate_options()
     private var integrand: ((Double) -> Double)!
-    
-    
+
     /// Initializes and returns a quadrature instance.
     ///
     /// - Parameter integrator: An enumeration specifying the integration algorithm and relevant properties.
@@ -52,43 +51,20 @@ public class Quadrature {
     public init(integrator: Integrator,
                 absoluteTolerance: Double = 1.0e-8,
                 relativeTolerance: Double = 1.0e-2){
-        
-        self.integrator = integrator
+
         integrateOptions.abs_tolerance = absoluteTolerance
         integrateOptions.rel_tolerance = relativeTolerance
-    }
-    
-    /// The quadrature instance's integration algorithm and relevant properties.
-    public var integrator: Integrator {
-        set {
-            switch newValue {
-            case .qng:
-                integrateOptions.integrator = QUADRATURE_INTEGRATE_QNG
-            case .qag(let pointsPerInterval, let maxIntervals):
-                integrateOptions.integrator = QUADRATURE_INTEGRATE_QAG
-                integrateOptions.qag_points_per_interval = pointsPerInterval.rawValue
-                integrateOptions.max_intervals = maxIntervals
-            case .qags(let maxIntervals):
-                integrateOptions.integrator = QUADRATURE_INTEGRATE_QAGS
-                integrateOptions.max_intervals = maxIntervals
-            }
-        }
-        get {
-            let integrator: Integrator!
-            
-            switch integrateOptions.integrator {
-            case QUADRATURE_INTEGRATE_QNG:
-                integrator = .qng
-            case QUADRATURE_INTEGRATE_QAG:
-                integrator = .qag(pointsPerInterval: QAGPointsPerInterval(rawValue: integrateOptions.qag_points_per_interval)!,
-                                  maxIntervals: integrateOptions.max_intervals)
-            case QUADRATURE_INTEGRATE_QAGS:
-                integrator = .qags(maxIntervals: integrateOptions.max_intervals)
-            default:
-                integrator = nil
-            }
-            
-            return integrator
+        
+        switch integrator {
+        case .qng:
+            integrateOptions.integrator = QUADRATURE_INTEGRATE_QNG
+        case .qag(let pointsPerInterval, let maxIntervals):
+            integrateOptions.integrator = QUADRATURE_INTEGRATE_QAG
+            integrateOptions.qag_points_per_interval = pointsPerInterval.rawValue
+            integrateOptions.max_intervals = maxIntervals
+        case .qags(let maxIntervals):
+            integrateOptions.integrator = QUADRATURE_INTEGRATE_QAGS
+            integrateOptions.max_intervals = maxIntervals
         }
     }
     
@@ -111,27 +87,7 @@ public class Quadrature {
             return integrateOptions.rel_tolerance
         }
     }
-    
-    /// The maximum number of subintervals in the subdivision used by QAG and QAGS integrators.
-    public var maxIntervals: Int {
-        set {
-            integrateOptions.max_intervals = newValue
-        }
-        get {
-            return integrateOptions.max_intervals
-        }
-    }
-    
-    /// Number of points per subinterval. Used by the QAG integrator only; other integrators ignore this value.
-    public var qagPointsPerInterval: QAGPointsPerInterval {
-        set {
-            integrateOptions.qag_points_per_interval = newValue.rawValue
-        }
-        get {
-            return QAGPointsPerInterval(rawValue: integrateOptions.qag_points_per_interval) ?? .default
-        }
-    }
-    
+ 
     /// Performs the integration over the supplied function.
     ///
     /// - Parameter interval: The lower and upper bounds of the integration interval.
