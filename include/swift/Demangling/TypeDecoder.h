@@ -315,7 +315,7 @@ class TypeDecoder {
       if (Node->getNumChildren() < 2)
         return BuiltType();
 
-      std::vector<BuiltType> args;
+      SmallVector<BuiltType, 8> args;
 
       const auto &genericArgs = Node->getChild(1);
       assert(genericArgs->getKind() == NodeKind::TypeList);
@@ -427,7 +427,7 @@ class TypeDecoder {
         return BuiltType();
 
       // Find the protocol list.
-      std::vector<BuiltProtocolDecl> Protocols;
+      SmallVector<BuiltProtocolDecl, 8> Protocols;
       auto TypeList = Node->getChild(0);
       if (TypeList->getKind() == NodeKind::ProtocolList &&
           TypeList->getNumChildren() >= 1) {
@@ -514,7 +514,7 @@ class TypeDecoder {
         return BuiltType();
 
       bool hasParamFlags = false;
-      std::vector<FunctionParam<BuiltType>> parameters;
+      SmallVector<FunctionParam<BuiltType>, 8> parameters;
       if (!decodeMangledFunctionInputType(Node->getChild(isThrow ? 1 : 0),
                                           parameters, hasParamFlags))
         return BuiltType();
@@ -531,9 +531,9 @@ class TypeDecoder {
     }
     case NodeKind::ImplFunctionType: {
       auto calleeConvention = ImplParameterConvention::Direct_Unowned;
-      std::vector<ImplFunctionParam<BuiltType>> parameters;
-      std::vector<ImplFunctionResult<BuiltType>> results;
-      std::vector<ImplFunctionResult<BuiltType>> errorResults;
+      SmallVector<ImplFunctionParam<BuiltType>, 8> parameters;
+      SmallVector<ImplFunctionResult<BuiltType>, 8> results;
+      SmallVector<ImplFunctionResult<BuiltType>, 8> errorResults;
       ImplFunctionTypeFlags flags;
 
       for (unsigned i = 0; i < Node->getNumChildren(); i++) {
@@ -611,7 +611,7 @@ class TypeDecoder {
       return decodeMangledType(Node->getChild(0));
 
     case NodeKind::Tuple: {
-      std::vector<BuiltType> elements;
+      SmallVector<BuiltType, 8> elements;
       std::string labels;
       bool variadic = false;
       for (auto &element : *Node) {
@@ -785,7 +785,7 @@ class TypeDecoder {
 private:
   template <typename T>
   bool decodeImplFunctionPart(Demangle::NodePointer node,
-                              std::vector<T> &results) {
+                              SmallVectorImpl<T> &results) {
     if (node->getNumChildren() != 2)
       return true;
     
@@ -871,7 +871,7 @@ private:
 
   bool decodeMangledFunctionInputType(
       Demangle::NodePointer node,
-      std::vector<FunctionParam<BuiltType>> &params,
+      SmallVectorImpl<FunctionParam<BuiltType>> &params,
       bool &hasParamFlags) {
     // Look through a couple of sugar nodes.
     if (node->getKind() == NodeKind::Type ||
