@@ -228,7 +228,7 @@ public:
         DebugInfoFormat(IRGenDebugInfoFormat::None),
         UseJIT(false), IntegratedREPL(false),
         DisableLLVMOptzns(false), DisableSwiftSpecificLLVMOptzns(false),
-        DisableLLVMSLPVectorizer(false), DisableFPElim(true), Playground(false),
+        DisableLLVMSLPVectorizer(false), DisableFPElim(false), Playground(false),
         EmitStackPromotionChecks(false), PrintInlineTree(false),
         EmbedMode(IRGenEmbedMode::None), HasValueNamesSetting(false),
         ValueNames(false), EnableReflectionMetadata(true),
