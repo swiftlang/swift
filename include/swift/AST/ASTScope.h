@@ -143,6 +143,9 @@ enum class ASTScopeKind : uint8_t {
 /// can be used to fully-expand the tree, constructing all of its nodes, but
 /// should only be used for testing or debugging purposes, e.g., via the
 /// frontend option
+///
+/// "Continuations" are used to lazily expand the next scope in a series.
+///
 /// \code
 /// -dump-scope-maps expanded
 /// \endcode

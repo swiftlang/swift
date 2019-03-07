@@ -196,7 +196,7 @@ void ASTScope::expand() const {
   if (!parentAndExpanded.getInt()) {
   // Expand the children in the current scope.
   switch (getKind()) {
-    case ASTScopeKind::NominalOrExtensionWhereClause: abort();
+
   case ASTScopeKind::Preexpanded:
     llvm_unreachable("Node should be pre-expanded");
 
@@ -327,6 +327,9 @@ void ASTScope::expand() const {
     // Expanding a brace statement means setting it as its own continuation,
     // unless that's already been done.
     addActiveContinuation(this);
+    break;
+      
+  case ASTScopeKind::NominalOrExtensionWhereClause:
     break;
 
   case ASTScopeKind::IfStmt:
@@ -692,7 +695,6 @@ static bool parentDirectDescendedFromAbstractStorageDecl(
               const AbstractStorageDecl *decl) {
   while (true) {
     switch (parent->getKind()) {
-      case ASTScopeKind::NominalOrExtensionWhereClause: abort();
     case ASTScopeKind::Preexpanded:
     case ASTScopeKind::AbstractFunctionDecl:
     case ASTScopeKind::AbstractFunctionParams:
@@ -707,6 +709,7 @@ static bool parentDirectDescendedFromAbstractStorageDecl(
     case ASTScopeKind::SourceFile:
     case ASTScopeKind::TypeDecl:
     case ASTScopeKind::ExtensionGenericParams:
+    case ASTScopeKind::NominalOrExtensionWhereClause:
     case ASTScopeKind::TypeOrExtensionBody:
     case ASTScopeKind::DefaultArgument:
     case ASTScopeKind::AbstractFunctionBody:
@@ -739,7 +742,6 @@ static bool parentDirectDescendedFromAbstractFunctionDecl(
               const AbstractFunctionDecl *decl) {
   while (true) {
     switch (parent->getKind()) {
-      case ASTScopeKind::NominalOrExtensionWhereClause: abort();
     case ASTScopeKind::Preexpanded:
     case ASTScopeKind::AbstractFunctionParams:
     case ASTScopeKind::DefaultArgument:
@@ -755,6 +757,7 @@ static bool parentDirectDescendedFromAbstractFunctionDecl(
     case ASTScopeKind::SourceFile:
     case ASTScopeKind::TypeDecl:
     case ASTScopeKind::ExtensionGenericParams:
+    case ASTScopeKind::NominalOrExtensionWhereClause:
     case ASTScopeKind::TypeOrExtensionBody:
     case ASTScopeKind::PatternBinding:
     case ASTScopeKind::PatternInitializer:
@@ -785,7 +788,6 @@ static bool parentDirectDescendedFromTypeDecl(const ASTScope *parent,
                                               const TypeDecl *decl) {
   while (true) {
     switch (parent->getKind()) {
-      case ASTScopeKind::NominalOrExtensionWhereClause: abort();
     case ASTScopeKind::Preexpanded:
     case ASTScopeKind::GenericParams:
       // Keep looking.
@@ -801,6 +803,7 @@ static bool parentDirectDescendedFromTypeDecl(const ASTScope *parent,
     case ASTScopeKind::DefaultArgument:
     case ASTScopeKind::AbstractFunctionBody:
     case ASTScopeKind::ExtensionGenericParams:
+    case ASTScopeKind::NominalOrExtensionWhereClause:
     case ASTScopeKind::TypeOrExtensionBody:
     case ASTScopeKind::PatternBinding:
     case ASTScopeKind::PatternInitializer:
@@ -1209,10 +1212,10 @@ ASTScope *ASTScope::createIfNeeded(
 
 bool ASTScope::canStealContinuation() const {
   switch (getKind()) {
-       case ASTScopeKind::NominalOrExtensionWhereClause: abort();
-  case ASTScopeKind::Preexpanded:
+   case ASTScopeKind::Preexpanded:
   case ASTScopeKind::SourceFile:
   case ASTScopeKind::ExtensionGenericParams:
+  case ASTScopeKind::NominalOrExtensionWhereClause:
   case ASTScopeKind::TypeOrExtensionBody:
   case ASTScopeKind::GenericParams:
   case ASTScopeKind::AbstractFunctionParams:
@@ -1314,7 +1317,6 @@ void ASTScope::enumerateContinuationScopes() const {
 
 ASTContext &ASTScope::getASTContext() const {
   switch (kind) {
-    case ASTScopeKind::NominalOrExtensionWhereClause: abort();
   case ASTScopeKind::SourceFile:
     return sourceFile.file->getASTContext();
 
@@ -1323,7 +1325,7 @@ ASTContext &ASTScope::getASTContext() const {
 
   case ASTScopeKind::ExtensionGenericParams:
     return extension->getASTContext();
-
+      
   case ASTScopeKind::TypeOrExtensionBody:
     return getParent()->getASTContext();
 
@@ -1358,6 +1360,8 @@ ASTContext &ASTScope::getASTContext() const {
   case ASTScopeKind::SwitchStmt:
   case ASTScopeKind::CaseStmt:
   case ASTScopeKind::Closure:
+  case ASTScopeKind::NominalOrExtensionWhereClause:
+
     return getParent()->getASTContext();
 
   case ASTScopeKind::Accessors:
@@ -1384,7 +1388,6 @@ SourceFile &ASTScope::getSourceFile() const {
 
 SourceRange ASTScope::getSourceRangeImpl() const {
   switch (kind) {
-    case ASTScopeKind::NominalOrExtensionWhereClause: abort();
   case ASTScopeKind::Preexpanded:
     return SourceRange(children().front()->getSourceRange().Start,
                        children().back()->getSourceRange().End);
@@ -1420,6 +1423,9 @@ SourceRange ASTScope::getSourceRangeImpl() const {
 
     return SourceRange(startLoc, extension->getEndLoc());
   }
+      
+   case ASTScopeKind::NominalOrExtensionWhereClause:
+    return whereClause->getSourceRange();
       
   case ASTScopeKind::TypeOrExtensionBody:
     if (auto ext = dyn_cast<ExtensionDecl>(iterableDeclContext))
@@ -1689,7 +1695,6 @@ const ASTScope *ASTScope::findInnermostEnclosingScope(SourceLoc loc) const {
 
 DeclContext *ASTScope::getDeclContext() const {
   switch (getKind()) {
-    case ASTScopeKind::NominalOrExtensionWhereClause: abort();
   case ASTScopeKind::SourceFile:
     return sourceFile.file;
 
@@ -1731,6 +1736,7 @@ DeclContext *ASTScope::getDeclContext() const {
 
   case ASTScopeKind::ExtensionGenericParams:
   case ASTScopeKind::GenericParams:
+  case ASTScopeKind::NominalOrExtensionWhereClause:
   case ASTScopeKind::AbstractFunctionParams:
   case ASTScopeKind::PatternBinding:
   case ASTScopeKind::AfterPatternBinding:
@@ -1771,7 +1777,6 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
   };
 
   switch (getKind()) {
-       case ASTScopeKind::NominalOrExtensionWhereClause: abort();
   case ASTScopeKind::Preexpanded:
   case ASTScopeKind::SourceFile:
   case ASTScopeKind::AbstractFunctionDecl:
@@ -1810,6 +1815,14 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
 
   case ASTScopeKind::GenericParams:
     result.push_back(genericParams.params->getParams()[genericParams.index]);
+    break;
+      
+  case ASTScopeKind::NominalOrExtensionWhereClause:
+    for (const auto &requirementRepr: whereClause->getRequirements()) {
+      auto *const nominal = requirementRepr.getSubject()->getAnyNominal();
+      assert(nominal && "where must bind a member type or an associated type");
+      result.push_back(nominal);
+    }
     break;
 
   case ASTScopeKind::AbstractFunctionParams:
@@ -1922,8 +1935,7 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
 
   // Print the scope kind and any salient information.
   switch (kind) {
-       case ASTScopeKind::NominalOrExtensionWhereClause: abort();
-  case ASTScopeKind::Preexpanded:
+   case ASTScopeKind::Preexpanded:
     printScopeKind("Preexpanded");
     printAddress(this);
     printRange();
@@ -1954,7 +1966,19 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
     out << "'";
     printRange();
     break;
-
+      
+    case ASTScopeKind::NominalOrExtensionWhereClause:
+    printScopeKind("NominalOrExtensionWhereClause");
+    printAddress(whereClause);
+    out << " where: '";
+    interleave(whereClause->getRequirements(),
+               [&](const RequirementRepr &req) { req.print(out); },
+               [&]() { out << ", "; }
+    );
+    out << "'\n";
+    printRange();
+    break;
+      
   case ASTScopeKind::TypeOrExtensionBody: {
     printScopeKind("TypeOrExtensionBody");
     if (auto ext = dyn_cast<ExtensionDecl>(iterableDeclContext)) {
