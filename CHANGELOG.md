@@ -6,6 +6,7 @@ CHANGELOG
 
 | Contents               |
 | :--------------------- |
+| [Swift 5.1](#swift-51) |
 | [Swift 5.0](#swift-50) |
 | [Swift 4.2](#swift-42) |
 | [Swift 4.1](#swift-41) |
@@ -29,11 +30,13 @@ Swift 5.1
 * Single-parameter functions accepting values of type `Any` are no
   longer preferred over other functions.
 
-```swift
-func foo(_: Any) { print("Any") }
-func foo<T>(_: T) { print("T") }
-foo(0) // prints "Any" in Swift < 5.1, "T" in Swift 5.1
-```
+  ```swift
+  func foo(_: Any) { print("Any") }
+  func foo<T>(_: T) { print("T") }
+  foo(0) // prints "Any" in Swift < 5.1, "T" in Swift 5.1
+  ```
+
+**Add new entries to the top of this section, not here!**
 
 Swift 5.0
 ---------
