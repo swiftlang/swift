@@ -1293,13 +1293,11 @@ bb4:
 // CHECK-NEXT: load [[BEGIN2]] : $*X
 // CHECK-NEXT: end_access [[BEGIN2]] : $*X
 // CHECK-NEXT: br bb3
-// CHECK: [[BEGIN3:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK: [[BEGIN3:%.*]] = begin_access [read] [dynamic] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN3]] : $*X
-// CHECK-NEXT: end_access [[BEGIN3]] : $*X
 // CHECK: br bb4
-// CHECK: [[BEGIN4:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
-// CHECK-NEXT: load [[BEGIN4]] : $*X
-// CHECK-NEXT: end_access [[BEGIN4]] : $*X
+// CHECK: load [[BEGIN3]] : $*X
+// CHECK-NEXT: end_access [[BEGIN3]] : $*X
 // CHECK: cond_br {{.*}}, bb2, bb5
 // CHECK: [[BEGIN5:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN5]] : $*X
