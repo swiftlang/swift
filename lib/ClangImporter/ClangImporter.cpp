@@ -1011,8 +1011,7 @@ ClangImporter::create(ASTContext &ctx,
   clangDiags.setSeverity(clang::diag::err_module_not_built,
                          clang::diag::Severity::Error,
                          clang::SourceLocation());
-  clangDiags.setSuppressAfterFatalError(
-      !ctx.Diags.getShowDiagnosticsAfterFatalError());
+  clangDiags.setFatalsAsError(ctx.Diags.getShowDiagnosticsAfterFatalError());
 
 
   // Create the associated action.
