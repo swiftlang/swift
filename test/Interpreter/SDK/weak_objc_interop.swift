@@ -3,6 +3,7 @@
 // RUN: cp %s %t/main.swift
 // RUN: %target-clang -fobjc-arc %S/Inputs/ObjCWeak/ObjCWeak.m -c -o %t/ObjCWeak.o
 // RUN: %target-build-swift %t/main.swift -I %S/Inputs/ObjCWeak/ -Xlinker %t/ObjCWeak.o -o %t/weak_objc_interop -Xfrontend -disable-access-control
+// RUN: %target-codesign %t/weak_objc_interop
 // RUN: %target-run %t/weak_objc_interop 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
 

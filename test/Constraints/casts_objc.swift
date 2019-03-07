@@ -34,12 +34,7 @@ func nsobject_as_class_cast<T>(_ x: NSObject, _: T) {
 func test(_ a : CFString!, b : CFString) {
   let dict = NSMutableDictionary()
   let object = NSObject()
-  dict[a] = object // expected-warning {{expression implicitly coerced from 'CFString?' to 'Any'}}
-  // expected-note@-1 {{force-unwrap the value to avoid this warning}}
-  // expected-note@-2 {{provide a default value to avoid this warning}}
-  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
-
-
+  dict[a] = object
   dict[b] = object
 }
 

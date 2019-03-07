@@ -1,22 +1,11 @@
+public func unknown() {}
 
-public protocol P {
-  func doSomething()
-}
-
-@_silgen_name("unknown") public
-func unknown() -> ()
-
-@_fixed_layout
-public class Y : P {
-  @inlinable
-  public func doAnotherThing() {
+public class Class {
+  @inlinable public class func firstMethod() {
     unknown()
   }
 
-  @inlinable
-  public func doSomething() {
-    doAnotherThing()
-  }
-  @inlinable
-  public init() {}
+  @inlinable public class func secondMethod() {}
+
+  @inlinable public class func thirdMethod() {}
 }

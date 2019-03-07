@@ -21,11 +21,11 @@ func test3() {
   undeclared_func( // expected-error {{use of unresolved identifier 'undeclared_func'}}
 } // expected-error {{expected expression in list of expressions}}
 
-func runAction() {} // expected-note {{did you mean 'runAction'?}}
+func runAction() {} // expected-note {{'runAction' declared here}}
 
 // rdar://16601779
 func foo() {
-  runAction(SKAction.sequence() // expected-error {{use of unresolved identifier 'SKAction'}} expected-error {{expected ',' separator}} {{32-32=,}}
+  runAction(SKAction.sequence() // expected-error {{use of unresolved identifier 'SKAction'; did you mean 'runAction'?}} {{13-21=runAction}} expected-error {{expected ',' separator}} {{32-32=,}}
     
     skview!
     // expected-error @-1 {{use of unresolved identifier 'skview'}}
@@ -58,7 +58,7 @@ func testNotCoveredCase(x: Int) {
 // rdar://18926814
 func test4() {
   let abc = 123
-  _ = " >> \( abc } ) << " // expected-error {{expected ',' separator}} {{18-18=,}}  expected-error {{expected expression in list of expressions}}  expected-error {{extra tokens after interpolated string expression}}
+  _ = " >> \( abc } ) << " // expected-error {{expected ',' separator}} {{18-18=,}}  expected-error {{expected expression in list of expressions}}
 
 }
 
@@ -140,7 +140,20 @@ struct Weak<T: class> { // expected-error {{'class' constraint can only appear o
 }
 
 let x: () = ()
-!() // expected-error {{missing argument for parameter #1 in call}}
+!() // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
 !(()) // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
 !(x) // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
 !x // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
+
+func sr8202_foo(@NSApplicationMain x: Int) {} // expected-error {{@NSApplicationMain may only be used on 'class' declarations}}
+func sr8202_bar(@available(iOS, deprecated: 0) x: Int) {} // expected-error {{'@availability' attribute cannot be applied to this declaration}}
+func sr8202_baz(@discardableResult x: Int) {} // expected-error {{'@discardableResult' attribute cannot be applied to this declaration}}
+func sr8202_qux(@objcMembers x: String) {} // expected-error {{@objcMembers may only be used on 'class' declarations}}
+func sr8202_quux(@weak x: String) {} // expected-error {{'weak' is a declaration modifier, not an attribute}} expected-error {{'weak' may only be used on 'var' declarations}}
+
+class sr8202_cls<@NSApplicationMain T: AnyObject> {} // expected-error {{@NSApplicationMain may only be used on 'class' declarations}}
+func sr8202_func<@discardableResult T>(x: T) {} // expected-error {{'@discardableResult' attribute cannot be applied to this declaration}}
+enum sr8202_enum<@indirect T> {} // expected-error {{'indirect' is a declaration modifier, not an attribute}} expected-error {{'indirect' modifier cannot be applied to this declaration}}
+protocol P {
+  @available(swift, introduced: 4.2) associatedtype Assoc // expected-error {{'@availability' attribute cannot be applied to this declaration}}
+}

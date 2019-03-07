@@ -1,8 +1,20 @@
-// RUN: %target-swift-frontend -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=missing %s
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=all %s
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=all %s -enable-resilience
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=all %s -enable-testing
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=all %s -enable-resilience -enable-testing
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=all %s -O
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=all %s -enable-resilience -O
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=all %s -enable-testing -O
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=all %s -enable-resilience -enable-testing -O
 
-public struct PublicNothing {}
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -typecheck -parse-as-library -module-name test %s -emit-tbd -emit-tbd-path %t/typecheck.tbd
+// RUN: %target-swift-frontend -emit-ir -parse-as-library -module-name test %s -emit-tbd -emit-tbd-path %t/emit-ir.tbd
+// RUN: diff -u %t/typecheck.tbd %t/emit-ir.tbd
 
-public struct PublicInit {
+public struct StructPublicNothing {}
+
+public struct StructPublicInit {
     public init() {}
 
     public init(public_: Int) {}
@@ -10,14 +22,14 @@ public struct PublicInit {
     private init(private_: Int) {}
 }
 
-public struct PublicMethods {
+public struct StructPublicMethods {
     public init() {}
     public func publicMethod() {}
     internal func internalMethod() {}
     private func privateMethod() {}
 }
 
-public struct PublicProperties {
+public struct StructPublicProperties {
     public let publicLet: Int = 0
     internal let internalLet: Int = 0
     private let privateLet: Int = 0
@@ -44,7 +56,26 @@ public struct PublicProperties {
     }
 }
 
-public struct PublicStatics {
+public struct StructPublicSubscripts {
+    public subscript(publicGet _: Int) -> Int { return 0 }
+    internal subscript(internalGet _: Int) -> Int { return 0 }
+    private subscript(privateGet _: Int) -> Int { return 0 }
+
+    public subscript(publicGetSet _: Int) -> Int {
+        get {return 0 }
+        set {}
+    }
+    internal subscript(internalGetSet _: Int) -> Int {
+        get {return 0 }
+        set {}
+    }
+    private subscript(privateGetSet _: Int) -> Int {
+        get {return 0 }
+        set {}
+    }
+}
+
+public struct StructPublicStatics {
     public static func publicStaticFunc() {}
     internal static func internalStaticFunc() {}
     private static func privateStaticFunc() {}
@@ -75,7 +106,7 @@ public struct PublicStatics {
     }
 }
 
-public struct PublicGeneric<T, U, V> {
+public struct StructPublicGeneric<T, U, V> {
   public var publicVar: T
   internal var internalVar: U
   private var privateVar: V
@@ -100,22 +131,22 @@ public struct PublicGeneric<T, U, V> {
 }
 
 
-internal struct InternalNothing {}
+internal struct StructInternalNothing {}
 
-internal struct InternalInit {
+internal struct StructInternalInit {
     internal init() {}
 
     internal init(internal_: Int) {}
     private init(private_: Int) {}
 }
 
-internal struct InternalMethods {
+internal struct StructInternalMethods {
     internal init() {}
     internal func internalMethod() {}
     private func privateMethod() {}
 }
 
-internal struct InternalProperties {
+internal struct StructInternalProperties {
     internal let internalLet: Int = 0
     private let privateLet: Int = 0
 
@@ -135,7 +166,21 @@ internal struct InternalProperties {
     }
 }
 
-internal struct InternalStatics {
+internal struct StructInternalSubscripts {
+    internal subscript(internalGet _: Int) -> Int { return 0 }
+    private subscript(privateGet _: Int) -> Int { return 0 }
+
+    internal subscript(internalGetSet _: Int) -> Int {
+        get {return 0 }
+        set {}
+    }
+    private subscript(privateGetSet _: Int) -> Int {
+        get {return 0 }
+        set {}
+    }
+}
+
+internal struct StructInternalStatics {
     internal static func internalStaticFunc() {}
     private static func privateStaticFunc() {}
 
@@ -158,7 +203,7 @@ internal struct InternalStatics {
     }
 }
 
-internal struct InternalGeneric<T, U, V> {
+internal struct StructInternalGeneric<T, U, V> {
   internal var internalVar: U
   private var privateVar: V
 
@@ -178,19 +223,19 @@ internal struct InternalGeneric<T, U, V> {
 }
 
 
-private struct PrivateNothing {}
+private struct StructPrivateNothing {}
 
-private struct PrivateInit {
+private struct StructPrivateInit {
     private init() {}
     private init(private_: Int) {}
 }
 
-private struct PrivateMethods {
+private struct StructPrivateMethods {
     private init() {}
     private func privateMethod() {}
 }
 
-private struct PrivateProperties {
+private struct StructPrivateProperties {
     private let privateLet: Int = 0
 
     private var privateVar: Int = 0
@@ -203,7 +248,16 @@ private struct PrivateProperties {
     }
 }
 
-private struct PrivateStatics {
+private struct StructPrivateSubscripts {
+    private subscript(privateGet _: Int) -> Int { return 0 }
+
+    private subscript(privateGetSet _: Int) -> Int {
+        get {return 0 }
+        set {}
+    }
+}
+
+private struct StructPrivateStatics {
     private static func privateStaticFunc() {}
 
     private static let privateLet: Int = 0
@@ -218,7 +272,7 @@ private struct PrivateStatics {
     }
 }
 
-private struct PrivateGeneric<T, U, V> {
+private struct StructPrivateGeneric<T, U, V> {
   private var privateVar: V
 
   private var privateVarConcrete: Int = 0

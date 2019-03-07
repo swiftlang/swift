@@ -41,3 +41,9 @@ enum ForwardDeclaredOnly {
   ForwardDeclaredOnlyA,
   ForwardDeclaredOnlyB
 };
+
+enum __attribute__((enum_extensibility(closed))) UnavailableCases {
+  UnavailableCasesA,
+  UnavailableCasesB,
+  UnavailableCasesThisIsTheUnavailableOne __attribute__((availability(swift, unavailable)))
+};

@@ -1,0 +1,10 @@
+Name:            resilient_struct
+Decls:
+  - Name:            16resilient_struct4SizeV
+    Size:            16
+    Alignment:       8
+    ExtraInhabitants: 0
+  - Name:            16resilient_struct12ResilientRefV
+    Size:            8
+    Alignment:       8
+    ExtraInhabitants: 4096

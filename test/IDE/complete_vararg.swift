@@ -82,7 +82,7 @@ func testSubscript() {
   obj#^SUBSCRIPT_1^#
 }
 // SUBSCRIPT_1: Begin completions
-// SUBSCRIPT_1: Decl[Subscript]/CurrNominal:        [{#Int...#}][#Int#]{{; name=.+$}}
+// SUBSCRIPT_1: Decl[Subscript]/CurrNominal:        [{#(i): Int...#}][#Int#]{{; name=.+$}}
 // SUBSCRIPT_1: End completions
 
 func testGenericFreeFunc() {

@@ -78,6 +78,9 @@ class SyntaxData final
   /// If there is no parent, this is 0.
   const CursorIndex IndexInParent;
 
+  /// Cache the absolute position of this node.
+  Optional<AbsolutePosition> PositionCache;
+
   size_t numTrailingObjects(OverloadToken<AtomicCache<SyntaxData>>) const {
     return Raw->getNumChildren();
   }
@@ -130,6 +133,18 @@ class SyntaxData final
   }
 
 public:
+  /// Get the node immediately before this current node that does contain a
+  /// non-missing token. Return nullptr if we cannot find such node.
+  RC<SyntaxData> getPreviousNode() const;
+
+  /// Get the node immediately after this current node that does contain a
+  /// non-missing token. Return nullptr if we cannot find such node.
+  RC<SyntaxData> getNextNode() const;
+
+  /// Get the first non-missing token node in this tree. Return nullptr if this
+  /// node does not contain non-missing tokens.
+  RC<SyntaxData> getFirstToken() const;
+
   ~SyntaxData() {
     for (auto &I : getChildren())
       I.~AtomicCache<SyntaxData>();
@@ -235,6 +250,18 @@ public:
     });
   }
 
+  /// Calculate the absolute position of this node, use cache if the cache
+  /// is populated.
+  AbsolutePosition getAbsolutePosition() const;
+
+  /// Calculate the absolute end position of this node, use cache of the immediate
+  /// next node if populated.
+  AbsolutePosition getAbsoluteEndPositionAfterTrailingTrivia() const;
+
+  /// Get the absolute position without skipping the leading trivia of this
+  /// node.
+  AbsolutePosition getAbsolutePositionBeforeLeadingTrivia() const;
+
   /// Returns true if the data node represents type syntax.
   bool isType() const;
 
@@ -256,6 +283,9 @@ public:
   /// Dump a debug description of the syntax data for debugging to
   /// standard error.
   void dump(llvm::raw_ostream &OS) const;
+
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "Only meant for use in the debugger");
 };
 
 } // end namespace syntax
@@ -265,7 +295,7 @@ public:
 namespace llvm {
   using SD = swift::syntax::SyntaxData;
   using RCSD = swift::RC<SD>;
-  template <> struct llvm::DenseMapInfo<RCSD> {
+  template <> struct DenseMapInfo<RCSD> {
     static inline RCSD getEmptyKey() {
       return SD::make(nullptr, nullptr, 0);
     }

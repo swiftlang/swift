@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/a.out -Ounchecked
+// RUN: %target-codesign %t/a.out
 //
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
@@ -15,7 +16,7 @@ DictionaryUnchecked.test("noCseOnInit") {
   func createDict() -> Dictionary<Int, Bool> {
     // CSE should not be able to combine both Dictionary.init() calls.
     // This did happen and resulted in a crash because Dictionary.init()
-    // was defined with @effects(readnone).
+    // was defined with @_effects(readnone).
     // But this was wrong because it actually reads the array buffer (from
     // the literal).
     var Dict: Dictionary<Int, Bool> = [:]

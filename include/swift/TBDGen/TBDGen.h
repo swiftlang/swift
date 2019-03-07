@@ -14,6 +14,7 @@
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
+#include "swift/Basic/Version.h"
 
 namespace llvm {
 class raw_ostream;
@@ -23,13 +24,39 @@ namespace swift {
 class FileUnit;
 class ModuleDecl;
 
-void enumeratePublicSymbols(FileUnit *module, llvm::StringSet<> &symbols,
-                            bool hasMultipleIGMs);
-void enumeratePublicSymbols(ModuleDecl *module, llvm::StringSet<> &symbols,
-                            bool hasMultipleIGMs);
+/// The current ABI version of Swift, as tapi labels it.
+const uint8_t TAPI_SWIFT_ABI_VERSION = 5;
 
-void writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os, bool hasMultipleIGMs,
-                  llvm::StringRef installName);
+/// Options for controlling the exact set of symbols included in the TBD
+/// output.
+struct TBDGenOptions {
+  /// Whether this compilation has multiple IRGen instances.
+  bool HasMultipleIGMs;
+
+  /// The install_name to use in the TBD file.
+  std::string InstallName;
+
+  /// The module link name (for force loading).
+  std::string ModuleLinkName;
+
+  /// The current project version to use in the generated TBD file. Defaults
+  /// to 1, which matches the default if the DYLIB_CURRENT_VERSION build setting
+  /// is not set.
+  version::Version CurrentVersion = {1, 0, 0};
+
+  /// The dylib compatibility-version to use in the generated TBD file. Defaults
+  /// to 1, which matches the default if the DYLIB_COMPATIBILITY_VERSION build
+  /// setting is not set.
+  version::Version CompatibilityVersion = {1, 0, 0};
+};
+
+void enumeratePublicSymbols(FileUnit *module, llvm::StringSet<> &symbols,
+                            const TBDGenOptions &opts);
+void enumeratePublicSymbols(ModuleDecl *module, llvm::StringSet<> &symbols,
+                            const TBDGenOptions &opts);
+
+void writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
+                  const TBDGenOptions &opts);
 
 } // end namespace swift
 

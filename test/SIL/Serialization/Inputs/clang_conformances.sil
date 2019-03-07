@@ -20,3 +20,11 @@ bb0:
   dealloc_stack %1 : $*ComparisonResult // id: %9
   return %7 : $Bool                               // id: %10
 }
+
+sil @compare_eq : $@convention(witness_method: Equatable) (@in_guaranteed ComparisonResult, @in_guaranteed ComparisonResult, @thick ComparisonResult.Type) -> Bool
+
+sil_witness_table shared [serialized] ComparisonResult: Equatable module __ObjC {
+  method #Equatable."=="!1: @compare_eq
+}
+
+

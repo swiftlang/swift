@@ -1,5 +1,3 @@
-// XFAIL: linux
-
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-pch -index-store-path %t/idx -o %t/bridge-head.pch %S/Inputs/bridge-head.h
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -import-objc-header %t/bridge-head.pch -primary-file %s -o %t/s1.o -index-store-path %t/idx
@@ -21,8 +19,8 @@
 // PCH-UNIT: has-main: 0
 // PCH-UNIT: DEPEND START
 // PCH-UNIT: Record | user | {{.*}}bridge-include.h | bridge-include.h-
-// PCH-UNIT: File | user | {{.*}}bridge-head.h |
-// PCH-UNIT: File | user | {{.*}}module.modulemap |
+// PCH-UNIT: File | user | {{.*}}bridge-head.h
+// PCH-UNIT: File | user | {{.*}}module.modulemap
 // PCH-UNIT: DEPEND END (3)
 // PCH-UNIT: INCLUDE START
 // PCH-UNIT: {{.*}}bridge-head.h:1 | {{.*}}bridge-include.h
@@ -32,7 +30,7 @@
 // PCH-UNIT: --------
 // PCH-UNIT: has-main: 1
 // PCH-UNIT: DEPEND START
-// PCH-UNIT: Unit | system | {{.*}}Swift.swiftmodule |
+// PCH-UNIT: Unit | system | {{.*}}Swift.swiftmodule
 // PCH-UNIT: Unit | user | {{.*}}bridge-head.pch | bridge-head.pch-
 // PCH-UNIT: Record | user | {{.*}}unit-with-bridging-header.swift | unit-with-bridging-header.swift-
 // PCH-UNIT: DEPEND END (3)
@@ -41,7 +39,7 @@
 // TEXTUAL-UNIT: --------
 // TEXTUAL-UNIT: has-main: 1
 // TEXTUAL-UNIT: DEPEND START
-// TEXTUAL-UNIT: Unit | system | {{.*}}Swift.swiftmodule |
+// TEXTUAL-UNIT: Unit | system | {{.*}}Swift.swiftmodule
 // TEXTUAL-UNIT: Record | user | {{.*}}unit-with-bridging-header.swift | unit-with-bridging-header.swift-
 // TEXTUAL-UNIT: DEPEND END (2)
 

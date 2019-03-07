@@ -6,7 +6,7 @@
 // Check that named-lazy-member-loading reduces the number of Decls deserialized
 // RUN: %target-swift-frontend -typecheck -I %t -disable-named-lazy-member-loading -typecheck -stats-output-dir %t/stats-pre %s
 // RUN: %target-swift-frontend -typecheck -I %t -stats-output-dir %t/stats-post %s
-// RUN: %utils/process-stats-dir.py --evaluate-delta 'NumDeclsDeserialized < -5' %t/stats-pre %t/stats-post
+// RUN: %{python} %utils/process-stats-dir.py --evaluate-delta 'NumDeclsDeserialized < -5' %t/stats-pre %t/stats-post
 
 import NamedLazyMembers
 

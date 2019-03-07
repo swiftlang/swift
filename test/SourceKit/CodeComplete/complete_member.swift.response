@@ -33,6 +33,15 @@
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:15complete_member11FooProtocolP14fooInstanceVarSivp",
       key.modulename: "complete_member"
+    },
+    {
+      key.kind: source.lang.swift.keyword,
+      key.name: "self",
+      key.sourcetext: "self",
+      key.description: "self",
+      key.typename: "FooProtocol",
+      key.context: source.codecompletion.context.thisclass,
+      key.num_bytes_to_erase: 0
     }
   ]
 }

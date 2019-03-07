@@ -1,4 +1,4 @@
-add_swift_library(swiftSwiftPrivateLibcExtras ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
+add_swift_target_library(swiftSwiftPrivateLibcExtras ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   # This file should be listed the first.  Module name is inferred from the
   # filename.
   SwiftPrivateLibcExtras.swift
@@ -15,4 +15,5 @@ add_swift_library(swiftSwiftPrivateLibcExtras ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc
   SWIFT_MODULE_DEPENDS_CYGWIN Glibc
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
+  SWIFT_MODULE_DEPENDS_WINDOWS MSVCRT WinSDK
   INSTALL_IN_COMPONENT stdlib-experimental)

@@ -1,4 +1,4 @@
-// RUN: %target-resilience-test --no-backward-deployment
+// RUN: %target-resilience-test
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -39,8 +39,6 @@ ProtocolAddRequirementsTest.test("AddMethodRequirements") {
 #else
   let expected = [0, 10, 11].map(Halogen.init)
 #endif
-
-  expectEqual(result, expected)
 }
 
 
@@ -141,6 +139,30 @@ ProtocolAddRequirementsTest.test("AddSubscriptRequirements") {
   t.set(key: "B", value: 20)
   doSomething(&t, k1: "A", k2: "B")
   expectEqual(t.get(key: "A"), 20)
+}
+
+struct AddAssociatedType<T> : AddAssocTypesProtocol { }
+
+ProtocolAddRequirementsTest.test("AddAssociatedTypeRequirements") {
+  let addString = AddAssociatedType<String>()
+  let stringResult = doSomethingWithAssocTypes(addString)
+
+  if getVersion() == 0 {
+    expectEqual("there are no associated types yet", stringResult)
+  } else {
+    expectEqual("Wrapper<AddAssociatedType<String>>", stringResult)
+  }
+}
+
+ProtocolAddRequirementsTest.test("AddAssociatedConformanceRequirements") {
+  let addString = AddAssociatedType<String>()
+  let stringResult = doSomethingWithAssocConformances(addString)
+
+  if getVersion() == 0 {
+    expectEqual("there are no associated conformances yet", stringResult)
+  } else {
+    expectEqual("I am a wrapper for AddAssociatedType<String>", stringResult)
+  }
 }
 
 runAllTests()

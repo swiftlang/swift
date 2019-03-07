@@ -22,6 +22,7 @@ namespace sourcekitd_test {
 enum class SourceKitRequest {
   None,
   ProtocolVersion,
+  CompilerVersion,
   DemangleNames,
   MangleSimpleClasses,
   Index,
@@ -31,6 +32,8 @@ enum class SourceKitRequest {
   CodeCompleteUpdate,
   CodeCompleteCacheOnDisk,
   CodeCompleteSetPopularAPI,
+  TypeContextInfo,
+  ConformingMethodList,
   CursorInfo,
   RangeInfo,
   RelatedIdents,
@@ -59,6 +62,7 @@ enum class SourceKitRequest {
   Statistics,
   SyntaxTree,
   EnableCompileNotifications,
+  CollectExpresstionType,
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) KIND,
 #include "swift/IDE/RefactoringKinds.def"
 };
@@ -99,10 +103,13 @@ struct TestOptions {
   bool PrintRequest = true;
   bool PrintResponseAsJSON = false;
   bool PrintRawResponse = false;
+  bool PrintResponse = true;
   bool SimplifiedDemangling = false;
   bool SynthesizedExtensions = false;
   bool CollectActionables = false;
   bool isAsyncRequest = false;
+  bool timeRequest = false;
+  unsigned repeatRequest = 1;
   llvm::Optional<bool> CancelOnSubsequentRequest;
   bool parseArgs(llvm::ArrayRef<const char *> Args);
   void printHelp(bool ShowHidden) const;

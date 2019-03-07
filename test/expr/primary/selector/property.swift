@@ -34,8 +34,8 @@ class ObjCClass {
     let _ = #selector(setter: myProperty)
     let _ = #selector(setter: myComputedReadWriteProperty)
 
-    let _ = #selector(setter: myConstant) // expected-error {{argument of '#selector(setter:)' refers to non-settable let 'myConstant'}}
-    let _ = #selector(setter: myComputedReadOnlyProperty) // expected-error {{argument of '#selector(setter:)' refers to non-settable var 'myComputedReadOnlyProperty'}}
+    let _ = #selector(setter: myConstant) // expected-error {{argument of '#selector(setter:)' refers to non-settable property 'myConstant'}}
+    let _ = #selector(setter: myComputedReadOnlyProperty) // expected-error {{argument of '#selector(setter:)' refers to non-settable property 'myComputedReadOnlyProperty'}}
 
     let _ = #selector(myClassFunc) // expected-error{{static member 'myClassFunc' cannot be used on instance of type 'ObjCClass'}}
   }
@@ -46,8 +46,8 @@ class ObjCClass {
     let _ = #selector(setter: myProperty)
     let _ = #selector(setter: myComputedReadWriteProperty)
 
-    let _ = #selector(setter: myConstant) // expected-error {{argument of '#selector(setter:)' refers to non-settable let 'myConstant'}}
-    let _ = #selector(setter: myComputedReadOnlyProperty) // expected-error {{argument of '#selector(setter:)' refers to non-settable var 'myComputedReadOnlyProperty'}}
+    let _ = #selector(setter: myConstant) // expected-error {{argument of '#selector(setter:)' refers to non-settable property 'myConstant'}}
+    let _ = #selector(setter: myComputedReadOnlyProperty) // expected-error {{argument of '#selector(setter:)' refers to non-settable property 'myComputedReadOnlyProperty'}}
 
     let _ = #selector(myClassFunc)
   }
@@ -91,20 +91,20 @@ func testWrongKind(myObjcInstance: ObjCClass, myWrapperInstance: Wrapper) {
   let _ = #selector(setter: ObjCClass.myFunc) // expected-error{{cannot reference instance method 'myFunc()' as a property; remove 'setter:'}} {{21-29=}}
 
   // Referring to a let property with a setter
-  let _ = #selector(setter: myObjcInstance.myConstant) // expected-error {{argument of '#selector(setter:)' refers to non-settable let 'myConstant'}}
-  let _ = #selector(setter: ObjCClass.myConstant) // expected-error {{argument of '#selector(setter:)' refers to non-settable let 'myConstant'}}
+  let _ = #selector(setter: myObjcInstance.myConstant) // expected-error {{argument of '#selector(setter:)' refers to non-settable property 'myConstant'}}
+  let _ = #selector(setter: ObjCClass.myConstant) // expected-error {{argument of '#selector(setter:)' refers to non-settable property 'myConstant'}}
 }
 
 // Referring to non ObjC members
 
 class NonObjCClass {
-  var nonObjCPropertyForGetter = HelperClass() // expected-note{{add '@objc' to expose this var to Objective-C}} {{3-3=@objc }}
-  var nonObjCPropertyForSetter = HelperClass() // expected-note{{add '@objc' to expose this var to Objective-C}} {{3-3=@objc }}
+  var nonObjCPropertyForGetter = HelperClass() // expected-note{{add '@objc' to expose this property to Objective-C}} {{3-3=@objc }}
+  var nonObjCPropertyForSetter = HelperClass() // expected-note{{add '@objc' to expose this property to Objective-C}} {{3-3=@objc }}
 }
 
 func testNonObjCMembers(nonObjCInstance: NonObjCClass) {
-  let _ = #selector(getter: nonObjCInstance.nonObjCPropertyForGetter) // expected-error{{argument of '#selector' refers to var 'nonObjCPropertyForGetter' that is not exposed to Objective-C}}
-  let _ = #selector(setter: nonObjCInstance.nonObjCPropertyForSetter) // expected-error{{argument of '#selector' refers to var 'nonObjCPropertyForSetter' that is not exposed to Objective-C}}
+  let _ = #selector(getter: nonObjCInstance.nonObjCPropertyForGetter) // expected-error{{argument of '#selector' refers to property 'nonObjCPropertyForGetter' that is not exposed to Objective-C}}
+  let _ = #selector(setter: nonObjCInstance.nonObjCPropertyForSetter) // expected-error{{argument of '#selector' refers to property 'nonObjCPropertyForSetter' that is not exposed to Objective-C}}
 
   // Referencing undefined symbols
 
@@ -221,9 +221,9 @@ let v13 = #selector(getter: otherObjCInstance.privateVar) // expected-error{{}}
 let v14 = #selector(setter: otherObjCInstance.privateVar) // expected-error{{privateVar' is inaccessible due to 'private' protection level}}
 
 let v21 = #selector(getter: OtherObjCClass.privateSetVar)
-let v22 = #selector(setter: OtherObjCClass.privateSetVar) // expected-error{{setter of var 'privateSetVar' is inaccessible}}
+let v22 = #selector(setter: OtherObjCClass.privateSetVar) // expected-error{{setter of property 'privateSetVar' is inaccessible}}
 let v23 = #selector(getter: otherObjCInstance.privateSetVar)
-let v24 = #selector(setter: otherObjCInstance.privateSetVar) // expected-error{{setter of var 'privateSetVar' is inaccessible}}
+let v24 = #selector(setter: otherObjCInstance.privateSetVar) // expected-error{{setter of property 'privateSetVar' is inaccessible}}
 
 let v31 = #selector(getter: OtherObjCClass.internalVar)
 let v32 = #selector(setter: OtherObjCClass.internalVar)

@@ -96,7 +96,7 @@ extension ClosedRange {
 }
 
 extension ClosedRange: RangeExpression {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // trivial-implementation
   public func relative<C: Collection>(to collection: C) -> Range<Bound>
   where C.Index == Bound {
     return Range(
@@ -158,7 +158,7 @@ extension ClosedRange.Index : Comparable {
     switch (lhs, rhs) {
     case (.inRange(let l), .inRange(let r)):
       return l < r
-    case (.inRange(_), .pastEnd):
+    case (.inRange, .pastEnd):
       return true
     default:
       return false
@@ -168,19 +168,19 @@ extension ClosedRange.Index : Comparable {
 
 extension ClosedRange.Index: Hashable
 where Bound: Strideable, Bound.Stride: SignedInteger, Bound: Hashable {
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable
+  public func hash(into hasher: inout Hasher) {
     switch self {
     case .inRange(let value):
-      hasher.append(0 as Int8)
-      hasher.append(value)
+      hasher.combine(0 as Int8)
+      hasher.combine(value)
     case .pastEnd:
-      hasher.append(1 as Int8)
+      hasher.combine(1 as Int8)
     }
   }
 }
@@ -232,24 +232,24 @@ where Bound : Strideable, Bound.Stride : SignedInteger
   }
 
   @inlinable
-  public func index(_ i: Index, offsetBy n: Int) -> Index {
+  public func index(_ i: Index, offsetBy distance: Int) -> Index {
     switch i {
     case .inRange(let x):
       let d = x.distance(to: upperBound)
-      if n <= d {
-        let newPosition = x.advanced(by: numericCast(n))
+      if distance <= d {
+        let newPosition = x.advanced(by: numericCast(distance))
         _precondition(newPosition >= lowerBound,
           "Advancing past start index")
         return .inRange(newPosition)
       }
-      if d - -1 == n { return .pastEnd }
+      if d - -1 == distance { return .pastEnd }
       _preconditionFailure("Advancing past end index")
     case .pastEnd:
-      if n == 0 {
+      if distance == 0 {
         return i
       } 
-      if n < 0 {
-        return index(.inRange(upperBound), offsetBy: numericCast(n + 1))
+      if distance < 0 {
+        return index(.inRange(upperBound), offsetBy: numericCast(distance + 1))
       }
       _preconditionFailure("Advancing past end index")
     }
@@ -308,6 +308,12 @@ where Bound : Strideable, Bound.Stride : SignedInteger
     return lowerBound <= element && element <= upperBound
               ? .inRange(element) : nil
   }
+
+  @inlinable
+  public func _customLastIndexOfEquatableElement(_ element: Bound) -> Index?? {
+    // The first and last elements are the same because each element is unique.
+    return _customIndexOfEquatableElement(element)
+  }
 }
 
 extension Comparable {  
@@ -324,42 +330,8 @@ extension Comparable {
   /// - Parameters:
   ///   - minimum: The lower bound for the range.
   ///   - maximum: The upper bound for the range.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func ... (minimum: Self, maximum: Self) -> ClosedRange<Self> {
-    _precondition(
-      minimum <= maximum, "Can't form Range with upperBound < lowerBound")
-    return ClosedRange(uncheckedBounds: (lower: minimum, upper: maximum))
-  }
-}
-
-extension Strideable where Stride: SignedInteger {  
-  /// Returns a countable closed range that contains both of its bounds.
-  ///
-  /// Use the closed range operator (`...`) to create a closed range of any type
-  /// that conforms to the `Strideable` protocol with an associated signed
-  /// integer `Stride` type, such as any of the standard library's integer
-  /// types. This example creates a `ClosedRange<Int>` from zero up to,
-  /// and including, nine.
-  ///
-  ///     let singleDigits = 0...9
-  ///     print(singleDigits.contains(9))
-  ///     // Prints "true"
-  ///
-  /// You can use sequence or collection methods on the `singleDigits` range.
-  ///
-  ///     print(singleDigits.count)
-  ///     // Prints "10"
-  ///     print(singleDigits.last)
-  ///     // Prints "9"
-  ///
-  /// - Parameters:)`.
-  ///   - minimum: The lower bound for the range.
-  ///   - maximum: The upper bound for the range.
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  public static func ... (minimum: Self, maximum: Self) -> ClosedRange<Self> {
-    // FIXME: swift-3-indexing-model: tests for traps.
     _precondition(
       minimum <= maximum, "Can't form Range with upperBound < lowerBound")
     return ClosedRange(uncheckedBounds: (lower: minimum, upper: maximum))
@@ -371,7 +343,7 @@ extension ClosedRange: Equatable {
   ///
   /// Two ranges are equal when they have the same lower and upper bounds.
   ///
-  ///     let x: ClosedRange = 5...15
+  ///     let x = 5...15
   ///     print(x == 5...15)
   ///     // Prints "true"
   ///     print(x == 10...20)
@@ -389,21 +361,16 @@ extension ClosedRange: Equatable {
 }
 
 extension ClosedRange: Hashable where Bound: Hashable {
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
-    hasher.append(lowerBound)
-    hasher.append(upperBound)
+  @inlinable
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(lowerBound)
+    hasher.combine(upperBound)
   }
 }
 
 extension ClosedRange : CustomStringConvertible {
   /// A textual representation of the range.
-  @inlinable // FIXME(sil-serialize-all)...
+  @inlinable // trivial-implementation...
   public var description: String {
     return "\(lowerBound)...\(upperBound)"
   }
@@ -411,7 +378,6 @@ extension ClosedRange : CustomStringConvertible {
 
 extension ClosedRange : CustomDebugStringConvertible {
   /// A textual representation of the range, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return "ClosedRange(\(String(reflecting: lowerBound))"
     + "...\(String(reflecting: upperBound)))"
@@ -419,7 +385,6 @@ extension ClosedRange : CustomDebugStringConvertible {
 }
 
 extension ClosedRange : CustomReflectable {
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(
       self, children: ["lowerBound": lowerBound, "upperBound": upperBound])
@@ -445,7 +410,7 @@ extension ClosedRange {
   ///
   /// - Parameter limits: The range to clamp the bounds of this range.
   /// - Returns: A new range clamped to the bounds of `limits`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // trivial-implementation
   @inline(__always)
   public func clamped(to limits: ClosedRange) -> ClosedRange {
     let lower =         
@@ -460,16 +425,7 @@ extension ClosedRange {
   }
 }
 
-extension ClosedRange where Bound: Strideable, Bound.Stride : SignedInteger {
-  /// Now that Range is conditionally a collection when Bound: Strideable,
-  /// CountableRange is no longer needed. This is a deprecated initializer
-  /// for any remaining uses of Range(countableRange).
-  @available(*,deprecated: 4.2, 
-    message: "CountableRange is now Range. No need to convert any more.")
-  public init(_ other: ClosedRange<Bound>) {
-    self = other
-  }  
-  
+extension ClosedRange where Bound: Strideable, Bound.Stride : SignedInteger {  
   /// Creates an instance equivalent to the given `Range`.
   ///
   /// - Parameter other: A `Range` to convert to a `ClosedRange` instance.
@@ -477,6 +433,7 @@ extension ClosedRange where Bound: Strideable, Bound.Stride : SignedInteger {
   /// An equivalent range must be representable as a closed range.
   /// For example, passing an empty range as `other` triggers a runtime error,
   /// because an empty range cannot be represented by a closed range instance.
+  @inlinable
   public init(_ other: Range<Bound>) {
     _precondition(!other.isEmpty, "Can't form an empty closed range")
     let upperBound = other.upperBound.advanced(by: -1)
@@ -496,8 +453,30 @@ extension ClosedRange {
   }
 }
 
-@available(*, deprecated, renamed: "ClosedRange.Index")
-public typealias ClosedRangeIndex<T> = ClosedRange<T>.Index where T: Strideable, T.Stride: SignedInteger
-@available(*, deprecated, renamed: "ClosedRange")
+// Note: this is not for compatibility only, it is considered a useful
+// shorthand. TODO: Add documentation
 public typealias CountableClosedRange<Bound: Strideable> = ClosedRange<Bound>
   where Bound.Stride : SignedInteger
+
+extension ClosedRange: Decodable where Bound: Decodable {
+  public init(from decoder: Decoder) throws {
+    var container = try decoder.unkeyedContainer()
+    let lowerBound = try container.decode(Bound.self)
+    let upperBound = try container.decode(Bound.self)
+    guard lowerBound <= upperBound else {
+      throw DecodingError.dataCorrupted(
+        DecodingError.Context(
+          codingPath: decoder.codingPath,
+          debugDescription: "Cannot initialize \(ClosedRange.self) with a lowerBound (\(lowerBound)) greater than upperBound (\(upperBound))"))
+    }
+    self.init(uncheckedBounds: (lower: lowerBound, upper: upperBound))
+  }
+}
+
+extension ClosedRange: Encodable where Bound: Encodable {
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.unkeyedContainer()
+    try container.encode(self.lowerBound)
+    try container.encode(self.upperBound)
+  }
+}

@@ -56,7 +56,7 @@ f5((1,1))
 // Tuples with existentials
 var any : Any = ()
 any = (1, 2)
-any = (label: 4)
+any = (label: 4) // expected-error {{cannot create a single-element tuple with an element label}}
 
 // Scalars don't have .0/.1/etc
 i = j.0 // expected-error{{value of type 'Int' has no member '0'}}
@@ -153,7 +153,7 @@ func gcd_23700031<T>(_ a: T, b: T) {
   var a = a
   var b = b
   (a, b) = (b, a % b)  // expected-error {{binary operator '%' cannot be applied to two 'T' operands}}
-  // expected-note @-1 {{overloads for '%' exist with these partially matching parameter lists: (UInt8, UInt8), (Int8, Int8), (UInt16, UInt16), (Int16, Int16), (UInt32, UInt32), (Int32, Int32), (UInt64, UInt64), (Int64, Int64), (UInt, UInt), (Int, Int)}}
+  // expected-note @-1 {{overloads for '%' exist with these partially matching parameter lists: (Int, Int), (Int16, Int16), (Int32, Int32), (Int64, Int64), (Int8, Int8), (Self, Self.Scalar), (Self.Scalar, Self), (UInt, UInt), (UInt16, UInt16), (UInt32, UInt32), (UInt64, UInt64), (UInt8, UInt8)}}
 }
 
 // <rdar://problem/24210190>
@@ -162,14 +162,14 @@ protocol Kingdom {
   associatedtype King
 }
 struct Victory<General> {
-  init<K: Kingdom>(_ king: K) where K.King == General {}
+  init<K: Kingdom>(_ king: K) where K.King == General {} // expected-note {{where 'General' = '(x: Int, y: Int)', 'K.King' = '(Int, Int)'}}
 }
 struct MagicKingdom<K> : Kingdom {
   typealias King = K
 }
 func magify<T>(_ t: T) -> MagicKingdom<T> { return MagicKingdom() }
 func foo(_ pair: (Int, Int)) -> Victory<(x: Int, y: Int)> {
-  return Victory(magify(pair)) // expected-error {{cannot convert return expression of type 'Victory<(Int, Int)>' to return type 'Victory<(x: Int, y: Int)>'}}
+  return Victory(magify(pair)) // expected-error {{initializer 'init(_:)' requires the types '(x: Int, y: Int)' and '(Int, Int)' be equivalent}}
 }
 
 
@@ -231,4 +231,32 @@ invoke(a: 1, b: "B") { (c: (a: Int, b: String)) in
 
 invoke(a: 1, b: "B") { c in
   return c.b
+}
+
+// Crash with one-element tuple with labeled element
+class Dinner {}
+
+func microwave() -> Dinner? {
+  let d: Dinner? = nil
+  return (n: d) // expected-error{{cannot convert return expression of type '(n: Dinner?)' to return type 'Dinner?'}}
+}
+
+func microwave() -> Dinner {
+  let d: Dinner? = nil
+  return (n: d) // expected-error{{cannot convert return expression of type '(n: Dinner?)' to return type 'Dinner'}}
+}
+
+// Tuple conversion with an optional
+func f(b: Bool) -> (a: Int, b: String)? {
+  let x = 3
+  let y = ""
+  return b ? (x, y) : nil
+}
+
+// Single element tuple expressions
+func singleElementTuple() {
+  let _ = (label: 123) // expected-error {{cannot create a single-element tuple with an element label}} {{12-19=}}
+  let _ = (label: 123).label // expected-error {{cannot create a single-element tuple with an element label}} {{12-19=}}
+  let _ = ((label: 123)) // expected-error {{cannot create a single-element tuple with an element label}} {{13-20=}}
+  let _ = ((label: 123)).label // expected-error {{cannot create a single-element tuple with an element label}} {{13-20=}}
 }

@@ -114,7 +114,7 @@ public:
 
   /// Retrieve the substitution map that maps the interface types of the
   /// requirement to the interface types of the synthetic environment.
-  const SubstitutionMap &getRequirementToSyntheticMap() const {
+  SubstitutionMap getRequirementToSyntheticMap() const {
     return reqToSyntheticEnvMap;
   }
 };

@@ -10,7 +10,7 @@ extension SomeProtocol where T == Optional<T> { } // expected-error{{same-type c
 
 class X<T> where T == X { // expected-error{{same-type constraint 'T' == 'X<T>' is recursive}}
 // expected-error@-1{{same-type requirement makes generic parameter 'T' non-generic}}
-    var type: T { return type(of: self) } // expected-error{{cannot convert return expression of type 'X<T>.Type' to return type 'T'}}
+    var type: T { return Swift.type(of: self) } // expected-error{{cannot convert return expression of type 'X<T>.Type' to return type 'T'}}
 }
 
 // FIXME: The "associated type 'Foo' is not a member type of 'Self'" diagnostic
@@ -48,7 +48,7 @@ public struct S<A: P> where A.T == S<A> {
 // expected-error@-2 {{generic struct 'S' references itself}}
   func f(a: A.T) {
     g(a: id(t: a))
-    // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+    // expected-error@-1 {{cannot convert value of type 'A.T' to expected argument type 'S<_>'}}
     _ = A.T.self
   }
 

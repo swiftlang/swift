@@ -29,3 +29,23 @@ public extension P2 where Self : P3 {
 public extension Dictionary.Keys {
   public func foo() {}
 }
+
+public extension Dictionary.Keys where Key: P1 {
+  public func bar() {}
+}
+
+public protocol InitProto {
+  init(x: Int)
+}
+extension InitProto {
+  // This initializer is marked as 'CtorInitializerKind::Convenience'.
+  public init() { self = Self(x: 0) }
+}
+
+public struct InitStructImpl : InitProto {
+  public init(x: Int) {}
+}
+
+public class InitClassImpl : InitProto {
+  public required init(x: Int) {}
+}

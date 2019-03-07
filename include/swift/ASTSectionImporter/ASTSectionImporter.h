@@ -23,7 +23,7 @@
 namespace swift {
   class SerializedModuleLoader;
 
-  /// \brief Provided a memory buffer with an entire Mach-O __apple_ast
+  /// Provided a memory buffer with an entire Mach-O __apple_ast
   /// section, this function makes memory buffer copies of all swift
   /// modules found in it and registers them using
   /// registerMemoryBuffer() so they can be found by loadModule(). The

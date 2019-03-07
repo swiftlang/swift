@@ -40,8 +40,8 @@ ManagedValue ManagedValue::copy(SILGenFunction &SGF, SILLocation loc) const {
 /// Emit a copy of this value with independent ownership.
 ManagedValue ManagedValue::formalAccessCopy(SILGenFunction &SGF,
                                             SILLocation loc) {
-  assert(SGF.InFormalEvaluationScope && "Can only perform a formal access copy in a "
-                                 "formal evaluation scope");
+  assert(SGF.isInFormalEvaluationScope() &&
+         "Can only perform a formal access copy in a formal evaluation scope");
   auto &lowering = SGF.getTypeLowering(getType());
   if (lowering.isTrivial())
     return *this;
@@ -85,6 +85,8 @@ ManagedValue ManagedValue::copyUnmanaged(SILGenFunction &SGF, SILLocation loc) {
 /// have cleanups.  It returns a +1 value with one.
 ManagedValue ManagedValue::formalAccessCopyUnmanaged(SILGenFunction &SGF,
                                                      SILLocation loc) {
+  assert(SGF.isInFormalEvaluationScope());
+
   if (getType().isObject()) {
     return SGF.B.createFormalAccessCopyValue(loc, *this);
   }
@@ -141,6 +143,7 @@ ManagedValue ManagedValue::borrow(SILGenFunction &SGF, SILLocation loc) const {
 
 ManagedValue ManagedValue::formalAccessBorrow(SILGenFunction &SGF,
                                               SILLocation loc) const {
+  assert(SGF.isInFormalEvaluationScope());
   assert(getValue() && "cannot borrow an invalid or in-context value");
   if (isLValue())
     return *this;
@@ -217,9 +220,9 @@ bool ManagedValue::isPlusOne(SILGenFunction &SGF) const {
   if (getType().isTrivial(SGF.F.getModule()))
     return true;
 
-  // If we have an object and the object has trivial ownership, the same
+  // If we have an object and the object has any ownership, the same
   // property applies.
-  if (getType().isObject() && getOwnershipKind() == ValueOwnershipKind::Trivial)
+  if (getType().isObject() && getOwnershipKind() == ValueOwnershipKind::Any)
     return true;
 
   return hasCleanup();

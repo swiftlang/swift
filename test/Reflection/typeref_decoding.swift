@@ -1,7 +1,7 @@
 // REQUIRES: no_asan
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %S/Inputs/ConcreteTypes.swift %S/Inputs/GenericTypes.swift %S/Inputs/Protocols.swift %S/Inputs/Extensions.swift %S/Inputs/Closures.swift -parse-as-library -emit-module -emit-library -module-name TypesToReflect -o %t/libTypesToReflect.%target-dylib-extension
-// RUN: %target-swift-reflection-dump -binary-filename %t/libTypesToReflect.%target-dylib-extension | %FileCheck %s
+// RUN: %target-build-swift %S/Inputs/ConcreteTypes.swift %S/Inputs/GenericTypes.swift %S/Inputs/Protocols.swift %S/Inputs/Extensions.swift %S/Inputs/Closures.swift -parse-as-library -emit-module -emit-library -module-name TypesToReflect -o %t/%target-library-name(TypesToReflect)
+// RUN: %target-swift-reflection-dump -binary-filename %t/%target-library-name(TypesToReflect) | %FileCheck %s
 
 // CHECK: FIELDS:
 // CHECK: =======
@@ -652,14 +652,14 @@
 // CHECK: TypesToReflect.ClassBoundP
 // CHECK: --------------------------
 
-// CHECK: TypesToReflect.(FileprivateProtocol in _{{[0-9A-F]+}})
+// CHECK: TypesToReflect.(FileprivateProtocol in _{{[0-9a-fA-F]+}})
 // CHECK: -------------------------------------------------------------------------
 
 // CHECK: TypesToReflect.HasFileprivateProtocol
 // CHECK: -------------------------------------
-// CHECK: x: TypesToReflect.(FileprivateProtocol in _{{[0-9A-F]+}})
+// CHECK: x: TypesToReflect.(FileprivateProtocol in ${{[0-9a-fA-F]+}})
 // CHECK: (protocol_composition
-// CHECK-NEXT: (protocol TypesToReflect.(FileprivateProtocol in _{{[0-9A-F]+}})))
+// CHECK-NEXT: (protocol TypesToReflect.(FileprivateProtocol in ${{[0-9a-fA-F]+}})))
 
 // CHECK: ASSOCIATED TYPES:
 // CHECK: =================
@@ -708,8 +708,7 @@
 // CHECK: CAPTURE DESCRIPTORS:
 // CHECK: ====================
 // CHECK: - Capture types:
-// CHECK: (sil_box
-// CHECK:   (generic_type_parameter depth=0 index=0))
+// CHECK: (builtin Builtin.NativeObject)
 // CHECK: - Metadata sources:
 // CHECK: (generic_type_parameter depth=0 index=0)
 // CHECK: (closure_binding index=0)

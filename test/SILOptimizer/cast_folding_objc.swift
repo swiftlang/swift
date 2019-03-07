@@ -36,7 +36,7 @@ func cast0(_ o: AnyObject) -> Bool {
   return o is CX
 }
 
-// CHECK-LABEL: sil hidden [noinline] @$S17cast_folding_objc5test0SbyF
+// CHECK-LABEL: sil hidden [noinline] @$s17cast_folding_objc5test0SbyF
 // CHECK: bb0
 // Check that cast is not eliminated even though cast0 is a conversion
 // from a class to struct, because it casts to a struct implementing
@@ -52,7 +52,7 @@ func test0() -> Bool {
 // the compiler does not statically know if this object
 // is NSNumber can be converted into Int.
 
-// CHECK-LABEL: sil [noinline] @$S17cast_folding_objc35testMayBeBridgedCastFromObjCtoSwiftySiyXlF
+// CHECK-LABEL: sil [noinline] @$s17cast_folding_objc35testMayBeBridgedCastFromObjCtoSwiftySiyXlF
 // CHECK: unconditional_checked_cast_addr
 // CHECK: return
 @inline(never)
@@ -64,7 +64,7 @@ public func testMayBeBridgedCastFromObjCtoSwift(_ o: AnyObject) -> Int {
 // the compiler does not statically know if this object
 // is NSString can be converted into String.
 
-// CHECK-LABEL: sil [noinline] @$S17cast_folding_objc41testConditionalBridgedCastFromObjCtoSwiftySSSgyXlF
+// CHECK-LABEL: sil [noinline] @$s17cast_folding_objc41testConditionalBridgedCastFromObjCtoSwiftySSSgyXlF
 // CHECK: unconditional_checked_cast_addr
 // CHECK: return
 @inline(never)
@@ -77,7 +77,7 @@ public func castObjCToSwift<T>(_ t: T) -> Int {
 }
 
 // Check that compiler understands that this cast always fails
-// CHECK-LABEL: sil [noinline] @$S17cast_folding_objc37testFailingBridgedCastFromObjCtoSwiftySiSo8NSStringCF
+// CHECK-LABEL: sil [noinline] @$s17cast_folding_objc37testFailingBridgedCastFromObjCtoSwiftySiSo8NSStringCF
 // CHECK: builtin "int_trap"
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }
@@ -87,7 +87,7 @@ public func testFailingBridgedCastFromObjCtoSwift(_ ns: NSString) -> Int {
 }
 
 // Check that compiler understands that this cast always fails
-// CHECK-LABEL: sil [noinline] @$S17cast_folding_objc37testFailingBridgedCastFromSwiftToObjCySiSSF
+// CHECK-LABEL: sil [noinline] @$s17cast_folding_objc37testFailingBridgedCastFromSwiftToObjCySiSSF
 // CHECK: builtin "int_trap"
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }
@@ -297,9 +297,9 @@ public func testBridgedCastFromObjCtoSwift(_ ns: NSString) -> String {
 
 // Check that compiler understands that this cast always succeeds
 
-// CHECK-LABEL: sil [noinline] @$S17cast_folding_objc30testBridgedCastFromSwiftToObjCySo8NSStringCSSF
+// CHECK-LABEL: sil [noinline] @$s17cast_folding_objc30testBridgedCastFromSwiftToObjCySo8NSStringCSSF
 // CHECK-NOT: {{ cast}}
-// CHECK: function_ref @$SSS10FoundationE19_bridgeToObjectiveC{{[_0-9a-zA-Z]*}}F
+// CHECK: function_ref @$sSS10FoundationE19_bridgeToObjectiveC{{[_0-9a-zA-Z]*}}F
 // CHECK: apply
 // CHECK: return
 @inline(never)
@@ -312,7 +312,7 @@ public class MyString: NSString {}
 // Check that the cast-optimizer bails out on a conditional downcast to a subclass of a
 // bridged ObjC class.
 // CHECK-LABEL: sil [noinline] @{{.*}}testConditionalBridgedCastFromSwiftToNSObjectDerivedClass{{.*}}
-// CHECK: function_ref @$SSS10FoundationE19_bridgeToObjectiveC{{[_0-9a-zA-Z]*}}F
+// CHECK: function_ref @$sSS10FoundationE19_bridgeToObjectiveC{{[_0-9a-zA-Z]*}}F
 // CHECK: apply
 // CHECK-NOT: apply
 // CHECK-NOT: unconditional_checked_cast
@@ -328,7 +328,7 @@ public func testConditionalBridgedCastFromSwiftToNSObjectDerivedClass(_ s: Strin
 // Check that the cast-optimizer does not bail out on an unconditional downcast to a subclass of a
 // bridged ObjC class.
 // CHECK-LABEL: sil [noinline] @{{.*}}testForcedBridgedCastFromSwiftToNSObjectDerivedClass{{.*}}
-// CHECK: function_ref @$SSS10FoundationE19_bridgeToObjectiveC{{[_0-9a-zA-Z]*}}F
+// CHECK: function_ref @$sSS10FoundationE19_bridgeToObjectiveC{{[_0-9a-zA-Z]*}}F
 // CHECK: apply
 // CHECK-NOT: apply
 // CHECK-NOT: checked_cast_br

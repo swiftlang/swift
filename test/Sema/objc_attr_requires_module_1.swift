@@ -1,6 +1,5 @@
-// RUN: %target-build-swift -typecheck %s -Xfrontend -verify
-// RUN: %target-build-swift -typecheck -parse-as-library %s -Xfrontend -verify
-// REQUIRES: objc_interop
+// RUN: %target-swift-frontend -typecheck -verify -enable-objc-interop %s
+// RUN: %target-swift-frontend -typecheck -verify -enable-objc-interop -parse-as-library %s
 
 // There was a bug where @objc without Foundation was only diagnosed if it
 // appeared before any top-level expressions. The _1 and _2 variants of

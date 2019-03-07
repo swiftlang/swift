@@ -19,6 +19,7 @@
 
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/ApplySite.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace swift {
@@ -286,7 +287,7 @@ protected:
     }
   };
 
-  BottomUpIPAnalysis(AnalysisKind K) : SILAnalysis(K) { }
+  BottomUpIPAnalysis(SILAnalysisKind k) : SILAnalysis(k) {}
 
   /// Increments the CurrentUpdateID.
   /// Should be called at the beginning of a recomputation.

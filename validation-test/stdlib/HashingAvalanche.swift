@@ -1,4 +1,5 @@
 // RUN: %target-build-swift -Xfrontend -disable-access-control -module-name a %s -o %t.out -O
+// RUN: %target-codesign %t.out
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
 
@@ -15,7 +16,7 @@ func avalancheTest<Input: FixedWidthInteger & UnsignedInteger>(
 ) {
   typealias Output = Int
   let testsInBatch = 100000
-  let testData = randArray64(testsInBatch).map { Input(truncatingIfNeeded: $0) }
+  let testData = (0 ..< testsInBatch).map { _ in Input.random(in: .min ... .max) }
   let testDataHashed = testData.map { hashUnderTest($0) }
 
   for inputBit in 0..<Input.bitWidth {
@@ -46,11 +47,11 @@ func avalancheTest<Input: FixedWidthInteger & UnsignedInteger>(
 
 // White-box testing: assume that the other N-bit to N-bit mixing functions
 // just dispatch to these.  (Avalanche test is relatively expensive.)
-HashingTestSuite.test("_Hasher.append(UInt64)/avalanche") {
+HashingTestSuite.test("Hasher.combine(UInt64)/avalanche") {
   avalancheTest(for: UInt64.self, _hashValue(for:), 0.02)
 }
 
-HashingTestSuite.test("_Hasher.append(UInt32)/avalanche") {
+HashingTestSuite.test("Hasher.combine(UInt32)/avalanche") {
   avalancheTest(for: UInt32.self, _hashValue(for:), 0.02)
 }
 

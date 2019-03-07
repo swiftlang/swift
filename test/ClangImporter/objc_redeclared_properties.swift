@@ -1,8 +1,6 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules -D ONE_MODULE %s -verify
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules -D SUB_MODULE %s -verify
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules -D TWO_MODULES %s -verify
-
-// REQUIRES: objc_interop
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -I %S/Inputs/custom-modules -D ONE_MODULE %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -I %S/Inputs/custom-modules -D SUB_MODULE %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -I %S/Inputs/custom-modules -D TWO_MODULES %s -verify
 
 #if ONE_MODULE
 import RedeclaredProperties
@@ -29,4 +27,10 @@ func test(obj: RPFoo) {
 
   if let _ = obj.accessorRedeclaredAsNullable {} // expected-error {{initializer for conditional binding must have Optional type}}
   if let _ = obj.accessorDeclaredFirstAsNullable {} // expected-error {{initializer for conditional binding must have Optional type}}
+
+  obj.accessorInProto = nil // okay
+}
+
+func sr8490(obj: RPSub) {
+  obj.accessorInProto = nil
 }

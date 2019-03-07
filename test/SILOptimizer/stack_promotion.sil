@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -stack-promotion -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -stack-promotion -enable-sil-verify-all %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -7,20 +7,20 @@ import Swift
 import SwiftShims
 
 class XX {
-	@sil_stored var x: Int32
+	@_hasStorage var x: Int32
 
 	init()
 }
 
 class YY {
-	@sil_stored var xx: XX
+	@_hasStorage var xx: XX
 
 	init(newx: XX)
 }
 
 class DummyArrayStorage<Element> {
-  @sil_stored var count : Int
-  @sil_stored var capacity : Int
+  @_hasStorage var count : Int
+  @_hasStorage var capacity : Int
   init()
 }
 
@@ -624,7 +624,7 @@ bb0(%0 : $Int, %closure: $@callee_owned (@inout Int) -> (@out (), @error Error))
   // pass the array to the withUnsafeMutableBufferPointer closure.
   %21 = function_ref @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error Error), @inout Array<Int>) -> (@out (), @error Error)
   %22 = alloc_stack $()
-  %23 = apply [nothrow]%21(%22, %closure, %the_array) : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error Error), @inout Array<Int>) -> (@out (), @error Error)
+  %23 = apply [nothrow] %21(%22, %closure, %the_array) : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error Error), @inout Array<Int>) -> (@out (), @error Error)
   dealloc_stack %22 : $*()
 
   dealloc_stack %the_array: $*Array<Int>

@@ -1,7 +1,6 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-source-import -emit-ir -o - -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -enable-source-import -emit-ir -o - -primary-file %s | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
-// REQUIRES: objc_interop
 
 // FIXME: This test uses IRGen with -enable-source-import; it may fail with -g.
 
@@ -19,7 +18,7 @@ class OverridesBoolProperty : HasProperties {
   }
 }
 
-// CHECK-LABEL: define hidden swiftcc void @"$S24objc_properties_imported16testBoolProperty{{[_0-9a-zA-Z]*}}F"
+// CHECK-LABEL: define hidden swiftcc void @"$s24objc_properties_imported16testBoolProperty{{[_0-9a-zA-Z]*}}F"
 func testBoolProperty(hp: HasProperties) {
   // CHECK-NOT: ret void
   // CHECK: load i8*, i8** @"\01L_selector(isEnabled)"

@@ -97,6 +97,10 @@ typedef NS_ENUM(NSInteger, NSEnumAddedCasesIn2017) {
 @interface AccessorDeprecations: NSObject
 @property int fullyDeprecated __attribute__((deprecated));
 
+@property NSInteger fullyDeprecatedOnAccessors;
+- (NSInteger)fullyDeprecatedOnAccessors __attribute__((deprecated));
+- (void)setFullyDeprecatedOnAccessors:(NSInteger)fullyDeprecatedOnAccessors __attribute__((deprecated));
+
 @property int getterDeprecated;
 - (int)getterDeprecated __attribute__((deprecated));
 @property (class) int getterDeprecatedClass;
@@ -106,4 +110,62 @@ typedef NS_ENUM(NSInteger, NSEnumAddedCasesIn2017) {
 - (void)setSetterDeprecated:(int)setterDeprecated __attribute__((deprecated));
 @property (class) int setterDeprecatedClass;
 + (void)setSetterDeprecatedClass:(int)setterDeprecated __attribute__((deprecated));
+@end
+
+
+@interface UnavailableAccessors: NSObject
+@property NSInteger fullyUnavailable __attribute__((unavailable));
+
+@property NSInteger fullyUnavailableOnAccessors;
+- (NSInteger)fullyUnavailableOnAccessors __attribute__((unavailable));
+- (void)setFullyUnavailableOnAccessors:(NSInteger)fullyUnavailableOnAccessors __attribute__((unavailable));
+
+@property NSInteger getterUnavailable;
+- (NSInteger)getterUnavailable __attribute__((unavailable));
+@property (class) NSInteger getterUnavailableClass;
++ (NSInteger)getterUnavailableClass __attribute__((unavailable));
+
+@property NSInteger setterUnavailable;
+- (void)setSetterUnavailable:(NSInteger)setterUnavailable __attribute__((unavailable));
+@property (class) NSInteger setterUnavailableClass;
++ (void)setSetterUnavailableClass:(NSInteger)setterUnavailable __attribute__((unavailable));
+@end
+
+
+@interface UnavailableSubscript: NSObject
+- (nonnull NSString *)objectAtIndexedSubscript:(NSInteger)i __attribute__((unavailable("bad subscript getter")));
+- (void)setObject:(nonnull NSString *)obj atIndexedSubscript:(NSInteger)i __attribute__((unavailable("bad subscript setter")));
+@end
+
+@interface UnavailableGetterSubscript: NSObject
+- (nonnull NSString *)objectAtIndexedSubscript:(NSInteger)i __attribute__((unavailable("bad subscript getter")));
+- (void)setObject:(nonnull NSString *)obj atIndexedSubscript:(NSInteger)i;
+@end
+
+@interface UnavailableSetterSubscript: NSObject
+- (nonnull NSString *)objectAtIndexedSubscript:(NSInteger)i;
+- (void)setObject:(nonnull NSString *)obj atIndexedSubscript:(NSInteger)i __attribute__((unavailable("bad subscript setter")));
+@end
+
+@interface UnavailableReadOnlySubscript: NSObject
+- (nonnull NSString *)objectAtIndexedSubscript:(NSInteger)i __attribute__((unavailable));
+@end
+
+@interface DeprecatedSubscript: NSObject
+- (nonnull NSString *)objectAtIndexedSubscript:(NSInteger)i __attribute__((deprecated("bad subscript getter")));
+- (void)setObject:(nonnull NSString *)obj atIndexedSubscript:(NSInteger)i __attribute__((deprecated("bad subscript setter")));
+@end
+
+@interface DeprecatedGetterSubscript: NSObject
+- (nonnull NSString *)objectAtIndexedSubscript:(NSInteger)i __attribute__((deprecated("bad subscript getter")));
+- (void)setObject:(nonnull NSString *)obj atIndexedSubscript:(NSInteger)i;
+@end
+
+@interface DeprecatedSetterSubscript: NSObject
+- (nonnull NSString *)objectAtIndexedSubscript:(NSInteger)i;
+- (void)setObject:(nonnull NSString *)obj atIndexedSubscript:(NSInteger)i __attribute__((deprecated("bad subscript setter")));
+@end
+
+@interface DeprecatedReadOnlySubscript: NSObject
+- (nonnull NSString *)objectAtIndexedSubscript:(NSInteger)i __attribute__((deprecated));
 @end

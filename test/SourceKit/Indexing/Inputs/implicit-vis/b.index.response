@@ -29,14 +29,16 @@
               key.usr: "s:12implicit_vis1BC1aAA1ACvg",
               key.line: 2,
               key.column: 6,
-              key.is_dynamic: 1
+              key.is_dynamic: 1,
+              key.is_implicit: 1
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
               key.usr: "s:12implicit_vis1BC1aAA1ACvs",
               key.line: 2,
               key.column: 6,
-              key.is_dynamic: 1
+              key.is_dynamic: 1,
+              key.is_implicit: 1
             }
           ]
         },

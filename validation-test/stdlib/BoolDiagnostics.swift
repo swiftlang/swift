@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
 
 func CVarArgs_withBool() {
   func varArgFunc(_ x: Bool, _ args: CVarArg...) { }

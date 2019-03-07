@@ -575,8 +575,12 @@ class FormatWalker : public SourceEntityWalker {
       };
 
       if (auto AE = dyn_cast_or_null<ApplyExpr>(Node.dyn_cast<Expr *>())) {
-        collect(AE->getArg());
-        return;
+        // PrefixUnaryExpr shouldn't be syntactically considered as a function call
+        // for sibling alignment.
+        if (!isa<PrefixUnaryExpr>(AE)) {
+          collect(AE->getArg());
+          return;
+        }
       }
 
       if (auto PE = dyn_cast_or_null<ParenExpr>(Node.dyn_cast<Expr *>())) {
@@ -601,12 +605,9 @@ class FormatWalker : public SourceEntityWalker {
 
       if (auto AFD = dyn_cast_or_null<AbstractFunctionDecl>(Node.dyn_cast<Decl*>())) {
         // Function parameters are siblings.
-        for (auto P : AFD->getParameterLists()) {
-          for (ParamDecl* param : *P) {
-            if (!param->isSelfParameter())
-              addPair(param->getEndLoc(), FindAlignLoc(param->getStartLoc()),
-                      tok::comma);
-          }
+        for (auto *param : *AFD->getParameters()) {
+          addPair(param->getEndLoc(), FindAlignLoc(param->getStartLoc()),
+                  tok::comma);
         }
       }
 
@@ -668,7 +669,7 @@ class FormatWalker : public SourceEntityWalker {
   SiblingCollector SCollector;
 
   /// Sometimes, target is a part of "parent", for instance, "#else" is a part
-  /// of an ifconfigstmt, so that ifconfigstmt is not really the parent of "#else".
+  /// of an IfConfigDecl, so that IfConfigDecl is not really the parent of "#else".
   bool isTargetPartOf(swift::ASTWalker::ParentTy Parent) {
     if (auto Conf = dyn_cast_or_null<IfConfigDecl>(Parent.getAsDecl())) {
       for (auto Clause : Conf->getClauses()) {
@@ -816,7 +817,9 @@ public:
                                            StringRef Text, TokenInfo ToInfo) {
 
     // If having sibling locs to align with, respect siblings.
-    if (FC.HasSibling()) {
+    auto isClosingSquare =
+      ToInfo && ToInfo.StartOfLineTarget->getKind() == tok::r_square;
+    if (!isClosingSquare && FC.HasSibling()) {
       StringRef Line = swift::ide::getTextForLine(LineIndex, Text, /*Trim*/true);
       StringBuilder Builder;
       FC.padToSiblingColumn(Builder, FmtOptions);

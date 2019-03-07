@@ -105,6 +105,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
     case OPT_req:
       Request = llvm::StringSwitch<SourceKitRequest>(InputArg->getValue())
         .Case("version", SourceKitRequest::ProtocolVersion)
+        .Case("compiler-version", SourceKitRequest::CompilerVersion)
         .Case("demangle", SourceKitRequest::DemangleNames)
         .Case("mangle", SourceKitRequest::MangleSimpleClasses)
         .Case("index", SourceKitRequest::Index)
@@ -114,6 +115,8 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("complete.update", SourceKitRequest::CodeCompleteUpdate)
         .Case("complete.cache.ondisk", SourceKitRequest::CodeCompleteCacheOnDisk)
         .Case("complete.setpopularapi", SourceKitRequest::CodeCompleteSetPopularAPI)
+        .Case("typecontextinfo", SourceKitRequest::TypeContextInfo)
+        .Case("conformingmethods", SourceKitRequest::ConformingMethodList)
         .Case("cursor", SourceKitRequest::CursorInfo)
         .Case("related-idents", SourceKitRequest::RelatedIdents)
         .Case("syntax-map", SourceKitRequest::SyntaxMap)
@@ -149,6 +152,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("markup-xml", SourceKitRequest::MarkupToXML)
         .Case("stats", SourceKitRequest::Statistics)
         .Case("track-compiles", SourceKitRequest::EnableCompileNotifications)
+        .Case("collect-type", SourceKitRequest::CollectExpresstionType)
         .Default(SourceKitRequest::None);
 
       if (Request == SourceKitRequest::None) {
@@ -160,7 +164,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
                "doc-info/sema/interface-gen/interface-gen-openfind-usr/find-interface/"
                "open/close/edit/print-annotations/print-diags/extract-comment/module-groups/"
                "range/syntactic-rename/find-rename-ranges/translate/markup-xml/stats/"
-               "track-compiles\n";
+               "track-compiles/collect-type\n";
         return true;
       }
       break;
@@ -276,6 +280,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       PrintRawResponse = true;
       break;
 
+    case OPT_dont_print_response:
+      PrintResponse = false;
+      break;
+
     case OPT_INPUT:
       SourceFile = InputArg->getValue();
       SourceText = llvm::None;
@@ -331,6 +339,20 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       CancelOnSubsequentRequest = Cancel;
       break;
 
+    case OPT_time_request:
+      timeRequest = true;
+      break;
+
+    case OPT_repeat_request:
+      if (StringRef(InputArg->getValue()).getAsInteger(10, repeatRequest)) {
+        llvm::errs() << "error: expected integer for 'cancel-on-subsequent-request'\n";
+        return true;
+      } else if (repeatRequest < 1) {
+        llvm::errs() << "error: repeat-request must be >= 1\n";
+        return true;
+      }
+      break;
+
     case OPT_UNKNOWN:
       llvm::errs() << "error: unknown argument: "
                    << InputArg->getAsString(ParsedArgs) << '\n'
@@ -357,6 +379,6 @@ void TestOptions::printHelp(bool ShowHidden) const {
 
   TestOptTable Table;
 
-  Table.PrintHelp(llvm::outs(), "sourcekitd-test", "SourceKit Testing Tool",
-                      ShowHidden);
+  Table.PrintHelp(llvm::outs(), "sourcekitd-test [options] <inputs>",
+                  "SourceKit Testing Tool", ShowHidden);
 }

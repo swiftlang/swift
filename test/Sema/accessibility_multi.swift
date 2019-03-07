@@ -21,3 +21,17 @@ func testSubscript(_ instance: Members) {
   instance[] = 42 // expected-error {{cannot assign through subscript: subscript setter is inaccessible}}
   reset(&instance[]) // expected-error {{cannot pass immutable value as inout argument: subscript setter is inaccessible}}
 }
+
+func testPrivateConformance(_ instance: PrivateConformance) {
+  instance.publicExtensionMember()
+  // expected-error@-1 {{'publicExtensionMember' is inaccessible due to 'private' protection level}}
+
+  instance.internalExtensionMember()
+  // expected-error@-1 {{'internalExtensionMember' is inaccessible due to 'private' protection level}}
+
+  instance.publicFPExtensionMember()
+  // expected-error@-1 {{'publicFPExtensionMember' is inaccessible due to 'fileprivate' protection level}}
+
+  instance.internalFPExtensionMember()
+  // expected-error@-1 {{'internalFPExtensionMember' is inaccessible due to 'fileprivate' protection level}}
+}

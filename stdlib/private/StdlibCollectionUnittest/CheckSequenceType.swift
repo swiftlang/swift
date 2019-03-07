@@ -140,6 +140,25 @@ public struct FilterTest {
   }
 }
 
+public struct PredicateCountTest {
+  public let expected: Int
+  public let sequence: [Int]
+  public let includeElement: (Int) -> Bool
+  public let loc: SourceLoc
+
+  public init(
+    _ expected: Int,
+    _ sequence: [Int],
+    _ includeElement: @escaping (Int) -> Bool,
+    file: String = #file, line: UInt = #line
+  ) {
+    self.expected = expected
+    self.sequence = sequence
+    self.includeElement = includeElement
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
 public struct FindTest {
   public let expected: Int?
   public let element: MinimalEquatableValue
@@ -149,7 +168,7 @@ public struct FindTest {
 
   public init(
     expected: Int?, element: Int, sequence: [Int],
-    expectedLeftoverSequence: [Int],
+    expectedLeftoverSequence: [Int] = [],
     file: String = #file, line: UInt = #line
   ) {
     self.expected = expected
@@ -521,6 +540,21 @@ public let filterTests = [
     [ 0, 30, 90 ], [ 0, 30, 10, 90 ], { (x: Int) -> Bool in x % 3 == 0 }
   ),
 ]
+
+public let predicateCountTests = [
+  PredicateCountTest(
+    0, [],
+    { _ -> Bool in expectUnreachable(); return true }),
+
+  PredicateCountTest(0, [ 0, 30, 10, 90 ], { _ -> Bool in false }),
+  PredicateCountTest(
+    4, [ 0, 30, 10, 90 ], { _ -> Bool in true }
+  ),
+  PredicateCountTest(
+    3, [ 0, 30, 10, 90 ], { (x: Int) -> Bool in x % 3 == 0 }
+  ),
+]
+
 
 public let findTests = [
   FindTest(
@@ -1577,17 +1611,17 @@ extension TestSuite {
     SequenceWithEquatableElement : Sequence
   >(
     _ testNamePrefix: String = "",
-    makeSequence: @escaping ([S.Iterator.Element]) -> S,
-    wrapValue: @escaping (OpaqueValue<Int>) -> S.Iterator.Element,
-    extractValue: @escaping (S.Iterator.Element) -> OpaqueValue<Int>,
+    makeSequence: @escaping ([S.Element]) -> S,
+    wrapValue: @escaping (OpaqueValue<Int>) -> S.Element,
+    extractValue: @escaping (S.Element) -> OpaqueValue<Int>,
 
-    makeSequenceOfEquatable: @escaping ([SequenceWithEquatableElement.Iterator.Element]) -> SequenceWithEquatableElement,
-    wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> SequenceWithEquatableElement.Iterator.Element,
-    extractValueFromEquatable: @escaping ((SequenceWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+    makeSequenceOfEquatable: @escaping ([SequenceWithEquatableElement.Element]) -> SequenceWithEquatableElement,
+    wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> SequenceWithEquatableElement.Element,
+    extractValueFromEquatable: @escaping ((SequenceWithEquatableElement.Element) -> MinimalEquatableValue),
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all
   ) where
-    SequenceWithEquatableElement.Iterator.Element : Equatable {
+    SequenceWithEquatableElement.Element : Equatable {
 
     var testNamePrefix = testNamePrefix
 
@@ -1609,14 +1643,6 @@ extension TestSuite {
 
     testNamePrefix += String(describing: S.Type.self)
 
-    let isMultiPass = makeSequence([])
-      ._preprocessingPass { true } ?? false
-    let isEquatableMultiPass = makeSequenceOfEquatable([])
-      ._preprocessingPass { true } ?? false
-    expectEqual(
-      isMultiPass, isEquatableMultiPass,
-      "Two sequence types are of different kinds?")
-
     // FIXME: swift-3-indexing-model: add tests for `underestimatedCount`
     // Check that it is non-negative, and an underestimate of the actual
     // element count.
@@ -1633,12 +1659,6 @@ self.test("\(testNamePrefix).contains()/WhereElementIsEquatable/semantics") {
       test.expected != nil,
       s.contains(wrapValueIntoEquatable(test.element)),
       stackTrace: SourceLocStack().with(test.loc))
-
-    if !isMultiPass {
-      expectEqualSequence(
-        test.expectedLeftoverSequence, s.map(extractValueFromEquatable),
-        stackTrace: SourceLocStack().with(test.loc))
-    }
   }
 }
 
@@ -1935,17 +1955,17 @@ self.test("\(testNamePrefix).forEach/semantics") {
 }
 
 //===----------------------------------------------------------------------===//
-// first()
+// first(where:)
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).first/semantics") {
+self.test("\(testNamePrefix).first(where:)/semantics") {
   for test in findTests {
     let s = makeWrappedSequenceWithEquatableElement(test.sequence)
     let closureLifetimeTracker = LifetimeTracked(0)
-    let found = s.first {
+    let found = s.first(where: {
       _blackHole(closureLifetimeTracker)
       return $0 == wrapValueIntoEquatable(test.element)
-    }
+    })
     expectEqual(
       test.expected == nil ? nil : wrapValueIntoEquatable(test.element),
       found,
@@ -1954,52 +1974,6 @@ self.test("\(testNamePrefix).first/semantics") {
       expectEqual(
         expectedIdentity, extractValueFromEquatable(found!).identity,
         "find() should find only the first element matching its predicate")
-    }
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// _preprocessingPass()
-//===----------------------------------------------------------------------===//
-
-self.test("\(testNamePrefix)._preprocessingPass/semantics") {
-  for test in forEachTests {
-    let s = makeWrappedSequence(test.sequence.map(OpaqueValue.init))
-    var wasInvoked = false
-    let result = s._preprocessingPass {
-      () -> OpaqueValue<Int> in
-      wasInvoked = true
-
-      expectEqualSequence(
-        test.sequence,
-        s.map { extractValue($0).value })
-
-      return OpaqueValue(42)
-    }
-    if wasInvoked {
-      expectOptionalEqual(42, result?.value)
-    } else {
-      expectNil(result)
-    }
-  }
-
-  for test in forEachTests {
-    let s = makeWrappedSequence(test.sequence.map(OpaqueValue.init))
-    var wasInvoked = false
-    var caughtError: Error?
-    var result: OpaqueValue<Int>?
-    do {
-      result = try s._preprocessingPass {
-        () -> OpaqueValue<Int> in
-        wasInvoked = true
-        throw TestError.error2
-      }
-    } catch {
-      caughtError = error
-    }
-    expectNil(result)
-    if wasInvoked {
-      expectOptionalEqual(TestError.error2, caughtError as? TestError)
     }
   }
 }

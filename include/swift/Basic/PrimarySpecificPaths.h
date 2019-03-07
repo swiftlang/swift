@@ -27,8 +27,9 @@ namespace swift {
 class PrimarySpecificPaths {
 public:
   /// The name of the main output file,
-  /// that is, the .o file for this input. If there is no such file, contains an
-  /// empty string. If the output is to be written to stdout, contains "-".
+  /// that is, the .o file for this input (or a file specified by -o).
+  /// If there is no such file, contains an empty string. If the output
+  /// is to be written to stdout, contains "-".
   std::string OutputFilename;
 
   SupplementaryOutputPaths SupplementaryOutputs;

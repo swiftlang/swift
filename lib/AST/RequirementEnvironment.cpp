@@ -86,7 +86,7 @@ RequirementEnvironment::RequirementEnvironment(
   auto selfType = cast<GenericTypeParamType>(
       proto->getSelfInterfaceType()->getCanonicalType());
 
-  reqToSyntheticEnvMap = reqSig->getSubstitutionMap(
+  reqToSyntheticEnvMap = SubstitutionMap::get(reqSig,
     [selfType, substConcreteType, depth, covariantSelf, &ctx]
     (SubstitutableType *type) -> Type {
       // If the conforming type is a class, the protocol 'Self' maps to
@@ -110,10 +110,8 @@ RequirementEnvironment::RequirementEnvironment(
       return substGenericParam;
     },
     [selfType, substConcreteType, conformance, conformanceDC, &ctx](
-        CanType type, Type replacement, ProtocolType *protoType)
+        CanType type, Type replacement, ProtocolDecl *proto)
           -> Optional<ProtocolConformanceRef> {
-      auto proto = protoType->getDecl();
-
       // The protocol 'Self' conforms concretely to the conforming type.
       if (type->isEqual(selfType)) {
         ProtocolConformance *specialized = conformance;
@@ -209,13 +207,6 @@ RequirementEnvironment::RequirementEnvironment(
   // Next, add each of the requirements (mapped from the requirement's
   // interface types into the abstract type parameters).
   for (auto &rawReq : reqSig->getRequirements()) {
-    // FIXME: This should not be necessary, since the constraint is redundant,
-    // but we need it to work around some crashes for now.
-    if (rawReq.getKind() == RequirementKind::Conformance &&
-        rawReq.getFirstType()->isEqual(selfType) &&
-        rawReq.getSecondType()->isEqual(proto->getDeclaredType()))
-      continue;
-
     if (auto req = rawReq.subst(reqToSyntheticEnvMap))
       builder.addRequirement(*req, source, conformanceDC->getParentModule());
   }

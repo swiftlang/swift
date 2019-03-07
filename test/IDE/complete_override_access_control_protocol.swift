@@ -1,25 +1,25 @@
 // RUN: sed -n -e '1,/NO_ERRORS_UP_TO_HERE$/ p' %s > %t_no_errors.swift
-// RUN: %target-swift-frontend -typecheck -verify -disable-objc-attr-requires-foundation-module %t_no_errors.swift
+// RUN: %target-swift-frontend -typecheck -verify -disable-objc-attr-requires-foundation-module -enable-objc-interop %t_no_errors.swift
 //
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PRIVATE_ABC -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_ABC
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_FILEPRIVATE_ABC -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_ABC
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_INTERNAL_ABC -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_INTERNAL_ABC
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PUBLIC_ABC -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PUBLIC_ABC
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=TEST_PRIVATE_ABC -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_ABC
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=TEST_FILEPRIVATE_ABC -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_ABC
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=TEST_INTERNAL_ABC -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_INTERNAL_ABC
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=TEST_PUBLIC_ABC -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PUBLIC_ABC
 //
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PRIVATE_DE -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_DE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_FILEPRIVATE_DE -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_DE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_INTERNAL_DE -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_INTERNAL_DE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PUBLIC_DE -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PUBLIC_DE
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=TEST_PRIVATE_DE -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_DE
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=TEST_FILEPRIVATE_DE -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_DE
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=TEST_INTERNAL_DE -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_INTERNAL_DE
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=TEST_PUBLIC_DE -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PUBLIC_DE
 //
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PRIVATE_ED -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_ED
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_FILEPRIVATE_ED -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_ED
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_INTERNAL_ED -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_INTERNAL_ED
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PUBLIC_ED -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PUBLIC_ED
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=TEST_PRIVATE_ED -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_ED
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=TEST_FILEPRIVATE_ED -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_ED
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=TEST_INTERNAL_ED -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_INTERNAL_ED
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=TEST_PUBLIC_ED -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PUBLIC_ED
 //
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PRIVATE_EF -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_EF
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_FILEPRIVATE_EF -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_EF
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_INTERNAL_EF -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_INTERNAL_EF
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PUBLIC_EF -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PUBLIC_EF
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=TEST_PRIVATE_EF -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_EF
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=TEST_FILEPRIVATE_EF -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_EF
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=TEST_INTERNAL_EF -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_INTERNAL_EF
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=TEST_PUBLIC_EF -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PUBLIC_EF
 
 @objc
 private class TagPA {}
@@ -168,16 +168,15 @@ public class TestPublicDE : ProtocolDPrivate, ProtocolEPublic {
   #^TEST_PUBLIC_DE^#
 }
 
-// FIXME: Should be 2 items in the three checks below.
-// TEST_PRIVATE_DE: Begin completions, 4 items
+// TEST_PRIVATE_DE: Begin completions, 2 items
 // TEST_PRIVATE_DE-DAG: Decl[InstanceMethod]/Super: func colliding() {|}{{; name=.+$}}
 // TEST_PRIVATE_DE-DAG: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 
-// TEST_INTERNAL_DE: Begin completions, 4 items
+// TEST_INTERNAL_DE: Begin completions, 2 items
 // TEST_INTERNAL_DE-DAG: Decl[InstanceMethod]/Super: func colliding() {|}{{; name=.+$}}
 // TEST_INTERNAL_DE-DAG: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 
-// TEST_PUBLIC_DE: Begin completions, 4 items
+// TEST_PUBLIC_DE: Begin completions, 2 items
 // TEST_PUBLIC_DE-DAG: Decl[InstanceMethod]/Super: public func colliding() {|}{{; name=.+$}}
 // TEST_PUBLIC_DE-DAG: Decl[InstanceMethod]/Super: public func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 
@@ -195,16 +194,15 @@ public class TestPublicED : ProtocolEPublic, ProtocolDPrivate {
   #^TEST_PUBLIC_ED^#
 }
 
-// FIXME: Should be 2 items in the three checks below.
-// TEST_PRIVATE_ED: Begin completions, 4 items
+// TEST_PRIVATE_ED: Begin completions, 2 items
 // TEST_PRIVATE_ED-DAG: Decl[InstanceMethod]/Super: func colliding() {|}{{; name=.+$}}
 // TEST_PRIVATE_ED-DAG: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 
-// TEST_INTERNAL_ED: Begin completions, 4 items
+// TEST_INTERNAL_ED: Begin completions, 2 items
 // TEST_INTERNAL_ED-DAG: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 // TEST_INTERNAL_ED-DAG: Decl[InstanceMethod]/Super: func colliding() {|}{{; name=.+$}}
 
-// TEST_PUBLIC_ED: Begin completions, 4 items
+// TEST_PUBLIC_ED: Begin completions, 2 items
 // TEST_PUBLIC_ED-DAG: Decl[InstanceMethod]/Super: public func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 // TEST_PUBLIC_ED-DAG: Decl[InstanceMethod]/Super: public func colliding() {|}{{; name=.+$}}
 
@@ -222,15 +220,14 @@ public class TestPublicEF : ProtocolEPublic, ProtocolFPublic {
   #^TEST_PUBLIC_EF^#
 }
 
-// FIXME: Should be 2 items in the three checks below.
-// TEST_PRIVATE_EF: Begin completions, 4 items
+// TEST_PRIVATE_EF: Begin completions, 2 items
 // TEST_PRIVATE_EF-DAG: Decl[InstanceMethod]/Super: func colliding() {|}{{; name=.+$}}
 // TEST_PRIVATE_EF-DAG: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 
-// TEST_INTERNAL_EF: Begin completions, 4 items
+// TEST_INTERNAL_EF: Begin completions, 2 items
 // TEST_INTERNAL_EF-DAG: Decl[InstanceMethod]/Super: func colliding() {|}{{; name=.+$}}
 // TEST_INTERNAL_EF-DAG: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 
-// TEST_PUBLIC_EF: Begin completions, 4 items
+// TEST_PUBLIC_EF: Begin completions, 2 items
 // TEST_PUBLIC_EF-DAG: Decl[InstanceMethod]/Super: public func colliding() {|}{{; name=.+$}}
 // TEST_PUBLIC_EF-DAG: Decl[InstanceMethod]/Super: public func collidingGeneric<T>(x: T) {|}{{; name=.+$}}

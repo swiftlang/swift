@@ -2,6 +2,7 @@
 
 // RUN: %target-clang -fobjc-arc %S/Inputs/BlockGlobals/BlockGlobals.m -c -o %t/BlockGlobals.o
 // RUN: %target-build-swift %s -import-objc-header %S/Inputs/BlockGlobals/BlockGlobals.h %t/BlockGlobals.o -o %t/main
+// RUN: %target-codesign %t/main
 // RUN: %target-run %t/main
 
 // REQUIRES: executable_test

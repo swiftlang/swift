@@ -82,7 +82,7 @@ public:
   bool hasPostTerminatorIP() const {
     return GetInsertBlock() != nullptr &&
            !GetInsertBlock()->empty() &&
-           isa<llvm::TerminatorInst>(GetInsertBlock()->back());
+           GetInsertBlock()->back().isTerminator();
   }
 
   void ClearInsertionPoint() {
@@ -269,10 +269,9 @@ public:
 
   using IRBuilderBase::CreateMemCpy;
   llvm::CallInst *CreateMemCpy(Address dest, Address src, Size size) {
-    return CreateMemCpy(dest.getAddress(), src.getAddress(),
-                        size.getValue(),
-                        std::min(dest.getAlignment(),
-                                 src.getAlignment()).getValue());
+    return CreateMemCpy(dest.getAddress(), dest.getAlignment().getValue(),
+                        src.getAddress(), src.getAlignment().getValue(),
+                        size.getValue());
   }
 
   using IRBuilderBase::CreateMemSet;

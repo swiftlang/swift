@@ -61,7 +61,9 @@ public:
     // importing of names.  We treat that with a rawValue of 5, and treat
     // all major values of 5 or higher as being rawValue = majorversion + 1.
     const auto &version = langOpts.EffectiveLanguageVersion;
-    if (version.size() > 1 && version[0] == 4 && version[1] == 2) {
+    // If the effective version is 4.x, where x >= 2, the import version
+    // is 4.2.
+    if (version.size() > 1 && version[0] == 4 && version[1] >= 2) {
       return ImportNameVersion::swift4_2();
     }
     unsigned major = version[0];
@@ -82,9 +84,9 @@ public:
     return 0;
   }
 
-  clang::VersionTuple asClangVersionTuple() const {
+  llvm::VersionTuple asClangVersionTuple() const {
     assert(*this != ImportNameVersion::raw());
-    return clang::VersionTuple(majorVersionNumber(), minorVersionNumber());    
+    return llvm::VersionTuple(majorVersionNumber(), minorVersionNumber());
   }
 
   bool operator==(ImportNameVersion other) const {
@@ -333,6 +335,28 @@ public:
                           ImportNameVersion version,
                           clang::DeclarationName preferredName =
                             clang::DeclarationName());
+
+  /// Attempts to import the name of \p decl with each possible
+  /// ImportNameVersion. \p action will be called with each unique name.
+  ///
+  /// In this case, "unique" means either the full name is distinct or the
+  /// effective context is distinct. This method does not attempt to handle
+  /// "unresolved" contexts in any special way---if one name references a
+  /// particular Clang declaration and the other has an unresolved context that
+  /// will eventually reference that declaration, the contexts will still be
+  /// considered distinct.
+  ///
+  /// If \p action returns false, the current name will \e not be added to the
+  /// set of seen names.
+  ///
+  /// The active name for \p activeVerion is always first, followed by the
+  /// other names in the order of
+  /// ImportNameVersion::forEachOtherImportNameVersion.
+  ///
+  /// Returns \c true if it fails to import name for the active version.
+  bool forEachDistinctImportName(
+      const clang::NamedDecl *decl, ImportNameVersion activeVersion,
+      llvm::function_ref<bool(ImportedName, ImportNameVersion)> action);
 
   /// Imports the name of the given Clang macro into Swift.
   Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,

@@ -180,7 +180,7 @@ internal func donotEliminate() {
 // CHECK-TESTING: sil {{.*}}publicClassMethod
 // CHECK-TESTING: sil {{.*}}DeadWitness
 
-// CHECK-LABEL: @$S25dead_function_elimination14donotEliminateyyF
+// CHECK-LABEL: @$s25dead_function_elimination14donotEliminateyyF
 
 // CHECK-LABEL: sil_vtable Base
 // CHECK: aliveMethod

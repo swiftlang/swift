@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -unsafe-guaranteed-peephole %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -unsafe-guaranteed-peephole %s | %FileCheck %s
 sil_stage canonical
 
 import Builtin
@@ -375,7 +375,7 @@ bb0(%0 : $Foo):
 }
 
 struct MyInt {
-  @sil_stored var val: Builtin.Int32
+  @_hasStorage var val: Builtin.Int32
 }
 
 // CHECK-LABEL: sil @testUnsafeGuaranteed_sideeffectfree_inst

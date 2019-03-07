@@ -24,50 +24,50 @@
 extern "C" {
 #endif
 
-typedef uintptr_t swift_typeref_t;
+typedef uint64_t swift_typeref_t;
 
-/// \brief Represents one of the Swift reflection sections of an image.
+/// Represents one of the Swift reflection sections of an image.
 typedef struct swift_reflection_section {
   void *Begin;
   void *End;
 } swift_reflection_section_t;
 
-/// \brief Represents the set of Swift reflection sections of an image.
+/// Represents the set of Swift reflection sections of an image.
 /// Not all sections may be present.
 typedef struct swift_reflection_info {
   struct {
     swift_reflection_section_t section;
-    uintptr_t offset;
+    uint64_t offset;
   } field;
 
   struct {
     swift_reflection_section_t section;
-    uintptr_t offset;
+    uint64_t offset;
   } associated_types;
 
   struct {
     swift_reflection_section_t section;
-    uintptr_t offset;
+    uint64_t offset;
   } builtin_types;
 
   struct {
     swift_reflection_section_t section;
-    uintptr_t offset;
+    uint64_t offset;
   } capture;
 
   struct {
     swift_reflection_section_t section;
-    uintptr_t offset;
+    uint64_t offset;
   } type_references;
 
   struct {
     swift_reflection_section_t section;
-    uintptr_t offset;
+    uint64_t offset;
   } reflection_strings;
 
   // Start address in local and remote address spaces.
-  uintptr_t LocalStartAddress;
-  uintptr_t RemoteStartAddress;
+  uint64_t LocalStartAddress;
+  uint64_t RemoteStartAddress;
 } swift_reflection_info_t;
 
 /// The layout kind of a Swift type.
@@ -140,7 +140,7 @@ typedef struct swift_childinfo {
   swift_typeref_t TR;
 } swift_childinfo_t;
 
-/// \brief An opaque pointer to a context which maintains state and
+/// An opaque pointer to a context which maintains state and
 /// caching of reflection structure for heap instances.
 typedef struct SwiftReflectionContext *SwiftReflectionContextRef;
 

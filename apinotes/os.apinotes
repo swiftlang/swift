@@ -6,6 +6,8 @@ Typedefs:
   Availability: nonswift
 - Name: os_log_t
   Availability: nonswift
+- Name: os_signpost_type_t
+  SwiftName: OSSignpostType
 Classes:
 - Name: OS_os_log
   SwiftName: OSLog
@@ -20,8 +22,20 @@ Enumerators:
   SwiftPrivate: true
 - Name: OS_LOG_TYPE_FAULT
   SwiftPrivate: true
+- Name: OS_SIGNPOST_INTERVAL_BEGIN
+  SwiftPrivate: true
+- Name: OS_SIGNPOST_INTERVAL_END
+  SwiftPrivate: true
+- Name: OS_SIGNPOST_EVENT
+  SwiftPrivate: true
 Functions:
 - Name: _os_log_impl
+  Availability: nonswift
+  AvailabilityMsg: 'Use os_log'
+- Name: _os_log_error_impl
+  Availability: nonswift
+  AvailabilityMsg: 'Use os_log'
+- Name: _os_log_fault_impl
   Availability: nonswift
   AvailabilityMsg: 'Use os_log'
 - Name: _os_log_sensitive_deprecated
@@ -40,3 +54,14 @@ Functions:
   NullabilityOfRet: N
 - Name: os_log_is_debug_enabled
   Availability: nonswift
+- Name: os_signpost_enabled
+  SwiftPrivate: true
+- Name: os_signpost_id_generate
+  SwiftPrivate: true
+  NullabilityOfRet: O
+- Name: os_signpost_id_make_with_pointer
+  SwiftPrivate: true
+  NullabilityOfRet: O
+- Name: _os_signpost_emit_with_name_impl
+  Availability: nonswift
+  AvailabilityMsg: 'Use os_signpost'

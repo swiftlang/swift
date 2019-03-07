@@ -104,12 +104,12 @@ func expectEqualCString(_ lhs: UnsafePointer<UInt8>,
 CStringTests.test("String.init(validatingUTF8:)") {
   do {
     let (s, dealloc) = getASCIIUTF8()
-    expectOptionalEqual("ab", String(validatingUTF8: bindAsCChar(s)))
+    expectEqual("ab", String(validatingUTF8: bindAsCChar(s)))
     dealloc()
   }
   do {
     let (s, dealloc) = getNonASCIIUTF8()
-    expectOptionalEqual("аб", String(validatingUTF8: bindAsCChar(s)))
+    expectEqual("аб", String(validatingUTF8: bindAsCChar(s)))
     dealloc()
   }
   do {
@@ -156,7 +156,7 @@ CStringTests.test("String.decodeCString") {
     let (s, dealloc) = getIllFormedUTF8String1()
     if let (result, repairsMade) = String.decodeCString(
       s, as: UTF8.self, repairingInvalidCodeUnits: true) {
-      expectOptionalEqual("\u{41}\u{fffd}\u{fffd}\u{fffd}\u{41}", result)
+      expectEqual("\u{41}\u{fffd}\u{fffd}\u{fffd}\u{41}", result)
       expectTrue(repairsMade)
     } else {
       expectUnreachable("Expected .some()")

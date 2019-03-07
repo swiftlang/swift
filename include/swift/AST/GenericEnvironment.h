@@ -17,7 +17,6 @@
 #ifndef SWIFT_AST_GENERIC_ENVIRONMENT_H
 #define SWIFT_AST_GENERIC_ENVIRONMENT_H
 
-#include "swift/AST/SubstitutionList.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericParamKey.h"
@@ -144,7 +143,7 @@ public:
   /// Map a generic parameter type to a contextual type.
   Type mapTypeIntoContext(GenericTypeParamType *type) const;
 
-  /// \brief Map the given SIL interface type to a contextual type.
+  /// Map the given SIL interface type to a contextual type.
   ///
   /// This operation will also reabstract dependent types according to the
   /// abstraction level of their associated type requirements.
@@ -170,7 +169,7 @@ public:
   /// generic parameter types by their sugared form.
   Type getSugaredType(Type type) const;
 
-  SubstitutionList getForwardingSubstitutions() const;
+  SubstitutionMap getForwardingSubstitutionMap() const;
 
   void dump(raw_ostream &os) const;
 

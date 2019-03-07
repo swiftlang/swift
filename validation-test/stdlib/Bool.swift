@@ -1,6 +1,7 @@
 // RUN: mkdir -p %t
 // RUN: %target-clang -x c %S/Inputs/VariadicBool/variadicBool.c -c -o %t/variadicBool.o
 // RUN: %target-build-swift -I %S/Inputs/VariadicBool/ %t/variadicBool.o %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 

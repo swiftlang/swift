@@ -59,7 +59,8 @@ func testCompleteModuleQualifiedMacros1() {
 func testClangMember1() {
 	var FS = FooStruct1()
 	FS.#^CLANG_MEMBER1^#
-// CLANG_MEMBERS1: Begin completions, 2 items
+// CLANG_MEMBERS1: Begin completions, 3 items
 // CLANG_MEMBERS1-DAG: Decl[InstanceVar]/CurrNominal/keyword[x, Struct1]/recommended[y]: x[#Int32#]{{; name=.+$}}
 // CLANG_MEMBERS1-DAG: Decl[InstanceVar]/CurrNominal/keyword[y, Struct1]/recommendedover[x]: y[#Double#]{{; name=.+$}}
+// CLANG_MEMBERS1-DAG: Keyword[self]/CurrNominal: self[#FooStruct1#]; name=self
 }

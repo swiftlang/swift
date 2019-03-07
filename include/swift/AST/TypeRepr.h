@@ -34,6 +34,7 @@ namespace swift {
   class DeclContext;
   class GenericEnvironment;
   class IdentTypeRepr;
+  class TupleTypeRepr;
   class TypeDecl;
 
 enum class TypeReprKind : uint8_t {
@@ -44,7 +45,7 @@ enum class TypeReprKind : uint8_t {
 enum : unsigned { NumTypeReprKindBits =
   countBitsUsed(static_cast<unsigned>(TypeReprKind::Last_TypeRepr)) };
 
-/// \brief Representation of a type as written in source.
+/// Representation of a type as written in source.
 class alignas(8) TypeRepr {
   TypeRepr(const TypeRepr&) = delete;
   void operator=(const TypeRepr&) = delete;
@@ -90,6 +91,11 @@ protected:
   SWIFT_INLINE_BITFIELD_FULL(CompositionTypeRepr, TypeRepr, 32,
     : NumPadBits,
     NumTypes : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(SILBoxTypeRepr, TypeRepr, 32,
+    NumGenericArgs : NumPadBits,
+    NumFields : 32
   );
 
   } Bits;
@@ -158,16 +164,9 @@ public:
 
   /// Clone the given type representation.
   TypeRepr *clone(const ASTContext &ctx) const;
-
-  /// Visit the top-level types in the given type representation,
-  /// which includes the types referenced by \c IdentTypeReprs either
-  /// directly or within a protocol composition type.
-  ///
-  /// \param visitor Each top-level type representation is passed to the visitor.
-  void visitTopLevelTypeReprs(llvm::function_ref<void(IdentTypeRepr *)> visitor);
 };
 
-/// \brief A TypeRepr for a type with a syntax error.  Can be used both as a
+/// A TypeRepr for a type with a syntax error.  Can be used both as a
 /// top-level TypeRepr and as a part of other TypeRepr.
 ///
 /// The client should make sure to emit a diagnostic at the construction time
@@ -194,7 +193,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief A type with attributes.
+/// A type with attributes.
 /// \code
 ///   @convention(thin) Foo
 /// \endcode
@@ -230,7 +229,7 @@ private:
 
 class ComponentIdentTypeRepr;
 
-/// \brief This is the abstract base class for types with identifier components.
+/// This is the abstract base class for types with identifier components.
 /// \code
 ///   Foo.Bar<Gen>
 /// \endcode
@@ -309,7 +308,7 @@ protected:
   friend class TypeRepr;
 };
 
-/// \brief A simple identifier type like "Int".
+/// A simple identifier type like "Int".
 class SimpleIdentTypeRepr : public ComponentIdentTypeRepr {
 public:
   SimpleIdentTypeRepr(SourceLoc Loc, Identifier Id)
@@ -333,7 +332,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief An identifier type with generic arguments.
+/// An identifier type with generic arguments.
 /// \code
 ///   Bar<Gen>
 /// \endcode
@@ -381,7 +380,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief A type with identifier components.
+/// A type with identifier components.
 /// \code
 ///   Foo.Bar<Gen>
 /// \endcode
@@ -460,9 +459,11 @@ inline IdentTypeRepr::ComponentRange IdentTypeRepr::getComponentRange() {
   return ComponentRange(this);
 }
 
-/// \brief A function type.
+/// A function type.
 /// \code
-///   Foo -> Bar
+///   (Foo) -> Bar
+///   (Foo, Bar) -> Baz
+///   (x: Foo, y: Bar) -> Baz
 /// \endcode
 class FunctionTypeRepr : public TypeRepr {
   // These three are only used in SIL mode, which is the only time
@@ -470,13 +471,13 @@ class FunctionTypeRepr : public TypeRepr {
   GenericParamList *GenericParams;
   GenericEnvironment *GenericEnv;
 
-  TypeRepr *ArgsTy;
+  TupleTypeRepr *ArgsTy;
   TypeRepr *RetTy;
   SourceLoc ArrowLoc;
   SourceLoc ThrowsLoc;
 
 public:
-  FunctionTypeRepr(GenericParamList *genericParams, TypeRepr *argsTy,
+  FunctionTypeRepr(GenericParamList *genericParams, TupleTypeRepr *argsTy,
                    SourceLoc throwsLoc, SourceLoc arrowLoc, TypeRepr *retTy)
     : TypeRepr(TypeReprKind::Function),
       GenericParams(genericParams),
@@ -493,7 +494,7 @@ public:
     GenericEnv = genericEnv;
   }
 
-  TypeRepr *getArgsTypeRepr() const { return ArgsTy; }
+  TupleTypeRepr *getArgsTypeRepr() const { return ArgsTy; }
   TypeRepr *getResultTypeRepr() const { return RetTy; }
   bool throws() const { return ThrowsLoc.isValid(); }
 
@@ -506,7 +507,7 @@ public:
   static bool classof(const FunctionTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const { return ArgsTy->getStartLoc(); }
+  SourceLoc getStartLocImpl() const;
   SourceLoc getEndLocImpl() const { return RetTy->getEndLoc(); }
   SourceLoc getLocImpl() const { return ArrowLoc; }
 
@@ -514,7 +515,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief An array type.
+/// An array type.
 /// \code
 ///   [Foo]
 /// \endcode
@@ -541,7 +542,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief A dictionary type.
+/// A dictionary type.
 /// \code
 ///   [K : V]
 /// \endcode
@@ -574,7 +575,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief An optional type.
+/// An optional type.
 /// \code
 ///   Foo?
 /// \endcode
@@ -606,7 +607,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief An implicitly unwrapped optional type.
+/// An implicitly unwrapped optional type.
 /// \code
 ///   Foo!
 /// \endcode
@@ -635,7 +636,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief A parsed element within a tuple type.
+/// A parsed element within a tuple type.
 struct TupleTypeReprElement {
   Identifier Name;
   SourceLoc NameLoc;
@@ -650,7 +651,7 @@ struct TupleTypeReprElement {
   TupleTypeReprElement(TypeRepr *Type): Type(Type) {}
 };
 
-/// \brief A tuple type.
+/// A tuple type.
 /// \code
 ///   (Foo, Bar)
 ///   (x: Foo)
@@ -780,7 +781,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief A type composite type.
+/// A type composite type.
 /// \code
 ///   Foo & Bar
 /// \endcode
@@ -830,7 +831,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief A 'metatype' type.
+/// A 'metatype' type.
 /// \code
 ///   Foo.Type
 /// \endcode
@@ -859,7 +860,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief A 'protocol' type.
+/// A 'protocol' type.
 /// \code
 ///   Foo.Protocol
 /// \endcode
@@ -914,7 +915,7 @@ private:
   friend class TypeRepr;
 };
   
-/// \brief An 'inout' type.
+/// An 'inout' type.
 /// \code
 ///   x : inout Int
 /// \endcode
@@ -929,7 +930,7 @@ public:
   static bool classof(const InOutTypeRepr *T) { return true; }
 };
   
-/// \brief A 'shared' type.
+/// A 'shared' type.
 /// \code
 ///   x : shared Int
 /// \endcode
@@ -944,7 +945,7 @@ public:
   static bool classof(const SharedTypeRepr *T) { return true; }
 };
 
-/// \brief A 'owned' type.
+/// A 'owned' type.
 /// \code
 ///   x : owned Int
 /// \endcode
@@ -959,7 +960,7 @@ public:
   static bool classof(const OwnedTypeRepr *T) { return true; }
 };
 
-/// \brief A TypeRepr for a known, fixed type.
+/// A TypeRepr for a known, fixed type.
 ///
 /// Fixed type representations should be used sparingly, in places
 /// where we need to specify some type (usually some built-in type)
@@ -996,29 +997,44 @@ private:
   friend class TypeRepr;
 };
 
+class SILBoxTypeReprField {
+  SourceLoc VarOrLetLoc;
+  llvm::PointerIntPair<TypeRepr*, 1, bool> FieldTypeAndMutable;
+
+public:
+  SILBoxTypeReprField(SourceLoc loc, bool isMutable, TypeRepr *fieldType)
+     : VarOrLetLoc(loc), FieldTypeAndMutable(fieldType, isMutable) {
+  }
+
+  SourceLoc getLoc() const { return VarOrLetLoc; }
+  TypeRepr *getFieldType() const { return FieldTypeAndMutable.getPointer(); }
+  bool isMutable() const { return FieldTypeAndMutable.getInt(); }
+};
+
 /// SIL-only TypeRepr for box types.
 ///
 /// Boxes are either concrete: { var Int, let String }
 /// or generic:                <T: Runcible> { var T, let String } <Int>
-class SILBoxTypeRepr : public TypeRepr {
+class SILBoxTypeRepr final : public TypeRepr,
+    private llvm::TrailingObjects<SILBoxTypeRepr,
+                                  SILBoxTypeReprField, TypeRepr *> {
+  friend TrailingObjects;
   GenericParamList *GenericParams;
   GenericEnvironment *GenericEnv = nullptr;
 
   SourceLoc LBraceLoc, RBraceLoc;
   SourceLoc ArgLAngleLoc, ArgRAngleLoc;
+
+  size_t numTrailingObjects(OverloadToken<SILBoxTypeReprField>) const {
+    return Bits.SILBoxTypeRepr.NumFields;
+  }
+  size_t numTrailingObjects(OverloadToken<TypeRepr*>) const {
+    return Bits.SILBoxTypeRepr.NumGenericArgs;
+  }
   
 public:
-  struct Field {
-    SourceLoc VarOrLetLoc;
-    bool Mutable;
-    TypeRepr *FieldType;
-  };
-  
-private:
-  ArrayRef<Field> Fields;
-  ArrayRef<TypeRepr *> GenericArgs;
-  
-public:
+  using Field = SILBoxTypeReprField;
+
   SILBoxTypeRepr(GenericParamList *GenericParams,
                  SourceLoc LBraceLoc, ArrayRef<Field> Fields,
                  SourceLoc RBraceLoc,
@@ -1026,9 +1042,17 @@ public:
                  SourceLoc ArgRAngleLoc)
     : TypeRepr(TypeReprKind::SILBox),
       GenericParams(GenericParams), LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc),
-      ArgLAngleLoc(ArgLAngleLoc), ArgRAngleLoc(ArgRAngleLoc),
-      Fields(Fields), GenericArgs(GenericArgs)
-  {}  
+      ArgLAngleLoc(ArgLAngleLoc), ArgRAngleLoc(ArgRAngleLoc)
+  {
+    Bits.SILBoxTypeRepr.NumFields = Fields.size();
+    Bits.SILBoxTypeRepr.NumGenericArgs = GenericArgs.size();
+
+    std::uninitialized_copy(Fields.begin(), Fields.end(),
+                            getTrailingObjects<SILBoxTypeReprField>());
+
+    std::uninitialized_copy(GenericArgs.begin(), GenericArgs.end(),
+                            getTrailingObjects<TypeRepr*>());
+  }
   
   static SILBoxTypeRepr *create(ASTContext &C,
                       GenericParamList *GenericParams,
@@ -1043,10 +1067,12 @@ public:
   }
   
   ArrayRef<Field> getFields() const {
-    return Fields;
+    return {getTrailingObjects<Field>(),
+            Bits.SILBoxTypeRepr.NumFields};
   }
   ArrayRef<TypeRepr *> getGenericArguments() const {
-    return GenericArgs;
+    return {getTrailingObjects<TypeRepr*>(),
+            static_cast<size_t>(Bits.SILBoxTypeRepr.NumGenericArgs)};
   }
   
   GenericParamList *getGenericParams() const {
@@ -1075,6 +1101,7 @@ private:
 };
 
 inline bool TypeRepr::isSimple() const {
+  // NOTE: Please keep this logic in sync with TypeBase::hasSimpleTypeRepr().
   switch (getKind()) {
   case TypeReprKind::Attributed:
   case TypeReprKind::Error:

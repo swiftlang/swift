@@ -15,6 +15,7 @@
 #include "sourcekitd/DocStructureArray.h"
 #include "sourcekitd/DocSupportAnnotationArray.h"
 #include "sourcekitd/TokenAnnotationsArray.h"
+#include "sourcekitd/ExpressionTypeArray.h"
 
 #include "SourceKit/Core/Context.h"
 #include "SourceKit/Core/LangSupport.h"
@@ -26,16 +27,23 @@
 #include "SourceKit/Support/UIdent.h"
 #include "SourceKit/SwiftLang/Factory.h"
 
-#include "swift/Demangling/ManglingMacros.h"
-#include "swift/Demangling/Demangler.h"
+#include "swift/Basic/ExponentialGrowthAppendingBinaryByteStream.h"
 #include "swift/Basic/Mangler.h"
+#include "swift/Basic/Version.h"
+#include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/ManglingMacros.h"
+#include "swift/Syntax/Serialization/SyntaxSerialization.h"
+#include "swift/Syntax/SyntaxNodes.h"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/BinaryByteStream.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/NativeFormatting.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/raw_ostream.h"
 #include <mutex>
 
@@ -67,6 +75,17 @@ public:
     return StringRef(Name);
   }
 };
+
+struct SKEditorConsumerOptions {
+  bool EnableSyntaxMap = false;
+  bool EnableStructure = false;
+  bool EnableDiagnostics = false;
+  SyntaxTreeTransferMode SyntaxTransferMode = SyntaxTreeTransferMode::Off;
+  SyntaxTreeSerializationFormat SyntaxSerializationFormat =
+      SyntaxTreeSerializationFormat::JSON;
+  bool SyntacticOnly = false;
+};
+
 } // anonymous namespace
 
 #define REQUEST(NAME, CONTENT) static LazySKDUID Request##NAME(CONTENT);
@@ -91,9 +110,10 @@ static void onDocumentUpdateNotification(StringRef DocumentName) {
 static SourceKit::Context *GlobalCtx = nullptr;
 
 void sourcekitd::initialize() {
+  llvm::EnablePrettyStackTrace();
   GlobalCtx = new SourceKit::Context(sourcekitd::getRuntimeLibPath(),
                                      SourceKit::createSwiftLangSupport);
-  GlobalCtx->getNotificationCenter().addDocumentUpdateNotificationReceiver(
+  GlobalCtx->getNotificationCenter()->addDocumentUpdateNotificationReceiver(
     onDocumentUpdateNotification);
 }
 void sourcekitd::shutdown() {
@@ -122,6 +142,8 @@ static sourcekitd_response_t reportDocInfo(llvm::MemoryBuffer *InputBuf,
 
 static void reportCursorInfo(const CursorInfoData &Info, ResponseReceiver Rec);
 
+static void reportExpressionTypeInfo(const ExpressionTypesInFile &Info, ResponseReceiver Rec);
+
 static void reportRangeInfo(const RangeInfo &Info, ResponseReceiver Rec);
 
 static void reportNameInfo(const NameTranslatingInfo &Info, ResponseReceiver Rec);
@@ -148,10 +170,18 @@ codeCompleteUpdate(StringRef name, int64_t Offset,
 
 static sourcekitd_response_t codeCompleteClose(StringRef name, int64_t Offset);
 
+static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
+                                             int64_t Offset,
+                                             ArrayRef<const char *> Args);
+
 static sourcekitd_response_t
-editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, bool EnableSyntaxMap,
-           bool EnableStructure, bool EnableDiagnostics, bool EnableSyntaxTree,
-           bool SyntacticOnly, ArrayRef<const char *> Args);
+conformingMethodList(llvm::MemoryBuffer *InputBuf, int64_t Offset,
+                     ArrayRef<const char *> Args,
+                     ArrayRef<const char *> ExpectedTypes);
+
+static sourcekitd_response_t
+editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
+           SKEditorConsumerOptions Opts, ArrayRef<const char *> Args);
 
 static sourcekitd_response_t
 editorOpenInterface(StringRef Name, StringRef ModuleName,
@@ -184,9 +214,7 @@ editorClose(StringRef Name, bool RemoveCache);
 
 static sourcekitd_response_t
 editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf, unsigned Offset,
-                  unsigned Length, bool EnableSyntaxMap, bool EnableStructure,
-                  bool EnableDiagnostics, bool EnableSyntaxTree,
-                  bool SyntacticOnly);
+                  unsigned Length, SKEditorConsumerOptions Opts);
 
 static void
 editorApplyFormatOptions(StringRef Name, RequestDict &FmtOptions);
@@ -236,6 +264,35 @@ static void fillDictionaryForDiagnosticInfo(
 
 static void enableCompileNotifications(bool value);
 
+static SyntaxTreeTransferMode syntaxTransferModeFromUID(sourcekitd_uid_t UID) {
+  if (UID == nullptr) {
+    // Default is no syntax tree
+    return SyntaxTreeTransferMode::Off;
+  } else if (UID == KindSyntaxTreeOff) {
+    return SyntaxTreeTransferMode::Off;
+  } else if (UID == KindSyntaxTreeIncremental) {
+    return SyntaxTreeTransferMode::Incremental;
+  } else if (UID == KindSyntaxTreeFull) {
+    return SyntaxTreeTransferMode::Full;
+  } else {
+    llvm_unreachable("Unexpected syntax tree transfer mode");
+  }
+}
+
+static llvm::Optional<SyntaxTreeSerializationFormat>
+syntaxSerializationFormatFromUID(sourcekitd_uid_t UID) {
+  if (UID == nullptr) {
+    // Default is JSON
+    return SyntaxTreeSerializationFormat::JSON;
+  } else if (UID == KindSyntaxTreeSerializationJSON) {
+    return SyntaxTreeSerializationFormat::JSON;
+  } else if (UID == KindSyntaxTreeSerializationByteTree) {
+    return SyntaxTreeSerializationFormat::ByteTree;
+  } else {
+    return llvm::None;
+  }
+}
+
 static void handleRequestImpl(sourcekitd_object_t Req,
                               ResponseReceiver Receiver);
 
@@ -283,7 +340,7 @@ getInputBufForRequest(Optional<StringRef> SourceFile,
       return nullptr;
     }
   } else {
-    InputBuf = llvm::MemoryBuffer::getNewMemBuffer(0, "<input>");
+    InputBuf = llvm::WritableMemoryBuffer::getNewMemBuffer(0, "<input>");
   }
 
   return InputBuf;
@@ -317,9 +374,31 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     return Rec(RB.createResponse());
   }
 
+  if (ReqUID == RequestCompilerVersion) {
+    ResponseBuilder RB;
+    auto dict = RB.getDictionary();
+    auto thisVersion = swift::version::Version::getCurrentLanguageVersion();
+    dict.set(KeyVersionMajor, static_cast<int64_t>(thisVersion[0]));
+    dict.set(KeyVersionMinor, static_cast<int64_t>(thisVersion[1]));
+    if (thisVersion.size() > 2)
+      dict.set(KeyVersionPatch, static_cast<int64_t>(thisVersion[2]));
+    else
+      dict.set(KeyVersionPatch, static_cast<int64_t>(0));
+    return Rec(RB.createResponse());
+  }
+
   if (ReqUID == RequestCrashWithExit) {
     // 'exit' has the same effect as crashing but without the crash log.
     ::exit(1);
+  }
+
+  if (ReqUID == RequestTestNotification) {
+    static UIdent TestNotification("source.notification.test");
+    ResponseBuilder RespBuilder;
+    auto Dict = RespBuilder.getDictionary();
+    Dict.set(KeyNotification, TestNotification);
+    sourcekitd::postNotification(RespBuilder.createResponse());
+    return Rec(ResponseBuilder().createResponse());
   }
 
   if (ReqUID == RequestDemangle) {
@@ -414,13 +493,23 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Req.getInt64(KeyEnableStructure, EnableStructure, /*isOptional=*/true);
     int64_t EnableDiagnostics = true;
     Req.getInt64(KeyEnableDiagnostics, EnableDiagnostics, /*isOptional=*/true);
-    int64_t EnableSyntaxTree = false;
-    Req.getInt64(KeyEnableSyntaxTree, EnableSyntaxTree, /*isOptional=*/true);
+    auto TransferModeUID = Req.getUID(KeySyntaxTreeTransferMode);
+    auto SerializationFormatUID = Req.getUID(KeySyntaxTreeSerializationFormat);
     int64_t SyntacticOnly = false;
     Req.getInt64(KeySyntacticOnly, SyntacticOnly, /*isOptional=*/true);
-    return Rec(editorOpen(*Name, InputBuf.get(), EnableSyntaxMap, EnableStructure,
-                          EnableDiagnostics, EnableSyntaxTree, SyntacticOnly,
-                          Args));
+
+    SKEditorConsumerOptions Opts;
+    Opts.EnableSyntaxMap = EnableSyntaxMap;
+    Opts.EnableStructure = EnableStructure;
+    Opts.EnableDiagnostics = EnableDiagnostics;
+    Opts.SyntaxTransferMode = syntaxTransferModeFromUID(TransferModeUID);
+    auto SyntaxSerializationFormat =
+        syntaxSerializationFormatFromUID(SerializationFormatUID);
+    if (!SyntaxSerializationFormat)
+      return Rec(createErrorRequestFailed("Invalid serialization format"));
+    Opts.SyntaxSerializationFormat = SyntaxSerializationFormat.getValue();
+    Opts.SyntacticOnly = SyntacticOnly;
+    return Rec(editorOpen(*Name, InputBuf.get(), Opts, Args));
   }
   if (ReqUID == RequestEditorClose) {
     Optional<StringRef> Name = Req.getString(KeyName);
@@ -450,14 +539,24 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Req.getInt64(KeyEnableStructure, EnableStructure, /*isOptional=*/true);
     int64_t EnableDiagnostics = true;
     Req.getInt64(KeyEnableDiagnostics, EnableDiagnostics, /*isOptional=*/true);
-    int64_t EnableSyntaxTree = false;
-    Req.getInt64(KeyEnableSyntaxTree, EnableSyntaxTree, /*isOptional=*/true);
     int64_t SyntacticOnly = false;
     Req.getInt64(KeySyntacticOnly, SyntacticOnly, /*isOptional=*/true);
-    return Rec(editorReplaceText(*Name, InputBuf.get(), Offset, Length,
-                                 EnableSyntaxMap, EnableStructure,
-                                 EnableDiagnostics, EnableSyntaxTree,
-                                 SyntacticOnly));
+    auto TransferModeUID = Req.getUID(KeySyntaxTreeTransferMode);
+    auto SerializationFormatUID = Req.getUID(KeySyntaxTreeSerializationFormat);
+
+    SKEditorConsumerOptions Opts;
+    Opts.EnableSyntaxMap = EnableSyntaxMap;
+    Opts.EnableStructure = EnableStructure;
+    Opts.EnableDiagnostics = EnableDiagnostics;
+    Opts.SyntaxTransferMode = syntaxTransferModeFromUID(TransferModeUID);
+    auto SyntaxSerializationFormat =
+        syntaxSerializationFormatFromUID(SerializationFormatUID);
+    if (!SyntaxSerializationFormat)
+      return Rec(createErrorRequestFailed("Invalid serialization format"));
+    Opts.SyntaxSerializationFormat = SyntaxSerializationFormat.getValue();
+    Opts.SyntacticOnly = SyntacticOnly;
+
+    return Rec(editorReplaceText(*Name, InputBuf.get(), Offset, Length, Opts));
   }
   if (ReqUID == RequestEditorFormatText) {
     Optional<StringRef> Name = Req.getString(KeyName);
@@ -784,6 +883,32 @@ handleSemanticRequest(RequestDict Req,
     return Rec(codeCompleteUpdate(*Name, Offset, options));
   }
 
+  if (ReqUID == RequestTypeContextInfo) {
+    std::unique_ptr<llvm::MemoryBuffer> InputBuf =
+        getInputBufForRequest(SourceFile, SourceText, ErrBuf);
+    if (!InputBuf)
+      return Rec(createErrorRequestFailed(ErrBuf.c_str()));
+    int64_t Offset;
+    if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
+      return Rec(createErrorRequestInvalid("missing 'key.offset'"));
+    return Rec(typeContextInfo(InputBuf.get(), Offset, Args));
+  }
+
+  if (ReqUID == RequestConformingMethodList) {
+    std::unique_ptr<llvm::MemoryBuffer> InputBuf =
+        getInputBufForRequest(SourceFile, SourceText, ErrBuf);
+    if (!InputBuf)
+      return Rec(createErrorRequestFailed(ErrBuf.c_str()));
+    int64_t Offset;
+    if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
+      return Rec(createErrorRequestInvalid("missing 'key.offset'"));
+    SmallVector<const char *, 8> ExpectedTypeNames;
+    if (Req.getStringArray(KeyExpectedTypes, ExpectedTypeNames, true))
+      return Rec(createErrorRequestInvalid("invalid 'key.expectedtypes'"));
+    return Rec(
+        conformingMethodList(InputBuf.get(), Offset, Args, ExpectedTypeNames));
+  }
+
   if (!SourceFile.hasValue())
     return Rec(createErrorRequestInvalid("missing 'key.sourcefile'"));
 
@@ -876,6 +1001,14 @@ handleSemanticRequest(RequestDict Req,
       }
     }
     return Rec(createErrorRequestInvalid("'key.line' or 'key.column' are required"));
+  }
+
+  if (ReqUID == RequestCollectExpressionType) {
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+    return Lang.collectExpressionTypes(*SourceFile, Args,
+      [Rec](const ExpressionTypesInFile &Info) {
+        reportExpressionTypeInfo(Info, Rec);
+      });
   }
 
   if (ReqUID == RequestFindLocalRenameRanges) {
@@ -1108,6 +1241,8 @@ bool SKIndexingConsumer::startSourceEntity(const EntityInfo &Info) {
     Elem.set(KeyReceiverUSR, Info.ReceiverUSR);
   if (Info.IsDynamic)
     Elem.setBool(KeyIsDynamic, true);
+  if (Info.IsImplicit)
+    Elem.setBool(KeyIsImplicit, true);
   if (Info.IsTestCandidate)
     Elem.setBool(KeyIsTestCandidate, true);
 
@@ -1230,13 +1365,6 @@ public:
 };
 } // end anonymous namespace
 
-static bool isSwiftPrefixed(StringRef MangledName) {
-  if (MangledName.size() < 2)
-    return false;
-  return MangledName[0] == '_' &&
-         (MangledName[1] == 'T' || MangledName[1] == MANGLING_PREFIX_STR[1]);
-}
-
 static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,
                                            bool Simplified) {
   swift::Demangle::DemangleOptions DemangleOptions;
@@ -1246,7 +1374,7 @@ static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,
   }
 
   auto getDemangledName = [&](StringRef MangledName) -> std::string {
-    if (!isSwiftPrefixed(MangledName))
+    if (!swift::Demangle::isSwiftSymbol(MangledName))
       return std::string(); // Not a mangled name
 
     std::string Result = swift::Demangle::demangleSymbolAsString(
@@ -1344,6 +1472,8 @@ void SKDocConsumer::addDocEntityInfoToDict(const DocEntityInfo &Info,
     Elem.set(KeyDocFullAsXML, Info.DocComment);
   if (!Info.FullyAnnotatedDecl.empty())
     Elem.set(KeyFullyAnnotatedDecl, Info.FullyAnnotatedDecl);
+  if (!Info.FullyAnnotatedGenericSig.empty())
+    Elem.set(KeyFullyAnnotatedGenericSignature, Info.FullyAnnotatedGenericSig);
   if (!Info.LocalizationKey.empty())
     Elem.set(KeyLocalizationKey, Info.LocalizationKey);
 
@@ -1604,6 +1734,22 @@ static void reportNameInfo(const NameTranslatingInfo &Info, ResponseReceiver Rec
     Elem.set(KeyIsZeroArgSelector, Info.IsZeroArgSelector);
   }
   Rec(RespBuilder.createResponse());
+}
+
+//===----------------------------------------------------------------------===//
+// ReportExpressionTypeInfo
+//===----------------------------------------------------------------------===//
+static void reportExpressionTypeInfo(const ExpressionTypesInFile &Info,
+                                     ResponseReceiver Rec) {
+  ResponseBuilder Builder;
+  auto Dict = Builder.getDictionary();
+  ExpressionTypeArrayBuilder ArrBuilder(Info.TypeBuffer);
+  for (auto &R: Info.Results) {
+    ArrBuilder.add(R);
+  }
+  Dict.setCustomBuffer(KeyExpressionTypeList, CustomBufferKind::ExpressionTypeArray,
+                       ArrBuilder.createBuffer());
+  Rec(Builder.createResponse());
 }
 
 //===----------------------------------------------------------------------===//
@@ -1964,6 +2110,107 @@ void SKGroupedCodeCompletionConsumer::setNextRequestStart(unsigned offset) {
 }
 
 //===----------------------------------------------------------------------===//
+// Type Context Info
+//===----------------------------------------------------------------------===//
+
+static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
+                                             int64_t Offset,
+                                             ArrayRef<const char *> Args) {
+  ResponseBuilder RespBuilder;
+
+  class Consumer : public TypeContextInfoConsumer {
+    ResponseBuilder::Array SKResults;
+    Optional<std::string> ErrorDescription;
+
+  public:
+    Consumer(ResponseBuilder Builder)
+        : SKResults(Builder.getDictionary().setArray(KeyResults)) {}
+
+    void handleResult(const TypeContextInfoItem &Item) override {
+      auto SKElem = SKResults.appendDictionary();
+      SKElem.set(KeyTypeName, Item.TypeName);
+      SKElem.set(KeyTypeUsr, Item.TypeUSR);
+      auto members = SKElem.setArray(KeyImplicitMembers);
+      for (auto member : Item.ImplicitMembers) {
+        auto memberElem = members.appendDictionary();
+        memberElem.set(KeyName, member.Name);
+        memberElem.set(KeyDescription, member.Description);
+        memberElem.set(KeySourceText, member.SourceText);
+        if (!member.DocBrief.empty())
+          memberElem.set(KeyDocBrief, member.DocBrief);
+      }
+    }
+
+    void failed(StringRef ErrDescription) override {
+      ErrorDescription = ErrDescription;
+    }
+
+    bool isError() const { return ErrorDescription.hasValue(); }
+    const char *getErrorDescription() const {
+      return ErrorDescription->c_str();
+    }
+  } Consumer(RespBuilder);
+
+  LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+  Lang.getExpressionContextInfo(InputBuf, Offset, Args, Consumer);
+
+  if (Consumer.isError())
+    return createErrorRequestFailed(Consumer.getErrorDescription());
+  return RespBuilder.createResponse();
+}
+
+//===----------------------------------------------------------------------===//
+// Conforming Method List
+//===----------------------------------------------------------------------===//
+
+static sourcekitd_response_t
+conformingMethodList(llvm::MemoryBuffer *InputBuf, int64_t Offset,
+                     ArrayRef<const char *> Args,
+                     ArrayRef<const char *> ExpectedTypes) {
+  ResponseBuilder RespBuilder;
+
+  class Consumer : public ConformingMethodListConsumer {
+    ResponseBuilder::Dictionary SKResult;
+    Optional<std::string> ErrorDescription;
+
+  public:
+    Consumer(ResponseBuilder Builder) : SKResult(Builder.getDictionary()) {}
+
+    void handleResult(const ConformingMethodListResult &Result) override {
+      SKResult.set(KeyTypeName, Result.TypeName);
+      SKResult.set(KeyTypeUsr, Result.TypeUSR);
+      auto members = SKResult.setArray(KeyMembers);
+      for (auto member : Result.Members) {
+        auto memberElem = members.appendDictionary();
+        memberElem.set(KeyName, member.Name);
+        memberElem.set(KeyTypeName, member.TypeName);
+        memberElem.set(KeyTypeUsr, member.TypeUSR);
+        memberElem.set(KeyDescription, member.Description);
+        memberElem.set(KeySourceText, member.SourceText);
+        if (!member.DocBrief.empty())
+          memberElem.set(KeyDocBrief, member.DocBrief);
+      }
+    }
+
+    void failed(StringRef ErrDescription) override {
+      ErrorDescription = ErrDescription;
+    }
+
+    bool isError() const { return ErrorDescription.hasValue(); }
+    const char *getErrorDescription() const {
+      return ErrorDescription->c_str();
+    }
+  } Consumer(RespBuilder);
+
+  LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+  Lang.getConformingMethodList(InputBuf, Offset, Args, ExpectedTypes, Consumer);
+
+  if (Consumer.isError())
+    return createErrorRequestFailed(Consumer.getErrorDescription());
+  return RespBuilder.createResponse();
+}
+
+//===----------------------------------------------------------------------===//
 // Editor
 //===----------------------------------------------------------------------===//
 
@@ -1972,6 +2219,7 @@ class SKEditorConsumer : public EditorConsumer {
   ResponseReceiver RespReceiver;
   ResponseBuilder RespBuilder;
 
+public:
   ResponseBuilder::Dictionary Dict;
   DocStructureArrayBuilder DocStructure;
   TokenAnnotationsArrayBuilder SyntaxMap;
@@ -1980,45 +2228,36 @@ class SKEditorConsumer : public EditorConsumer {
   ResponseBuilder::Array Diags;
   sourcekitd_response_t Error = nullptr;
 
-  bool EnableSyntaxMap;
-  bool EnableStructure;
-  bool EnableDiagnostics;
-  bool EnableSyntaxTree;
-  bool SyntacticOnly;
+  SKEditorConsumerOptions Opts;
 
 public:
-  SKEditorConsumer(bool EnableSyntaxMap, bool EnableStructure,
-                   bool EnableDiagnostics, bool EnableSyntaxTree,
-                   bool SyntacticOnly)
-      : EnableSyntaxMap(EnableSyntaxMap), EnableStructure(EnableStructure),
-        EnableDiagnostics(EnableDiagnostics), EnableSyntaxTree(EnableSyntaxTree),
-        SyntacticOnly(SyntacticOnly) {
-
+  SKEditorConsumer(SKEditorConsumerOptions Opts) : Opts(Opts) {
     Dict = RespBuilder.getDictionary();
   }
 
-  SKEditorConsumer(ResponseReceiver RespReceiver, bool EnableSyntaxMap,
-                   bool EnableStructure, bool EnableDiagnostics,
-                   bool EnableSyntaxTree, bool SyntacticOnly)
-  : SKEditorConsumer(EnableSyntaxMap, EnableStructure,
-                     EnableDiagnostics, EnableSyntaxTree, SyntacticOnly) {
+  SKEditorConsumer(ResponseReceiver RespReceiver, SKEditorConsumerOptions Opts)
+      : SKEditorConsumer(Opts) {
     this->RespReceiver = RespReceiver;
   }
 
   sourcekitd_response_t createResponse();
 
   bool needsSemanticInfo() override {
-    return !SyntacticOnly && !isSemanticEditorDisabled();
+    return !Opts.SyntacticOnly && !isSemanticEditorDisabled();
   }
 
   void handleRequestError(const char *Description) override;
 
-  bool handleSyntaxMap(unsigned Offset, unsigned Length, UIdent Kind) override;
+  bool syntaxMapEnabled() override { return Opts.EnableSyntaxMap; }
 
-  bool handleSemanticAnnotation(unsigned Offset, unsigned Length, UIdent Kind,
+  void handleSyntaxMap(unsigned Offset, unsigned Length, UIdent Kind) override;
+
+  void handleSemanticAnnotation(unsigned Offset, unsigned Length, UIdent Kind,
                                 bool isSystem) override;
 
-  bool beginDocumentSubStructure(unsigned Offset, unsigned Length, UIdent Kind,
+  bool documentStructureEnabled() override { return Opts.EnableStructure; }
+
+  void beginDocumentSubStructure(unsigned Offset, unsigned Length, UIdent Kind,
                                  UIdent AccessLevel,
                                  UIdent SetterAccessLevel,
                                  unsigned NameOffset,
@@ -2034,25 +2273,30 @@ public:
                                  ArrayRef<StringRef> InheritedTypes,
                                  ArrayRef<std::tuple<UIdent, unsigned, unsigned>> Attrs) override;
 
-  bool endDocumentSubStructure() override;
+  void endDocumentSubStructure() override;
 
-  bool handleDocumentSubStructureElement(UIdent Kind,
-                                         unsigned Offset,
+  void handleDocumentSubStructureElement(UIdent Kind, unsigned Offset,
                                          unsigned Length) override;
 
-  bool recordAffectedRange(unsigned Offset, unsigned Length) override;
+  void recordAffectedRange(unsigned Offset, unsigned Length) override;
 
-  bool recordAffectedLineRange(unsigned Line, unsigned Length) override;
+  void recordAffectedLineRange(unsigned Line, unsigned Length) override;
 
-  bool recordFormattedText(StringRef Text) override;
+  void recordFormattedText(StringRef Text) override;
 
-  bool setDiagnosticStage(UIdent DiagStage) override;
-  bool handleDiagnostic(const DiagnosticEntryInfo &Info,
+  void setDiagnosticStage(UIdent DiagStage) override;
+  void handleDiagnostic(const DiagnosticEntryInfo &Info,
                         UIdent DiagStage) override;
 
-  bool handleSourceText(StringRef Text) override;
-  bool handleSerializedSyntaxTree(StringRef Text) override;
-  virtual bool syntaxTreeEnabled() override;
+  void handleSourceText(StringRef Text) override;
+
+  void handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
+                        std::unordered_set<unsigned> &ReusedNodeIds) override;
+
+  SyntaxTreeTransferMode syntaxTreeTransferMode() override {
+    return Opts.SyntaxTransferMode;
+  }
+
   void finished() override {
     if (RespReceiver)
       RespReceiver(createResponse());
@@ -2062,13 +2306,11 @@ public:
 } // end anonymous namespace
 
 static sourcekitd_response_t
-editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, bool EnableSyntaxMap,
-           bool EnableStructure, bool EnableDiagnostics, bool EnableSyntaxTree,
-           bool SyntacticOnly, ArrayRef<const char *> Args) {
-  SKEditorConsumer EditC(EnableSyntaxMap, EnableStructure,
-                         EnableDiagnostics, EnableSyntaxTree, SyntacticOnly);
+editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
+           SKEditorConsumerOptions Opts, ArrayRef<const char *> Args) {
+  SKEditorConsumer EditC(Opts);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.editorOpen(Name, Buf, EnableSyntaxMap, EditC, Args);
+  Lang.editorOpen(Name, Buf, EditC, Args);
   return EditC.createResponse();
 }
 
@@ -2077,11 +2319,10 @@ editorOpenInterface(StringRef Name, StringRef ModuleName,
                     Optional<StringRef> Group, ArrayRef<const char *> Args,
                     bool SynthesizedExtensions,
                     Optional<StringRef> InterestedUSR) {
-  SKEditorConsumer EditC(/*EnableSyntaxMap=*/true,
-                         /*EnableStructure=*/true,
-                         /*EnableDiagnostics=*/false,
-                         /*EnableSyntaxTree=*/false,
-                         /*SyntacticOnly=*/false);
+  SKEditorConsumerOptions Opts;
+  Opts.EnableSyntaxMap = true;
+  Opts.EnableStructure = true;
+  SKEditorConsumer EditC(Opts);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorOpenInterface(EditC, Name, ModuleName, Group, Args,
                            SynthesizedExtensions, InterestedUSR);
@@ -2095,12 +2336,10 @@ static void
 editorOpenSwiftSourceInterface(StringRef Name, StringRef HeaderName,
                                ArrayRef<const char *> Args,
                                ResponseReceiver Rec) {
-  auto EditC = std::make_shared<SKEditorConsumer>(Rec,
-                                                  /*EnableSyntaxMap=*/true,
-                                                  /*EnableStructure=*/true,
-                                                  /*EnableDiagnostics=*/false,
-                                                  /*EnableSyntaxTree=*/false,
-                                                  /*SyntacticOnly=*/false);
+  SKEditorConsumerOptions Opts;
+  Opts.EnableSyntaxMap = true;
+  Opts.EnableStructure = true;
+  auto EditC = std::make_shared<SKEditorConsumer>(Rec, Opts);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorOpenSwiftSourceInterface(Name, HeaderName, Args, EditC);
 }
@@ -2108,33 +2347,27 @@ editorOpenSwiftSourceInterface(StringRef Name, StringRef HeaderName,
 static void
 editorOpenSwiftTypeInterface(StringRef TypeUsr, ArrayRef<const char *> Args,
                              ResponseReceiver Rec) {
-  auto EditC = std::make_shared<SKEditorConsumer>(Rec,
-                                                  /*EnableSyntaxMap=*/true,
-                                                  /*EnableStructure=*/true,
-                                                  /*EnableDiagnostics=*/false,
-                                                  /*EnableSyntaxTree=*/false,
-                                                  /*SyntacticOnly=*/false);
+  SKEditorConsumerOptions Opts;
+  Opts.EnableSyntaxMap = true;
+  Opts.EnableStructure = true;
+  auto EditC = std::make_shared<SKEditorConsumer>(Rec, Opts);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorOpenTypeInterface(*EditC, Args, TypeUsr);
 }
 
 static sourcekitd_response_t editorExtractTextFromComment(StringRef Source) {
-  SKEditorConsumer EditC(/*EnableSyntaxMap=*/false,
-                         /*EnableStructure=*/false,
-                         /*EnableDiagnostics=*/false,
-                         /*EnableSyntaxTree=*/false,
-                         /*SyntacticOnly=*/true);
+  SKEditorConsumerOptions Opts;
+  Opts.SyntacticOnly = true;
+  SKEditorConsumer EditC(Opts);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorExtractTextFromComment(Source, EditC);
   return EditC.createResponse();
 }
 
 static sourcekitd_response_t editorConvertMarkupToXML(StringRef Source) {
-  SKEditorConsumer EditC(/*EnableSyntaxMap=*/false,
-                         /*EnableStructure=*/false,
-                         /*EnableDiagnostics=*/false,
-                         /*EnableSyntaxTree=*/false,
-                         /*SyntacticOnly=*/true);
+  SKEditorConsumerOptions Opts;
+  Opts.SyntacticOnly = true;
+  SKEditorConsumer EditC(Opts);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorConvertMarkupToXML(Source, EditC);
   return EditC.createResponse();
@@ -2146,11 +2379,10 @@ editorOpenHeaderInterface(StringRef Name, StringRef HeaderName,
                           bool UsingSwiftArgs,
                           bool SynthesizedExtensions,
                           StringRef swiftVersion) {
-  SKEditorConsumer EditC(/*EnableSyntaxMap=*/true,
-                         /*EnableStructure=*/true,
-                         /*EnableDiagnostics=*/false,
-                         /*EnableSyntaxTree=*/false,
-                         /*SyntacticOnly=*/false);
+  SKEditorConsumerOptions Opts;
+  Opts.EnableSyntaxMap = true;
+  Opts.EnableStructure = true;
+  SKEditorConsumer EditC(Opts);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorOpenHeaderInterface(EditC, Name, HeaderName, Args, UsingSwiftArgs,
                                  SynthesizedExtensions, swiftVersion);
@@ -2167,11 +2399,8 @@ editorClose(StringRef Name, bool RemoveCache) {
 
 static sourcekitd_response_t
 editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf, unsigned Offset,
-                  unsigned Length, bool EnableSyntaxMap, bool EnableStructure,
-                  bool EnableDiagnostics, bool EnableSyntaxTree,
-                  bool SyntacticOnly) {
-  SKEditorConsumer EditC(EnableSyntaxMap, EnableStructure,
-                         EnableDiagnostics, EnableSyntaxTree, SyntacticOnly);
+                  unsigned Length, SKEditorConsumerOptions Opts) {
+  SKEditorConsumer EditC(Opts);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorReplaceText(Name, Buf, Offset, Length, EditC);
   return EditC.createResponse();
@@ -2186,8 +2415,9 @@ editorApplyFormatOptions(StringRef Name, RequestDict &FmtOptions) {
 
 static sourcekitd_response_t
 editorFormatText(StringRef Name, unsigned Line, unsigned Length) {
-  SKEditorConsumer EditC(false, false, false, false,
-                         /*SyntacticOnly=*/true);
+  SKEditorConsumerOptions Opts;
+  Opts.SyntacticOnly = true;
+  SKEditorConsumer EditC(Opts);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorFormatText(Name, Line, Length, EditC);
   return EditC.createResponse();
@@ -2195,8 +2425,9 @@ editorFormatText(StringRef Name, unsigned Line, unsigned Length) {
 
 static sourcekitd_response_t
 editorExpandPlaceholder(StringRef Name, unsigned Offset, unsigned Length) {
-  SKEditorConsumer EditC(false, false, false, false,
-                         /*SyntacticOnly=*/true);
+  SKEditorConsumerOptions Opts;
+  Opts.SyntacticOnly = true;
+  SKEditorConsumer EditC(Opts);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorExpandPlaceholder(Name, Offset, Length, EditC);
   return EditC.createResponse();
@@ -2206,7 +2437,7 @@ sourcekitd_response_t SKEditorConsumer::createResponse() {
   if (Error)
     return Error;
 
-  if (EnableSyntaxMap) {
+  if (Opts.EnableSyntaxMap) {
     Dict.setCustomBuffer(KeySyntaxMap,
         CustomBufferKind::TokenAnnotationsArray,
         SyntaxMap.createBuffer());
@@ -2216,7 +2447,7 @@ sourcekitd_response_t SKEditorConsumer::createResponse() {
         CustomBufferKind::TokenAnnotationsArray,
         SemanticAnnotations.createBuffer());
   }
-  if (EnableStructure) {
+  if (Opts.EnableStructure) {
     Dict.setCustomBuffer(KeySubStructure, CustomBufferKind::DocStructureArray,
                          DocStructure.createBuffer());
   }
@@ -2235,24 +2466,22 @@ void SKEditorConsumer::handleRequestError(const char *Description) {
   }
 }
 
-bool SKEditorConsumer::handleSyntaxMap(unsigned Offset, unsigned Length,
+void SKEditorConsumer::handleSyntaxMap(unsigned Offset, unsigned Length,
                                        UIdent Kind) {
-  if (!EnableSyntaxMap)
-    return true;
+  if (!Opts.EnableSyntaxMap)
+    return;
 
   SyntaxMap.add(Kind, Offset, Length, /*IsSystem=*/false);
-  return true;
 }
 
-bool SKEditorConsumer::handleSemanticAnnotation(unsigned Offset,
-                                                unsigned Length,
-                                                UIdent Kind, bool isSystem) {
+void SKEditorConsumer::handleSemanticAnnotation(unsigned Offset,
+                                                unsigned Length, UIdent Kind,
+                                                bool isSystem) {
   assert(Kind.isValid());
   SemanticAnnotations.add(Kind, Offset, Length, isSystem);
-  return true;
 }
 
-bool
+void
 SKEditorConsumer::beginDocumentSubStructure(unsigned Offset,
                                             unsigned Length, UIdent Kind,
                                             UIdent AccessLevel,
@@ -2269,47 +2498,38 @@ SKEditorConsumer::beginDocumentSubStructure(unsigned Offset,
                                             StringRef SelectorName,
                                             ArrayRef<StringRef> InheritedTypes,
                                             ArrayRef<std::tuple<UIdent, unsigned, unsigned>> Attrs) {
-  if (EnableStructure) {
+  if (Opts.EnableStructure) {
     DocStructure.beginSubStructure(
         Offset, Length, Kind, AccessLevel, SetterAccessLevel, NameOffset,
         NameLength, BodyOffset, BodyLength, DocOffset, DocLength, DisplayName,
         TypeName, RuntimeName, SelectorName, InheritedTypes, Attrs);
   }
-  return true;
 }
 
-bool SKEditorConsumer::endDocumentSubStructure() {
-  if (EnableStructure)
+void SKEditorConsumer::endDocumentSubStructure() {
+  if (Opts.EnableStructure)
     DocStructure.endSubStructure();
-  return true;
 }
 
-bool SKEditorConsumer::handleDocumentSubStructureElement(UIdent Kind,
+void SKEditorConsumer::handleDocumentSubStructureElement(UIdent Kind,
                                                          unsigned Offset,
                                                          unsigned Length) {
-  if (EnableStructure)
+  if (Opts.EnableStructure)
     DocStructure.addElement(Kind, Offset, Length);
-  return true;
 }
 
-bool SKEditorConsumer::recordAffectedRange(unsigned Offset, unsigned Length) {
+void SKEditorConsumer::recordAffectedRange(unsigned Offset, unsigned Length) {
   Dict.set(KeyOffset, Offset);
   Dict.set(KeyLength, Length);
-
-  return true;
 }
 
-bool SKEditorConsumer::recordAffectedLineRange(unsigned Line, unsigned Length) {
+void SKEditorConsumer::recordAffectedLineRange(unsigned Line, unsigned Length) {
   Dict.set(KeyLine, Line);
   Dict.set(KeyLength, Length);
-
-  return true;
 }
 
-bool SKEditorConsumer::recordFormattedText(StringRef Text) {
+void SKEditorConsumer::recordFormattedText(StringRef Text) {
   Dict.set(KeySourceText, Text);
-
-  return true;
 }
 
 static void fillDictionaryForDiagnosticInfoBase(
@@ -2376,15 +2596,14 @@ static void fillDictionaryForDiagnosticInfoBase(
   }
 }
 
-bool SKEditorConsumer::setDiagnosticStage(UIdent DiagStage) {
+void SKEditorConsumer::setDiagnosticStage(UIdent DiagStage) {
   Dict.set(KeyDiagnosticStage, DiagStage);
-  return true;
 }
 
-bool SKEditorConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info,
+void SKEditorConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info,
                                         UIdent DiagStage) {
-  if (!EnableDiagnostics)
-    return true;
+  if (!Opts.EnableDiagnostics)
+    return;
 
   ResponseBuilder::Array &Arr = Diags;
   if (Arr.isNull())
@@ -2393,22 +2612,102 @@ bool SKEditorConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info,
   auto Elem = Arr.appendDictionary();
   Elem.set(KeyDiagnosticStage, DiagStage);
   fillDictionaryForDiagnosticInfo(Elem, Info);
-  return true;
 }
 
-bool SKEditorConsumer::handleSourceText(StringRef Text) {
+void SKEditorConsumer::handleSourceText(StringRef Text) {
   Dict.set(KeySourceText, Text);
-  return true;
 }
 
-bool SKEditorConsumer::syntaxTreeEnabled() {
-  return EnableSyntaxTree;
+void serializeSyntaxTreeAsByteTree(
+    const swift::syntax::SourceFileSyntax &SyntaxTree,
+    std::unordered_set<unsigned> &ReusedNodeIds,
+    ResponseBuilder::Dictionary &Dict) {
+  auto StartClock = clock();
+  // Serialize the syntax tree as a ByteTree
+  swift::ExponentialGrowthAppendingBinaryByteStream Stream(
+      llvm::support::endianness::little);
+  Stream.reserve(32 * 1024);
+  std::map<void *, void *> UserInfo;
+  UserInfo[swift::byteTree::UserInfoKeyReusedNodeIds] = &ReusedNodeIds;
+  swift::byteTree::ByteTreeWriter::write(Stream,
+                                         swift::byteTree::SYNTAX_TREE_VERSION,
+                                         *SyntaxTree.getRaw(), UserInfo);
+
+  std::unique_ptr<llvm::WritableMemoryBuffer> Buf =
+      llvm::WritableMemoryBuffer::getNewUninitMemBuffer(Stream.data().size());
+  memcpy(Buf->getBufferStart(), Stream.data().data(), Stream.data().size());
+
+  Dict.setCustomBuffer(KeySerializedSyntaxTree, CustomBufferKind::RawData,
+                       std::move(Buf));
+
+  auto EndClock = clock();
+  LOG_SECTION("incrParse Performance", InfoLowPrio) {
+    Log->getOS() << "Serialized " << Stream.data().size()
+                 << " bytes as ByteTree in ";
+    auto Seconds = (double)(EndClock - StartClock) * 1000 / CLOCKS_PER_SEC;
+    llvm::write_double(Log->getOS(), Seconds, llvm::FloatStyle::Fixed, 2);
+    Log->getOS() << "ms";
+  }
 }
 
-bool SKEditorConsumer::handleSerializedSyntaxTree(StringRef Text) {
-  if (EnableSyntaxTree)
-    Dict.set(KeySerializedSyntaxTree, Text);
-  return true;
+void serializeSyntaxTreeAsJson(
+    const swift::syntax::SourceFileSyntax &SyntaxTree,
+    std::unordered_set<unsigned> ReusedNodeIds,
+    ResponseBuilder::Dictionary &Dict) {
+  auto StartClock = clock();
+  // 4096 is a heuristic buffer size that appears to usually be able to fit an
+  // incremental syntax tree
+  size_t ReserveBufferSize = 4096;
+  std::string SyntaxTreeString;
+  SyntaxTreeString.reserve(ReserveBufferSize);
+  {
+    llvm::raw_string_ostream SyntaxTreeStream(SyntaxTreeString);
+    SyntaxTreeStream.SetBufferSize(ReserveBufferSize);
+    swift::json::Output::UserInfoMap JsonUserInfo;
+    JsonUserInfo[swift::json::OmitNodesUserInfoKey] = &ReusedNodeIds;
+    swift::json::Output SyntaxTreeOutput(SyntaxTreeStream, JsonUserInfo,
+                                         /*PrettyPrint=*/false);
+    SyntaxTreeOutput << *SyntaxTree.getRaw();
+  }
+  Dict.set(KeySerializedSyntaxTree, SyntaxTreeString);
+
+  auto EndClock = clock();
+  LOG_SECTION("incrParse Performance", InfoLowPrio) {
+    Log->getOS() << "Serialized " << SyntaxTreeString.size()
+                 << " bytes as JSON in ";
+    auto Seconds = (double)(EndClock - StartClock) * 1000 / CLOCKS_PER_SEC;
+    llvm::write_double(Log->getOS(), Seconds, llvm::FloatStyle::Fixed, 2);
+    Log->getOS() << "ms";
+  }
+}
+
+void SKEditorConsumer::handleSyntaxTree(
+    const swift::syntax::SourceFileSyntax &SyntaxTree,
+    std::unordered_set<unsigned> &ReusedNodeIds) {
+
+  std::unordered_set<unsigned> OmitNodes;
+  switch (Opts.SyntaxTransferMode) {
+  case SourceKit::SyntaxTreeTransferMode::Off:
+    // Don't serialize the tree at all
+    return;
+  case SourceKit::SyntaxTreeTransferMode::Full:
+    // Serialize the tree without omitting any nodes
+    OmitNodes = {};
+    break;
+  case SourceKit::SyntaxTreeTransferMode::Incremental:
+    // Serialize the tree and omit all nodes that have been reused
+    OmitNodes = ReusedNodeIds;
+    break;
+  }
+
+  switch (Opts.SyntaxSerializationFormat) {
+  case SourceKit::SyntaxTreeSerializationFormat::JSON:
+    serializeSyntaxTreeAsJson(SyntaxTree, OmitNodes, Dict);
+    break;
+  case SourceKit::SyntaxTreeSerializationFormat::ByteTree:
+    serializeSyntaxTreeAsByteTree(SyntaxTree, OmitNodes, Dict);
+    break;
+  }
 }
 
 static sourcekitd_response_t
@@ -2718,7 +3017,7 @@ void CompileTrackingConsumer::operationStarted(
   Dict.set(KeyCompileID, std::to_string(OpId));
   Dict.set(KeyFilePath, Inv.Args.PrimaryFile);
   // FIXME: OperationKind
-  Dict.set(KeyCompilerArgs, Inv.Args.Args);
+  Dict.set(KeyCompilerArgsString, Inv.Args.Arguments);
   sourcekitd::postNotification(RespBuilder.createResponse());
 }
 

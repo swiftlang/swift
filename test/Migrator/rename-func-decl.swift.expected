@@ -10,3 +10,19 @@ class MyCities : MoreCities {
   func setZooLocationNew(newX ix: Int, newY iy: Int, newZ iz: Int) {}
   func addNewZooAt(_ x: Int, newY y: Int, newZ z: Int) {}
 }
+
+class MySubTopLevelType: ToplevelType {
+  override func member(_ x: @escaping ([Int]?) -> Void) {}
+}
+
+class MySubTopLevelType2: ToplevelType {
+  override func member(_ x: @escaping (((([(Int)])?))) -> Void) {}
+}
+
+class SubCities: Cities {
+  override var cheese: Int { return 2 }
+}
+
+func boo(_ a: ToplevelType) {
+  a.trailing2 {  print($0!) }
+}

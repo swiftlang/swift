@@ -50,12 +50,12 @@ struct BitfieldUnionIndirect {
   };
 };
 
-void populate(void *memory) {
+static void populate(void *memory) {
   const uint32_t value = 0x11223344;
   memcpy(memory, &value, sizeof(value));
 }
 
-void populateAtOffset(void *memory) {
+static void populateAtOffset(void *memory) {
   const uint32_t value = 0x11223344;
   memcpy((char *)memory + sizeof(uint32_t), &value, sizeof(value));
 }

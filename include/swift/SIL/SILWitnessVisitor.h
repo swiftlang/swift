@@ -51,21 +51,6 @@ public:
     // The protocol conformance descriptor gets added first.
     asDerived().addProtocolConformanceDescriptor();
 
-    // Associated types get added after the inherited conformances, but
-    // before all the function requirements.
-    bool haveAddedAssociatedTypes = false;
-    auto addAssociatedTypes = [&] {
-      if (haveAddedAssociatedTypes) return;
-      haveAddedAssociatedTypes = true;
-
-      for (Decl *member : protocol->getMembers()) {
-        if (auto associatedType = dyn_cast<AssociatedTypeDecl>(member)) {
-          // TODO: only add associated types when they're new?
-          asDerived().addAssociatedType(AssociatedType(associatedType));
-        }
-      }
-    };
-
     for (const auto &reqt : protocol->getRequirementSignature()) {
       switch (reqt.getKind()) {
       // These requirements don't show up in the witness table.
@@ -90,16 +75,11 @@ public:
         // come before any protocol requirements on associated types.
         if (auto parameter = dyn_cast<GenericTypeParamType>(type)) {
           assert(type->isEqual(protocol->getSelfInterfaceType()));
-          assert(!haveAddedAssociatedTypes &&
-                 "unexpected ordering of conformances");
           assert(parameter->getDepth() == 0 && parameter->getIndex() == 0 &&
                  "non-self type parameter in protocol");
           asDerived().addOutOfLineBaseProtocol(requirement);
           continue;
         }
-
-        // Add the associated types if we haven't yet.
-        addAssociatedTypes();
 
         // Otherwise, add an associated requirement.
         AssociatedConformance assocConf(protocol, type, requirement);
@@ -110,12 +90,29 @@ public:
       llvm_unreachable("bad requirement kind");
     }
 
-    // Add the associated types if we haven't yet.
-    addAssociatedTypes();
+    // Add the associated types.
+    for (Decl *member : protocol->getMembers()) {
+      if (auto associatedType = dyn_cast<AssociatedTypeDecl>(member)) {
+        // If this is a new associated type (which does not override an
+        // existing associated type), add it.
+        if (associatedType->getOverriddenDecls().empty())
+          asDerived().addAssociatedType(AssociatedType(associatedType));
+      }
+    }
+
+    if (asDerived().shouldVisitRequirementSignatureOnly())
+      return;
 
     // Visit the witnesses for the direct members of a protocol.
-    for (Decl *member : protocol->getMembers())
+    for (Decl *member : protocol->getMembers()) {
       ASTVisitor<T>::visit(member);
+    }
+  }
+
+  /// If true, only the base protocols and associated types will be visited.
+  /// The base implementation returns false.
+  bool shouldVisitRequirementSignatureOnly() const {
+    return false;
   }
 
   /// Fallback for unexpected protocol requirements.
@@ -124,19 +121,15 @@ public:
   }
 
   void visitAbstractStorageDecl(AbstractStorageDecl *sd) {
-    asDerived().addMethod(SILDeclRef(sd->getGetter(),
-                                     SILDeclRef::Kind::Func));
-    if (sd->isSettable(sd->getDeclContext())) {
-      asDerived().addMethod(SILDeclRef(sd->getSetter(),
-                                       SILDeclRef::Kind::Func));
-      if (sd->getMaterializeForSetFunc())
-        asDerived().addMethod(SILDeclRef(sd->getMaterializeForSetFunc(),
-                                         SILDeclRef::Kind::Func));
-    }
+    sd->visitOpaqueAccessors([&](AccessorDecl *accessor) {
+      if (SILDeclRef::requiresNewWitnessTableEntry(accessor))
+        asDerived().addMethod(SILDeclRef(accessor, SILDeclRef::Kind::Func));
+    });
   }
 
   void visitConstructorDecl(ConstructorDecl *cd) {
-    asDerived().addMethod(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
+    if (SILDeclRef::requiresNewWitnessTableEntry(cd))
+      asDerived().addMethod(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
   }
 
   void visitAccessorDecl(AccessorDecl *func) {
@@ -145,7 +138,8 @@ public:
 
   void visitFuncDecl(FuncDecl *func) {
     assert(!isa<AccessorDecl>(func));
-    asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
+    if (SILDeclRef::requiresNewWitnessTableEntry(func))
+      asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
   }
 
   void visitMissingMemberDecl(MissingMemberDecl *placeholder) {

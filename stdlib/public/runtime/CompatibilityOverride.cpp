@@ -38,7 +38,7 @@ using namespace swift;
 struct OverrideSection {
   uintptr_t version;
   
-#define OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs) \
+#define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   Override_ ## name name;
 #include "CompatibilityOverride.def"
 };
@@ -61,7 +61,7 @@ static OverrideSection *getOverrideSectionPtr() {
   return OverrideSectionPtr;
 }
 
-#define OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs) \
+#define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   Override_ ## name swift::getOverride_ ## name() {                 \
     auto *Section = getOverrideSectionPtr();                        \
     if (Section == nullptr)                                         \

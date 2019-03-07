@@ -8,7 +8,7 @@
 import Foundation
 
 class ObservedValue: NSObject {
-	dynamic var amount = 0
+	@objc dynamic var amount = 0
 }
 
 class ValueObserver: NSObject {

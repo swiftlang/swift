@@ -33,7 +33,9 @@ func useContainer() -> () {
   func exists() -> Bool { return true }
 }
 
-func test(a: BadAttributes) -> () { // expected-note * {{did you mean 'test'?}}
+// expected-note @+2 {{did you mean 'test'?}}
+// expected-note @+1 {{'test' declared here}}
+func test(a: BadAttributes) -> () {
   _ = a.exists() // no-warning
 }
 
@@ -128,7 +130,7 @@ func missingControllingExprInRepeatWhile() {
   }
 
   repeat {
-  } while { true }() // expected-error{{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{10-10=;}} expected-warning {{result of call is unused, but produces 'Bool'}}
+  } while { true }() // expected-error{{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{10-10=;}} expected-warning {{result of call to closure returning 'Bool' is unused}}
 }
 
 // SR-165
@@ -489,7 +491,7 @@ struct ErrorInFunctionSignatureResultArrayType5 {
 
 
 struct ErrorInFunctionSignatureResultArrayType11 { // expected-note{{in declaration of 'ErrorInFunctionSignatureResultArrayType11'}}
-  func foo() -> Int[(a){a++}] { // expected-error {{consecutive declarations on a line must be separated by ';'}} {{29-29=;}} expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}} expected-error {{use of unresolved identifier 'a'}} expected-error {{expected declaration}}
+  func foo() -> Int[(a){a++}] { // expected-error {{consecutive declarations on a line must be separated by ';'}} {{29-29=;}} expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}} expected-error {{use of unresolved operator '++'; did you mean '+= 1'?}} expected-error {{use of unresolved identifier 'a'}} expected-error {{expected declaration}}
   }
 }
 
@@ -555,8 +557,39 @@ class WrongDeclIntroducerKeyword1 { // expected-note{{in declaration of 'WrongDe
   class func bar() {}
 }
 
+//===--- Recovery for wrong inheritance clause.
+
+class Base2<T> {
+}
+
+class SubModule {
+    class Base1 {}
+    class Base2<T> {}
+}
+
+// expected-error@+1 {{expected ':' to begin inheritance clause}} {{30-31=: }} {{34-35=}}    
+class WrongInheritanceClause1(Int) {}           
+
+// expected-error@+1 {{expected ':' to begin inheritance clause}} {{30-31=: }} {{41-42=}}
+class WrongInheritanceClause2(Base2<Int>) {}
+
+// expected-error@+1 {{expected ':' to begin inheritance clause}} {{33-34=: }} {{49-50=}}
+class WrongInheritanceClause3<T>(SubModule.Base1) where T:AnyObject {}
+
+// expected-error@+1 {{expected ':' to begin inheritance clause}} {{30-31=: }} {{51-52=}}
+class WrongInheritanceClause4(SubModule.Base2<Int>) {}
+
+// expected-error@+1 {{expected ':' to begin inheritance clause}} {{33-34=: }} {{54-55=}}
+class WrongInheritanceClause5<T>(SubModule.Base2<Int>) where T:AnyObject {}
+
+// expected-error@+1 {{expected ':' to begin inheritance clause}} {{30-31=: }} 
+class WrongInheritanceClause6(Int {}
+
+// expected-error@+1 {{expected ':' to begin inheritance clause}} {{33-34=: }} 
+class WrongInheritanceClause7<T>(Int where T:AnyObject {}
+
 // <rdar://problem/18502220> [swift-crashes 078] parser crash on invalid cast in sequence expr
-Base=1 as Base=1  // expected-error {{cannot assign to immutable expression of type 'Base'}}
+Base=1 as Base=1  // expected-error {{cannot assign to immutable expression of type 'Base.Type'}}
 
 
 
@@ -586,7 +619,7 @@ func foo1(bar!=baz) {} // expected-note {{did you mean 'foo1'?}}
 func foo2(bar! = baz) {}// expected-note {{did you mean 'foo2'?}}
 
 // rdar://19605567
-// expected-error@+1{{use of unresolved identifier 'esp'}}
+// expected-error@+1{{use of unresolved identifier 'esp'; did you mean 'test'?}}
 switch esp {
 case let (jeb):
   // expected-error@+5{{operator with postfix spacing cannot start a subexpression}}
@@ -624,6 +657,9 @@ struct InitializerWithName {
 
 struct InitializerWithNameAndParam {
   init a(b: Int) {} // expected-error {{initializers cannot have a name}} {{8-9=}}
+  init? c(_ d: Int) {} // expected-error {{initializers cannot have a name}} {{9-10=}}
+  init e<T>(f: T) {} // expected-error {{initializers cannot have a name}} {{8-9=}}
+  init? g<T>(_: T) {} // expected-error {{initializers cannot have a name}} {{9-10=}}
 }
 
 struct InitializerWithLabels {

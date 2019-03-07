@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 ///
 ///  \file
-///  \brief This file provides implementations of a few helper functions
+///  This file provides implementations of a few helper functions
 ///  which provide abstracted entrypoints to the SILPasses stage.
 ///
 ///  \note The actual SIL passes should be implemented in per-pass source files,
@@ -66,7 +66,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
   if (Module.getOptions().VerifyAll)
     Module.verify();
   else {
-    DEBUG(Module.verify());
+    LLVM_DEBUG(Module.verify());
   }
 
   // If errors were produced during SIL analysis, return true.
@@ -78,7 +78,8 @@ bool swift::runSILOwnershipEliminatorPass(SILModule &Module) {
 
   SILPassManager PM(&Module);
   PM.executePassPipelinePlan(
-      SILPassPipelinePlan::getOwnershipEliminatorPassPipeline());
+      SILPassPipelinePlan::getOwnershipEliminatorPassPipeline(
+          Module.getOptions()));
 
   return Ctx.hadError();
 }
@@ -110,7 +111,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   if (Module.getOptions().VerifyAll)
     Module.verify();
   else {
-    DEBUG(Module.verify());
+    LLVM_DEBUG(Module.verify());
   }
 }
 
@@ -122,13 +123,14 @@ void swift::runSILPassesForOnone(SILModule &Module) {
   // We want to run the Onone passes also for function which have an explicit
   // Onone attribute.
   SILPassManager PM(&Module, "Onone", /*isMandatoryPipeline=*/ true);
-  PM.executePassPipelinePlan(SILPassPipelinePlan::getOnonePassPipeline());
+  PM.executePassPipelinePlan(
+      SILPassPipelinePlan::getOnonePassPipeline(Module.getOptions()));
 
   // Verify the module, if required.
   if (Module.getOptions().VerifyAll)
     Module.verify();
   else {
-    DEBUG(Module.verify());
+    LLVM_DEBUG(Module.verify());
   }
 }
 
@@ -136,7 +138,7 @@ void swift::runSILOptimizationPassesWithFileSpecification(SILModule &M,
                                                           StringRef Filename) {
   SILPassManager PM(&M);
   PM.executePassPipelinePlan(
-      SILPassPipelinePlan::getPassPipelineFromFile(Filename));
+      SILPassPipelinePlan::getPassPipelineFromFile(M.getOptions(), Filename));
 }
 
 /// Get the Pass ID enum value from an ID string.
@@ -187,7 +189,8 @@ StringRef swift::PassKindTag(PassKind Kind) {
 // same stage of lowering.
 void swift::runSILLoweringPasses(SILModule &Module) {
   SILPassManager PM(&Module, "LoweringPasses", /*isMandatoryPipeline=*/ true);
-  PM.executePassPipelinePlan(SILPassPipelinePlan::getLoweringPassPipeline());
+  PM.executePassPipelinePlan(
+      SILPassPipelinePlan::getLoweringPassPipeline(Module.getOptions()));
 
   assert(Module.getStage() == SILStage::Lowered);
 }

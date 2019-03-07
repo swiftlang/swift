@@ -184,3 +184,10 @@ _ = """\
   // FIXME: Bad diagnostics
   // expected-error@-3 {{multi-line string literal content must begin on a new line}}
   // expected-error@-4 {{escaped newline at the last line is not allowed}} {{8-9=}}
+
+let _ = """
+  foo
+  \("bar
+  baz
+  """
+  // expected-error@-3 {{unterminated string literal}}

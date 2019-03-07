@@ -76,7 +76,6 @@ class mixed_redecl3 {} // expected-note {{previously declared here}}
 enum mixed_redecl3 {} // expected-error {{invalid redeclaration}}
 // expected-note @-1 2{{found this candidate}}
 enum mixed_redecl3a : mixed_redecl3 {} // expected-error {{'mixed_redecl3' is ambiguous for type lookup in this context}}
-// expected-error @-1{{'mixed_redecl3a' does not conform}}
 class mixed_redecl3b : mixed_redecl3 {} // expected-error {{'mixed_redecl3' is ambiguous for type lookup in this context}}
 
 class mixed_redecl4 {} // expected-note {{previously declared here}}
@@ -219,7 +218,9 @@ struct X6<T> {
 
 extension X6 {
   var k: Int { return 0 } // expected-note{{previously declared here}}
-  func k() // expected-error{{invalid redeclaration of 'k()'}}
+  func k()
+  // expected-error@-1{{invalid redeclaration of 'k()'}}
+  // expected-error@-2{{expected '{' in body of function declaration}}
 }
 
 // Subscripting
@@ -242,7 +243,7 @@ struct Subscript2 {
     get { return a }
   }
 
-  subscript (a: Int) -> Int { // expected-error{{invalid redeclaration of 'subscript'}}
+  subscript (a: Int) -> Int { // expected-error{{invalid redeclaration of 'subscript(_:)'}}
     get { return a }
   }
 
@@ -262,7 +263,7 @@ struct GenericSubscripts {
 }
 
 extension GenericSubscripts {
-  subscript<U>(x: U) -> Int { return 0 } // expected-error{{invalid redeclaration of 'subscript'}}
+  subscript<U>(x: U) -> Int { return 0 } // expected-error{{invalid redeclaration of 'subscript(_:)'}}
   subscript<T, U>(x: T) -> U { fatalError() }
   subscript<T>(x: T) -> T { fatalError() }
   subscript(x: Int) -> Int { return 0 }
@@ -273,7 +274,7 @@ struct GenericSubscripts2<T> {
 }
 
 extension GenericSubscripts2 {
-  subscript(x: T) -> Int { return 0 } // expected-error{{invalid redeclaration of 'subscript'}}
+  subscript(x: T) -> Int { return 0 } // expected-error{{invalid redeclaration of 'subscript(_:)'}}
   subscript<U>(x: U) -> Int { return 0 }
   subscript(x: T) -> T { fatalError() }
   subscript<U>(x: T) -> U { fatalError() }
@@ -286,7 +287,7 @@ struct GenericSubscripts3<T> {
 }
 
 extension GenericSubscripts3 {
-  subscript<U>(x: T) -> U { fatalError() } // expected-error{{invalid redeclaration of 'subscript'}}
+  subscript<U>(x: T) -> U { fatalError() } // expected-error{{invalid redeclaration of 'subscript(_:)'}}
   subscript<U, V>(x: U) -> V { fatalError() }
   subscript<U>(x: U) -> U { fatalError() }
   subscript(x: Int) -> Int { return 0 }
@@ -446,8 +447,8 @@ struct SR7249<T> {
 }
 
 extension SR7249 {
-  var x: Int { fatalError() } // expected-error{{invalid redeclaration of 'x'}}
-  var y: T { fatalError() } // expected-error{{invalid redeclaration of 'y'}}
+  var x: Int { fatalError() } // expected-warning{{redeclaration of 'x' is deprecated and will be an error in Swift 5}}
+  var y: T { fatalError() } // expected-warning{{redeclaration of 'y' is deprecated and will be an error in Swift 5}}
   var z: Int { fatalError() } // expected-error{{invalid redeclaration of 'z'}}
 }
 

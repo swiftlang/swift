@@ -2,6 +2,7 @@
 @_silgen_name("unknown")
 public func unknown() -> ()
 
+@inline(never)
 @inlinable
 public func doSomething() {
   unknown()

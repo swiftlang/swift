@@ -1,8 +1,7 @@
-add_swift_library(swiftParseSIL STATIC
-  ParseSIL.cpp
-  LINK_LIBRARIES
-    swiftParse
-    swiftSema
-    swiftSIL
-)
+add_swift_host_library(swiftParseSIL STATIC
+  ParseSIL.cpp)
+target_link_libraries(swiftParseSIL PRIVATE
+  swiftSema
+  swiftSIL
+  swiftSyntaxParse)
 

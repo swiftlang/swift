@@ -1,0 +1,157 @@
+// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all %/s -devirtualizer -dce -save-optimization-record-path=%t.yaml | %FileCheck %s
+// RUN: %FileCheck -check-prefix=YAML -input-file=%t.yaml %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Bar {
+  init()
+  func foo()
+}
+
+sil_global @x : $Bar
+
+
+// CHECK: function_with_cm
+// CHECK: function_ref @_TFC4main3Bar3foofS0_FT_T_
+// CHECK-NEXT: begin_borrow
+// CHECK-NEXT: apply
+// CHECK-NOT: class_method
+// CHECK: return
+
+// YAML:      --- !Passed
+// YAML-NEXT: Pass:            sil-devirtualizer
+// YAML-NEXT: Name:            sil.ClassMethodDevirtualized
+// YAML-NEXT: DebugLoc:
+// YAML-NEXT:   File:            {{.*}}/devirtualize_ownership.sil
+// YAML-NEXT:   Line:            46
+// YAML-NEXT:   Column:          8
+// YAML-NEXT: Function:        function_with_cm
+// YAML-NEXT: Args:
+// YAML-NEXT:   - String:          'Devirtualized call to class method '
+// YAML-NEXT:   - Method:          '"main.Bar.foo(_:)"'
+// YAML-NEXT:     DebugLoc:
+// YAML-NEXT:       File:            {{.*}}/devirtualize_ownership.sil
+// YAML-NEXT:       Line:            52
+// YAML-NEXT:       Column:          6
+// YAML-NEXT: ...
+
+sil [ossa] @function_with_cm : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @x : $*Bar                     // users: %2, %3
+  %1 = alloc_ref $Bar                             // user: %2
+  %5 = class_method %1 : $Bar, #Bar.foo!1 : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> () // user: %6
+  %6 = apply %5(%1) : $@convention(method) (@guaranteed Bar) -> ()
+  destroy_value %1 : $Bar
+  %7 = tuple ()                                   // user: %8
+  return %7 : $()                                 // id: %8
+}
+
+sil @_TFC4main3Bar3foofS0_FT_T_ : $@convention(method) (@guaranteed Bar) -> ()
+
+sil_vtable Bar {
+  #Bar.foo!1: @_TFC4main3Bar3foofS0_FT_T_
+}
+
+private class Node {
+  @_hasStorage var index: Int { get set }
+  init(index: Int)
+   deinit
+}
+
+// CHECK-LABEL: sil private [ossa] @class_method_apply
+sil private [ossa] @class_method_apply : $@convention(method) (@guaranteed Node) -> Int {
+bb0(%0 : @guaranteed $Node):
+  // CHECK: bb0([[ARG:%.*]] :
+  // CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]
+  %1 = copy_value %0 : $Node
+  // CHECK-NOT: class_method [[ARG_COPY]]
+  // CHECK: [[FUNC:%.*]] = function_ref @transparent_target
+  // CHECK: [[BORROW_ARG_COPY:%.*]] = begin_borrow [[ARG_COPY]]
+  %3 = class_method %1 : $Node, #Node.index!getter.1 : (Node) -> () -> Int, $@convention(method) (@guaranteed Node) -> Int
+  // CHECK: [[RESULT:%.*]] = apply [[FUNC]]([[BORROW_ARG_COPY]])
+  %4 = apply %3(%1) : $@convention(method) (@guaranteed Node) -> Int
+  // CHECK: destroy_value [[ARG_COPY]]
+  destroy_value %1 : $Node
+  // return [[RESULT]]
+  return %4 : $Int
+}
+
+// YAML-NEXT: --- !Passed
+// YAML-NEXT: Pass:            sil-devirtualizer
+// YAML-NEXT: Name:            sil.ClassMethodDevirtualized
+// YAML-NEXT: DebugLoc:
+// YAML-NEXT:   File:            {{.*}}/devirtualize_ownership.sil
+// YAML-NEXT:   Line:            75
+// YAML-NEXT:   Column:          8
+// YAML-NEXT: Function:        class_method_apply
+// YAML-NEXT: Args:
+// YAML-NEXT:   - String:          'Devirtualized call to class method '
+// YAML-NEXT:   - Method:          '"transparent_target"'
+// YAML-NEXT:     DebugLoc:
+// YAML-NEXT:       File:            {{.*}}/devirtualize_ownership.sil
+// YAML-NEXT:       Line:            101
+// YAML-NEXT:       Column:          46
+// YAML-NEXT: ...
+
+
+// CHECK-LABEL: sil private [transparent] [noinline] [ossa] @transparent_target
+sil private [transparent] [noinline] [ossa] @transparent_target : $@convention(method) (@guaranteed Node) -> Int {
+bb0(%0 : @owned $Node):
+  %2 = ref_element_addr %0 : $Node, #Node.index
+  %3 = load [trivial] %2 : $*Int
+  // CHECK: return
+  return %3 : $Int
+}
+
+sil_vtable Node {
+  #Node.index!getter.1: @transparent_target
+}
+
+private class B {
+  class func foo() -> Int
+}
+
+private class C : B { }
+
+sil [ossa] @_TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si : $@convention(method) (@thick B.Type) -> Int
+
+// CHECK-LABEL: sil private [noinline] [ossa] @_TF4metaP33_7026FC13D35FB9700BACF693F51A99016callerFMCS_P33_7026FC13D35FB9700BACF693F51A99011CT_
+sil private [noinline] [ossa] @_TF4metaP33_7026FC13D35FB9700BACF693F51A99016callerFMCS_P33_7026FC13D35FB9700BACF693F51A99011CT_ : $@convention(method) (@thick C.Type) -> () {
+bb0(%0 : $@thick C.Type):
+  %2 = upcast %0 : $@thick C.Type to $@thick B.Type
+  // CHECK-NOT: class_method
+  // CHECK: function_ref @_TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si
+  %3 = class_method %2 : $@thick B.Type, #B.foo!1 : (B.Type) -> () -> Int, $@convention(method) (@thick B.Type) -> Int
+  %4 = apply %3(%2) : $@convention(method) (@thick B.Type) -> Int
+  %5 = tuple ()
+  // CHECK: return
+  return %5 : $()
+}
+
+// YAML-NEXT: --- !Passed
+// YAML-NEXT: Pass:            sil-devirtualizer
+// YAML-NEXT: Name:            sil.ClassMethodDevirtualized
+// YAML-NEXT: DebugLoc:
+// YAML-NEXT:   File:            {{.*}}/devirtualize_ownership.sil
+// YAML-NEXT:   Line:            128
+// YAML-NEXT:   Column:          8
+// YAML-NEXT: Function:        'caller(_:)'
+// YAML-NEXT: Args:
+// YAML-NEXT:   - String:          'Devirtualized call to class method '
+// YAML-NEXT:   - Method:          '"static meta.B.foo(_:)"'
+// YAML-NEXT:     DebugLoc:
+// YAML-NEXT:       File:            {{.*}}/devirtualize_ownership.sil
+// YAML-NEXT:       Line:            119
+// YAML-NEXT:       Column:          13
+// YAML-NEXT: ...
+
+sil_vtable B {
+  #B.foo!1: @_TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si
+}
+
+sil_vtable C {
+  #B.foo!1: @_TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si
+}

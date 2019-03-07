@@ -32,25 +32,10 @@ intptr_t _swift_stdlib_getDefaultErrorCode(OpaqueValue *error,
       result = T->vw_getEnumTag(error);
       break;
 
-    case MetadataKind::Class:
-    case MetadataKind::ObjCClassWrapper:
-    case MetadataKind::ForeignClass:
-    case MetadataKind::Function:
-    case MetadataKind::Struct:
-    case MetadataKind::Optional:
-    case MetadataKind::Opaque:
-    case MetadataKind::Tuple:
-    case MetadataKind::Existential:
-    case MetadataKind::Metatype:
-    case MetadataKind::ExistentialMetatype:
-    case MetadataKind::HeapLocalVariable:
-    case MetadataKind::HeapGenericLocalVariable:
-    case MetadataKind::ErrorObject:
+    default:
       result = 1;
       break;
   }
 
-  // Destroy the value.
-  SWIFT_CC_PLUSONE_GUARD(T->vw_destroy(error));
   return result;
 }

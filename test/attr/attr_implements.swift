@@ -70,3 +70,23 @@ assert(!(s == s))
 
 // print(s.f(x:1, y:2))
 
+
+// Next test is for rdar://43804798
+//
+// When choosing between an @_implements-provided implementation of a specific
+// protocol's witness (Equatable / Comparable in particular), we want to choose
+// the @_implements-provided one when we're looking up from a context that only
+// knows the protocol bound, and the non-@_implements-provided one when we're
+// looking up from a context that knows the full type.
+
+struct SpecificType : Equatable {
+  @_implements(Equatable, ==(_:_:))
+  static func bar(_: SpecificType, _: SpecificType) -> Bool { return true }
+  static func ==(_: SpecificType, _: SpecificType) -> Bool { return false }
+}
+
+func trueWhenJustEquatable<T: Equatable>(_ x: T) -> Bool { return x == x }
+func falseWhenSpecificType(_ x: SpecificType) -> Bool { return x == x }
+
+assert(trueWhenJustEquatable(SpecificType()))
+assert(!falseWhenSpecificType(SpecificType()))

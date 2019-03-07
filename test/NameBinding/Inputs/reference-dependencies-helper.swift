@@ -30,8 +30,8 @@ func getOtherFileIntArray() -> OtherFileIntArray { return OtherFileIntArray() }
 
 typealias OtherFileAliasForSecret = OtherFileSecretTypeWrapper.SecretType
 
-prefix operator *** {}
-prefix operator ~~~~~ {}
+prefix operator ***
+prefix operator ~~~~~
 
 prefix operator ****
 infix operator *****

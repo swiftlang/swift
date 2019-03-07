@@ -1,0 +1,7 @@
+---
+Name: VisualC
+Functions:
+- Name: _setjmp
+  Availability: nonswift
+  AvailabilityMsg: 'Functions that return more than once are unavailable in swift'
+

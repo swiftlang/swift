@@ -32,7 +32,7 @@ struct OnlyMutable {
   var base: UnsafeMutablePointer<Int>
 
   subscript(index: Int) -> Int {
-    unsafeMutableAddress { // expected-error {{subscript must provide either a getter or 'address' if it provides 'mutableAddress'}}
+    unsafeMutableAddress { // expected-error {{subscript with a mutable addressor must also have a getter, addressor, or 'read' accessor}}
       return base
     }
   }
@@ -45,7 +45,7 @@ struct Repeated {
     unsafeAddress { // expected-note {{previous definition}}
       return UnsafePointer(base)
     }
-    unsafeAddress { // expected-error {{duplicate definition}}
+    unsafeAddress { // expected-error {{subscript already has an addressor}}
       return base // expected-error {{cannot convert return expression of type 'UnsafeMutablePointer<Int>' to return type 'UnsafePointer<Int>'}}
     }
   }
@@ -61,7 +61,7 @@ struct RepeatedMutable {
     unsafeMutableAddress { // expected-note {{previous definition}}
       return base
     }
-    unsafeMutableAddress { // expected-error {{duplicate definition}}
+    unsafeMutableAddress { // expected-error {{subscript already has a mutable addressor}}
       return base
     }
   }
@@ -71,11 +71,11 @@ struct AddressorAndGet {
   var base: UnsafePointer<Int>
 
   subscript(index: Int) -> Int {
-    unsafeAddress { // expected-error {{subscript cannot provide both 'address' and a getter}}
+    unsafeAddress { // expected-error {{subscript cannot provide both an addressor and a getter}}
       return base
     }
-    get {
-      return base.get()
+    get { // expected-note {{getter defined here}}
+      return base.get() // expected-error {{value of type 'UnsafePointer<Int>' has no member 'get'}}
     }
   }
 }
@@ -87,7 +87,7 @@ struct AddressorAndSet {
     unsafeAddress {
       return base
     }
-    set { // expected-error {{subscript cannot provide both 'address' and a setter; use an ordinary getter instead}}
+    set {
     }
   }
 }
@@ -179,51 +179,19 @@ struct ObedientNonMutatingMutableAddressor: HasNonMutatingMutableSubscript {
   }
 }
 
-// FIXME: Actually plumb the work to fix the grammar in these
-// diagnostics if/when we productize them.  ("a addressor")
-struct RedundantAddressors1 {
+struct RedundantAddressors {
   var owner : Builtin.NativeObject
   subscript(index: Int) -> Int {
-    unsafeAddress { return someValidAddress() } // expected-note {{previous definition of addressor is here}}
-    addressWithNativeOwner { return (someValidAddress(), owner)  } // expected-error {{subscript already has a addressor}}
-  }
-}
-struct RedundantAddressors2 {
-  var owner : Builtin.NativeObject
-  subscript(index: Int) -> Int {
-    unsafeAddress { return someValidAddress() } // expected-note {{previous definition of addressor is here}}
-    addressWithPinnedNativeOwner { return (someValidAddress(), owner)  } // expected-error {{subscript already has a addressor}}
-  }
-}
-struct RedundantAddressors3 {
-  var owner : Builtin.NativeObject
-  subscript(index: Int) -> Int {
-    addressWithNativeOwner { return someValidAddress() } // expected-note {{previous definition of addressor is here}}
-    addressWithPinnedNativeOwner { return (someValidAddress(), owner)  } // expected-error {{subscript already has a addressor}}
+    unsafeAddress { return someValidAddress() } // expected-note {{previous definition of addressor here}}
+    unsafeAddress { return someValidAddress() } // expected-error {{subscript already has an addressor}}
   }
 }
 
-struct RedundantMutableAddressors1 {
+struct RedundantMutableAddressors {
   var owner : Builtin.NativeObject
   subscript(index: Int) -> Int {
     unsafeAddress { return someValidAddress() }
-    unsafeMutableAddress { return someValidAddress() } // expected-note {{previous definition of mutable addressor is here}}
-    mutableAddressWithNativeOwner { return (someValidAddress(), owner)  } // expected-error {{subscript already has a mutable addressor}}
-  }
-}
-struct RedundantMutableAddressors2 {
-  var owner : Builtin.NativeObject
-  subscript(index: Int) -> Int {
-    unsafeAddress { return someValidAddress() }
-    unsafeMutableAddress { return someValidAddress() } // expected-note {{previous definition of mutable addressor is here}}
-    mutableAddressWithNativeOwner { return (someValidAddress(), owner)  } // expected-error {{subscript already has a mutable addressor}}
-  }
-}
-struct RedundantMutableAddressors3 {
-  var owner : Builtin.NativeObject
-  subscript(index: Int) -> Int {
-    unsafeAddress { return someValidAddress() }
-    unsafeMutableAddress { return someValidAddress() } // expected-note {{previous definition of mutable addressor is here}}
-    mutableAddressWithNativeOwner { return (someValidAddress(), owner)  } // expected-error {{subscript already has a mutable addressor}}
+    unsafeMutableAddress { return someValidAddress() } // expected-note {{previous definition of mutable addressor here}}
+    unsafeMutableAddress { return someValidAddress() } // expected-error {{subscript already has a mutable addressor}}
   }
 }

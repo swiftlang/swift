@@ -171,14 +171,18 @@ extension C {
   static final let el4: Int = 0 // expected-error {{static declarations are already final}} {{10-16=}}
 }
 
-protocol P {  // expected-note{{did you mean 'P'?}}
+protocol P {  // expected-note{{did you mean 'P'?}} expected-note{{extended type declared here}}
   // Both `static` and `class` property requirements are equivalent in protocols rdar://problem/17198298
   static var v1: Int { get }
-  class var v2: Int { get } // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}} {{3-8=static}}
+  class var v2: Int { get } // expected-error {{class properties are only allowed within classes; use 'static' to declare a requirement fulfilled by either a static or class property}} {{3-8=static}}
   static final var v3: Int { get } // expected-error {{only classes and class members may be marked with 'final'}}
 
   static let l1: Int // expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
-  class let l2: Int // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}} {{3-8=static}} expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
+  class let l2: Int // expected-error {{class properties are only allowed within classes; use 'static' to declare a requirement fulfilled by either a static or class property}} {{3-8=static}} expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
+}
+
+extension P {
+  class var v4: Int { return 0 } // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}} {{3-8=static}}
 }
 
 struct S1 {
@@ -219,18 +223,18 @@ class ClassHasVars {
 }
 
 class ClassOverridesVars : ClassHasVars {
-  override static var computedStatic: Int { return 1 } // expected-error {{cannot override static var}}
-  override static var computedFinalClass: Int { return 1 } // expected-error {{static var overrides a 'final' class var}}
+  override static var computedStatic: Int { return 1 } // expected-error {{cannot override static property}}
+  override static var computedFinalClass: Int { return 1 } // expected-error {{static property overrides a 'final' class property}}
   override class var computedClass: Int { return 1 }
   override var computedInstance: Int { return 1 }
 }
 class ClassOverridesVars2 : ClassHasVars {
-  override final class var computedStatic: Int { return 1 } // expected-error {{cannot override static var}}
-  override final class var computedFinalClass: Int { return 1 } // expected-error {{class var overrides a 'final' class var}}
+  override final class var computedStatic: Int { return 1 } // expected-error {{cannot override static property}}
+  override final class var computedFinalClass: Int { return 1 } // expected-error {{class property overrides a 'final' class property}}
 }
 class ClassOverridesVars3 : ClassHasVars {
-  override class var computedStatic: Int { return 1 } // expected-error {{cannot override static var}}
-  override class var computedFinalClass: Int { return 1 } // expected-error {{class var overrides a 'final' class var}}
+  override class var computedStatic: Int { return 1 } // expected-error {{cannot override static property}}
+  override class var computedFinalClass: Int { return 1 } // expected-error {{class property overrides a 'final' class property}}
 }
 
 struct S2 {

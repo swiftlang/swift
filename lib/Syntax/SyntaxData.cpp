@@ -49,4 +49,88 @@ bool SyntaxData::isUnknown() const {
 
 void SyntaxData::dump(llvm::raw_ostream &OS) const {
   Raw->dump(OS, 0);
+  OS << '\n';
+}
+
+void SyntaxData::dump() const { dump(llvm::errs()); }
+
+RC<SyntaxData> SyntaxData::getPreviousNode() const {
+  if (size_t N = getIndexInParent()) {
+    if (hasParent()) {
+      for (size_t I = N - 1; ; I--) {
+        if (auto C = getParent()->getChild(I)) {
+          if (C->getRaw()->isPresent() && C->getFirstToken())
+            return C;
+        }
+        if (I == 0)
+          break;
+      }
+    }
+  }
+  return hasParent() ? Parent->getPreviousNode() : nullptr;
+}
+
+RC<SyntaxData> SyntaxData::getNextNode() const {
+  if (hasParent()) {
+    for (size_t I = getIndexInParent() + 1, N = Parent->getNumChildren();
+         I != N; I++) {
+      if (auto C = getParent()->getChild(I)) {
+        if (C->getRaw()->isPresent() && C->getFirstToken())
+          return C;
+      }
+    }
+    return Parent->getNextNode();
+  }
+  return nullptr;
+}
+
+RC<SyntaxData> SyntaxData::getFirstToken() const {
+  if (getRaw()->isToken()) {
+    // Get a reference counted version of this
+    assert(hasParent() && "The syntax tree should not conisist only of the root");
+    return getParent()->getChild(getIndexInParent());
+  }
+
+  for (size_t I = 0, E = getNumChildren(); I < E; ++I) {
+    if (auto Child = getChild(I)) {
+      if (Child->getRaw()->isMissing())
+        continue;
+      if (Child->getRaw()->isToken()) {
+        return Child;
+      } else if (auto Token = Child->getFirstToken()) {
+        return Token;
+      }
+    }
+  }
+  return nullptr;
+}
+
+AbsolutePosition SyntaxData::getAbsolutePositionBeforeLeadingTrivia() const {
+  if (PositionCache.hasValue())
+    return *PositionCache;
+  if (auto P = getPreviousNode()) {
+    auto Result = P->getAbsolutePositionBeforeLeadingTrivia();
+    P->getRaw()->accumulateAbsolutePosition(Result);
+    // FIXME: avoid using const_cast.
+    const_cast<SyntaxData*>(this)->PositionCache = Result;
+  } else {
+    const_cast<SyntaxData*>(this)->PositionCache = AbsolutePosition();
+  }
+  return *PositionCache;
+}
+
+AbsolutePosition SyntaxData::getAbsolutePosition() const {
+  auto Result = getAbsolutePositionBeforeLeadingTrivia();
+  getRaw()->accumulateLeadingTrivia(Result);
+  return Result;
+}
+
+AbsolutePosition SyntaxData::getAbsoluteEndPositionAfterTrailingTrivia() const {
+  if (auto N = getNextNode()) {
+    return N->getAbsolutePositionBeforeLeadingTrivia();
+  } else {
+    auto Result = getAbsolutePositionBeforeLeadingTrivia();
+    getRaw()->accumulateAbsolutePosition(Result);
+    return Result;
+  }
 }

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -abcopts %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -abcopts %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -14,7 +14,7 @@ struct ArrayOf<T> : _DestructorSafeContainer {
 }
 
 struct Foo {
-  @sil_stored var subFoos: ArrayOf<Foo>
+  @_hasStorage var subFoos: ArrayOf<Foo>
   init()
 }
 

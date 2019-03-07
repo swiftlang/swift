@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -temp-rvalue-opt | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -temp-rvalue-opt | %FileCheck %s
 
 sil_stage canonical
 
@@ -444,3 +444,30 @@ bb0(%0 : $*Klass):
   %9999 = tuple()
   return %9999 : $()
 }
+
+sil @$createKlass : $@convention(thin) () -> @out Klass
+sil @$appendKlass : $@convention(method) (@in_guaranteed Klass, @inout Klass) -> ()
+
+// CHECK-LABEL: sil @$overlapping_lifetime_in_function_all : $@convention(thin) () -> @out Klass {
+// CHECK: [[S1:%.*]] = alloc_stack $Klass
+// CHECK: [[S2:%.*]] = alloc_stack $Klass
+// CHECK: copy_addr [[S1]] to [initialization] [[S2]]
+// CHECK: apply {{%.*}}([[S2]], [[S1]])
+// CHECK: }
+sil @$overlapping_lifetime_in_function_all : $@convention(thin) () -> @out Klass {
+bb0(%0 : $*Klass):
+  %1 = alloc_stack $Klass
+  %2 = function_ref @$createKlass : $@convention(thin) () -> @out Klass
+  %3 = apply %2(%1) : $@convention(thin) () -> @out Klass
+  %4 = alloc_stack $Klass
+  copy_addr %1 to [initialization] %4 : $*Klass
+  %6 = function_ref @$appendKlass : $@convention(method) (@in_guaranteed Klass, @inout Klass) -> ()
+  %7 = apply %6(%4, %1) : $@convention(method) (@in_guaranteed Klass, @inout Klass) -> ()
+  destroy_addr %4 : $*Klass
+  dealloc_stack %4 : $*Klass
+  copy_addr [take] %1 to [initialization] %0 : $*Klass
+  dealloc_stack %1 : $*Klass
+  %12 = tuple ()
+  return %12 : $()
+}
+

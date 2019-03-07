@@ -29,7 +29,7 @@ private:
   const llvm::opt::ArgList &Args;
   FrontendOptions &Opts;
 
-  Optional<const std::vector<std::string>>
+  Optional<std::vector<std::string>>
       cachedOutputFilenamesFromCommandLineOrFilelist;
 
   void handleDebugCrashGroupArguments();
@@ -47,10 +47,10 @@ private:
   void computePrintStatsOptions();
   void computeTBDOptions();
 
-  void setUnsignedIntegerArgument(options::ID optionID, unsigned max,
+  void setUnsignedIntegerArgument(options::ID optionID, unsigned radix,
                                   unsigned &valueToSet);
 
-  bool setUpForSILOrLLVM();
+  bool setUpInputKindAndImmediateArgs();
 
   bool checkUnusedSupplementaryOutputPaths() const;
 

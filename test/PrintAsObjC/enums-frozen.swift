@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/enums.swiftmodule -typecheck -emit-objc-header-path %t/enums.h -import-objc-header %S/Inputs/enums.h -disable-objc-attr-requires-foundation-module -enable-resilience
 // RUN: %FileCheck %s < %t/enums.h
 // RUN: %check-in-clang %t/enums.h
-// RUN: %check-in-clang -fno-modules -Qunused-arguments %t/enums.h -include Foundation.h -include ctypes.h -include CoreFoundation.h
+// RUN: %check-in-clang -fno-modules -Qunused-arguments %t/enums.h -include ctypes.h -include CoreFoundation.h
 
 // REQUIRES: objc_interop
 

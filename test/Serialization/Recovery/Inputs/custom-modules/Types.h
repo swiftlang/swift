@@ -10,6 +10,7 @@
 
 typedef int RenamedTypedef;
 typedef int NewlyWrappedTypedef __attribute__((swift_wrapper(struct)));
+typedef int RenamedWrappedTypedef __attribute__((swift_wrapper(struct)));
 
 struct RenamedStruct {
   int value;

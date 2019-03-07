@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -target x86_64-apple-macosx10.11 -module-name=cgtest -emit-ir -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name=cgtest -emit-ir -O %s | %FileCheck %s
 
 // Test some imported CG APIs
 import CoreGraphics
@@ -75,6 +75,7 @@ public func pdfOperations(_ context: CGContext) {
 // Test some more recently renamed APIs
 
 // CHECK-LABEL: define swiftcc void {{.*}}testColorRenames{{.*}} {
+@available(macOS 10.11, *)
 public func testColorRenames(color: CGColor,
                              intent: CGColorRenderingIntent) {
   let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
@@ -99,9 +100,9 @@ public func testRenames(transform: CGAffineTransform, context: CGContext,
   let _ = point.applying(transform)
   var rect = rect.applying(transform)
   let _ = size.applying(transform)
-// CHECK:   %{{.*}} = call { double, double } @CGPointApplyAffineTransform(double %{{.*}}, double %{{.*}}, %struct.CGAffineTransform* {{.*}})
+// CHECK:   %{{.*}} = {{(tail )?}}call { double, double } @CGPointApplyAffineTransform(double %{{.*}}, double %{{.*}}, %struct.CGAffineTransform* {{.*}})
 // CHECK:   call void @CGRectApplyAffineTransform(%struct.CGRect* {{.*}}, %struct.CGRect* {{.*}}, %struct.CGAffineTransform* {{.*}})
-// CHECK:   %{{.*}} = call { double, double } @CGSizeApplyAffineTransform(double %{{.*}}, double %{{.*}}, %struct.CGAffineTransform* {{.*}})
+// CHECK:   %{{.*}} = {{(tail )?}}call { double, double } @CGSizeApplyAffineTransform(double %{{.*}}, double %{{.*}}, %struct.CGAffineTransform* {{.*}})
 
   context.concatenate(transform)
   context.rotate(by: CGFloat.pi)

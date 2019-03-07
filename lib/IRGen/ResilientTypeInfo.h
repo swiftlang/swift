@@ -42,9 +42,10 @@ namespace irgen {
 template <class Impl>
 class ResilientTypeInfo : public WitnessSizedTypeInfo<Impl> {
 protected:
-  ResilientTypeInfo(llvm::Type *type)
+  ResilientTypeInfo(llvm::Type *type, IsABIAccessible_t abiAccessible)
     : WitnessSizedTypeInfo<Impl>(type, Alignment(1),
-                                 IsNotPOD, IsNotBitwiseTakable) {}
+                                 IsNotPOD, IsNotBitwiseTakable,
+                                 abiAccessible) {}
 
 public:
   void assignWithCopy(IRGenFunction &IGF, Address dest, Address src, SILType T,
@@ -84,13 +85,6 @@ public:
                                    Address dest, Address src,
                                    SILType T) const override {
     auto addr = emitInitializeBufferWithCopyOfBufferCall(IGF, T, dest, src);
-    return this->getAddressForPointer(addr);
-  }
-
-  Address initializeBufferWithTakeOfBuffer(IRGenFunction &IGF,
-                                   Address dest, Address src,
-                                   SILType T) const override {
-    auto addr = emitInitializeBufferWithTakeOfBufferCall(IGF, T, dest, src);
     return this->getAddressForPointer(addr);
   }
 
@@ -143,28 +137,18 @@ public:
   bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
     return true;
   }
-  llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                       Address src,
-                                       SILType T) const override {
-    return emitGetExtraInhabitantIndexCall(IGF, T, src);
-  }
-  void storeExtraInhabitant(IRGenFunction &IGF,
-                            llvm::Value *index,
-                            Address dest,
-                            SILType T) const override {
-    emitStoreExtraInhabitantCall(IGF, T, index, dest);
-  }
 
   llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
                                        llvm::Value *numEmptyCases,
                                        Address enumAddr,
-                                       SILType T) const override {
+                                       SILType T,
+                                       bool isOutlined) const override {
     return emitGetEnumTagSinglePayloadCall(IGF, T, numEmptyCases, enumAddr);
   }
 
   void storeEnumTagSinglePayload(IRGenFunction &IGF, llvm::Value *whichCase,
                                  llvm::Value *numEmptyCases, Address enumAddr,
-                                 SILType T) const override {
+                                 SILType T, bool isOutlined) const override {
     emitStoreEnumTagSinglePayloadCall(IGF, T, whichCase, numEmptyCases, enumAddr);
   }
 

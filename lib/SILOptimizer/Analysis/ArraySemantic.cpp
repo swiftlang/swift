@@ -30,7 +30,7 @@ getSelfParameterConvention(ApplyInst *SemanticsCall) {
   return FnTy->getSelfParameter().getConvention();
 }
 
-/// \brief Make sure that all parameters are passed with a reference count
+/// Make sure that all parameters are passed with a reference count
 /// neutral parameter convention except for self.
 bool swift::ArraySemanticsCall::isValidSignature() {
   assert(SemanticsCall && getKind() != ArrayCallKind::kNone &&
@@ -175,7 +175,6 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() const {
             .Case("array.get_count", ArrayCallKind::kGetCount)
             .Case("array.get_capacity", ArrayCallKind::kGetCapacity)
             .Case("array.get_element", ArrayCallKind::kGetElement)
-            .Case("array.owner", ArrayCallKind::kGetArrayOwner)
             .Case("array.make_mutable", ArrayCallKind::kMakeMutable)
             .Case("array.get_element_address",
                   ArrayCallKind::kGetElementAddress)
@@ -381,7 +380,7 @@ static ApplyInst *hoistOrCopyCall(ApplyInst *AI, SILInstruction *InsertBefore,
 }
 
 
-/// \brief Hoist or copy the self argument of the semantics call.
+/// Hoist or copy the self argument of the semantics call.
 /// Return the hoisted self argument.
 static SILValue hoistOrCopySelf(ApplyInst *SemanticsCall,
                                 SILInstruction *InsertBefore,
@@ -695,7 +694,7 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
     return false;
 
   SILBuilderWithScope Builder(SemanticsCall);
-  auto &ValLowering = Builder.getModule().getTypeLowering(V->getType());
+  auto &ValLowering = Builder.getTypeLowering(V->getType());
   if (hasGetElementDirectResult()) {
     ValLowering.emitCopyValue(Builder, SemanticsCall->getLoc(), V);
     SemanticsCall->replaceAllUsesWith(V);
@@ -717,7 +716,7 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
 
 bool swift::ArraySemanticsCall::replaceByAppendingValues(
     SILModule &M, SILFunction *AppendFn, SILFunction *ReserveFn,
-    const SmallVectorImpl<SILValue> &Vals, ArrayRef<Substitution> Subs) {
+    const SmallVectorImpl<SILValue> &Vals, SubstitutionMap Subs) {
   assert(getKind() == ArrayCallKind::kAppendContentsOf &&
          "Must be an append_contentsOf call");
   assert(AppendFn && "Must provide an append SILFunction");
@@ -732,12 +731,13 @@ bool swift::ArraySemanticsCall::replaceByAppendingValues(
   SILValue ArrRef = SemanticsCall->getArgument(1);
   SILBuilderWithScope Builder(SemanticsCall);
   auto Loc = SemanticsCall->getLoc();
-  auto *FnRef = Builder.createFunctionRef(Loc, AppendFn);
+  auto *FnRef = Builder.createFunctionRefFor(Loc, AppendFn);
 
   if (Vals.size() > 1) {
     // Create a call to reserveCapacityForAppend() to reserve space for multiple
     // elements.
-    FunctionRefInst *ReserveFnRef = Builder.createFunctionRef(Loc, ReserveFn);
+    FunctionRefBaseInst *ReserveFnRef =
+        Builder.createFunctionRefFor(Loc, ReserveFn);
     SILFunctionType *ReserveFnTy =
       ReserveFnRef->getType().castTo<SILFunctionType>();
     assert(ReserveFnTy->getNumParameters() == 2);
@@ -756,7 +756,7 @@ bool swift::ArraySemanticsCall::replaceByAppendingValues(
 
   for (SILValue V : Vals) {
     auto SubTy = V->getType();
-    auto &ValLowering = Builder.getModule().getTypeLowering(SubTy);
+    auto &ValLowering = Builder.getTypeLowering(SubTy);
     auto CopiedVal = ValLowering.emitCopyValue(Builder, Loc, V);
     auto *AllocStackInst = Builder.createAllocStack(Loc, SubTy);
 

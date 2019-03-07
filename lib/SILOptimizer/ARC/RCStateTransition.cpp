@@ -78,14 +78,15 @@ RCStateTransitionKind swift::getRCStateTransitionKind(SILNode *N) {
     return RCStateTransitionKind::Unknown;
   }
 
+  // Alloc* are always allocating new classes so they are introducing new
+  // values at +1.
   case SILNodeKind::AllocRefInst:
   case SILNodeKind::AllocRefDynamicInst:
-    // AllocRef* are always allocating new classes so they are introducing new
-    // values at +1.
+  case SILNodeKind::AllocBoxInst:
     return RCStateTransitionKind::StrongEntrance;
 
-  case SILNodeKind::AllocBoxInst:
-    // AllocBox introduce their container result at +1.
+  case SILNodeKind::PartialApplyInst:
+    // Partial apply boxes are introduced at +1.
     return RCStateTransitionKind::StrongEntrance;
 
   default:

@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_class.swift -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_class.swift -disable-objc-attr-requires-foundation-module -enable-objc-interop
 // RUN: %target-swift-frontend -emit-module -o %t -I %t %S/Inputs/def_override.swift
 // RUN: llvm-bcanalyzer %t/def_override.swiftmodule | %FileCheck %s
 // RUN: %target-swift-frontend -typecheck -I %t %s -verify

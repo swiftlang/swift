@@ -1,4 +1,4 @@
-// RUN: %scale-test --invert-result --begin 3 --end 7 --step 1 --select incrementScopeCounter %s
+// RUN: %scale-test --invert-result --begin 3 --end 7 --step 1 --select NumLeafScopes %s
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 

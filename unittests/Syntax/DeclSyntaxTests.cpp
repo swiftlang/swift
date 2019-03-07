@@ -17,8 +17,7 @@ DeclModifierSyntax getCannedDeclModifier() {
   auto LParen = SyntaxFactory::makeLeftParenToken({}, {});
   auto Set = SyntaxFactory::makeIdentifier("set", {}, {});
   auto RParen = SyntaxFactory::makeRightParenToken({}, {});
-  return SyntaxFactory::makeDeclModifier(Private,
-    SyntaxFactory::makeTokenList({ LParen, Set, RParen}));
+  return SyntaxFactory::makeDeclModifier(Private, LParen, Set, RParen);
 }
 
 TEST(DeclSyntaxTests, DeclModifierMakeAPIs) {
@@ -41,13 +40,12 @@ TEST(DeclSyntaxTests, DeclModifierGetAPIs) {
   auto LParen = SyntaxFactory::makeLeftParenToken({}, {});
   auto Set = SyntaxFactory::makeIdentifier("set", {}, {});
   auto RParen = SyntaxFactory::makeRightParenToken({}, {});
-  auto Mod = SyntaxFactory::makeDeclModifier(Private,
-    SyntaxFactory::makeTokenList({LParen, Set, RParen}));
+  auto Mod = SyntaxFactory::makeDeclModifier(Private, LParen, Set, RParen);
 
   ASSERT_EQ(Private.getRaw(), Mod.getName().getRaw());
-  ASSERT_EQ(LParen.getRaw(), Mod.getDetail().getValue()[0].getRaw());
-  ASSERT_EQ(Set.getRaw(), Mod.getDetail().getValue()[1].getRaw());
-  ASSERT_EQ(RParen.getRaw(), Mod.getDetail().getValue()[2].getRaw());
+  ASSERT_EQ(LParen.getRaw(), Mod.getDetailLeftParen()->getRaw());
+  ASSERT_EQ(Set.getRaw(), Mod.getDetail()->getRaw());
+  ASSERT_EQ(RParen.getRaw(), Mod.getDetailRightParen()->getRaw());
 }
 
 TEST(DeclSyntaxTests, DeclModifierWithAPIs) {
@@ -59,9 +57,11 @@ TEST(DeclSyntaxTests, DeclModifierWithAPIs) {
   SmallString<24> Scratch;
   llvm::raw_svector_ostream OS(Scratch);
   SyntaxFactory::makeBlankDeclModifier()
-    .withName(Private)
-    .withDetail(SyntaxFactory::makeTokenList({LParen, Set, RParen}))
-    .print(OS);
+      .withName(Private)
+      .withDetailLeftParen(LParen)
+      .withDetail(Set)
+      .withDetailRightParen(RParen)
+      .print(OS);
   ASSERT_EQ(OS.str().str(), "private(set)");
 }
 
@@ -324,6 +324,34 @@ TEST(DeclSyntaxTests, FunctionParameterWithAPIs) {
   }
 }
 
+TEST(DeclSyntaxTests, FunctionParameterWithEllipsis) {
+    auto ExternalName = SyntaxFactory::makeIdentifier("for", {},
+                                                      Trivia::spaces(1));
+    auto LocalName = SyntaxFactory::makeIdentifier("integer", {}, {});
+    auto Colon = SyntaxFactory::makeColonToken(Trivia::spaces(1),
+                                               Trivia::spaces(1));
+    auto Int = SyntaxFactory::makeTypeIdentifier("Int", {},
+                                                 Trivia::spaces(0));
+    auto Ellipsis = SyntaxFactory::makeEllipsisToken({},
+                                                     Trivia::spaces(1));
+    auto Comma = SyntaxFactory::makeCommaToken({}, {});
+    
+    {
+        SmallString<48> Scratch;
+        llvm::raw_svector_ostream OS(Scratch);
+        getCannedFunctionParameter()
+        .withFirstName(ExternalName)
+        .withSecondName(LocalName)
+        .withColon(Colon)
+        .withType(Int)
+        .withEllipsis(Ellipsis)
+        .withDefaultArgument(llvm::None)
+        .withTrailingComma(Comma)
+        .print(OS);
+        ASSERT_EQ(OS.str().str(), "for integer : Int... ,");
+    }
+}
+
 #pragma mark - parameter-list
 
 TEST(DeclSyntaxTests, FunctionParameterListMakeAPIs) {
@@ -467,12 +495,12 @@ ModifierListSyntax getCannedModifiers() {
   auto NoLParen = TokenSyntax::missingToken(tok::l_paren, "(");
   auto NoArgument = TokenSyntax::missingToken(tok::identifier, "");
   auto NoRParen = TokenSyntax::missingToken(tok::r_paren, ")");
-  auto Public = SyntaxFactory::makeDeclModifier(PublicID,
-    SyntaxFactory::makeTokenList({NoLParen, NoArgument, NoRParen}));
+  auto Public =
+      SyntaxFactory::makeDeclModifier(PublicID, NoLParen, NoArgument, NoRParen);
 
   auto StaticKW = SyntaxFactory::makeStaticKeyword({}, Trivia::spaces(1));
-  auto Static = SyntaxFactory::makeDeclModifier(StaticKW,
-    SyntaxFactory::makeTokenList({NoLParen, NoArgument, NoRParen}));
+  auto Static =
+      SyntaxFactory::makeDeclModifier(StaticKW, NoLParen, NoArgument, NoRParen);
 
   return SyntaxFactory::makeBlankModifierList()
     .appending(Public)
@@ -507,7 +535,7 @@ CodeBlockSyntax getCannedBody() {
     SyntaxFactory::makeReturnKeyword(Trivia::newlines(1) + Trivia::spaces(2),
                                      {});
   auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, One);
-  auto ReturnItem = SyntaxFactory::makeCodeBlockItem(Return, None);
+  auto ReturnItem = SyntaxFactory::makeCodeBlockItem(Return, None, None);
 
   auto Stmts = SyntaxFactory::makeCodeBlockItemList({ReturnItem});
 

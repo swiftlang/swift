@@ -57,7 +57,7 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &SGF,
 
     // If we have the slot, emit a store to it.
     SGF.B.emitBlock(hasSlotBB);
-    SILValue slot = hasSlotBB->createPHIArgument(errorPtrObjectTy,
+    SILValue slot = hasSlotBB->createPhiArgument(errorPtrObjectTy,
                                                  ValueOwnershipKind::Owned);
     emitStoreToForeignErrorSlot(SGF, loc, slot, errorSrc);
     SGF.B.createBranch(loc, contBB);
@@ -74,8 +74,7 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &SGF,
 
   // Okay, break down the components of SomePointer<SomeError?>.
   // TODO: this should really be an unlowered AST type?
-  CanType bridgedErrorPtrType =
-    foreignErrorSlot->getType().getSwiftRValueType();
+  auto bridgedErrorPtrType = foreignErrorSlot->getType().getASTType();
 
   PointerTypeKind ptrKind;
   CanType bridgedErrorProto =
@@ -101,7 +100,7 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &SGF,
     SGF.emitPropertyLValue(loc, ManagedValue::forUnmanaged(foreignErrorSlot),
                            bridgedErrorPtrType, pointeeProperty,
                            LValueOptions(),
-                           AccessKind::Write,
+                           SGFAccessKind::Write,
                            AccessSemantics::Ordinary);
   RValue rvalue(SGF, loc, bridgedErrorProto,
                 SGF.emitManagedRValueWithCleanup(bridgedError));
@@ -132,7 +131,7 @@ namespace {
 
     SILValue emitBridged(SILGenFunction &SGF, SILLocation loc,
                          CanType bridgedErrorProto) const override {
-      auto nativeErrorType = NativeError->getType().getSwiftRValueType();
+      auto nativeErrorType = NativeError->getType().getASTType();
       assert(nativeErrorType == SGF.SGM.getASTContext().getExceptionType());
 
       SILValue bridgedError = SGF.emitNativeToBridgedError(loc,
@@ -282,25 +281,6 @@ void SILGenFunction::emitForeignErrorBlock(SILLocation loc,
   emitThrow(loc, error);
 }
 
-/// Unwrap a value of a wrapped integer type to get at the juicy
-/// Builtin.IntegerN value within.
-static SILValue emitUnwrapIntegerResult(SILGenFunction &SGF,
-                                        SILLocation loc,
-                                        SILValue value) {
-  // This is a loop because we want to handle types that wrap integer types,
-  // like ObjCBool (which may be Bool or Int8).
-  while (!value->getType().is<BuiltinIntegerType>()) {
-    auto structDecl = value->getType().getStructOrBoundGenericStruct();
-    assert(structDecl && "value for error result wasn't of struct type!");
-    assert(std::next(structDecl->getStoredProperties().begin())
-             == structDecl->getStoredProperties().end());
-    auto property = *structDecl->getStoredProperties().begin();
-    value = SGF.B.createStructExtract(loc, value, property);
-  }
-
-  return value;
-}
-
 /// Perform a foreign error check by testing whether the call result is zero.
 /// The call result is otherwise ignored.
 static void
@@ -313,8 +293,8 @@ emitResultIsZeroErrorCheck(SILGenFunction &SGF, SILLocation loc,
   }
 
   SILValue resultValue =
-    emitUnwrapIntegerResult(SGF, loc, result.getUnmanagedValue());
-  CanType resultType = resultValue->getType().getSwiftRValueType();
+    SGF.emitUnwrapIntegerResult(loc, result.getUnmanagedValue());
+  auto resultType = resultValue->getType().getASTType();
 
   if (!resultType->isBuiltinIntegerType(1)) {
     SILValue zero =
@@ -376,7 +356,7 @@ emitResultIsNilErrorCheck(SILGenFunction &SGF, SILLocation loc,
   // result value.
   SGF.B.emitBlock(contBB);
   SILValue objectResult =
-      contBB->createPHIArgument(resultObjectType, ValueOwnershipKind::Owned);
+      contBB->createPhiArgument(resultObjectType, ValueOwnershipKind::Owned);
   return SGF.emitManagedRValueWithCleanup(objectResult);
 }
 
@@ -394,7 +374,7 @@ emitErrorIsNonNilErrorCheck(SILGenFunction &SGF, SILLocation loc,
 
   // Switch on the optional error.
   SILBasicBlock *errorBB = SGF.createBasicBlock(FunctionSection::Postmatter);
-  errorBB->createPHIArgument(optionalError->getType().unwrapOptionalType(),
+  errorBB->createPhiArgument(optionalError->getType().unwrapOptionalType(),
                              ValueOwnershipKind::Owned);
   SILBasicBlock *contBB = SGF.createBasicBlock();
   SGF.B.createSwitchEnum(loc, optionalError, /*default*/ nullptr,

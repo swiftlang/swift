@@ -12,7 +12,7 @@ class Other { }
 
 func acceptA(_ a: A) { }
 
-func f0<T : A>(_ obji: T, _ ai: A, _ bi: B) {
+func f0<T : A>(_ obji: T, _ ai: A, _ bi: B) { // expected-note {{where 'T' = 'Other'}}
   var obj = obji, a = ai, b = bi
   // Method access
   obj.foo()
@@ -39,7 +39,7 @@ func f0<T : A>(_ obji: T, _ ai: A, _ bi: B) {
 func call_f0(_ a: A, b: B, other: Other) {
   f0(a, a, b)
   f0(b, a, b)
-  f0(other, a, b) // expected-error{{cannot convert value of type 'Other' to expected argument type 'A'}}
+  f0(other, a, b) // expected-error{{global function 'f0' requires that 'Other' inherit from 'A'}}
 }
 
 class X<T> {
@@ -56,7 +56,7 @@ func testGenericInherit() {
 
 
 struct SS<T> : T { } // expected-error{{inheritance from non-protocol type 'T'}}
-enum SE<T> : T { case X } // expected-error{{raw type 'T' is not expressible by any literal}} // expected-error {{SE<T>' declares raw type 'T', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-error{{RawRepresentable conformance cannot be synthesized because raw type 'T' is not Equatable}}
+enum SE<T> : T { case X } // expected-error{{raw type 'T' is not expressible by a string, integer, or floating-point literal}} // expected-error {{SE<T>' declares raw type 'T', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-error{{RawRepresentable conformance cannot be synthesized because raw type 'T' is not Equatable}}
 
 // Also need Equatable for init?(RawValue)
 enum SE2<T : ExpressibleByIntegerLiteral>

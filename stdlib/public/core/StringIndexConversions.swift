@@ -26,7 +26,7 @@ extension String.Index {
   ///     print(cafe)
   ///     // Prints "Café"
   ///
-  ///     let scalarsIndex = cafe.unicodeScalars.index(of: "e")!
+  ///     let scalarsIndex = cafe.unicodeScalars.firstIndex(of: "e")!
   ///     let stringIndex = String.Index(scalarsIndex, within: cafe)!
   ///
   ///     print(cafe[...stringIndex])
@@ -49,15 +49,14 @@ extension String.Index {
   ///     `sourcePosition` must be a valid index of at least one of the views
   ///     of `target`.
   ///   - target: The string referenced by the resulting index.
-  @inlinable // FIXME(sil-serialize-all)
   public init?(
     _ sourcePosition: String.Index,
     within target: String
   ) {
-    guard target.unicodeScalars._isOnGraphemeClusterBoundary(sourcePosition)
-    else { return nil }
-
-    self = target._index(atEncodedOffset: sourcePosition.encodedOffset)
+    guard target._guts.isOnGraphemeClusterBoundary(sourcePosition) else {
+      return nil
+    }
+    self = sourcePosition
   }
 
   /// Returns the position in the given UTF-8 view that corresponds exactly to
@@ -67,7 +66,7 @@ extension String.Index {
   /// uses this method find the same position in the string's `utf8` view.
   ///
   ///     let cafe = "Café"
-  ///     if let i = cafe.index(of: "é") {
+  ///     if let i = cafe.firstIndex(of: "é") {
   ///         let j = i.samePosition(in: cafe.utf8)!
   ///         print(Array(cafe.utf8[j...]))
   ///     }
@@ -80,10 +79,9 @@ extension String.Index {
   ///   If this index does not have an exact corresponding position in `utf8`,
   ///   this method returns `nil`. For example, an attempt to convert the
   ///   position of a UTF-16 trailing surrogate returns `nil`.
-  @inlinable // FIXME(sil-serialize-all)
   public func samePosition(
     in utf8: String.UTF8View
-  ) -> String.UTF8View.Index? {
+    ) -> String.UTF8View.Index? {
     return String.UTF8View.Index(self, within: utf8)
   }
 
@@ -96,7 +94,7 @@ extension String.Index {
   /// uses this method find the same position in the string's `utf16` view.
   ///
   ///     let cafe = "Café"
-  ///     if let i = cafe.index(of: "é") {
+  ///     if let i = cafe.firstIndex(of: "é") {
   ///         let j = i.samePosition(in: cafe.utf16)!
   ///         print(cafe.utf16[j])
   ///     }
@@ -109,7 +107,6 @@ extension String.Index {
   ///   index. If this index does not have an exact corresponding position in
   ///   `utf16`, this method returns `nil`. For example, an attempt to convert
   ///   the position of a UTF-8 continuation byte returns `nil`.
-  @inlinable // FIXME(sil-serialize-all)
   public func samePosition(
     in utf16: String.UTF16View
   ) -> String.UTF16View.Index? {

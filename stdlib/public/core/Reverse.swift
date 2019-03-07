@@ -22,7 +22,7 @@ extension MutableCollection where Self: BidirectionalCollection {
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements in the
   ///   collection.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   public mutating func reverse() {
     if isEmpty { return }
     var f = startIndex
@@ -49,8 +49,6 @@ extension MutableCollection where Self: BidirectionalCollection {
 /// * `c.reversed()` does not create new storage
 /// * `c.reversed().map(f)` maps eagerly and returns a new array
 /// * `c.lazy.reversed().map(f)` maps lazily and returns a `LazyMapCollection`
-///
-/// - See also: `ReversedRandomAccessCollection`
 @_fixed_layout
 public struct ReversedCollection<Base: BidirectionalCollection> {
   public let _base: Base
@@ -59,7 +57,6 @@ public struct ReversedCollection<Base: BidirectionalCollection> {
   /// reverse order.
   ///
   /// - Complexity: O(1)
-  @usableFromInline
   @inlinable
   internal init(_base: Base) {
     self._base = _base
@@ -85,7 +82,7 @@ extension ReversedCollection {
     }
   }
 }
- 
+
 extension ReversedCollection.Iterator: IteratorProtocol, Sequence {
   public typealias Element = Base.Element
   
@@ -107,7 +104,7 @@ extension ReversedCollection: Sequence {
 
   @inlinable
   @inline(__always)
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return Iterator(_base: _base)
   }
 }
@@ -132,7 +129,7 @@ extension ReversedCollection {
     ///
     ///     func indexOfLastEven(_ numbers: [Int]) -> Int? {
     ///         let reversedNumbers = numbers.reversed()
-    ///         guard let i = reversedNumbers.index(where: { $0 % 2 == 0 })
+    ///         guard let i = reversedNumbers.firstIndex(where: { $0 % 2 == 0 })
     ///             else { return nil }
     ///
     ///         return numbers.index(before: i.base)
@@ -155,7 +152,7 @@ extension ReversedCollection {
     /// `"a"` character in a string's character view.
     ///
     ///     let name = "Horatio"
-    ///     let aIndex = name.index(of: "a")!
+    ///     let aIndex = name.firstIndex(of: "a")!
     ///     // name[aIndex] == "a"
     ///
     ///     let reversedName = name.reversed()
@@ -194,14 +191,14 @@ extension ReversedCollection.Index: Comparable {
 }
 
 extension ReversedCollection.Index: Hashable where Base.Index: Hashable {
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return base.hashValue
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
-    hasher.append(base)
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(base)
   }
 }
 
@@ -254,6 +251,17 @@ extension ReversedCollection: BidirectionalCollection {
 
 extension ReversedCollection: RandomAccessCollection where Base: RandomAccessCollection { }
 
+extension ReversedCollection {
+  /// Reversing a reversed collection returns the original collection.
+  ///
+  /// - Complexity: O(1)
+  @inlinable
+  @available(swift, introduced: 4.2)
+  public __consuming func reversed() -> Base {
+    return _base
+  }
+}
+
 extension BidirectionalCollection {
   /// Returns a view presenting the elements of the collection in reverse
   /// order.
@@ -281,27 +289,7 @@ extension BidirectionalCollection {
   ///
   /// - Complexity: O(1)
   @inlinable
-  public func reversed() -> ReversedCollection<Self> {
+  public __consuming func reversed() -> ReversedCollection<Self> {
     return ReversedCollection(_base: self)
   }
 }
-
-extension LazyCollectionProtocol
-  where
-  Self: BidirectionalCollection,
-  Elements: BidirectionalCollection {
-
-  /// Returns the elements of the collection in reverse order.
-  ///
-  /// - Complexity: O(1)
-  @inlinable
-  public func reversed() -> LazyCollection<ReversedCollection<Elements>> {
-    return ReversedCollection(_base: elements).lazy
-  }
-}
-
-// @available(*, deprecated, renamed: "ReversedCollection")
-public typealias ReversedRandomAccessCollection<T: RandomAccessCollection> = ReversedCollection<T>
-
-// @available(*, deprecated, renamed: "ReversedCollection.Index")
-public typealias ReversedIndex<T: BidirectionalCollection> = ReversedCollection<T>

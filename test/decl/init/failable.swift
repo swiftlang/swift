@@ -32,7 +32,9 @@ class DuplicateDecls {
 func testConstruction(_ i: Int, s: String) {
   let s0Opt = S0(string: s)
   assert(s0Opt != nil)
-  var _: S0 = s0Opt // expected-error{{value of optional type 'S0?' not unwrapped; did you mean to use '!' or '?'?}} {{20-20=!}}
+  var _: S0 = s0Opt // expected-error{{value of optional type 'S0?' must be unwrapped}}
+  // expected-note@-1{{coalesce}}
+  // expected-note@-2{{force-unwrap}}
   
   let s0IUO = S0(int: i)
   assert(s0IUO != nil)
@@ -58,7 +60,7 @@ class Sub : Super {
   }
 
   convenience init(forceNonfail: Int) {
-    self.init(nonfail: forceNonfail)! // expected-error{{cannot force unwrap value of non-optional type '()'}} {{37-38=}}
+    self.init(nonfail: forceNonfail)! // expected-error{{cannot force unwrap value of non-optional type 'Sub'}} {{37-38=}}
   }
 
   init(nonfail2: Int) { // okay, traps on nil
@@ -229,6 +231,11 @@ class C1b : P1 {
 class C1b_objc : P1_objc {
   @objc required init!(string: String) { } // expected-error{{non-failable initializer requirement 'init(string:)' in Objective-C protocol cannot be satisfied by a failable initializer ('init!')}}
 }
+
+class C1c {
+  required init?(string: String) { } // expected-note {{'init(string:)' declared here}}
+}
+extension C1c: P1 {} // expected-error{{non-failable initializer requirement 'init(string:)' cannot be satisfied by a failable initializer ('init?')}}
 
 class C2a : P2 {
   required init(fail: String) { } // okay to remove failability

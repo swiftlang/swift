@@ -8,8 +8,8 @@ import Foundation
 import objc_generics
 
 public extension GenericClass {
-  func method() {}
-  class func classMethod() {}
+  @objc func method() {}
+  @objc class func classMethod() {}
 }
 
 public func takesFunction<T : AnyObject>(fn: @escaping (GenericClass<T>) -> ()) -> (GenericClass<T>) -> () {

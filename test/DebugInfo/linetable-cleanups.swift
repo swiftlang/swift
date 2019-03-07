@@ -17,13 +17,13 @@ func main() {
         markUsed("element = \(element)")
     }
     markUsed("Done with the for loop")
-// CHECK: call {{.*}}void @"$S4main8markUsedyyxlF"
+// CHECK: call {{.*}}void @"$s4main8markUsedyyxlF"
 // CHECK: br label
 // CHECK: <label>:
-// CHECK: call %Ts16IndexingIteratorVySaySiGG* @"$Ss16IndexingIteratorVySaySiGGWOh"(%Ts16IndexingIteratorVySaySiGG* %{{.*}}), !dbg ![[LOOPHEADER_LOC:.*]]
-// CHECK: call {{.*}}void @"$S4main8markUsedyyxlF"
+// CHECK: call %Ts16IndexingIteratorVySaySiGG* @"$ss16IndexingIteratorVySaySiGGWOh"(%Ts16IndexingIteratorVySaySiGG* %{{.*}}), !dbg ![[LOOPHEADER_LOC:.*]]
+// CHECK: call {{.*}}void @"$s4main8markUsedyyxlF"
 // The cleanups should share the line number with the ret stmt.
-// CHECK:  call %TSa* @"$SSaySiGWOh"(%TSa* %{{.*}}), !dbg ![[CLEANUPS:.*]]
+// CHECK:  call %TSa* @"$sSaySiGWOh"(%TSa* %{{.*}}), !dbg ![[CLEANUPS:.*]]
 // CHECK-NEXT:  !dbg ![[CLEANUPS]]
 // CHECK-NEXT:  llvm.lifetime.end
 // CHECK-NEXT:  load

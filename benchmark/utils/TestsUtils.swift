@@ -25,19 +25,19 @@ public enum BenchmarkCategory : String {
   case sdk
   case runtime, refcount, metadata
   // Other general areas of compiled code validation.
-  case abstraction, safetychecks, exceptions, bridging, concurrency
-   
+  case abstraction, safetychecks, exceptions, bridging, concurrency, existential
+
   // Algorithms are "micro" that test some well-known algorithm in isolation:
   // sorting, searching, hashing, fibonaci, crypto, etc.
   case algorithm
-   
+
   // Miniapplications are contrived to mimic some subset of application behavior
   // in a way that can be easily measured. They are larger than micro-benchmarks,
   // combining multiple APIs, data structures, or algorithms. This includes small
   // standardized benchmarks, pieces of real applications that have been extracted
   // into a benchmark, important functionality like JSON parsing, etc.
   case miniapplication
-   
+
   // Regression benchmarks is a catch-all for less important "micro"
   // benchmarks. This could be a random piece of code that was attached to a bug
   // report. We want to make sure the optimizer as a whole continues to handle
@@ -46,12 +46,12 @@ public enum BenchmarkCategory : String {
   // as highly as "validation" benchmarks and likely won't be the subject of
   // future investigation unless they significantly regress.
   case regression
-   
+
   // Most benchmarks are assumed to be "stable" and will be regularly tracked at
   // each commit. A handful may be marked unstable if continually tracking them is
   // counterproductive.
   case unstable
-   
+
   // CPU benchmarks represent instrinsic Swift performance. They are useful for
   // measuring a fully baked Swift implementation across different platforms and
   // hardware. The benchmark should also be reasonably applicable to real Swift
@@ -70,34 +70,106 @@ public enum BenchmarkCategory : String {
   case skip
 }
 
+extension BenchmarkCategory : CustomStringConvertible {
+  public var description: String {
+    return self.rawValue
+  }
+}
+
+extension BenchmarkCategory : Comparable {
+    public static func < (lhs: BenchmarkCategory, rhs: BenchmarkCategory) -> Bool {
+        return lhs.rawValue < rhs.rawValue
+    }
+}
+
+public struct BenchmarkPlatformSet : OptionSet {
+  public let rawValue: Int
+
+  public init(rawValue: Int) {
+    self.rawValue = rawValue
+  }
+
+  public static let darwin = BenchmarkPlatformSet(rawValue: 1 << 0)
+  public static let linux = BenchmarkPlatformSet(rawValue: 1 << 1)
+
+  public static var currentPlatform: BenchmarkPlatformSet {
+    #if os(Linux)
+      return .linux
+    #else
+      return .darwin
+    #endif
+  }
+
+  public static var allPlatforms: BenchmarkPlatformSet {
+    return [.darwin, .linux]
+  }
+}
+
 public struct BenchmarkInfo {
   /// The name of the benchmark that should be displayed by the harness.
   public var name: String
 
+  /// Shadow static variable for runFunction.
+  private var _runFunction: (Int) -> ()
+
   /// A function that invokes the specific benchmark routine.
-  public var runFunction: (Int) -> ()
+  public var runFunction: ((Int) -> ())? {
+    if !shouldRun {
+      return nil
+    }
+    return _runFunction
+  }
 
   /// A set of category tags that describe this benchmark. This is used by the
   /// harness to allow for easy slicing of the set of benchmarks along tag
   /// boundaries, e.x.: run all string benchmarks or ref count benchmarks, etc.
-  public var tags: [BenchmarkCategory]
+  public var tags: Set<BenchmarkCategory>
+
+  /// The platforms that this benchmark supports. This is an OptionSet.
+  private var unsupportedPlatforms: BenchmarkPlatformSet
+
+  /// Shadow variable for setUpFunction.
+  private var _setUpFunction: (() -> ())?
 
   /// An optional function that if non-null is run before benchmark samples
   /// are timed.
-  public var setUpFunction: (() -> ())?
+  public var setUpFunction : (() -> ())? {
+    if !shouldRun {
+      return nil
+    }
+    return _setUpFunction
+  }
 
-  /// An optional function that if non-null is run immediately after a sample is
-  /// taken.
-  public var tearDownFunction: (() -> ())?
+  /// Shadow static variable for computed property tearDownFunction.
+  private var _tearDownFunction: (() -> ())?
+
+  /// An optional function that if non-null is run after samples are taken.
+  public var tearDownFunction: (() -> ())? {
+    if !shouldRun {
+      return nil
+    }
+    return _tearDownFunction
+  }
+
+  public var legacyFactor: Int?
 
   public init(name: String, runFunction: @escaping (Int) -> (), tags: [BenchmarkCategory],
               setUpFunction: (() -> ())? = nil,
-              tearDownFunction: (() -> ())? = nil) {
+              tearDownFunction: (() -> ())? = nil,
+              unsupportedPlatforms: BenchmarkPlatformSet = [],
+              legacyFactor: Int? = nil) {
     self.name = name
-    self.runFunction = runFunction
-    self.tags = tags
-    self.setUpFunction = setUpFunction
-    self.tearDownFunction = tearDownFunction
+    self._runFunction = runFunction
+    self.tags = Set(tags)
+    self._setUpFunction = setUpFunction
+    self._tearDownFunction = tearDownFunction
+    self.unsupportedPlatforms = unsupportedPlatforms
+    self.legacyFactor = legacyFactor
+  }
+
+  /// Returns true if this benchmark should be run on the current platform.
+  var shouldRun: Bool {
+    return !unsupportedPlatforms.contains(.currentPlatform)
   }
 }
 
@@ -111,8 +183,8 @@ extension BenchmarkInfo : Comparable {
 }
 
 extension BenchmarkInfo : Hashable {
-  public var hashValue: Int {
-    return name.hashValue
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(name)
   }
 }
 
@@ -149,6 +221,7 @@ public func Random() -> Int64 {
   return lfsrRandomGenerator.randInt()
 }
 
+@inlinable // FIXME(inline-always)
 @inline(__always)
 public func CheckResults(
     _ resultsMatch: Bool,
@@ -161,6 +234,19 @@ public func CheckResults(
         abort()
     }
 }
+
+#if !_runtime(_ObjC)
+// If we do not have an objc-runtime, then we do not have a definition for
+// autoreleasepool. Add in our own fake autoclosure for it that is inline
+// always. That should be able to be eaten through by the optimizer no problem.
+@inlinable // FIXME(inline-always)
+@inline(__always)
+public func autoreleasepool<Result>(
+  invoking body: () throws -> Result
+) rethrows -> Result {
+  return try body()
+}
+#endif
 
 public func False() -> Bool { return false }
 
@@ -194,3 +280,7 @@ public func getInt(_ x: Int) -> Int { return x }
 // The same for String.
 @inline(never)
 public func getString(_ s: String) -> String { return s }
+
+// The same for Substring.
+@inline(never)
+public func getSubstring(_ s: Substring) -> Substring { return s }

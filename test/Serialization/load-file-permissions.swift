@@ -1,4 +1,4 @@
-// RUN: if [[ -d %t ]]; then chmod -R u+rwx %t && rm -rf %t; fi
+// RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/good)
 // RUN: %empty-directory(%t/bad)
 // RUN: chmod a-rx %t/bad

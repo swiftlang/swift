@@ -50,8 +50,7 @@ const char *
 ToolChain::JobContext::getTemporaryFilePath(const llvm::Twine &name,
                                             StringRef suffix) const {
   SmallString<128> buffer;
-  std::error_code EC =
-      llvm::sys::fs::createTemporaryFile(name, suffix, buffer);
+  std::error_code EC = llvm::sys::fs::createTemporaryFile(name, suffix, buffer);
   if (EC) {
     // FIXME: This should not take down the entire process.
     llvm::report_fatal_error("unable to create temporary file for filelist");
@@ -63,13 +62,10 @@ ToolChain::JobContext::getTemporaryFilePath(const llvm::Twine &name,
   return C.getArgs().MakeArgString(buffer.str());
 }
 
-std::unique_ptr<Job>
-ToolChain::constructJob(const JobAction &JA,
-                        Compilation &C,
-                        SmallVectorImpl<const Job *> &&inputs,
-                        ArrayRef<const Action *> inputActions,
-                        std::unique_ptr<CommandOutput> output,
-                        const OutputInfo &OI) const {
+std::unique_ptr<Job> ToolChain::constructJob(
+    const JobAction &JA, Compilation &C, SmallVectorImpl<const Job *> &&inputs,
+    ArrayRef<const Action *> inputActions,
+    std::unique_ptr<CommandOutput> output, const OutputInfo &OI) const {
   JobContext context{C, inputs, inputActions, *output, OI};
 
   auto invocationInfo = [&]() -> InvocationInfo {
@@ -77,17 +73,17 @@ ToolChain::constructJob(const JobAction &JA,
 #define CASE(K)                                                                \
   case Action::Kind::K:                                                        \
     return constructInvocation(cast<K##Action>(JA), context);
-    CASE(CompileJob)
-    CASE(InterpretJob)
-    CASE(BackendJob)
-    CASE(MergeModuleJob)
-    CASE(ModuleWrapJob)
-    CASE(LinkJob)
-    CASE(GenerateDSYMJob)
-    CASE(VerifyDebugInfoJob)
-    CASE(GeneratePCHJob)
-    CASE(AutolinkExtractJob)
-    CASE(REPLJob)
+      CASE(CompileJob)
+      CASE(InterpretJob)
+      CASE(BackendJob)
+      CASE(MergeModuleJob)
+      CASE(ModuleWrapJob)
+      CASE(LinkJob)
+      CASE(GenerateDSYMJob)
+      CASE(VerifyDebugInfoJob)
+      CASE(GeneratePCHJob)
+      CASE(AutolinkExtractJob)
+      CASE(REPLJob)
 #undef CASE
     case Action::Kind::Input:
       llvm_unreachable("not a JobAction");
@@ -118,11 +114,28 @@ ToolChain::constructJob(const JobAction &JA,
     }
   }
 
+  const char *responseFilePath = nullptr;
+  const char *responseFileArg = nullptr;
+
+  const bool forceResponseFiles =
+      C.getArgs().hasArg(options::OPT_driver_force_response_files);
+  assert((invocationInfo.allowsResponseFiles || !forceResponseFiles) &&
+         "Cannot force response file if platform does not allow it");
+
+  if (forceResponseFiles || (invocationInfo.allowsResponseFiles &&
+                             !llvm::sys::commandLineFitsWithinSystemLimits(
+                                 executablePath, invocationInfo.Arguments))) {
+    responseFilePath = context.getTemporaryFilePath("arguments", "resp");
+    responseFileArg = C.getArgs().MakeArgString(Twine("@") + responseFilePath);
+  }
+
   return llvm::make_unique<Job>(JA, std::move(inputs), std::move(output),
                                 executablePath,
                                 std::move(invocationInfo.Arguments),
                                 std::move(invocationInfo.ExtraEnvironment),
-                                std::move(invocationInfo.FilelistInfos));
+                                std::move(invocationInfo.FilelistInfos),
+                                responseFilePath,
+                                responseFileArg);
 }
 
 std::string
@@ -153,8 +166,7 @@ file_types::ID ToolChain::lookupTypeForExtension(StringRef Ext) const {
 
 /// Return a _single_ TY_Swift InputAction, if one exists;
 /// if 0 or >1 such inputs exist, return nullptr.
-static const InputAction*
-findSingleSwiftInput(const CompileJobAction *CJA) {
+static const InputAction *findSingleSwiftInput(const CompileJobAction *CJA) {
   auto Inputs = CJA->getInputs();
   const InputAction *IA = nullptr;
   for (auto const *I : Inputs) {
@@ -172,8 +184,7 @@ findSingleSwiftInput(const CompileJobAction *CJA) {
   return IA;
 }
 
-static bool
-jobsHaveSameExecutableNames(const Job *A, const Job *B) {
+static bool jobsHaveSameExecutableNames(const Job *A, const Job *B) {
   // Jobs that get here (that are derived from CompileJobActions) should always
   // have the same executable name -- it should always be SWIFT_EXECUTABLE_NAME
   // -- but we check here just to be sure / fail gracefully in non-assert
@@ -185,16 +196,14 @@ jobsHaveSameExecutableNames(const Job *A, const Job *B) {
   return true;
 }
 
-static bool
-jobsHaveSameOutputTypes(const Job *A, const Job *B) {
+static bool jobsHaveSameOutputTypes(const Job *A, const Job *B) {
   if (A->getOutput().getPrimaryOutputType() !=
       B->getOutput().getPrimaryOutputType())
     return false;
   return A->getOutput().hasSameAdditionalOutputTypes(B->getOutput());
 }
 
-static bool
-jobsHaveSameEnvironment(const Job *A, const Job *B) {
+static bool jobsHaveSameEnvironment(const Job *A, const Job *B) {
   auto AEnv = A->getExtraEnvironment();
   auto BEnv = B->getExtraEnvironment();
   if (AEnv.size() != BEnv.size())
@@ -208,8 +217,7 @@ jobsHaveSameEnvironment(const Job *A, const Job *B) {
   return true;
 }
 
-bool
-ToolChain::jobIsBatchable(const Compilation &C, const Job *A) const {
+bool ToolChain::jobIsBatchable(const Compilation &C, const Job *A) const {
   // FIXME: There might be a tighter criterion to use here?
   if (C.getOutputInfo().CompilerMode != OutputInfo::Mode::StandardCompile)
     return false;
@@ -219,13 +227,11 @@ ToolChain::jobIsBatchable(const Compilation &C, const Job *A) const {
   return findSingleSwiftInput(CJActA) != nullptr;
 }
 
-bool
-ToolChain::jobsAreBatchCombinable(const Compilation &C,
-                                  const Job *A, const Job *B) const {
+bool ToolChain::jobsAreBatchCombinable(const Compilation &C, const Job *A,
+                                       const Job *B) const {
   assert(jobIsBatchable(C, A));
   assert(jobIsBatchable(C, B));
-  return (jobsHaveSameExecutableNames(A, B) &&
-          jobsHaveSameOutputTypes(A, B) &&
+  return (jobsHaveSameExecutableNames(A, B) && jobsHaveSameOutputTypes(A, B) &&
           jobsHaveSameEnvironment(A, B));
 }
 
@@ -286,16 +292,18 @@ mergeBatchInputs(ArrayRef<const Job *> jobs,
 /// discovered yet). So long as this is true, we need to make sure any batch job
 /// we build names its inputs in an order that's a subsequence of the sequence
 /// of inputs the driver was initially invoked with.
-static void sortJobsToMatchCompilationInputs(ArrayRef<const Job *> unsortedJobs,
-                                             SmallVectorImpl<const Job *> &sortedJobs,
-                                             Compilation &C) {
-  llvm::StringMap<const Job *> jobsByInput;
+static void
+sortJobsToMatchCompilationInputs(ArrayRef<const Job *> unsortedJobs,
+                                 SmallVectorImpl<const Job *> &sortedJobs,
+                                 Compilation &C) {
+  llvm::DenseMap<StringRef, const Job *> jobsByInput;
   for (const Job *J : unsortedJobs) {
     const CompileJobAction *CJA = cast<CompileJobAction>(&J->getSource());
-    const InputAction* IA = findSingleSwiftInput(CJA);
-    auto R = jobsByInput.insert(std::make_pair(IA->getInputArg().getValue(),
-                                               J));
+    const InputAction *IA = findSingleSwiftInput(CJA);
+    auto R =
+        jobsByInput.insert(std::make_pair(IA->getInputArg().getValue(), J));
     assert(R.second);
+    (void)R;
   }
   for (const InputPair &P : C.getInputFiles()) {
     auto I = jobsByInput.find(P.second->getValue());
@@ -310,8 +318,8 @@ static void sortJobsToMatchCompilationInputs(ArrayRef<const Job *> unsortedJobs,
 /// on \p BatchJob, to build the \c InvocationInfo.
 std::unique_ptr<Job>
 ToolChain::constructBatchJob(ArrayRef<const Job *> unsortedJobs,
-                             Compilation &C) const
-{
+                             Job::PID &NextQuasiPID,
+                             Compilation &C) const {
   if (unsortedJobs.empty())
     return nullptr;
 
@@ -336,21 +344,21 @@ ToolChain::constructBatchJob(ArrayRef<const Job *> unsortedJobs,
   JobContext context{C, inputJobs.getArrayRef(), inputActions.getArrayRef(),
                      *output, OI};
   auto invocationInfo = constructInvocation(*batchCJA, context);
-  return llvm::make_unique<BatchJob>(*batchCJA,
-                                     inputJobs.takeVector(),
-                                     std::move(output),
-                                     executablePath,
-                                     std::move(invocationInfo.Arguments),
-                                     std::move(invocationInfo.ExtraEnvironment),
-                                     std::move(invocationInfo.FilelistInfos),
-                                     sortedJobs);
-}
-
-bool
-ToolChain::sanitizerRuntimeLibExists(const ArgList &args,
-                                     StringRef sanitizerName,
-                                     bool shared) const {
-  // Assume no sanitizers are supported by default.
-  // This method should be overriden by a platform-specific subclass.
-  return false;
+  // Batch mode can produce quite long command lines; in almost every case these
+  // will trigger use of supplementary output file maps, but in some rare corner
+  // cases (very few files, very long paths) they might not. However, in those
+  // cases we _should_ degrade to using response files to pass arguments to the
+  // frontend, which is done automatically by code elsewhere.
+  //
+  // The `allowsResponseFiles` flag on the `invocationInfo` we have here exists
+  // only to model external tools that don't know about response files, such as
+  // platform linkers; when talking to the frontend (which we control!) it
+  // should always be true. But double check with an assert here in case someone
+  // failed to set it in `constructInvocation`.
+  assert(invocationInfo.allowsResponseFiles);
+  return llvm::make_unique<BatchJob>(
+      *batchCJA, inputJobs.takeVector(), std::move(output), executablePath,
+      std::move(invocationInfo.Arguments),
+      std::move(invocationInfo.ExtraEnvironment),
+      std::move(invocationInfo.FilelistInfos), sortedJobs, NextQuasiPID);
 }

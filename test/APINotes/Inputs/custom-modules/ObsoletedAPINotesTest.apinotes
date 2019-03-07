@@ -1,0 +1,14 @@
+Name: M
+Classes:
+- Name: FooID
+  SwiftName: Foo_ID
+- Name: BarSub
+  SwiftName: BarContainerCanonical.Sub
+
+SwiftVersions:
+- Version: 4
+  Classes:
+  - Name: FooID
+    SwiftName: FooID
+  - Name: BarSub
+    SwiftName: BarContainerOld.Sub

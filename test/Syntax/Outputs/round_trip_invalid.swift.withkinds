@@ -1,0 +1,16 @@
+<VariableDecl>// RUN: rm -rf %t
+// RUN: %swift-syntax-test -input-source-filename %s -parse-gen > %t
+// RUN: diff -u %s %t
+// RUN: %swift-syntax-test -input-source-filename %s -parse-gen -print-node-kind > %t.withkinds
+// RUN: diff -u %S/Outputs/round_trip_invalid.swift.withkinds %t.withkinds
+// RUN: %swift-syntax-test -input-source-filename %s -eof > %t
+// RUN: diff -u %s %t
+// RUN: %swift-syntax-test -serialize-raw-tree -input-source-filename %s > %t.dump
+// RUN: %swift-syntax-test -deserialize-raw-tree -input-source-filename %t.dump -output-filename %t
+// RUN: diff -u %s %t
+
+let <PatternBinding><IdentifierPattern>strings</IdentifierPattern><TypeAnnotation>: [<SimpleTypeIdentifier>Strin</SimpleTypeIdentifier>[<UnresolvedPatternExpr><IdentifierPattern>g</IdentifierPattern></UnresolvedPatternExpr>]?</TypeAnnotation></PatternBinding></VariableDecl><FunctionDecl>
+
+// Function body without closing brace token.
+func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<VariableDecl>
+  var <PatternBinding><IdentifierPattern>a </IdentifierPattern><InitializerClause>= <IntegerLiteralExpr>2</IntegerLiteralExpr></InitializerClause></PatternBinding></VariableDecl></CodeBlock></FunctionDecl>

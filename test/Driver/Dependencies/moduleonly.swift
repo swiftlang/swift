@@ -1,4 +1,5 @@
-// RUN: rm -rf %t && cp -r %S/Inputs/moduleonly/ %t
+// RUN: %empty-directory(%t)
+// RUN: cp -r %S/Inputs/moduleonly/* %t
 // RUN: touch -t 201801230045 %t/*.swift
 
 // RUN: cd %t && %target-build-swift -emit-module -output-file-map ./output.json -incremental ./foo.swift ./bar.swift ./baz.swift -module-name testmodule -v 2>&1 | %FileCheck -check-prefix=CHECK1 %s
@@ -48,7 +49,8 @@
 
 // '-c' (without '-emit-module') from clean environment.
 //
-// RUN: rm -rf %t && cp -r %S/Inputs/moduleonly/ %t
+// RUN: %empty-directory(%t)
+// RUN: cp -r %S/Inputs/moduleonly/* %t
 // RUN: touch -t 201801230045 %t/*.swift
 // RUN: cd %t && %target-build-swift -c -g -output-file-map ./output.json -incremental ./foo.swift ./bar.swift ./baz.swift -module-name testmodule -v 2>&1
 // RUN: test ! -f %t/buildrecord.swiftdeps~moduleonly
@@ -57,9 +59,27 @@
 
 // '-emit-library -g' (without '-emit-module') from clean environment.
 //
-// RUN: rm -rf %t && cp -r %S/Inputs/moduleonly/ %t
+// RUN: %empty-directory(%t)
+// RUN: cp -r %S/Inputs/moduleonly/* %t
 // RUN: touch -t 201801230045 %t/*.swift
 // RUN: cd %t && %target-build-swift -emit-library -g -output-file-map ./output.json -incremental ./foo.swift ./bar.swift ./baz.swift -module-name testmodule -v 2>&1
 // RUN: test ! -f %t/buildrecord.swiftdeps~moduleonly
 // RUN: test   -f %t/buildrecord.swiftdeps
 // RUN: test   -f %t/foo~partial.swiftmodule
+
+// Ensure '-emit-module' and '-c -emit-module' emits identical 'swiftmodule' and 'swiftdoc' file.
+//
+// RUN: rm -f %t-moduleonly.swiftmodule
+// RUN: rm -f %t-moduleonly.swiftdoc
+// RUN: %empty-directory(%t)
+// RUN: cp -r %S/Inputs/moduleonly/* %t
+// RUN: touch -t 201801230045 %t/*.swift
+// RUN: cd %t && %target-build-swift -emit-module -output-file-map ./output.json -incremental ./foo.swift ./bar.swift ./baz.swift -module-name testmodule -v 2>&1
+// RUN: cp -f %t/testmodule.swiftmodule %t-moduleonly.swiftmodule
+// RUN: cp -f %t/testmodule.swiftdoc %t-moduleonly.swiftdoc
+// RUN: %empty-directory(%t)
+// RUN: cp -r %S/Inputs/moduleonly/* %t
+// RUN: touch -t 201801230045 %t/*.swift
+// RUN: cd %t && %target-build-swift -c -emit-module -output-file-map ./output.json -incremental ./foo.swift ./bar.swift ./baz.swift -module-name testmodule -v 2>&1
+// RUN: diff %t/testmodule.swiftmodule %t-moduleonly.swiftmodule
+// RUN: diff %t/testmodule.swiftdoc %t-moduleonly.swiftdoc

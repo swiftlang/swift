@@ -22,34 +22,47 @@ public let StringBuilder = [
     runFunction: run_StringBuilder,
     tags: [.validation, .api, .String]),
   BenchmarkInfo(
+    name: "StringBuilderSmallReservingCapacity",
+    runFunction: run_StringBuilderSmallReservingCapacity,
+    tags: [.validation, .api, .String]),
+  BenchmarkInfo(
     name: "StringUTF16Builder",
     runFunction: run_StringUTF16Builder,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 10),
   BenchmarkInfo(
     name: "StringUTF16SubstringBuilder",
     runFunction: run_StringUTF16SubstringBuilder,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 10),
   BenchmarkInfo(
     name: "StringBuilderLong",
     runFunction: run_StringBuilderLong,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 10),
   BenchmarkInfo(
     name: "StringBuilderWithLongSubstring",
     runFunction: run_StringBuilderWithLongSubstring,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 10),
   BenchmarkInfo(
     name: "StringWordBuilder",
     runFunction: run_StringWordBuilder,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 10),
   BenchmarkInfo(
     name: "StringWordBuilderReservingCapacity",
     runFunction: run_StringWordBuilderReservingCapacity,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 10),
 ]
 
 @inline(never)
-func buildString(_ i: String) -> String {
+func buildString(_ i: String, reservingCapacity: Bool = false) -> String {
   var sb = getString(i)
+  if reservingCapacity {
+    sb.reserveCapacity(10)
+  }
   for str in ["b","c","d","pizza"] {
     sb += str
   }
@@ -60,6 +73,13 @@ func buildString(_ i: String) -> String {
 public func run_StringBuilder(_ N: Int) {
   for _ in 1...5000*N {
     blackHole(buildString("a"))
+  }
+}
+
+@inline(never)
+public func run_StringBuilderSmallReservingCapacity(_ N: Int) {
+  for _ in 1...5000*N {
+    blackHole(buildString("a", reservingCapacity: true))
   }
 }
 
@@ -96,14 +116,14 @@ func buildStringFromSmallSubstrings(_ i: String) -> String {
 
 @inline(never)
 public func run_StringUTF16Builder(_ N: Int) {
-  for _ in 1...5000*N {
+  for _ in 1...500*N {
     blackHole(buildStringUTF16("a"))
   }
 }
 
 @inline(never)
 public func run_StringUTF16SubstringBuilder(_ N: Int) {
-  for _ in 1...5000*N {
+  for _ in 1...500*N {
     blackHole(buildStringFromSmallSubstrings("a"))
   }
 }
@@ -139,14 +159,14 @@ func buildStringWithLongSubstring(_ i: String) -> String {
 
 @inline(never)
 public func run_StringBuilderLong(_ N: Int) {
-  for _ in 1...5000*N {
+  for _ in 1...500*N {
     blackHole(buildStringLong("👻"))
   }
 }
 
 @inline(never)
 public func run_StringBuilderWithLongSubstring(_ N: Int) {
-  for _ in 1...5000*N {
+  for _ in 1...500*N {
     blackHole(buildStringWithLongSubstring("👻"))
   }
 }
@@ -170,12 +190,16 @@ func buildString(
 
 @inline(never)
 public func run_StringWordBuilder(_ N: Int) {
-  blackHole(buildString(
-    word: "bumfuzzle", count: 50_000 * N, reservingCapacity: false))
+  for _ in 1...N {
+    blackHole(buildString(
+      word: "bumfuzzle", count: 5_000, reservingCapacity: false))
+  }
 }
 
 @inline(never)
 public func run_StringWordBuilderReservingCapacity(_ N: Int) {
-  blackHole(buildString(
-    word: "bumfuzzle", count: 50_000 * N, reservingCapacity: true))
+  for _ in 1...N {
+    blackHole(buildString(
+      word: "bumfuzzle", count: 5_000, reservingCapacity: true))
+  }
 }

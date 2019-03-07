@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
 // RUN: %target-build-swift -Xfrontend -playground -Xfrontend -disable-playground-transform -o %t/main %t/main.swift
+// RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 // RUN: ! %target-run %t/main --crash 2>&1 | %FileCheck -check-prefix=CRASH-CHECK %s
 // REQUIRES: executable_test

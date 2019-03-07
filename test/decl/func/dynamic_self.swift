@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-objc-interop
 
 // ----------------------------------------------------------------------------
 // DynamicSelf is only allowed on the return type of class and
@@ -89,7 +89,7 @@ class C1 {
 
     if b { return self.init(int: 5) }
 
-    return Self() // expected-error{{use of unresolved identifier 'Self'}} expected-note {{did you mean 'self'?}}
+    return Self() // expected-error{{use of unresolved identifier 'Self'; did you mean 'self'?}}
   }
 
   // This used to crash because metatype construction went down a
@@ -392,4 +392,24 @@ final class FinalFactory : FactoryPattern {
   convenience init(string: String) {
     self.init(factory: FinalFactory(_string: string))
   }
+}
+
+// Operators returning Self
+
+class SelfOperator {
+  required init() {}
+
+  static func +(lhs: SelfOperator, rhs: SelfOperator) -> Self {
+    return self.init()
+  }
+
+  func double() -> Self {
+    // FIXME: Should this work?
+    return self + self // expected-error {{cannot convert return expression of type 'SelfOperator' to return type 'Self'}}
+  }
+}
+
+func useSelfOperator() {
+  let s = SelfOperator()
+  _ = s + s
 }

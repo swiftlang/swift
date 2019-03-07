@@ -1,13 +1,25 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -O %s | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-os
 
-// XFAIL: linux
-
-import Darwin
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+  import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+  import Glibc
+#elseif os(Windows)
+  import MSVCRT
+#else
+#error("Unsupported platform")
+#endif
 
 // Make sure we use an intrinsic for functions such as exp.
 
 // CHECK-LABEL: define {{.*}}test1
-// CHECK: call float @llvm.exp.f32
+// CHECK-ios: call float @llvm.exp.f32
+// CHECK-macosx: call float @llvm.exp.f32
+// CHECK-tvos: call float @llvm.exp.f32
+// CHECK-watchos: call float @llvm.exp.f32
+// CHECK-darwin: call float @llvm.exp.f32
+// CHECK-linux-gnu: call float @expf
+// CHECK-windows: call float @expf
 
 public func test1(f : Float) -> Float {
   return exp(f)
@@ -29,7 +41,8 @@ public func test3(d : Double) -> Double {
 }
 
 // CHECK-LABEL: define {{.*}}test4
-// CHECK: call float @llvm.sqrt.f32
+// CHECK-LINUX: call float @llvm.sqrt.f32
+// CHECK-WINDOWS: call float @llvm.sqrt.f32
 
 public func test4(f : Float) -> Float {
   // This call does not match the signature for the C sqrt function

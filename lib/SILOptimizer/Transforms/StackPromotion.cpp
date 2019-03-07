@@ -54,7 +54,11 @@ private:
 
 void StackPromotion::run() {
   SILFunction *F = getFunction();
-  DEBUG(llvm::dbgs() << "** StackPromotion in " << F->getName() << " **\n");
+  // FIXME: We should be able to support ownership.
+  if (F->hasOwnership())
+    return;
+
+  LLVM_DEBUG(llvm::dbgs() << "** StackPromotion in " << F->getName() << " **\n");
 
   auto *EA = PM->getAnalysis<EscapeAnalysis>();
   DeadEndBlocks DEBlocks(F);
@@ -111,7 +115,7 @@ bool StackPromotion::tryPromoteAlloc(AllocRefInst *ARI, EscapeAnalysis *EA,
   if (Node->escapes())
     return false;
 
-  DEBUG(llvm::dbgs() << "Promote " << *ARI);
+  LLVM_DEBUG(llvm::dbgs() << "Promote " << *ARI);
 
   // Collect all use-points of the allocation. These are refcount instructions
   // and apply instructions.
@@ -123,7 +127,7 @@ bool StackPromotion::tryPromoteAlloc(AllocRefInst *ARI, EscapeAnalysis *EA,
       UsePoints.push_back(I);
     } else {
       // Also block arguments can be use points.
-      SILBasicBlock *UseBB = cast<SILPHIArgument>(UsePoint)->getParent();
+      SILBasicBlock *UseBB = cast<SILPhiArgument>(UsePoint)->getParent();
       // For simplicity we just add the first instruction of the block as use
       // point.
       UsePoints.push_back(&UseBB->front());
@@ -136,7 +140,7 @@ bool StackPromotion::tryPromoteAlloc(AllocRefInst *ARI, EscapeAnalysis *EA,
   // alive at the allocation point).
   // In such a case the value lifetime extends up to the function entry.
   if (VLA.isAliveAtBeginOfBlock(ARI->getFunction()->getEntryBlock())) {
-    DEBUG(llvm::dbgs() << "  use before allocation -> don't promote");
+    LLVM_DEBUG(llvm::dbgs() << "  use before allocation -> don't promote");
     return false;
   }
 
@@ -144,7 +148,7 @@ bool StackPromotion::tryPromoteAlloc(AllocRefInst *ARI, EscapeAnalysis *EA,
   ValueLifetimeAnalysis::Frontier Frontier;
   if (!VLA.computeFrontier(Frontier, ValueLifetimeAnalysis::UsersMustPostDomDef,
                            &DEBlocks)) {
-    DEBUG(llvm::dbgs() << "  uses don't post-dom allocation -> don't promote");
+    LLVM_DEBUG(llvm::dbgs() << "  uses don't post-dom allocation -> don't promote");
     return false;
   }
   NumStackPromoted++;

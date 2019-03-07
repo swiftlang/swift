@@ -20,13 +20,13 @@ extension TestSuite {
     CollectionWithEquatableElement : RangeReplaceableCollection
   >(
     _ testNamePrefix: String = "",
-    makeCollection: @escaping ([C.Iterator.Element]) -> C,
-    wrapValue: @escaping (OpaqueValue<Int>) -> C.Iterator.Element,
-    extractValue: @escaping (C.Iterator.Element) -> OpaqueValue<Int>,
+    makeCollection: @escaping ([C.Element]) -> C,
+    wrapValue: @escaping (OpaqueValue<Int>) -> C.Element,
+    extractValue: @escaping (C.Element) -> OpaqueValue<Int>,
 
-    makeCollectionOfEquatable: @escaping ([CollectionWithEquatableElement.Iterator.Element]) -> CollectionWithEquatableElement,
-    wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
-    extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+    makeCollectionOfEquatable: @escaping ([CollectionWithEquatableElement.Element]) -> CollectionWithEquatableElement,
+    wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> CollectionWithEquatableElement.Element,
+    extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Element) -> MinimalEquatableValue),
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1,
@@ -34,7 +34,7 @@ extension TestSuite {
   ) where
     C.SubSequence == C,
     CollectionWithEquatableElement.SubSequence == CollectionWithEquatableElement,
-    CollectionWithEquatableElement.Iterator.Element : Equatable {
+    CollectionWithEquatableElement.Element : Equatable {
 
     var testNamePrefix = testNamePrefix
 
@@ -152,20 +152,20 @@ extension TestSuite {
     CollectionWithEquatableElement : BidirectionalCollection & RangeReplaceableCollection
   >(
     _ testNamePrefix: String = "",
-    makeCollection: @escaping ([C.Iterator.Element]) -> C,
-    wrapValue: @escaping (OpaqueValue<Int>) -> C.Iterator.Element,
-    extractValue: @escaping (C.Iterator.Element) -> OpaqueValue<Int>,
+    makeCollection: @escaping ([C.Element]) -> C,
+    wrapValue: @escaping (OpaqueValue<Int>) -> C.Element,
+    extractValue: @escaping (C.Element) -> OpaqueValue<Int>,
 
-    makeCollectionOfEquatable: @escaping ([CollectionWithEquatableElement.Iterator.Element]) -> CollectionWithEquatableElement,
-    wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
-    extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+    makeCollectionOfEquatable: @escaping ([CollectionWithEquatableElement.Element]) -> CollectionWithEquatableElement,
+    wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> CollectionWithEquatableElement.Element,
+    extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Element) -> MinimalEquatableValue),
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1
   ) where
     C.SubSequence == C,
     CollectionWithEquatableElement.SubSequence == CollectionWithEquatableElement,
-    CollectionWithEquatableElement.Iterator.Element : Equatable {
+    CollectionWithEquatableElement.Element : Equatable {
 
     var testNamePrefix = testNamePrefix
 
@@ -296,20 +296,20 @@ extension TestSuite {
     CollectionWithEquatableElement : RandomAccessCollection & RangeReplaceableCollection
   >(
     _ testNamePrefix: String = "",
-    makeCollection: @escaping ([C.Iterator.Element]) -> C,
-    wrapValue: @escaping (OpaqueValue<Int>) -> C.Iterator.Element,
-    extractValue: @escaping (C.Iterator.Element) -> OpaqueValue<Int>,
+    makeCollection: @escaping ([C.Element]) -> C,
+    wrapValue: @escaping (OpaqueValue<Int>) -> C.Element,
+    extractValue: @escaping (C.Element) -> OpaqueValue<Int>,
 
-    makeCollectionOfEquatable: @escaping ([CollectionWithEquatableElement.Iterator.Element]) -> CollectionWithEquatableElement,
-    wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
-    extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+    makeCollectionOfEquatable: @escaping ([CollectionWithEquatableElement.Element]) -> CollectionWithEquatableElement,
+    wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> CollectionWithEquatableElement.Element,
+    extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Element) -> MinimalEquatableValue),
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1
   ) where
     C.SubSequence == C,
     CollectionWithEquatableElement.SubSequence == CollectionWithEquatableElement,
-    CollectionWithEquatableElement.Iterator.Element : Equatable {
+    CollectionWithEquatableElement.Element : Equatable {
 
     var testNamePrefix = testNamePrefix
 

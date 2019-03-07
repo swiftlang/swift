@@ -35,6 +35,11 @@ ClusteredBitVector ClusteredBitVector::fromAPInt(const llvm::APInt &bits) {
 }
 
 llvm::APInt ClusteredBitVector::asAPInt() const {
+  if (size() == 0) {
+    // APInt doesn't like zero-bit values.
+    return llvm::APInt(1, 0);
+  }
+
   if (isInlineAndAllClear()) {
     return llvm::APInt(size(), 0);
   } else {

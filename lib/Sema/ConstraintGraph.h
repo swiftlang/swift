@@ -22,6 +22,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Compiler.h"
 #include <functional>
@@ -104,7 +105,7 @@ private:
   /// directly. If the adjacency becomes empty afterward, it will be
   /// removed.
   void modifyAdjacency(TypeVariableType *typeVar,
-                       std::function<void(Adjacency& adj)> modify);
+                       llvm::function_ref<void(Adjacency &adj)> modify);
 
   /// Add an adjacency to the list of adjacencies.
   void addAdjacency(TypeVariableType *typeVar);
@@ -221,11 +222,12 @@ public:
   /// Gather the set of constraints that involve the given type variable,
   /// i.e., those constraints that will be affected when the type variable
   /// gets merged or bound to a fixed type.
-  ///
-  /// The resulting set of constraints may contain duplicates.
-  void gatherConstraints(TypeVariableType *typeVar,
-                         SmallVectorImpl<Constraint *> &constraints,
-                         GatheringKind kind);
+  void
+  gatherConstraints(TypeVariableType *typeVar,
+                    llvm::SetVector<Constraint *> &constraints,
+                    GatheringKind kind,
+                    llvm::function_ref<bool(Constraint *)> acceptConstraint =
+                        [](Constraint *constraint) { return true; });
 
   /// Retrieve the type variables that correspond to nodes in the graph.
   ///
@@ -331,6 +333,10 @@ private:
 
   /// Constraints that are "orphaned" because they contain no type variables.
   SmallVector<Constraint *, 4> OrphanedConstraints;
+
+  /// Increment the number of constraints considered per attempt
+  /// to contract constrant graph edges.
+  void incrementConstraintsPerContractionCounter();
 
   /// The kind of change made to the graph.
   enum class ChangeKind {

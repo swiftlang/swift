@@ -84,7 +84,7 @@ public:
       std::string ExecutableName = llvm::sys::path::stem(MainExecutablePath);
       Table->PrintHelp(llvm::outs(), ExecutableName.c_str(),
                        "Swift Autolink Extract", options::AutolinkExtractOption,
-                       0);
+                       0, /*ShowAllAliases*/false);
       return 1;
     }
 

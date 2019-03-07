@@ -13,7 +13,6 @@
 #ifndef SWIFT_FRONTEND_FRONTENDINPUTS_H
 #define SWIFT_FRONTEND_FRONTENDINPUTS_H
 
-#include "swift/AST/Module.h"
 #include "swift/Basic/PrimarySpecificPaths.h"
 #include "swift/Basic/SupplementaryOutputPaths.h"
 #include "swift/Frontend/InputFile.h"
@@ -28,6 +27,8 @@ class MemoryBuffer;
 }
 
 namespace swift {
+
+class DiagnosticEngine;
 
 /// Information about all the inputs and outputs to the frontend.
 
@@ -103,6 +104,10 @@ public:
   bool
   forEachPrimaryInput(llvm::function_ref<bool(const InputFile &)> fn) const;
 
+  /// If \p fn returns true, exit early and return true.
+  bool
+  forEachNonPrimaryInput(llvm::function_ref<bool(const InputFile &)> fn) const;
+
   unsigned primaryInputCount() const { return PrimaryInputsInOrder.size(); }
 
   // Primary count readers:
@@ -139,7 +144,7 @@ public:
 
   bool isInputPrimary(StringRef file) const;
 
-  unsigned numberOfPrimaryInputsEndingWith(const char *extension) const;
+  unsigned numberOfPrimaryInputsEndingWith(StringRef extension) const;
 
   // Multi-facet readers
 
@@ -147,6 +152,7 @@ public:
   // treat the input as LLVM_IR.
   bool shouldTreatAsLLVM() const;
   bool shouldTreatAsSIL() const;
+  bool shouldTreatAsModuleInterface() const;
 
   bool areAllNonPrimariesSIB() const;
 
@@ -167,7 +173,7 @@ public:
 
 private:
   friend class ArgsToFrontendOptionsConverter;
-
+  friend class ParseableInterfaceModuleLoader;
   void setMainAndSupplementaryOutputs(
       ArrayRef<std::string> outputFiles,
       ArrayRef<SupplementaryOutputPaths> supplementaryOutputs);
@@ -229,6 +235,7 @@ public:
   bool hasLoadedModuleTracePath() const;
   bool hasModuleOutputPath() const;
   bool hasModuleDocOutputPath() const;
+  bool hasParseableInterfaceOutputPath() const;
   bool hasTBDPath() const;
 
   bool hasDependencyTrackerPath() const;

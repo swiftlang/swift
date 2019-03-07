@@ -24,12 +24,11 @@ internal struct _ArrayBody {
   internal var _storage: _SwiftArrayBodyStorage
 
   @inlinable
-  @usableFromInline
   internal init(
     count: Int, capacity: Int, elementTypeIsBridgedVerbatim: Bool = false
   ) {
-    _sanityCheck(count >= 0)
-    _sanityCheck(capacity >= 0)
+    _internalInvariant(count >= 0)
+    _internalInvariant(capacity >= 0)
     
     _storage = _SwiftArrayBodyStorage(
       count: count,
@@ -43,14 +42,12 @@ internal struct _ArrayBody {
   /// capacity after a new buffer is allocated, it's typical to want
   /// to update it immediately after construction.
   @inlinable
-  @usableFromInline
   internal init() {
     _storage = _SwiftArrayBodyStorage(count: 0, _capacityAndFlags: 0)
   }
   
   /// The number of elements stored in this Array.
   @inlinable
-  @usableFromInline
   internal var count: Int {
     get {
       return _assumeNonNegative(_storage.count)
@@ -63,7 +60,6 @@ internal struct _ArrayBody {
   /// The number of elements that can be stored in this Array without
   /// reallocation.
   @inlinable
-  @usableFromInline
   internal var capacity: Int {
     return Int(_capacityAndFlags &>> 1)
   }
@@ -75,7 +71,6 @@ internal struct _ArrayBody {
   /// avoid the cost of calls into the runtime that compute the
   /// answer.
   @inlinable
-  @usableFromInline
   internal var elementTypeIsBridgedVerbatim: Bool {
     get {
       return (_capacityAndFlags & 0x1) != 0
@@ -89,7 +84,6 @@ internal struct _ArrayBody {
   /// Storage optimization: compresses capacity and
   /// elementTypeIsBridgedVerbatim together.
   @inlinable
-  @usableFromInline
   internal var _capacityAndFlags: UInt {
     get {
       return _storage._capacityAndFlags

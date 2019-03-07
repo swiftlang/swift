@@ -43,16 +43,41 @@ enum class CastConsumptionKind : uint8_t {
   /// The source value is always left in place, and the destination
   /// value is copied into on success.
   CopyOnSuccess,
+
+  /// The source value is never taken, regardless of whether the cast
+  /// succeeds. Instead, we always borrow the source value and feed it through.
+  ///
+  /// NOTE: This can only be used with objects. We do not support borrowing of
+  /// addresses. If an address is needed for a cast operation, a BorrowAlways
+  /// value must be copied into a temporary and operated upon. If the result of
+  /// the cast is a loadable type then the value is loaded using a
+  /// load_borrow. If an address only value is returned, we continue processing
+  /// the value as an owned TakeAlways value.
+  BorrowAlways,
 };
 
 /// Should the source value be destroyed if the cast fails?
 inline bool shouldDestroyOnFailure(CastConsumptionKind kind) {
-  return (kind == CastConsumptionKind::TakeAlways);
+  switch (kind) {
+  case CastConsumptionKind::TakeAlways:
+    return true;
+  case CastConsumptionKind::TakeOnSuccess:
+  case CastConsumptionKind::CopyOnSuccess:
+  case CastConsumptionKind::BorrowAlways:
+    return false;
+  }
 }
 
 /// Should the source value be taken if the cast succeeds?
 inline IsTake_t shouldTakeOnSuccess(CastConsumptionKind kind) {
-  return IsTake_t(kind != CastConsumptionKind::CopyOnSuccess);
+  switch (kind) {
+  case CastConsumptionKind::TakeAlways:
+  case CastConsumptionKind::TakeOnSuccess:
+    return IsTake;
+  case CastConsumptionKind::CopyOnSuccess:
+  case CastConsumptionKind::BorrowAlways:
+    return IsNotTake;
+  }
 }
 
 } // end namespace swift

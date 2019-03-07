@@ -7,8 +7,8 @@
 
 // CHECK-DAG: ![[FOOMODULE:[0-9]+]] = !DIModule({{.*}}, name: "Foo", includePath: "{{.*}}test{{.*}}DebugInfo{{.*}}"
 // CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, scope: ![[THISFILE:[0-9]+]], entity: ![[FOOMODULE]]
-// CHECK-DAG: ![[THISFILE]] = !DIFile(filename: "Imports.swift", directory: "{{.*}}test/DebugInfo")
-// CHECK-DAG: ![[SWIFTFILE:[0-9]+]] = !DIFile(filename: "Swift.swiftmodule"
+// CHECK-DAG: ![[THISFILE]] = !DIFile(filename: "{{.*}}test{{/|\\5C}}DebugInfo{{/|\\5C}}Imports.swift",
+// CHECK-DAG: ![[SWIFTFILE:[0-9]+]] = !DIFile(filename: "{{.*}}Swift.swiftmodule{{(/.+[.]swiftmodule)?}}"
 // CHECK-DAG: ![[SWIFTMODULE:[0-9]+]] = !DIModule({{.*}}, name: "Swift"
 // CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, scope: ![[THISFILE]], entity: ![[SWIFTMODULE]]
 // CHECK-DAG: ![[BASICMODULE:[0-9]+]] = !DIModule({{.*}}, name: "basic"
@@ -31,4 +31,5 @@ markUsed(basic.foo(1, 2))
 
 // DWARF-NOT: "Swift.Optional"
 
-// DWARF-DAG: file_names{{.*}} Imports.swift
+// DWARF-DAG: file_names{{.*}}
+// DWARF-NEXT: "Imports.swift"

@@ -136,6 +136,25 @@ STMT_NODES = [
                    is_optional=True),
          ]),
 
+    # yield-stmt -> 'yield' '('? expr-list? ')'?
+    Node('YieldStmt', kind='Stmt',
+         children=[
+             Child('YieldKeyword', kind='YieldToken'),
+             Child('Yields', kind='Syntax',
+                   node_choices=[
+                       Child('YieldList', kind='YieldList'),
+                       Child('SimpleYield', kind='Expr'),
+                   ]),
+         ]),
+
+    Node('YieldList', kind='Syntax',
+         children=[
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('ElementList', kind='ExprList'),
+             Child('TrailingComma', kind='CommaToken', is_optional=True),
+             Child('RightParen', kind='RightParenToken'),
+         ]),
+
     # fallthrough-stmt -> 'fallthrough' ';'?
     Node('FallthroughStmt', kind='Stmt',
          children=[
@@ -173,10 +192,14 @@ STMT_NODES = [
              Child('TrailingComma', kind='CommaToken',
                    is_optional=True),
          ]),
+
+    # availability-condition -> '#available' '(' availability-spec ')'
     Node('AvailabilityCondition', kind='Syntax',
          children=[
              Child('PoundAvailableKeyword', kind='PoundAvailableToken'),
-             Child('Arguments', kind='TokenList'),
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('AvailabilitySpec', kind='AvailabilitySpecList'),
+             Child('RightParen', kind='RightParenToken'),
          ]),
     Node('MatchingPatternCondition', kind='Syntax',
          children=[
@@ -253,11 +276,12 @@ STMT_NODES = [
              Child('Body', kind='CodeBlock'),
          ]),
 
-    # switch-case -> switch-case-label stmt-list
-    #              | default-label stmt-list
+    # switch-case -> unknown-attr? switch-case-label stmt-list
+    #              | unknown-attr? switch-default-label stmt-list
     Node('SwitchCase', kind='Syntax',
          traits=['WithStatements'],
          children=[
+             Child('UnknownAttr', kind='Attribute', is_optional=True),
              Child('Label', kind='Syntax',
                    node_choices=[
                        Child('Default', kind='SwitchDefaultLabel'),
@@ -301,5 +325,19 @@ STMT_NODES = [
              Child('WhereClause', kind='WhereClause',
                    is_optional=True),
              Child('Body', kind='CodeBlock'),
+         ]),
+
+    # e.g. #assert(1 == 2)
+    Node('PoundAssertStmt', kind='Stmt',
+         children=[
+             Child('PoundAssert', kind='PoundAssertToken'),
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('Condition', kind='Expr',
+                   description='The assertion condition.'),
+             Child('Comma', kind='CommaToken', is_optional=True,
+                   description='The comma after the assertion condition.'),
+             Child('Message', kind='StringLiteralToken', is_optional=True,
+                   description='The assertion message.'),
+             Child('RightParen', kind='RightParenToken'),
          ]),
 ]

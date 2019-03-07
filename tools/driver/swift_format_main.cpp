@@ -61,13 +61,11 @@ public:
 
   void updateCode(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
     BufferID = SM.addNewSourceBuffer(std::move(Buffer));
-    Parser.reset(new ParserUnit(SM, BufferID, CompInv.getLangOptions(),
+    Parser.reset(new ParserUnit(SM, SourceFileKind::Main,
+                                BufferID, CompInv.getLangOptions(),
                                 CompInv.getModuleName()));
     Parser->getDiagnosticEngine().addConsumer(DiagConsumer);
-    auto &P = Parser->getParser();
-    for (bool Done = false; !Done; Done = P.Tok.is(tok::eof)) {
-      P.parseTopLevel();
-    }
+    Parser->parse();
   }
 
   std::pair<LineRange, std::string> reformat(LineRange Range,
@@ -152,7 +150,8 @@ public:
     if (ParsedArgs.getLastArg(OPT_help)) {
       std::string ExecutableName = llvm::sys::path::stem(MainExecutablePath);
       Table->PrintHelp(llvm::outs(), ExecutableName.c_str(),
-                       "Swift Format Tool", options::SwiftFormatOption, 0);
+                       "Swift Format Tool", options::SwiftFormatOption, 0,
+                       /*ShowAllAliases*/false);
       return 1;
     }
 
@@ -209,7 +208,7 @@ public:
           Formatted = "";
 
         Output.replace(Offset, Length, Formatted);
-        Doc.updateCode(llvm::MemoryBuffer::getMemBuffer(Output));        
+        Doc.updateCode(llvm::MemoryBuffer::getMemBufferCopy(Output));
       }
       if (Filename == "-" || (!InPlace && OutputFilename == "-")) {
         llvm::outs() << Output;

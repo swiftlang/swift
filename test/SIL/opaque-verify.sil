@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-opaque-values -assume-parsing-unqualified-ownership-sil %s
+// RUN: %target-sil-opt -enable-sil-opaque-values %s
 
 // REQUIRES: asserts
 

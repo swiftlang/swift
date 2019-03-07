@@ -21,10 +21,10 @@ class FromOtherFile: Proto {
   }
 
   // dynamic, so it has only an ObjC entry point
-  dynamic init(dynamic: Int) {}
-  dynamic func dynamicMethod() {}
-  dynamic var dynamicProp: Int = 0
-  dynamic subscript(dynamic dynamic: Int) -> Int {
+  @objc dynamic init(dynamic: Int) {}
+  @objc dynamic func dynamicMethod() {}
+  @objc dynamic var dynamicProp: Int = 0
+  @objc dynamic subscript(dynamic dynamic: Int) -> Int {
     get { return dynamic }
     set {}
   }
@@ -37,11 +37,11 @@ class FromOtherFile: Proto {
 @objc class ObjCOtherFile : NSObject {}
 
 extension ObjCOtherFile {
-  func extensionMethod() {}
-  var extensionProp: Int { return 0 }
-  class var extensionClassProp: Int { return 0 }
+  @objc func extensionMethod() {}
+  @objc var extensionProp: Int { return 0 }
+  @objc class var extensionClassProp: Int { return 0 }
 
-  dynamic func dynExtensionMethod() {}
-  dynamic var dynExtensionProp: Int { return 0 }
-  dynamic class var dynExtensionClassProp: Int { return 0 }
+  @objc dynamic func dynExtensionMethod() {}
+  @objc dynamic var dynExtensionProp: Int { return 0 }
+  @objc dynamic class var dynExtensionClassProp: Int { return 0 }
 }

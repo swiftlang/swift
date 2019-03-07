@@ -83,7 +83,7 @@ class OptBugReducerTestCase(unittest.TestCase):
                 '-resource-dir', os.path.join(self.build_dir, 'lib', 'swift'),
                 '-o', self._get_sib_file_path(input_file_path),
                 input_file_path]
-        subprocess.call(args)
+        subprocess.check_call(args)
 
     def test_basic(self):
         name = 'testbasic'
@@ -105,14 +105,14 @@ class OptBugReducerTestCase(unittest.TestCase):
         self.assertTrue('*** Found miscompiling passes!' in output)
         self.assertTrue('*** Final Passes: --bug-reducer-tester' in output)
         re_end = 'testoptbugreducer_testbasic_initial'
-        output_file_re = re.compile('\*\*\* Final File: .*' + re_end)
+        output_file_re = re.compile(r'\*\*\* Final File: .*' + re_end)
         output_matches = [
             1 for o in output if output_file_re.match(o) is not None]
-        self.assertEquals(sum(output_matches), 1)
+        self.assertEqual(sum(output_matches), 1)
         # Make sure our final output command does not have -emit-sib in
         # the output. We want users to get sil output when they type in
         # the relevant command.
-        self.assertEquals([], [o for o in output if '-emit-sib' in o])
+        self.assertEqual([], [o for o in output if '-emit-sib' in o])
 
     def test_suffix_in_need_of_prefix(self):
         name = 'testsuffixinneedofprefix'
@@ -134,14 +134,14 @@ class OptBugReducerTestCase(unittest.TestCase):
         self.assertTrue('*** Found miscompiling passes!' in output)
         self.assertTrue('*** Final Passes: --bug-reducer-tester' in output)
         re_end = 'testoptbugreducer_testsuffixinneedofprefix_initial'
-        output_file_re = re.compile('\*\*\* Final File: .*' + re_end)
+        output_file_re = re.compile(r'\*\*\* Final File: .*' + re_end)
         output_matches = [
             1 for o in output if output_file_re.match(o) is not None]
-        self.assertEquals(sum(output_matches), 0)
+        self.assertEqual(sum(output_matches), 1)
         # Make sure our final output command does not have -emit-sib in the
         # output. We want users to get sil output when they type in the
         # relevant command.
-        self.assertEquals([], [o for o in output if '-emit-sib' in o])
+        self.assertEqual([], [o for o in output if '-emit-sib' in o])
 
     def test_reduce_function(self):
         name = 'testreducefunction'
@@ -163,18 +163,18 @@ class OptBugReducerTestCase(unittest.TestCase):
         output = subprocess.check_output(args).split("\n")
         self.assertTrue('*** Found miscompiling passes!' in output)
         self.assertTrue(
-            '*** Final Functions: _TF18testreducefunction6foo413FT_T_')
+            '*** Final Functions: $s18testreducefunction6foo413yyF' in output)
         self.assertTrue('*** Final Passes: --bug-reducer-tester' in output)
         re_end = 'testoptbugreducer_testreducefunction_initial_'
-        re_end += 'a490c440d7e84b77e5b134720b298d2c.sib'
-        output_file_re = re.compile('\*\*\* Final File: .*' + re_end)
+        re_end += '30775a3d942671a403702a9846afa7a4.sib'
+        output_file_re = re.compile(r'\*\*\* Final File: .*' + re_end)
         output_matches = [
             1 for o in output if output_file_re.match(o) is not None]
-        self.assertEquals(sum(output_matches), 1)
+        self.assertEqual(sum(output_matches), 1)
         # Make sure our final output command does not have -emit-sib in the
         # output. We want users to get sil output when they type in the
         # relevant command.
-        self.assertEquals([], [o for o in output if '-emit-sib' in o])
+        self.assertEqual([], [o for o in output if '-emit-sib' in o])
 
 
 if __name__ == '__main__':

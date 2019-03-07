@@ -64,6 +64,12 @@ public:
 
   bool isDynamicSelfMetadata() const { return !Value.getPointer(); }
 
+  CapturedValue mergeFlags(CapturedValue cv) {
+    assert(Value.getPointer() == cv.Value.getPointer() &&
+           "merging flags on two different value decls");
+    return CapturedValue(Value.getPointer(), getFlags() & cv.getFlags());
+  }
+
   ValueDecl *getDecl() const {
     assert(Value.getPointer() && "dynamic Self metadata capture does not "
            "have a value");
@@ -118,7 +124,7 @@ namespace swift {
 
 class DynamicSelfType;
 
-/// \brief Stores information about captured variables.
+/// Stores information about captured variables.
 class CaptureInfo {
   const CapturedValue *Captures;
   DynamicSelfType *DynamicSelf;
@@ -146,7 +152,7 @@ public:
     Count = C.size();
   }
 
-  /// \brief Return a filtered list of the captures for this function,
+  /// Return a filtered list of the captures for this function,
   /// filtering out global variables.  This function returns the list that
   /// actually needs to be closed over.
   ///

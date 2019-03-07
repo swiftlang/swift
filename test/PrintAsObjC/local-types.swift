@@ -13,7 +13,7 @@ import ObjectiveC
 // CHECK-LABEL: @interface AFullyDefinedClass
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-@objc class AFullyDefinedClass {}
+@objc @objcMembers class AFullyDefinedClass {}
 
 class ANonObjCClass {}
 
@@ -65,6 +65,8 @@ class ANonObjCClass {}
 
   @objc var j: ZForwardClass3 { return ZForwardClass3() }
   @objc var k: ZForwardClass4.Type { return ZForwardClass4.self }
+
+  @objc init() {}
 }
 
 // CHECK-NOT: @class ZForwardClass1;
@@ -78,6 +80,7 @@ class ANonObjCClass {}
 @objc class UseForwardAgain {
   @objc func a(_ a: ZForwardClass1) {}
   @objc func b(_ b: ZForwardProtocol1) {}
+  @objc init() {}
 }
 
 typealias ZForwardAlias = ZForwardAliasClass
@@ -91,6 +94,7 @@ typealias ZForwardAlias = ZForwardAliasClass
 // CHECK-NEXT: @end
 @objc class ZForwardClass1 {
   @objc func circular(_ a: UseForward) {}
+  @objc init() {}
 }
 @objc class ZForwardClass2 {}
 @objc class ZForwardClass3 {}

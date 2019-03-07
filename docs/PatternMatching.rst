@@ -1,4 +1,3 @@
-.. @raise litre.TestsAreMissing
 .. _PatternMatching:
 
 Pattern Matching

@@ -4,15 +4,6 @@ import ObjectiveC
 
 // REQUIRES: objc_interop
 
-@objc class Selectors {
-  func takeSel(_: Selector) {}
-  func mySel() {}
-  func test() {
-    takeSel("mySel")
-    takeSel(Selector("mySel"))
-  }
-}
-
 func foo(an : Any) {
   let a1 : AnyObject
   a1 = an

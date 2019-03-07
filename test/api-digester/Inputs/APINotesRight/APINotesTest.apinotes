@@ -5,3 +5,10 @@ Globals:
 Protocols:
   - Name: TypeWithMethod
     SwiftName: SwiftTypeWithMethodRight
+
+SwiftVersions:
+- Version: 4
+  Typedefs:
+  - Name: AnimalAttributeName
+    SwiftName: AnimalAttributeName
+    SwiftWrapper: none

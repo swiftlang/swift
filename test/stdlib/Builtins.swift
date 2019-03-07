@@ -12,6 +12,7 @@
 // RUN: %empty-directory(%t)
 //   note: building with -Onone to test debug-mode-only safety checks
 // RUN: %target-build-swift %s -parse-stdlib -Xfrontend -disable-access-control -Onone -o %t/Builtins
+// RUN: %target-codesign %t/Builtins
 // RUN: %target-run %t/Builtins
 // REQUIRES: executable_test
 
@@ -27,6 +28,10 @@ import Foundation
 var tests = TestSuite("Builtins")
 
 class X {}
+
+struct W {
+    weak var weakX: X?
+}
 
 tests.test("_isUnique/NativeObject") {
   var a: Builtin.NativeObject = Builtin.castToNativeObject(X())
@@ -63,12 +68,12 @@ tests.test("_isUnique/NativeObjectWithUnownedRef") {
 
 tests.test("_isUniquelyReferenced/OptionalNativeObject") {
   var a: Builtin.NativeObject? = Builtin.castToNativeObject(X())
-  StdlibUnittest.expectTrue(_getBool(Builtin.isUnique(&a)))
+  StdlibUnittest.expectTrue(Bool(_builtinBooleanLiteral: Builtin.isUnique(&a)))
   var b = a
-  expectFalse(_getBool(Builtin.isUnique(&a)))
-  expectFalse(_getBool(Builtin.isUnique(&b)))
+  expectFalse(Bool(_builtinBooleanLiteral: Builtin.isUnique(&a)))
+  expectFalse(Bool(_builtinBooleanLiteral: Builtin.isUnique(&b)))
   var x: Builtin.NativeObject? = nil
-  expectFalse(_getBool(Builtin.isUnique(&x)))
+  expectFalse(Bool(_builtinBooleanLiteral: Builtin.isUnique(&x)))
 }
 
 #if _runtime(_ObjC)
@@ -85,17 +90,6 @@ tests.test("_isUnique_native/SpareBitTrap")
   _ = _isUnique_native(&b)
 }
 
-tests.test("_isUniqueOrPinned_native/SpareBitTrap")
-  .skip(.custom(
-    { !_isStdlibInternalChecksEnabled() },
-    reason: "sanity checks are disabled in this build of stdlib"))
-  .code {
-  // Fake an ObjC pointer.
-  var b = _makeObjCBridgeObject(X())
-  expectCrashLater()
-  _ = _isUniqueOrPinned_native(&b)
-}
-
 tests.test("_isUnique_native/NonNativeTrap")
   .skip(.custom(
     { !_isStdlibInternalChecksEnabled() },
@@ -104,16 +98,6 @@ tests.test("_isUnique_native/NonNativeTrap")
   var x = XObjC()
   expectCrashLater()
   _ = _isUnique_native(&x)
-}
-
-tests.test("_isUniqueOrPinned_native/NonNativeTrap")
-  .skip(.custom(
-    { !_isStdlibInternalChecksEnabled() },
-    reason: "sanity checks are disabled in this build of stdlib"))
-  .code {
-  var x = XObjC()
-  expectCrashLater()
-  _ = _isUniqueOrPinned_native(&x)
 }
 #endif // _ObjC
 
@@ -291,6 +275,13 @@ tests.test("_isPOD") {
   expectTrue(_isPOD(Int.self))
   expectFalse(_isPOD(X.self))
   expectFalse(_isPOD(P.self))
+}
+
+tests.test("_isBitwiseTakable") {
+  expectTrue(_isBitwiseTakable(Int.self))
+  expectTrue(_isBitwiseTakable(X.self))
+  expectTrue(_isBitwiseTakable(P.self))
+  expectFalse(_isBitwiseTakable(W.self))
 }
 
 tests.test("_isOptional") {

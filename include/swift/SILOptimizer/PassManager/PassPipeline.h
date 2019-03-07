@@ -41,13 +41,18 @@ enum class PassPipelineKind {
 };
 
 class SILPassPipelinePlan final {
+  const SILOptions &Options;
   std::vector<PassKind> Kinds;
   std::vector<SILPassPipeline> PipelineStages;
 
 public:
-  SILPassPipelinePlan() = default;
+  SILPassPipelinePlan(const SILOptions &Options)
+      : Options(Options), Kinds(), PipelineStages() {}
+
   ~SILPassPipelinePlan() = default;
   SILPassPipelinePlan(const SILPassPipelinePlan &) = default;
+
+  const SILOptions &getOptions() const { return Options; }
 
 // Each pass gets its own add-function.
 #define PASS(ID, TAG, NAME)                                                    \
@@ -60,13 +65,13 @@ public:
   void addPasses(ArrayRef<PassKind> PassKinds);
 
 #define PASSPIPELINE(NAME, DESCRIPTION)                                        \
-  static SILPassPipelinePlan get##NAME##PassPipeline();
-#define PASSPIPELINE_WITH_OPTIONS(NAME, DESCRIPTION)                           \
   static SILPassPipelinePlan get##NAME##PassPipeline(const SILOptions &Options);
 #include "swift/SILOptimizer/PassManager/PassPipeline.def"
 
-  static SILPassPipelinePlan getPassPipelineForKinds(ArrayRef<PassKind> Kinds);
-  static SILPassPipelinePlan getPassPipelineFromFile(StringRef Filename);
+  static SILPassPipelinePlan getPassPipelineForKinds(const SILOptions &Options,
+                                                     ArrayRef<PassKind> Kinds);
+  static SILPassPipelinePlan getPassPipelineFromFile(const SILOptions &Options,
+                                                     StringRef Filename);
 
   /// Our general format is as follows:
   ///

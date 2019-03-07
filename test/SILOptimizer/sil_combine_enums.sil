@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 sil_stage canonical
 
@@ -423,8 +423,8 @@ bb3:
 public class C {}
 public struct S {}
 public struct T {
-  @sil_stored let c: C
-  @sil_stored let s: S
+  @_hasStorage let c: C
+  @_hasStorage let s: S
 }
 public enum X {
   case none

@@ -129,11 +129,19 @@ typedef NS_ENUM(unsigned, NeverActuallyMentionedByName) {
 - (NeverActuallyMentionedByName)getValue;
 @end
 
+#if defined(_WIN32)
+enum RawEnumInGizmo : unsigned {
+  InGizmoOne=0x7FFFFFFF,
+  InGizmoTwo,
+  InGizmoThree
+};
+#else
 enum RawEnumInGizmo {
   InGizmoOne=0x7FFFFFFF,
   InGizmoTwo,
   InGizmoThree
 };
+#endif
 
 struct StructOfNSStrings {
   __unsafe_unretained NSString *a;

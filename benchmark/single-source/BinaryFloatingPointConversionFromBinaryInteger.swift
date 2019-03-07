@@ -59,8 +59,8 @@ extension MockBinaryInteger : Comparable {
 }
 
 extension MockBinaryInteger : Hashable {
-  var hashValue: Int {
-    return _value.hashValue
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(_value)
   }
 }
 
@@ -109,6 +109,10 @@ extension MockBinaryInteger : BinaryInteger {
 
   var trailingZeroBitCount: Int {
     return _value.trailingZeroBitCount
+  }
+  
+  func isMultiple(of other: MockBinaryInteger<T>) -> Bool {
+    return _value.isMultiple(of: other._value)
   }
 
   static func + (

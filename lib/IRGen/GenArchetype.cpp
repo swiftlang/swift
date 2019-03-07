@@ -49,7 +49,6 @@
 #include "ProtocolInfo.h"
 #include "ResilientTypeInfo.h"
 #include "TypeInfo.h"
-#include "WeakTypeInfo.h"
 
 using namespace swift;
 using namespace irgen;
@@ -63,11 +62,10 @@ irgen::emitArchetypeTypeMetadataRef(IRGenFunction &IGF,
     return response;
 
   // If that's not present, this must be an associated type.
-  assert(!archetype->isPrimary() &&
-         "type metadata for primary archetype was not bound in context");
+  auto nested = cast<NestedArchetypeType>(archetype);
 
-  CanArchetypeType parent(archetype->getParent());
-  AssociatedType association(archetype->getAssocType());
+  CanArchetypeType parent(nested->getParent());
+  AssociatedType association(nested->getAssocType());
 
   MetadataResponse response =
     emitAssociatedTypeMetadataRef(IGF, parent, association, request);
@@ -89,7 +87,8 @@ namespace {
 class OpaqueArchetypeTypeInfo
   : public ResilientTypeInfo<OpaqueArchetypeTypeInfo>
 {
-  OpaqueArchetypeTypeInfo(llvm::Type *type) : ResilientTypeInfo(type) {}
+  OpaqueArchetypeTypeInfo(llvm::Type *type)
+    : ResilientTypeInfo(type, IsABIAccessible) {}
 
 public:
   static const OpaqueArchetypeTypeInfo *create(llvm::Type *type) {
@@ -99,7 +98,7 @@ public:
   void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                    SILType T) const override {
     // We'll need formal type metadata for this archetype.
-    collector.collectFormalTypeMetadata(T.getSwiftRValueType());
+    collector.collectTypeMetadataForLayout(T);
   }
 };
 
@@ -173,43 +172,7 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
   auto wtable = IGF.tryGetLocalTypeData(archetype, localDataKind);
   if (wtable) return wtable;
 
-  // It can happen with class constraints that Sema will consider a
-  // constraint to be abstract, but the minimized signature will
-  // eliminate it as concrete.  Handle this by performing a concrete
-  // lookup.
-  // TODO: maybe Sema shouldn't ever do this?
-  if (Type classBound = archetype->getSuperclass()) {
-    auto conformance =
-      IGF.IGM.getSwiftModule()->lookupConformance(classBound, protocol);
-    if (conformance && conformance->isConcrete()) {
-      return emitWitnessTableRef(IGF, archetype, *conformance);
-    }
-  }
-
-  // If we don't have an environment, this must be an implied witness table
-  // reference.
-  // FIXME: eliminate this path when opened types have generic environments.
   auto environment = archetype->getGenericEnvironment();
-  if (!environment) {
-    assert(archetype->isOpenedExistential() &&
-           "non-opened archetype lacking generic environment?");
-    SmallVector<ProtocolEntry, 4> entries;
-    for (auto p : archetype->getConformsTo()) {
-      const ProtocolInfo &impl = IGF.IGM.getProtocolInfo(p);
-      entries.push_back(ProtocolEntry(p, impl));
-    }
-
-    return emitImpliedWitnessTableRef(IGF, entries, protocol,
-        [&](unsigned index) -> llvm::Value* {
-      auto localDataKind =
-         LocalTypeDataKind::forAbstractProtocolWitnessTable(
-                                                  entries[index].getProtocol());
-      auto wtable = IGF.tryGetLocalTypeData(archetype, localDataKind);
-      assert(wtable &&
-             "opened type without local type data for direct conformance?");
-      return wtable;
-    });
-  }
 
   // Otherwise, ask the generic signature for the environment for the best
   // path to the conformance.
@@ -240,7 +203,9 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
     CanType depType = CanType(entry.first);
     ProtocolDecl *requirement = entry.second;
 
-    auto &lastPI = IGF.IGM.getProtocolInfo(lastProtocol);
+    const ProtocolInfo &lastPI =
+        IGF.IGM.getProtocolInfo(lastProtocol,
+                                ProtocolInfoKind::RequirementSignature);
 
     // If it's a type parameter, it's self, and this is a base protocol
     // requirement.
@@ -300,7 +265,7 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   // representation.
   if (archetype->requiresClass() ||
       (layout && layout->isRefCounted())) {
-    auto refcount = getReferenceCountingForType(IGM, CanType(archetype));
+    auto refcount = archetype->getReferenceCounting();
 
     llvm::PointerType *reprTy;
 

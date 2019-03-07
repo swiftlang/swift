@@ -13,7 +13,10 @@ struct rdar19612086 {
   var description : String {
     return "\(i)" + Stringly(format: "%.2f", x) +
            "\(i+1)" + Stringly(format: "%.2f", x) +
-           "\(i+2)" + Stringly(format: "%.2f", x)
+           "\(i+2)" + Stringly(format: "%.2f", x) +
+           "\(i+3)" + Stringly(format: "%.2f", x) +
+           "\(i+4)" + Stringly(format: "%.2f", x) +
+           "\(i+5)" + Stringly(format: "%.2f", x)
     // expected-error@-1 {{reasonable time}}
   }
 }

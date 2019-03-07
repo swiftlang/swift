@@ -38,7 +38,7 @@ bb2:
   %10 = struct $Int64 (%9 : $Builtin.Int64)
   br bb3(%10 : $Int64)
 
-bb3 (%11: @trivial $Int64):
+bb3 (%11: $Int64):
   return %11 : $Int64
 }
 

@@ -41,6 +41,13 @@
   ],
   key.entities: [
     {
+      key.kind: source.lang.swift.ref.module,
+      key.name: "test_module",
+      key.usr: "c:@M@test_module",
+      key.line: 7,
+      key.column: 13
+    },
+    {
       key.kind: source.lang.swift.ref.function.free,
       key.name: "globalFunc()",
       key.usr: "s:11test_module10globalFuncyyF",

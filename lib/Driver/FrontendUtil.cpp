@@ -18,14 +18,14 @@
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/ToolChain.h"
-#include "swift/Frontend/Frontend.h"
+#include "llvm/Option/ArgList.h"
 
 using namespace swift;
 using namespace swift::driver;
 
-std::unique_ptr<CompilerInvocation>
-swift::driver::createCompilerInvocation(ArrayRef<const char *> Argv,
-                                        DiagnosticEngine &Diags) {
+bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
+    ArrayRef<const char *> Argv, DiagnosticEngine &Diags,
+    llvm::function_ref<bool(ArrayRef<const char *> FrontendArgs)> Action) {
   SmallVector<const char *, 16> Args;
   Args.push_back("<swiftc>"); // FIXME: Remove dummy argument.
   Args.insert(Args.end(), Argv.begin(), Argv.end());
@@ -33,6 +33,17 @@ swift::driver::createCompilerInvocation(ArrayRef<const char *> Argv,
   // When creating a CompilerInvocation, ensure that the driver creates a single
   // frontend command.
   Args.push_back("-force-single-frontend-invocation");
+
+  // Explictly disable batch mode to avoid a spurious warning when combining
+  // -enable-batch-mode with -force-single-frontend-invocation.  This is an
+  // implementation detail.
+  Args.push_back("-disable-batch-mode");
+
+  // Avoid using filelists
+  std::string neverThreshold =
+      std::to_string(Compilation::NEVER_USE_FILELIST);
+  Args.push_back("-driver-filelist-threshold");
+  Args.push_back(neverThreshold.c_str());
 
   // Force the driver into batch mode by specifying "swiftc" as the name.
   Driver TheDriver("swiftc", "swiftc", Args, Diags);
@@ -44,16 +55,16 @@ swift::driver::createCompilerInvocation(ArrayRef<const char *> Argv,
   std::unique_ptr<llvm::opt::InputArgList> ArgList =
     TheDriver.parseArgStrings(ArrayRef<const char *>(Args).slice(1));
   if (Diags.hadAnyError())
-    return nullptr;
+    return true;
 
   std::unique_ptr<ToolChain> TC = TheDriver.buildToolChain(*ArgList);
   if (Diags.hadAnyError())
-    return nullptr;
+    return true;
 
   std::unique_ptr<Compilation> C =
       TheDriver.buildCompilation(*TC, std::move(ArgList));
   if (!C || C->getJobs().empty())
-    return nullptr; // Don't emit an error; one should already have been emitted
+    return true; // Don't emit an error; one should already have been emitted
 
   SmallPtrSet<const Job *, 4> CompileCommands;
   for (const Job *Cmd : C->getJobs())
@@ -63,22 +74,15 @@ swift::driver::createCompilerInvocation(ArrayRef<const char *> Argv,
   if (CompileCommands.size() != 1) {
     // TODO: include Jobs in the diagnostic.
     Diags.diagnose(SourceLoc(), diag::error_expected_one_frontend_job);
-    return nullptr;
+    return true;
   }
 
   const Job *Cmd = *CompileCommands.begin();
   if (StringRef("-frontend") != Cmd->getArguments().front()) {
     Diags.diagnose(SourceLoc(), diag::error_expected_frontend_command);
-    return nullptr;
+    return true;
   }
 
-  std::unique_ptr<CompilerInvocation> Invocation(new CompilerInvocation());
   const llvm::opt::ArgStringList &BaseFrontendArgs = Cmd->getArguments();
-  ArrayRef<const char *> FrontendArgs =
-      llvm::makeArrayRef(BaseFrontendArgs.data() + 1,
-                         BaseFrontendArgs.data() + BaseFrontendArgs.size());
-  if (Invocation->parseArgs(FrontendArgs, Diags))
-    return nullptr; // Don't emit an error; one should already have been emitted
-
-  return Invocation;
+  return Action(llvm::makeArrayRef(BaseFrontendArgs).drop_front());
 }

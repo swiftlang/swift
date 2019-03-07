@@ -67,8 +67,8 @@ static bool shouldBridgeThroughError(SILGenModule &SGM, CanType type,
 
     // They're also convertible to Error if they have a class bound that
     // conforms to Error.
-    if (auto cls = layout.superclass) {
-      type = cls->getCanonicalType();
+    if (auto superclass = layout.getSuperclass()) {
+      type = superclass->getCanonicalType();
 
     // Otherwise, they are not convertible to Error.
     } else {
@@ -120,7 +120,6 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
          "Generic witnesses not supported");
 
   auto *dc = cast<FuncDecl>(witness)->getDeclContext();
-  auto *genericSig = dc->getGenericSignatureOfContext();
   auto typeSubMap = swiftValueType->getContextSubstitutionMap(
       SGF.SGM.SwiftModule, dc);
 
@@ -130,7 +129,9 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   // We might have to re-abstract the 'self' value if it is an
   // Optional.
   AbstractionPattern origSelfType(witness->getInterfaceType());
-  origSelfType = origSelfType.getFunctionInputType();
+  origSelfType = origSelfType.getFunctionParamType(0);
+
+  ArgumentScope scope(SGF, loc);
 
   swiftValue = SGF.emitSubstToOrigValue(loc, swiftValue,
                                         origSelfType,
@@ -152,17 +153,14 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
     swiftValue = ManagedValue::forUnmanaged(tmp);
   }
 
-  SmallVector<Substitution, 4> subs;
-  if (genericSig)
-    genericSig->getSubstitutions(typeSubMap, subs);
-
   // Call the witness.
   SILType resultTy = SGF.getLoweredType(objcType);
   SILValue bridgedValue =
-      SGF.B.createApply(loc, witnessRef, witnessFnTy, resultTy, subs,
+      SGF.B.createApply(loc, witnessRef, witnessFnTy, resultTy, typeSubMap,
                         swiftValue.borrow(SGF, loc).getValue());
 
   auto bridgedMV = SGF.emitManagedRValueWithCleanup(bridgedValue);
+  bridgedMV = scope.popPreservingValue(bridgedMV);
 
   // The Objective-C value doesn't necessarily match the desired type.
   bridgedMV = emitUnabstractedCast(SGF, loc, bridgedMV,
@@ -206,9 +204,7 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
 
   CanType swiftValueType = conformance->getType()->getCanonicalType();
   auto genericSig = witnessFnTy->getGenericSignature();
-  SubstitutionMap typeSubMap;
-  if (genericSig)
-    typeSubMap = genericSig->getSubstitutionMap(witness.getSubstitutions());
+  SubstitutionMap typeSubMap = witness.getSubstitutions();
 
   // Substitute into the witness function type.
   witnessFnTy = witnessFnTy->substGenericArgs(SGF.SGM.M, typeSubMap);
@@ -241,12 +237,11 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
   ResultPlanPtr resultPlan =
       ResultPlanBuilder::computeResultPlan(SGF, calleeTypeInfo, loc, context);
   ArgumentScope argScope(SGF, loc);
-  PostponedCleanup postpone(SGF);
   RValue result =
       SGF.emitApply(std::move(resultPlan), std::move(argScope), loc,
                     ManagedValue::forUnmanaged(witnessRef), subs,
                     {objcValue, ManagedValue::forUnmanaged(metatypeValue)},
-                    calleeTypeInfo, ApplyOptions::None, context, postpone);
+                    calleeTypeInfo, ApplyOptions::None, context);
   return std::move(result).getAsSingleValue(SGF, loc);
 }
 
@@ -355,15 +350,18 @@ static void expandTupleTypes(CanType type, SmallVectorImpl<CanType> &results) {
 static SmallVector<CanType, 8>
 expandTupleTypes(AnyFunctionType::CanParamArrayRef params) {
   SmallVector<CanType, 8> results;
-  for (auto param : params)
-    expandTupleTypes(param.getType(), results);
+  for (auto param : params) {
+    assert(!param.isInOut() && !param.isVariadic());
+    expandTupleTypes(param.getPlainType(), results);
+  }
   return results;
 }
 
 static CanAnyFunctionType getBridgedBlockType(SILGenModule &SGM,
                                               CanAnyFunctionType blockType) {
   return SGM.Types.getBridgedFunctionType(AbstractionPattern(blockType),
-                                         blockType, blockType->getExtInfo());
+                                         blockType, blockType->getExtInfo(),
+                                         Bridgeability::Full);
 }
 
 static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
@@ -372,7 +370,8 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
                                        CanAnyFunctionType formalBlockType,
                                        CanSILFunctionType funcTy,
                                        CanSILFunctionType blockTy,
-                                       CanSILBlockStorageType blockStorageTy) {
+                                       CanSILBlockStorageType blockStorageTy,
+                                       bool isUnretainedClosureSafe) {
   Scope scope(SGF.Cleanups, CleanupLocation::get(loc));
   SILBasicBlock *entry = &*SGF.F.begin();
   SILFunctionConventions blockConv(blockTy, SGF.SGM.M);
@@ -396,7 +395,9 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
   auto storage = entry->createFunctionArgument(storageAddrTy);
   auto capture = SGF.B.createProjectBlockStorage(loc, storage);
   auto &funcTL = SGF.getTypeLowering(funcTy);
-  auto fn = SGF.emitLoad(loc, capture, funcTL, SGFContext(), IsNotTake);
+  auto fn = isUnretainedClosureSafe
+                ? SGF.emitManagedLoadBorrow(loc, capture)
+                : SGF.emitLoad(loc, capture, funcTL, SGFContext(), IsNotTake);
 
   // Collect the block arguments, which may have nonstandard conventions.
   assert(blockTy->getParameters().size() == funcTy->getParameters().size()
@@ -508,6 +509,26 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
                                              CanSILFunctionType loweredBlockTy){
   auto loweredFuncTy = fn.getType().castTo<SILFunctionType>();
 
+  // If we store a @noescape closure in a block verify that the block has not
+  // escaped by storing a withoutActuallyEscaping closure in the block and after
+  // the block is ultimately destroyed checking that the closure is uniquely
+  // referenced.
+  bool useWithoutEscapingVerification = false;
+	ManagedValue escaping;
+  if (loweredFuncTy->isNoEscape()) {
+    auto escapingTy = loweredFuncTy->getWithExtInfo(
+        loweredFuncTy->getExtInfo().withNoEscape(false));
+
+    escaping = createWithoutActuallyEscapingClosure(
+        loc, fn, SILType::getPrimitiveObjectType(escapingTy));
+    loweredFuncTy = escapingTy;
+    auto escapingAnyTy =
+        funcType.withExtInfo(funcType->getExtInfo().withNoEscape(false));
+    funcType = escapingAnyTy;
+    fn = B.createCopyValue(loc, escaping);
+    useWithoutEscapingVerification = true;
+  }
+
   // Build the invoke function signature. The block will capture the original
   // function value.
   auto fnInterfaceTy = cast<SILFunctionType>(
@@ -534,12 +555,12 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
 
   CanGenericSignature genericSig;
   GenericEnvironment *genericEnv = nullptr;
-  SubstitutionList subs;
+  SubstitutionMap subs;
   if (funcType->hasArchetype() || blockType->hasArchetype()) {
     genericSig = F.getLoweredFunctionType()->getGenericSignature();
     genericEnv = F.getGenericEnvironment();
 
-    subs = F.getForwardingSubstitutions();
+    subs = F.getForwardingSubstitutionMap();
 
     // The block invoke function must be pseudogeneric. This should be OK for now
     // since a bridgeable function's parameters and returns should all be
@@ -569,10 +590,13 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   // Build it if necessary.
   if (thunk->empty()) {
     thunk->setGenericEnvironment(genericEnv);
-    SILGenFunction thunkSGF(SGM, *thunk);
+    SILGenFunction thunkSGF(SGM, *thunk, FunctionDC);
     auto loc = RegularLocation::getAutoGeneratedLocation();
+    // Not retaining the closure in the reabstraction thunk is safe if we hold
+    // another reference for the is_escaping sentinel.
     buildFuncToBlockInvokeBody(thunkSGF, loc, funcType, blockType,
-                               loweredFuncTy, loweredBlockTy, storageTy);
+                               loweredFuncTy, loweredBlockTy, storageTy,
+                               useWithoutEscapingVerification);
   }
 
   // Form the block on the stack.
@@ -580,14 +604,22 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   auto storage = emitTemporaryAllocation(loc, storageAddrTy);
   auto capture = B.createProjectBlockStorage(loc, storage);
   B.createStore(loc, fn, capture, StoreOwnershipQualifier::Init);
-  auto invokeFn = B.createFunctionRef(loc, thunk);
-  
+  auto invokeFn = B.createFunctionRefFor(loc, thunk);
+
   auto stackBlock = B.createInitBlockStorageHeader(loc, storage, invokeFn,
                               SILType::getPrimitiveObjectType(loweredBlockTy),
                                                    subs);
 
   // Copy the block so we have an independent heap object we can hand off.
-  auto heapBlock = B.createCopyBlock(loc, stackBlock);
+
+  // If withoutActuallyEscaping verification is requested we emit a
+  // copy_block_without_escaping %block withoutEscaping %closure instruction.
+  // A mandatory SIL pass will replace this instruction by the required
+  // verification instruction sequence.
+  auto heapBlock = useWithoutEscapingVerification
+                       ? SILValue(B.createCopyBlockWithoutEscaping(
+                             loc, stackBlock, escaping.forward(*this)))
+                       : SILValue(B.createCopyBlock(loc, stackBlock));
   return emitManagedRValueWithCleanup(heapBlock);
 }
 
@@ -675,10 +707,13 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
   // If the input argument is known to be an existential, save the runtime
   // some work by opening it.
   if (nativeType->isExistentialType()) {
-    auto openedType = ArchetypeType::getOpened(nativeType);
+    auto openedType = OpenedArchetypeType::get(nativeType);
+
+    FormalEvaluationScope scope(SGF);
 
     auto openedExistential = SGF.emitOpenExistential(
-        loc, v, openedType, SGF.getLoweredType(openedType), AccessKind::Read);
+        loc, v, openedType, SGF.getLoweredType(openedType),
+        AccessKind::Read);
 
     v = SGF.manageOpaqueValue(openedExistential, loc, SGFContext());
     nativeType = openedType;
@@ -686,9 +721,10 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
 
   // Call into the stdlib intrinsic.
   if (auto bridgeAnything =
-        SGF.getASTContext().getBridgeAnythingToObjectiveC(nullptr)) {
+        SGF.getASTContext().getBridgeAnythingToObjectiveC()) {
     auto *genericSig = bridgeAnything->getGenericSignature();
-    auto subMap = genericSig->getSubstitutionMap(
+    auto subMap = SubstitutionMap::get(
+      genericSig,
       [&](SubstitutableType *t) -> Type {
         return nativeType;
       },
@@ -900,9 +936,11 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
       loweredFuncTy, loweredFuncTy->getExtInfo().withNoEscape(false),
       loweredFuncTy->getWitnessMethodConformanceOrNone());
 
+  CanType dynamicSelfType;
   auto thunkTy = buildThunkType(loweredBlockTy, loweredFuncTyWithoutNoEscape,
                                 inputSubstType, outputSubstType,
-                                genericEnv, interfaceSubs);
+                                genericEnv, interfaceSubs, dynamicSelfType);
+  assert(!dynamicSelfType && "Not implemented");
 
   auto thunk = SGM.getOrCreateReabstractionThunk(thunkTy,
                                                  loweredBlockTy,
@@ -911,7 +949,7 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
 
   // Build it if necessary.
   if (thunk->empty()) {
-    SILGenFunction thunkSGF(SGM, *thunk);
+    SILGenFunction thunkSGF(SGM, *thunk, FunctionDC);
     thunk->setGenericEnvironment(genericEnv);
     auto loc = RegularLocation::getAutoGeneratedLocation();
     buildBlockToFuncThunkBody(thunkSGF, loc, blockType, funcType,
@@ -920,18 +958,16 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
 
   CanSILFunctionType substFnTy = thunkTy;
 
-  SmallVector<Substitution, 4> subs;
-  if (auto genericSig = thunkTy->getGenericSignature()) {
-    genericSig->getSubstitutions(interfaceSubs, subs);
+  if (thunkTy->getGenericSignature()) {
     substFnTy = thunkTy->substGenericArgs(F.getModule(),
                                           interfaceSubs);
   }
 
   // Create it in the current function.
-  auto thunkValue = B.createFunctionRef(loc, thunk);
+  auto thunkValue = B.createFunctionRefFor(loc, thunk);
   ManagedValue thunkedFn = B.createPartialApply(
-      loc, thunkValue, SILType::getPrimitiveObjectType(substFnTy), subs,
-      block,
+      loc, thunkValue, SILType::getPrimitiveObjectType(substFnTy),
+      interfaceSubs, block,
       SILType::getPrimitiveObjectType(loweredFuncTyWithoutNoEscape));
 
   if (!loweredFuncTy->isNoEscape()) {
@@ -940,8 +976,8 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
 
   // Handle the escaping to noescape conversion.
   assert(loweredFuncTy->isNoEscape());
-  return B.createConvertEscapeToNoEscape(loc, thunkedFn,
-                          SILType::getPrimitiveObjectType(loweredFuncTy));
+  return B.createConvertEscapeToNoEscape(
+      loc, thunkedFn, SILType::getPrimitiveObjectType(loweredFuncTy));
 }
 
 static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
@@ -1066,7 +1102,7 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
     auto optionalMV =
       SGF.B.createUncheckedBitCast(loc, v, optionalBridgedTy);
     return SGF.emitApplyOfLibraryIntrinsic(loc,
-                           SGF.getASTContext().getBridgeAnyObjectToAny(nullptr),
+                           SGF.getASTContext().getBridgeAnyObjectToAny(),
                            SubstitutionMap(), optionalMV, C)
               .getAsSingleValue(SGF, loc);
   }
@@ -1094,7 +1130,7 @@ ManagedValue SILGenFunction::emitBridgedToNativeValue(SILLocation loc,
 ManagedValue SILGenFunction::emitBridgedToNativeError(SILLocation loc,
                                                   ManagedValue bridgedError) {
   // If the incoming error is non-optional, just do an existential erasure.
-  CanType bridgedErrorTy = bridgedError.getType().getSwiftRValueType();
+  auto bridgedErrorTy = bridgedError.getType().getASTType();
   if (!bridgedErrorTy.getOptionalObjectType()) {
     auto nativeErrorTy = SILType::getExceptionType(getASTContext());
 
@@ -1119,16 +1155,9 @@ ManagedValue SILGenFunction::emitBridgedToNativeError(SILLocation loc,
          == ResultConvention::Owned);
   auto nativeErrorType = bridgeFnConv.getSILType(bridgeFnType->getResults()[0]);
 
-  SILValue arg;
-  if (SGM.M.getOptions().EnableGuaranteedNormalArguments) {
-    assert(bridgeFnType->getParameters()[0].getConvention() ==
-           ParameterConvention::Direct_Guaranteed);
-    arg = bridgedError.getValue();
-  } else {
-    assert(bridgeFnType->getParameters()[0].getConvention() ==
-           ParameterConvention::Direct_Owned);
-    arg = bridgedError.forward(*this);
-  }
+  assert(bridgeFnType->getParameters()[0].getConvention() ==
+	 ParameterConvention::Direct_Guaranteed);
+  SILValue arg = bridgedError.getValue();
 
   SILValue nativeError = B.createApply(loc, bridgeFn, bridgeFn->getType(),
                                        nativeErrorType, {}, arg);
@@ -1175,16 +1204,9 @@ ManagedValue SILGenFunction::emitNativeToBridgedError(SILLocation loc,
   auto loweredBridgedErrorType =
     bridgeFnConv.getSILType(bridgeFnType->getResults()[0]);
 
-  SILValue arg;
-  if (SGM.M.getOptions().EnableGuaranteedNormalArguments) {
-    assert(bridgeFnType->getParameters()[0].getConvention() ==
-           ParameterConvention::Direct_Guaranteed);
-    arg = nativeError.getValue();
-  } else {
-    assert(bridgeFnType->getParameters()[0].getConvention() ==
-           ParameterConvention::Direct_Owned);
-    arg = nativeError.forward(*this);
-  }
+  assert(bridgeFnType->getParameters()[0].getConvention() ==
+	 ParameterConvention::Direct_Guaranteed);
+  SILValue arg = nativeError.getValue();
 
   SILValue bridgedError = B.createApply(loc, bridgeFn, bridgeFn->getType(),
                                         loweredBridgedErrorType, {}, arg);
@@ -1226,7 +1248,7 @@ static SILValue emitObjCUnconsumedArgument(SILGenFunction &SGF,
 }
 
 static CanAnyFunctionType substGenericArgs(CanAnyFunctionType fnType,
-                                           const SubstitutionList &subs) {
+                                           SubstitutionMap subs) {
   if (auto genericFnType = dyn_cast<GenericFunctionType>(fnType)) {
     return cast<FunctionType>(genericFnType->substGenericArgs(subs)
                                            ->getCanonicalType());
@@ -1245,7 +1267,7 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &SGF,
                                                CanType &bridgedFormalResultTy) {
   SILDeclRef native = thunk.asForeign(false);
 
-  auto subs = SGF.F.getForwardingSubstitutions();
+  auto subs = SGF.F.getForwardingSubstitutionMap();
 
   auto objcInfo = SGF.SGM.Types.getConstantInfo(thunk);
   auto objcFnTy = objcInfo.SILFnType->substGenericArgs(SGF.SGM.M, subs);
@@ -1255,9 +1277,6 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &SGF,
   auto swiftFnTy = swiftInfo.SILFnType->substGenericArgs(SGF.SGM.M, subs);
   auto swiftFormalFnTy = substGenericArgs(swiftInfo.LoweredType, subs);
   SILFunctionConventions swiftConv(swiftFnTy, SGF.SGM.M);
-
-  // We must have the same context archetypes as the unthunked function.
-  assert(objcInfo.GenericEnv == swiftInfo.GenericEnv);
 
   SmallVector<ManagedValue, 8> bridgedArgs;
   bridgedArgs.reserve(objcFnTy->getParameters().size());
@@ -1365,14 +1384,29 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &SGF,
 void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   assert(thunk.isForeign);
   SILDeclRef native = thunk.asForeign(false);
+
+  // If we're calling a native non-designated class initializer, we have to
+  // discard the `self` object we were given, since
+  // Swift convenience initializers only have allocating entry points that
+  // create whole new objects.
+  bool isInitializingToAllocatingInitThunk = false;
+  if (native.kind == SILDeclRef::Kind::Initializer) {
+    if (auto ctor = dyn_cast<ConstructorDecl>(native.getDecl())) {
+      if (!ctor->isDesignatedInit() && !ctor->isObjC()) {
+        isInitializingToAllocatingInitThunk = true;
+        native = SILDeclRef(ctor, SILDeclRef::Kind::Allocator);
+      }
+    }
+  }
+
   auto nativeInfo = getConstantInfo(native);
-  auto subs = F.getForwardingSubstitutions();
+  auto subs = F.getForwardingSubstitutionMap();
   auto substTy = nativeInfo.SILFnType->substGenericArgs(SGM.M, subs);
   SILType substSILTy = SILType::getPrimitiveObjectType(substTy);
   SILFunctionConventions substConv(substTy, SGM.M);
 
   // Use the same generic environment as the native entry point.
-  F.setGenericEnvironment(nativeInfo.GenericEnv);
+  F.setGenericEnvironment(SGM.Types.getConstantGenericEnvironment(native));
 
   auto loc = thunk.getAsRegularLocation();
   loc.markAutoGenerated();
@@ -1401,14 +1435,10 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     }
 
     if (auto attr = decl->getAttrs().getAttribute<ObjCAttr>()) {
-      // If @objc was inferred based on the Swift 3 @objc inference rules, but
-      // we aren't compiling in Swift 3 compatibility mode, emit a call to
-      // Builtin.swift3ImplicitObjCEntrypoint() to enable runtime logging of
-      // the uses of such entrypoints.
-      if (attr->isSwift3Inferred() &&
-          !decl->getAttrs().hasAttribute<DynamicAttr>() &&
-          !getASTContext().LangOpts.isSwiftVersion3()) {
-        
+      // If @objc was inferred based on the Swift 3 @objc inference rules, emit
+      // a call to Builtin.swift3ImplicitObjCEntrypoint() to enable runtime
+      // logging of the uses of such entrypoints.
+      if (attr->isSwift3Inferred() && !decl->isObjCDynamic()) {
         // Get the starting source location of the declaration so we can say
         // exactly where to stick '@objc'.
         SourceLoc objcInsertionLoc =
@@ -1442,6 +1472,24 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
                                          foreignErrorSlot, foreignError,
                                          nativeFormalResultType,
                                          bridgedFormalResultType);
+
+  // Throw away the partially-initialized `self` value we were given if we're
+  // bridging from an initializing to allocating entry point.
+  if (isInitializingToAllocatingInitThunk) {
+    auto oldSelf = args.pop_back_val();
+    auto oldSelfTy = B.createValueMetatype(loc,
+         SILType::getPrimitiveObjectType(
+           CanMetatypeType::get(oldSelf->getType().getASTType(),
+                                MetatypeRepresentation::Thick)),
+         oldSelf);
+    
+    B.createDeallocPartialRef(loc, oldSelf, oldSelfTy);
+    
+    // Pass the dynamic type on to the native allocating initializer.
+    args.push_back(oldSelfTy);
+    native = SILDeclRef(native.getDecl(), SILDeclRef::Kind::Allocator);
+  }
+
   SILFunctionConventions objcConv(CanSILFunctionType(objcFnTy), SGM.M);
   SILFunctionConventions nativeConv(CanSILFunctionType(nativeInfo.SILFnType),
                                     SGM.M);
@@ -1481,7 +1529,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     {
       B.emitBlock(normalBB);
       SILValue nativeResult =
-          normalBB->createPHIArgument(swiftResultTy, ValueOwnershipKind::Owned);
+          normalBB->createPhiArgument(swiftResultTy, ValueOwnershipKind::Owned);
 
       if (substConv.hasIndirectSILResults()) {
         assert(substTy->getNumResults() == 1);
@@ -1503,7 +1551,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     // Emit the error destination.
     {
       B.emitBlock(errorBB);
-      SILValue nativeError = errorBB->createPHIArgument(
+      SILValue nativeError = errorBB->createPhiArgument(
           substConv.getSILErrorType(), ValueOwnershipKind::Owned);
 
       // In this branch, the eventual return value is mostly invented.
@@ -1516,7 +1564,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
 
     // Emit the join block.
     B.emitBlock(contBB);
-    result = contBB->createPHIArgument(objcResultTy, ValueOwnershipKind::Owned);
+    result = contBB->createPhiArgument(objcResultTy, ValueOwnershipKind::Owned);
 
     // Leave the scope now.
     argScope.pop();
@@ -1531,7 +1579,6 @@ getThunkedForeignFunctionRef(SILGenFunction &SGF,
                              SILLocation loc,
                              SILDeclRef foreign,
                              ArrayRef<ManagedValue> args,
-                             SubstitutionList subs,
                              const SILConstantInfo &foreignCI) {
   assert(!foreign.isCurried
          && "should not thunk calling convention when curried");
@@ -1563,7 +1610,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
   assert(nativeFnTy == nativeCI.SILFnType);
 
   // Use the same generic environment as the native entry point.
-  F.setGenericEnvironment(nativeCI.GenericEnv);
+  F.setGenericEnvironment(SGM.Types.getConstantGenericEnvironment(thunk));
   
   SILDeclRef foreignDeclRef = thunk.asForeign(true);
   SILConstantInfo foreignCI = getConstantInfo(foreignDeclRef);
@@ -1577,24 +1624,6 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
   }
   ImportAsMemberStatus memberStatus = fd->getImportAsMemberStatus();
 
-  // Forward the arguments.
-  auto forwardedParameters = fd->getParameterLists();
-
-  // For allocating constructors, 'self' is a metatype, not the 'self' value
-  // formally present in the constructor body.
-  Type allocatorSelfType;
-  if (thunk.kind == SILDeclRef::Kind::Allocator) {
-    allocatorSelfType = forwardedParameters[0]
-      ->getInterfaceType(getASTContext())
-      ->getWithoutSpecifierType();
-    if (F.getGenericEnvironment())
-      allocatorSelfType = F.getGenericEnvironment()
-        ->mapTypeIntoContext(allocatorSelfType);
-    forwardedParameters = forwardedParameters.slice(1);
-  }
-
-  SmallVector<SILValue, 8> params;
-  
   // Introduce indirect returns if necessary.
   // TODO: Handle exploded results? We don't currently need to since the only
   // bridged indirect type is Any.
@@ -1607,14 +1636,26 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
         F.begin()->createFunctionArgument(nativeConv.getSingleSILResultType());
   }
   
-  for (auto *paramList : reversed(forwardedParameters))
-    bindParametersForForwarding(paramList, params);
+  // Forward the arguments.
+  SmallVector<SILValue, 8> params;
 
-  if (allocatorSelfType) {
+  bindParametersForForwarding(fd->getParameters(), params);
+  if (thunk.kind != SILDeclRef::Kind::Allocator)
+    if (auto *selfDecl = fd->getImplicitSelfDecl())
+      bindParameterForForwarding(selfDecl, params);
+
+  // For allocating constructors, 'self' is a metatype, not the 'self' value
+  // formally present in the constructor body.
+  Type allocatorSelfType;
+  if (thunk.kind == SILDeclRef::Kind::Allocator) {
+    auto *selfDecl = fd->getImplicitSelfDecl();
+    allocatorSelfType = F.mapTypeIntoContext(
+      fd->getDeclContext()->getSelfInterfaceType());
+
     auto selfMetatype =
       CanMetatypeType::get(allocatorSelfType->getCanonicalType());
     auto selfArg = F.begin()->createFunctionArgument(
-        getLoweredLoadableType(selfMetatype), fd->getImplicitSelfDecl());
+        getLoweredLoadableType(selfMetatype), selfDecl);
     params.push_back(selfArg);
   }
 
@@ -1733,8 +1774,8 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     maybeAddForeignErrorArg();
     
     // Call the original.
-    auto subs = getForwardingSubstitutions();
-    auto fn = getThunkedForeignFunctionRef(*this, fd, foreignDeclRef, args, subs,
+    auto subs = getForwardingSubstitutionMap();
+    auto fn = getThunkedForeignFunctionRef(*this, fd, foreignDeclRef, args,
                                            foreignCI);
 
     auto fnType = fn->getType().castTo<SILFunctionType>();
@@ -1760,11 +1801,10 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     ResultPlanPtr resultPlan = ResultPlanBuilder::computeResultPlan(
         *this, calleeTypeInfo, fd, context);
     ArgumentScope argScope(*this, fd);
-    PostponedCleanup postpone(*this);
     ManagedValue resultMV =
         emitApply(std::move(resultPlan), std::move(argScope), fd,
-                  ManagedValue::forUnmanaged(fn), subs, args, calleeTypeInfo,
-                  ApplyOptions::None, context, postpone)
+                  ManagedValue::forUnmanaged(fn), subs, args,
+                  calleeTypeInfo, ApplyOptions::None, context)
             .getAsSingleValue(*this, fd);
 
     if (indirectResult) {

@@ -14,7 +14,7 @@ import TestsUtils
 import Foundation
 
 public let ReduceInto = [
-  BenchmarkInfo(name: "FilterEvenUsingReduce", runFunction: run_FilterEvenUsingReduce, tags: [.validation, .api]),
+  BenchmarkInfo(name: "FilterEvenUsingReduce", runFunction: run_FilterEvenUsingReduce, tags: [.validation, .api], legacyFactor: 10),
   BenchmarkInfo(name: "FilterEvenUsingReduceInto", runFunction: run_FilterEvenUsingReduceInto, tags: [.validation, .api]),
   BenchmarkInfo(name: "FrequenciesUsingReduce", runFunction: run_FrequenciesUsingReduce, tags: [.validation, .api]),
   BenchmarkInfo(name: "FrequenciesUsingReduceInto", runFunction: run_FrequenciesUsingReduceInto, tags: [.validation, .api]),
@@ -27,7 +27,7 @@ public let ReduceInto = [
 @inline(never)
 public func run_SumUsingReduce(_ N: Int) {
   let numbers = [Int](0..<1000)
-  
+
   var c = 0
   for _ in 1...N*1000 {
     c = c &+ numbers.reduce(0) { (acc: Int, num: Int) -> Int in
@@ -40,7 +40,7 @@ public func run_SumUsingReduce(_ N: Int) {
 @inline(never)
 public func run_SumUsingReduceInto(_ N: Int) {
   let numbers = [Int](0..<1000)
-  
+
   var c = 0
   for _ in 1...N*1000 {
     c = c &+ numbers.reduce(into: 0) { (acc: inout Int, num: Int) in
@@ -55,9 +55,9 @@ public func run_SumUsingReduceInto(_ N: Int) {
 @inline(never)
 public func run_FilterEvenUsingReduce(_ N: Int) {
   let numbers = [Int](0..<100)
-  
+
   var c = 0
-  for _ in 1...N*100 {
+  for _ in 1...N*10 {
     let a = numbers.reduce([]) { (acc: [Int], num: Int) -> [Int] in
       var a = acc
       if num % 2 == 0 {
@@ -73,7 +73,7 @@ public func run_FilterEvenUsingReduce(_ N: Int) {
 @inline(never)
 public func run_FilterEvenUsingReduceInto(_ N: Int) {
   let numbers = [Int](0..<100)
-  
+
   var c = 0
   for _ in 1...N*100 {
     let a = numbers.reduce(into: []) { (acc: inout [Int], num: Int) in
@@ -91,7 +91,7 @@ public func run_FilterEvenUsingReduceInto(_ N: Int) {
 @inline(never)
 public func run_FrequenciesUsingReduce(_ N: Int) {
   let s = "thequickbrownfoxjumpsoverthelazydogusingasmanycharacteraspossible123456789"
-  
+
   var c = 0
   for _ in 1...N*100 {
     let a = s.reduce([:]) {
@@ -108,7 +108,7 @@ public func run_FrequenciesUsingReduce(_ N: Int) {
 @inline(never)
 public func run_FrequenciesUsingReduceInto(_ N: Int) {
   let s = "thequickbrownfoxjumpsoverthelazydogusingasmanycharacteraspossible123456789"
-  
+
   var c = 0
   for _ in 1...N*100 {
     let a = s.reduce(into: [:]) {

@@ -315,33 +315,27 @@ public:
   }
 
   void addCallParameter(Identifier Name, Identifier LocalName, Type Ty,
-                        bool IsVarArg, bool Outermost, bool IsInOut,
-                        bool IsIUO) {
+                        bool IsVarArg, bool Outermost, bool IsInOut, bool IsIUO,
+                        bool isAutoClosure) {
     CurrentNestingLevel++;
 
     addSimpleChunk(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin);
 
     if (!Name.empty()) {
-      StringRef NameStr = Name.str();
-
-      // 'self' is a keyword, we cannot allow to insert it into the source
-      // buffer.
-      bool IsAnnotation = (NameStr == "self");
-
       llvm::SmallString<16> EscapedKeyword;
       addChunkWithText(
           CodeCompletionString::Chunk::ChunkKind::CallParameterName,
-          // if the name is not annotation, we need to escape keyword
-          IsAnnotation ? NameStr
-                       : escapeArgumentLabel(NameStr, !Outermost,
-                                             EscapedKeyword));
-      if (IsAnnotation)
-        getLastChunk().setIsAnnotation();
-
+          escapeArgumentLabel(Name.str(), !Outermost, EscapedKeyword));
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
-      if (IsAnnotation)
-        getLastChunk().setIsAnnotation();
+    } else if (!LocalName.empty()) {
+      // Use local (non-API) parameter name if we have nothing else.
+      llvm::SmallString<16> EscapedKeyword;
+      addChunkWithText(
+          CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName,
+            escapeArgumentLabel(LocalName.str(), !Outermost, EscapedKeyword));
+      addChunkWithTextNoCopy(
+          CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
     }
 
     // 'inout' arguments are printed specially.
@@ -351,50 +345,30 @@ public:
       Ty = Ty->getInOutObjectType();
     }
 
-    if (Name.empty() && !LocalName.empty()) {
-      llvm::SmallString<16> EscapedKeyword;
-      // Use local (non-API) parameter name if we have nothing else.
-      addChunkWithText(
-          CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName,
-            escapeArgumentLabel(LocalName.str(), !Outermost, EscapedKeyword));
-      addChunkWithTextNoCopy(
-          CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
-    }
-
     // If the parameter is of the type @autoclosure ()->output, then the
     // code completion should show the parameter of the output type
     // instead of the function type ()->output.
-    if (auto FuncType = Ty->getAs<AnyFunctionType>()) {
-      if (FuncType->isAutoClosure()) {
-        Ty = FuncType->getResult();
-      }
-    }
+    if (isAutoClosure)
+      Ty = Ty->castTo<FunctionType>()->getResult();
 
     PrintOptions PO;
     PO.SkipAttributes = true;
-    std::string TypeName;
-    if (IsIUO) {
-      assert(Ty->getOptionalObjectType());
-      TypeName = Ty->getOptionalObjectType()->getStringAsComponent(PO) + "!";
-    } else {
-      TypeName = Ty->getString(PO);
-    }
+    PO.PrintOptionalAsImplicitlyUnwrapped = IsIUO;
+    std::string TypeName = Ty->getString(PO);
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::CallParameterType,
                      TypeName);
 
     // Look through optional types and type aliases to find out if we have
-    // function/closure parameter type that is not an autoclosure.
+    // function type.
     Ty = Ty->lookThroughAllOptionalTypes();
     if (auto AFT = Ty->getAs<AnyFunctionType>()) {
-      if (!AFT->isAutoClosure()) {
-        // If this is a closure type, add ChunkKind::CallParameterClosureType.
-        PrintOptions PO;
-        PO.PrintFunctionRepresentationAttrs = false;
-        PO.SkipAttributes = true;
-        addChunkWithText(
-            CodeCompletionString::Chunk::ChunkKind::CallParameterClosureType,
-            AFT->getString(PO));
-      }
+      // If this is a closure type, add ChunkKind::CallParameterClosureType.
+      PrintOptions PO;
+      PO.PrintFunctionRepresentationAttrs = false;
+      PO.SkipAttributes = true;
+      addChunkWithText(
+          CodeCompletionString::Chunk::ChunkKind::CallParameterClosureType,
+          AFT->getString(PO));
     }
 
     if (IsVarArg)
@@ -403,9 +377,9 @@ public:
   }
 
   void addCallParameter(Identifier Name, Type Ty, bool IsVarArg, bool Outermost,
-                        bool IsInOut, bool IsIUO) {
+                        bool IsInOut, bool IsIUO, bool isAutoClosure) {
     addCallParameter(Name, Identifier(), Ty, IsVarArg, Outermost, IsInOut,
-                     IsIUO);
+                     IsIUO, isAutoClosure);
   }
 
   void addGenericParameter(StringRef Name) {
@@ -426,8 +400,7 @@ public:
 
   void addOptionalMethodCallTail() {
     addChunkWithTextNoCopy(
-        CodeCompletionString::Chunk::ChunkKind::OptionalMethodCallTail, "!");
-    getLastChunk().setIsAnnotation();
+        CodeCompletionString::Chunk::ChunkKind::OptionalMethodCallTail, "?");
   }
 
   void addTypeAnnotation(StringRef Type) {

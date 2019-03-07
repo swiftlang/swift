@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4
+// RUN: %target-typecheck-verify-swift -swift-version 5
 
 ////
 // Members of structs
@@ -28,7 +28,7 @@ func g0(_: (inout X) -> (Float) -> ()) {}
 _ = x.f0(i)
 x.f0(i).f1(i)
 
-g0(X.f1)
+g0(X.f1) // expected-error{{partial application of 'mutating' method}}
 
 _ = x.f0(x.f2(1))
 _ = x.f0(1).f2(i)
@@ -58,10 +58,10 @@ struct GZ<T> {
   var i : T
   func getI() -> T { return i }
 
-  func f1<U>(_ a: T, b: U) -> (T, U) { 
+  func f1<U>(_ a: T, b: U) -> (T, U) {
     return (a, b)
   }
-  
+
   func f2() {
     var f : Float
     var t = f1(i, b: f)
@@ -119,7 +119,7 @@ var wcurriedFull : () = w.curried(0)(1)
 
 // Member of enum type
 func enumMetatypeMember(_ opt: Int?) {
-  opt.none // expected-error{{enum element 'none' cannot be referenced as an instance member}}
+  opt.none // expected-error{{enum case 'none' cannot be used as an instance member}}
 }
 
 ////
@@ -315,7 +315,7 @@ struct S22490787 {
 
 func f22490787() {
   var path: S22490787 = S22490787()
-  
+
   for p in path {  // expected-error {{type 'S22490787' does not conform to protocol 'Sequence'}}
   }
 }
@@ -348,7 +348,7 @@ enum SR_2193_Error: Error {
 
 do {
   throw SR_2193_Error.Boom
-} catch let e as SR_2193_Error.Boom { // expected-error {{enum element 'Boom' is not a member type of 'SR_2193_Error'}}
+} catch let e as SR_2193_Error.Boom { // expected-error {{enum case 'Boom' is not a member type of 'SR_2193_Error'}}
 }
 
 // rdar://problem/25341015
@@ -433,8 +433,7 @@ struct Aardvark {
 func rdar33914444() {
   struct A {
     enum R<E: Error> {
-      case e(E)
-      // expected-note@-1  {{did you mean 'e'}}
+      case e(E) // expected-note {{'e' declared here}}
     }
 
     struct S {
@@ -447,7 +446,7 @@ func rdar33914444() {
   }
 
   _ = A.S(e: .e1)
-  // expected-error@-1 {{type 'A.R<A.S.E>' has no member 'e1'}}
+  // expected-error@-1 {{type 'A.R<A.S.E>' has no member 'e1'; did you mean 'e'?}}
 }
 
 // SR-5324: Better diagnostic when instance member of outer type is referenced from nested type
@@ -462,5 +461,107 @@ struct Outer {
       return inner + outer
       // expected-error@-1 {{instance member 'outer' of type 'Outer' cannot be used on instance of nested type 'Outer.Inner'}}
     }
+  }
+}
+
+// rdar://problem/39514009 - don't crash when trying to diagnose members with special names
+print("hello")[0] // expected-error {{value of tuple type '()' has no member 'subscript'}}
+
+
+func rdar40537782() {
+  class A {}
+  class B : A {
+    override init() {}
+    func foo() -> A { return A() }
+  }
+
+  struct S<T> {
+    init(_ a: T...) {}
+  }
+
+  func bar<T>(_ t: T) {
+    _ = S(B(), .foo(), A()) // expected-error {{type 'A' has no member 'foo'}}
+  }
+}
+
+func rdar36989788() {
+  struct A<T> {
+    func foo() -> A<T> {
+      return self
+    }
+  }
+
+  func bar<T>(_ x: A<T>) -> (A<T>, A<T>) {
+    return (x.foo(), x.undefined()) // expected-error {{value of type 'A<T>' has no member 'undefined'}}
+  }
+}
+
+func rdar46211109() {
+  struct MyIntSequenceStruct: Sequence {
+    struct Iterator: IteratorProtocol {
+      var current = 0
+      mutating func next() -> Int? {
+        return current + 1
+      }
+    }
+
+    func makeIterator() -> Iterator {
+      return Iterator()
+    }
+  }
+
+  func foo<E, S: Sequence>(_ type: E.Type) -> S? where S.Element == E {
+    return nil
+  }
+
+  let _: MyIntSequenceStruct? = foo(Int.Self)
+  // expected-error@-1 {{type 'Int' has no member 'Self'}}
+}
+
+class A {}
+
+enum B {
+  static func foo() {
+    bar(A()) // expected-error {{'A' is not convertible to 'B'}}
+  }
+
+  func bar(_: A) {}
+}
+
+class C {
+  static func foo() {
+    bar(0) // expected-error {{instance member 'bar' cannot be used on type 'C'}}
+  }
+
+  func bar(_: Int) {}
+}
+
+class D {
+  static func foo() {}
+
+  func bar() {
+    foo() // expected-error {{static member 'foo' cannot be used on instance of type 'D'}}
+  }
+}
+
+func rdar_48114578() {
+  struct S<T> {
+    var value: T
+
+    static func valueOf<T>(_ v: T) -> S<T> {
+      return S<T>(value: v)
+    }
+  }
+
+  typealias A = (a: [String]?, b: Int)
+
+  func foo(_ a: [String], _ b: Int) -> S<A> {
+    let v = (a, b)
+    return .valueOf(v)
+    // expected-error@-1 {{cannot express tuple conversion '([String], Int)' to '(a: [String]?, b: Int)'}}
+  }
+
+  func bar(_ a: [String], _ b: Int) -> S<A> {
+    return .valueOf((a, b)) // Ok
   }
 }

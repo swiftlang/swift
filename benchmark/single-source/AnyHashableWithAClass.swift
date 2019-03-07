@@ -25,7 +25,8 @@ import TestsUtils
 public var AnyHashableWithAClass = BenchmarkInfo(
   name: "AnyHashableWithAClass",
   runFunction: run_AnyHashableWithAClass,
-  tags: [.abstraction, .runtime, .cpubench]
+  tags: [.abstraction, .runtime, .cpubench],
+  legacyFactor: 500
 )
 
 class TestHashableBase : Hashable {
@@ -33,9 +34,11 @@ class TestHashableBase : Hashable {
   init(_ value: Int) {
     self.value = value
   }
-  var hashValue: Int {
-    return value
+
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
   }
+
   static func == (
     lhs: TestHashableBase,
     rhs: TestHashableBase
@@ -53,8 +56,7 @@ class TestHashableDerived5 : TestHashableDerived4 {}
 @inline(never)
 public func run_AnyHashableWithAClass(_ N: Int) {
   let c = TestHashableDerived5(10)
-  for _ in 0...(N*500000) {
+  for _ in 0...(N*1000) {
     _ = AnyHashable(c)
   }
 }
-

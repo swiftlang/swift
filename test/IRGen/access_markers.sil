@@ -1,11 +1,11 @@
-// RUN: %target-swift-frontend -swift-version 4 -enforce-exclusivity=checked -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s --check-prefix=CHECK
+// RUN: %target-swift-frontend -swift-version 4 -enforce-exclusivity=checked %s -emit-ir | %FileCheck %s --check-prefix=CHECK
 
 import Builtin
 import Swift
 
 class A {
-  @sil_stored var property: Int { get set }
-  @sil_stored var exProperty: Any { get set }
+  @_hasStorage var property: Int { get set }
+  @_hasStorage var exProperty: Any { get set }
   deinit
   init()
 }

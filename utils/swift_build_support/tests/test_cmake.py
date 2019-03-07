@@ -35,9 +35,12 @@ class CMakeTestCase(unittest.TestCase):
                          enable_ubsan=False,
                          enable_tsan=False,
                          enable_lsan=False,
+                         enable_sanitize_coverage=False,
                          export_compile_commands=False,
                          distcc=False,
                          cmake_generator="Ninja",
+                         cmake_c_launcher=None,
+                         cmake_cxx_launcher=None,
                          clang_compiler_version=None,
                          clang_user_visible_version=None,
                          build_jobs=8,
@@ -171,6 +174,19 @@ class CMakeTestCase(unittest.TestCase):
              "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
+    def test_common_options_coverage_sanitizer(self):
+        args = self.default_args()
+        args.enable_sanitize_coverage = True
+        cmake = self.cmake(args)
+        self.assertEqual(
+            list(cmake.common_options()),
+            ["-G", "Ninja",
+             "-DLLVM_USE_SANITIZE_COVERAGE=ON",
+             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
+             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
+             "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
+
     def test_common_options_export_compile_commands(self):
         args = self.default_args()
         args.export_compile_commands = True
@@ -191,10 +207,28 @@ class CMakeTestCase(unittest.TestCase):
         self.assertEqual(
             list(cmake.common_options()),
             ["-G", "Ninja",
-             "-DCMAKE_C_COMPILER:PATH=" + self.mock_distcc_path(),
-             "-DCMAKE_C_COMPILER_ARG1=/path/to/clang",
-             "-DCMAKE_CXX_COMPILER:PATH=" + self.mock_distcc_path(),
-             "-DCMAKE_CXX_COMPILER_ARG1=/path/to/clang++",
+             "-DCMAKE_C_COMPILER_LAUNCHER:PATH=" + self.mock_distcc_path(),
+             "-DCMAKE_CXX_COMPILER_LAUNCHER:PATH=" + self.mock_distcc_path(),
+             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
+             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
+             "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
+
+    def test_common_options_launcher(self):
+        args = self.default_args()
+        cmake_c_launcher = "/path/to/c_launcher"
+        cmake_cxx_launcher = "/path/to/cxx_launcher"
+        args.cmake_c_launcher = cmake_c_launcher
+        args.cmake_cxx_launcher = cmake_cxx_launcher
+        cmake = self.cmake(args)
+        self.assertEqual(
+            list(cmake.common_options()),
+            ["-G", "Ninja",
+             "-DCMAKE_C_COMPILER_LAUNCHER:PATH=" + cmake_c_launcher,
+             "-DCMAKE_CXX_COMPILER_LAUNCHER:PATH=" + cmake_cxx_launcher,
+             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
+             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_xcode(self):
@@ -276,10 +310,11 @@ class CMakeTestCase(unittest.TestCase):
             ["-G", "Xcode",
              "-DLLVM_USE_SANITIZER=Address;Undefined",
              "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
-             "-DCMAKE_C_COMPILER:PATH=" + self.mock_distcc_path(),
-             "-DCMAKE_C_COMPILER_ARG1=/path/to/clang",
-             "-DCMAKE_CXX_COMPILER:PATH=" + self.mock_distcc_path(),
-             "-DCMAKE_CXX_COMPILER_ARG1=/path/to/clang++",
+             "-DCMAKE_C_COMPILER_LAUNCHER:PATH=" + self.mock_distcc_path(),
+             "-DCMAKE_CXX_COMPILER_LAUNCHER:PATH=" + self.mock_distcc_path(),
+             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
+             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_CONFIGURATION_TYPES=" +
              "Debug;Release;MinSizeRel;RelWithDebInfo",
              "-DLLVM_VERSION_MAJOR:STRING=9",

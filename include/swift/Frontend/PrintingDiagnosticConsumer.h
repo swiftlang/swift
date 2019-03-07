@@ -25,7 +25,7 @@
 
 namespace swift {
 
-/// \brief Diagnostic consumer that displays diagnostics to standard error.
+/// Diagnostic consumer that displays diagnostics to standard error.
 class PrintingDiagnosticConsumer : public DiagnosticConsumer {
   llvm::raw_ostream &Stream;
   bool ForceColors = false;

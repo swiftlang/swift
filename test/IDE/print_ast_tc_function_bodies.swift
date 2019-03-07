@@ -37,7 +37,7 @@ struct FooStruct {
       instanceVar = i + j
     }
   }
-// CHECK-NEXT: {{^}}  subscript(i: Int, j: Int) -> Double {{{$}}
+// CHECK: {{^}}  subscript(i: Int, j: Int) -> Double {{{$}}
 // CHECK-NEXT: {{^}}    get {{{$}}
 // CHECK-NEXT: {{^}}      return {{$}}
 // CHECK-NEXT: {{^}}    }{{$}}
@@ -139,7 +139,7 @@ class InClassVar1 {
       if true {}
     }
   }
-// CHECK-NEXT: {{^}}  var instanceVar2: Int {{{$}}
+// CHECK: {{^}}  var instanceVar2: Int {{{$}}
 // CHECK-NEXT: {{^}}    get {{{$}}
 // CHECK-NEXT: {{^}}      return {{$}}
 // CHECK-NEXT: {{^}}    }{{$}}

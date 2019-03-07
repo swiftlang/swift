@@ -14,20 +14,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if defined(__CYGWIN__) || defined(__ANDROID__) || defined(_WIN32) || defined(__HAIKU__)
-#  define SWIFT_SUPPORTS_BACKTRACE_REPORTING 0
+#if defined(__CYGWIN__) || defined(__ANDROID__) || defined(__HAIKU__)
+#define SWIFT_SUPPORTS_BACKTRACE_REPORTING 0
 #else
-#  define SWIFT_SUPPORTS_BACKTRACE_REPORTING 1
+#define SWIFT_SUPPORTS_BACKTRACE_REPORTING 1
 #endif
 
 #if defined(_WIN32)
 #include <mutex>
 #endif
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
 #if defined(_WIN32)
 #include <io.h>
 #else
@@ -48,9 +48,7 @@
 #include <cxxabi.h>
 #endif
 
-#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
-// execinfo.h is not available on Android. Checks in this file ensure that
-// fatalError behaves as expected, but without stack traces.
+#if __has_include(<execinfo.h>)
 #include <execinfo.h>
 #endif
 
@@ -69,7 +67,8 @@ enum: uint32_t {
 using namespace swift;
 
 #if SWIFT_SUPPORTS_BACKTRACE_REPORTING
-static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
+static bool getSymbolNameAddr(llvm::StringRef libraryName,
+                              const SymbolInfo &syminfo,
                               std::string &symbolName, uintptr_t &addrOut) {
   // If we failed to find a symbol and thus dlinfo->dli_sname is nullptr, we
   // need to use the hex address.
@@ -97,8 +96,8 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
   DWORD dwResult;
 
   {
-    std::lock_guard<std::mutex> lock(m);
-    dwResult = UnDecorateSymbolName(syminfo.symbolName, szUndName,
+    std::lock_guard<std::mutex> lock(mutex);
+    dwResult = UnDecorateSymbolName(syminfo.symbolName.get(), szUndName,
                                     sizeof(szUndName), dwFlags);
   }
 
@@ -108,7 +107,8 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
   }
 #else
   int status;
-  char *demangled = abi::__cxa_demangle(syminfo.symbolName, 0, 0, &status);
+  char *demangled =
+      abi::__cxa_demangle(syminfo.symbolName.get(), 0, 0, &status);
   if (status == 0) {
     assert(demangled != nullptr &&
            "If __cxa_demangle succeeds, demangled should never be nullptr");
@@ -123,7 +123,7 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
   // Otherwise, try to demangle with swift. If swift fails to demangle, it will
   // just pass through the original output.
   symbolName = demangleSymbolAsString(
-      syminfo.symbolName, strlen(syminfo.symbolName),
+      syminfo.symbolName.get(), strlen(syminfo.symbolName.get()),
       Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
   return true;
 }
@@ -140,8 +140,11 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
   }
 
   // If lookupSymbol succeeded then fileName is non-null. Thus, we find the
-  // library name here.
-  StringRef libraryName = StringRef(syminfo.fileName).rsplit('/').second;
+  // library name here. Avoid using StringRef::rsplit because its definition
+  // is not provided in the header so that it requires linking with
+  // libSupport.a.
+  StringRef libraryName = StringRef(syminfo.fileName);
+  libraryName = libraryName.substr(libraryName.rfind('/')).substr(1);
 
   // Next we get the symbol name that we are going to use in our backtrace.
   std::string symbolName;
@@ -171,7 +174,7 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
     fprintf(stderr, "%s`%s + %td", libraryName.data(), symbolName.c_str(),
             offset);
   } else {
-    constexpr const char *format = "%-4u %-34s 0x%0.16tx %s + %td\n";
+    constexpr const char *format = "%-4u %-34s 0x%0.16" PRIxPTR " %s + %td\n";
     fprintf(stderr, format, index, libraryName.data(), symbolAddr,
             symbolName.c_str(), offset);
   }
@@ -190,8 +193,11 @@ void swift::printCurrentBacktrace(unsigned framesToSkip) {
 #if SWIFT_SUPPORTS_BACKTRACE_REPORTING
   constexpr unsigned maxSupportedStackDepth = 128;
   void *addrs[maxSupportedStackDepth];
-
+#if defined(_WIN32)
+  int symbolCount = CaptureStackBackTrace(0, maxSupportedStackDepth, addrs, NULL);
+#else
   int symbolCount = backtrace(addrs, maxSupportedStackDepth);
+#endif
   for (int i = framesToSkip; i < symbolCount; ++i) {
     dumpStackTraceEntry(i - framesToSkip, addrs[i]);
   }
@@ -349,20 +355,27 @@ swift::fatalError(uint32_t flags, const char *format, ...)
 
 // Report a warning to system console and stderr.
 void
-swift::warning(uint32_t flags, const char *format, ...)
+swift::warningv(uint32_t flags, const char *format, va_list args)
 {
-  va_list args;
-  va_start(args, format);
-
   char *log;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wuninitialized"
   swift_vasprintf(&log, format, args);
 #pragma GCC diagnostic pop
-
+  
   reportNow(flags, log);
-
+  
   free(log);
+}
+
+// Report a warning to system console and stderr.
+void
+swift::warning(uint32_t flags, const char *format, ...)
+{
+  va_list args;
+  va_start(args, format);
+
+  warningv(flags, format, args);
 }
 
 // Crash when a deleted method is called by accident.
@@ -408,4 +421,18 @@ void swift::swift_abortRetainUnowned(const void *object) {
                       "Fatal error: Attempted to read an unowned reference but "
                       "the object was already deallocated");
   }
+}
+
+/// Halt due to enabling an already enabled dynamic replacement().
+void swift::swift_abortDynamicReplacementEnabling() {
+  swift::fatalError(FatalErrorFlags::ReportBacktrace,
+                    "Fatal error: trying to enable a dynamic replacement "
+                    "that is already enabled");
+}
+
+/// Halt due to disabling an already disabled dynamic replacement().
+void swift::swift_abortDynamicReplacementDisabling() {
+  swift::fatalError(FatalErrorFlags::ReportBacktrace,
+                    "Fatal error: trying to disable a dynamic replacement "
+                    "that is already disabled");
 }

@@ -96,7 +96,7 @@ private:
 public:
   PatternKind getKind() const { return PatternKind(Bits.Pattern.Kind); }
 
-  /// \brief Retrieve the name of the given pattern kind.
+  /// Retrieve the name of the given pattern kind.
   ///
   /// This name should only be used for debugging dumps and other
   /// developer aids, and should never be part of a diagnostic or exposed
@@ -126,7 +126,10 @@ public:
 
   /// Set the type of this pattern, given that it was previously not
   /// type-checked.
-  void setType(Type ty) { Ty = ty; }
+  void setType(Type ty) {
+    assert(!ty || !ty->hasTypeVariable());
+    Ty = ty;
+  }
 
   /// Retrieve the delayed interface type of this pattern, if it has one.
   ///
@@ -158,19 +161,19 @@ public:
   SourceLoc getEndLoc() const { return getSourceRange().End; }
   SourceLoc getLoc() const;
 
-  /// \brief Collect the set of variables referenced in the given pattern.
+  /// Collect the set of variables referenced in the given pattern.
   void collectVariables(SmallVectorImpl<VarDecl *> &variables) const;
 
-  /// \brief apply the specified function to all variables referenced in this
+  /// apply the specified function to all variables referenced in this
   /// pattern.
-  void forEachVariable(const std::function<void(VarDecl*)> &f) const;
+  void forEachVariable(llvm::function_ref<void(VarDecl *)> f) const;
 
-  /// \brief apply the specified function to all pattern nodes recursively in
+  /// apply the specified function to all pattern nodes recursively in
   /// this pattern.  This is a pre-order traversal.
-  void forEachNode(const std::function<void(Pattern*)> &f);
+  void forEachNode(llvm::function_ref<void(Pattern *)> f);
 
-  void forEachNode(const std::function<void(const Pattern*)> &f) const {
-    const std::function<void(Pattern*)> &f2 = f;
+  void forEachNode(llvm::function_ref<void(const Pattern *)> f) const {
+    llvm::function_ref<void(Pattern *)> f2 = f;
     const_cast<Pattern *>(this)->forEachNode(f2);
   }
 
@@ -179,7 +182,7 @@ public:
 
   bool isNeverDefaultInitializable() const;
 
-  /// \brief Mark all vardecls in this pattern as having non-pattern initial
+  /// Mark all vardecls in this pattern as having non-pattern initial
   /// values bound into them.
   void markHasNonPatternBindingInit() {
     forEachVariable([&](VarDecl *VD) {
@@ -187,7 +190,7 @@ public:
     });
   }
   
-  /// \brief Mark all vardecls in this pattern as having an owning statement for
+  /// Mark all vardecls in this pattern as having an owning statement for
   /// the pattern.
   void markOwnedByStatement(Stmt *S) {
     forEachVariable([&](VarDecl *VD) {
@@ -302,7 +305,7 @@ public:
                               ArrayRef<TuplePatternElt> elements, SourceLoc rp,
                               Optional<bool> implicit = None);
 
-  /// \brief Create either a tuple pattern or a paren pattern, depending
+  /// Create either a tuple pattern or a paren pattern, depending
   /// on the elements.
   static Pattern *createSimple(ASTContext &C, SourceLoc lp,
                                ArrayRef<TuplePatternElt> elements, SourceLoc rp,
@@ -380,14 +383,25 @@ public:
 /// dynamic type match.
 class TypedPattern : public Pattern {
   Pattern *SubPattern;
-  mutable TypeLoc PatType;
+  TypeRepr *PatTypeRepr;
 
 public:
-  TypedPattern(Pattern *pattern, TypeLoc tl, Optional<bool> implicit = None)
-    : Pattern(PatternKind::Typed), SubPattern(pattern), PatType(tl) {
-    if (implicit.hasValue() ? *implicit : !tl.hasLocation())
-      setImplicit();
-    Bits.TypedPattern.IsPropagatedType = false;
+  /// Creates a new TypedPattern which annotates the provided sub-pattern with
+  /// the provided TypeRepr. If 'implicit' is true, the pattern will be
+  /// set to implicit. If false, it will not. If 'implicit' is not provided,
+  /// then the pattern will be set to 'implicit' if there is a provided TypeRepr
+  /// which has a valid SourceRange.
+  TypedPattern(Pattern *pattern, TypeRepr *tr, Optional<bool> implicit = None);
+
+  /// Creates an implicit typed pattern annotating the provided sub-pattern
+  /// with a given type.
+  static TypedPattern *
+  createImplicit(ASTContext &ctx, Pattern *pattern, Type type) {
+    auto tp = new (ctx) TypedPattern(pattern, /*typeRepr*/nullptr,
+                                     /*implicit*/true);
+    if (!type.isNull())
+      tp->setType(type);
+    return tp;
   }
 
   /// True if the type in this \c TypedPattern was propagated from a different
@@ -409,27 +423,10 @@ public:
   const Pattern *getSubPattern() const { return SubPattern; }
   void setSubPattern(Pattern *p) { SubPattern = p; }
 
-  TypeLoc &getTypeLoc() {
-    // If we have a delayed interface type, set our type from that.
-    if (getDelayedInterfaceType())
-      PatType.setType(getType());
+  TypeRepr *getTypeRepr() const { return PatTypeRepr; }
 
-    return PatType;
-  }
-  TypeLoc getTypeLoc() const {
-    // If we have a delayed interface type, set our type from that.
-    if (getDelayedInterfaceType())
-      PatType.setType(getType());
-
-    return PatType;
-  }
-
-  SourceLoc getLoc() const {
-    if (SubPattern->isImplicit())
-      return PatType.getSourceRange().Start;
-
-    return SubPattern->getLoc();
-  }
+  TypeLoc getTypeLoc() const;
+  SourceLoc getLoc() const;
   SourceRange getSourceRange() const;
 
   static bool classof(const Pattern *P) {

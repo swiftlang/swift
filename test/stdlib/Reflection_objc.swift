@@ -2,18 +2,21 @@
 //
 // RUN: %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g
 // RUN: %target-build-swift -parse-stdlib %s -module-name Reflection -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/a.out
-// RUN: %S/timeout.sh 360 %target-run %t/a.out %S/Inputs/shuffle.jpg | %FileCheck %s
-// REQUIRES: executable_test
+// RUN: %target-codesign %t/a.out
+// RUN: %{python} %S/timeout.py 360 %target-run %t/a.out %S/Inputs/shuffle.jpg | %FileCheck %s
 // FIXME: timeout wrapper is necessary because the ASan test runs for hours
+
+// REQUIRES: executable_test
+// REQUIRES: objc_interop
 
 //
 // DO NOT add more tests to this file.  Add them to test/1_stdlib/Runtime.swift.
 //
 
-// XFAIL: linux
 
 import Swift
 import Foundation
+import simd
 
 #if os(macOS)
 import AppKit
@@ -283,6 +286,10 @@ testQLO(HasAttributedQLO.self)
 testQLO(HasStringQLO.self)
 // CHECK-NEXT: HasStringQLO overboard
 // CHECK-NEXT: CanaryBase overboard
+
+let x = float4(0)
+print("float4 has \(Mirror(reflecting: x).children.count) children")
+// CHECK-NEXT: float4 has 1 children
 
 // CHECK-LABEL: and now our song is done
 print("and now our song is done")

@@ -92,7 +92,7 @@ struct GraphTraits<swift::SILFunction *>
 
   static NodeRef getEntryNode(GraphType F) { return &F->front(); }
 
-  typedef pointer_iterator<swift::SILFunction::iterator> nodes_iterator;
+  using nodes_iterator = pointer_iterator<swift::SILFunction::iterator>;
   static nodes_iterator nodes_begin(GraphType F) {
     return nodes_iterator(F->begin());
   }
@@ -104,12 +104,12 @@ struct GraphTraits<swift::SILFunction *>
 
 template <> struct GraphTraits<Inverse<swift::SILFunction*> >
     : public GraphTraits<Inverse<swift::SILBasicBlock*> > {
-  typedef Inverse<swift::SILFunction *> GraphType;
-  typedef NodeRef NodeRef;
+  using GraphType = Inverse<swift::SILFunction *>;
+  using NodeRef = NodeRef;
 
   static NodeRef getEntryNode(GraphType F) { return &F.Graph->front(); }
 
-  typedef pointer_iterator<swift::SILFunction::iterator> nodes_iterator;
+  using nodes_iterator = pointer_iterator<swift::SILFunction::iterator>;
   static nodes_iterator nodes_begin(GraphType F) {
     return nodes_iterator(F.Graph->begin());
   }

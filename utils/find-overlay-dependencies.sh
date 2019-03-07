@@ -32,7 +32,7 @@ case $# in
   usage ;;
 esac
 
-OVERLAYS_PATH=$(dirname "$0")/../stdlib/public/SDK/
+OVERLAYS_PATH=$(dirname "$0")/../stdlib/public/Darwin/
 CMAKE_PATH=$OVERLAYS_PATH/$1/CMakeLists.txt
 
 # Add both directions to associative array

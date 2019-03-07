@@ -1,6 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -o %t/a.out3 -swift-version 3 && %target-run %t/a.out3
-// RUN: %target-build-swift %s -o %t/a.out4 -swift-version 4 && %target-run %t/a.out4
+// RUN: %target-build-swift %s -o %t/a.out4 -swift-version 4 && %target-codesign %t/a.out4 && %target-run %t/a.out4
 
 // REQUIRES: executable_test
 
@@ -10,11 +9,7 @@ var tests = TestSuite("RangeReplaceableFilterCompatibility")
 
 tests.test("String.filter return type") {
   var filtered = "Hello, World".filter { $0 < "A" }
-#if swift(>=4)
   expectType(String.self, &filtered)
-#else
-  expectType([Character].self, &filtered)
-#endif
 }
 
 tests.test("Array.filter return type") {

@@ -143,14 +143,16 @@ emitAllocateExistentialBoxInBuffer(IRGenFunction &IGF, SILType boxedType,
 /// Given an opaque class instance pointer, produce the type
 /// metadata reference as a %type*.
 llvm::Value *emitDynamicTypeOfOpaqueHeapObject(IRGenFunction &IGF,
-                                               llvm::Value *object);
+                                               llvm::Value *object,
+                                               MetatypeRepresentation rep);
 
 /// Given a heap-object instance, with some heap-object type,
 /// produce a reference to its type metadata.
 llvm::Value *emitDynamicTypeOfHeapObject(IRGenFunction &IGF,
                                          llvm::Value *object,
+                                         MetatypeRepresentation rep,
                                          SILType objectType,
-                                         bool suppressCast = false);
+                                         bool allowArtificialSubclasses = false);
 
 /// Given a non-tagged object pointer, load a pointer to its class object.
 llvm::Value *emitLoadOfObjCHeapMetadataRef(IRGenFunction &IGF,

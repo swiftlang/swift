@@ -5,7 +5,9 @@ set(sources
   GlobalObjects.h
   HeapObject.h
   KeyPath.h
+  LibcOverlayShims.h
   LibcShims.h
+  Random.h
   RefCount.h
   RuntimeShims.h
   RuntimeStubs.h
@@ -13,10 +15,13 @@ set(sources
   SwiftStddef.h
   SwiftStdint.h
   System.h
+  Target.h
+  ThreadLocalStorage.h
   UnicodeShims.h
   Visibility.h
 
   DispatchOverlayShims.h
+  NetworkOverlayShims.h
   OSOverlayShims.h
   ObjectiveCOverlayShims.h
   SafariServicesOverlayShims.h
@@ -59,7 +64,8 @@ foreach(input ${sources})
       COMMAND
         "${CMAKE_COMMAND}" "-E" "copy_if_different"
         "${CMAKE_CURRENT_SOURCE_DIR}/${input}"
-        "${output_dir}/${input}")
+        "${output_dir}/${input}"
+      COMMENT "Copying ${input} to ${output_dir}")
   list(APPEND outputs "${output_dir}/${input}")
 endforeach()
 # Put the output dir itself last so that it isn't considered the primary output.
@@ -78,34 +84,7 @@ endif()
 # First extract the "version" used for Clang's resource directory.
 string(REGEX MATCH "[0-9]+\\.[0-9]+(\\.[0-9]+)?" CLANG_VERSION
   "${LLVM_PACKAGE_VERSION}")
-
-# Function to find LLVM or Clang headers
-function(find_llvm_clang_headers suffix description out_var)
-  set(headers_locations
-      "${LLVM_LIBRARY_DIR}${suffix}"
-
-      "${SWIFT_PATH_TO_CLANG_BUILD}/${CMAKE_CFG_INTDIR}/lib${suffix}"
-      "${SWIFT_PATH_TO_CLANG_BUILD}/${LLVM_BUILD_TYPE}/lib${suffix}")
-
-  set(headers_location)
-  foreach(loc ${headers_locations})
-    if(EXISTS "${loc}")
-      set(headers_location "${loc}")
-      set(${out_var} "${loc}" PARENT_SCOPE)
-      break()
-    endif()
-  endforeach()
-  if("${headers_location}" STREQUAL "")
-    message(FATAL_ERROR "${description} headers were not found in any of the following locations: ${headers_locations}")
-  endif()
-endfunction()
-
-if(SWIFT_BUILT_STANDALONE)
-  find_llvm_clang_headers("/clang/${CLANG_VERSION}" "Clang"
-    clang_headers_location)
-else() # NOT SWIFT_BUILT_STANDALONE
-  set(clang_headers_location "${LLVM_LIBRARY_DIR}/clang/${CLANG_VERSION}")
-endif()
+set(clang_headers_location "${LLVM_LIBRARY_OUTPUT_INTDIR}/clang/${CLANG_VERSION}")
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
   set(cmake_symlink_option "copy_directory")
@@ -145,7 +124,9 @@ swift_install_symlink_component(clang-resource-dir-symlink
 # Possibly install Clang headers under Clang's resource directory in case we
 # need to use a different version of the headers than the installed Clang. This
 # should be used in conjunction with clang-resource-dir-symlink.
+file(TO_CMAKE_PATH "${LLVM_LIBRARY_OUTPUT_INTDIR}"
+  _SWIFT_SHIMS_PATH_TO_CLANG_BUILD)
 swift_install_in_component(clang-builtin-headers-in-clang-resource-dir
-    DIRECTORY "${SWIFT_PATH_TO_CLANG_BUILD}/lib/clang"
+    DIRECTORY "${_SWIFT_SHIMS_PATH_TO_CLANG_BUILD}/lib/clang"
     DESTINATION "lib"
     PATTERN "*.h")

@@ -125,6 +125,7 @@ struct FooStruct {
 func returnsInt() -> Int {}
 
 // FOO_OBJECT_DOT: Begin completions
+// FOO_OBJECT_DOT-NEXT: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc0()[#Void#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: End completions
@@ -149,8 +150,8 @@ func returnsInt() -> Int {}
 
 // WITH_MEMBER_DECLS_INIT: Begin completions
 // WITH_MEMBER_DECLS_INIT-DAG: Decl[Struct]/CurrModule:          FooStruct[#FooStruct#]{{; name=.+$}}
-// WITH_MEMBER_DECLS_INIT-DAG: Decl[FreeFunction]/CurrModule:    returnsInt()[#Int#]{{; name=.+$}}
-// WITH_MEMBER_DECLS_INIT-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc({#self: MemberAccessors#})[#(Int) -> Float#]{{; name=.+$}}
+// WITH_MEMBER_DECLS_INIT-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Identical]: returnsInt()[#Int#]{{; name=.+$}}
+// WITH_MEMBER_DECLS_INIT-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(self): MemberAccessors#})[#(Int) -> Float#]{{; name=.+$}}
 // WITH_MEMBER_DECLS_INIT: End completions
 
 // WITH_MEMBER_DECLS_INIT_WRONG-NOT: self[

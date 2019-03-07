@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-objc-interop
 
 infix operator ====
 infix operator <<<<
@@ -104,7 +104,7 @@ _ = nullaryClosure(0)
 // parameter labels, and they are thus not in scope in the body of the function.
 // expected-error@+1{{unnamed parameters must be written}} {{27-27=_: }}
 func destructureArgument( (result: Int, error: Bool) ) -> Int {
-  return result
+  return result  // expected-error {{use of unresolved identifier 'result'}}
 }
 
 // The former is the same as this:
@@ -153,18 +153,29 @@ func bareTypeWithAttr(@convention(c) () -> Void) {} // expected-error{{attribute
 
 // Test fixits on curried functions.
 func testCurryFixits() {
-  func f1(_ x: Int)(y: Int) {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{19-21=, }}
+  func f1(_ x: Int)(y: Int) {} // expected-error{{cannot have more than one parameter list}}
   func f1a(_ x: Int, y: Int) {}
-  func f2(_ x: Int)(y: Int)(z: Int) {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{19-21=, }} {{27-29=, }}
+  func f2(_ x: Int)(y: Int)(z: Int) {} // expected-error{{cannot have more than one parameter list}}
   func f2a(_ x: Int, y: Int, z: Int) {}
-  func f3(_ x: Int)() {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{19-21=}}
+  func f3(_ x: Int)() {} // expected-error{{cannot have more than one parameter list}}
   func f3a(_ x: Int) {}
-  func f4()(x: Int) {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{11-13=}}
+  func f4()(x: Int) {} // expected-error{{cannot have more than one parameter list}}
   func f4a(_ x: Int) {}
-  func f5(_ x: Int)()(y: Int) {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{19-21=}} {{21-23=, }}
+  func f5(_ x: Int)()(y: Int) {} // expected-error{{cannot have more than one parameter list}}
   func f5a(_ x: Int, y: Int) {}
 }
 
 // Bogus diagnostic talking about a 'var' where there is none
 func invalidInOutParam(x: inout XYZ) {}
 // expected-error@-1{{use of undeclared type 'XYZ'}}
+
+// Parens around the 'inout'
+func parentheticalInout(_ x: ((inout Int))) {}
+
+var value = 0
+parentheticalInout(&value)
+
+func parentheticalInout2(_ fn: (((inout Int)), Int) -> ()) {
+  var value = 0
+  fn(&value, 0)
+}

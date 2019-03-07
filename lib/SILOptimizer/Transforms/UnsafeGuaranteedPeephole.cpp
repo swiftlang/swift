@@ -99,7 +99,7 @@ static void tryRemoveRetainReleasePairsBetween(
 static bool removeGuaranteedRetainReleasePairs(SILFunction &F,
                                                RCIdentityFunctionInfo &RCIA,
                                                PostDominanceAnalysis *PDA) {
-  DEBUG(llvm::dbgs() << "Running on function " << F.getName() << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Running on function " << F.getName() << "\n");
   bool Changed = false;
 
   // Lazily compute post-dominance info only when we really need it.
@@ -128,7 +128,7 @@ static bool removeGuaranteedRetainReleasePairs(SILFunction &F,
       auto Opd = UnsafeGuaranteedI->getOperand(0);
       auto RCIdOpd = RCIA.getRCIdentityRoot(UnsafeGuaranteedI->getOperand(0));
       if (!LastRetain.count(RCIdOpd)) {
-        DEBUG(llvm::dbgs() << "LastRetain failed\n");
+        LLVM_DEBUG(llvm::dbgs() << "LastRetain failed\n");
         continue;
       }
 
@@ -144,12 +144,12 @@ static bool removeGuaranteedRetainReleasePairs(SILFunction &F,
               isa<DebugValueAddrInst>(*NextInstIter)))
        ++NextInstIter;
       if (&*NextInstIter != CurInst) {
-        DEBUG(llvm::dbgs() << "Last retain right before match failed\n");
+        LLVM_DEBUG(llvm::dbgs() << "Last retain right before match failed\n");
         continue;
       }
 
-      DEBUG(llvm::dbgs() << "Saw " << *UnsafeGuaranteedI);
-      DEBUG(llvm::dbgs() << "  with operand " << *Opd);
+      LLVM_DEBUG(llvm::dbgs() << "Saw " << *UnsafeGuaranteedI);
+      LLVM_DEBUG(llvm::dbgs() << "  with operand " << *Opd);
 
       // Match the reference and token result.
       //  %4 = builtin "unsafeGuaranteed"<Foo>(%0 : $Foo)
@@ -161,7 +161,7 @@ static bool removeGuaranteedRetainReleasePairs(SILFunction &F,
           getSingleUnsafeGuaranteedValueResult(UnsafeGuaranteedI);
 
       if (!UnsafeGuaranteedValue) {
-        DEBUG(llvm::dbgs() << "  no single unsafeGuaranteed value use\n");
+        LLVM_DEBUG(llvm::dbgs() << "  no single unsafeGuaranteed value use\n");
         continue;
       }
 
@@ -171,7 +171,7 @@ static bool removeGuaranteedRetainReleasePairs(SILFunction &F,
       auto *UnsafeGuaranteedEndI =
           getUnsafeGuaranteedEndUser(UnsafeGuaranteedToken);
       if (!UnsafeGuaranteedEndI) {
-        DEBUG(llvm::dbgs() << "  no single unsafeGuaranteedEnd use found\n");
+        LLVM_DEBUG(llvm::dbgs()<<"  no single unsafeGuaranteedEnd use found\n");
         continue;
       }
 
@@ -190,7 +190,8 @@ static bool removeGuaranteedRetainReleasePairs(SILFunction &F,
           UnsafeGuaranteedEndI, UnsafeGuaranteedI, UnsafeGuaranteedValue,
           UnsafeGuaranteedEndBB, RCIA);
       if (!LastRelease) {
-        DEBUG(llvm::dbgs() << "  no release before/after unsafeGuaranteedEnd found\n");
+        LLVM_DEBUG(llvm::dbgs() << "  no release before/after "
+                                   "unsafeGuaranteedEnd found\n");
         continue;
       }
 

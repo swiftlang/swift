@@ -1,6 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %s
-
-// XFAIL: linux
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -verify %s
 
 @_exported import macros
 

@@ -16,6 +16,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
@@ -66,8 +67,10 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
     Optional<unsigned> Length;
     if (AttrLoc.isValid()) {
       // This token is following @, see if it's a known attribute name.
+      // Type attribute, decl attribute, or '@unknown' for swift case statement.
       if (TypeAttributes::getAttrKindFromString(Tok.getText()) != TAK_Count ||
-          DeclAttribute::getAttrKindFromString(Tok.getText()) != DAK_Count) {
+          DeclAttribute::getAttrKindFromString(Tok.getText()) != DAK_Count ||
+          Tok.getText() == "unknown")  {
         // It's a known attribute, so treat it as a syntactic attribute node for
         // syntax coloring. If swift gets user attributes then all identifiers
         // will be treated as syntactic attribute nodes.
@@ -175,8 +178,9 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
       }
 
       case tok::unknown: {
-        if (Tok.getRawText().startswith("\"")) {
-          // This is an invalid string literal
+        if (Tok.getRawText().ltrim('#').startswith("\"")) {
+          // This is likely an invalid single-line ("), multi-line ("""),
+          // or raw (#", ##", #""", etc.) string literal.
           Kind = SyntaxNodeKind::String;
           break;
         }
@@ -545,6 +549,18 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
                           Closure->getExplicitResultTypeLoc().getSourceRange());
 
     pushStructureNode(SN, Closure);
+  } else if (auto SE = dyn_cast<SequenceExpr>(E)) {
+    // In SequenceExpr, explicit cast expressions (e.g. 'as', 'is') appear
+    // twice. Skip pointers we've already seen.
+    SmallPtrSet<Expr *, 5> seenExpr;
+    for (auto subExpr : SE->getElements()) {
+      if (!seenExpr.insert(subExpr).second) {
+        continue;
+      }
+      llvm::SaveAndRestore<ASTWalker::ParentTy> SetParent(Parent, E);
+      subExpr->walk(*this);
+    }
+    return { false, walkToExprPost(SE) };
   }
 
   return { true, E };
@@ -677,11 +693,16 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
     }
 
   } else if (auto *DeferS = dyn_cast<DeferStmt>(S)) {
+    // Since 'DeferStmt::getTempDecl()' is marked as implicit, we manually walk
+    // into the body.
     if (auto *FD = DeferS->getTempDecl()) {
       auto *RetS = FD->getBody()->walk(*this);
-      // Already walked children.
-      return { false, RetS };
+      assert(RetS == FD->getBody());
+      (void)RetS;
+      walkToStmtPost(DeferS);
     }
+    // Already walked children.
+    return { false, DeferS };
   }
 
   return { true, S };
@@ -731,7 +752,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
                         AFD->getSignatureSourceRange());
     if (FD) {
       SN.TypeRange = charSourceRangeFromSourceRange(SM,
-                                    FD->getReturnTypeLoc().getSourceRange());
+                                    FD->getBodyResultTypeLoc().getSourceRange());
     }
     pushStructureNode(SN, AFD);
   } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
@@ -795,9 +816,9 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     else
       SR = VD->getSourceRange();
     SN.Range = charSourceRangeFromSourceRange(SM, SR);
-    if (VD->hasAccessorFunctions())
-      SN.BodyRange = innerCharSourceRangeFromSourceRange(SM,
-                                                         VD->getBracesRange());
+    auto bracesRange = VD->getBracesRange();
+    if (bracesRange.isValid())
+      SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, bracesRange);
     SourceLoc NRStart = VD->getNameLoc();
     SourceLoc NREnd = NRStart.getAdvancedLoc(VD->getName().getLength());
     SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
@@ -870,8 +891,22 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
         SN.Kind = SyntaxStructureKind::EnumElement;
         SN.Range = charSourceRangeFromSourceRange(SM,
                                                   EnumElemD->getSourceRange());
-        SN.NameRange = CharSourceRange(EnumElemD->getNameLoc(),
-                                       EnumElemD->getName().getLength());
+        if (auto ParamList = EnumElemD->getParameterList()) {
+          SourceRange NameRange = SourceRange(EnumElemD->getNameLoc(),
+                                              ParamList->getSourceRange().End);
+          SN.NameRange = charSourceRangeFromSourceRange(SM, NameRange);
+
+          for (auto Param : ParamList->getArray()) {
+            auto TL = Param->getTypeLoc();
+            CharSourceRange TR = charSourceRangeFromSourceRange(SM,
+                                                                TL.getSourceRange());
+            passNonTokenNode({SyntaxNodeKind::TypeId, TR});
+          }
+        } else {
+          SN.NameRange = CharSourceRange(EnumElemD->getNameLoc(),
+                                         EnumElemD->getName().getLength());
+        }
+
         if (auto *E = EnumElemD->getRawValueExpr()) {
           SourceRange ElemRange = E->getSourceRange();
           SN.Elements.emplace_back(SyntaxStructureElementKind::InitExpr,
@@ -947,11 +982,14 @@ bool ModelASTWalker::walkToTypeReprPre(TypeRepr *T) {
       return false;
 
   } else if (auto IdT = dyn_cast<ComponentIdentTypeRepr>(T)) {
-    if (!passNonTokenNode({ SyntaxNodeKind::TypeId,
-                            CharSourceRange(IdT->getIdLoc(),
-                                            IdT->getIdentifier().getLength())
-                          }))
+    if (!passTokenNodesUntil(IdT->getIdLoc(), ExcludeNodeAtLocation))
       return false;
+    if (TokenNodes.empty() ||
+        TokenNodes.front().Range.getStart() != IdT->getIdLoc())
+      return false;
+    if (!passNode({SyntaxNodeKind::TypeId, TokenNodes.front().Range}))
+      return false;
+    TokenNodes = TokenNodes.slice(1);
   }
   return true;
 }
@@ -1013,6 +1051,8 @@ bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
     TokenNodes = TokenNodes.slice(I);
     return true;
   }
+  if (isa<RethrowsAttr>(D))
+    return true;
   return false;
 }
 

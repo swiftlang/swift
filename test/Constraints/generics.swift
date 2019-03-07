@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-objc-interop
 
 infix operator +++
 
@@ -52,7 +52,7 @@ func generic_metatypes<T : SomeProtocol>(_ x: T)
 }
 
 // Inferring a variable's type from a call to a generic.
-struct Pair<T, U> { } // expected-note 4 {{'T' declared as parameter to type 'Pair'}} expected-note {{'U' declared as parameter to type 'Pair'}}
+struct Pair<T, U> { } // expected-note 3 {{'T' declared as parameter to type 'Pair'}} expected-note 2 {{'U' declared as parameter to type 'Pair'}}
 
 func pair<T, U>(_ x: T, _ y: U) -> Pair<T, U> { }
 
@@ -188,7 +188,7 @@ func r22459135() {
 
 // <rdar://problem/19710848> QoI: Friendlier error message for "[] as Set"
 // <rdar://problem/22326930> QoI: "argument for generic parameter 'Element' could not be inferred" lacks context
-_ = [] as Set  // expected-error {{generic parameter 'Element' could not be inferred in cast to 'Set'}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{14-14=<<#Element: Hashable#>>}}
+_ = [] as Set  // expected-error {{protocol type 'Any' cannot conform to 'Hashable' because only concrete types can conform to protocols}}
 
 
 //<rdar://problem/22509125> QoI: Error when unable to infer generic archetype lacks greatness
@@ -248,12 +248,12 @@ struct S27515965 : P27515965 {
 
 struct V27515965 {
   init<T : P27515965>(_ tp: T) where T.R == Float {}
-  // expected-note@-1 {{candidate requires that the types 'Any' and 'Float' be equivalent (requirement specified as 'T.R' == 'Float' [with T = S27515965])}}
+  // expected-note@-1 {{where 'T.R' = 'Any'}}
 }
 
 func test(x: S27515965) -> V27515965 {
   return V27515965(x)
-  // expected-error@-1 {{cannot invoke initializer for type 'init(_:)' with an argument list of type '(S27515965)'}}
+  // expected-error@-1 {{initializer 'init(_:)' requires the types 'Any' and 'Float' be equivalent}}
 }
 
 protocol BaseProto {}
@@ -285,10 +285,10 @@ struct ProtosBound3<Foo: SubProto> where Foo: NSCopyish {} // expected-note {{'F
 struct AnyClassAndProtoBound<Foo> where Foo: AnyObject, Foo: SubProto {} // expected-note {{'Foo' declared as parameter to type 'AnyClassAndProtoBound'}}
 struct AnyClassAndProtoBound2<Foo> where Foo: SubProto, Foo: AnyObject {} // expected-note {{'Foo' declared as parameter to type 'AnyClassAndProtoBound2'}}
 
-struct ClassAndProtoBound<Foo> where Foo: X, Foo: SubProto {} // expected-note {{'Foo' declared as parameter to type 'ClassAndProtoBound'}}
+struct ClassAndProtoBound<Foo> where Foo: X, Foo: SubProto {} // expected-note {{where 'Foo' = 'X'}}
 
-struct ClassAndProtosBound<Foo> where Foo: X, Foo: SubProto, Foo: NSCopyish {} // expected-note {{'Foo' declared as parameter to type 'ClassAndProtosBound'}}
-struct ClassAndProtosBound2<Foo> where Foo: X, Foo: SubProto & NSCopyish {} // expected-note {{'Foo' declared as parameter to type 'ClassAndProtosBound2'}}
+struct ClassAndProtosBound<Foo> where Foo: X, Foo: SubProto, Foo: NSCopyish {} // expected-note 2 {{where 'Foo' = 'X'}}
+struct ClassAndProtosBound2<Foo> where Foo: X, Foo: SubProto & NSCopyish {} // expected-note 2 {{where 'Foo' = 'X'}}
 
 extension Pair {
   init(first: T) {}
@@ -331,10 +331,14 @@ func testFixIts() {
   _ = AnyClassAndProtoBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{28-28=<<#Foo: SubProto & AnyObject#>>}}
   _ = AnyClassAndProtoBound2() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{29-29=<<#Foo: SubProto & AnyObject#>>}}
 
-  _ = ClassAndProtoBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{25-25=<<#Foo: X & SubProto#>>}}
+  _ = ClassAndProtoBound() // expected-error {{referencing initializer 'init()' on 'ClassAndProtoBound' requires that 'X' conform to 'SubProto'}}
 
-  _ = ClassAndProtosBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{26-26=<<#Foo: X & NSCopyish & SubProto#>>}}
-  _ = ClassAndProtosBound2() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{27-27=<<#Foo: X & NSCopyish & SubProto#>>}}
+  _ = ClassAndProtosBound() 
+  // expected-error@-1 {{referencing initializer 'init()' on 'ClassAndProtosBound' requires that 'X' conform to 'NSCopyish'}}
+  // expected-error@-2 {{referencing initializer 'init()' on 'ClassAndProtosBound' requires that 'X' conform to 'SubProto'}}
+  _ = ClassAndProtosBound2()
+  // expected-error@-1 {{referencing initializer 'init()' on 'ClassAndProtosBound2' requires that 'X' conform to 'NSCopyish'}}
+  // expected-error@-2 {{referencing initializer 'init()' on 'ClassAndProtosBound2' requires that 'X' conform to 'SubProto'}}
 
   _ = Pair() // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{11-11=<Any, Any>}}
   _ = Pair(first: S()) // expected-error {{generic parameter 'U' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{11-11=<S, Any>}}
@@ -360,7 +364,7 @@ func testFixItCasting(x: Any) {
 
 func testFixItContextualKnowledge() {
   // FIXME: These could propagate backwards.
-  let _: Int = Pair().first // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{20-20=<Any, Any>}}
+  let _: Int = Pair().first // expected-error {{generic parameter 'U' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{20-20=<Any, Any>}}
   let _: Int = Pair().second // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{20-20=<Any, Any>}}
 }
 
@@ -559,5 +563,127 @@ do {
 }
 
 func rdar35890334(_ arr: inout [Int]) {
-  _ = arr.popFirst() // expected-error {{'[Int]' requires the types '[Int]' and 'ArraySlice<Int>' be equivalent to use 'popFirst'}}
+  _ = arr.popFirst() // expected-error {{referencing instance method 'popFirst()' on 'Collection' requires the types '[Int]' and 'ArraySlice<Int>' be equivalent}}
+}
+
+// rdar://problem/39616039
+
+func rdar39616039() {
+  func foo<V>(default: V, _ values: [String: V]) -> V {
+    return values["foo"] ?? `default`
+  }
+
+  var a = foo(default: 42, ["foo": 0])
+  a += 1 // ok
+
+  var b = foo(default: 42.0, ["foo": 0])
+  b += 1 // ok
+
+  var c = foo(default: 42.0, ["foo": Float(0)])
+  c += 1 // ok
+}
+
+// https://bugs.swift.org/browse/SR-8075
+
+func sr8075() {
+  struct UIFont {
+    init(ofSize: Float) {}
+  }
+
+  func switchOnCategory<T>(_ categoryToValue: [Int: T]) -> T {
+    fatalError()
+  }
+
+  let _: UIFont = .init(ofSize: switchOnCategory([0: 15.5, 1: 20.5]))
+}
+
+// rdar://problem/40537858 - Ambiguous diagnostic when type is missing conformance
+func rdar40537858() {
+  struct S {
+    struct Id {}
+    var id: Id
+  }
+
+  struct List<T: Collection, E: Hashable> { // expected-note {{where 'E' = 'S.Id'}}
+    typealias Data = T.Element
+    init(_: T, id: KeyPath<Data, E>) {}
+  }
+
+  var arr: [S] = []
+  _ = List(arr, id: \.id) // expected-error {{referencing initializer 'init(_:id:)' on 'List' requires that 'S.Id' conform to 'Hashable'}}
+
+  enum E<T: P> { // expected-note 2 {{where 'T' = 'S'}}
+    case foo(T)
+    case bar([T])
+  }
+
+  var s = S(id: S.Id())
+  let _: E = .foo(s)   // expected-error {{enum case 'foo' requires that 'S' conform to 'P'}}
+  let _: E = .bar([s]) // expected-error {{enum case 'bar' requires that 'S' conform to 'P'}}
+}
+
+// https://bugs.swift.org/browse/SR-8934
+struct BottleLayout {
+    let count : Int
+}
+let arr = [BottleLayout]()
+let layout = BottleLayout(count:1)
+let ix = arr.firstIndex(of:layout) // expected-error {{argument type 'BottleLayout' does not conform to expected type 'Equatable'}}
+
+let _: () -> UInt8 = { .init("a" as Unicode.Scalar) } // expected-error {{initializer 'init(_:)' requires that 'Unicode.Scalar' conform to 'BinaryInteger'}}
+
+// https://bugs.swift.org/browse/SR-9068
+func compare<C: Collection, Key: Hashable, Value: Equatable>(c: C)
+  -> Bool where C.Element == (key: Key, value: Value)
+{
+  _ = Dictionary(uniqueKeysWithValues: Array(c))
+}
+
+// https://bugs.swift.org/browse/SR-7984
+struct SR_7984<Bar> {
+  func doSomething() {}
+}
+
+extension SR_7984 where Bar: String {} // expected-error {{type 'Bar' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'Bar == String' to require 'Bar' to be 'String'}} {{28-29= ==}}
+
+protocol SR_7984_Proto {
+  associatedtype Bar
+}
+
+extension SR_7984_Proto where Bar: String {} // expected-error {{type 'Self.Bar' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'Bar == String' to require 'Bar' to be 'String'}} {{34-35= ==}}
+
+protocol SR_7984_HasFoo {
+  associatedtype Foo
+}
+protocol SR_7984_HasAssoc {
+  associatedtype Assoc: SR_7984_HasFoo
+}
+
+struct SR_7984_X<T: SR_7984_HasAssoc> {}
+extension SR_7984_X where T.Assoc.Foo: String {} // expected-error {{type 'T.Assoc.Foo' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Assoc.Foo == String' to require 'T.Assoc.Foo' to be 'String'}} {{38-39= ==}}
+
+struct SR_7984_S<T: Sequence> where T.Element: String {} // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{46-47= ==}}
+func SR_7984_F<T: Sequence>(foo: T) where T.Element: String {} // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{52-53= ==}}
+
+protocol SR_7984_P {
+  func S<T : Sequence>(bar: T) where T.Element: String // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{47-48= ==}}
+}
+
+struct A<T: String> {} // expected-error {{type 'T' constrained to non-protocol, non-class type 'String'}}
+struct B<T> where T: String {} // expected-error {{type 'T' constrained to non-protocol, non-class type 'String'}}
+protocol C {
+  associatedtype Foo: String // expected-error {{inheritance from non-protocol, non-class type 'String'}} expected-error {{type 'Self.Foo' constrained to non-protocol, non-class type 'String'}}
+}
+protocol D {
+  associatedtype Foo where Foo: String // expected-error {{type 'Self.Foo' constrained to non-protocol, non-class type 'String'}}
+}
+
+func member_ref_with_explicit_init() {
+  struct S<T: P> { // expected-note {{where 'T' = 'Int'}}
+    init(_: T) {}
+    init(_: T, _ other: Int = 42) {}
+  }
+
+  _ = S.init(42)
+  // expected-error@-1 {{generic struct 'S' requires that 'Int' conform to 'P'}}
 }

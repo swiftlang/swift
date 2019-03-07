@@ -12,7 +12,9 @@
 
 #include "swift/Serialization/ModuleFile.h"
 #include "DeserializationErrors.h"
+#include "DocFormat.h"
 #include "swift/Serialization/ModuleFormat.h"
+#include "swift/Serialization/SerializationOptions.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -27,6 +29,8 @@
 #include "swift/Serialization/BCReadingExtras.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/Chrono.h"
+#include "llvm/Support/DJB.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
 
@@ -35,15 +39,9 @@ using namespace swift::serialization;
 using namespace llvm::support;
 using llvm::Expected;
 
-static bool checkModuleSignature(llvm::BitstreamCursor &cursor) {
-  for (unsigned char byte : MODULE_SIGNATURE)
-    if (cursor.AtEndOfStream() || cursor.Read(8) != byte)
-      return false;
-  return true;
-}
-
-static bool checkModuleDocSignature(llvm::BitstreamCursor &cursor) {
-  for (unsigned char byte : MODULE_DOC_SIGNATURE)
+static bool checkModuleSignature(llvm::BitstreamCursor &cursor,
+                                 ArrayRef<unsigned char> signature) {
+  for (unsigned char byte : signature)
     if (cursor.AtEndOfStream() || cursor.Read(8) != byte)
       return false;
   return true;
@@ -115,6 +113,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::IS_TESTABLE:
       extendedInfo.setIsTestable(true);
       break;
+    case options_block::ARE_PRIVATE_IMPORTS_ENABLED:
+      extendedInfo.setPrivateImportsEnabled(true);
+      break;
     case options_block::RESILIENCE_STRATEGY:
       unsigned Strategy;
       options_block::ResilienceStrategyLayout::readRecord(scratch, Strategy);
@@ -133,6 +134,7 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
 static ValidationInfo
 validateControlBlock(llvm::BitstreamCursor &cursor,
                      SmallVectorImpl<uint64_t> &scratch,
+                     std::pair<uint16_t, uint16_t> expectedVersion,
                      ExtendedValidationInfo *extendedInfo) {
   // The control block is malformed until we've at least read a major version
   // number.
@@ -178,9 +180,9 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
       }
 
       uint16_t versionMajor = scratch[0];
-      if (versionMajor > VERSION_MAJOR)
+      if (versionMajor > expectedVersion.first)
         result.status = Status::FormatTooNew;
-      else if (versionMajor < VERSION_MAJOR)
+      else if (versionMajor < expectedVersion.first)
         result.status = Status::FormatTooOld;
       else
         result.status = Status::Valid;
@@ -188,8 +190,8 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
       // Major version 0 does not have stable minor versions.
       if (versionMajor == 0) {
         uint16_t versionMinor = scratch[1];
-        if (versionMinor != VERSION_MINOR) {
-          if (versionMinor < VERSION_MINOR)
+        if (versionMinor != expectedVersion.second) {
+          if (versionMinor < expectedVersion.second)
             result.status = Status::FormatTooOld;
           else
             result.status = Status::FormatTooNew;
@@ -201,9 +203,11 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
       default:
         // Add new cases here, in descending order.
       case 4:
-        result.compatibilityVersion =
-          version::Version(blobData.substr(scratch[2]+1, scratch[3]),
-                           SourceLoc(), nullptr);
+        if (scratch[3] != 0) {
+          result.compatibilityVersion =
+            version::Version(blobData.substr(scratch[2]+1, scratch[3]),
+                             SourceLoc(), nullptr);
+        }
         LLVM_FALLTHROUGH;
       case 3:
         result.shortVersion = blobData.slice(0, scratch[2]);
@@ -233,15 +237,45 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
   return result;
 }
 
+static bool validateInputBlock(
+    llvm::BitstreamCursor &cursor, SmallVectorImpl<uint64_t> &scratch,
+    SmallVectorImpl<SerializationOptions::FileDependency> &dependencies) {
+  while (!cursor.AtEndOfStream()) {
+    auto entry = cursor.advance();
+    if (entry.Kind == llvm::BitstreamEntry::EndBlock)
+      break;
+
+    if (entry.Kind == llvm::BitstreamEntry::Error)
+      return true;
+
+    scratch.clear();
+    StringRef blobData;
+    unsigned kind = cursor.readRecord(entry.ID, scratch, &blobData);
+    switch (kind) {
+    case input_block::FILE_DEPENDENCY:
+      dependencies.push_back(SerializationOptions::FileDependency{
+          scratch[0], scratch[1], blobData});
+      break;
+    default:
+      // Unknown metadata record, possibly for use by a future version of the
+      // module format.
+      break;
+    }
+  }
+  return false;
+}
+
+
 bool serialization::isSerializedAST(StringRef data) {
-  StringRef signatureStr(reinterpret_cast<const char *>(MODULE_SIGNATURE),
-                         llvm::array_lengthof(MODULE_SIGNATURE));
+  StringRef signatureStr(reinterpret_cast<const char *>(SWIFTMODULE_SIGNATURE),
+                         llvm::array_lengthof(SWIFTMODULE_SIGNATURE));
   return data.startswith(signatureStr);
 }
 
 ValidationInfo serialization::validateSerializedAST(
     StringRef data,
-    ExtendedValidationInfo *extendedInfo) {
+    ExtendedValidationInfo *extendedInfo,
+    SmallVectorImpl<SerializationOptions::FileDependency> *dependencies) {
   ValidationInfo result;
 
   // Check 32-bit alignment.
@@ -252,7 +286,7 @@ ValidationInfo serialization::validateSerializedAST(
   llvm::BitstreamCursor cursor(data);
   SmallVector<uint64_t, 32> scratch;
 
-  if (!checkModuleSignature(cursor) ||
+  if (!checkModuleSignature(cursor, SWIFTMODULE_SIGNATURE) ||
       !enterTopLevelModuleBlock(cursor, MODULE_BLOCK_ID, false))
     return result;
 
@@ -265,9 +299,20 @@ ValidationInfo serialization::validateSerializedAST(
 
     if (topLevelEntry.ID == CONTROL_BLOCK_ID) {
       cursor.EnterSubBlock(CONTROL_BLOCK_ID);
-      result = validateControlBlock(cursor, scratch, extendedInfo);
+      result = validateControlBlock(cursor, scratch,
+                                    {SWIFTMODULE_VERSION_MAJOR,
+                                     SWIFTMODULE_VERSION_MINOR},
+                                    extendedInfo);
       if (result.status == Status::Malformed)
         return result;
+    } else if (dependencies &&
+               result.status == Status::Valid &&
+               topLevelEntry.ID == INPUT_BLOCK_ID) {
+      cursor.EnterSubBlock(INPUT_BLOCK_ID);
+      if (validateInputBlock(cursor, scratch, *dependencies)) {
+        result.status = Status::Malformed;
+        return result;
+      }
     } else {
       if (cursor.SkipBlock()) {
         result.status = Status::Malformed;
@@ -317,7 +362,8 @@ public:
 
   hash_value_type ComputeHash(internal_key_type key) {
     if (key.first == DeclBaseName::Kind::Normal) {
-      return llvm::HashString(key.second);
+      // FIXME: DJB seed=0, audit whether the default seed could be used.
+      return llvm::djbHash(key.second, 0);
     } else {
       return (hash_value_type)key.first;
     }
@@ -379,7 +425,8 @@ public:
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::HashString(key);
+    // FIXME: DJB seed=0, audit whether the default seed could be used.
+    return llvm::djbHash(key, 0);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -408,7 +455,8 @@ public:
       StringRef moduleNameOrMangledBase;
       if (nameIDOrLength < 0) {
         const ModuleDecl *module = File.getModule(-nameIDOrLength);
-        moduleNameOrMangledBase = module->getName().str();
+        if (module)
+          moduleNameOrMangledBase = module->getName().str();
       } else {
         moduleNameOrMangledBase =
             StringRef(reinterpret_cast<const char *>(data), nameIDOrLength);
@@ -429,7 +477,7 @@ class ModuleFile::LocalDeclTableInfo {
 public:
   using internal_key_type = StringRef;
   using external_key_type = internal_key_type;
-  using data_type = std::pair<DeclID, unsigned>; // ID, local discriminator
+  using data_type = DeclID;
   using hash_value_type = uint32_t;
   using offset_type = unsigned;
 
@@ -438,7 +486,8 @@ public:
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::HashString(key);
+    // FIXME: DJB seed=0, audit whether the default seed could be used.
+    return llvm::djbHash(key, 0);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -447,7 +496,7 @@ public:
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
     unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
-    return { keyLength, sizeof(uint32_t) + sizeof(unsigned) };
+    return { keyLength, sizeof(uint32_t) };
   }
 
   static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
@@ -456,9 +505,7 @@ public:
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
-    auto declID = endian::readNext<uint32_t, little, unaligned>(data);
-    auto discriminator = endian::readNext<unsigned, little, unaligned>(data);
-    return { declID, discriminator };
+    return endian::readNext<uint32_t, little, unaligned>(data);
   }
 };
 
@@ -475,7 +522,8 @@ public:
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::HashString(key);
+    // FIXME: DJB seed=0, audit whether the default seed could be used.
+    return llvm::djbHash(key, 0);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -530,7 +578,8 @@ public:
 
   hash_value_type ComputeHash(internal_key_type key) {
     if (key.first == DeclBaseName::Kind::Normal) {
-      return llvm::HashString(key.second);
+      // FIXME: DJB seed=0, audit whether the default seed could be used.
+      return llvm::djbHash(key.second, 0);
     } else {
       return (hash_value_type)key.first;
     }
@@ -557,6 +606,8 @@ public:
       return {DeclBaseName::Kind::Subscript, StringRef()};
     case static_cast<uint8_t>(DeclNameKind::Destructor):
       return {DeclBaseName::Kind::Destructor, StringRef()};
+    case static_cast<uint8_t>(DeclNameKind::Constructor):
+      return {DeclBaseName::Kind::Constructor, StringRef()};
     default:
       llvm_unreachable("Unknown DeclNameKind");
     }
@@ -596,9 +647,8 @@ public:
   }
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
-    unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
     unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
-    return { keyLength, dataLength };
+    return { sizeof(uint32_t), dataLength };
   }
 
   static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
@@ -703,7 +753,8 @@ public:
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::HashString(key);
+    // FIXME: DJB seed=0, audit whether the default seed could be used.
+    return llvm::djbHash(key, 0);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -792,19 +843,19 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
       switch (kind) {
       case index_block::DECL_OFFSETS:
         assert(blobData.empty());
-        Decls.assign(scratch.begin(), scratch.end());
+        allocateBuffer(Decls, scratch);
         break;
       case index_block::DECL_CONTEXT_OFFSETS:
         assert(blobData.empty());
-        DeclContexts.assign(scratch.begin(), scratch.end());
+        allocateBuffer(DeclContexts, scratch);
         break;
       case index_block::TYPE_OFFSETS:
         assert(blobData.empty());
-        Types.assign(scratch.begin(), scratch.end());
+        allocateBuffer(Types, scratch);
         break;
       case index_block::IDENTIFIER_OFFSETS:
         assert(blobData.empty());
-        Identifiers.assign(scratch.begin(), scratch.end());
+        allocateBuffer(Identifiers, scratch);
         break;
       case index_block::TOP_LEVEL_DECLS:
         TopLevelDecls = readDeclTable(scratch, blobData);
@@ -831,6 +882,9 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         assert(blobData.empty());
         setEntryPointClassID(scratch.front());
         break;
+      case index_block::ORDERED_TOP_LEVEL_DECLS:
+        allocateBuffer(OrderedTopLevelDecls, scratch);
+        break;
       case index_block::LOCAL_TYPE_DECLS:
         LocalTypeDecls = readLocalDeclTable(scratch, blobData);
         break;
@@ -842,23 +896,27 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         break;
       case index_block::LOCAL_DECL_CONTEXT_OFFSETS:
         assert(blobData.empty());
-        LocalDeclContexts.assign(scratch.begin(), scratch.end());
+        allocateBuffer(LocalDeclContexts, scratch);
         break;
       case index_block::GENERIC_SIGNATURE_OFFSETS:
         assert(blobData.empty());
-        GenericSignatures.assign(scratch.begin(), scratch.end());
+        allocateBuffer(GenericSignatures, scratch);
         break;
       case index_block::GENERIC_ENVIRONMENT_OFFSETS:
         assert(blobData.empty());
-        GenericEnvironments.assign(scratch.begin(), scratch.end());
+        allocateBuffer(GenericEnvironments, scratch);
+        break;
+      case index_block::SUBSTITUTION_MAP_OFFSETS:
+        assert(blobData.empty());
+        allocateBuffer(SubstitutionMaps, scratch);
         break;
       case index_block::NORMAL_CONFORMANCE_OFFSETS:
         assert(blobData.empty());
-        NormalConformances.assign(scratch.begin(), scratch.end());
+        allocateBuffer(NormalConformances, scratch);
         break;
       case index_block::SIL_LAYOUT_OFFSETS:
         assert(blobData.empty());
-        SILLayouts.assign(scratch.begin(), scratch.end());
+        allocateBuffer(SILLayouts, scratch);
         break;
 
       default:
@@ -890,7 +948,8 @@ public:
 
   hash_value_type ComputeHash(internal_key_type key) {
     assert(!key.empty());
-    return llvm::HashString(key);
+    // FIXME: DJB seed=0, audit whether the default seed could be used.
+    return llvm::djbHash(key, 0);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -940,8 +999,9 @@ public:
 std::unique_ptr<ModuleFile::SerializedDeclCommentTable>
 ModuleFile::readDeclCommentTable(ArrayRef<uint64_t> fields,
                                  StringRef blobData) {
-  uint32_t tableOffset;
-  index_block::DeclListLayout::readRecord(fields, tableOffset);
+  if (fields.empty() || blobData.empty())
+    return nullptr;
+  uint32_t tableOffset = static_cast<uint32_t>(fields.front());
   auto base = reinterpret_cast<const uint8_t *>(blobData.data());
 
   return std::unique_ptr<SerializedDeclCommentTable>(
@@ -956,7 +1016,7 @@ ModuleFile::readGroupTable(ArrayRef<uint64_t> Fields, StringRef BlobData) {
     new ModuleFile::GroupNameTable);
   auto Data = reinterpret_cast<const uint8_t *>(BlobData.data());
   unsigned GroupCount = endian::readNext<uint32_t, little, unaligned>(Data);
-  for (unsigned I = 0; I < GroupCount; I++) {
+  for (unsigned I = 0; I < GroupCount; ++I) {
     auto RawSize = endian::readNext<uint32_t, little, unaligned>(Data);
     auto RawText = StringRef(reinterpret_cast<const char *>(Data), RawSize);
     Data += RawSize;
@@ -1070,6 +1130,65 @@ static bool isTargetTooNew(const llvm::Triple &moduleTarget,
   return ctxTarget.isOSVersionLT(major, minor, micro);
 }
 
+bool ModuleFile::readModuleDocIfPresent() {
+  if (!this->ModuleDocInputBuffer)
+    return true;
+
+  llvm::BitstreamCursor docCursor{ModuleDocInputBuffer->getMemBufferRef()};
+  if (!checkModuleSignature(docCursor, SWIFTDOC_SIGNATURE) ||
+      !enterTopLevelModuleBlock(docCursor, MODULE_DOC_BLOCK_ID)) {
+    return false;
+  }
+
+  SmallVector<uint64_t, 64> scratch;
+  llvm::BitstreamEntry topLevelEntry;
+
+  bool hasValidControlBlock = false;
+  ValidationInfo info;
+
+  while (!docCursor.AtEndOfStream()) {
+    topLevelEntry = docCursor.advance(AF_DontPopBlockAtEnd);
+    if (topLevelEntry.Kind != llvm::BitstreamEntry::SubBlock)
+      break;
+
+    switch (topLevelEntry.ID) {
+    case CONTROL_BLOCK_ID: {
+      docCursor.EnterSubBlock(CONTROL_BLOCK_ID);
+
+      info = validateControlBlock(docCursor, scratch,
+                                  {SWIFTDOC_VERSION_MAJOR,
+                                   SWIFTDOC_VERSION_MINOR},
+                                  /*extendedInfo*/nullptr);
+      if (info.status != Status::Valid)
+        return false;
+      // Check that the swiftdoc is actually for this module.
+      if (info.name != Name)
+        return false;
+      hasValidControlBlock = true;
+      break;
+    }
+
+    case COMMENT_BLOCK_ID: {
+      if (!hasValidControlBlock || !readCommentBlock(docCursor))
+        return false;
+      break;
+    }
+
+    default:
+      // Unknown top-level block, possibly for use by a future version of the
+      // module format.
+      if (docCursor.SkipBlock())
+        return false;
+      break;
+    }
+  }
+
+  if (topLevelEntry.Kind != llvm::BitstreamEntry::EndBlock)
+    return false;
+
+  return true;
+}
+
 ModuleFile::ModuleFile(
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
@@ -1085,7 +1204,7 @@ ModuleFile::ModuleFile(
 
   llvm::BitstreamCursor cursor{ModuleInputBuffer->getMemBufferRef()};
 
-  if (!checkModuleSignature(cursor) ||
+  if (!checkModuleSignature(cursor, SWIFTMODULE_SIGNATURE) ||
       !enterTopLevelModuleBlock(cursor, MODULE_BLOCK_ID)) {
     error();
     return;
@@ -1107,7 +1226,10 @@ ModuleFile::ModuleFile(
     case CONTROL_BLOCK_ID: {
       cursor.EnterSubBlock(CONTROL_BLOCK_ID);
 
-      info = validateControlBlock(cursor, scratch, extInfo);
+      info = validateControlBlock(cursor, scratch,
+                                  {SWIFTMODULE_VERSION_MAJOR,
+                                   SWIFTMODULE_VERSION_MINOR},
+                                  extInfo);
       if (info.status != Status::Valid) {
         error(info.status);
         return;
@@ -1128,7 +1250,6 @@ ModuleFile::ModuleFile(
       }
 
       cursor.EnterSubBlock(INPUT_BLOCK_ID);
-      bool seenFlags = false;
 
       auto next = cursor.advance();
       while (next.Kind == llvm::BitstreamEntry::Record) {
@@ -1167,15 +1288,6 @@ ModuleFile::ModuleFile(
           assert(importedHeaderInfo.contents.empty() &&
                  "contents seen already");
           importedHeaderInfo.contents = blobData;
-          break;
-        }
-        case input_block::MODULE_FLAGS: {
-          assert(!seenFlags && "only one flags record allowed");
-          seenFlags = true;
-          bool hasUnderlyingModule;
-          input_block::ModuleFlagsLayout::readRecord(scratch,
-                                                     hasUnderlyingModule);
-          Bits.HasUnderlyingModule = hasUnderlyingModule;
           break;
         }
         case input_block::SEARCH_PATH: {
@@ -1309,42 +1421,7 @@ ModuleFile::ModuleFile(
     return;
   }
 
-  if (!this->ModuleDocInputBuffer)
-    return;
-
-  llvm::BitstreamCursor docCursor{ModuleDocInputBuffer->getMemBufferRef()};
-  if (!checkModuleDocSignature(docCursor) ||
-      !enterTopLevelModuleBlock(docCursor, MODULE_DOC_BLOCK_ID)) {
-    error(Status::MalformedDocumentation);
-    return;
-  }
-
-  while (!docCursor.AtEndOfStream()) {
-    topLevelEntry = docCursor.advance(AF_DontPopBlockAtEnd);
-    if (topLevelEntry.Kind != llvm::BitstreamEntry::SubBlock)
-      break;
-
-    switch (topLevelEntry.ID) {
-    case COMMENT_BLOCK_ID: {
-      if (!hasValidControlBlock || !readCommentBlock(docCursor)) {
-        error(Status::MalformedDocumentation);
-        return;
-      }
-      break;
-    }
-
-    default:
-      // Unknown top-level block, possibly for use by a future version of the
-      // module format.
-      if (docCursor.SkipBlock()) {
-        error(Status::MalformedDocumentation);
-        return;
-      }
-      break;
-    }
-  }
-
-  if (topLevelEntry.Kind != llvm::BitstreamEntry::EndBlock) {
+  if (!readModuleDocIfPresent()) {
     error(Status::MalformedDocumentation);
     return;
   }
@@ -1358,7 +1435,8 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
   assert(!FileContext && "already associated with an AST module");
   FileContext = file;
 
-  if (file->getParentModule()->getName().str() != Name)
+  ModuleDecl *M = file->getParentModule();
+  if (M->getName().str() != Name)
     return error(Status::NameMismatch);
 
   ASTContext &ctx = getContext();
@@ -1369,6 +1447,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
     return error(Status::TargetIncompatible);
   }
   if (ctx.LangOpts.EnableTargetOSChecking &&
+      M->getResilienceStrategy() != ResilienceStrategy::Resilient &&
       isTargetTooNew(moduleTarget, ctx.LangOpts.Target)) {
     return error(Status::TargetTooNew);
   }
@@ -1419,7 +1498,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       assert(!modulePath.back().empty() &&
              "invalid module name (submodules not yet supported)");
     }
-    auto module = getModule(modulePath);
+    auto module = getModule(modulePath, /*allowLoading*/true);
     if (!module || module->failedToLoad()) {
       // If we're missing the module we're shadowing, treat that specially.
       if (modulePath.size() == 1 &&
@@ -1433,11 +1512,6 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       continue;
     }
 
-    // This is for backwards-compatibility with modules that still rely on the
-    // "HasUnderlyingModule" flag.
-    if (Bits.HasUnderlyingModule && module == ShadowedModule)
-      dependency.forceExported();
-
     if (scopePath.empty()) {
       dependency.Import = { {}, module };
     } else {
@@ -1447,6 +1521,13 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       std::pair<Identifier, SourceLoc> accessPathElem(scopeID, SourceLoc());
       dependency.Import = {ctx.AllocateCopy(llvm::makeArrayRef(accessPathElem)),
                            module};
+    }
+
+    if (!module->hasResolvedImports()) {
+      // Notice that we check this condition /after/ recording the module that
+      // caused the problem. Clients need to be able to track down what the
+      // cycle was.
+      return error(Status::CircularDependency);
     }
   }
 
@@ -1461,6 +1542,17 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
   }
 
   return getStatus();
+}
+
+std::unique_ptr<llvm::MemoryBuffer> ModuleFile::takeBufferForDiagnostics() {
+  assert(getStatus() != Status::Valid);
+
+  // Today, the only buffer that might have diagnostics in them is the input
+  // buffer, and even then only if it has imported module contents.
+  if (!importedHeaderInfo.contents.empty())
+    return std::move(ModuleInputBuffer);
+
+  return nullptr;
 }
 
 ModuleFile::~ModuleFile() { }
@@ -1520,32 +1612,36 @@ TypeDecl *ModuleFile::lookupLocalType(StringRef MangledName) {
   if (iter == LocalTypeDecls->end())
     return nullptr;
 
-  return cast<TypeDecl>(getDecl((*iter).first));
+  return cast<TypeDecl>(getDecl(*iter));
 }
 
 TypeDecl *ModuleFile::lookupNestedType(Identifier name,
                                        const NominalTypeDecl *parent) {
   PrettyStackTraceModuleFile stackEntry(*this);
 
-  if (!NestedTypeDecls)
-    return nullptr;
+  if (NestedTypeDecls) {
+    auto iter = NestedTypeDecls->find(name);
+    if (iter != NestedTypeDecls->end()) {
+      for (std::pair<DeclID, DeclID> entry : *iter) {
+        assert(entry.first);
+        auto declOrOffset = Decls[entry.first - 1];
+        if (!declOrOffset.isComplete())
+          continue;
 
-  auto iter = NestedTypeDecls->find(name);
-  if (iter == NestedTypeDecls->end())
-    return nullptr;
-
-  auto data = *iter;
-  for (std::pair<DeclID, DeclID> entry : data) {
-    assert(entry.first);
-    auto declOrOffset = Decls[entry.first - 1];
-    if (!declOrOffset.isComplete())
-      continue;
-
-    Decl *decl = declOrOffset;
-    if (decl != parent)
-      continue;
-    return cast<TypeDecl>(getDecl(entry.second));
+        Decl *decl = declOrOffset;
+        if (decl != parent)
+          continue;
+        return cast<TypeDecl>(getDecl(entry.second));
+      }
+    }
   }
+
+  if (!ShadowedModule)
+    return nullptr;
+
+  for (FileUnit *file : ShadowedModule->getFiles())
+    if (auto *nestedType = file->lookupNestedType(name, parent))
+      return nestedType;
 
   return nullptr;
 }
@@ -1591,9 +1687,26 @@ void ModuleFile::getImportedModules(
   PrettyStackTraceModuleFile stackEntry(*this);
 
   for (auto &dep : Dependencies) {
-    if (filter != ModuleDecl::ImportFilter::All &&
-        (filter == ModuleDecl::ImportFilter::Public) ^ dep.isExported())
-      continue;
+    switch (filter) {
+    case ModuleDecl::ImportFilter::All:
+      // We're including all imports.
+      break;
+
+    case ModuleDecl::ImportFilter::Private:
+      // Skip @_exported imports.
+      if (dep.isExported())
+        continue;
+
+      break;
+
+    case ModuleDecl::ImportFilter::Public:
+      // Only include @_exported imports.
+      if (!dep.isExported())
+        continue;
+
+      break;
+    }
+
     assert(dep.isLoaded());
     results.push_back(dep.Import);
   }
@@ -1623,7 +1736,7 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
       if (AccessPath.size() == 1 && AccessPath[0].first == Ctx.StdlibModuleName)
         continue;
 
-      ModuleDecl *M = Ctx.getModule(AccessPath);
+      ModuleDecl *M = Ctx.getLoadedModule(AccessPath);
 
       auto Kind = ImportKind::Module;
       if (!ScopePath.empty()) {
@@ -1643,8 +1756,8 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
 
           SmallVector<ValueDecl *, 8> Decls;
           TopLevelModule->lookupQualified(
-              ModuleType::get(TopLevelModule), ScopeID,
-              NL_QualifiedDefault | NL_KnownNoDependency, nullptr, Decls);
+              TopLevelModule, ScopeID,
+              NL_QualifiedDefault | NL_KnownNoDependency, Decls);
           Optional<ImportKind> FoundKind = ImportDecl::findBestImportKind(Decls);
           assert(FoundKind.hasValue() &&
                  "deserialized imports should not be ambiguous");
@@ -1714,8 +1827,7 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
   if (iter == ExtensionDecls->end())
     return;
 
-  if (nominal->hasAccess() &&
-      nominal->getEffectiveAccess() < AccessLevel::Internal) {
+  if (nominal->getEffectiveAccess() < AccessLevel::Internal) {
     if (nominal->getModuleScopeContext() != getFile())
       return;
   }
@@ -1839,6 +1951,8 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
       } else {
         if (!getContext().LangOpts.EnableDeserializationRecovery)
           fatal(mem.takeError());
+        llvm::consumeError(mem.takeError());
+
         // Treat this as a cache-miss to the caller and let them attempt
         // to refill through the normal loadAllMembers() path.
         return None;
@@ -1871,7 +1985,7 @@ void ModuleFile::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
         auto dc = vd->getDeclContext();
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
-        if (auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext())
+        if (auto nominal = dc->getSelfNominalTypeDecl())
           if (nominal->getName() == accessPath.front().first)
             results.push_back(vd);
       }
@@ -1884,7 +1998,7 @@ void ModuleFile::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
         auto dc = vd->getDeclContext();
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
-        if (auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext())
+        if (auto nominal = dc->getSelfNominalTypeDecl())
           if (nominal->getName() == accessPath.front().first)
             results.push_back(vd);
       }
@@ -1913,7 +2027,7 @@ void ModuleFile::lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
         auto dc = vd->getDeclContext();
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
-        if (auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext())
+        if (auto nominal = dc->getSelfNominalTypeDecl())
           if (nominal->getName() == accessPath.front().first)
             consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup);
       }
@@ -1957,47 +2071,25 @@ ModuleFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
 
 void ModuleFile::getTopLevelDecls(SmallVectorImpl<Decl *> &results) {
   PrettyStackTraceModuleFile stackEntry(*this);
+  for (DeclID entry : OrderedTopLevelDecls) {
+    Expected<Decl *> declOrError = getDeclChecked(entry);
+    if (!declOrError) {
+      if (!getContext().LangOpts.EnableDeserializationRecovery)
+        fatal(declOrError.takeError());
+      llvm::consumeError(declOrError.takeError());
+      continue;
+    }
+    results.push_back(declOrError.get());
+  }
+}
+
+void ModuleFile::getPrecedenceGroups(
+       SmallVectorImpl<PrecedenceGroupDecl*> &results) {
+  PrettyStackTraceModuleFile stackEntry(*this);
   if (PrecedenceGroupDecls) {
     for (auto entry : PrecedenceGroupDecls->data()) {
       for (auto item : entry)
-        results.push_back(getDecl(item.second));
-    }
-  }
-
-  if (OperatorDecls) {
-    for (auto entry : OperatorDecls->data()) {
-      for (auto item : entry)
-        results.push_back(getDecl(item.second));
-    }
-  }
-
-  if (TopLevelDecls) {
-    for (auto entry : TopLevelDecls->data()) {
-      for (auto item : entry) {
-        Expected<Decl *> declOrError = getDeclChecked(item.second);
-        if (!declOrError) {
-          if (!getContext().LangOpts.EnableDeserializationRecovery)
-            fatal(declOrError.takeError());
-          llvm::consumeError(declOrError.takeError());
-          continue;
-        }
-        results.push_back(declOrError.get());
-      }
-    }
-  }
-
-  if (ExtensionDecls) {
-    for (auto entry : ExtensionDecls->data()) {
-      for (auto item : entry) {
-        Expected<Decl *> declOrError = getDeclChecked(item.second);
-        if (!declOrError) {
-          if (!getContext().LangOpts.EnableDeserializationRecovery)
-            fatal(declOrError.takeError());
-          llvm::consumeError(declOrError.takeError());
-          continue;
-        }
-        results.push_back(declOrError.get());
-      }
+        results.push_back(cast<PrecedenceGroupDecl>(getDecl(item.second)));
     }
   }
 }
@@ -2008,10 +2100,8 @@ ModuleFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl *> &results) {
   if (!LocalTypeDecls)
     return;
 
-  for (auto entry : LocalTypeDecls->data()) {
-    auto DeclID = entry.first;
+  for (auto DeclID : LocalTypeDecls->data()) {
     auto TD = cast<TypeDecl>(getDecl(DeclID));
-    TD->setLocalDiscriminator(entry.second);
     results.push_back(TD);
   }
 }

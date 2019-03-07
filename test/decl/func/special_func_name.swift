@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 5
 
 protocol P1 {
   static func `init`(_: Int) // expected-note {{protocol requires function 'init' with type '(Int) -> ()'; do you want to add a stub?}}
@@ -14,16 +14,23 @@ struct S12 : P1 { // expected-error {{type 'S12' does not conform to protocol 'P
 }
 
 protocol P2 {
-  init(_: Int) // expected-note {{protocol requires initializer 'init' with type 'Int'; do you want to add a stub?}}
+  init(_: Int) // expected-note {{protocol requires initializer 'init(_:)' with type 'Int'; do you want to add a stub?}}
 }
 
 struct S21 : P2 { // expected-error {{type 'S21' does not conform to protocol 'P2'}}
-  // expected-note@-1 {{candidate has non-matching type '()'}}
   static func `init`(_: Int) {}
 }
 
 struct S22 : P2 {
   init(_: Int) {}
+}
+
+struct S3 {
+  static func `init`() {}
+
+  init(x: Int) { // expected-note {{'init(x:)' declared here}}
+    self.init() // expected-error {{missing argument for parameter 'x' in call}}
+  }
 }
 
 _ = S11(0) // expected-error {{argument passed to call that takes no arguments}}

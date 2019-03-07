@@ -17,6 +17,4 @@
 #ifndef SWIFT_RUNTIME_HEAP_H
 #define SWIFT_RUNTIME_HEAP_H
 
-#include <llvm/Support/Compiler.h>
-
 #endif /* SWIFT_RUNTIME_HEAP_H */

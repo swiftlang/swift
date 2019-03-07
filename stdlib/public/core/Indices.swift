@@ -21,7 +21,6 @@ public struct DefaultIndices<Elements: Collection> {
   internal var _endIndex: Elements.Index
 
   @inlinable
-  @usableFromInline
   internal init(
     _elements: Elements,
     startIndex: Elements.Index,
@@ -120,7 +119,7 @@ extension Collection where Indices == DefaultIndices<Self> {
   ///         i = c.index(after: i)
   ///     }
   ///     // c == MyFancyCollection([2, 4, 6, 8, 10])
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // trivial-implementation
   public var indices: DefaultIndices<Self> {
     return DefaultIndices(
       _elements: self,
@@ -128,8 +127,3 @@ extension Collection where Indices == DefaultIndices<Self> {
       endIndex: self.endIndex)
   }
 }
-
-@available(*, deprecated, renamed: "DefaultIndices")
-public typealias DefaultBidirectionalIndices<T> = DefaultIndices<T> where T : BidirectionalCollection
-@available(*, deprecated, renamed: "DefaultIndices")
-public typealias DefaultRandomAccessIndices<T> = DefaultIndices<T> where T : RandomAccessCollection

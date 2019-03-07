@@ -62,7 +62,7 @@ bool SILOpenedArchetypesTracker::registerUsedOpenedArchetypes(CanType Ty) {
       return;
 
     auto *CurF = const_cast<SILFunction *>(this->getFunction());
-    auto &SILMod = CurF->getModule();
+
     // Create a placeholder representing a forward definition.
     // Add the placeholder at the beginning of the entry block.
     SingleValueInstruction *Placeholder;
@@ -70,12 +70,12 @@ bool SILOpenedArchetypesTracker::registerUsedOpenedArchetypes(CanType Ty) {
       SILBuilder B(CurF->getEntryBlock()->begin());
       Placeholder =
           B.createGlobalAddr(ArtificialUnreachableLocation(),
-                             SILMod.Types.getLoweredType(archetypeTy));
+                             SILType::getPrimitiveAddressType(archetypeTy));
     } else {
       SILBuilder B(CurF->getEntryBlock());
       Placeholder =
           B.createGlobalAddr(ArtificialUnreachableLocation(),
-                             SILMod.Types.getLoweredType(archetypeTy));
+                             SILType::getPrimitiveAddressType(archetypeTy));
     }
     // Make it available to SILBuilder, so that instructions using this
     // archetype can be constructed.
@@ -152,7 +152,7 @@ CanArchetypeType swift::getOpenedArchetypeOf(const SILInstruction *I) {
       isa<OpenExistentialBoxInst>(I) || isa<OpenExistentialBoxValueInst>(I) ||
       isa<OpenExistentialMetatypeInst>(I) || isa<OpenExistentialValueInst>(I)) {
     auto SVI = cast<SingleValueInstruction>(I);
-    auto Ty = getOpenedArchetypeOf(SVI->getType().getSwiftRValueType());
+    auto Ty = getOpenedArchetypeOf(SVI->getType().getASTType());
     assert(Ty && Ty->isOpenedExistential() &&
            "Type should be an opened archetype");
     return Ty;

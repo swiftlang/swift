@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 /// \file
-/// \brief This file defines common diagnostics for the whole compiler, as well
+/// This file defines common diagnostics for the whole compiler, as well
 /// as some diagnostic infrastructure.
 //
 //===----------------------------------------------------------------------===//

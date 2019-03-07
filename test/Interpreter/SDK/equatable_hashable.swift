@@ -32,7 +32,7 @@ func testEquatable<E: Equatable>(_ x: E) {}
 func test_Equatable() {
   // CHECK-NEXT: Found 2.5 at index 1
   let array: [NSNumber] = [1, 2.5, 3.14159]
-  if let index = array.index(of: 2.5) {
+  if let index = array.firstIndex(of: 2.5) {
     print("Found \(array[index]) at index \(index)")
   } else {
     print("Did not find 2.5?")

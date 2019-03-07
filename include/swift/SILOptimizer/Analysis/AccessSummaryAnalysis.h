@@ -173,22 +173,18 @@ private:
 
   /// A trie of integer indices that gives pointer identity to a path of
   /// projections. This is shared between all functions in the module.
-  IndexTrieNode *SubPathTrie;
+  std::unique_ptr<IndexTrieNode> SubPathTrie;
 
 public:
-  AccessSummaryAnalysis() : BottomUpIPAnalysis(AnalysisKind::AccessSummary) {
-    SubPathTrie = new IndexTrieNode();
-  }
-
-  ~AccessSummaryAnalysis() {
-    delete SubPathTrie;
+  AccessSummaryAnalysis() : BottomUpIPAnalysis(SILAnalysisKind::AccessSummary) {
+    SubPathTrie.reset(new IndexTrieNode());
   }
 
   /// Returns a summary of the accesses performed by the given function.
   const FunctionSummary &getOrCreateSummary(SILFunction *Fn);
 
   IndexTrieNode *getSubPathTrieRoot() {
-    return SubPathTrie;
+    return SubPathTrie.get();
   }
 
   /// Returns an IndexTrieNode that represents the single subpath accessed from
@@ -198,14 +194,14 @@ public:
   virtual void initialize(SILPassManager *PM) override {}
   virtual void invalidate() override;
   virtual void invalidate(SILFunction *F, InvalidationKind K) override;
-  virtual void notifyAddFunction(SILFunction *F) override {}
-  virtual void notifyDeleteFunction(SILFunction *F) override {
+  virtual void notifyAddedOrModifiedFunction(SILFunction *F) override {}
+  virtual void notifyWillDeleteFunction(SILFunction *F) override {
     invalidate(F, InvalidationKind::Nothing);
   }
   virtual void invalidateFunctionTables() override {}
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::AccessSummary;
+    return S->getKind() == SILAnalysisKind::AccessSummary;
   }
 
   /// Returns a description of the subpath suitable for use in diagnostics.

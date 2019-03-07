@@ -109,8 +109,8 @@ public:
 
   SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
 
-  SILValue remapValue(SILValue Value) {
-    return SILCloner<InitSequenceCloner>::remapValue(Value);
+  SILValue getMappedValue(SILValue Value) {
+    return SILCloner<InitSequenceCloner>::getMappedValue(Value);
   }
 
   void postProcess(SILInstruction *orig, SILInstruction *cloned) {
@@ -125,7 +125,7 @@ public:
   SILValue clone() {
     for (auto I : Init.Instructions)
       process(I);
-    return remapValue(Init.Result);
+    return getMappedValue(Init.Result);
   }
 };
 
@@ -156,8 +156,8 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
   if (SkipTypeProcessing.count(Ty))
     return;
 
-  DEBUG(llvm::dbgs() << "Replacing access to property '" << *Property
-                     << "' by its constant initializer\n");
+  LLVM_DEBUG(llvm::dbgs() << "Replacing access to property '" << *Property
+                          << "' by its constant initializer\n");
 
   auto PropertyAccess = Property->getEffectiveAccess();
   auto TypeAccess = Ty->getEffectiveAccess();
@@ -172,15 +172,15 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
           PropertyAccess <= AccessLevel::Internal) &&
           Module->isWholeModule())) {
     CanRemove = true;
-    DEBUG(llvm::dbgs() << "Storage for property '" << *Property
-                       << "' can be eliminated\n");
+    LLVM_DEBUG(llvm::dbgs() << "Storage for property '" << *Property
+                            << "' can be eliminated\n");
   }
 
   if (CannotRemove.count(Property))
     CanRemove = false;
 
   if (!AccessMap.count(Property)) {
-    DEBUG(llvm::dbgs() << "Property '" << *Property << "' is never read\n");
+    LLVM_DEBUG(llvm::dbgs() << "Property '" << *Property <<"' is never read\n");
     if (CanRemove) {
       // TODO: Remove the let property, because it is never accessed.
     }
@@ -210,22 +210,18 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
       // Replace the access to a let property by the value
       // computed by this initializer.
       SILValue clonedInit = cloneInitAt(proj);
-      SILBuilderWithScope B(proj);
       for (auto UI = proj->use_begin(), E = proj->use_end(); UI != E;) {
         auto *User = UI->getUser();
         ++UI;
-
-        if (isIncidentalUse(User))
-          continue;
 
         // A nested begin_access will be mapped as a separate "Load".
         if (isa<BeginAccessInst>(User))
           continue;
 
-        if (isa<StoreInst>(User))
+        if (!canReplaceLoadSequence(User))
           continue;
 
-        replaceLoadSequence(User, clonedInit, B);
+        replaceLoadSequence(User, clonedInit);
         eraseUsesOfInstruction(User);
         User->eraseFromParent();
         ++NumReplaced;
@@ -237,7 +233,7 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
       // computed by this initializer.
       SILValue clonedInit = cloneInitAt(proj);
       proj->replaceAllUsesWith(clonedInit);
-      DEBUG(llvm::dbgs() << "Access to " << *Property << " was replaced:\n";
+      LLVM_DEBUG(llvm::dbgs() << "Access to " << *Property <<" was replaced:\n";
             clonedInit->dumpInContext());
 
       proj->eraseFromParent();
@@ -246,8 +242,8 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
     }
   }
 
-  DEBUG(llvm::dbgs() << "Access to " << *Property << " was replaced "
-                     << NumReplaced << " time(s)\n");
+  LLVM_DEBUG(llvm::dbgs() << "Access to " << *Property << " was replaced "
+                          << NumReplaced << " time(s)\n");
 
   if (CanRemove) {
     // TODO: Remove the let property, because it is never accessed.
@@ -284,28 +280,7 @@ static bool isSameInitSequence(const InitSequence &LHS,
 
 /// Check if a given let property can be assigned externally.
 static bool isAssignableExternally(VarDecl *Property, SILModule *Module) {
-  AccessLevel access = Property->getEffectiveAccess();
-  SILLinkage linkage;
-  switch (access) {
-  case AccessLevel::Private:
-  case AccessLevel::FilePrivate:
-    linkage = SILLinkage::Private;
-    DEBUG(llvm::dbgs() << "Property " << *Property << " has private access\n");
-    break;
-  case AccessLevel::Internal:
-    linkage = SILLinkage::Hidden;
-    DEBUG(llvm::dbgs() << "Property " << *Property << " has internal access\n");
-    break;
-  case AccessLevel::Public:
-  case AccessLevel::Open:
-    linkage = SILLinkage::Public;
-    DEBUG(llvm::dbgs() << "Property " << *Property << " has public access\n");
-    break;
-  }
-
-  DEBUG(llvm::dbgs() << "Module of " << *Property << " WMO mode is: " << Module->isWholeModule() << "\n");
-
-  if (isPossiblyUsedExternally(linkage, Module->isWholeModule())) {
+  if (Module->isVisibleExternally(Property)) {
     // If at least one of the properties of the enclosing type cannot be
     // used externally, then no initializer can be implemented externally as
     // it wouldn't be able to initialize such a property.
@@ -330,14 +305,14 @@ static bool isAssignableExternally(VarDecl *Property, SILModule *Module) {
       if (storedPropertyAccess <= AccessLevel::FilePrivate ||
           (storedPropertyAccess <= AccessLevel::Internal &&
            Module->isWholeModule())) {
-       DEBUG(llvm::dbgs() << "Property " << *Property
-                       << " cannot be set externally\n");
+       LLVM_DEBUG(llvm::dbgs() << "Property " << *Property
+                               << " cannot be set externally\n");
        return false;
       }
     }
 
-    DEBUG(llvm::dbgs() << "Property " << *Property
-                       << " can be used externally\n");
+    LLVM_DEBUG(llvm::dbgs() << "Property " << *Property
+                            << " can be used externally\n");
     return true;
   }
 
@@ -349,8 +324,8 @@ static bool isAssignableExternally(VarDecl *Property, SILModule *Module) {
 static bool mayHaveUnknownUses(VarDecl *Property, SILModule *Module) {
   if (Property->getDeclContext()->getParentModule() !=
       Module->getSwiftModule()) {
-    DEBUG(llvm::dbgs() << "Property " << *Property
-                       << " is defined in a different module\n");
+    LLVM_DEBUG(llvm::dbgs() << "Property " << *Property
+                            << " is defined in a different module\n");
     // We don't see the bodies of initializers from a different module
     // unless all of them are fragile.
     // TODO: Support fragile initializers.
@@ -387,19 +362,23 @@ bool LetPropertiesOpt::isConstantLetProperty(VarDecl *Property) {
   // implies that this optimization pass cannot analyze all uses,
   // don't process it.
   if (mayHaveUnknownUses(Property, Module)) {
-    DEBUG(llvm::dbgs() << "Property '" << *Property
-                       << "' may have unknown uses\n");
+    LLVM_DEBUG(llvm::dbgs() << "Property '" << *Property
+                            << "' may have unknown uses\n");
     SkipProcessing.insert(Property);
     return false;
   }
 
-  DEBUG(llvm::dbgs() << "Property '" << *Property
-                      << "' has no unknown uses\n");
+  LLVM_DEBUG(llvm::dbgs() << "Property '" << *Property
+                          << "' has no unknown uses\n");
 
   // Only properties of simple types can be optimized.
-  if (!isSimpleType(Module->Types.getLoweredType(Property->getType()), *Module)) {
-     DEBUG(llvm::dbgs() << "Property '" << *Property
-                       << "' is not of trivial type\n");
+
+  // FIXME: Expansion
+  auto &TL = Module->Types.getTypeLowering(Property->getType(),
+                                           ResilienceExpansion::Minimal);
+  if (!TL.isTrivial()) {
+     LLVM_DEBUG(llvm::dbgs() << "Property '" << *Property
+                             << "' is not of trivial type\n");
     SkipProcessing.insert(Property);
     return false;
   }
@@ -409,36 +388,43 @@ bool LetPropertiesOpt::isConstantLetProperty(VarDecl *Property) {
   return true;
 }
 
+static bool isProjectionOfProperty(SILValue addr, VarDecl *Property) {
+  if (auto *REA = dyn_cast<RefElementAddrInst>(addr)) {
+    return REA->getField() == Property;
+  }
+  if (auto *SEA = dyn_cast<StructElementAddrInst>(addr)) {
+    return SEA->getField() == Property;
+  }
+  return false;
+}
+
 // Analyze the init value being stored by the instruction into a property.
 bool
 LetPropertiesOpt::analyzeInitValue(SILInstruction *I, VarDecl *Property) {
-  SmallVector<SILInstruction *, 8> ReverseInsns;
   SILValue value;
   if (auto SI = dyn_cast<StructInst>(I)) {
     value = SI->getFieldValue(Property);
   } else if (auto SI = dyn_cast<StoreInst>(I)) {
     auto Dest = stripAddressAccess(SI->getDest());
 
-    assert(((isa<RefElementAddrInst>(Dest) &&
-             cast<RefElementAddrInst>(Dest)->getField() == Property) ||
-            (isa<StructElementAddrInst>(Dest) &&
-             cast<StructElementAddrInst>(Dest)->getField() == Property)) &&
-           "Store instruction should store into a proper let property");
+    assert(isProjectionOfProperty(stripAddressAccess(SI->getDest()), Property)
+           && "Store instruction should store into a proper let property");
     (void) Dest;
     value = SI->getSrc();
   }
 
-  // Bail if a value of a property is not a statically known constant init.
-  if (!analyzeStaticInitializer(value, ReverseInsns))
-    return false;
-
-  // Fill in the InitSequence by reversing the instructions and
-  // setting the result index.
-  InitSequence sequence;
-  while (!ReverseInsns.empty()) {
-    sequence.Instructions.push_back(ReverseInsns.pop_back_val());
+  // Check if it's just a copy from another instance of the struct.
+  if (auto *LI = dyn_cast<LoadInst>(value)) {
+    SILValue addr = LI->getOperand();
+    if (isProjectionOfProperty(addr, Property))
+      return true;
   }
+
+  // Bail if a value of a property is not a statically known constant init.
+  InitSequence sequence;
   sequence.Result = value;
+  if (!analyzeStaticInitializer(value, sequence.Instructions))
+    return false;
 
   auto &cachedSequence = InitMap[Property];
   if (cachedSequence.isValid() &&
@@ -446,8 +432,8 @@ LetPropertiesOpt::analyzeInitValue(SILInstruction *I, VarDecl *Property) {
     // The found init value is different from the already seen init value.
     return false;
   } else {
-    DEBUG(llvm::dbgs() << "The value of property '" << *Property
-                       << "' is statically known so far\n");
+    LLVM_DEBUG(llvm::dbgs() << "The value of property '" << *Property
+                            << "' is statically known so far\n");
     // Remember the statically known value.
     cachedSequence = std::move(sequence);
     return true;
@@ -483,27 +469,27 @@ void LetPropertiesOpt::collectStructPropertiesAccess(StructInst *SI,
     }
 
     NominalTypeLetProperties[structDecl] = LetProps;
-    DEBUG(llvm::dbgs() << "Computed set of let properties for struct '"
-                       << structDecl->getName() << "'\n");
+    LLVM_DEBUG(llvm::dbgs() << "Computed set of let properties for struct '"
+                            << structDecl->getName() << "'\n");
   }
 
   auto &Props = NominalTypeLetProperties[structDecl];
 
-  DEBUG(llvm::dbgs()
-            << "Found a struct instruction initializing some let properties: ";
-        SI->dumpInContext());
+  LLVM_DEBUG(llvm::dbgs() << "Found a struct instruction initializing some "
+                             "let properties: ";
+             SI->dumpInContext());
   // Figure out the initializing sequence for each
   // of the properties.
   for (auto Prop : Props) {
     if (SkipProcessing.count(Prop))
       continue;
     SILValue PropValue = SI->getOperandForField(Prop)->get();
-    DEBUG(llvm::dbgs() << "Check the value of property '" << *Prop
-                       << "' :" << PropValue << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Check the value of property '" << *Prop
+                            << "' :" << PropValue << "\n");
     if (!analyzeInitValue(SI, Prop)) {
       SkipProcessing.insert(Prop);
-      DEBUG(llvm::dbgs() << "The value of a let property '" << *Prop
-                         << "' is not statically known\n");
+      LLVM_DEBUG(llvm::dbgs() << "The value of a let property '" << *Prop
+                              << "' is not statically known\n");
     }
     (void) PropValue;
   }
@@ -539,9 +525,9 @@ void LetPropertiesOpt::collectPropertyAccess(SILInstruction *I,
   if (!isConstantLetProperty(Property))
     return;
 
-  DEBUG(llvm::dbgs() << "Collecting property access for property '" << *Property
-                     << "':\n";
-        llvm::dbgs() << "The instructions are:\n"; I->dumpInContext());
+  LLVM_DEBUG(llvm::dbgs() << "Collecting property access for property '"
+                          << *Property << "':\n";
+             llvm::dbgs() << "The instructions are:\n"; I->dumpInContext());
 
   if (isa<RefElementAddrInst>(I) || isa<StructElementAddrInst>(I)
       || isa<BeginAccessInst>(I)) {
@@ -594,6 +580,9 @@ void LetPropertiesOpt::run(SILModuleTransform *T) {
     // optimized, because they may contain access to the let
     // properties.
     bool NonRemovable = !F.shouldOptimize();
+
+    // FIXME: We should be able to handle ownership.
+    NonRemovable &= !F.hasOwnership();
 
     for (auto &BB : F) {
       for (auto &I : BB)

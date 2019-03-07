@@ -238,12 +238,12 @@ CalleeList CalleeCache::getCalleeListForCalleeKind(SILValue Callee) const {
            "Unhandled method instruction in callee determination!");
     return CalleeList();
 
-  case ValueKind::ThinToThickFunctionInst:
-    return getCalleeListForCalleeKind(
-        cast<ThinToThickFunctionInst>(Callee)->getOperand());
-
   case ValueKind::FunctionRefInst:
     return CalleeList(cast<FunctionRefInst>(Callee)->getReferencedFunction());
+
+  case ValueKind::DynamicFunctionRefInst:
+  case ValueKind::PreviousDynamicFunctionRefInst:
+    return CalleeList(); // Don't know the dynamic target.
 
   case ValueKind::PartialApplyInst:
     return getCalleeListForCalleeKind(
@@ -265,7 +265,7 @@ CalleeList CalleeCache::getCalleeListForCalleeKind(SILValue Callee) const {
 // Return the list of functions that can be called via the given apply
 // site.
 CalleeList CalleeCache::getCalleeList(FullApplySite FAS) const {
-  return getCalleeListForCalleeKind(FAS.getCallee());
+  return getCalleeListForCalleeKind(FAS.getCalleeOrigin());
 }
 
 // Return the list of functions that can be called via the given instruction.

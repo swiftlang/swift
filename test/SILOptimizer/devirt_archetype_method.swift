@@ -16,7 +16,7 @@ func generic_call<T : Pingable>(_ x: T) {
 }
 
 // Make sure we can devirtualize and inline the virtual call to ping.
-//CHECK: @$S23devirt_archetype_method21interesting_code_hereyyF
+//CHECK: @$s23devirt_archetype_method21interesting_code_hereyyF
 //CHECK-NOT: apply
 //CHECK: return
 func interesting_code_here() {
@@ -43,7 +43,7 @@ func aMethod<T : TPingable>(_ x : T) {
 
 // Make sure that we devirtualizer, specialize and inline the call to aMethod
 // and that everything is optimized away.
-//CHECK: $S23devirt_archetype_method4mainyyF
+//CHECK: $s23devirt_archetype_method4mainyyF
 //CHECK-NOT: apply
 //CHECK: return
 func main() {

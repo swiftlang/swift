@@ -8,11 +8,11 @@ var a : Int64 = 2
 // CHECK-SAME:             size: 64,
 // CHECK-NOT:              offset: 0
 // CHECK-NOT:              DIFlagFwdDecl
-// CHECK-SAME:             identifier: "$Ss5Int64VD"
+// CHECK-SAME:             identifier: "$ss5Int64VD"
 
 // CHECK: !DIGlobalVariable(name: "b",{{.*}} line: [[@LINE+2]]
 // CHECK-SAME:              type: ![[INT:[0-9]+]]
 var b = 2
 // CHECK: ![[INT]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Int"
-// CHECK-SAME:                        identifier: "$SSiD"
+// CHECK-SAME:                        identifier: "$sSiD"
 

@@ -38,8 +38,8 @@ class Devirtualizer : public SILFunctionTransform {
   void run() override {
     SILFunction &F = *getFunction();
     ClassHierarchyAnalysis *CHA = PM->getAnalysis<ClassHierarchyAnalysis>();
-    DEBUG(llvm::dbgs() << "***** Devirtualizer on function:" << F.getName()
-                       << " *****\n");
+    LLVM_DEBUG(llvm::dbgs() << "***** Devirtualizer on function:" << F.getName()
+                            << " *****\n");
 
     if (devirtualizeAppliesInFunction(F, CHA))
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
@@ -52,7 +52,6 @@ class Devirtualizer : public SILFunctionTransform {
 bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
                                                   ClassHierarchyAnalysis *CHA) {
   bool Changed = false;
-  llvm::SmallVector<SILInstruction *, 8> DeadApplies;
   llvm::SmallVector<ApplySite, 8> NewApplies;
   OptRemark::Emitter ORE(DEBUG_TYPE, F.getModule());
 
@@ -70,24 +69,14 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
    }
   }
   for (auto Apply : Applies) {
-    auto NewInstPair = tryDevirtualizeApply(Apply, CHA, &ORE);
-    if (!NewInstPair.second)
+    auto NewInst = tryDevirtualizeApply(Apply, CHA, &ORE);
+    if (!NewInst)
       continue;
 
     Changed = true;
 
-    auto *AI = Apply.getInstruction();
-    if (!isa<TryApplyInst>(AI))
-      cast<SingleValueInstruction>(AI)->replaceAllUsesWith(NewInstPair.first);
-
-    DeadApplies.push_back(AI);
-    NewApplies.push_back(NewInstPair.second);
-  }
-
-  // Remove all the now-dead applies.
-  while (!DeadApplies.empty()) {
-    auto *AI = DeadApplies.pop_back_val();
-    recursivelyDeleteTriviallyDeadInstructions(AI, true);
+    deleteDevirtualizedApply(Apply);
+    NewApplies.push_back(NewInst);
   }
 
   // For each new apply, attempt to link in function bodies if we do
@@ -104,11 +93,9 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
     assert(CalleeFn && "Expected devirtualized callee!");
 
     // We need to ensure that we link after devirtualizing in order to pull in
-    // everything we reference from another module. This is especially important
-    // for transparent functions, because if transparent functions are not
-    // inlined for some reason, we need to generate code for them.
-    // Note that functions, which are only referenced from witness/vtables, are
-    // not linked upfront by the SILLinker.
+    // everything we reference from another module, which may expose optimization
+    // opportunities and is also needed for correctness if we reference functions
+    // with non-public linkage. See lib/SIL/Linker.cpp for details.
     if (!CalleeFn->isDefinition())
       F.getModule().linkFunction(CalleeFn, SILModule::LinkingMode::LinkAll);
 
@@ -116,7 +103,7 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
     // be beneficial to rerun some earlier passes on the current
     // function now that we've made these direct references visible.
     if (CalleeFn->isDefinition() && CalleeFn->shouldOptimize())
-      notifyAddFunction(CalleeFn, nullptr);
+      addFunctionToPassManagerWorklist(CalleeFn, nullptr);
   }
 
   return Changed;

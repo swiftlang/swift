@@ -1,9 +1,19 @@
+
+# Add path for custom CMake modules.
+list(APPEND CMAKE_MODULE_PATH
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
+
+include(AddSwiftStdlib)
+
 # Create convenience targets for the Swift standard library.
 
+# NOTE(compnerd) save the original compiler for the host swiftReflection that
+# we build
+set(HOST_CMAKE_CXX_COMPILER ${CMAKE_CXX_COMPILER})
+set(HOST_CMAKE_C_COMPILER_INITIAL ${CMAKE_C_COMPILER})
 
 if(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
-  if((NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang") AND
-     (NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "AppleClang"))
+  if(NOT "${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
     message(FATAL_ERROR "Building the swift runtime is not supported with ${CMAKE_C_COMPILER_ID}. Use the just-built clang instead.")
   else()
     message(WARNING "Building the swift runtime using the host compiler, and not the just-built clang.")
@@ -18,9 +28,10 @@ else()
     set(CMAKE_CXX_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang++")
     set(CMAKE_C_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang")
   endif()
-  
-  set(CMAKE_CXX_COMPILER_ARG1 "")
-  set(CMAKE_C_COMPILER_ARG1 "")
+
+  set(CMAKE_C_COMPILER_LAUNCHER "")
+  set(CMAKE_CXX_COMPILER_LAUNCHER "")
+
   # The sanitizers require using the same version of the compiler for
   # everything and there are various places where we link runtime code with
   # code built by the host compiler. Disable sanitizers for the runtime for
@@ -36,10 +47,6 @@ endif()
 # we get link failures regardless, so instead, this just disables the checks.
 append("-DLLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
 
-if(SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS)
-  append("-DSWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS=1" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
-endif()
-
 set(SWIFT_STDLIB_LIBRARY_BUILD_TYPES)
 if(SWIFT_BUILD_DYNAMIC_STDLIB)
   list(APPEND SWIFT_STDLIB_LIBRARY_BUILD_TYPES SHARED)
@@ -48,53 +55,100 @@ if(SWIFT_BUILD_STATIC_STDLIB)
   list(APPEND SWIFT_STDLIB_LIBRARY_BUILD_TYPES STATIC)
 endif()
 
-add_custom_target(swift-stdlib-all)
-add_custom_target(swift-stdlib-sib-all)
-add_custom_target(swift-stdlib-sibopt-all)
-add_custom_target(swift-stdlib-sibgen-all)
-foreach(SDK ${SWIFT_SDKS})
-  add_custom_target("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
-  add_custom_target("swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
-  add_custom_target("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-sib")
-  add_custom_target("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-sibopt")
-  add_custom_target("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-sibgen")
-  foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
-    set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
-    add_custom_target("swift-stdlib${VARIANT_SUFFIX}")
-    add_custom_target("swift-stdlib${VARIANT_SUFFIX}-sib")
-    add_custom_target("swift-stdlib${VARIANT_SUFFIX}-sibopt")
-    add_custom_target("swift-stdlib${VARIANT_SUFFIX}-sibgen")
-    add_custom_target("swift-test-stdlib${VARIANT_SUFFIX}")
+function(swift_create_stdlib_targets name variant define_all_alias)
+  if(NOT variant STREQUAL "")
+    set(variant "-${variant}")
+  endif()
 
-    add_dependencies(swift-stdlib-all "swift-stdlib${VARIANT_SUFFIX}")
-    add_dependencies(swift-stdlib-sib-all "swift-stdlib${VARIANT_SUFFIX}-sib")
-    add_dependencies(swift-stdlib-sibopt-all "swift-stdlib${VARIANT_SUFFIX}-sibopt")
-    add_dependencies(swift-stdlib-sibgen-all "swift-stdlib${VARIANT_SUFFIX}-sibgen")
+  if(define_all_alias)
+    add_custom_target(${name}${variant}-all)
+    set_target_properties(${name}${variant}-all
+      PROPERTIES
+      FOLDER "Swift libraries/Aggregate")
+  endif()
 
-    add_dependencies("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
-      "swift-stdlib${VARIANT_SUFFIX}")
-    add_dependencies("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-sib"
-      "swift-stdlib${VARIANT_SUFFIX}-sib")
-    add_dependencies("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-sibopt"
-        "swift-stdlib${VARIANT_SUFFIX}-sibopt")
-    add_dependencies("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-sibgen"
-        "swift-stdlib${VARIANT_SUFFIX}-sibgen")
+  foreach(sdk ${SWIFT_SDKS})
+    add_custom_target(${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}${variant})
+    set_target_properties(${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}${variant}
+      PROPERTIES
+      FOLDER "Swift libraries/Aggregate")
 
-    add_dependencies("swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
-        "swift-test-stdlib${VARIANT_SUFFIX}")
+    foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
+      set(target_variant -${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch})
+
+      add_custom_target(${name}${target_variant}${variant})
+      set_target_properties(${name}${target_variant}${variant}
+        PROPERTIES
+        FOLDER "Swift libraries/Aggregate")
+      if(define_all_alias)
+        add_dependencies(${name}${variant}-all
+          ${name}${target_variant}${variant})
+      endif()
+      add_dependencies(${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}${variant}
+        ${name}${target_variant}${variant})
+    endforeach()
+  endforeach()
+
+  if(NOT define_all_alias)
+    set(ALL_keyword ALL)
+  endif()
+  add_custom_target(${name}${variant}
+    ${ALL_keyword}
+    DEPENDS
+    ${name}${SWIFT_PRIMARY_VARIANT_SUFFIX}${variant})
+  set_target_properties(${name}${variant}
+    PROPERTIES
+    FOLDER "Swift libraries/Aggregate")
+endfunction()
+
+swift_create_stdlib_targets("swift-stdlib" "" TRUE)
+swift_create_stdlib_targets("swift-stdlib" "sib" TRUE)
+swift_create_stdlib_targets("swift-stdlib" "sibopt" TRUE)
+swift_create_stdlib_targets("swift-stdlib" "sibgen" TRUE)
+swift_create_stdlib_targets("swift-test-stdlib" "" FALSE)
+
+foreach(sdk ${SWIFT_SDKS})
+  foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
+    set(platform "${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
+    set(input "${SWIFT_SOURCE_DIR}/stdlib/public/legacy_layouts/${platform}/layouts-${arch}.yaml")
+    set(output "${SWIFTLIB_DIR}/${platform}/layouts-${arch}.yaml")
+
+    if(EXISTS "${input}")
+      # Copy the input file to the build directory.
+      add_custom_command(
+        OUTPUT "${output}"
+        DEPENDS "${input}"
+        COMMAND
+          "${CMAKE_COMMAND}" -E copy
+          "${input}"
+          "${output}")
+
+      # Define a target for this so that we can depend on it when
+      # building Swift sources.
+      add_custom_target(
+        "copy-legacy-layouts-${platform}-${arch}"
+        DEPENDS "${output}"
+        SOURCES "${input}")
+
+      # Make sure we ultimately always do this as part of building the
+      # standard library. In practice we'll do this earlier if at least
+      # one Swift source file has changed.
+      add_dependencies(
+        "swift-stdlib-${platform}-${arch}"
+        "copy-legacy-layouts-${platform}-${arch}")
+
+      swift_install_in_component(stdlib
+          FILES ${input}
+          DESTINATION "lib/swift/${platform}/")
+    else()
+      # Add a dummy target that does nothing so we can still depend on it
+      # later without checking if the input files exist.
+      add_custom_target(
+        "copy-legacy-layouts-${platform}-${arch}")
+    endif()
   endforeach()
 endforeach()
-add_custom_target(swift-stdlib
-    DEPENDS "swift-stdlib${SWIFT_PRIMARY_VARIANT_SUFFIX}")
-add_custom_target(swift-stdlib-sib
-  DEPENDS "swift-stdlib${SWIFT_PRIMARY_VARIANT_SUFFIX}-sib")
-add_custom_target(swift-stdlib-sibopt
-  DEPENDS "swift-stdlib${SWIFT_PRIMARY_VARIANT_SUFFIX}-sibopt")
-add_custom_target(swift-stdlib-sibgen
-    DEPENDS "swift-stdlib${SWIFT_PRIMARY_VARIANT_SUFFIX}-sibgen")
-add_custom_target(swift-test-stdlib ALL
-    DEPENDS "swift-test-stdlib${SWIFT_PRIMARY_VARIANT_SUFFIX}")
 
 add_subdirectory(public)
 add_subdirectory(private)
-
+add_subdirectory(tools)

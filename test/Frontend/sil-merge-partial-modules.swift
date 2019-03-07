@@ -42,31 +42,31 @@ public class CircleManager : ShapeManager {
 
 // FIXME: Why is the definition order totally random?
 
-// CHECK-LABEL: sil [canonical] @$S4test17versionedFunctionyyF : $@convention(thin) () -> ()
+// CHECK-LABEL: sil [canonical] @$s4test17versionedFunctionyyF : $@convention(thin) () -> ()
 
-// CHECK-LABEL: sil [canonical] @$S4test9RectangleV4areaSfvg : $@convention(method) (Rectangle) -> Float
+// CHECK-LABEL: sil [canonical] @$s4test9RectangleV4areaSfvg : $@convention(method) (Rectangle) -> Float
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [canonical] @$S4test9RectangleVAA5ShapeA2aDP4drawyyFTW : $@convention(witness_method: Shape) (@in_guaranteed Rectangle) -> () {
-// CHECK: function_ref @$S4test14publicFunctionyyF
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [canonical] @$s4test9RectangleVAA5ShapeA2aDP4drawyyFTW : $@convention(witness_method: Shape) (@in_guaranteed Rectangle) -> () {
+// CHECK: function_ref @$s4test14publicFunctionyyF
 // CHECK: }
 
-// CHECK-LABEL: sil [canonical] @$S4test14publicFunctionyyF : $@convention(thin) () -> ()
+// CHECK-LABEL: sil [canonical] @$s4test14publicFunctionyyF : $@convention(thin) () -> ()
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [canonical] @$S4test9RectangleVAA5ShapeA2aDP4areaSfvgTW : $@convention(witness_method: Shape) (@in_guaranteed Rectangle) -> Float {
-// CHECK: function_ref @$S4test9RectangleV4areaSfvg
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [canonical] @$s4test9RectangleVAA5ShapeA2aDP4areaSfvgTW : $@convention(witness_method: Shape) (@in_guaranteed Rectangle) -> Float {
+// CHECK: function_ref @$s4test9RectangleV4areaSfvg
 // CHECK: }
 
-// CHECK-LABEL: sil shared [serialized] [canonical] @$S4test17inlinableFunctionyyFyycfU_ : $@convention(thin) () -> () {
-// CHECK: function_ref @$S4test17versionedFunctionyyF
+// CHECK-LABEL: sil shared [serialized] [canonical] @$s4test17inlinableFunctionyyFyycfU_ : $@convention(thin) () -> () {
+// CHECK: function_ref @$s4test17versionedFunctionyyF
 // CHECK: }
 
-// CHECK-LABEL: sil [serialized] [canonical] @$S4test17inlinableFunctionyyF : $@convention(thin) () -> () {
-// CHECK: function_ref @$S4test17inlinableFunctionyyFyycfU_
+// CHECK-LABEL: sil [serialized] [canonical] @$s4test17inlinableFunctionyyF : $@convention(thin) () -> () {
+// CHECK: function_ref @$s4test17inlinableFunctionyyFyycfU_
 // CHECK: }
 
 // CHECK-LABEL: sil_witness_table [serialized] Rectangle: Shape module test {
-// CHECK-LABEL:   method #Shape.draw!1: <Self where Self : Shape> (Self) -> () -> () : @$S4test9RectangleVAA5ShapeA2aDP4drawyyFTW
-// CHECK-LABEL:   method #Shape.area!getter.1: <Self where Self : Shape> (Self) -> () -> Float : @$S4test9RectangleVAA5ShapeA2aDP4areaSfvgTW
+// CHECK-LABEL:   method #Shape.draw!1: <Self where Self : Shape> (Self) -> () -> () : @$s4test9RectangleVAA5ShapeA2aDP4drawyyFTW
+// CHECK-LABEL:   method #Shape.area!getter.1: <Self where Self : Shape> (Self) -> () -> Float : @$s4test9RectangleVAA5ShapeA2aDP4areaSfvgTW
 // CHECK-LABEL: }
 
 // NEGATIVE-NOT: sil {{.*}}internalFunction

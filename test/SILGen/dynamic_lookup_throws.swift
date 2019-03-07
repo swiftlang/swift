@@ -2,18 +2,18 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -module-name dynamic_lookup_throws -emit-silgen -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk-nosource -I %t) -module-name dynamic_lookup_throws -parse-as-library %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
 import Foundation
 
 class Blub : NSObject {
-   func blub() throws {}
+   @objc func blub() throws {}
 }
 
-// CHECK-LABEL: sil hidden @$S21dynamic_lookup_throws8testBlub1ayyXl_tKF : $@convention(thin) (@guaranteed AnyObject) -> @error Error
-// CHECK: bb0([[ARG:%.*]] : $AnyObject):
+// CHECK-LABEL: sil hidden [ossa] @$s21dynamic_lookup_throws8testBlub1ayyXl_tKF : $@convention(thin) (@guaranteed AnyObject) -> @error Error
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $AnyObject):
 func testBlub(a: AnyObject) throws {
   // CHECK:   [[ANYOBJECT_REF:%.*]] = open_existential_ref [[ARG]] : $AnyObject to $@opened("[[OPENED:.*]]") AnyObject
   // CHECK:   [[ANYOBJECT_REF_COPY:%.*]] = copy_value [[ANYOBJECT_REF]]
@@ -24,7 +24,7 @@ func testBlub(a: AnyObject) throws {
   // CHECK:   return
 
   // CHECK: bb2
-  // CHECK:   function_ref @$S10Foundation22_convertNSErrorToErrorys0E0_pSo0C0CSgF
+  // CHECK:   function_ref @$s10Foundation22_convertNSErrorToErrorys0E0_pSo0C0CSgF
   // CHECK:   throw {{%.*}} : $Error
   try a.blub()
 }

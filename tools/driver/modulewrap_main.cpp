@@ -91,7 +91,8 @@ public:
     if (ParsedArgs.getLastArg(OPT_help)) {
       std::string ExecutableName = llvm::sys::path::stem(MainExecutablePath);
       Table->PrintHelp(llvm::outs(), ExecutableName.c_str(),
-                       "Swift Module Wrapper", options::ModuleWrapOption, 0);
+                       "Swift Module Wrapper", options::ModuleWrapOption, 0,
+                       /*ShowAllAliases*/false);
       return 1;
     }
 
@@ -146,7 +147,7 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
 
   // Superficially verify that the input is a swift module file.
   llvm::BitstreamCursor Cursor(ErrOrBuf.get()->getMemBufferRef());
-  for (unsigned char Byte : serialization::MODULE_SIGNATURE)
+  for (unsigned char Byte : serialization::SWIFTMODULE_SIGNATURE)
     if (Cursor.AtEndOfStream() || Cursor.Read(8) != Byte) {
       Instance.getDiags().diagnose(SourceLoc(), diag::error_parse_input_file,
                                    Filename, "signature mismatch");
@@ -168,7 +169,10 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   SourceManager SrcMgr;
   LangOptions LangOpts;
   LangOpts.Target = Invocation.getTargetTriple();
-  ASTContext ASTCtx(LangOpts, SearchPathOpts, SrcMgr, Instance.getDiags());
+  ASTContext &ASTCtx = *ASTContext::get(LangOpts, SearchPathOpts, SrcMgr,
+                                        Instance.getDiags());
+  registerTypeCheckerRequestFunctions(ASTCtx.evaluator);
+  
   ClangImporterOptions ClangImporterOpts;
   ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, ClangImporterOpts, ""),
                          true);

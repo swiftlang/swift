@@ -44,6 +44,12 @@ def argument_parser():
         help='The path to an Android NDK. If specified, the libc++ library '
              'in that NDK will be pushed to the device.',
         default=os.getenv('ANDROID_NDK_HOME', None))
+    parser.add_argument(
+        '-a', '--destination-arch',
+        help='The architecture of the host device. Used to determine the '
+             'right library versions to send to the device.',
+        choices=['armv7', 'aarch64'],
+        default='armv7')
     return parser
 
 
@@ -75,7 +81,10 @@ def main():
                               'cxx-stl',
                               'llvm-libc++',
                               'libs',
-                              'armeabi-v7a',
+                              {
+                                  'armv7': 'armeabi-v7a',
+                                  'aarch64': 'arm64-v8a',
+                              }[args.destination_arch],
                               'libc++_shared.so')
         _push(libcpp, args.destination)
 

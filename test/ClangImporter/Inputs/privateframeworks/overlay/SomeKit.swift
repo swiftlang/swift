@@ -47,3 +47,10 @@ public func inlineWidgetOperations(_ widget: SKWidget) {
   someKitGlobalFunc()
   hao.anObject = widget
 }
+
+@available(swift, deprecated: 4.2)
+public func someKitOtherGlobalFunc() { }
+
+extension SKWidget {
+  public var name: String { return "blah" }
+}

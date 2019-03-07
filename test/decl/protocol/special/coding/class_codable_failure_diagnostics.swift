@@ -109,8 +109,24 @@ class C6 : Codable {
   }
 }
 
-// Classes cannot yet synthesize Encodable or Decodable in extensions.
+// Non-final classes cannot synthesize Decodable in an extension.
 class C7 {}
-extension C7 : Codable {}
-// expected-error@-1 {{implementation of 'Decodable' cannot be automatically synthesized in an extension}}
-// expected-error@-2 {{implementation of 'Encodable' cannot be automatically synthesized in an extension}}
+extension C7 : Decodable {}
+// expected-error@-1 {{implementation of 'Decodable' for non-final class cannot be automatically synthesized in extension because initializer requirement 'init(from:)' can only be be satisfied by a 'required' initializer in the class definition}}
+
+// Check that the diagnostics from an extension end up on the extension
+class C8 {
+// expected-note@-1 {{cannot automatically synthesize 'init(from:)' because superclass does not have a callable 'init()'}}
+    private init?(from: Decoder) {}
+}
+final class C9: C8 {}
+extension C9: Codable {}
+// expected-error@-1 {{type 'C9' does not conform to protocol 'Decodable'}}
+
+struct NotEncodable {}
+class C10 {
+    var x: NotEncodable = NotEncodable()
+    // expected-note@-1 {{cannot automatically synthesize 'Encodable' because 'NotEncodable' does not conform to 'Encodable'}}
+}
+extension C10: Encodable {}
+// expected-error@-1 {{type 'C10' does not conform to protocol 'Encodable'}}

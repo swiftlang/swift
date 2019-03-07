@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/overload_vars.swift
 // RUN: %target-swift-frontend -typecheck %s -I %t -sdk "" -verify
 
-// RUN: not %target-swift-frontend -dump-ast %s -I %t -sdk "" > %t.astdump 2>&1
+// RUN: not %target-swift-frontend -dump-ast %s -I %t -sdk "" > %t.astdump
 // RUN: %FileCheck %s < %t.astdump
 
 import overload_intFunctions
@@ -55,7 +55,7 @@ extension HasFooSub {
   var foo: Int { return 0 }
 }
 
-// CHECK-LABEL: func_decl "testHasFooSub(_:)"
+// CHECK-LABEL: func_decl{{.*}}"testHasFooSub(_:)"
 func testHasFooSub(_ hfs: HasFooSub) -> Int {
   // CHECK: return_stmt
   // CHECK-NOT: func_decl
@@ -67,7 +67,7 @@ extension HasBar {
   var bar: Int { return 0 }
 }
 
-// CHECK-LABEL: func_decl "testHasBar(_:)"
+// CHECK-LABEL: func_decl{{.*}}"testHasBar(_:)"
 func testHasBar(_ hb: HasBar) -> Int {
   // CHECK: return_stmt
   // CHECK-NOT: func_decl

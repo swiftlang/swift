@@ -43,8 +43,6 @@
   * IsExpr
   * AsExpr
   * ArrowExpr
-
-### Not-started (UnknownExpr):
   * ObjCSelectorExpr
 
 ## Declaration
@@ -67,12 +65,8 @@
   * DestructorDecl
   * EnumDecl
   * EnumCaseDecl
-
-### Not-started (UnknownDecl):
+  * OperatorDecl
   * PrecedenceGroupDecl
-  * InfixOperatorDecl
-  * PrefixOperatorDecl
-  * PostfixOperatorDecl
 
 ## Statement
 ### Done:
@@ -90,6 +84,7 @@
   * WhileStmt
   * ForInStmt
   * SwitchStmt
+  * YieldStmt
 
 ## Pattern
 ### Done:

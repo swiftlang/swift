@@ -492,3 +492,10 @@ public func localizationKeyShouldNotAppearInDocComments2() {}
 /// - TAG: TAG_C
 public func tags() {}
 // CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>tags()</Name><USR>s:14comment_to_xml4tagsyyF</USR><Declaration>public func tags()</Declaration><CommentParts><Abstract><Para>Brief.</Para></Abstract><Tags><Tag>Tag_A</Tag><Tag>Tag B</Tag><Tag>Dedupe tag</Tag><Tag>TAG_C</Tag></Tags><Discussion><Para>Intentional break</Para></Discussion></CommentParts></Function>]
+
+
+#sourceLocation(file: "custom.swuft", line: 20)
+/// Oooh, custom!
+public func customLocation() {}
+// CHECK: DocCommentAsXML=[<Function file="custom.swuft" line="21" column="{{.*}}"><Name>customLocation()</Name><USR>s:14comment_to_xml14customLocationyyF</USR><Declaration>public func customLocation()</Declaration><CommentParts><Abstract><Para>Oooh, custom!</Para></Abstract></CommentParts></Function>]
+#sourceLocation() // reset

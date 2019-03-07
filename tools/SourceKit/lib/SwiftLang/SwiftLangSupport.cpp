@@ -18,6 +18,8 @@
 
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ParameterList.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Config.h"
 #include "swift/IDE/CodeCompletion.h"
@@ -57,6 +59,24 @@ using swift::index::SymbolRoleSet;
 
 #define REFACTORING(KIND, NAME, ID) static UIdent Kind##Refactoring##KIND("source.refactoring.kind."#ID);
 #include "swift/IDE/RefactoringKinds.def"
+
+static UIdent Attr_IBAction("source.decl.attribute.ibaction");
+static UIdent Attr_IBOutlet("source.decl.attribute.iboutlet");
+static UIdent Attr_IBDesignable("source.decl.attribute.ibdesignable");
+static UIdent Attr_IBInspectable("source.decl.attribute.ibinspectable");
+static UIdent Attr_GKInspectable("source.decl.attribute.gkinspectable");
+static UIdent Attr_Objc("source.decl.attribute.objc");
+static UIdent Attr_ObjcNamed("source.decl.attribute.objc.name");
+static UIdent Attr_Private("source.decl.attribute.private");
+static UIdent Attr_FilePrivate("source.decl.attribute.fileprivate");
+static UIdent Attr_Internal("source.decl.attribute.internal");
+static UIdent Attr_Public("source.decl.attribute.public");
+static UIdent Attr_Open("source.decl.attribute.open");
+static UIdent Attr_Setter_Private("source.decl.attribute.setter_access.private");
+static UIdent Attr_Setter_FilePrivate("source.decl.attribute.setter_access.fileprivate");
+static UIdent Attr_Setter_Internal("source.decl.attribute.setter_access.internal");
+static UIdent Attr_Setter_Public("source.decl.attribute.setter_access.public");
+static UIdent Attr_Setter_Open("source.decl.attribute.setter_access.open");
 
 std::unique_ptr<LangSupport>
 SourceKit::createSwiftLangSupport(SourceKit::Context &SKCtx) {
@@ -158,7 +178,7 @@ UIdent UIdentVisitor::visitParamDecl(const ParamDecl *D) {
 
 UIdent UIdentVisitor::visitExtensionDecl(const ExtensionDecl *D) {
   assert(!IsRef && "reference to an extension ?");
-  if (NominalTypeDecl *NTD = D->getExtendedType()->getAnyNominal()) {
+  if (NominalTypeDecl *NTD = D->getExtendedNominal()) {
     if (isa<StructDecl>(NTD))
       return KindDeclExtensionStruct;
     if (isa<ClassDecl>(NTD))
@@ -172,17 +192,41 @@ UIdent UIdentVisitor::visitExtensionDecl(const ExtensionDecl *D) {
 }
 
 SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
-    : SKCtx(SKCtx), CCCache(new SwiftCompletionCache) {
+    : NotificationCtr(SKCtx.getNotificationCenter()),
+      CCCache(new SwiftCompletionCache) {
   llvm::SmallString<128> LibPath(SKCtx.getRuntimeLibPath());
   llvm::sys::path::append(LibPath, "swift");
   RuntimeResourcePath = LibPath.str();
 
-  ASTMgr.reset(new SwiftASTManager(*this));
+  Stats = std::make_shared<SwiftStatistics>();
+  EditorDocuments = std::make_shared<SwiftEditorDocumentFileMap>();
+  ASTMgr = std::make_shared<SwiftASTManager>(EditorDocuments, Stats,
+                                             RuntimeResourcePath);
   // By default, just use the in-memory cache.
   CCCache->inMemory = llvm::make_unique<ide::CodeCompletionCache>();
 }
 
 SwiftLangSupport::~SwiftLangSupport() {
+}
+
+std::unique_ptr<llvm::MemoryBuffer>
+SwiftLangSupport::makeCodeCompletionMemoryBuffer(
+    const llvm::MemoryBuffer *origBuf, unsigned &Offset,
+    const std::string bufferIdentifier) {
+
+  auto origBuffSize = origBuf->getBufferSize();
+  if (Offset > origBuffSize)
+    Offset = origBuffSize;
+
+  auto newBuffer = llvm::WritableMemoryBuffer::getNewUninitMemBuffer(
+      origBuffSize + 1, bufferIdentifier);
+  auto *pos = origBuf->getBufferStart() + Offset;
+  auto *newPos =
+      std::copy(origBuf->getBufferStart(), pos, newBuffer->getBufferStart());
+  *newPos = '\0';
+  std::copy(pos, origBuf->getBufferEnd(), newPos + 1);
+
+  return std::unique_ptr<llvm::MemoryBuffer>(newBuffer.release());
 }
 
 UIdent SwiftLangSupport::getUIDForDecl(const Decl *D, bool IsRef) {
@@ -212,21 +256,23 @@ UIdent SwiftLangSupport::getUIDForAccessor(const ValueDecl *D,
                                            AccessorKind AccKind,
                                            bool IsRef) {
   switch (AccKind) {
-  case AccessorKind::IsMaterializeForSet:
-    llvm_unreachable("unexpected MaterializeForSet");
-  case AccessorKind::IsGetter:
+  case AccessorKind::Get:
     return IsRef ? KindRefAccessorGetter : KindDeclAccessorGetter;
-  case AccessorKind::IsSetter:
+  case AccessorKind::Set:
     return IsRef ? KindRefAccessorSetter : KindDeclAccessorSetter;
-  case AccessorKind::IsWillSet:
+  case AccessorKind::WillSet:
     return IsRef ? KindRefAccessorWillSet : KindDeclAccessorWillSet;
-  case AccessorKind::IsDidSet:
+  case AccessorKind::DidSet:
     return IsRef ? KindRefAccessorDidSet : KindDeclAccessorDidSet;
-  case AccessorKind::IsAddressor:
+  case AccessorKind::Address:
     return IsRef ? KindRefAccessorAddress : KindDeclAccessorAddress;
-  case AccessorKind::IsMutableAddressor:
+  case AccessorKind::MutableAddress:
     return IsRef ? KindRefAccessorMutableAddress
                  : KindDeclAccessorMutableAddress;
+  case AccessorKind::Read:
+    return IsRef ? KindRefAccessorRead : KindDeclAccessorRead;
+  case AccessorKind::Modify:
+    return IsRef ? KindRefAccessorModify : KindDeclAccessorModify;
   }
 
   llvm_unreachable("Unhandled AccessorKind in switch.");
@@ -234,6 +280,10 @@ UIdent SwiftLangSupport::getUIDForAccessor(const ValueDecl *D,
 
 SourceKit::UIdent SwiftLangSupport::getUIDForModuleRef() {
   return KindRefModule;
+}
+
+SourceKit::UIdent SwiftLangSupport::getUIDForObjCAttr() {
+  return Attr_Objc;
 }
 
 UIdent SwiftLangSupport::getUIDForRefactoringKind(ide::RefactoringKind Kind){
@@ -538,21 +588,24 @@ UIdent SwiftLangSupport::getUIDForSymbol(SymbolInfo sym, bool isRef) {
     return UID_FOR(TypeAlias);
 
   case SymbolKind::Function:
+  case SymbolKind::StaticMethod:
     if (sym.SubKind == SymbolSubKind::SwiftPrefixOperator)
       return UID_FOR(FunctionPrefixOperator);
     if (sym.SubKind == SymbolSubKind::SwiftPostfixOperator)
       return UID_FOR(FunctionPostfixOperator);
     if (sym.SubKind == SymbolSubKind::SwiftInfixOperator)
       return UID_FOR(FunctionInfixOperator);
-    return UID_FOR(FunctionFree);
+    if (sym.Kind == SymbolKind::StaticMethod) {
+      return UID_FOR(MethodStatic);
+    } else {
+      return UID_FOR(FunctionFree);
+    }
   case SymbolKind::Variable:
     return UID_FOR(VarGlobal);
   case SymbolKind::InstanceMethod:
     return UID_FOR(MethodInstance);
   case SymbolKind::ClassMethod:
     return UID_FOR(MethodClass);
-  case SymbolKind::StaticMethod:
-    return UID_FOR(MethodStatic);
   case SymbolKind::InstanceProperty:
     if (sym.SubKind == SymbolSubKind::SwiftSubscript)
       return UID_FOR(Subscript);
@@ -575,6 +628,9 @@ UIdent SwiftLangSupport::getUIDForSymbol(SymbolInfo sym, bool isRef) {
     } else {
       llvm_unreachable("missing extension sub kind");
     }
+
+  case SymbolKind::Module:
+    return KindRefModule;
 
   default:
     // TODO: reconsider whether having a default case is a good idea.
@@ -605,28 +661,21 @@ Optional<UIdent> SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttri
   // Check special-case names first.
   switch (Attr->getKind()) {
     case DAK_IBAction: {
-      static UIdent Attr_IBAction("source.decl.attribute.ibaction");
       return Attr_IBAction;
     }
     case DAK_IBOutlet: {
-      static UIdent Attr_IBOutlet("source.decl.attribute.iboutlet");
       return Attr_IBOutlet;
     }
     case DAK_IBDesignable: {
-      static UIdent Attr_IBDesignable("source.decl.attribute.ibdesignable");
       return Attr_IBDesignable;
     }
     case DAK_IBInspectable: {
-      static UIdent Attr_IBInspectable("source.decl.attribute.ibinspectable");
       return Attr_IBInspectable;
     }
     case DAK_GKInspectable: {
-      static UIdent Attr_GKInspectable("source.decl.attribute.gkinspectable");
       return Attr_GKInspectable;
     }
     case DAK_ObjC: {
-      static UIdent Attr_Objc("source.decl.attribute.objc");
-      static UIdent Attr_ObjcNamed("source.decl.attribute.objc.name");
       if (cast<ObjCAttr>(Attr)->hasName()) {
         return Attr_ObjcNamed;
       } else {
@@ -634,12 +683,6 @@ Optional<UIdent> SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttri
       }
     }
     case DAK_AccessControl: {
-      static UIdent Attr_Private("source.decl.attribute.private");
-      static UIdent Attr_FilePrivate("source.decl.attribute.fileprivate");
-      static UIdent Attr_Internal("source.decl.attribute.internal");
-      static UIdent Attr_Public("source.decl.attribute.public");
-      static UIdent Attr_Open("source.decl.attribute.open");
-
       switch (cast<AbstractAccessControlAttr>(Attr)->getAccess()) {
         case AccessLevel::Private:
           return Attr_Private;
@@ -654,30 +697,25 @@ Optional<UIdent> SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttri
       }
     }
     case DAK_SetterAccess: {
-      static UIdent Attr_Private("source.decl.attribute.setter_access.private");
-      static UIdent Attr_FilePrivate("source.decl.attribute.setter_access.fileprivate");
-      static UIdent Attr_Internal("source.decl.attribute.setter_access.internal");
-      static UIdent Attr_Public("source.decl.attribute.setter_access.public");
-      static UIdent Attr_Open("source.decl.attribute.setter_access.open");
-
       switch (cast<AbstractAccessControlAttr>(Attr)->getAccess()) {
         case AccessLevel::Private:
-          return Attr_Private;
+          return Attr_Setter_Private;
         case AccessLevel::FilePrivate:
-          return Attr_FilePrivate;
+          return Attr_Setter_FilePrivate;
         case AccessLevel::Internal:
-          return Attr_Internal;
+          return Attr_Setter_Internal;
         case AccessLevel::Public:
-          return Attr_Public;
+          return Attr_Setter_Public;
         case AccessLevel::Open:
-          return Attr_Open;
+          return Attr_Setter_Open;
       }
     }
 
     // Ignore these.
     case DAK_ShowInInterface:
     case DAK_RawDocComment:
-    case DAK_DowngradeExhaustivityCheck:
+    case DAK_HasInitialValue:
+    case DAK_HasStorage:
       return None;
     default:
       break;
@@ -736,6 +774,71 @@ bool SwiftLangSupport::printAccessorUSR(const AbstractStorageDecl *D,
   return ide::printAccessorUSR(D, AccKind, OS);
 }
 
+void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
+                                                  swift::Type baseTy,
+                                                  bool usePlaceholder,
+                                                  llvm::raw_ostream &OS) {
+  // Base name.
+  OS << VD->getBaseName().userFacingName();
+
+  // Parameters.
+  auto *M = VD->getModuleContext();
+  auto substMap = baseTy->getMemberSubstitutionMap(M, VD);
+  auto printSingleParam = [&](ParamDecl *param) {
+    auto paramTy = param->getInterfaceType();
+
+    // Label.
+    if (!param->getArgumentName().empty())
+      OS << param->getArgumentName() << ": ";
+
+    // InOut.
+    if (param->isInOut()) {
+      OS << "&";
+      paramTy = paramTy->getInOutObjectType();
+    }
+
+    // Type.
+    if (usePlaceholder)
+      OS << "<#T##";
+
+    if (auto substitutedTy = paramTy.subst(substMap))
+      paramTy = substitutedTy;
+
+    if (paramTy->hasError() && param->getTypeLoc().hasLocation()) {
+      // Fallback to 'TypeRepr' printing.
+      param->getTypeLoc().getTypeRepr()->print(OS);
+    } else {
+      paramTy.print(OS);
+    }
+
+    if (usePlaceholder)
+      OS << "#>";
+  };
+  auto printParams = [&](const ParameterList *params) {
+    OS << '(';
+    bool isFirst = true;
+    for (auto param : params->getArray()) {
+      if (isFirst)
+        isFirst = false;
+      else
+        OS << ", ";
+      printSingleParam(param);
+    }
+    OS << ')';
+  };
+  if (auto EED = dyn_cast<EnumElementDecl>(VD)) {
+    if (auto params = EED->getParameterList())
+      printParams(params);
+  } else if (auto *FD = dyn_cast<FuncDecl>(VD)) {
+    if (auto params = FD->getParameters())
+      printParams(params);
+  } else if (isa<VarDecl>(VD)) {
+    // Var decl doesn't have parameters.
+  } else {
+    llvm_unreachable("Unsupported Decl kind for printMemberDeclDescription()");
+  }
+}
+
 std::string SwiftLangSupport::resolvePathSymlinks(StringRef FilePath) {
   std::string InputPath = FilePath;
 #if !defined(_WIN32)
@@ -762,7 +865,7 @@ std::string SwiftLangSupport::resolvePathSymlinks(StringRef FilePath) {
 
 void SwiftLangSupport::getStatistics(StatisticsReceiver receiver) {
   std::vector<Statistic *> stats = {
-#define SWIFT_STATISTIC(VAR, UID, DESC) &Stats.VAR,
+#define SWIFT_STATISTIC(VAR, UID, DESC) &Stats->VAR,
 #include "SwiftStatistics.def"
   };
   receiver(stats);
@@ -776,4 +879,14 @@ CloseClangModuleFiles::~CloseClangModuleFiles() {
     if (!M->isSubModule() && M->getASTFile())
       M->getASTFile()->closeFile();
   }
+}
+
+void SourceKit::disableExpensiveSILOptions(SILOptions &Opts) {
+  // Disable the sanitizers.
+  Opts.Sanitizers = {};
+
+  // Disable PGO and code coverage.
+  Opts.GenerateProfile = false;
+  Opts.EmitProfileCoverageMapping = false;
+  Opts.UseProfile = "";
 }

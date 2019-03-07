@@ -13,8 +13,8 @@
 #ifndef SWIFT_DRIVER_UTIL_H
 #define SWIFT_DRIVER_UTIL_H
 
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Frontend/FileTypes.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace llvm {

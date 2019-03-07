@@ -144,7 +144,7 @@ void ARCRegionState::mergePredTopDown(ARCRegionState &PredRegionState) {
     // Attempt to merge Other into this ref count state. If we fail, blot this
     // ref counted value and continue.
     if (!RefCountState.merge(OtherRefCountState)) {
-      DEBUG(llvm::dbgs() << "Failed to merge!\n");
+      LLVM_DEBUG(llvm::dbgs() << "Failed to merge!\n");
       PtrToTopDownState.erase(RefCountedValue);
       continue;
     }
@@ -249,7 +249,7 @@ static bool processBlockBottomUpInsts(
     SILInstruction *I = *II;
     ++II;
 
-    DEBUG(llvm::dbgs() << "VISITING:\n    " << *I);
+    LLVM_DEBUG(llvm::dbgs() << "VISITING:\n    " << *I);
 
     auto Result = DataflowVisitor.visit(I);
 
@@ -291,7 +291,7 @@ bool ARCRegionState::processBlockBottomUp(
     bool FreezeOwnedArgEpilogueReleases,
     BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap,
     ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
-  DEBUG(llvm::dbgs() << ">>>> Bottom Up!\n");
+  LLVM_DEBUG(llvm::dbgs() << ">>>> Bottom Up!\n");
 
   SILBasicBlock &BB = *R->getBlock();
   BottomUpDataflowRCStateVisitor<ARCRegionState> DataflowVisitor(
@@ -402,7 +402,7 @@ bool ARCRegionState::processBlockTopDown(
     SILBasicBlock &BB, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
     BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
     ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
-  DEBUG(llvm::dbgs() << ">>>> Top Down!\n");
+  LLVM_DEBUG(llvm::dbgs() << ">>>> Top Down!\n");
 
   bool NestingDetected = false;
 
@@ -427,7 +427,7 @@ bool ARCRegionState::processBlockTopDown(
   // For each instruction I in BB...
   for (auto *I : SummarizedInterestingInsts) {
 
-    DEBUG(llvm::dbgs() << "VISITING:\n    " << *I);
+    LLVM_DEBUG(llvm::dbgs() << "VISITING:\n    " << *I);
 
     auto Result = DataflowVisitor.visit(I);
 

@@ -769,8 +769,10 @@ public:
   }
 
   std::vector<sma::TypeName> collectProtocolConformances(NominalTypeDecl *NTD) {
+    const auto AllProtocols = NTD->getAllProtocols();
     std::vector<sma::TypeName> Result;
-    for (const auto *PD : NTD->getAllProtocols()) {
+    Result.reserve(AllProtocols.size());
+    for (const auto *PD : AllProtocols) {
       Result.emplace_back(convertToTypeName(PD->getDeclaredType()));
     }
     return Result;
@@ -907,27 +909,30 @@ int swift::doGenerateModuleAPIDescription(StringRef MainExecutablePath,
   DiagnosticEngine Diags(SM);
   Diags.addConsumer(PDC);
 
-  std::unique_ptr<CompilerInvocation> Invocation =
-      driver::createCompilerInvocation(CStringArgs, Diags);
+  CompilerInvocation Invocation;
+  bool HadError = driver::getSingleFrontendInvocationFromDriverArguments(
+      CStringArgs, Diags, [&](ArrayRef<const char *> FrontendArgs) {
+    return Invocation.parseArgs(FrontendArgs, Diags);
+  });
 
-  if (!Invocation) {
+  if (HadError) {
     llvm::errs() << "error: unable to create a CompilerInvocation\n";
     return 1;
   }
 
-  Invocation->setMainExecutablePath(MainExecutablePath);
+  Invocation.setMainExecutablePath(MainExecutablePath);
 
   CompilerInstance CI;
   CI.addDiagnosticConsumer(&PDC);
-  if (CI.setup(*Invocation))
+  if (CI.setup(Invocation))
     return 1;
   CI.performSema();
 
   PrintOptions Options = PrintOptions::printEverything();
 
   ModuleDecl *M = CI.getMainModule();
-  M->getMainSourceFile(Invocation->getSourceFileKind()).print(llvm::outs(),
-                                                        Options);
+  M->getMainSourceFile(Invocation.getSourceFileKind()).print(llvm::outs(),
+                                                             Options);
 
   auto SMAModel = createSMAModel(M);
   llvm::yaml::Output YOut(llvm::outs());

@@ -376,7 +376,7 @@ Use `M-x hs-show-all' to show them again."
         ,(concat
      "^"
        "[ \t]+" "\\(?:(@\\)?"
-       "[A-Z][A-Za-z0-9_]*@"
+       "[A-Z⚠️][A-Za-z0-9_]*@"
      ;; Filename \1
        "\\("
           "[0-9]*[^0-9\n]"
