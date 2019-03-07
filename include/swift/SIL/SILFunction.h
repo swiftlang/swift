@@ -482,6 +482,8 @@ public:
 
   const Lowering::TypeLowering &getTypeLowering(SILType type) const;
 
+  bool isTypeABIAccessible(SILType type) const;
+
   /// Returns true if this function has a calling convention that has a self
   /// argument.
   bool hasSelfParam() const {

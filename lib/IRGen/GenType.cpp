@@ -1433,17 +1433,23 @@ const TypeInfo &IRGenFunction::getTypeInfo(SILType T) {
 }
 
 /// Return the SIL-lowering of the given type.
-SILType IRGenModule::getLoweredType(AbstractionPattern orig, Type subst) {
+SILType IRGenModule::getLoweredType(AbstractionPattern orig, Type subst) const {
   // FIXME: Expansion
   return getSILTypes().getLoweredType(orig, subst,
                                       ResilienceExpansion::Minimal);
 }
 
 /// Return the SIL-lowering of the given type.
-SILType IRGenModule::getLoweredType(Type subst) {
+SILType IRGenModule::getLoweredType(Type subst) const {
   // FIXME: Expansion
   return getSILTypes().getLoweredType(subst,
                                       ResilienceExpansion::Minimal);
+}
+
+bool IRGenModule::isTypeABIAccessible(SILType type) const {
+  // FIXME: Expansion
+  return getSILModule().isTypeABIAccessible(type,
+                                            ResilienceExpansion::Minimal);
 }
 
 /// Get a pointer to the storage type for the given type.  Note that,
