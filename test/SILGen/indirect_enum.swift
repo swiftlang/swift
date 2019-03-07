@@ -229,9 +229,9 @@ func switchTreeB<T>(_ x: TreeB<T>) {
   switch x {
 
   // CHECK:     bb{{.*}}:
+  // CHECK:       function_ref @$s13indirect_enum1ayyF
   // CHECK:       destroy_addr [[SCRATCH]]
   // CHECK:       dealloc_stack [[SCRATCH]]
-  // CHECK:       function_ref @$s13indirect_enum1ayyF
   // CHECK:       br [[OUTER_CONT:bb[0-9]+]]
   case .Nil:
     a()
@@ -305,9 +305,9 @@ func switchTreeB<T>(_ x: TreeB<T>) {
   // CHECK:       br [[INNER_CONT:bb[0-9]+]]
 
   // CHECK:     [[INNER_CONT]]:
+  // CHECK:       function_ref @$s13indirect_enum1dyyF
   // CHECK:       destroy_addr [[SCRATCH]]
   // CHECK:       dealloc_stack [[SCRATCH]]
-  // CHECK:       function_ref @$s13indirect_enum1dyyF
   // CHECK:       br [[OUTER_CONT]]
   default:
     d()
