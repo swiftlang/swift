@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,11 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_exported import Accelerate
+import Accelerate
 
 // MARK: Quadrature
 
-@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+@available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
 /// A class that approximates the definite integral of a function over a finite interval.
 ///
 /// The following code is an example of using a `Quadrature` instance to calculate the
