@@ -565,6 +565,11 @@ private:
   Type getUnwrappedType() const {
     return resolveType(UnwrappedType, /*reconstituteSugar=*/true);
   }
+
+  /// Suggest a default value via `?? <default value>`
+  void offerDefaultValueUnwrapFixIt(DeclContext *DC, Expr *expr) const;
+  /// Suggest a force optional unwrap via `!`
+  void offerForceUnwrapFixIt(Expr *expr) const;
 };
 
 /// Diagnose errors associated with rvalues in positions

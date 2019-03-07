@@ -549,16 +549,16 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
                                            resultIsOptional, SourceRange());
 }
 
-// Suggest a default value via ?? <default value>
-static void offerDefaultValueUnwrapFixit(TypeChecker &TC, DeclContext *DC, Expr *expr, Expr *rootExpr) {
-  auto diag =
-  TC.diagnose(expr->getLoc(), diag::unwrap_with_default_value);
+void MissingOptionalUnwrapFailure::offerDefaultValueUnwrapFixIt(
+    DeclContext *DC, Expr *expr) const {
+  auto diag = emitDiagnostic(expr->getLoc(), diag::unwrap_with_default_value);
 
+  auto &TC = getTypeChecker();
   // Figure out what we need to parenthesize.
   bool needsParensInside =
-  exprNeedsParensBeforeAddingNilCoalescing(TC, DC, expr);
+      exprNeedsParensBeforeAddingNilCoalescing(TC, DC, expr);
   bool needsParensOutside =
-  exprNeedsParensAfterAddingNilCoalescing(TC, DC, expr, rootExpr);
+      exprNeedsParensAfterAddingNilCoalescing(TC, DC, expr, getParentExpr());
 
   llvm::SmallString<2> insertBefore;
   llvm::SmallString<32> insertAfter;
@@ -580,8 +580,8 @@ static void offerDefaultValueUnwrapFixit(TypeChecker &TC, DeclContext *DC, Expr 
 }
 
 // Suggest a force-unwrap.
-static void offerForceUnwrapFixit(ConstraintSystem &CS, Expr *expr) {
-  auto diag = CS.TC.diagnose(expr->getLoc(), diag::unwrap_with_force_value);
+void MissingOptionalUnwrapFailure::offerForceUnwrapFixIt(Expr *expr) const {
+  auto diag = emitDiagnostic(expr->getLoc(), diag::unwrap_with_force_value);
 
   // If expr is optional as the result of an optional chain and this last
   // dot isn't a member returning optional, then offer to force the last
@@ -590,7 +590,7 @@ static void offerForceUnwrapFixit(ConstraintSystem &CS, Expr *expr) {
     if (auto dotExpr =
         dyn_cast<UnresolvedDotExpr>(optionalChain->getSubExpr())) {
       auto bind = dyn_cast<BindOptionalExpr>(dotExpr->getBase());
-      if (bind && !CS.getType(dotExpr)->getOptionalObjectType()) {
+      if (bind && !getType(dotExpr)->getOptionalObjectType()) {
         diag.fixItReplace(SourceRange(bind->getLoc()), "!");
         return;
       }
@@ -601,7 +601,7 @@ static void offerForceUnwrapFixit(ConstraintSystem &CS, Expr *expr) {
     diag.fixItInsertAfter(expr->getEndLoc(), "!");
   } else {
     diag.fixItInsert(expr->getStartLoc(), "(")
-    .fixItInsertAfter(expr->getEndLoc(), ")!");
+        .fixItInsertAfter(expr->getEndLoc(), ")!");
   }
 }
 
@@ -622,8 +622,38 @@ public:
   int referencesCount() { return count; }
 };
 
-static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Expr *rootExpr, Type baseType,
-                           Type unwrappedType) {
+bool MissingOptionalUnwrapFailure::diagnoseAsError() {
+  if (hasComplexLocator())
+    return false;
+
+  auto *anchor = getAnchor();
+
+  if (auto assignExpr = dyn_cast<AssignExpr>(anchor))
+    anchor = assignExpr->getSrc();
+
+  auto *unwrappedExpr = anchor->getValueProvidingExpr();
+
+  if (auto *tryExpr = dyn_cast<OptionalTryExpr>(unwrappedExpr)) {
+    bool isSwift5OrGreater = getASTContext().isSwiftVersionAtLeast(5);
+    auto subExprType = getType(tryExpr->getSubExpr());
+    bool subExpressionIsOptional = (bool)subExprType->getOptionalObjectType();
+
+    if (isSwift5OrGreater && subExpressionIsOptional) {
+      // Using 'try!' won't change the type for a 'try?' with an optional
+      // sub-expr under Swift 5+, so just report that a missing unwrap can't be
+      // handled here.
+      return false;
+    }
+
+    emitDiagnostic(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try,
+                   getType(anchor)->getRValueType())
+        .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()},
+                      "try!");
+    return true;
+  }
+
+  auto baseType = getBaseType();
+  auto unwrappedType = getUnwrappedType();
 
   assert(!baseType->hasTypeVariable() &&
          "Base type must not be a type variable");
@@ -633,15 +663,14 @@ static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Expr *rootExpr, Typ
   if (!baseType->getOptionalObjectType())
     return false;
 
-  CS.TC.diagnose(expr->getLoc(), diag::optional_not_unwrapped, baseType,
-                 unwrappedType);
+  emitDiagnostic(unwrappedExpr->getLoc(), diag::optional_not_unwrapped,
+                 baseType, unwrappedType);
 
   // If the expression we're unwrapping is the only reference to a
   // local variable whose type isn't explicit in the source, then
   // offer unwrapping fixits on the initializer as well.
-  if (auto declRef = dyn_cast<DeclRefExpr>(expr)) {
+  if (auto declRef = dyn_cast<DeclRefExpr>(unwrappedExpr)) {
     if (auto varDecl = dyn_cast<VarDecl>(declRef->getDecl())) {
-
       bool singleUse = false;
       AbstractFunctionDecl *AFD = nullptr;
       if (auto contextDecl = varDecl->getDeclContext()->getAsDecl()) {
@@ -658,69 +687,37 @@ static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Expr *rootExpr, Typ
 
         Expr *initializer = varDecl->getParentInitializer();
         if (auto declRefExpr = dyn_cast<DeclRefExpr>(initializer)) {
-          if (declRefExpr->getDecl()->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
-            CS.TC.diagnose(declRefExpr->getLoc(), diag::unwrap_iuo_initializer,
+          if (declRefExpr->getDecl()
+                  ->getAttrs()
+                  .hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+            emitDiagnostic(declRefExpr->getLoc(), diag::unwrap_iuo_initializer,
                            baseType);
           }
         }
 
         auto fnTy = AFD->getInterfaceType()->castTo<AnyFunctionType>();
-        bool voidReturn = fnTy->getResult()->isEqual(TupleType::getEmpty(CS.DC->getASTContext()));
+        bool voidReturn =
+            fnTy->getResult()->isEqual(TupleType::getEmpty(getASTContext()));
 
-        auto diag = CS.TC.diagnose(varDecl->getLoc(), diag::unwrap_with_guard);
+        auto diag = emitDiagnostic(varDecl->getLoc(), diag::unwrap_with_guard);
         diag.fixItInsert(binding->getStartLoc(), "guard ");
         if (voidReturn) {
           diag.fixItInsertAfter(binding->getEndLoc(), " else { return }");
         } else {
           diag.fixItInsertAfter(binding->getEndLoc(), " else { return <"
-                                "#default value#" "> }");
+                                                      "#default value#"
+                                                      "> }");
         }
         diag.flush();
 
-        offerDefaultValueUnwrapFixit(CS.TC, varDecl->getDeclContext(), 
-                                     initializer, rootExpr);
-        offerForceUnwrapFixit(CS, initializer);
+        offerDefaultValueUnwrapFixIt(varDecl->getDeclContext(), initializer);
+        offerForceUnwrapFixIt(initializer);
       }
     }
   }
 
-  offerDefaultValueUnwrapFixit(CS.TC, CS.DC, expr, rootExpr);
-  offerForceUnwrapFixit(CS, expr);
-  return true;
-}
-
-bool MissingOptionalUnwrapFailure::diagnoseAsError() {
-  if (hasComplexLocator())
-    return false;
-
-  auto *anchor = getAnchor();
-  auto *rootExpr = getParentExpr();
-
-  if (auto assignExpr = dyn_cast<AssignExpr>(anchor))
-    anchor = assignExpr->getSrc();
-  
-  auto *unwrapped = anchor->getValueProvidingExpr();
-  auto type = getType(anchor)->getRValueType();
-
-  auto *tryExpr = dyn_cast<OptionalTryExpr>(unwrapped);
-  if (!tryExpr) {
-    return diagnoseUnwrap(getConstraintSystem(), unwrapped, rootExpr, getBaseType(),
-                          getUnwrappedType());
-  }
-
-  bool isSwift5OrGreater = getTypeChecker().getLangOpts().isSwiftVersionAtLeast(5);
-  auto subExprType = getType(tryExpr->getSubExpr());
-  bool subExpressionIsOptional = (bool)subExprType->getOptionalObjectType();
-  
-  
-  if (isSwift5OrGreater && subExpressionIsOptional) {
-    // Using 'try!' won't change the type for a 'try?' with an optional sub-expr
-    // under Swift 5+, so just report that a missing unwrap can't be handled here.
-    return false;
-  }
-
-  emitDiagnostic(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try, type)
-      .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()}, "try!");
+  offerDefaultValueUnwrapFixIt(getDC(), unwrappedExpr);
+  offerForceUnwrapFixIt(unwrappedExpr);
   return true;
 }
 
