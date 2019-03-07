@@ -178,81 +178,8 @@ void ASTScope::expand() const {
   assert(!isExpanded() && "Already expanded the children of this node");
   ASTContext &ctx = getASTContext();
 
-#ifndef NDEBUG
-  auto verificationError = [&]() -> llvm::raw_ostream& {
-    return llvm::errs() << "ASTScope verification error in source file '"
-      << getSourceFile().getFilename()
-      << "': ";
-  };
-#endif
-
   // Local function to add a child to the list of children.
   bool previouslyEmpty = storedChildren.empty();
-  auto addChild = [&](ASTScope *child) -> bool {
-    assert(child->getParent() == this && "Wrong parent");
-
-    // If we have a continuation and the child can steal it, transfer the
-    // continuation to that child.
-    bool stoleContinuation = false;
-    if (getActiveContinuation() && child->canStealContinuation()) {
-      assert(!child->getActiveContinuation() &&
-             "Child cannot have a continuation already");
-      child->continuation = this->continuation;
-      this->clearActiveContinuation();
-      stoleContinuation = true;
-    }
-
-#ifndef NDEBUG
-    // Check invariants in asserting builds.
-    SourceManager &sourceMgr = ctx.SourceMgr;
-
-    // Check for containment of the child within the parent.
-    if (!sourceMgr.rangeContains(getSourceRange(), child->getSourceRange())) {
-      auto &out = verificationError() << "child not contained in its parent\n";
-      out << "***Child node***\n";
-      child->print(out);
-      out << "***Parent node***\n";
-      this->print(out);
-      abort();
-    }
-
-    // If there was a previous child, check it's source range.
-    if (!storedChildren.empty()) {
-      auto prevChild = storedChildren.back();
-      SourceRange prevChildRange = prevChild->getSourceRange();
-      SourceRange childRange = child->getSourceRange();
-
-      // This new child must come after the previous child.
-      if (sourceMgr.isBeforeInBuffer(childRange.Start, prevChildRange.End)) {
-        auto &out = verificationError() << "unexpected out-of-order nodes\n";
-        out << "***Child node***\n";
-        child->print(out);
-        out << "***Previous child node***\n";
-        prevChild->print(out);
-        out << "***Parent node***\n";
-        this->print(out);
-        abort();
-      }
-
-      // The previous child must not overlap this child.
-      if (sourceMgr.isBeforeInBuffer(childRange.End, prevChildRange.End)) {
-        auto &out = verificationError() << "unexpected child overlap\n";
-        out << "***Child node***\n";
-        child->print(out);
-        out << "***Previous child node***\n";
-        prevChild->print(out);
-        out << "***Parent node***\n";
-        this->print(out);
-        abort();
-      }
-    }
-#endif
-
-    // Add the child.
-    storedChildren.push_back(child);
-
-    return stoleContinuation;
-  };
 
   // Local function to add the accessors of the variables in the given pattern
   // as children.
@@ -301,8 +228,7 @@ void ASTScope::expand() const {
   case ASTScopeKind::ExtensionGenericParams: {
     // Since an extension always has an ExtensionGenericParams scope,
     // create the NominalOrExtensionWhereClause here for an extension.
-    if (ASTScope *child = createIfNeeded(this, extension->getTrailingWhereClause()))
-      addChild(child);
+    addNominalOrExtensionWhereClause(cast<GenericContext>(extension));
 
     // Create a child node.
     if (ASTScope *child = createIfNeeded(this, extension))
@@ -319,30 +245,12 @@ void ASTScope::expand() const {
     break;
 
   case ASTScopeKind::GenericParams:
-    // Create a child of the generic parameters, if needed.
-    if (auto child = createIfNeeded(this, genericParams.decl)) {
-      if (child->getKind() != ASTScopeKind::GenericParams) {
-        assert(child->getKind() == ASTScopeKind::TypeOrExtensionBody && "unexpected scope kind");
-        // FACTOR
-        if (ASTScope *child = createIfNeeded(this, extension->getTrailingWhereClause()))
-          addChild(child);
-      }
-      addChild(child);
-    }
+    addNextGenericParamOrWhereAndBody(genericParams.decl);
     break;
 
   case ASTScopeKind::TypeDecl:
-    // Create the child of the function, if any.
-    if (auto child = createIfNeeded(this, typeDecl)) {
-      if (child->getKind() != ASTScopeKind::GenericParams) {
-        assert(child->getKind() == ASTScopeKind::TypeOrExtensionBody && "unexpected scope kind");
-        // FACTOR
-        if (ASTScope *child = createIfNeeded(this, extension->getTrailingWhereClause()))
-          addChild(child);
-      }
-      addChild(child);
-    }
-    break;
+   addNextGenericParamOrWhereAndBody(typeDecl);
+   break;
 
   case ASTScopeKind::AbstractFunctionDecl:
     // Create the child of the function, if any.
@@ -590,7 +498,7 @@ void ASTScope::expand() const {
   }
 
   // Enumerate any continuation scopes associated with this parent.
-  enumerateContinuationScopes(addChild);
+  enumerateContinuationScopes();
 
   // If this is the first time we've added children, notify the ASTContext
   // that there's a SmallVector that needs to be cleaned up.
@@ -602,6 +510,98 @@ void ASTScope::expand() const {
   // further work to do if there is an active continuation.
   if (getKind() != ASTScopeKind::SourceFile || getHistoricalContinuation())
     parentAndExpanded.setInt(true);
+}
+
+bool ASTScope::addChild(ASTScope *const child) const {
+  assert(child->getParent() == this && "Wrong parent");
+  
+  // If we have a continuation and the child can steal it, transfer the
+  // continuation to that child.
+  bool stoleContinuation = false;
+  if (getActiveContinuation() && child->canStealContinuation()) {
+    assert(!child->getActiveContinuation() &&
+           "Child cannot have a continuation already");
+    child->continuation = this->continuation;
+    this->clearActiveContinuation();
+    stoleContinuation = true;
+  }
+  
+#ifndef NDEBUG
+  
+  auto verificationError = [&]() -> llvm::raw_ostream& {
+    return llvm::errs() << "ASTScope verification error in source file '"
+    << getSourceFile().getFilename()
+    << "': ";
+  };
+
+  // Check invariants in asserting builds.
+  SourceManager &sourceMgr = getASTContext().SourceMgr;
+  
+  // Check for containment of the child within the parent.
+  if (!sourceMgr.rangeContains(getSourceRange(), child->getSourceRange())) {
+    auto &out = verificationError() << "child not contained in its parent\n";
+    out << "***Child node***\n";
+    child->print(out);
+    out << "***Parent node***\n";
+    this->print(out);
+    abort();
+  }
+  
+  // If there was a previous child, check it's source range.
+  if (!storedChildren.empty()) {
+    auto prevChild = storedChildren.back();
+    SourceRange prevChildRange = prevChild->getSourceRange();
+    SourceRange childRange = child->getSourceRange();
+    
+    // This new child must come after the previous child.
+    if (sourceMgr.isBeforeInBuffer(childRange.Start, prevChildRange.End)) {
+      auto &out = verificationError() << "unexpected out-of-order nodes\n";
+      out << "***Child node***\n";
+      child->print(out);
+      out << "***Previous child node***\n";
+      prevChild->print(out);
+      out << "***Parent node***\n";
+      this->print(out);
+      abort();
+    }
+    
+    // The previous child must not overlap this child.
+    if (sourceMgr.isBeforeInBuffer(childRange.End, prevChildRange.End)) {
+      auto &out = verificationError() << "unexpected child overlap\n";
+      out << "***Child node***\n";
+      child->print(out);
+      out << "***Previous child node***\n";
+      prevChild->print(out);
+      out << "***Parent node***\n";
+      this->print(out);
+      abort();
+    }
+  }
+#endif
+  
+  // Add the child.
+  storedChildren.push_back(child);
+  
+  return stoleContinuation;
+}
+
+void ASTScope::addNextGenericParamOrWhereAndBody(Decl *const decl) const {
+  if (auto child = createIfNeeded(this, decl)) {
+    if (child->getKind() != ASTScopeKind::GenericParams) {
+      assert(child->getKind() == ASTScopeKind::TypeOrExtensionBody &&
+             "unexpected scope kind");
+      if (const auto *gc = dyn_cast<GenericContext>(decl))
+        addNominalOrExtensionWhereClause(gc);
+    }
+    addChild(child);
+  }
+}
+
+void ASTScope::addNominalOrExtensionWhereClause(
+                 const GenericContext *const whereContext) const {
+  if (ASTScope *child = createIfNeeded(this,
+                                       extension->getTrailingWhereClause()))
+    addChild(child);
 }
 
 bool ASTScope::isExpanded() const {
@@ -904,7 +904,7 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
     // If we already have a scope of the (possible) generic parameters,
     // add the body.
     if (parent->getKind() == ASTScopeKind::ExtensionGenericParams) {
-     return new (ctx) ASTScope("gazorp", parent, cast<IterableDeclContext>(ext));
+     return new (ctx) ASTScope(parent, cast<IterableDeclContext>(ext));
     }
 
     // Otherwise, form the extension's generic parameters scope.
@@ -921,16 +921,13 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
   case DeclKind::Class:
   case DeclKind::Enum:
   case DeclKind::Struct: {
-    // There may not be a GenericParams scope, so:
-    // 1. must create trailing where scope when expanding the last GenericParams scope, or
-    // 2. how to have already created trailing where?
     auto nominal = cast<NominalTypeDecl>(decl);
 
     // If we have a generic type and our parent isn't describing our generic
     // parameters, build the generic parameter scope.
     if (auto scope = nextGenericParam(nominal->getGenericParams(), nominal))
       return scope;
-    return new (ctx) ASTScope("gazorp", parent, cast<IterableDeclContext>(nominal));
+    return new (ctx) ASTScope(parent, cast<IterableDeclContext>(nominal));
   }
 
   case DeclKind::TypeAlias: {
@@ -1264,8 +1261,7 @@ bool ASTScope::canStealContinuation() const {
   llvm_unreachable("Unhandled ASTScopeKind in switch.");
 }
 
-void ASTScope::enumerateContinuationScopes(
-       llvm::function_ref<bool(ASTScope *)> addChild) const {
+void ASTScope::enumerateContinuationScopes() const {
   while (auto continuation = getActiveContinuation()) {
     // Continue to brace statements.
     if (continuation->getKind() == ASTScopeKind::BraceStmt) {

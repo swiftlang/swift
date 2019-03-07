@@ -37,6 +37,7 @@ class Decl;
 class DoCatchStmt;
 class Expr;
 class ForEachStmt;
+class GenericContext;
 class GenericParamList;
 class GuardStmt;
 class IfStmt;
@@ -355,7 +356,7 @@ class ASTScope {
     this->extension = extension;
   }
 
-  ASTScope(const char*, const ASTScope *parent, IterableDeclContext *idc)
+  ASTScope(const ASTScope *parent, IterableDeclContext *idc)
       : ASTScope(ASTScopeKind::TypeOrExtensionBody, parent) {
     this->iterableDeclContext = idc;
   }
@@ -484,6 +485,22 @@ class ASTScope {
 
   /// Expand the children of this AST scope so they can be queried.
   void expand() const;
+  
+  /// Add a child to the receiver.
+  ///
+  /// \returns true if child steals the continuation. The return value is used to termiante the enumeration
+  /// in \c enumerateContunationScopes.
+  bool addChild(ASTScope *child) const;
+  
+  /// While expanding a \c TypeDecl, or a \c GenericParms child of a \c TypeDecl,
+  /// add either the next \c GenericParms child, or if no more generic params,
+  /// add the \c NominalOrExtensionWhereClause (if needed) and the
+  ///\c TypeOrExtensionBody children.
+  void addNextGenericParamOrWhereAndBody(Decl *const decl) const;
+  
+  /// If a where clause is present, create a \c NominalOrExtensionWhereClause scope and
+  /// add it as a child of the receiver.
+  void addNominalOrExtensionWhereClause(const GenericContext *) const;
 
   /// Determine whether the given scope has already been completely expanded,
   /// and cannot create any new children.
@@ -527,13 +544,10 @@ class ASTScope {
   /// in the continuation.
   bool canStealContinuation() const;
 
-  /// Enumerate the continuation child scopes for the given scope.
-  ///
-  /// \param addChild Function that will be invoked to add the continuation
-  /// child. This function should return true if the child steals the
+  /// Enumerate the continuation child scopes for the given scope by calling \c addChild.
+  /// This function should return true if the child steals the
   /// continuation, which terminates the enumeration.
-  void enumerateContinuationScopes(
-         llvm::function_ref<bool(ASTScope *)> addChild) const;
+  void enumerateContinuationScopes() const;
 
   /// Compute the source range of this scope.
   SourceRange getSourceRangeImpl() const;
