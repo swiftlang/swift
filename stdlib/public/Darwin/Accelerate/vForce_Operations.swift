@@ -26,7 +26,7 @@ extension vDSP {
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func ceiling<U, V>(_ vector: U,
                               result: inout V)
         where
@@ -52,7 +52,7 @@ extension vDSP {
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func ceiling<U, V>(_ vector: U,
                               result: inout V)
         where
@@ -80,7 +80,7 @@ extension vDSP {
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func floor<U, V>(_ vector: U,
                             result: inout V)
         where
@@ -106,7 +106,7 @@ extension vDSP {
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func floor<U, V>(_ vector: U,
                             result: inout V)
         where
@@ -135,7 +135,7 @@ extension vDSP {
     /// - Parameter signs: Input signs.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func copySign<T, U, V>(magnitudes: T,
                                   signs: U,
                                   result: inout V)
@@ -167,7 +167,7 @@ extension vDSP {
     /// - Parameter signs: Input signs.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func copySign<T, U, V>(magnitudes: T,
                                   signs: U,
                                   result: inout V)
@@ -204,7 +204,7 @@ extension vDSP {
     /// - Parameter denominators: Input denominators.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func modulus<T, U, V>(numerators: T,
                                  denominators: U,
                                  result: inout V)
@@ -236,7 +236,7 @@ extension vDSP {
     /// - Parameter denominators: Input denominators.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func modulus<T, U, V>(numerators: T,
                                  denominators: U,
                                  result: inout V)
@@ -270,7 +270,7 @@ extension vDSP {
     /// - Parameter denominators: Input denominators.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func remainder<T, U, V>(numerators: T,
                                    denominators: U,
                                    result: inout V)
@@ -302,7 +302,7 @@ extension vDSP {
     /// - Parameter denominators: Input denominators.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func remainder<T, U, V>(numerators: T,
                                    denominators: U,
                                    result: inout V)
@@ -335,7 +335,7 @@ extension vDSP {
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func integerTruncation<U, V>(_ vector: U,
                                         result: inout V)
         where
@@ -361,7 +361,7 @@ extension vDSP {
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func integerTruncation<U, V>(_ vector: U,
                                         result: inout V)
         where
@@ -389,7 +389,7 @@ extension vDSP {
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func nearestInteger<U, V>(_ vector: U,
                                      result: inout V)
         where
@@ -415,7 +415,7 @@ extension vDSP {
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func nearestInteger<U, V>(_ vector: U,
                                      result: inout V)
         where
@@ -443,7 +443,7 @@ extension vDSP {
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func reciprocalSquareRoot<U, V>(_ vector: U,
                                            result: inout V)
         where
@@ -469,7 +469,7 @@ extension vDSP {
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func reciprocalSquareRoot<U, V>(_ vector: U,
                                            result: inout V)
         where
@@ -497,7 +497,7 @@ extension vDSP {
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func squareRoot<U, V>(_ vector: U,
                                  result: inout V)
         where
@@ -523,7 +523,7 @@ extension vDSP {
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func squareRoot<U, V>(_ vector: U,
                                  result: inout V)
         where
@@ -551,7 +551,7 @@ extension vDSP {
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func reciprocal<U, V>(_ vector: U,
                                  result: inout V)
         where
@@ -577,7 +577,7 @@ extension vDSP {
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func reciprocal<U, V>(_ vector: U,
                                  result: inout V)
         where
@@ -617,7 +617,7 @@ extension vDSP {
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func exponential<U, V>(_ vector: U,
                                   exponentialType: ExponentialType,
                                   result: inout V)
@@ -657,7 +657,7 @@ extension vDSP {
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func exponential<U, V>(_ vector: U,
                                   exponentialType: ExponentialType,
                                   result: inout V)
@@ -704,7 +704,7 @@ extension vDSP {
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func logarithm<U, V>(_ vector: U,
                                 base: LogarithmBase,
                                 result: inout V)
@@ -740,7 +740,7 @@ extension vDSP {
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func logarithm<U, V>(_ vector: U,
                                 base: LogarithmBase,
                                 result: inout V)
@@ -777,7 +777,7 @@ extension vDSP {
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func unbiasedExponent<U, V>(_ vector: U,
                                        result: inout V)
         where
@@ -803,7 +803,7 @@ extension vDSP {
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func unbiasedExponent<U, V>(_ vector: U,
                                        result: inout V)
         where
@@ -837,7 +837,7 @@ extension vDSP {
     /// - Parameter exponents: Input exponents.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func power<T, U, V>(bases: T,
                                exponents: U,
                                result: inout V)
@@ -869,7 +869,7 @@ extension vDSP {
     /// - Parameter exponents: Input exponents.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func power<T, U, V>(bases: T,
                                exponents: U,
                                result: inout V)
@@ -911,7 +911,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sin<U, V>(_ vector: U,
                           result: inout V)
         where
@@ -937,7 +937,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sin<U, V>(_ vector: U,
                           result: inout V)
         where
@@ -963,7 +963,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sinPi<U, V>(_ vector: U,
                             result: inout V)
         where
@@ -989,7 +989,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sinPi<U, V>(_ vector: U,
                             result: inout V)
         where
@@ -1017,7 +1017,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cos<U, V>(_ vector: U,
                           result: inout V)
         where
@@ -1043,7 +1043,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cos<U, V>(_ vector: U,
                           result: inout V)
         where
@@ -1069,7 +1069,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cosPi<U, V>(_ vector: U,
                             result: inout V)
         where
@@ -1095,7 +1095,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cosPi<U, V>(_ vector: U,
                             result: inout V)
         where
@@ -1124,7 +1124,7 @@ extension vDSP {
     /// - Parameter sinresult: Output sine values.
     /// - Parameter cosresult: Output cosine values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sinCos<T, U, V>(_ vector: T,
                                 sinResult: inout U,
                                 cosResult: inout V)
@@ -1156,7 +1156,7 @@ extension vDSP {
     /// - Parameter sinresult: Output sine values.
     /// - Parameter cosresult: Output cosine values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sinCos<T, U, V>(_ vector: T,
                                 sinResult: inout U,
                                 cosResult: inout V)
@@ -1189,7 +1189,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tan<U, V>(_ vector: U,
                           result: inout V)
         where
@@ -1215,7 +1215,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tan<U, V>(_ vector: U,
                           result: inout V)
         where
@@ -1241,7 +1241,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tanPi<U, V>(_ vector: U,
                             result: inout V)
         where
@@ -1267,7 +1267,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tanPi<U, V>(_ vector: U,
                             result: inout V)
         where
@@ -1295,7 +1295,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func arcsin<U, V>(_ vector: U,
                              result: inout V)
         where
@@ -1321,7 +1321,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func arcsin<U, V>(_ vector: U,
                              result: inout V)
         where
@@ -1349,7 +1349,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func arccos<U, V>(_ vector: U,
                              result: inout V)
         where
@@ -1375,7 +1375,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func arccos<U, V>(_ vector: U,
                              result: inout V)
         where
@@ -1403,7 +1403,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func arctan<U, V>(_ vector: U,
                              result: inout V)
         where
@@ -1429,7 +1429,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func arctan<U, V>(_ vector: U,
                              result: inout V)
         where
@@ -1462,7 +1462,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sinh<U, V>(_ vector: U,
                            result: inout V)
         where
@@ -1488,7 +1488,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sinh<U, V>(_ vector: U,
                            result: inout V)
         where
@@ -1516,7 +1516,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cosh<U, V>(_ vector: U,
                            result: inout V)
         where
@@ -1542,7 +1542,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cosh<U, V>(_ vector: U,
                            result: inout V)
         where
@@ -1570,7 +1570,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tanh<U, V>(_ vector: U,
                            result: inout V)
         where
@@ -1596,7 +1596,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tanh<U, V>(_ vector: U,
                            result: inout V)
         where
@@ -1624,7 +1624,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func asinh<U, V>(_ vector: U,
                             result: inout V)
         where
@@ -1650,7 +1650,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func asinh<U, V>(_ vector: U,
                             result: inout V)
         where
@@ -1678,7 +1678,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func acosh<U, V>(_ vector: U,
                             result: inout V)
         where
@@ -1704,7 +1704,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func acosh<U, V>(_ vector: U,
                             result: inout V)
         where
@@ -1732,7 +1732,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func atanh<U, V>(_ vector: U,
                             result: inout V)
         where
@@ -1758,7 +1758,7 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
-    @available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func atanh<U, V>(_ vector: U,
                             result: inout V)
         where
