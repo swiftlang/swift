@@ -6,6 +6,7 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// REQUIRES: long_test
 
 import Foundation
 
