@@ -299,9 +299,8 @@ void ASTScope::expand() const {
   }
 
   case ASTScopeKind::ExtensionGenericParams: {
-#error have to make trailingWhere here?? YES - for every extension
-    // need to create trailing where next to child in extension generic
-    // what if no generic?
+    // Since an extension always has an ExtensionGenericParams scope,
+    // create the NominalOrExtensionWhereClause here for an extension.
     if (ASTScope *child = createIfNeeded(this, extension->getTrailingWhereClause()))
       addChild(child);
 
@@ -321,15 +320,26 @@ void ASTScope::expand() const {
 
   case ASTScopeKind::GenericParams:
     // Create a child of the generic parameters, if needed.
-    if (auto child = createIfNeeded(this, genericParams.decl))
-#error if child is TypeOrExtensionBody, and decl is nominal then create where and add it first
+    if (auto child = createIfNeeded(this, genericParams.decl)) {
+      if (child->getKind() != ASTScopeKind::GenericParams) {
+        assert(child->getKind() == ASTScopeKind::TypeOrExtensionBody && "unexpected scope kind");
+        // FACTOR
+        if (ASTScope *child = createIfNeeded(this, extension->getTrailingWhereClause()))
+          addChild(child);
+      }
       addChild(child);
+    }
     break;
 
   case ASTScopeKind::TypeDecl:
     // Create the child of the function, if any.
     if (auto child = createIfNeeded(this, typeDecl)) {
-#error if child is TypeOrExtensionBody, and decl is nominal then create where and add it first
+      if (child->getKind() != ASTScopeKind::GenericParams) {
+        assert(child->getKind() == ASTScopeKind::TypeOrExtensionBody && "unexpected scope kind");
+        // FACTOR
+        if (ASTScope *child = createIfNeeded(this, extension->getTrailingWhereClause()))
+          addChild(child);
+      }
       addChild(child);
     }
     break;
