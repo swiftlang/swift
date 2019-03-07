@@ -590,6 +590,7 @@ class TestDriverArgumentParser(unittest.TestCase):
             self.assertFalse(namespace.build_libicu)
             self.assertFalse(namespace.build_lldb)
             self.assertFalse(namespace.build_llbuild)
+            self.assertFalse(namespace.build_libcxx)
             self.assertFalse(namespace.build_playgroundsupport)
             self.assertFalse(namespace.build_swiftpm)
             self.assertFalse(namespace.build_xctest)
