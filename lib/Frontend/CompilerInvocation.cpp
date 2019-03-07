@@ -429,7 +429,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableSILOpaqueValues |= Args.hasArg(OPT_enable_sil_opaque_values);
 
 #if SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
-  Opts.UseDarwinPreStableABIBit = false;
+  Opts.UseDarwinPreStableABIBit =
+    (Target.isMacOSX() && Target.isMacOSXVersionLT(10, 14, 4)) ||
+    (Target.isiOS() && Target.isOSVersionLT(12, 2)) ||
+    (Target.isTvOS() && Target.isOSVersionLT(12, 2)) ||
+    (Target.isWatchOS() && Target.isOSVersionLT(5, 2));
 #else
   Opts.UseDarwinPreStableABIBit = true;
 #endif
