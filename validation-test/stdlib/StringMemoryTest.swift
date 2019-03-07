@@ -33,7 +33,7 @@ func lowercase(_ str: String) -> String {
 /// Make sure the hash function does not leak.
 
 let dict = [ "foo" : 1]
-for _ in 0 ..< 10_000_000 {
+for _ in 0 ..< 1_000_000 {
   if lookup("\u{1F1E7}\u{1F1E7}", dict) {
     print("Found?!")
   }
@@ -56,9 +56,9 @@ getrusage(RUSAGE_SELF, &usage)
 // CHECK: success
 // CHECK-NOT: failure
 
-// We should not need 50MB for this.
-if usage.ru_maxrss > 50 * 1024 * 1024 {
-  print("failure - should not need 50MB!")
+// We should not need 10MB for this.
+if usage.ru_maxrss > 10 * 1024 * 1024 {
+  print("failure - should not need 10MB!")
 } else {
   print("success")
 }
