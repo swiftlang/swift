@@ -178,7 +178,7 @@ func keyedSubscripting(_ b: B, idx: A, a: A) {
   dict[NSString()] = a
   let value = dict[NSString()]
 
-  dict[nil] = a // expected-error {{cannot assign value of type 'A' to type 'Any?'}}
+  dict[nil] = a // expected-error {{ambiguous subscript with base type 'NSMutableDictionary' and index type '_'}}
   let q = dict[nil]  // expected-error {{ambiguous subscript}}
   _ = q
 }
