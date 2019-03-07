@@ -26,10 +26,11 @@ public func condCast<NS, T>(_ ns: NS) -> T? {
 }
 
 // Check optimizations of casts from NSString to String
-
-let nsString: NSString = "string"
-let swiftString: String = "string"
-let cfString: CFString = "string" as CFString
+//
+// Use
+let nsString: NSString = "string🍕"
+let swiftString: String = "string🍕"
+let cfString: CFString = "string🍕" as CFString
 
 Tests.test("NSString => String") {
   do {
@@ -39,7 +40,7 @@ Tests.test("NSString => String") {
 
   do {
     let o: String? = condCast(nsString)
-    expectEqual(o!, "string")
+    expectEqual(o!, swiftString)
   }
 }
 
@@ -50,7 +51,7 @@ Tests.test("NSString => Array<Int>. Crashing test case") {
   }
 
   // CHECK-LABEL: [ RUN      ] BridgedCastFolding.NSString => Array<Int>. Crashing test case
-  // CHECK: stderr>>> Could not cast value of type 'NSTaggedPointerString' (0x{{[0-9a-f]*}}) to 'NSArray' (0x{{[0-9a-f]*}}).
+  // CHECK: stderr>>> Could not cast value of type '__NSCFString' (0x{{[0-9a-f]*}}) to 'NSArray' (0x{{[0-9a-f]*}}).
   // CHECK: stderr>>> OK: saw expected "crashed: sigabrt"
   // CHECK: [       OK ] BridgedCastFolding.NSString => Array<Int>. Crashing test case
 
@@ -140,13 +141,13 @@ Tests.test("NSNumber (Int) -> String. Crashing test.") {
 
 let nsArrInt: NSArray = [1, 2, 3, 4]
 let nsArrDouble: NSArray = [1.1, 2.2, 3.3, 4.4]
-let nsArrString: NSArray = ["One", "Two", "Three", "Four"]
+let nsArrString: NSArray = ["One🍕", "Two🍕", "Three🍕", "Four🍕"]
 let swiftArrInt: [Int] = [1, 2, 3, 4]
 let swiftArrDouble: [Double] = [1.1, 2.2, 3.3, 4.4]
-let swiftArrString: [String] = ["One", "Two", "Three", "Four"]
+let swiftArrString: [String] = ["One🍕", "Two🍕", "Three🍕", "Four🍕"]
 let cfArrInt: CFArray = [1, 2, 3, 4] as CFArray
 let cfArrDouble: CFArray = [1.1, 2.2, 3.3, 4.4] as CFArray
-let cfArrString: CFArray = ["One", "Two", "Three", "Four"] as CFArray
+let cfArrString: CFArray = ["One🍕", "Two🍕", "Three🍕", "Four🍕"] as CFArray
 
 Tests.test("NSArray -> Swift Array") {
   do {
@@ -187,12 +188,12 @@ Tests.test("NSArray (String) -> Swift Array (Int). Crashing.") {
   }
 
   // CHECK-LABEL: [ RUN      ] BridgedCastFolding.NSArray (String) -> Swift Array (Int). Crashing.
-  // CHECK: stderr>>> Could not cast value of type 'NSTaggedPointerString' (0x{{[0-9a-f]*}}) to 'NSNumber' (0x{{[0-9a-f]*}}).
+  // CHECK: stderr>>> Could not cast value of type '__NSCFString' (0x{{[0-9a-f]*}}) to 'NSNumber' (0x{{[0-9a-f]*}}).
   // CHECK: stderr>>> OK: saw expected "crashed: sigabrt"
   // CHECK: [       OK ] BridgedCastFolding.NSArray (String) -> Swift Array (Int). Crashing.
 
   // CHECK-OPT-LABEL: [ RUN      ] BridgedCastFolding.NSArray (String) -> Swift Array (Int). Crashing.
-  // CHECK-OPT: stderr>>> Could not cast value of type 'NSTaggedPointerString' (0x{{[0-9a-f]*}}) to 'NSNumber' (0x{{[0-9a-f]*}}).
+  // CHECK-OPT: stderr>>> Could not cast value of type '__NSCFString' (0x{{[0-9a-f]*}}) to 'NSNumber' (0x{{[0-9a-f]*}}).
   // CHECK-OPT: stderr>>> OK: saw expected "crashed: sigabrt"
   // CHECK-OPT: [       OK ] BridgedCastFolding.NSArray (String) -> Swift Array (Int). Crashing.
   expectCrashLater()
@@ -209,11 +210,11 @@ Tests.test("NSArray (String) -> Swift Array (Double). Crashing.") {
   }
 
   // CHECK-LABEL: [ RUN      ] BridgedCastFolding.NSArray (String) -> Swift Array (Double). Crashing.
-  // CHECK: stderr>>> Could not cast value of type 'NSTaggedPointerString' (0x{{[0-9a-f]*}}) to 'NSNumber' (0x{{[0-9a-f]*}}).
+  // CHECK: stderr>>> Could not cast value of type '__NSCFString' (0x{{[0-9a-f]*}}) to 'NSNumber' (0x{{[0-9a-f]*}}).
   // CHECK: stderr>>> OK: saw expected "crashed: sigabrt"
   // CHECK: [       OK ] BridgedCastFolding.NSArray (String) -> Swift Array (Double). Crashing.
   // CHECK-OPT-LABEL: [ RUN      ] BridgedCastFolding.NSArray (String) -> Swift Array (Double). Crashing.
-  // CHECK-OPT: stderr>>> Could not cast value of type 'NSTaggedPointerString' (0x{{[0-9a-f]*}}) to 'NSNumber' (0x{{[0-9a-f]*}}).
+  // CHECK-OPT: stderr>>> Could not cast value of type '__NSCFString' (0x{{[0-9a-f]*}}) to 'NSNumber' (0x{{[0-9a-f]*}}).
   // CHECK-OPT: stderr>>> OK: saw expected "crashed: sigabrt"
   // CHECK-OPT: [       OK ] BridgedCastFolding.NSArray (String) -> Swift Array (Double). Crashing.
   expectCrashLater()
@@ -249,13 +250,13 @@ Tests.test("NSArray (Int) -> Swift Array (String). Crashing.") {
 
 let swiftDictInt: [Int: Int] = [1:1, 2:2, 3:3, 4:4]
 let swiftDictDouble: [Double: Double] = [1.1 : 1.1, 2.2 : 2.2, 3.3 : 3.3, 4.4 : 4.4]
-let swiftDictString: [String: String] = ["One":"One", "Two":"Two", "Three":"Three", "Four":"Four"]
+let swiftDictString: [String: String] = ["One🍕":"One🍕", "Two":"Two", "Three":"Three", "Four":"Four"]
 let nsDictInt: NSDictionary = [1:1, 2:2, 3:3, 4:4]
 let nsDictDouble: NSDictionary = [1.1 : 1.1, 2.2 : 2.2, 3.3 : 3.3, 4.4 : 4.4]
-let nsDictString: NSDictionary = ["One":"One", "Two":"Two", "Three":"Three", "Four":"Four"]
+let nsDictString: NSDictionary = ["One🍕":"One🍕", "Two":"Two", "Three":"Three", "Four":"Four"]
 let cfDictInt: CFDictionary = [1:1, 2:2, 3:3, 4:4] as CFDictionary
 let cfDictDouble: CFDictionary = [1.1 : 1.1, 2.2 : 2.2, 3.3 : 3.3, 4.4 : 4.4] as CFDictionary
-let cfDictString: CFDictionary = ["One":"One", "Two":"Two", "Three":"Three", "Four":"Four"] as CFDictionary
+let cfDictString: CFDictionary = ["One🍕":"One🍕", "Two":"Two", "Three":"Three", "Four":"Four"] as CFDictionary
 
 Tests.test("NSDictionary -> Swift (Dictionary)") {
   do {
@@ -323,13 +324,13 @@ Tests.test("NSDictionary -> Swift (Dictionary). Crashing Test Cases") {
 
 let swiftSetInt: Set<Int> = [1, 2, 3, 4]
 let swiftSetDouble: Set<Double> = [1.1, 2.2, 3.3, 4.4]
-let swiftSetString: Set<String> = ["One", "Two", "Three", "Four"]
+let swiftSetString: Set<String> = ["One🍕", "Two🍕", "Three🍕", "Four🍕"]
 let nsSetInt: NSSet = [1, 2, 3, 4]
 let nsSetDouble: NSSet = [1.1, 2.2, 3.3, 4.4]
-let nsSetString: NSSet = ["One", "Two", "Three", "Four"]
+let nsSetString: NSSet = ["One🍕", "Two🍕", "Three🍕", "Four🍕"]
 let cfSetInt: CFSet = [1, 2, 3, 4] as NSSet
 let cfSetDouble: CFSet = [1.1, 2.2, 3.3, 4.4] as NSSet
-let cfSetString: CFSet = ["One", "Two", "Three", "Four"] as NSSet
+let cfSetString: CFSet = ["One🍕", "Two🍕", "Three🍕", "Four🍕"] as NSSet
 
 Tests.test("NSSet -> Swift Set") {
   do {
@@ -386,7 +387,7 @@ Tests.test("String -> NSNumber. Crashing Test Case") {
   }
 
   // CHECK-LABEL: [ RUN      ] BridgedCastFolding.String -> NSNumber. Crashing Test Case
-  // CHECK: stderr>>> Could not cast value of type 'NSTaggedPointerString' (0x{{[0-9a-f]*}}) to 'NSNumber' (0x{{[0-9a-f]*}}).
+  // CHECK: stderr>>> Could not cast value of type '__NSCFString' (0x{{[0-9a-f]*}}) to 'NSNumber' (0x{{[0-9a-f]*}}).
   // CHECK: stderr>>> OK: saw expected "crashed: sigabrt"
   // CHECK: [       OK ] BridgedCastFolding.String -> NSNumber. Crashing Test Case
 
