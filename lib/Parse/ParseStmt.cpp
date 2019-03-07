@@ -2417,6 +2417,18 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
 
   assert(!CaseLabelItems.empty() && "did not parse any labels?!");
 
+  // Add a scope so that the parser can find our body bound decls if it emits
+  // optimized accesses.
+  Optional<Scope> BodyScope;
+  if (CaseBodyDecls) {
+    BodyScope.emplace(this, ScopeKind::CaseVars);
+    for (auto *v : *CaseBodyDecls) {
+      setLocalDiscriminator(v);
+      if (v->hasName())
+        addToScope(v);
+    }
+  }
+
   SmallVector<ASTNode, 8> BodyItems;
 
   SourceLoc StartOfBody = Tok.getLoc();
