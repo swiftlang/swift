@@ -136,6 +136,95 @@ extension Sequence {
     try result.sort(by: areInIncreasingOrder)
     return Array(result)
   }
+
+  /// Returns the elements of the sequence, sorted in respect to the values
+  /// returned by applying the given transform to each element and using
+  /// the given predicate as the comparison between those values.
+  ///
+  /// When you want to sort a sequence of elements in respect to a metric
+  /// that doesn't conform to the `Comparable` protocol, pass a closure to
+  /// `areInIncreasingOrder` that returns `true` when the element corresponding
+  /// to the first value should be ordered before the element corresponding to
+  /// the second.
+  ///
+  /// Here's an example of sorting a list of people by their age. Integers
+  /// in Swift conform to the `Comparable` protocol, so the list can be sorted
+  /// in ascending age order according to the less-than operator (`<`).
+  ///
+  ///     struct Person {
+  ///         let name: String
+  ///         var age: Int
+  ///     }
+  ///
+  ///     let people: [Person] = [
+  ///         Person(name: "Abena", age: 12),
+  ///         Person(name: "Akosua", age: 5),
+  ///         Person(name: "Kofi", age: 30),
+  ///         Person(name: "Kweku", age: 22),
+  ///         Person(name: "Peter", age: 0)
+  ///     ]
+  ///     let sortedByAge = people.sorted(over: { $0.age }, by: <)
+  ///     print(sortedByAge)
+  ///     // Prints "[
+  ///     //   Person(name: "Peter", age: 0),
+  ///     //   Person(name: "Akosua", age: 5),
+  ///     //   Person(name: "Abena", age: 12),
+  ///     //   Person(name: "Kweku", age: 22),
+  ///     //   Person(name: "Kofi", age: 30)
+  ///     // ]"
+  ///
+  /// The predicate must be a *strict weak ordering* over its arguments.
+  /// That is, for any values `a`, `b`, and `c`, the following conditions must
+  /// hold:
+  ///
+  /// - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
+  /// - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are
+  ///   both `true`, then `areInIncreasingOrder(a, c)` is also `true`.
+  ///   (Transitive comparability)
+  /// - Two values are *incomparable* if neither is ordered before the other
+  ///   according to the predicate. If `a` and `b` are incomparable, and `b`
+  ///   and `c` are incomparable, then `a` and `c` are also incomparable.
+  ///   (Transitive incomparability)
+  ///
+  /// The sorting algorithm is not guaranteed to be stable. A stable sort
+  /// preserves the relative order of elements for which
+  /// `areInIncreasingOrder` does not establish an order.
+  ///
+  /// - Parameter transform: A mapping closure that accepts an element of this
+  ///   sequence and returns a transformed value relative to which the
+  ///   sequence is sorted.
+  /// - Parameter areInIncreasingOrder: A predicate that returns `true` if its
+  ///   first argument should be ordered before its second argument;
+  ///   otherwise, `false`.
+  /// - Parameter isExpensiveTransform: If `true`, the algorithm will start
+  ///   off by mapping each element to its transformed value. When the values
+  ///   are expensive to retrieve, this will result in much faster sorts.
+  ///   However, if `transform` takes O(1) time on average, then the extra
+  ///   overhead of caching the values may be unwarranted.
+  ///   Defaults to `false`.
+  /// - Returns: A sorted array of the sequence's elements.
+  ///
+  /// - Complexity: O(*n* log *n*), where *n* is the length of the sequence.
+  @inlinable
+  public func sorted<Value>(
+    on transform: (Element) throws -> Value,
+    by areInIncreasingOrder: (Value, Value) throws -> Bool,
+    isExpensiveTransform: Bool = false
+  ) rethrows -> [Element] {
+    guard isExpensiveTransform else {
+      return try sorted {
+        try areInIncreasingOrder(transform($0), transform($1))
+      }
+    }
+    var pairs = try map {
+      try (element: $0, value: transform($0))
+    }
+    try pairs.sort {
+      try areInIncreasingOrder($0.value, $1.value)
+    }
+
+    return pairs.map { $0.element }
+  }
 }
 
 extension MutableCollection
@@ -257,6 +346,97 @@ extension MutableCollection where Self: RandomAccessCollection {
       for (i, j) in zip(indices, sortedElements.indices) {
         self[i] = sortedElements[j]
       }
+    }
+  }
+
+  /// Sorts the collection in place relative to the values
+  /// returned by applying the given transform to each element and using
+  /// the given predicate as the comparison between those values.
+  ///
+  /// When you want to sort a collection of elements in respect to a metric
+  /// that doesn't conform to the `Comparable` protocol, pass a closure to
+  /// `areInIncreasingOrder` that returns `true` when the element corresponding
+  /// to the first value should be ordered before the element corresponding to
+  /// the second.
+  ///
+  /// Here's an example of sorting a list of people by their age. Integers
+  /// in Swift conform to the `Comparable` protocol, so the list can be sorted
+  /// in ascending age order according to the less-than operator (`<`).
+  ///
+  ///     struct Person {
+  ///         let name: String
+  ///         var age: Int
+  ///     }
+  ///
+  ///     var people: [Person] = [
+  ///         Person(name: "Abena", age: 12),
+  ///         Person(name: "Akosua", age: 5),
+  ///         Person(name: "Kofi", age: 30),
+  ///         Person(name: "Kweku", age: 22),
+  ///         Person(name: "Peter", age: 0)
+  ///     ]
+  ///     people.sort(over: { $0.age }, by: <)
+  ///     print(people)
+  ///     // Prints "[
+  ///     //   Person(name: "Peter", age: 0),
+  ///     //   Person(name: "Akosua", age: 5),
+  ///     //   Person(name: "Abena", age: 12),
+  ///     //   Person(name: "Kweku", age: 22),
+  ///     //   Person(name: "Kofi", age: 30)
+  ///     // ]"
+  ///
+  /// The predicate must be a *strict weak ordering* over its arguments.
+  /// That is, for any values `a`, `b`, and `c`, the following conditions must
+  /// hold:
+  ///
+  /// - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
+  /// - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are
+  ///   both `true`, then `areInIncreasingOrder(a, c)` is also `true`.
+  ///   (Transitive comparability)
+  /// - Two values are *incomparable* if neither is ordered before the other
+  ///   according to the predicate. If `a` and `b` are incomparable, and `b`
+  ///   and `c` are incomparable, then `a` and `c` are also incomparable.
+  ///   (Transitive incomparability)
+  ///
+  /// The sorting algorithm is not guaranteed to be stable. A stable sort
+  /// preserves the relative order of elements for which
+  /// `areInIncreasingOrder` does not establish an order.
+  ///
+  /// - Parameter transform: A mapping closure that accepts an element of this
+  ///   collection and returns a transformed value relative to which the
+  ///   collection is sorted.
+  /// - Parameter areInIncreasingOrder: A predicate that returns `true` if its
+  ///   first argument should be ordered before its second argument;
+  ///   otherwise, `false`.
+  /// - Parameter isExpensiveTransform: If `true`, the algorithm will start
+  ///   off by mapping each element to its transformed value. When the values
+  ///   are expensive to retrieve, this will result in much faster sorts.
+  ///   However, if `transform` takes O(1) time on average, then the extra
+  ///   overhead of caching the values may be unwarranted.
+  ///   Defaults to `false`.
+  /// - Returns: A sorted array of the collection's elements.
+  ///
+  /// - Complexity: O(*n* log *n*), where *n* is the length of the collection.
+  @inlinable
+  public mutating func sort<Value>(
+    on transform: (Element) throws -> Value,
+    by areInIncreasingOrder: (Value, Value) throws -> Bool,
+    isExpensiveTransform: Bool = false
+  ) rethrows {
+    guard isExpensiveTransform else {
+      return try sort {
+        try areInIncreasingOrder(transform($0), transform($1))
+      }
+    }
+    var pairs = try map {
+      try (element: $0, value: transform($0))
+    }
+    try pairs.sort {
+      try areInIncreasingOrder($0.value, $1.value)
+    }
+
+    for (i, j) in zip(indices, pairs.indices) {
+      self[i] = pairs[j].element
     }
   }
 }
