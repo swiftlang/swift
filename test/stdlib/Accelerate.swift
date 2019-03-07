@@ -75,7 +75,7 @@ if #available(iOS 10.0, OSX 10.12, tvOS 10.0, watchOS 4.0, *) {
 //
 //===----------------------------------------------------------------------===//
 
-if #available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *) {
+if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     
     var result = [Float]()
     var legacyResult = [Float]()
@@ -609,7 +609,7 @@ if #available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *) {
 //
 //===----------------------------------------------------------------------===//
 
-if #available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *) {
+if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     
     var result = [Double]()
     var legacyResult = [Double]()
