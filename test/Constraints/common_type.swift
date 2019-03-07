@@ -2,49 +2,55 @@
 // RUN: %FileCheck %s < %t.err
 
 struct X {
-  func g(_: Int) -> Int { return 0 }
-  func g(_: Double) -> Int { return 0 }
+  func g(_: Inting) -> Int { return 0 }
+  func g(_: Doubling) -> Int { return 0 }
 
-  subscript(_: Int) -> String { return "" }
-  subscript(_: Double) -> String { return "" }
+  subscript(_: Inting) -> String { return "" }
+  subscript(_: Doubling) -> String { return "" }
 
-  func iuo(_: Int) -> Int! { return 0 }
-  func iuo(_: Double) -> Int! { return 0 }
+  func iuo(_: Inting) -> Int! { return 0 }
+  func iuo(_: Doubling) -> Int! { return 0 }
 }
 
 struct Y {
-  func g(_: Int) -> Double { return 0 }
-  func g(_: Double) -> Double { return 0 }
+  func g(_: Inting) -> Double { return 0 }
+  func g(_: Doubling) -> Double { return 0 }
 
-  subscript(_: Int) -> Substring { return "" }
-  subscript(_: Double) -> Substring { return "" }
+  subscript(_: Inting) -> Substring { return "" }
+  subscript(_: Doubling) -> Substring { return "" }
 
-  func iuo(_: Int) -> Double! { return 0 }
-  func iuo(_: Double) -> Double! { return 0 }
+  func iuo(_: Inting) -> Double! { return 0 }
+  func iuo(_: Doubling) -> Double! { return 0 }
 }
 
-func f(_: Int) -> X { return X() }
-func f(_: Double) -> Y { return Y() }
+protocol Inting { }
+extension Int: Inting { }
+
+protocol Doubling { }
+extension Double: Doubling { }
+
+func f(_: Inting) -> X { return X() }
+func f(_: Doubling) -> Y { return Y() }
 
 func testCallCommonType() {
-  // CHECK: overload set choice binding $T{{[0-9]+}} := (Int) -> X
+  // CHECK: overload set choice binding $T{{[0-9]+}} := (Inting) -> X
   // CHECK-NEXT: (common result type for $T{{[0-9]+}} is Int)
-  // CHECK: (overload set choice binding $T{{[0-9]+}} := (Double) -> Y)
+  // CHECK: (overload set choice binding $T{{[0-9]+}} := (Doubling) -> Y)
   // CHECK-NEXT: (common result type for $T{{[0-9]+}} is Double)
   _ = f(0).g(0)
 }
 
 func testSubscriptCommonType() {
   // CHECK: subscript_expr
-  // CHECK: overload set choice binding $T{{[0-9]+}} := (Int) -> X
+  // CHECK: overload set choice binding $T{{[0-9]+}} := (Inting) -> X
   // CHECK: (common result type for $T{{[0-9]+}} is String)
-  // CHECK: (overload set choice binding $T{{[0-9]+}} := (Double) -> Y)
+  // CHECK: (overload set choice binding $T{{[0-9]+}} := (Doubling) -> Y)
   // CHECK: (common result type for $T{{[0-9]+}} is Substring)
   _ = f(0)[0]
 }
 
 func testCommonTypeIUO() {
-  // CHECK: overload set choice binding $T{{[0-9]+}} := (Int) -> X
+  // CHECK: overload set choice binding $T{{[0-9]+}} := (Inting) -> X
   // CHECK-NOT: common result type
     _ = f(0).iuo(0)
 }

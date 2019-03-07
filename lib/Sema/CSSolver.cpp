@@ -17,6 +17,7 @@
 #include "ConstraintGraph.h"
 #include "ConstraintSystem.h"
 #include "TypeCheckType.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeWalker.h"
 #include "llvm/ADT/STLExtras.h"
@@ -1649,13 +1650,45 @@ bool ConstraintSystem::haveTypeInformationForAllArguments(
                       });
 }
 
-bool ConstraintSystem::isFavoredParamAndArg(Type paramTy, Type argTy) {
-  // Determine the argument type.
-  argTy = argTy->getWithoutSpecifierType();
+/// Adjust parameter or argument types for comparison when favoring,
+static Type adjustParamOrArgType(Type type) {
+  type = type->getWithoutSpecifierType();
+
+  // Drop noescape from function types.
+  if (auto fnType = type->getAs<FunctionType>()) {
+    if (fnType->isNoEscape()) {
+      return FunctionType::get(fnType->getParams(), fnType->getResult(),
+                               fnType->getExtInfo().withNoEscape(false));
+    }
+  }
+
+  return type;
+}
+
+bool ConstraintSystem::isFavoredParamAndArg(Type paramTy, Type argTy,
+                                            GenericSignature *genericSig) {
+  // Determine the argument and parameter types.
+  paramTy = adjustParamOrArgType(paramTy);
+  argTy = adjustParamOrArgType(argTy);
 
   // Do the types match exactly?
   if (paramTy->isEqual(argTy))
     return true;
+
+  // Drop optionality, if either is optional.
+  if (paramTy->getOptionalObjectType() || argTy->getOptionalObjectType()) {
+    paramTy = paramTy->lookThroughAllOptionalTypes();
+    argTy = argTy->lookThroughAllOptionalTypes();
+
+    // Optionality and class parameters have ranked subtyping constraints, so
+    // don't favor in this case.
+    if (paramTy->getClassOrBoundGenericClass())
+      return false;
+
+    // Do the types match now?
+    if (paramTy->isEqual(argTy))
+      return true;
+  }
 
   llvm::SmallSetVector<ProtocolDecl *, 2> literalProtos;
   if (auto argTypeVar = argTy->getAs<TypeVariableType>()) {
@@ -1670,6 +1703,23 @@ bool ConstraintSystem::isFavoredParamAndArg(Type paramTy, Type argTy) {
     for (auto constraint : constraints) {
       literalProtos.insert(constraint->getProtocol());
     }
+  }
+
+  // If the parameter type is a type parameter and we have a generic signature
+  // to provide more information, then dig out the set of protocols to which
+  // the type parameter must conform. We can use this for favoring.
+  if (paramTy->isTypeParameter() && genericSig) {
+    if (argTy->isTypeVariableOrMember())
+      return true;
+
+    for (auto paramProto : genericSig->getConformsTo(paramTy)) {
+      if (DC->getParentModule()->conformsToProtocol(argTy, paramProto))
+        continue;
+
+      return false;
+    }
+
+    return true;
   }
 
   for (auto literalProto : literalProtos) {

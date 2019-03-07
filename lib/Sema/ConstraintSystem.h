@@ -3425,7 +3425,12 @@ public:
 
   /// Determine whether the given parameter type and argument should be
   /// "favored" because they match exactly.
-  bool isFavoredParamAndArg(Type paramTy, Type argTy);
+  ///
+  /// \param genericSig When provided, the generic signature will be
+  /// used to extract more information about \c paramTy when it is a
+  /// type parameter.
+  bool isFavoredParamAndArg(Type paramTy, Type argTy,
+                            GenericSignature *genericSig = nullptr);
 
   typedef std::function<bool(unsigned index, Constraint *)> ConstraintMatcher;
   typedef std::function<void(ArrayRef<Constraint *>, ConstraintMatcher)>
@@ -3588,9 +3593,9 @@ Expr *getArgumentLabelTargetExpr(Expr *fn);
 /// Attempt to prove that arguments with the given labels at the
 /// given parameter depth cannot be used with the given value.
 /// If this cannot be proven, conservatively returns true.
-bool areConservativelyCompatibleArgumentLabels(OverloadChoice choice,
-                                               ArrayRef<Identifier> labels,
-                                               bool hasTrailingClosure);
+bool areConservativelyCompatibleArgumentLabels(
+    OverloadChoice choice, ArrayRef<Identifier> labels,
+    bool hasTrailingClosure, SmallVectorImpl<ParamBinding> *bindings = nullptr);
 
 /// Simplify the given locator by zeroing in on the most specific
 /// subexpression described by the locator.

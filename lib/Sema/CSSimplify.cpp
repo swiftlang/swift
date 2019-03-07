@@ -95,9 +95,8 @@ static Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
 }
 
 bool constraints::areConservativelyCompatibleArgumentLabels(
-                                               OverloadChoice choice,
-                                               ArrayRef<Identifier> labels,
-                                               bool hasTrailingClosure) {
+    OverloadChoice choice, ArrayRef<Identifier> labels,
+    bool hasTrailingClosure, SmallVectorImpl<ParamBinding> *bindings) {
   ValueDecl *decl = nullptr;
   Type baseType;
   switch (choice.getKind()) {
@@ -172,7 +171,8 @@ bool constraints::areConservativelyCompatibleArgumentLabels(
   return !matchCallArguments(argInfos, params, defaultMap,
                              hasTrailingClosure,
                              /*allow fixes*/ false,
-                             listener, unusedParamBindings);
+                             listener,
+                             bindings ? *bindings : unusedParamBindings);
 }
 
 Expr *constraints::getArgumentLabelTargetExpr(Expr *fn) {
@@ -4955,10 +4955,60 @@ Type ConstraintSystem::simplifyAppliedOverloads(
       return markFailure();
   };
 
+  /// Local function to help track the favored parameters and arguments.
+  unsigned bestNumFavoredPairs = 0;
+  SmallVector<Constraint *, 2> bestFavored;
+  auto updateFavoredParamsAndArgs =
+      [&](Constraint *constraint, const FunctionType *choiceFnType,
+          ArrayRef<ParamBinding> bindings) {
+        auto choiceParams = choiceFnType->getParams();
+        if (choiceParams.size() != bindings.size())
+          return;
+
+        // Figure out the generic signature.
+        GenericSignature *genericSig = nullptr;
+        if (constraint->getKind() == ConstraintKind::BindOverload) {
+          if (auto decl = constraint->getOverloadChoice().getDecl()) {
+            genericSig = decl->getInnermostDeclContext()
+              ->getGenericSignatureOfContext();
+          }
+        }
+
+        // Count the number of favored parameter/argument pairs.
+        unsigned numFavoredPairs = 0;
+        auto argParams = argFnType->getParams();
+        for (unsigned paramIdx : indices(bindings)) {
+          const auto &param = choiceParams[paramIdx];
+          Type paramTy = param.getPlainType();
+          for (unsigned argIdx : bindings[paramIdx]) {
+            Type argTy = argParams[argIdx].getPlainType();
+            if (isFavoredParamAndArg(paramTy, argTy, genericSig))
+              ++numFavoredPairs;
+          }
+        }
+
+        if (numFavoredPairs == 0)
+          return;
+
+        // If we have a better result than the current best, clear out the
+        // current set and update the "best".
+        if (numFavoredPairs > bestNumFavoredPairs) {
+          bestNumFavoredPairs = numFavoredPairs;
+          bestFavored.clear();
+        }
+
+        // If we have the best number of favored pairs, record this constraint.
+        if (numFavoredPairs == bestNumFavoredPairs) {
+          bestFavored.push_back(constraint);
+        }
+      };
+
   // Consider each of the constraints in the disjunction.
 retry_after_fail:
   bool hasUnhandledConstraints = false;
   bool labelMismatch = false;
+  bool sawFavored = false;
+  unsigned numEnabledConstraints = 0;
   auto filterResult =
       filterDisjunction(disjunction, /*restoreOnFail=*/shouldAttemptFixes(),
                          [&](Constraint *constraint) {
@@ -4968,13 +5018,17 @@ retry_after_fail:
 
         // Determine whether the argument labels we have conflict with those of
         // this overload choice.
+        SmallVector<ParamBinding, 8> paramBindings;
         if (argumentLabels &&
             !areConservativelyCompatibleArgumentLabels(
                 choice, argumentLabels->Labels,
-                argumentLabels->HasTrailingClosure)) {
+                argumentLabels->HasTrailingClosure, &paramBindings)) {
           labelMismatch = true;
           return false;
         }
+
+        // Note that this constraint is enabled.
+        ++numEnabledConstraints;
 
         // Determine the type that this choice will have.
         Type choiceType =
@@ -4992,6 +5046,17 @@ retry_after_fail:
             choiceType = objectType;
         }
 
+        if (constraint->isFavored())
+          sawFavored = true;
+
+        if (auto choiceFnType = choiceType->getAs<FunctionType>()) {
+          if (!sawFavored) {
+            // Update the set of favored constraints based on parameter/argument
+            // matching.
+            updateFavoredParamsAndArgs(constraint, choiceFnType, paramBindings);
+          }
+        }
+
         // If we have a function type, we can compute a common result type.
         updateCommonResultType(choiceType);
         return true;
@@ -5001,6 +5066,7 @@ retry_after_fail:
   case SolutionKind::Error:
     if (labelMismatch && shouldAttemptFixes()) {
       argumentLabels = None;
+      commonResultType = Type();
       goto retry_after_fail;
     }
 
@@ -5013,6 +5079,33 @@ retry_after_fail:
 
   case SolutionKind::Unsolved:
     break;
+  }
+
+  // If we found some favored constraints, mark them as such.
+  if (bestNumFavoredPairs > 0 && !sawFavored &&
+      bestFavored.size() < numEnabledConstraints) {
+    ASTContext &ctx = getASTContext();
+    if (ctx.LangOpts.DebugConstraintSolver) {
+      auto &log = ctx.TypeCheckerDebug->getStream();
+      log.indent(solverState ? solverState->depth * 2 + 2 : 0)
+        << "(favoring overloads for $T" << fnTypeVar->getID() << ":";
+    }
+
+    for (auto favored : bestFavored) {
+      if (ctx.LangOpts.DebugConstraintSolver) {
+        auto &log = ctx.TypeCheckerDebug->getStream();
+        log << "\n";
+        log.indent(solverState ? solverState->depth * 2 + 4 : 2) << "(";
+        favored->print(log, &ctx.SourceMgr);
+        log << ")";
+      }
+
+      favorConstraint(favored);
+    }
+
+    if (ctx.LangOpts.DebugConstraintSolver) {
+      ctx.TypeCheckerDebug->getStream() << ")\n";
+    }
   }
 
   // If there was a constraint that we couldn't reason about, don't use the
