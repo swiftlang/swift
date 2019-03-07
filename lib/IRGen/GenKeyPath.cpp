@@ -648,27 +648,43 @@ getInitializerForComputedComponent(IRGenModule &IGM,
   return initFn;
 }
 
-/// Emit a generator function to produce a reference to a type or
-/// protocol conformance metadata record.
-/// TODO: It would be much better to emit typeref strings and use runtime
-/// demangling here.
 static llvm::Constant *
-emitGeneratorForKeyPath(IRGenModule &IGM,
-                        StringRef name, CanType type, llvm::Type *returnType,
-                        GenericEnvironment *genericEnv,
-                        ArrayRef<GenericRequirement> requirements,
-                        llvm::function_ref<void(IRGenFunction&,CanType)> emit) {
+emitMetadataGeneratorForKeyPath(IRGenModule &IGM,
+                                CanType type,
+                                GenericEnvironment *genericEnv,
+                                ArrayRef<GenericRequirement> requirements) {
+  // Produce a mangled name for the type.
+  auto constant = IGM.getTypeRef(type, MangledTypeRefRole::Metadata);
+  auto bitConstant = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
+  return llvm::ConstantExpr::getGetElementPtr(nullptr, constant, bitConstant);
+}
 
-  return IGM.getAddrOfStringForMetadataRef(name, /*alignment=*/2,
+static llvm::Constant *
+emitWitnessTableGeneratorForKeyPath(IRGenModule &IGM,
+                                    CanType type,
+                                    ProtocolConformanceRef conformance,
+                                    GenericEnvironment *genericEnv,
+                                    ArrayRef<GenericRequirement> requirements) {
+  auto origType = type;
+  CanGenericSignature genericSig;
+  if (genericEnv)
+    genericSig = genericEnv->getGenericSignature()->getCanonicalSignature();
+
+  IRGenMangler mangler;
+  std::string symbolName =
+    mangler.mangleSymbolNameForKeyPathMetadata(
+      "keypath_get_witness_table", genericSig, type, conformance);
+
+  return IGM.getAddrOfStringForMetadataRef(symbolName, /*alignment=*/2,
       /*shouldSetLowBit=*/true,
       [&](ConstantInitBuilder &B) {
         // Build a stub that loads the necessary bindings from the key path's
         // argument buffer then fetches the metadata.
-        auto fnTy = llvm::FunctionType::get(returnType,
+        auto fnTy = llvm::FunctionType::get(IGM.WitnessTablePtrTy,
                                             {IGM.Int8PtrTy}, /*vararg*/ false);
         auto accessorThunk =
           llvm::Function::Create(fnTy, llvm::GlobalValue::PrivateLinkage,
-                                 name, IGM.getModule());
+                                 symbolName, IGM.getModule());
         accessorThunk->setAttributes(IGM.constructInitialAttributes());
         {
           IRGenFunction IGF(IGM, accessorThunk);
@@ -687,7 +703,12 @@ emitGeneratorForKeyPath(IRGenModule &IGM,
 
             type = genericEnv->mapTypeIntoContext(type)->getCanonicalType();
           }
-          emit(IGF, type);
+          if (origType->hasTypeParameter())
+            conformance = conformance.subst(origType,
+              QueryInterfaceTypeSubstitutions(genericEnv),
+              LookUpConformanceInSignature(*genericEnv->getGenericSignature()));
+          auto ret = emitWitnessTableRef(IGF, type, conformance);
+          IGF.Builder.CreateRet(ret);
         }
 
         // Form the mangled name with its relative reference.
@@ -702,47 +723,6 @@ emitGeneratorForKeyPath(IRGenModule &IGM,
 
         return S.finishAndCreateFuture();
       });
-}
-
-static llvm::Constant *
-emitMetadataGeneratorForKeyPath(IRGenModule &IGM,
-                                CanType type,
-                                GenericEnvironment *genericEnv,
-                                ArrayRef<GenericRequirement> requirements) {
-  // Produce a mangled name for the type.
-  auto constant = IGM.getTypeRef(type, MangledTypeRefRole::Metadata);
-  auto bitConstant = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
-  return llvm::ConstantExpr::getGetElementPtr(nullptr, constant, bitConstant);
-}
-
-static llvm::Constant *
-emitWitnessTableGeneratorForKeyPath(IRGenModule &IGM,
-                                    CanType type,
-                                    ProtocolConformanceRef conformance,
-                                    GenericEnvironment *genericEnv,
-                                    ArrayRef<GenericRequirement> requirements) {
-  CanGenericSignature genericSig;
-  if (genericEnv)
-    genericSig = genericEnv->getGenericSignature()->getCanonicalSignature();
-
-  IRGenMangler mangler;
-  std::string symbolName =
-    mangler.mangleSymbolNameForKeyPathMetadata(
-      "keypath_get_witness_table", genericSig, type, conformance);
-
-  // TODO: Use the standard conformance accessor when there are no arguments
-  // and the conformance accessor is defined.
-  return emitGeneratorForKeyPath(IGM, symbolName, type,
-    IGM.WitnessTablePtrTy,
-    genericEnv, requirements,
-    [&](IRGenFunction &IGF, CanType substType) {
-      if (type->hasTypeParameter())
-        conformance = conformance.subst(type,
-          QueryInterfaceTypeSubstitutions(genericEnv),
-          LookUpConformanceInSignature(*genericEnv->getGenericSignature()));
-      auto ret = emitWitnessTableRef(IGF, substType, conformance);
-      IGF.Builder.CreateRet(ret);
-    });
 }
 
 static unsigned getClassFieldIndex(ClassDecl *classDecl, VarDecl *property) {
