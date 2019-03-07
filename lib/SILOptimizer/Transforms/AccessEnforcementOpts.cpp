@@ -1089,11 +1089,10 @@ static bool mergeAccesses(
     LLVM_DEBUG(llvm::dbgs()
                << "Merging: " << *childIns << " into " << *parentIns << "\n");
 
-    // Change the no nested conflict of parent:
-    // should be the worst case scenario: we might merge to non-conflicting
-    // scopes to a conflicting one. f the new result does not conflict,
-    // a later on pass will remove the flag
-    parentIns->setNoNestedConflict(false);
+    // Change the no nested conflict of parent if the child has a nested
+    // conflict.
+    if (!childIns->hasNoNestedConflict())
+      parentIns->setNoNestedConflict(false);
 
     // remove end accesses and create new ones that cover bigger scope:
     mergeEndAccesses(parentIns, childIns);
