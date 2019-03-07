@@ -269,6 +269,7 @@ void ASTScope::expand() const {
   if (!parentAndExpanded.getInt()) {
   // Expand the children in the current scope.
   switch (getKind()) {
+    case ASTScopeKind::NominalOrExtensionWhereClause: abort();
   case ASTScopeKind::Preexpanded:
     llvm_unreachable("Node should be pre-expanded");
 
@@ -298,8 +299,10 @@ void ASTScope::expand() const {
   }
 
   case ASTScopeKind::ExtensionGenericParams: {
-#error not general enough, could be inside others try before making a nominalOrExtensionBody whenever decl is a GenericContext
-    if (ASTScope *child = createIfNeeded(this, extension->getTrailingWhereClause()));
+#error have to make trailingWhere here?? YES - for every extension
+    // need to create trailing where next to child in extension generic
+    // what if no generic?
+    if (ASTScope *child = createIfNeeded(this, extension->getTrailingWhereClause()))
       addChild(child);
 
     // Create a child node.
@@ -317,18 +320,18 @@ void ASTScope::expand() const {
     break;
 
   case ASTScopeKind::GenericParams:
-    if (ASTScope *child = createIfNeeded(this, extension->getTrailingWhereClause()));
-      addChild(child);
-
     // Create a child of the generic parameters, if needed.
     if (auto child = createIfNeeded(this, genericParams.decl))
+#error if child is TypeOrExtensionBody, and decl is nominal then create where and add it first
       addChild(child);
     break;
 
   case ASTScopeKind::TypeDecl:
     // Create the child of the function, if any.
-    if (auto child = createIfNeeded(this, typeDecl))
+    if (auto child = createIfNeeded(this, typeDecl)) {
+#error if child is TypeOrExtensionBody, and decl is nominal then create where and add it first
       addChild(child);
+    }
     break;
 
   case ASTScopeKind::AbstractFunctionDecl:
@@ -679,6 +682,7 @@ static bool parentDirectDescendedFromAbstractStorageDecl(
               const AbstractStorageDecl *decl) {
   while (true) {
     switch (parent->getKind()) {
+      case ASTScopeKind::NominalOrExtensionWhereClause: abort();
     case ASTScopeKind::Preexpanded:
     case ASTScopeKind::AbstractFunctionDecl:
     case ASTScopeKind::AbstractFunctionParams:
@@ -725,6 +729,7 @@ static bool parentDirectDescendedFromAbstractFunctionDecl(
               const AbstractFunctionDecl *decl) {
   while (true) {
     switch (parent->getKind()) {
+      case ASTScopeKind::NominalOrExtensionWhereClause: abort();
     case ASTScopeKind::Preexpanded:
     case ASTScopeKind::AbstractFunctionParams:
     case ASTScopeKind::DefaultArgument:
@@ -770,6 +775,7 @@ static bool parentDirectDescendedFromTypeDecl(const ASTScope *parent,
                                               const TypeDecl *decl) {
   while (true) {
     switch (parent->getKind()) {
+      case ASTScopeKind::NominalOrExtensionWhereClause: abort();
     case ASTScopeKind::Preexpanded:
     case ASTScopeKind::GenericParams:
       // Keep looking.
@@ -880,12 +886,16 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
     return nullptr;
 
   case DeclKind::Extension: {
+    // There is always an ExtensionGenericParams for an extension
+    // So the NominalOrExtensionWhereClause (for extensions)
+    // can always be created when expanding the ExtensionGenericParams.
     auto ext = cast<ExtensionDecl>(decl);
 
     // If we already have a scope of the (possible) generic parameters,
     // add the body.
-    if (parent->getKind() == ASTScopeKind::ExtensionGenericParams)
-      return new (ctx) ASTScope(parent, cast<IterableDeclContext>(ext));
+    if (parent->getKind() == ASTScopeKind::ExtensionGenericParams) {
+     return new (ctx) ASTScope("gazorp", parent, cast<IterableDeclContext>(ext));
+    }
 
     // Otherwise, form the extension's generic parameters scope.
     return new (ctx) ASTScope(parent, ext);
@@ -901,14 +911,16 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
   case DeclKind::Class:
   case DeclKind::Enum:
   case DeclKind::Struct: {
+    // There may not be a GenericParams scope, so:
+    // 1. must create trailing where scope when expanding the last GenericParams scope, or
+    // 2. how to have already created trailing where?
     auto nominal = cast<NominalTypeDecl>(decl);
 
     // If we have a generic type and our parent isn't describing our generic
     // parameters, build the generic parameter scope.
     if (auto scope = nextGenericParam(nominal->getGenericParams(), nominal))
       return scope;
-
-    return new (ctx) ASTScope(parent, cast<IterableDeclContext>(nominal));
+    return new (ctx) ASTScope("gazorp", parent, cast<IterableDeclContext>(nominal));
   }
 
   case DeclKind::TypeAlias: {
@@ -936,7 +948,6 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
                                         abstractFunction))
         return scope;
     }
-
     // Figure out which parameter is next is the next one down.
     Optional<std::pair<unsigned, unsigned>> nextParameter = None;
     if (parent->getKind() == ASTScopeKind::AbstractFunctionParams &&
@@ -1191,6 +1202,7 @@ ASTScope *ASTScope::createIfNeeded(
 
 bool ASTScope::canStealContinuation() const {
   switch (getKind()) {
+       case ASTScopeKind::NominalOrExtensionWhereClause: abort();
   case ASTScopeKind::Preexpanded:
   case ASTScopeKind::SourceFile:
   case ASTScopeKind::ExtensionGenericParams:
@@ -1296,6 +1308,7 @@ void ASTScope::enumerateContinuationScopes(
 
 ASTContext &ASTScope::getASTContext() const {
   switch (kind) {
+    case ASTScopeKind::NominalOrExtensionWhereClause: abort();
   case ASTScopeKind::SourceFile:
     return sourceFile.file->getASTContext();
 
@@ -1365,6 +1378,7 @@ SourceFile &ASTScope::getSourceFile() const {
 
 SourceRange ASTScope::getSourceRangeImpl() const {
   switch (kind) {
+    case ASTScopeKind::NominalOrExtensionWhereClause: abort();
   case ASTScopeKind::Preexpanded:
     return SourceRange(children().front()->getSourceRange().Start,
                        children().back()->getSourceRange().End);
@@ -1669,6 +1683,7 @@ const ASTScope *ASTScope::findInnermostEnclosingScope(SourceLoc loc) const {
 
 DeclContext *ASTScope::getDeclContext() const {
   switch (getKind()) {
+    case ASTScopeKind::NominalOrExtensionWhereClause: abort();
   case ASTScopeKind::SourceFile:
     return sourceFile.file;
 
@@ -1750,6 +1765,7 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
   };
 
   switch (getKind()) {
+       case ASTScopeKind::NominalOrExtensionWhereClause: abort();
   case ASTScopeKind::Preexpanded:
   case ASTScopeKind::SourceFile:
   case ASTScopeKind::AbstractFunctionDecl:
@@ -1900,6 +1916,7 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
 
   // Print the scope kind and any salient information.
   switch (kind) {
+       case ASTScopeKind::NominalOrExtensionWhereClause: abort();
   case ASTScopeKind::Preexpanded:
     printScopeKind("Preexpanded");
     printAddress(this);

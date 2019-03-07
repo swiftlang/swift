@@ -44,6 +44,7 @@ using namespace swift::namelookup;
 /// name lookup successfully resolved.
 static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
   switch (scope->getKind()) {
+       case ASTScopeKind::NominalOrExtensionWhereClause: abort();
   case ASTScopeKind::Preexpanded:
   case ASTScopeKind::SourceFile:
   case ASTScopeKind::TypeDecl:

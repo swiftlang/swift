@@ -49,6 +49,7 @@ class SourceFile;
 class Stmt;
 class StmtConditionElement;
 class SwitchStmt;
+class TrailingWhereClause;
 class TopLevelCodeDecl;
 class TypeDecl;
 class WhileStmt;
@@ -197,7 +198,7 @@ class ASTScope {
     
     /// The where clause, for
     /// \c kind == ASTScopeKind::NominalOrExtensionWhereClause
-    TrailingWhereClause *whereClause;
+    const TrailingWhereClause *whereClause;
 
     /// An iterable declaration context, which covers nominal type declarations
     /// and extension bodies.
@@ -354,7 +355,7 @@ class ASTScope {
     this->extension = extension;
   }
 
-  ASTScope(const ASTScope *parent, IterableDeclContext *idc)
+  ASTScope(const char*, const ASTScope *parent, IterableDeclContext *idc)
       : ASTScope(ASTScopeKind::TypeOrExtensionBody, parent) {
     this->iterableDeclContext = idc;
   }
@@ -469,7 +470,7 @@ class ASTScope {
     this->topLevelCode = topLevelCode;
   }
   
-  ASTScope(const ASTScope *parent, TrailingWhereClause *whereClause)
+  ASTScope(const ASTScope *parent, const TrailingWhereClause *const whereClause)
   : ASTScope(ASTScopeKind::NominalOrExtensionWhereClause, parent) {
     this->whereClause = whereClause;
   }
@@ -518,7 +519,8 @@ class ASTScope {
   /// Create a new AST scope if one is needed for the where clause.
   ///
   /// \returns the newly-created AST scope, or \c null if there is no scope
-  static ASTScope *createIfNeeded(const ASTScope *parent, TrailingWhereClause*);
+  static ASTScope *createIfNeeded(const ASTScope *parent,
+                                  const TrailingWhereClause*);
 
   /// Determine whether this scope can steal a continuation from its parent,
   /// because (e.g.) it introduces some name binding that should be visible
