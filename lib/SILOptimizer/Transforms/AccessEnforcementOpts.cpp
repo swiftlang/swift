@@ -294,7 +294,7 @@ protected:
 
   void
   propagateAccessSetsBottomUp(LoopRegionToAccessedStorage &regionToStorageMap,
-                              llvm::SmallVector<unsigned, 16> worklist);
+                              const llvm::SmallVector<unsigned, 16> &worklist);
 
   void calcBottomUpOrder(llvm::SmallVectorImpl<unsigned> &worklist);
 
@@ -505,6 +505,8 @@ void AccessConflictAndMergeAnalysis::mergeState(RegionState &state,
 void AccessConflictAndMergeAnalysis::analyze() {
   identifyBeginAccesses();
   LoopRegionToAccessedStorage accessSetsOfRegions;
+  // Populate a worklist of regions such that the top of the worklist is the
+  // innermost loop and the bottom of the worklist is the entry block.
   llvm::SmallVector<unsigned, 16> worklist;
   calcBottomUpOrder(worklist);
   propagateAccessSetsBottomUp(accessSetsOfRegions, worklist);
@@ -593,9 +595,8 @@ void AccessConflictAndMergeAnalysis::identifyBeginAccesses() {
 // Propagates access summaries bottom-up from nested regions
 void AccessConflictAndMergeAnalysis::propagateAccessSetsBottomUp(
     LoopRegionToAccessedStorage &regionToStorageMap,
-    llvm::SmallVector<unsigned, 16> worklist) {
-  while (!worklist.empty()) {
-    auto regionID = worklist.pop_back_val();
+    const llvm::SmallVector<unsigned, 16> &worklist) {
+  for (unsigned regionID : reverse(worklist)) {
     auto *region = LRFI->getRegion(regionID);
     assert(regionToStorageMap.find(regionID) == regionToStorageMap.end() &&
            "Should not process a region twice");
