@@ -13,8 +13,6 @@ let x: protocol<> // expected-error {{'protocol<>' syntax has been removed; use 
 let y: protocol<P1> // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}}}
 let z: protocol<P1, P2> // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}}
 
-func bar(f: @noescape () -> ()) {} // expected-error {{@noescape is the default and has been removed}}
-
 func baz(f: @autoclosure(escaping) () -> ()) {} // expected-error {{@autoclosure(escaping) has been removed; use @autoclosure @escaping instead}}
 
 prefix operator +++ {} // expected-error {{operator should no longer be declared with body}}

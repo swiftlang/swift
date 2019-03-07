@@ -600,38 +600,12 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       if (!AlreadyDiagnosedNoEscapes.insert(DRE).second)
         return;
 
-      // The only valid use of the noescape parameter is an immediate call,
-      // either as the callee or as an argument (in which case, the typechecker
-      // validates that the noescape bit didn't get stripped off), or as
-      // a special case, e.g. in the binding of a withoutActuallyEscaping block
-      // or the argument of a type(of: ...).
-      if (parent) {
-        if (auto apply = dyn_cast<ApplyExpr>(parent)) {
-          if (isa<ParamDecl>(DRE->getDecl()) && useKind == OperandKind::Callee)
-            checkNoEscapeParameterCall(apply);
-          return;
-        } else if (isa<SubscriptExpr>(parent)
-                   && useKind == OperandKind::Argument) {
-          return;
-        } else if (isa<MakeTemporarilyEscapableExpr>(parent)) {
-          return;
-        } else if (isa<DynamicTypeExpr>(parent)) {
-          return;
-        }
-      }
-
-      TC.diagnose(DRE->getStartLoc(), diag::invalid_noescape_use,
-                  cast<VarDecl>(DRE->getDecl())->getName(),
-                  isa<ParamDecl>(DRE->getDecl()));
-
-      // If we're a parameter, emit a helpful fixit to add @escaping
-      auto paramDecl = dyn_cast<ParamDecl>(DRE->getDecl());
-      if (paramDecl) {
-        TC.diagnose(paramDecl->getStartLoc(), diag::noescape_parameter,
-                    paramDecl->getName())
-            .fixItInsert(paramDecl->getTypeLoc().getSourceRange().Start,
-                         "@escaping ");
-      }
+      if (!parent)
+        return;
+      if (!isa<ParamDecl>(DRE->getDecl()) || useKind != OperandKind::Callee)
+        return;
+      if (auto apply = dyn_cast<ApplyExpr>(parent))
+        checkNoEscapeParameterCall(apply);
     }
 
     // Diagnose metatype values that don't appear as part of a property,

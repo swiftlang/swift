@@ -2513,6 +2513,9 @@ ERROR(autoclosure_function_input_nonunit,none,
 ERROR(escaping_non_function_parameter,none,
       "@escaping attribute may only be used in function parameter position", ())
 
+ERROR(non_local_noescape,none,
+      "@noescape attribute may only be used in local function contexts", ())
+
 NOTE(escaping_optional_type_argument, none,
      "closure is already escaping in optional type argument", ())
 
@@ -3043,9 +3046,6 @@ WARNING(debug_description_in_string_interpolation_segment,none,
 NOTE(silence_debug_description_in_interpolation_segment_call,none,
      "use 'String(describing:)' to silence this warning", ())
 
-ERROR(invalid_noescape_use,none,
-      "non-escaping %select{value|parameter}1 %0 may only be called",
-      (Identifier, bool))
 NOTE(noescape_parameter,none,
     "parameter %0 is implicitly non-escaping",
      (Identifier))

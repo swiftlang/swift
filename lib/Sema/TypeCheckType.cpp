@@ -2194,7 +2194,13 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
   // Handle @escaping
   if (hasFunctionAttr && ty->is<FunctionType>()) {
-    if (attrs.has(TAK_escaping)) {
+    if (attrs.has(TAK_noescape)) {
+      auto loc = attrs.getLoc(TAK_noescape);
+      if (!DC->isLocalContext() ||
+          options.getBaseContext() == TypeResolverContext::FunctionResult) {
+        diagnose(loc, diag::non_local_noescape);
+      }
+    } else if (attrs.has(TAK_escaping)) {
       // The attribute is meaningless except on non-variadic parameter types.
       if (!isParam || options.getBaseContext() == TypeResolverContext::EnumElementDecl) {
         auto loc = attrs.getLoc(TAK_escaping);
