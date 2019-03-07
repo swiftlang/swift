@@ -221,8 +221,7 @@ DominatedAccessAnalysis::Result DominatedAccessAnalysis::analyze() && {
       }
       if (isa<BeginUnpairedAccessInst>(&I)) {
         // Unpaired accesses could be tracked, but are ignored because they are
-        // mostly irrelevant and hard to test. Rather than making the results
-        // conservative, we return an empty result.
+        // mostly irrelevant and hard to test. Completely bail on this function.
         result.accessMap.clear();
         return std::move(result);
       }
@@ -456,6 +455,21 @@ bool DominatedAccessRemoval::checkDominatedAccess(
 // non-distinct read and isn't contained by another non-distinct read. The
 // containsRead and isInner flags from in DominatedAccessAnalysis answer this
 // conservatively.
+//
+// Note: Promoting an earlier access to a modify could cause a program to
+// trap when optimized even if the unoptimized program does not trap; the
+// original modify access may be on an unreachable code path. This is acceptable
+// because:
+//
+// (a) in theory, exclusivity violations do not need to be executed to be
+// considered program violations. Promoting the access does not introduce any
+// new conflict where one didn't already exist statically. Catching these
+// violations at runtime is only an implementation compromise, and the more true
+// violations are caught, the better.
+//
+// (b) in practice, this situation is so exceedingly unlikely that it won't
+// cause any pervasive usability problem where programs have stronger
+// enforcement only when optimized.
 bool DominatedAccessRemoval::optimizeDominatedAccess(
     BeginAccessInst *BAI, DomAccessedStorage currAccessInfo,
     const DominatingAccess &domAccess) {

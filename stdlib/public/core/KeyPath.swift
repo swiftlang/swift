@@ -1772,7 +1772,7 @@ func _getAtKeyPath<Root, Value>(
 }
 
 // The release that ends the access scope is guaranteed to happen
-// immediate at the end_apply call because the continuation is a
+// immediately at the end_apply call because the continuation is a
 // runtime call with a manual release (access scopes cannot be extended).
 @_silgen_name("_swift_modifyAtWritableKeyPath_impl")
 public // runtime entrypoint
@@ -1784,7 +1784,7 @@ func _modifyAtWritableKeyPath_impl<Root, Value>(
 }
 
 // The release that ends the access scope is guaranteed to happen
-// immediate at the end_apply call because the continuation is a
+// immediately at the end_apply call because the continuation is a
 // runtime call with a manual release (access scopes cannot be extended).
 @_silgen_name("_swift_modifyAtReferenceWritableKeyPath_impl")
 public // runtime entrypoint
