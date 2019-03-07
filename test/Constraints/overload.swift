@@ -236,3 +236,12 @@ func autoclosure1<T>(_: [T], _: X) { }
 func test_autoclosure1(ia: [Int]) {
   autoclosure1(ia, X()) // okay: resolves to the second function
 }
+
+// SR-9970 / rdar://problem/48295187
+func singleAnyParamOverload(_ arg: Any) -> Int { return 0 }
+func singleAnyParamOverload(_ arg: [Any]) -> Double { return 0 }
+
+func testSingleAnyParamOverload() {
+  let x = singleAnyParamOverload([0])
+  let _: Double = x
+}
