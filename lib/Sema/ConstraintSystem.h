@@ -3166,17 +3166,16 @@ public:
   // bind overloads associated with it. This may return null in cases where
   // the disjunction has either not been created or binds the type variable
   // in some manner other than by binding overloads.
-  Constraint *getUnboundBindOverloadDisjunction(TypeVariableType *tyvar);
+  ///
+  /// \param numOptionalUnwraps If non-null, this will receive the number
+  /// of "optional object of" constraints that this function looked through
+  /// to uncover the disjunction. The actual overloads will have this number
+  /// of optionals wrapping the type.
+  Constraint *getUnboundBindOverloadDisjunction(
+    TypeVariableType *tyvar,
+    unsigned *numOptionalUnwraps = nullptr);
 
 private:
-  /// Given a type variable that might represent an overload set, retrieve
-  ///
-  /// \returns the set of overload choices to which this type variable
-  /// could be bound, or an empty vector if the type variable is not
-  /// solely resolved by an overload set.
-  SmallVector<OverloadChoice, 2> getUnboundBindOverloads(
-                                                  TypeVariableType *tyvar);
-
   /// Solve the system of constraints after it has already been
   /// simplified.
   ///

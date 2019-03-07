@@ -1551,7 +1551,7 @@ public:
   void checkLoadInst(LoadInst *LI) {
     require(LI->getType().isObject(), "Result of load must be an object");
     require(!fnConv.useLoweredAddresses()
-                || LI->getType().isLoadable(LI->getFunction()),
+                || LI->getType().isLoadable(*LI->getFunction()),
             "Load must have a loadable type");
     require(LI->getOperand()->getType().isAddress(),
             "Load operand must be an address");
@@ -1571,14 +1571,14 @@ public:
       require(F.hasOwnership(),
               "Load with qualified ownership in an unqualified function");
       // TODO: Could probably make this a bit stricter.
-      require(!LI->getType().isTrivial(LI->getModule()),
+      require(!LI->getType().isTrivial(*LI->getFunction()),
               "load [copy] or load [take] can only be applied to non-trivial "
               "types");
       break;
     case LoadOwnershipQualifier::Trivial:
       require(F.hasOwnership(),
               "Load with qualified ownership in an unqualified function");
-      require(LI->getType().isTrivial(LI->getModule()),
+      require(LI->getType().isTrivial(*LI->getFunction()),
               "A load with trivial ownership must load a trivial type");
       break;
     }
@@ -1590,7 +1590,7 @@ public:
         "Inst with qualified ownership in a function that is not qualified");
     require(LBI->getType().isObject(), "Result of load must be an object");
     require(!fnConv.useLoweredAddresses()
-            || LBI->getType().isLoadable(LBI->getFunction()),
+            || LBI->getType().isLoadable(*LBI->getFunction()),
             "Load must have a loadable type");
     require(LBI->getOperand()->getType().isAddress(),
             "Load operand must be an address");
@@ -1708,7 +1708,7 @@ public:
     require(SI->getSrc()->getType().isObject(),
             "Can't store from an address source");
     require(!fnConv.useLoweredAddresses()
-                || SI->getSrc()->getType().isLoadable(SI->getFunction()),
+                || SI->getSrc()->getType().isLoadable(*SI->getFunction()),
             "Can't store a non loadable type");
     require(SI->getDest()->getType().isAddress(),
             "Must store to an address dest");
@@ -1729,7 +1729,7 @@ public:
           F.hasOwnership(),
           "Inst with qualified ownership in a function that is not qualified");
       // TODO: Could probably make this a bit stricter.
-      require(!SI->getSrc()->getType().isTrivial(SI->getModule()),
+      require(!SI->getSrc()->getType().isTrivial(*SI->getFunction()),
               "store [init] or store [assign] can only be applied to "
               "non-trivial types");
       break;
@@ -1738,7 +1738,7 @@ public:
           F.hasOwnership(),
           "Inst with qualified ownership in a function that is not qualified");
       SILValue Src = SI->getSrc();
-      require(Src->getType().isTrivial(SI->getModule()) ||
+      require(Src->getType().isTrivial(*SI->getFunction()) ||
               Src.getOwnershipKind() == ValueOwnershipKind::Any,
               "A store with trivial ownership must store a type with trivial "
               "ownership");
@@ -1913,7 +1913,7 @@ public:
             "Dest address should be lvalue");
     require(SI->getDest()->getType() == SI->getSrc()->getType(),
             "Store operand type and dest type mismatch");
-    require(F.getModule().isTypeABIAccessible(SI->getDest()->getType()),
+    require(F.isTypeABIAccessible(SI->getDest()->getType()),
             "cannot directly copy type with inaccessible ABI");
   }
 
@@ -1934,7 +1934,7 @@ public:
   void checkCopyValueInst(CopyValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
-    require(!I->getOperand()->getType().isTrivial(I->getModule()),
+    require(!I->getOperand()->getType().isTrivial(*I->getFunction()),
             "Source value should be non-trivial");
     require(!fnConv.useLoweredAddresses() || F.hasOwnership(),
             "copy_value is only valid in functions with qualified "
@@ -1944,7 +1944,7 @@ public:
   void checkDestroyValueInst(DestroyValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
-    require(!I->getOperand()->getType().isTrivial(I->getModule()),
+    require(!I->getOperand()->getType().isTrivial(*I->getFunction()),
             "Source value should be non-trivial");
     require(!fnConv.useLoweredAddresses() || F.hasOwnership(),
             "destroy_value is only valid in functions with qualified "
@@ -2328,7 +2328,7 @@ public:
   void checkDestroyAddrInst(DestroyAddrInst *DI) {
     require(DI->getOperand()->getType().isAddress(),
             "Operand of destroy_addr must be address");
-    require(F.getModule().isTypeABIAccessible(DI->getOperand()->getType()),
+    require(F.isTypeABIAccessible(DI->getOperand()->getType()),
             "cannot directly destroy type with inaccessible ABI");
   }
 
@@ -3585,7 +3585,7 @@ public:
             "unchecked_trivial_bit_cast must operate on a value");
     require(BI->getType().isObject(),
             "unchecked_trivial_bit_cast must produce a value");
-    require(BI->getType().isTrivial(F.getModule()),
+    require(BI->getType().isTrivial(F),
             "unchecked_trivial_bit_cast must produce a value of trivial type");
   }
 

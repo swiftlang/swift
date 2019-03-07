@@ -370,10 +370,8 @@ public:
 
     // Otherwise, query specifically for the original type.
     } else {
-      // FIXME: Get expansion from SILDeclRef
       return SILType::isFormallyReturnedIndirectly(
-          origType.getType(), M, origType.getGenericSignature(),
-          ResilienceExpansion::Minimal);
+          origType.getType(), M, origType.getGenericSignature());
     }
   }
 };
@@ -453,10 +451,8 @@ static bool isFormallyPassedIndirectly(SILModule &M,
 
   // Otherwise, query specifically for the original type.
   } else {
-    // FIXME: Get expansion from SILDeclRef
     return SILType::isFormallyPassedIndirectly(
-        origType.getType(), M, origType.getGenericSignature(),
-        ResilienceExpansion::Minimal);
+        origType.getType(), M, origType.getGenericSignature());
   }
 }
 
