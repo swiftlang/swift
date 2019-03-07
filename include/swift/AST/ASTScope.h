@@ -65,6 +65,8 @@ enum class ASTScopeKind : uint8_t {
   TypeDecl,
   /// The generic parameters of an extension declaration.
   ExtensionGenericParams,
+  /// The where clause (if any) of a nominal or extension declaration.
+  NominalOrExtensionWhereClause,
   /// The body of a type or extension thereof.
   TypeOrExtensionBody,
   /// The generic parameters of a declaration.
@@ -192,6 +194,10 @@ class ASTScope {
     /// An extension declaration, for
     /// \c kind == ASTScopeKind::ExtensionGenericParams.
     ExtensionDecl *extension;
+    
+    /// The where clause, for
+    /// \c kind == ASTScopeKind::NominalOrExtensionWhereClause
+    TrailingWhereClause *whereClause;
 
     /// An iterable declaration context, which covers nominal type declarations
     /// and extension bodies.
@@ -462,6 +468,11 @@ class ASTScope {
       : ASTScope(ASTScopeKind::TopLevelCode, parent) {
     this->topLevelCode = topLevelCode;
   }
+  
+  ASTScope(const ASTScope *parent, TrailingWhereClause *whereClause)
+  : ASTScope(ASTScopeKind::NominalOrExtensionWhereClause, parent) {
+    this->whereClause = whereClause;
+  }
 
   ~ASTScope();
 
@@ -503,6 +514,11 @@ class ASTScope {
   /// \returns the newly-created AST scope, or \c null if there is no scope
   /// introduced by this AST node.
   static ASTScope *createIfNeeded(const ASTScope *parent, ASTNode node);
+  
+  /// Create a new AST scope if one is needed for the where clause.
+  ///
+  /// \returns the newly-created AST scope, or \c null if there is no scope
+  static ASTScope *createIfNeeded(const ASTScope *parent, TrailingWhereClause*);
 
   /// Determine whether this scope can steal a continuation from its parent,
   /// because (e.g.) it introduces some name binding that should be visible

@@ -298,6 +298,10 @@ void ASTScope::expand() const {
   }
 
   case ASTScopeKind::ExtensionGenericParams: {
+#error not general enough, could be inside others try before making a nominalOrExtensionBody whenever decl is a GenericContext
+    if (ASTScope *child = createIfNeeded(this, extension->getTrailingWhereClause()));
+      addChild(child);
+
     // Create a child node.
     if (ASTScope *child = createIfNeeded(this, extension))
       addChild(child);
@@ -313,6 +317,9 @@ void ASTScope::expand() const {
     break;
 
   case ASTScopeKind::GenericParams:
+    if (ASTScope *child = createIfNeeded(this, extension->getTrailingWhereClause()));
+      addChild(child);
+
     // Create a child of the generic parameters, if needed.
     if (auto child = createIfNeeded(this, genericParams.decl))
       addChild(child);
@@ -1174,6 +1181,14 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, ASTNode node) {
   return createIfNeeded(parent, node.get<Expr *>());
 }
 
+ASTScope *ASTScope::createIfNeeded(
+                      const ASTScope *parent,
+                      const TrailingWhereClause *const whereClause) {
+  return !whereClause
+    ? nullptr
+  : new (parent->getASTContext()) ASTScope(parent, whereClause);
+}
+
 bool ASTScope::canStealContinuation() const {
   switch (getKind()) {
   case ASTScopeKind::Preexpanded:
@@ -1378,7 +1393,7 @@ SourceRange ASTScope::getSourceRangeImpl() const {
     if (!extension->getInherited().empty() &&
         extension->getInherited().front().getSourceRange().Start.isValid())
       startLoc = extension->getInherited().front().getSourceRange().Start;
-    if (auto trailingWhere = extension->getTrailingWhereClause())
+    else if (auto trailingWhere = extension->getTrailingWhereClause())
       startLoc = trailingWhere->getWhereLoc();
     else
       startLoc = extension->getBraces().Start;
