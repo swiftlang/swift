@@ -597,13 +597,10 @@ namespace {
   /// \param expr The application.
   /// \param isFavored Determine whether the given overload is favored, passing
   /// it the "effective" overload type when it's being called.
-  /// \param mustConsider If provided, a function to detect the presence of
-  /// overloads which inhibit any overload from being favored.
-  void favorCallOverloads(ApplyExpr *expr,
-                          ConstraintSystem &CS,
-                          llvm::function_ref<bool(ValueDecl *, Type)> isFavored,
-                          std::function<bool(ValueDecl *)>
-                              mustConsider = nullptr) {
+  void favorCallOverloads(
+      ApplyExpr *expr,
+      ConstraintSystem &CS,
+      llvm::function_ref<bool(ValueDecl *, Type)> isFavored) {
     // Find the type variable associated with the function, if any.
     auto tyvarType = CS.getType(expr->getFn())->getAs<TypeVariableType>();
     if (!tyvarType || CS.getFixedType(tyvarType))
@@ -617,21 +614,12 @@ namespace {
       return;
     
     // Find the favored constraints and mark them.
-    SmallVector<Constraint *, 4> newlyFavoredConstraints;
     unsigned numFavoredConstraints = 0;
     Constraint *firstFavored = nullptr;
     for (auto constraint : disjunction->getNestedConstraints()) {
       if (!constraint->getOverloadChoice().isDecl())
         continue;
       auto decl = constraint->getOverloadChoice().getDecl();
-
-      if (mustConsider && mustConsider(decl)) {
-        // Roll back any constraints we favored.
-        for (auto favored : newlyFavoredConstraints)
-          favored->setFavored(false);
-
-        return;
-      }
 
       Type overloadType =
           CS.getEffectiveOverloadType(constraint->getOverloadChoice(),
@@ -641,11 +629,6 @@ namespace {
 
       if (!decl->getAttrs().isUnavailable(CS.getASTContext()) &&
           isFavored(decl, overloadType)) {
-        // If we might need to roll back the favored constraints, keep
-        // track of those we are favoring.
-        if (mustConsider && !constraint->isFavored())
-          newlyFavoredConstraints.push_back(constraint);
-
         constraint->setFavored();
         ++numFavoredConstraints;
         if (!firstFavored)
@@ -664,40 +647,6 @@ namespace {
       if (!resultType->hasTypeParameter())
         CS.setFavoredType(expr, resultType.getPointer());
     }
-  }
-  
-  size_t getOperandCount(Type t) {
-    size_t nOperands = 0;
-    
-    if (auto parenTy = dyn_cast<ParenType>(t.getPointer())) {
-      if (parenTy->getDesugaredType())
-        nOperands = 1;
-    } else if (auto tupleTy = t->getAs<TupleType>()) {
-      nOperands = tupleTy->getElementTypes().size();
-    }
-    
-    return nOperands;
-  }
-  
-  /// Return a pair, containing the total parameter count of a function, coupled
-  /// with the number of non-default parameters.
-  std::pair<size_t, size_t> getParamCount(ValueDecl *VD) {
-    auto fTy = VD->getInterfaceType()->castTo<AnyFunctionType>();
-    
-    size_t nOperands = fTy->getParams().size();
-    size_t nNoDefault = 0;
-    
-    if (auto AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
-      assert(!AFD->hasImplicitSelfDecl());
-      for (auto param : *AFD->getParameters()) {
-        if (!param->isDefaultArgument())
-          nNoDefault++;
-      }
-    } else {
-      nNoDefault = nOperands;
-    }
-    
-    return { nOperands, nNoDefault };
   }
   
   /// Favor unary operator constraints where we have exact matches
@@ -722,75 +671,6 @@ namespace {
     };
     
     favorCallOverloads(expr, CS, isFavoredDecl);
-  }
-  
-  void favorMatchingOverloadExprs(ApplyExpr *expr,
-                                  ConstraintSystem &CS) {
-    // Find the argument type.
-    size_t nArgs = getOperandCount(CS.getType(expr->getArg()));
-    auto fnExpr = expr->getFn();
-    
-    // Check to ensure that we have an OverloadedDeclRef, and that we're not
-    // favoring multiple overload constraints. (Otherwise, in this case
-    // favoring is useless.
-    if (auto ODR = dyn_cast<OverloadedDeclRefExpr>(fnExpr)) {
-      bool haveMultipleApplicableOverloads = false;
-      
-      for (auto VD : ODR->getDecls()) {
-        if (VD->getInterfaceType()->is<AnyFunctionType>()) {
-          auto nParams = getParamCount(VD);
-          
-          if (nArgs == nParams.first) {
-            if (haveMultipleApplicableOverloads) {
-              return;
-            } else {
-              haveMultipleApplicableOverloads = true;
-            }
-          }
-        }
-      }
-      
-      // Determine whether the given declaration is favored.
-      auto isFavoredDecl = [&](ValueDecl *value, Type type) -> bool {
-        if (!type->is<AnyFunctionType>())
-          return false;
-
-        auto paramCount = getParamCount(value);
-        
-        return nArgs == paramCount.first ||
-               nArgs == paramCount.second;
-      };
-      
-      favorCallOverloads(expr, CS, isFavoredDecl);
-      
-    }
-    
-    if (auto favoredTy = CS.getFavoredType(expr->getArg())) {
-      // Determine whether the given declaration is favored.
-      auto isFavoredDecl = [&](ValueDecl *value, Type type) -> bool {
-        auto fnTy = type->getAs<AnyFunctionType>();
-        if (!fnTy)
-          return false;
-
-        auto paramTy =
-            AnyFunctionType::composeInput(CS.getASTContext(), fnTy->getParams(),
-                                          /*canonicalVararg*/ false);
-        return favoredTy->isEqual(paramTy);
-      };
-
-      // This is a hack to ensure we always consider the protocol requirement
-      // itself when calling something that has a default implementation in an
-      // extension. Otherwise, the extension method might be favored if we're
-      // inside an extension context, since any archetypes in the parameter
-      // list could match exactly.
-      auto mustConsider = [&](ValueDecl *value) -> bool {
-        return isa<ProtocolDecl>(value->getDeclContext());
-      };
-
-      favorCallOverloads(expr, CS,
-                         isFavoredDecl,
-                         mustConsider);
-    }
   }
   
   /// Favor binary operator constraints where we have exact matches
@@ -899,8 +779,6 @@ namespace {
           favorMatchingUnaryOperators(applyExpr, CS);
         } else if (isa<BinaryExpr>(applyExpr)) {
           favorMatchingBinaryOperators(applyExpr, CS);
-        } else {
-          favorMatchingOverloadExprs(applyExpr, CS);
         }
       }
       
