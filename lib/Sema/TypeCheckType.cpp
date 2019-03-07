@@ -1002,6 +1002,36 @@ static Type resolveTypeDecl(TypeDecl *typeDecl, SourceLoc loc,
   return type;
 }
 
+static std::string getDeclNameFromContext(DeclContext *dc,
+                                          NominalTypeDecl *nominal) {
+  // We don't allow an unqualified reference to a type inside an
+  // extension if the type is itself nested inside another type,
+  // eg:
+  //
+  // extension A.B { ... B ... }
+  //
+  // Instead, you must write 'A.B'. Calculate the right name to use
+  // for fixits.
+  if (!isa<ExtensionDecl>(dc)) {
+    SmallVector<Identifier, 2> idents;
+    auto *parentNominal = nominal;
+    while (parentNominal != nullptr) {
+      idents.push_back(parentNominal->getName());
+      parentNominal = parentNominal->getDeclContext()->getSelfNominalTypeDecl();
+    }
+    std::reverse(idents.begin(), idents.end());
+    std::string result;
+    for (auto ident : idents) {
+      if (!result.empty())
+        result += ".";
+      result += ident.str();
+    }
+    return result;
+  } else {
+    return nominal->getName().str();
+  }
+}
+
 /// Diagnose a reference to an unknown type.
 ///
 /// This routine diagnoses a reference to an unknown type, and
@@ -1021,6 +1051,45 @@ static Type diagnoseUnknownType(TypeResolution resolution,
 
   // Unqualified lookup case.
   if (parentType.isNull()) {
+    if (comp->getIdentifier() == ctx.Id_Self &&
+        !isa<GenericIdentTypeRepr>(comp)) {
+      DeclContext *nominalDC = nullptr;
+      NominalTypeDecl *nominal = nullptr;
+      if ((nominalDC = dc->getInnermostTypeContext()) &&
+          (nominal = nominalDC->getSelfNominalTypeDecl())) {
+        // Attempt to refer to 'Self' within a non-protocol nominal
+        // type. Fix this by replacing 'Self' with the nominal type name.
+        assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
+
+        if (!nominalDC->getSelfClassDecl())
+          return resolution.mapTypeIntoContext(nominal
+                                               ->getDeclaredInterfaceType());
+
+        // Produce a Fix-It replacing 'Self' with the nominal type name.
+        auto name = getDeclNameFromContext(dc, nominal);
+        diags.diagnose(comp->getIdLoc(), diag::self_in_nominal, name)
+          .fixItReplace(comp->getIdLoc(), name);
+
+        // If this is a requirement, replacing 'Self' with a valid type will
+        // result in additional unnecessary diagnostics (does not refer to a
+        // generic parameter or associated type). Simply return an error type.
+        if (options.is(TypeResolverContext::GenericRequirement))
+          return ErrorType::get(ctx);
+
+        auto type = resolution.mapTypeIntoContext(
+          dc->getInnermostTypeContext()->getSelfInterfaceType());
+
+        comp->overwriteIdentifier(nominal->getName());
+        comp->setValue(nominal, nominalDC->getParent());
+        return type;
+      }
+      // Attempt to refer to 'Self' from a free function.
+      diags.diagnose(comp->getIdLoc(), diag::dynamic_self_non_method,
+                     dc->getParent()->isLocalContext());
+
+      return ErrorType::get(ctx);
+    }
+
     // Try ignoring access control.
     DeclContext *lookupDC = dc;
     NameLookupOptions relookupOptions = lookupOptions;
@@ -1259,31 +1328,6 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
     // source, bail out.
     if (options.contains(TypeResolutionFlags::SilenceErrors))
       return ErrorType::get(ctx);
-
-    if (comp->getIdentifier() == ctx.Id_Self &&
-        !isa<GenericIdentTypeRepr>(comp)) {
-      DeclContext *nominalDC = nullptr;
-      NominalTypeDecl *nominal = nullptr;
-      auto dc = resolution.getDeclContext();
-      if ((nominalDC = dc->getInnermostTypeContext()) &&
-          (nominal = nominalDC->getSelfNominalTypeDecl())) {
-        assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
-
-        Type SelfType = nominal->getDeclaredInterfaceType();
-
-// Causes assertion failure:
-// Assertion failed: (hasSelfMetadataParam() && "This method can only be called if the " "SILFunction has a self-metadata parameter"), function getSelfMetadataArgument, file /Volumes/Elements/swift-self/swift/include/swift/SIL/SILFunction.h, line 935.
-//        if (nominalDC->getSelfClassDecl())
-//          SelfType = DynamicSelfType::get(SelfType, ctx);
-
-        return resolution.mapTypeIntoContext(SelfType);
-      }
-      // Attempt to refer to 'Self' from a free function.
-      diags.diagnose(comp->getIdLoc(), diag::dynamic_self_non_method,
-                     dc->getParent()->isLocalContext());
-
-      return ErrorType::get(ctx);
-    }
 
     return diagnoseUnknownType(resolution, nullptr, SourceRange(), comp,
                                options, lookupOptions);

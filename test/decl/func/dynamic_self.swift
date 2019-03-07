@@ -24,9 +24,9 @@ enum E0 {
 class C0 {
   func f() -> Self { } // okay
 
-  func g(_ ds: Self) { }
+  func g(_ ds: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C0'?}}{{16-20=C0}}
 
-  func h(_ ds: Self) -> Self { }
+  func h(_ ds: Self) -> Self { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C0'?}}{{16-20=C0}}
 }
 
 protocol P0 {
@@ -73,7 +73,7 @@ class C1 {
     if !b { return type(of: self).init(int: 5) }
 
     // Can't utter Self within the body of a method.
-    var _: Self = self
+    var _: Self = self // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C1'?}} {{12-16=C1}}
 
     // Okay to return 'self', because it has the appropriate type.
     return self // okay
@@ -85,7 +85,7 @@ class C1 {
     var x: Int = self // expected-error{{cannot convert value of type 'Self.Type' to specified type 'Int'}}
 
     // Can't utter Self within the body of a method.
-    var c1 = C1(int: 5) as Self
+    var c1 = C1(int: 5) as Self // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C1'?}} {{28-32=C1}}
 
     if b { return self.init(int: 5) }
 
