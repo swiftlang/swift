@@ -10,8 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SwiftRemoteMirror/Platform.h"
+
 #define SWIFT_CLASS_IS_SWIFT_MASK swift_reflection_classIsSwiftMask
-extern "C" unsigned long long swift_reflection_classIsSwiftMask = 2;
+extern "C" {
+SWIFT_REMOTE_MIRROR_LINKAGE
+unsigned long long swift_reflection_classIsSwiftMask = 2;
+}
 
 #include "swift/Reflection/ReflectionContext.h"
 #include "swift/Reflection/TypeLowering.h"
