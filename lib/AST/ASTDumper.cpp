@@ -1070,7 +1070,10 @@ namespace {
           Indent -= 2;
         }
       }
-      if (auto Body = D->getBody(/*canSynthesize=*/false)) {
+      if (D->hasSingleExpressionBody()) {
+        OS << '\n';
+        printRec(D->getSingleExpressionBody());
+      } else if (auto Body = D->getBody(/*canSynthesize=*/false)) {
         OS << '\n';
         printRec(Body, D->getASTContext());
       }

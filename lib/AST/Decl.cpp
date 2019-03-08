@@ -471,6 +471,26 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getLoc();
   llvm_unreachable("Unknown decl kind");
 }
 
+Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
+  assert(hasSingleExpressionBody() && "Not a single-expression body");
+  auto braceStmt = getBody();
+  assert(braceStmt != nullptr && "No body currently available.");
+  auto body = getBody()->getElement(0);
+  if (body.is<Stmt *>())
+    return cast<ReturnStmt>(body.get<Stmt *>())->getResult();
+  return body.get<Expr *>();
+}
+
+void AbstractFunctionDecl::setSingleExpressionBody(Expr *NewBody) {
+  assert(hasSingleExpressionBody() && "Not a single-expression body");
+  auto body = getBody()->getElement(0);
+  if (body.is<Stmt *>()) {
+    cast<ReturnStmt>(body.get<Stmt *>())->setResult(NewBody);
+    return;
+  }
+  getBody()->setElement(0, NewBody);
+}
+
 bool AbstractStorageDecl::isTransparent() const {
   return getAttrs().hasAttribute<TransparentAttr>();
 }

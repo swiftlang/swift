@@ -339,6 +339,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }
     }
 
+    // FIXME: FIXME_NOW: DETERMINE: Is this or something like it needed?  Right
+    //        now it's causing assertion failures during AST verification.
+    //     
+    //     if (AFD->hasSingleExpressionBody()) {
+    //       if (Expr *body = doIt(AFD->getSingleExpressionBody()))
+    //         AFD->setSingleExpressionBody(body);
+    //       else
+    //         return true;
+    //     }
     if (AFD->getBody(/*canSynthesize=*/false)) {
       AbstractFunctionDecl::BodyKind PreservedKind = AFD->getBodyKind();
       if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(AFD->getBody())))

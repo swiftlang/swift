@@ -5655,8 +5655,56 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
     Context.Stats->getFrontendCounters().NumFunctionsParsed++;
 
   ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
-  if (!Body.isNull())
-    AFD->setBody(Body.get());
+  if (!Body.isNull()) {
+    // If the body consists of a single expression, turn it into a return 
+    // statement.
+    BraceStmt * BS = Body.get();
+    AFD->setBody(BS);
+    // FIXME: FIXME_NOW: DETERMINE: Do we need to handle the code completion 
+    //        case here?  It is being handled for closure 
+    //        (Parser::parseExprClosure).
+    if (BS->getNumElements() == 1) {
+      auto Element = BS->getElement(0);
+      // FIXME: FIXME_NOW: DETERMINE: Do we need to do this?  It's being done
+      //        for closures (Parser::parseExprClosure) but it may not be 
+      //        relevant here.
+      //
+      //           if (Element.is<Stmt *>()) {
+      //             if (auto returnStmt =
+      //                         dyn_cast_or_null<ReturnStmt>(Element.get<Stmt*>())) {
+      //               
+      //               if (!returnStmt->hasResult()) {
+      //                 Expr *returnExpr = TupleExpr::createEmpty(Context,
+      //                                                           SourceLoc(),
+      //                                                           SourceLoc(),
+      //                                                           /*implicit*/true);
+      //                 
+      //                 returnStmt->setResult(returnExpr);
+      //                 AFD->setHasSingleExpressionBody();
+      //                 AFD->setSingleExpressionBody(returnExpr);
+      //               }
+      //             }
+      //           } else 
+      if (Element.is<Expr *>()) {
+        auto E = Element.get<Expr *>();
+        if (auto F = dyn_cast_or_null<FuncDecl>(AFD)) {
+          auto RS = new (Context) ReturnStmt(SourceLoc(), E);
+          BS->setElement(0, RS); 
+          AFD->setHasSingleExpressionBody();
+          AFD->setSingleExpressionBody(E);
+        } else if (auto F = dyn_cast_or_null<ConstructorDecl>(AFD)) {
+          if (F->getFailability() != OTK_None && isa<NilLiteralExpr>(E)) {
+            // If it's a nil literal, just insert return.  This is the only 
+            // legal thing to return.
+            auto RS = new (Context) ReturnStmt(E->getStartLoc(), E);
+            BS->setElement(0, RS); 
+            AFD->setHasSingleExpressionBody();
+            AFD->setSingleExpressionBody(E);
+          }
+        }
+      }
+    }
+  }
 }
 
 bool Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {

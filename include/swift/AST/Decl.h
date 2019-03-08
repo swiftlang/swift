@@ -401,8 +401,7 @@ protected:
   SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2,
     StaticSpelling : 2
   );
-
-  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
 
@@ -426,7 +425,10 @@ protected:
 
     /// Whether this member was synthesized as part of a derived
     /// protocol conformance.
-    Synthesized : 1
+    Synthesized : 1,
+
+    /// Whether this member's body consists of a single expression.
+    HasSingleExpressionBody : 1
   );
 
   SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+2+1+1+2,
@@ -5433,6 +5435,7 @@ protected:
     Bits.AbstractFunctionDecl.NeedsNewVTableEntry = false;
     Bits.AbstractFunctionDecl.HasComputedNeedsNewVTableEntry = false;
     Bits.AbstractFunctionDecl.Synthesized = false;
+    Bits.AbstractFunctionDecl.HasSingleExpressionBody = false;
   }
 
   void setBodyKind(BodyKind K) {
@@ -5440,6 +5443,17 @@ protected:
   }
 
 public:
+  void setHasSingleExpressionBody(bool Has = true) { 
+    Bits.AbstractFunctionDecl.HasSingleExpressionBody = Has;
+  }
+
+  bool hasSingleExpressionBody() const {
+    return Bits.AbstractFunctionDecl.HasSingleExpressionBody;
+  }
+
+  Expr *getSingleExpressionBody() const;
+  void setSingleExpressionBody(Expr *NewBody);
+
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
     assert(!getFullName().isSpecial() && "Cannot get string for special names");
