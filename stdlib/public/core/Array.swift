@@ -1865,3 +1865,125 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
     return true
   }
 }
+
+extension Array : Differentiable where Element : AdditiveArithmetic & Differentiable {
+  public struct TangentVector : AdditiveArithmetic & Differentiable {
+    public typealias TangentVector = Array<Element>.TangentVector
+    public typealias CotangentVector = Array<Element>.CotangentVector
+
+    public var elements: [Element.TangentVector]
+
+    public static var zero: TangentVector {
+      get {
+        return TangentVector(elements: [.zero])
+      }
+    }
+    
+    public init(elements: [Element.TangentVector]) {
+      self.elements = elements
+    }
+
+    public func count() -> Int {
+      return elements.count
+    }
+
+    public static func + (lhs: TangentVector, rhs: TangentVector) -> TangentVector {
+      precondition(lhs.count() == 1 || rhs.count() == 1 || lhs.count() == rhs.count())
+      if lhs.count() == 1 {
+        return TangentVector(elements: rhs.elements.map { $0 + lhs.elements[0] })
+      } else if rhs.count() == 1 {
+        return TangentVector(elements: lhs.elements.map { $0 + rhs.elements[0] })
+      } else {
+        return TangentVector(elements: zip(lhs.elements, rhs.elements).map(+))
+      }
+    }
+
+    public static func - (lhs: TangentVector, rhs: TangentVector) -> TangentVector {
+      precondition(lhs.count() == 1 || rhs.count() == 1 || lhs.count() == rhs.count())
+      if lhs.count() == 1 {
+        return TangentVector(elements: rhs.elements.map { $0 - lhs.elements[0] })
+      } else if rhs.count() == 1 {
+        return TangentVector(elements: lhs.elements.map { $0 - rhs.elements[0] })
+      } else {
+        return TangentVector(elements: zip(lhs.elements, rhs.elements).map(-))
+      }
+    }
+
+    @inlinable @inline(__always)
+    public func moved(along direction: TangentVector) -> [Element.TangentVector] {
+      return zip(elements, direction.elements).map { $0.moved(along: $1) }
+    }
+
+    @inlinable @inline(__always)
+    public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
+      let e = zip(elements, cotangent.elements).map { $0.tangentVector(from: $1) }
+      return TangentVector(elements: e)
+    }
+  }
+
+  public struct CotangentVector : AdditiveArithmetic & Differentiable {
+    public typealias TangentVector = Array<Element>.CotangentVector
+    public typealias CotangentVector = Array<Element>.TangentVector
+
+    public var elements: [Element.CotangentVector]
+
+    public static var zero: TangentVector {
+      get {
+        return TangentVector(elements: [.zero])
+      }
+    }
+    
+    public init(elements: [Element.CotangentVector]) {
+      self.elements = elements
+    }
+
+    public func count() -> Int {
+      return elements.count
+    }
+
+    public static func + (lhs: TangentVector, rhs: TangentVector) -> TangentVector {
+      precondition(lhs.count() == 1 || rhs.count() == 1 || lhs.count() == rhs.count())
+      if lhs.count() == 1 {
+        return TangentVector(elements: rhs.elements.map { $0 + lhs.elements[0] })
+      } else if rhs.count() == 1 {
+        return TangentVector(elements: lhs.elements.map { $0 + rhs.elements[0] })
+      } else {
+        return TangentVector(elements: zip(lhs.elements, rhs.elements).map(+))
+      }
+    }
+
+    public static func - (lhs: TangentVector, rhs: TangentVector) -> TangentVector {
+      precondition(lhs.count() == 1 || rhs.count() == 1 || lhs.count() == rhs.count())
+      if lhs.count() == 1 {
+        return TangentVector(elements: rhs.elements.map { $0 - lhs.elements[0] })
+      } else if rhs.count() == 1 {
+        return TangentVector(elements: lhs.elements.map { $0 - rhs.elements[0] })
+      } else {
+        return TangentVector(elements: zip(lhs.elements, rhs.elements).map(-))
+      }
+    }
+
+    @inlinable @inline(__always)
+    public func moved(along direction: TangentVector) -> [Element.CotangentVector] {
+      return zip(elements, direction.elements).map { $0.moved(along: $1) }
+    }
+
+    @inlinable @inline(__always)
+    public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
+      let e = zip(elements, cotangent.elements).map { $0.tangentVector(from: $1) }
+      return TangentVector(elements: e)
+    }
+  }
+
+  public typealias AllDifferentiableVariables = [Element]
+
+  @inlinable @inline(__always)
+  public func moved(along direction: TangentVector) -> [Element] {
+    return zip(self, direction.elements).map { $0.moved(along: $1) }
+  }
+
+  @inlinable @inline(__always)
+  public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
+    return TangentVector(elements: zip(self, cotangent.elements).map { $0.tangentVector(from: $1) })
+  }
+}
