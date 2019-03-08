@@ -300,15 +300,14 @@ Tests.test("NSDictionary -> Swift (Dictionary). Crashing Test Cases") {
     expectNil(dictOpt)
   }
 
-  // NOTE: This is preserving current behavior. We should probably have a better
-  // error here like in the other crashes.
-  //
   // CHECK-LABEL: [ RUN      ] BridgedCastFolding.NSDictionary -> Swift (Dictionary). Crashing Test Cases
-  // CHECK: stderr>>> OK: saw expected "crashed: sigill"
+  // CHECK: stderr>>> Could not cast value of type '{{.*}}' (0x{{[0-9a-f]*}}) to 'NSNumber' (0x{{[0-9a-f]*}}).
+  // CHECK: stderr>>> OK: saw expected "crashed: sigabrt"
   // CHECK: [       OK ] BridgedCastFolding.NSDictionary -> Swift (Dictionary). Crashing Test Cases
   //
   // CHECK-OPT-LABEL: [ RUN      ] BridgedCastFolding.NSDictionary -> Swift (Dictionary). Crashing Test Cases
-  // CHECK-OPT: stderr>>> OK: saw expected "crashed: sigill"
+  // CHECK-OPT: stderr>>> Could not cast value of type '{{.*}}' (0x{{[0-9a-f]*}}) to 'NSNumber' (0x{{[0-9a-f]*}}).
+  // CHECK-OPT: stderr>>> OK: saw expected "crashed: sigabrt"
   // CHECK-OPT: [       OK ] BridgedCastFolding.NSDictionary -> Swift (Dictionary). Crashing Test Cases
   expectCrashLater()
   do {
