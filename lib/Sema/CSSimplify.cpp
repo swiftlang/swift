@@ -95,9 +95,8 @@ static Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
 }
 
 bool constraints::areConservativelyCompatibleArgumentLabels(
-                                               OverloadChoice choice,
-                                               ArrayRef<Identifier> labels,
-                                               bool hasTrailingClosure) {
+    OverloadChoice choice, ArrayRef<Identifier> labels,
+    bool hasTrailingClosure, SmallVectorImpl<ParamBinding> *bindings) {
   ValueDecl *decl = nullptr;
   Type baseType;
   switch (choice.getKind()) {
@@ -172,7 +171,8 @@ bool constraints::areConservativelyCompatibleArgumentLabels(
   return !matchCallArguments(argInfos, params, defaultMap,
                              hasTrailingClosure,
                              /*allow fixes*/ false,
-                             listener, unusedParamBindings);
+                             listener,
+                             bindings ? *bindings : unusedParamBindings);
 }
 
 Expr *constraints::getArgumentLabelTargetExpr(Expr *fn) {

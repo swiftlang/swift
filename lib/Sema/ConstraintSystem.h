@@ -3584,9 +3584,9 @@ Expr *getArgumentLabelTargetExpr(Expr *fn);
 /// Attempt to prove that arguments with the given labels at the
 /// given parameter depth cannot be used with the given value.
 /// If this cannot be proven, conservatively returns true.
-bool areConservativelyCompatibleArgumentLabels(OverloadChoice choice,
-                                               ArrayRef<Identifier> labels,
-                                               bool hasTrailingClosure);
+bool areConservativelyCompatibleArgumentLabels(
+    OverloadChoice choice, ArrayRef<Identifier> labels,
+    bool hasTrailingClosure, SmallVectorImpl<ParamBinding> *bindings = nullptr);
 
 /// Simplify the given locator by zeroing in on the most specific
 /// subexpression described by the locator.
