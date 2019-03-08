@@ -33,8 +33,8 @@ extension String: P {
   // CHECK-SAME:         @"$s18opaque_result_typeMXM"
   // -- mangled underlying type
   // CHECK-SAME:         @"symbolic Si"
-  // -- conformance to O (todo)
-  // CHECK-SAME:         i32 0
+  // -- conformance to O
+  // CHECK-SAME:         @"get_witness_table S2i18opaque_result_type1OHpyHC
   // CHECK-SAME:  }>
   func poo() -> __opaque O {
     return 0
@@ -49,8 +49,8 @@ public class C: P, Q {
   // CHECK-SAME:         @"$s18opaque_result_typeMXM"
   // -- mangled underlying type
   // CHECK-SAME:         @"symbolic Si"
-  // -- conformance to O (todo)
-  // CHECK-SAME:         i32 0
+  // -- conformance to O
+  // CHECK-SAME:         @"get_witness_table S2i18opaque_result_type1OHpyHC
   // CHECK-SAME:  }>
   func poo() -> __opaque O {
     return 0
@@ -63,10 +63,10 @@ public class C: P, Q {
   // CHECK-SAME:         @"$s18opaque_result_typeMXM"
   // -- mangled underlying type
   // CHECK-SAME:         @"symbolic Si"
-  // -- conformance to O (todo)
-  // CHECK-SAME:         i32 0
-  // -- conformance to O2 (todo)
-  // CHECK-SAME:         i32 0
+  // -- conformance to O
+  // CHECK-SAME:         @"get_witness_table S2i18opaque_result_type1OHpyHC
+  // -- conformance to O2
+  // CHECK-SAME:         @"get_witness_table S2i18opaque_result_type2O2HpyHC
   // CHECK-SAME:  }>
   func qoo() -> __opaque O & O2 {
     return 0
@@ -80,8 +80,8 @@ public class C: P, Q {
 // CHECK-SAME:         @"$s18opaque_result_typeMXM"
 // -- mangled underlying type
 // CHECK-SAME:         @"symbolic SS"
-// -- conformance to P (todo)
-// CHECK-SAME:         i32 0
+// -- conformance to P
+// CHECK-SAME:         @"get_witness_table S2S18opaque_result_type1PHpyHC
 // CHECK-SAME:  }>
 func foo(x: String) -> __opaque P {
   return x
@@ -94,8 +94,8 @@ func foo(x: String) -> __opaque P {
 // CHECK-SAME:         @"$s18opaque_result_typeMXM"
 // -- mangled underlying type
 // CHECK-SAME:         @"symbolic _____ 18opaque_result_type1CC"
-// -- conformance to Q (todo)
-// CHECK-SAME:         i32 0
+// -- conformance to Q
+// CHECK-SAME:         @"get_witness_table 18opaque_result_type1CCAcA1QHPyHC
 // CHECK-SAME:  }>
 func bar(y: C) -> __opaque Q {
   return y
@@ -109,9 +109,9 @@ func bar(y: C) -> __opaque Q {
 // -- mangled underlying type
 // CHECK-SAME:         @"symbolic x"
 // -- conformance to P (todo)
-// CHECK-SAME:         i32 0
+// CHECK-SAME:         @"get_witness_table 18opaque_result_type1PRzAA1QRzlxAaB
 // -- conformance to Q (todo)
-// CHECK-SAME:         i32 0
+// CHECK-SAME:         @"get_witness_table 18opaque_result_type1PRzAA1QRzlxAaC
 // CHECK-SAME:  }>
 func baz<T: P & Q>(z: T) -> __opaque P & Q {
   return z
