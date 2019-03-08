@@ -1866,40 +1866,49 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
   }
 }
 
-/// `Array<Element>` is a countably infinite direct sum (https://en.wikipedia.org/wiki/Direct_sum) 
-/// of `Element`, when `Element` conforms to `AdditiveArithmetic` and thus has a zero.
-///
-/// Therefore, the most useful (co)tangent space for `Array<Element>` is the countably infinite 
-/// direct sum of `Element.TangentVector`/`Element.CoTangentVector` (since `Element.TangentVector` 
-/// and `Element.CoTangentVector` conform to `AdditiveArithmetic`, they have a zero). If we think of 
-/// all the elements past the end of an array as zeros, values of these direct sums can be 
-/// represented by values of `Array<Element.TangentVector>`/`Array<Element.CotangentVector>`. 
-/// 
-/// The operations are:
-/// - `zero` is `[]` (which is equivalent to `[.zero]`, `[.zero, .zero]`, etc).
-/// - `+` is (pseudocode): 
-///   `a + b = range(max(a.count, b.count)).map { i in (a[i] or .zero) + (b[i] or .zero) }`.
-/// 
-/// This leads to expected behavior when differentiating functions on arrays. For example:
-/// ```
-/// func sumFirstThree(_ array: Array<Float>) -> Float {
-///   return array[0] + array[1] + array[2]
-/// }
-/// ```
-/// We expect the gradient of that to be `[1, 1, 1]`. That is what we get, if we define the pullback 
-/// of array subscripting as follows:
-/// ```
-/// func vjpSubscript(index) {
-///   let result = self[index]
-///   let pullback = { v in
-///     var pb = Array(repeating: zero, count: index + 1)
-///     pb[index] = v
-///     return pb
-///   }
-///   return (result, pullback)
-/// }
-/// ```
-/// 
+// SWIFT_ENABLE_TENSORFLOW
+// `Array<Element>` is a countably infinite direct sum 
+// (https://en.wikipedia.org/wiki/Direct_sum) of `Element`, when `Element` 
+// conforms to `AdditiveArithmetic` and thus has a zero.
+//
+// Therefore, the most useful (co)tangent space for `Array<Element>` is the 
+// countably infinite direct sum of 
+// `Element.TangentVector`/`Element.CoTangentVector` (since 
+// `Element.TangentVector` and `Element.CoTangentVector` conform to 
+// `AdditiveArithmetic`, they have a zero). If we think of all the elements past 
+// the end of an array as zeros, values of these direct sums can be represented 
+// by values of `Array<Element.TangentVector>`/`Array<Element.CotangentVector>`. 
+// 
+// The operations are:
+// - `zero` is `[]` (which is equivalent to `[.zero]`, `[.zero, .zero]`, etc).
+// - `+` is (pseudocode): 
+//   ```
+//   a + b = range(max(a.count, b.count)).map {
+//     i in (a[i] or .zero) + (b[i] or .zero)
+//   }
+//   ```
+// 
+// This leads to expected behavior when differentiating functions on arrays. 
+// For example:
+// ```
+// func sumFirstThree(_ array: Array<Float>) -> Float {
+//   return array[0] + array[1] + array[2]
+// }
+// ```
+// We expect the gradient of that to be `[1, 1, 1]`. That is what we get, if we 
+// define the pullback of array subscripting as follows:
+// ```
+// func vjpSubscript(index) {
+//   let result = self[index]
+//   let pullback = { v in
+//     var pb = Array(repeating: zero, count: index + 1)
+//     pb[index] = v
+//     return pb
+//   }
+//   return (result, pullback)
+// }
+// ```
+//
 extension Array : Differentiable where Element : Differentiable {
   public struct TangentVector : AdditiveArithmetic & Differentiable {
     public typealias TangentVector = Array<Element>.TangentVector
@@ -1908,40 +1917,38 @@ extension Array : Differentiable where Element : Differentiable {
     public var elements: [Element.TangentVector]
 
     public static var zero: TangentVector {
-      get {
-        return TangentVector(elements: [])
-      }
+      return TangentVector(elements: [])
     }
     
     public init(elements: [Element.TangentVector]) {
       self.elements = elements
     }
 
-    public func count() -> Int {
-      return elements.count
-    }
-
+    @inlinable
     public static func + (lhs: TangentVector, rhs: TangentVector) -> TangentVector {
       return TangentVector(elements: zipLongest(lhs.elements, rhs.elements).map {
         ($0 ?? .zero) + ($1 ?? .zero)
       })
     }
 
+    @inlinable
     public static func - (lhs: TangentVector, rhs: TangentVector) -> TangentVector {
       return TangentVector(elements: zipLongest(lhs.elements, rhs.elements).map {
         ($0 ?? .zero) - ($1 ?? .zero)
       })
     }
 
-    @inlinable @inline(__always)
+    @inlinable
     public func moved(along direction: TangentVector) -> [Element.TangentVector] {
       return zip(elements, direction.elements).map { $0.moved(along: $1) }
     }
 
-    @inlinable @inline(__always)
+    @inlinable
     public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
-      let e = zip(elements, cotangent.elements).map { $0.tangentVector(from: $1) }
-      return TangentVector(elements: e)
+      let elements = zip(elements, cotangent.elements).map {
+        $0.tangentVector(from: $1)
+      }
+      return TangentVector(elements: elements)
     }
   }
 
@@ -1952,51 +1959,49 @@ extension Array : Differentiable where Element : Differentiable {
     public var elements: [Element.CotangentVector]
 
     public static var zero: TangentVector {
-      get {
-        return TangentVector(elements: [])
-      }
+      return TangentVector(elements: [])
     }
     
     public init(elements: [Element.CotangentVector]) {
       self.elements = elements
     }
 
-    public func count() -> Int {
-      return elements.count
-    }
-
+    @inlinable
     public static func + (lhs: TangentVector, rhs: TangentVector) -> TangentVector {
       return TangentVector(elements: zipLongest(lhs.elements, rhs.elements).map {
         ($0 ?? .zero) + ($1 ?? .zero)
       })
     }
 
+    @inlinable
     public static func - (lhs: TangentVector, rhs: TangentVector) -> TangentVector {
       return TangentVector(elements: zipLongest(lhs.elements, rhs.elements).map {
         ($0 ?? .zero) - ($1 ?? .zero)
       })
     }
 
-    @inlinable @inline(__always)
+    @inlinable
     public func moved(along direction: TangentVector) -> [Element.CotangentVector] {
       return zip(elements, direction.elements).map { $0.moved(along: $1) }
     }
 
-    @inlinable @inline(__always)
+    @inlinable
     public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
-      let e = zip(elements, cotangent.elements).map { $0.tangentVector(from: $1) }
-      return TangentVector(elements: e)
+      let elements = zip(elements, cotangent.elements).map {
+        $0.tangentVector(from: $1)
+      }
+      return TangentVector(elements: elements)
     }
   }
 
   public typealias AllDifferentiableVariables = [Element]
 
-  @inlinable @inline(__always)
+  @inlinable
   public func moved(along direction: TangentVector) -> [Element] {
     return zip(self, direction.elements).map { $0.moved(along: $1) }
   }
 
-  @inlinable @inline(__always)
+  @inlinable
   public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
     return TangentVector(elements: zip(self, cotangent.elements).map { $0.tangentVector(from: $1) })
   }
