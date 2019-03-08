@@ -49,7 +49,7 @@ Tests.test("NSString => Array<Int>. Crashing test case") {
   }
 
   // CHECK-LABEL: [ RUN      ] BridgedCastFolding.NSString => Array<Int>. Crashing test case
-  // CHECK: stderr>>> Could not cast value of type '__NSCFString' (0x{{[0-9a-f]*}}) to 'NSArray' (0x{{[0-9a-f]*}}).
+  // CHECK: stderr>>> Could not cast value of type '{{.*}}' (0x{{[0-9a-f]*}}) to 'NSArray' (0x{{[0-9a-f]*}}).
   // CHECK: stderr>>> OK: saw expected "crashed: sigabrt"
   // CHECK: [       OK ] BridgedCastFolding.NSString => Array<Int>. Crashing test case
 
@@ -121,7 +121,7 @@ Tests.test("NSNumber (Int) -> String. Crashing test.") {
   }
 
   // CHECK-LABEL: [ RUN      ] BridgedCastFolding.NSNumber (Int) -> String. Crashing test.
-  // CHECK: stderr>>> Could not cast value of type '__NSCFNumber' (0x{{[0-9a-f]*}}) to 'NSString' (0x{{[0-9a-f]*}}).
+  // CHECK: stderr>>> Could not cast value of type '{{.*}}' (0x{{[0-9a-f]*}}) to 'NSString' (0x{{[0-9a-f]*}}).
   // CHECK: stderr>>> OK: saw expected "crashed: sigabrt"
   // CHECK: [       OK ] BridgedCastFolding.NSNumber (Int) -> String. Crashing test.
 
@@ -186,12 +186,12 @@ Tests.test("NSArray (String) -> Swift Array (Int). Crashing.") {
   }
 
   // CHECK-LABEL: [ RUN      ] BridgedCastFolding.NSArray (String) -> Swift Array (Int). Crashing.
-  // CHECK: stderr>>> Could not cast value of type '__NSCFString' (0x{{[0-9a-f]*}}) to 'NSNumber' (0x{{[0-9a-f]*}}).
+  // CHECK: stderr>>> Could not cast value of type '{{.*}}' (0x{{[0-9a-f]*}}) to 'NSNumber' (0x{{[0-9a-f]*}}).
   // CHECK: stderr>>> OK: saw expected "crashed: sigabrt"
   // CHECK: [       OK ] BridgedCastFolding.NSArray (String) -> Swift Array (Int). Crashing.
 
   // CHECK-OPT-LABEL: [ RUN      ] BridgedCastFolding.NSArray (String) -> Swift Array (Int). Crashing.
-  // CHECK-OPT: stderr>>> Could not cast value of type '__NSCFString' (0x{{[0-9a-f]*}}) to 'NSNumber' (0x{{[0-9a-f]*}}).
+  // CHECK-OPT: stderr>>> Could not cast value of type '{{.*}}' (0x{{[0-9a-f]*}}) to 'NSNumber' (0x{{[0-9a-f]*}}).
   // CHECK-OPT: stderr>>> OK: saw expected "crashed: sigabrt"
   // CHECK-OPT: [       OK ] BridgedCastFolding.NSArray (String) -> Swift Array (Int). Crashing.
   expectCrashLater()
@@ -208,11 +208,11 @@ Tests.test("NSArray (String) -> Swift Array (Double). Crashing.") {
   }
 
   // CHECK-LABEL: [ RUN      ] BridgedCastFolding.NSArray (String) -> Swift Array (Double). Crashing.
-  // CHECK: stderr>>> Could not cast value of type '__NSCFString' (0x{{[0-9a-f]*}}) to 'NSNumber' (0x{{[0-9a-f]*}}).
+  // CHECK: stderr>>> Could not cast value of type '{{.*}}' (0x{{[0-9a-f]*}}) to 'NSNumber' (0x{{[0-9a-f]*}}).
   // CHECK: stderr>>> OK: saw expected "crashed: sigabrt"
   // CHECK: [       OK ] BridgedCastFolding.NSArray (String) -> Swift Array (Double). Crashing.
   // CHECK-OPT-LABEL: [ RUN      ] BridgedCastFolding.NSArray (String) -> Swift Array (Double). Crashing.
-  // CHECK-OPT: stderr>>> Could not cast value of type '__NSCFString' (0x{{[0-9a-f]*}}) to 'NSNumber' (0x{{[0-9a-f]*}}).
+  // CHECK-OPT: stderr>>> Could not cast value of type '{{.*}}' (0x{{[0-9a-f]*}}) to 'NSNumber' (0x{{[0-9a-f]*}}).
   // CHECK-OPT: stderr>>> OK: saw expected "crashed: sigabrt"
   // CHECK-OPT: [       OK ] BridgedCastFolding.NSArray (String) -> Swift Array (Double). Crashing.
   expectCrashLater()
@@ -229,12 +229,12 @@ Tests.test("NSArray (Int) -> Swift Array (String). Crashing.") {
   }
 
   // CHECK-LABEL: [ RUN      ] BridgedCastFolding.NSArray (Int) -> Swift Array (String). Crashing.
-  // CHECK: stderr>>> Could not cast value of type '__NSCFNumber' (0x{{[0-9a-f]*}}) to 'NSString' (0x{{[0-9a-f]*}}).
+  // CHECK: stderr>>> Could not cast value of type '{{.*}}' (0x{{[0-9a-f]*}}) to 'NSString' (0x{{[0-9a-f]*}}).
   // CHECK: stderr>>> OK: saw expected "crashed: sigabrt"
   // CHECK: [       OK ] BridgedCastFolding.NSArray (Int) -> Swift Array (String). Crashing.
 
   // CHECK-OPT-LABEL: [ RUN      ] BridgedCastFolding.NSArray (Int) -> Swift Array (String). Crashing.
-  // CHECK-OPT: stderr>>> Could not cast value of type '__NSCFNumber' (0x{{[0-9a-f]*}}) to 'NSString' (0x{{[0-9a-f]*}}).
+  // CHECK-OPT: stderr>>> Could not cast value of type '{{.*}}' (0x{{[0-9a-f]*}}) to 'NSString' (0x{{[0-9a-f]*}}).
   // CHECK-OPT: stderr>>> OK: saw expected "crashed: sigabrt"
   // CHECK-OPT: [       OK ] BridgedCastFolding.NSArray (Int) -> Swift Array (String). Crashing.
   expectCrashLater()
@@ -384,7 +384,7 @@ Tests.test("String -> NSNumber. Crashing Test Case") {
   }
 
   // CHECK-LABEL: [ RUN      ] BridgedCastFolding.String -> NSNumber. Crashing Test Case
-  // CHECK: stderr>>> Could not cast value of type '__NSCFString' (0x{{[0-9a-f]*}}) to 'NSNumber' (0x{{[0-9a-f]*}}).
+  // CHECK: stderr>>> Could not cast value of type '{{.*}}' (0x{{[0-9a-f]*}}) to 'NSNumber' (0x{{[0-9a-f]*}}).
   // CHECK: stderr>>> OK: saw expected "crashed: sigabrt"
   // CHECK: [       OK ] BridgedCastFolding.String -> NSNumber. Crashing Test Case
 
