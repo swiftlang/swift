@@ -49,6 +49,8 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
   llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
   SearchPathOpts.RuntimeLibraryPath = LibPath.str();
 
+  // Set up the import paths containing the swiftmodules for the libraries in
+  // RuntimeLibraryPath.
   SearchPathOpts.RuntimeLibraryImportPaths.clear();
 
   // If this is set, we don't want any runtime import paths.
@@ -58,6 +60,12 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
   if (!Triple.isOSDarwin())
     llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
   SearchPathOpts.RuntimeLibraryImportPaths.push_back(LibPath.str());
+
+  if (!SearchPathOpts.SDKPath.empty()) {
+    LibPath = SearchPathOpts.SDKPath;
+    llvm::sys::path::append(LibPath, "usr", "lib", "swift");
+    SearchPathOpts.RuntimeLibraryImportPaths.push_back(LibPath.str());
+  }
 }
 
 void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
