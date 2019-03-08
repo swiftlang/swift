@@ -590,10 +590,8 @@ bool ASTScope::addChild(ASTScope *const child) const {
 
 void ASTScope::addNextGenericParamOrWhereAndBody(Decl *const decl) const {
   if (auto child = createIfNeeded(this, decl)) {
-    if (child->getKind() != ASTScopeKind::GenericParams) {
-      assert(child->getKind() == ASTScopeKind::TypeOrExtensionBody &&
-             "unexpected scope kind");
-      if (NominalTypeDecl *n = dyn_cast<NominalTypeDecl>(decl))
+    if (child->getKind() == ASTScopeKind::TypeOrExtensionBody) {
+      if (auto *n = dyn_cast<NominalTypeDecl>(decl))
         addNominalOrExtensionWhereClause(n);
     }
     addChild(child);
