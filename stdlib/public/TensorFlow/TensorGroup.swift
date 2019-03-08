@@ -16,11 +16,11 @@
 
 import CTensorFlow
 
-/// A protocol for types that can be mapped to Array<CTensorHandle>.
+/// A protocol representing types that can be mapped to `Array<CTensorHandle>`.
 ///
-/// This protocol is divided from TensorGroup in order for the number of
-/// tensors to be determined at runtime.  For example, Array<Tensor<Float>> may
-/// have an unknown number of elements compile time.
+/// This protocol is defined separately from `TensorGroup` in order for the
+/// number of tensors to be determined at runtime. For example,
+/// `[Tensor<Float>]` may have an unknown number of elements at compile time.
 public protocol TensorArrayProtocol {
   /// Writes the tensor handles to `address`, which must be allocated
   /// with enough capacity to hold `_tensorHandleCount` handles. The tensor
@@ -31,17 +31,21 @@ public protocol TensorArrayProtocol {
   var _tensorHandleCount: Int32 { get }
 }
 
-/// A protocol for types that can be mapped to and from Array<CTensorHandle>.
-/// When a TensorGroup is used as an argument, it gets passed to the
-/// tensor operation as an argument list whose elements are the tensor fields of
-/// the type.  When a TensorGroup is used as a result, it gets initialized
-/// with its tensor fields set to the tensor operation's tensor results.
+/// A protocol representing types that can be mapped to and from
+/// `Array<CTensorHandle>`.
+///
+/// When a `TensorGroup` is used as an argument to a tensor operation, it is
+/// passed as an argument list whose elements are the tensor fields of the type.
+///
+/// When a `TensorGroup` is returned as a result of a tensor operation, it is
+/// initialized with its tensor fields set to the tensor operation's tensor
+/// results.
 public protocol TensorGroup : TensorArrayProtocol {
   /// The types of the tensor stored properties in this type.
   static var _typeList: [TensorDataType] { get }
 
   /// Initializes a value of this type, taking ownership of the
-  /// `_tensorHandleCount` tensors that are at `tensorHandles`.
+  /// `_tensorHandleCount` tensors starting at address `tensorHandles`.
   init(_owning tensorHandles: UnsafePointer<CTensorHandle>?)
 }
 
@@ -145,7 +149,7 @@ extension Tensor : TensorGroup {
   }
 }
 
-extension TensorElementLiteral : TensorGroup {
+extension _TensorElementLiteral : TensorGroup {
   @inlinable
   public static var _unknownShapeList: [TensorShape?] {
     return [nil]

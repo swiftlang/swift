@@ -80,6 +80,9 @@ ShapedArrayTests.test("ElementMutation") {
     tensor[0][0][scalarIndex] = ShapedArraySlice<Int>(scalarIndex - 5)
   }
   expectEqual(Array(-5..<10) + Array(15..<60), tensor.scalars)
+
+  tensor[0][1][1].scalar = 100
+  expectEqual(100, tensor[0][1][1].scalar)
 }
 
 ShapedArrayTests.test("ScalarMutation") {

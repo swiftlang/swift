@@ -154,9 +154,9 @@ let PyInt_AsUnsignedLongMask: @convention(c) (PyObjectPointer) -> UInt =
     name: "PyLong_AsUnsignedLongMask",
     legacyName: "PyInt_AsUnsignedLongMask")
 
-let PyInt_FromSize_t: @convention(c) (Int) -> PyObjectPointer =
+let PyInt_FromSize_t: @convention(c) (UInt) -> PyObjectPointer =
   PythonLibrary.loadSymbol(
-    name: "PyInt_FromLong",
+    name: "PyLong_FromUnsignedLong",
     legacyName: "PyInt_FromSize_t")
 
 let PyString_AsString: @convention(c) (PyObjectPointer) -> PyCCharPointer? =

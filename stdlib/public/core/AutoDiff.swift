@@ -71,7 +71,7 @@ public protocol __Differentiable {
   /// The type of all differentiable variables in this type.
   associatedtype AllDifferentiableVariables : Differentiable
 
-  /// All differentiable variables in this type.
+  /// All differentiable variables of this value.
   var allDifferentiableVariables: AllDifferentiableVariables { get set }
 
   /// Returns `self` moved along the value space towards the given tangent
@@ -96,6 +96,9 @@ public protocol _Differentiable : __Differentiable
 
 /// A type that mathematically represents a differentiable manifold whose
 /// tangent spaces are finite-dimensional.
+// BEGIN DIFFERENTIABLE
+// - Note: these marks are identified during API doc generation and the
+//   contents are replaced with the ideal `Differentiable` protocol design.
 public protocol Differentiable : _Differentiable
   where TangentVector.TangentVector == TangentVector,
         TangentVector.CotangentVector == CotangentVector,
@@ -106,6 +109,7 @@ public protocol Differentiable : _Differentiable
         AllDifferentiableVariables.TangentVector == TangentVector,
         AllDifferentiableVariables.CotangentVector == CotangentVector {
 }
+// END DIFFERENTIABLE
 
 public extension Differentiable where AllDifferentiableVariables == Self {
   var allDifferentiableVariables: AllDifferentiableVariables {
@@ -170,6 +174,39 @@ public func differentiableFunction<T, U, R>(
   return original
 }
 
+public extension Differentiable {
+  @differentiable(wrt: self, vjp: _vjpWithGrad)
+  func withGradient(_ body: @escaping (inout CotangentVector) -> Void) -> Self {
+    return self
+  }
+
+  @inlinable
+  internal func _vjpWithGrad(
+    _ body: @escaping (inout CotangentVector) -> Void
+  ) -> (Self, (CotangentVector) -> CotangentVector) {
+    return (self, { grad in
+      var grad = grad
+      body(&grad)
+      return grad
+    })
+  }
+
+  @differentiable(wrt: self, vjp: _vjpWithGrad)
+  func withGradient(_ body: @escaping (CotangentVector) -> Void) -> Self {
+    return self
+  }
+
+  @inlinable
+  internal func _vjpWithGrad(
+    _ body: @escaping (CotangentVector) -> Void
+  ) -> (Self, (CotangentVector) -> CotangentVector) {
+    return (self, { grad in
+      body(grad)
+      return grad
+    })
+  }
+}
+
 /// Make a function be recomputed in its pullback, known as "checkpointing" in
 /// traditional automatic differentiation.
 @inlinable
@@ -190,7 +227,7 @@ public extension Differentiable {
     return body(self)
   }
 
-  @usableFromInline
+  @inlinable
   internal func _vjp_withRecomputationInPullbacks<Result : Differentiable>(
     _ body: @escaping @differentiable (Self) -> Result
   ) -> (Result, (Result.CotangentVector) -> CotangentVector) {

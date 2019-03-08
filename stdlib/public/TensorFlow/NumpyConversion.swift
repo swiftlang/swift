@@ -29,6 +29,12 @@ private func debugLogNumpyError(_ message: String) {
 
 extension ShapedArray : ConvertibleFromNumpyArray
   where Scalar : NumpyScalarCompatible {
+  /// Creates a `ShapedArray` with the same shape and scalars as the specified
+  /// `numpy.ndarray` instance.
+  ///
+  /// - Parameter numpyArray: The `numpy.ndarray` instance to convert.
+  /// - Precondition: The `numpy` Python package must be installed.
+  /// - Precondition: `numpyArray` must have a compatible scalar `dtype`.
   public init?(numpy numpyArray: PythonObject) {
     // Check if input is a `numpy.ndarray` instance.
     guard Python.isinstance(numpyArray, np.ndarray) == true else {
@@ -87,6 +93,13 @@ extension ShapedArray : ConvertibleFromNumpyArray
 
 extension Tensor : ConvertibleFromNumpyArray
   where Scalar : NumpyScalarCompatible {
+  /// Creates a tensor with the same shape and scalars as the specified
+  /// `numpy.ndarray` instance.
+  ///
+  /// - Parameter numpyArray: The `numpy.ndarray` instance to convert.
+  /// - Precondition: The `numpy` Python package must be installed.
+  /// - Returns: `numpyArray` converted to an `Array`. Returns `nil` if
+  ///   `numpyArray` does not have a compatible scalar `dtype`.
   public init?(numpy numpyArray: PythonObject) {
     // Check if input is a `numpy.ndarray` instance.
     guard Python.isinstance(numpyArray, np.ndarray) == true else {
@@ -134,16 +147,21 @@ extension Tensor : ConvertibleFromNumpyArray
 }
 
 extension ShapedArray where Scalar : NumpyScalarCompatible {
-  /// Creates a NumPy array with the same elements.
+  /// Creates a `numpy.ndarray` instance with the same shape and scalars as
+  /// this `ShapedArray`.
   ///
-  /// - Precondition: The `numpy` Python package must have been installed.
+  /// - Precondition: The `numpy` Python package must be installed.
   public func makeNumpyArray() -> PythonObject {
     return scalars.makeNumpyArray().reshape(shape)
   }
 }
 
 extension Tensor where Scalar : NumpyScalarCompatible {
+  /// Creates a `numpy.ndarray` instance with the same shape and scalars as
+  /// this tensor.
+  ///
+  /// - Precondition: The `numpy` Python package must be installed.
   public func makeNumpyArray() -> PythonObject { return array.makeNumpyArray() }
 }
 
-#endif
+#endif // canImport(Python)

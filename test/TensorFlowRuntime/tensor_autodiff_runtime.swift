@@ -36,6 +36,13 @@ TensorADTests.testAllBackends("TestScalarGenericGrad") {
   expectEqual(Tensor(-1), gradient(at: Tensor([0.1, 0.2, 0.3]), in: negate))
 }
 
+TensorADTests.testAllBackends("TestScalarized") {
+  let grad = gradient(at: Tensor<Float>([3.0, 4.0])) { x in
+    logSoftmax(x).mean().scalarized()
+  }
+  expectEqual(Tensor([0.23105857, -0.2310586]), grad)
+}
+
 TensorADTests.testAllBackends("+") {
   let f = { (a: Tensor<Float>, b: Tensor<Float>) in a + b }
   expectTrue((Tensor(1), Tensor(1)) == gradient(at: Tensor(0), Tensor(0), in: f))

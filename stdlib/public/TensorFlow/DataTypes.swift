@@ -21,11 +21,11 @@
 
 import CTensorFlow
 
-/// A TensorFlow dynamic type value. Can be created from types that conform to
-/// `TensorFlowScalar`.
-// This simply wraps TF_DataTypes, which allows user code to handle TF_DataTypes
-// without importing CTensorFlow, which would import a bunch of distracting
-// declarations from the TF C API.
+/// A TensorFlow dynamic type value that can be created from types that conform
+/// to `TensorFlowScalar`.
+// This simply wraps a `TF_DataType` and allows user code to handle
+// `TF_DataType` without importing CTensorFlow, which pollutes the namespace
+// with TensorFlow C API declarations.
 @_fixed_layout
 public struct TensorDataType {
   public var _cDataType: TF_DataType
@@ -73,6 +73,11 @@ public typealias TensorFlowNumeric = TensorFlowScalar & Numeric
 public typealias TensorFlowSignedNumeric = TensorFlowScalar & SignedNumeric
 public typealias TensorFlowInteger = TensorFlowScalar & BinaryInteger
 
+/// A floating-point data type that conforms to `Differentiable` and is
+/// compatible with TensorFlow.
+///
+/// - Note: `Tensor` conditionally conforms to `Differentiable` when the
+///   `Scalar` associated type conforms `TensorFlowFloatingPoint`.
 public protocol TensorFlowFloatingPoint :
   TensorFlowScalar & BinaryFloatingPoint & Differentiable
   where Self.RawSignificand: FixedWidthInteger,
