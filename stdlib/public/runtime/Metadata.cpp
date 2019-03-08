@@ -601,11 +601,9 @@ MetadataResponse
 swift::swift_getGenericMetadata(MetadataRequest request,
                                 const void * const *arguments,
                                 const TypeContextDescriptor *description) {
-  auto &generics = description->getFullGenericContextHeader();
-  size_t numGenericArgs = generics.Base.NumKeyArguments;
-
   auto &cache = getCache(*description);
-  assert(numGenericArgs == cache.NumKeyParameters + cache.NumWitnessTables);
+  assert(description->getFullGenericContextHeader().Base.NumKeyArguments ==
+         cache.NumKeyParameters + cache.NumWitnessTables);
   auto key = MetadataCacheKey(cache.NumKeyParameters, cache.NumWitnessTables,
                               arguments);
   auto result = cache.getOrInsert(key, request, description, arguments);
