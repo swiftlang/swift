@@ -484,11 +484,6 @@ enum class OperatorKind {
   Infix,
 };
 
-/// Mangle an identifier using Swift's mangling rules.
-void mangleIdentifier(const char *data, size_t length,
-                      OperatorKind operatorKind, std::string &out,
-                      bool usePunycode = true);
-
 /// Remangle a demangled parse tree.
 std::string mangleNode(NodePointer root);
 

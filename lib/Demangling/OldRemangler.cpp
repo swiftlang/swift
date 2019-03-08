@@ -116,15 +116,6 @@ static void mangleIdentifier(StringRef ident, OperatorKind operatorKind,
   }
 }
 
-void Demangle::mangleIdentifier(const char *data, size_t length,
-                                OperatorKind operatorKind,
-                                std::string &out, bool usePunycode) {
-  DemanglerPrinter printer;
-  ::mangleIdentifier(StringRef(data, length), operatorKind,
-                     usePunycode, printer);
-  out = std::move(printer).str();
-}
-
 namespace {
   struct DeepHasher {
     size_t value = 0;
