@@ -200,9 +200,9 @@ class ASTScope {
     /// \c kind == ASTScopeKind::ExtensionGenericParams.
     ExtensionDecl *extension;
     
-    /// The where clause, for
+    /// The declaration, for
     /// \c kind == ASTScopeKind::NominalOrExtensionWhereClause
-    const TrailingWhereClause *whereClause;
+    llvm::PointerUnion<NominalTypeDecl*, ExtensionDecl*> nominalOrExtensionDecl;
 
     /// An iterable declaration context, which covers nominal type declarations
     /// and extension bodies.
@@ -474,9 +474,11 @@ class ASTScope {
     this->topLevelCode = topLevelCode;
   }
   
-  ASTScope(const ASTScope *parent, const TrailingWhereClause *const whereClause)
+  ASTScope(
+    const ASTScope *parent,
+    llvm::PointerUnion<NominalTypeDecl*, ExtensionDecl*> nominalOrExtensionDecl)
   : ASTScope(ASTScopeKind::NominalOrExtensionWhereClause, parent) {
-    this->whereClause = whereClause;
+    this->nominalOrExtensionDecl = nominalOrExtensionDecl;
   }
 
   ~ASTScope();
@@ -503,7 +505,8 @@ class ASTScope {
   
   /// If a where clause is present, create a \c NominalOrExtensionWhereClause scope and
   /// add it as a child of the receiver.
-  void addNominalOrExtensionWhereClause(const GenericContext *) const;
+  void addNominalOrExtensionWhereClause(
+         llvm::PointerUnion<NominalTypeDecl*, ExtensionDecl*>) const;
 
   /// Determine whether the given scope has already been completely expanded,
   /// and cannot create any new children.
@@ -539,8 +542,9 @@ class ASTScope {
   /// Create a new AST scope if one is needed for the where clause.
   ///
   /// \returns the newly-created AST scope, or \c null if there is no scope
-  static ASTScope *createIfNeeded(const ASTScope *parent,
-                                  const TrailingWhereClause*);
+  static ASTScope *createIfNeeded(
+                     const ASTScope *parent,
+                     llvm::PointerUnion<NominalTypeDecl*, ExtensionDecl*>);
 
   /// Determine whether this scope can steal a continuation from its parent,
   /// because (e.g.) it introduces some name binding that should be visible
@@ -563,7 +567,15 @@ class ASTScope {
 
   /// Retrieve the source file in which this scope exists.
   SourceFile &getSourceFile() const;
-
+  
+  /// Retrieve the \c TrailingWhereClause, if any
+  static TrailingWhereClause* getTrailingWhereClause(
+           llvm::PointerUnion<NominalTypeDecl*, ExtensionDecl*>);
+  
+  /// Retrieve the \c SelfBounds decls when
+  /// \c getKind() == ASTScopeKind::NominalOrExtensionScope
+  llvm::TinyPtrVector<NominalTypeDecl *> getSelfBoundsDecls() const;
+ 
 public:
   /// Create the AST scope for a source file, which is the root of the scope
   /// tree.

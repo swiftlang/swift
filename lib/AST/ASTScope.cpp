@@ -22,6 +22,8 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
@@ -228,7 +230,7 @@ void ASTScope::expand() const {
   case ASTScopeKind::ExtensionGenericParams: {
     // Since an extension always has an ExtensionGenericParams scope,
     // create the NominalOrExtensionWhereClause here for an extension.
-    addNominalOrExtensionWhereClause(cast<GenericContext>(extension));
+    addNominalOrExtensionWhereClause(extension);
 
     // Create a child node.
     if (ASTScope *child = createIfNeeded(this, extension))
@@ -593,17 +595,17 @@ void ASTScope::addNextGenericParamOrWhereAndBody(Decl *const decl) const {
     if (child->getKind() != ASTScopeKind::GenericParams) {
       assert(child->getKind() == ASTScopeKind::TypeOrExtensionBody &&
              "unexpected scope kind");
-      if (const auto *gc = dyn_cast<GenericContext>(decl))
-        addNominalOrExtensionWhereClause(gc);
+      if (NominalTypeDecl *n = dyn_cast<NominalTypeDecl>(decl))
+        addNominalOrExtensionWhereClause(n);
     }
     addChild(child);
   }
 }
 
 void ASTScope::addNominalOrExtensionWhereClause(
-                 const GenericContext *const whereContext) const {
-  if (ASTScope *child = createIfNeeded(this,
-                                       extension->getTrailingWhereClause()))
+       llvm::PointerUnion<NominalTypeDecl*, ExtensionDecl*> nominalOrExtension
+     ) const {
+  if (ASTScope *child = createIfNeeded(this, nominalOrExtension))
     addChild(child);
 }
 
@@ -1204,10 +1206,10 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, ASTNode node) {
 
 ASTScope *ASTScope::createIfNeeded(
                       const ASTScope *parent,
-                      const TrailingWhereClause *const whereClause) {
-  return !whereClause
+                      llvm::PointerUnion<NominalTypeDecl*, ExtensionDecl*> nominalOrExtensionDecl) {
+  return !getTrailingWhereClause(nominalOrExtensionDecl)
     ? nullptr
-  : new (parent->getASTContext()) ASTScope(parent, whereClause);
+    : new (parent->getASTContext()) ASTScope(parent, nominalOrExtensionDecl);
 }
 
 bool ASTScope::canStealContinuation() const {
@@ -1382,6 +1384,24 @@ const ASTScope *ASTScope::getSourceFileScope() const {
   return result;
 }
 
+TrailingWhereClause* ASTScope::getTrailingWhereClause(
+  llvm::PointerUnion<NominalTypeDecl*, ExtensionDecl*> nominalOrExtensionDecl) {
+  if (auto *nominal = nominalOrExtensionDecl.dyn_cast<NominalTypeDecl*>())
+    return nominal->getTrailingWhereClause();
+  if (auto *extension = nominalOrExtensionDecl.get<ExtensionDecl*>())
+    return extension->getTrailingWhereClause();
+  return nullptr;
+}
+
+llvm::TinyPtrVector<NominalTypeDecl *> ASTScope::getSelfBoundsDecls() const {
+  llvm::PointerUnion<TypeDecl*, ExtensionDecl*> tOrE;
+  if (auto *nominal = nominalOrExtensionDecl.dyn_cast<NominalTypeDecl*>())
+    tOrE = cast<TypeDecl>(nominal);
+  else
+    tOrE = nominalOrExtensionDecl.get<ExtensionDecl*>();
+  return getSelfBoundsFromWhereClause(tOrE).decls;
+}
+
 SourceFile &ASTScope::getSourceFile() const {
   return *getSourceFileScope()->sourceFile.file;
 }
@@ -1425,7 +1445,7 @@ SourceRange ASTScope::getSourceRangeImpl() const {
   }
       
    case ASTScopeKind::NominalOrExtensionWhereClause:
-    return whereClause->getSourceRange();
+    return getTrailingWhereClause(nominalOrExtensionDecl)->getSourceRange();
       
   case ASTScopeKind::TypeOrExtensionBody:
     if (auto ext = dyn_cast<ExtensionDecl>(iterableDeclContext))
@@ -1818,11 +1838,8 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
     break;
       
   case ASTScopeKind::NominalOrExtensionWhereClause:
-    for (const auto &requirementRepr: whereClause->getRequirements()) {
-      auto *const nominal = requirementRepr.getSubject()->getAnyNominal();
-      assert(nominal && "where must bind a member type or an associated type");
-      result.push_back(nominal);
-    }
+      for (NominalTypeDecl *n: getSelfBoundsDecls())
+        result.push_back(n);
     break;
 
   case ASTScopeKind::AbstractFunctionParams:
@@ -1969,10 +1986,9 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
       
     case ASTScopeKind::NominalOrExtensionWhereClause:
     printScopeKind("NominalOrExtensionWhereClause");
-    printAddress(whereClause);
-    out << " where: '";
-    interleave(whereClause->getRequirements(),
-               [&](const RequirementRepr &req) { req.print(out); },
+    out << " binding: '";
+    interleave(getSelfBoundsDecls(),
+               [&](NominalTypeDecl *n) { n->print(out); },
                [&]() { out << ", "; }
     );
     out << "'\n";
