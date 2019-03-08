@@ -195,6 +195,10 @@ option(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES
        "Generate .swiftinterface files alongside .swiftmodule files"
        TRUE)
 
+option(SWIFT_STDLIB_ENABLE_SIB_TARGETS
+       "Should we generate sib targets for the stdlib or not?"
+       FALSE)
+
 #
 # User-configurable Android specific options.
 #
