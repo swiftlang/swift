@@ -15,9 +15,9 @@ import Accelerate
 // MARK: Quadrature
 
 @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-/// A class that approximates the definite integral of a function over a finite interval.
+/// A structure that approximates the definite integral of a function over a finite interval.
 ///
-/// The following code is an example of using a `Quadrature` instance to calculate the
+/// The following code is an example of using a `Quadrature` structure to calculate the
 /// area under a curve defined by `y = sqrt(radius * radius - pow(x - radius, 2))`:
 ///
 ///
@@ -38,7 +38,7 @@ import Accelerate
 ///         print("quadrature error:", error.errorDescription)
 ///     }
 ///
-public class Quadrature {
+public struct Quadrature {
     
     private var integrateOptions = quadrature_integrate_options()
 
@@ -92,7 +92,7 @@ public class Quadrature {
     /// - Parameter interval: The lower and upper bounds of the integration interval.
     /// - Parameter integrand: The function to integrate. The input value is `x` that's within the interval over which the integrand is being integrated, and the output value is the corresponding value `y = integrand(x)` at those points.
     public func integrate(over interval: ClosedRange<Double>,
-                          integrand: @escaping (Double) -> Double) ->
+                          integrand: (Double) -> Double) ->
         Result<(integralResult: Double, estimatedAbsoluteError: Double), Error> {
             
             var status = QUADRATURE_SUCCESS
@@ -101,35 +101,37 @@ public class Quadrature {
             
             var callback: quadrature_integrate_function!
             
-            withUnsafePointer(to: integrand) {
-                let integrandPointer = UnsafeMutableRawPointer(mutating: $0)
-                
-                callback = quadrature_integrate_function(
-                    fun: { (arg: UnsafeMutableRawPointer?,
-                        n: Int,
-                        x: UnsafePointer<Double>,
-                        y: UnsafeMutablePointer<Double>
-                        ) in
-                        
-                        guard let integrand = arg?.load(as: ((Double) -> Double).self) else {
-                            return
-                        }
-                        
-                        (0 ..< n).forEach { i in
-                            y[i] = integrand(x[i])
-                        }
-                },
-                    fun_arg: integrandPointer)
-                
-                withUnsafePointer(to: integrateOptions) { options in
-                    result = quadrature_integrate(&callback,
-                                                  interval.lowerBound,
-                                                  interval.upperBound,
-                                                  options,
-                                                  &status,
-                                                  &estimatedAbsoluteError,
-                                                  0,
-                                                  nil)
+            withoutActuallyEscaping(integrand) {escapableIntegrand in
+                withUnsafePointer(to: escapableIntegrand) {
+                    let integrandPointer = UnsafeMutableRawPointer(mutating: $0)
+                    
+                    callback = quadrature_integrate_function(
+                        fun: { (arg: UnsafeMutableRawPointer?,
+                                n: Int,
+                                x: UnsafePointer<Double>,
+                                y: UnsafeMutablePointer<Double>
+                                ) in
+                            
+                            guard let integrand = arg?.load(as: ((Double) -> Double).self) else {
+                                return
+                            }
+                            
+                            (0 ..< n).forEach { i in
+                                y[i] = integrand(x[i])
+                            }
+                    },
+                        fun_arg: integrandPointer)
+                    
+                    withUnsafePointer(to: self.integrateOptions) { options in
+                        result = quadrature_integrate(&callback,
+                                                      interval.lowerBound,
+                                                      interval.upperBound,
+                                                      options,
+                                                      &status,
+                                                      &estimatedAbsoluteError,
+                                                      0,
+                                                      nil)
+                    }
                 }
             }
             

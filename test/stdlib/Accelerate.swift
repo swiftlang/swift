@@ -258,7 +258,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     }
     
     AccelerateTests.test("Quadrature/ToleranceProperties") {
-        let quadrature = Quadrature(integrator: .qng, absoluteTolerance: 1, relativeTolerance: 2)
+        var quadrature = Quadrature(integrator: .qng,
+                                    absoluteTolerance: 1,
+                                    relativeTolerance: 2)
         
         expectEqual(quadrature.absoluteTolerance, 1)
         expectEqual(quadrature.relativeTolerance, 2)
