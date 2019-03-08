@@ -202,7 +202,7 @@ class ASTScope {
     
     /// The declaration, for
     /// \c kind == ASTScopeKind::NominalOrExtensionWhereClause
-    llvm::PointerUnion<NominalTypeDecl*, ExtensionDecl*> nominalOrExtensionDecl;
+    llvm::PointerUnion<NominalTypeDecl*, ExtensionDecl*> whereDeclContext;
 
     /// An iterable declaration context, which covers nominal type declarations
     /// and extension bodies.
@@ -476,9 +476,9 @@ class ASTScope {
   
   ASTScope(
     const ASTScope *parent,
-    llvm::PointerUnion<NominalTypeDecl*, ExtensionDecl*> nominalOrExtensionDecl)
+    llvm::PointerUnion<NominalTypeDecl*, ExtensionDecl*> whereDeclContext)
   : ASTScope(ASTScopeKind::NominalOrExtensionWhereClause, parent) {
-    this->nominalOrExtensionDecl = nominalOrExtensionDecl;
+    this->whereDeclContext = whereDeclContext;
   }
 
   ~ASTScope();
@@ -571,10 +571,6 @@ class ASTScope {
   /// Retrieve the \c TrailingWhereClause, if any
   static TrailingWhereClause* getTrailingWhereClause(
            llvm::PointerUnion<NominalTypeDecl*, ExtensionDecl*>);
-  
-  /// Retrieve the \c SelfBounds decls when
-  /// \c getKind() == ASTScopeKind::NominalOrExtensionScope
-  llvm::TinyPtrVector<NominalTypeDecl *> getSelfBoundsDecls() const;
  
 public:
   /// Create the AST scope for a source file, which is the root of the scope

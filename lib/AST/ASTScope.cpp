@@ -22,8 +22,6 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/NameLookup.h"
-#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
@@ -1206,10 +1204,10 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, ASTNode node) {
 
 ASTScope *ASTScope::createIfNeeded(
                       const ASTScope *parent,
-                      llvm::PointerUnion<NominalTypeDecl*, ExtensionDecl*> nominalOrExtensionDecl) {
-  return !getTrailingWhereClause(nominalOrExtensionDecl)
+                      llvm::PointerUnion<NominalTypeDecl*, ExtensionDecl*> whereDeclContext) {
+  return !getTrailingWhereClause(whereDeclContext)
     ? nullptr
-    : new (parent->getASTContext()) ASTScope(parent, nominalOrExtensionDecl);
+    : new (parent->getASTContext()) ASTScope(parent, whereDeclContext);
 }
 
 bool ASTScope::canStealContinuation() const {
@@ -1385,21 +1383,12 @@ const ASTScope *ASTScope::getSourceFileScope() const {
 }
 
 TrailingWhereClause* ASTScope::getTrailingWhereClause(
-  llvm::PointerUnion<NominalTypeDecl*, ExtensionDecl*> nominalOrExtensionDecl) {
-  if (auto *nominal = nominalOrExtensionDecl.dyn_cast<NominalTypeDecl*>())
+  llvm::PointerUnion<NominalTypeDecl*, ExtensionDecl*> whereDeclContext) {
+  if (auto *nominal = whereDeclContext.dyn_cast<NominalTypeDecl*>())
     return nominal->getTrailingWhereClause();
-  if (auto *extension = nominalOrExtensionDecl.get<ExtensionDecl*>())
+  if (auto *extension = whereDeclContext.get<ExtensionDecl*>())
     return extension->getTrailingWhereClause();
   return nullptr;
-}
-
-llvm::TinyPtrVector<NominalTypeDecl *> ASTScope::getSelfBoundsDecls() const {
-  llvm::PointerUnion<TypeDecl*, ExtensionDecl*> tOrE;
-  if (auto *nominal = nominalOrExtensionDecl.dyn_cast<NominalTypeDecl*>())
-    tOrE = cast<TypeDecl>(nominal);
-  else
-    tOrE = nominalOrExtensionDecl.get<ExtensionDecl*>();
-  return getSelfBoundsFromWhereClause(tOrE).decls;
 }
 
 SourceFile &ASTScope::getSourceFile() const {
@@ -1445,7 +1434,7 @@ SourceRange ASTScope::getSourceRangeImpl() const {
   }
       
    case ASTScopeKind::NominalOrExtensionWhereClause:
-    return getTrailingWhereClause(nominalOrExtensionDecl)->getSourceRange();
+    return getTrailingWhereClause(whereDeclContext)->getSourceRange();
       
   case ASTScopeKind::TypeOrExtensionBody:
     if (auto ext = dyn_cast<ExtensionDecl>(iterableDeclContext))
@@ -1837,11 +1826,26 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
     result.push_back(genericParams.params->getParams()[genericParams.index]);
     break;
       
-  case ASTScopeKind::NominalOrExtensionWhereClause:
-      for (NominalTypeDecl *n: getSelfBoundsDecls())
-        result.push_back(n);
+  case ASTScopeKind::NominalOrExtensionWhereClause: {
+    NominalTypeDecl *baseNominal = whereDeclContext.is<NominalTypeDecl*>()
+    ? whereDeclContext.get<NominalTypeDecl*>()
+    : whereDeclContext.get<ExtensionDecl*>()->getExtendedNominal();
+   if (auto *pd = dyn_cast<ProtocolDecl>(baseNominal))
+     for (auto *atm: pd->getAssociatedTypeMembers())
+       result.push_back(atm);
+   else {
+     GenericParamList *gps = whereDeclContext.is<NominalTypeDecl*>()
+     ? whereDeclContext.get<NominalTypeDecl*>()->getGenericParams()
+     : whereDeclContext.get<ExtensionDecl*>()->getGenericParams();
+      for (GenericTypeParamDecl* gp: *gps)
+          result.push_back(gp);
+    }
+    }
     break;
 
+      
+      
+      
   case ASTScopeKind::AbstractFunctionParams:
     result.push_back(
       getParameter(abstractFunctionParams.decl,
@@ -1987,8 +1991,8 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
     case ASTScopeKind::NominalOrExtensionWhereClause:
     printScopeKind("NominalOrExtensionWhereClause");
     out << " binding: '";
-    interleave(getSelfBoundsDecls(),
-               [&](NominalTypeDecl *n) { n->print(out); },
+    interleave(getLocalBindings(),
+               [&](ValueDecl *v) { v->print(out); },
                [&]() { out << ", "; }
     );
     out << "'\n";

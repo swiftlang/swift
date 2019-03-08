@@ -44,7 +44,6 @@ using namespace swift::namelookup;
 /// name lookup successfully resolved.
 static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
   switch (scope->getKind()) {
-       case ASTScopeKind::NominalOrExtensionWhereClause: abort();
   case ASTScopeKind::Preexpanded:
   case ASTScopeKind::SourceFile:
   case ASTScopeKind::TypeDecl:
@@ -65,6 +64,7 @@ static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
 
   case ASTScopeKind::ExtensionGenericParams:
   case ASTScopeKind::GenericParams:
+  case ASTScopeKind::NominalOrExtensionWhereClause:
     return DeclVisibilityKind::GenericParameter;
 
   case ASTScopeKind::AbstractFunctionParams:
@@ -387,8 +387,8 @@ public:
 
   bool isOutsideBodyOfFunction(const AbstractFunctionDecl *const AFD) const;
 
-  void addGenericParametersHereAndInEnclosingScopes(DeclContext *dc);
-  void addGenericParametersHereAndInEnclosingScopes(GenericParamList *);
+  void addGenericParametersForContext(DeclContext *dc);
+  void addGenericParametersForContext(GenericParamList *);
 
   /// Consume generic parameters
   void addGenericParametersForFunction(AbstractFunctionDecl *AFD);
@@ -970,7 +970,7 @@ void UnqualifiedLookupFactory::finishLookingInContext(
   // corresponding way to qualify a generic parameter.
   // So, look for generics first.
   if (addGenericParameters == AddGenericParameters::Yes)
-    addGenericParametersHereAndInEnclosingScopes(lookupContextForThisContext);
+    addGenericParametersForContext(lookupContextForThisContext);
   
   ifNotDoneYet(
     [&] {
@@ -1052,22 +1052,22 @@ UnqualifiedLookupFactory::getGenericParams(const DeclContext *const dc) {
   return nullptr;
 }
 
-void UnqualifiedLookupFactory::addGenericParametersHereAndInEnclosingScopes(
+void UnqualifiedLookupFactory::addGenericParametersForContext(
     DeclContext *dc) {
   // Generics can be nested, so visit the generic list, innermost first.
   // Cannot use DeclContext::forEachGenericContext because this code breaks out
   // if it finds a match and isFirstResultEnough()
-  addGenericParametersHereAndInEnclosingScopes(getGenericParams(dc));
+  addGenericParametersForContext(getGenericParams(dc));
 }
 
-void UnqualifiedLookupFactory::addGenericParametersHereAndInEnclosingScopes(
+void UnqualifiedLookupFactory::addGenericParametersForContext(
     GenericParamList *dcGenericParams) {
   if (!dcGenericParams)
     return;
   namelookup::FindLocalVal localVal(SM, Loc, Consumer);
   localVal.checkGenericParams(dcGenericParams);
   ifNotDoneYet([&] {
-    addGenericParametersHereAndInEnclosingScopes(
+    addGenericParametersForContext(
         dcGenericParams->getOuterParameters());
   });
 }
