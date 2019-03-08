@@ -10,10 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Accelerate.vecLib
-
-// Top level enum for namespaced vDSP and vForce based functions
-public enum vDSP {}
+import Accelerate
 
 // Array-Oriented Arithmetic and Auxiliary Functions
 
@@ -27,8 +24,8 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func ceiling<U, V>(_ vector: U,
-                              result: inout V)
+    public static func ceil<U, V>(_ vector: U,
+                                  result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -53,8 +50,8 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func ceiling<U, V>(_ vector: U,
-                              result: inout V)
+    public static func ceil<U, V>(_ vector: U,
+                                  result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -82,7 +79,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func floor<U, V>(_ vector: U,
-                            result: inout V)
+                                   result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -108,7 +105,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func floor<U, V>(_ vector: U,
-                            result: inout V)
+                                   result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -136,9 +133,9 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func copySign<T, U, V>(magnitudes: T,
-                                  signs: U,
-                                  result: inout V)
+    public static func copysign<T, U, V>(magnitudes: T,
+                                         signs: U,
+                                         result: inout V)
         where
         T : _ContiguousCollection,
         U : _ContiguousCollection,
@@ -168,9 +165,9 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func copySign<T, U, V>(magnitudes: T,
-                                  signs: U,
-                                  result: inout V)
+    public static func copysign<T, U, V>(magnitudes: T,
+                                         signs: U,
+                                         result: inout V)
         where
         T : _ContiguousCollection,
         U : _ContiguousCollection,
@@ -198,64 +195,72 @@ extension vDSP {
     
     // MARK: Modulus
     
-    /// Calculates the modulus after dividing each element in `numerators` by the corresponding element in `denominators`, single-precision.
+    /// Returns the remainder of the elements in `dividends` divided by the the elements in `divisors` using truncating division.
     ///
-    /// - Parameter numerators: Input numerators.
-    /// - Parameter denominators: Input denominators.
+    /// - Parameter dividends: Input dividends.
+    /// - Parameter divisors: Input divisors.
     /// - Parameter result: Output values.
+    ///
+    /// For each corresponding `a` from `dividends` and `b` from `divisors`, the result `r` satisfies:
+    ///     a = bq + r
+    /// where q is the integer formed by rounding `a/b` towards zero, so `abs(r) < abs(b)` and `r` has the same sign as `a`.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func modulus<T, U, V>(numerators: T,
-                                 denominators: U,
-                                 result: inout V)
+    public static func truncatingRemainder<T, U, V>(dividends: T,
+                                                    divisors: U,
+                                                    result: inout V)
         where
         T : _ContiguousCollection,
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
-            precondition(denominators.count == denominators.count && denominators.count == result.count)
+            precondition(dividends.count == divisors.count && divisors.count == result.count)
             
-            var n = Int32(numerators.count)
+            var n = Int32(result.count)
             
             result.withUnsafeMutableBufferPointer { dest in
-                numerators.withUnsafeBufferPointer { num in
-                    denominators.withUnsafeBufferPointer { denom in
+                dividends.withUnsafeBufferPointer { a in
+                    divisors.withUnsafeBufferPointer { b in
                         vvfmodf(dest.baseAddress!,
-                                num.baseAddress!,
-                                denom.baseAddress!,
+                                a.baseAddress!,
+                                b.baseAddress!,
                                 &n)
                     }
                 }
             }
     }
     
-    /// Calculates the modulus after dividing each element in `numerators` by the corresponding element in `denominators`, double-precision.
+    /// Returns the remainder of the elements in `dividends` divided by the the elements in `divisors` using truncating division.
     ///
-    /// - Parameter numerators: Input numerators.
-    /// - Parameter denominators: Input denominators.
+    /// - Parameter dividends: Input dividends.
+    /// - Parameter divisors: Input divisors.
     /// - Parameter result: Output values.
+    ///
+    /// For each corresponding `a` from `dividends` and `b` from `divisors`, the result `r` satisfies:
+    ///     a = bq + r
+    /// where q is the integer formed by rounding `a/b` towards zero, so `abs(r) < abs(b)` and `r` has the same sign as `a`.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func modulus<T, U, V>(numerators: T,
-                                 denominators: U,
-                                 result: inout V)
+    public static func truncatingRemainder<T, U, V>(dividends: T,
+                                                    divisors: U,
+                                                    result: inout V)
         where
         T : _ContiguousCollection,
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
-            precondition(denominators.count == denominators.count && denominators.count == result.count)
+            precondition(dividends.count == divisors.count && divisors.count == result.count)
             
-            var n = Int32(numerators.count)
+            var n = Int32(result.count)
             
             result.withUnsafeMutableBufferPointer { dest in
-                numerators.withUnsafeBufferPointer { num in
-                    denominators.withUnsafeBufferPointer { denom in
+                dividends.withUnsafeBufferPointer { a in
+                    divisors.withUnsafeBufferPointer { b in
                         vvfmod(dest.baseAddress!,
-                               num.baseAddress!,
-                               denom.baseAddress!,
+                               a.baseAddress!,
+                               b.baseAddress!,
                                &n)
                     }
                 }
@@ -264,64 +269,72 @@ extension vDSP {
     
     // MARK: Remainder
     
-    /// Calculates the remainder after dividing each element in `numerators` by the corresponding element in `denominators`, single-precision.
+    /// Calculates the remainder after dividing each element in `dividends` by the corresponding element in `divisors`, single-precision.
     ///
-    /// - Parameter numerators: Input numerators.
-    /// - Parameter denominators: Input denominators.
+    /// - Parameter dividends: Input dividends.
+    /// - Parameter divisors: Input divisors.
     /// - Parameter result: Output values.
+    ///
+    /// For each corresponding `a` from `dividends` and `b` from `divisors`, the result `r` satisfies:
+    ///     a = bq + r
+    /// where q is `a/b` rounded to the nearest integer, so `abs(r) <= abs(b/2)`.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func remainder<T, U, V>(numerators: T,
-                                   denominators: U,
-                                   result: inout V)
+    public static func remainder<T, U, V>(dividends: T,
+                                          divisors: U,
+                                          result: inout V)
         where
         T : _ContiguousCollection,
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
-            precondition(denominators.count == denominators.count && denominators.count == result.count)
+            precondition(dividends.count == divisors.count && divisors.count == result.count)
             
-            var n = Int32(numerators.count)
+            var n = Int32(result.count)
             
             result.withUnsafeMutableBufferPointer { dest in
-                numerators.withUnsafeBufferPointer { num in
-                    denominators.withUnsafeBufferPointer { denom in
+                dividends.withUnsafeBufferPointer { a in
+                    divisors.withUnsafeBufferPointer { b in
                         vvremainderf(dest.baseAddress!,
-                                     num.baseAddress!,
-                                     denom.baseAddress!,
+                                     a.baseAddress!,
+                                     b.baseAddress!,
                                      &n)
                     }
                 }
             }
     }
     
-    /// Calculates the remainder after dividing each element in `numerators` by the corresponding element in `denominators`, double-precision.
+    /// Calculates the remainder after dividing each element in `dividends` by the corresponding element in `divisors`, double-precision.
     ///
-    /// - Parameter numerators: Input numerators.
-    /// - Parameter denominators: Input denominators.
+    /// - Parameter dividends: Input dividends.
+    /// - Parameter divisors: Input divisors.
     /// - Parameter result: Output values.
+    ///
+    /// For each corresponding `a` from `dividends` and `b` from `divisors`, the result `r` satisfies:
+    ///     a = bq + r
+    /// where q is `a/b` rounded to the nearest integer, so `abs(r) <= abs(b/2)`.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func remainder<T, U, V>(numerators: T,
-                                   denominators: U,
-                                   result: inout V)
+    public static func remainder<T, U, V>(dividends: T,
+                                          divisors: U,
+                                          result: inout V)
         where
         T : _ContiguousCollection,
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
-            precondition(denominators.count == denominators.count && denominators.count == result.count)
+            precondition(dividends.count == divisors.count && divisors.count == result.count)
             
-            var n = Int32(numerators.count)
+            var n = Int32(result.count)
             
             result.withUnsafeMutableBufferPointer { dest in
-                numerators.withUnsafeBufferPointer { num in
-                    denominators.withUnsafeBufferPointer { denom in
+                dividends.withUnsafeBufferPointer { a in
+                    divisors.withUnsafeBufferPointer { b in
                         vvremainder(dest.baseAddress!,
-                                    num.baseAddress!,
-                                    denom.baseAddress!,
+                                    a.baseAddress!,
+                                    b.baseAddress!,
                                     &n)
                     }
                 }
@@ -336,8 +349,8 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func integerTruncation<U, V>(_ vector: U,
-                                        result: inout V)
+    public static func trunc<U, V>(_ vector: U,
+                                   result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -362,8 +375,8 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func integerTruncation<U, V>(_ vector: U,
-                                        result: inout V)
+    public static func trunc<U, V>(_ vector: U,
+                                   result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -391,7 +404,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func nearestInteger<U, V>(_ vector: U,
-                                     result: inout V)
+                                            result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -417,7 +430,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func nearestInteger<U, V>(_ vector: U,
-                                     result: inout V)
+                                            result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -445,7 +458,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func reciprocalSquareRoot<U, V>(_ vector: U,
-                                           result: inout V)
+                                                  result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -471,7 +484,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func reciprocalSquareRoot<U, V>(_ vector: U,
-                                           result: inout V)
+                                                  result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -499,7 +512,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func squareRoot<U, V>(_ vector: U,
-                                 result: inout V)
+                                        result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -525,7 +538,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func squareRoot<U, V>(_ vector: U,
-                                 result: inout V)
+                                        result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -553,7 +566,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func reciprocal<U, V>(_ vector: U,
-                                 result: inout V)
+                                        result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -579,7 +592,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func reciprocal<U, V>(_ vector: U,
-                                 result: inout V)
+                                        result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -613,14 +626,14 @@ extension vDSP {
     
     /// Calculates an exponential function of each element in `vector`, writing the result to `result`, single-precision.
     ///
-    /// - Parameter exponentialType: Specifies the function: e raised to the power of each element, e raised to the power of each element minus one, or 2 raised to the power of each element.
+    /// - Parameter type: Specifies the function: e raised to the power of each element, e raised to the power of each element minus one, or 2 raised to the power of each element.
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func exponential<U, V>(_ vector: U,
-                                  exponentialType: ExponentialType,
-                                  result: inout V)
+    public static func exp<U, V>(_ vector: U,
+                                 type: ExponentialType,
+                                 result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -633,7 +646,7 @@ extension vDSP {
             result.withUnsafeMutableBufferPointer { dest in
                 vector.withUnsafeBufferPointer { src in
                     
-                    switch exponentialType {
+                    switch type {
                     case .exp:
                         vvexpf(dest.baseAddress!,
                                src.baseAddress!,
@@ -653,14 +666,14 @@ extension vDSP {
     
     /// Calculates an exponential function of each element in `vector`, writing the result to `result`, double-precision.
     ///
-    /// - Parameter exponentialType: Specifies the function: e raised to the power of each element, e raised to the power of each element minus one, or 2 raised to the power of each element.
+    /// - Parameter type: Specifies the function: e raised to the power of each element, e raised to the power of each element minus one, or 2 raised to the power of each element.
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func exponential<U, V>(_ vector: U,
-                                  exponentialType: ExponentialType,
-                                  result: inout V)
+    public static func exp<U, V>(_ vector: U,
+                                 type: ExponentialType,
+                                 result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -673,7 +686,7 @@ extension vDSP {
             result.withUnsafeMutableBufferPointer { dest in
                 vector.withUnsafeBufferPointer { src in
                     
-                    switch exponentialType {
+                    switch type {
                     case .exp:
                         vvexp(dest.baseAddress!,
                               src.baseAddress!,
@@ -705,9 +718,9 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func logarithm<U, V>(_ vector: U,
-                                base: LogarithmBase,
-                                result: inout V)
+    public static func log<U, V>(_ vector: U,
+                                 base: LogarithmBase,
+                                 result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -741,9 +754,9 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func logarithm<U, V>(_ vector: U,
-                                base: LogarithmBase,
-                                result: inout V)
+    public static func log<U, V>(_ vector: U,
+                                 base: LogarithmBase,
+                                 result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -776,10 +789,12 @@ extension vDSP {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
+    ///
+    /// This function calculates `floor(log2(vector))`.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func unbiasedExponent<U, V>(_ vector: U,
-                                       result: inout V)
+    public static func exponent<U, V>(_ vector: U,
+                                      result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -802,10 +817,12 @@ extension vDSP {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
+    ///
+    /// This function calculates `floor(log2(vector))`.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func unbiasedExponent<U, V>(_ vector: U,
-                                       result: inout V)
+    public static func exponent<U, V>(_ vector: U,
+                                      result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -838,9 +855,9 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func power<T, U, V>(bases: T,
-                               exponents: U,
-                               result: inout V)
+    public static func pow<T, U, V>(bases: T,
+                                    exponents: U,
+                                    result: inout V)
         where
         T : _ContiguousCollection,
         U : _ContiguousCollection,
@@ -870,9 +887,9 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func power<T, U, V>(bases: T,
-                               exponents: U,
-                               result: inout V)
+    public static func pow<T, U, V>(bases: T,
+                                    exponents: U,
+                                    result: inout V)
         where
         T : _ContiguousCollection,
         U : _ContiguousCollection,
@@ -913,7 +930,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sin<U, V>(_ vector: U,
-                          result: inout V)
+                                 result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -939,7 +956,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sin<U, V>(_ vector: U,
-                          result: inout V)
+                                 result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -964,8 +981,8 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func sinPi<U, V>(_ vector: U,
-                            result: inout V)
+    public static func sin<U, V>(piTimes vector: U,
+                                 result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -990,8 +1007,8 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func sinPi<U, V>(_ vector: U,
-                            result: inout V)
+    public static func sin<U, V>(piTimes vector: U,
+                                 result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1019,7 +1036,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cos<U, V>(_ vector: U,
-                          result: inout V)
+                                 result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1045,7 +1062,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cos<U, V>(_ vector: U,
-                          result: inout V)
+                                 result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1070,8 +1087,8 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func cosPi<U, V>(_ vector: U,
-                            result: inout V)
+    public static func cos<U, V>(piTimes vector: U,
+                                 result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1096,8 +1113,8 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func cosPi<U, V>(_ vector: U,
-                            result: inout V)
+    public static func cos<U, V>(piTimes vector: U,
+                                 result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1125,9 +1142,9 @@ extension vDSP {
     /// - Parameter cosresult: Output cosine values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func sinCos<T, U, V>(_ vector: T,
-                                sinResult: inout U,
-                                cosResult: inout V)
+    public static func sincos<T, U, V>(_ vector: T,
+                                       sinResult: inout U,
+                                       cosResult: inout V)
         where
         T : _ContiguousCollection,
         U : _MutableContiguousCollection,
@@ -1157,9 +1174,9 @@ extension vDSP {
     /// - Parameter cosresult: Output cosine values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func sinCos<T, U, V>(_ vector: T,
-                                sinResult: inout U,
-                                cosResult: inout V)
+    public static func sincos<T, U, V>(_ vector: T,
+                                       sinResult: inout U,
+                                       cosResult: inout V)
         where
         T : _ContiguousCollection,
         U : _MutableContiguousCollection,
@@ -1191,7 +1208,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tan<U, V>(_ vector: U,
-                          result: inout V)
+                                 result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1217,7 +1234,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tan<U, V>(_ vector: U,
-                          result: inout V)
+                                 result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1242,8 +1259,8 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func tanPi<U, V>(_ vector: U,
-                            result: inout V)
+    public static func tan<U, V>(piTimes vector: U,
+                                 result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1268,8 +1285,8 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func tanPi<U, V>(_ vector: U,
-                            result: inout V)
+    public static func tan<U, V>(piTimes vector: U,
+                                 result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1296,8 +1313,8 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func arcsin<U, V>(_ vector: U,
-                             result: inout V)
+    public static func asin<U, V>(_ vector: U,
+                                  result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1322,8 +1339,8 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func arcsin<U, V>(_ vector: U,
-                             result: inout V)
+    public static func asin<U, V>(_ vector: U,
+                                  result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1350,8 +1367,8 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func arccos<U, V>(_ vector: U,
-                             result: inout V)
+    public static func acos<U, V>(_ vector: U,
+                                  result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1376,8 +1393,8 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func arccos<U, V>(_ vector: U,
-                             result: inout V)
+    public static func acos<U, V>(_ vector: U,
+                                  result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1404,8 +1421,8 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func arctan<U, V>(_ vector: U,
-                             result: inout V)
+    public static func atan<U, V>(_ vector: U,
+                                  result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1430,8 +1447,8 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func arctan<U, V>(_ vector: U,
-                             result: inout V)
+    public static func atan<U, V>(_ vector: U,
+                                  result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1464,7 +1481,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sinh<U, V>(_ vector: U,
-                           result: inout V)
+                                  result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1490,7 +1507,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sinh<U, V>(_ vector: U,
-                           result: inout V)
+                                  result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1518,7 +1535,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cosh<U, V>(_ vector: U,
-                           result: inout V)
+                                  result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1544,7 +1561,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cosh<U, V>(_ vector: U,
-                           result: inout V)
+                                  result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1572,7 +1589,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tanh<U, V>(_ vector: U,
-                           result: inout V)
+                                  result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1598,7 +1615,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tanh<U, V>(_ vector: U,
-                           result: inout V)
+                                  result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1626,7 +1643,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func asinh<U, V>(_ vector: U,
-                            result: inout V)
+                                   result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1652,7 +1669,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func asinh<U, V>(_ vector: U,
-                            result: inout V)
+                                   result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1680,7 +1697,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func acosh<U, V>(_ vector: U,
-                            result: inout V)
+                                   result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1706,7 +1723,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func acosh<U, V>(_ vector: U,
-                            result: inout V)
+                                   result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1734,7 +1751,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func atanh<U, V>(_ vector: U,
-                            result: inout V)
+                                   result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1760,7 +1777,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func atanh<U, V>(_ vector: U,
-                            result: inout V)
+                                   result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
