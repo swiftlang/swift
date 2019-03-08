@@ -1945,7 +1945,7 @@ extension Array : Differentiable where Element : Differentiable {
 
     @inlinable
     public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
-      let elements = zip(elements, cotangent.elements).map {
+      let elements = zip(self.elements, cotangent.elements).map {
         $0.tangentVector(from: $1)
       }
       return TangentVector(elements: elements)
@@ -1987,7 +1987,7 @@ extension Array : Differentiable where Element : Differentiable {
 
     @inlinable
     public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
-      let elements = zip(elements, cotangent.elements).map {
+      let elements = zip(self.elements, cotangent.elements).map {
         $0.tangentVector(from: $1)
       }
       return TangentVector(elements: elements)
