@@ -1488,6 +1488,19 @@ ArrayExpr *ArrayExpr::create(ASTContext &C, SourceLoc LBracketLoc,
   return new (Mem) ArrayExpr(LBracketLoc, Elements, CommaLocs, RBracketLoc, Ty);
 }
 
+Type ArrayExpr::getElementType() {
+  auto init = getInitializer();
+  if (!init)
+    return Type();
+
+  auto *decl = cast<ConstructorDecl>(init.getDecl());
+  return decl->getMethodInterfaceType()
+      ->getAs<AnyFunctionType>()
+      ->getParams()[0]
+      .getPlainType()
+      .subst(init.getSubstitutions());
+}
+
 DictionaryExpr *DictionaryExpr::create(ASTContext &C, SourceLoc LBracketLoc,
                              ArrayRef<Expr*> Elements,
                              ArrayRef<SourceLoc> CommaLocs,

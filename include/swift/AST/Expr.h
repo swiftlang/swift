@@ -2207,6 +2207,7 @@ public:
 class CollectionExpr : public Expr {
   SourceLoc LBracketLoc;
   SourceLoc RBracketLoc;
+  ConcreteDeclRef Initializer;
 
   Expr *SemanticExpr = nullptr;
 
@@ -2283,6 +2284,14 @@ public:
            e->getKind() <= ExprKind::Last_CollectionExpr;
   }
 
+  /// Retrieve the initializer that will be used to construct the 'array'
+  /// literal from the result of the initializer.
+  ConcreteDeclRef getInitializer() const { return Initializer; }
+
+  /// Set the initializer that will be used to construct the 'array' literal.
+  void setInitializer(ConcreteDeclRef initializer) {
+    Initializer = initializer;
+  }
 };
  
 /// An array literal expression [a, b, c].
@@ -2313,6 +2322,8 @@ public:
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::Array;
   }
+
+  Type getElementType();
 };
 
 /// A dictionary literal expression [a : x, b : y, c : z].

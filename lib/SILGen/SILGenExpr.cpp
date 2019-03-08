@@ -462,7 +462,8 @@ namespace {
     RValue visitKeyPathExpr(KeyPathExpr *E, SGFContext C);
     RValue visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E,
                                            SGFContext C);
-    RValue visitCollectionExpr(CollectionExpr *E, SGFContext C);
+    RValue visitArrayExpr(ArrayExpr *E, SGFContext C);
+    RValue visitDictionaryExpr(DictionaryExpr *E, SGFContext C);
     RValue visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E,
                                             SGFContext C);
     RValue visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E, SGFContext C);
@@ -3652,7 +3653,51 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
 }
 
-RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
+RValue RValueEmitter::visitArrayExpr(ArrayExpr *E, SGFContext C) {
+  auto loc = SILLocation(E);
+  ArgumentScope scope(SGF, loc);
+  auto init = E->getInitializer();
+  auto *decl = dyn_cast<AbstractFunctionDecl>(init.getDecl());
+  Type elementType = E->getElementType();
+  ArrayRef<Identifier> argLabels = decl->getFullName().getArgumentNames();
+  CanType arrayTy = ArraySliceType::get(elementType)->getCanonicalType();
+  VarargsInfo varargsInfo =
+      emitBeginVarargs(SGF, loc, elementType->getCanonicalType(), arrayTy,
+                       E->getNumElements(), {});
+
+  for (unsigned index : range(E->getNumElements())) {
+    auto destAddr = varargsInfo.getBaseAddress();
+    if (index != 0) {
+      SILValue indexValue = SGF.B.createIntegerLiteral(
+          loc, SILType::getBuiltinWordType(SGF.getASTContext()), index);
+      destAddr = SGF.B.createIndexAddr(loc, destAddr, indexValue);
+    }
+    auto &destTL = varargsInfo.getBaseTypeLowering();
+    // Use an invalid cleanup here because we're relying on the cleanup for
+    // the Array constructed inside emitBeginVarargs to destroy these values.
+    TemporaryInitialization init(destAddr, CleanupHandle::invalid());
+    ArgumentSource(E->getElements()[index])
+        .forwardInto(SGF, varargsInfo.getBaseAbstractionPattern(), &init,
+                     destTL);
+  }
+
+  RValue arg(SGF, loc, arrayTy,
+             emitEndVarargs(SGF, loc, std::move(varargsInfo)));
+
+  // Add an argument label for init(arrayLiteral: T...) as the above tuple is of
+  // the form (T...) with no label.
+  assert(argLabels.size() == 1 && !argLabels[0].empty() &&
+         !isa<TupleType>(arg.getType()));
+  Type newType = TupleType::get({TupleTypeElt(arg.getType(), argLabels[0])},
+                                SGF.getASTContext());
+  arg.rewriteType(newType->getCanonicalType());
+
+  // Call the builtin initializer.
+  return scope.popPreservingValue(SGF.emitApplyAllocatingInitializer(
+      loc, init, std::move(arg), E->getType(), C));
+}
+
+RValue RValueEmitter::visitDictionaryExpr(DictionaryExpr *E, SGFContext C) {
   return visit(E->getSemanticExpr(), C);
 }
 
