@@ -41,7 +41,6 @@ import Accelerate
 public class Quadrature {
     
     private var integrateOptions = quadrature_integrate_options()
-    private var integrand: ((Double) -> Double)!
 
     /// Initializes and returns a quadrature instance.
     ///
@@ -95,53 +94,51 @@ public class Quadrature {
     public func integrate(over interval: ClosedRange<Double>,
                           integrand: @escaping (Double) -> Double) ->
         Result<(integralResult: Double, estimatedAbsoluteError: Double), Error> {
-        
-        self.integrand = integrand
-        
-        let byteCount = MemoryLayout<Quadrature>.size
-        let integrandPointer = UnsafeMutableRawPointer.allocate(byteCount: byteCount,
-                                                                alignment: 1)
-        integrandPointer.storeBytes(of: self,
-                                    as: Quadrature.self)
-        
-        var callback = quadrature_integrate_function(
-            fun: { (arg: UnsafeMutableRawPointer?,
-                n: Int,
-                x: UnsafePointer<Double>,
-                y: UnsafeMutablePointer<Double>
-                ) in
+            
+            var status = QUADRATURE_SUCCESS
+            var estimatedAbsoluteError: Double = 0
+            var result: Double = 0
+            
+            var callback: quadrature_integrate_function!
+            
+            withUnsafePointer(to: integrand) {
+                let integrandPointer = UnsafeMutableRawPointer(mutating: $0)
                 
-                guard let quadrature = arg?.load(as: Quadrature.self) else {
-                    return
-                }
+                callback = quadrature_integrate_function(
+                    fun: { (arg: UnsafeMutableRawPointer?,
+                        n: Int,
+                        x: UnsafePointer<Double>,
+                        y: UnsafeMutablePointer<Double>
+                        ) in
+                        
+                        guard let integrand = arg?.load(as: ((Double) -> Double).self) else {
+                            return
+                        }
+                        
+                        (0 ..< n).forEach { i in
+                            y[i] = integrand(x[i])
+                        }
+                },
+                    fun_arg: integrandPointer)
                 
-                (0 ..< n).forEach { i in
-                    y[i] = quadrature.integrand(x[i])
+                withUnsafePointer(to: integrateOptions) { options in
+                    result = quadrature_integrate(&callback,
+                                                  interval.lowerBound,
+                                                  interval.upperBound,
+                                                  options,
+                                                  &status,
+                                                  &estimatedAbsoluteError,
+                                                  0,
+                                                  nil)
                 }
-        },
-            fun_arg: integrandPointer)
-        
-        var status = QUADRATURE_SUCCESS
-        var estimatedAbsoluteError: Double = 0
-        var result: Double = 0
-        
-        withUnsafePointer(to: integrateOptions) { options in
-            result = quadrature_integrate(&callback,
-                                          interval.lowerBound,
-                                          interval.upperBound,
-                                          options,
-                                          &status,
-                                          &estimatedAbsoluteError,
-                                          0,
-                                          nil)
-        }
-        
-        if status == QUADRATURE_SUCCESS {
-            return .success((integralResult: result,
-                             estimatedAbsoluteError: estimatedAbsoluteError))
-        } else {
-            return .failure(Error(quadratureStatus: status))
-        }
+            }
+            
+            if status == QUADRATURE_SUCCESS {
+                return .success((integralResult: result,
+                                 estimatedAbsoluteError: estimatedAbsoluteError))
+            } else {
+                return .failure(Error(quadratureStatus: status))
+            }
     }
     
     public enum Integrator {
