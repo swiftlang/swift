@@ -10,14 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_exported import Accelerate
-
-// Top level enum for namespaced vDSP and vForce based functions
-public enum vDSP {}
-
+import Accelerate
 
 extension vDSP {
-
+    
     // MARK: Integer to floating-point conversion
     
     /// Converts an array of unsigned 8-bit integers to single-precision floating-point values.

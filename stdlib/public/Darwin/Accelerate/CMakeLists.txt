@@ -3,6 +3,7 @@ include("../../../../cmake/modules/StandaloneOverlay.cmake")
 
 add_swift_target_library(swiftAccelerate ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   BNNS.swift.gyb
+  Accelerate.swift
   ContiguousCollection.swift
   vDSP_Conversion.swift
 

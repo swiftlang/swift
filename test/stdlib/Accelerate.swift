@@ -9,7 +9,7 @@ import Accelerate
 
 var AccelerateTests = TestSuite("Accelerate")
 
-if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
+if #available(iOS 10.0, OSX 10.12, tvOS 10.0, watchOS 4.0, *) {
     
     AccelerateTests.test("BNNS/ImageStackDescriptor") {
         var succeed = BNNSImageStackDescriptor(width: 0, height: 0, channels: 0,
@@ -75,7 +75,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
 //
 //===----------------------------------------------------------------------===//
 
-if #available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *) {
+if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
     
     let n = vDSP_Length(10)
     
