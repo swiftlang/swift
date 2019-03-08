@@ -288,12 +288,21 @@ public:
     : name(name), results(results), isTypeLookup(isTypeLookup) {}
 
   virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+    if (isVisible(VD))
+      results.push_back(LookupResultEntry(VD));
+  }
+  // All a baseDC to be passed in
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason, DeclContext* BaseDC) {
+    if (isVisible(VD))
+      results.push_back(LookupResultEntry(BaseDC, VD));
+  }
+private:
+  bool isVisible(const ValueDecl *const VD) const {
     // Give clients an opportunity to filter out non-type declarations early,
     // to avoid circular validation.
     if (isTypeLookup && !isa<TypeDecl>(VD))
-      return;
-    if (VD->getFullName().matchesRef(name))
-      results.push_back(LookupResultEntry(VD));
+      return false;
+    return  VD->getFullName().matchesRef(name);
   }
 };
 

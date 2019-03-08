@@ -653,6 +653,9 @@ public:
   /// type declarations or extensions thereof, or the source file itself. The
   /// client can perform such lookups using the result of \c getDeclContext().
   SmallVector<ValueDecl *, 4> getLocalBindings() const;
+  
+  /// If \c getLocalBindings needs a baseDC, return it here.
+  DeclContext *getBaseDCForLocalBindings() const;
 
   /// Expand the entire scope map.
   ///

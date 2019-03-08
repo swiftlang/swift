@@ -1909,6 +1909,47 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
   return result;
 }
 
+DeclContext* ASTScope::getBaseDCForLocalBindings() const {
+  switch (getKind()) {
+    // HACK for compatibility
+    case ASTScopeKind::NominalOrExtensionWhereClause:
+      if (auto *ed = whereDeclContext.dyn_cast<ExtensionDecl*>()) {
+        if (isa<ProtocolDecl>(ed->getExtendedNominal()))
+          return ed;
+      }
+      return nullptr;
+      
+    case ASTScopeKind::Preexpanded:
+    case ASTScopeKind::SourceFile:
+    case ASTScopeKind::TypeDecl:
+    case ASTScopeKind::ExtensionGenericParams:
+    case ASTScopeKind::TypeOrExtensionBody:
+    case ASTScopeKind::GenericParams:
+    case ASTScopeKind::AbstractFunctionDecl:
+    case ASTScopeKind::AbstractFunctionParams:
+    case ASTScopeKind::DefaultArgument:
+    case ASTScopeKind::AbstractFunctionBody:
+    case ASTScopeKind::PatternBinding:
+    case ASTScopeKind::PatternInitializer:
+    case ASTScopeKind::AfterPatternBinding:
+    case ASTScopeKind::BraceStmt:
+    case ASTScopeKind::IfStmt:
+    case ASTScopeKind::ConditionalClause:
+    case ASTScopeKind::GuardStmt:
+    case ASTScopeKind::RepeatWhileStmt:
+    case ASTScopeKind::ForEachStmt:
+    case ASTScopeKind::ForEachPattern:
+    case ASTScopeKind::DoCatchStmt:
+    case ASTScopeKind::CatchStmt:
+    case ASTScopeKind::SwitchStmt:
+    case ASTScopeKind::CaseStmt:
+    case ASTScopeKind::Accessors:
+    case ASTScopeKind::Closure:
+    case ASTScopeKind::TopLevelCode:
+      return nullptr;
+  }
+}
+
 void ASTScope::expandAll() const {
   if (!isExpanded())
     expand();
