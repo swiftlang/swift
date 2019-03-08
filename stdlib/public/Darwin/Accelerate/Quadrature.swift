@@ -60,7 +60,7 @@ public class Quadrature {
             integrateOptions.integrator = QUADRATURE_INTEGRATE_QNG
         case .qag(let pointsPerInterval, let maxIntervals):
             integrateOptions.integrator = QUADRATURE_INTEGRATE_QAG
-            integrateOptions.qag_points_per_interval = pointsPerInterval.rawValue
+            integrateOptions.qag_points_per_interval = pointsPerInterval.points
             integrateOptions.max_intervals = maxIntervals
         case .qags(let maxIntervals):
             integrateOptions.integrator = QUADRATURE_INTEGRATE_QAGS
@@ -93,7 +93,8 @@ public class Quadrature {
     /// - Parameter interval: The lower and upper bounds of the integration interval.
     /// - Parameter integrand: The function to integrate. The input value is `x` that's within the interval over which the integrand is being integrated, and the output value is the corresponding value `y = integrand(x)` at those points.
     public func integrate(over interval: ClosedRange<Double>,
-                          integrand: @escaping (Double) -> Double) -> Result {
+                          integrand: @escaping (Double) -> Double) ->
+        Result<(integralResult: Double, estimatedAbsoluteError: Double), Error> {
         
         self.integrand = integrand
         
@@ -136,10 +137,10 @@ public class Quadrature {
         }
         
         if status == QUADRATURE_SUCCESS {
-            return .success(integralResult: result,
-                            estimatedAbsoluteError: estimatedAbsoluteError)
+            return .success((integralResult: result,
+                             estimatedAbsoluteError: estimatedAbsoluteError))
         } else {
-            return .failure(error: Error(quadratureStatus: status))
+            return .failure(Error(quadratureStatus: status))
         }
     }
     
@@ -157,19 +158,16 @@ public class Quadrature {
         case qags(maxIntervals: Int)
     }
     
-    public enum QAGPointsPerInterval: Int {
-        case `default` = 0
-        case fifteen = 15
-        case twentyOne = 21
-        case thirtyOne = 31
-        case fortyOne = 41
-        case fiftyOne = 51
-        case sixtyOne = 61
-    }
-    
-    public enum Result {
-        case success (integralResult: Double, estimatedAbsoluteError: Double)
-        case failure (error: Error)
+    public struct QAGPointsPerInterval {
+        public let points: Int
+        private init(points: Int) { self.points = points }
+        
+        public static let fifteen = QAGPointsPerInterval(points: 15)
+        public static let twentyOne = QAGPointsPerInterval(points: 21)
+        public static let thirtyOne = QAGPointsPerInterval(points: 31)
+        public static let fortyOne = QAGPointsPerInterval(points: 41)
+        public static let fiftyOne = QAGPointsPerInterval(points: 51)
+        public static let sixtyOne = QAGPointsPerInterval(points: 61)
     }
     
     public enum Error: Swift.Error {
