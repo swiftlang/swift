@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.4.3)
 include("../../../../cmake/modules/StandaloneOverlay.cmake")
 
 add_swift_target_library(swiftAccelerate ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+  Accelerate.swift
   Quadrature.swift
   ContiguousCollection.swift
   vForce_Operations.swift
