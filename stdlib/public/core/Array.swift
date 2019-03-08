@@ -2008,7 +2008,7 @@ extension Array : Differentiable where Element : Differentiable {
 }
 
 // TODO: Remove once `zipLongest` is part of stdlib.
-fileprivate func zipLongest<Sequence1: Sequence, Sequence2: Sequence>(
+public func zipLongest<Sequence1: Sequence, Sequence2: Sequence>(
   _ sequence1: Sequence1, 
   _ sequence2: Sequence2
 ) -> [(Sequence1.Element?, Sequence2.Element?)] {
