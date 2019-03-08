@@ -4927,38 +4927,19 @@ Type ConstraintSystem::simplifyAppliedOverloads(
       getUnboundBindOverloadDisjunction(fnTypeVar, &numOptionalUnwraps);
   if (!disjunction) return fnType;
 
-  /// The common result type amongst all function overloads.
-  Type commonResultType;
-  auto updateCommonResultType = [&](Type choiceType) {
-    auto markFailure = [&] {
-      commonResultType = ErrorType::get(getASTContext());
-    };
-
-    auto choiceFnType = choiceType->getAs<FunctionType>();
-    if (!choiceFnType)
-      return markFailure();
-
-    // For now, don't attempt to establish a common result type when there
-    // are type parameters.
-    Type choiceResultType = choiceFnType->getResult();
-    if (choiceResultType->hasTypeParameter())
-      return markFailure();
-
-    // If we haven't seen a common result type yet, record what we found.
-    if (!commonResultType) {
-      commonResultType = choiceResultType;
-      return;
-    }
-
-    // If we found something different, fail.
-    if (!commonResultType->isEqual(choiceResultType))
-      return markFailure();
-  };
-
   // Consider each of the constraints in the disjunction.
 retry_after_fail:
   bool hasUnhandledConstraints = false;
   bool labelMismatch = false;
+
+  /// Tracks a choice that is viable, with information about its
+  /// function type and parameter bindings to allow further type-based
+  /// analysis.
+  struct ViableChoice {
+    Constraint *constraint;
+    const FunctionType *fnType;
+  };
+  SmallVector<ViableChoice, 4> viableChoices;
   auto filterResult =
       filterDisjunction(disjunction, /*restoreOnFail=*/shouldAttemptFixes(),
                          [&](Constraint *constraint) {
@@ -4992,8 +4973,14 @@ retry_after_fail:
             choiceType = objectType;
         }
 
-        // If we have a function type, we can compute a common result type.
-        updateCommonResultType(choiceType);
+        auto choiceFnType = choiceType->getAs<FunctionType>();
+        if (!choiceFnType) {
+          hasUnhandledConstraints = true;
+          return true;
+        }
+
+        // Record the type of this choice.
+        viableChoices.push_back({constraint, choiceFnType});
         return true;
       });
 
@@ -5009,7 +4996,14 @@ retry_after_fail:
   case SolutionKind::Solved:
     // We should now have a type for the one remaining overload.
     fnType = getFixedTypeRecursive(fnType, /*wantRValue=*/true);
-    break;
+
+    // Bind the argument's result type to the only choice's result type.
+    if (auto onlyFnType = fnType->getAs<FunctionType>()) {
+      addConstraint(ConstraintKind::Bind, argFnType->getResult(),
+                    onlyFnType->getResult(), locator);
+    }
+
+    return fnType;
 
   case SolutionKind::Unsolved:
     break;
@@ -5019,6 +5013,26 @@ retry_after_fail:
   // results of any common-type computations.
   if (hasUnhandledConstraints)
     return fnType;
+
+  /// Compute the common result type amongst all function overloads.
+  Type commonResultType;
+  for (const auto &choice : viableChoices) {
+    // For now, don't attempt to establish a common result type when there
+    // are type parameters.
+    Type choiceResultType = choice.fnType->getResult();
+    if (choiceResultType->hasTypeParameter()) {
+      commonResultType = ErrorType::get(getASTContext());
+      break;
+    }
+
+    if (!commonResultType) {
+      commonResultType = choiceResultType;
+      continue;
+    } else if (!commonResultType->isEqual(choiceResultType)) {
+      commonResultType = ErrorType::get(getASTContext());
+      break;
+    }
+  }
 
   // If we have a common result type, bind the expected result type to it.
   if (commonResultType && !commonResultType->is<ErrorType>()) {
