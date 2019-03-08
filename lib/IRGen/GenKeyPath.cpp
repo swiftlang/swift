@@ -649,80 +649,14 @@ getInitializerForComputedComponent(IRGenModule &IGM,
 }
 
 static llvm::Constant *
-emitMetadataGeneratorForKeyPath(IRGenModule &IGM,
-                                CanType type,
-                                GenericEnvironment *genericEnv,
-                                ArrayRef<GenericRequirement> requirements) {
+emitMetadataTypeRefForKeyPath(IRGenModule &IGM, CanType type) {
   // Produce a mangled name for the type.
   auto constant = IGM.getTypeRef(type, MangledTypeRefRole::Metadata);
+  
+  // Mask the bottom bit to tell the key path runtime this is a mangled name
+  // rather than a direct reference.
   auto bitConstant = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
   return llvm::ConstantExpr::getGetElementPtr(nullptr, constant, bitConstant);
-}
-
-static llvm::Constant *
-emitWitnessTableGeneratorForKeyPath(IRGenModule &IGM,
-                                    CanType type,
-                                    ProtocolConformanceRef conformance,
-                                    GenericEnvironment *genericEnv,
-                                    ArrayRef<GenericRequirement> requirements) {
-  auto origType = type;
-  CanGenericSignature genericSig;
-  if (genericEnv)
-    genericSig = genericEnv->getGenericSignature()->getCanonicalSignature();
-
-  IRGenMangler mangler;
-  std::string symbolName =
-    mangler.mangleSymbolNameForKeyPathMetadata(
-      "keypath_get_witness_table", genericSig, type, conformance);
-
-  return IGM.getAddrOfStringForMetadataRef(symbolName, /*alignment=*/2,
-      /*shouldSetLowBit=*/true,
-      [&](ConstantInitBuilder &B) {
-        // Build a stub that loads the necessary bindings from the key path's
-        // argument buffer then fetches the metadata.
-        auto fnTy = llvm::FunctionType::get(IGM.WitnessTablePtrTy,
-                                            {IGM.Int8PtrTy}, /*vararg*/ false);
-        auto accessorThunk =
-          llvm::Function::Create(fnTy, llvm::GlobalValue::PrivateLinkage,
-                                 symbolName, IGM.getModule());
-        accessorThunk->setAttributes(IGM.constructInitialAttributes());
-        {
-          IRGenFunction IGF(IGM, accessorThunk);
-          if (IGM.DebugInfo)
-            IGM.DebugInfo->emitArtificialFunction(IGF, accessorThunk);
-
-          if (type->hasTypeParameter()) {
-            auto bindingsBufPtr = IGF.collectParameters().claimNext();
-
-            bindFromGenericRequirementsBuffer(IGF, requirements,
-                Address(bindingsBufPtr, IGM.getPointerAlignment()),
-                MetadataState::Complete,
-                [&](CanType t) {
-                  return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
-                });
-
-            type = genericEnv->mapTypeIntoContext(type)->getCanonicalType();
-          }
-          if (origType->hasTypeParameter())
-            conformance = conformance.subst(origType,
-              QueryInterfaceTypeSubstitutions(genericEnv),
-              LookUpConformanceInSignature(*genericEnv->getGenericSignature()));
-          auto ret = emitWitnessTableRef(IGF, type, conformance);
-          IGF.Builder.CreateRet(ret);
-        }
-
-        // Form the mangled name with its relative reference.
-        auto S = B.beginStruct();
-        S.setPacked(true);
-        S.add(llvm::ConstantInt::get(IGM.Int8Ty, 255));
-        S.add(llvm::ConstantInt::get(IGM.Int8Ty, 9));
-        S.addRelativeAddress(accessorThunk);
-
-        // And a null terminator!
-        S.addInt(IGM.Int8Ty, 0);
-
-        return S.finishAndCreateFuture();
-      });
 }
 
 static unsigned getClassFieldIndex(ClassDecl *classDecl, VarDecl *property) {
@@ -891,16 +825,15 @@ emitKeyPathComponent(IRGenModule &IGM,
             if (!reqt.Protocol) {
               // Type requirement.
               externalSubArgs.push_back(
-                emitMetadataGeneratorForKeyPath(IGM, substType,
-                                                genericEnv, requirements));
+                emitMetadataTypeRefForKeyPath(IGM, substType));
             } else {
               // Protocol requirement.
               auto conformance = subs.lookupConformance(
                            reqt.TypeParameter->getCanonicalType(), reqt.Protocol);
               externalSubArgs.push_back(
-                emitWitnessTableGeneratorForKeyPath(IGM, substType,
-                                                    *conformance,
-                                                    genericEnv, requirements));
+                IGM.emitWitnessTableRefString(substType, *conformance,
+                      genericEnv ? genericEnv->getGenericSignature() : nullptr,
+                      /*shouldSetLowBit*/ true));
             }
           });
       }
@@ -1213,9 +1146,9 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
     getAddrOfGenericEnvironment(pattern->getGenericSignature()));
   // Store type references for the root and leaf.
   fields.addRelativeAddress(
-    emitMetadataGeneratorForKeyPath(*this, rootTy, genericEnv, requirements));
+    emitMetadataTypeRefForKeyPath(*this, rootTy));
   fields.addRelativeAddress(
-    emitMetadataGeneratorForKeyPath(*this, valueTy, genericEnv, requirements));
+    emitMetadataTypeRefForKeyPath(*this, valueTy));
   
   // Add a pointer to the ObjC KVC compatibility string, if there is one, or
   // null otherwise.
@@ -1269,8 +1202,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
     // For all but the last component, we pack in the type of the component.
     if (i + 1 != pattern->getComponents().size()) {
       fields.addRelativeAddress(
-        emitMetadataGeneratorForKeyPath(*this, component.getComponentType(),
-                                        genericEnv, requirements));
+        emitMetadataTypeRefForKeyPath(*this, component.getComponentType()));
     }
     baseTy = component.getComponentType();
   }
