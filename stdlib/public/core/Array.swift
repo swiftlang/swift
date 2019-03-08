@@ -1910,13 +1910,16 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
 // ```
 //
 extension Array : Differentiable where Element : Differentiable {
+  public typealias AllDifferentiableVariables = [Element]
+
   public struct TangentVector : AdditiveArithmetic & Differentiable {
-    public typealias TangentVector = Array<Element>.TangentVector
-    public typealias CotangentVector = Array<Element>.CotangentVector
+    public typealias AllDifferentiableVariables = Array.TangentVector
+    public typealias TangentVector = Array.TangentVector
+    public typealias CotangentVector = Array.CotangentVector
 
     public var elements: [Element.TangentVector]
 
-    public static var zero: TangentVector {
+    public static var zero: Array.TangentVector {
       return TangentVector(elements: [])
     }
     
@@ -1925,41 +1928,52 @@ extension Array : Differentiable where Element : Differentiable {
     }
 
     @inlinable
-    public static func + (lhs: TangentVector, rhs: TangentVector) -> TangentVector {
-      return TangentVector(elements: zipLongest(lhs.elements, rhs.elements).map {
-        ($0 ?? .zero) + ($1 ?? .zero)
-      })
+    public static func + (
+      lhs: Array.TangentVector,
+      rhs: Array.TangentVector
+    ) -> Array.TangentVector {
+      let zippedElements = zipLongest(lhs.elements, rhs.elements)
+      return Array.TangentVector(
+        elements: zippedElements.map { ($0 ?? .zero) + ($1 ?? .zero) })
     }
 
     @inlinable
-    public static func - (lhs: TangentVector, rhs: TangentVector) -> TangentVector {
-      return TangentVector(elements: zipLongest(lhs.elements, rhs.elements).map {
-        ($0 ?? .zero) - ($1 ?? .zero)
-      })
+    public static func - (
+      lhs: Array.TangentVector,
+      rhs: Array.TangentVector
+    ) -> Array.TangentVector {
+      let zippedElements = zipLongest(lhs.elements, rhs.elements)
+      return Array.TangentVector(
+        elements: zippedElements.map { ($0 ?? .zero) - ($1 ?? .zero) })
     }
 
     @inlinable
-    public func moved(along direction: TangentVector) -> [Element.TangentVector] {
+    public func moved(
+      along direction: Array.TangentVector
+    ) -> [Element.TangentVector] {
       return zip(elements, direction.elements).map { $0.moved(along: $1) }
     }
 
     @inlinable
-    public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
+    public func tangentVector(
+      from cotangent: Array.CotangentVector
+    ) -> Array.TangentVector {
       let elements = zip(self.elements, cotangent.elements).map {
         $0.tangentVector(from: $1)
       }
-      return TangentVector(elements: elements)
+      return Array.TangentVector(elements: elements)
     }
   }
 
   public struct CotangentVector : AdditiveArithmetic & Differentiable {
-    public typealias TangentVector = Array<Element>.CotangentVector
-    public typealias CotangentVector = Array<Element>.TangentVector
+    public typealias AllDifferentiableVariables = Array.CotangentVector
+    public typealias TangentVector = Array.CotangentVector
+    public typealias CotangentVector = Array.TangentVector
 
     public var elements: [Element.CotangentVector]
 
-    public static var zero: TangentVector {
-      return TangentVector(elements: [])
+    public static var zero: Array.CotangentVector {
+      return Array.CotangentVector(elements: [])
     }
     
     public init(elements: [Element.CotangentVector]) {
@@ -1967,34 +1981,42 @@ extension Array : Differentiable where Element : Differentiable {
     }
 
     @inlinable
-    public static func + (lhs: TangentVector, rhs: TangentVector) -> TangentVector {
-      return TangentVector(elements: zipLongest(lhs.elements, rhs.elements).map {
-        ($0 ?? .zero) + ($1 ?? .zero)
-      })
+    public static func + (
+      lhs: Array.CotangentVector,
+      rhs: Array.CotangentVector
+    ) -> Array.CotangentVector {
+      let zippedElements = zipLongest(lhs.elements, rhs.elements)
+      return Array.CotangentVector(
+        elements: zippedElements.map { ($0 ?? .zero) + ($1 ?? .zero) })
     }
 
     @inlinable
-    public static func - (lhs: TangentVector, rhs: TangentVector) -> TangentVector {
-      return TangentVector(elements: zipLongest(lhs.elements, rhs.elements).map {
-        ($0 ?? .zero) - ($1 ?? .zero)
-      })
+    public static func - (
+      lhs: Array.CotangentVector,
+      rhs: Array.CotangentVector
+    ) -> Array.CotangentVector {
+      let zippedElements = zipLongest(lhs.elements, rhs.elements)
+      return Array.CotangentVector(
+        elements: zippedElements.map { ($0 ?? .zero) - ($1 ?? .zero) })
     }
 
     @inlinable
-    public func moved(along direction: TangentVector) -> [Element.CotangentVector] {
+    public func moved(
+      along direction: Array.CotangentVector
+    ) -> [Element.CotangentVector] {
       return zip(elements, direction.elements).map { $0.moved(along: $1) }
     }
 
     @inlinable
-    public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
+    public func tangentVector(
+      from cotangent: Array.TangentVector
+    ) -> Array.CotangentVector {
       let elements = zip(self.elements, cotangent.elements).map {
         $0.tangentVector(from: $1)
       }
-      return TangentVector(elements: elements)
+      return Array.CotangentVector(elements: elements)
     }
   }
-
-  public typealias AllDifferentiableVariables = [Element]
 
   @inlinable
   public func moved(along direction: TangentVector) -> [Element] {
@@ -2008,25 +2030,22 @@ extension Array : Differentiable where Element : Differentiable {
 }
 
 // TODO: Remove once `zipLongest` is part of stdlib.
-public func zipLongest<Sequence1: Sequence, Sequence2: Sequence>(
+@usableFromInline
+internal func zipLongest<Sequence1: Sequence, Sequence2: Sequence>(
   _ sequence1: Sequence1, 
   _ sequence2: Sequence2
 ) -> [(Sequence1.Element?, Sequence2.Element?)] {
   var (iterator1, iterator2) = (sequence1.makeIterator(), sequence2.makeIterator())
   var result = [(Sequence1.Element?, Sequence2.Element?)]()
-  
   result.reserveCapacity(Swift.max(
     sequence1.underestimatedCount, 
     sequence2.underestimatedCount))
-
   while true {
     let (element1, element2) = (iterator1.next(), iterator2.next())
     if element1 == nil && element2 == nil {
       break
-    } else {
-      result.append((element1, element2))
     }
+    result.append((element1, element2))
   }
-
   return result
 }
