@@ -122,6 +122,8 @@ template <> struct DenseMapInfo<swift::StorageAccessInfo> {
 }
 
 namespace swift {
+using AccessedStorageSet = llvm::SmallDenseSet<StorageAccessInfo, 8>;
+
 /// Records each unique AccessedStorage in a set of StorageAccessInfo
 /// objects. Hashing and equality only sees the AccesedStorage data. The
 /// additional StorageAccessInfo bits are recorded as results of this analysis.
@@ -132,16 +134,16 @@ namespace swift {
 /// large. It does not imply that all accesses have Unidentified
 /// AccessedStorage, which is never allowed for class or global access.
 class AccessedStorageResult {
-
-  using AccessedStorageSet = llvm::SmallDenseSet<StorageAccessInfo, 8>;
-
   AccessedStorageSet storageAccessSet;
   Optional<SILAccessKind> unidentifiedAccess;
+
 public:
   AccessedStorageResult() {}
 
   // ---------------------------------------------------------------------------
   // Accessing the results.
+
+  const AccessedStorageSet &getStorageSet() const { return storageAccessSet; }
 
   bool isEmpty() const {
     return storageAccessSet.empty() && !unidentifiedAccess;
