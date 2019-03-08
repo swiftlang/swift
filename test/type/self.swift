@@ -5,7 +5,7 @@ struct S0<T> {
 }
 
 class C0<T> {
-  func foo(_ other: Self) { } // expected-error {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C0'?}}
+  func foo(_ other: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C0'?}}{{21-25=C0}}
 }
 
 enum E0<T> {
@@ -65,11 +65,9 @@ class A<T> {
     Self.y()
     Self.z()
     let _: Self = Self.init(a: 66)
-    // expected-error@-1 {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'A'?}}
     return Self.init(a: 77) as? Self as? A
-    // expected-error@-1 {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'A'?}}
-    // expected-warning@-2 {{conditional cast from 'Self' to 'A<T>' always succeeds}}
-    // expected-warning@-3 {{conditional downcast from 'A<T>?' to 'A<T>' does nothing}}
+    // expected-warning@-1 {{conditional cast from 'Self' to 'Self' always succeeds}}
+    // expected-warning@-2 {{conditional downcast from 'Self?' to 'A<T>' is equivalent to an implicit conversion to an optional 'A<T>'}}
   }
 }
 
@@ -96,8 +94,7 @@ class C {
   }
   func g() {
     _ = Self.init() as? Self
-    // expected-error@-1 {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C'?}}
-    // expected-warning@-2 {{conditional cast from 'Self' to 'C' always succeeds}}
+    // expected-warning@-1 {{conditional cast from 'Self' to 'Self' always succeeds}}
   }
 }
 

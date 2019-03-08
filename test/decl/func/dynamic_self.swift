@@ -73,7 +73,7 @@ class C1 {
     if !b { return type(of: self).init(int: 5) }
 
     // Can't utter Self within the body of a method.
-    var _: Self = self // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C1'?}} {{12-16=C1}}
+    var _: Self = self
 
     // Okay to return 'self', because it has the appropriate type.
     return self // okay
@@ -85,7 +85,7 @@ class C1 {
     var x: Int = self // expected-error{{cannot convert value of type 'Self.Type' to specified type 'Int'}}
 
     // Can't utter Self within the body of a method.
-    var c1 = C1(int: 5) as Self // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C1'?}} {{28-32=C1}}
+    var c1 = C1(int: 5) as Self // expected-error{{'C1' is not convertible to 'Self'; did you mean to use 'as!' to force downcast?}}
 
     if b { return self.init(int: 5) }
 

@@ -1061,9 +1061,13 @@ static Type diagnoseUnknownType(TypeResolution resolution,
         // type. Fix this by replacing 'Self' with the nominal type name.
         assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
 
-        if (!nominalDC->getSelfClassDecl())
-          return resolution.mapTypeIntoContext(nominal
-                                               ->getDeclaredInterfaceType());
+        bool insideClass = nominalDC->getSelfClassDecl() != nullptr;
+        if (!insideClass || options.isAnyExpr()) {
+          Type SelfType = nominal->getSelfInterfaceType();
+          if (insideClass)
+            SelfType = DynamicSelfType::get(SelfType, ctx);
+          return resolution.mapTypeIntoContext(SelfType);
+        }
 
         // Produce a Fix-It replacing 'Self' with the nominal type name.
         auto name = getDeclNameFromContext(dc, nominal);
