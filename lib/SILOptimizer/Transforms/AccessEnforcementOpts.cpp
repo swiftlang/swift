@@ -149,7 +149,6 @@ using DenseAccessSet = llvm::SmallSetVector<BeginAccessInst *, 4>;
 struct RegionState {
   DenseAccessSet inScopeConflictFreeAccesses;
   DenseAccessSet outOfScopeConflictFreeAccesses;
-  bool unidentifiedAccess = false;
 
 public:
   RegionState(unsigned size) {
@@ -161,7 +160,6 @@ public:
   void reset() {
     inScopeConflictFreeAccesses.clear();
     outOfScopeConflictFreeAccesses.clear();
-    unidentifiedAccess = false;
   }
 
   const DenseAccessSet &getInScopeAccesses() {
@@ -224,7 +222,7 @@ public:
   using AccessMap = llvm::SmallDenseMap<BeginAccessInst *, AccessInfo, 32>;
   using AccessedStorageSet = llvm::SmallDenseSet<AccessedStorage, 8>;
   using LoopRegionToAccessedStorage =
-      llvm::SmallDenseMap<unsigned, AccessedStorageSet>;
+      llvm::SmallDenseMap<unsigned, AccessedStorageResult>;
   using RegionIDToLocalStateMap = llvm::DenseMap<unsigned, RegionState>;
   // Instruction pairs we can merge from dominating instruction to dominated
   using MergeablePairs =
@@ -299,15 +297,10 @@ protected:
 
   void visitMayRelease(SILInstruction *instr, RegionState &state);
 
-  void mergePredAccesses(unsigned regionID,
-                         RegionIDToLocalStateMap &localRegionStates);
+  RegionState &mergePredAccesses(unsigned regionID,
+                                 RegionIDToLocalStateMap &localRegionStates);
 
-  void detectConflictsInLoop(LoopRegion *loopRegion,
-                             RegionIDToLocalStateMap &localRegionStates,
-                             LoopRegionToAccessedStorage &accessSetsOfRegions);
-
-  void localDataFlowInBlock(LoopRegion *bbRegion,
-                            RegionIDToLocalStateMap &localRegionStates);
+  void localDataFlowInBlock(RegionState &state, SILBasicBlock *bb);
 
 private:
   void recordInScopeConflicts(RegionState &state,
@@ -369,9 +362,7 @@ void AccessConflictAndMergeAnalysis::recordUnknownConflict(RegionState &state) {
     LLVM_DEBUG(llvm::dbgs() << "  may conflict with:\n"; accessInfo.dump());
   });
   // Clear data flow.
-  state.inScopeConflictFreeAccesses.clear();
-  state.outOfScopeConflictFreeAccesses.clear();
-  // FIXME!!!: call reset() after removing RegionState.unidentifiedAccess.
+  state.reset();
 }
 
 // Update data flow `state` by removing accesses that conflict with the
@@ -495,31 +486,16 @@ void AccessConflictAndMergeAnalysis::analyze() {
     RegionIDToLocalStateMap localRegionStates;
     // This is RPO order of the sub-regions
     for (auto subID : region->getSubregions()) {
-      auto *subRegion = LRFI->getRegion(subID);
-      // testIrreducibleGraph2 in test/SILOptimizer/access_enforcement_opts:
-      // If the sub-region is the source of a previously visited backedge,
-      // Then the in-state is an empty set.
-      bool disableCrossBlock = false;
-      if (localRegionStates.find(subID) != localRegionStates.end())
-        // Irreducible loop - we already set the predecessor to empty set
-        disableCrossBlock = true;
-      else
-        mergePredAccesses(subID, localRegionStates);
+      RegionState &state = mergePredAccesses(subID, localRegionStates);
 
+      auto *subRegion = LRFI->getRegion(subID);
       if (subRegion->isBlock()) {
-        localDataFlowInBlock(subRegion, localRegionStates);
+        localDataFlowInBlock(state, subRegion->getBlock());
       } else {
         assert(subRegion->isLoop() && "Expected a loop sub-region");
-        detectConflictsInLoop(subRegion, localRegionStates,
-                              accessSetsOfRegions);
-      }
-      // After doing the control flow on the region, and as mentioned above,
-      // the sub-region is the source of a previously visited backedge,
-      // we want to remove the merging candidates from its final state
-      if (disableCrossBlock) {
-        // Clear-out the out state: this is risky irreducible control flow
-        // Only in-block conflict and merging is allowed
-        localRegionStates.find(subID)->getSecond().reset();
+
+        const AccessedStorageResult &loopStorage = accessSetsOfRegions[subID];
+        recordConflicts(state, loopStorage);
       }
     }
   }
@@ -572,33 +548,33 @@ void AccessConflictAndMergeAnalysis::propagateAccessSetsBottomUp(
     const llvm::SmallVector<unsigned, 16> &worklist) {
   for (unsigned regionID : reverse(worklist)) {
     auto *region = LRFI->getRegion(regionID);
-    assert(regionToStorageMap.find(regionID) == regionToStorageMap.end() &&
-           "Should not process a region twice");
-    AccessedStorageSet &accessedStorageSet = regionToStorageMap[regionID];
+    auto iterAndInserted =
+        regionToStorageMap.try_emplace(regionID, AccessedStorageResult());
+    assert(iterAndInserted.second && "Should not process a region twice");
+    AccessedStorageResult &accessResult = iterAndInserted.first->second;
     for (auto subID : region->getSubregions()) {
       auto *subRegion = LRFI->getRegion(subID);
       if (subRegion->isLoop()) {
         // propagate access sets bottom-up from nested loops.
-        auto subRegionStorageIt = regionToStorageMap.find(subID);
-        assert(subRegionStorageIt != regionToStorageMap.end() &&
-               "Should have processed sub-region");
-        for (auto storage : subRegionStorageIt->getSecond()) {
-          accessedStorageSet.insert(storage);
-        }
+        auto subRegionResultIter = regionToStorageMap.find(subID);
+        assert(subRegionResultIter != regionToStorageMap.end()
+               && "Should have processed sub-region");
+        accessResult.mergeFrom(subRegionResultIter->second);
       } else {
         assert(subRegion->isBlock() && "Expected a block region");
         auto *bb = subRegion->getBlock();
         for (auto &instr : *bb) {
-          if (auto *beginAccess = dyn_cast<BeginAccessInst>(&instr)) {
-            const AccessedStorage &storage =
-                findAccessedStorageNonNested(beginAccess->getSource());
-            accessedStorageSet.insert(storage);
+          if (auto fullApply = FullApplySite::isa(&instr)) {
+            FunctionAccessedStorage calleeAccess;
+            // Instead of calling getCallSiteEffects, call getCalleeEffects and
+            // merge ourselves to avoid an extra merge step.
+            ASA->getCalleeEffects(calleeAccess, fullApply);
+            accessResult.mergeFrom(calleeAccess.getResult());
+            continue;
           }
-          if (auto *beginAccess = dyn_cast<BeginUnpairedAccessInst>(&instr)) {
-            const AccessedStorage &storage =
-                findAccessedStorageNonNested(beginAccess->getSource());
-            accessedStorageSet.insert(storage);
-          }
+          // FIXME: Treat may-release conservatively in the anlysis itself by
+          // adding a mayRelease flag, in addition to the unidentified flag.
+          accessResult.analyzeInstruction(&instr);
         }
       }
     }
@@ -633,7 +609,6 @@ void AccessConflictAndMergeAnalysis::visitBeginAccess(
   // Get the Access info:
   auto &beginAccessInfo = result.getAccessInfo(beginAccess);
   if (beginAccessInfo.getKind() == AccessedStorage::Unidentified) {
-    state.unidentifiedAccess = true;
     recordUnknownConflict(state);
     return;
   }
@@ -752,14 +727,13 @@ void AccessConflictAndMergeAnalysis::mergeAccessSet(
 void AccessConflictAndMergeAnalysis::mergeState(RegionState &state,
                                                 const RegionState &otherState,
                                                 bool isInitialized) {
-  state.unidentifiedAccess |= otherState.unidentifiedAccess;
   mergeAccessSet(state.inScopeConflictFreeAccesses,
                  otherState.inScopeConflictFreeAccesses, isInitialized);
   mergeAccessSet(state.outOfScopeConflictFreeAccesses,
                  otherState.outOfScopeConflictFreeAccesses, isInitialized);
 }
 
-void AccessConflictAndMergeAnalysis::mergePredAccesses(
+RegionState &AccessConflictAndMergeAnalysis::mergePredAccesses(
     unsigned regionID, RegionIDToLocalStateMap &localRegionStates) {
   auto regionStateIterAndInserted = localRegionStates.try_emplace(
       regionID, RegionState(result.accessMap.size()));
@@ -780,42 +754,16 @@ void AccessConflictAndMergeAnalysis::mergePredAccesses(
     if (predStateIter == localRegionStates.end()) {
       // Backedge / irreducable control flow - bail
       state.reset();
-      return;
+      break;
     }
     mergeState(state, predStateIter->second, isInitialized);
     isInitialized = true;
   }
+  return state;
 }
 
-void AccessConflictAndMergeAnalysis::detectConflictsInLoop(
-    LoopRegion *loopRegion, RegionIDToLocalStateMap &localRegionStates,
-    LoopRegionToAccessedStorage &accessSetsOfRegions) {
-  assert(loopRegion->isLoop() && "Expected a loop region");
-  auto loopID = loopRegion->getID();
-  RegionState &state = localRegionStates.find(loopID)->getSecond();
-
-  // FIXME!!!: just call recordConflicts instead one loop summaries are fixed.
-  if (state.unidentifiedAccess) {
-    recordUnknownConflict(state);
-    return;
-  }
-  AccessedStorageSet &loopStorage =
-      accessSetsOfRegions.find(loopID)->getSecond();
-  for (const AccessedStorage &currStorage : loopStorage) {
-    // FIXME: The access kind will be part of the loop summary soon.
-    recordInScopeConflicts(state, currStorage, SILAccessKind::Modify);
-
-    removeConflicts(state.inScopeConflictFreeAccesses, currStorage);
-
-    removeConflicts(state.outOfScopeConflictFreeAccesses, currStorage);
-  }
-}
-
-void AccessConflictAndMergeAnalysis::localDataFlowInBlock(
-    LoopRegion *bbRegion, RegionIDToLocalStateMap &localRegionStates) {
-  assert(bbRegion->isBlock() && "Expected a block region");
-  auto *bb = bbRegion->getBlock();
-  RegionState &state = localRegionStates.find(bbRegion->getID())->getSecond();
+void AccessConflictAndMergeAnalysis::localDataFlowInBlock(RegionState &state,
+                                                          SILBasicBlock *bb) {
   for (auto &instr : *bb) {
     if (auto *beginAccess = dyn_cast<BeginAccessInst>(&instr)) {
       visitBeginAccess(beginAccess, state);

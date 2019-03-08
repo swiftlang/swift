@@ -258,9 +258,16 @@ transformCalleeStorage(const StorageAccessInfo &storage,
     }
     // If the argument can't be transformed, demote it to an unidentified
     // access.
+    //
+    // This is an untested bailout. It is only reachable if the call graph
+    // contains an edge that getCallerArg is unable to analyze OR if
+    // findAccessedStorageNonNested returns an invalid SILValue, which won't
+    // pass SIL verification.
+    //
+    // FIXME: In case argVal is invalid, support Unidentified access for invalid
+    // values. This would also be useful for partially invalidating results.
     return StorageAccessInfo(
-      AccessedStorage(storage.getValue(), AccessedStorage::Unidentified),
-      storage);
+        AccessedStorage(argVal, AccessedStorage::Unidentified), storage);
   }
   case AccessedStorage::Nested:
     llvm_unreachable("Unexpected nested access");
