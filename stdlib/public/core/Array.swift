@@ -1875,7 +1875,7 @@ extension Array : Differentiable where Element : AdditiveArithmetic & Differenti
 
     public static var zero: TangentVector {
       get {
-        return TangentVector(elements: [.zero])
+        return TangentVector(elements: [])
       }
     }
     
@@ -1888,25 +1888,15 @@ extension Array : Differentiable where Element : AdditiveArithmetic & Differenti
     }
 
     public static func + (lhs: TangentVector, rhs: TangentVector) -> TangentVector {
-      precondition(lhs.count() == 1 || rhs.count() == 1 || lhs.count() == rhs.count())
-      if lhs.count() == 1 {
-        return TangentVector(elements: rhs.elements.map { $0 + lhs.elements[0] })
-      } else if rhs.count() == 1 {
-        return TangentVector(elements: lhs.elements.map { $0 + rhs.elements[0] })
-      } else {
-        return TangentVector(elements: zip(lhs.elements, rhs.elements).map(+))
-      }
+      return TangentVector(elements: zipLongest(lhs.elements, rhs.elements).map {
+        ($0 ?? .zero) + ($1 ?? .zero)
+      })
     }
 
     public static func - (lhs: TangentVector, rhs: TangentVector) -> TangentVector {
-      precondition(lhs.count() == 1 || rhs.count() == 1 || lhs.count() == rhs.count())
-      if lhs.count() == 1 {
-        return TangentVector(elements: rhs.elements.map { $0 - lhs.elements[0] })
-      } else if rhs.count() == 1 {
-        return TangentVector(elements: lhs.elements.map { $0 - rhs.elements[0] })
-      } else {
-        return TangentVector(elements: zip(lhs.elements, rhs.elements).map(-))
-      }
+      return TangentVector(elements: zipLongest(lhs.elements, rhs.elements).map {
+        ($0 ?? .zero) - ($1 ?? .zero)
+      })
     }
 
     @inlinable @inline(__always)
@@ -1929,7 +1919,7 @@ extension Array : Differentiable where Element : AdditiveArithmetic & Differenti
 
     public static var zero: TangentVector {
       get {
-        return TangentVector(elements: [.zero])
+        return TangentVector(elements: [])
       }
     }
     
@@ -1942,25 +1932,15 @@ extension Array : Differentiable where Element : AdditiveArithmetic & Differenti
     }
 
     public static func + (lhs: TangentVector, rhs: TangentVector) -> TangentVector {
-      precondition(lhs.count() == 1 || rhs.count() == 1 || lhs.count() == rhs.count())
-      if lhs.count() == 1 {
-        return TangentVector(elements: rhs.elements.map { $0 + lhs.elements[0] })
-      } else if rhs.count() == 1 {
-        return TangentVector(elements: lhs.elements.map { $0 + rhs.elements[0] })
-      } else {
-        return TangentVector(elements: zip(lhs.elements, rhs.elements).map(+))
-      }
+      return TangentVector(elements: zipLongest(lhs.elements, rhs.elements).map {
+        ($0 ?? .zero) + ($1 ?? .zero)
+      })
     }
 
     public static func - (lhs: TangentVector, rhs: TangentVector) -> TangentVector {
-      precondition(lhs.count() == 1 || rhs.count() == 1 || lhs.count() == rhs.count())
-      if lhs.count() == 1 {
-        return TangentVector(elements: rhs.elements.map { $0 - lhs.elements[0] })
-      } else if rhs.count() == 1 {
-        return TangentVector(elements: lhs.elements.map { $0 - rhs.elements[0] })
-      } else {
-        return TangentVector(elements: zip(lhs.elements, rhs.elements).map(-))
-      }
+      return TangentVector(elements: zipLongest(lhs.elements, rhs.elements).map {
+        ($0 ?? .zero) - ($1 ?? .zero)
+      })
     }
 
     @inlinable @inline(__always)
@@ -1986,4 +1966,28 @@ extension Array : Differentiable where Element : AdditiveArithmetic & Differenti
   public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
     return TangentVector(elements: zip(self, cotangent.elements).map { $0.tangentVector(from: $1) })
   }
+}
+
+// TODO: Remove once `zipLongest` is part of stdlib.
+fileprivate func zipLongest<Sequence1: Sequence, Sequence2: Sequence>(
+  _ sequence1: Sequence1, 
+  _ sequence2: Sequence2
+) -> [(Sequence1.Element?, Sequence2.Element?)] {
+  var (iterator1, iterator2) = (sequence1.makeIterator(), sequence2.makeIterator())
+  var result = [(Sequence1.Element?, Sequence2.Element?)]()
+  
+  result.reserveCapacity(Swift.max(
+    sequence1.underestimatedCount, 
+    sequence2.underestimatedCount))
+
+  while true {
+    let (element1, element2) = (iterator1.next(), iterator2.next())
+    if element1 == nil && element2 == nil {
+      break
+    } else {
+      result.append((element1, element2))
+    }
+  }
+
+  return result
 }
