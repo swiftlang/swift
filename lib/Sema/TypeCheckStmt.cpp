@@ -1920,6 +1920,48 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
   BraceStmt *BS = FD->getBody();
   assert(BS && "Should have a body");
 
+  // FIXME: FIXME_NOW: DETERMINE: What is the appropriate place for this code to
+  //        live?
+  if (FD->hasSingleExpressionBody()) {
+    auto fnType = FD->getBodyResultTypeLoc().getType();
+    auto returnStmt = cast<ReturnStmt>(BS->getElement(0).get<Stmt *>());
+    auto E = returnStmt->getResult();
+
+    // FIXME: FIXME_NOW: DETERMINE: Does this actually need to be here?  It's 
+    //        being done for closures, but there may be a reason that applies
+    //        there but not here.
+    //
+    //           if (E != FD->getSingleExpressionBody()) {
+    //             FD->setSingleExpressionBody(E);
+    //           }
+
+    if (FD->getBodyResultTypeLoc().isNull() || fnType->isVoid()) {
+      auto voidExpr = TupleExpr::createEmpty(Context,
+                                             E->getStartLoc(),
+                                             E->getEndLoc(),
+                                             /*implicit*/true);
+      returnStmt->setResult(voidExpr);
+      BS = BraceStmt::create(Context,
+                             BS->getStartLoc(),
+                             { E, returnStmt },
+                             BS->getEndLoc(),
+                             /*implicit=*/true);
+    } else {
+      // FIXME: FIXME_NOW: DETERMINE: Is this the appropriate mechanism to use
+      //        to divine the type of E?
+      auto exprTy = typeCheckExpression(E, FD, TypeLoc(),
+                                        CTP_ReturnStmt);
+      if (!exprTy.isNull() && exprTy->isUninhabited() &&
+          exprTy->getCanonicalType() != fnType->getCanonicalType()) {
+        BS = BraceStmt::create(Context,
+                               BS->getStartLoc(),
+                               { E },
+                               BS->getEndLoc(),
+                               /*implicit=*/true);
+      }
+    }
+  }
+
   StmtChecker SC(*this, static_cast<AbstractFunctionDecl *>(FD));
   SC.EndTypeCheckLoc = EndTypeCheckLoc;
   bool HadError = SC.typeCheckBody(BS);
