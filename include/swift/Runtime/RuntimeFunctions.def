@@ -608,12 +608,12 @@ FUNCTION(GetOpaqueTypeMetadata, swift_getOpaqueTypeMetadata, SwiftCC,
          ARGS(SizeTy, Int8PtrTy, OpaqueTypeDescriptorPtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
-// const WitnessTable *swift_getOpaqueTypeConformance(const Metadata *opaqueType,
+// const WitnessTable *swift_getOpaqueTypeConformance(const void * const *arguments,
 //                                     const OpaqueTypeDescriptor *descriptor,
 //                                     uintptr_t index);
 FUNCTION(GetOpaqueTypeConformance, swift_getOpaqueTypeConformance, SwiftCC,
          RETURNS(WitnessTablePtrTy),
-         ARGS(TypeMetadataPtrTy, OpaqueTypeDescriptorPtrTy, SizeTy),
+         ARGS(Int8PtrTy, OpaqueTypeDescriptorPtrTy, SizeTy),
          ATTRS(NoUnwind, ReadOnly))
 
 // Metadata *swift_allocateGenericClassMetadata(ClassDescriptor *type,

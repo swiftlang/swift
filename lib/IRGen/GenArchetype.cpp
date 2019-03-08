@@ -399,15 +399,12 @@ llvm::Value *irgen::emitDynamicTypeOfOpaqueArchetype(IRGenFunction &IGF,
                                  llvm::ConstantInt::get(IGF.IGM.Int1Ty, 0)});
 }
 
-MetadataResponse irgen::emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
-                                          CanOpaqueTypeArchetypeType archetype,
-                                          DynamicMetadataRequest request) {
-  auto accessorFn = IGF.IGM.getGetOpaqueTypeMetadataFn();
-  auto opaqueDecl = archetype->getOpaqueDecl();
-  auto descriptor = IGF.IGM
-   .getAddrOfOpaqueTypeDescriptor(opaqueDecl, ConstantInit());
-
+static void
+withOpaqueTypeGenericArgs(IRGenFunction &IGF,
+                          CanOpaqueTypeArchetypeType archetype,
+                          llvm::function_ref<void (llvm::Value*)> body) {
   // Collect the generic arguments of the opaque decl.
+  auto opaqueDecl = archetype->getOpaqueDecl();
   auto generics = opaqueDecl->getGenericSignatureOfContext();
   llvm::Value *genericArgs;
   Address alloca;
@@ -444,16 +441,34 @@ MetadataResponse irgen::emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
                                             IGF.IGM.Int8PtrTy);
   }
   
-  auto result = IGF.Builder.CreateCall(accessorFn,
-                                   {request.get(IGF), genericArgs, descriptor});
-  result->setDoesNotThrow();
-  result->setCallingConv(IGF.IGM.SwiftCC);
-  result->addAttribute(llvm::AttributeList::FunctionIndex,
-                       llvm::Attribute::ReadOnly);
-  
+  // Pass them down to the body.
+  body(genericArgs);
+
+  // End the alloca's lifetime, if we allocated one.
   if (alloca.getAddress()) {
     IGF.Builder.CreateLifetimeEnd(alloca, allocaSize);
   }
+}
+
+MetadataResponse irgen::emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
+                                          CanOpaqueTypeArchetypeType archetype,
+                                          DynamicMetadataRequest request) {
+  auto accessorFn = IGF.IGM.getGetOpaqueTypeMetadataFn();
+  auto opaqueDecl = archetype->getOpaqueDecl();
+  auto descriptor = IGF.IGM
+   .getAddrOfOpaqueTypeDescriptor(opaqueDecl, ConstantInit());
+
+  llvm::CallInst *result = nullptr;
+  withOpaqueTypeGenericArgs(IGF, archetype,
+    [&](llvm::Value *genericArgs) {
+      result = IGF.Builder.CreateCall(accessorFn,
+                                   {request.get(IGF), genericArgs, descriptor});
+      result->setDoesNotThrow();
+      result->setCallingConv(IGF.IGM.SwiftCC);
+      result->addAttribute(llvm::AttributeList::FunctionIndex,
+                           llvm::Attribute::ReadOnly);
+    });
+  assert(result);
   
   auto response = MetadataResponse::handle(IGF, request, result);
   IGF.setScopedLocalTypeMetadata(archetype, response);
@@ -464,8 +479,6 @@ llvm::Value *irgen::emitOpaqueTypeWitnessTableRef(IRGenFunction &IGF,
                                           CanOpaqueTypeArchetypeType archetype,
                                           ProtocolDecl *protocol) {
   auto accessorFn = IGF.IGM.getGetOpaqueTypeConformanceFn();
-  auto metadata = emitArchetypeTypeMetadataRef(IGF, archetype,
-               DynamicMetadataRequest(MetadataState::Complete)).getMetadata();
   auto opaqueDecl = archetype->getOpaqueDecl();
   auto descriptor = IGF.IGM
     .getAddrOfOpaqueTypeDescriptor(opaqueDecl, ConstantInit());
@@ -478,16 +491,20 @@ llvm::Value *irgen::emitOpaqueTypeWitnessTableRef(IRGenFunction &IGF,
   unsigned index = foundProtocol - archetype->getConformsTo().begin();
   auto indexValue = llvm::ConstantInt::get(IGF.IGM.SizeTy, index);
   
-  auto result = IGF.Builder.CreateCall(accessorFn,
-                                       {metadata, descriptor, indexValue});
-  result->setDoesNotThrow();
-  result->setCallingConv(IGF.IGM.SwiftCC);
-  result->addAttribute(llvm::AttributeList::FunctionIndex,
-                       llvm::Attribute::ReadOnly);
+  llvm::CallInst *result = nullptr;
+  withOpaqueTypeGenericArgs(IGF, archetype,
+    [&](llvm::Value *genericArgs) {
+      result = IGF.Builder.CreateCall(accessorFn,
+                                   {genericArgs, descriptor, indexValue});
+      result->setDoesNotThrow();
+      result->setCallingConv(IGF.IGM.SwiftCC);
+      result->addAttribute(llvm::AttributeList::FunctionIndex,
+                           llvm::Attribute::ReadOnly);
+    });
+  assert(result);
   
   IGF.setScopedLocalTypeData(archetype,
                  LocalTypeDataKind::forAbstractProtocolWitnessTable(protocol),
                  result);
-  
   return result;
 }
