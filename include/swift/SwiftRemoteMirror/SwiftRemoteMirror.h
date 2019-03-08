@@ -37,6 +37,7 @@
 extern "C" {
 #endif
 
+SWIFT_REMOTE_MIRROR_LINKAGE
 extern unsigned long long swift_reflection_classIsSwiftMask;
 
 /// Get the metadata version supported by the Remote Mirror library.
