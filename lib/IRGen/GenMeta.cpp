@@ -1670,8 +1670,11 @@ namespace {
           .subst(O->getUnderlyingInterfaceType(),
                  *O->getUnderlyingTypeSubstitutions());
         
-        // fixme: mangle conformance references
-        B.addInt32(0);
+        auto witnessTableRef = IGM.emitWitnessTableRefString(
+                                          underlyingType, underlyingConformance,
+                                          O->getGenericSignature(),
+                                          /*setLowBit*/ false);
+        B.addRelativeAddress(witnessTableRef);
       }
     }
     
