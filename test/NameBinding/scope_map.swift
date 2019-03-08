@@ -467,7 +467,6 @@ class LazyProperties {
 // CHECK-SEARCHES-NEXT: SourceFile {{.*}} '{{.*}}scope_map.swift' [1:1 - [[EOF:[0-9]+:[0-9]+]]] unexpanded
 // CHECK-SEARCHES: TypeOrExtensionBody {{.*}} 'S0' [4:11 - 6:1] expanded
 // CHECK-SEARCHES: -TypeOrExtensionBody {{.*}} 'InnerC0' [5:17 - 5:19] expanded
-// CHECK-SEARCHES-NOT: {{ expanded}}
 // CHECK-SEARCHES: -TypeDecl {{.*}} ContainsGenerics0 [25:1 - 31:1] expanded
 // CHECK-SEARCHES-NEXT: `-TypeOrExtensionBody {{.*}} 'ContainsGenerics0' [25:25 - 31:1] expanded
 // CHECK-SEARCHES-NEXT:   |-AbstractFunctionDecl {{.*}} init(t:u:) [26:3 - 27:3] expanded
@@ -482,19 +481,17 @@ class LazyProperties {
 // CHECK-SEARCHES: |-AbstractFunctionDecl {{.*}} throwing() [102:1 - 102:26] unexpanded
 // CHECK-SEARCHES: -AbstractFunctionDecl {{.*}} defaultArguments(i:j:) [166:1 - 175:1] expanded
 // CHECK-SEARCHES: DefaultArgument {{.*}} [166:32 - 166:32] expanded
-// CHECK-SEARCHES-NOT: {{ expanded}}
 // CHECK-SEARCHES: |-TypeDecl {{.*}} PatternInitializers [177:1 - 180:1] expanded
 // CHECK-SEARCHES: -TypeOrExtensionBody {{.*}} 'PatternInitializers' [177:28 - 180:1] expanded
 // CHECK-SEARCHES:    |-PatternBinding {{.*}} entry 0 [178:7 - 178:21] unexpanded
 // CHECK-SEARCHES:    `-PatternBinding {{.*}} entry 1 [179:7 - 179:25] expanded
 // CHECK-SEARCHES:      `-PatternInitializer {{.*}} entry 1 [179:16 - 179:25] expanded
 // CHECK-SEARCHES-NOT: {{ expanded}}
-// CHECK-SEARCHES:    |-TypeDecl {{.*}} ProtoWithSubscript [182:1 - 184:1] unexpanded
-// CHECK-SEARCHES-NOT: {{ expanded}}
-// CHECK-SEARCHES: |-AbstractFunctionDecl {{.*}} localPatternsWithSharedType() [186:1 - 188:1] unexpanded
+// CHECK-SEARCHES:    |-TypeDecl {{.*}} ProtoWithSubscript [182:1 - 184:1] expanded
+// CHECK-SEARCHES: |-AbstractFunctionDecl {{.*}} localPatternsWithSharedType() [186:1 - 188:1] expanded
 // CHECK-SEARCHES: `-TypeDecl {{.*}} LazyProperties [190:1 - 194:1] expanded
 // CHECK-SEARCHES: -TypeOrExtensionBody {{.*}} 'LazyProperties' [190:22 - 194:1] expanded
-// CHECK-SEARCHES-NEXT:   |-PatternBinding {{.*}} entry 0 [191:7 - 191:20] unexpanded
-// CHECK-SEARCHES-NEXT:   `-PatternBinding {{.*}} entry 0 [193:12 - 193:29] expanded
+// CHECK-SEARCHES-NEXT:   |-PatternBinding {{.*}} entry 0 [191:7 - 191:20] expanded
+// CHECK-SEARCHES:   `-PatternBinding {{.*}} entry 0 [193:12 - 193:29] expanded
 // CHECK-SEARCHES-NEXT:     `-PatternInitializer {{.*}} entry 0 [193:24 - 193:29] expanded
 // CHECK-SEARCHES-NOT: {{ expanded}}
