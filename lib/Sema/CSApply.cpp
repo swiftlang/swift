@@ -2786,71 +2786,23 @@ namespace {
                               ConformanceCheckFlags::InExpression);
       assert(conformance && "Type does not conform to protocol?");
 
-      // Call the witness that builds the array literal.
-      // FIXME: callWitness() may end up re-doing some work we already did
-      // to convert the array literal elements to the element type. It would
-      // be nicer to re-use them.
-
-      // FIXME: This location info is bogus.
-      Expr *typeRef = TypeExpr::createImplicitHack(expr->getLoc(), arrayTy,
-                                                   tc.Context);
-      cs.cacheExprTypes(typeRef);
-
       DeclName name(tc.Context, DeclBaseName::createConstructor(),
                     { tc.Context.Id_arrayLiteral });
 
-      // Coerce the array elements to be rvalues, so that other type-checker
-      // code that attempts to peephole the AST doesn't have to re-load the
-      // elements (and break the invariant that lvalue nodes only get their
-      // access kind set once).
-      for (auto &element : expr->getElements()) {
-        element = cs.coerceToRValue(element);
-      }
-
-      // Restructure the argument to provide the appropriate labels in the
-      // tuple.
-      SmallVector<TupleTypeElt, 4> typeElements;
-      SmallVector<Identifier, 4> names;
-      bool first = true;
-      for (auto elt : expr->getElements()) {
-        if (first) {
-          typeElements.push_back(TupleTypeElt(cs.getType(elt),
-                                              tc.Context.Id_arrayLiteral));
-          names.push_back(tc.Context.Id_arrayLiteral);
-
-          first = false;
-          continue;
-        }
-
-        typeElements.push_back(cs.getType(elt));
-        names.push_back(Identifier());
-      }
-
-      Type argType = TupleType::get(typeElements, tc.Context);
-      assert(isa<TupleType>(argType.getPointer()));
-
-      Expr *arg =
-        TupleExpr::create(tc.Context, SourceLoc(),
-                          expr->getElements(),
-                          names,
-                          { },
-                          SourceLoc(), /*HasTrailingClosure=*/false,
-                          /*Implicit=*/true,
-                          argType);
-
-      cs.cacheExprTypes(arg);
-
-      cs.setExprTypes(typeRef);
-      cs.setExprTypes(arg);
-
-      Expr *result = tc.callWitness(typeRef, dc, arrayProto, *conformance,
-                                    name, arg, diag::array_protocol_broken);
-      if (!result)
+      ConcreteDeclRef witness =
+          findNamedWitnessImpl(tc, dc, arrayTy->getRValueType(), arrayProto,
+                               name, diag::array_protocol_broken, conformance);
+      if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
         return nullptr;
+      expr->setInitializer(witness);
 
-      cs.cacheExprTypes(result);
+      auto elementType = expr->getElementType();
 
-      expr->setSemanticExpr(result);
+      for (auto &element : expr->getElements()) {
+        element = coerceToType(element, elementType,
+                               cs.getConstraintLocator(element));
+      }
+
       return expr;
     }
 

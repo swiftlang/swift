@@ -2047,6 +2047,8 @@ public:
   }
   void visitArrayExpr(ArrayExpr *E) {
     printCommon(E, "array_expr");
+    PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
+    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
     for (auto elt : E->getElements()) {
       OS << '\n';
       printRec(elt);

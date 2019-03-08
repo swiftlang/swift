@@ -572,6 +572,12 @@ class ExprContextAnalyzer {
       analyzeApplyExpr(Parent);
       break;
     }
+    case ExprKind::Array: {
+      if (auto type = ParsedExpr->getType()) {
+        recordPossibleType(type);
+      }
+      break;
+    }
     case ExprKind::Assign: {
       auto *AE = cast<AssignExpr>(Parent);
 
@@ -715,6 +721,7 @@ public:
         case ExprKind::PrefixUnary:
         case ExprKind::Assign:
         case ExprKind::Subscript:
+        case ExprKind::Array:
           return true;
         case ExprKind::Tuple: {
           auto ParentE = Parent.getAsExpr();
