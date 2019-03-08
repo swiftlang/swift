@@ -1866,7 +1866,41 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
   }
 }
 
-extension Array : Differentiable where Element : AdditiveArithmetic & Differentiable {
+/// `Array<Element>` is a countably infinite direct sum (https://en.wikipedia.org/wiki/Direct_sum) 
+/// of `Element`, when `Element` conforms to `AdditiveArithmetic` and thus has a zero.
+///
+/// Therefore, the most useful (co)tangent space for `Array<Element>` is the countably infinite 
+/// direct sum of `Element.TangentVector`/`Element.CoTangentVector` (since `Element.TangentVector` 
+/// and `Element.CoTangentVector` conform to `AdditiveArithmetic`, they have a zero). If we think of 
+/// all the elements past the end of an array as zeros, values of these direct sums can be 
+/// represented by values of `Array<Element.TangentVector>`/`Array<Element.CotangentVector>`. 
+/// 
+/// The operations are:
+/// - `zero` is `[]` (which is equivalent to `[.zero]`, `[.zero, .zero]`, etc).
+/// - `+` is (pseudocode): 
+///   `a + b = range(max(a.count, b.count)).map { i in (a[i] or .zero) + (b[i] or .zero) }`.
+/// 
+/// This leads to expected behavior when differentiating functions on arrays. For example:
+/// ```
+/// func sumFirstThree(_ array: Array<Float>) -> Float {
+///   return array[0] + array[1] + array[2]
+/// }
+/// ```
+/// We expect the gradient of that to be `[1, 1, 1]`. That is what we get, if we define the pullback 
+/// of array subscripting as follows:
+/// ```
+/// func vjpSubscript(index) {
+///   let result = self[index]
+///   let pullback = { v in
+///     var pb = Array(repeating: zero, count: index + 1)
+///     pb[index] = v
+///     return pb
+///   }
+///   return (result, pullback)
+/// }
+/// ```
+/// 
+extension Array : Differentiable where Element : Differentiable {
   public struct TangentVector : AdditiveArithmetic & Differentiable {
     public typealias TangentVector = Array<Element>.TangentVector
     public typealias CotangentVector = Array<Element>.CotangentVector
