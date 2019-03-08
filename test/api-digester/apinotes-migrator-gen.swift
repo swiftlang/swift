@@ -8,3 +8,4 @@
 // RUN: diff -u %S/Outputs/apinotes-migrator-gen.json %t.result
 // RUN: %api-digester -compare-sdk --input-paths %t.dump2.json -input-paths %t.dump1.json -o %t.result -json
 // RUN: diff -u %S/Outputs/apinotes-migrator-gen-revert.json %t.result
+
