@@ -7,10 +7,12 @@
 func foo(_: Int) { }
 func foo(_: Int, _: Int) { }
 func foo(_: Int, _: Int, _: Int) { }
+func foo(_: Double, _: Int) { }
 
 func testModuleScope(i: Int) {
   // CHECK: (disabled disjunction term {{.*}} (Int) -> ()
   // CHECK-NEXT: (disabled disjunction term {{.*}} (Int, Int, Int) -> ()
+  // CHECK-NEXT: (disabled disjunction term {{.*}} (Double, Int) -> ()
   // CHECK: (introducing single enabled disjunction term {{.*}} (Int, Int) -> ()
   foo(i, i)
 }
@@ -19,6 +21,7 @@ struct X {
   subscript(_: Int) -> Int { return 0 }
   subscript(_: Int, _: Int) -> Double { return 0 }
   subscript(_: Int, _: Int, _: Int) -> String { return "" }
+  subscript(_: Int, _: Double) -> Double { return 0 }
 
   init(_: Int) { }
   init(_: Int, _: Int) { }
@@ -29,6 +32,7 @@ func testSubscript(x: X, i: Int) {
   // CHECK: disabled disjunction term {{.*}} bound to key path application
   // CHECK-NEXT: disabled disjunction term {{.*}}X.subscript(_:)
   // CHECK-NEXT: disabled disjunction term {{.*}}X.subscript(_:_:_:)
+  // CHECK-NEXT: disabled disjunction term {{.*}}X.subscript(_:_:){{.*}}(Int, Double) -> Double
   // CHECK-NEXT: introducing single enabled disjunction term {{.*}} bound to decl overload_filtering.(file).X.subscript(_:_:)
   _ = x[i, i]
 }

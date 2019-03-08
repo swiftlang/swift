@@ -4911,6 +4911,68 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
   return unsolved();
 }
 
+static bool isStructOrEnum(NominalTypeDecl *nominal) {
+  return isa<StructDecl>(nominal) || isa<EnumDecl>(nominal);
+}
+
+/// Check whether this is a nominal type with special implicit conversions.
+static bool isNominalWithSpecialConversions(NominalTypeDecl *nominal) {
+  ASTContext &ctx = nominal->getASTContext();
+  return nominal == ctx.getUnsafeMutableRawPointerDecl() ||
+         nominal == ctx.getUnsafeRawPointerDecl() ||
+         nominal == ctx.getUnsafeMutablePointerDecl() ||
+         nominal == ctx.getUnsafePointerDecl() ||
+         nominal == ctx.getAutoreleasingUnsafeMutablePointerDecl();
+}
+
+bool ConstraintSystem::isConservativelyConvertible(Type fromType, Type toType) {
+  // Look through optionals.
+  fromType = fromType->lookThroughAllOptionalTypes();
+  toType = toType->lookThroughAllOptionalTypes();
+
+  if (fromType->isEqual(toType))
+    return true;
+
+  // For now, all of our rules are depending on having a nominal type that
+  // we're converting from.
+  auto fromNominal = fromType->getAnyNominal();
+  if (!fromNominal || isNominalWithSpecialConversions(fromNominal))
+    return true;
+
+  if (auto toNominal = toType->getAnyNominal()) {
+    if (toNominal == fromNominal || isNominalWithSpecialConversions(toNominal))
+      return true;
+
+    // There are no conversions among different struct/enum types.
+    if (isStructOrEnum(toNominal) && isStructOrEnum(fromNominal))
+      return false;
+  }
+
+  return true;
+}
+
+bool ConstraintSystem::isConservativelyCompatibleApplication(
+    const OverloadChoice &choice, const FunctionType *choiceFnType,
+    const FunctionType *argFnType, ArrayRef<ParamBinding> bindings) {
+  auto choiceParams = choiceFnType->getParams();
+  if (choiceParams.size() != bindings.size())
+     return true;
+
+  // Check whether the parameters and arguments are conservatively compatible.
+  auto argParams = argFnType->getParams();
+  for (unsigned paramIdx : indices(bindings)) {
+    const auto &param = choiceParams[paramIdx];
+    Type paramTy = param.getPlainType();
+    for (unsigned argIdx : bindings[paramIdx]) {
+      Type argTy = argParams[argIdx].getPlainType();
+      if (!isConservativelyConvertible(argTy, paramTy))
+        return false;
+    }
+  }
+
+  return true;
+}
+
 Type ConstraintSystem::simplifyAppliedOverloads(
                                 TypeVariableType *fnTypeVar,
                                 const FunctionType *argFnType,
@@ -4928,9 +4990,11 @@ Type ConstraintSystem::simplifyAppliedOverloads(
   if (!disjunction) return fnType;
 
   // Consider each of the constraints in the disjunction.
+  bool allowTypeMismatches = false;
 retry_after_fail:
   bool hasUnhandledConstraints = false;
   bool labelMismatch = false;
+  bool typeMismatch = false;
 
   /// Tracks a choice that is viable, with information about its
   /// function type and parameter bindings to allow further type-based
@@ -4949,10 +5013,11 @@ retry_after_fail:
 
         // Determine whether the argument labels we have conflict with those of
         // this overload choice.
+        SmallVector<ParamBinding, 4> paramBindings;
         if (argumentLabels &&
             !areConservativelyCompatibleArgumentLabels(
                 choice, argumentLabels->Labels,
-                argumentLabels->HasTrailingClosure)) {
+                argumentLabels->HasTrailingClosure, &paramBindings)) {
           labelMismatch = true;
           return false;
         }
@@ -4979,6 +5044,14 @@ retry_after_fail:
           return true;
         }
 
+        // Check whether the arguments we have make sense with the parameters.
+        if (argumentLabels && !allowTypeMismatches &&
+            !isConservativelyCompatibleApplication(choice, choiceFnType,
+                                                   argFnType, paramBindings)) {
+          typeMismatch = true;
+          return false;
+        }
+
         // Record the type of this choice.
         viableChoices.push_back({constraint, choiceFnType});
         return true;
@@ -4986,6 +5059,11 @@ retry_after_fail:
 
   switch (filterResult) {
   case SolutionKind::Error:
+    if (typeMismatch && shouldAttemptFixes()) {
+      allowTypeMismatches = true;
+      goto retry_after_fail;
+    }
+
     if (labelMismatch && shouldAttemptFixes()) {
       argumentLabels = None;
       goto retry_after_fail;

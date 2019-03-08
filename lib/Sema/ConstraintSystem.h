@@ -66,6 +66,11 @@ namespace swift {
 
 namespace constraints {
 
+/// Describes the arguments to which a parameter binds.
+/// FIXME: This is an awful data structure. We want the equivalent of a
+/// TinyPtrVector for unsigned values.
+using ParamBinding = SmallVector<unsigned, 1>;
+
 /// A handle that holds the saved state of a type variable, which
 /// can be restored.
 class SavedTypeVariableBinding {
@@ -2415,6 +2420,18 @@ public:
                                 bool allowMembers,
                                 DeclContext *useDC);
 
+  /// Conservatively determine whether the given "from" type can be converted
+  /// to the given "to" type, e.g., for checking whether an argument of a
+  /// particular type can be passed to a parameter of a different type.
+  bool isConservativelyConvertible(Type fromType, Type toType);
+
+  /// Conservatively determine whether an application of a given overload
+  /// choice
+  bool isConservativelyCompatibleApplication(const OverloadChoice &choice,
+                                             const FunctionType *choiceFnType,
+                                             const FunctionType *argFnType,
+                                             ArrayRef<ParamBinding> bindings);
+
   /// Add a new overload set to the list of unresolved overload
   /// sets.
   void addOverloadSet(Type boundType, ArrayRef<OverloadChoice> choices,
@@ -3482,11 +3499,6 @@ static inline bool computeTupleShuffle(TupleType *fromTuple,
   return computeTupleShuffle(fromTuple->getElements(), toTuple->getElements(),
                              sources);
 }
-
-/// Describes the arguments to which a parameter binds.
-/// FIXME: This is an awful data structure. We want the equivalent of a
-/// TinyPtrVector for unsigned values.
-using ParamBinding = SmallVector<unsigned, 1>;
 
 /// Class used as the base for listeners to the \c matchCallArguments process.
 ///
