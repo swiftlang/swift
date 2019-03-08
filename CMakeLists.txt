@@ -101,25 +101,6 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   message(STATUS "No build type was specified, will default to ${CMAKE_BUILD_TYPE}")
 endif()
 
-set(SWIFT_STDLIB_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
-    "Build type for the Swift standard library and SDK overlays [Debug, RelWithDebInfo, Release, MinSizeRel]")
-set_property(CACHE SWIFT_STDLIB_BUILD_TYPE PROPERTY
-    STRINGS "Debug" "RelWithDebInfo" "Release" "MinSizeRel")
-
-is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" swift_optimized)
-if(swift_optimized)
-  set(SWIFT_STDLIB_ASSERTIONS_default FALSE)
-else()
-  set(SWIFT_STDLIB_ASSERTIONS_default TRUE)
-endif()
-option(SWIFT_STDLIB_ASSERTIONS
-    "Enable internal checks for the Swift standard library (useful for debugging the library itself, does not affect checks required for safety)"
-    "${SWIFT_STDLIB_ASSERTIONS_default}")
-
-option(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER
-       "Use the host compiler and not the internal clang to build the swift runtime"
-       FALSE)
-
 set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
     "Build Swift with code coverage instrumenting enabled [FALSE, NOT-MERGED, MERGED]")
 set_property(CACHE SWIFT_ANALYZE_CODE_COVERAGE PROPERTY
@@ -146,6 +127,53 @@ set(SWIFT_ENABLE_LLD_LINKER TRUE CACHE BOOL
 set(SWIFT_ENABLE_GOLD_LINKER TRUE CACHE BOOL
     "Enable using the gold linker when available")
 
+set(SWIFT_TOOLS_ENABLE_LTO OFF CACHE STRING "Build Swift tools with LTO. One
+    must specify the form of LTO by setting this to one of: 'full', 'thin'. This
+    option only affects the tools that run on the host (the compiler), and has
+    no effect on the target libraries (the standard library and the runtime).")
+
+# The following only works with the Ninja generator in CMake >= 3.0.
+set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
+  "Define the maximum number of linker jobs for swift.")
+
+option(SWIFT_FORCE_OPTIMIZED_TYPECHECKER "Override the optimization setting of
+  the type checker so that it always compiles with optimization. This eases
+  debugging after type checking occurs by speeding up type checking" FALSE)
+
+# Allow building Swift with Clang's Profile Guided Optimization
+if(SWIFT_PROFDATA_FILE AND EXISTS ${SWIFT_PROFDATA_FILE})
+  if(NOT CMAKE_C_COMPILER_ID MATCHES Clang)
+    message(FATAL_ERROR "SWIFT_PROFDATA_FILE can only be specified when compiling with clang")
+  endif()
+  add_definitions("-fprofile-instr-use=${SWIFT_PROFDATA_FILE}")
+endif()
+
+#
+# User-configurable Swift Standard Library specific options.
+#
+# TODO: Once the stdlib/compiler builds are split, this should be sunk into the
+# stdlib cmake.
+#
+
+set(SWIFT_STDLIB_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
+    "Build type for the Swift standard library and SDK overlays [Debug, RelWithDebInfo, Release, MinSizeRel]")
+set_property(CACHE SWIFT_STDLIB_BUILD_TYPE PROPERTY
+    STRINGS "Debug" "RelWithDebInfo" "Release" "MinSizeRel")
+
+is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" swift_optimized)
+if(swift_optimized)
+  set(SWIFT_STDLIB_ASSERTIONS_default FALSE)
+else()
+  set(SWIFT_STDLIB_ASSERTIONS_default TRUE)
+endif()
+option(SWIFT_STDLIB_ASSERTIONS
+    "Enable internal checks for the Swift standard library (useful for debugging the library itself, does not affect checks required for safety)"
+    "${SWIFT_STDLIB_ASSERTIONS_default}")
+
+option(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER
+       "Use the host compiler and not the internal clang to build the swift runtime"
+       FALSE)
+
 set(SWIFT_SDKS "" CACHE STRING
     "If non-empty, limits building target binaries only to specified SDKs (despite other SDKs being available)")
 
@@ -161,32 +189,11 @@ set(SWIFT_NATIVE_CLANG_TOOLS_PATH "" CACHE STRING
     "Path to the directory that contains Clang tools that are executable on the build machine")
 
 set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "" CACHE STRING
-    "Path to the directory that contains Swift tools that are executable on the build machine")
-
-set(SWIFT_TOOLS_ENABLE_LTO OFF CACHE STRING "Build Swift tools with LTO. One
-    must specify the form of LTO by setting this to one of: 'full', 'thin'. This
-    option only affects the tools that run on the host (the compiler), and has
-    no effect on the target libraries (the standard library and the runtime).")
-
-# The following only works with the Ninja generator in CMake >= 3.0.
-set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
-  "Define the maximum number of linker jobs for swift.")
-
-option(SWIFT_FORCE_OPTIMIZED_TYPECHECKER "Override the optimization setting of
-  the type checker so that it always compiles with optimization. This eases
-  debugging after type checking occurs by speeding up type checking" FALSE)
+   "Path to the directory that contains Swift tools that are executable on the build machine")
 
 option(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES
        "Generate .swiftinterface files alongside .swiftmodule files"
        TRUE)
-
-# Allow building Swift with Clang's Profile Guided Optimization
-if(SWIFT_PROFDATA_FILE AND EXISTS ${SWIFT_PROFDATA_FILE})
-  if(NOT CMAKE_C_COMPILER_ID MATCHES Clang)
-    message(FATAL_ERROR "SWIFT_PROFDATA_FILE can only be specified when compiling with clang")
-  endif()
-  add_definitions("-fprofile-instr-use=${SWIFT_PROFDATA_FILE}")
-endif()
 
 #
 # User-configurable Android specific options.
