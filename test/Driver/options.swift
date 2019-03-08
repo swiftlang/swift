@@ -35,7 +35,7 @@
 // DEFAULT_EXEC_ERR: error: no input files
 // RUN: %swiftc_driver %s -### 2>&1 | %FileCheck -check-prefix=DEFAULT_EXEC  %s
 // DEFAULT_EXEC: -c
-// DEFAULT_EXEC: ld
+// DEFAULT_EXEC: {{ld|clang\+\+}}
 
 // RUN: %swift_driver -repl -### 2>&1 | %FileCheck -check-prefix=REPL %s
 // REPL: warning: unnecessary option '-repl'
