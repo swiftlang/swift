@@ -2418,6 +2418,10 @@ void TypeChecker::checkTypeModifyingDeclAttributes(VarDecl *var) {
 
   if (auto *attr = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
     checkReferenceOwnershipAttr(var, attr);
+
+  if (var->hasPropertyBehavior()) {
+
+  }
 }
 
 void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
