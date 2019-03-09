@@ -1852,13 +1852,11 @@ void ASTScope::forEachLocalBinding(
                          );
           return TypeWalker::Action::Continue;
        });
-   else {
-     GenericParamList *gps = whereDeclContext.is<NominalTypeDecl*>()
-     ? whereDeclContext.get<NominalTypeDecl*>()->getGenericParams()
-     : whereDeclContext.get<ExtensionDecl*>()->getGenericParams();
-      for (GenericTypeParamDecl* gp: *gps)
-          processBinding(gp, nullptr);
-    }
+   GenericParamList *gps = whereDeclContext.is<NominalTypeDecl*>()
+   ? whereDeclContext.get<NominalTypeDecl*>()->getGenericParams()
+   : whereDeclContext.get<ExtensionDecl*>()->getGenericParams();
+    for (GenericTypeParamDecl* gp: *gps)
+        processBinding(gp, nullptr);
     }
     break;
       
