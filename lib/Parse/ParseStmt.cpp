@@ -405,6 +405,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       ParserResult<Decl> DeclResult = 
           parseDecl(IsTopLevel ? PD_AllowTopLevel : PD_Default,
                     [&](Decl *D) {TmpDecls.push_back(D);});
+      BraceItemsStatus |= DeclResult;
       if (DeclResult.isParseError()) {
         NeedParseErrorRecovery = true;
         if (DeclResult.hasCodeCompletion() && IsTopLevel &&
@@ -429,6 +430,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       }
 
       ParserStatus Status = parseExprOrStmt(Result);
+      BraceItemsStatus |= Status;
       if (Status.hasCodeCompletion() && isCodeCompletionFirstPass()) {
         consumeTopLevelDecl(BeginParserPosition, TLCD);
         auto Brace = BraceStmt::create(Context, StartLoc, {}, PreviousLoc);
@@ -461,6 +463,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       diagnose(StartLoc, diag::invalid_nested_init, isSelf)
         .fixItInsert(StartLoc, isSelf ? "self." : "super.");
       NeedParseErrorRecovery = true;
+      BraceItemsStatus.setIsParseError();
     } else {
       ParserStatus ExprOrStmtStatus = parseExprOrStmt(Result);
       BraceItemsStatus |= ExprOrStmtStatus;
