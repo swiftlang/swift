@@ -1389,8 +1389,11 @@ bool UnqualifiedLookupFactory::verifyEqualTo(
     // unsigned printContext(llvm::raw_ostream &OS, unsigned indent = 0,
     // bool onlyAPartialLine = false) const;
   }
-
-  llvm::errs() << "WARNING NOT TESTING DEPS\n";
+  static bool haveWarned = false;
+  if (!haveWarned) {
+    haveWarned = true;
+    llvm::errs() << "WARNING NOT TESTING DEPS\n";
+  }
 //  if (recordedSF != other.recordedSF) {
 //    llvm::errs() << "\n\nrecordedSFs differ: "
 //    << recordedSF
