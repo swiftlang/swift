@@ -1938,18 +1938,23 @@ extension Array : Differentiable where Element : Differentiable {
     public func moved(
       along direction: Array.TangentVector
     ) -> Array.AllDifferentiableVariables {
-      return Array.AllDifferentiableVariables(
-        elements: zip(elements, direction.elements).map { $0.moved(along: $1) })
+      precondition(self.elements.count >= direction.elements.count)
+      let elements = self.elements.indices.map {
+        self.elements[$0].moved(
+          along: $0 < direction.elements.count ? direction.elements[$0] : .zero)
+      }
+      return Array.AllDifferentiableVariables(elements: elements)
     }
 
     @inlinable
     public func tangentVector(
       from cotangent: Array.CotangentVector
     ) -> Array.TangentVector {
-      let elements = zip(self.elements, cotangent.elements).map {
-        $0.tangentVector(from: $1)
-      }
-      return Array.TangentVector(elements: elements)
+      precondition(self.elements.count >= cotangent.elements.count)
+      return Array.TangentVector(elements: self.elements.indices.map {
+        self.elements[$0].tangentVector(
+          from: $0 < cotangent.elements.count ? cotangent.elements[$0] : .zero)
+      })
     }
   }
 
@@ -1990,17 +1995,22 @@ extension Array : Differentiable where Element : Differentiable {
     public func moved(
       along direction: Array.TangentVector
     ) -> [Element.TangentVector] {
-      return zip(elements, direction.elements).map { $0.moved(along: $1) }
+      precondition(self.elements.count >= direction.elements.count)
+      return elements.indices.map {
+        self.elements[$0].moved(
+          along: $0 < direction.elements.count ? direction.elements[$0] : .zero)
+      }
     }
 
     @inlinable
     public func tangentVector(
       from cotangent: Array.CotangentVector
     ) -> Array.TangentVector {
-      let elements = zip(self.elements, cotangent.elements).map {
-        $0.tangentVector(from: $1)
-      }
-      return Array.TangentVector(elements: elements)
+      precondition(self.elements.count >= cotangent.elements.count)
+      return Array.TangentVector(elements: self.elements.indices.map {
+        self.elements[$0].tangentVector(
+          from: $0 < cotangent.elements.count ? cotangent.elements[$0] : .zero)
+      })
     }
   }
 
@@ -2041,31 +2051,41 @@ extension Array : Differentiable where Element : Differentiable {
     public func moved(
       along direction: Array.CotangentVector
     ) -> [Element.CotangentVector] {
-      return zip(elements, direction.elements).map { $0.moved(along: $1) }
+      precondition(self.elements.count >= direction.elements.count)
+      return elements.indices.map {
+        self.elements[$0].moved(
+          along: $0 < direction.elements.count ? direction.elements[$0] : .zero)
+      }
     }
 
     @inlinable
     public func tangentVector(
       from cotangent: Array.TangentVector
     ) -> Array.CotangentVector {
-      let elements = zip(self.elements, cotangent.elements).map {
-        $0.tangentVector(from: $1)
-      }
-      return Array.CotangentVector(elements: elements)
+      precondition(self.elements.count >= cotangent.elements.count)
+      return Array.CotangentVector(elements: self.elements.indices.map {
+        self.elements[$0].tangentVector(
+          from: $0 < cotangent.elements.count ? cotangent.elements[$0] : .zero)
+      })
     }
   }
 
   @inlinable
   public func moved(along direction: TangentVector) -> [Element] {
-    return zip(self, direction.elements).map { $0.moved(along: $1) }
+    precondition(self.count >= direction.elements.count)
+    return indices.map {
+      self[$0].moved(
+        along: $0 < direction.elements.count ? direction.elements[$0] : .zero)
+    }
   }
 
   @inlinable
   public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
-    let elements = zip(self, cotangent.elements).map {
-      $0.tangentVector(from: $1)
-    }
-    return TangentVector(elements: elements)
+    precondition(self.count >= cotangent.elements.count)
+    return TangentVector(elements: indices.map {
+      self[$0].tangentVector(
+        from: $0 < cotangent.elements.count ? cotangent.elements[$0] : .zero)
+    })
   }
 }
 
