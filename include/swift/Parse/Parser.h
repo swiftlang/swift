@@ -425,9 +425,38 @@ public:
     llvm::Optional<SyntaxParsingContext> SynContext;
     bool Backtrack = true;
 
+    /// A token receiver used by the parser in the back tracking scope. This
+    /// receiver will save any consumed tokens during this back tracking scope.
+    /// After the scope ends, it either transfers the saved tokens to the old receiver
+    /// or discard them.
+    struct DelayedTokenReceiver: ConsumeTokenReceiver {
+      /// Keep track of the old token receiver in the parser so that we can recover
+      /// after the backtracking sope ends.
+      llvm::SaveAndRestore<ConsumeTokenReceiver*> savedConsumer;
+
+      // Whether the tokens should be transferred to the original receiver.
+      // When the back tracking scope will actually back track, this should be false;
+      // otherwise true.
+      bool shouldTransfer = false;
+      std::vector<Token> delayedTokens;
+      DelayedTokenReceiver(ConsumeTokenReceiver *&receiver):
+        savedConsumer(receiver, this) {}
+      void receive(Token tok) override {
+        delayedTokens.push_back(tok);
+      }
+      ~DelayedTokenReceiver() {
+        if (!shouldTransfer)
+          return;
+        for (auto tok: delayedTokens) {
+          savedConsumer.get()->receive(tok);
+        }
+      }
+    } TempReceiver;
+
   public:
     BacktrackingScope(Parser &P)
-        : P(P), PP(P.getParserPosition()), DT(P.Diags) {
+        : P(P), PP(P.getParserPosition()), DT(P.Diags),
+          TempReceiver(P.TokReceiver) {
       SynContext.emplace(P.SyntaxContext);
       SynContext->setBackTracking();
     }
@@ -440,8 +469,8 @@ public:
       SynContext->setTransparent();
       SynContext.reset();
       DT.commit();
+      TempReceiver.shouldTransfer = true;
     }
-
   };
 
   /// RAII object that, when it is destructed, restores the parser and lexer to
