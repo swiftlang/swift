@@ -642,20 +642,18 @@ public:
   /// \seealso getDeclContext().
   DeclContext *getInnermostEnclosingDeclContext() const;
 
-  /// Call the passed function with the declarations whose names are directly bound by this scope
-  /// and the contexts in which they were found if any.
+  /// Retrieve the declarations whose names are directly bound by this scope.
   ///
   /// The declarations bound in this scope aren't available in the immediate
   /// parent of this scope, but will still be visible in child scopes (unless
   /// shadowed there).
   ///
-  /// This routine does not produce bindings for anything that can
+  /// Note that this routine does not produce bindings for anything that can
   /// be found via qualified name lookup in a \c DeclContext, such as nominal
   /// type declarations or extensions thereof, or the source file itself. The
   /// client can perform such lookups using the result of \c getDeclContext().
-  void forEachLocalBinding(llvm::function_ref<void(ValueDecl*, DeclContext*)>)
-         const;
- 
+  SmallVector<ValueDecl *, 4> getLocalBindings() const;
+
   /// Expand the entire scope map.
   ///
   /// Normally, the scope map will be expanded only as needed by its queries,

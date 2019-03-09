@@ -1751,10 +1751,15 @@ DeclContext *ASTScope::getDeclContext() const {
 
   case ASTScopeKind::TopLevelCode:
     return topLevelCode;
+      
+  case ASTScopeKind::NominalOrExtensionWhereClause:
+      return whereDeclContext.is<NominalTypeDecl*>()
+        ? up_cast<DeclContext>(whereDeclContext.get<NominalTypeDecl*>())
+        : up_cast<DeclContext>(whereDeclContext.get<  ExtensionDecl*>());
+
 
   case ASTScopeKind::ExtensionGenericParams:
   case ASTScopeKind::GenericParams:
-  case ASTScopeKind::NominalOrExtensionWhereClause:
   case ASTScopeKind::AbstractFunctionParams:
   case ASTScopeKind::PatternBinding:
   case ASTScopeKind::AfterPatternBinding:
@@ -1784,14 +1789,14 @@ DeclContext *ASTScope::getInnermostEnclosingDeclContext() const {
   llvm_unreachable("Top-most scope is a declaration context");
 }
 
-void ASTScope::forEachLocalBinding(
-      llvm::function_ref<void(ValueDecl*, DeclContext*)> processBinding) const {
+SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
+  SmallVector<ValueDecl *, 4> result;
 
   auto handlePattern = [&](const Pattern *pattern) {
     if (!pattern) return;
     pattern->forEachVariable([&](VarDecl *var) {
-      processBinding(var, nullptr);
-    });
+        result.push_back(var);
+      });
   };
 
   switch (getKind()) {
@@ -1811,6 +1816,7 @@ void ASTScope::forEachLocalBinding(
   case ASTScopeKind::SwitchStmt:
   case ASTScopeKind::Accessors:
   case ASTScopeKind::TopLevelCode:
+  case ASTScopeKind::NominalOrExtensionWhereClause:
     // No local declarations.
     break;
 
@@ -1826,46 +1832,20 @@ void ASTScope::forEachLocalBinding(
          genericParams;
          genericParams = genericParams->getOuterParameters()) {
       for (auto param : genericParams->getParams())
-        processBinding(param, nullptr);
+        result.push_back(param);
     }
     break;
   }
 
   case ASTScopeKind::GenericParams:
-    processBinding(genericParams.params->getParams()[genericParams.index],
-                   nullptr);
-    break;
-      
-  case ASTScopeKind::NominalOrExtensionWhereClause: {
-    auto *extensionDecl = whereDeclContext.dyn_cast<ExtensionDecl*>();
-    auto *baseNominal = extensionDecl
-      ? extensionDecl->getExtendedNominal()
-      : whereDeclContext.get<NominalTypeDecl*>();
-    auto *baseProtocol = dyn_cast<ProtocolDecl>(baseNominal);
-    
-    if (baseProtocol)
-      baseProtocol->walkInheritedProtocols([&](ProtocolDecl *p) {
-        for (auto *atm: p->getAssociatedTypeMembers())
-          processBinding(atm,
-                         extensionDecl ? cast<DeclContext>(extensionDecl)
-                                       : cast<DeclContext>(baseProtocol)
-                         );
-          return TypeWalker::Action::Continue;
-       });
-   GenericParamList *gps = whereDeclContext.is<NominalTypeDecl*>()
-   ? whereDeclContext.get<NominalTypeDecl*>()->getGenericParams()
-   : whereDeclContext.get<ExtensionDecl*>()->getGenericParams();
-    for (GenericTypeParamDecl* gp: *gps)
-        processBinding(gp, nullptr);
-    }
+    result.push_back(genericParams.params->getParams()[genericParams.index]);
     break;
       
   case ASTScopeKind::AbstractFunctionParams:
-    processBinding(
+    result.push_back(
       getParameter(abstractFunctionParams.decl,
                    abstractFunctionParams.listIndex,
-                   abstractFunctionParams.paramIndex),
-      nullptr);
+                   abstractFunctionParams.paramIndex));
     break;
 
   case ASTScopeKind::AfterPatternBinding:
@@ -1883,7 +1863,7 @@ void ASTScope::forEachLocalBinding(
     for (auto element : braceStmt.stmt->getElements()) {
       if (auto decl = element.dyn_cast<Decl *>()) {
         if (isa<AbstractFunctionDecl>(decl) || isa<TypeDecl>(decl))
-          processBinding(cast<ValueDecl>(decl), nullptr);
+          result.push_back(cast<ValueDecl>(decl));
       }
     }
     break;
@@ -1907,7 +1887,7 @@ void ASTScope::forEachLocalBinding(
       patternBinding.decl->getPatternList()[0].getInitContext());
     if (initContext) {
       if (auto *selfParam = initContext->getImplicitSelfDecl())
-        processBinding(selfParam, nullptr);
+        result.push_back(selfParam);
     }
 
     break;
@@ -1917,9 +1897,11 @@ void ASTScope::forEachLocalBinding(
     // Note: Parameters all at once is different from functions, but it's not
     // relevant because there are no default arguments.
     for (auto param : *closure->getParameters())
-      processBinding(param, nullptr);
+      result.push_back(param);
     break;
   }
+
+  return result;
 }
 
 void ASTScope::expandAll() const {
