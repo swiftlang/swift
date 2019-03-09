@@ -590,7 +590,12 @@ bool ASTScope::addChild(ASTScope *const child) const {
 
 void ASTScope::addNextGenericParamOrWhereAndBody(Decl *const decl) const {
   if (auto child = createIfNeeded(this, decl)) {
-    if (child->getKind() == ASTScopeKind::TypeOrExtensionBody) {
+    // The which clause comes before the GenericParams scope for an associated
+    // type.
+    const bool isAboutToCreateGenericParamsForAssociatedType =
+    child->getKind() == ASTScopeKind::GenericParams && isa<ProtocolDecl>(decl);
+    if (child->getKind() == ASTScopeKind::TypeOrExtensionBody ||
+        isAboutToCreateGenericParamsForAssociatedType) {
       if (auto *n = dyn_cast<NominalTypeDecl>(decl))
         addNominalOrExtensionWhereClause(n);
     }
@@ -1829,8 +1834,11 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
     ? whereDeclContext.get<NominalTypeDecl*>()
     : whereDeclContext.get<ExtensionDecl*>()->getExtendedNominal();
    if (auto *pd = dyn_cast<ProtocolDecl>(baseNominal))
-     for (auto *atm: pd->getAssociatedTypeMembers())
-       result.push_back(atm);
+     pd->walkInheritedProtocols([&](ProtocolDecl *p) {
+       for (auto *atm: p->getAssociatedTypeMembers())
+         result.push_back(atm);
+       return TypeWalker::Action::Continue;
+     });
    else {
      GenericParamList *gps = whereDeclContext.is<NominalTypeDecl*>()
      ? whereDeclContext.get<NominalTypeDecl*>()->getGenericParams()
