@@ -1843,19 +1843,27 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
   assert((QuoteChar == '"' || QuoteChar == '\'') && "Unexpected start");
 
   bool IsMultilineString = advanceIfMultilineDelimiter(CurPtr, Diags);
-  // Test for single-line Strings that may resemble multiline delimiter
   if (IsMultilineString && *CurPtr != '\n' && *CurPtr != '\r') {
-    const char *TmpPtr = CurPtr + 1;
-    TmpPtr = skipToEndOfInterpolatedExpression(TmpPtr, BufferEnd, false);
-    TmpPtr = TmpPtr - CustomDelimiterLen;
-    if (CustomDelimiterLen != 0
-      && delimiterMatches(CustomDelimiterLen, TmpPtr, Diags)) {
-      // Undo effects from falsely detecting multiline delimiter
-      CurPtr = CurPtr - 2;
-      IsMultilineString = false;
-    } else {
+    // Test for single-line Strings that may resemble multiline delimiter
+    for (const char *Ptr = CurPtr; Ptr <= BufferEnd-CustomDelimiterLen; Ptr++) {
+      if (*Ptr == '\r' || *Ptr == '\n') {
+        break;
+      }
+      if (*Ptr == '#') {
+        const char *TmpPtr = Ptr + 1;
+        while (*TmpPtr == '#') {
+          TmpPtr++;
+        }
+        if (TmpPtr-Ptr == CustomDelimiterLen) {
+          // Undo effects from falsely detecting multiline delimiter
+          CurPtr = CurPtr - 2;
+          IsMultilineString = false;
+        }
+      }
+    }
+    if (IsMultilineString) {
       diagnose(CurPtr, diag::lex_illegal_multiline_string_start)
-        .fixItInsert(Lexer::getSourceLoc(CurPtr), "\n");
+          .fixItInsert(Lexer::getSourceLoc(CurPtr), "\n");
     }
   }
 

@@ -69,7 +69,10 @@ _ = ##"""
 // CHECK: "a raw string with \"\"\" in it"
 
 _ = #"""#
-// CHECK: "a raw string with \" in it"
+// CHECK: "\""
+
+_ = ###"""##"###
+// CHECK: "\"\"##"
 
 let foo = "Interpolation"
 _ = #"\b\b \#(foo)\#(foo) Kappa"#
