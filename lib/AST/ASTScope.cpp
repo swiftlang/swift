@@ -1843,15 +1843,15 @@ void ASTScope::forEachLocalBinding(
       : whereDeclContext.get<NominalTypeDecl*>();
     auto *baseProtocol = dyn_cast<ProtocolDecl>(baseNominal);
     
-   if (baseProtocol)
-     baseProtocol->walkInheritedProtocols([&](ProtocolDecl *p) {
-       for (auto *atm: p->getAssociatedTypeMembers())
-         processBinding(atm,
-                        extensionDecl ? cast<DeclContext>(extensionDecl)
-                                      : cast<DeclContext>(baseProtocol)
-                        );
-       return TypeWalker::Action::Continue;
-     });
+    if (baseProtocol)
+      baseProtocol->walkInheritedProtocols([&](ProtocolDecl *p) {
+        for (auto *atm: p->getAssociatedTypeMembers())
+          processBinding(atm,
+                         extensionDecl ? cast<DeclContext>(extensionDecl)
+                                       : cast<DeclContext>(baseProtocol)
+                         );
+          return TypeWalker::Action::Continue;
+       });
    else {
      GenericParamList *gps = whereDeclContext.is<NominalTypeDecl*>()
      ? whereDeclContext.get<NominalTypeDecl*>()->getGenericParams()
