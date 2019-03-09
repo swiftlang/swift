@@ -1909,8 +1909,22 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
 // }
 // ```
 //
-extension Array : Differentiable where Element : Differentiable {
-  public typealias AllDifferentiableVariables = [Element]
+extension Array : Differentiable 
+  where Element : Differentiable, 
+        Element.AllDifferentiableVariables == Element {
+  public typealias AllDifferentiableVariables = 
+    [Element.AllDifferentiableVariables]
+
+  public var allDifferentiableVariables: AllDifferentiableVariables {
+    get {
+      return self.map { $0.allDifferentiableVariables }
+    }
+    mutating set {
+      for i in indices {
+        self[i].allDifferentiableVariables = newValue[i]
+      }
+    }
+  }
 
   public struct TangentVector : AdditiveArithmetic & Differentiable {
     public typealias AllDifferentiableVariables = Array.TangentVector
@@ -1932,9 +1946,8 @@ extension Array : Differentiable where Element : Differentiable {
       lhs: Array.TangentVector,
       rhs: Array.TangentVector
     ) -> Array.TangentVector {
-      let zippedElements = zipLongest(lhs.elements, rhs.elements)
       return Array.TangentVector(
-        elements: zippedElements.map { ($0 ?? .zero) + ($1 ?? .zero) })
+        elements: zipLongest(lhs.elements, rhs.elements, default: .zero).map(+))
     }
 
     @inlinable
@@ -1942,9 +1955,8 @@ extension Array : Differentiable where Element : Differentiable {
       lhs: Array.TangentVector,
       rhs: Array.TangentVector
     ) -> Array.TangentVector {
-      let zippedElements = zipLongest(lhs.elements, rhs.elements)
       return Array.TangentVector(
-        elements: zippedElements.map { ($0 ?? .zero) - ($1 ?? .zero) })
+        elements: zipLongest(lhs.elements, rhs.elements, default: .zero).map(-))
     }
 
     @inlinable
@@ -1985,9 +1997,8 @@ extension Array : Differentiable where Element : Differentiable {
       lhs: Array.CotangentVector,
       rhs: Array.CotangentVector
     ) -> Array.CotangentVector {
-      let zippedElements = zipLongest(lhs.elements, rhs.elements)
       return Array.CotangentVector(
-        elements: zippedElements.map { ($0 ?? .zero) + ($1 ?? .zero) })
+        elements: zipLongest(lhs.elements, rhs.elements, default: .zero).map(+))
     }
 
     @inlinable
@@ -1995,9 +2006,8 @@ extension Array : Differentiable where Element : Differentiable {
       lhs: Array.CotangentVector,
       rhs: Array.CotangentVector
     ) -> Array.CotangentVector {
-      let zippedElements = zipLongest(lhs.elements, rhs.elements)
       return Array.CotangentVector(
-        elements: zippedElements.map { ($0 ?? .zero) - ($1 ?? .zero) })
+        elements: zipLongest(lhs.elements, rhs.elements, default: .zero).map(-))
     }
 
     @inlinable
@@ -2025,27 +2035,22 @@ extension Array : Differentiable where Element : Differentiable {
 
   @inlinable
   public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
-    return TangentVector(elements: zip(self, cotangent.elements).map { $0.tangentVector(from: $1) })
+    let elements = zip(self, cotangent.elements).map {
+      $0.tangentVector(from: $1)
+    }
+    return TangentVector(elements: elements)
   }
 }
 
-// TODO: Remove once `zipLongest` is part of stdlib.
 @usableFromInline
-internal func zipLongest<Sequence1: Sequence, Sequence2: Sequence>(
-  _ sequence1: Sequence1, 
-  _ sequence2: Sequence2
-) -> [(Sequence1.Element?, Sequence2.Element?)] {
-  var (iterator1, iterator2) = (sequence1.makeIterator(), sequence2.makeIterator())
-  var result = [(Sequence1.Element?, Sequence2.Element?)]()
-  result.reserveCapacity(Swift.max(
-    sequence1.underestimatedCount, 
-    sequence2.underestimatedCount))
-  while true {
-    let (element1, element2) = (iterator1.next(), iterator2.next())
-    if element1 == nil && element2 == nil {
-      break
-    }
-    result.append((element1, element2))
-  }
-  return result
+internal func zipLongest<S: Sequence>(
+  _ sequence1: S, 
+  _ sequence2: S,
+  default defaultValue: S.Element
+) -> LazySequence<UnfoldSequence<(S.Element, S.Element), 
+                                 (S.Iterator, S.Iterator)>> {
+  return sequence(state: (sequence1.makeIterator(), sequence2.makeIterator())) {
+    let (element1, element2) = ($0.0.next(), $0.1.next())
+    return (element1 ?? defaultValue, element2 ?? defaultValue)
+  }.lazy
 }
