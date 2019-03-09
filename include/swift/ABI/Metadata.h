@@ -3005,6 +3005,50 @@ public:
     return cd->getKind() == ContextDescriptorKind::Protocol;
   }
 };
+  
+/// The descriptor for an opaque type.
+template <typename Runtime>
+struct TargetOpaqueTypeDescriptor final
+  : TargetContextDescriptor<Runtime>,
+    TrailingGenericContextObjects<TargetOpaqueTypeDescriptor<Runtime>,
+                                  TargetGenericContextDescriptorHeader,
+                                  RelativeDirectPointer<const char>>
+{
+private:
+  using TrailingGenericContextObjects
+    = TrailingGenericContextObjects<TargetOpaqueTypeDescriptor<Runtime>,
+                                    TargetGenericContextDescriptorHeader,
+                                    RelativeDirectPointer<const char>>;
+  using TrailingObjects =
+    typename TrailingGenericContextObjects::TrailingObjects;
+  friend TrailingObjects;
+
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+
+public:
+  // The kind-specific flags area is used to store the count of the generic
+  // arguments for underlying type(s) encoded in the descriptor.
+  unsigned getNumUnderlyingTypeArguments() const {
+    return this->Flags.getKindSpecificFlags();
+  }
+  
+  using TrailingGenericContextObjects::numTrailingObjects;
+  size_t numTrailingObjects(OverloadToken<RelativeDirectPointer<const char>>) const {
+    return getNumUnderlyingTypeArguments();
+  }
+  
+  const char * getUnderlyingTypeArgument(unsigned i) const {
+    assert(i < getNumUnderlyingTypeArguments());
+    return (this->template getTrailingObjects<RelativeDirectPointer<const char>>())[i];
+  }
+  
+  static bool classof(const TargetContextDescriptor<Runtime> *cd) {
+    return cd->getKind() == ContextDescriptorKind::OpaqueType;
+  }
+};
+  
+using OpaqueTypeDescriptor = TargetOpaqueTypeDescriptor<InProcess>;
 
 /// The instantiation cache for generic metadata.  This must be guaranteed
 /// to zero-initialized before it is first accessed.  Its contents are private

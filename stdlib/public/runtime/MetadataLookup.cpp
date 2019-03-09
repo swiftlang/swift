@@ -1436,6 +1436,34 @@ swift_stdlib_getTypeByMangledNameUntrusted(const char *typeNameStart,
                                     {}, {}).getMetadata();
 }
 
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
+MetadataResponse
+swift_getOpaqueTypeMetadata(MetadataRequest request,
+                            const void * const *arguments,
+                            const OpaqueTypeDescriptor *descriptor,
+                            unsigned index) {
+  auto mangledName = Demangle::makeSymbolicMangledNameStringRef(
+                              descriptor->getUnderlyingTypeArgument(index));
+  SubstGenericParametersFromMetadata substitutions(descriptor, arguments);
+
+  return swift_getTypeByMangledName(request.getState(),
+                                    mangledName,
+                                    arguments,
+                                    substitutions, substitutions)
+    .getResponse();
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
+const WitnessTable *
+swift_getOpaqueTypeConformance(const void * const *arguments,
+                               const OpaqueTypeDescriptor *descriptor,
+                               unsigned index) {
+  auto response = swift_getOpaqueTypeMetadata(
+                                    MetadataRequest(MetadataState::Complete),
+                                    arguments, descriptor, index);
+  return (const WitnessTable *)response.Value;
+}
+
 #if SWIFT_OBJC_INTEROP
 
 // Return the ObjC class for the given type name.
