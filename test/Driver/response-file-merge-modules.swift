@@ -1,4 +1,4 @@
-// RUN: %{python} -c 'for i in range(500001): print "-DTEST_" + str(i)' > %t.resp
+// RUN: %{python} -c 'for i in range(500001): print("-DTEST_" + str(i))' > %t.resp
 // RUN: %swiftc_driver -driver-print-jobs -module-name merge -emit-module %S/Inputs/main.swift %S/Inputs/lib.swift @%t.resp 2>&1 > %t.jobs.txt
 // RUN: %FileCheck %s < %t.jobs.txt -check-prefix=MERGE
 
