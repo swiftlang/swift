@@ -1484,6 +1484,7 @@ public:
   struct ArgumentLabelState {
     ArrayRef<Identifier> Labels;
     bool HasTrailingClosure;
+    bool IgnoreParameterNames;
   };
 
   /// A mapping from the constraint locators for references to various
@@ -3598,7 +3599,8 @@ Expr *getArgumentLabelTargetExpr(Expr *fn);
 /// If this cannot be proven, conservatively returns true.
 bool areConservativelyCompatibleArgumentLabels(
     OverloadChoice choice, ArrayRef<Identifier> labels,
-    bool hasTrailingClosure, SmallVectorImpl<ParamBinding> *bindings = nullptr);
+    bool hasTrailingClosure, bool ignoreParameterNames,
+    SmallVectorImpl<ParamBinding> *bindings = nullptr);
 
 /// Simplify the given locator by zeroing in on the most specific
 /// subexpression described by the locator.

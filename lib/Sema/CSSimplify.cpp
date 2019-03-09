@@ -96,7 +96,8 @@ static Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
 
 bool constraints::areConservativelyCompatibleArgumentLabels(
     OverloadChoice choice, ArrayRef<Identifier> labels,
-    bool hasTrailingClosure, SmallVectorImpl<ParamBinding> *bindings) {
+    bool hasTrailingClosure, bool ignoreParameterNames,
+    SmallVectorImpl<ParamBinding> *bindings) {
   ValueDecl *decl = nullptr;
   Type baseType;
   switch (choice.getKind()) {
@@ -127,6 +128,9 @@ bool constraints::areConservativelyCompatibleArgumentLabels(
   bool hasCurriedSelf;
   if (isa<SubscriptDecl>(decl)) {
     hasCurriedSelf = false;
+  } else if (isa<FuncDecl>(decl) && decl->getDeclContext()->isTypeContext() &&
+             cast<FuncDecl>(decl)->isOperator()) {
+    hasCurriedSelf = true;
   } else if (!baseType || baseType->is<ModuleType>()) {
     hasCurriedSelf = false;
   } else if (baseType->is<AnyMetatypeType>() && decl->isInstanceMember()) {
@@ -161,7 +165,18 @@ bool constraints::areConservativelyCompatibleArgumentLabels(
     assert(levelTy && "Parameter list curry level does not match type");
   }
 
+  SmallVector<AnyFunctionType::Param, 2> paramsScratch;
   auto params = levelTy->getParams();
+
+  // If we were told to ignore parameter names, remove them now.
+  if (ignoreParameterNames) {
+    paramsScratch.reserve(params.size());
+    for (const auto param: params) {
+      paramsScratch.push_back(param.getWithoutLabel());
+    }
+    params = paramsScratch;
+  }
+
   SmallBitVector defaultMap =
     computeDefaultMap(params, decl, hasCurriedSelf);
 
@@ -3701,7 +3716,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         (!candidate.isDecl() || !isa<SubscriptDecl>(candidate.getDecl())) &&
         !areConservativelyCompatibleArgumentLabels(
             candidate, argumentLabels->Labels,
-            argumentLabels->HasTrailingClosure)) {
+            argumentLabels->HasTrailingClosure,
+            argumentLabels->IgnoreParameterNames)) {
       labelMismatch = true;
       result.addUnviable(candidate, MemberLookupResult::UR_LabelMismatch);
       return;
@@ -5017,7 +5033,8 @@ retry_after_fail:
         if (argumentLabels &&
             !areConservativelyCompatibleArgumentLabels(
                 choice, argumentLabels->Labels,
-                argumentLabels->HasTrailingClosure, &paramBindings)) {
+                argumentLabels->HasTrailingClosure,
+                argumentLabels->IgnoreParameterNames, &paramBindings)) {
           labelMismatch = true;
           return false;
         }

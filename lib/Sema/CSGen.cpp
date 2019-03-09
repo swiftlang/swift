@@ -3408,18 +3408,22 @@ namespace {
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      if (auto call = dyn_cast<CallExpr>(expr)) {
-        associateArgumentLabels(call->getFn(),
-                                { call->getArgumentLabels(),
-                                  call->hasTrailingClosure() },
-                                /*labelsArePermanent=*/true);
+      if (auto apply = dyn_cast<ApplyExpr>(expr)) {
+        SmallVector<Identifier, 2> labelsScratch;
+        associateArgumentLabels(
+            apply->getFn(),
+            { apply->getArgumentLabels(labelsScratch),
+              apply->hasTrailingClosure(),
+              /*ignoreParameterNames=*/!isa<CallExpr>(apply) },
+            /*labelsArePermanent=*/isa<CallExpr>(apply));
         return { true, expr };
       }
 
       if (auto subscript = dyn_cast<SubscriptExpr>(expr)) {
         associateArgumentLabels(subscript,
                                 { subscript->getArgumentLabels(),
-                                  subscript->hasTrailingClosure() },
+                                  subscript->hasTrailingClosure(),
+                                  /*ignoreParameterNames=*/false },
                                 /*labelsArePermanent=*/true);
         return { true, expr };
       }
@@ -3427,7 +3431,8 @@ namespace {
       if (auto unresolvedMember = dyn_cast<UnresolvedMemberExpr>(expr)) {
         associateArgumentLabels(unresolvedMember,
                                 { unresolvedMember->getArgumentLabels(),
-                                  unresolvedMember->hasTrailingClosure() },
+                                  unresolvedMember->hasTrailingClosure(),
+                                  /*ignoreParameterNames=*/false },
                                 /*labelsArePermanent=*/true);
         return { true, expr };
       }
