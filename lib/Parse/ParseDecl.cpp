@@ -3330,7 +3330,8 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &Loc,
     // We parsed an identifier for the declaration. If we see another
     // identifier, it might've been a single identifier that got broken by a
     // space or newline accidentally.
-    if (P.Tok.isIdentifierOrUnderscore() && !P.Tok.isContextualDeclKeyword())
+    if (P.Tok.isIdentifierOrUnderscore() && !P.Tok.isContextualDeclKeyword() &&
+        !P.Tok.isContextualKeyword("by"))
       P.diagnoseConsecutiveIDs(Result.str(), Loc, DeclKindName);
 
     // Return success anyway
@@ -5215,7 +5216,26 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
 
       pattern = patternRes.get();
     }
-    
+
+    // Parse a property behavior.
+    if (Tok.isContextualKeyword("by")) {
+      SourceLoc byLoc = consumeToken();
+      ParserResult<TypeRepr> behaviorType =
+          parseType(diag::expected_behavior_type_after_by);
+      if (behaviorType.hasCodeCompletion())
+        return makeResult(makeParserCodeCompletionStatus());
+
+      if (behaviorType.isNonNull()) {
+        if (auto var = pattern->getSingleVar()) {
+          var->setPropertyBehavior(byLoc, behaviorType.get());
+        } else {
+          // FIXME: Support AnyPattern as well, somehow.
+          diagnose(byLoc, diag::property_behavior_not_named)
+            .highlight(pattern->getSourceRange());
+        }
+      }
+    }
+
     // Configure all vars with attributes, 'static' and parent pattern.
     pattern->forEachVariable([&](VarDecl *VD) {
       VD->setStatic(StaticLoc.isValid());

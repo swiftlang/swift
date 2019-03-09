@@ -4608,6 +4608,10 @@ protected:
 
   Type typeInContext;
 
+  /// Property behavior information.
+  SourceLoc byLoc;
+  TypeLoc behaviorTypeLoc;
+
 public:
   VarDecl(bool IsStatic, Specifier Sp, bool IsCaptureList, SourceLoc NameLoc,
           Identifier Name, DeclContext *DC)
@@ -4870,6 +4874,24 @@ public:
   bool isREPLVar() const { return Bits.VarDecl.IsREPLVar; }
   void setREPLVar(bool IsREPLVar) {
     Bits.VarDecl.IsREPLVar = IsREPLVar;
+  }
+
+  /// Whether this variable has a property behavior attached.
+  bool hasPropertyBehavior() const {
+    return !behaviorTypeLoc.isNull();
+  }
+
+  SourceLoc getPropertyBehaviorByLoc() const {
+    return byLoc;
+  }
+
+  TypeLoc &getPropertyBehaviorTypeLoc() {
+    return behaviorTypeLoc;
+  }
+
+  void setPropertyBehavior(SourceLoc byLoc, TypeLoc typeLoc) {
+    this->byLoc = byLoc;
+    this->behaviorTypeLoc = typeLoc;
   }
 
   /// Return the Objective-C runtime name for this property.

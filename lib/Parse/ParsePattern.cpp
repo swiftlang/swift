@@ -920,7 +920,8 @@ ParserResult<Pattern> Parser::parsePattern() {
     PatternCtx.setCreateSyntax(SyntaxKind::IdentifierPattern);
     Identifier name;
     SourceLoc loc = consumeIdentifier(&name);
-    if (Tok.isIdentifierOrUnderscore() && !Tok.isContextualDeclKeyword())
+    if (Tok.isIdentifierOrUnderscore() && !Tok.isContextualDeclKeyword() &&
+        !Tok.isContextualKeyword("by"))
       diagnoseConsecutiveIDs(name.str(), loc, isLet ? "constant" : "variable");
 
     return makeParserResult(createBindingFromPattern(loc, name, specifier));
