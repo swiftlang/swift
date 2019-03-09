@@ -1844,7 +1844,7 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
 
   bool IsMultilineString = advanceIfMultilineDelimiter(CurPtr, Diags);
   if (IsMultilineString && *CurPtr != '\n' && *CurPtr != '\r') {
-    // Test for single-line Strings that may resemble multiline delimiter
+    // Test for single-line string literals that may resemble multiline delimiter.
     for (const char *Ptr = CurPtr; Ptr <= BufferEnd-CustomDelimiterLen; Ptr++) {
       if (*Ptr == '\r' || *Ptr == '\n') {
         break;
@@ -1855,7 +1855,7 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
           TmpPtr++;
         }
         if (TmpPtr-Ptr == CustomDelimiterLen) {
-          // Undo effects from falsely detecting multiline delimiter
+          // Undo effects from falsely detecting multiline delimiter.
           CurPtr = CurPtr - 2;
           IsMultilineString = false;
           break;
