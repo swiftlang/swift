@@ -1950,9 +1950,9 @@ extension Array : Differentiable where Element : Differentiable {
     public func tangentVector(
       from cotangent: Array.CotangentVector
     ) -> Array.TangentVector {
-      precondition(self.elements.count >= cotangent.elements.count)
-      return Array.TangentVector(elements: self.elements.indices.map {
-        self.elements[$0].tangentVector(
+      precondition(elements.count >= cotangent.elements.count)
+      return Array.TangentVector(elements: elements.indices.map {
+        elements[$0].tangentVector(
           from: $0 < cotangent.elements.count ? cotangent.elements[$0] : .zero)
       })
     }
@@ -1979,7 +1979,9 @@ extension Array : Differentiable where Element : Differentiable {
       rhs: Array.TangentVector
     ) -> Array.TangentVector {
       return Array.TangentVector(
-        elements: zipLongest(lhs.elements, rhs.elements, default: .zero).map(+))
+        elements: _lazyZipLongestForArrayTangent(
+          lhs.elements, rhs.elements, default: .zero
+        ).map(+))
     }
 
     @inlinable
@@ -1988,16 +1990,18 @@ extension Array : Differentiable where Element : Differentiable {
       rhs: Array.TangentVector
     ) -> Array.TangentVector {
       return Array.TangentVector(
-        elements: zipLongest(lhs.elements, rhs.elements, default: .zero).map(-))
+        elements: _lazyZipLongestForArrayTangent(
+          lhs.elements, rhs.elements, default: .zero
+        ).map(-))
     }
 
     @inlinable
     public func moved(
       along direction: Array.TangentVector
     ) -> [Element.TangentVector] {
-      precondition(self.elements.count >= direction.elements.count)
+      precondition(elements.count >= direction.elements.count)
       return elements.indices.map {
-        self.elements[$0].moved(
+        elements[$0].moved(
           along: $0 < direction.elements.count ? direction.elements[$0] : .zero)
       }
     }
@@ -2006,9 +2010,9 @@ extension Array : Differentiable where Element : Differentiable {
     public func tangentVector(
       from cotangent: Array.CotangentVector
     ) -> Array.TangentVector {
-      precondition(self.elements.count >= cotangent.elements.count)
-      return Array.TangentVector(elements: self.elements.indices.map {
-        self.elements[$0].tangentVector(
+      precondition(elements.count >= cotangent.elements.count)
+      return Array.TangentVector(elements: elements.indices.map {
+        elements[$0].tangentVector(
           from: $0 < cotangent.elements.count ? cotangent.elements[$0] : .zero)
       })
     }
@@ -2035,7 +2039,9 @@ extension Array : Differentiable where Element : Differentiable {
       rhs: Array.CotangentVector
     ) -> Array.CotangentVector {
       return Array.CotangentVector(
-        elements: zipLongest(lhs.elements, rhs.elements, default: .zero).map(+))
+        elements: _lazyZipLongestForArrayTangent(
+          lhs.elements, rhs.elements, default: .zero
+        ).map(+))
     }
 
     @inlinable
@@ -2044,16 +2050,18 @@ extension Array : Differentiable where Element : Differentiable {
       rhs: Array.CotangentVector
     ) -> Array.CotangentVector {
       return Array.CotangentVector(
-        elements: zipLongest(lhs.elements, rhs.elements, default: .zero).map(-))
+        elements: _lazyZipLongestForArrayTangent(
+          lhs.elements, rhs.elements, default: .zero
+        ).map(-))
     }
 
     @inlinable
     public func moved(
       along direction: Array.CotangentVector
     ) -> [Element.CotangentVector] {
-      precondition(self.elements.count >= direction.elements.count)
+      precondition(elements.count >= direction.elements.count)
       return elements.indices.map {
-        self.elements[$0].moved(
+        elements[$0].moved(
           along: $0 < direction.elements.count ? direction.elements[$0] : .zero)
       }
     }
@@ -2062,9 +2070,9 @@ extension Array : Differentiable where Element : Differentiable {
     public func tangentVector(
       from cotangent: Array.TangentVector
     ) -> Array.CotangentVector {
-      precondition(self.elements.count >= cotangent.elements.count)
-      return Array.CotangentVector(elements: self.elements.indices.map {
-        self.elements[$0].tangentVector(
+      precondition(elements.count >= cotangent.elements.count)
+      return Array.CotangentVector(elements: elements.indices.map {
+        elements[$0].tangentVector(
           from: $0 < cotangent.elements.count ? cotangent.elements[$0] : .zero)
       })
     }
@@ -2072,7 +2080,7 @@ extension Array : Differentiable where Element : Differentiable {
 
   @inlinable
   public func moved(along direction: TangentVector) -> [Element] {
-    precondition(self.count >= direction.elements.count)
+    precondition(count >= direction.elements.count)
     return indices.map {
       self[$0].moved(
         along: $0 < direction.elements.count ? direction.elements[$0] : .zero)
@@ -2081,7 +2089,7 @@ extension Array : Differentiable where Element : Differentiable {
 
   @inlinable
   public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
-    precondition(self.count >= cotangent.elements.count)
+    precondition(count >= cotangent.elements.count)
     return TangentVector(elements: indices.map {
       self[$0].tangentVector(
         from: $0 < cotangent.elements.count ? cotangent.elements[$0] : .zero)
@@ -2090,7 +2098,7 @@ extension Array : Differentiable where Element : Differentiable {
 }
 
 @usableFromInline
-internal func zipLongest<S: Sequence>(
+internal func _lazyZipLongestForArrayTangent<S: Sequence>(
   _ sequence1: S, 
   _ sequence2: S,
   default defaultValue: S.Element
