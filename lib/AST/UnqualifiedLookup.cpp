@@ -501,6 +501,11 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
     lookupOperatorInDeclContexts(contextAndIsCascadingUse);
   else {
     const bool isCascadingUse = computeIsCascadingUse();
+    
+    llvm::errs() << "WARNING: TRYING Scope exclusively";
+    experimentallyLookInASTScopes(contextAndIsCascadingUse);
+    return;
+    
     lookupNamesIntroducedBy(contextAndIsCascadingUse);
     assert(!recordedSF || isCascadingUse == recordedIsCascadingUse);
 
