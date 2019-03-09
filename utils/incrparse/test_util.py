@@ -10,6 +10,8 @@ import subprocess
 import sys
 
 
+is_py2 = sys.version_info[0] == 2
+
 class TestFailedError(Exception):
     pass
 
@@ -22,21 +24,27 @@ def escapeCmdArg(arg):
 
 
 def run_command(cmd):
-    print(' '.join([escapeCmdArg(arg) for arg in cmd]).encode())
+    print(' '.join([escapeCmdArg(arg) for arg in cmd]))
     return subprocess.check_output(cmd, stderr=subprocess.STDOUT)
 
 
 def parseLine(line, line_no, test_case, incremental_edit_args, reparse_args,
               current_reparse_start):
-    pre_edit_line = ""
-    post_edit_line = ""
+    pre_edit_line = b""
+    post_edit_line = b""
 
     # We parse one tag at a time in the line while eating away a prefix of the
     # line
     while line:
         # The regular expression to match the template markers
-        subst_re = re.compile(r'^(.*?)<<(.*?)<(.*?)\|\|\|(.*?)>>>(.*\n?)')
-        reparse_re = re.compile(r'^(.*?)<(/?)reparse ?(.*?)>(.*\n?)')
+        if is_py2:
+            subst_re = re.compile(r'^(.*?)<<(.*?)<(.*?)\|\|\|(.*?)>>>(.*\n?)')
+            reparse_re = re.compile(r'^(.*?)<(/?)reparse ?(.*?)>(.*\n?)')
+        else:
+            # Sadly rb"" strings are not valid in Python 2, so to parse this, we
+            # need to drop the r part and escape everything.
+            subst_re = re.compile(b'^(.*?)<<(.*?)<(.*?)\\|\\|\\|(.*?)>>>(.*\n?)')
+            reparse_re = re.compile(b'^(.*?)<(/?)reparse ?(.*?)>(.*\n?)')
         subst_match = subst_re.match(line)
         reparse_match = reparse_re.match(line)
         if subst_match and reparse_match:
@@ -108,9 +116,9 @@ def parseLine(line, line_no, test_case, incremental_edit_args, reparse_args,
 
 def prepareForIncrParse(test_file, test_case, pre_edit_file, post_edit_file,
                         incremental_edit_args, reparse_args):
-    with io.open(test_file, mode='r', encoding='utf-8') as test_file_handle, \
-            io.open(pre_edit_file, mode='w+', encoding='utf-8') as pre_edit_file_handle, \
-            io.open(post_edit_file, mode='w+', encoding='utf-8') as post_edit_file_handle:
+    with io.open(test_file, mode='rb') as test_file_handle, \
+            io.open(pre_edit_file, mode='w+b') as pre_edit_file_handle, \
+            io.open(post_edit_file, mode='w+b') as post_edit_file_handle:
 
         current_reparse_start = None
 

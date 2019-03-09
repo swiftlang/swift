@@ -102,8 +102,8 @@ def main():
         sys.exit(1)
 
     # Check if the two syntax trees are the same
-    lines = difflib.unified_diff(io.open(incremental_serialized_file, encoding='utf-8').readlines(),
-                                 io.open(post_edit_serialized_file, encoding='utf-8').readlines(),
+    lines = difflib.unified_diff(io.open(incremental_serialized_file, 'r', encoding='utf-8').readlines(),
+                                 io.open(post_edit_serialized_file, 'r', encoding='utf-8').readlines(),
                                  fromfile=incremental_serialized_file,
                                  tofile=incremental_serialized_file)
     diff = '\n'.join(line for line in lines)
