@@ -17,8 +17,8 @@ let _ = ###"invalid"######
 // expected-error@-2{{consecutive statements on a line must be separated by ';'}}
 // expected-error@-3{{expected expression}}
 
-let _ = ##"""##
+let _ = ##"""a
   foobar
-  ##"""##
+  a"""##
 // expected-error@-3{{multi-line string literal content must begin on a new line}}{{14-14=\n}}
 // expected-error@-2{{multi-line string literal closing delimiter must begin on a new line}}{{5-5=\n}}
