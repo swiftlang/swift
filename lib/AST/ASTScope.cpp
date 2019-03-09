@@ -1831,13 +1831,19 @@ void ASTScope::forEachLocalBinding(
     break;
       
   case ASTScopeKind::NominalOrExtensionWhereClause: {
-    NominalTypeDecl *baseNominal = whereDeclContext.is<NominalTypeDecl*>()
-    ? whereDeclContext.get<NominalTypeDecl*>()
-    : whereDeclContext.get<ExtensionDecl*>()->getExtendedNominal();
-   if (auto *pd = dyn_cast<ProtocolDecl>(baseNominal))
-     pd->walkInheritedProtocols([&](ProtocolDecl *p) {
+    auto *extensionDecl = whereDeclContext.dyn_cast<ExtensionDecl*>();
+    auto *baseNominal = extensionDecl
+      ? extensionDecl->getExtendedNominal()
+      : whereDeclContext.get<NominalTypeDecl*>();
+    auto *baseProtocol = dyn_cast<ProtocolDecl>(baseNominal);
+    
+   if (baseProtocol)
+     baseProtocol->walkInheritedProtocols([&](ProtocolDecl *p) {
        for (auto *atm: p->getAssociatedTypeMembers())
-         processBinding(atm, p);
+         processBinding(atm,
+                        extensionDecl ? cast<DeclContext>(extensionDecl)
+                                      : cast<DeclContext>(p)
+                        );
        return TypeWalker::Action::Continue;
      });
    else {
