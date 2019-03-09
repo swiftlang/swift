@@ -592,12 +592,18 @@ void ASTScope::addNextGenericParamOrWhereAndBody(Decl *const decl) const {
   if (auto child = createIfNeeded(this, decl)) {
     // The which clause comes before the GenericParams scope for an associated
     // type.
-    const bool isAboutToCreateGenericParamsForAssociatedType =
-    child->getKind() == ASTScopeKind::GenericParams && isa<ProtocolDecl>(decl);
-    if (child->getKind() == ASTScopeKind::TypeOrExtensionBody ||
-        isAboutToCreateGenericParamsForAssociatedType) {
-      if (auto *n = dyn_cast<NominalTypeDecl>(decl))
-        addNominalOrExtensionWhereClause(n);
+    // TODO: Clean up this logic!!!
+    const bool isInProtocol = isa<ProtocolDecl>(decl);
+    const bool mustHaveAlreadyCreatedWhereClause = isInProtocol &&
+      getKind() == ASTScopeKind::GenericParams;
+    if (!mustHaveAlreadyCreatedWhereClause) {
+      const bool isAboutToCreateGenericParamsForAssociatedType =
+      child->getKind() == ASTScopeKind::GenericParams && isInProtocol;
+      if (child->getKind() == ASTScopeKind::TypeOrExtensionBody ||
+          isAboutToCreateGenericParamsForAssociatedType) {
+        if (auto *n = dyn_cast<NominalTypeDecl>(decl))
+          addNominalOrExtensionWhereClause(n);
+      }
     }
     addChild(child);
   }
@@ -1997,18 +2003,18 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
     printRange();
     break;
       
-    case ASTScopeKind::NominalOrExtensionWhereClause:
-    printScopeKind("NominalOrExtensionWhereClause");
-    out << " binding: '";
-    forEachLocalBinding([&](ValueDecl *v, DeclContext* dc) {
-      v->print(out);
-      if (dc) {
-        out << " in ";
-        dc->printContext(out);
-        out << "\n";
-      }
-    });
-    out << "'\n";
+  case ASTScopeKind::NominalOrExtensionWhereClause:
+    printScopeKind("NominalOrExtensionWhereClause ");
+    if (auto *n = whereDeclContext.dyn_cast<NominalTypeDecl*>()) {
+      printAddress(n);
+      out << " nominal '" << n->getFullName() << "'";
+    }
+    else {
+      auto *e = whereDeclContext.get<ExtensionDecl*>();
+      printAddress(e);
+      out << " extension of '" << e->getExtendedNominal()->getFullName()
+          << "'";
+    }
     printRange();
     break;
       
