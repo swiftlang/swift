@@ -332,9 +332,11 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
   if (key.Kind != LocalTypeDataKind::forFormalTypeMetadata())
     return;
 
-  // Only for primary archetypes.
-  auto type = dyn_cast<PrimaryArchetypeType>(key.Type);
+  // Only for archetypes, and not for opened/opaque archetypes.
+  auto type = dyn_cast<ArchetypeType>(key.Type);
   if (!type)
+    return;
+  if (!isa<PrimaryArchetypeType>(type))
     return;
 
   auto *typeParam = type->getInterfaceType()->castTo<GenericTypeParamType>();

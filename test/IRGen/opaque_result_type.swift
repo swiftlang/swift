@@ -27,8 +27,8 @@ extension Int: O, O2 {
 
 extension String: P {
   // CHECK-LABEL: @"$sSS18opaque_result_typeE3pooQryFQOMQ" = {{.*}} constant <{ {{.*}} }> <{
-  // -- header: opaque type context (0x4), generic (0x80), unique (0x40)
-  // CHECK-SAME:         <i32 0xc4>,
+  // -- header: opaque type context (0x4), generic (0x80), unique (0x40), two entries (0x2_0000)
+  // CHECK-SAME:         <i32 0x2_00c4>,
   // -- parent context: module, or anon context for function
   // CHECK-SAME:         @"$s18opaque_result_typeMXM"
   // -- mangled underlying type
@@ -43,8 +43,8 @@ extension String: P {
 
 public class C: P, Q {
   // CHECK-LABEL: @"$s18opaque_result_type1CC3pooQryFQOMQ" = {{.*}} constant <{ {{.*}} }> <{
-  // -- header: opaque type context (0x4), generic (0x80), unique (0x40)
-  // CHECK-SAME:         <i32 0xc4>
+  // -- header: opaque type context (0x4), generic (0x80), unique (0x40), two entries (0x2_0000)
+  // CHECK-SAME:         <i32 0x2_00c4>
   // -- parent context: module, or anon context for function
   // CHECK-SAME:         @"$s18opaque_result_typeMXM"
   // -- mangled underlying type
@@ -57,8 +57,8 @@ public class C: P, Q {
   }
 
   // CHECK-LABEL: @"$s18opaque_result_type1CC3qooQryFQOMQ" = {{.*}} constant <{ {{.*}} }> <{
-  // -- header: opaque type context (0x4), generic (0x80), unique (0x40)
-  // CHECK-SAME:         <i32 0xc4>
+  // -- header: opaque type context (0x4), generic (0x80), unique (0x40), three entries (0x3_0000)
+  // CHECK-SAME:         <i32 0x3_00c4>
   // -- parent context: module, or anon context for function
   // CHECK-SAME:         @"$s18opaque_result_typeMXM"
   // -- mangled underlying type
@@ -74,8 +74,8 @@ public class C: P, Q {
 }
 
 // CHECK-LABEL: @"$s18opaque_result_type3foo1xQrSS_tFQOMQ" = {{.*}} constant <{ {{.*}} }> <{
-// -- header: opaque type context (0x4), generic (0x80), unique (0x40)
-// CHECK-SAME:         <i32 0xc4>
+// -- header: opaque type context (0x4), generic (0x80), unique (0x40), two entries (0x2_0000)
+// CHECK-SAME:         <i32 0x2_00c4>
 // -- parent context: module, or anon context for function
 // CHECK-SAME:         @"$s18opaque_result_typeMXM"
 // -- mangled underlying type
@@ -88,8 +88,8 @@ func foo(x: String) -> __opaque P {
 }
 
 // CHECK-LABEL: @"$s18opaque_result_type3bar1yQrAA1CC_tFQOMQ" = {{.*}} constant <{ {{.*}} }> <{
-// -- header: opaque type context (0x4), generic (0x80), unique (0x40)
-// CHECK-SAME:         <i32 0xc4>
+// -- header: opaque type context (0x4), generic (0x80), unique (0x40), two entries (0x2_0000)
+// CHECK-SAME:         <i32 0x2_00c4>
 // -- parent context: module, or anon context for function
 // CHECK-SAME:         @"$s18opaque_result_typeMXM"
 // -- mangled underlying type
@@ -102,15 +102,15 @@ func bar(y: C) -> __opaque Q {
 }
 
 // CHECK-LABEL: @"$s18opaque_result_type3baz1zQrx_tAA1PRzAA1QRzlFQOMQ" = {{.*}} constant <{ {{.*}} }> <{
-// -- header: opaque type context (0x4), generic (0x80), unique (0x40), underlying type ordinal 1 (0x1_0000)
-// CHECK-SAME:         <i32 0x1_00c4>
+// -- header: opaque type context (0x4), generic (0x80), unique (0x40), three entries (0x3_0000)
+// CHECK-SAME:         <i32 0x3_00c4>
 // -- parent context: anon context for function
 // CHECK-SAME:         @"$s18opaque_result_type3baz1zQrx_tAA1PRzAA1QRzlFMXX"
 // -- mangled underlying type
 // CHECK-SAME:         @"symbolic x"
-// -- conformance to P (todo)
+// -- conformance to P
 // CHECK-SAME:         @"get_witness_table 18opaque_result_type1PRzAA1QRzlxAaB
-// -- conformance to Q (todo)
+// -- conformance to Q
 // CHECK-SAME:         @"get_witness_table 18opaque_result_type1PRzAA1QRzlxAaC
 // CHECK-SAME:  }>
 func baz<T: P & Q>(z: T) -> __opaque P & Q {

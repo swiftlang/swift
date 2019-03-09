@@ -812,7 +812,9 @@ private:
     std::string Result = Mangler.mangleTypeForDebugger(
         Ty, nullptr);
 
-    if (!Opts.DisableRoundTripDebugTypes) {
+    if (!Opts.DisableRoundTripDebugTypes
+        // FIXME: implement type reconstruction for opaque types
+        && !Ty->hasOpaqueArchetype()) {
       // Make sure we can reconstruct mangled types for the debugger.
 #ifndef NDEBUG
       auto &Ctx = Ty->getASTContext();
@@ -1366,8 +1368,8 @@ private:
       break;
 
     case TypeKind::OpaqueTypeArchetype:
-      // TODO: opaque type resilience
-      llvm_unreachable("should be lowered to underlying type; resilience not implemented");
+      // TODO
+      break;
     case TypeKind::PrimaryArchetype:
     case TypeKind::OpenedArchetype:
     case TypeKind::NestedArchetype: {
