@@ -1383,7 +1383,8 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
   invocation->getPreprocessorOpts().resetNonModularOptions();
 
   clang::CompilerInstance rewriteInstance(
-    Impl.Instance->getPCHContainerOperations());
+    Impl.Instance->getPCHContainerOperations(),
+    &Impl.Instance->getModuleCache());
   rewriteInstance.setInvocation(invocation);
   rewriteInstance.createDiagnostics(new clang::IgnoringDiagConsumer);
 
@@ -1441,7 +1442,8 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   invocation->getLangOpts()->NeededByPCHOrCompilationUsesPCH = true;
 
   clang::CompilerInstance emitInstance(
-    Impl.Instance->getPCHContainerOperations());
+    Impl.Instance->getPCHContainerOperations(),
+    &Impl.Instance->getModuleCache());
   emitInstance.setInvocation(std::move(invocation));
   emitInstance.createDiagnostics(&Impl.Instance->getDiagnosticClient(),
                                  /*ShouldOwnClient=*/false);
