@@ -148,13 +148,29 @@ public struct Quadrature {
         /// Evaluates 21, or 43, or 87 points in the interval until the requested accuracy is reached.
         case qng
         
+        /// Simple non-adaptive automatic integrator using Gauss-Kronrod-Patterson quadrature coefficients.
+        /// Evaluates 21, or 43, or 87 points in the interval until the requested accuracy is reached.
+        public static let nonAdaptive = Integrator.qng
+        
         /// Simple globally adaptive integrator.
         /// Allows selection of the number of Gauss-Kronrod points used in each subinterval, and the max number of subintervals.
         case qag(pointsPerInterval: QAGPointsPerInterval, maxIntervals: Int)
         
+        /// Simple globally adaptive integrator.
+        /// Allows selection of the number of Gauss-Kronrod points used in each subinterval, and the max number of subintervals.
+        public static func adaptive(pointsPerInterval: QAGPointsPerInterval, maxIntervals: Int) -> Integrator  {
+            return Integrator.qag(pointsPerInterval: pointsPerInterval, maxIntervals: maxIntervals)
+        }
+        
         /// Global adaptive quadrature based on 21-point or 15-point (if at least one bound is infinite) Gauss–Kronrod quadrature within each subinterval, with acceleration by Peter Wynn's epsilon algorithm.
         /// If at least one of the interval bounds is infinite, this is equivalent to the QUADPACK QAGI routine. Otherwise, this is equivalent to the QUADPACK QAGS routine.
         case qags(maxIntervals: Int)
+        
+        /// Global adaptive quadrature based on 21-point or 15-point (if at least one bound is infinite) Gauss–Kronrod quadrature within each subinterval, with acceleration by Peter Wynn's epsilon algorithm.
+        /// If at least one of the interval bounds is infinite, this is equivalent to the QUADPACK QAGI routine. Otherwise, this is equivalent to the QUADPACK QAGS routine.
+        public static func adaptiveWithSingularities(maxIntervals: Int) -> Integrator  {
+            return Integrator.qags(maxIntervals: maxIntervals)
+        }
     }
     
     public struct QAGPointsPerInterval {
@@ -176,7 +192,7 @@ public struct Quadrature {
         case integrateMaxEval
         case badIntegrandBehaviour
         
-        init(quadratureStatus: quadrature_status) {
+        public init(quadratureStatus: quadrature_status) {
             switch quadratureStatus {
             case QUADRATURE_ERROR:
                 self = .generic
@@ -193,12 +209,12 @@ public struct Quadrature {
             }
         }
         
-        var errorDescription: String {
+        public var errorDescription: String {
             switch self {
             case .generic:
-                return "Generic error"
+                return "Generic error."
             case .invalidArgument:
-                return "Invalid Argument"
+                return "Invalid Argument."
             case .internal:
                 return "This is a bug in the Quadrature code, please file a bug report."
             case .integrateMaxEval:

@@ -75,7 +75,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         var diameter: Double = 25
         
         // New API
-        let quadrature = Quadrature(integrator: .qng,
+        let quadrature = Quadrature(integrator: .nonAdaptive,
                                     absoluteTolerance: 1.0e-8,
                                     relativeTolerance: 1.0e-2)
         
@@ -129,7 +129,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
             expectEqual(integralResult, legacyResult)
             expectEqual(estimatedAbsoluteError, legacyEstimatedAbsoluteError)
         case .failure( _):
-            expectTrue(false)
+            expectationFailure("Non-adaptive integration failed.", trace: "",
+                               stackTrace: SourceLocStack())
         }
     }
     
@@ -137,7 +138,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         var diameter: Double = 25
         
         // New API
-        let quadrature = Quadrature(integrator: .qags(maxIntervals: 11),
+        let quadrature = Quadrature(integrator: .adaptiveWithSingularities(maxIntervals: 11),
                                     absoluteTolerance: 1.0e-8,
                                     relativeTolerance: 1.0e-2)
         
@@ -191,7 +192,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
             expectEqual(integralResult, legacyResult)
             expectEqual(estimatedAbsoluteError, legacyEstimatedAbsoluteError)
         case .failure( _):
-            expectTrue(false)
+            expectationFailure("Adaptive with singularities integration failed.", trace: "",
+                               stackTrace: SourceLocStack())
         }
     }
     
@@ -199,7 +201,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         var diameter: Double = 25
         
         // New API
-        let quadrature = Quadrature(integrator: .qag(pointsPerInterval: .sixtyOne, maxIntervals: 7),
+        let quadrature = Quadrature(integrator: .adaptive(pointsPerInterval: .sixtyOne,
+                                                          maxIntervals: 7),
                                     absoluteTolerance: 1.0e-8,
                                     relativeTolerance: 1.0e-2)
         
@@ -253,7 +256,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
             expectEqual(integralResult, legacyResult)
             expectEqual(estimatedAbsoluteError, legacyEstimatedAbsoluteError)
         case .failure( _):
-            expectTrue(false)
+            expectationFailure("Adaptive integration failed.", trace: "",
+                               stackTrace: SourceLocStack())
         }
     }
     
@@ -270,6 +274,32 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         
         expectEqual(quadrature.absoluteTolerance, 101)
         expectEqual(quadrature.relativeTolerance, 102)
+    }
+
+    AccelerateTests.test("Quadrature/QAGPointsPerInterval") {
+        expectEqual(Quadrature.QAGPointsPerInterval.fifteen.points, 15)
+        expectEqual(Quadrature.QAGPointsPerInterval.twentyOne.points, 21)
+        expectEqual(Quadrature.QAGPointsPerInterval.thirtyOne.points, 31)
+        expectEqual(Quadrature.QAGPointsPerInterval.fortyOne.points, 41)
+        expectEqual(Quadrature.QAGPointsPerInterval.fiftyOne.points, 51)
+        expectEqual(Quadrature.QAGPointsPerInterval.sixtyOne.points, 61)
+    }
+    
+    AccelerateTests.test("Quadrature/ErrorDescription") {
+        let a = Quadrature.Error(quadratureStatus: QUADRATURE_ERROR)
+        expectEqual(a.errorDescription, "Generic error.")
+        
+        let b = Quadrature.Error(quadratureStatus: QUADRATURE_INVALID_ARG_ERROR)
+        expectEqual(b.errorDescription, "Invalid Argument.")
+        
+        let c = Quadrature.Error(quadratureStatus: QUADRATURE_INTERNAL_ERROR)
+        expectEqual(c.errorDescription, "This is a bug in the Quadrature code, please file a bug report.")
+        
+        let d = Quadrature.Error(quadratureStatus: QUADRATURE_INTEGRATE_MAX_EVAL_ERROR)
+        expectEqual(d.errorDescription, "The requested accuracy limit could not be reached with the allowed number of evals/subdivisions.")
+        
+        let e = Quadrature.Error(quadratureStatus: QUADRATURE_INTEGRATE_BAD_BEHAVIOUR_ERROR)
+        expectEqual(e.errorDescription, "Extremely bad integrand behaviour, or excessive roundoff error occurs at some points of the integration interval.")
     }
 }
 
