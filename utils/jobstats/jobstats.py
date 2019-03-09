@@ -90,7 +90,7 @@ class JobStats(JobData):
                                     else max(a, b)),
                "max": lambda a, b: max(a, b)}
         op = ops[merge_by]
-        for k, v in self.stats.items() + other.stats.items():
+        for k, v in list(self.stats.items()) + list(other.stats.items()):
             if k in merged_stats:
                 merged_stats[k] = op(v, merged_stats[k])
             else:
