@@ -93,12 +93,25 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
   // Type-check this context.
   switch (DC->getContextKind()) {
   case DeclContextKind::AbstractClosureExpr:
-  case DeclContextKind::Initializer:
   case DeclContextKind::Module:
   case DeclContextKind::SerializedLocal:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::EnumElementDecl:
     // Nothing to do for these.
+    break;
+
+  case DeclContextKind::Initializer:
+    if (auto *patternInit = dyn_cast<PatternBindingInitializer>(DC)) {
+      auto *PBD = patternInit->getBinding();
+      auto i = patternInit->getBindingIndex();
+      if (PBD->getInit(i)) {
+        PBD->getPattern(i)->forEachVariable([](VarDecl *VD) {
+          typeCheckCompletionDecl(VD);
+        });
+        if (!PBD->isInitializerChecked(i))
+          typeCheckPatternBinding(PBD, i);
+      }
+    }
     break;
 
   case DeclContextKind::AbstractFunctionDecl: {
