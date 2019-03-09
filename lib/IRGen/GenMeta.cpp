@@ -1663,6 +1663,7 @@ namespace {
     
     void layout() {
       super::layout();
+      addGenericSignature();
       addUnderlyingTypeAndConformances();
     }
     
@@ -1749,10 +1750,11 @@ namespace {
     }
     
     uint16_t getKindSpecificFlags() {
-      // Store the ordinal of the generic argument that represents the opaque
-      // type in the encoded generic signature.
-      return O->getOpaqueInterfaceGenericSignature()
-        ->getGenericParamOrdinal(O->getUnderlyingInterfaceType());
+      // Store the size of the type and conformances vector in the flags.
+      auto opaqueType = O->getDeclaredInterfaceType()
+        ->castTo<OpaqueTypeArchetypeType>();
+
+      return 1 + opaqueType->getConformsTo().size();
     }
   };
 } // end anonymous namespace

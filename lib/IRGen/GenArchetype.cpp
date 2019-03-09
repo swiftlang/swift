@@ -458,11 +458,13 @@ MetadataResponse irgen::emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
   auto descriptor = IGF.IGM
    .getAddrOfOpaqueTypeDescriptor(opaqueDecl, ConstantInit());
 
+  auto indexValue = llvm::ConstantInt::get(IGF.IGM.SizeTy, 0);
+
   llvm::CallInst *result = nullptr;
   withOpaqueTypeGenericArgs(IGF, archetype,
     [&](llvm::Value *genericArgs) {
       result = IGF.Builder.CreateCall(accessorFn,
-                                   {request.get(IGF), genericArgs, descriptor});
+                       {request.get(IGF), genericArgs, descriptor, indexValue});
       result->setDoesNotThrow();
       result->setCallingConv(IGF.IGM.SwiftCC);
       result->addAttribute(llvm::AttributeList::FunctionIndex,
@@ -488,7 +490,7 @@ llvm::Value *irgen::emitOpaqueTypeWitnessTableRef(IRGenFunction &IGF,
                                  protocol);
   assert(foundProtocol != archetype->getConformsTo().end());
   
-  unsigned index = foundProtocol - archetype->getConformsTo().begin();
+  unsigned index = foundProtocol - archetype->getConformsTo().begin() + 1;
   auto indexValue = llvm::ConstantInt::get(IGF.IGM.SizeTy, index);
   
   llvm::CallInst *result = nullptr;
