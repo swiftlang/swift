@@ -1913,7 +1913,7 @@ extension Array : Differentiable where Element : Differentiable {
   public var allDifferentiableVariables: AllDifferentiableVariables {
     get {
       return AllDifferentiableVariables(
-        elements: self.map { $0.allDifferentiableVariables })
+        elements: map { $0.allDifferentiableVariables })
     }
     set {
       for i in indices {
@@ -1938,12 +1938,12 @@ extension Array : Differentiable where Element : Differentiable {
     public func moved(
       along direction: Array.TangentVector
     ) -> Array.AllDifferentiableVariables {
-      precondition(self.elements.count >= direction.elements.count)
-      let elements = self.elements.indices.map {
-        self.elements[$0].moved(
+      precondition(elements.count >= direction.elements.count)
+      let movedElements = elements.indices.map {
+        elements[$0].moved(
           along: $0 < direction.elements.count ? direction.elements[$0] : .zero)
       }
-      return Array.AllDifferentiableVariables(elements: elements)
+      return Array.AllDifferentiableVariables(elements: movedElements)
     }
 
     @inlinable
