@@ -4,6 +4,24 @@ import StdlibUnittest
 
 var ArrayAutodiffTests = TestSuite("ArrayAutodiff")
 
+ArrayAutodiffTests.test("ArrayIdentity") {
+  func arrayIdentity(_ x: [Float]) -> [Float] {
+    return x
+  }
+  let backprop = pullback(at: [1, 2, 3, 4], in: arrayIdentity)
+  expectEqual([1.0, 1.0, 1.0, 1.0], backprop(.zero).elements)
+}
+
+ArrayAutodiffTests.test("ArraySubscript") {
+  func sumFirstThree(_ array: [Float]) -> Float {
+    return array[0] + array[1] + array[2]
+  }
+
+  expectEqual(
+    [1.0, 1.0, 1.0, 0.0, 0.0, 0.0],
+    gradient(at: [0.5, 0.2, 0.3, 0.7, 0.6, 1.0], in: sumFirstThree).elements)
+}
+
 struct Parameter : Equatable {
   @differentiable(wrt: (self), vjp: vjpX)
   let x: Float
@@ -70,16 +88,6 @@ ArrayAutodiffTests.test("ArrayPairMethod") {
                 at: [Parameter(x: 100), Parameter(x: 200)], 
                 in: g
               ).elements)
-}
-
-ArrayAutodiffTests.test("ArraySubscript") {
-  func sumFirstThree(_ array: Array<Float>) -> Float {
-    return array[0] + array[1] + array[2]
-  }
-
-  expectEqual(
-    [1.0, 1.0, 1.0, 0.0, 0.0, 0.0],
-    gradient(at: [0.5, 0.2, 0.3, 0.7, 0.6, 1.0], in: sumFirstThree).elements)
 }
 
 runAllTests()
