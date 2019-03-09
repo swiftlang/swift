@@ -1909,20 +1909,47 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
 // }
 // ```
 //
-extension Array : Differentiable 
-  where Element : Differentiable, 
-        Element.AllDifferentiableVariables == Element {
-  public typealias AllDifferentiableVariables = 
-    [Element.AllDifferentiableVariables]
-
+extension Array : Differentiable where Element : Differentiable {
   public var allDifferentiableVariables: AllDifferentiableVariables {
     get {
-      return self.map { $0.allDifferentiableVariables }
+      return AllDifferentiableVariables(
+        elements: self.map { $0.allDifferentiableVariables })
     }
-    mutating set {
+    set {
       for i in indices {
-        self[i].allDifferentiableVariables = newValue[i]
+        self[i].allDifferentiableVariables = newValue.elements[i]
       }
+    }
+  }
+
+  public struct AllDifferentiableVariables : Differentiable {
+    public typealias AllDifferentiableVariables = 
+      Array.AllDifferentiableVariables
+    public typealias TangentVector = Array.TangentVector
+    public typealias CotangentVector = Array.CotangentVector
+
+    public var elements: [Element.AllDifferentiableVariables]
+
+    public init(elements: [Element.AllDifferentiableVariables]) {
+      self.elements = elements
+    }
+
+    @inlinable
+    public func moved(
+      along direction: Array.TangentVector
+    ) -> Array.AllDifferentiableVariables {
+      return Array.AllDifferentiableVariables(
+        elements: zip(elements, direction.elements).map { $0.moved(along: $1) })
+    }
+
+    @inlinable
+    public func tangentVector(
+      from cotangent: Array.CotangentVector
+    ) -> Array.TangentVector {
+      let elements = zip(self.elements, cotangent.elements).map {
+        $0.tangentVector(from: $1)
+      }
+      return Array.TangentVector(elements: elements)
     }
   }
 
