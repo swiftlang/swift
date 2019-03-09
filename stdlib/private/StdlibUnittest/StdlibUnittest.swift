@@ -255,7 +255,7 @@ public func expectationFailure(
   _ reason: String,
   trace message: String,
   stackTrace: SourceLocStack) {
-  _anyExpectFailed.store(0) /*false*/
+  _anyExpectFailed.store(1) /*true*/
   stackTrace.print()
   print(reason, terminator: reason == "" ? "" : "\n")
   print(message, terminator: message == "" ? "" : "\n")
