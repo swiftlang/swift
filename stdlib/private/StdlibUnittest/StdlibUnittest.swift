@@ -684,7 +684,7 @@ public func expectCrashLater(withMessage message: String = "") {
   var stderr = _Stderr()
   print("\(_stdlibUnittestStreamPrefix);expectCrash;\(message)", to: &stderr)
 
-  _seenExpectCrash.store(1)
+  _seenExpectCrash.store(1) /*true*/
 }
 
 public func expectCrash(withMessage message: String = "", executing: () -> Void) -> Never {
