@@ -1858,6 +1858,7 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
           // Undo effects from falsely detecting multiline delimiter
           CurPtr = CurPtr - 2;
           IsMultilineString = false;
+          break;
         }
       }
     }
