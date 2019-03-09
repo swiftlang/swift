@@ -8,12 +8,14 @@ func foo(_: Int) { }
 func foo(_: Int, _: Int) { }
 func foo(_: Int, _: Int, _: Int) { }
 func foo(_: Double, _: Int) { }
+func foo<T: FloatingPoint>(_: T, _: T) { }
 
 func testModuleScope(i: Int) {
   // CHECK: (disabled disjunction term {{.*}} (Int) -> ()
   // CHECK-NEXT: (disabled disjunction term {{.*}} (Int, Int, Int) -> ()
   // CHECK-NEXT: (disabled disjunction term {{.*}} (Double, Int) -> ()
-  // CHECK: (introducing single enabled disjunction term {{.*}} (Int, Int) -> ()
+  // CHECK-NEXT: (disabled disjunction term {{.*}} <T where T : FloatingPoint> (T, T) -> ()
+  // CHECK-NEXT: (introducing single enabled disjunction term {{.*}} (Int, Int) -> ()
   foo(i, i)
 }
 

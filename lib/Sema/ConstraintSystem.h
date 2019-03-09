@@ -2424,7 +2424,8 @@ public:
   /// Conservatively determine whether the given "from" type can be converted
   /// to the given "to" type, e.g., for checking whether an argument of a
   /// particular type can be passed to a parameter of a different type.
-  bool isConservativelyConvertible(Type fromType, Type toType);
+  bool isConservativelyConvertible(Type fromType, Type toType,
+                                   GenericSignature *genericSig);
 
   /// Conservatively determine whether an application of a given overload
   /// choice

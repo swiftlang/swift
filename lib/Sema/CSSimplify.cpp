@@ -4941,7 +4941,8 @@ static bool isNominalWithSpecialConversions(NominalTypeDecl *nominal) {
          nominal == ctx.getAutoreleasingUnsafeMutablePointerDecl();
 }
 
-bool ConstraintSystem::isConservativelyConvertible(Type fromType, Type toType) {
+bool ConstraintSystem::isConservativelyConvertible(
+    Type fromType, Type toType, GenericSignature *genericSig) {
   // Look through optionals.
   fromType = fromType->lookThroughAllOptionalTypes();
   toType = toType->lookThroughAllOptionalTypes();
@@ -4952,7 +4953,7 @@ bool ConstraintSystem::isConservativelyConvertible(Type fromType, Type toType) {
   // For now, all of our rules are depending on having a nominal type that
   // we're converting from.
   auto fromNominal = fromType->getAnyNominal();
-  if (!fromNominal || isNominalWithSpecialConversions(fromNominal))
+  if (!fromNominal)
     return true;
 
   if (auto toNominal = toType->getAnyNominal()) {
@@ -4962,6 +4963,15 @@ bool ConstraintSystem::isConservativelyConvertible(Type fromType, Type toType) {
     // There are no conversions among different struct/enum types.
     if (isStructOrEnum(toNominal) && isStructOrEnum(fromNominal))
       return false;
+  } else if (toType->isTypeParameter() && genericSig) {
+    // If there are any protocol constraints on the type parameter that the
+    // nominal type does not conform to, then it's not compatible.
+    auto module = DC->getParentModule();
+    for (auto proto : genericSig->getConformsTo(toType)) {
+      SmallVector<ProtocolConformance *, 4> conformances;
+      if (!fromNominal->lookupConformance(module, proto, conformances))
+        return false;
+    }
   }
 
   return true;
@@ -4974,6 +4984,14 @@ bool ConstraintSystem::isConservativelyCompatibleApplication(
   if (choiceParams.size() != bindings.size())
      return true;
 
+  // Dig out the generic signature of the choice, which will allow us to
+  // interpret type parameters in the parameter type.
+  GenericSignature *genericSig = nullptr;
+  if (auto decl = choice.getDecl()) {
+    genericSig = decl->getInnermostDeclContext()
+        ->getGenericSignatureOfContext();
+  }
+
   // Check whether the parameters and arguments are conservatively compatible.
   auto argParams = argFnType->getParams();
   for (unsigned paramIdx : indices(bindings)) {
@@ -4981,7 +4999,7 @@ bool ConstraintSystem::isConservativelyCompatibleApplication(
     Type paramTy = param.getPlainType();
     for (unsigned argIdx : bindings[paramIdx]) {
       Type argTy = argParams[argIdx].getPlainType();
-      if (!isConservativelyConvertible(argTy, paramTy))
+      if (!isConservativelyConvertible(argTy, paramTy, genericSig))
         return false;
     }
   }
