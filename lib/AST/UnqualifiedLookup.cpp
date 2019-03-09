@@ -198,7 +198,6 @@ private:
 
 public: // for exp debugging
   SourceFile const *recordedSF = nullptr;
-  DeclName recordedName;
   bool recordedIsCascadingUse = false;
 
 public:
@@ -438,7 +437,8 @@ public:
       bool isCascadingUse, NLOptions baseNLOptions
       );
 
-  void dumpBreadcrumbs() const;
+  void dump() const;
+  void print(raw_ostream &OS) const;
 
   bool verifyEqualTo(const UnqualifiedLookupFactory &&) const;
   
@@ -1152,7 +1152,6 @@ void UnqualifiedLookupFactory::recordDependencyOnTopLevelName(
     DeclContext *topLevelContext, DeclName name, bool isCascadingUse) {
   recordLookupOfTopLevelName(topLevelContext, Name, isCascadingUse);
   recordedSF = dyn_cast<SourceFile>(topLevelContext);
-  recordedName = Name;
   recordedIsCascadingUse = isCascadingUse;
 }
 
@@ -1351,24 +1350,68 @@ bool UnqualifiedLookupFactory::verifyEqualTo(
   if (shouldDiffer()) {
      return true;
   }
-  assert(Results.size() == other.Results.size());
+  if (Results.size() != other.Results.size()) {
+    llvm::errs() << "\n\nResults sizes differ: "
+    << Results.size()
+    << " vs \n"
+    << other.Results.size()
+    << "\n";
+    dump();
+    assert(false);
+  }
+  if (IndexOfFirstOuterResult != other.IndexOfFirstOuterResult) {
+    llvm::errs() << "\n\nIndexOfFirstOuterResults differ: "
+    << IndexOfFirstOuterResult
+    << " vs \n"
+    << other.IndexOfFirstOuterResult
+    << "\n";
+    dump();
+    assert(false);
+  }
   for (size_t i : indices(Results)) {
     const auto &e = Results[i];
     const auto &oe = other.Results[i];
-    assert(e.getValueDecl() == oe.getValueDecl());
-    assert(e.getDeclContext() == oe.getDeclContext());
+    if (e.getValueDecl() != oe.getValueDecl()) {
+      llvm::errs() << "\n\nValueDecls differ:\n";
+      if (e.getValueDecl()) e.getValueDecl()->print(llvm::errs());
+      llvm::errs() << " vs \n";
+      if (oe.getValueDecl()) oe.getValueDecl()->print(llvm::errs());
+      llvm::errs() << "\n";
+      dump();
+      assert(false);
+    }
+    if (e.getDeclContext() != oe.getDeclContext()) {
+      llvm::errs() << "\n\nContexts differ:\n";
+      if (e.getDeclContext()) e.getDeclContext()->printContext(llvm::errs());
+      llvm::errs() << " vs \n";
+      if (oe.getDeclContext()) oe.getDeclContext()->printContext(llvm::errs());
+      llvm::errs() << "\n";
+      dump();
+      assert(false);
+    }
     // unsigned printContext(llvm::raw_ostream &OS, unsigned indent = 0,
     // bool onlyAPartialLine = false) const;
-    assert(e.getBaseDecl() == oe.getBaseDecl());
   }
-  assert(IndexOfFirstOuterResult == other.IndexOfFirstOuterResult);
+
   llvm::errs() << "WARNING NOT TESTING DEPS\n";
-//  assert(recordedSF == other.recordedSF);
-//  assert(recordedName == other.recordedName);
-//  if (recordedIsCascadingUse)
-//    assert(other.recordedIsCascadingUse);
-//  else
-//    assert(!other.recordedIsCascadingUse);
+//  if (recordedSF != other.recordedSF) {
+//    llvm::errs() << "\n\nrecordedSFs differ: "
+//    << recordedSF
+//    << " vs \n"
+//    << other.recordedSF
+//    << "\n";
+//    dump();
+//    assert(false);
+//  }
+//  if (recordedIsCascadingUse != other.recordedSF) {
+//    llvm::errs() << "\n\nother.recordedIsCascadingUses differ: "
+//    << recordedIsCascadingUse
+//    << " vs \n"
+//    << other.recordedIsCascadingUse
+//    << "\n";
+//    dump();
+//    assert(false);
+//  }
   return true;
 }
 
@@ -1379,4 +1422,15 @@ bool UnqualifiedLookupFactory::shouldDiffer() const {
   return SF->getFilename() == "/Volumes/AS/s/exp-dep/swift/test/NameBinding/name-binding.swift" &&
   isa<AbstractFunctionDecl>(DC) &&
   (Name.getBaseName() == "v" || Name.getBaseName() == "x");
+}
+
+void UnqualifiedLookupFactory::dump() const {
+  print(llvm::errs());
+}
+void UnqualifiedLookupFactory::print(raw_ostream &OS) const {
+  OS << "Looking up '" << Name << " at: ";
+  Loc.print(OS, DC->getASTContext().SourceMgr);
+  OS << "\nStarting in: ";
+  DC->printContext(OS);
+  OS << "\n";
 }
