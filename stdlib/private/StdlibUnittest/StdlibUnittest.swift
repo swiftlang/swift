@@ -124,10 +124,10 @@ public func expectFailure(
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line, invoking body: () -> Void) {
   let startAnyExpectFailed = _anyExpectFailed.load()
-  _anyExpectFailed.store(0)
+  _anyExpectFailed.store(0) /*false*/
   body()
   let endAnyExpectFailed = _anyExpectFailed.load()
-  _anyExpectFailed.store(0)
+  _anyExpectFailed.store(0) /*false*/
   expectTrue(
     endAnyExpectFailed != 0, "running `body` should produce an expected failure",
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line)
@@ -255,7 +255,7 @@ public func expectationFailure(
   _ reason: String,
   trace message: String,
   stackTrace: SourceLocStack) {
-  _anyExpectFailed.store(0)
+  _anyExpectFailed.store(0) /*false*/
   stackTrace.print()
   print(reason, terminator: reason == "" ? "" : "\n")
   print(message, terminator: message == "" ? "" : "\n")
@@ -829,7 +829,7 @@ func _childProcess() {
     }
 
     let testSuite = _allTestSuites[_testSuiteNameToIndex[testSuiteName]!]
-    _anyExpectFailed.store(0)
+    _anyExpectFailed.store(0) /*false*/
     testSuite._runTest(name: testName, parameter: testParameter)
 
     print("\(_stdlibUnittestStreamPrefix);end;\(_anyExpectFailed.load() != 0)")
@@ -1206,9 +1206,9 @@ class _ParentProcess {
     if _runTestsInProcess {
       if t.stdinText != nil {
         print("The test \(fullTestName) requires stdin input and can't be run in-process, marking as failed")
-        _anyExpectFailed.store(1)
+        _anyExpectFailed.store(1) /*true*/
       } else {
-        _anyExpectFailed.store(0)
+        _anyExpectFailed.store(0) /*false*/
         testSuite._runTest(name: t.name, parameter: testParameter)
       }
     } else {
