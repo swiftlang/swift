@@ -617,10 +617,12 @@ void UnqualifiedLookupFactory::lookInASTScope(
     const ASTScopeLookupState state) {
 
   // Perform local lookup within this scope.
-  auto localBindings = state.scope->getLocalBindings();
-  for (auto local : localBindings)
-    Consumer.foundDecl(local, getLocalDeclVisibilityKind(state.scope),
-                       state.scope->getBaseDCForLocalBindings());
+  state.scope->forEachLocalBinding(
+    [&](ValueDecl *local, DeclContext *context) {
+    Consumer.foundDecl(local,
+                       getLocalDeclVisibilityKind(state.scope),
+                       context);
+    });
 
   ifNotDoneYet([&] {
     // When we are in the body of a method, get the 'self' declaration.

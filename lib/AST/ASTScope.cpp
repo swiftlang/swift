@@ -1778,14 +1778,14 @@ DeclContext *ASTScope::getInnermostEnclosingDeclContext() const {
   llvm_unreachable("Top-most scope is a declaration context");
 }
 
-SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
-  SmallVector<ValueDecl *, 4> result;
+void ASTScope::forEachLocalBinding(
+      llvm::function_ref<void(ValueDecl*, DeclContext*)> processBinding) const {
 
   auto handlePattern = [&](const Pattern *pattern) {
     if (!pattern) return;
     pattern->forEachVariable([&](VarDecl *var) {
-        result.push_back(var);
-      });
+      processBinding(var, nullptr);
+    });
   };
 
   switch (getKind()) {
@@ -1820,13 +1820,14 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
          genericParams;
          genericParams = genericParams->getOuterParameters()) {
       for (auto param : genericParams->getParams())
-        result.push_back(param);
+        processBinding(param, nullptr);
     }
     break;
   }
 
   case ASTScopeKind::GenericParams:
-    result.push_back(genericParams.params->getParams()[genericParams.index]);
+    processBinding(genericParams.params->getParams()[genericParams.index],
+                   nullptr);
     break;
       
   case ASTScopeKind::NominalOrExtensionWhereClause: {
@@ -1836,7 +1837,7 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
    if (auto *pd = dyn_cast<ProtocolDecl>(baseNominal))
      pd->walkInheritedProtocols([&](ProtocolDecl *p) {
        for (auto *atm: p->getAssociatedTypeMembers())
-         result.push_back(atm);
+         processBinding(atm, p);
        return TypeWalker::Action::Continue;
      });
    else {
@@ -1844,19 +1845,17 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
      ? whereDeclContext.get<NominalTypeDecl*>()->getGenericParams()
      : whereDeclContext.get<ExtensionDecl*>()->getGenericParams();
       for (GenericTypeParamDecl* gp: *gps)
-          result.push_back(gp);
+          processBinding(gp, nullptr);
     }
     }
     break;
-
-      
-      
       
   case ASTScopeKind::AbstractFunctionParams:
-    result.push_back(
+    processBinding(
       getParameter(abstractFunctionParams.decl,
                    abstractFunctionParams.listIndex,
-                   abstractFunctionParams.paramIndex));
+                   abstractFunctionParams.paramIndex),
+      nullptr);
     break;
 
   case ASTScopeKind::AfterPatternBinding:
@@ -1874,7 +1873,7 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
     for (auto element : braceStmt.stmt->getElements()) {
       if (auto decl = element.dyn_cast<Decl *>()) {
         if (isa<AbstractFunctionDecl>(decl) || isa<TypeDecl>(decl))
-          result.push_back(cast<ValueDecl>(decl));
+          processBinding(cast<ValueDecl>(decl), nullptr);
       }
     }
     break;
@@ -1898,7 +1897,7 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
       patternBinding.decl->getPatternList()[0].getInitContext());
     if (initContext) {
       if (auto *selfParam = initContext->getImplicitSelfDecl())
-        result.push_back(selfParam);
+        processBinding(selfParam, nullptr);
     }
 
     break;
@@ -1908,51 +1907,8 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
     // Note: Parameters all at once is different from functions, but it's not
     // relevant because there are no default arguments.
     for (auto param : *closure->getParameters())
-      result.push_back(param);
+      processBinding(param, nullptr);
     break;
-  }
-
-  return result;
-}
-
-DeclContext* ASTScope::getBaseDCForLocalBindings() const {
-  switch (getKind()) {
-    // HACK for compatibility
-    case ASTScopeKind::NominalOrExtensionWhereClause:
-      if (auto *ed = whereDeclContext.dyn_cast<ExtensionDecl*>()) {
-        if (isa<ProtocolDecl>(ed->getExtendedNominal()))
-          return ed;
-      }
-      return nullptr;
-      
-    case ASTScopeKind::Preexpanded:
-    case ASTScopeKind::SourceFile:
-    case ASTScopeKind::TypeDecl:
-    case ASTScopeKind::ExtensionGenericParams:
-    case ASTScopeKind::TypeOrExtensionBody:
-    case ASTScopeKind::GenericParams:
-    case ASTScopeKind::AbstractFunctionDecl:
-    case ASTScopeKind::AbstractFunctionParams:
-    case ASTScopeKind::DefaultArgument:
-    case ASTScopeKind::AbstractFunctionBody:
-    case ASTScopeKind::PatternBinding:
-    case ASTScopeKind::PatternInitializer:
-    case ASTScopeKind::AfterPatternBinding:
-    case ASTScopeKind::BraceStmt:
-    case ASTScopeKind::IfStmt:
-    case ASTScopeKind::ConditionalClause:
-    case ASTScopeKind::GuardStmt:
-    case ASTScopeKind::RepeatWhileStmt:
-    case ASTScopeKind::ForEachStmt:
-    case ASTScopeKind::ForEachPattern:
-    case ASTScopeKind::DoCatchStmt:
-    case ASTScopeKind::CatchStmt:
-    case ASTScopeKind::SwitchStmt:
-    case ASTScopeKind::CaseStmt:
-    case ASTScopeKind::Accessors:
-    case ASTScopeKind::Closure:
-    case ASTScopeKind::TopLevelCode:
-      return nullptr;
   }
 }
 
@@ -2038,10 +1994,14 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
     case ASTScopeKind::NominalOrExtensionWhereClause:
     printScopeKind("NominalOrExtensionWhereClause");
     out << " binding: '";
-    interleave(getLocalBindings(),
-               [&](ValueDecl *v) { v->print(out); },
-               [&]() { out << ", "; }
-    );
+    forEachLocalBinding([&](ValueDecl *v, DeclContext* dc) {
+      v->print(out);
+      if (dc) {
+        out << " in ";
+        dc->printContext(out);
+        out << "\n";
+      }
+    });
     out << "'\n";
     printRange();
     break;

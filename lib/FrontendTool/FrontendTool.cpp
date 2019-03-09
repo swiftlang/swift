@@ -664,14 +664,19 @@ static void dumpOneScopeMapLocation(unsigned bufferID,
   }
 
   // Grab the local bindings introduced by this scope.
-  auto localBindings = locScope->getLocalBindings();
-  if (!localBindings.empty()) {
-    llvm::errs() << "Local bindings: ";
-    interleave(localBindings.begin(), localBindings.end(),
-               [&](ValueDecl *value) { llvm::errs() << value->getFullName(); },
-               [&]() { llvm::errs() << " "; });
+  // TODO: move this code into ASTScope
+  bool firstBinding = true;
+  locScope->forEachLocalBinding([&](ValueDecl *value, DeclContext *) {
+    if (firstBinding) {
+      firstBinding = false;
+      llvm::errs() << "Local bindings: ";
+    }
+    else
+      llvm::errs() << " ";
+    llvm::errs() << value->getFullName();
+  });
+  if (firstBinding)
     llvm::errs() << "\n";
-  }
 }
 
 static void dumpAndPrintScopeMap(CompilerInvocation &Invocation,
