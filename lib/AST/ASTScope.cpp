@@ -1842,7 +1842,7 @@ void ASTScope::forEachLocalBinding(
        for (auto *atm: p->getAssociatedTypeMembers())
          processBinding(atm,
                         extensionDecl ? cast<DeclContext>(extensionDecl)
-                                      : cast<DeclContext>(p)
+                                      : cast<DeclContext>(baseProtocol)
                         );
        return TypeWalker::Action::Continue;
      });
