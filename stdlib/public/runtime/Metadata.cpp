@@ -3668,6 +3668,17 @@ public:
         state = PrivateMetadataState::NonTransitiveComplete;
       }
     } else {
+      if (candidate->getValueWitnesses() == nullptr) {
+        assert(isa<ForeignClassMetadata>(candidate) &&
+               "cannot set default value witnesses for non-class foreign types");
+        // Fill in the default VWT if it was not set in the candidate at build
+        // time.
+#if SWIFT_OBJC_INTEROP
+        candidate->setValueWitnesses(&VALUE_WITNESS_SYM(BO));
+#else
+        candidate->setValueWitnesses(&VALUE_WITNESS_SYM(Bo));
+#endif
+      }
       state = inferStateForMetadata(candidate);
     }
 
@@ -3902,7 +3913,9 @@ StringRef swift::getStringForMetadataKind(MetadataKind kind) {
 }
 
 #ifndef NDEBUG
-template <> void Metadata::dump() const {
+template <>
+LLVM_ATTRIBUTE_USED
+void Metadata::dump() const {
   printf("TargetMetadata.\n");
   printf("Kind: %s.\n", getStringForMetadataKind(getKind()).data());
   printf("Value Witnesses: %p.\n", getValueWitnesses());

@@ -1925,6 +1925,16 @@ repairFailures(ConstraintSystem &cs, Type lhs, Type rhs,
 
   auto &elt = path.back();
   switch (elt.getKind()) {
+  case ConstraintLocator::LValueConversion:
+  case ConstraintLocator::ApplyArgToParam: {
+    if (lhs->getOptionalObjectType() && !rhs->getOptionalObjectType()) {
+      conversionsOrFixes.push_back(
+          ForceOptional::create(cs, lhs, lhs->getOptionalObjectType(),
+                                cs.getConstraintLocator(locator)));
+    }
+    break;
+  }
+
   case ConstraintLocator::FunctionArgument: {
     auto *argLoc = cs.getConstraintLocator(
         locator.withPathElement(LocatorPathElt::getSynthesizedArgument(0)));
