@@ -17,22 +17,26 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Type.h"
 #include "llvm/Support/FormatVariadic.h"
-#include "gtest/gtest.h"
+#include "gmock/gmock.h"
 
 using namespace swift;
 using namespace swift::unittest;
 
-class TypeContainsTensorFlowValueTest : public ::testing::Test {
+class TensorTypeUtilsTest : public ::testing::Test {
 protected:
   TestContext testContext;
   ASTContext& Ctx;
   Type floatType;
   BoundGenericClassType *tensorHandleType;
+  Type resourceHandleType;
+  Type variantHandleType;
   tf::TypeContainsTensorFlowValue tctf;
 
-  TypeContainsTensorFlowValueTest()
+  TensorTypeUtilsTest()
       : Ctx(testContext.Ctx), floatType(createFloatType()),
-        tensorHandleType(createTensorHandleType(floatType)) {}
+        tensorHandleType(createTensorHandleType(floatType)),
+        resourceHandleType(createHandleType("ResourceHandle")),
+        variantHandleType(createHandleType("VariantHandle")) {}
 
   Type createStructWithFields(const char *name, Type fieldType,
                               int numFields = 1) {
@@ -77,9 +81,20 @@ private:
 
     return BoundGenericClassType::get(tensorDecl, Type(), {genericType});
   }
+
+  Type createHandleType(StringRef typeName) {
+    auto *resourceHandleDecl = testContext.makeNominal<ClassDecl>(typeName);
+    return resourceHandleDecl->getDeclaredInterfaceType();
+  }
 };
 
-TEST_F(TypeContainsTensorFlowValueTest, ClassifiesCorrectly) {
+// Given that Type objects are not directly comparable we define our own Matcher
+MATCHER_P(IsSameTypeAs, refType,
+          "is same type as " + ::testing::PrintToString(refType)) {
+  return arg->matches(refType, TypeMatchOptions());
+}
+
+TEST_F(TensorTypeUtilsTest, ClassifiesCorrectly) {
   EXPECT_TRUE(containsTensorFlowValue(tensorHandleType));
   EXPECT_TRUE(containsTensorFlowValue(
       createStructWithFields("StructWithTensor", tensorHandleType)));
@@ -87,7 +102,7 @@ TEST_F(TypeContainsTensorFlowValueTest, ClassifiesCorrectly) {
       createStructWithFields("StructWithNoTensor", floatType)));
 }
 
-TEST_F(TypeContainsTensorFlowValueTest, WorksForRecursiveTypes) {
+TEST_F(TensorTypeUtilsTest, WorksForRecursiveTypes) {
   // Creates a recursive type for testing purposes. Note that this is not a
   // valid swift type, but should suffice for the purposes of this unit test.
   //
@@ -105,28 +120,28 @@ TEST_F(TypeContainsTensorFlowValueTest, WorksForRecursiveTypes) {
   EXPECT_FALSE(containsTensorFlowValue(recursiveType));
 }
 
-TEST_F(TypeContainsTensorFlowValueTest, TensorFlowType) {
+TEST_F(TensorTypeUtilsTest, IsTensorHandleWorks) {
   EXPECT_TRUE(tf::isTensorHandle(tensorHandleType));
   EXPECT_FALSE(tf::isTensorHandle(floatType));
 }
 
-TEST_F(TypeContainsTensorFlowValueTest, TensorHandleElementType) {
+TEST_F(TensorTypeUtilsTest, ExtractsNullTypeOfNonTensorHandle) {
   EXPECT_TRUE(tf::getTensorHandleElementType(floatType).isNull());
-  EXPECT_FALSE(tf::getTensorHandleElementType(tensorHandleType).isNull());
 }
 
-TEST_F(TypeContainsTensorFlowValueTest, ClassifyTensorFlowTypes) {
+TEST_F(TensorTypeUtilsTest, ExtractsGenericTypeOfTensorHandle) {
+  Type elementTy = tf::getTensorHandleElementType(tensorHandleType);
+  EXPECT_FALSE(elementTy.isNull());
+  EXPECT_THAT(elementTy, IsSameTypeAs(floatType));
+}
+
+TEST_F(TensorTypeUtilsTest, ClassifiesTensorFlowTypes) {
   EXPECT_EQ(tf::TFValueKind::TensorHandle,
             tf::classifyTensorFlowValue(tensorHandleType));
 
-  auto *resourceHandleDecl =
-      testContext.makeNominal<ClassDecl>("ResourceHandle");
-  Type resourceHandleType = resourceHandleDecl->getDeclaredInterfaceType();
   EXPECT_EQ(tf::TFValueKind::ResourceHandle,
             tf::classifyTensorFlowValue(resourceHandleType));
 
-  auto *variantHandleDecl = testContext.makeNominal<ClassDecl>("VariantHandle");
-  Type variantHandleType = variantHandleDecl->getDeclaredInterfaceType();
   EXPECT_EQ(tf::TFValueKind::VariantHandle,
             tf::classifyTensorFlowValue(variantHandleType));
 
@@ -135,36 +150,40 @@ TEST_F(TypeContainsTensorFlowValueTest, ClassifyTensorFlowTypes) {
   auto *classDecl = testContext.makeNominal<ClassDecl>("SomeClass");
   Type classType = classDecl->getDeclaredInterfaceType();
   EXPECT_EQ(tf::TFValueKind::Nope, tf::classifyTensorFlowValue(classType));
+}
 
-  // We test all functions defined around classifyTensorFlowValue
-  EXPECT_TRUE(tf::isTensorHandle(tensorHandleType));
-  EXPECT_FALSE(tf::isTensorHandle(floatType));
-
+TEST_F(TensorTypeUtilsTest, IsOpaqueHandleWorks) {
+  auto *classDecl = testContext.makeNominal<ClassDecl>("SomeClass");
+  Type classType = classDecl->getDeclaredInterfaceType();
   EXPECT_TRUE(tf::isOpaqueHandle(resourceHandleType) &&
               tf::isOpaqueHandle(variantHandleType));
   EXPECT_FALSE(tf::isOpaqueHandle(classType));
+}
 
+TEST_F(TensorTypeUtilsTest, IsTensorFlowValueWorks) {
   EXPECT_TRUE(tf::isTensorFlowValue(tensorHandleType) &&
               tf::isTensorFlowValue(resourceHandleType) &&
               tf::isTensorFlowValue(variantHandleType));
   EXPECT_FALSE(tf::isTensorFlowValue(floatType));
 }
 
-TEST_F(TypeContainsTensorFlowValueTest, flattenTensorFlowValueAggregate) {
+TEST_F(TensorTypeUtilsTest, FlattenTensorFlowValueAggregateWorks) {
   SmallVector<Type, 4> flattenedTensorFlowTypes;
 
   auto *anyDecl = testContext.makeNominal<ClassDecl>("AnyHandle");
   EXPECT_FALSE(tf::flattenTensorFlowValueAggregate(
       anyDecl->getDeclaredInterfaceType(), flattenedTensorFlowTypes));
-  EXPECT_EQ(0ul, flattenedTensorFlowTypes.size());
+  EXPECT_THAT(flattenedTensorFlowTypes, ::testing::IsEmpty());
 
   EXPECT_TRUE(
       tf::flattenTensorFlowValueAggregate(floatType, flattenedTensorFlowTypes));
-  EXPECT_EQ(0ul, flattenedTensorFlowTypes.size());
+  EXPECT_THAT(flattenedTensorFlowTypes, ::testing::IsEmpty());
 
   EXPECT_TRUE(tf::flattenTensorFlowValueAggregate(tensorHandleType,
                                                   flattenedTensorFlowTypes));
   EXPECT_EQ(1ul, flattenedTensorFlowTypes.size());
+  EXPECT_THAT(flattenedTensorFlowTypes,
+              ::testing::Each(IsSameTypeAs(tensorHandleType)));
   flattenedTensorFlowTypes.clear();
 
   Type twoFieldStructType = createStructWithFields(
@@ -172,10 +191,14 @@ TEST_F(TypeContainsTensorFlowValueTest, flattenTensorFlowValueAggregate) {
   EXPECT_TRUE(tf::flattenTensorFlowValueAggregate(twoFieldStructType,
                                                   flattenedTensorFlowTypes));
   EXPECT_EQ(2ul, flattenedTensorFlowTypes.size());
+  EXPECT_THAT(flattenedTensorFlowTypes,
+              ::testing::Each(IsSameTypeAs(tensorHandleType)));
   flattenedTensorFlowTypes.clear();
 
   EXPECT_TRUE(tf::flattenTensorFlowValueAggregate(
       TupleType::get({twoFieldStructType, twoFieldStructType}, testContext.Ctx),
       flattenedTensorFlowTypes));
   EXPECT_EQ(4ul, flattenedTensorFlowTypes.size());
+  EXPECT_THAT(flattenedTensorFlowTypes,
+              ::testing::Each(IsSameTypeAs(tensorHandleType)));
 }
