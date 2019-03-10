@@ -21,6 +21,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -876,6 +877,72 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL,
   return hadError;
 }
 
+//// Retrieve the unbound property behavior type for the given property.
+static UnboundGenericType *getUnboundPropertyBehaviorType(
+    TypeChecker &tc, VarDecl *var) {
+  assert(var->hasPropertyBehavior() && "Only call with property behaviors");
+
+  if (var->getPropertyBehaviorTypeLoc().wasValidated()) {
+    if (var->getPropertyBehaviorTypeLoc().isError())
+      return nullptr;
+
+    return var->getPropertyBehaviorTypeLoc().getType()
+        ->castTo<UnboundGenericType>();
+  }
+
+  // We haven't resolved the property behavior type yet; do so now.
+  SourceLoc byLoc = var->getPropertyBehaviorByLoc();
+  TypeResolution resolution =
+      TypeResolution::forContextual(var->getInnermostDeclContext());
+  TypeResolutionOptions options(TypeResolverContext::ProtocolWhereClause);
+  options |= TypeResolutionFlags::AllowUnboundGenerics;
+  Type unboundBehaviorType = resolution.resolveType(
+      var->getPropertyBehaviorTypeLoc().getTypeRepr(), options);
+
+  if (!unboundBehaviorType || unboundBehaviorType->hasError()) {
+    var->getPropertyBehaviorTypeLoc().setInvalidType(tc.Context);
+    return nullptr;
+  }
+
+  // We expect an unbound generic type here.
+  auto unboundGeneric = unboundBehaviorType->getAs<UnboundGenericType>();
+  if (!unboundGeneric) {
+    tc.diagnose(byLoc, diag::property_behavior_not_unbound)
+      .highlight(var->getPropertyBehaviorTypeLoc().getSourceRange());
+    var->getPropertyBehaviorTypeLoc().setInvalidType(tc.Context);
+    return nullptr;
+  }
+
+  // Make sure that we have a single-parameter generic.
+  auto genericDecl = unboundGeneric->getDecl();
+  if (!genericDecl->getGenericSignature() ||
+      genericDecl->getGenericSignature()->getGenericParams().size() != 1) {
+    tc.diagnose(var->getPropertyBehaviorByLoc(),
+                diag::property_behavior_not_single_parameter)
+      .highlight(var->getPropertyBehaviorTypeLoc().getSourceRange());
+    tc.diagnose(genericDecl, diag::kind_declname_declared_here,
+                genericDecl->getDescriptiveKind(),
+                genericDecl->getFullName());
+    var->getPropertyBehaviorTypeLoc().setInvalidType(tc.Context);
+    return nullptr;
+  }
+
+  var->getPropertyBehaviorTypeLoc().setType(unboundBehaviorType);
+  return unboundGeneric;
+}
+
+Type TypeChecker::applyPropertyBehaviorType(Type type, VarDecl *var,
+                                            TypeResolution resolution) {
+  auto unboundGeneric = getUnboundPropertyBehaviorType(*this, var);
+  if (!unboundGeneric)
+    return Type();
+
+  SourceLoc byLoc = var->getPropertyBehaviorByLoc();
+  return applyUnboundGenericArguments(unboundGeneric,
+                                      unboundGeneric->getDecl(),
+                                      byLoc, resolution, { type });
+}
+
 bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
                                    TypeResolutionOptions options) {
   switch (P->getKind()) {
@@ -907,6 +974,17 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     auto resolution = TypeResolution::forContextual(dc);
     TypedPattern *TP = cast<TypedPattern>(P);
     bool hadError = validateTypedPattern(*this, resolution, TP, options);
+
+    // If we have a single variable that has a property behavior, apply that
+    // property behavior type.
+    if (auto var = TP->getSingleVar()) {
+      if (var->hasPropertyBehavior()) {
+        if (Type newType =
+                applyPropertyBehaviorType(P->getType(), var, resolution)) {
+          P->overwriteType(newType);
+        }
+      }
+    }
 
     // If we have unbound generic types, don't apply them below; instead,
     // the caller will call typeCheckBinding() later.

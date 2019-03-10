@@ -4271,6 +4271,14 @@ WARNING(hashvalue_implementation,none,
         "conform type %0 to 'Hashable' by implementing 'hash(into:)' instead",
         (Type))
 
+//------------------------------------------------------------------------------
+// MARK: property behavior diagnostics
+//------------------------------------------------------------------------------
+ERROR(property_behavior_not_unbound, none,
+  "property behavior must name a generic type without any generic arguments", ())
+ERROR(property_behavior_not_single_parameter, none,
+  "property behavior must refer to a single-parameter generic type", ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
