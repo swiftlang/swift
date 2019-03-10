@@ -1353,11 +1353,8 @@ endfunction()
 #   add_swift_host_library(name
 #     [SHARED]
 #     [STATIC]
-#     [SWIFT_MODULE_DEPENDS dep1 ...]
 #     [LLVM_COMPONENT_DEPENDS comp1 ...]
 #     [FILE_DEPENDS target1 ...]
-#     [INSTALL]
-#     INSTALL_IN_COMPONENT comp
 #     source1 [source2 source3 ...])
 #
 # name
@@ -1374,9 +1371,6 @@ endfunction()
 #
 # FILE_DEPENDS
 #   Additional files this library depends on.
-#
-# INSTALL_IN_COMPONENT comp
-#   The Swift installation component that this library belongs to.
 #
 # source1 ...
 #   Sources to add into this library.
