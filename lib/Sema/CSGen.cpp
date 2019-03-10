@@ -2070,7 +2070,7 @@ namespace {
         //
         // Otherwise, create a new type variable.
         auto ty = Type();
-        if (!var->hasNonPatternBindingInit()) {
+        if (!var->hasNonPatternBindingInit() && !var->hasPropertyBehavior()) {
           if (auto boundExpr = locator.trySimplifyToExpr()) {
             if (!boundExpr->isSemanticallyInOutExpr())
               ty = CS.getType(boundExpr)->getRValueType();
@@ -2084,18 +2084,31 @@ namespace {
         switch (optionalityOf(ROK)) {
         case ReferenceOwnershipOptionality::Required:
           if (ty && ty->getOptionalObjectType())
-            return ty; // Already Optional<T>.
+            break; // Already Optional<T>.
           // Create a fresh type variable to handle overloaded expressions.
-          if (!ty || ty->is<TypeVariableType>())
+          if (!ty || !ty->is<TypeVariableType>())
             ty = CS.createTypeVariable(CS.getConstraintLocator(locator));
-          return CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
+          ty = CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
+          break;
         case ReferenceOwnershipOptionality::Allowed:
         case ReferenceOwnershipOptionality::Disallowed:
           break;
         }
-        if (ty)
-          return ty;
-        return CS.createTypeVariable(CS.getConstraintLocator(locator));
+
+        // If we don't have a type yet, create a type variable.
+        if (!ty)
+          ty = CS.createTypeVariable(CS.getConstraintLocator(locator));
+
+        // If this variable has a property behavior, apply the property
+        // behavior type.
+        if (var->hasPropertyBehavior()) {
+          auto &tc = CS.getTypeChecker();
+          if (Type tyWithBehavior = tc.applyPropertyBehaviorType(
+                  ty, var, TypeResolution::forContextual(CS.DC)))
+            ty = tyWithBehavior;
+        }
+
+        return ty;
       }
 
       case PatternKind::Typed: {
