@@ -195,6 +195,11 @@ private:
   SmallVectorImpl<LookupResultEntry> &Results;
   size_t &IndexOfFirstOuterResult;
   SmallVector<LookupResultEntry, 4> UnavailableInnerResults;
+  
+  
+  /// For debugging:
+  bool involvedANominalOrExtensionWhereClause = false;
+
 
 public: // for exp debugging
   SourceFile const *recordedSF = nullptr;
@@ -501,10 +506,12 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
     lookupOperatorInDeclContexts(contextAndIsCascadingUse);
   else {
     const bool isCascadingUse = computeIsCascadingUse();
-    
-    llvm::errs() << "WARNING: TRYING Scope exclusively";
-    experimentallyLookInASTScopes(contextAndIsCascadingUse);
-    return;
+    const bool useOnlyScopeLookupWhenPossible = false;
+    if (useOnlyScopeLookupWhenPossible && Loc.isValid()) {
+      llvm::errs() << "WARNING: TRYING Scope exclusively";
+      experimentallyLookInASTScopes(contextAndIsCascadingUse);
+      return;
+    }
     
     lookupNamesIntroducedBy(contextAndIsCascadingUse);
     assert(!recordedSF || isCascadingUse == recordedIsCascadingUse);
@@ -620,6 +627,9 @@ UnqualifiedLookupFactory::nonoperatorScopeForASTScopeLookup(
 
 void UnqualifiedLookupFactory::lookInASTScope(
     const ASTScopeLookupState state) {
+  
+  involvedANominalOrExtensionWhereClause |=
+    state.scope->getKind() == ASTScopeKind::NominalOrExtensionWhereClause;
 
   // Perform local lookup within this scope.
   auto localBindings = state.scope->getLocalBindings();
@@ -1358,7 +1368,7 @@ bool UnqualifiedLookupFactory::verifyEqualTo(
     << " vs \n"
     << other.Results.size()
     << "\n";
-    dump();
+    other.dump();
     assert(false);
   }
   if (IndexOfFirstOuterResult != other.IndexOfFirstOuterResult) {
@@ -1367,7 +1377,7 @@ bool UnqualifiedLookupFactory::verifyEqualTo(
     << " vs \n"
     << other.IndexOfFirstOuterResult
     << "\n";
-    dump();
+    other.dump();
     assert(false);
   }
   for (size_t i : indices(Results)) {
@@ -1379,7 +1389,7 @@ bool UnqualifiedLookupFactory::verifyEqualTo(
       llvm::errs() << " vs \n";
       if (oe.getValueDecl()) oe.getValueDecl()->print(llvm::errs());
       llvm::errs() << "\n";
-      dump();
+      other.dump();
       assert(false);
     }
     if (e.getDeclContext() != oe.getDeclContext()) {
@@ -1388,7 +1398,7 @@ bool UnqualifiedLookupFactory::verifyEqualTo(
       llvm::errs() << " vs \n";
       if (oe.getDeclContext()) oe.getDeclContext()->printContext(llvm::errs());
       llvm::errs() << "\n";
-      dump();
+      other.dump();
       assert(false);
     }
     // unsigned printContext(llvm::raw_ostream &OS, unsigned indent = 0,
@@ -1405,7 +1415,7 @@ bool UnqualifiedLookupFactory::verifyEqualTo(
 //    << " vs \n"
 //    << other.recordedSF
 //    << "\n";
-//    dump();
+//    other.dump();
 //    assert(false);
 //  }
 //  if (recordedIsCascadingUse != other.recordedSF) {
@@ -1414,7 +1424,7 @@ bool UnqualifiedLookupFactory::verifyEqualTo(
 //    << " vs \n"
 //    << other.recordedIsCascadingUse
 //    << "\n";
-//    dump();
+//    other.dump();
 //    assert(false);
 //  }
   return true;
@@ -1432,10 +1442,12 @@ bool UnqualifiedLookupFactory::shouldDiffer() const {
 void UnqualifiedLookupFactory::dump() const {
   print(llvm::errs());
 }
+
 void UnqualifiedLookupFactory::print(raw_ostream &OS) const {
   OS << "Looking up '" << Name << " at: ";
   Loc.print(OS, DC->getASTContext().SourceMgr);
   OS << "\nStarting in: ";
   DC->printContext(OS);
-  OS << "\n";
+  OS << (involvedANominalOrExtensionWhereClause ? " w/" : " w/o")
+     << " where\n";
 }
