@@ -139,3 +139,26 @@ void ScopeInfo::addToScope(ValueDecl *D, Parser &TheParser) {
                      D->getFullName(),
                      std::make_pair(CurScope->getDepth(), D));
 }
+
+void ScopeInfo::dump() const {
+#ifndef NDEBUG
+  // Dump out the current list of scopes.
+  if (!CurScope->isResolvable())
+    return;
+
+  assert(CurScope->getDepth() >= ResolvableDepth &&
+         "Attempting to dump a non-resolvable scope?!");
+
+  llvm::dbgs() << "--- Dumping ScopeInfo ---\n";
+  std::function<void(decltype(HT)::DebugVisitValueTy)> func =
+      [&](const decltype(HT)::DebugVisitValueTy &iter) -> void {
+    llvm::dbgs() << "DeclName: " << iter->getKey() << "\n"
+                 << "KeyScopeID: " << iter->getValue().first << "\n"
+                 << "Decl: ";
+    iter->getValue().second->dumpRef(llvm::dbgs());
+    llvm::dbgs() << "\n";
+  };
+  HT.debugVisit(std::move(func));
+  llvm::dbgs() << "\n";
+#endif
+}
