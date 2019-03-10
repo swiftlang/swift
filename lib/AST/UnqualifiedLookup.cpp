@@ -506,9 +506,13 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
     lookupOperatorInDeclContexts(contextAndIsCascadingUse);
   else {
     const bool isCascadingUse = computeIsCascadingUse();
-    const bool useOnlyScopeLookupWhenPossible = false;
+    const bool useOnlyScopeLookupWhenPossible = true;
     if (useOnlyScopeLookupWhenPossible && Loc.isValid()) {
-      llvm::errs() << "WARNING: TRYING Scope exclusively";
+      static bool haveWarned = false;
+      if (!haveWarned) {
+        haveWarned = true;
+        llvm::errs() << "WARNING: TRYING Scope exclusively\n";
+      }
       experimentallyLookInASTScopes(contextAndIsCascadingUse);
       return;
     }
