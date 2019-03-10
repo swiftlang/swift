@@ -1037,6 +1037,11 @@ static void flattenImportPath(const ModuleDecl::ImportedModule &import,
   out.append(accessPathElem.first.str());
 }
 
+uint64_t getRawModTimeOrHash(const SerializationOptions::FileDependency &dep) {
+  if (dep.isHashBased()) return dep.getContentHash();
+  return dep.getModificationTime();
+}
+
 void Serializer::writeInputBlock(const SerializationOptions &options) {
   BCBlockRAII restoreBlock(Out, INPUT_BLOCK_ID, 4);
   input_block::ImportedModuleLayout ImportedModule(Out);
@@ -1058,9 +1063,11 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   }
 
   for (auto const &dep : options.Dependencies) {
-    FileDependency.emit(ScratchRecord, dep.Size,
-                        dep.ModificationTime,
-                        dep.Path);
+    FileDependency.emit(ScratchRecord,
+                        dep.getSize(),
+                        getRawModTimeOrHash(dep),
+                        dep.isHashBased(),
+                        dep.getPath());
   }
 
   SmallVector<ModuleDecl::ImportedModule, 8> allImports;

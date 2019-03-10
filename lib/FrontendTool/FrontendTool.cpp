@@ -51,6 +51,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
+#include "swift/Frontend/ParseableInterfaceModuleLoader.h"
 #include "swift/Frontend/ParseableInterfaceSupport.h"
 #include "swift/Immediate/Immediate.h"
 #include "swift/Index/IndexRecord.h"
@@ -569,7 +570,8 @@ static bool buildModuleFromParseableInterface(CompilerInvocation &Invocation,
   return ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
       Instance.getASTContext(), Invocation.getClangModuleCachePath(),
       PrebuiltCachePath, Invocation.getModuleName(), InputPath,
-      Invocation.getOutputFilename());
+      Invocation.getOutputFilename(),
+      FEOpts.SerializeParseableModuleInterfaceDependencyHashes);
 }
 
 static bool compileLLVMIR(CompilerInvocation &Invocation,
