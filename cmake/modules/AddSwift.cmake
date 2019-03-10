@@ -1354,7 +1354,6 @@ endfunction()
 #     [SHARED]
 #     [STATIC]
 #     [DEPENDS dep1 ...]
-#     [LINK_LIBRARIES dep1 ...]
 #     [INTERFACE_LINK_LIBRARIES dep1 ...]
 #     [SWIFT_MODULE_DEPENDS dep1 ...]
 #     [LLVM_COMPONENT_DEPENDS comp1 ...]
@@ -1376,9 +1375,6 @@ endfunction()
 #
 # DEPENDS
 #   Targets that this library depends on.
-#
-# LINK_LIBRARIES
-#   Libraries this library depends on.
 #
 # LLVM_COMPONENT_DEPENDS
 #   LLVM components this library depends on.
@@ -1419,6 +1415,10 @@ function(add_swift_host_library name)
                         ${ARGN})
   set(ASHL_SOURCES ${ASHL_UNPARSED_ARGUMENTS})
 
+  if(ASHL_LINK_LIBRARIES)
+    message(SEND_ERROR "library ${name} is using LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead")
+  endif()
+
   translate_flags(ASHL "${options}")
 
   if(NOT ASHL_SHARED AND NOT ASHL_STATIC)
@@ -1435,7 +1435,6 @@ function(add_swift_host_library name)
     SDK ${SWIFT_HOST_VARIANT_SDK}
     ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
     DEPENDS ${ASHL_DEPENDS}
-    LINK_LIBRARIES ${ASHL_LINK_LIBRARIES}
     LLVM_COMPONENT_DEPENDS ${ASHL_LLVM_COMPONENT_DEPENDS}
     FILE_DEPENDS ${ASHL_FILE_DEPENDS}
     C_COMPILE_FLAGS ${ASHL_C_COMPILE_FLAGS}
@@ -2249,13 +2248,17 @@ endmacro()
 function(add_swift_host_tool executable)
   set(options)
   set(single_parameter_options SWIFT_COMPONENT)
-  set(multiple_parameter_options)
+  set(multiple_parameter_options LINK_LIBRARIES)
 
   cmake_parse_arguments(ASHT
     "${options}"
     "${single_parameter_options}"
     "${multiple_parameter_options}"
     ${ARGN})
+
+  if(ASHT_LINK_LIBRARIES)
+    message(SEND_ERROR "${executable} is using LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead")
+  endif()
 
   precondition(ASHT_SWIFT_COMPONENT
                MESSAGE "Swift Component is required to add a host tool")
