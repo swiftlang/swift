@@ -332,7 +332,6 @@ public:
     return false;
   }
 
-public:
   V lookup(const ScopeTy &S, const K &Key) {
     const typename ScopeTy::ImplTy *CurrScope = S.getImpl();
     while (CurrScope) {
