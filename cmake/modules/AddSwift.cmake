@@ -1353,7 +1353,6 @@ endfunction()
 #   add_swift_host_library(name
 #     [SHARED]
 #     [STATIC]
-#     [DEPENDS dep1 ...]
 #     [SWIFT_MODULE_DEPENDS dep1 ...]
 #     [LLVM_COMPONENT_DEPENDS comp1 ...]
 #     [FILE_DEPENDS target1 ...]
@@ -1369,9 +1368,6 @@ endfunction()
 #
 # STATIC
 #   Build a static library.
-#
-# DEPENDS
-#   Targets that this library depends on.
 #
 # LLVM_COMPONENT_DEPENDS
 #   LLVM components this library depends on.
@@ -1408,6 +1404,9 @@ function(add_swift_host_library name)
   if(ASHL_C_COMPILE_FLAGS)
     message(SEND_ERROR "library ${name} is using C_COMPILE_FLAGS parameter which is deprecated.  Please use target_compile_definitions, target_compile_options, or target_include_directories instead")
   endif()
+  if(ASHL_DEPENDS)
+    message(SEND_ERROR "library ${name} is using DEPENDS parameter which is deprecated.  Please use add_dependencies instead")
+  endif()
   if(ASHL_INTERFACE_LINK_LIBRARIES)
     message(SEND_ERROR "library ${name} is using INTERFACE_LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead.")
   endif()
@@ -1430,7 +1429,6 @@ function(add_swift_host_library name)
     ${ASHL_FORCE_BUILD_OPTIMIZED_keyword}
     SDK ${SWIFT_HOST_VARIANT_SDK}
     ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
-    DEPENDS ${ASHL_DEPENDS}
     LLVM_COMPONENT_DEPENDS ${ASHL_LLVM_COMPONENT_DEPENDS}
     FILE_DEPENDS ${ASHL_FILE_DEPENDS}
     INSTALL_IN_COMPONENT "dev"
