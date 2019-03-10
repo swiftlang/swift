@@ -1358,7 +1358,6 @@ endfunction()
 #     [SWIFT_MODULE_DEPENDS dep1 ...]
 #     [LLVM_COMPONENT_DEPENDS comp1 ...]
 #     [FILE_DEPENDS target1 ...]
-#     [C_COMPILE_FLAGS flag1...]
 #     [LINK_FLAGS flag1...]
 #     [INSTALL]
 #     INSTALL_IN_COMPONENT comp
@@ -1381,9 +1380,6 @@ endfunction()
 #
 # FILE_DEPENDS
 #   Additional files this library depends on.
-#
-# C_COMPILE_FLAGS
-#   Extra compiler flags (C, C++, ObjC).
 #
 # LINK_FLAGS
 #   Extra linker flags.
@@ -1415,6 +1411,9 @@ function(add_swift_host_library name)
                         ${ARGN})
   set(ASHL_SOURCES ${ASHL_UNPARSED_ARGUMENTS})
 
+  if(ASHL_C_COMPILE_FLAGS)
+    message(SEND_ERROR "library ${name} is using C_COMPILE_FLAGS parameter which is deprecated.  Please use target_compile_definitions, target_compile_options, or target_include_directories instead")
+  endif()
   if(ASHL_LINK_LIBRARIES)
     message(SEND_ERROR "library ${name} is using LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead")
   endif()
@@ -1437,7 +1436,6 @@ function(add_swift_host_library name)
     DEPENDS ${ASHL_DEPENDS}
     LLVM_COMPONENT_DEPENDS ${ASHL_LLVM_COMPONENT_DEPENDS}
     FILE_DEPENDS ${ASHL_FILE_DEPENDS}
-    C_COMPILE_FLAGS ${ASHL_C_COMPILE_FLAGS}
     LINK_FLAGS ${ASHL_LINK_FLAGS}
     INTERFACE_LINK_LIBRARIES ${ASHL_INTERFACE_LINK_LIBRARIES}
     INSTALL_IN_COMPONENT "dev"
