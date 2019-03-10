@@ -1357,7 +1357,6 @@ endfunction()
 #     [SWIFT_MODULE_DEPENDS dep1 ...]
 #     [LLVM_COMPONENT_DEPENDS comp1 ...]
 #     [FILE_DEPENDS target1 ...]
-#     [LINK_FLAGS flag1...]
 #     [INSTALL]
 #     INSTALL_IN_COMPONENT comp
 #     source1 [source2 source3 ...])
@@ -1380,9 +1379,6 @@ endfunction()
 # FILE_DEPENDS
 #   Additional files this library depends on.
 #
-# LINK_FLAGS
-#   Extra linker flags.
-#
 # INSTALL_IN_COMPONENT comp
 #   The Swift installation component that this library belongs to.
 #
@@ -1399,7 +1395,6 @@ function(add_swift_host_library name)
         DEPENDS
         FILE_DEPENDS
         INTERFACE_LINK_LIBRARIES
-        LINK_FLAGS
         LINK_LIBRARIES
         LLVM_COMPONENT_DEPENDS)
 
@@ -1438,7 +1433,6 @@ function(add_swift_host_library name)
     DEPENDS ${ASHL_DEPENDS}
     LLVM_COMPONENT_DEPENDS ${ASHL_LLVM_COMPONENT_DEPENDS}
     FILE_DEPENDS ${ASHL_FILE_DEPENDS}
-    LINK_FLAGS ${ASHL_LINK_FLAGS}
     INSTALL_IN_COMPONENT "dev"
     )
 
