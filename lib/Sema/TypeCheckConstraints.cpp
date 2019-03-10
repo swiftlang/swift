@@ -2441,6 +2441,30 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
   }
 }
 
+/// When binding the initial value of a variable with a property behavior,
+/// apply any changes needed to the initializer expression.
+///
+/// \returns null if nothing needs to be done
+static Expr *applyPropertyBehaviorInitialValue(
+    TypeChecker &tc, VarDecl *var, Expr *initializer, DeclContext *dc) {
+  auto unbound = tc.getUnboundPropertyBehaviorType(var);
+  if (!unbound)
+    return nullptr;
+
+  // Check whether we have an init(initialValue:) initializer in the
+  // property behavior type.
+  DeclName initName(tc.Context, DeclBaseName::createConstructor(),
+                    {tc.Context.Id_initialValue});
+  SmallVector<ValueDecl *, 2> decls;
+  if (!dc->lookupQualified(Type(unbound), initName, NL_QualifiedDefault, &tc,
+                           decls))
+    return nullptr;
+
+  auto typeExpr = TypeExpr::createImplicit(Type(unbound), tc.Context);
+  return CallExpr::createImplicit(
+      tc.Context, typeExpr, {initializer}, {tc.Context.Id_initialValue});
+}
+
 bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
                                    DeclContext *DC) {
 
@@ -2508,6 +2532,17 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
   assert(initializer && "type-checking an uninitialized binding?");
   BindingListener listener(pattern, initializer);
+
+  // If the pattern contains a property behavior with an init(initialValue:),
+  // then the initializer will call init(initialValue:) directly.
+  if (auto var = pattern->getSingleVar()) {
+    if (var->hasPropertyBehavior()) {
+      if (auto wrappedInitializer =
+              applyPropertyBehaviorInitialValue(*this, var, initializer, DC)) {
+        initializer = wrappedInitializer;
+      }
+    }
+  }
 
   TypeLoc contextualType;
   auto contextualPurpose = CTP_Unused;

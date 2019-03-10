@@ -57,3 +57,23 @@ func testBadWrapperTypes() {
   _ = wrapped3
   _ = wrapped4
 }
+
+// ---------------------------------------------------------------------------
+// Initialization via initial value
+// ---------------------------------------------------------------------------
+struct WrapperWithInitialValue<T> {
+  var value: T
+  init(initialValue: T) { value = initialValue }
+}
+
+func testExplicitInitialValue() {
+  var wrapped1: Int by WrapperWithInitialValue = 5
+
+  wrapped1 = "Hello" // expected-error{{cannot assign value of type 'String' to type 'WrapperWithInitialValue<Int>'}}
+}
+
+func testImplicitInitialValue() {
+  var wrapped1 by WrapperWithInitialValue = 5
+
+  wrapped1 = "Hello" // expected-error{{cannot assign value of type 'String' to type 'WrapperWithInitialValue<Int>'}}
+}

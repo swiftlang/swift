@@ -1465,6 +1465,9 @@ public:
   Pattern *resolvePattern(Pattern *P, DeclContext *dc,
                           bool isStmtCondition);
 
+  //// Retrieve the unbound property behavior type for the given property.
+  UnboundGenericType *getUnboundPropertyBehaviorType(VarDecl *var);
+
   /// Given the type of the given variable (which must have a property
   /// behavior), form the stored property type that results from applying
   /// the behavior.

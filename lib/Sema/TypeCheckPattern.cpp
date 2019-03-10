@@ -870,8 +870,7 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL,
 }
 
 //// Retrieve the unbound property behavior type for the given property.
-static UnboundGenericType *getUnboundPropertyBehaviorType(
-    TypeChecker &tc, VarDecl *var) {
+UnboundGenericType *TypeChecker::getUnboundPropertyBehaviorType(VarDecl *var) {
   assert(var->hasPropertyBehavior() && "Only call with property behaviors");
 
   if (var->getPropertyBehaviorTypeLoc().wasValidated()) {
@@ -892,16 +891,16 @@ static UnboundGenericType *getUnboundPropertyBehaviorType(
       var->getPropertyBehaviorTypeLoc().getTypeRepr(), options);
 
   if (!unboundBehaviorType || unboundBehaviorType->hasError()) {
-    var->getPropertyBehaviorTypeLoc().setInvalidType(tc.Context);
+    var->getPropertyBehaviorTypeLoc().setInvalidType(Context);
     return nullptr;
   }
 
   // We expect an unbound generic type here.
   auto unboundGeneric = unboundBehaviorType->getAs<UnboundGenericType>();
   if (!unboundGeneric) {
-    tc.diagnose(byLoc, diag::property_behavior_not_unbound)
+    diagnose(byLoc, diag::property_behavior_not_unbound)
       .highlight(var->getPropertyBehaviorTypeLoc().getSourceRange());
-    var->getPropertyBehaviorTypeLoc().setInvalidType(tc.Context);
+    var->getPropertyBehaviorTypeLoc().setInvalidType(Context);
     return nullptr;
   }
 
@@ -909,13 +908,13 @@ static UnboundGenericType *getUnboundPropertyBehaviorType(
   auto genericDecl = unboundGeneric->getDecl();
   if (!genericDecl->getGenericSignature() ||
       genericDecl->getGenericSignature()->getGenericParams().size() != 1) {
-    tc.diagnose(var->getPropertyBehaviorByLoc(),
+    diagnose(var->getPropertyBehaviorByLoc(),
                 diag::property_behavior_not_single_parameter)
       .highlight(var->getPropertyBehaviorTypeLoc().getSourceRange());
-    tc.diagnose(genericDecl, diag::kind_declname_declared_here,
-                genericDecl->getDescriptiveKind(),
-                genericDecl->getFullName());
-    var->getPropertyBehaviorTypeLoc().setInvalidType(tc.Context);
+    genericDecl->diagnose(diag::kind_declname_declared_here,
+                          genericDecl->getDescriptiveKind(),
+                          genericDecl->getFullName());
+    var->getPropertyBehaviorTypeLoc().setInvalidType(Context);
     return nullptr;
   }
 
@@ -925,7 +924,7 @@ static UnboundGenericType *getUnboundPropertyBehaviorType(
 
 Type TypeChecker::applyPropertyBehaviorType(Type type, VarDecl *var,
                                             TypeResolution resolution) {
-  auto unboundGeneric = getUnboundPropertyBehaviorType(*this, var);
+  auto unboundGeneric = getUnboundPropertyBehaviorType(var);
   if (!unboundGeneric)
     return Type();
 
