@@ -880,14 +880,11 @@ struct LLVMCodeGenThreads {
 #ifdef __APPLE__
     pthread_t threadId;
 #else
-    std::thread *thread;
+    std::thread thread;
 #endif
 
     Thread(LLVMCodeGenThreads &parent, unsigned threadIndex)
         : parent(parent), threadIndex(threadIndex)
-#ifndef __APPLE__
-          , thread(nullptr)
-#endif
     {}
 
     /// Run llvm codegen.
@@ -951,7 +948,7 @@ struct LLVMCodeGenThreads {
     pthread_attr_destroy(&stackSizeAttribute);
 #else
     for (auto &thread : threads) {
-      thread.thread = new std::thread(runThread, &thread);
+      thread.thread = std::thread(runThread, &thread);
     }
 #endif
 
@@ -968,8 +965,7 @@ struct LLVMCodeGenThreads {
       pthread_join(thread.threadId, 0);
 #else
     for (auto &thread: threads) {
-      thread.thread->join();
-      delete thread.thread;
+      thread.thread.join();
     }
 #endif
   }
