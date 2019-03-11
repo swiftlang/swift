@@ -130,3 +130,24 @@ struct HasStaticWrapper {
     ^(HasStaticWrapper.wrapped) = WrapperWithInitialValue(initialValue: 17)
   }
 }
+
+struct TwoStepWrapper<T> {
+  var value: T by WrapperWithInitialValue
+
+  init(initialValue value: T) {
+    self.value = value
+  }
+}
+
+func testTwoStepWrapper() {
+  var doubleWrapped by TwoStepWrapper = 17
+
+  let val1 = doubleWrapped
+  let _: Double = val1 // expected-error{{cannot convert value of type 'Int' to specified type 'Double'}}
+
+  let val2 = ^doubleWrapped
+  let _: Double = val2 // expected-error{{cannot convert value of type 'WrapperWithInitialValue<Int>' to specified type 'Double'}}
+
+  let val3 = ^(^doubleWrapped)
+  let _: Double = val3 // expected-error{{cannot convert value of type 'TwoStepWrapper<Int>' to specified type 'Double'}}
+}

@@ -1952,7 +1952,8 @@ Type ConstraintSystem::unwrapPropertyBehaviorReference(
           OverloadChoice(refType, unwrapProperty, FunctionRefKind::Unapplied),
           unwrapLocator, unwrapped.first, unwrapped.second};
 
-      refType = unwrapped.second;
+    refType = unwrapped.second;
+    locator = unwrapLocator;
   }
 
   return refType;
