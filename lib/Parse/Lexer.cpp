@@ -1845,16 +1845,13 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
   bool IsMultilineString = advanceIfMultilineDelimiter(CurPtr, Diags);
   if (IsMultilineString && *CurPtr != '\n' && *CurPtr != '\r') {
     // Test for single-line Strings that may resemble multiline delimiter
-    for (const char *Ptr = CurPtr; Ptr <= BufferEnd-CustomDelimiterLen; Ptr++) {
+    for (const char *Ptr = CurPtr-1; Ptr <= BufferEnd-CustomDelimiterLen; Ptr++) {
       if (*Ptr == '\r' || *Ptr == '\n') {
         break;
       }
-      if (*Ptr == '#') {
+      if (*Ptr == '"') {
         const char *TmpPtr = Ptr + 1;
-        while (*TmpPtr == '#') {
-          TmpPtr++;
-        }
-        if (TmpPtr-Ptr == CustomDelimiterLen) {
+        if (delimiterMatches(CustomDelimiterLen, TmpPtr, nullptr)) {
           // Undo effects from falsely detecting multiline delimiter
           CurPtr = CurPtr - 2;
           IsMultilineString = false;
