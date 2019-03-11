@@ -1,4 +1,4 @@
-# RUN: %{python} -m unittest discover -s %swift_src_root/utils/update_checkout
+# RUN: %{python} -m unittest discover -s %swift_src_root/utils/update_checkout -t %swift_src_root/utils/
 
 # Do not run this when doing simulator or device testing on darwin.
 #
