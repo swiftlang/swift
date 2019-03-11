@@ -4282,6 +4282,9 @@ ERROR(property_behavior_no_value_property, none,
 ERROR(property_behavior_ambiguous_value_property, none,
   "property behavior type %0 has multiple non-static properties "
   "named 'value'", (Type))
+ERROR(property_behavior_unwrap_not_declaration, none,
+  "subject of unwrap suppression '^' must refer to a property or variable",
+  ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

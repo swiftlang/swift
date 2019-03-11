@@ -2693,6 +2693,12 @@ public:
     printRec(E->getBody(), E->getVar()->getDeclContext()->getASTContext());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+
+  void visitSuppressUnwrapExpr(SuppressUnwrapExpr *E) {
+    printCommon(E, "suppress_unwrap_expr") << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
 };
 
 } // end anonymous namespace

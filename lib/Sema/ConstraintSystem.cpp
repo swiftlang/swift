@@ -1872,31 +1872,97 @@ static void validateInitializerRef(ConstraintSystem &cs, ConstructorDecl *init,
   }
 }
 
+static Expr *findSuppressUnwrapTarget(Expr *expr, bool &isMember) {
+  expr = expr->getSemanticsProvidingExpr();
+
+  if (isa<DeclRefExpr>(expr) || isa<UnresolvedDeclRefExpr>(expr) ||
+      isa<OverloadedDeclRefExpr>(expr)) {
+    isMember = false;
+    return expr;
+  }
+
+  if (isa<MemberRefExpr>(expr) || isa<DotSyntaxCallExpr>(expr) ||
+      isa<DotSyntaxBaseIgnoredExpr>(expr)) {
+    isMember = true;
+    return expr;
+  }
+
+  return nullptr;
+}
+
+void ConstraintSystem::recordSuppressUnwrap(SuppressUnwrapExpr *expr) {
+  // Find the target of a suppress-unwrap expression.
+  bool isMember;
+  auto wrappedExpr = findSuppressUnwrapTarget(expr->getSubExpr(), isMember);
+  if (!wrappedExpr) {
+    TC.diagnose(wrappedExpr->getLoc(),
+                diag::property_behavior_unwrap_not_declaration)
+      .highlight(expr->getSubExpr()->getSourceRange());
+    return;
+  }
+
+  ConstraintLocator *locator;
+  if (isMember)
+    locator = getConstraintLocator(wrappedExpr, ConstraintLocator::Member);
+  else
+    locator = getConstraintLocator(wrappedExpr);
+  UnwrapSuppressions[locator].push_back(expr);
+}
+
 Type ConstraintSystem::unwrapPropertyBehaviorReference(
     VarDecl *var, Type refType, DeclContext *useDC,
-    ConstraintLocatorBuilder locator) {
-  auto unwrapProperty = TC.getPropertyBehaviorUnwrapProperty(var);
+    ConstraintLocatorBuilder locatorBuilder) {
+  // Collect the chain of unwrapped properties that we should follow.
+  SmallVector<VarDecl *, 2> unwrappedProperties;
+  {
+    // FIXME: Detect recursive property behavior definitions.
+    VarDecl *currentVar = var;
+    while (auto nextVar = TC.getPropertyBehaviorUnwrapProperty(currentVar)) {
+      unwrappedProperties.push_back(nextVar);
+      currentVar = nextVar;
+    }
+  }
 
-  // If we didn't find a property to unwrap to, this property behavior aspect of
-  // the variable was ill-formed; ignore it here.
-  if (!unwrapProperty)
+  // Collect the set of unwrap suppressions to be applied to this reference.
+  ArrayRef<SuppressUnwrapExpr *> suppressions;
+  auto locator = getConstraintLocator(locatorBuilder);
+  {
+    auto known = UnwrapSuppressions.find(locator);
+    if (known != UnwrapSuppressions.end())
+      suppressions = known->second;
+  }
+
+  // If we have as many suppressions as we have unwrapped properties,
+  // don't unwrap anything.
+  if (suppressions.size() >= unwrappedProperties.size()) {
+    // FIXME: If we have more suppressions, produce an error.
     return refType;
+  }
 
+  // Remove the # of suppressed properties from the end of the chain.
+  unwrappedProperties.erase(unwrappedProperties.end() - suppressions.size(),
+                            unwrappedProperties.end());
+
+  // Unwrap via successive property accesses.
+  for (auto unwrapProperty : unwrappedProperties) {
   // Determine the type of a reference to the unwrapped member.
-  auto unwrappedLocator = getConstraintLocator(
-      locator.withPathElement(ConstraintLocator::UnwrappedPropertyBehavior));
+  auto unwrapLocator = getConstraintLocator(
+      locator, ConstraintLocator::UnwrappedPropertyBehavior);
   std::pair<Type, Type> unwrapped = getTypeOfMemberReference(
-    refType, unwrapProperty, useDC, false, FunctionRefKind::Unapplied,
-    unwrappedLocator);
+      refType, unwrapProperty, useDC, false, FunctionRefKind::Unapplied,
+      unwrapLocator);
 
   // Record this as a resolved overload.
   resolvedOverloadSets
     = new (*this) ResolvedOverloadSetListItem{
         resolvedOverloadSets, Type(),
         OverloadChoice(refType, unwrapProperty, FunctionRefKind::Unapplied),
-        unwrappedLocator, unwrapped.first, unwrapped.second};
+        unwrapLocator, unwrapped.first, unwrapped.second};
 
-  return unwrapped.second;
+    refType = unwrapped.second;
+  }
+
+  return refType;
 }
 
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,

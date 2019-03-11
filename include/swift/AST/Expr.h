@@ -1665,14 +1665,18 @@ public:
   SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }
   SourceLoc getStartLoc() const {
     SourceLoc BaseStartLoc = getBase()->getStartLoc();
-    if (BaseStartLoc.isInvalid() || NameLoc.isInvalid()) {
+    if (BaseStartLoc.isInvalid()) {
       return NameLoc.getBaseNameLoc();
     } else {
       return BaseStartLoc;
     }
   }
   SourceLoc getEndLoc() const {
-    return NameLoc.getSourceRange().End;
+    SourceLoc NameEndLoc = NameLoc.getSourceRange().End;
+    if (NameEndLoc.isValid())
+      return NameEndLoc;
+
+    return getBase()->getEndLoc();
   }
   
   static bool classof(const Expr *E) {
@@ -5341,6 +5345,34 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::KeyPathDot;
+  }
+};
+
+/// Tightly-binding prefix ^ operator that suppresses the implicit
+/// "unwrapping" of a reference to a property that has an associated
+/// property behavior.
+class SuppressUnwrapExpr : public IdentityExpr {
+  SourceLoc CaretLoc;
+
+public:
+  SuppressUnwrapExpr(SourceLoc caretLoc, Expr *subExpr, Type ty = Type())
+    : IdentityExpr(ExprKind::SuppressUnwrap, subExpr, ty),
+      CaretLoc(caretLoc) { }
+
+  SourceLoc getCaretLoc() const { return CaretLoc; }
+  SourceLoc getLoc() const { return getStartLoc(); }
+
+  SourceLoc getStartLoc() const {
+    if (CaretLoc.isValid())
+      return CaretLoc;
+
+    return getSubExpr()->getStartLoc();
+  }
+
+  SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::SuppressUnwrap;
   }
 };
 

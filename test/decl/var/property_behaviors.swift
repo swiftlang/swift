@@ -77,3 +77,17 @@ func testImplicitInitialValue() {
 
   wrapped1 = "Hello" // expected-error{{cannot assign value of type 'String' to type 'Int'}}
 }
+
+// ---------------------------------------------------------------------------
+// Unwrap suppression
+// ---------------------------------------------------------------------------
+func testSuppressUnwrap() {
+  var wrapped1 by WrapperWithInitialValue = 5
+
+  ^wrapped1 = "Hello" // expected-error{{cannot assign value of type 'String' to type 'WrapperWithInitialValue<Int>'}}
+  let z  = ^wrapped1
+  let _: Double = z // expected-error{{cannot convert value of type 'WrapperWithInitialValue<Int>' to specified type 'Double'}}
+
+  // FIXME wrong type for ^wrapped1
+  let _: Double = ^wrapped1 // expected-error{{cannot convert value of type 'Int' to specified type 'Double'}}
+}

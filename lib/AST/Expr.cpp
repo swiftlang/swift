@@ -363,6 +363,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(KeyPath);
   NO_REFERENCE(KeyPathDot);
   NO_REFERENCE(Tap);
+  PASS_THROUGH_REFERENCE(SuppressUnwrap, getSubExpr);
 
 #undef SIMPLE_REFERENCE
 #undef NO_REFERENCE
@@ -544,6 +545,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::MagicIdentifierLiteral:
   case ExprKind::ObjCSelector:
   case ExprKind::KeyPath:
+  case ExprKind::SuppressUnwrap:
     return true;
 
   case ExprKind::ObjectLiteral:

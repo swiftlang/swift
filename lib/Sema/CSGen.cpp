@@ -3377,6 +3377,9 @@ namespace {
     ConstraintWalker(ConstraintGenerator &CG) : CG(CG) { }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      if (auto suppressUnwrap = dyn_cast<SuppressUnwrapExpr>(expr)) {
+       CG.getConstraintSystem().recordSuppressUnwrap(suppressUnwrap);
+      }
 
       if (CG.getConstraintSystem().shouldReusePrecheckedType()) {
         if (expr->getType()) {

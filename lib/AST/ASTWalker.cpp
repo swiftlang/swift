@@ -1073,6 +1073,17 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
+  Expr *visitSuppressUnwrapExpr(SuppressUnwrapExpr *E) {
+    if (Expr *arg = E->getSubExpr()) {
+      if (Expr *arg2 = doIt(arg)) {
+        E->setSubExpr(arg2);
+      } else {
+        return nullptr;
+      }
+    }
+    return E;
+  }
+
   //===--------------------------------------------------------------------===//
   //                           Everything Else
   //===--------------------------------------------------------------------===//

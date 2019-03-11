@@ -1076,6 +1076,12 @@ private:
   SmallVector<std::pair<ConstraintLocator *, ProtocolConformanceRef>, 8>
       CheckedConformances;
 
+  /// For constraint locators that refer to a declaration (e.g., as would
+  /// be used for an overload choice), provide the list of suppress-unwrap
+  /// expressions that apply to that declaration.
+  llvm::DenseMap<ConstraintLocator *, TinyPtrVector<SuppressUnwrapExpr *>>
+    UnwrapSuppressions;
+
 public:
   /// The locators of \c Defaultable constraints whose defaults were used.
   SmallVector<ConstraintLocator *, 8> DefaultedConstraints;
@@ -1087,6 +1093,7 @@ public:
   /// A cache that stores whether types are valid @dynamicMemberLookup types.
   llvm::DenseMap<CanType, bool> DynamicMemberLookupCache;
 
+  ///
 private:
   /// Describe the candidate expression for partial solving.
   /// This class used by shrink & solve methods which apply
@@ -1836,6 +1843,11 @@ public:
     auto e = ExprWeights.find(expr);
     return e != ExprWeights.end() ? e->second.second : nullptr;
   }
+
+  /// Note the presence of the given suppress-unwrap expression,
+  /// which will be used to suppress the implicit "unwrapping" of
+  /// a reference to a property that has a property behavior.
+  void recordSuppressUnwrap(SuppressUnwrapExpr *expr);
 
 public:
 

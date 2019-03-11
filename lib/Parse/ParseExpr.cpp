@@ -476,6 +476,8 @@ static Expr *formUnaryArgument(ASTContext &context, Expr *argument) {
 ///     expr-postfix(Mode)
 ///     operator-prefix expr-unary(Mode)
 ///     '&' expr-unary(Mode)
+///     '^' expr-identifier
+///     '^' expr-paren
 ///
 ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   SyntaxParsingContext UnaryContext(SyntaxContext, SyntaxContextKind::Expr);
@@ -507,8 +509,27 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
     // expression (and that may not always be an expression).
     diagnose(Tok, diag::invalid_postfix_operator);
     Tok.setKind(tok::oper_prefix);
-    LLVM_FALLTHROUGH;
+    Operator = parseExprOperator();
+    break;
   case tok::oper_prefix:
+    /// Parse the unwrap suppression operator.
+    if (Tok.isContextualPunctuator("^") &&
+        peekToken().isAny(tok::identifier, tok::kw_self, tok::l_paren)) {
+      SourceLoc CaretLoc = consumeToken();
+
+      // Parse the subexpression.
+      ParserResult<Expr> SubExpr = parseExprPrimary(Message, isExprBasic);
+      ParserStatus Status = SubExpr;
+      if (SubExpr.isNull())
+        return Status;
+
+      // We are sure we can create a prefix operator expr now.
+      UnaryContext.setCreateSyntax(SyntaxKind::PrefixOperatorExpr);
+
+      return makeParserResult(
+          Status, new (Context) SuppressUnwrapExpr(CaretLoc, SubExpr.get()));
+    }
+
     Operator = parseExprOperator();
     break;
   case tok::oper_binary_spaced:

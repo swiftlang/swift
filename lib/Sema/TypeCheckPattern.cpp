@@ -923,6 +923,9 @@ UnboundGenericType *TypeChecker::getUnboundPropertyBehaviorType(VarDecl *var) {
 }
 
 VarDecl *TypeChecker::getPropertyBehaviorUnwrapProperty(VarDecl *var) {
+  if (!var->hasPropertyBehavior())
+    return nullptr;
+  
   auto unboundGeneric = getUnboundPropertyBehaviorType(var);
   if (!unboundGeneric)
     return nullptr;
