@@ -18,6 +18,7 @@
 
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/Punycode.h"
+#include "swift/Demangling/ManglingUtils.h"
 #include "swift/AST/Ownership.h"
 #include "swift/Strings.h"
 #include "RemanglerBase.h"
@@ -31,88 +32,6 @@ using namespace Demangle;
 static void unreachable(const char *Message) {
   fprintf(stderr, "fatal error: %s\n", Message);
   std::abort();
-}
-
-/// Translate the given operator character into its mangled form.
-///
-/// Current operator characters:   @/=-+*%<>!&|^~ and the special operator '..'
-static char mangleOperatorChar(char op) {
-  switch (op) {
-  case '&': return 'a'; // 'and'
-  case '@': return 'c'; // 'commercial at sign'
-  case '/': return 'd'; // 'divide'
-  case '=': return 'e'; // 'equal'
-  case '>': return 'g'; // 'greater'
-  case '<': return 'l'; // 'less'
-  case '*': return 'm'; // 'multiply'
-  case '!': return 'n'; // 'negate'
-  case '|': return 'o'; // 'or'
-  case '+': return 'p'; // 'plus'
-  case '?': return 'q'; // 'question'
-  case '%': return 'r'; // 'remainder'
-  case '-': return 's'; // 'subtract'
-  case '~': return 't'; // 'tilde'
-  case '^': return 'x'; // 'xor'
-  case '.': return 'z'; // 'zperiod' (the z is silent)
-  default:
-    return op;
-  }
-}
-
-static bool isNonAscii(StringRef str) {
-  for (unsigned char c : str) {
-    if (c >= 0x80)
-      return true;
-  }
-  return false;
-}
-
-static char mangleOperatorKind(OperatorKind operatorKind) {
-  switch (operatorKind) {
-  case OperatorKind::NotOperator: unreachable("invalid");
-  case OperatorKind::Infix: return 'i';
-  case OperatorKind::Prefix: return 'p';
-  case OperatorKind::Postfix: return 'P';
-  }
-  unreachable("invalid");
-}
-
-static void mangleIdentifier(StringRef ident, OperatorKind operatorKind,
-                             bool usePunycode, RemanglerBuffer &Buffer) {
-  std::string punycodeBuf;
-  if (usePunycode) {
-    // If the identifier contains non-ASCII character, we mangle 
-    // with an initial X and Punycode the identifier string.
-    if (isNonAscii(ident)) {
-      Buffer << 'X';
-      Punycode::encodePunycodeUTF8(ident, punycodeBuf);
-      ident = punycodeBuf;
-    }
-  }
-
-  // Mangle normal identifiers as
-  //   count identifier-char+
-  // where the count is the number of characters in the identifier,
-  // and where individual identifier characters represent themselves.
-  if (operatorKind == OperatorKind::NotOperator) {
-    Buffer << ident.size() << ident;
-    return;
-  }
-
-  // Mangle operator identifiers as
-  //   operator ::= 'o' operator-fixity count operator-char+
-  //   operator-fixity ::= 'p' // prefix
-  //   operator-fixity ::= 'P' // postfix
-  //   operator-fixity ::= 'i' // infix
-  // where the count is the number of characters in the operator,
-  // and where the individual operator characters are translated.
-  Buffer << 'o' << mangleOperatorKind(operatorKind);
-
-  // Mangle ASCII operators directly.
-  Buffer << ident.size();
-  for (char ch : ident) {
-    Buffer << mangleOperatorChar(ch);
-  }
 }
 
 namespace {
@@ -388,7 +307,35 @@ void Remangler::mangleInfixOperator(Node *node) {
   mangleIdentifier(node->getText(), OperatorKind::Infix);
 }
 void Remangler::mangleIdentifier(StringRef ident, OperatorKind operatorKind) {
-  ::mangleIdentifier(ident, operatorKind, /*usePunycode*/ false, Buffer);
+  // Mangle normal identifiers as
+  //   count identifier-char+
+  // where the count is the number of characters in the identifier,
+  // and where individual identifier characters represent themselves.
+  if (operatorKind == OperatorKind::NotOperator) {
+    Buffer << ident.size() << ident;
+    return;
+  }
+
+  // Mangle operator identifiers as
+  //   operator ::= 'o' operator-fixity count operator-char+
+  //   operator-fixity ::= 'p' // prefix
+  //   operator-fixity ::= 'P' // postfix
+  //   operator-fixity ::= 'i' // infix
+  // where the count is the number of characters in the operator,
+  // and where the individual operator characters are translated.
+  Buffer << 'o';
+  switch (operatorKind) {
+    case OperatorKind::NotOperator: unreachable("invalid");
+    case OperatorKind::Infix: Buffer << 'i'; break;
+    case OperatorKind::Prefix: Buffer << 'p'; break;
+    case OperatorKind::Postfix: Buffer << 'P'; break;
+  }
+
+  // Mangle ASCII operators directly.
+  Buffer << ident.size();
+  for (char ch : ident) {
+    Buffer << Mangle::translateOperatorChar(ch);
+  }
 }
 
 void Remangler::mangleNumber(Node *node) {
@@ -983,9 +930,7 @@ void Remangler::mangleNamedEntity(Node *node, char basicKind,
   if (!privateDiscriminator.empty()
       && name->getKind() == Node::Kind::Identifier) {
     Buffer << 'P';
-    ::mangleIdentifier(privateDiscriminator,
-                       OperatorKind::NotOperator,
-                       /*punycode*/ false, Buffer);
+    mangleIdentifier(privateDiscriminator, OperatorKind::NotOperator);
   }
   mangle(name);
 }
