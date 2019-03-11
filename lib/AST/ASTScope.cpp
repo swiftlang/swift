@@ -1746,6 +1746,7 @@ DeclContext *ASTScope::getDeclContext() const {
     // own nodes. Maybe they should.
     if (auto subscript = dyn_cast<SubscriptDecl>(abstractStorageDecl))
       return subscript;
+    return nullptr;
 
   case ASTScopeKind::NominalOrExtensionWhereClause:
       return whereDeclContext.is<NominalTypeDecl*>()
