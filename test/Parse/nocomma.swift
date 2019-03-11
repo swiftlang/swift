@@ -744,6 +744,9 @@ let sv11: Int = int[
 /// Subscript Super Helpers
 
 class SB {
+    subscript() -> Int {
+        return 0
+    }
     subscript(a: Int) -> Int {
         return a
     }
@@ -755,6 +758,68 @@ class SB {
     }
     subscript(a: Int, b: Int, c: Int, d: Int) -> Int {
         return a + b + c + d
+    }
+}
+
+/// Subscripts, Supers, Basic
+
+class SDB0 : SB {
+    override subscript() -> Int {
+        return super[]
+    }
+}
+
+class SDB1 : SB {
+   override subscript() -> Int {
+       return super[int]
+    }
+}
+
+class SDB2 : SB {
+   override subscript() -> Int {
+       return super[.typeFoo]
+    }
+}
+
+class SDB3 : SB {
+   override subscript() -> Int {
+       return super[0.instanceFoo]
+    }
+}
+
+class SDB4 : SB {
+   override subscript() -> Int {
+       return super[(0 as Int).typeFoo] // expected-error{{static member 'typeFoo' cannot be used on instance of type 'Int'}}
+    }
+}
+
+class SDB5 : SB {
+   override subscript() -> Int {
+       return super[0, 1]
+    }
+}
+
+class SDB6 : SB {
+   override subscript() -> Int {
+       return super[.typeFoo, 1]
+    }
+}
+
+class SDB7 : SB {
+   override subscript() -> Int {
+       return super[0, .typeBar]
+    }
+}
+
+class SDB8 : SB {
+   override subscript() -> Int {
+       return super[.typeFoo, .typeBar]
+    }
+}
+
+class SDB9 : SB {
+   override subscript() -> Int {
+       return super[foo.instanceBar, bar.instanceBaz]
     }
 }
 
@@ -1467,6 +1532,9 @@ let fvmc11: Int = funcy(
 /// Function Super Helpers
 
 class FB {
+    func funcy() -> Int {
+        return 0
+    }
     func funcy(_ a: Int) -> Int {
         return a
     }
@@ -1478,6 +1546,68 @@ class FB {
     }
     func funcy(_ a: Int, _ b: Int, _ c: Int, _ d: Int) -> Int {
         return a + b + c + d
+    }
+}
+
+/// Functions, Supers, Basic
+
+class FDB0 : FB {
+    func ffuncy() -> Int {
+        return super.funcy()
+    }
+}
+
+class FDB1 : FB {
+   func ffuncy() -> Int {
+       return super.funcy(int)
+    }
+}
+
+class FDB2 : FB {
+   func ffuncy() -> Int {
+       return super.funcy(.typeFoo)
+    }
+}
+
+class FDB3 : FB {
+   func ffuncy() -> Int {
+       return super.funcy(0.instanceFoo)
+    }
+}
+
+class FDB4 : FB {
+   func ffuncy() -> Int {
+       return super.funcy((0 as Int).typeFoo) // expected-error{{static member 'typeFoo' cannot be used on instance of type 'Int'}}
+    }
+}
+
+class FDB5 : FB {
+   func ffuncy() -> Int {
+       return super.funcy(0, 1)
+    }
+}
+
+class FDB6 : FB {
+   func ffuncy() -> Int {
+       return super.funcy(.typeFoo, 1)
+    }
+}
+
+class FDB7 : FB {
+   func ffuncy() -> Int {
+       return super.funcy(0, .typeBar)
+    }
+}
+
+class FDB8 : FB {
+   func ffuncy() -> Int {
+       return super.funcy(.typeFoo, .typeBar)
+    }
+}
+
+class FDB9 : FB {
+   func ffuncy() -> Int {
+       return super.funcy(foo.instanceBar, bar.instanceBaz)
     }
 }
 
@@ -1759,4 +1889,565 @@ class FVMC11 : FB {
         )
     }
 }
+
+/// Initializer Helpers
+
+class IB {
+    init() {
+    }
+    init(_ a: Int) {
+    }
+    init(_ a: Int, _ b: Int) {
+    }
+    init(_ a: Int, _ b: Int, _ c: Int) {
+    }
+    init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) {
+    }
+}
+
+/// Initializer Basics
+
+let ib0 = IB()
+
+let ib1 = IB(int)
+
+let ib2 = IB(.typeFoo)
+
+let ib3 = IB(0.instanceFoo)
+
+let ib4 = IB((0 as Int).typeFoo) // expected-error{{static member 'typeFoo' cannot be used on instance of type 'Int'}}
+
+let ib5 = IB(0, 1)
+
+let ib6 = IB(.typeFoo, 1)
+
+let ib7 = IB(0, .typeBar)
+
+let ib8 = IB(.typeFoo, .typeBar)
+
+let ib9 = IB(foo.instanceBar, bar.instanceBaz)
+
+/// Initializers, Int Literals, Vertical, Trailing
+
+let iilvt1 = IB(
+    0,
+    1,
+    2,
+    3   
+)
+
+let iilvt2 = IB(
+    0
+    1
+    2
+    3
+)
+
+let iilvt3 = IB(
+    0,
+    1,
+    2
+    3
+)
+
+let iilvt4 = IB(
+    0,
+    1
+    2,
+    3
+)
+
+let iilvt5 = IB(
+    0
+    1,
+    2,
+    3
+)
+
+let iilvt6 = IB(
+    0,
+    1
+    2
+    3
+)
+
+let iilvt7 = IB(
+    0
+    1,
+    2
+    3
+)
+
+let iilvt8 = IB(
+    0
+    1
+    2,
+    3
+)
+
+/// Initializers, Int Literals, Vertical, Leading
+
+let iilvl1 = IB(
+    0
+  , 1
+  , 2
+  , 3    
+)
+
+let iilvl2 = IB(
+    0
+    1
+    2
+    3
+)
+
+let iilvl3 = IB(
+    0
+  , 1
+  , 2
+    3
+)
+
+let iilvl4 = IB(
+    0
+  , 1
+    2
+  , 3
+)
+
+let iilvl5 = IB(
+    0
+    1
+  , 2
+  , 3
+)
+
+let iilvl6 = IB(
+    0
+  , 1
+    2
+    3
+)
+
+let iilvl7 = IB(
+    0
+    1
+  , 2
+    3
+)
+
+let iilvl8 = IB(
+    0
+    1
+    2
+  , 3
+)
+
+/// Initializers, Variables + Members, Columnar
+
+let ivmc1 = IB(
+    foo
+    .instanceBar
+)
+
+let ivmc2 = IB(
+    foo // expected-error{{static member 'typeBar' cannot be used on instance of type 'Int'}}
+    .typeBar
+)
+
+let ivmc3 = IB(
+    foo
+    bar
+    baz
+)
+
+let ivmc4 = IB(
+    foo
+    .instanceBar
+    baz
+)
+
+let ivmc5 = IB(
+    foo // expected-error{{static member 'typeBar' cannot be used on instance of type 'Int'}}
+    .typeBar
+    baz
+)
+
+let ivmc6 = IB(
+    foo,
+    bar,
+    baz
+)
+
+let ivmc7 = IB(
+    foo
+    .instanceBar
+    baz
+)
+
+let ivmc8 = IB(
+    foo // expected-error{{static member 'typeBar' cannot be used on instance of type 'Int'}}
+    .typeBar
+    baz
+)
+
+let ivmc9 = IB(
+    .typeFoo
+    .typeBar
+    .typeBaz // expected-error{{type of expression is ambiguous without more context}}
+)
+
+let ivmc10 = IB(
+    .typeFoo,
+    .typeBar,
+    .typeBaz
+)
+
+let ivmc11 = IB(
+    Int.typeFoo
+    Int.typeBar
+    Int.typeBaz
+)
+
+/// Initializers, Supers, Basic
+
+class IDB0 : IB {
+    override init() {
+        super.init()
+    }
+}
+
+class IDB1 : IB {
+   override init() {
+       super.init(int)
+    }
+}
+
+class IDB2 : IB {
+   override init() {
+       super.init(.typeFoo)
+    }
+}
+
+class IDB3 : IB {
+   override init() {
+       super.init(0.instanceFoo)
+    }
+}
+
+class IDB4 : IB {
+   override init() {
+       super.init((0 as Int).typeFoo) // expected-error{{static member 'typeFoo' cannot be used on instance of type 'Int'}}
+    }
+}
+
+class IDB5 : IB {
+   override init() {
+       super.init(0, 1)
+    }
+}
+
+class IDB6 : IB {
+   override init() {
+       super.init(.typeFoo, 1)
+    }
+}
+
+class IDB7 : IB {
+   override init() {
+       super.init(0, .typeBar)
+    }
+}
+
+class IDB8 : IB {
+   override init() {
+       super.init(.typeFoo, .typeBar)
+    }
+}
+
+class IDB9 : IB {
+   override init() {
+       super.init(foo.instanceBar, bar.instanceBaz)
+    }
+}
+
+/// Initializers, Supers, Int Literals, Vertical, Trailing
+
+class IDT1 : IB {
+    override init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) {
+        super.init(
+            a,
+            b,
+            c,
+            d
+        )
+    }
+}
+
+class IDT2 : IB {
+    override init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) {
+        super.init(
+            a
+            b
+            c
+            d
+        )
+    }
+}
+
+class IDT3 : IB {
+    override init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) {
+        super.init(
+            a,
+            b,
+            c
+            d
+        )
+    }
+}
+
+class IDT4 : IB {
+    override init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) {
+        super.init(
+            a,
+            b
+            c,
+            d
+        )
+    }
+}
+
+class IDT5 : IB {
+    override init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) {
+        super.init(
+            a
+            b,
+            c,
+            d
+        )
+    }
+}
+
+class IDT6 : IB {
+    override init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) {
+        super.init(
+            a,
+            b
+            c
+            d
+        )
+    }
+}
+
+class IDT7 : IB {
+    override init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) {
+        super.init(
+            a
+            b,
+            c
+            d
+        )
+    }
+}
+
+/// Initializers, Super, Int Literals, Leading
+
+class IDL1 : IB {
+    override init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) {
+        super.init(
+            a
+          , b
+          , c
+          , d
+        )
+    }
+}
+
+class IDL2 : IB {
+    override init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) {
+        super.init(
+            a
+            b
+            c
+            d
+        )
+    }
+}
+
+class IDL3 : IB {
+    override init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) {
+        super.init(
+            a
+          , b
+          , c
+            d
+        )
+    }
+}
+
+class IDL4 : IB {
+    override init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) {
+        super.init(
+            a
+          , b
+            c
+          , d
+        )
+    }
+}
+
+class IDL5 : IB {
+    override init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) {
+        super.init(
+            a
+            b
+          , c
+          , d
+        )
+    }
+}
+
+class IDL6 : IB {
+    override init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) {
+        super.init(
+            a
+          , b
+            c
+            d
+        )
+    }
+}
+
+class IDL7 : IB {
+    override init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) {
+        super.init(
+            a
+            b
+          , c
+            d
+        )
+    }
+}
+
+class IDL8 : IB {
+    override init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) {
+        super.init(
+            a
+            b
+            c
+          , d
+        )
+    }
+}
+
+/// Initializers, Super, Variables + Members, Columnar
+
+class IVMC1 : IB {
+    override init() {
+        super.init(
+            foo
+            .instanceBar
+        )
+    }
+}
+
+class IVMC2 : IB {
+    override init() {
+        super.init(
+            foo // expected-error{{static member 'typeBar' cannot be used on instance of type 'Int'}}
+            .typeBar
+        )
+    }
+}
+
+class IVMC3 : IB {
+    override init() {
+        super.init(
+            foo
+            bar
+            baz
+        )
+    }
+}
+
+class IVMC4 : IB {
+    override init() {
+        super.init(
+            foo
+            .instanceBar
+            baz
+        )
+    }
+}
+
+class IVMC5 : IB {
+    override init() {
+        super.init(
+            foo // expected-error{{static member 'typeBar' cannot be used on instance of type 'Int'}}
+            .typeBar
+            baz
+        )
+    }
+}
+
+class IVMC6 : IB {
+    override init() {
+        super.init(
+            foo,
+            bar,
+            baz
+        )
+    }
+}
+
+class IVMC7 : IB {
+    override init() {
+        super.init(
+            foo
+            .instanceBar
+            baz
+        )
+    }
+}
+
+class IVMC8 : IB {
+    override init() {
+        super.init(
+            foo // expected-error{{static member 'typeBar' cannot be used on instance of type 'Int'}}
+            .typeBar
+            baz
+        )
+    }
+}
+
+class IVMC9 : IB {
+    override init() {
+        super.init(
+            .typeFoo
+            .typeBar
+            .typeBaz // expected-error{{type of expression is ambiguous without more context}}
+        )
+    }
+}
+
+class IVMC10 : IB {
+    override init() {
+        super.init(
+            .typeFoo,
+            .typeBar,
+            .typeBaz
+        )
+    }
+}
+
+class IVMC11 : IB {
+    override init() {
+        super.init(
+            Int.typeFoo
+            Int.typeBar
+            Int.typeBaz
+        )
+    }
+}
+
 
