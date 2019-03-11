@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A collection that supports access to its underlying contiguous storage.
-@available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 public protocol _ContiguousCollection: Collection
 where SubSequence: _ContiguousCollection {
     /// Calls a closure with a pointer to the array's contiguous storage.
@@ -20,7 +20,7 @@ where SubSequence: _ContiguousCollection {
         ) rethrows -> R
 }
 
-@available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 public extension _ContiguousCollection {
     func withUnsafeBufferPointer<R>(
         _ body: (UnsafeBufferPointer<Element>) throws -> R
@@ -31,7 +31,7 @@ public extension _ContiguousCollection {
 
 /// A collection that supports mutable access to its underlying contiguous
 /// storage.
-@available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 public protocol _MutableContiguousCollection: _ContiguousCollection, MutableCollection
 where SubSequence: _MutableContiguousCollection {
     /// Calls the given closure with a pointer to the array's mutable contiguous
@@ -41,7 +41,7 @@ where SubSequence: _MutableContiguousCollection {
         ) rethrows -> R
 }
 
-@available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 extension _MutableContiguousCollection {
     public mutating func withUnsafeMutableBufferPointer<R>(
         _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
@@ -50,23 +50,23 @@ extension _MutableContiguousCollection {
     }
 }
 
-@available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 extension Array: _MutableContiguousCollection { }
 
-@available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 extension ContiguousArray: _MutableContiguousCollection { }
 
-@available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 extension ArraySlice: _MutableContiguousCollection { }
 
-@available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 extension UnsafeBufferPointer: _ContiguousCollection { }
 
-@available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 extension UnsafeMutableBufferPointer: _MutableContiguousCollection { }
 
-@available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 extension Slice: _ContiguousCollection where Base: _ContiguousCollection { }
 
-@available(iOS 13.0, macOS 10.14, tvOS 13.0, watchOS 6.0, *)
+@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 extension Slice: _MutableContiguousCollection where Base: _MutableContiguousCollection { }
