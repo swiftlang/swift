@@ -91,3 +91,42 @@ func testSuppressUnwrap() {
   // FIXME wrong type for ^wrapped1
   let _: Double = ^wrapped1 // expected-error{{cannot convert value of type 'Int' to specified type 'Double'}}
 }
+
+// ---------------------------------------------------------------------------
+// Behaviors as members of types
+// ---------------------------------------------------------------------------
+struct HasWrapper {
+  var wrapped by WrapperWithInitialValue = 5
+
+  func testReading() -> Int {
+    return wrapped + self.wrapped
+  }
+
+  mutating func testMutating(i: Int) {
+    wrapped += i
+    self.wrapped += i
+  }
+
+  mutating func testSuppression(i: Int) {
+    ^wrapped = WrapperWithInitialValue(initialValue: 17)
+    ^(self.wrapped) = WrapperWithInitialValue(initialValue: 17)
+  }
+}
+
+struct HasStaticWrapper {
+  static var wrapped by WrapperWithInitialValue = 5
+
+  static func testReading() -> Int {
+    return wrapped + HasStaticWrapper.wrapped
+  }
+
+  static func testMutating(i: Int) {
+    wrapped += i
+    HasStaticWrapper.wrapped += i
+  }
+
+  static func testSuppression(i: Int) {
+    ^wrapped = WrapperWithInitialValue(initialValue: 17)
+    ^(HasStaticWrapper.wrapped) = WrapperWithInitialValue(initialValue: 17)
+  }
+}

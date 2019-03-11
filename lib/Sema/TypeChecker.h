@@ -1472,6 +1472,10 @@ public:
   /// will be accessed to unwrap references to the variable.
   VarDecl *getPropertyBehaviorUnwrapProperty(VarDecl *var);
 
+  /// Retrieve the sequence of property declarations through which access
+  /// to the given variable should be projected to access the underlying value.
+  SmallVector<VarDecl *, 2> getPropertyBehaviorUnwrapPath(VarDecl *var);
+
   /// Given the type of the given variable (which must have a property
   /// behavior), form the stored property type that results from applying
   /// the behavior.

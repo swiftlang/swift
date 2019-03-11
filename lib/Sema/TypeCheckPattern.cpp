@@ -925,7 +925,7 @@ UnboundGenericType *TypeChecker::getUnboundPropertyBehaviorType(VarDecl *var) {
 VarDecl *TypeChecker::getPropertyBehaviorUnwrapProperty(VarDecl *var) {
   if (!var->hasPropertyBehavior())
     return nullptr;
-  
+
   auto unboundGeneric = getUnboundPropertyBehaviorType(var);
   if (!unboundGeneric)
     return nullptr;
@@ -967,6 +967,20 @@ VarDecl *TypeChecker::getPropertyBehaviorUnwrapProperty(VarDecl *var) {
     }
     return nullptr;
   }
+}
+
+SmallVector<VarDecl *, 2>
+TypeChecker::getPropertyBehaviorUnwrapPath(VarDecl *var) {
+  SmallVector<VarDecl *, 2> unwrappedProperties;
+
+  // FIXME: Detect recursive property behavior definitions.
+  VarDecl *currentVar = var;
+  while (auto nextVar = getPropertyBehaviorUnwrapProperty(currentVar)) {
+    unwrappedProperties.push_back(nextVar);
+    currentVar = nextVar;
+  }
+
+  return unwrappedProperties;
 }
 
 Type TypeChecker::applyPropertyBehaviorType(Type type, VarDecl *var,

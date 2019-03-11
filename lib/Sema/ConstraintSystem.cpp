@@ -1882,7 +1882,7 @@ static Expr *findSuppressUnwrapTarget(Expr *expr, bool &isMember) {
   }
 
   if (isa<MemberRefExpr>(expr) || isa<DotSyntaxCallExpr>(expr) ||
-      isa<DotSyntaxBaseIgnoredExpr>(expr)) {
+      isa<DotSyntaxBaseIgnoredExpr>(expr) || isa<UnresolvedDotExpr>(expr)) {
     isMember = true;
     return expr;
   }
@@ -1895,7 +1895,7 @@ void ConstraintSystem::recordSuppressUnwrap(SuppressUnwrapExpr *expr) {
   bool isMember;
   auto wrappedExpr = findSuppressUnwrapTarget(expr->getSubExpr(), isMember);
   if (!wrappedExpr) {
-    TC.diagnose(wrappedExpr->getLoc(),
+    TC.diagnose(expr->getLoc(),
                 diag::property_behavior_unwrap_not_declaration)
       .highlight(expr->getSubExpr()->getSourceRange());
     return;
@@ -1913,15 +1913,8 @@ Type ConstraintSystem::unwrapPropertyBehaviorReference(
     VarDecl *var, Type refType, DeclContext *useDC,
     ConstraintLocatorBuilder locatorBuilder) {
   // Collect the chain of unwrapped properties that we should follow.
-  SmallVector<VarDecl *, 2> unwrappedProperties;
-  {
-    // FIXME: Detect recursive property behavior definitions.
-    VarDecl *currentVar = var;
-    while (auto nextVar = TC.getPropertyBehaviorUnwrapProperty(currentVar)) {
-      unwrappedProperties.push_back(nextVar);
-      currentVar = nextVar;
-    }
-  }
+  SmallVector<VarDecl *, 2> unwrappedProperties =
+      TC.getPropertyBehaviorUnwrapPath(var);
 
   // Collect the set of unwrap suppressions to be applied to this reference.
   ArrayRef<SuppressUnwrapExpr *> suppressions;
@@ -1945,21 +1938,21 @@ Type ConstraintSystem::unwrapPropertyBehaviorReference(
 
   // Unwrap via successive property accesses.
   for (auto unwrapProperty : unwrappedProperties) {
-  // Determine the type of a reference to the unwrapped member.
-  auto unwrapLocator = getConstraintLocator(
-      locator, ConstraintLocator::UnwrappedPropertyBehavior);
-  std::pair<Type, Type> unwrapped = getTypeOfMemberReference(
-      refType, unwrapProperty, useDC, false, FunctionRefKind::Unapplied,
-      unwrapLocator);
+    // Determine the type of a reference to the unwrapped member.
+    auto unwrapLocator = getConstraintLocator(
+        locator, ConstraintLocator::UnwrappedPropertyBehavior);
+    std::pair<Type, Type> unwrapped = getTypeOfMemberReference(
+        refType, unwrapProperty, useDC, false, FunctionRefKind::Unapplied,
+        unwrapLocator);
 
-  // Record this as a resolved overload.
-  resolvedOverloadSets
-    = new (*this) ResolvedOverloadSetListItem{
-        resolvedOverloadSets, Type(),
-        OverloadChoice(refType, unwrapProperty, FunctionRefKind::Unapplied),
-        unwrapLocator, unwrapped.first, unwrapped.second};
+    // Record this as a resolved overload.
+    resolvedOverloadSets
+      = new (*this) ResolvedOverloadSetListItem{
+          resolvedOverloadSets, Type(),
+          OverloadChoice(refType, unwrapProperty, FunctionRefKind::Unapplied),
+          unwrapLocator, unwrapped.first, unwrapped.second};
 
-    refType = unwrapped.second;
+      refType = unwrapped.second;
   }
 
   return refType;
@@ -2150,10 +2143,6 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       addConstraint(ConstraintKind::LiteralConformsTo, argType,
                     protocol->getDeclaredType(),
                     locator);
-    } else if (isa<VarDecl>(choice.getDecl()) &&
-               cast<VarDecl>(choice.getDecl())->hasPropertyBehavior()) {
-      refType = unwrapPropertyBehaviorReference(
-          cast<VarDecl>(choice.getDecl()), refType, useDC, locator);
     }
     break;
   }
@@ -2269,6 +2258,13 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                               locator,
                                               openedFullType,
                                               refType};
+
+  // If this refers to a property that has a behavior, unwrap that behavior.
+  if (choice.isDecl() && isa<VarDecl>(choice.getDecl()) &&
+      cast<VarDecl>(choice.getDecl())->hasPropertyBehavior()) {
+    refType = unwrapPropertyBehaviorReference(
+        cast<VarDecl>(choice.getDecl()), refType, useDC, locator);
+  }
 
   // In some cases we already created the appropriate bind constraints.
   if (!bindConstraintCreated) {

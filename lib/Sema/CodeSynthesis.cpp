@@ -566,23 +566,38 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     break;
   }
 
-  VarDecl *selfDecl = accessor->getImplicitSelfDecl();
-  if (!selfDecl) {
+  // Build the storage reference.
+  Expr *storageRef;
+  if (VarDecl *selfDecl = accessor->getImplicitSelfDecl()) {
+    Expr *selfDRE = buildSelfReference(selfDecl, selfAccessKind, ctx);
+
+    if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
+      Expr *indices = buildSubscriptIndexReference(ctx, accessor);
+      storageRef = SubscriptExpr::create(ctx, selfDRE, indices, storage,
+                                         IsImplicit, semantics);
+    } else {
+      storageRef = new (ctx) MemberRefExpr(selfDRE, SourceLoc(), storage,
+                                           DeclNameLoc(), IsImplicit,
+                                           semantics);
+    }
+  } else {
     assert(target != TargetImpl::Super);
-    return new (ctx) DeclRefExpr(storage, DeclNameLoc(), IsImplicit, semantics);
+    storageRef = new (ctx) DeclRefExpr(storage, DeclNameLoc(), IsImplicit,
+                                       semantics);
   }
 
-  Expr *selfDRE =
-    buildSelfReference(selfDecl, selfAccessKind, ctx);
-
-  if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
-    Expr *indices = buildSubscriptIndexReference(ctx, accessor);
-    return SubscriptExpr::create(ctx, selfDRE, indices, storage,
-                                 IsImplicit, semantics);
+  // Suppress unwrapping of property behaviors.
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    if (var->hasPropertyBehavior()) {
+      auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
+      for (unsigned i : range(tc.getPropertyBehaviorUnwrapPath(var).size())) {
+        (void)i;
+        storageRef = new (ctx) SuppressUnwrapExpr(SourceLoc(), storageRef);
+      }
+    }
   }
 
-  return new (ctx) MemberRefExpr(selfDRE, SourceLoc(), storage,
-                                 DeclNameLoc(), IsImplicit, semantics);
+  return storageRef;
 }
 
 /// Load the value of VD.  If VD is an @override of another value, we call the
