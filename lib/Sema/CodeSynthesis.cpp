@@ -1706,9 +1706,10 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       arg->setInterfaceType(varInterfaceType);
       arg->setImplicit();
       
-      // If this is a var that has a default value, lets assign a default value
+      // If this is a var that has a default value, and is only binding one var,
+      // i.e, var (a, b) = (3, 3) is not allowed, lets assign a default value
       // to the parameter with the same expression.
-      if (!var->isLet()) {
+      if (!var->isLet() && var->getParentPattern()->getSingleVar()) {
         if (auto init = var->getParentInitializer()) {
           // Give this some bogus context right now, we'll fix it after making
           // the constructor.
