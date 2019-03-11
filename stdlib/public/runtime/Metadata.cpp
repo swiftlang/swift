@@ -2208,24 +2208,26 @@ static void initGenericClassObjCName(ClassMetadata *theClass) {
   auto globalNode = Dem.createNode(Demangle::Node::Kind::Global);
   globalNode->addChild(typeNode, Dem);
 
-  auto string = Demangle::mangleNodeOld(globalNode, &Dem);
+  llvm::StringRef string = Demangle::mangleNodeOld(globalNode, Dem);
 
   // If the class is in the Swift module, add a $ to the end of the ObjC
   // name. The old and new Swift libraries must be able to coexist in
   // the same process, and this avoids warnings due to the ObjC names
   // colliding.
-  bool addSuffix = strncmp(string.c_str(), "_TtGCs", 6) == 0;
+  bool addSuffix = string.startswith("_TtGCs");
 
   size_t allocationSize = string.size() + 1;
   if (addSuffix)
     allocationSize += 1;
   
   auto fullNameBuf = (char*)swift_slowAlloc(allocationSize, 0);
-  memcpy(fullNameBuf, string.c_str(), string.size() + 1);
+  memcpy(fullNameBuf, string.data(), string.size());
 
   if (addSuffix) {
     fullNameBuf[string.size()] = '$';
     fullNameBuf[string.size() + 1] = '\0';
+  } else {
+    fullNameBuf[string.size()] = '\0';
   }
 
   auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
