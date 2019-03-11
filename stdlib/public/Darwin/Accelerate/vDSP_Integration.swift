@@ -22,9 +22,9 @@ extension vDSP {
     /// Integrates source vector using specified rule, single-precision.
     ///
     /// - Parameter vector: The vector to integrate.
-    /// - Parameter result: The destinatiuon vector to receive the result.
     /// - Parameter rule: The integration rule.
     /// - Parameter stepSize: The integration step size (weighting factor for running sum).
+    /// - Parameter result: The destinatiuon vector to receive the result.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func integrate<U, V>(_ vector: U,
@@ -65,9 +65,9 @@ extension vDSP {
     /// Integrates source vector using specified rule, double-precision.
     ///
     /// - Parameter vector: The vector to integrate.
-    /// - Parameter result: The destinatiuon vector to receive the result.
     /// - Parameter rule: The integration rule.
     /// - Parameter stepSize: The integration step size (weighting factor for running sum).
+    /// - Parameter result: The destinatiuon vector to receive the result.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func integrate<U, V>(_ vector: U,
