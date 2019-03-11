@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -343,8 +343,8 @@ extension vDSP {
     // MARK: Floating-point to integer conversion
     
     public enum RoundingMode {
-        case towardsZero
-        case towardsNearestInteger
+        case towardZero
+        case towardNearestInteger
     }
     
     /// Converts an array of single-precision floating-point values to signed 32-bit integer values using specified rounding.
@@ -367,11 +367,11 @@ extension vDSP {
             destination.withUnsafeMutableBufferPointer { dest in
                 source.withUnsafeBufferPointer { src in
                     switch rounding {
-                    case .towardsZero:
+                    case .towardZero:
                         vDSP_vfix32(src.baseAddress!, 1,
                                     dest.baseAddress!, 1,
                                     n)
-                    case .towardsNearestInteger:
+                    case .towardNearestInteger:
                         vDSP_vfixr32(src.baseAddress!, 1,
                                      dest.baseAddress!, 1,
                                      n)
@@ -400,11 +400,11 @@ extension vDSP {
             destination.withUnsafeMutableBufferPointer { dest in
                 source.withUnsafeBufferPointer { src in
                     switch rounding {
-                    case .towardsZero:
+                    case .towardZero:
                         vDSP_vfix32D(src.baseAddress!, 1,
                                      dest.baseAddress!, 1,
                                      n)
-                    case .towardsNearestInteger:
+                    case .towardNearestInteger:
                         vDSP_vfixr32D(src.baseAddress!, 1,
                                       dest.baseAddress!, 1,
                                       n)
@@ -433,11 +433,11 @@ extension vDSP {
             destination.withUnsafeMutableBufferPointer { dest in
                 source.withUnsafeBufferPointer { src in
                     switch rounding {
-                    case .towardsZero:
+                    case .towardZero:
                         vDSP_vfixu16(src.baseAddress!, 1,
                                      dest.baseAddress!, 1,
                                      n)
-                    case .towardsNearestInteger:
+                    case .towardNearestInteger:
                         vDSP_vfixru16(src.baseAddress!, 1,
                                       dest.baseAddress!, 1,
                                       n)
@@ -466,11 +466,11 @@ extension vDSP {
             destination.withUnsafeMutableBufferPointer { dest in
                 source.withUnsafeBufferPointer { src in
                     switch rounding {
-                    case .towardsZero:
+                    case .towardZero:
                         vDSP_vfixu16D(src.baseAddress!, 1,
                                       dest.baseAddress!, 1,
                                       n)
-                    case .towardsNearestInteger:
+                    case .towardNearestInteger:
                         vDSP_vfixru16D(src.baseAddress!, 1,
                                        dest.baseAddress!, 1,
                                        n)
@@ -499,11 +499,11 @@ extension vDSP {
             destination.withUnsafeMutableBufferPointer { dest in
                 source.withUnsafeBufferPointer { src in
                     switch rounding {
-                    case .towardsZero:
+                    case .towardZero:
                         vDSP_vfixu32(src.baseAddress!, 1,
                                      dest.baseAddress!, 1,
                                      n)
-                    case .towardsNearestInteger:
+                    case .towardNearestInteger:
                         vDSP_vfixru32(src.baseAddress!, 1,
                                       dest.baseAddress!, 1,
                                       n)
@@ -532,11 +532,11 @@ extension vDSP {
             destination.withUnsafeMutableBufferPointer { dest in
                 source.withUnsafeBufferPointer { src in
                     switch rounding {
-                    case .towardsZero:
+                    case .towardZero:
                         vDSP_vfixu32D(src.baseAddress!, 1,
                                       dest.baseAddress!, 1,
                                       n)
-                    case .towardsNearestInteger:
+                    case .towardNearestInteger:
                         vDSP_vfixru32D(src.baseAddress!, 1,
                                        dest.baseAddress!, 1,
                                        n)
@@ -566,11 +566,11 @@ extension vDSP {
             destination.withUnsafeMutableBufferPointer { dest in
                 source.withUnsafeBufferPointer { src in
                     switch rounding {
-                    case .towardsZero:
+                    case .towardZero:
                         vDSP_vfix16(src.baseAddress!, 1,
                                     dest.baseAddress!, 1,
                                     n)
-                    case .towardsNearestInteger:
+                    case .towardNearestInteger:
                         vDSP_vfixr16(src.baseAddress!, 1,
                                      dest.baseAddress!, 1,
                                      n)
@@ -599,11 +599,11 @@ extension vDSP {
             destination.withUnsafeMutableBufferPointer { dest in
                 source.withUnsafeBufferPointer { src in
                     switch rounding {
-                    case .towardsZero:
+                    case .towardZero:
                         vDSP_vfix16D(src.baseAddress!, 1,
                                      dest.baseAddress!, 1,
                                      n)
-                    case .towardsNearestInteger:
+                    case .towardNearestInteger:
                         vDSP_vfixr16D(src.baseAddress!, 1,
                                       dest.baseAddress!, 1,
                                       n)
@@ -632,11 +632,11 @@ extension vDSP {
             destination.withUnsafeMutableBufferPointer { dest in
                 source.withUnsafeBufferPointer { src in
                     switch rounding {
-                    case .towardsZero:
+                    case .towardZero:
                         vDSP_vfix8(src.baseAddress!, 1,
                                    dest.baseAddress!, 1,
                                    n)
-                    case .towardsNearestInteger:
+                    case .towardNearestInteger:
                         vDSP_vfixr8(src.baseAddress!, 1,
                                     dest.baseAddress!, 1,
                                     n)
@@ -665,11 +665,11 @@ extension vDSP {
             destination.withUnsafeMutableBufferPointer { dest in
                 source.withUnsafeBufferPointer { src in
                     switch rounding {
-                    case .towardsZero:
+                    case .towardZero:
                         vDSP_vfix8D(src.baseAddress!, 1,
                                     dest.baseAddress!, 1,
                                     n)
-                    case .towardsNearestInteger:
+                    case .towardNearestInteger:
                         vDSP_vfixr8D(src.baseAddress!, 1,
                                      dest.baseAddress!, 1,
                                      n)
@@ -698,11 +698,11 @@ extension vDSP {
             destination.withUnsafeMutableBufferPointer { dest in
                 source.withUnsafeBufferPointer { src in
                     switch rounding {
-                    case .towardsZero:
+                    case .towardZero:
                         vDSP_vfixu8(src.baseAddress!, 1,
                                     dest.baseAddress!, 1,
                                     n)
-                    case .towardsNearestInteger:
+                    case .towardNearestInteger:
                         vDSP_vfixru8(src.baseAddress!, 1,
                                      dest.baseAddress!, 1,
                                      n)
@@ -731,11 +731,11 @@ extension vDSP {
             destination.withUnsafeMutableBufferPointer { dest in
                 source.withUnsafeBufferPointer { src in
                     switch rounding {
-                    case .towardsZero:
+                    case .towardZero:
                         vDSP_vfixu8D(src.baseAddress!, 1,
                                      dest.baseAddress!, 1,
                                      n)
-                    case .towardsNearestInteger:
+                    case .towardNearestInteger:
                         vDSP_vfixru8D(src.baseAddress!, 1,
                                       dest.baseAddress!, 1,
                                       n)

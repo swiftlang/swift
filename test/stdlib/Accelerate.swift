@@ -284,12 +284,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
     }
     
-    AccelerateTests.test("vDSP/FloatToInt32TowardsZero") {
+    AccelerateTests.test("vDSP/FloatToInt32towardZero") {
         let source = floatingPointValues
         var result = [Int32](repeating: 0, count: source.count)
         var legacyResult = [Int32](repeating: -1, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardsZero)
+        vDSP.convert(source, to: &result, rounding: .towardZero)
         
         vDSP_vfix32(source, 1,
                     &legacyResult, 1,
@@ -298,12 +298,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
     }
     
-    AccelerateTests.test("vDSP/FloatToInt32TowardsNearest") {
+    AccelerateTests.test("vDSP/FloatToInt32towardNearest") {
         let source = floatingPointValues
         var result = [Int32](repeating: 0, count: source.count)
         var legacyResult = [Int32](repeating: -1, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardsNearestInteger)
+        vDSP.convert(source, to: &result, rounding: .towardNearestInteger)
         
         vDSP_vfixr32(source, 1,
                      &legacyResult, 1,
@@ -312,12 +312,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
     }
     
-    AccelerateTests.test("vDSP/DoubleToInt32TowardsZero") {
+    AccelerateTests.test("vDSP/DoubleToInt32towardZero") {
         let source = floatingPointValuesD
         var result = [Int32](repeating: 0, count: source.count)
         var legacyResult = [Int32](repeating: -1, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardsZero)
+        vDSP.convert(source, to: &result, rounding: .towardZero)
         
         vDSP_vfix32D(source, 1,
                      &legacyResult, 1,
@@ -326,12 +326,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
     }
     
-    AccelerateTests.test("vDSP/DoubleToInt32TowardsNearest") {
+    AccelerateTests.test("vDSP/DoubleToInt32towardNearest") {
         let source = floatingPointValuesD
         var result = [Int32](repeating: 0, count: source.count)
         var legacyResult = [Int32](repeating: -1, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardsNearestInteger)
+        vDSP.convert(source, to: &result, rounding: .towardNearestInteger)
         
         vDSP_vfixr32D(source, 1,
                       &legacyResult, 1,
@@ -340,12 +340,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
     }
     
-    AccelerateTests.test("vDSP/FloatToUInt16TowardsZero") {
+    AccelerateTests.test("vDSP/FloatToUInt16towardZero") {
         let source = floatingPointValues
         var result = [UInt16](repeating: 0, count: source.count)
         var legacyResult = [UInt16](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardsZero)
+        vDSP.convert(source, to: &result, rounding: .towardZero)
         
         vDSP_vfixu16(source, 1,
                      &legacyResult, 1,
@@ -354,12 +354,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
     }
     
-    AccelerateTests.test("vDSP/FloatToUInt16TowardsNearest") {
+    AccelerateTests.test("vDSP/FloatToUInt16towardNearest") {
         let source = floatingPointValues
         var result = [UInt16](repeating: 0, count: source.count)
         var legacyResult = [UInt16](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardsNearestInteger)
+        vDSP.convert(source, to: &result, rounding: .towardNearestInteger)
         
         vDSP_vfixru16(source, 1,
                       &legacyResult, 1,
@@ -368,12 +368,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
     }
     
-    AccelerateTests.test("vDSP/DoubleToUInt16TowardsZero") {
+    AccelerateTests.test("vDSP/DoubleToUInt16towardZero") {
         let source = floatingPointValuesD
         var result = [UInt16](repeating: 0, count: source.count)
         var legacyResult = [UInt16](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardsZero)
+        vDSP.convert(source, to: &result, rounding: .towardZero)
         
         vDSP_vfixu16D(source, 1,
                       &legacyResult, 1,
@@ -382,12 +382,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
     }
     
-    AccelerateTests.test("vDSP/DoubleToUInt16TowardsNearest") {
+    AccelerateTests.test("vDSP/DoubleToUInt16towardNearest") {
         let source = floatingPointValuesD
         var result = [UInt16](repeating: 0, count: source.count)
         var legacyResult = [UInt16](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardsNearestInteger)
+        vDSP.convert(source, to: &result, rounding: .towardNearestInteger)
         
         vDSP_vfixru16D(source, 1,
                        &legacyResult, 1,
@@ -396,12 +396,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
     }
     
-    AccelerateTests.test("vDSP/FloatToUInt32TowardsZero") {
+    AccelerateTests.test("vDSP/FloatToUInt32towardZero") {
         let source = floatingPointValues
         var result = [UInt32](repeating: 0, count: source.count)
         var legacyResult = [UInt32](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardsZero)
+        vDSP.convert(source, to: &result, rounding: .towardZero)
         
         vDSP_vfixu32(source, 1,
                      &legacyResult, 1,
@@ -410,12 +410,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
     }
     
-    AccelerateTests.test("vDSP/FloatToUInt32TowardsNearest") {
+    AccelerateTests.test("vDSP/FloatToUInt32towardNearest") {
         let source = floatingPointValues
         var result = [UInt32](repeating: 0, count: source.count)
         var legacyResult = [UInt32](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardsNearestInteger)
+        vDSP.convert(source, to: &result, rounding: .towardNearestInteger)
         
         vDSP_vfixru32(source, 1,
                       &legacyResult, 1,
@@ -424,12 +424,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
     }
     
-    AccelerateTests.test("vDSP/DoubleToUInt32TowardsZero") {
+    AccelerateTests.test("vDSP/DoubleToUInt32towardZero") {
         let source = floatingPointValuesD
         var result = [UInt32](repeating: 0, count: source.count)
         var legacyResult = [UInt32](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardsZero)
+        vDSP.convert(source, to: &result, rounding: .towardZero)
         
         vDSP_vfixu32D(source, 1,
                       &legacyResult, 1,
@@ -438,12 +438,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
     }
     
-    AccelerateTests.test("vDSP/DoubleToUInt32TowardsNearest") {
+    AccelerateTests.test("vDSP/DoubleToUInt32towardNearest") {
         let source = floatingPointValuesD
         var result = [UInt32](repeating: 0, count: source.count)
         var legacyResult = [UInt32](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardsNearestInteger)
+        vDSP.convert(source, to: &result, rounding: .towardNearestInteger)
         
         vDSP_vfixru32D(source, 1,
                        &legacyResult, 1,
@@ -452,12 +452,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
     }
     
-    AccelerateTests.test("vDSP/FloatToInt16TowardsZero") {
+    AccelerateTests.test("vDSP/FloatToInt16towardZero") {
         let source = floatingPointValues
         var result = [Int16](repeating: 0, count: source.count)
         var legacyResult = [Int16](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardsZero)
+        vDSP.convert(source, to: &result, rounding: .towardZero)
         
         vDSP_vfix16(source, 1,
                     &legacyResult, 1,
@@ -466,12 +466,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
     }
     
-    AccelerateTests.test("vDSP/FloatToInt16TowardsNearest") {
+    AccelerateTests.test("vDSP/FloatToInt16towardNearest") {
         let source = floatingPointValues
         var result = [Int16](repeating: 0, count: source.count)
         var legacyResult = [Int16](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardsNearestInteger)
+        vDSP.convert(source, to: &result, rounding: .towardNearestInteger)
         
         vDSP_vfixr16(source, 1,
                      &legacyResult, 1,
@@ -480,12 +480,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
     }
     
-    AccelerateTests.test("vDSP/DoubleToInt16TowardsZero") {
+    AccelerateTests.test("vDSP/DoubleToInt16towardZero") {
         let source = floatingPointValuesD
         var result = [Int16](repeating: 0, count: source.count)
         var legacyResult = [Int16](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardsZero)
+        vDSP.convert(source, to: &result, rounding: .towardZero)
         
         vDSP_vfix16D(source, 1,
                      &legacyResult, 1,
@@ -494,12 +494,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
     }
     
-    AccelerateTests.test("vDSP/DoubleToInt16TowardsNearest") {
+    AccelerateTests.test("vDSP/DoubleToInt16towardNearest") {
         let source = floatingPointValuesD
         var result = [Int16](repeating: 0, count: source.count)
         var legacyResult = [Int16](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardsNearestInteger)
+        vDSP.convert(source, to: &result, rounding: .towardNearestInteger)
         
         vDSP_vfixr16D(source, 1,
                       &legacyResult, 1,
@@ -508,12 +508,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
     }
     
-    AccelerateTests.test("vDSP/FloatToInt8TowardsZero") {
+    AccelerateTests.test("vDSP/FloatToInt8towardZero") {
         let source = floatingPointValues
         var result = [Int8](repeating: 0, count: source.count)
         var legacyResult = [Int8](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardsZero)
+        vDSP.convert(source, to: &result, rounding: .towardZero)
         
         vDSP_vfix8(source, 1,
                    &legacyResult, 1,
@@ -522,12 +522,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
     }
     
-    AccelerateTests.test("vDSP/FloatToInt8TowardsNearest") {
+    AccelerateTests.test("vDSP/FloatToInt8towardNearest") {
         let source = floatingPointValues
         var result = [Int8](repeating: 0, count: source.count)
         var legacyResult = [Int8](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardsNearestInteger)
+        vDSP.convert(source, to: &result, rounding: .towardNearestInteger)
         
         vDSP_vfixr8(source, 1,
                     &legacyResult, 1,
@@ -536,12 +536,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
     }
     
-    AccelerateTests.test("vDSP/DoubleToInt8TowardsZero") {
+    AccelerateTests.test("vDSP/DoubleToInt8towardZero") {
         let source = floatingPointValuesD
         var result = [Int8](repeating: 0, count: source.count)
         var legacyResult = [Int8](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardsZero)
+        vDSP.convert(source, to: &result, rounding: .towardZero)
         
         vDSP_vfix8D(source, 1,
                     &legacyResult, 1,
@@ -550,12 +550,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
     }
     
-    AccelerateTests.test("vDSP/DoubleToInt8TowardsNearest") {
+    AccelerateTests.test("vDSP/DoubleToInt8towardNearest") {
         let source = floatingPointValuesD
         var result = [Int8](repeating: 0, count: source.count)
         var legacyResult = [Int8](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardsNearestInteger)
+        vDSP.convert(source, to: &result, rounding: .towardNearestInteger)
         
         vDSP_vfixr8D(source, 1,
                      &legacyResult, 1,
@@ -564,12 +564,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
     }
     
-    AccelerateTests.test("vDSP/FloatToUInt8TowardsZero") {
+    AccelerateTests.test("vDSP/FloatToUInt8towardZero") {
         let source = floatingPointValues
         var result = [UInt8](repeating: 0, count: source.count)
         var legacyResult = [UInt8](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardsZero)
+        vDSP.convert(source, to: &result, rounding: .towardZero)
         
         vDSP_vfixu8(source, 1,
                     &legacyResult, 1,
@@ -578,12 +578,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
     }
     
-    AccelerateTests.test("vDSP/FloatToUInt8TowardsNearest") {
+    AccelerateTests.test("vDSP/FloatToUInt8towardNearest") {
         let source = floatingPointValues
         var result = [UInt8](repeating: 0, count: source.count)
         var legacyResult = [UInt8](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardsNearestInteger)
+        vDSP.convert(source, to: &result, rounding: .towardNearestInteger)
         
         vDSP_vfixru8(source, 1,
                      &legacyResult, 1,
@@ -592,12 +592,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
     }
     
-    AccelerateTests.test("vDSP/DoubleToUInt8TowardsZero") {
+    AccelerateTests.test("vDSP/DoubleToUInt8towardZero") {
         let source = floatingPointValuesD
         var result = [UInt8](repeating: 0, count: source.count)
         var legacyResult = [UInt8](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardsZero)
+        vDSP.convert(source, to: &result, rounding: .towardZero)
         
         vDSP_vfixu8D(source, 1,
                      &legacyResult, 1,
@@ -606,12 +606,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
     }
     
-    AccelerateTests.test("vDSP/DoubletoUInt8TowardsNearest") {
+    AccelerateTests.test("vDSP/DoubletoUInt8towardNearest") {
         let source = floatingPointValuesD
         var result = [UInt8](repeating: 0, count: source.count)
         var legacyResult = [UInt8](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardsNearestInteger)
+        vDSP.convert(source, to: &result, rounding: .towardNearestInteger)
         
         vDSP_vfixru8D(source, 1,
                       &legacyResult, 1,
