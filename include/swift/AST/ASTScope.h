@@ -665,8 +665,8 @@ public:
   void expandAll() const;
   
   /// UnqualifiedLookup often wants to stop looking after finding the first match.
-  /// Some scopes are too soon to stop lookup.
-  bool isTooSoonToStopLookup() const {
+  /// Some scopes are too soon to stop lookup. Don't look here; leave it to the module level.
+  bool isEffectivelyTopLevelCode() const {
     return isCloseToTopLevelCode();
   }
 

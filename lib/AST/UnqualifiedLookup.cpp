@@ -634,6 +634,11 @@ void UnqualifiedLookupFactory::lookInASTScope(
   
   involvedANominalOrExtensionWhereClause |=
     state.scope->getKind() == ASTScopeKind::NominalOrExtensionWhereClause;
+  
+  if (state.scope->isEffectivelyTopLevelCode()) {
+    lookInASTScope(state.withParentScope());
+    return;
+  }
 
   // Perform local lookup within this scope.
   auto localBindings = state.scope->getLocalBindings();
