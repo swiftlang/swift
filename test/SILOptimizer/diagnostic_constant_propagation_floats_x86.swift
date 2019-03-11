@@ -70,10 +70,23 @@ func testFloatConvertUnderflow() {
   let d4: Double = 5E-324
   _blackHole(d4)
 
+  let e4: Float80 = 0x1p-16445
+  _blackHole(e4)
+
   // FIXME: if a number is so tiny that it underflows even Float80,
   // nothing is reported
   let e1: Float80 = 0x1p-16446
   _blackHole(e1)
+
+  // Test the case where conversion results in subnormality in the destination.
+  let e2: Double = 0x1p-1074
+  _blackHole(e2)
+  // FIXME: there should be a warning in the following line but it is suppressed
+  // conservatively as ConstantFolder thinks that the truncation here is
+  // explicitly requested in the code. A future enhancement to the AST may
+  // produce a warning here.
+  let e3: Double = 0x11p-1074
+  _blackHole(e3)
 
   // All warnings are disabled during explict conversions
   _blackHole(Float(1E-400))
