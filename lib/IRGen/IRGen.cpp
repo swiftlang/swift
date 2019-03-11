@@ -200,6 +200,9 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
                            addSwiftContractPass);
   }
 
+  if (RunSwiftSpecificLLVMOptzns)
+    addCoroutinePassesToExtensionPoints(PMBuilder);
+
   if (Opts.Sanitizers & SanitizerKind::Address) {
     PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
                            addAddressSanitizerPasses);
@@ -222,10 +225,6 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
     PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
                            addSanitizerCoveragePass);
   }
-
-  if (RunSwiftSpecificLLVMOptzns)
-    addCoroutinePassesToExtensionPoints(PMBuilder);
-
   if (RunSwiftSpecificLLVMOptzns)
     PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
                            addSwiftMergeFunctionsPass);
