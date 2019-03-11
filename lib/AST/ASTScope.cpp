@@ -1747,17 +1747,13 @@ DeclContext *ASTScope::getDeclContext() const {
     if (auto subscript = dyn_cast<SubscriptDecl>(abstractStorageDecl))
       return subscript;
 
-    return nullptr;
-
-  case ASTScopeKind::TopLevelCode:
-    return topLevelCode;
-      
   case ASTScopeKind::NominalOrExtensionWhereClause:
       return whereDeclContext.is<NominalTypeDecl*>()
         ? up_cast<DeclContext>(whereDeclContext.get<NominalTypeDecl*>())
         : up_cast<DeclContext>(whereDeclContext.get<  ExtensionDecl*>());
 
 
+  case ASTScopeKind::TopLevelCode:
   case ASTScopeKind::ExtensionGenericParams:
   case ASTScopeKind::GenericParams:
   case ASTScopeKind::AbstractFunctionParams:
@@ -1815,7 +1811,6 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
   case ASTScopeKind::DoCatchStmt:
   case ASTScopeKind::SwitchStmt:
   case ASTScopeKind::Accessors:
-  case ASTScopeKind::TopLevelCode:
   case ASTScopeKind::NominalOrExtensionWhereClause:
     // No local declarations.
     break;
@@ -1867,6 +1862,28 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
       }
     }
     break;
+      
+  case ASTScopeKind::TopLevelCode:
+//qqq    for (auto *child: children()) {
+//      assert(child->getKind() == ASTScopeKind::BraceStmt);
+//      for (auto &element: child->braceStmt.stmt->getElements()) {
+//        if (auto *d = element.dyn_cast<Decl *>())
+//          if (auto *vd = dyn_cast<ValueDecl>(d))
+//            result.push_back(vd);
+//      }
+//    }
+    // TODO: factor with above
+    // All types and functions are visible anywhere within the brace
+    // statement. It's up to capture analysis to determine what is usable.
+    // TODO: Just types and functions???
+//    for (auto element : topLevelCode->getBody()->getElements()) {
+//      if (auto decl = element.dyn_cast<Decl *>()) {
+//        if (auto *vd = dyn_cast<ValueDecl>(decl))
+//          result.push_back(vd);
+//      }
+//    }
+    break;
+
 
   case ASTScopeKind::ForEachPattern:
     handlePattern(forEach->getPattern());
@@ -2189,3 +2206,41 @@ void *ASTScope::operator new(size_t bytes, const ASTContext &ctx,
   return ctx.Allocate(bytes, alignment);
 }
 
+bool ASTScope::isCloseToTopLevelCode() const {
+  for (const auto *s = this;  s;  s = s->getParent()) {
+    switch (s->getKind()) {
+      case ASTScopeKind::TopLevelCode:
+        return true;
+      case ASTScopeKind::SourceFile:
+      case ASTScopeKind::TypeOrExtensionBody:
+      case ASTScopeKind::AbstractFunctionBody:
+      case ASTScopeKind::Closure:
+        return false;
+      case ASTScopeKind::Preexpanded:
+      case ASTScopeKind::ExtensionGenericParams:
+      case ASTScopeKind::NominalOrExtensionWhereClause:
+      case ASTScopeKind::GenericParams:
+      case ASTScopeKind::TypeDecl:
+      case ASTScopeKind::AbstractFunctionDecl:
+      case ASTScopeKind::AbstractFunctionParams:
+      case ASTScopeKind::DefaultArgument:
+      case ASTScopeKind::PatternBinding:
+      case ASTScopeKind::PatternInitializer:
+      case ASTScopeKind::AfterPatternBinding:
+      case ASTScopeKind::BraceStmt:
+      case ASTScopeKind::IfStmt:
+      case ASTScopeKind::ConditionalClause:
+      case ASTScopeKind::GuardStmt:
+      case ASTScopeKind::RepeatWhileStmt:
+      case ASTScopeKind::ForEachStmt:
+      case ASTScopeKind::ForEachPattern:
+      case ASTScopeKind::DoCatchStmt:
+      case ASTScopeKind::CatchStmt:
+      case ASTScopeKind::SwitchStmt:
+      case ASTScopeKind::CaseStmt:
+      case ASTScopeKind::Accessors:
+        break;
+    }
+  }
+  return false;
+}

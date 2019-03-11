@@ -571,6 +571,10 @@ class ASTScope {
   /// Retrieve the \c TrailingWhereClause, if any
   static TrailingWhereClause* getTrailingWhereClause(
            llvm::PointerUnion<NominalTypeDecl*, ExtensionDecl*>);
+  
+  /// Is the receiver a close enought descendant of a TopLevelCode scope
+  /// that other matches must be found, even if one is found here?
+  bool isCloseToTopLevelCode() const;
  
 public:
   /// Create the AST scope for a source file, which is the root of the scope
@@ -659,6 +663,12 @@ public:
   /// Normally, the scope map will be expanded only as needed by its queries,
   /// but complete expansion can be useful for debugging.
   void expandAll() const;
+  
+  /// UnqualifiedLookup often wants to stop looking after finding the first match.
+  /// Some scopes are too soon to stop lookup.
+  bool isTooSoonToStopLookup() const {
+    return isCloseToTopLevelCode();
+  }
 
   /// Print out this scope for debugging/reporting purposes.
   void print(llvm::raw_ostream &out, unsigned level = 0,

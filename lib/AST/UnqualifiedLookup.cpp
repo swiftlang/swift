@@ -313,23 +313,41 @@ public:
 
   /// Can lookup stop searching for results, assuming hasn't looked for outer
   /// results yet?
-  bool isFirstResultEnough() const;
+  bool isFirstResultEnoughForScopes(const ASTScope&) const;
+  bool isFirstResultEnoughForContexts() const;
 
   /// Every time lookup finishes searching a scope, call me
   /// to record the dividing line between results from first fruitful scope and
   /// the result.
   void recordCompletionOfAScope();
 
-  template <typename Fn> void ifNotDoneYet(Fn fn) {
+  template <typename Fn> void ifContextLookupIsNotDoneYet(Fn fn) {
     recordCompletionOfAScope();
-    if (!isFirstResultEnough())
+    if (!isFirstResultEnoughForContexts())
+      fn();
+  }
+  
+  template <typename Fn>
+  void ifScopeLookupIsNotDoneYet(const ASTScope& currentScope, Fn fn) {
+    if (isFirstResultEnoughForScopes(currentScope))
+      recordCompletionOfAScope();
+    else
       fn();
   }
 
-  template <typename Fn1, typename Fn2> void ifNotDoneYet(Fn1 fn1, Fn2 fn2) {
-    ifNotDoneYet(fn1);
-    ifNotDoneYet(fn2);
+  template <typename Fn1, typename Fn2>
+  void ifContextLookupIsNotDoneYet(Fn1 fn1, Fn2 fn2) {
+    ifContextLookupIsNotDoneYet(fn1);
+    ifContextLookupIsNotDoneYet(fn2);
   }
+  
+  
+  template <typename Fn1, typename Fn2>
+  void ifScopeLookupIsNotDoneYet(const ASTScope &currentScope, Fn1 fn1, Fn2 fn2) {
+    ifScopeLookupIsNotDoneYet(currentScope, fn1);
+    ifScopeLookupIsNotDoneYet(currentScope, fn2);
+  }
+
 
 #pragma mark normal (non-ASTScope-based) lookup declarations
 
@@ -640,7 +658,7 @@ void UnqualifiedLookupFactory::lookInASTScope(
   for (auto local : localBindings)
     Consumer.foundDecl(local, getLocalDeclVisibilityKind(state.scope));
 
-  ifNotDoneYet([&] {
+  ifScopeLookupIsNotDoneYet(*state.scope, [&] {
     // When we are in the body of a method, get the 'self' declaration.
     const bool inMethodBody =
         state.scope->getKind() == ASTScopeKind::AbstractFunctionBody &&
@@ -703,7 +721,7 @@ void UnqualifiedLookupFactory::lookInASTScopeContext(
     return;
   }
   lookForGenericsBeforeMembersInViolationOfLexicalOrdering(scopeDC);
-  ifNotDoneYet([&] {
+  ifScopeLookupIsNotDoneYet(*stateArg.scope, [&] {
     // Dig out the type we're looking into.
     // Perform lookup into the type
     auto resultFinder = ResultFinderForTypeContext(
@@ -790,7 +808,7 @@ void UnqualifiedLookupFactory::lookupInModuleScopeContext(
     DeclContext *dc, Optional<bool> isCascadingUse) {
   if (auto SF = dyn_cast<SourceFile>(dc))
     lookForLocalVariablesIn(SF);
-  ifNotDoneYet([&] {
+  ifContextLookupIsNotDoneYet([&] {
     // If no result has been found yet, the dependency must be on a top-level
     // name, since up to now, the search has been for non-top-level names.
     recordDependencyOnTopLevelName(dc, Name, isCascadingUse.getValueOr(true));
@@ -817,7 +835,7 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByPatternBindingInitializer(
       PatternBindingInitializer *PBI, ParamDecl *selfParam,
       Optional<bool> isCascadingUse) {
     Consumer.foundDecl(selfParam, DeclVisibilityKind::FunctionParameter);
-    ifNotDoneYet([&] {
+    ifContextLookupIsNotDoneYet([&] {
       DeclContext *const patternContainer = PBI->getParent();
       // clang-format off
     finishLookingInContext(
@@ -880,7 +898,7 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByFunctionDecl(
 void UnqualifiedLookupFactory::lookupNamesIntroducedByMemberFunction(
     AbstractFunctionDecl *AFD, bool isCascadingUse) {
   lookForLocalVariablesIn(AFD, isCascadingUse);
-  ifNotDoneYet(
+  ifContextLookupIsNotDoneYet(
       [&] {
         // If we're inside a function context, we're about to move to
         // the parent DC, so we have to check the function's generic
@@ -913,7 +931,7 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByMemberFunction(
 void UnqualifiedLookupFactory::lookupNamesIntroducedByPureFunction(
     AbstractFunctionDecl *AFD, bool isCascadingUse) {
   lookForLocalVariablesIn(AFD, isCascadingUse);
-  ifNotDoneYet([&] {
+  ifContextLookupIsNotDoneYet([&] {
     // clang-format off
     finishLookingInContext(
                            AddGenericParameters::Yes,
@@ -928,7 +946,7 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByClosure(
     AbstractClosureExpr *ACE, Optional<bool> isCascadingUse) {
   if (auto *CE = dyn_cast<ClosureExpr>(ACE))
     lookForLocalVariablesIn(CE);
-  ifNotDoneYet([&] {
+  ifContextLookupIsNotDoneYet([&] {
     // clang-format off
     finishLookingInContext(
       AddGenericParameters::Yes,
@@ -994,7 +1012,7 @@ void UnqualifiedLookupFactory::finishLookingInContext(
   if (addGenericParameters == AddGenericParameters::Yes)
     addGenericParametersForContext(lookupContextForThisContext);
   
-  ifNotDoneYet(
+  ifContextLookupIsNotDoneYet(
     [&] {
       if (resultFinderForTypeContext)
         findResultsAndSaveUnavailables(lookupContextForThisContext,
@@ -1023,7 +1041,7 @@ void UnqualifiedLookupFactory::lookForLocalVariablesIn(
   namelookup::FindLocalVal localVal(SM, Loc, Consumer);
   localVal.visit(AFD->getBody());
 
-  ifNotDoneYet([&] {
+  ifContextLookupIsNotDoneYet([&] {
     if (auto *P = AFD->getImplicitSelfDecl())
       localVal.checkValueDecl(P, DeclVisibilityKind::FunctionParameter);
     localVal.checkParameterList(AFD->getParameters());
@@ -1038,7 +1056,7 @@ void UnqualifiedLookupFactory::lookForLocalVariablesIn(ClosureExpr *CE) {
   namelookup::FindLocalVal localVal(SM, Loc, Consumer);
   if (auto body = CE->getBody())
     localVal.visit(body);
-  ifNotDoneYet([&] {
+  ifContextLookupIsNotDoneYet([&] {
     if (auto params = CE->getParameters())
       localVal.checkParameterList(params);
   });
@@ -1088,7 +1106,7 @@ void UnqualifiedLookupFactory::addGenericParametersForContext(
     return;
   namelookup::FindLocalVal localVal(SM, Loc, Consumer);
   localVal.checkGenericParams(dcGenericParams);
-  ifNotDoneYet([&] {
+  ifContextLookupIsNotDoneYet([&] {
     addGenericParametersForContext(
         dcGenericParams->getOuterParameters());
   });
@@ -1258,8 +1276,14 @@ NLOptions UnqualifiedLookupFactory::computeBaseNLOptions(
   return baseNLOptions;
 }
 
-bool UnqualifiedLookupFactory::isFirstResultEnough()
+bool UnqualifiedLookupFactory::isFirstResultEnoughForScopes(const ASTScope &currentScope)
     const {
+  return !Results.empty() && !options.contains(Flags::IncludeOuterResults) && !currentScope.isTooSoonToStopLookup();
+}
+
+
+bool UnqualifiedLookupFactory::isFirstResultEnoughForContexts()
+const {
   return !Results.empty() && !options.contains(Flags::IncludeOuterResults);
 }
 
