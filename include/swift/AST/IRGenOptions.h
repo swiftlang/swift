@@ -225,6 +225,8 @@ public:
 
   TypeInfoDumpFilter TypeInfoFilter;
 
+  SwiftRuntime Runtime;
+
   IRGenOptions()
       : DWARFVersion(2), OutputKind(IRGenOutputKind::LLVMAssembly),
         Verify(true), OptMode(OptimizationMode::NotSet),
@@ -246,7 +248,7 @@ public:
         GenerateProfile(false), EnableDynamicReplacementChaining(false),
         DisableRoundTripDebugTypes(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
-        TypeInfoFilter(TypeInfoDumpFilter::All) {}
+        TypeInfoFilter(TypeInfoDumpFilter::All), Runtime() {}
 
   // Get a hash of all options which influence the llvm compilation but are not
   // reflected in the llvm module itself.

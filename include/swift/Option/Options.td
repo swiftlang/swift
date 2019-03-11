@@ -187,6 +187,9 @@ def swift_version : Separate<["-"], "swift-version">, Flags<[FrontendOption, Par
   HelpText<"Interpret input according to a specific Swift language version number">,
   MetaVarName<"<vers>">;
 
+def swift_runtime : Separator<["-"], "swift-runtime">, Flags<[FrontendOption]>,
+  HelpText<"Specify the target Swift runtime version">, MetaVarName<"<runtime>">;
+
 def package_description_version: Separate<["-"], "package-description-version">,
   Flags<[FrontendOption, HelpHidden, ParseableInterfaceOption]>,
   HelpText<"The version number to be applied on the input for the PackageDescription availability kind">,

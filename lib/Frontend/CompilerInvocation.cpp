@@ -881,6 +881,12 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
   return false;
 }
 
+static llvm::VersionTuple getDefaultTargetTriple(const llvm::Triple &Triple) {
+  if (!Triple.isOSDarwin())
+    return llvm::VersionTuple(0);
+  return llvm::VersionTuple(5, 0);
+}
+
 static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                            DiagnosticEngine &Diags,
                            const FrontendOptions &FrontendOpts,
@@ -1121,6 +1127,22 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
     }
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_swift_runtime)) {
+    if (!Opts.Runtime.tryParse(A->getValue()))
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     verArg->getAsString(Args), verArg->getValue());
+  } else {
+    auto runtime = getSystemRuntime(Triple);
+
+    bool succeeded = false;
+    if (runtime > llvm::VersionTuple(0)) {
+      succeeded = Opts.Runtime.tryParse(runtime);
+    } else {
+      succeeded = Opts.Runtime.tryParse(LangOpts.EffectiveLanguageVersion);
+    }
+    assert(succeeded && "compiler version must be a valid version tuple");
   }
 
   return false;
