@@ -38,6 +38,19 @@ import Accelerate
 ///         print("quadrature error:", error.errorDescription)
 ///     }
 ///
+/// Alternatively, you can integrate over a function that uses vectors for its
+/// source and destination. For example:
+///
+///     func vectorExp(x: UnsafeBufferPointer<Double>,
+///                    y: UnsafeMutableBufferPointer<Double>) {
+///         let radius: Double = 12.5
+///         for i in 0 ..< x.count {
+///             y[i] = sqrt(radius * radius - pow(x[i] - radius, 2))
+///         }
+///     }
+///
+///     let vRresult = quadrature.integrate(over: 0.0 ... diameter,
+///                                         integrand: vectorExp)
 public struct Quadrature {
     
     private var integrateOptions = quadrature_integrate_options()
@@ -91,14 +104,9 @@ public struct Quadrature {
     ///
     /// - Parameter interval: The lower and upper bounds of the integration interval.
     /// - Parameter integrand: The function to integrate. The input value is `x` that's within the interval over which the integrand is being integrated, and the output value is the corresponding value `y = integrand(x)` at those points.
-    public func integrate<U, V>(over interval: ClosedRange<Double>,
-                                integrand: (_ input: U, _ result: V) -> ()) ->
-        Result<(integralResult: Double, estimatedAbsoluteError: Double), Error>
-        where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
-        U.Element == Double,
-        V.Element == Double {
+    public func integrate(over interval: ClosedRange<Double>,
+                                integrand: (_ input: UnsafeBufferPointer<Double>, _ result: UnsafeMutableBufferPointer<Double>) -> ()) ->
+        Result<(integralResult: Double, estimatedAbsoluteError: Double), Error>{
             
             var status = QUADRATURE_SUCCESS
             var estimatedAbsoluteError: Double = 0
