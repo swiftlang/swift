@@ -1648,7 +1648,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       
       ParserStatus status = parseExprList(tok::l_paren, tok::r_paren,
                                           /*isPostfix=*/true, isExprBasic,
-                                          /*allowSepOmission=*/false,
+                                          /*allowSepOmission=*/true,
                                           lParenLoc, args, argLabels,
                                           argLabelLocs,
                                           rParenLoc,
@@ -1703,7 +1703,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     // differentiation. A tuple expression node in libSyntax can have a single
     // element without label.
     ExprContext.setCreateSyntax(SyntaxKind::TupleExpr);
-    return parseExprList(tok::l_paren, tok::r_paren,
+    return parseExprList(tok::l_paren, tok::r_paren, /*allowSepOmission=*/true,
                          SyntaxKind::TupleElementList);
 
   case tok::l_square:
@@ -2979,7 +2979,8 @@ Expr *Parser::parseExprAnonClosureArg() {
 ///     (identifier ':')? expr
 ///
 ParserResult<Expr>
-Parser::parseExprList(tok leftTok, tok rightTok, SyntaxKind Kind) {
+Parser::parseExprList(tok leftTok, tok rightTok, bool allowSepOmission,
+                      SyntaxKind Kind) {
   SmallVector<Expr*, 8> subExprs;
   SmallVector<Identifier, 8> subExprNames;
   SmallVector<SourceLoc, 8> subExprNameLocs;
@@ -2988,7 +2989,7 @@ Parser::parseExprList(tok leftTok, tok rightTok, SyntaxKind Kind) {
   SourceLoc leftLoc, rightLoc;
   ParserStatus status = parseExprList(leftTok, rightTok, /*isPostfix=*/false,
                                       /*isExprBasic=*/true,
-                                      /*allowSepOmission=*/false,
+                                      allowSepOmission,
                                       leftLoc,
                                       subExprs,
                                       subExprNames,
@@ -3345,7 +3346,7 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
 
   ParserStatus status = parseExprList(tok::l_paren, tok::r_paren,
                                       /*isPostfix=*/true, isExprBasic,
-                                      /*allowSepOmission=*/false,
+                                      /*allowSepOmission=*/true,
                                       lParenLoc, args, argLabels,
                                       argLabelLocs,
                                       rParenLoc,

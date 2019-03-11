@@ -1377,7 +1377,8 @@ public:
                                       SourceLoc &inLoc);
 
   Expr *parseExprAnonClosureArg();
-  ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok,
+  ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok, 
+                                   bool allowSepOmission,
                                    syntax::SyntaxKind Kind);
 
   /// Parse an expression list, keeping all of the pieces separated.

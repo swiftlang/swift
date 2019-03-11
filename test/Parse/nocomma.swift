@@ -740,3 +740,1023 @@ let sv11: Int = int[
     Int.typeBar
     Int.typeBaz
 ]
+
+/// Subscript Super Helpers
+
+class SB {
+    subscript(a: Int) -> Int {
+        return a
+    }
+    subscript(a: Int, b: Int) -> Int {
+        return a + b
+    }
+    subscript(a: Int, b: Int, c: Int) -> Int {
+        return a + b + c
+    }
+    subscript(a: Int, b: Int, c: Int, d: Int) -> Int {
+        return a + b + c + d
+    }
+}
+
+/// Subscript, Super, Int Literals, Vertical, Trailing
+
+class SDT1 : SB {
+    override subscript(a: Int, b: Int, c: Int, d: Int) -> Int {
+        return super[
+            a,
+            b,
+            c,
+            d
+        ]
+    }
+}
+
+class SDT2 : SB {
+    override subscript(a: Int, b: Int, c: Int, d: Int) -> Int {
+        return super[
+            a
+            b
+            c
+            d
+        ]
+    }
+}
+
+class SDT3 : SB {
+    override subscript(a: Int, b: Int, c: Int, d: Int) -> Int {
+        return super[
+            a,
+            b,
+            c
+            d
+        ]
+    }
+}
+
+class SDT4 : SB {
+    override subscript(a: Int, b: Int, c: Int, d: Int) -> Int {
+        return super[
+            a,
+            b
+            c,
+            d
+        ]
+    }
+}
+
+class SDT5 : SB {
+    override subscript(a: Int, b: Int, c: Int, d: Int) -> Int {
+        return super[
+            a
+            b,
+            c,
+            d
+        ]
+    }
+}
+
+class SDT6 : SB {
+    override subscript(a: Int, b: Int, c: Int, d: Int) -> Int {
+        return super[
+            a,
+            b
+            c
+            d
+        ]
+    }
+}
+
+class SDT7 : SB {
+    override subscript(a: Int, b: Int, c: Int, d: Int) -> Int {
+        return super[
+            a
+            b,
+            c
+            d
+        ]
+    }
+}
+
+class SDT8 : SB {
+    override subscript(a: Int, b: Int, c: Int, d: Int) -> Int {
+        return super[
+            a
+            b
+            c,
+            d
+        ]
+    }
+}
+
+/// Subscript, Super, Int Literals, Vertical, Leading
+
+class SDL1 : SB {
+    override subscript(a: Int, b: Int, c: Int, d: Int) -> Int {
+        return super[
+            a
+          , b
+          , c
+          , d
+        ]
+    }
+}
+
+class SDL2 : SB {
+    override subscript(a: Int, b: Int, c: Int, d: Int) -> Int {
+        return super[
+            a
+            b
+            c
+            d
+        ]
+    }
+}
+
+class SDL3 : SB {
+    override subscript(a: Int, b: Int, c: Int, d: Int) -> Int {
+        return super[
+            a
+          , b
+          , c
+            d
+        ]
+    }
+}
+
+class SDL4 : SB {
+    override subscript(a: Int, b: Int, c: Int, d: Int) -> Int {
+        return super[
+            a
+          , b
+            c
+          , d
+        ]
+    }
+}
+
+class SDL5 : SB {
+    override subscript(a: Int, b: Int, c: Int, d: Int) -> Int {
+        return super[
+            a
+            b
+          , c
+          , d
+        ]
+    }
+}
+
+class SDL6 : SB {
+    override subscript(a: Int, b: Int, c: Int, d: Int) -> Int {
+        return super[
+            a
+          , b
+            c
+            d
+        ]
+    }
+}
+
+class SDL7 : SB {
+    override subscript(a: Int, b: Int, c: Int, d: Int) -> Int {
+        return super[
+            a
+            b
+          , c
+            d
+        ]
+    }
+}
+
+class SDL8 : SB {
+    override subscript(a: Int, b: Int, c: Int, d: Int) -> Int {
+        return super[
+            a
+            b
+            c
+          , d
+        ]
+    }
+}
+
+/// Subscripts, Super, Variables + Members, Columnar
+
+class SVMC1 : SB {
+    func fizz() -> Int {
+        return super[
+            foo
+            .instanceBar
+        ]
+    }
+}
+
+class SVMC2 : SB {
+    func fizz() -> Int {
+        return super[
+            foo // expected-error{{static member 'typeBar' cannot be used on instance of type 'Int'}}
+            .typeBar
+        ]
+    }
+}
+
+class SVMC3 : SB {
+    func fizz() -> Int {
+        return super[
+            foo
+            bar
+            baz
+        ]
+    }
+}
+
+class SVMC4 : SB {
+    func fizz() -> Int {
+        return super[
+            foo
+            .instanceBar
+            baz
+        ]
+    }
+}
+
+class SVMC5 : SB {
+    func fizz() -> Int {
+        return super[
+            foo // expected-error{{static member 'typeBar' cannot be used on instance of type 'Int'}}
+            .typeBar
+            baz
+        ]
+    }
+}
+
+class SVMC6 : SB {
+    func fizz() -> Int {
+        return super[
+            foo,
+            bar,
+            baz
+        ]
+    }
+}
+
+class SVMC7 : SB {
+    func fizz() -> Int {
+        return super[
+            foo
+            .instanceBar
+            baz
+        ]
+    }
+}
+
+class SVMC8 : SB {
+    func fizz() -> Int {
+        return super[
+            foo // expected-error{{static member 'typeBar' cannot be used on instance of type 'Int'}}
+            .typeBar
+            baz
+        ]
+    }
+}
+
+class SVMC9 : SB {
+    func fizz() -> Int {
+        return super[
+            .typeFoo
+            .typeBar
+            .typeBaz // expected-error{{type of expression is ambiguous without more context}}
+        ]
+    }
+}
+
+class SVMC10 : SB {
+    func fizz() -> Int {
+        return super[
+            .typeFoo,
+            .typeBar,
+            .typeBaz
+        ]
+    }
+}
+
+class SVMC11 : SB {
+    func fizz() -> Int {
+        return super[
+            Int.typeFoo
+            Int.typeBar
+            Int.typeBaz
+        ]
+    }
+}
+
+/// Tuples, Basics
+
+let tb0: Void = ()
+
+let tb1 = (int)
+
+let tb2: (Int) = (.typeFoo)
+
+let tb3 = (0.instanceFoo)
+
+let tb4 = ((0 as Int).typeFoo) // expected-error{{static member 'typeFoo' cannot be used on instance of type 'Int'}}
+
+let tb5 = (0, 1)
+
+let tb6: (Int, Int) = (.typeFoo, 1)
+
+let tb7: (Int, Int) = (0, .typeBar)
+
+let tb8: (Int, Int) = (.typeFoo, .typeBar)
+
+let tb9 = (foo.instanceBar, bar.instanceBaz)
+
+/// Tuple, Int Literals, Vertical, Trailing
+
+let tilvt1 = (
+    0,
+    1,
+    2,
+    3   
+)
+
+let tilvt2 = (
+    0
+    1
+    2
+    3
+)
+
+let tilvt3 = (
+    0,
+    1,
+    2
+    3
+)
+
+let tilvt4 = (
+    0,
+    1
+    2,
+    3
+)
+
+let tilvt5 = (
+    0
+    1,
+    2,
+    3
+)
+
+let tilvt6 = (
+    0,
+    1
+    2
+    3
+)
+
+let tilvt7 = (
+    0
+    1,
+    2
+    3
+)
+
+let tilvt8 = (
+    0
+    1
+    2,
+    3
+)
+
+/// Tuples, Int Literals, Vertical, Trailing
+
+let tilvl1 = (
+    0
+  , 1
+  , 2
+  , 3   
+)
+
+let tilvl2 = (
+    0
+    1
+    2
+    3
+)
+
+let tilvl3 = (
+    0
+  , 1
+  , 2
+    3
+)
+
+let tilvl4 = (
+    0
+  , 1
+    2
+  , 3
+)
+
+let tilvl5 = (
+    0
+    1
+  , 2
+  , 3
+)
+
+let tilvl6 = (
+    0
+  , 1
+    2
+    3
+)
+
+let tilvl7 = (
+    0
+    1
+  , 2
+    3
+)
+
+let tilvl8 = (
+    0
+    1
+    2
+  , 3
+)
+
+/// Tuples, Variables + Members, Columnar
+
+let tvmc1 = (
+    foo
+    .instanceBar
+)
+
+let tvmc2 = (
+    foo // expected-error{{static member 'typeBar' cannot be used on instance of type 'Int'}}
+    .typeBar
+)
+
+let tvmc3 = (
+    foo
+    bar
+    baz
+)
+
+let tvmc4 = (
+    foo
+    .instanceBar
+    baz
+)
+
+let tvmc5 = (
+    foo // expected-error{{static member 'typeBar' cannot be used on instance of type 'Int'}}
+    .typeBar
+    baz
+)
+
+let tvmc6 = (
+    foo,
+    bar,
+    baz
+)
+
+let tvmc7 = (
+    foo
+    .instanceBar
+    baz
+)
+
+let tvmc8 = (
+    foo // expected-error{{static member 'typeBar' cannot be used on instance of type 'Int'}}
+    .typeBar
+    baz
+)
+
+let tvmc9 = (
+    .typeFoo
+    .typeBar
+    .typeBaz // expected-error{{type of expression is ambiguous without more context}}
+)
+
+let tvmc10: (Int, Int, Int) = (
+    .typeFoo,
+    .typeBar,
+    .typeBaz
+)
+
+let tvmc11 = (
+    Int.typeFoo
+    Int.typeBar
+    Int.typeBaz
+)
+
+/// Function Helpers
+
+func funcy() -> Int { return 0 }
+func funcy(_ a: Int) -> Int { return 0 }
+func funcy(_ a: Int, _ b: Int) -> Int { return 0 }
+func funcy(_ a: Int, _ b: Int, _ c: Int) -> Int { return 0 }
+func funcy(_ a: Int, _ b: Int, _ c: Int, _ d: Int) -> Int { return 0 }
+
+/// Function, Basics
+
+let fb0: Int = funcy()
+
+let fb1: Int = funcy(0)
+
+let fb2: Int = funcy(.typeFoo)
+
+let fb3: Int = funcy(0.instanceFoo)
+
+let fb4: Int = funcy((0 as Int).typeFoo) // expected-error{{static member 'typeFoo' cannot be used on instance of type 'Int'}}
+
+let fb5: Int = funcy(0, 1)
+
+let fb6: Int = funcy(.typeFoo, 1)
+
+let fb7: Int = funcy(0, .typeBar)
+
+let fb8: Int = funcy(.typeFoo, .typeBar)
+
+let fb9: Int = funcy(foo.instanceBar, bar.instanceBaz)
+
+/// Function, Int Literals, Vertical, Trailing
+
+let filvt1: Int = funcy(
+    0,
+    1,
+    2,
+    3   
+)
+
+let filvt2: Int = funcy(
+    0
+    1
+    2
+    3
+)
+
+let filvt3: Int = funcy(
+    0,
+    1,
+    2
+    3
+)
+
+let filvt4: Int = funcy(
+    0,
+    1
+    2,
+    3
+)
+
+let filvt5: Int = funcy(
+    0
+    1,
+    2,
+    3
+)
+
+let filvt6: Int = funcy(
+    0,
+    1
+    2
+    3
+)
+
+let filvt7: Int = funcy(
+    0
+    1,
+    2
+    3
+)
+
+let filvt8: Int = funcy(
+    0
+    1
+    2,
+    3
+)
+
+/// Functions, Int Literals, Vertical, Leading
+
+let filvl1: Int = funcy(
+    0
+  , 1
+  , 2
+  , 3    
+)
+
+let filvl2: Int = funcy(
+    0
+    1
+    2
+    3
+)
+
+let filvl3: Int = funcy(
+    0
+  , 1
+  , 2
+    3
+)
+
+let filvl4: Int = funcy(
+    0
+  , 1
+    2
+  , 3
+)
+
+let filvl5: Int = funcy(
+    0
+    1
+  , 2
+  , 3
+)
+
+let filvl6: Int = funcy(
+    0
+  , 1
+    2
+    3
+)
+
+let filvl7: Int = funcy(
+    0
+    1
+  , 2
+    3
+)
+
+let filvl8: Int = funcy(
+    0
+    1
+    2
+  , 3
+)
+
+/// Functions, Variables + Members, Columnar
+
+let fvmc1 = funcy(
+    foo
+    .instanceBar
+)
+
+let fvmc2 = funcy(
+    foo // expected-error{{static member 'typeBar' cannot be used on instance of type 'Int'}}
+    .typeBar
+)
+
+let fvmc3 = funcy(
+    foo
+    bar
+    baz
+)
+
+let fvmc4 = funcy(
+    foo
+    .instanceBar
+    baz
+)
+
+let fvmc5 = funcy(
+    foo // expected-error{{static member 'typeBar' cannot be used on instance of type 'Int'}}
+    .typeBar
+    baz
+)
+
+let fvmc6 = funcy(
+    foo,
+    bar,
+    baz
+)
+
+let fvmc7 = funcy(
+    foo
+    .instanceBar
+    baz
+)
+
+let fvmc8 = funcy(
+    foo // expected-error{{static member 'typeBar' cannot be used on instance of type 'Int'}}
+    .typeBar
+    baz
+)
+
+let fvmc9: Int = funcy(
+    .typeFoo
+    .typeBar
+    .typeBaz // expected-error{{type of expression is ambiguous without more context}}
+)
+
+let fvmc10: Int = funcy(
+    .typeFoo,
+    .typeBar,
+    .typeBaz
+)
+
+let fvmc11: Int = funcy(
+    Int.typeFoo
+    Int.typeBar
+    Int.typeBaz
+)
+
+/// Function Super Helpers
+
+class FB {
+    func funcy(_ a: Int) -> Int {
+        return a
+    }
+    func funcy(_ a: Int, _ b: Int) -> Int {
+        return a + b
+    }
+    func funcy(_ a: Int, _ b: Int, _ c: Int) -> Int {
+        return a + b + c
+    }
+    func funcy(_ a: Int, _ b: Int, _ c: Int, _ d: Int) -> Int {
+        return a + b + c + d
+    }
+}
+
+/// Function, Super, Int Literals, Vertical, Trailing
+
+class FDT1 : FB {
+    override func funcy(_ a: Int, _ b: Int, _ c: Int, _ d: Int) -> Int {
+        return super.funcy(
+            a,
+            b,
+            c,
+            d
+        )
+    }
+}
+
+class FDT2 : FB {
+    override func funcy(_ a: Int, _ b: Int, _ c: Int, _ d: Int) -> Int {
+        return super.funcy(
+            a
+            b
+            c
+            d
+        )
+    }
+}
+
+class FDT3 : FB {
+    override func funcy(_ a: Int, _ b: Int, _ c: Int, _ d: Int) -> Int {
+        return super.funcy(
+            a,
+            b,
+            c
+            d
+        )
+    }
+}
+
+class FDT4 : FB {
+    override func funcy(_ a: Int, _ b: Int, _ c: Int, _ d: Int) -> Int {
+        return super.funcy(
+            a,
+            b
+            c,
+            d
+        )
+    }
+}
+
+class FDT5 : FB {
+    override func funcy(_ a: Int, _ b: Int, _ c: Int, _ d: Int) -> Int {
+        return super.funcy(
+            a
+            b,
+            c,
+            d
+        )
+    }
+}
+
+class FDT6 : FB {
+    override func funcy(_ a: Int, _ b: Int, _ c: Int, _ d: Int) -> Int {
+        return super.funcy(
+            a,
+            b
+            c
+            d
+        )
+    }
+}
+
+class FDT7 : FB {
+    override func funcy(_ a: Int, _ b: Int, _ c: Int, _ d: Int) -> Int {
+        return super.funcy(
+            a
+            b,
+            c
+            d
+        )
+    }
+}
+
+/// Function, Super, Int Literals, Vertical, Leading
+
+class FDL1 : FB {
+    override func funcy(_ a: Int, _ b: Int, _ c: Int, _ d: Int) -> Int {
+        return super.funcy(
+            a
+          , b
+          , c
+          , d
+        )
+    }
+}
+
+class FDL2 : FB {
+    override func funcy(_ a: Int, _ b: Int, _ c: Int, _ d: Int) -> Int {
+        return super.funcy(
+            a
+            b
+            c
+            d
+        )
+    }
+}
+
+class FDL3 : FB {
+    override func funcy(_ a: Int, _ b: Int, _ c: Int, _ d: Int) -> Int {
+        return super.funcy(
+            a
+          , b
+          , c
+            d
+        )
+    }
+}
+
+class FDL4 : FB {
+    override func funcy(_ a: Int, _ b: Int, _ c: Int, _ d: Int) -> Int {
+        return super.funcy(
+            a
+          , b
+            c
+          , d
+        )
+    }
+}
+
+class FDL5 : FB {
+    override func funcy(_ a: Int, _ b: Int, _ c: Int, _ d: Int) -> Int {
+        return super.funcy(
+            a
+            b
+          , c
+          , d
+        )
+    }
+}
+
+class FDL6 : FB {
+    override func funcy(_ a: Int, _ b: Int, _ c: Int, _ d: Int) -> Int {
+        return super.funcy(
+            a
+          , b
+            c
+            d
+        )
+    }
+}
+
+class FDL7 : FB {
+    override func funcy(_ a: Int, _ b: Int, _ c: Int, _ d: Int) -> Int {
+        return super.funcy(
+            a
+            b
+          , c
+            d
+        )
+    }
+}
+
+class FDL8 : FB {
+    override func funcy(_ a: Int, _ b: Int, _ c: Int, _ d: Int) -> Int {
+        return super.funcy(
+            a
+            b
+            c
+          , d
+        )
+    }
+}
+
+/// Functions, Super, Variables + Members, Columnar
+
+class FVMC1 : FB {
+    func fizz() -> Int {
+        return super.funcy(
+            foo
+            .instanceBar
+        )
+    }
+}
+
+class FVMC2 : FB {
+    func fizz() -> Int {
+        return super.funcy(
+            foo // expected-error{{static member 'typeBar' cannot be used on instance of type 'Int'}}
+            .typeBar
+        )
+    }
+}
+
+class FVMC3 : FB {
+    func fizz() -> Int {
+        return super.funcy(
+            foo
+            bar
+            baz
+        )
+    }
+}
+
+class FVMC4 : FB {
+    func fizz() -> Int {
+        return super.funcy(
+            foo
+            .instanceBar
+            baz
+        )
+    }
+}
+
+class FVMC5 : FB {
+    func fizz() -> Int {
+        return super.funcy(
+            foo // expected-error{{static member 'typeBar' cannot be used on instance of type 'Int'}}
+            .typeBar
+            baz
+        )
+    }
+}
+
+class FVMC6 : FB {
+    func fizz() -> Int {
+        return super.funcy(
+            foo,
+            bar,
+            baz
+        )
+    }
+}
+
+class FVMC7 : FB {
+    func fizz() -> Int {
+        return super.funcy(
+            foo
+            .instanceBar
+            baz
+        )
+    }
+}
+
+class FVMC8 : FB {
+    func fizz() -> Int {
+        return super.funcy(
+            foo // expected-error{{static member 'typeBar' cannot be used on instance of type 'Int'}}
+            .typeBar
+            baz
+        )
+    }
+}
+
+class FVMC9 : FB {
+    func fizz() -> Int {
+        return super.funcy(
+            .typeFoo
+            .typeBar
+            .typeBaz // expected-error{{type of expression is ambiguous without more context}}
+        )
+    }
+}
+
+class FVMC10 : FB {
+    func fizz() -> Int {
+        return super.funcy(
+            .typeFoo,
+            .typeBar,
+            .typeBaz
+        )
+    }
+}
+
+class FVMC11 : FB {
+    func fizz() -> Int {
+        return super.funcy(
+            Int.typeFoo
+            Int.typeBar
+            Int.typeBaz
+        )
+    }
+}
+
