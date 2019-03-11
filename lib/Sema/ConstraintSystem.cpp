@@ -1490,55 +1490,39 @@ void ConstraintSystem::addOverloadSet(Type boundType,
     return;
   }
 
+  auto recordChoice = [&](SmallVectorImpl<Constraint *> &choices,
+                          const OverloadChoice &choice,
+                          bool isFavored = false) {
+    auto *constraint = Constraint::createBindOverload(*this, boundType, choice,
+                                                      useDC, locator);
+    if (isFavored)
+      constraint->setFavored();
+
+    choices.push_back(constraint);
+  };
+
   SmallVector<Constraint *, 4> overloads;
-  
   // As we do for other favored constraints, if a favored overload has been
   // specified, let it be the first term in the disjunction.
   if (favoredChoice) {
-    auto bindOverloadConstraint =
-        Constraint::createBindOverload(*this,
-                                       boundType,
-                                       *favoredChoice,
-                                       useDC,
-                                       locator);
-
     assert((!favoredChoice->isDecl() ||
             !favoredChoice->getDecl()->getAttrs().isUnavailable(
                 getASTContext())) &&
            "Cannot make unavailable decl favored!");
-    bindOverloadConstraint->setFavored();
-    
-    overloads.push_back(bindOverloadConstraint);
+    recordChoice(overloads, *favoredChoice, /*isFavored=*/true);
   }
-  
+
   for (auto &choice : choices) {
     if (favoredChoice && (favoredChoice == &choice))
       continue;
-    
-    overloads.push_back(Constraint::createBindOverload(*this, boundType, choice,
-                                                       useDC, locator));
+
+    recordChoice(overloads, choice);
   }
 
-  auto innerDisjunction = Constraint::createDisjunction(*this, overloads,
-                                                        locator, ForgetChoice);
-  if (outerAlternatives.empty()) {
-    if (favoredChoice)
-      innerDisjunction->setFavored();
+  for (auto &choice : outerAlternatives)
+    recordChoice(overloads, choice);
 
-    addUnsolvedConstraint(innerDisjunction);
-    return;
-  }
-
-  SmallVector<Constraint *, 4> outerConstraints;
-  outerConstraints.push_back(innerDisjunction);
-  innerDisjunction->setFavored();
-  for (auto choice : outerAlternatives) {
-    outerConstraints.push_back(Constraint::createBindOverload(
-                                 *this, boundType, choice,
-                                   useDC, locator));
-  }
-
-  addDisjunctionConstraint(outerConstraints, locator, ForgetChoice, favoredChoice);
+  addDisjunctionConstraint(overloads, locator, ForgetChoice);
 }
 
 /// If we're resolving an overload set with a decl that has special type
