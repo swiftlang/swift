@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %gyb %S/Inputs/FixedPointConversion.swift.gyb -o %t/FixedPointConversion.swift
+// RUN: %gyb %S/Inputs/FixedPointConversion.swift.gyb -Dtarget_ptrsize=%target-ptrsize -o %t/FixedPointConversion.swift
 // RUN: %line-directive %t/FixedPointConversion.swift -- %target-build-swift %t/FixedPointConversion.swift -o %t/a.out_Debug -Onone
 // RUN: %target-codesign %t/a.out_Debug
 //
