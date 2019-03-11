@@ -514,7 +514,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   // the block is ultimately destroyed checking that the closure is uniquely
   // referenced.
   bool useWithoutEscapingVerification = false;
-	ManagedValue escaping;
+  ManagedValue escaping;
   if (loweredFuncTy->isNoEscape()) {
     auto escapingTy = loweredFuncTy->getWithExtInfo(
         loweredFuncTy->getExtInfo().withNoEscape(false));
@@ -525,8 +525,11 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
     auto escapingAnyTy =
         funcType.withExtInfo(funcType->getExtInfo().withNoEscape(false));
     funcType = escapingAnyTy;
-    fn = B.createCopyValue(loc, escaping);
+    fn = escaping.copy(*this, loc);
     useWithoutEscapingVerification = true;
+  } else {
+    // Since we are going to be storing this into memory, we need fn at +1.
+    fn = fn.ensurePlusOne(*this, loc);
   }
 
   // Build the invoke function signature. The block will capture the original
