@@ -69,4 +69,138 @@ if #available(iOS 10.0, OSX 10.12, tvOS 10.0, watchOS 4.0, *) {
   
 }
 
+//===----------------------------------------------------------------------===//
+//
+//  vDSP integration tests
+//
+//===----------------------------------------------------------------------===//
+
+if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+    
+    let count = 1024
+    let n = vDSP_Length(1024)
+    
+    let sourcef: [Float] = (0 ..< 1024).map {
+        return sin(Float($0) * 0.03) * cos(Float($0) * 0.07)
+    }
+    
+    let sourced: [Double] = (0 ..< 1024).map {
+        return sin(Double($0) * 0.03) * cos(Double($0) * 0.07)
+    }
+    
+    AccelerateTests.test("vDSP/SinglePrecisionRunningSum") {
+        var result = [Float](repeating: 0,
+                             count: count)
+        
+        vDSP.integrate(sourcef,
+                       using: .runningSum,
+                       result: &result)
+        
+        var legacyResult = [Float](repeating: -1,
+                                   count: count)
+        
+        vDSP_vrsum(sourcef, 1,
+                   [1],
+                   &legacyResult, 1,
+                   n)
+        
+        expectTrue(result.elementsEqual(legacyResult))
+    }
+    
+    AccelerateTests.test("vDSP/SinglePrecisionTrapezoidal") {
+        var result = [Float](repeating: 0,
+                             count: count)
+        
+        vDSP.integrate(sourcef,
+                       using: .simpson,
+                       result: &result)
+        
+        var legacyResult = [Float](repeating: -1,
+                                   count: count)
+        
+        vDSP_vsimps(sourcef, 1,
+                    [1],
+                    &legacyResult, 1,
+                    n)
+        
+        expectTrue(result.elementsEqual(legacyResult))
+    }
+    
+    AccelerateTests.test("vDSP/SinglePrecisionTrapezoidal") {
+        var result = [Float](repeating: 0,
+                             count: count)
+        
+        vDSP.integrate(sourcef,
+                       using: .trapezoidal,
+                       result: &result)
+        
+        var legacyResult = [Float](repeating: -1,
+                                   count: count)
+        
+        vDSP_vtrapz(sourcef, 1,
+                    [1],
+                    &legacyResult, 1,
+                    n)
+        
+        expectTrue(result.elementsEqual(legacyResult))
+    }
+    
+    AccelerateTests.test("vDSP/DoublePrecisionRunningSum") {
+        var result = [Double](repeating: 0,
+                              count: count)
+        
+        vDSP.integrate(sourced,
+                       using: .runningSum,
+                       result: &result)
+        
+        var legacyResult = [Double](repeating: -1,
+                                    count: count)
+        
+        vDSP_vrsumD(sourced, 1,
+                    [1],
+                    &legacyResult, 1,
+                    n)
+        
+        expectTrue(result.elementsEqual(legacyResult))
+    }
+    
+    AccelerateTests.test("vDSP/DoublePrecisionSimpson") {
+        var result = [Double](repeating: 0,
+                              count: count)
+        
+        vDSP.integrate(sourced,
+                       using: .simpson,
+                       result: &result)
+        
+        var legacyResult = [Double](repeating: -1,
+                                    count: count)
+        
+        vDSP_vsimpsD(sourced, 1,
+                     [1],
+                     &legacyResult, 1,
+                     n)
+        
+        expectTrue(result.elementsEqual(legacyResult))
+    }
+    
+    AccelerateTests.test("vDSP/DoublePrecisionTrapezoidal") {
+        var result = [Double](repeating: 0,
+                              count: count)
+        
+        vDSP.integrate(sourced,
+                       using: .trapezoidal,
+                       result: &result)
+        
+        var legacyResult = [Double](repeating: -1,
+                                    count: count)
+        
+        vDSP_vtrapzD(sourced, 1,
+                     [1],
+                     &legacyResult, 1,
+                     n)
+        
+        expectTrue(result.elementsEqual(legacyResult))
+    }
+}
+
 runAllTests()
