@@ -4028,6 +4028,27 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     if (toType->isAnyObject() || fromType->isAnyObject())
       return CheckedCastKind::ValueCast;
 
+    // A checked cast from Swift.Error to a type that does not conform to
+    // Swift.Error cannot succeed.
+    //
+    // struct S {}
+    // enum FooError: Error { case bar }
+    // func foo() throws {
+    //   do {
+    //     throw FooError.bar
+    //   } catch is X {
+    //     print("Caught bar error")
+    //   }
+    // }
+    auto exceptionType = getExceptionType(dc, SourceLoc());
+    auto toTypeConformsToError =
+        conformsToProtocol(toType, Context.getErrorDecl(), dc,
+                           ConformanceCheckFlags::InExpression);
+    if (fromType->isEqual(exceptionType) && !toTypeConformsToError) {
+      diagnose(diagLoc, diag::type_does_not_conform, toType, exceptionType);
+      return failed();
+    }
+
     bool toRequiresClass;
     if (toType->isExistentialType())
       toRequiresClass = toType->getExistentialLayout().requiresClass();

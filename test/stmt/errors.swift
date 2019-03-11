@@ -165,3 +165,26 @@ func thirteen() {
     }
   }
 }
+
+// SR 6400
+
+enum SR_6400_E: Error {
+  case castError
+}
+
+struct SR_6400_S_1 {}
+struct SR_6400_S_2: Error {}
+
+func sr_6400() throws {
+  do {
+    throw SR_6400_E.castError
+  } catch is SR_6400_S_1 { // expected-error {{type 'SR_6400_S_1' does not conform to protocol 'Error'}} expected-warning {{cast from 'Error' to unrelated type 'SR_6400_S_1' always fails}}
+    print("Caught error")
+  }
+
+  do {
+    throw SR_6400_E.castError
+  } catch is SR_6400_S_2 {
+    print("Caught error") // Ok
+  }
+}
