@@ -3045,14 +3045,19 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     complained = true;
   }
 
+  bool hadError = false;
   for (unsigned i = 0, end = repr->getNumElements(); i != end; ++i) {
     auto *tyR = repr->getElementType(i);
 
     Type ty = resolveType(tyR, elementOptions);
-    if (!ty || ty->hasError()) return ty;
+    if (!ty || ty->hasError())
+      hadError = true;
 
     elements.emplace_back(ty, repr->getElementName(i), ParameterTypeFlags());
   }
+
+  if (hadError)
+    return ErrorType::get(Context);
 
   // Single-element labeled tuples are not permitted outside of declarations
   // or SIL, either.
