@@ -306,7 +306,6 @@ namespace {
     bool trySubstitution(Node *node, SubstitutionEntry &entry);
     bool mangleStandardSubstitution(Node *node);
     void addSubstitution(const SubstitutionEntry &entry);
-    void resetSubstitutions();
 
     void mangleDependentGenericParamIndex(Node *node);
     void mangleConstrainedType(Node *node);
@@ -387,13 +386,6 @@ static NodePointer applyParamLabels(NodePointer LabelList, NodePointer OrigType,
     Type->addChild(visitTypeChild(Child), Factory);
 
   return Type;
-}
-
-/// Reset the currently-active set of substitutions.  This is useful
-/// when part of the mangling is done independently, e.g. when an
-/// optimization pass modifies a pass.
-void Remangler::resetSubstitutions() {
-  Substitutions.clear();
 }
 
 bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry) {
@@ -520,65 +512,35 @@ void Remangler::mangleSuffix(Node *node) {
 }
 
 void Remangler::mangleGenericSpecialization(Node *node) {
-  Out << "TSg";
-  mangleChildNodes(node); // GenericSpecializationParams
-
-  // Specializations are just prepended to already-mangled names.
-  resetSubstitutions();
-
-  // Start another mangled name.
-  Out << "__T";
+  unreachable("unsupported");
 }
 
 void Remangler::mangleGenericSpecializationNotReAbstracted(Node *node) {
-  Out << "TSr";
-  mangleChildNodes(node); // GenericSpecializationParams
-
-  // Specializations are just prepended to already-mangled names.
-  resetSubstitutions();
-
-  // Start another mangled name.
-  Out << "__T";
+  unreachable("unsupported");
 }
 
 void Remangler::mangleInlinedGenericFunction(Node *node) {
-  Out << "TSi";
-  mangleChildNodes(node); // GenericSpecializationParams
-
-  // Specializations are just prepended to already-mangled names.
-  resetSubstitutions();
-
-  // Start another mangled name.
-  Out << "__T";
+  unreachable("unsupported");
 }
 
 void Remangler::mangleGenericPartialSpecialization(Node *node) {
-  unreachable("todo");
+  unreachable("unsupported");
 }
 
 void Remangler::mangleGenericPartialSpecializationNotReAbstracted(Node *node) {
-  unreachable("todo");
+  unreachable("unsupported");
 }
 
 void Remangler::mangleGenericSpecializationParam(Node *node) {
-  // Should be a type followed by a series of protocol conformances.
-  mangleChildNodes(node);
-  Out << '_';
+  unreachable("unsupported");
 }
 
 void Remangler::mangleFunctionSignatureSpecialization(Node *node) {
-  Out << "TSf";
-  mangleChildNodes(node); // FunctionSignatureSpecializationParams
-
-  // Specializations are just prepended to already-mangled names.
-  resetSubstitutions();
-
-  // Start another mangled name.
-  Out << "__T";
+  unreachable("unsupported");
 }
 
 void Remangler::mangleSpecializationPassID(Node *node) {
-  Out << node->getIndex();
+  unreachable("unsupported");
 }
 
 void Remangler::mangleIsSerialized(Node *node) {
@@ -586,81 +548,11 @@ void Remangler::mangleIsSerialized(Node *node) {
 }
 
 void Remangler::mangleFunctionSignatureSpecializationReturn(Node *node) {
-  mangleFunctionSignatureSpecializationParam(node);
+  unreachable("unsupported");
 }
 
 void Remangler::mangleFunctionSignatureSpecializationParam(Node *node) {
-  if (!node->hasChildren()) {
-    Out << "n_";
-    return;
-  }
-
-  // The first child is always a kind that specifies the type of param that we
-  // have.
-  NodePointer firstChild = node->getChild(0);
-  unsigned kindValue = firstChild->getIndex();
-  auto kind = FunctionSigSpecializationParamKind(kindValue);
-
-  switch (kind) {
-  case FunctionSigSpecializationParamKind::ConstantPropFunction:
-    Out << "cpfr";
-    mangleIdentifier(node->getChild(1));
-    Out << '_';
-    return;
-  case FunctionSigSpecializationParamKind::ConstantPropGlobal:
-    Out << "cpg";
-    mangleIdentifier(node->getChild(1));
-    Out << '_';
-    return;
-  case FunctionSigSpecializationParamKind::ConstantPropInteger:
-    Out << "cpi" << node->getChild(1)->getText() << '_';
-    return;
-  case FunctionSigSpecializationParamKind::ConstantPropFloat:
-    Out << "cpfl" << node->getChild(1)->getText() << '_';
-    return;
-  case FunctionSigSpecializationParamKind::ConstantPropString: {
-    Out << "cpse";
-    StringRef encodingStr = node->getChild(1)->getText();
-    if (encodingStr == "u8")
-      Out << '0';
-    else if (encodingStr == "u16")
-      Out << '1';
-    else
-      unreachable("Unknown encoding");
-    Out << 'v';
-    mangleIdentifier(node->getChild(2));
-    Out << '_';
-    return;
-  }
-  case FunctionSigSpecializationParamKind::ClosureProp:
-    Out << "cl";
-    mangleIdentifier(node->getChild(1));
-    for (unsigned i = 2, e = node->getNumChildren(); i != e; ++i) {
-      mangleType(node->getChild(i));
-    }
-    Out << '_';
-    return;
-  case FunctionSigSpecializationParamKind::BoxToValue:
-    Out << "i_";
-    return;
-  case FunctionSigSpecializationParamKind::BoxToStack:
-    Out << "k_";
-    return;
-  default:
-    if (kindValue &
-        unsigned(FunctionSigSpecializationParamKind::Dead))
-      Out << 'd';
-    if (kindValue &
-        unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed))
-      Out << 'g';
-    if (kindValue &
-        unsigned(FunctionSigSpecializationParamKind::GuaranteedToOwned))
-      Out << 'o';
-    if (kindValue & unsigned(FunctionSigSpecializationParamKind::SROA))
-      Out << 's';
-    Out << '_';
-    return;
-  }
+  unreachable("unsupported");
 }
 
 void Remangler::mangleFunctionSignatureSpecializationParamPayload(Node *node) {
