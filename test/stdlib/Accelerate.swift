@@ -69,12 +69,26 @@ if #available(iOS 10.0, OSX 10.12, tvOS 10.0, watchOS 4.0, *) {
     
 }
 
+//===----------------------------------------------------------------------===//
+//
+//  Quadrature Tests
+//
+//===----------------------------------------------------------------------===//
+
 if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
-    
+
+    func vectorExp(x: UnsafeBufferPointer<Double>,
+                   y: UnsafeMutableBufferPointer<Double>) {
+        let radius: Double = 12.5
+        for i in 0 ..< x.count {
+            y[i] = sqrt(radius * radius - pow(x[i] - radius, 2))
+        }
+    }
+     
     AccelerateTests.test("Quadrature/QNG") {
         var diameter: Double = 25
         
-        // New API
+        // New API: Scalar
         let quadrature = Quadrature(integrator: .nonAdaptive,
                                     absoluteTolerance: 1.0e-8,
                                     relativeTolerance: 1.0e-2)
@@ -83,6 +97,14 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
             let radius = diameter * 0.5
             return sqrt(radius * radius - pow(x - radius, 2))
         }
+        
+        // New API: Vectorized
+        let vQuadrature = Quadrature(integrator: .nonAdaptive,
+                                     absoluteTolerance: 1.0e-8,
+                                     relativeTolerance: 1.0e-2)
+        
+        let vRresult = vQuadrature.integrate(over: 0.0 ... diameter,
+                                             integrand: vectorExp)
         
         // Legacy API
         var integrateFunction: quadrature_integrate_function = {
@@ -128,12 +150,20 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         case .success(let integralResult, let estimatedAbsoluteError):
             expectEqual(integralResult, legacyResult)
             expectEqual(estimatedAbsoluteError, legacyEstimatedAbsoluteError)
+            switch vRresult {
+            case .success(let vIntegralResult, let vEstimatedAbsoluteError):
+                expectEqual(integralResult, vIntegralResult)
+                expectEqual(estimatedAbsoluteError, vEstimatedAbsoluteError)
+            case .failure(_):
+                expectationFailure("Vectorized non-adaptive integration failed.", trace: "",
+                                   stackTrace: SourceLocStack())
+            }
         case .failure( _):
             expectationFailure("Non-adaptive integration failed.", trace: "",
                                stackTrace: SourceLocStack())
         }
     }
-    
+
     AccelerateTests.test("Quadrature/QAGS") {
         var diameter: Double = 25
         
@@ -146,6 +176,14 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
             let radius = diameter * 0.5
             return sqrt(radius * radius - pow(x - radius, 2))
         }
+        
+        // New API: Vectorized
+        let vQuadrature = Quadrature(integrator: .adaptiveWithSingularities(maxIntervals: 11),
+                                     absoluteTolerance: 1.0e-8,
+                                     relativeTolerance: 1.0e-2)
+        
+        let vRresult = vQuadrature.integrate(over: 0.0 ... diameter,
+                                             integrand: vectorExp)
         
         // Legacy API
         var integrateFunction: quadrature_integrate_function = {
@@ -191,6 +229,14 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         case .success(let integralResult, let estimatedAbsoluteError):
             expectEqual(integralResult, legacyResult)
             expectEqual(estimatedAbsoluteError, legacyEstimatedAbsoluteError)
+            switch vRresult {
+            case .success(let vIntegralResult, let vEstimatedAbsoluteError):
+                expectEqual(integralResult, vIntegralResult)
+                expectEqual(estimatedAbsoluteError, vEstimatedAbsoluteError)
+            case .failure(_):
+                expectationFailure("Vectorized adaptive with singularities integration failed.", trace: "",
+                                   stackTrace: SourceLocStack())
+            }
         case .failure( _):
             expectationFailure("Adaptive with singularities integration failed.", trace: "",
                                stackTrace: SourceLocStack())
@@ -210,6 +256,15 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
             let radius: Double = diameter * 0.5
             return sqrt(radius * radius - pow(x - radius, 2))
         }
+        
+        // New API: Vectorized
+        let vQuadrature = Quadrature(integrator: .adaptive(pointsPerInterval: .sixtyOne,
+                                                           maxIntervals: 7),
+                                     absoluteTolerance: 1.0e-8,
+                                     relativeTolerance: 1.0e-2)
+        
+        let vRresult = vQuadrature.integrate(over: 0.0 ... diameter,
+                                             integrand: vectorExp)
         
         // Legacy API
         var integrateFunction: quadrature_integrate_function = {
@@ -255,6 +310,14 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         case .success(let integralResult, let estimatedAbsoluteError):
             expectEqual(integralResult, legacyResult)
             expectEqual(estimatedAbsoluteError, legacyEstimatedAbsoluteError)
+            switch vRresult {
+            case .success(let vIntegralResult, let vEstimatedAbsoluteError):
+                expectEqual(integralResult, vIntegralResult)
+                expectEqual(estimatedAbsoluteError, vEstimatedAbsoluteError)
+            case .failure(_):
+                expectationFailure("Vectorized adaptive integration failed.", trace: "",
+                                   stackTrace: SourceLocStack())
+            }
         case .failure( _):
             expectationFailure("Adaptive integration failed.", trace: "",
                                stackTrace: SourceLocStack())

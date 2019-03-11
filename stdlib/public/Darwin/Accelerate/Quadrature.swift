@@ -86,6 +86,66 @@ public struct Quadrature {
             return integrateOptions.rel_tolerance
         }
     }
+    
+    /// Performs the integration over the supplied function.
+    ///
+    /// - Parameter interval: The lower and upper bounds of the integration interval.
+    /// - Parameter integrand: The function to integrate. The input value is `x` that's within the interval over which the integrand is being integrated, and the output value is the corresponding value `y = integrand(x)` at those points.
+    public func integrate<U, V>(over interval: ClosedRange<Double>,
+                                integrand: (_ input: U, _ result: V) -> ()) ->
+        Result<(integralResult: Double, estimatedAbsoluteError: Double), Error>
+        where
+        U: _ContiguousCollection,
+        V: _MutableContiguousCollection,
+        U.Element == Double,
+        V.Element == Double {
+            
+            var status = QUADRATURE_SUCCESS
+            var estimatedAbsoluteError: Double = 0
+            var result: Double = 0
+            
+            var callback: quadrature_integrate_function!
+            
+            withoutActuallyEscaping(integrand) {escapableIntegrand in
+                withUnsafePointer(to: escapableIntegrand) {
+                    let integrandPointer = UnsafeMutableRawPointer(mutating: $0)
+                    
+                    callback = quadrature_integrate_function(
+                        fun: { (arg: UnsafeMutableRawPointer?,
+                            n: Int,
+                            x: UnsafePointer<Double>,
+                            y: UnsafeMutablePointer<Double>
+                            ) in
+                            
+                            guard let integrand = arg?.load(as: ((UnsafeBufferPointer<Double>, UnsafeMutableBufferPointer<Double>) ->()).self) else {
+                                return
+                            }
+                            
+                            integrand(UnsafeBufferPointer(start: x, count: n),
+                                      UnsafeMutableBufferPointer(start: y, count: n))
+                    },
+                        fun_arg: integrandPointer)
+                    
+                    withUnsafePointer(to: self.integrateOptions) { options in
+                        result = quadrature_integrate(&callback,
+                                                      interval.lowerBound,
+                                                      interval.upperBound,
+                                                      options,
+                                                      &status,
+                                                      &estimatedAbsoluteError,
+                                                      0,
+                                                      nil)
+                    }
+                }
+            }
+            
+            if status == QUADRATURE_SUCCESS {
+                return .success((integralResult: result,
+                                 estimatedAbsoluteError: estimatedAbsoluteError))
+            } else {
+                return .failure(Error(quadratureStatus: status))
+            }
+    }
  
     /// Performs the integration over the supplied function.
     ///
