@@ -1811,6 +1811,7 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
   case ASTScopeKind::DoCatchStmt:
   case ASTScopeKind::SwitchStmt:
   case ASTScopeKind::Accessors:
+  case ASTScopeKind::TopLevelCode:
   case ASTScopeKind::NominalOrExtensionWhereClause:
     // No local declarations.
     break;
@@ -1862,28 +1863,6 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
       }
     }
     break;
-      
-  case ASTScopeKind::TopLevelCode:
-//qqq    for (auto *child: children()) {
-//      assert(child->getKind() == ASTScopeKind::BraceStmt);
-//      for (auto &element: child->braceStmt.stmt->getElements()) {
-//        if (auto *d = element.dyn_cast<Decl *>())
-//          if (auto *vd = dyn_cast<ValueDecl>(d))
-//            result.push_back(vd);
-//      }
-//    }
-    // TODO: factor with above
-    // All types and functions are visible anywhere within the brace
-    // statement. It's up to capture analysis to determine what is usable.
-    // TODO: Just types and functions???
-//    for (auto element : topLevelCode->getBody()->getElements()) {
-//      if (auto decl = element.dyn_cast<Decl *>()) {
-//        if (auto *vd = dyn_cast<ValueDecl>(decl))
-//          result.push_back(vd);
-//      }
-//    }
-    break;
-
 
   case ASTScopeKind::ForEachPattern:
     handlePattern(forEach->getPattern());
