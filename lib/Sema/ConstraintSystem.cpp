@@ -1872,6 +1872,33 @@ static void validateInitializerRef(ConstraintSystem &cs, ConstructorDecl *init,
   }
 }
 
+Type ConstraintSystem::unwrapPropertyBehaviorReference(
+    VarDecl *var, Type refType, DeclContext *useDC,
+    ConstraintLocatorBuilder locator) {
+  auto unwrapProperty = TC.getPropertyBehaviorUnwrapProperty(var);
+
+  // If we didn't find a property to unwrap to, this property behavior aspect of
+  // the variable was ill-formed; ignore it here.
+  if (!unwrapProperty)
+    return refType;
+
+  // Determine the type of a reference to the unwrapped member.
+  auto unwrappedLocator = getConstraintLocator(
+      locator.withPathElement(ConstraintLocator::UnwrappedPropertyBehavior));
+  std::pair<Type, Type> unwrapped = getTypeOfMemberReference(
+    refType, unwrapProperty, useDC, false, FunctionRefKind::Unapplied,
+    unwrappedLocator);
+
+  // Record this as a resolved overload.
+  resolvedOverloadSets
+    = new (*this) ResolvedOverloadSetListItem{
+        resolvedOverloadSets, Type(),
+        OverloadChoice(refType, unwrapProperty, FunctionRefKind::Unapplied),
+        unwrappedLocator, unwrapped.first, unwrapped.second};
+
+  return unwrapped.second;
+}
+
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                        Type boundType,
                                        OverloadChoice choice,
@@ -2057,6 +2084,10 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       addConstraint(ConstraintKind::LiteralConformsTo, argType,
                     protocol->getDeclaredType(),
                     locator);
+    } else if (isa<VarDecl>(choice.getDecl()) &&
+               cast<VarDecl>(choice.getDecl())->hasPropertyBehavior()) {
+      refType = unwrapPropertyBehaviorReference(
+          cast<VarDecl>(choice.getDecl()), refType, useDC, locator);
     }
     break;
   }

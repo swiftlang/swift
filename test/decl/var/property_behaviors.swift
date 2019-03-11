@@ -34,13 +34,13 @@ func testParseError() {
 func testExplicitWrapperType() {
   var wrapped1: Int by Wrapper
 
-  wrapped1 = "Hello" // expected-error{{cannot assign value of type 'String' to type 'Wrapper<Int>'}}
+  wrapped1 = "Hello" // expected-error{{cannot assign value of type 'String' to type 'Int'}}
 }
 
 func testImplicitWrapperType() {
   var wrapped1 by Wrapper = .init(value: 5)
 
-  wrapped1 = "Hello" // expected-error{{cannot assign value of type 'String' to type 'Wrapper<Int>'}}
+  wrapped1 = "Hello" // expected-error{{cannot assign value of type 'String' to type 'Int'}}
 }
 
 struct NonGenericWrapper { }
@@ -69,11 +69,11 @@ struct WrapperWithInitialValue<T> {
 func testExplicitInitialValue() {
   var wrapped1: Int by WrapperWithInitialValue = 5
 
-  wrapped1 = "Hello" // expected-error{{cannot assign value of type 'String' to type 'WrapperWithInitialValue<Int>'}}
+  wrapped1 = "Hello" // expected-error{{cannot assign value of type 'String' to type 'Int'}}
 }
 
 func testImplicitInitialValue() {
   var wrapped1 by WrapperWithInitialValue = 5
 
-  wrapped1 = "Hello" // expected-error{{cannot assign value of type 'String' to type 'WrapperWithInitialValue<Int>'}}
+  wrapped1 = "Hello" // expected-error{{cannot assign value of type 'String' to type 'Int'}}
 }

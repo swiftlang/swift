@@ -547,7 +547,7 @@ namespace {
                 if (auto fnConv = dyn_cast<FunctionConversionExpr>(refExpr))
                   refExpr = fnConv->getSubExpr();
 
-                return forceUnwrapIfExpected(refExpr, choice, locator);
+                return finishDeclReference(refExpr, choice, locator);
               }
             }
           }
@@ -581,7 +581,7 @@ namespace {
                               loc, implicit, semantics, type);
       cs.cacheType(declRefExpr);
       declRefExpr->setFunctionRefKind(functionRefKind);
-      return forceUnwrapIfExpected(declRefExpr, choice, locator);
+      return finishDeclReference(declRefExpr, choice, locator);
     }
 
     /// Describes an opened existential that has not yet been closed.
@@ -850,7 +850,7 @@ namespace {
         ref->setFunctionRefKind(functionRefKind);
         auto *DSBI = cs.cacheType(new (context) DotSyntaxBaseIgnoredExpr(
             base, dotLoc, ref, cs.getType(ref)));
-        return forceUnwrapIfExpected(DSBI, choice, memberLocator);
+        return finishDeclReference(DSBI, choice, memberLocator);
       }
 
       // The formal type of the 'self' value for the member's declaration.
@@ -985,7 +985,7 @@ namespace {
         // We also need to handle the implicitly unwrap of the result
         // of the called function if that's the type checking solution
         // we ended up with.
-        return forceUnwrapIfExpected(
+        return finishDeclReference(
             ref, choice, memberLocator,
             member->getAttrs().hasAttribute<OptionalAttr>());
       }
@@ -1014,7 +1014,7 @@ namespace {
         cs.setType(memberRefExpr, simplifyType(openedType));
         Expr *result = memberRefExpr;
         closeExistential(result, locator);
-        return forceUnwrapIfExpected(result, choice, memberLocator);
+        return finishDeclReference(result, choice, memberLocator);
       }
       
       // Handle all other references.
@@ -1034,7 +1034,7 @@ namespace {
       ApplyExpr *apply;
       if (isa<ConstructorDecl>(member)) {
         // FIXME: Provide type annotation.
-        ref = forceUnwrapIfExpected(ref, choice, memberLocator);
+        ref = finishDeclReference(ref, choice, memberLocator);
         apply = new (context) ConstructorRefCallExpr(ref, base);
       } else if (!baseIsInstance && member->isInstanceMember()) {
         // Reference to an unbound instance method.
@@ -1043,11 +1043,11 @@ namespace {
                                                               cs.getType(ref));
         cs.cacheType(result);
         closeExistential(result, locator, /*force=*/openedExistential);
-        return forceUnwrapIfExpected(result, choice, memberLocator);
+        return finishDeclReference(result, choice, memberLocator);
       } else {
         assert((!baseIsInstance || member->isInstanceMember()) &&
                "can't call a static method on an instance");
-        ref = forceUnwrapIfExpected(ref, choice, memberLocator);
+        ref = finishDeclReference(ref, choice, memberLocator);
         apply = new (context) DotSyntaxCallExpr(ref, dotLoc, base);
         if (Implicit) {
           apply->setImplicit();
@@ -1274,7 +1274,7 @@ namespace {
           locatorKind = ConstraintLocator::Member;
 
         newSubscript =
-            forceUnwrapIfExpected(newSubscript, selected->choice,
+            finishDeclReference(newSubscript, selected->choice,
                                   locator.withPathElement(locatorKind));
       }
 
@@ -2230,14 +2230,51 @@ namespace {
       return solution.getDisjunctionChoice(choiceLocator);
     }
 
-    Expr *forceUnwrapIfExpected(Expr *expr, OverloadChoice choice,
-                                ConstraintLocatorBuilder locator,
-                                bool forForcedOptional = false) {
-      if (!shouldForceUnwrapResult(choice, locator))
+    /// Whether the given overload choice might result in unwrapping a
+    /// property behavior.
+    static bool mayUnwrapViaPropertyBehavior(OverloadChoice choice) {
+      if (!choice.isDecl()) return false;
+
+      auto var = dyn_cast<VarDecl>(choice.getDecl());
+      if (!var) return false;
+
+      return var->hasPropertyBehavior();
+    }
+
+    Expr *unwrapViaPropertyBehavior(Expr *expr,
+                                    ConstraintLocatorBuilder locator) {
+      // Check whether we have another level of unwrap to perform.
+      auto unwrapLocator = cs.getConstraintLocator(
+        locator.withPathElement(ConstraintLocator::UnwrappedPropertyBehavior));
+      auto selected = solution.getOverloadChoiceIfAvailable(unwrapLocator);
+      if (!selected)
         return expr;
 
+      // Build a reference to the unwrapping property.
+      return buildMemberRef(expr, selected->openedFullType, SourceLoc(),
+                            selected->choice, DeclNameLoc(),
+                            selected->openedType, unwrapLocator, unwrapLocator,
+                            /*Implicit=*/true, FunctionRefKind::Unapplied,
+                            AccessSemantics::Ordinary, /*isDynamic=*/false);
+    }
+
+    Expr *finishDeclReference(Expr *expr, OverloadChoice choice,
+                              ConstraintLocatorBuilder locator,
+                              bool forForcedOptional = false) {
       // Force the expression if required for the solution.
-      return forceUnwrapResult(expr, forForcedOptional);
+      if (shouldForceUnwrapResult(choice, locator)) {
+        expr = forceUnwrapResult(expr, forForcedOptional);
+        if (!expr) return nullptr;
+      }
+
+      // If this is a variable that involves a property behavior, it may
+      // need to be unwrapped here.
+      if (mayUnwrapViaPropertyBehavior(choice)) {
+        expr = unwrapViaPropertyBehavior(expr, locator);
+        if (!expr) return nullptr;
+      }
+
+      return expr;
     }
 
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {

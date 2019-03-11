@@ -75,6 +75,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case DynamicLookupResult:
     case ContextualType:
     case SynthesizedArgument:
+    case UnwrappedPropertyBehavior:
       if (unsigned numValues = numNumericValuesInPathElement(elt.getKind())) {
         id.AddInteger(elt.getValue());
         if (numValues > 1)
@@ -265,6 +266,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case SynthesizedArgument:
       out << " synthesized argument #" << llvm::utostr(elt.getValue());
+      break;
+
+    case UnwrappedPropertyBehavior:
+      out << "unwrapped property behavior";
       break;
     }
   }

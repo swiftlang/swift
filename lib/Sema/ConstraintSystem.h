@@ -2681,6 +2681,12 @@ public:
   void resolveOverload(ConstraintLocator *locator, Type boundType,
                        OverloadChoice choice, DeclContext *useDC);
 
+  /// Unwrap an access to the given property behavior, where access to
+  /// the variable has produced a value of the type \p refType.
+  Type unwrapPropertyBehaviorReference(VarDecl *var, Type refType,
+                                       DeclContext *useDC,
+                                       ConstraintLocatorBuilder locator);
+
   /// Simplify a type, by replacing type variables with either their
   /// fixed types (if available) or their representatives.
   ///

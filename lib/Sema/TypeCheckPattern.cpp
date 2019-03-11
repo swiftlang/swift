@@ -922,6 +922,50 @@ UnboundGenericType *TypeChecker::getUnboundPropertyBehaviorType(VarDecl *var) {
   return unboundGeneric;
 }
 
+VarDecl *TypeChecker::getPropertyBehaviorUnwrapProperty(VarDecl *var) {
+  auto unboundGeneric = getUnboundPropertyBehaviorType(var);
+  if (!unboundGeneric)
+    return nullptr;
+
+  // Look for a non-stsatic property named "value" in the property behavior
+  // type.
+  SmallVector<ValueDecl *, 2> decls;
+  var->getModuleContext()->lookupQualified(unboundGeneric, Context.Id_value,
+                                           NL_QualifiedDefault, this, decls);
+  SmallVector<VarDecl *, 2> unwrapVars;
+  for (const auto &foundDecl : decls) {
+    auto foundVar = dyn_cast<VarDecl>(foundDecl);
+    if (!foundVar || foundVar->isStatic())
+      continue;
+
+    unwrapVars.push_back(foundVar);
+  }
+
+  // Diagnose missing or ambiguous "value" properties.
+  // FIXME: Cache the result of this. which will also suppress
+  // redundant diagnostics.
+  switch (unwrapVars.size()) {
+  case 0:
+    unboundGeneric->getDecl()
+      ->diagnose(diag::property_behavior_no_value_property,
+                 Type(unboundGeneric));
+    return nullptr;
+
+  case 1:
+    return unwrapVars.front();
+
+  default:
+    unboundGeneric->getDecl()
+      ->diagnose(diag::property_behavior_ambiguous_value_property,
+                 Type(unboundGeneric));
+    for (auto var : unwrapVars) {
+      var->diagnose(diag::kind_declname_declared_here,
+                    var->getDescriptiveKind(), var->getFullName());
+    }
+    return nullptr;
+  }
+}
+
 Type TypeChecker::applyPropertyBehaviorType(Type type, VarDecl *var,
                                             TypeResolution resolution) {
   auto unboundGeneric = getUnboundPropertyBehaviorType(var);

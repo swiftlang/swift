@@ -1468,6 +1468,10 @@ public:
   //// Retrieve the unbound property behavior type for the given property.
   UnboundGenericType *getUnboundPropertyBehaviorType(VarDecl *var);
 
+  /// Retrieve the property declaration within a property behavior that
+  /// will be accessed to unwrap references to the variable.
+  VarDecl *getPropertyBehaviorUnwrapProperty(VarDecl *var);
+
   /// Given the type of the given variable (which must have a property
   /// behavior), form the stored property type that results from applying
   /// the behavior.

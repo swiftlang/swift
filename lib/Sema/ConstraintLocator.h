@@ -34,6 +34,7 @@ namespace swift {
 
 class Expr;
 class SourceManager;
+class VarDecl;
 
 namespace constraints {
   class ConstraintSystem;
@@ -127,6 +128,8 @@ public:
     ContextualType,
     /// The missing argument synthesized by the solver.
     SynthesizedArgument,
+    /// Implicit access to the property of a property behavior type.
+    UnwrappedPropertyBehavior,
   };
 
   /// Determine the number of numeric values used for the given path
@@ -157,6 +160,7 @@ public:
     case ImplicitlyUnwrappedDisjunctionChoice:
     case DynamicLookupResult:
     case ContextualType:
+    case UnwrappedPropertyBehavior:
       return 0;
 
     case OpenedGeneric:
@@ -221,6 +225,7 @@ public:
     case DynamicLookupResult:
     case ContextualType:
     case SynthesizedArgument:
+    case UnwrappedPropertyBehavior:
       return 0;
 
     case FunctionArgument:
