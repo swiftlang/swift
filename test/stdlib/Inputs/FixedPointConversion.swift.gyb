@@ -40,7 +40,10 @@ int_to_int_conversion_template = gyb.parse_template("int_to_int_conversion",
 """
 %{
 from SwiftIntTypes import all_integer_types, int_max, int_min
-from SwiftFloatingPointTypes import all_floating_point_types
+from SwiftFloatingPointTypes import all_floating_point_types, getFtoIBounds
+
+from decimal import Decimal
+
 
 }%
 % for self_ty in all_integer_types(word_bits):
@@ -105,51 +108,53 @@ FixedPointConversionFailure.test("${Other}To${Self}Conversion/dest=${testValue}"
 %     Other = "Float" + str(other_type.bits)
 %     otherMin = -int_max(bits=other_type.explicit_significand_bits, signed=False)
 %     otherMax = int_max(bits=other_type.explicit_significand_bits, signed=False)
+%     (selfFtoIMin, selfFtoIMax) = getFtoIBounds(other_type.bits, selfBits, selfSigned)
 
 %     if Other == 'Float80':
 #if !os(Windows) && (arch(i386) || arch(x86_64))
 %     end
 
-%     for testValue in [repr(value) for value in [selfMin, selfMax, selfMin - 0.1, selfMax + 0.1, otherMin, otherMax, 0.0, -0.0, 0.1, -0.1]]:
+%     for testValue in [Decimal(selfMin), Decimal(selfMax), Decimal(selfFtoIMin) - Decimal('0.1'), Decimal(selfFtoIMax) + Decimal('0.1'), Decimal(otherMin), Decimal(otherMax), Decimal('0.0'), Decimal('-0.0'), Decimal('0.1'), Decimal('-0.1')]:
+%       testValueStr = str(testValue)
 
 %       if testValue < otherMin or testValue > otherMax:
 %         # Can't construct `other` value to test from, do nothing and continue.
 
-%       elif testValue >= selfMin and testValue <= selfMax and testValue % 1 == 0 and testValue != -0.0:
+%       elif testValue >= selfFtoIMin and testValue <= selfFtoIMax and (testValue % 1).is_zero():
 
-FloatingPointConversionTruncations.test("${Other}To${Self}Conversion/dest=${testValue}") {
-  let input = get${Other}(${testValue})
+FloatingPointConversionTruncations.test("${Other}To${Self}Conversion/dest=${testValueStr}") {
+  let input = get${Other}(${testValueStr})
   let result = ${Self}(input)
   var resultConvertedBack = ${Other}(result)
-  expectEqual(${testValue}, resultConvertedBack)
+  expectEqual(${testValueStr}, resultConvertedBack)
 }
 
-FloatingPointConversionFailures.test("${Other}To${Self}FailableConversion/dest=${testValue}") {
-  let input = get${Other}(${testValue})
-  expectNil(${Self}(exactly: input))
+FloatingPointConversionFailures.test("${Other}To${Self}FailableConversion/dest=${testValueStr}") {
+  let input = get${Other}(${testValueStr})
+  expectNotNil(${Self}(exactly: input))
 }
 
 %       else:
 
-%         if testValue > selfMax:
-FloatingPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}")
+%         if testValue > selfFtoIMax:
+FloatingPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValueStr}")
 .crashOutputMatches(getTooLargeMessage()).code {
   expectCrashLater()
-%         elif testValue < selfMin:
-FloatingPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}")
+%         elif testValue < selfFtoIMin:
+FloatingPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValueStr}")
 .crashOutputMatches(getTooSmallMessage()).code {
   expectCrashLater()
 %         else:
-FloatingPointConversionTruncations.test("${Other}To${Self}Conversion/dest=${testValue}") {
+FloatingPointConversionTruncations.test("${Other}To${Self}Conversion/dest=${testValueStr}") {
 %         end
-  let input = get${Other}(${testValue})
+  let input = get${Other}(${testValueStr})
   var result = ${Self}(input)
   var resultConvertedBack = ${Other}(result)
   expectNotEqual(input, resultConvertedBack)
 }
 
-FloatingPointConversionFailures.test("${Other}To${Self}Conversion/dest=${testValue}") {
-  let input = get${Other}(${testValue})
+FloatingPointConversionFailures.test("${Other}To${Self}Conversion/dest=${testValueStr}") {
+  let input = get${Other}(${testValueStr})
   expectNil(${Self}(exactly: input))
 }
 %       end
