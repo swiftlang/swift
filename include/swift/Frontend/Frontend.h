@@ -431,6 +431,9 @@ public:
   SourceManager &getSourceMgr() { return SourceMgr; }
 
   FileManager &getFileMgr() { return *FileMgr; }
+  void setFileMgr(llvm::IntrusiveRefCntPtr<FileManager> fm) {
+    FileMgr = fm;
+  }
 
   DiagnosticEngine &getDiags() { return Diagnostics; }
 

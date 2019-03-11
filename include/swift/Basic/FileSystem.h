@@ -23,12 +23,6 @@ namespace llvm {
   class Twine;
 }
 
-namespace llvm {
-  namespace vfs {
-    class FileSystem;
-  }
-}
-
 namespace swift {
   /// Invokes \p action with a raw_ostream that refers to a temporary file,
   /// which is then renamed into place as \p outputPath when the action
@@ -55,13 +49,6 @@ namespace swift {
   /// the file at \p source will still be present at \p source.
   std::error_code moveFileIfDifferent(const llvm::Twine &source,
                                       const llvm::Twine &destination);
-
-  namespace vfs {
-    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
-    getFileOrSTDIN(llvm::vfs::FileSystem &FS,
-                   const llvm::Twine &Name, int64_t FileSize = -1,
-                   bool RequiresNullTerminator = true, bool IsVolatile = false);
-  } // end namespace vfs
 
 } // end namespace swift
 

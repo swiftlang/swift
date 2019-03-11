@@ -222,18 +222,3 @@ std::error_code swift::moveFileIfDifferent(const llvm::Twine &source,
   // If we get here, we weren't able to prove that the files are the same.
   return fs::rename(source, destination);
 }
-
-llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
-swift::vfs::getFileOrSTDIN(llvm::vfs::FileSystem &FS,
-                           const llvm::Twine &Filename,
-                           int64_t FileSize,
-                           bool RequiresNullTerminator,
-                           bool IsVolatile) {
-  llvm::SmallString<256> NameBuf;
-  llvm::StringRef NameRef = Filename.toStringRef(NameBuf);
-
-  if (NameRef == "-")
-    return llvm::MemoryBuffer::getSTDIN();
-  return FS.getBufferForFile(Filename, FileSize,
-                             RequiresNullTerminator, IsVolatile);
-}
