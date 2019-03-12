@@ -487,6 +487,24 @@ class PrintAST : public ASTVisitor<PrintAST> {
     Printer << Ctx.SourceMgr.extractText(Range);
   }
 
+  static std::string sanitizeClangDocCommentStyle(StringRef Line) {
+    static StringRef ClangStart = "/*!";
+    static StringRef SwiftStart = "/**";
+    auto Pos = Line.find(ClangStart);
+    if (Pos == StringRef::npos)
+      return Line.str();
+    StringRef Segment[2];
+    // The text before "/*!"
+    Segment[0] = Line.substr(0, Pos);
+    // The text after "/*!"
+    Segment[1] = Line.substr(Pos).substr(ClangStart.size());
+    // Only sanitize when "/*!" appears at the start of this line.
+    if (Segment[0].trim().empty()) {
+      return (llvm::Twine(Segment[0]) + SwiftStart + Segment[1]).str();
+    }
+    return Line.str();
+  }
+
   void printClangDocumentationComment(const clang::Decl *D) {
     const auto &ClangContext = D->getASTContext();
     const clang::RawComment *RC = ClangContext.getRawCommentForAnyRedecl(D);
@@ -507,10 +525,14 @@ class PrintAST : public ASTVisitor<PrintAST> {
     StringRef RawText =
         RC->getRawText(ClangContext.getSourceManager()).rtrim("\n\r");
     trimLeadingWhitespaceFromLines(RawText, WhitespaceToTrim, Lines);
-
+    bool FirstLine = true;
     for (auto Line : Lines) {
-      Printer << ASTPrinter::sanitizeUtf8(Line);
+      if (FirstLine)
+        Printer << sanitizeClangDocCommentStyle(ASTPrinter::sanitizeUtf8(Line));
+      else
+        Printer << ASTPrinter::sanitizeUtf8(Line);
       Printer.printNewline();
+      FirstLine = false;
     }
   }
 
