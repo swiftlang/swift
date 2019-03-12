@@ -142,6 +142,8 @@ private:
   /// For example, when there's a protocol extension, e.g. extension P where
   /// self: P2, self also conforms to P2 so P2 must be searched.
   class ResultFinderForTypeContext {
+    /// For debugging
+    UnqualifiedLookupFactory *const factory;
     /// Nontypes are formally members of the base type, i.e. the dynamic type
     /// of the activation record.
     DeclContext *const dynamicContext;
@@ -153,7 +155,8 @@ private:
 
   public:
     /// \p staticContext is also the context from which to derive the self types
-    ResultFinderForTypeContext(DeclContext *dynamicContext,
+    ResultFinderForTypeContext(UnqualifiedLookupFactory *factory,
+                               DeclContext *dynamicContext,
                                DeclContext *staticContext);
 
     void dump() const;
@@ -175,6 +178,26 @@ private:
   };
 
   enum class AddGenericParameters { Yes, No };
+  
+  
+  /// A consumer for debugging that lets the UnqualifiedLookupFactory know when finding something.
+  class InstrumentedNamedDeclConsumer : public NamedDeclConsumer {
+    virtual void anchor() override;
+    UnqualifiedLookupFactory *factory;
+  public:
+    InstrumentedNamedDeclConsumer(
+                                  UnqualifiedLookupFactory *factory,
+                                  DeclName name,
+                                  SmallVectorImpl<LookupResultEntry> &results,
+                                  bool isTypeLookup)
+    : NamedDeclConsumer(name, results, isTypeLookup), factory(factory) {}
+    
+    virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+      NamedDeclConsumer::foundDecl(
+                          factory->addingResult(VD).getValueDecl(), Reason);
+    }
+  };
+
 
   // Inputs
   const DeclName Name;
@@ -190,7 +213,7 @@ private:
   const bool isOriginallyTypeLookup;
   const NLOptions baseNLOptions;
   // Transputs
-  NamedDeclConsumer Consumer;
+  InstrumentedNamedDeclConsumer Consumer;
   // Outputs
   SmallVectorImpl<LookupResultEntry> &Results;
   size_t &IndexOfFirstOuterResult;
@@ -199,6 +222,8 @@ private:
   
   /// For debugging:
   bool involvedANominalOrExtensionWhereClause = false;
+  unsigned lookupCounter = 0;
+  unsigned targetLookup = ~0;
 
 
 public: // for exp debugging
@@ -449,6 +474,10 @@ public:
   
   /// Legacy lookup is wrong here; we should NOT find this symbol.
   bool shouldDiffer() const;
+  
+  /// For debugging:
+  void stopIfTargetLookup() const;
+  LookupResultEntry addingResult(LookupResultEntry&&) const;
 };
 } // namespace
 
@@ -488,13 +517,15 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
   options(options),
   isOriginallyTypeLookup(options.contains(Flags::TypeLookup)),
   baseNLOptions(computeBaseNLOptions(options, isOriginallyTypeLookup)),
-  Consumer(Name, Results, isOriginallyTypeLookup),
+  Consumer(this, Name, Results, isOriginallyTypeLookup),
   Results(Results),
   IndexOfFirstOuterResult(IndexOfFirstOuterResult)
 {}
 // clang-format on
 
 void UnqualifiedLookupFactory::performUnqualifiedLookup() {
+  ++lookupCounter;
+  
   const Optional<bool> isCascadingUseInitial =
   options.contains(Flags::KnownPrivate) ? Optional<bool>(false) : None;
 
@@ -506,7 +537,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
     lookupOperatorInDeclContexts(contextAndIsCascadingUse);
   else {
     const bool isCascadingUse = computeIsCascadingUse();
-    const bool useOnlyScopeLookupWhenPossible = true;
+    const bool useOnlyScopeLookupWhenPossible = false;
     if (useOnlyScopeLookupWhenPossible && Loc.isValid()) {
       static bool haveWarned = false;
       if (!haveWarned) {
@@ -712,7 +743,7 @@ void UnqualifiedLookupFactory::lookInASTScopeContext(
     // Dig out the type we're looking into.
     // Perform lookup into the type
     auto resultFinder = ResultFinderForTypeContext(
-      stateArg.selfDC ? stateArg.selfDC : scopeDC, scopeDC);
+      this, stateArg.selfDC ? stateArg.selfDC : scopeDC, scopeDC);
 
     findResultsAndSaveUnavailables(scopeDC,
                                    std::move(resultFinder),
@@ -828,7 +859,7 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByPatternBindingInitializer(
     finishLookingInContext(
       AddGenericParameters::Yes,
       patternContainer,
-      ResultFinderForTypeContext(PBI, patternContainer),
+      ResultFinderForTypeContext(this, PBI, patternContainer),
       resolveIsCascadingUse(PBI, isCascadingUse,
                            /*onlyCareAboutFunctionBody=*/false));
       // clang-format on
@@ -845,7 +876,8 @@ void UnqualifiedLookupFactory::
   finishLookingInContext(
     AddGenericParameters::Yes,
     storedPropertyContainer,
-    ResultFinderForTypeContext(storedPropertyContainer, storedPropertyContainer),
+    ResultFinderForTypeContext(
+      this, storedPropertyContainer, storedPropertyContainer),
     resolveIsCascadingUse(storedPropertyContainer, None,
                           /*onlyCareAboutFunctionBody=*/false));
   // clang-format on
@@ -907,10 +939,10 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByMemberFunction(
         // FIXME: We should persist this information between lookups.
         // clang-format off
       finishLookingInContext(
-                             AddGenericParameters::Yes,
-                             AFD->getParent(),
-                             ResultFinderForTypeContext(BaseDC, fnDeclContext),
-                             isCascadingUse);
+        AddGenericParameters::Yes,
+        AFD->getParent(),
+        ResultFinderForTypeContext(this, BaseDC, fnDeclContext),
+        isCascadingUse);
         // clang-format on
       });
 }
@@ -953,7 +985,8 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByNominalTypeOrExtension(
     AddGenericParameters::Yes,
     D,
     shouldLookupMembers(D, Loc)
-    ? Optional<ResultFinderForTypeContext>(ResultFinderForTypeContext(D, D))
+    ? Optional<ResultFinderForTypeContext>(
+                ResultFinderForTypeContext(this, D, D))
     : None,
     resolveIsCascadingUse(D, isCascadingUse,
                           /*onlyCareAboutFunctionBody=*/false));
@@ -1122,7 +1155,8 @@ void UnqualifiedLookupFactory::ResultFinderForTypeContext::findResults(
   SmallVector<ValueDecl *, 4> Lookup;
   contextForLookup->lookupQualified(selfBounds, Name, options, Lookup);
   for (auto Result : Lookup)
-    results.push_back(LookupResultEntry(whereValueIsMember(Result), Result));
+    results.push_back(factory->addingResult(
+      LookupResultEntry(whereValueIsMember(Result), Result)));
 }
 
 // TODO (someday): Instead of adding unavailable entries to Results,
@@ -1195,7 +1229,7 @@ void UnqualifiedLookupFactory::addImportedResults(DeclContext *const dc) {
   }
 
   for (auto VD : CurModuleResults)
-    Results.push_back(LookupResultEntry(VD));
+    Results.push_back(addingResult(LookupResultEntry(VD)));
 
   filterForDiscriminator(Results, DebugClient);
 }
@@ -1218,7 +1252,7 @@ void UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
 
   // Look for a module with the given name.
   if (Name.isSimpleName(M.getName())) {
-    Results.push_back(LookupResultEntry(&M));
+    Results.push_back(addingResult(LookupResultEntry(&M)));
     return;
   }
   ModuleDecl *desiredModule = Ctx.getLoadedModule(Name.getBaseIdentifier());
@@ -1228,7 +1262,7 @@ void UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
     forAllVisibleModules(
         dc, [&](const ModuleDecl::ImportedModule &import) -> bool {
           if (import.second == desiredModule) {
-            Results.push_back(LookupResultEntry(import.second));
+            Results.push_back(addingResult(LookupResultEntry(import.second)));
             return false;
           }
           return true;
@@ -1275,9 +1309,11 @@ void UnqualifiedLookupFactory::recordCompletionOfAScope() {
 }
 
 UnqualifiedLookupFactory::ResultFinderForTypeContext::
-    ResultFinderForTypeContext(DeclContext *dynamicContext,
+    ResultFinderForTypeContext(UnqualifiedLookupFactory *factory,
+                               DeclContext *dynamicContext,
                                DeclContext *staticContext)
-    : dynamicContext(dynamicContext), staticContext(staticContext),
+    : factory(factory),
+      dynamicContext(dynamicContext), staticContext(staticContext),
       selfBounds(findSelfBounds(staticContext)) {}
 
 UnqualifiedLookupFactory::ResultFinderForTypeContext::SelfBounds
@@ -1453,10 +1489,23 @@ void UnqualifiedLookupFactory::dump() const {
 }
 
 void UnqualifiedLookupFactory::print(raw_ostream &OS) const {
-  OS << "Looking up '" << Name << " at: ";
+  OS << "Look up (" << lookupCounter << ") '" << Name << " at: ";
   Loc.print(OS, DC->getASTContext().SourceMgr);
   OS << "\nStarting in: ";
   DC->printContext(OS);
   OS << (involvedANominalOrExtensionWhereClause ? " w/" : " w/o")
      << " where\n";
 }
+
+void UnqualifiedLookupFactory::stopIfTargetLookup() const {
+  if (lookupCounter == targetLookup)
+    llvm::errs() << "Target lookup\n";
+}
+
+LookupResultEntry UnqualifiedLookupFactory::addingResult(
+                                              LookupResultEntry &&e) const {
+  stopIfTargetLookup();
+  return e;
+}
+
+void UnqualifiedLookupFactory::InstrumentedNamedDeclConsumer::anchor() {}
