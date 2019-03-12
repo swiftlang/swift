@@ -1440,6 +1440,7 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   invocation->getFrontendOpts().ProgramAction = clang::frontend::GeneratePCH;
   invocation->getPreprocessorOpts().resetNonModularOptions();
   invocation->getLangOpts()->NeededByPCHOrCompilationUsesPCH = true;
+  invocation->getLangOpts()->CacheGeneratedPCH = true;
 
   clang::CompilerInstance emitInstance(
     Impl.Instance->getPCHContainerOperations(),
