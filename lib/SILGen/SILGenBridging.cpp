@@ -681,7 +681,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
 
     assert(SGF.SGM.getASTContext().Diags.hadAnyError() &&
            "Bridging code should have complained");
-    return SGF.emitUndef(loc, bridgedType);
+    return SGF.emitUndef(bridgedType);
   }
 
   // Bridge Error, or types that conform to it, to NSError.
@@ -754,7 +754,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
   }
   
   // Shouldn't get here unless the standard library is busted.
-  return SGF.emitUndef(loc, loweredBridgedTy);
+  return SGF.emitUndef(loweredBridgedTy);
 }
 
 static ManagedValue emitNativeToCBridgedValue(SILGenFunction &SGF,
@@ -1070,7 +1070,7 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
 
     assert(SGF.SGM.getASTContext().Diags.hadAnyError() &&
            "Bridging code should have complained");
-    return SGF.emitUndef(loc, nativeType);
+    return SGF.emitUndef(nativeType);
   }
 
   // id-to-Any bridging.
@@ -1138,7 +1138,7 @@ ManagedValue SILGenFunction::emitBridgedToNativeError(SILLocation loc,
     auto nativeErrorTy = SILType::getExceptionType(getASTContext());
 
     auto conformance = SGM.getNSErrorConformanceToError();
-    if (!conformance) return emitUndef(loc, nativeErrorTy);
+    if (!conformance) return emitUndef(nativeErrorTy);
     ProtocolConformanceRef conformanceArray[] = {
       ProtocolConformanceRef(conformance)
     };

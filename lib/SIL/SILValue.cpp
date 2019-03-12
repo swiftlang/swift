@@ -53,14 +53,14 @@ void ValueBase::replaceAllUsesWith(ValueBase *RHS) {
 }
 
 void ValueBase::replaceAllUsesWithUndef() {
-  SILModule *Mod = getModule();
-  if (!Mod) {
+  auto *F = getFunction();
+  if (!F) {
     llvm_unreachable("replaceAllUsesWithUndef can only be used on ValueBase "
-                     "that have access to the parent module.");
+                     "that have access to the parent function.");
   }
   while (!use_empty()) {
     Operand *Op = *use_begin();
-    Op->set(SILUndef::get(Op->get()->getType(), Mod));
+    Op->set(SILUndef::get(Op->get()->getType(), *F));
   }
 }
 

@@ -1895,7 +1895,7 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
       if (hasNonAny) {
         result = SGF.emitEmptyTuple(loc);
       } else {
-        result = SILUndef::get(SGF.SGM.Types.getEmptyTupleType(), SGF.SGM.M);
+        result = SILUndef::get(SGF.SGM.Types.getEmptyTupleType(), SGF.F);
       }
       origCMV = ConsumableManagedValue::forUnmanaged(result);
       eltCMV = origCMV;
@@ -2071,7 +2071,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
       if (hasNonAny) {
         result = SGF.emitEmptyTuple(loc);
       } else {
-        result = SILUndef::get(SGF.SGM.Types.getEmptyTupleType(), SGF.SGM.M);
+        result = SILUndef::get(SGF.SGM.Types.getEmptyTupleType(), SGF.F);
       }
       origCMV = ConsumableManagedValue::forUnmanaged(result);
       eltCMV = origCMV;
@@ -2278,7 +2278,7 @@ emitBoolDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     Scope scope(SGF.Cleanups, CleanupLocation::get(loc));
 
     SILValue result
-      = SILUndef::get(SGF.SGM.Types.getEmptyTupleType(), SGF.SGM.M);
+      = SILUndef::get(SGF.SGM.Types.getEmptyTupleType(), SGF.F);
     ConsumableManagedValue CMV =
       ConsumableManagedValue::forUnmanaged(result);
 

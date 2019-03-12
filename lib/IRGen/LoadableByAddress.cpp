@@ -1317,7 +1317,7 @@ void LoadableStorageAllocation::allocateLoadableStorage() {
 SILArgument *LoadableStorageAllocation::replaceArgType(SILBuilder &argBuilder,
                                                        SILArgument *arg,
                                                        SILType newSILType) {
-  SILValue undef = SILUndef::get(newSILType, pass.F->getModule());
+  SILValue undef = SILUndef::get(newSILType, *pass.F);
   SmallVector<Operand *, 8> useList(arg->use_begin(), arg->use_end());
   for (auto *use : useList) {
     use->set(undef);
@@ -1387,7 +1387,7 @@ void LoadableStorageAllocation::convertIndirectFunctionArgs() {
 
 static void convertBBArgType(SILBuilder &argBuilder, SILType newSILType,
                              SILArgument *arg) {
-  SILValue undef = SILUndef::get(newSILType, argBuilder.getModule());
+  SILValue undef = SILUndef::get(newSILType, argBuilder.getFunction());
   SmallVector<Operand *, 8> useList(arg->use_begin(), arg->use_end());
   for (auto *use : useList) {
     use->set(undef);

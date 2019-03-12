@@ -605,7 +605,7 @@ static bool removeAndReleaseArray(SingleValueInstruction *NewArrayValue,
       return false;
   }
   // For each store location, insert releases.
-  SILSSAUpdater SSAUp(ArrayDef->getModule());
+  SILSSAUpdater SSAUp;
   ValueLifetimeAnalysis::Frontier ArrayFrontier;
   if (!VLA.computeFrontier(ArrayFrontier,
                            ValueLifetimeAnalysis::UsersMustPostDomDef,

@@ -582,7 +582,7 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
   // SSA updater to get a value. The reason why this is safe is that we can only
   // have multiple insertion points if we are storing exactly the same value
   // implying that we can just copy firstVal at each insertion point.
-  SILSSAUpdater updater(B.getModule());
+  SILSSAUpdater updater;
   updater.Initialize(loadTy);
 
   Optional<SILValue> singularValue;
@@ -713,7 +713,7 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
 
   // If we have an available value, then we want to extract the subelement from
   // the borrowed aggregate before each insertion point.
-  SILSSAUpdater updater(B.getModule());
+  SILSSAUpdater updater;
   updater.Initialize(loadTy);
 
   Optional<SILValue> singularValue;

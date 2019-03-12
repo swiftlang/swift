@@ -1120,8 +1120,8 @@ public:
   ManagedValue emitRValueAsSingleValue(Expr *E, SGFContext C = SGFContext());
 
   /// Emit 'undef' in a particular formal type.
-  ManagedValue emitUndef(SILLocation loc, Type type);
-  ManagedValue emitUndef(SILLocation loc, SILType type);
+  ManagedValue emitUndef(Type type);
+  ManagedValue emitUndef(SILType type);
   RValue emitUndefRValue(SILLocation loc, Type type);
   
   std::pair<ManagedValue, SILValue>

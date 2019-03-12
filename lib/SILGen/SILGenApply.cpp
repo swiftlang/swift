@@ -1429,7 +1429,7 @@ public:
       // If the initializer is a C function imported as a member,
       // there is no 'self' parameter. Mark it undef.
       if (ctorRef->getDecl()->isImportAsMember()) {
-        self = SGF.emitUndef(expr, selfFormalType);
+        self = SGF.emitUndef(selfFormalType);
       } else if (SGF.AllocatorMetatype) {
         self = emitCorrespondingSelfValue(
             ManagedValue::forUnmanaged(SGF.AllocatorMetatype), arg);

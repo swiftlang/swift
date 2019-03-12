@@ -25,18 +25,20 @@ class SILModule;
 class SILUndef : public ValueBase {
   ValueOwnershipKind ownershipKind;
 
-  SILUndef(SILType type, SILModule &m);
+  SILUndef(SILType type, ValueOwnershipKind ownershipKind);
 
 public:
   void operator=(const SILArgument &) = delete;
   void operator delete(void *, size_t) SWIFT_DELETE_OPERATOR_DELETED;
 
-  static SILUndef *get(SILType ty, SILModule &m);
-  static SILUndef *get(SILType ty, SILModule *m) { return get(ty, *m); }
+  static SILUndef *get(SILType ty, SILModule &m, ValueOwnershipKind ownershipKind);
+  static SILUndef *get(SILType ty, const SILFunction &f);
 
   template <class OwnerTy>
-  static SILUndef *getSentinelValue(SILType type, SILModule &m, OwnerTy owner) {
-    return new (*owner) SILUndef(type, m);
+  static SILUndef *getSentinelValue(SILType type, OwnerTy owner) {
+    // Ownership kind isn't used here, the value just needs to have a unique
+    // address.
+    return new (*owner) SILUndef(type, ValueOwnershipKind::Any);
   }
 
   ValueOwnershipKind getOwnershipKind() const { return ownershipKind; }

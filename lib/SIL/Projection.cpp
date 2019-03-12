@@ -1153,7 +1153,7 @@ ProjectionTree::computeExplodedArgumentValueInner(SILBuilder &Builder,
     if (Iter != LeafValues.end())
       return Iter->second;
     // Return undef for dead node.
-    return SILUndef::get(Node->getType(), Mod);
+    return SILUndef::get(Node->getType(), Builder.getFunction());
   }
 
   // This is an aggregate node, construct its value from its children

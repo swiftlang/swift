@@ -259,7 +259,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
     assert(ArgUser == SEI);
     // We delete the SEI later anyway. Just get rid of the Arg use.
     ArgUse->set(SILUndef::get(SEI->getOperand()->getType(),
-                              getFunction()->getModule()));
+                              *getFunction()));
   }
 
   // Redirect the predecessors of the condition's merging block to the

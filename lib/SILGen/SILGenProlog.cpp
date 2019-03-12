@@ -510,7 +510,7 @@ uint16_t SILGenFunction::emitProlog(ParameterList *paramList,
     else if (auto *ACE = dyn_cast<AbstractClosureExpr>(DC))
       Loc = ACE->getLoc();
     auto NativeErrorTy = SILType::getExceptionType(getASTContext());
-    ManagedValue Undef = emitUndef(Loc, NativeErrorTy);
+    ManagedValue Undef = emitUndef(NativeErrorTy);
     SILDebugVariable DbgVar("$error", /*Constant*/ false, ++ArgNo);
     B.createDebugValue(Loc, Undef.getValue(), DbgVar);
   }
