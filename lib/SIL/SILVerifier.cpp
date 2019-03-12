@@ -743,7 +743,7 @@ public:
     // ownership.
     if (!F->hasOwnership())
       return;
-    SILValue(V).verifyOwnership(F->getModule(), &DEBlocks);
+    SILValue(V).verifyOwnership(&DEBlocks);
   }
 
   void checkSILInstruction(SILInstruction *I) {
@@ -4359,7 +4359,6 @@ public:
 
     bool matched = true;
     auto argI = entry->args_begin();
-    SILModule &M = F.getModule();
 
     auto check = [&](const char *what, SILType ty) {
       auto mappedTy = F.mapTypeIntoContext(ty);
@@ -4378,7 +4377,7 @@ public:
       }
 
       auto ownershipkind = ValueOwnershipKind(
-          M, mappedTy, fnConv.getSILArgumentConvention(bbarg->getIndex()));
+          F, mappedTy, fnConv.getSILArgumentConvention(bbarg->getIndex()));
 
       if (bbarg->getOwnershipKind() != ownershipkind) {
         llvm::errs() << what << " ownership kind mismatch!\n";

@@ -1446,6 +1446,13 @@ SILType IRGenModule::getLoweredType(Type subst) const {
                                       ResilienceExpansion::Minimal);
 }
 
+/// Return the SIL-lowering of the given type.
+const Lowering::TypeLowering &IRGenModule::getTypeLowering(SILType type) const {
+  // FIXME: Expansion
+  return getSILTypes().getTypeLowering(type,
+                                       ResilienceExpansion::Minimal);
+}
+
 bool IRGenModule::isTypeABIAccessible(SILType type) const {
   // FIXME: Expansion
   return getSILModule().isTypeABIAccessible(type,

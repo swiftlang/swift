@@ -671,7 +671,7 @@ public:
       return createLoad(Loc, LV, LoadOwnershipQualifier::Unqualified);
     }
 
-    if (LV->getType().isTrivial(getModule())) {
+    if (LV->getType().isTrivial(getFunction())) {
       return createLoad(Loc, LV, LoadOwnershipQualifier::Trivial);
     }
     return createLoad(Loc, LV, Qualifier);
@@ -764,7 +764,7 @@ public:
       return createStore(Loc, Src, DestAddr,
                          StoreOwnershipQualifier::Unqualified);
     }
-    if (Src->getType().isTrivial(getModule())) {
+    if (Src->getType().isTrivial(getFunction())) {
       return createStore(Loc, Src, DestAddr, StoreOwnershipQualifier::Trivial);
     }
     return createStore(Loc, Src, DestAddr, Qualifier);
@@ -1095,7 +1095,7 @@ public:
   }
 
   CopyValueInst *createCopyValue(SILLocation Loc, SILValue operand) {
-    assert(!operand->getType().isTrivial(getModule()) &&
+    assert(!operand->getType().isTrivial(getFunction()) &&
            "Should not be passing trivial values to this api. Use instead "
            "emitCopyValueOperation");
     return insert(new (getModule())
@@ -1104,7 +1104,7 @@ public:
 
   DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand) {
     assert(isLoadableOrOpaque(operand->getType()));
-    assert(!operand->getType().isTrivial(getModule()) &&
+    assert(!operand->getType().isTrivial(getFunction()) &&
            "Should not be passing trivial values to this api. Use instead "
            "emitDestroyValueOperation");
     return insert(new (getModule())
@@ -1398,13 +1398,13 @@ public:
   DestructureStructInst *createDestructureStruct(SILLocation Loc,
                                                  SILValue Operand) {
     return insert(DestructureStructInst::create(
-        getModule(), getSILDebugLocation(Loc), Operand));
+        getFunction(), getSILDebugLocation(Loc), Operand));
   }
 
   DestructureTupleInst *createDestructureTuple(SILLocation Loc,
                                                SILValue Operand) {
     return insert(DestructureTupleInst::create(
-        getModule(), getSILDebugLocation(Loc), Operand));
+        getFunction(), getSILDebugLocation(Loc), Operand));
   }
 
   MultipleValueInstruction *emitDestructureValueOperation(SILLocation loc,

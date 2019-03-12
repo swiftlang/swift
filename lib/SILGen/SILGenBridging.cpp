@@ -681,7 +681,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
 
     assert(SGF.SGM.getASTContext().Diags.hadAnyError() &&
            "Bridging code should have complained");
-    return SGF.emitUndef(loc, bridgedType);
+    return SGF.emitUndef(bridgedType);
   }
 
   // Bridge Error, or types that conform to it, to NSError.
@@ -739,7 +739,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
                                  nativeType);
 
     // Put the value into memory if necessary.
-    assert(v.getType().isTrivial(SGF.SGM.M) || v.hasCleanup());
+    assert(v.getType().isTrivial(SGF.F) || v.hasCleanup());
     SILModuleConventions silConv(SGF.SGM.M);
     // bridgeAnything always takes an indirect argument as @in.
     // Since we don't have the SIL type here, check the current SIL stage/mode
@@ -754,7 +754,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
   }
   
   // Shouldn't get here unless the standard library is busted.
-  return SGF.emitUndef(loc, loweredBridgedTy);
+  return SGF.emitUndef(loweredBridgedTy);
 }
 
 static ManagedValue emitNativeToCBridgedValue(SILGenFunction &SGF,
@@ -1070,7 +1070,7 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
 
     assert(SGF.SGM.getASTContext().Diags.hadAnyError() &&
            "Bridging code should have complained");
-    return SGF.emitUndef(loc, nativeType);
+    return SGF.emitUndef(nativeType);
   }
 
   // id-to-Any bridging.
@@ -1138,7 +1138,7 @@ ManagedValue SILGenFunction::emitBridgedToNativeError(SILLocation loc,
     auto nativeErrorTy = SILType::getExceptionType(getASTContext());
 
     auto conformance = SGM.getNSErrorConformanceToError();
-    if (!conformance) return emitUndef(loc, nativeErrorTy);
+    if (!conformance) return emitUndef(nativeErrorTy);
     ProtocolConformanceRef conformanceArray[] = {
       ProtocolConformanceRef(conformance)
     };
@@ -1369,6 +1369,15 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &SGF,
                         SGFContext(),
                         /*isCallResult*/ true);
     SILValue argValue;
+
+    // This can happen if the value is resilient in the calling convention
+    // but not resilient locally.
+    if (nativeInputs[i].isFormalIndirect() &&
+        !native.getType().isAddress()) {
+      auto buf = SGF.emitTemporaryAllocation(loc, native.getType());
+      native.forwardInto(SGF, loc, buf);
+      native = SGF.emitManagedBufferWithCleanup(buf);
+    }
 
     if (nativeInputs[i].isConsumed()) {
       argValue = native.forward(SGF);

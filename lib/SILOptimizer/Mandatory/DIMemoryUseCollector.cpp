@@ -418,7 +418,7 @@ bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
 /// have trivial type.
 bool DIMemoryUse::onlyTouchesTrivialElements(
     const DIMemoryObjectInfo &MI) const {
-  auto &Module = Inst->getModule();
+  auto *F = Inst->getFunction();
 
   for (unsigned i = FirstElement, e = i + NumElements; i != e; ++i) {
     // Skip 'super.init' bit
@@ -426,7 +426,7 @@ bool DIMemoryUse::onlyTouchesTrivialElements(
       return false;
 
     auto EltTy = MI.getElementType(i);
-    if (!EltTy.isTrivial(Module))
+    if (!EltTy.isTrivial(*F))
       return false;
   }
   return true;
@@ -755,7 +755,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         Kind = DIUseKind::PartialStore;
       else if (isa<AssignInst>(User))
         Kind = DIUseKind::InitOrAssign;
-      else if (PointeeType.isTrivial(User->getModule()))
+      else if (PointeeType.isTrivial(*User->getFunction()))
         Kind = DIUseKind::InitOrAssign;
       else
         Kind = DIUseKind::Initialization;
