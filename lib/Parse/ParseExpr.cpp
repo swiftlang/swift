@@ -526,8 +526,9 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
       // We are sure we can create a prefix operator expr now.
       UnaryContext.setCreateSyntax(SyntaxKind::PrefixOperatorExpr);
 
-      return makeParserResult(
+      auto Result = makeParserResult(
           Status, new (Context) SuppressUnwrapExpr(CaretLoc, SubExpr.get()));
+      return parseExprPostfix(Result, isExprBasic);
     }
 
     Operator = parseExprOperator();
@@ -1417,20 +1418,25 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   if (Result.isNull())
     return Result;
 
+  return parseExprPostfix(Result, isExprBasic);
+}
+
+ParserResult<Expr> Parser::parseExprPostfix(ParserResult<Expr> primary,
+                                            bool isExprBasic) {
   bool hasBindOptional = false;
-  Result = parseExprPostfixSuffix(Result, isExprBasic,
+  primary = parseExprPostfixSuffix(primary, isExprBasic,
                                   /*periodHasKeyPathBehavior=*/InSwiftKeyPath,
                                   hasBindOptional);
-  if (Result.isParseError() || Result.hasCodeCompletion())
-    return Result;
+  if (primary.isParseError() || primary.hasCodeCompletion())
+    return primary;
 
   // If we had a ? suffix expression, bind the entire postfix chain
   // within an OptionalEvaluationExpr.
   if (hasBindOptional) {
-    Result = makeParserResult(new (Context) OptionalEvaluationExpr(Result.get()));
+    primary = makeParserResult(new (Context) OptionalEvaluationExpr(primary.get()));
   }
 
-  return Result;
+  return primary;
 }
 
 /// parseExprPrimary

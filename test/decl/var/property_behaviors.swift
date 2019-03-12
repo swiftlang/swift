@@ -64,6 +64,8 @@ func testBadWrapperTypes() {
 struct WrapperWithInitialValue<T> {
   var value: T
   init(initialValue: T) { value = initialValue }
+
+  func method() { }
 }
 
 func testExplicitInitialValue() {
@@ -90,6 +92,8 @@ func testSuppressUnwrap() {
 
   // FIXME wrong type for ^wrapped1
   let _: Double = ^wrapped1 // expected-error{{cannot convert value of type 'Int' to specified type 'Double'}}
+
+  ^wrapped1.method()  // call a method on the wrapper
 }
 
 // ---------------------------------------------------------------------------
