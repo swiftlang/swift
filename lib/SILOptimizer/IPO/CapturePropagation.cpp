@@ -424,11 +424,12 @@ static SILFunction *getSpecializedWithDeadParams(
     // Perform a generic specialization of the Specialized function.
     ReabstractionInfo ReInfo(ApplySite(), Specialized,
                              PAI->getSubstitutionMap(),
+                             Specialized->isSerialized(),
                              /* ConvertIndirectToDirect */ false);
     GenericFuncSpecializer FuncSpecializer(FuncBuilder,
                                            Specialized,
                                            ReInfo.getClonerParamSubstitutionMap(),
-                                           Specialized->isSerialized(), ReInfo);
+                                           ReInfo);
 
     SILFunction *GenericSpecializedFunc = FuncSpecializer.trySpecialization();
     if (!GenericSpecializedFunc)
