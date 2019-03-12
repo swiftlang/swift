@@ -476,5 +476,20 @@ extension SR7250 where T : P3 {
   subscript(i: Int) -> String { return "" }
 }
 
+// SR-10084
 
+struct SR_10084_S {
+  let name: String
+}
 
+enum SR_10084_E {
+  case foo(SR_10084_S) // expected-note {{'foo' previously declared here}}
+    
+  static func foo(_ name: String) -> SR_10084_E { // Ok
+    return .foo(SR_10084_S(name: name))
+  }
+
+  static func foo(_ value: SR_10084_S) -> SR_10084_E { // expected-error {{invalid redeclaration of 'foo'}}
+    return .foo(value)
+  }
+}
