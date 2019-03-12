@@ -2035,6 +2035,7 @@ semanticRefactoring(StringRef Filename, SemanticRefactoringInfo Info,
 
 void SwiftLangSupport::collectExpressionTypes(StringRef FileName,
                                               ArrayRef<const char *> Args,
+                                    ArrayRef<const char *> ExpectedProtocols,
                   std::function<void(const ExpressionTypesInFile&)> Receiver) {
   std::string Error;
   SwiftInvocationRef Invok = ASTMgr->getInvocation(Args, FileName, Error);
@@ -2047,17 +2048,23 @@ void SwiftLangSupport::collectExpressionTypes(StringRef FileName,
   assert(Invok);
   class ExpressionTypeCollector: public SwiftASTConsumer {
     std::function<void(const ExpressionTypesInFile&)> Receiver;
+    std::vector<const char *> ExpectedProtocols;
   public:
-    ExpressionTypeCollector(std::function<void(const ExpressionTypesInFile&)> Receiver):
-      Receiver(std::move(Receiver)) {}
+    ExpressionTypeCollector(
+        std::function<void(const ExpressionTypesInFile&)> Receiver,
+        ArrayRef<const char *> ExpectedProtocols): Receiver(std::move(Receiver)),
+          ExpectedProtocols(ExpectedProtocols.vec()) {}
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto *SF = AstUnit->getCompilerInstance().getPrimarySourceFile();
       std::vector<ExpressionTypeInfo> Scratch;
       llvm::SmallString<256> TypeBuffer;
       llvm::raw_svector_ostream OS(TypeBuffer);
       ExpressionTypesInFile Result;
-      for (auto Item: collectExpressionType(*SF, Scratch, OS)) {
-        Result.Results.push_back({Item.offset, Item.length, Item.typeOffset});
+      for (auto Item: collectExpressionType(*SF, ExpectedProtocols, Scratch, OS)) {
+        Result.Results.push_back({Item.offset, Item.length, Item.typeOffset, {}});
+        for (auto P: Item.protocols) {
+          Result.Results.back().ProtocolOffsets.push_back(P.first);
+        }
       }
       Result.TypeBuffer = OS.str();
       Receiver(Result);
@@ -2071,7 +2078,8 @@ void SwiftLangSupport::collectExpressionTypes(StringRef FileName,
       Receiver({});
     }
   };
-  auto Collector = std::make_shared<ExpressionTypeCollector>(Receiver);
+  auto Collector = std::make_shared<ExpressionTypeCollector>(Receiver,
+                                                             ExpectedProtocols);
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
