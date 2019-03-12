@@ -238,6 +238,8 @@ NOTE(inout_change_var_type_if_possible,none,
 ERROR(cannot_pass_rvalue_inout,none,
       "cannot pass immutable value of type %0 as inout argument",
       (Type))
+ERROR(cannot_provide_default_value_inout,none,
+      "cannot provide default value to inout parameter %0", (Identifier))
 
 ERROR(cannot_assign_to_literal,none,
       "cannot assign to a literal value", ())
