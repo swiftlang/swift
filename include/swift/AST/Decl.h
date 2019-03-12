@@ -213,9 +213,6 @@ struct OverloadSignature {
   /// Whether this is a function.
   unsigned IsFunction : 1;
 
-  /// Whether this is a static function.
-  unsigned IsStaticFunction : 1;
-
   /// Whether this is a enum element.
   unsigned IsEnumElement : 1;
 

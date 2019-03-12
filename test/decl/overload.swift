@@ -493,3 +493,27 @@ enum SR_10084_E {
     return .foo(value)
   }
 }
+
+enum SR_10084_E_1 {
+  static func foo(_ name: String) -> SR_10084_E_1 { // expected-note {{'foo' previously declared here}}
+    return .foo(SR_10084_S(name: name))
+  }
+
+  static func foo(_ value: SR_10084_S) -> SR_10084_E_1 { // expected-error {{invalid redeclaration of 'foo'}}
+    return .foo(value)
+  }
+
+  case foo(SR_10084_S)
+}
+
+enum SR_10084_E_2 {
+  case fn(() -> Void) // expected-note {{'fn' previously declared here}}
+
+  static func fn(_ x: @escaping () -> Void) -> SR_10084_E_2 { // expected-error {{invalid redeclaration of 'fn'}}
+    fatalError()
+  }
+
+  static func fn(_ x: @escaping () -> Int) -> SR_10084_E_2 { // Ok
+    fatalError()
+  }
+}

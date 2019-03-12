@@ -2090,12 +2090,15 @@ bool swift::conflicting(ASTContext &ctx,
   if (!conflicting(sig1, sig2, skipProtocolExtensionCheck))
     return false;
 
-  // Static functions do not conflict with enum element decls if the types
-  // are different
-  if (sig1.IsStaticFunction == sig2.IsEnumElement) {
-    if (sig1Type != sig2Type) {
-      return false;
-    }
+  // Two enum elements always conflict with each other. At this point, they
+  // have the same base name but different types.
+  if (sig1.IsEnumElement == sig2.IsEnumElement) {
+    return true;
+  }
+
+  // A function does not conflict with an enum element if their types differ.
+  if (sig1.IsFunction == sig2.IsEnumElement && sig1Type != sig2Type) {
+    return false;
   }
 
   // Functions always conflict with non-functions with the same signature.
@@ -2257,8 +2260,6 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   signature.IsVariable = isa<VarDecl>(this);
   signature.IsFunction = isa<AbstractFunctionDecl>(this);
   signature.IsEnumElement = isa<EnumElementDecl>(this);
-  signature.IsStaticFunction =
-      isa<FuncDecl>(this) && cast<FuncDecl>(this)->isStatic();
 
   // Unary operators also include prefix/postfix.
   if (auto func = dyn_cast<FuncDecl>(this)) {
@@ -2305,7 +2306,10 @@ CanType ValueDecl::getOverloadSignatureType() const {
   }
 
   if (isa<EnumElementDecl>(this)) {
-    return this->getInterfaceType()->getCanonicalType();
+    auto mappedType = mapSignatureFunctionType(
+        getASTContext(), getInterfaceType(), /*topLevelFunction=*/false,
+        /*isMethod=*/false, /*isInitializer=*/false, /*curryLevels=*/0);
+    return mappedType->getCanonicalType();
   }
 
   // Note: If you add more cases to this function, you should update the
