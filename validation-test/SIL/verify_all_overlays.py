@@ -5,8 +5,11 @@
 # REQUIRES: long_test
 # REQUIRES: nonexecutable_test
 
-# XFAIL: OS=macosx || OS=ios || OS=tvos || OS=watchos
+# XFAIL: OS=macosx || OS=ios || OS=tvos
 # https://bugs.swift.org/browse/SR-9847
+
+# UNSUPPORTED: OS=watchos
+# watchOS behaves differently when building against the Apple-internal SDK.
 
 from __future__ import print_function
 
