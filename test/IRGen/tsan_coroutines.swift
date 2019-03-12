@@ -1,6 +1,10 @@
 // This test case used to crash when tsan ran before co-routine lowering.
 // RUN: %target-swift-frontend -emit-ir -sanitize=thread %s | %FileCheck %s
 
+// TSan is currently only supported on 64 bit mac and simulators.
+// (We do not test the simulators here.)
+// REQUIRES: CPU=x86_64, OS=macosx
+
 public class C { }
 
 public struct Foobar {
