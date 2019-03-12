@@ -122,3 +122,16 @@ struct X<T> {
 
 let testXa: X<Int> = .foo(i: 0)
 let testXb: X<Int> = .bar
+
+// SR-10062
+
+var aLiteral = 1
+let bLiteral = 2
+
+func inoutFuncWithDefaultArg1(x: inout Int = 1) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
+func inoutFuncWithDefaultArg2(x: inout Int = bLiteral) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
+func inoutFuncWithDefaultArg3(x: inout Int = aLiteral) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
+func inoutFuncWithDefaultArg4(x: inout Int = &aLiteral) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
+func inoutFuncWithDefaultArg5(x: inout Int = &bLiteral) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
+func inoutFuncWithDefaultArg6(x: inout Int = #file) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
+func inoutFuncWithDefaultArg7(_: inout Int = 1) {} // expected-error {{cannot provide default value to inout parameter '_'}}
