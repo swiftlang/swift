@@ -2195,10 +2195,12 @@ bool ASTScope::isCloseToTopLevelCode() const {
       case ASTScopeKind::TypeOrExtensionBody:
       case ASTScopeKind::AbstractFunctionBody:
       case ASTScopeKind::Closure:
+      // Need to get generic parameters
+      // for ClangImporter/MixedSource/can_import_objc_idempotent.swift
+      case ASTScopeKind::NominalOrExtensionWhereClause:
         return false;
       case ASTScopeKind::Preexpanded:
       case ASTScopeKind::ExtensionGenericParams:
-      case ASTScopeKind::NominalOrExtensionWhereClause:
       case ASTScopeKind::GenericParams:
       case ASTScopeKind::TypeDecl:
       case ASTScopeKind::AbstractFunctionDecl:
