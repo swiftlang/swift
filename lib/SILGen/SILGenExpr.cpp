@@ -2061,6 +2061,9 @@ public:
 
   /// Emit the RValue.
   Optional<RValue> emit(SILGenFunction &SGF) {
+#if 1
+    return None;
+#else
     // If we don't have a class or a struct, bail.
     if (!isa<ClassDecl>(Base) && !isa<StructDecl>(Base))
       return None;
@@ -2078,6 +2081,7 @@ public:
       return emitStructDecl(SGF);
     assert(isa<ClassDecl>(Base) && "Expected class");
     return emitClassDecl(SGF);
+#endif
   }
 
   NominalTypeMemberRefRValueEmitter(const SelfTy &) = delete;
