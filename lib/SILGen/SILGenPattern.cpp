@@ -1868,37 +1868,44 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
     // instruction to receive the enum case data if it has any.
 
     SILType eltTy;
-    bool hasElt = false;
-    if (elt->hasAssociatedValues()) {
+    bool hasNonVoidAssocValue = false;
+    bool hasAssocValue = elt->hasAssociatedValues();
+    if (hasAssocValue) {
       eltTy = src.getType().getEnumElementType(elt, SGF.SGM.M);
-      hasElt = !eltTy.getASTType()->isVoid();
+      hasNonVoidAssocValue = !eltTy.getASTType()->isVoid();
     }
 
     ConsumableManagedValue eltCMV, origCMV;
 
-    // Empty cases.  Try to avoid making an empty tuple value if it's
-    // obviously going to be ignored.  This assumes that we won't even
-    // try to touch the value in such cases, although we may touch the
-    // cleanup (enough to see that it's not present).
-    if (!hasElt) {
-      bool hasNonAny = false;
-      for (auto &specRow : specializedRows) {
-        auto pattern = specRow.Patterns[0];
-        if (pattern &&
-            !isa<AnyPattern>(pattern->getSemanticsProvidingPattern())) {
-          hasNonAny = true;
-          break;
+    // Void (i.e. empty) cases.
+    //
+    if (!hasNonVoidAssocValue) {
+      // Inline constructor.
+      eltCMV = [&]() -> ConsumableManagedValue {
+        // If we have an associated value, rather than no payload at all, we
+        // still need to create the argument. So do that instead of creating the
+        // empty-tuple. Otherwise, we need to create undef or the empty-tuple.
+        if (hasAssocValue) {
+          return {SGF.B.createOwnedPhiArgument(eltTy),
+                  CastConsumptionKind::TakeAlways};
         }
-      }
 
-      SILValue result;
-      if (hasNonAny) {
-        result = SGF.emitEmptyTuple(loc);
-      } else {
-        result = SILUndef::get(SGF.SGM.Types.getEmptyTupleType(), SGF.F);
-      }
-      origCMV = ConsumableManagedValue::forUnmanaged(result);
-      eltCMV = origCMV;
+        // Otherwise, try to avoid making an empty tuple value if it's obviously
+        // going to be ignored. This assumes that we won't even try to touch the
+        // value in such cases, although we may touch the cleanup (enough to see
+        // that it's not present).
+        bool hasNonAny =
+            llvm::any_of(specializedRows, [&](const SpecializedRow &row) {
+              auto *p = row.Patterns[0];
+              return p && !isa<AnyPattern>(p->getSemanticsProvidingPattern());
+            });
+        if (hasNonAny) {
+          return ConsumableManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
+        }
+
+        return ConsumableManagedValue::forUnmanaged(
+            SILUndef::get(SGF.SGM.Types.getEmptyTupleType(), SGF.F));
+      }();
 
       // Okay, specialize on the argument.
     } else {
