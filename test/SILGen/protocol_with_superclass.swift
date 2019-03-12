@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-ir -enable-sil-ownership %s
+// RUN: %target-swift-emit-silgen -verify-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -verify-sil-ownership %s
 
 // Protocols with superclass-constrained Self.
 

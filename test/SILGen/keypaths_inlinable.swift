@@ -1,8 +1,8 @@
 // RUN: %target-swift-emit-silgen %s | %FileCheck %s --check-prefix=CHECK --check-prefix=FRAGILE
 // RUN: %target-swift-emit-silgen -enable-resilience %s | %FileCheck %s --check-prefix=CHECK --check-prefix=RESILIENT
 
-// RUN: %target-swift-frontend -emit-ir -enable-sil-ownership %s
-// RUN: %target-swift-frontend -emit-ir -enable-sil-ownership -enable-resilience %s
+// RUN: %target-swift-frontend -emit-ir -verify-sil-ownership %s
+// RUN: %target-swift-frontend -emit-ir -verify-sil-ownership -enable-resilience %s
 
 public struct KeypathStruct {
   public var stored: Int = 0

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -enable-sil-ownership -module-name outcopyaddr -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -verify-sil-ownership -module-name outcopyaddr -primary-file %s | %FileCheck %s
 
 public protocol BaseProt {
 }

@@ -111,8 +111,8 @@ public:
   /// The name of the SIL outputfile if compiled with SIL debugging (-gsil).
   std::string SILOutputFileNameForDebugging;
 
-  /// If set to true, compile with the SIL Ownership Model enabled.
-  bool EnableSILOwnership = false;
+  /// If set to true, verify ownership semantics when verifying function bodies.
+  bool VerifySILOwnership = false;
 
   /// Assume that code will be executed in a single-threaded environment.
   bool AssumeSingleThreaded = false;

@@ -1,7 +1,7 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -enable-resilience -enable-testing -emit-module-path=%t/resilient_struct.swiftmodule -enable-sil-ownership %S/../Inputs/resilient_struct.swift
-// RUN: %target-swift-emit-silgen -I %t -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-module -enable-resilience -enable-testing -emit-module-path=%t/resilient_struct.swiftmodule -verify-sil-ownership %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-emit-silgen -I %t -verify-sil-ownership %s | %FileCheck %s
 
 @testable import resilient_struct
 

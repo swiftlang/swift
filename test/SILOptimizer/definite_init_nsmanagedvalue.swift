@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/../ClangImporter/Inputs/custom-modules %s -emit-sil -enable-sil-ownership
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/../ClangImporter/Inputs/custom-modules %s -emit-sil -verify-sil-ownership
 
 // REQUIRES: objc_interop
 

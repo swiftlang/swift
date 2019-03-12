@@ -305,8 +305,8 @@ def emit_pch : Flag<["-"], "emit-pch">,
 def pch_disable_validation : Flag<["-"], "pch-disable-validation">,
   HelpText<"Disable validating the persistent PCH">;
 
-def enable_sil_ownership : Flag<["-"], "enable-sil-ownership">,
-  HelpText<"Enable the SIL Ownership Model">;
+def verify_sil_ownership : Flag<["-"], "verify-sil-ownership">,
+  HelpText<"Enable SIL ownership verification">;
 
 def enable_mandatory_semantic_arc_opts : Flag<["-"], "enable-mandatory-semantic-arc-opts">,
   HelpText<"Enable the mandatory semantic arc optimizer">;

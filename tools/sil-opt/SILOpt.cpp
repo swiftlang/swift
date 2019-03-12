@@ -77,8 +77,8 @@ EnableResilience("enable-resilience",
                                 "default"));
 
 static llvm::cl::opt<bool>
-EnableSILOwnershipOpt("enable-sil-ownership",
-                 llvm::cl::desc("Compile the module with sil-ownership initially enabled for all functions"));
+VerifySILOwnershipOpt("verify-sil-ownership",
+                 llvm::cl::desc("Verify ownership during SIL verification of ossa functions"));
 
 static llvm::cl::opt<bool>
 EnableSILOpaqueValues("enable-sil-opaque-values",
@@ -336,7 +336,7 @@ int main(int argc, char **argv) {
   SILOpts.AssertConfig = AssertConfId;
   if (OptimizationGroup != OptGroup::Diagnostics)
     SILOpts.OptMode = OptimizationMode::ForSpeed;
-  SILOpts.EnableSILOwnership = EnableSILOwnershipOpt;
+  SILOpts.VerifySILOwnership = VerifySILOwnershipOpt;
 
   SILOpts.VerifyExclusivity = VerifyExclusivity;
   if (EnforceExclusivity.getNumOccurrences() != 0) {

@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -verify-sil-ownership -emit-silgen %s | %FileCheck %s
 
 infix operator ~>
 
