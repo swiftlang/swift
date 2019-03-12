@@ -538,7 +538,7 @@ lookupVarDeclForCodingKeysCase(DeclContext *conformanceDC,
         }
 
         bool useIfPresentVariant =
-          varType->getAnyNominal() == C.getOptionalDecl();
+            varType->getAnyNominal() == C.getOptionalDecl();
 
         if (useIfPresentVariant) {
           // The type we request out of decodeIfPresent needs to be unwrapped
@@ -546,7 +546,7 @@ lookupVarDeclForCodingKeysCase(DeclContext *conformanceDC,
           // e.g. String? => decodeIfPresent(String.self, forKey: ...), not
           //                 decodeIfPresent(String?.self, forKey: ...)
           auto boundOptionalType =
-            dyn_cast<BoundGenericType>(varType->getCanonicalType());
+              dyn_cast<BoundGenericType>(varType->getCanonicalType());
           varType = boundOptionalType->getGenericArgs()[0];
         }
 
