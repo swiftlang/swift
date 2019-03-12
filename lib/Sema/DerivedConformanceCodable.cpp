@@ -529,13 +529,8 @@ lookupVarDeclForCodingKeysCase(DeclContext *conformanceDC,
       if (!vd->isStatic()) {
         // This is the VarDecl we're looking for.
 
-        auto varType = conformanceDC->mapTypeIntoContext(vd->getInterfaceType());
-
-        if (auto referenceType = varType->getAs<ReferenceStorageType>()) {
-          // This is a weak/unowned/unmanaged var. Get the inner type before
-          // checking optionality.
-          varType = referenceType->getReferentType();
-        }
+        auto varType =
+            conformanceDC->mapTypeIntoContext(vd->getValueInterfaceType());
 
         bool useIfPresentVariant =
             varType->getAnyNominal() == C.getOptionalDecl();
