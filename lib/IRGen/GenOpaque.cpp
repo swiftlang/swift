@@ -26,6 +26,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/IRGen/ValueWitness.h"
+#include "swift/SIL/TypeLowering.h"
 
 #include "Callee.h"
 #include "Explosion.h"
@@ -719,7 +720,7 @@ void irgen::emitDestroyArrayCall(IRGenFunction &IGF,
                                  Address object,
                                  llvm::Value *count) {
   // If T is a trivial/POD type, nothing needs to be done.
-  if (T.getObjectType().isTrivial(IGF.getSILModule()))
+  if (IGF.IGM.getTypeLowering(T).isTrivial())
     return;
 
   auto metadata = IGF.emitTypeMetadataRefForLayout(T);
@@ -994,7 +995,7 @@ void irgen::emitDestroyCall(IRGenFunction &IGF,
                             SILType T,
                             Address object) {
   // If T is a trivial/POD type, nothing needs to be done.
-  if (T.getObjectType().isTrivial(IGF.getSILModule()))
+  if (IGF.IGM.getTypeLowering(T).isTrivial())
     return;
   llvm::Value *metadata;
   auto fn = IGF.emitValueWitnessFunctionRef(T, metadata,
