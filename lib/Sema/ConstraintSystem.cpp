@@ -1519,8 +1519,15 @@ void ConstraintSystem::addOverloadSet(Type boundType,
     recordChoice(overloads, choice);
   }
 
-  for (auto &choice : outerAlternatives)
-    recordChoice(overloads, choice);
+  if (!outerAlternatives.empty()) {
+    // If local scope has a single choice,
+    // it should always be preferred.
+    if (overloads.size() == 1)
+      overloads.front()->setFavored();
+
+    for (auto &choice : outerAlternatives)
+      recordChoice(overloads, choice);
+  }
 
   addDisjunctionConstraint(overloads, locator, ForgetChoice);
 }
