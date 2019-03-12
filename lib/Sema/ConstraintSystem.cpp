@@ -1480,56 +1480,31 @@ void ConstraintSystem::addOverloadSet(Type boundType,
                                       ArrayRef<OverloadChoice> choices,
                                       DeclContext *useDC,
                                       ConstraintLocator *locator,
-                                      OverloadChoice *favoredChoice,
-                                      ArrayRef<OverloadChoice> outerAlternatives) {
-  assert(!choices.empty() && "Empty overload set");
-
+                                      OverloadChoice *favoredChoice) {
   // If there is a single choice, add the bind overload directly.
-  if (choices.size() == 1 && outerAlternatives.empty()) {
+  if (choices.size() == 1) {
     addBindOverloadConstraint(boundType, choices.front(), locator, useDC);
     return;
   }
 
-  auto recordChoice = [&](SmallVectorImpl<Constraint *> &choices,
-                          const OverloadChoice &choice,
-                          bool isFavored = false) {
-    auto *constraint = Constraint::createBindOverload(*this, boundType, choice,
-                                                      useDC, locator);
-    if (isFavored)
-      constraint->setFavored();
+  SmallVector<Constraint *, 4> candidates;
+  generateConstraints(candidates, boundType, choices, useDC, locator,
+                      favoredChoice);
+  // For an overload set (disjunction) from newly generated candidates.
+  addOverloadSet(candidates, locator);
+}
 
-    choices.push_back(constraint);
-  };
+void ConstraintSystem::addOverloadSet(ArrayRef<Constraint *> choices,
+                                      ConstraintLocator *locator) {
+  assert(!choices.empty() && "Empty overload set");
 
-  SmallVector<Constraint *, 4> overloads;
-  // As we do for other favored constraints, if a favored overload has been
-  // specified, let it be the first term in the disjunction.
-  if (favoredChoice) {
-    assert((!favoredChoice->isDecl() ||
-            !favoredChoice->getDecl()->getAttrs().isUnavailable(
-                getASTContext())) &&
-           "Cannot make unavailable decl favored!");
-    recordChoice(overloads, *favoredChoice, /*isFavored=*/true);
+  // If there is a single choice, attempt it right away.
+  if (choices.size() == 1) {
+    simplifyConstraint(*choices.front());
+    return;
   }
 
-  for (auto &choice : choices) {
-    if (favoredChoice && (favoredChoice == &choice))
-      continue;
-
-    recordChoice(overloads, choice);
-  }
-
-  if (!outerAlternatives.empty()) {
-    // If local scope has a single choice,
-    // it should always be preferred.
-    if (overloads.size() == 1)
-      overloads.front()->setFavored();
-
-    for (auto &choice : outerAlternatives)
-      recordChoice(overloads, choice);
-  }
-
-  addDisjunctionConstraint(overloads, locator, ForgetChoice);
+  addDisjunctionConstraint(choices, locator, ForgetChoice);
 }
 
 /// If we're resolving an overload set with a decl that has special type
@@ -2676,4 +2651,35 @@ Expr *constraints::getArgumentExpr(Expr *expr, unsigned index) {
 
   assert(isa<TupleExpr>(argExpr));
   return cast<TupleExpr>(argExpr)->getElement(index);
+}
+
+void ConstraintSystem::generateConstraints(
+    SmallVectorImpl<Constraint *> &constraints, Type type,
+    ArrayRef<OverloadChoice> choices, DeclContext *useDC,
+    ConstraintLocator *locator, OverloadChoice *favoredChoice) {
+  auto recordChoice = [&](SmallVectorImpl<Constraint *> &choices,
+                          const OverloadChoice &choice,
+                          bool isFavored = false) {
+    auto *constraint =
+        Constraint::createBindOverload(*this, type, choice, useDC, locator);
+    if (isFavored)
+      constraint->setFavored();
+
+    choices.push_back(constraint);
+  };
+
+  if (favoredChoice) {
+    assert((!favoredChoice->isDecl() ||
+            !favoredChoice->getDecl()->getAttrs().isUnavailable(
+                getASTContext())) &&
+           "Cannot make unavailable decl favored!");
+    recordChoice(constraints, *favoredChoice, /*isFavored=*/true);
+  }
+
+  for (const auto &choice : choices) {
+    if (favoredChoice && (favoredChoice == &choice))
+      continue;
+
+    recordChoice(constraints, choice);
+  }
 }

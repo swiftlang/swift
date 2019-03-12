@@ -2417,8 +2417,10 @@ public:
   /// sets.
   void addOverloadSet(Type boundType, ArrayRef<OverloadChoice> choices,
                       DeclContext *useDC, ConstraintLocator *locator,
-                      OverloadChoice *favored = nullptr,
-                      ArrayRef<OverloadChoice> outerAlternatives = {});
+                      OverloadChoice *favored = nullptr);
+
+  void addOverloadSet(ArrayRef<Constraint *> choices,
+                      ConstraintLocator *locator);
 
   /// Retrieve the allocator used by this constraint system.
   llvm::BumpPtrAllocator &getAllocator() { return Allocator; }
@@ -2454,6 +2456,12 @@ public:
   ///
   /// \returns a possibly-sanitized initializer, or null if an error occurred.
   Type generateConstraints(Pattern *P, ConstraintLocatorBuilder locator);
+
+  /// Generate constraints for a given set of overload choices.
+  void generateConstraints(SmallVectorImpl<Constraint *> &constraints,
+                           Type type, ArrayRef<OverloadChoice> choices,
+                           DeclContext *useDC, ConstraintLocator *locator,
+                           OverloadChoice *favoredChoice = nullptr);
 
   /// Propagate constraints in an effort to enforce local
   /// consistency to reduce the time to solve the system.
