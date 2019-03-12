@@ -96,7 +96,9 @@ public:
   }
 
   ManagedValue visitType(CanType t, bool isInOut) {
-    auto argType = SGF.getLoweredType(t);
+    // The calling convention always uses minimal resilience expansion.
+    auto argType =
+        SGF.SGM.Types.getLoweredType(t, ResilienceExpansion::Minimal);
     if (isInOut)
       argType = SILType::getPrimitiveAddressType(argType.getASTType());
 
@@ -123,6 +125,15 @@ public:
     if (isInOut)
       return mv;
 
+    // This can happen if the value is resilient in the calling convention
+    // but not resilient locally.
+    if (argType.isLoadable(SGF.SGM.M) && argType.isAddress()) {
+      if (mv.isPlusOne(SGF))
+        mv = SGF.B.createLoadTake(loc, mv);
+      else
+        mv = SGF.B.createLoadBorrow(loc, mv);
+    }
+
     // If the value is a (possibly optional) ObjC block passed into the entry
     // point of the function, then copy it so we can treat the value reliably
     // as a heap object. Escape analysis can eliminate this copy if it's
@@ -142,7 +153,7 @@ public:
   ManagedValue visitTupleType(CanTupleType t) {
     SmallVector<ManagedValue, 4> elements;
 
-    auto &tl = SGF.getTypeLowering(t);
+    auto &tl = SGF.SGM.Types.getTypeLowering(t, ResilienceExpansion::Minimal);
     bool canBeGuaranteed = tl.isLoadable();
 
     // Collect the exploded elements.
@@ -305,7 +316,8 @@ static void makeArgument(Type ty, ParamDecl *decl,
     for (auto fieldType : tupleTy->getElementTypes())
       makeArgument(fieldType, decl, args, SGF);
   } else {
-    auto loweredTy = SGF.getLoweredType(ty);
+    auto loweredTy = SGF.SGM.Types.getLoweredType(ty,
+                                                  ResilienceExpansion::Minimal);
     if (decl->isInOut())
       loweredTy = SILType::getPrimitiveAddressType(loweredTy.getASTType());
     auto arg = SGF.F.begin()->createFunctionArgument(loweredTy, decl);
@@ -348,7 +360,8 @@ static void emitCaptureArguments(SILGenFunction &SGF,
 
   case CaptureKind::Constant: {
     auto type = getVarTypeInCaptureContext();
-    auto &lowering = SGF.getTypeLowering(type);
+    auto &lowering = SGF.SGM.Types.getTypeLowering(type,
+                                                   ResilienceExpansion::Minimal);
     // Constant decls are captured by value.
     SILType ty = lowering.getLoweredType();
     SILValue val = SGF.F.begin()->createFunctionArgument(ty, VD);
@@ -387,7 +400,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     // the captured value.
     auto type = getVarTypeInCaptureContext();
     auto boxTy = SGF.SGM.Types.getContextBoxTypeForCapture(VD,
-                               SGF.getLoweredType(type).getASTType(),
+                               SGF.SGM.Types.getLoweredRValueType(type),
                                SGF.F.getGenericEnvironment(), /*mutable*/ true);
     SILValue box = SGF.F.begin()->createFunctionArgument(
         SILType::getPrimitiveObjectType(boxTy), VD);
@@ -460,8 +473,10 @@ static void emitIndirectResultParameters(SILGenFunction &SGF, Type resultType,
 
   // If the return type is address-only, emit the indirect return argument.
 
-  const TypeLowering &resultTI =
-      SGF.getTypeLowering(DC->mapTypeIntoContext(resultType));
+  // The calling convention always uses minimal resilience expansion.
+  auto &resultTI =
+    SGF.SGM.Types.getTypeLowering(DC->mapTypeIntoContext(resultType),
+                                  ResilienceExpansion::Minimal);
   if (!SILModuleConventions::isReturnedIndirectlyInSIL(
           resultTI.getLoweredType(), SGF.SGM.M)) {
     return;
@@ -510,7 +525,7 @@ uint16_t SILGenFunction::emitProlog(ParameterList *paramList,
     else if (auto *ACE = dyn_cast<AbstractClosureExpr>(DC))
       Loc = ACE->getLoc();
     auto NativeErrorTy = SILType::getExceptionType(getASTContext());
-    ManagedValue Undef = emitUndef(Loc, NativeErrorTy);
+    ManagedValue Undef = emitUndef(NativeErrorTy);
     SILDebugVariable DbgVar("$error", /*Constant*/ false, ++ArgNo);
     B.createDebugValue(Loc, Undef.getValue(), DbgVar);
   }

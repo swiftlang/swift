@@ -1223,7 +1223,7 @@ mapMarkDependenceArguments(SingleValueInstruction *root,
         MD->setBase(iter->second);
       }
       // Remove mark_dependence on trivial values.
-      if (MD->getBase()->getType().isTrivial(MD->getModule())) {
+      if (MD->getBase()->getType().isTrivial(*MD->getFunction())) {
         MD->replaceAllUsesWith(MD->getValue());
         Delete.push_back(MD);
       }

@@ -1701,7 +1701,7 @@ makeBaseConsumableMaterializedRValue(SILGenFunction &SGF,
   }
 
   bool isBorrowed = base.isPlusZeroRValueOrTrivial()
-    && !base.getType().isTrivial(SGF.SGM.M);
+    && !base.getType().isTrivial(SGF.F);
   if (!base.getType().isAddress() || isBorrowed) {
     auto tmp = SGF.emitTemporaryAllocation(loc, base.getType());
     if (isBorrowed)

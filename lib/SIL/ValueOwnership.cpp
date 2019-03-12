@@ -149,7 +149,7 @@ CONSTANT_OWNERSHIP_INST(Unowned, ValueToBridgeObject)
 #define CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(OWNERSHIP, INST)                    \
   ValueOwnershipKind ValueOwnershipKindClassifier::visit##INST##Inst(          \
       INST##Inst *I) {                                                         \
-    if (I->getType().isTrivial(I->getModule())) {                              \
+    if (I->getType().isTrivial(*I->getFunction())) {                           \
       return ValueOwnershipKind::Any;                                          \
     }                                                                          \
     return ValueOwnershipKind::OWNERSHIP;                                      \
@@ -290,23 +290,22 @@ ValueOwnershipKindClassifier::visitMarkDependenceInst(MarkDependenceInst *MDI) {
 }
 
 ValueOwnershipKind ValueOwnershipKindClassifier::visitApplyInst(ApplyInst *ai) {
-  SILModule &m = ai->getModule();
-  bool isTrivial = ai->getType().isTrivial(m);
+  auto *f = ai->getFunction();
+  bool isTrivial = ai->getType().isTrivial(*f);
   // Quick is trivial check.
   if (isTrivial)
     return ValueOwnershipKind::Any;
 
-  SILFunctionConventions fnConv(ai->getSubstCalleeType(), m);
+  SILFunctionConventions fnConv(ai->getSubstCalleeType(), f->getModule());
   auto results = fnConv.getDirectSILResults();
   // No results => Any.
   if (results.empty())
     return ValueOwnershipKind::Any;
 
   // Otherwise, map our results to their ownership kinds and then merge them!
-  CanGenericSignature sig = ai->getSubstCalleeType()->getGenericSignature();
   auto resultOwnershipKinds =
       makeTransformRange(results, [&](const SILResultInfo &info) {
-        return info.getOwnershipKind(m, sig);
+        return info.getOwnershipKind(*f);
       });
   auto mergedOwnershipKind = ValueOwnershipKind::merge(resultOwnershipKinds);
   if (!mergedOwnershipKind) {
@@ -493,7 +492,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Any, PoundAssert)
 #define UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(ID)                             \
   ValueOwnershipKind ValueOwnershipKindBuiltinVisitor::visit##ID(              \
       BuiltinInst *BI, StringRef Attr) {                                       \
-    if (BI->getType().isTrivial(BI->getModule())) {                            \
+    if (BI->getType().isTrivial(*BI->getFunction())) {                         \
       return ValueOwnershipKind::Any;                                          \
     }                                                                          \
     return ValueOwnershipKind::Unowned;                                        \

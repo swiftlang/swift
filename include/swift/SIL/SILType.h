@@ -284,11 +284,8 @@ public:
   /// \p F into account (see isLoadable(SILFunction)).
   bool isAddressOnly(const SILFunction &F) const;
 
-  /// True if the type, or the referenced type of an address type, is trivial.
-  bool isTrivial(SILModule &M) const;
-
-  /// Like isTrivial(SILModule), but takes the resilience expansion of
-  /// \p F into account (see isLoadable(SILFunction)).
+  /// True if the type, or the referenced type of an address type, is trivial,
+  /// meaning it is loadable and can be trivially copied, moved or detroyed.
   bool isTrivial(const SILFunction &F) const;
 
   /// True if the type, or the referenced type of an address type, is known to
