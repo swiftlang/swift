@@ -7189,6 +7189,15 @@ public:
     assert(hasDefault() && "doesn't have a default");
     return getSuccessorBuf()[getNumCases()];
   }
+
+  Optional<unsigned> getUniqueCaseForDestination(SILBasicBlock *bb) const {
+    for (unsigned i = 0; i < getNumCases(); ++i) {
+      if (getCase(i).second == bb) {
+        return i + 1;
+      }
+    }
+    return None;
+  }
 };
 
 /// Common implementation for the switch_enum and
