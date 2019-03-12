@@ -369,7 +369,20 @@ NOTE(previous_yield, none, "previous yield was here", ())
 ERROR(possible_return_before_yield, none,
       "accessor must yield on all paths before returning", ())
 
-NOTE(one_yield, none, "yield along one path is here", ())
+NOTE(branch_doesnt_yield, none,
+     "missing yield when the condition is %select{false|true}0", (bool))
+
+NOTE(named_case_doesnt_yield, none, "missing yield in the %0 case",
+    (Identifier))
+
+NOTE(case_doesnt_yield, none, "missing yield in "
+     "%select{this|the nil|the non-nil}0 case", (unsigned))
+
+NOTE(switch_value_case_doesnt_yield, none, "missing yield in the %0 case",
+    (StringRef))
+
+NOTE(try_branch_doesnt_yield, none, "missing yield when error is "
+     "%select{not |}0thrown", (bool))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
