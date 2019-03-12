@@ -642,6 +642,11 @@ HeaderToPrint("header-to-print",
               llvm::cl::cat(Category));
 
 static llvm::cl::list<std::string>
+UsrFilter("usr-filter",
+          llvm::cl::desc("Filter results by the given usrs"),
+          llvm::cl::cat(Category));
+
+static llvm::cl::list<std::string>
 DeclToPrint("decl-to-print",
             llvm::cl::desc("Decl name to print swift interface for"),
             llvm::cl::cat(Category));
@@ -1734,8 +1739,11 @@ static int doPrintExpressionTypes(const CompilerInvocation &InitInvok,
   auto Source = SF.getASTContext().SourceMgr.getRangeForBuffer(*SF.getBufferID()).str();
   std::vector<std::pair<unsigned, std::string>> SortedTags;
 
+  std::vector<const char*> Usrs;
+  for (auto &u: options::UsrFilter)
+    Usrs.push_back(u.c_str());
   // Collect all tags of expressions.
-  for (auto R: collectExpressionType(*CI.getPrimarySourceFile(), Scratch, OS)) {
+  for (auto R: collectExpressionType(*CI.getPrimarySourceFile(), Usrs, Scratch, OS)) {
     SortedTags.push_back({R.offset,
       (llvm::Twine("<expr type:\"") + TypeBuffer.str().substr(R.typeOffset,
                                                   R.typeLength) + "\">").str()});
