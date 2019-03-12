@@ -137,8 +137,10 @@ namespace swift {
     bool EnableObjCInterop = true;
 
     /// On Darwin platforms, use the pre-stable ABI's mark bit for Swift
-    /// classes instead of the stable ABI's bit.
-    bool UseDarwinPreStableABIBit = !bool(SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT);
+    /// classes instead of the stable ABI's bit. This is needed when
+    /// targeting OSes prior to macOS 10.14.4 and iOS 12.2, where
+    /// libobjc does not support the stable ABI's marker bit.
+    bool UseDarwinPreStableABIBit = false;
 
     /// Enables checking that uses of @objc require importing
     /// the Foundation module.
