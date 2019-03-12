@@ -69,7 +69,7 @@ static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
 
   // If our payload is trivial, we do not need to insert any retain or release
   // operations.
-  if (UEDITy.isTrivial(Mod))
+  if (UEDITy.isTrivial(*I->getFunction()))
     return;
 
   ++NumRefCountOpsSimplified;

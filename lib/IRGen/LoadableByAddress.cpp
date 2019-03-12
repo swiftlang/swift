@@ -1039,7 +1039,7 @@ static StoreOwnershipQualifier
 getStoreInitOwnership(StructLoweringState &pass, SILType type) {
   if (!pass.F->hasOwnership()) {
     return StoreOwnershipQualifier::Unqualified;
-  } else if (type.isTrivial(pass.F->getModule())) {
+  } else if (type.isTrivial(*pass.F)) {
     return StoreOwnershipQualifier::Trivial;
   } else {
     return StoreOwnershipQualifier::Init;
@@ -2475,7 +2475,7 @@ void LoadableByAddress::recreateSingleApply(
         LoadOwnershipQualifier ownership;
         if (!F->hasOwnership()) {
           ownership = LoadOwnershipQualifier::Unqualified;
-        } else if (newValue->getType().isTrivial(*getModule())) {
+        } else if (newValue->getType().isTrivial(*F)) {
           ownership = LoadOwnershipQualifier::Trivial;
         } else {
           assert(oldYields[i].isConsumed() &&

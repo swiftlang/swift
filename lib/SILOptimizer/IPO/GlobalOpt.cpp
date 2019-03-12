@@ -816,13 +816,14 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
   if (GlobalVarSkipProcessing.count(SILG))
     return;
 
-  if (!SILG->getLoweredType().isTrivial(*Module)) {
+  auto *F = GAI->getFunction();
+
+  if (!SILG->getLoweredType().isTrivial(*F)) {
     GlobalVarSkipProcessing.insert(SILG);
     return;
   }
 
   // Ignore any accesses inside addressors for SILG
-  auto *F = GAI->getFunction();
   auto GlobalVar = getVariableOfGlobalInit(F);
   if (GlobalVar == SILG)
     return;

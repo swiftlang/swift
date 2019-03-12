@@ -273,7 +273,7 @@ SILGenFunction::emitFormalEvaluationManagedBorrowedRValueWithCleanup(
 ManagedValue
 SILGenFunction::emitManagedBorrowedArgumentWithCleanup(SILPhiArgument *arg) {
   if (arg->getOwnershipKind() == ValueOwnershipKind::Any ||
-      arg->getType().isTrivial(arg->getModule())) {
+      arg->getType().isTrivial(F)) {
     return ManagedValue::forUnmanaged(arg);
   }
 
@@ -1989,7 +1989,7 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
 
     if (I->canPerformInPlaceInitialization() &&
         I->isInPlaceInitializationOfGlobal() &&
-        SGF.getTypeLowering(type).getLoweredType().isTrivial(SGF.SGM.M)) {
+        SGF.getLoweredType(type).isTrivial(SGF.F)) {
       // Implode tuples in initialization of globals if they are
       // of trivial types.
       implodeTuple = true;

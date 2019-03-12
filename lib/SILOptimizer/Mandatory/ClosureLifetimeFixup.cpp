@@ -257,7 +257,7 @@ static SILValue insertMarkDependenceForCapturedArguments(PartialApplyInst *PAI,
   SILValue curr(PAI);
   // Mark dependence on all non-trivial arguments.
   for (auto &arg : PAI->getArgumentOperands()) {
-    if (arg.get()->getType().isTrivial(PAI->getModule()))
+    if (arg.get()->getType().isTrivial(*PAI->getFunction()))
       continue;
     curr = B.createMarkDependence(PAI->getLoc(), curr, arg.get());
   }

@@ -1441,7 +1441,7 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
   if (src.getType().isObject()) {
     // Make sure that if we have a copy_on_success, non-trivial value that we do
     // not have a value with @owned ownership.
-    assert((!src.getType().isTrivial(SGF.getModule()) ||
+    assert((!src.getType().isTrivial(SGF.F) ||
             src.getFinalConsumption() != CastConsumptionKind::CopyOnSuccess ||
             src.getOwnershipKind() != ValueOwnershipKind::Owned) &&
            "@owned value without cleanup + copy_on_success");
@@ -2574,7 +2574,7 @@ static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
 
   assert(enumDecl->isObjC());
   assert(enumDecl->hasRawType());
-  assert(value.getType().isTrivial(SGF.getModule()));
+  assert(value.getType().isTrivial(SGF.F));
 
   // Get the enum type as an Any.Type value.
   SILType metatypeType = SGF.getLoweredType(
@@ -2585,7 +2585,7 @@ static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
   // Bitcast the enum value to its raw type. (This is only safe for @objc
   // enums.)
   SILType loweredRawType = SGF.getLoweredType(enumDecl->getRawType());
-  assert(loweredRawType.isTrivial(SGF.getModule()));
+  assert(loweredRawType.isTrivial(SGF.F));
   assert(loweredRawType.isObject());
   auto rawValue = SGF.B.createUncheckedTrivialBitCast(loc, value,
                                                       loweredRawType);

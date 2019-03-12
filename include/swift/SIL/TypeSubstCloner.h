@@ -267,7 +267,7 @@ protected:
   void visitCopyValueInst(CopyValueInst *Copy) {
     // If the substituted type is trivial, ignore the copy.
     SILType copyTy = getOpType(Copy->getType());
-    if (copyTy.isTrivial(Copy->getModule())) {
+    if (copyTy.isTrivial(*Copy->getFunction())) {
       recordFoldedValue(SILValue(Copy), getOpValue(Copy->getOperand()));
       return;
     }
@@ -277,7 +277,7 @@ protected:
   void visitDestroyValueInst(DestroyValueInst *Destroy) {
     // If the substituted type is trivial, ignore the destroy.
     SILType destroyTy = getOpType(Destroy->getOperand()->getType());
-    if (destroyTy.isTrivial(Destroy->getModule())) {
+    if (destroyTy.isTrivial(*Destroy->getFunction())) {
       return;
     }
     super::visitDestroyValueInst(Destroy);

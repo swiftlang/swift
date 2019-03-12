@@ -755,7 +755,7 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &SGF,
   // Create the appropriate bitcast based on the source and dest types.
   ManagedValue in = args[0];
   SILType resultTy = toTL.getLoweredType();
-  if (resultTy.isTrivial(SGF.getModule()))
+  if (resultTy.isTrivial(SGF.F))
     return SGF.B.createUncheckedTrivialBitCast(loc, in, resultTy);
 
   // If we can perform a ref cast, just return.

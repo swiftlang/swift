@@ -2866,7 +2866,8 @@ void ArgumentSplitter::replaceIncomingArgs(
 }
 
 bool ArgumentSplitter::createNewArguments() {
-  SILModule &Mod = Arg->getModule();
+  auto *F = Arg->getFunction();
+  SILModule &Mod = F->getModule();
   SILBasicBlock *ParentBB = Arg->getParent();
 
   // Grab the incoming values. Return false if we can't find them.
@@ -2888,7 +2889,7 @@ bool ArgumentSplitter::createNewArguments() {
   // We do not want to split arguments that have less than 2 non-trivial
   // projections.
   if (count_if(Projections, [&](const Projection &P) {
-        return !P.getType(Ty, Mod).isTrivial(Mod);
+        return !P.getType(Ty, Mod).isTrivial(*F);
       }) < 2)
     return false;
 

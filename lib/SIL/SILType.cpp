@@ -80,12 +80,6 @@ SILType SILType::getSILTokenType(const ASTContext &C) {
   return getPrimitiveObjectType(C.TheSILTokenType);
 }
 
-bool SILType::isTrivial(SILModule &M) const {
-  return M.Types.getTypeLowering(*this,
-                                 ResilienceExpansion::Minimal)
-    .isTrivial();
-}
-
 bool SILType::isTrivial(const SILFunction &F) const {
   // FIXME: Should just call F.getTypeLowering()
   return F.getModule().Types.getTypeLowering(*this,
@@ -421,12 +415,13 @@ SILBoxType::getFieldLoweredType(SILModule &M, unsigned index) const {
   return fieldTy;
 }
 
-// FIXME: This should take a SILFunction, or a SILModule + ResilienceExpansion
 ValueOwnershipKind
-SILResultInfo::getOwnershipKind(SILModule &M,
-                                CanGenericSignature signature) const {
-  GenericContextScope GCS(M.Types, signature);
-  bool IsTrivial = getSILStorageType().isTrivial(M);
+SILResultInfo::getOwnershipKind(SILFunction &F) const {
+  auto &M = F.getModule();
+  auto sig = F.getLoweredFunctionType()->getGenericSignature();
+  GenericContextScope GCS(M.Types, sig);
+
+  bool IsTrivial = getSILStorageType().isTrivial(F);
   switch (getConvention()) {
   case ResultConvention::Indirect:
     return SILModuleConventions(M).isSILIndirect(*this)
