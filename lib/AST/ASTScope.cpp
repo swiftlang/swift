@@ -1423,7 +1423,7 @@ SourceRange ASTScope::getSourceRangeImpl() const {
                        sourceFile.file->Decls.back()->getEndLoc());
 
   case ASTScopeKind::TypeDecl:
-    return typeDecl->getSourceRange();
+    return typeDecl->getSourceRangeIncludingAttrs();
 
   case ASTScopeKind::ExtensionGenericParams: {
     // The generic parameters of an extension are available from the ':' of
@@ -1472,7 +1472,7 @@ SourceRange ASTScope::getSourceRangeImpl() const {
       return SourceRange(abstractFunction->getLoc(),
                          abstractFunction->getEndLoc());
 
-    return abstractFunction->getSourceRange();
+    return abstractFunction->getSourceRangeIncludingAttrs();
   }
 
   case ASTScopeKind::AbstractFunctionParams: {
