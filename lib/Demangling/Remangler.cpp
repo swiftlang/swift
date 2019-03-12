@@ -38,33 +38,59 @@ static void unreachable(const char *Message) {
   std::abort();
 }
 
-void SubstitutionEntry::deepHash(Node *node) {
-  if (treatAsIdentifier) {
-    combineHash((size_t) Node::Kind::Identifier);
-    std::string tmp;
-    combineHash(getTextForSubstitution(node, tmp));
-    return;
-  }
-  combineHash((size_t) node->getKind());
-  if (node->hasIndex()) {
-    combineHash(node->getIndex());
-  } else if (node->hasText()) {
-    combineHash(node->getText());
-  }
-  for (Node *child : *node) {
-    deepHash(child);
+static char getCharOfNodeText(Node *node, unsigned idx) {
+  switch (node->getKind()) {
+  case Node::Kind::InfixOperator:
+  case Node::Kind::PrefixOperator:
+  case Node::Kind::PostfixOperator:
+    return Mangle::translateOperatorChar(node->getText()[idx]);
+  default:
+    return node->getText()[idx];
   }
 }
 
-StringRef SubstitutionEntry::getTextForSubstitution(Node *node, std::string &tmp) {
-  switch (node->getKind()) {
+bool SubstitutionEntry::identifierEquals(Node *lhs, Node *rhs) {
+  unsigned length = lhs->getText().size();
+  if (rhs->getText().size() != length)
+    return false;
+  // The fast path.
+  if (lhs->getKind() == rhs->getKind())
+    return lhs->getText() == rhs->getText();
+  // The slow path.
+  for (unsigned i = 0; i < length; ++i) {
+    if (getCharOfNodeText(lhs, i) != getCharOfNodeText(rhs, i))
+      return false;
+  }
+  return true;
+}
+
+void SubstitutionEntry::deepHash(Node *node) {
+  if (treatAsIdentifier) {
+    combineHash((size_t) Node::Kind::Identifier);
+    assert(node->hasText());
+    switch (node->getKind()) {
     case Node::Kind::InfixOperator:
     case Node::Kind::PrefixOperator:
     case Node::Kind::PostfixOperator:
-      tmp = Mangle::translateOperator(node->getText());
-      return tmp;
+      for (char c : node->getText()) {
+        combineHash((unsigned char)translateOperatorChar(c));
+      }
+      return;
     default:
-      return node->getText();
+      break;
+    }
+  } else {
+    combineHash((size_t) node->getKind());
+  }
+  if (node->hasIndex()) {
+    combineHash(node->getIndex());
+  } else if (node->hasText()) {
+    for (char c : node->getText()) {
+      combineHash((unsigned char) c);
+    }
+  }
+  for (Node *child : *node) {
+    deepHash(child);
   }
 }
 

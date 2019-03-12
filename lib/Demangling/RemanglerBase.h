@@ -53,26 +53,18 @@ private:
     if (lhs.treatAsIdentifier != rhs.treatAsIdentifier)
       return false;
     if (lhs.treatAsIdentifier) {
-      std::string tmp1, tmp2;
-      return (getTextForSubstitution(lhs.TheNode, tmp1) ==
-              getTextForSubstitution(rhs.TheNode, tmp2));
+      return identifierEquals(lhs.TheNode, rhs.TheNode);
     }
     return lhs.deepEquals(lhs.TheNode, rhs.TheNode);
   }
+
+  static bool identifierEquals(Node *lhs, Node *rhs);
 
   void combineHash(size_t newValue) {
     StoredHash = 33 * StoredHash + newValue;
   }
 
-  void combineHash(StringRef Text) {
-    for (char c : Text) {
-      combineHash((unsigned char) c);
-    }
-  }
-
   void deepHash(Node *node);
-
-  static StringRef getTextForSubstitution(Node *node, std::string &tmp);
 
   bool deepEquals(Node *lhs, Node *rhs) const;
 };
