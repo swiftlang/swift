@@ -339,9 +339,10 @@ class Constraint final : public llvm::ilist_node<Constraint>,
              ConstraintLocator *locator,
              ArrayRef<TypeVariableType *> typeVars);
 
-  /// Construct a new overload-binding constraint.
+  /// Construct a new overload-binding constraint, which might have a fix.
   Constraint(Type type, OverloadChoice choice, DeclContext *useDC,
-             ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
+             ConstraintFix *fix, ConstraintLocator *locator,
+             ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a restricted constraint.
   Constraint(ConstraintKind kind, ConversionRestrictionKind restriction,
@@ -398,6 +399,12 @@ public:
   static Constraint *createFixed(ConstraintSystem &cs, ConstraintKind kind,
                                  ConstraintFix *fix, Type first, Type second,
                                  ConstraintLocator *locator);
+
+  /// Create a bind overload choice with a fix.
+  static Constraint *createFixedChoice(ConstraintSystem &cs, Type type,
+                                       OverloadChoice choice,
+                                       DeclContext *useDC, ConstraintFix *fix,
+                                       ConstraintLocator *locator);
 
   /// Create a new disjunction constraint.
   static Constraint *createDisjunction(ConstraintSystem &cs,
