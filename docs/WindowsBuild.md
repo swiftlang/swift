@@ -57,15 +57,15 @@ subst S: <path to sources>
 
 ```cmd
 S:
-git clone -c core.autocrlf=input https://github.com/apple/swift-cmark cmark
-git clone -c core.autocrlf=input https://github.com/apple/swift-clang clang
-git clone -c core.autocrlf=input https://github.com/apple/swift-llvm llvm
-git clone -c core.autocrlf=input https://github.com/apple/swift-compiler-rt compiler-rt
+git clone https://github.com/apple/swift-cmark cmark
+git clone https://github.com/apple/swift-clang clang
+git clone https://github.com/apple/swift-llvm llvm
+git clone https://github.com/apple/swift-compiler-rt compiler-rt
 git clone -c core.autocrlf=input https://github.com/apple/swift
-git clone -c core.autocrlf=input https://github.com/apple/swift-corelibs-libdispatch
-git clone -c core.autocrlf=input https://github.com/apple/swift-corelibs-foundation
-git clone -c core.autocrlf=input https://github.com/apple/swift-corelibs-xctest
-git clone -c core.autocrlf=input https://github.com/apple/swift-lldb lldb
+git clone https://github.com/apple/swift-corelibs-libdispatch
+git clone https://github.com/apple/swift-corelibs-foundation
+git clone https://github.com/apple/swift-corelibs-xctest
+git clone https://github.com/apple/swift-lldb lldb
 git clone https://github.com/curl/curl.git curl
 git clone https://gitlab.gnome.org/GNOME/libxml2.git libxml2
 ```
@@ -127,7 +127,7 @@ cmake -G Ninja^
  -DLLVM_ENABLE_PROJECTS=clang^
  -DLLVM_TARGETS_TO_BUILD=X86;ARM;AArch64^
  S:/llvm
-cmake --build %CD%
+ninja
 ```
 
 - Update your path to include the LLVM tools.
@@ -147,7 +147,7 @@ cmake -G Ninja^
   -DCMAKE_C_COMPILER=cl^
   -DCMAKE_CXX_COMPILER=cl^
   S:\cmark
-cmake --build %CD%
+ninja
 ```
 
 ### 7. Build Swift
@@ -175,7 +175,7 @@ cmake -G Ninja^
  -DCMAKE_INSTALL_PREFIX="C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr"^
  -DPYTHON_EXECUTABLE="C:\Python27\python.exe"^
  S:\swift
-cmake --build %CD%
+ninja
 ```
 
 - To create a Visual Studio project, you'll need to change the generator and,
@@ -206,7 +206,7 @@ cmake -G Ninja^
   -DLLVM_ENABLE_ASSERTIONS=ON^
   -DPYTHON_HOME=%ProgramFiles(x86)%\Microsoft Visual Studio\Shared\Python37_64^
   S:\lldb
-cmake --build %CD%
+ninja
 ```
 
 ### 9. Running tests on Windows
@@ -236,7 +236,7 @@ cmake -G Ninja^
   -DENABLE_SWIFT=ON^
   -DENABLE_TESTING=OFF^
   S:\swift-corelibs-libdispatch
-cmake --build %CD%
+ninja
 ```
 
 - Add libdispatch to your path:
@@ -278,7 +278,7 @@ cmake -G Ninja^
   -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE="S:\swift-corelibs-libdispatch"^
   -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD="S:\b\libdispatch"^
    S:\swift-corelibs-foundation
-cmake --build %CD%
+ninja
 ```
 
 - Add Foundation to your path:
@@ -302,7 +302,7 @@ cmake -G Ninja^
   -DLIT_COMMAND="S:\llvm\utils\lit\lit.py"^
   -DPYTHON_EXECUTABLE="C:\Python27\python.exe"^
   S:\swift-corelibs-xctest
-cmake --build %CD%
+ninja
 ```
 
 - Add XCTest to your path:
