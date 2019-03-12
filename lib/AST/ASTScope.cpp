@@ -174,6 +174,22 @@ static bool hasAccessors(AbstractStorageDecl *asd) {
   return asd->getBracesRange().isValid();
 }
 
+static void forEachSpecializeAttrInSourceOrder(
+              Decl* decl,
+              llvm::function_ref<void(SpecializeAttr*)> fn) {
+  llvm::SmallVector<SpecializeAttr*, 8> sortedSpecializeAttrs;
+  for (auto *attr: decl->getAttrs())
+    if (auto *specializeAttr = dyn_cast<SpecializeAttr>(attr))
+      sortedSpecializeAttrs.push_back(specializeAttr);
+  const auto &srcMgr = decl->getASTContext().SourceMgr;
+  std::sort(sortedSpecializeAttrs.begin(), sortedSpecializeAttrs.end(),
+            [&](const SpecializeAttr *a, const SpecializeAttr *b) {
+              return srcMgr.isBeforeInBuffer(a->getLocation(), b->getLocation());
+            });
+  for (auto *specializedAttr: sortedSpecializeAttrs)
+    fn(specializedAttr);
+}
+
 void ASTScope::expand() const {
   assert(!isExpanded() && "Already expanded the children of this node");
   ASTContext &ctx = getASTContext();
@@ -252,11 +268,18 @@ void ASTScope::expand() const {
    addNextGenericParamOrWhereAndBody(typeDecl);
    break;
 
-  case ASTScopeKind::AbstractFunctionDecl:
+  case ASTScopeKind::AbstractFunctionDecl: {
+    forEachSpecializeAttrInSourceOrder(
+      abstractFunction,
+      [&](SpecializeAttr* specializeAttr) {
+        auto child = createIfNeeded(this, specializeAttr, abstractFunction);
+        addChild(child);
+    });
     // Create the child of the function, if any.
     if (auto child = createIfNeeded(this, abstractFunction))
       addChild(child);
-    break;
+  }
+  break;
 
   case ASTScopeKind::AbstractFunctionParams:
     // Create a child of the function parameters, which may eventually be
@@ -330,6 +353,7 @@ void ASTScope::expand() const {
     break;
       
   case ASTScopeKind::NominalOrExtensionWhereClause:
+  case ASTScopeKind::SpecializeAttribute:
     break;
 
   case ASTScopeKind::IfStmt:
@@ -705,6 +729,7 @@ static bool parentDirectDescendedFromAbstractStorageDecl(
   while (true) {
     switch (parent->getKind()) {
     case ASTScopeKind::Preexpanded:
+    case ASTScopeKind::SpecializeAttribute:
     case ASTScopeKind::AbstractFunctionDecl:
     case ASTScopeKind::AbstractFunctionParams:
     case ASTScopeKind::GenericParams:
@@ -753,6 +778,7 @@ static bool parentDirectDescendedFromAbstractFunctionDecl(
     switch (parent->getKind()) {
     case ASTScopeKind::Preexpanded:
     case ASTScopeKind::AbstractFunctionParams:
+    case ASTScopeKind::SpecializeAttribute:
     case ASTScopeKind::DefaultArgument:
     case ASTScopeKind::AbstractFunctionBody:
     case ASTScopeKind::GenericParams:
@@ -808,6 +834,7 @@ static bool parentDirectDescendedFromTypeDecl(const ASTScope *parent,
 
     case ASTScopeKind::SourceFile:
     case ASTScopeKind::AbstractFunctionDecl:
+    case ASTScopeKind::SpecializeAttribute:
     case ASTScopeKind::AbstractFunctionParams:
     case ASTScopeKind::DefaultArgument:
     case ASTScopeKind::AbstractFunctionBody:
@@ -1219,6 +1246,14 @@ ASTScope *ASTScope::createIfNeeded(
     : new (parent->getASTContext()) ASTScope(parent, whereDeclContext);
 }
 
+ASTScope *ASTScope::createIfNeeded(
+                      const ASTScope *parent,
+                      SpecializeAttr *attr,
+                      AbstractFunctionDecl *whatWasSpecialized) {
+  return new (parent->getASTContext()) ASTScope(parent, attr,
+                                                whatWasSpecialized);
+}
+
 bool ASTScope::canStealContinuation() const {
   switch (getKind()) {
    case ASTScopeKind::Preexpanded:
@@ -1228,6 +1263,7 @@ bool ASTScope::canStealContinuation() const {
   case ASTScopeKind::TypeOrExtensionBody:
   case ASTScopeKind::GenericParams:
   case ASTScopeKind::AbstractFunctionParams:
+  case ASTScopeKind::SpecializeAttribute:
   case ASTScopeKind::DefaultArgument:
   case ASTScopeKind::AbstractFunctionBody:
   case ASTScopeKind::PatternInitializer:
@@ -1370,7 +1406,7 @@ ASTContext &ASTScope::getASTContext() const {
   case ASTScopeKind::CaseStmt:
   case ASTScopeKind::Closure:
   case ASTScopeKind::NominalOrExtensionWhereClause:
-
+  case ASTScopeKind::SpecializeAttribute:
     return getParent()->getASTContext();
 
   case ASTScopeKind::Accessors:
@@ -1424,6 +1460,9 @@ SourceRange ASTScope::getSourceRangeImpl() const {
 
   case ASTScopeKind::TypeDecl:
     return typeDecl->getSourceRangeIncludingAttrs();
+      
+  case ASTScopeKind::SpecializeAttribute:
+      return specializeInfo.specializeAttr->getRange();
 
   case ASTScopeKind::ExtensionGenericParams: {
     // The generic parameters of an extension are available from the ':' of
@@ -1450,6 +1489,8 @@ SourceRange ASTScope::getSourceRangeImpl() const {
       return ext->getBraces();
 
     return cast<NominalTypeDecl>(iterableDeclContext)->getBraces();
+      
+      
 
   case ASTScopeKind::GenericParams:
     // A protocol's generic parameter list is not written in source, and
@@ -1773,6 +1814,7 @@ DeclContext *ASTScope::getDeclContext() const {
   case ASTScopeKind::SwitchStmt:
   case ASTScopeKind::CaseStmt:
   case ASTScopeKind::AbstractFunctionBody:
+  case ASTScopeKind::SpecializeAttribute:
     return nullptr;
   }
 
@@ -1833,6 +1875,16 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
     }
     break;
   }
+      
+  case ASTScopeKind::SpecializeAttribute: {
+    // TODO: factor with lookForGenericsBeforeMembersInViolationOfLexicalOrdering
+    auto *params = specializeInfo.whatWasSpecialized->getGenericParams();
+    if (params)
+      for (auto *param : params->getParams())
+        result.push_back(param);
+    }
+    break;
+
 
   case ASTScopeKind::GenericParams:
     result.push_back(genericParams.params->getParams()[genericParams.index]);
@@ -1965,6 +2017,12 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
     printScopeKind("TypeDecl");
     printAddress(typeDecl);
     out << " " << typeDecl->getFullName();
+    printRange();
+    break;
+      
+  case ASTScopeKind::SpecializeAttribute:
+    printScopeKind("SpecializeAttribute");
+    printAddress(specializeInfo.specializeAttr);
     printRange();
     break;
 
@@ -2205,6 +2263,7 @@ bool ASTScope::isCloseToTopLevelCode() const {
       case ASTScopeKind::TypeDecl:
       case ASTScopeKind::AbstractFunctionDecl:
       case ASTScopeKind::AbstractFunctionParams:
+      case ASTScopeKind::SpecializeAttribute:
       case ASTScopeKind::DefaultArgument:
       case ASTScopeKind::PatternBinding:
       case ASTScopeKind::PatternInitializer:

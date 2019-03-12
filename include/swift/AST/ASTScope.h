@@ -47,6 +47,7 @@ class ParamDecl;
 class PatternBindingDecl;
 class RepeatWhileStmt;
 class SourceFile;
+class SpecializeAttr;
 class Stmt;
 class StmtConditionElement;
 class SwitchStmt;
@@ -73,6 +74,8 @@ enum class ASTScopeKind : uint8_t {
   TypeOrExtensionBody,
   /// The generic parameters of a declaration.
   GenericParams,
+  /// The \c _@specialize attribute.
+  SpecializeAttribute,
   /// A function/initializer/deinitializer.
   AbstractFunctionDecl,
   /// The parameters of a function/initializer/deinitializer.
@@ -310,6 +313,12 @@ class ASTScope {
     /// The top-level code declaration for
     /// \c kind == ASTScopeKind::TopLevelCodeDecl.
     TopLevelCodeDecl *topLevelCode;
+    
+    /// For \c kind == ASTScopeKind::SpecializeAttribute.
+    struct {
+      SpecializeAttr *specializeAttr;
+      AbstractFunctionDecl *whatWasSpecialized;
+    } specializeInfo;
   };
 
   /// Child scopes, sorted by source range.
@@ -378,6 +387,14 @@ class ASTScope {
     assert(kind == ASTScopeKind::AbstractFunctionDecl ||
            kind == ASTScopeKind::AbstractFunctionBody);
     this->abstractFunction = abstractFunction;
+  }
+  
+  ASTScope(const ASTScope *parent,
+           SpecializeAttr *specializeAttr,
+           AbstractFunctionDecl *whatWasSpecialized)
+  :  ASTScope(ASTScopeKind::SpecializeAttribute, parent) {
+    this->specializeInfo.specializeAttr = specializeAttr;
+    this->specializeInfo.whatWasSpecialized = whatWasSpecialized;
   }
 
   ASTScope(const ASTScope *parent, AbstractFunctionDecl *abstractFunction,
@@ -545,6 +562,11 @@ class ASTScope {
   static ASTScope *createIfNeeded(
                      const ASTScope *parent,
                      llvm::PointerUnion<NominalTypeDecl*, ExtensionDecl*>);
+  
+  static ASTScope *createIfNeeded(
+                     const ASTScope *parent,
+                     SpecializeAttr *,
+                     AbstractFunctionDecl *);
 
   /// Determine whether this scope can steal a continuation from its parent,
   /// because (e.g.) it introduces some name binding that should be visible

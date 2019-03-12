@@ -65,6 +65,7 @@ static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
   case ASTScopeKind::ExtensionGenericParams:
   case ASTScopeKind::GenericParams:
   case ASTScopeKind::NominalOrExtensionWhereClause:
+  case swift::ASTScopeKind::SpecializeAttribute:
     return DeclVisibilityKind::GenericParameter;
 
   case ASTScopeKind::AbstractFunctionParams:
