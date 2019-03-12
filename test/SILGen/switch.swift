@@ -1291,3 +1291,15 @@ indirect enum SR6664_Base<Element> {
     }
   }
 }
+
+// Make sure that we properly create switch_enum success arguments if we have an
+// associated type that is a void type.
+func testVoidType() {
+  let x: Optional<()> = ()
+  switch x {
+  case .some(let x):
+    break
+  case .none:
+    break
+  }
+}
