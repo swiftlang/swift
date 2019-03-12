@@ -606,6 +606,7 @@ swift::swift_getGenericMetadata(MetadataRequest request,
 
   auto &cache = getCache(*description);
   assert(numGenericArgs == cache.NumKeyParameters + cache.NumWitnessTables);
+  (void)numGenericArgs;
   auto key = MetadataCacheKey(cache.NumKeyParameters, cache.NumWitnessTables,
                               arguments);
   auto result = cache.getOrInsert(key, request, description, arguments);
