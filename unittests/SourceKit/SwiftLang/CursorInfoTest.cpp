@@ -60,7 +60,8 @@ class NullEditorConsumer : public EditorConsumer {
                                  StringRef RuntimeName,
                                  StringRef SelectorName,
                                  ArrayRef<StringRef> InheritedTypes,
-                                 ArrayRef<std::tuple<UIdent, unsigned, unsigned>> Attrs) override {
+                                 ArrayRef<std::tuple<UIdent, unsigned, unsigned>> Attrs,
+                                 ArrayRef<StringRef> GenericRequirements) override {
   }
 
   void endDocumentSubStructure() override {}

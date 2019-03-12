@@ -258,6 +258,7 @@ public:
       case CustomBufferKind::DocStructureElementArray:
       case CustomBufferKind::AttributesArray:
       case CustomBufferKind::ExpressionTypeArray:
+      case CustomBufferKind::GenericRequirementsArray:
         return SOURCEKITD_VARIANT_TYPE_ARRAY;
       case CustomBufferKind::RawData:
         return SOURCEKITD_VARIANT_TYPE_DATA;
@@ -986,6 +987,8 @@ static sourcekitd_variant_t variantFromSKDObject(SKDObjectRef Object) {
           (uintptr_t)DataObject->getDataPtr(), 0 }};
       case CustomBufferKind::ExpressionTypeArray:
         return {{ (uintptr_t)getVariantFunctionsForExpressionTypeArray(),
+      case CustomBufferKind::GenericRequirementsArray:
+        return {{ (uintptr_t)getVariantFunctionsForGenericRequirementsArray(),
           (uintptr_t)DataObject->getDataPtr(), 0 }};
       case CustomBufferKind::RawData:
         return {{ (uintptr_t)getVariantFunctionsForRawData(),

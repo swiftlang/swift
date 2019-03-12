@@ -1175,6 +1175,11 @@ public:
       }
     }
 
+    SmallVector<StringRef, 4> GenericRequirements;
+    for (auto &TR : Node.GenericRequirementRanges) {
+      GenericRequirements.push_back(SrcManager.extractText(TR));
+    }
+
     StringRef TypeName;
     if (Node.TypeRange.isValid()) {
       TypeName = SrcManager.extractText(Node.TypeRange);
@@ -1227,7 +1232,8 @@ public:
                                        DisplayName,
                                        TypeName, RuntimeName,
                                        SelectorName,
-                                       InheritedNames, Attrs);
+                                       InheritedNames, Attrs,
+                                       GenericRequirements);
 
     for (const auto &Elem : Node.Elements) {
       if (Elem.Range.isInvalid())
@@ -1299,7 +1305,7 @@ public:
                                        StringRef(),
                                        StringRef(), StringRef(),
                                        StringRef(),
-                                       {}, {});
+                                       {}, {}, {});
     return true;
   }
 

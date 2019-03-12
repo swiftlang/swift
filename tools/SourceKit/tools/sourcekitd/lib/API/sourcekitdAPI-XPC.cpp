@@ -623,6 +623,7 @@ static sourcekitd_variant_type_t XPCVar_get_type(sourcekitd_variant_t var) {
     case CustomBufferKind::DocStructureElementArray:
     case CustomBufferKind::AttributesArray:
     case CustomBufferKind::ExpressionTypeArray:
+    case CustomBufferKind::GenericRequirementsArray:
       return SOURCEKITD_VARIANT_TYPE_ARRAY;
     case CustomBufferKind::RawData:
       return SOURCEKITD_VARIANT_TYPE_DATA;
@@ -785,6 +786,9 @@ static sourcekitd_variant_t variantFromXPCObject(xpc_object_t obj) {
                 (uintptr_t)CUSTOM_BUF_START(obj), 0 }};
     case CustomBufferKind::ExpressionTypeArray:
       return {{ (uintptr_t)getVariantFunctionsForExpressionTypeArray(),
+                (uintptr_t)CUSTOM_BUF_START(obj), 0 }};
+    case CustomBufferKind::GenericRequirementsArray:
+      return {{ (uintptr_t)getVariantFunctionsForGenericRequirementsArray(),
                 (uintptr_t)CUSTOM_BUF_START(obj), 0 }};
     case sourcekitd::CustomBufferKind::RawData:
       return {{ (uintptr_t)getVariantFunctionsForRawData(),

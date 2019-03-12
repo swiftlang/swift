@@ -129,3 +129,16 @@ enum MySecondEnum {
 }
 
 func someFunc(input :Int?, completion: () throws -> Void) rethrows {}
+
+class GenReqClass<T> where T: MyProt
+{}
+
+extension GenReqClass where T: Equatable
+{}
+
+protocol GenReqProt where Self: Foo {
+    associatedtype GenReqAssocType where GenReqAssocType: Foo
+}
+
+func genReqFunc<A, B>(a: A, b: B) where A: GenReqProt, B == A.GenReqAssocType
+{}

@@ -46,10 +46,10 @@ struct MyStruc {
 // CHECK:   <ifunc>func <name>foo()</name></ifunc>
 // CHECK:   <ifunc>func <name>foo2()</name> throws</ifunc>
 // CHECK:   <ifunc>func <name>foo3()</name> throws -> <type>Int</type></ifunc>
-// CHECK:   <ifunc>func <name>foo4<<generic-param><name>T</name></generic-param>>()</name> where T: MyProt</ifunc>
+// CHECK:   <ifunc>func <name>foo4<<generic-param><name>T</name></generic-param>>()</name> where <generic-req>T: MyProt</generic-req></ifunc>
 // CHECK:   <ifunc><name>init()</name></ifunc>
 // CHECK:   <ifunc><name>init(<param><name>a</name>: <type>Int</type></param>)</name> throws</ifunc>
-// CHECK:   <ifunc><name>init<<generic-param><name>T</name></generic-param>>(<param><name>a</name>: <type>T</type></param>)</name> where T: MyProt</ifunc>
+// CHECK:   <ifunc><name>init<<generic-param><name>T</name></generic-param>>(<param><name>a</name>: <type>T</type></param>)</name> where <generic-req>T: MyProt</generic-req></ifunc>
 // CHECK: }</protocol>
 protocol MyProt {
   func foo()
@@ -197,7 +197,7 @@ class A {
 // CHECK: <typealias>typealias <name>OtherA</name> = A</typealias>
 typealias OtherA = A
 
-// CHECK: <typealias>typealias <name>EqBox</name><<generic-param><name>Boxed</name></generic-param>> = Box<Boxed> where Boxed: Equatable</typealias>
+// CHECK: <typealias>typealias <name>EqBox</name><<generic-param><name>Boxed</name></generic-param>> = Box<Boxed> where <generic-req>Boxed: Equatable</generic-req></typealias>
 typealias EqBox<Boxed> = Box<Boxed> where Boxed: Equatable
 
 class SubscriptTest {
@@ -244,13 +244,13 @@ protocol FooProtocol {
   associatedtype Baz: Equatable
   // CHECK:  <associatedtype>associatedtype <name>Baz</name>: Equatable</associatedtype>
   associatedtype Qux where Qux: Equatable
-  // CHECK:  <associatedtype>associatedtype <name>Qux</name> where Qux: Equatable</associatedtype>
+  // CHECK:  <associatedtype>associatedtype <name>Qux</name> where <generic-req>Qux: Equatable</generic-req></associatedtype>
   associatedtype Bar2 = Int
   // CHECK:  <associatedtype>associatedtype <name>Bar2</name> = Int</associatedtype>
   associatedtype Baz2: Equatable = Int
   // CHECK:  <associatedtype>associatedtype <name>Baz2</name>: Equatable = Int</associatedtype>
   associatedtype Qux2 = Int where Qux2: Equatable
-  // CHECK:  <associatedtype>associatedtype <name>Qux2</name> = Int where Qux2: Equatable</associatedtype>
+  // CHECK:  <associatedtype>associatedtype <name>Qux2</name> = Int where <generic-req>Qux2: Equatable</generic-req></associatedtype>
 }
 
 // CHECK: <struct>struct <name>Generic</name><<generic-param><name>T</name>: <inherited><elem-typeref>Comparable</elem-typeref></inherited></generic-param>, <generic-param><name>X</name></generic-param>> {

@@ -321,6 +321,7 @@ private:
   bool isVisitedBeforeInIfConfig(ASTNode Node) {
     return VisitedNodesInsideIfConfig.count(Node) > 0;
   }
+  void setDecl(SyntaxStructureNode &N, Decl *D);
 };
 
 const std::regex &ModelASTWalker::getURLRegex(StringRef Pro) {
@@ -400,13 +401,30 @@ CharSourceRange parameterNameRangeOfCallArg(const TupleExpr *TE,
   return CharSourceRange();
 }
 
-static void setDecl(SyntaxStructureNode &N, Decl *D) {
+} // anonymous namespace
+
+void ModelASTWalker::setDecl(SyntaxStructureNode &N, Decl *D) {
   N.Dcl = D;
   N.Attrs = D->getAttrs();
   N.DocRange = D->getRawComment().getCharSourceRange();
-}
 
-} // anonymous namespace
+  auto addRequirements = [&](ArrayRef<RequirementRepr> Reqs) {
+    for(auto &Req: Reqs) {
+      auto Range = charSourceRangeFromSourceRange(SM, Req.getSourceRange());
+      N.GenericRequirementRanges.push_back(Range);
+    }
+  };
+
+  if (auto GC = D->getAsGenericContext()) {
+    if (auto GP = GC->getGenericParams())
+      addRequirements(GP->getRequirements());
+    else if(auto TWC = GC->getTrailingWhereClause())
+      addRequirements(TWC->getRequirements());
+  } else if (auto ATD = dyn_cast<AssociatedTypeDecl>(D)) {
+    if(auto TWC = ATD->getTrailingWhereClause())
+      addRequirements(TWC->getRequirements());
+  }
+}
 
 bool SyntaxModelContext::walk(SyntaxModelWalker &Walker) {
   ModelASTWalker ASTWalk(Impl.SrcFile, Walker);

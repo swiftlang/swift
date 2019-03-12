@@ -22,6 +22,7 @@ VariantFunctions *getVariantFunctionsForDocStructureArray();
 VariantFunctions *getVariantFunctionsForDocStructureElementArray();
 VariantFunctions *getVariantFunctionsForInheritedTypesArray();
 VariantFunctions *getVariantFunctionsForAttributesArray();
+VariantFunctions *getVariantFunctionsForGenericRequirementsArray();
 
 class DocStructureArrayBuilder {
 public:
@@ -38,7 +39,8 @@ public:
                          llvm::StringRef RuntimeName,
                          llvm::StringRef SelectorName,
                          llvm::ArrayRef<llvm::StringRef> InheritedTypes,
-                         llvm::ArrayRef<std::tuple<SourceKit::UIdent, unsigned, unsigned>> Attrs);
+                         llvm::ArrayRef<std::tuple<SourceKit::UIdent, unsigned, unsigned>> Attrs,
+                         llvm::ArrayRef<llvm::StringRef> GenericRequirements);
 
   void addElement(SourceKit::UIdent Kind, unsigned Offset, unsigned Length);
 

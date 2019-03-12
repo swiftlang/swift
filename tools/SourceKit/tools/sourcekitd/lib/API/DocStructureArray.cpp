@@ -43,6 +43,7 @@ struct Node {
   // Arrays
   unsigned InheritedTypesOffset;
   unsigned AttrsOffset;
+  unsigned GenericRequirementsOffset;
 
   // Children
   struct Element {
@@ -60,6 +61,8 @@ struct DocStructureArrayBuilder::Implementation {
   SmallVector<char, 256> inheritedTypesBuffer;
   typedef CompactArrayBuilder<UIdent, unsigned, unsigned> AttrsBuilder;
   SmallVector<char, 256> attrsBuffer;
+  typedef CompactArrayBuilder<StringRef> GenericRequirementsBuilder;
+  SmallVector<char, 256> genericRequirementsBuffer;
   typedef CompactArrayBuilder<UIdent, unsigned, unsigned> ElementsBuilder;
   SmallVector<char, 256> elementsBuffer;
   typedef CompactArrayBuilder<unsigned> StructureArrayBuilder;
@@ -82,6 +85,7 @@ struct DocStructureArrayBuilder::Implementation {
                       Optional<StringRef>, // SelectorName
                       unsigned,            // InheritedTypesOffset
                       unsigned,            // AttrsOffset
+                      unsigned,            // GenericRequirementsOffset
                       unsigned,            // ElementsOffset
                       unsigned             // ChildrenOffset
                       >
@@ -92,6 +96,7 @@ struct DocStructureArrayBuilder::Implementation {
 
   unsigned addInheritedTypes(ArrayRef<StringRef> inheritedTypes);
   unsigned addAttrs(ArrayRef<std::tuple<UIdent, unsigned, unsigned>> attrs);
+  unsigned addGenericRequirements(ArrayRef<StringRef> genericRequirements);
   unsigned addElements(ArrayRef<Node::Element> elements);
   unsigned addChildren(ArrayRef<unsigned> offsets);
 
@@ -103,6 +108,7 @@ DocStructureArrayBuilder::Implementation::Implementation() {
   // empty so we don't duplicate empty arrays anywhere.
   InheritedTypesBuilder().appendTo(inheritedTypesBuffer);
   AttrsBuilder().appendTo(attrsBuffer);
+  GenericRequirementsBuilder().appendTo(genericRequirementsBuffer);
   ElementsBuilder().appendTo(elementsBuffer);
   StructureArrayBuilder().appendTo(structureArrayBuffer);
 }
@@ -136,6 +142,20 @@ DocStructureArrayBuilder::Implementation::addAttrs(ArrayRef<std::tuple<UIdent, u
 
   unsigned offset = attrsBuffer.size();
   builder.appendTo(attrsBuffer);
+  return offset;
+}
+
+unsigned DocStructureArrayBuilder::Implementation::addGenericRequirements(
+  ArrayRef<StringRef> genericRequirements) {
+  if (genericRequirements.empty())
+    return 0;
+
+  GenericRequirementsBuilder builder;
+  for (StringRef req : genericRequirements)
+    builder.addEntry(req);
+
+  unsigned offset = genericRequirementsBuffer.size();
+  builder.appendTo(genericRequirementsBuffer);
   return offset;
 }
 
@@ -179,7 +199,8 @@ void DocStructureArrayBuilder::beginSubStructure(
     StringRef DisplayName, StringRef TypeName,
     StringRef RuntimeName, StringRef SelectorName,
     ArrayRef<StringRef> InheritedTypes,
-    ArrayRef<std::tuple<UIdent, unsigned, unsigned>> Attrs) {
+    ArrayRef<std::tuple<UIdent, unsigned, unsigned>> Attrs,
+    ArrayRef<StringRef> GenericRequirements) {
 
   Node node = {
       Offset,
@@ -199,6 +220,7 @@ void DocStructureArrayBuilder::beginSubStructure(
       SelectorName,
       impl.addInheritedTypes(InheritedTypes),
       impl.addAttrs(Attrs),
+      impl.addGenericRequirements(GenericRequirements),
       {}, // elements
       {}, // children
   };
@@ -231,6 +253,7 @@ void DocStructureArrayBuilder::endSubStructure() {
       node.BodyLength, node.DocOffset, node.DocLength, str(node.DisplayName),
       str(node.TypeName), str(node.RuntimeName), str(node.SelectorName),
       node.InheritedTypesOffset, node.AttrsOffset,
+      node.GenericRequirementsOffset,
       impl.addElements(node.elements), impl.addChildren(node.childIndices));
 }
 
@@ -240,17 +263,19 @@ std::unique_ptr<llvm::MemoryBuffer> DocStructureArrayBuilder::createBuffer() {
 
   size_t inheritedTypesBufferSize = impl.inheritedTypesBuffer.size();
   size_t attrsBufferSize = impl.attrsBuffer.size();
+  size_t genericRequirementsBufferSize = impl.genericRequirementsBuffer.size();
   size_t elementsBufferSize = impl.elementsBuffer.size();
   size_t structureArrayBufferSize = impl.structureArrayBuffer.size();
   size_t structureBufferSize = impl.structureBuilder.sizeInBytes();
 
   // Header:
-  // * offset of each section start (5)
+  // * offset of each section start (6)
   // * offset of top structure array (relative to structure array section) (1)
-  size_t headerSize = sizeof(uint64_t) * 6;
+  size_t headerSize = sizeof(uint64_t) * 7;
 
   auto result = llvm::WritableMemoryBuffer::getNewUninitMemBuffer(
-      inheritedTypesBufferSize + attrsBufferSize + elementsBufferSize +
+      inheritedTypesBufferSize + attrsBufferSize +
+      genericRequirementsBufferSize + elementsBufferSize +
       structureArrayBufferSize + structureBufferSize + headerSize);
 
   char *start = result->getBufferStart();
@@ -270,6 +295,7 @@ std::unique_ptr<llvm::MemoryBuffer> DocStructureArrayBuilder::createBuffer() {
   impl.structureBuilder.appendTo(structureBuffer);
   addBuffer(structureBuffer);
   addBuffer(impl.elementsBuffer);
+  addBuffer(impl.genericRequirementsBuffer);
   addBuffer(impl.attrsBuffer);
   addBuffer(impl.inheritedTypesBuffer);
 
@@ -301,6 +327,7 @@ struct OutNode {
   // Arrays
   unsigned InheritedTypesOffset;
   unsigned AttrsOffset;
+  unsigned GenericRequirementsOffset;
   unsigned ElementsOffset;
   unsigned ChildIndicesOffset;
 };
@@ -321,14 +348,18 @@ public:
   void *getAttrsBuffer(size_t offset) const {
     return (char *)getAttrsBufferStart() + offset;
   }
+  void *getGenericRequirementsBuffer(size_t offset) const {
+    return (char*)getGenericRequirementsBufferStart() + offset;
+  }
 
 private:
   void *getStructureArrayBufferStart() const { return getBufferStart(0); }
   void *getStructureBufferStart() const { return getBufferStart(1); }
   void *getElementsBufferStart() const { return getBufferStart(2); }
-  void *getAttrsBufferStart() const { return getBufferStart(3); }
-  void *getInheritedTypesBufferStart() const { return getBufferStart(4); }
-  size_t getTopStructureArrayOffset() const { return getHeaderValue(5); }
+  void *getGenericRequirementsBufferStart() const { return getBufferStart(3); }
+  void *getAttrsBufferStart() const { return getBufferStart(4); }
+  void *getInheritedTypesBufferStart() const { return getBufferStart(5); }
+  size_t getTopStructureArrayOffset() const { return getHeaderValue(6); }
 
   uint64_t getHeaderValue(unsigned index) const;
   void *getBufferStart(unsigned index) const;
@@ -353,6 +384,7 @@ private:
                              const char *,     // SelectorName
                              unsigned,         // InheritedTypesOffset
                              unsigned,         // AttrsOffset
+                             unsigned,         // GenericRequirementsOffset
                              unsigned,         // ElementsOffset
                              unsigned          // ChildrenOffset
                              >
@@ -372,7 +404,8 @@ OutNode DocStructureArrayReader::readStructure(size_t index) {
       result.BodyOffset, result.BodyLength, result.DocOffset, result.DocLength,
       result.DisplayName, result.TypeName, result.RuntimeName,
       result.SelectorName, result.InheritedTypesOffset,
-      result.AttrsOffset, result.ElementsOffset, result.ChildIndicesOffset);
+      result.AttrsOffset, result.GenericRequirementsOffset,
+      result.ElementsOffset, result.ChildIndicesOffset);
   return result;
 }
 
@@ -462,6 +495,23 @@ struct AttributesReader {
   }
 };
 
+struct GenericRequirementReader {
+  typedef CompactArrayReader<const char *> CompactArrayReaderTy;
+
+  static bool
+  dictionary_apply(void *buffer, size_t index,
+                   llvm::function_ref<bool(sourcekitd_uid_t,
+                                           sourcekitd_variant_t)> applier) {
+
+    CompactArrayReaderTy reader(buffer);
+    const char *value = nullptr;
+    reader.readEntries(index, value);
+    if (value)
+      APPLY(KeyDescription, String, value);
+     return true;
+  }
+};
+
 struct DocStructureReader {
   static bool
   dictionary_apply(void *buffer, size_t index,
@@ -513,6 +563,11 @@ struct DocStructureReader {
     if (node.AttrsOffset) {
       void *buf = reader.getAttrsBuffer(node.AttrsOffset);
       APPLY_ARRAY(Attributes, buf, KeyAttributes, 0);
+    }
+    if (node.GenericRequirementsOffset) {
+      void *buf = reader.getGenericRequirementsBuffer(
+                    node.GenericRequirementsOffset);
+      APPLY_ARRAY(GenericRequirements, buf, KeyGenericRequirements, 0);
     }
     if (node.ElementsOffset) {
       void *buf = reader.getElementsBuffer(node.ElementsOffset);
@@ -594,6 +649,10 @@ VariantFunctions *sourcekitd::getVariantFunctionsForInheritedTypesArray() {
 
 VariantFunctions *sourcekitd::getVariantFunctionsForAttributesArray() {
   return &CompactArrayFuncs<AttributesReader>::Funcs;
+}
+
+VariantFunctions *sourcekitd::getVariantFunctionsForGenericRequirementsArray() {
+  return &CompactArrayFuncs<GenericRequirementReader>::Funcs;
 }
 
 VariantFunctions *sourcekitd::getVariantFunctionsForDocStructureArray() {

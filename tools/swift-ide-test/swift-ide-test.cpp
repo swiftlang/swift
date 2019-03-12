@@ -1220,6 +1220,9 @@ private:
     for (auto &TyRange : Node.InheritedTypeRanges) {
       tagRange(TyRange, "inherited", Node);
     }
+    for (auto &TyRange : Node.GenericRequirementRanges) {
+      tagRange(TyRange, "generic-req", Node);
+    }
     for (auto &Elem : Node.Elements) {
       tagRange(Elem.Range, getTagName(Elem.Kind), Node);
     }

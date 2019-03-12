@@ -145,6 +145,7 @@ struct SyntaxStructureNode {
   CharSourceRange TypeRange;
   CharSourceRange DocRange;
   std::vector<CharSourceRange> InheritedTypeRanges;
+  std::vector<CharSourceRange> GenericRequirementRanges;
   std::vector<SyntaxStructureElement> Elements;
 
   bool hasSubstructure() const {
