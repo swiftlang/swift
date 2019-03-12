@@ -89,7 +89,7 @@ bool SILType::isTrivial(SILModule &M) const {
 bool SILType::isTrivial(const SILFunction &F) const {
   // FIXME: Should just call F.getTypeLowering()
   return F.getModule().Types.getTypeLowering(*this,
-                                       F.getResilienceExpansion()).isTrivial();
+                                      ResilienceExpansion::Minimal).isTrivial();
 }
 
 bool SILType::isReferenceCounted(SILModule &M) const {
