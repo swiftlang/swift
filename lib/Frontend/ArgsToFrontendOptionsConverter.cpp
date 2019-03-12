@@ -76,6 +76,9 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.TrackSystemDeps |= Args.hasArg(OPT_track_system_dependencies);
 
+  Opts.SerializeParseableModuleInterfaceDependencyHashes |=
+    Args.hasArg(OPT_serialize_parseable_module_interface_dependency_hashes);
+
   computePrintStatsOptions();
   computeDebugTimeOptions();
   computeTBDOptions();

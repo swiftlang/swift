@@ -267,6 +267,10 @@ public:
   /// dependencies as well.
   bool TrackSystemDeps = false;
 
+  /// Should we serialize the hashes of dependencies (vs. the modification
+  /// times) when compiling a parseable module interface?
+  bool SerializeParseableModuleInterfaceDependencyHashes = false;
+
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
     Default,        ///< Do the default validation for the current platform.
