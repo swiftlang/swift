@@ -34,6 +34,23 @@ func myOwnFatalError() -> MyOwnNever { fatalError() }
 
 func identity<T>(_ t: T) -> T { t }
 
+internal func _fatalErrorFlags() -> UInt32 {
+    return 0
+}
+internal func _assertionFailure(
+  _ prefix: StaticString, _ message: String,
+  flags: UInt32
+) -> Never {
+    fatalError()
+} 
+internal func _diagnoseUnexpectedEnumCaseValue<SwitchedValue, RawValue>(
+  type: SwitchedValue.Type,
+  rawValue: RawValue
+) -> Never {
+  _assertionFailure("Fatal error",
+                    "unexpected enum case '\(type)(rawValue: \(rawValue))'",
+                    flags: _fatalErrorFlags())
+}
 
 
 // MARK: - Free Functions
@@ -60,6 +77,22 @@ func ff_explicitClosure() -> () -> Void {
 
 func ff_implicitClosure() -> () -> Void {
     { print("howdy") }
+}
+
+func ff_explicitMultilineClosure() -> () -> String {
+    return {
+        let one = "big a"
+        let two = "little a"
+        return "\(one) + \(two)"
+    }
+}
+
+func ff_implicitMultilineClosure() -> () -> String {
+    {
+        let one = "big a"
+        let two = "little a"
+        return "\(one) + \(two)"
+    }
 }
 
 func ff_implicitWrong() -> String {
@@ -242,6 +275,22 @@ var fv_implicitClosure: () -> Void {
     { print("howdy") }
 }
 
+var fv_explicitMultilineClosure: () -> String {
+    return {
+        let one = "big a"
+        let two = "little a"
+        return "\(one) + \(two)"
+    }
+}
+
+var fv_implicitMultilineClosure: () -> String {
+    {
+        let one = "big a"
+        let two = "little a"
+        return "\(one) + \(two)"
+    }
+}
+
 var fv_implicitWrong: String {
     17 // expected-error {{cannot convert return expression of type 'Int' to return type 'String'}}
 }
@@ -397,6 +446,26 @@ var fvg_explicitClosure: () -> Void {
 var fvg_implicitClosure: () -> Void {
     get {
         { print("howdy") }
+    }
+}
+
+var fvg_explicitMultilineClosure: () -> String {
+    get {
+        return {
+            let one = "big a"
+            let two = "little a"
+            return "\(one) + \(two)"
+        }
+    }
+}
+
+var fvg_implicitMultilineClosure: () -> String {
+    get {
+        {
+            let one = "big a"
+            let two = "little a"
+            return "\(one) + \(two)"
+        }
     }
 }
 
@@ -726,6 +795,26 @@ enum S_implicitClosure {
     }
 }
 
+enum S_explicitMultilineClosure {
+   subscript() -> () -> String {
+        return {
+            let one = "big a"
+            let two = "little a"
+            return "\(one) + \(two)"
+        }
+    }
+}
+
+enum S_implicitMultilineClosure {
+    subscript() -> () -> String {
+        {
+            let one = "big a"
+            let two = "little a"
+            return "\(one) + \(two)"
+        }
+    }
+}
+
 enum S_implicitWrong {
     subscript() -> String {
         17 // expected-error {{cannot convert return expression of type 'Int' to return type 'String'}}
@@ -928,6 +1017,30 @@ enum SRO_implicitClosure {
     subscript() -> () -> Void {
         get {
             { print("howdy") } 
+        }
+    }
+}
+
+enum SRO_explicitMultilineClosure {
+   subscript() -> () -> String {
+        get {
+            return {
+                let one = "big a"
+                let two = "little a"
+                return "\(one) + \(two)"
+            }
+        }
+    }
+}
+
+enum SRO_implicitMultilineClosure {
+    subscript() -> () -> String {
+        get {
+            {
+                let one = "big a"
+                let two = "little a"
+                return "\(one) + \(two)"
+            }
         }
     }
 }
