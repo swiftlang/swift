@@ -195,11 +195,15 @@ extension vDSP {
             
             let n = vDSP_Length(result.count)
             
-            result.withUnsafeMutableBufferPointer { v in
-                vDSP_vramp([initialValue],
-                           [increment],
-                           v.baseAddress!, 1,
-                           n)
+            withUnsafePointer(to: initialValue) { a in
+                withUnsafePointer(to: increment) { b in
+                    result.withUnsafeMutableBufferPointer { c in
+                        vDSP_vramp(a,
+                                   b,
+                                   c.baseAddress!, 1,
+                                   n)
+                    }
+                }
             }
     }
     
@@ -218,11 +222,15 @@ extension vDSP {
             
             let n = vDSP_Length(result.count)
             
-            result.withUnsafeMutableBufferPointer { v in
-                vDSP_vrampD([initialValue],
-                            [increment],
-                            v.baseAddress!, 1,
-                            n)
+            withUnsafePointer(to: initialValue) { a in
+                withUnsafePointer(to: increment) { b in
+                    result.withUnsafeMutableBufferPointer { c in
+                        vDSP_vrampD(a,
+                                    b,
+                                    c.baseAddress!, 1,
+                                    n)
+                    }
+                }
             }
     }
     
@@ -239,11 +247,15 @@ extension vDSP {
             
             let n = vDSP_Length(result.count)
             
-            result.withUnsafeMutableBufferPointer { v in
-                vDSP_vgen([range.lowerBound],
-                          [range.upperBound],
-                          v.baseAddress!, 1,
-                          n)
+            withUnsafePointer(to: range.lowerBound) { a in
+                withUnsafePointer(to: range.upperBound) { b in
+                    result.withUnsafeMutableBufferPointer { c in
+                        vDSP_vgen(a,
+                                  b,
+                                  c.baseAddress!, 1,
+                                  n)
+                    }
+                }
             }
     }
     
@@ -260,11 +272,15 @@ extension vDSP {
             
             let n = vDSP_Length(result.count)
             
-            result.withUnsafeMutableBufferPointer { v in
-                vDSP_vgenD([range.lowerBound],
-                           [range.upperBound],
-                           v.baseAddress!, 1,
-                           n)
+            withUnsafePointer(to: range.lowerBound) { a in
+                withUnsafePointer(to: range.upperBound) { b in
+                    result.withUnsafeMutableBufferPointer { c in
+                        vDSP_vgenD(a,
+                                   b,
+                                   c.baseAddress!, 1,
+                                   n)
+                    }
+                }
             }
     }
     
@@ -290,11 +306,13 @@ extension vDSP {
             
             result.withUnsafeMutableBufferPointer { dest in
                 vector.withUnsafeBufferPointer { src in
-                    vDSP_vrampmul(src.baseAddress!, 1,
-                                  &initialValue,
-                                  [increment],
-                                  dest.baseAddress!, 1,
-                                  n)
+                    withUnsafePointer(to: increment) { step in
+                        vDSP_vrampmul(src.baseAddress!, 1,
+                                      &initialValue,
+                                      step,
+                                      dest.baseAddress!, 1,
+                                      n)
+                    }
                 }
             }
     }
@@ -321,11 +339,13 @@ extension vDSP {
             
             result.withUnsafeMutableBufferPointer { dest in
                 vector.withUnsafeBufferPointer { src in
-                    vDSP_vrampmulD(src.baseAddress!, 1,
-                                   &initialValue,
-                                   [increment],
-                                   dest.baseAddress!, 1,
-                                   n)
+                    withUnsafePointer(to: increment) { step in
+                        vDSP_vrampmulD(src.baseAddress!, 1,
+                                       &initialValue,
+                                       step,
+                                       dest.baseAddress!, 1,
+                                       n)
+                    }
                 }
             }
     }
@@ -358,13 +378,15 @@ extension vDSP {
                 resultTwo.withUnsafeMutableBufferPointer { o1 in
                     multiplierOne.withUnsafeBufferPointer { i0 in
                         multiplierTwo.withUnsafeBufferPointer { i1 in
-                            vDSP_vrampmul2(i0.baseAddress!,
-                                           i1.baseAddress!, 1,
-                                           &initialValue,
-                                           [increment],
-                                           o0.baseAddress!,
-                                           o1.baseAddress!, 1,
-                                           n)
+                            withUnsafePointer(to: increment) { step in
+                                vDSP_vrampmul2(i0.baseAddress!,
+                                               i1.baseAddress!, 1,
+                                               &initialValue,
+                                               step,
+                                               o0.baseAddress!,
+                                               o1.baseAddress!, 1,
+                                               n)
+                            }
                         }
                     }
                 }
@@ -399,13 +421,15 @@ extension vDSP {
                 resultTwo.withUnsafeMutableBufferPointer { o1 in
                     multiplierOne.withUnsafeBufferPointer { i0 in
                         multiplierTwo.withUnsafeBufferPointer { i1 in
-                            vDSP_vrampmul2D(i0.baseAddress!,
-                                            i1.baseAddress!, 1,
-                                            &initialValue,
-                                            [increment],
-                                            o0.baseAddress!,
-                                            o1.baseAddress!, 1,
-                                            n)
+                            withUnsafePointer(to: increment) { step in
+                                vDSP_vrampmul2D(i0.baseAddress!,
+                                                i1.baseAddress!, 1,
+                                                &initialValue,
+                                                step,
+                                                o0.baseAddress!,
+                                                o1.baseAddress!, 1,
+                                                n)
+                            }
                         }
                     }
                 }
