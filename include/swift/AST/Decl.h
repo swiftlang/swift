@@ -216,6 +216,9 @@ struct OverloadSignature {
   /// Whether this is a enum element.
   unsigned IsEnumElement : 1;
 
+  /// Whether this is a nominal type.
+  unsigned IsNominal : 1;
+
   /// Whether this signature is part of a protocol extension.
   unsigned InProtocolExtension : 1;
 
