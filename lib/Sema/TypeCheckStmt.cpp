@@ -17,6 +17,7 @@
 #include "TypeChecker.h"
 #include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
+#include "ConstraintSystem.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
@@ -1923,7 +1924,8 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
   // FIXME: FIXME_NOW: DETERMINE: What is the appropriate place for this code to
   //        live?
   if (FD->hasSingleExpressionBody()) {
-    auto fnType = FD->getBodyResultTypeLoc().getType();
+    auto fnTypeLoc = FD->getBodyResultTypeLoc();
+    auto fnType = fnTypeLoc.getType();
     auto returnStmt = cast<ReturnStmt>(BS->getElement(0).get<Stmt *>());
     auto E = returnStmt->getResult();
 
@@ -1935,7 +1937,7 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
     //             FD->setSingleExpressionBody(E);
     //           }
 
-    if (FD->getBodyResultTypeLoc().isNull() || fnType->isVoid()) {
+    if (fnTypeLoc.isNull() || fnType->isVoid()) {
       auto voidExpr = TupleExpr::createEmpty(Context,
                                              E->getStartLoc(),
                                              E->getEndLoc(),
@@ -1949,15 +1951,23 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
     } else {
       // FIXME: FIXME_NOW: DETERMINE: Is this the appropriate mechanism to use
       //        to divine the type of E?
-      auto exprTy = typeCheckExpression(E, FD, TypeLoc(),
-                                        CTP_ReturnStmt);
-      if (!exprTy.isNull() && exprTy->isUninhabited() &&
-          exprTy->getCanonicalType() != fnType->getCanonicalType()) {
-        BS = BraceStmt::create(Context,
-                               BS->getStartLoc(),
-                               { E },
-                               BS->getEndLoc(),
-                               /*implicit=*/true);
+      preCheckExpression(E, FD);
+      constraints::ConstraintSystem cs(*this, FD, 
+                                       constraints::ConstraintSystemFlags::SuppressDiagnostics);
+      SmallVector<constraints::Solution, 4> viable;
+      if(!cs.solve(E, /*convertType*/Type(), nullptr, viable,
+                   FreeTypeVariableBinding::Disallow)) {
+        auto &solution = viable[0];
+        auto &solutionCS = solution.getConstraintSystem();
+        Type exprType = solution.simplifyType(solutionCS.getType(E));
+        if (!exprType.isNull() && exprType->isUninhabited() &&
+            exprType->getCanonicalType() != fnType->getCanonicalType()) {
+          BS = BraceStmt::create(Context,
+                                 BS->getStartLoc(),
+                                 { E },
+                                 BS->getEndLoc(),
+                                 /*implicit=*/true);
+        }
       }
     }
   }
