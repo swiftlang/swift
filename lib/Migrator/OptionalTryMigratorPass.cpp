@@ -31,22 +31,25 @@ namespace {
     bool explicitCastActiveForOptionalTry = false;
     
     bool walkToExprPre(Expr *E) override {
-      if (dyn_cast<ParenExpr>(E) || E->isImplicit()) {
+      if (isa<ParenExpr>(E) || E->isImplicit()) {
         // Look through parentheses and implicit expressions.
         return true;
       }
       
-      if (const auto *explicitCastExpr = dyn_cast<ExplicitCastExpr>(E)) {
+      if (isa<ExplicitCastExpr>(E)) {
         // If the user has already provided an explicit cast for the
         // 'try?', then we don't need to add one. So let's track whether
         // one is active
         explicitCastActiveForOptionalTry = true;
+        return true;
       }
-      else if (const auto *optTryExpr = dyn_cast<OptionalTryExpr>(E)) {
+
+      if (const auto *optTryExpr = dyn_cast<OptionalTryExpr>(E)) {
         wrapTryInCastIfNeeded(optTryExpr);
         return false;
       }
-      else if (explicitCastActiveForOptionalTry) {
+
+      if (explicitCastActiveForOptionalTry) {
         // If an explicit cast is active and we are entering a new
         // expression that is not an OptionalTryExpr, then the cast
         // does not apply to the OptionalTryExpr.
