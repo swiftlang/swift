@@ -1064,8 +1064,9 @@ static Type diagnoseUnknownType(TypeResolution resolution,
         bool declaringMethod = methodDecl &&
           methodDecl->getDeclContext() == dc->getParentForLookup();
 
-        if (!insideClass || !declaringMethod ||
-            options.getBaseContext() == TypeResolverContext::ExplicitCastExpr) {
+        if (((!insideClass || !declaringMethod) &&
+             !options.is(TypeResolverContext::GenericRequirement)) ||
+            options.is(TypeResolverContext::ExplicitCastExpr)) {
           Type SelfType = nominal->getSelfInterfaceType();
           if (insideClass)
             SelfType = DynamicSelfType::get(SelfType, ctx);
