@@ -80,7 +80,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     AccelerateTests.test("vDSP/DifferenceEquationSinglePrecision") {
         let n = 256
         
-        let source: [Float] = (0 ..< 1024).map {
+        let source: [Float] = (0 ..< n).map {
             return sin(Float($0) * 0.05).sign == .minus ? -1 : 1
         }
         var result = [Float](repeating: 0, count: n)
@@ -110,7 +110,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     AccelerateTests.test("vDSP/DifferenceEquationDoublePrecision") {
         let n = 256
         
-        let source: [Double] = (0 ..< 1024).map {
+        let source: [Double] = (0 ..< n).map {
             return sin(Double($0) * 0.05).sign == .minus ? -1 : 1
         }
         var result = [Double](repeating: 0, count: n)
