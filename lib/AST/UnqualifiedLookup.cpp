@@ -785,13 +785,14 @@ bool UnqualifiedLookupFactory::nothingToSeeHere(
 }
 
 void UnqualifiedLookupFactory::
-    lookForGenericsBeforeMembersInViolationOfLexicalOrdering(
-        DeclContext *const scopeDC) {
-  auto *params = getGenericParams(scopeDC);
-  if (params)
-    for (auto *param : params->getParams()) {
+lookForGenericsBeforeMembersInViolationOfLexicalOrdering(
+  DeclContext *const scopeDC) {
+  for (auto *params = getGenericParams(scopeDC);
+       params;
+       params = params->getOuterParameters()) {
+    for (auto *param : params->getParams())
       Consumer.foundDecl(param, DeclVisibilityKind::GenericParameter);
-    }
+  }
 }
 
 #pragma mark context-based lookup definitions
