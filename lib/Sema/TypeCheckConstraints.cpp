@@ -4045,7 +4045,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         conformsToProtocol(toType, Context.getErrorDecl(), dc,
                            ConformanceCheckFlags::InExpression);
     if (fromType->isEqual(exceptionType) && !toTypeConformsToError) {
-      diagnose(diagLoc, diag::type_does_not_conform, toType, exceptionType);
       return failed();
     }
 
