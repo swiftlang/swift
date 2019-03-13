@@ -2249,6 +2249,7 @@ bool ASTScope::isCloseToTopLevelCode() const {
     switch (s->getKind()) {
       case ASTScopeKind::TopLevelCode:
         return true;
+        
       case ASTScopeKind::SourceFile:
       case ASTScopeKind::TypeOrExtensionBody:
       case ASTScopeKind::AbstractFunctionBody:
@@ -2258,6 +2259,12 @@ bool ASTScope::isCloseToTopLevelCode() const {
       // for ClangImporter/MixedSource/can_import_objc_idempotent.swift
       case ASTScopeKind::NominalOrExtensionWhereClause:
         return false;
+        
+      case ASTScopeKind::BraceStmt:
+        if (getParent()->getKind() != ASTScopeKind::TopLevelCode)
+          return false;
+        break;
+
       case ASTScopeKind::Preexpanded:
       case ASTScopeKind::ExtensionGenericParams:
       case ASTScopeKind::TypeDecl:
@@ -2268,7 +2275,6 @@ bool ASTScope::isCloseToTopLevelCode() const {
       case ASTScopeKind::PatternBinding:
       case ASTScopeKind::PatternInitializer:
       case ASTScopeKind::AfterPatternBinding:
-      case ASTScopeKind::BraceStmt:
       case ASTScopeKind::IfStmt:
       case ASTScopeKind::ConditionalClause:
       case ASTScopeKind::GuardStmt:
