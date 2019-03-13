@@ -444,11 +444,12 @@ class BuildScriptInvocation(object):
                 "can't find source directory for ninja "
                 "(tried %s)" % (self.workspace.source_dir("ninja")))
 
-        ninja_build = products.Ninja(
+        ninja_build = products.Ninja.new_builder(
             args=self.args,
             toolchain=self.toolchain,
-            source_dir=self.workspace.source_dir("ninja"),
-            build_dir=self.workspace.build_dir("build", "ninja"))
+            workspace=self.workspace,
+            host=StdlibDeploymentTarget.get_target_for_name(
+                self.args.host_target))
         ninja_build.build()
         self.toolchain.ninja = ninja_build.ninja_bin_path
 
