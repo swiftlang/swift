@@ -2287,7 +2287,7 @@ bool ASTScope::isCloseToTopLevelCode() const {
         return false;
         
       case ASTScopeKind::BraceStmt:
-        if (getParent()->getKind() != ASTScopeKind::TopLevelCode)
+        if (s->getParent()->getKind() != ASTScopeKind::TopLevelCode)
           return false;
         break;
 
