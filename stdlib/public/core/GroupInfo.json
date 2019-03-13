@@ -96,6 +96,7 @@
         "Zip.swift",
         "Filter.swift",
         "Reverse.swift",
+        "Rotate.swift",
         "Slice.swift",
         "DropWhile.swift",
         "PrefixWhile.swift",

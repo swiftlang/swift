@@ -118,6 +118,7 @@ set(SWIFTLIB_ESSENTIAL
   REPL.swift
   Result.swift
   Reverse.swift
+  Rotate.swift
   Runtime.swift.gyb
   RuntimeFunctionCounters.swift
   SipHash.swift

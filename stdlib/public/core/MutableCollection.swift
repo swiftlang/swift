@@ -45,7 +45,7 @@
 /// To add conformance to the `MutableCollection` protocol to your own
 /// custom collection, upgrade your type's subscript to support both read
 /// and write access.
-/// 
+///
 /// A value stored into a subscript of a `MutableCollection` instance must
 /// subsequently be accessible at that same position. That is, for a mutable
 /// collection instance `a`, index `i`, and value `x`, the two sets of
@@ -53,7 +53,7 @@
 ///
 ///     a[i] = x
 ///     let y = a[i]
-///     
+///
 ///     // Must be equivalent to:
 ///     a[i] = x
 ///     let y = x
@@ -166,7 +166,35 @@ where SubSequence: MutableCollection
   ///
   /// - Complexity: O(1)
   mutating func swapAt(_ i: Index, _ j: Index)
-  
+
+  /// Rotates the elements of the collection such that the value at the given
+  /// index moves leftward to `startIndex`.
+  ///
+  /// Passing `startIndex` or `endIndex` as `middle` has no effect.
+  ///
+  /// The following example rotates the elements of an array of characters so
+  /// the second character moves to be the first:
+  ///
+  ///     var café: [Character] = Array("Café")
+  ///     café.rotate(toFirst: café.index(after: café.startIndex))
+  ///     print(café)
+  ///     // Prints "["a", "f", "é", "C"]"
+  ///
+  /// - Precondition: `middle` must be a valid index of this collection.
+  ///
+  /// - Parameter middle: The index of the element whose value will move
+  ///   to `startIndex`, unless it's `endIndex` (then it's ignored).
+  ///
+  /// - Returns: The new index of the value originally at `startIndex`.
+  ///
+  /// - Postcondition: The collection is a left-rotation of its old state,
+  ///   *i.e.* `newValue` equals `oldValue[middle...] + oldValue[..<middle]`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the number of elements in the
+  ///   collection.
+  @discardableResult
+  mutating func rotate(toFirst middle: Index) -> Index
+
   /// Call `body(p)`, where `p` is a pointer to the collection's
   /// mutable contiguous storage.  If no such storage exists, it is
   /// first created.  If the collection does not support an internal
@@ -295,4 +323,3 @@ public func swap<T>(_ a: inout T, _ b: inout T) {
   // Initialize P2.
   Builtin.initialize(tmp, p2)
 }
-
