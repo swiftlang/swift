@@ -568,10 +568,30 @@ enum SR_10084_E_10 {
 
 enum SR_10084_E_11 {
   case A // expected-note {{found this candidate}} // expected-note {{'A' previously declared here}}
-  static let A: SR_10084_E_11 = .A // expected-note {{found this candidate}} // expected-error {{invalid redeclaration of 'A'}} // expected-error {{ambiguous use of 'A'}}
+  static var A: SR_10084_E_11 = .A // expected-note {{found this candidate}} // expected-error {{invalid redeclaration of 'A'}} // expected-error {{ambiguous use of 'A'}}
 }
 
 enum SR_10084_E_12 {
-  static let A: SR_10084_E_12 = .A // expected-note {{found this candidate}} // expected-note {{'A' previously declared here}} // expected-error {{ambiguous use of 'A'}}
+  static var A: SR_10084_E_12 = .A // expected-note {{found this candidate}} // expected-note {{'A' previously declared here}} // expected-error {{ambiguous use of 'A'}}
   case A // expected-note {{found this candidate}} // expected-error {{invalid redeclaration of 'A'}}
+}
+
+enum SR_10084_E_13 {
+  case X // expected-note {{'X' previously declared here}}
+  struct X<T> {} // expected-error {{invalid redeclaration of 'X'}}
+}
+
+enum SR_10084_E_14 {
+  struct X<T> {} // expected-note {{'X' previously declared here}}
+  case X // expected-error {{invalid redeclaration of 'X'}}
+}
+
+enum SR_10084_E_15 {
+  case Y // expected-note {{'Y' previously declared here}}
+  typealias Y = Int // expected-error {{invalid redeclaration of 'Y'}}
+}
+
+enum SR_10084_E_16 {
+  typealias Z = Int // expected-note {{'Z' previously declared here}}
+  case Z // expected-error {{invalid redeclaration of 'Z'}}
 }

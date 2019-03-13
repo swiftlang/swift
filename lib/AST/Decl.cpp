@@ -2104,6 +2104,12 @@ bool swift::conflicting(ASTContext &ctx,
     return true;
   }
 
+  // Typealiases and enum elements always conflict with each other.
+  if ((sig1.IsTypeAlias && sig2.IsEnumElement) ||
+      (sig1.IsEnumElement && sig2.IsTypeAlias)) {
+    return true;
+  }
+
   // Enum elements always conflict with each other. At this point, they
   // have the same base name but different types.
   if (sig1.IsEnumElement && sig2.IsEnumElement) {
@@ -2270,6 +2276,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   signature.IsFunction = isa<AbstractFunctionDecl>(this);
   signature.IsEnumElement = isa<EnumElementDecl>(this);
   signature.IsNominal = isa<NominalTypeDecl>(this);
+  signature.IsTypeAlias = isa<TypeAliasDecl>(this);
 
   // Unary operators also include prefix/postfix.
   if (auto func = dyn_cast<FuncDecl>(this)) {
