@@ -1062,7 +1062,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
         assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
 
         bool insideClass = nominalDC->getSelfClassDecl() != nullptr;
-        if (!insideClass || options.isAnyExpr()) {
+        if (!insideClass || dc->isLocalContext() || options.isAnyExpr()) {
           Type SelfType = nominal->getSelfInterfaceType();
           if (insideClass)
             SelfType = DynamicSelfType::get(SelfType, ctx);

@@ -92,6 +92,9 @@ class B: A<Int> {
 class C {
   required init() {
   }
+  func f() {
+    func g(_: Self) {}
+  }
   func g() {
     _ = Self.init() as? Self
     // expected-warning@-1 {{conditional cast from 'Self' to 'Self' always succeeds}}
