@@ -305,6 +305,10 @@ def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Specifies the Clang module cache path">;
 
+def enable_library_evolution : Flag<["-"], "enable-library-evolution">,
+  Flags<[FrontendOption, ParseableInterfaceOption]>,
+  HelpText<"Build the module to allow binary-compatible library evolution">;
+
 def module_name : Separate<["-"], "module-name">,
   Flags<[FrontendOption, ParseableInterfaceOption]>,
   HelpText<"Name of the module to build">;

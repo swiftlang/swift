@@ -71,10 +71,10 @@ ModuleName("module-name", llvm::cl::desc("The name of the module if processing"
                                          "stdin."));
 
 static llvm::cl::opt<bool>
-EnableResilience("enable-resilience",
-                 llvm::cl::desc("Compile the module to export resilient "
-                                "interfaces for all public declarations by "
-                                "default"));
+EnableLibraryEvolution("enable-library-evolution",
+                       llvm::cl::desc("Compile the module to export resilient "
+                                      "interfaces for all public declarations by "
+                                      "default"));
 
 static llvm::cl::opt<bool>
 EnableSILOwnershipOpt("enable-sil-ownership",
@@ -305,7 +305,8 @@ int main(int argc, char **argv) {
     Invocation.setTargetTriple(Target);
   if (!ResourceDir.empty())
     Invocation.setRuntimeResourcePath(ResourceDir);
-  Invocation.getFrontendOptions().EnableResilience = EnableResilience;
+  Invocation.getFrontendOptions().EnableLibraryEvolution
+    = EnableLibraryEvolution;
   // Set the module cache path. If not passed in we use the default swift module
   // cache.
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;

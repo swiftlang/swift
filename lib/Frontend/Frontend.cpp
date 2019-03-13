@@ -286,10 +286,11 @@ bool CompilerInstance::setUpModuleLoaders() {
   if (hasSourceImport()) {
     bool immediate = FrontendOptions::isActionImmediate(
         Invocation.getFrontendOptions().RequestedAction);
-    bool enableResilience = Invocation.getFrontendOptions().EnableResilience;
+    bool enableLibraryEvolution =
+      Invocation.getFrontendOptions().EnableLibraryEvolution;
     Context->addModuleLoader(SourceLoader::create(*Context,
                                                   !immediate,
-                                                  enableResilience,
+                                                  enableLibraryEvolution,
                                                   getDependencyTracker()));
   }
   auto MLM = ModuleLoadingMode::OnlySerialized;
@@ -531,7 +532,7 @@ ModuleDecl *CompilerInstance::getMainModule() {
     if (Invocation.getFrontendOptions().EnableImplicitDynamic)
       MainModule->setImplicitDynamicEnabled();
 
-    if (Invocation.getFrontendOptions().EnableResilience)
+    if (Invocation.getFrontendOptions().EnableLibraryEvolution)
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
   }
   return MainModule;
