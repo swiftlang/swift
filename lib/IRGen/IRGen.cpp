@@ -1230,6 +1230,7 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   switch (IGM.TargetInfo.OutputObjectFormat) {
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("unknown object format");
+  case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     Section = COFFASTSectionName;
     break;
