@@ -714,6 +714,7 @@ static std::pair<AbstractionPattern, CanType> updateResultTypeForForeignError(
 static void
 lowerCaptureContextParameters(SILModule &M, AnyFunctionRef function,
                               CanGenericSignature genericSig,
+                              ResilienceExpansion expansion,
                               SmallVectorImpl<SILParameterInfo> &inputs) {
 
   // NB: The generic signature may be elided from the lowered function type
@@ -746,13 +747,11 @@ lowerCaptureContextParameters(SILModule &M, AnyFunctionRef function,
     auto type = VD->getInterfaceType();
     auto canType = type->getCanonicalType(origGenericSig);
 
-    // FIXME: Could be changed to Maximal at some point without impacting ABI,
-    // as long as we make sure all call sites are non inlinable.
     auto &loweredTL =
         Types.getTypeLowering(AbstractionPattern(genericSig, canType), canType,
-                              ResilienceExpansion::Minimal);
+                              expansion);
     auto loweredTy = loweredTL.getLoweredType();
-    switch (Types.getDeclCaptureKind(capture)) {
+    switch (Types.getDeclCaptureKind(capture, expansion)) {
     case CaptureKind::None:
       break;
     case CaptureKind::Constant: {
@@ -985,7 +984,10 @@ static CanSILFunctionType getSILFunctionType(
   // from the function to which the argument is attached.
   if (constant && !constant->isDefaultArgGenerator()) {
     if (auto function = constant->getAnyFunctionRef()) {
-      lowerCaptureContextParameters(M, *function, genericSig, inputs);
+      // FIXME: Expansion
+      auto expansion = ResilienceExpansion::Minimal;
+      lowerCaptureContextParameters(M, *function, genericSig, expansion,
+                                    inputs);
     }
   }
   

@@ -4507,8 +4507,6 @@ CallEmission::applyEnumElementConstructor(SGFContext C) {
   // correctly.
   firstLevelResult.formalType = callee.getSubstFormalType();
   auto origFormalType = callee.getOrigFormalType();
-  auto substFnType =
-      SGF.getSILFunctionType(origFormalType, firstLevelResult.formalType);
 
   // We have a fully-applied enum element constructor: open-code the
   // construction.
@@ -4539,8 +4537,6 @@ CallEmission::applyEnumElementConstructor(SGFContext C) {
     assert(uncurriedSites.size() == 1);
   }
 
-  assert(substFnType->getNumResults() == 1);
-  (void)substFnType;
   ManagedValue resultMV = SGF.emitInjectEnum(
       uncurriedLoc, std::move(payload),
       SGF.getLoweredType(formalResultType),

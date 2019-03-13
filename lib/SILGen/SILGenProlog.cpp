@@ -354,14 +354,15 @@ static void emitCaptureArguments(SILGenFunction &SGF,
       closure.getGenericEnvironment(), interfaceType);
   };
 
-  switch (SGF.SGM.Types.getDeclCaptureKind(capture)) {
+  // FIXME: Expansion
+  auto expansion = ResilienceExpansion::Minimal;
+  switch (SGF.SGM.Types.getDeclCaptureKind(capture, expansion)) {
   case CaptureKind::None:
     break;
 
   case CaptureKind::Constant: {
     auto type = getVarTypeInCaptureContext();
-    auto &lowering = SGF.SGM.Types.getTypeLowering(type,
-                                                   ResilienceExpansion::Minimal);
+    auto &lowering = SGF.getTypeLowering(type);
     // Constant decls are captured by value.
     SILType ty = lowering.getLoweredType();
     SILValue val = SGF.F.begin()->createFunctionArgument(ty, VD);

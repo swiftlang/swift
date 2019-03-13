@@ -446,15 +446,21 @@ SILModuleConventions::SILModuleConventions(const SILModule &M)
 
 bool SILModuleConventions::isReturnedIndirectlyInSIL(SILType type,
                                                      SILModule &M) {
-  if (SILModuleConventions(M).loweredAddresses)
-    return type.isAddressOnly(M);
+  if (SILModuleConventions(M).loweredAddresses) {
+    return M.Types.getTypeLowering(type,
+                                   ResilienceExpansion::Minimal)
+      .isAddressOnly();
+  }
 
   return false;
 }
 
 bool SILModuleConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
-  if (SILModuleConventions(M).loweredAddresses)
-    return type.isAddressOnly(M);
+  if (SILModuleConventions(M).loweredAddresses) {
+    return M.Types.getTypeLowering(type,
+                                   ResilienceExpansion::Minimal)
+      .isAddressOnly();
+  }
 
   return false;
 }
