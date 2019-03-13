@@ -252,6 +252,56 @@ extension vDSP {
             return output
     }
     
+    /// Returns sum of elements and sum of elements' squares; single-precision.
+    ///
+    /// - Parameter vector: The input vector.
+    /// - Returns: The sum of values and the sum of squares in `vector`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func sum<U>(_ vector: U) -> (elementsSum: Float, squaresSum: Float)
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let n = vDSP_Length(vector.count)
+            var sum = Float.nan
+            var sumOfSquares = Float.nan
+            
+            vector.withUnsafeBufferPointer { v in
+                vDSP_sve_svesq(v.baseAddress!, 1,
+                               &sum,
+                               &sumOfSquares,
+                               n)
+            }
+            
+            return (elementsSum: sum, squaresSum: sumOfSquares)
+    }
+    
+    /// Returns sum of elements and sum of elements' squares; double-precision.
+    ///
+    /// - Parameter vector: The input vector.
+    /// - Returns: The sum of values and the sum of squares in `vector`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func sum<U>(_ vector: U) -> (elementsSum: Double, squaresSum: Double)
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let n = vDSP_Length(vector.count)
+            var sum = Double.nan
+            var sumOfSquares = Double.nan
+            
+            vector.withUnsafeBufferPointer { v in
+                vDSP_sve_svesqD(v.baseAddress!, 1,
+                                &sum,
+                                &sumOfSquares,
+                                n)
+            }
+            
+            return (elementsSum: sum, squaresSum: sumOfSquares)
+    }
+    
     /// Returns vector sum of magnitudes; single-precision.
     ///
     /// - Parameter vector: The input vector.

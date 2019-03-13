@@ -188,6 +188,21 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         expectEqual(result, legacyResult)
     }
     
+    AccelerateTests.test("vDSP/SinglePrecisionSumOfElementsAndSquares") {
+        let result: (Float, Float) = vDSP.sum(a)
+        
+        var legacySumResult = Float(0)
+        var legacySumOfSquaresResult = Float(0)
+        
+        vDSP_sve_svesq(a, 1,
+                       &legacySumResult,
+                       &legacySumOfSquaresResult,
+                       n)
+        
+        expectEqual(result.0, legacySumResult)
+        expectEqual(result.1, legacySumOfSquaresResult)
+    }
+    
     AccelerateTests.test("vDSP/SinglePrecisionSumOfMagnitudes") {
         let result: Float = vDSP.sumOfMagnitudes(a)
         
@@ -366,6 +381,21 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                     n)
         
         expectEqual(result, legacyResult)
+    }
+    
+    AccelerateTests.test("vDSP/DoublePrecisionSumOfElementsAndSquares") {
+        let result: (Double, Double) = vDSP.sum(a)
+        
+        var legacySumResult = Double(0)
+        var legacySumOfSquaresResult = Double(0)
+        
+        vDSP_sve_svesqD(a, 1,
+                        &legacySumResult,
+                        &legacySumOfSquaresResult,
+                        n)
+        
+        expectEqual(result.0, legacySumResult)
+        expectEqual(result.1, legacySumOfSquaresResult)
     }
     
     AccelerateTests.test("vDSP/DoublePrecisionSumOfMagnitudes") {
