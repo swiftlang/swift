@@ -278,24 +278,35 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
     }
   }
 
-  // If we're not allowed to look in the runtime library import path, stop.
-  if (Ctx.SearchPathOpts.SkipRuntimeLibraryImportPath)
-    return false;
-
-  // Search the runtime import path.
+  // Search the runtime import paths.
   isFramework = false;
-  currPath = Ctx.SearchPathOpts.RuntimeLibraryImportPath;
-  if (Ctx.LangOpts.Target.isOSDarwin()) {
-    // Apple platforms always use architecture-specific files within a
-    // .swiftmodule directory for the stdlib.
-    llvm::sys::path::append(currPath, fileNames.module.str());
-    return findTargetSpecificModuleFiles().getValueOr(false);
+
+  // Apple platforms always use target-specific files within a
+  // .swiftmodule directory for the stdlib; non-Apple platforms
+  // always use single-architecture swiftmodules.
+  // We could move the `if` outside of the `for` instead of inside,
+  // but I/O will be so slow that we won't notice the difference,
+  // so it's not worth the code duplication.
+  bool hasTargetSpecificRuntimeModules = Ctx.LangOpts.Target.isOSDarwin();
+
+  for (auto RuntimeLibraryImportPath :
+       Ctx.SearchPathOpts.RuntimeLibraryImportPaths) {
+    currPath = RuntimeLibraryImportPath;
+    if (hasTargetSpecificRuntimeModules) {
+      llvm::sys::path::append(currPath, fileNames.module.str());
+      if (auto outcome = findTargetSpecificModuleFiles())
+        return *outcome;
+    } else {
+      auto result = findModuleFilesInDirectory(moduleID, currPath,
+                                               fileNames.module.str(),
+                                               fileNames.moduleDoc.str(),
+                                               moduleBuffer, moduleDocBuffer);
+      if (!result)
+        return true;
+    }
   }
-  // Non-Apple platforms always use single-architecture swiftmodules.
-  return !findModuleFilesInDirectory(moduleID, currPath,
-                                     fileNames.module.str(),
-                                     fileNames.moduleDoc.str(),
-                                     moduleBuffer, moduleDocBuffer);
+
+  return false;
 }
 
 static std::pair<StringRef, clang::VersionTuple>
