@@ -40,20 +40,6 @@ class Product(object):
         """
         return True
 
-    def do_build(self, host_target):
-        """do_build() -> void
-
-        Perform the build, for a non-build-script-impl product.
-        """
-        raise NotImplementedError
-
-    def do_test(self, host_target):
-        """do_build() -> void
-
-        Run the tests, for a non-build-script-impl product.
-        """
-        raise NotImplementedError
-
     @classmethod
     def make_builder(cls, args, toolchain, workspace, host):
         return BuildScriptImplBuilder(cls, args, toolchain, workspace, host)
