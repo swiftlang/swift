@@ -155,6 +155,11 @@ public:
     return Serialized;
   }
 
+  ResilienceExpansion getResilienceExpansion() const {
+    // FIXME: Expansion
+    return ResilienceExpansion::Minimal;
+  }
+
   /// Returns true if the \p ParamIdx'th (non-result) formal parameter is
   /// converted from indirect to direct.
   bool isParamConverted(unsigned ParamIdx) const {

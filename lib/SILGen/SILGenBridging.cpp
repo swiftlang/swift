@@ -333,26 +333,15 @@ static ManagedValue emitManagedParameter(SILGenFunction &SGF, SILLocation loc,
   llvm_unreachable("bad convention");
 }
 
-static void expandTupleTypes(CanType type, SmallVectorImpl<CanType> &results) {
-  if (auto tuple = dyn_cast<TupleType>(type)) {
-    for (auto eltType : tuple.getElementTypes())
-      expandTupleTypes(eltType, results);
-  } else {
-    results.push_back(type);
-  }
-}
-
-/// Recursively expand all the tuples in the given parameter list.
-/// Callers assume that the resulting array will line up with the
-/// SILFunctionType's parameter list, which is true as along as there
-/// aren't any indirectly-passed tuples; we should be safe from that
-/// here in the bridging code.
+/// Get the type of each parameter, filtering out empty tuples.
 static SmallVector<CanType, 8>
-expandTupleTypes(AnyFunctionType::CanParamArrayRef params) {
+getParameterTypes(AnyFunctionType::CanParamArrayRef params) {
   SmallVector<CanType, 8> results;
   for (auto param : params) {
     assert(!param.isInOut() && !param.isVariadic());
-    expandTupleTypes(param.getPlainType(), results);
+    if (param.getPlainType()->isVoid())
+      continue;
+    results.push_back(param.getPlainType());
   }
   return results;
 }
@@ -403,8 +392,8 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
   assert(blockTy->getParameters().size() == funcTy->getParameters().size()
          && "block and function types don't match");
 
-  auto nativeParamTypes = expandTupleTypes(formalFuncType.getParams());
-  auto bridgedParamTypes = expandTupleTypes(formalBlockType.getParams());
+  auto nativeParamTypes = getParameterTypes(formalFuncType.getParams());
+  auto bridgedParamTypes = getParameterTypes(formalBlockType.getParams());
 
   SmallVector<ManagedValue, 4> args;
   for (unsigned i : indices(funcTy->getParameters())) {
@@ -839,8 +828,8 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
     }
   }
 
-  auto formalBlockParams = expandTupleTypes(formalBlockTy.getParams());
-  auto formalFuncParams = expandTupleTypes(formalFuncTy.getParams());
+  auto formalBlockParams = getParameterTypes(formalBlockTy.getParams());
+  auto formalFuncParams = getParameterTypes(formalFuncTy.getParams());
   assert(formalBlockParams.size() == blockTy->getNumParameters());
   assert(formalFuncParams.size() == funcTy->getNumParameters());
 
@@ -1297,10 +1286,10 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &SGF,
   assert(objcFnTy->getNumIndirectFormalResults() == 0
          && "Objective-C methods cannot have indirect results");
 
-  auto bridgedFormalTypes = expandTupleTypes(objcFormalFnTy.getParams());
+  auto bridgedFormalTypes = getParameterTypes(objcFormalFnTy.getParams());
   bridgedFormalResultTy = objcFormalFnTy.getResult();
 
-  auto nativeFormalTypes = expandTupleTypes(swiftFormalFnTy.getParams());
+  auto nativeFormalTypes = getParameterTypes(swiftFormalFnTy.getParams());
   nativeFormalResultTy = swiftFormalFnTy.getResult();
 
   // Emit the other arguments, taking ownership of arguments if necessary.
@@ -1697,9 +1686,9 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
 
     {
       auto foreignFormalParams =
-        expandTupleTypes(foreignCI.LoweredType.getParams());
+        getParameterTypes(foreignCI.LoweredType.getParams());
       auto nativeFormalParams =
-        expandTupleTypes(nativeCI.LoweredType.getParams());
+        getParameterTypes(nativeCI.LoweredType.getParams());
 
       for (unsigned nativeParamIndex : indices(params)) {
         // Bring the parameter to +1.
