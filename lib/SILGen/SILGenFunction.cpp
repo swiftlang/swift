@@ -208,8 +208,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 
     auto *vd = capture.getDecl();
 
-    // FIXME: Expansion
-    auto expansion = ResilienceExpansion::Minimal;
+    auto expansion = F.getResilienceExpansion();
     switch (SGM.Types.getDeclCaptureKind(capture, expansion)) {
     case CaptureKind::None:
       break;

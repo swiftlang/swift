@@ -552,7 +552,8 @@ ManagedValue SILGenBuilder::createOptionalSome(SILLocation loc,
 
 ManagedValue SILGenBuilder::createManagedOptionalNone(SILLocation loc,
                                                       SILType type) {
-  if (!type.isAddressOnly(getModule()) || !SGF.silConv.useLoweredAddresses()) {
+  if (!type.isAddressOnly(getFunction()) ||
+      !SGF.silConv.useLoweredAddresses()) {
     SILValue noneValue = createOptionalNone(loc, type);
     return ManagedValue::forUnmanaged(noneValue);
   }

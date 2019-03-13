@@ -111,7 +111,7 @@ void TupleInitialization::copyOrInitValueInto(SILGenFunction &SGF,
           SILType fieldType) -> ManagedValue {
         ManagedValue elt =
             SGF.B.createTupleElementAddr(loc, value, i, fieldType);
-        if (!fieldType.isAddressOnly(SGF.F.getModule())) {
+        if (!fieldType.isAddressOnly(SGF.F)) {
           return SGF.B.createLoadTake(loc, elt);
         }
 

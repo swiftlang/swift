@@ -88,7 +88,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
 
   // This can happen if the value is resilient in the calling convention
   // but not resilient locally.
-  if (argType.isLoadable(SGF.SGM.M) && argType.isAddress()) {
+  if (argType.isLoadable(SGF.F) && argType.isAddress()) {
     if (mvArg.isPlusOne(SGF))
       mvArg = SGF.B.createLoadTake(loc, mvArg);
     else
@@ -140,7 +140,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
 
   // Emit the indirect return argument, if any.
   SILValue resultSlot;
-  if (selfTy.isAddressOnly(SGF.SGM.M) && SGF.silConv.useLoweredAddresses()) {
+  if (SILModuleConventions::isReturnedIndirectlyInSIL(selfTy, SGF.SGM.M)) {
     auto &AC = SGF.getASTContext();
     auto VD = new (AC) ParamDecl(VarDecl::Specifier::InOut,
                                  SourceLoc(), SourceLoc(),

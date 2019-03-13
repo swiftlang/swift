@@ -81,9 +81,7 @@ SILType SILType::getSILTokenType(const ASTContext &C) {
 }
 
 bool SILType::isTrivial(const SILFunction &F) const {
-  // FIXME: Should just call F.getTypeLowering()
-  return F.getModule().Types.getTypeLowering(*this,
-                                      ResilienceExpansion::Minimal).isTrivial();
+  return F.getTypeLowering(*this).isTrivial();
 }
 
 bool SILType::isReferenceCounted(SILModule &M) const {

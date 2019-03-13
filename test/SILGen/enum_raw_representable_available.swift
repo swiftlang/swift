@@ -74,7 +74,7 @@ public enum E: Int {
 // CHECK: end sil function '$s4main1EO8rawValueACSgSi_tcfC'
 
 // CHECK-LABEL: sil {{(\[serialized\] )?}}[ossa] @$s4main1EO8rawValueSivg
-// CHECK: {{switch_enum %0 : \$E|switch_enum_addr %2 : \$\*E}}
+// CHECK: switch_enum {{%.*}} : $E
 // CHECK-NOT: function_ref @$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF
 // CHECK: end sil function '$s4main1EO8rawValueSivg'
 
