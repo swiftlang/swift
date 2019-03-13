@@ -4579,7 +4579,7 @@ public:
   };
 
 protected:
-  llvm::PointerUnion<PatternBindingDecl*, Stmt*> ParentPattern;
+  PointerUnion3<PatternBindingDecl *, Stmt *, VarDecl *> Parent;
 
   VarDecl(DeclKind Kind, bool IsStatic, Specifier Sp, bool IsCaptureList,
           SourceLoc NameLoc, Identifier Name, DeclContext *DC)
@@ -4650,12 +4650,15 @@ public:
   /// Return the parent pattern binding that may provide an initializer for this
   /// VarDecl.  This returns null if there is none associated with the VarDecl.
   PatternBindingDecl *getParentPatternBinding() const {
-    return ParentPattern.dyn_cast<PatternBindingDecl *>();
+    if (!Parent)
+      return nullptr;
+    return Parent.dyn_cast<PatternBindingDecl *>();
   }
   void setParentPatternBinding(PatternBindingDecl *PBD) {
-    ParentPattern = PBD;
+    assert(PBD);
+    Parent = PBD;
   }
-  
+
   /// Return the Pattern involved in initializing this VarDecl.  However, recall
   /// that the Pattern may be involved in initializing more than just this one
   /// vardecl.  For example, if this is a VarDecl for "x", the pattern may be
@@ -4670,10 +4673,28 @@ public:
   /// Return the statement that owns the pattern associated with this VarDecl,
   /// if one exists.
   Stmt *getParentPatternStmt() const {
-    return ParentPattern.dyn_cast<Stmt*>();
+    if (!Parent)
+      return nullptr;
+    return Parent.dyn_cast<Stmt *>();
   }
-  void setParentPatternStmt(Stmt *S) {
-    ParentPattern = S;
+  void setParentPatternStmt(Stmt *s) {
+    assert(s);
+    Parent = s;
+  }
+
+  /// Returns the var decl that this var decl is an implicit reference to if
+  /// such a var decl exists.
+  VarDecl *getParentVarDecl() const {
+    if (!Parent)
+      return nullptr;
+    return Parent.dyn_cast<VarDecl *>();
+  }
+
+  /// Set \p v to be the pattern produced VarDecl that is the parent of this
+  /// var decl.
+  void setParentVarDecl(VarDecl *v) {
+    assert(v);
+    Parent = v;
   }
 
   /// True if the global stored property requires lazy initialization.
