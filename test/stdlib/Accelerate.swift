@@ -69,4 +69,692 @@ if #available(iOS 10.0, OSX 10.12, tvOS 10.0, watchOS 4.0, *) {
   
 }
 
+//===----------------------------------------------------------------------===//
+//
+//  vDSP Single Precision Arithmetic
+//
+//===----------------------------------------------------------------------===//
+
+if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+    
+    var result = [Float.nan]
+    
+    var vectorA = [Float.nan]
+    var vectorB = [Float.nan]
+    var vectorC = [Float.nan]
+    
+    var scalarA = Float.nan
+    var scalarB = Float.nan
+    
+    // c[i] = a[i] + b
+    AccelerateTests.test("vDSP/vsadd") {
+        scalarA = 100
+        vectorB = [500]
+        
+        vDSP.add(scalarA,
+                 to: vectorB,
+                 result: &result)
+        
+        expectEqual(Int(result.first!), 600)
+    }
+    
+    // c[i] = a[i] + b[i]
+    AccelerateTests.test("vDSP/vadd") {
+        vectorA = [750]
+        vectorB = [250]
+        
+        vDSP.add(vectorA,
+                 to: vectorB,
+                 result: &result)
+        
+        expectEqual(Int(result.first!), 1000)
+    }
+    
+    // c[i] = a[i] - b[i]
+    AccelerateTests.test("vDSP/vsub") {
+        vectorA = [5]
+        vectorB = [30]
+        
+        vDSP.subtract(vectorA,
+                      from: vectorB,
+                      result: &result)
+        
+        expectEqual(Int(result.first!), 25)
+    }
+    
+    // c[i] = a[i] * b
+    AccelerateTests.test("vDSP/vsmul") {
+        scalarA = 100
+        vectorB = [3]
+        
+        vDSP.multiply(scalarA,
+                      by: vectorB,
+                      result: &result)
+        
+        expectEqual(Int(result.first!), 300)
+    }
+    
+    // a[i] * b[i]
+    AccelerateTests.test("vDSP/vmul") {
+        vectorA = [6]
+        vectorB = [10]
+        
+        vDSP.multiply(vectorA,
+                      by: vectorB,
+                      result: &result)
+        
+        expectEqual(Int(result.first!), 60)
+    }
+    
+    // c[i] = a[i] / b
+    AccelerateTests.test("vDSP/vsdiv") {
+        scalarA = 4
+        vectorB = [100]
+        
+        vDSP.divide(vectorB,
+                    by: scalarA,
+                    result: &result)
+        
+        expectEqual(Int(result.first!), 25)
+    }
+    
+    // c[i] = a / b[i]
+    AccelerateTests.test("vDSP/svdiv") {
+        scalarA = 200
+        vectorB = [4]
+        
+        vDSP.divide(scalarA,
+                    by: vectorB,
+                    result: &result)
+        
+        expectEqual(Int(result.first!), 50)
+    }
+    
+    // c[i] = a[i] / b[i]
+    AccelerateTests.test("vDSP/vdiv") {
+        vectorA = [600]
+        vectorB = [3]
+        
+        vDSP.divide(vectorA,
+                    by: vectorB,
+                    result: &result)
+        
+        expectEqual(Int(result.first!), 200)
+    }
+    
+    // o0[i] = i1[i] + i0[i]; o1[i] = i1[i] - i0[i]
+    AccelerateTests.test("vDSP/vaddsub") {
+        vectorA = [4]
+        vectorB = [16]
+        var subtractResult = [ Float.nan ]
+        
+        vDSP.addSubtract(vectorA,
+                         vectorB,
+                         addResult: &result,
+                         subtractResult: &subtractResult)
+        
+        expectEqual(Int(result.first!), 20)
+        expectEqual(Int(subtractResult.first!), 12)
+        
+    }
+    
+    // d[i] = (a[i] + b[i]) * c
+    AccelerateTests.test("vDSP/vasm") {
+        vectorA = [4]
+        vectorB = [16]
+        scalarA = 4
+        
+        vDSP.multiply(vectorSum: (vectorA, vectorB),
+                      by: scalarA,
+                      result: &result)
+        
+        expectEqual(Int(result.first!), 80)
+    }
+    
+    // d[i] = (a[i] + b[i]) * c[i]
+    AccelerateTests.test("vDSP/vam") {
+        vectorA = [4]
+        vectorB = [16]
+        vectorC = [5]
+        
+        vDSP.multiply(vectorSum: (vectorA, vectorB),
+                      by: vectorC,
+                      result: &result)
+        
+        expectEqual(Int(result.first!), 100)
+    }
+    
+    // d[i] = (a[i] - b[i]) * c
+    AccelerateTests.test("vDSP/vsbsm") {
+        vectorA = [20]
+        vectorB = [5]
+        scalarA = 2
+        
+        vDSP.multiply(vectorDifference: (vectorA, vectorB),
+                      by: scalarA,
+                      result: &result)
+        
+        expectEqual(Int(result.first!), 30)
+        
+    }
+    
+    // d[i] = (a[i] - b[i]) * c[i]
+    AccelerateTests.test("vDSP/vsbm") {
+        vectorA = [20]
+        vectorB = [5]
+        vectorC = [2]
+        
+        vDSP.multiply(vectorDifference: (vectorA, vectorB),
+                      by: vectorC,
+                      result: &result)
+        
+        expectEqual(Int(result.first!), 30)
+    }
+    
+    // a[i]*b[i] + c
+    AccelerateTests.test("vDSP/vmsa") {
+        vectorA = [18]
+        vectorB = [10]
+        scalarA = 20
+        
+        vDSP.add(vectorProduct: (vectorA, vectorB),
+                 to: scalarA,
+                 result: &result)
+        
+        expectEqual(Int(result.first!), 200)
+    }
+    
+    // (a[i] * b) + c[i]
+    AccelerateTests.test("vDSP/vsma") {
+        vectorA = [18]
+        scalarB = 10
+        vectorC = [120]
+        
+        vDSP.add(vectorScalarProduct: (vectorA, scalarB),
+                 to: vectorC,
+                 result: &result)
+        
+        expectEqual(Int(result.first!), 300)
+    }
+    
+    // d[i] = (a[i] * b[i]) + c[i]
+    AccelerateTests.test("vDSP/vma") {
+        vectorA = [5]
+        vectorB = [20]
+        vectorC = [6]
+        
+        vDSP.add(vectorProduct: (vectorA, vectorB),
+                 to: vectorC,
+                 result: &result)
+        
+        expectEqual(Int(result.first!), 106)
+    }
+    
+    // d[i] = (a[i] * b[i]) - c[i]
+    AccelerateTests.test("vDSP/vmsb") {
+        vectorA = [25]
+        vectorB = [2]
+        vectorC = [50]
+        
+        vDSP.subtract(vectorA,
+                      fromVectorProduct: (vectorB, vectorC),
+                      result: &result)
+        
+        expectEqual(Int(result.first!), 75)
+    }
+    
+    // e[i] = (a[i] * b) + (c[i] * d)
+    AccelerateTests.test("vDSP/vsmsma") {
+        vectorA = [5]
+        scalarA = 100
+        vectorB = [50]
+        scalarB = 4
+        
+        vDSP.add(vectorScalarProduct: (vectorA, scalarA),
+                 toVectorScalarProduct: (vectorB, scalarB),
+                 result: &result)
+        
+        expectEqual(Int(result.first!), 700)
+    }
+    
+    // E[n] = A[n]*B[n] + C[n]*D[n]
+    AccelerateTests.test("vDSP/vmma") {
+        vectorA = [2]
+        vectorB = [10]
+        vectorC = [3]
+        let vectorD: [Float] = [20]
+        
+        vDSP.add(vectorProduct: (vectorA, vectorB),
+                 toVectorProduct: (vectorC, vectorD),
+                 result: &result)
+        
+        expectEqual(Int(result.first!), 80)
+    }
+    
+    // e[i] = (a[i] + b[i]) * (c[i] + d[i])
+    AccelerateTests.test("vDSP/vaam") {
+        vectorA = [2]
+        vectorB = [8]
+        vectorC = [3]
+        let vectorD: [Float] = [17]
+        
+        vDSP.multiply(vectorSum: (vectorA, vectorB),
+                      toVectorSum: (vectorC, vectorD),
+                      result: &result)
+    }
+    
+    // e[i] = (a[i] * b[i]) - (c[i] * d[i])
+    AccelerateTests.test("vDSP/vmmsb") {
+        vectorA = [2]
+        vectorB = [3]
+        vectorC = [5]
+        let vectorD: [Float] = [15]
+        
+        vDSP.subtract(vectorProduct: (vectorA, vectorB),
+                      fromVectorProduct: (vectorC, vectorD),
+                      result: &result)
+        
+        expectEqual(Int(result.first!), 69)
+    }
+    
+    // e[i] = (a[i] - b[i]) * (c[i] - d[i])
+    AccelerateTests.test("vDSP/vsbsbm") {
+        vectorA = [12]
+        vectorB = [2]
+        vectorC = [20]
+        let vectorD: [Float] = [3]
+        
+        vDSP.multiply(vectorDifference: (vectorA, vectorB),
+                      byVectorDifference: (vectorC, vectorD),
+                      result: &result)
+        
+        expectEqual(Int(result.first!), 170)
+    }
+    
+    // e[i] = (a[i] + b[i]) * (c[i] - d[i])
+    AccelerateTests.test("vDSP/vasbm") {
+        vectorA = [16]
+        vectorB = [4]
+        vectorC = [102]
+        let vectorD: [Float] = [2]
+        
+        vDSP.multiply(vectorSum: (vectorA, vectorB),
+                      byVectorDifference: (vectorC, vectorD),
+                      result: &result)
+        
+        expectEqual(Int(result.first!), 2000)
+    }
+    
+    // d[n] = a[n]*b + c
+    AccelerateTests.test("vDSP/vsmsa") {
+        vectorA = [12]
+        scalarA = 2
+        scalarB = 6
+        
+        vDSP.add(vectorScalarProduct: (vectorA, scalarA),
+                 to: scalarB,
+                 result: &result)
+        
+        expectEqual(Int(result.first!), 30)
+    }
+    
+    // D[n] = A[n]*B - C[n];
+    AccelerateTests.test("vDSP/vsmsb") {
+        vectorA = [10]
+        scalarB = 5
+        vectorC = [25]
+        
+        vDSP.subtract(vectorC,
+                      fromVectorScalarProduct: (vectorA, scalarB),
+                      result: &result)
+        
+        expectEqual(Int(result.first!), 25)
+    }
+}
+
+
+//===----------------------------------------------------------------------===//
+//
+//  vDSP Double Precision Arithmetic
+//
+//===----------------------------------------------------------------------===//
+
+if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+    
+    var result = [Double.nan]
+    
+    var vectorA = [Double.nan]
+    var vectorB = [Double.nan]
+    var vectorC = [Double.nan]
+    
+    var scalarA = Double.nan
+    var scalarB = Double.nan
+    
+    // c[i] = a[i] + b
+    AccelerateTests.test("vDSP/vsaddD") {
+        scalarA = 100
+        vectorB = [500]
+        
+        vDSP.add(scalarA,
+                 to: vectorB,
+                 result: &result)
+        
+        expectEqual(Int(result.first!), 600)
+    }
+    
+    // c[i] = a[i] + b[i]
+    AccelerateTests.test("vDSP/vaddD") {
+        vectorA = [750]
+        vectorB = [250]
+        
+        vDSP.add(vectorA,
+                 to: vectorB,
+                 result: &result)
+        
+        expectEqual(Int(result.first!), 1000)
+    }
+    
+    // c[i] = a[i] - b[i]
+    AccelerateTests.test("vDSP/vsubD") {
+        vectorA = [5]
+        vectorB = [30]
+        
+        vDSP.subtract(vectorA,
+                      from: vectorB,
+                      result: &result)
+        
+        expectEqual(Int(result.first!), 25)
+    }
+    
+    // c[i] = a[i] * b
+    AccelerateTests.test("vDSP/vsmulD") {
+        scalarA = 100
+        vectorB = [3]
+        
+        vDSP.multiply(scalarA,
+                      by: vectorB,
+                      result: &result)
+        
+        expectEqual(Int(result.first!), 300)
+    }
+    
+    // a[i] * b[i]
+    AccelerateTests.test("vDSP/vmulD") {
+        vectorA = [6]
+        vectorB = [10]
+        
+        vDSP.multiply(vectorA,
+                      by: vectorB,
+                      result: &result)
+        
+        expectEqual(Int(result.first!), 60)
+    }
+    
+    // c[i] = a[i] / b
+    AccelerateTests.test("vDSP/vsdivD") {
+        scalarA = 4
+        vectorB = [100]
+        
+        vDSP.divide(vectorB,
+                    by: scalarA,
+                    result: &result)
+        
+        expectEqual(Int(result.first!), 25)
+    }
+    
+    // c[i] = a / b[i]
+    AccelerateTests.test("vDSP/svdivD") {
+        scalarA = 200
+        vectorB = [4]
+        
+        vDSP.divide(scalarA,
+                    by: vectorB,
+                    result: &result)
+        
+        expectEqual(Int(result.first!), 50)
+    }
+    
+    // c[i] = a[i] / b[i]
+    AccelerateTests.test("vDSP/vdivD") {
+        vectorA = [600]
+        vectorB = [3]
+        
+        vDSP.divide(vectorA,
+                    by: vectorB,
+                    result: &result)
+        
+        expectEqual(Int(result.first!), 200)
+    }
+    
+    // o0[i] = i1[i] + i0[i]; o1[i] = i1[i] - i0[i]
+    AccelerateTests.test("vDSP/vaddsubD") {
+        vectorA = [4]
+        vectorB = [16]
+        var subtractResult = [ Double.nan ]
+        
+        vDSP.addSubtract(vectorA,
+                         vectorB,
+                         addResult: &result,
+                         subtractResult: &subtractResult)
+        
+        expectEqual(Int(result.first!), 20)
+        expectEqual(Int(subtractResult.first!), 12)
+        
+    }
+    
+    // d[i] = (a[i] + b[i]) * c
+    AccelerateTests.test("vDSP/vasmD") {
+        vectorA = [4]
+        vectorB = [16]
+        scalarA = 4
+        
+        vDSP.multiply(vectorSum: (vectorA, vectorB),
+                      by: scalarA,
+                      result: &result)
+        
+        expectEqual(Int(result.first!), 80)
+    }
+    
+    // d[i] = (a[i] + b[i]) * c[i]
+    AccelerateTests.test("vDSP/vamD") {
+        vectorA = [4]
+        vectorB = [16]
+        vectorC = [5]
+        
+        vDSP.multiply(vectorSum: (vectorA, vectorB),
+                      by: vectorC,
+                      result: &result)
+        
+        expectEqual(Int(result.first!), 100)
+    }
+    
+    // d[i] = (a[i] - b[i]) * c
+    AccelerateTests.test("vDSP/vsbsmD") {
+        vectorA = [20]
+        vectorB = [5]
+        scalarA = 2
+        
+        vDSP.multiply(vectorDifference: (vectorA, vectorB),
+                      by: scalarA,
+                      result: &result)
+        
+        expectEqual(Int(result.first!), 30)
+        
+    }
+    
+    // d[i] = (a[i] - b[i]) * c[i]
+    AccelerateTests.test("vDSP/vsbmD") {
+        vectorA = [20]
+        vectorB = [5]
+        vectorC = [2]
+        
+        vDSP.multiply(vectorDifference: (vectorA, vectorB),
+                      by: vectorC,
+                      result: &result)
+        
+        expectEqual(Int(result.first!), 30)
+    }
+    
+    // a[i]*b[i] + c
+    AccelerateTests.test("vDSP/vmsaD") {
+        vectorA = [18]
+        vectorB = [10]
+        scalarA = 20
+        
+        vDSP.add(vectorProduct: (vectorA, vectorB),
+                 to: scalarA,
+                 result: &result)
+        
+        expectEqual(Int(result.first!), 200)
+    }
+    
+    // (a[i] * b) + c[i]
+    AccelerateTests.test("vDSP/vsmaD") {
+        vectorA = [18]
+        scalarB = 10
+        vectorC = [120]
+        
+        vDSP.add(vectorScalarProduct: (vectorA, scalarB),
+                 to: vectorC,
+                 result: &result)
+        
+        expectEqual(Int(result.first!), 300)
+    }
+    
+    // d[i] = (a[i] * b[i]) + c[i]
+    AccelerateTests.test("vDSP/vmaD") {
+        vectorA = [5]
+        vectorB = [20]
+        vectorC = [6]
+        
+        vDSP.add(vectorProduct: (vectorA, vectorB),
+                 to: vectorC,
+                 result: &result)
+        
+        expectEqual(Int(result.first!), 106)
+    }
+    
+    // d[i] = (a[i] * b[i]) - c[i]
+    AccelerateTests.test("vDSP/vmsbD") {
+        vectorA = [25]
+        vectorB = [2]
+        vectorC = [50]
+        
+        vDSP.subtract(vectorA,
+                      fromVectorProduct: (vectorB, vectorC),
+                      result: &result)
+        
+        expectEqual(Int(result.first!), 75)
+    }
+    
+    // e[i] = (a[i] * b) + (c[i] * d)
+    AccelerateTests.test("vDSP/vsmsmaD") {
+        vectorA = [5]
+        scalarA = 100
+        vectorB = [50]
+        scalarB = 4
+        
+        vDSP.add(vectorScalarProduct: (vectorA, scalarA),
+                 toVectorScalarProduct: (vectorB, scalarB),
+                 result: &result)
+        
+        expectEqual(Int(result.first!), 700)
+    }
+    
+    // E[n] = A[n]*B[n] + C[n]*D[n]
+    AccelerateTests.test("vDSP/vmmaD") {
+        vectorA = [2]
+        vectorB = [10]
+        vectorC = [3]
+        let vectorD: [Double] = [20]
+        
+        vDSP.add(vectorProduct: (vectorA, vectorB),
+                 toVectorProduct: (vectorC, vectorD),
+                 result: &result)
+        
+        expectEqual(Int(result.first!), 80)
+    }
+    
+    // e[i] = (a[i] + b[i]) * (c[i] + d[i])
+    AccelerateTests.test("vDSP/vaamD") {
+        vectorA = [2]
+        vectorB = [8]
+        vectorC = [3]
+        let vectorD: [Double] = [17]
+        
+        vDSP.multiply(vectorSum: (vectorA, vectorB),
+                      toVectorSum: (vectorC, vectorD),
+                      result: &result)
+    }
+    
+    // e[i] = (a[i] * b[i]) - (c[i] * d[i])
+    AccelerateTests.test("vDSP/vmmsbD") {
+        vectorA = [2]
+        vectorB = [3]
+        vectorC = [5]
+        let vectorD: [Double] = [15]
+        
+        vDSP.subtract(vectorProduct: (vectorA, vectorB),
+                      fromVectorProduct: (vectorC, vectorD),
+                      result: &result)
+        
+        expectEqual(Int(result.first!), 69)
+    }
+    
+    // e[i] = (a[i] - b[i]) * (c[i] - d[i])
+    AccelerateTests.test("vDSP/vsbsbmD") {
+        vectorA = [12]
+        vectorB = [2]
+        vectorC = [20]
+        let vectorD: [Double] = [3]
+        
+        vDSP.multiply(vectorDifference: (vectorA, vectorB),
+                      byVectorDifference: (vectorC, vectorD),
+                      result: &result)
+        
+        expectEqual(Int(result.first!), 170)
+    }
+    
+    // e[i] = (a[i] + b[i]) * (c[i] - d[i])
+    AccelerateTests.test("vDSP/vasbmD") {
+        vectorA = [16]
+        vectorB = [4]
+        vectorC = [102]
+        let vectorD: [Double] = [2]
+        
+        vDSP.multiply(vectorSum: (vectorA, vectorB),
+                      byVectorDifference: (vectorC, vectorD),
+                      result: &result)
+        
+        expectEqual(Int(result.first!), 2000)
+    }
+    
+    // d[n] = a[n]*b + c
+    AccelerateTests.test("vDSP/vsmsaD") {
+        vectorA = [12]
+        scalarA = 2
+        scalarB = 6
+        
+        vDSP.add(vectorScalarProduct: (vectorA, scalarA),
+                 to: scalarB,
+                 result: &result)
+        
+        expectEqual(Int(result.first!), 30)
+    }
+    
+    // D[n] = A[n]*B - C[n];
+    AccelerateTests.test("vDSP/vsmsbD") {
+        vectorA = [10]
+        scalarB = 5
+        vectorC = [25]
+        
+        vDSP.subtract(vectorC,
+                      fromVectorScalarProduct: (vectorA, scalarB),
+                      result: &result)
+        
+        expectEqual(Int(result.first!), 25)
+    }
+}
+
+
 runAllTests()
