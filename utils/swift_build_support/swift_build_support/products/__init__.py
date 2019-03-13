@@ -10,6 +10,9 @@
 #
 # ----------------------------------------------------------------------------
 
+from .build_script_impl_builder import (
+    BuildScriptImplHelper,
+    BUILD_SCRIPT_IMPL_PATH)
 from .cmark import CMark
 from .foundation import Foundation
 from .indexstoredb import IndexStoreDB
@@ -29,6 +32,8 @@ from .swiftsyntax import SwiftSyntax
 from .xctest import XCTest
 
 __all__ = [
+    'BUILD_SCRIPT_IMPL_PATH'
+    'BuildScriptImplHelper',
     'CMark',
     'Ninja',
     'Foundation',

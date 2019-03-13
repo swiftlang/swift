@@ -10,6 +10,8 @@
 #
 # ----------------------------------------------------------------------------
 
+from .build_script_impl_builder import BuildScriptImplBuilder
+
 
 class Product(object):
     @classmethod
@@ -29,11 +31,6 @@ class Product(object):
         the value of product_name() by default for this reason.
         """
         return cls.product_name()
-
-    @classmethod
-    def get_build_directory_name(cls, host_target):
-        return "{}-{}".format(cls.product_name(),
-                              host_target.name)
 
     @classmethod
     def is_build_script_impl_product(cls):
@@ -56,6 +53,10 @@ class Product(object):
         Run the tests, for a non-build-script-impl product.
         """
         raise NotImplementedError
+
+    @classmethod
+    def make_builder(cls, args, toolchain, workspace, host):
+        return BuildScriptImplBuilder(cls, args, toolchain, workspace, host)
 
     def __init__(self, args, toolchain, source_dir, build_dir):
         self.args = args
