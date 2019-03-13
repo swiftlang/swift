@@ -538,7 +538,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
     lookupOperatorInDeclContexts(contextAndIsCascadingUse);
   else {
     const bool isCascadingUse = computeIsCascadingUse();
-    const bool useOnlyScopeLookupWhenPossible = false;
+    const bool useOnlyScopeLookupWhenPossible = true;
     if (useOnlyScopeLookupWhenPossible && Loc.isValid()) {
       static bool haveWarned = false;
       if (!haveWarned) {
@@ -1490,7 +1490,7 @@ void UnqualifiedLookupFactory::dump() const {
 }
 
 void UnqualifiedLookupFactory::print(raw_ostream &OS) const {
-  OS << "Look up (" << lookupCounter << ") '" << Name << " at: ";
+  OS << "Look up (" << lookupCounter << ") '" << Name << "' at: ";
   Loc.print(OS, DC->getASTContext().SourceMgr);
   OS << "\nStarting in: ";
   DC->printContext(OS);
