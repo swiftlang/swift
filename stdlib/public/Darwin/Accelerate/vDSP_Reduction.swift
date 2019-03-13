@@ -258,7 +258,7 @@ extension vDSP {
     /// - Returns: The sum of values and the sum of squares in `vector`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func sum<U>(_ vector: U) -> (elementsSum: Float, squaresSum: Float)
+    public static func sumAndSumOfSquares<U>(_ vector: U) -> (elementsSum: Float, squaresSum: Float)
         where
         U: _ContiguousCollection,
         U.Element == Float {
@@ -283,7 +283,7 @@ extension vDSP {
     /// - Returns: The sum of values and the sum of squares in `vector`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func sum<U>(_ vector: U) -> (elementsSum: Double, squaresSum: Double)
+    public static func sumAndSumOfSquares<U>(_ vector: U) -> (elementsSum: Double, squaresSum: Double)
         where
         U: _ContiguousCollection,
         U.Element == Double {
@@ -359,7 +359,7 @@ extension vDSP {
     /// - Returns: A tuple containing the maximum value and its index.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func maximum<U>(_ vector: U) -> (UInt, Float)
+    public static func indexOfMaximum<U>(_ vector: U) -> (UInt, Float)
         where
         U: _ContiguousCollection,
         U.Element == Float {
@@ -384,7 +384,7 @@ extension vDSP {
     /// - Returns: A tuple containing the maximum value and its index.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func maximum<U>(_ vector: U) -> (UInt, Double)
+    public static func indexOfMaximum<U>(_ vector: U) -> (UInt, Double)
         where
         U: _ContiguousCollection,
         U.Element == Double {
@@ -411,7 +411,7 @@ extension vDSP {
     /// - Returns: A tuple containing the maximum magnitude and its index.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func maximumMagnitude<U>(_ vector: U) -> (UInt, Float)
+    public static func indexOfMaximumMagnitude<U>(_ vector: U) -> (UInt, Float)
         where
         U: _ContiguousCollection,
         U.Element == Float {
@@ -436,7 +436,7 @@ extension vDSP {
     /// - Returns: A tuple containing the maximum magnitude and its index.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func maximumMagnitude<U>(_ vector: U) -> (UInt, Double)
+    public static func indexOfMaximumMagnitude<U>(_ vector: U) -> (UInt, Double)
         where
         U: _ContiguousCollection,
         U.Element == Double {
@@ -463,7 +463,7 @@ extension vDSP {
     /// - Returns: A tuple containing the minimum value and its index.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func minimum<U>(_ vector: U) -> (UInt, Float)
+    public static func indexOfMinimum<U>(_ vector: U) -> (UInt, Float)
         where
         U: _ContiguousCollection,
         U.Element == Float {
@@ -488,7 +488,7 @@ extension vDSP {
     /// - Returns: A tuple containing the minimum value and its index.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func minimum<U>(_ vector: U) -> (UInt, Double)
+    public static func indexOfMinimum<U>(_ vector: U) -> (UInt, Double)
         where
         U: _ContiguousCollection,
         U.Element == Double {

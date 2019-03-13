@@ -96,7 +96,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     }
     
     AccelerateTests.test("vDSP/SinglePrecisionMaximumIndex") {
-        let result: (vDSP_Length, Float) = vDSP.maximum(a)
+        let result: (vDSP_Length, Float) = vDSP.indexOfMaximum(a)
         
         var legacyValueResult = Float(0)
         var legacyIndexResult = vDSP_Length(0)
@@ -123,7 +123,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     }
     
     AccelerateTests.test("vDSP/SinglePrecisionMaximumMagnitudeIndex") {
-        let result: (vDSP_Length, Float) = vDSP.maximumMagnitude(a)
+        let result: (vDSP_Length, Float) = vDSP.indexOfMaximumMagnitude(a)
         
         var legacyValueResult = Float(0)
         var legacyIndexResult = vDSP_Length(0)
@@ -150,7 +150,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     }
     
     AccelerateTests.test("vDSP/SinglePrecisionMinimumIndex") {
-        let result: (vDSP_Length, Float) = vDSP.minimum(a)
+        let result: (vDSP_Length, Float) = vDSP.indexOfMinimum(a)
         
         var legacyValueResult = Float(0)
         var legacyIndexResult = vDSP_Length(0)
@@ -189,7 +189,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     }
     
     AccelerateTests.test("vDSP/SinglePrecisionSumOfElementsAndSquares") {
-        let result: (Float, Float) = vDSP.sum(a)
+        let result: (Float, Float) = vDSP.sumAndSumOfSquares(a)
         
         var legacySumResult = Float(0)
         var legacySumOfSquaresResult = Float(0)
@@ -291,7 +291,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     }
     
     AccelerateTests.test("vDSP/DoublePrecisionMaximumIndex") {
-        let result: (vDSP_Length, Double) = vDSP.maximum(a)
+        let result: (vDSP_Length, Double) = vDSP.indexOfMaximum(a)
         
         var legacyValueResult = Double(0)
         var legacyIndexResult = vDSP_Length(0)
@@ -318,7 +318,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     }
     
     AccelerateTests.test("vDSP/DoublePrecisionMaximumMagnitudeIndex") {
-        let result: (vDSP_Length, Double) = vDSP.maximumMagnitude(a)
+        let result: (vDSP_Length, Double) = vDSP.indexOfMaximumMagnitude(a)
         
         var legacyValueResult = Double(0)
         var legacyIndexResult = vDSP_Length(0)
@@ -345,7 +345,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     }
     
     AccelerateTests.test("vDSP/DoublePrecisionMinimumIndex") {
-        let result: (vDSP_Length, Double) = vDSP.minimum(a)
+        let result: (vDSP_Length, Double) = vDSP.indexOfMinimum(a)
         
         var legacyValueResult = Double(0)
         var legacyIndexResult = vDSP_Length(0)
@@ -384,7 +384,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     }
     
     AccelerateTests.test("vDSP/DoublePrecisionSumOfElementsAndSquares") {
-        let result: (Double, Double) = vDSP.sum(a)
+        let result: (Double, Double) = vDSP.sumAndSumOfSquares(a)
         
         var legacySumResult = Double(0)
         var legacySumOfSquaresResult = Double(0)
