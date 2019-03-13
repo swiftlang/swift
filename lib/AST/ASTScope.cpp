@@ -504,7 +504,6 @@ void ASTScope::expand() const {
     break;
       
   case ASTScopeKind::SubscriptDecl:
-#error add generics
     addChildrenForAllExplicitAccessors(getSubscriptDecl());
     break;
 
@@ -746,7 +745,10 @@ static bool parentDirectDescendedFromAbstractStorageDecl(
       continue;
 
     case ASTScopeKind::VarDecl:
-      return (parent->getVarDecl() == decl);
+      return parent->getVarDecl() == decl;
+ 
+    case ASTScopeKind::SubscriptDecl:
+      return parent->getSubscriptDecl() == decl;
 
     case ASTScopeKind::SourceFile:
     case ASTScopeKind::TypeDecl:
@@ -771,8 +773,6 @@ static bool parentDirectDescendedFromAbstractStorageDecl(
     case ASTScopeKind::CaseStmt:
     case ASTScopeKind::Closure:
     case ASTScopeKind::TopLevelCode:
-#error is this right?
-    case ASTScopeKind::SubscriptDecl:
       // Not a direct descendant.
       return false;
     }
@@ -999,13 +999,17 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
   case DeclKind::Destructor: {
     auto abstractFunction = cast<AbstractFunctionDecl>(decl);
 
-    // If we have a generic function and our parent isn't describing our generic
-    // parameters or function parameters, build the generic parameter scope.
-    if (parent->getKind() != ASTScopeKind::AbstractFunctionParams ||
-        parent->abstractFunctionParams.decl != decl) {
-      if (auto scope = nextGenericParam(abstractFunction->getGenericParams(),
-                                        abstractFunction))
-        return scope;
+    // Subscripts always take over the generics, so only if not in a subscript:
+    auto *const grandParent = parent->getParent();
+    if (!grandParent || grandParent->getKind() != ASTScopeKind::SubscriptDecl) {
+      // If we have a generic function and our parent isn't describing our generic
+      // parameters or function parameters, build the generic parameter scope.
+      if (parent->getKind() != ASTScopeKind::AbstractFunctionParams ||
+          parent->abstractFunctionParams.decl != decl) {
+        if (auto scope = nextGenericParam(abstractFunction->getGenericParams(),
+                                          abstractFunction))
+          return scope;
+      }
     }
     // Figure out which parameter is next is the next one down.
     Optional<std::pair<unsigned, unsigned>> nextParameter = None;
@@ -1867,7 +1871,6 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
   case ASTScopeKind::DoCatchStmt:
   case ASTScopeKind::SwitchStmt:
   case ASTScopeKind::VarDecl:
-#error is this right? -- generics
   case ASTScopeKind::SubscriptDecl:
   case ASTScopeKind::TopLevelCode:
   case ASTScopeKind::NominalOrExtensionWhereClause:

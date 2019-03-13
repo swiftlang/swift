@@ -43,6 +43,7 @@ using namespace swift::namelookup;
 /// Determine the local declaration visibility key for an \c ASTScope in which
 /// name lookup successfully resolved.
 static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
+  // TODO: integrate this func with getLocalBindings
   switch (scope->getKind()) {
   case ASTScopeKind::Preexpanded:
   case ASTScopeKind::SourceFile:
@@ -58,7 +59,8 @@ static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
   case ASTScopeKind::ForEachStmt:
   case ASTScopeKind::DoCatchStmt:
   case ASTScopeKind::SwitchStmt:
-  case ASTScopeKind::Accessors:
+  case ASTScopeKind::VarDecl:
+  case ASTScopeKind::SubscriptDecl:
   case ASTScopeKind::TopLevelCode:
     llvm_unreachable("no local declarations?");
 
@@ -223,8 +225,8 @@ private:
   
   /// For debugging:
   bool involvedANominalOrExtensionWhereClause = false;
-  unsigned lookupCounter = 0;
-  unsigned targetLookup = ~0;
+  static unsigned lookupCounter;
+  const unsigned targetLookup = ~0;
 
 
 public: // for exp debugging
@@ -641,6 +643,8 @@ UnqualifiedLookupFactory::nonoperatorScopeForASTScopeLookup(
   // Find the source file in which we are performing the lookup.
   SourceFile &sourceFile =
       *contextAndIsCascadingUseArg.whereToLook->getParentSourceFile();
+      
+  stopIfTargetLookup();
 
   // Find the scope from which we will initiate unqualified name lookup.
   const ASTScope *innermostScope =
@@ -666,6 +670,8 @@ void UnqualifiedLookupFactory::lookInASTScope(
   
   involvedANominalOrExtensionWhereClause |=
     state.scope->getKind() == ASTScopeKind::NominalOrExtensionWhereClause;
+  
+  stopIfTargetLookup();
   
   if (state.scope->isEffectivelyTopLevelCode()) {
     lookInASTScope(state.withParentScope());
@@ -707,6 +713,8 @@ void UnqualifiedLookupFactory::lookInASTScopeContext(
   const ASTScopeLookupState defaultNextState =
       stateArg.withParentScope()
               .withResolvedIsCascadingUse(isCascadingUseResult);
+  
+  stopIfTargetLookup();
 
   // Lookup in the source file's scope marks the end.
   if (isa<SourceFile>(scopeDC)) {
@@ -1510,3 +1518,5 @@ LookupResultEntry UnqualifiedLookupFactory::addingResult(
 }
 
 void UnqualifiedLookupFactory::InstrumentedNamedDeclConsumer::anchor() {}
+
+unsigned UnqualifiedLookupFactory::lookupCounter = 0;
