@@ -24,6 +24,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/DWARFImporter/DWARFImporter.h"
+#include "swift/Frontend/ParseableInterfaceModuleLoader.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"

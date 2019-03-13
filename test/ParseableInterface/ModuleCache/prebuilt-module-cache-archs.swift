@@ -16,7 +16,9 @@
 // RUN: %empty-directory(%t/prebuilt-cache/Lib.swiftmodule)
 // RUN: sed -e 's/FromInterface/FromPrebuilt/g' %S/Inputs/prebuilt-module-cache/Lib.swiftinterface | %target-swift-frontend -parse-stdlib -module-cache-path %t/MCP -emit-module-path %t/prebuilt-cache/Lib.swiftmodule/%target-swiftmodule-name - -module-name Lib
 // RUN: not %target-swift-frontend -typecheck -enable-parseable-module-interface -parse-stdlib -module-cache-path %t/MCP -sdk %t/include -I %t/include/ -prebuilt-module-cache-path %t/prebuilt-cache %s 2>&1 | %FileCheck -check-prefix=FROM-PREBUILT %s
-// RUN: ls %t/MCP | not grep swiftmodule
+
+// Make sure we installed a forwarding module.
+// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/Lib-*.swiftmodule
 
 // What if the module is invalid?
 // RUN: rm %t/prebuilt-cache/Lib.swiftmodule/%target-swiftmodule-name && touch %t/prebuilt-cache/Lib.swiftmodule/%target-swiftmodule-name
