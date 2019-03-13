@@ -4624,6 +4624,8 @@ public:
   /// True if any of the accessors to the storage is private or fileprivate.
   bool hasPrivateAccessor() const;
 
+  bool hasDidSetOrWillSetDynamicReplacement() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractStorageDecl &&
