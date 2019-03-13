@@ -365,6 +365,7 @@ computeNewArgInterfaceTypes(SILFunction *F,
     assert(paramBoxTy->getLayout()->getFields().size() == 1
            && "promoting compound box not implemented yet");
     auto paramBoxedTy = paramBoxTy->getFieldType(F->getModule(), 0);
+    // FIXME: Expansion
     auto &paramTL = Types.getTypeLowering(paramBoxedTy,
                                           ResilienceExpansion::Minimal);
     ParameterConvention convention;

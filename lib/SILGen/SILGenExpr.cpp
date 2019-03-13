@@ -856,11 +856,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 
   // If this is a decl that we have an lvalue for, produce and return it.
   ValueDecl *decl = declRef.getDecl();
-  
-  if (!ncRefType) {
-    ncRefType = decl->getInnermostDeclContext()->mapTypeIntoContext(
-        decl->getInterfaceType());
-  }
+
   CanType refType = ncRefType->getCanonicalType();
 
   // If this is a reference to a module, produce an undef value. The
