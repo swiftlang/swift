@@ -676,8 +676,13 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
     unsigned IdxForResult = 0;
     for (SILResultInfo RI : SubstitutedType->getIndirectFormalResults()) {
       assert(RI.isFormalIndirect());
-      if (substConv.getSILType(RI).isLoadable(M) && !RI.getType()->isVoid() &&
-          shouldExpand(M, substConv.getSILType(RI).getObjectType())) {
+
+      auto ResultTy = substConv.getSILType(RI);
+      auto &TL = M.Types.getTypeLowering(ResultTy,
+                                         getResilienceExpansion());
+
+      if (TL.isLoadable() && !RI.getType()->isVoid() &&
+          shouldExpand(M, ResultTy)) {
         Conversions.set(IdxForResult);
         break;
       }
@@ -690,7 +695,12 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
   for (SILParameterInfo PI : SubstitutedType->getParameters()) {
     auto IdxToInsert = IdxForParam;
     ++IdxForParam;
-    if (!substConv.getSILType(PI).isLoadable(M)) {
+
+    auto ParamTy = substConv.getSILType(PI);
+    auto &TL = M.Types.getTypeLowering(ParamTy,
+                                       getResilienceExpansion());
+
+    if (!TL.isLoadable()) {
       continue;
     }
 
@@ -778,9 +788,8 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
       if (isFormalResultConverted(IndirectResultIdx++)) {
         // Convert the indirect result to a direct result.
         SILType SILResTy = SILType::getPrimitiveObjectType(RI.getType());
-        // FIXME: Expansion
         auto &TL = M.Types.getTypeLowering(SILResTy,
-                                           ResilienceExpansion::Minimal);
+                                           getResilienceExpansion());
 
         // Indirect results are passed as owned, so we also need to pass the
         // direct result as owned (except it's a trivial type).
@@ -804,9 +813,8 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
 
     // Convert the indirect parameter to a direct parameter.
     SILType SILParamTy = SILType::getPrimitiveObjectType(PI.getType());
-    // FIXME: Expansion
     auto &TL = M.Types.getTypeLowering(SILParamTy,
-                                       ResilienceExpansion::Minimal);
+                                       getResilienceExpansion());
 
     // Indirect parameters are passed as owned/guaranteed, so we also
     // need to pass the direct/guaranteed parameter as
