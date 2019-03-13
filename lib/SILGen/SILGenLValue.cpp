@@ -1903,11 +1903,18 @@ namespace {
 RValue
 TranslationPathComponent::get(SILGenFunction &SGF, SILLocation loc,
                               ManagedValue base, SGFContext c) && {
-  // Load the original value.
-  RValue baseVal(SGF, loc, getSubstFormalType(),
-           SGF.emitLoad(loc, base.getValue(),
-                        SGF.getTypeLowering(base.getType()),
-                        SGFContext(), IsNotTake));
+  // Inline constructor.
+  RValue baseVal = [&]() -> RValue {
+    // If our base is an object, just put it into an RValue and return.
+    if (base.getType().isObject())
+      return RValue(SGF, loc, getSubstFormalType(), base);
+
+    // Otherwise, load the value and put it into an RValue.
+    return RValue(SGF, loc, getSubstFormalType(),
+                  SGF.emitLoad(loc, base.getValue(),
+                               SGF.getTypeLowering(base.getType()),
+                               SGFContext(), IsNotTake));
+  }();
 
   // Map the base value to its substituted representation.
   return std::move(*this).translate(SGF, loc, std::move(baseVal), c);
@@ -1916,6 +1923,8 @@ TranslationPathComponent::get(SILGenFunction &SGF, SILLocation loc,
 void TranslationPathComponent::set(SILGenFunction &SGF, SILLocation loc,
                                    ArgumentSource &&valueSource,
                                    ManagedValue base) && {
+  assert(base.getType().isAddress() &&
+         "Only support setting bases that have addresses");
   RValue value = std::move(valueSource).getAsRValue(SGF);
 
   // Map the value to the original pattern.
