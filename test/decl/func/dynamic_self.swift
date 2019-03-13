@@ -73,7 +73,7 @@ class C1 {
     if !b { return type(of: self).init(int: 5) }
 
     // Can't utter Self within the body of a method.
-    var _: Self = self
+    var _: Self = self // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C1'?}} {{12-16=C1}}
 
     // Okay to return 'self', because it has the appropriate type.
     return self // okay

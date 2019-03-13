@@ -1057,18 +1057,22 @@ static Type diagnoseUnknownType(TypeResolution resolution,
       NominalTypeDecl *nominal = nullptr;
       if ((nominalDC = dc->getInnermostTypeContext()) &&
           (nominal = nominalDC->getSelfNominalTypeDecl())) {
-        // Attempt to refer to 'Self' within a non-protocol nominal
-        // type. Fix this by replacing 'Self' with the nominal type name.
         assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
 
         bool insideClass = nominalDC->getSelfClassDecl() != nullptr;
-        if (!insideClass || dc->isLocalContext() || options.isAnyExpr()) {
+        AbstractFunctionDecl *methodDecl = dc->getInnermostMethodContext();
+        bool declaringMethod = methodDecl &&
+          methodDecl->getDeclContext() == dc->getParentForLookup();
+
+        if (!insideClass || !declaringMethod ||
+            options.getBaseContext() == TypeResolverContext::ExplicitCastExpr) {
           Type SelfType = nominal->getSelfInterfaceType();
           if (insideClass)
             SelfType = DynamicSelfType::get(SelfType, ctx);
           return resolution.mapTypeIntoContext(SelfType);
         }
 
+        // Attempt to refer to 'Self' within a non-protocol nominal type.
         // Produce a Fix-It replacing 'Self' with the nominal type name.
         auto name = getDeclNameFromContext(dc, nominal);
         diags.diagnose(comp->getIdLoc(), diag::self_in_nominal, name)

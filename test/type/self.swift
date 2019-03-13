@@ -65,6 +65,7 @@ class A<T> {
     Self.y()
     Self.z()
     let _: Self = Self.init(a: 66)
+    // expected-error@-1 {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'A'?}}
     return Self.init(a: 77) as? Self as? A
     // expected-warning@-1 {{conditional cast from 'Self' to 'Self' always succeeds}}
     // expected-warning@-2 {{conditional downcast from 'Self?' to 'A<T>' is equivalent to an implicit conversion to an optional 'A<T>'}}
@@ -108,6 +109,9 @@ struct S2 {
     static func x() {
       Self.y()
     }
+    func f() {
+      func g(_: Self) {}
+    }
     static func y() {
       print("HERE")
     }
@@ -126,6 +130,9 @@ extension S2 {
   static func y() {
     print("HERE")
   }
+  func f() {
+    func g(_: Self) {}
+  }
   func foo(a: [Self]) -> Self? {
     Self.x()
     return Self.init() as? Self
@@ -135,6 +142,7 @@ extension S2 {
 
 enum E {
   static func f() {
+    func g(_: Self) {}
     print("f()")
   }
   case e
