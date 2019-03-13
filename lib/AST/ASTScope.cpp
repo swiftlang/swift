@@ -499,16 +499,14 @@ void ASTScope::expand() const {
       addChild(bodyChild);
     break;
 
-  case ASTScopeKind::Accessors: {
-    // Add children for all of the explicitly-written accessors.
-    for (auto accessor : abstractStorageDecl->getAllAccessors()) {
-      if (accessor->isImplicit() || accessor->getStartLoc().isInvalid())
-        continue;
-      if (auto accessorChild = createIfNeeded(this, accessor))
-        addChild(accessorChild);
-    }
+  case ASTScopeKind::VarDecl:
+    addChildrenForAllExplicitAccessors(getVarDecl());
     break;
-  }
+      
+  case ASTScopeKind::SubscriptDecl:
+#error add generics
+    addChildrenForAllExplicitAccessors(getSubscriptDecl());
+    break;
 
   case ASTScopeKind::Closure:
     // Add the child for a body.
@@ -517,7 +515,7 @@ void ASTScope::expand() const {
     break;
 
   case ASTScopeKind::TopLevelCode:
-    /// Add a child for the body.
+    // Add a child for the body.
     if (auto bodyChild = createIfNeeded(this, topLevelCode->getBody()))
       addChild(bodyChild);
     break;
@@ -537,6 +535,16 @@ void ASTScope::expand() const {
   // further work to do if there is an active continuation.
   if (getKind() != ASTScopeKind::SourceFile || getHistoricalContinuation())
     parentAndExpanded.setInt(true);
+}
+
+void ASTScope::addChildrenForAllExplicitAccessors(
+                 AbstractStorageDecl* abstractStorageDecl) const {
+  for (auto accessor : abstractStorageDecl->getAllAccessors()) {
+    if (accessor->isImplicit() || accessor->getStartLoc().isInvalid())
+      continue;
+    if (auto accessorChild = createIfNeeded(this, accessor))
+      addChild(accessorChild);
+  }
 }
 
 bool ASTScope::addChild(ASTScope *const child) const {
@@ -737,8 +745,8 @@ static bool parentDirectDescendedFromAbstractStorageDecl(
       parent = parent->getParent();
       continue;
 
-    case ASTScopeKind::Accessors:
-      return (parent->getAbstractStorageDecl() == decl);
+    case ASTScopeKind::VarDecl:
+      return (parent->getVarDecl() == decl);
 
     case ASTScopeKind::SourceFile:
     case ASTScopeKind::TypeDecl:
@@ -763,6 +771,8 @@ static bool parentDirectDescendedFromAbstractStorageDecl(
     case ASTScopeKind::CaseStmt:
     case ASTScopeKind::Closure:
     case ASTScopeKind::TopLevelCode:
+#error is this right?
+    case ASTScopeKind::SubscriptDecl:
       // Not a direct descendant.
       return false;
     }
@@ -797,7 +807,8 @@ static bool parentDirectDescendedFromAbstractFunctionDecl(
     case ASTScopeKind::PatternBinding:
     case ASTScopeKind::PatternInitializer:
     case ASTScopeKind::AfterPatternBinding:
-    case ASTScopeKind::Accessors:
+    case ASTScopeKind::VarDecl:
+    case ASTScopeKind::SubscriptDecl:
     case ASTScopeKind::BraceStmt:
     case ASTScopeKind::ConditionalClause:
     case ASTScopeKind::IfStmt:
@@ -844,7 +855,8 @@ static bool parentDirectDescendedFromTypeDecl(const ASTScope *parent,
     case ASTScopeKind::PatternBinding:
     case ASTScopeKind::PatternInitializer:
     case ASTScopeKind::AfterPatternBinding:
-    case ASTScopeKind::Accessors:
+    case ASTScopeKind::VarDecl:
+    case ASTScopeKind::SubscriptDecl:
     case ASTScopeKind::BraceStmt:
     case ASTScopeKind::ConditionalClause:
     case ASTScopeKind::IfStmt:
@@ -871,6 +883,7 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
   if (decl->isImplicit()) return nullptr;
 
   // Accessors are always nested within their abstract storage declaration.
+  // Except for subscripts, which have their own scope for generics.
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
     if (!parentDirectDescendedFromAbstractStorageDecl(
             parent, accessor->getStorage()))
@@ -1074,12 +1087,8 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
     return new (ctx) ASTScope(parent, bindings);
   }
 
-  case DeclKind::Subscript: {
-    auto asd = cast<AbstractStorageDecl>(decl);
-    if (hasAccessors(asd))
-      return new (ctx) ASTScope(parent, asd);
-    return nullptr;
-  }
+  case DeclKind::Subscript:
+    return new (ctx) ASTScope(parent, cast<SubscriptDecl>(decl));
   }
 
   llvm_unreachable("Unhandled DeclKind in switch.");
@@ -1267,7 +1276,8 @@ bool ASTScope::canStealContinuation() const {
   case ASTScopeKind::DefaultArgument:
   case ASTScopeKind::AbstractFunctionBody:
   case ASTScopeKind::PatternInitializer:
-  case ASTScopeKind::Accessors:
+  case ASTScopeKind::VarDecl:
+  case ASTScopeKind::SubscriptDecl:
   case ASTScopeKind::IfStmt:
   case ASTScopeKind::RepeatWhileStmt:
   case ASTScopeKind::ForEachStmt:
@@ -1409,8 +1419,11 @@ ASTContext &ASTScope::getASTContext() const {
   case ASTScopeKind::SpecializeAttribute:
     return getParent()->getASTContext();
 
-  case ASTScopeKind::Accessors:
-    return abstractStorageDecl->getASTContext();
+  case ASTScopeKind::VarDecl:
+    return getVarDecl()->getASTContext();
+
+  case ASTScopeKind::SubscriptDecl:
+    return getSubscriptDecl()->getASTContext();
 
   case ASTScopeKind::TopLevelCode:
     return static_cast<Decl *>(topLevelCode)->getASTContext();
@@ -1691,8 +1704,11 @@ SourceRange ASTScope::getSourceRangeImpl() const {
     // Otherwise, it covers the body.
     return caseStmt->getBody()->getSourceRange();
 
-  case ASTScopeKind::Accessors:
-    return abstractStorageDecl->getBracesRange();
+  case ASTScopeKind::VarDecl:
+    return getVarDecl()->getBracesRange();
+
+  case ASTScopeKind::SubscriptDecl:
+    return getSubscriptDecl()->getBracesRange();
 
   case ASTScopeKind::Closure:
     if (closure->getInLoc().isValid())
@@ -1782,12 +1798,8 @@ DeclContext *ASTScope::getDeclContext() const {
   case ASTScopeKind::Closure:
     return closure;
 
-  case ASTScopeKind::Accessors:
-    // FIXME: Somewhat odd modeling because Subscripts don't have their
-    // own nodes. Maybe they should.
-    if (auto subscript = dyn_cast<SubscriptDecl>(abstractStorageDecl))
-      return subscript;
-    return nullptr;
+  case ASTScopeKind::SubscriptDecl:
+    return getSubscriptDecl();
 
   case ASTScopeKind::NominalOrExtensionWhereClause:
       return whereDeclContext.is<NominalTypeDecl*>()
@@ -1815,6 +1827,7 @@ DeclContext *ASTScope::getDeclContext() const {
   case ASTScopeKind::CaseStmt:
   case ASTScopeKind::AbstractFunctionBody:
   case ASTScopeKind::SpecializeAttribute:
+  case ASTScopeKind::VarDecl:
     return nullptr;
   }
 
@@ -1853,7 +1866,9 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
   case ASTScopeKind::ForEachStmt:
   case ASTScopeKind::DoCatchStmt:
   case ASTScopeKind::SwitchStmt:
-  case ASTScopeKind::Accessors:
+  case ASTScopeKind::VarDecl:
+#error is this right? -- generics
+  case ASTScopeKind::SubscriptDecl:
   case ASTScopeKind::TopLevelCode:
   case ASTScopeKind::NominalOrExtensionWhereClause:
     // No local declarations.
@@ -2199,11 +2214,19 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
     printRange();
     break;
 
-  case ASTScopeKind::Accessors:
-    printScopeKind("Accessors");
-    printAddress(abstractStorageDecl);
+  case ASTScopeKind::VarDecl:
+    printScopeKind("VarDecl");
+    printAddress(getVarDecl());
     out << " ";
-    abstractStorageDecl->dumpRef(out);
+    getVarDecl()->dumpRef(out);
+    printRange();
+    break;
+
+  case ASTScopeKind::SubscriptDecl:
+    printScopeKind("SubscriptDecl");
+    printAddress(getSubscriptDecl());
+    out << " ";
+    getSubscriptDecl()->dumpRef(out);
     printRange();
     break;
 
@@ -2285,7 +2308,8 @@ bool ASTScope::isCloseToTopLevelCode() const {
       case ASTScopeKind::CatchStmt:
       case ASTScopeKind::SwitchStmt:
       case ASTScopeKind::CaseStmt:
-      case ASTScopeKind::Accessors:
+      case ASTScopeKind::SubscriptDecl:
+      case ASTScopeKind::VarDecl:
         break;
     }
   }

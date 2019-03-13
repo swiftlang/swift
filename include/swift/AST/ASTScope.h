@@ -50,10 +50,12 @@ class SourceFile;
 class SpecializeAttr;
 class Stmt;
 class StmtConditionElement;
+class SubscriptDecl;
 class SwitchStmt;
 class TrailingWhereClause;
 class TopLevelCodeDecl;
 class TypeDecl;
+class VarDecl;
 class WhileStmt;
 
 /// Describes kind of scope that occurs within the AST.
@@ -115,12 +117,14 @@ enum class ASTScopeKind : uint8_t {
   SwitchStmt,
   /// Describes a 'case' statement.
   CaseStmt,
-  /// Scope for the accessors of an abstract storage declaration.
-  Accessors,
   /// Scope for a closure.
   Closure,
   /// Scope for top-level code.
   TopLevelCode,
+  /// Because a SubscriptDecl can be generic
+  SubscriptDecl,
+ 
+  VarDecl
 };
 
 /// Describes a lexical scope within a source file.
@@ -303,10 +307,6 @@ class ASTScope {
     /// A case statement, for \c kind == ASTScopeKind::CaseStmt;
     CaseStmt *caseStmt;
 
-    /// An abstract storage declaration, for
-    /// \c kind == ASTScopeKind::Accessors.
-    AbstractStorageDecl *abstractStorageDecl;
-
     /// The closure, for \c kind == ASTScopeKind::Closure.
     ClosureExpr *closure;
 
@@ -314,6 +314,12 @@ class ASTScope {
     /// \c kind == ASTScopeKind::TopLevelCodeDecl.
     TopLevelCodeDecl *topLevelCode;
     
+    /// For \c kind == ASTScopeKind::SubscriptDecl.
+    SubscriptDecl *subscriptDecl;
+    
+    /// For \c kind == ASTScopeKind::VarDecl
+    VarDecl *varDecl;
+
     /// For \c kind == ASTScopeKind::SpecializeAttribute.
     struct {
       SpecializeAttr *specializeAttr;
@@ -476,11 +482,6 @@ class ASTScope {
     this->caseStmt = caseStmt;
   }
 
-  ASTScope(const ASTScope *parent, AbstractStorageDecl *abstractStorageDecl)
-      : ASTScope(ASTScopeKind::Accessors, parent) {
-    this->abstractStorageDecl = abstractStorageDecl;
-  }
-
   ASTScope(const ASTScope *parent, ClosureExpr *closure)
       : ASTScope(ASTScopeKind::Closure, parent) {
     this->closure = closure;
@@ -490,7 +491,19 @@ class ASTScope {
       : ASTScope(ASTScopeKind::TopLevelCode, parent) {
     this->topLevelCode = topLevelCode;
   }
+  // TODO: Find a way to get rid of all this boilerplate
+
+  ASTScope(const ASTScope *parent, VarDecl *varDecl)
+  : ASTScope(ASTScopeKind::VarDecl, parent) {
+    this->varDecl = varDecl;
+  }
   
+  ASTScope(const ASTScope *parent, SubscriptDecl *subscriptDecl)
+  : ASTScope(ASTScopeKind::SubscriptDecl, parent) {
+    this->subscriptDecl = subscriptDecl;
+  }
+
+
   ASTScope(
     const ASTScope *parent,
     llvm::PointerUnion<NominalTypeDecl*, ExtensionDecl*> whereDeclContext)
@@ -597,6 +610,8 @@ class ASTScope {
   /// Is the receiver a close enought descendant of a TopLevelCode scope
   /// that other matches must be found, even if one is found here?
   bool isCloseToTopLevelCode() const;
+  
+  void addChildrenForAllExplicitAccessors(AbstractStorageDecl*) const;
  
 public:
   /// Create the AST scope for a source file, which is the root of the scope
@@ -643,11 +658,18 @@ public:
     return abstractFunction;
   }
 
-  /// Retrieve the abstract storage declaration when
-  /// \c getKind() == ASTScopeKind::Accessors;
-  AbstractStorageDecl *getAbstractStorageDecl() const {
-    assert(getKind() == ASTScopeKind::Accessors);
-    return abstractStorageDecl;
+  /// Retrieve the var declaration when
+  /// \c getKind() == ASTScopeKind::VarDecl;
+  VarDecl *getVarDecl() const {
+    assert(getKind() == ASTScopeKind::VarDecl);
+    return varDecl;
+  }
+
+  /// Retrieve the subscript declaration when
+  /// \c getKind() == ASTScopeKind::SubscriptDecl;
+  SubscriptDecl *getSubscriptDecl() const {
+    assert(getKind() == ASTScopeKind::SubscriptDecl);
+    return subscriptDecl;
   }
 
   /// Find the innermost enclosing scope that contains this source location.
