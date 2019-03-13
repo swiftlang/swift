@@ -899,6 +899,7 @@ std::string IRGenModule::GetObjCSectionName(StringRef Section,
                : ("__DATA," + Section + "," + MachOAttributes).str();
   case llvm::Triple::ELF:
     return Section.substr(2).str();
+  case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     return ("." + Section.substr(2) + "$B").str();
   case llvm::Triple::Wasm:
@@ -930,6 +931,7 @@ void IRGenModule::SetCStringLiteralSection(llvm::GlobalVariable *GV,
     }
   case llvm::Triple::ELF:
     return;
+  case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     return;
   case llvm::Triple::Wasm:
@@ -1225,6 +1227,7 @@ static std::string getDynamicReplacementSection(IRGenModule &IGM) {
   case llvm::Triple::Wasm:
     sectionName = "swift5_replace";
     break;
+  case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     sectionName = ".sw5repl$B";
     break;
@@ -2703,6 +2706,7 @@ llvm::Constant *IRGenModule::emitSwiftProtocols() {
   case llvm::Triple::Wasm:
     sectionName = "swift5_protocols";
     break;
+  case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     sectionName = ".sw5prt$B";
     break;
@@ -2763,6 +2767,7 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
   case llvm::Triple::Wasm:
     sectionName = "swift5_protocol_conformances";
     break;
+  case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     sectionName = ".sw5prtc$B";
     break;
@@ -2788,6 +2793,7 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
   case llvm::Triple::Wasm:
     sectionName = "swift5_type_metadata";
     break;
+  case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     sectionName = ".sw5tymd$B";
     break;
@@ -2856,6 +2862,7 @@ llvm::Constant *IRGenModule::emitFieldDescriptors() {
   case llvm::Triple::Wasm:
     sectionName = "swift5_fieldmd";
     break;
+  case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     sectionName = ".swift5_fieldmd";
     break;
