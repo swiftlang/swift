@@ -856,7 +856,8 @@ def index_ignore_system_modules : Flag<["-"], "index-ignore-system-modules">,
   HelpText<"Avoid indexing system modules">;
 
 def enforce_exclusivity_EQ : Joined<["-"], "enforce-exclusivity=">,
-  Flags<[FrontendOption]>, MetaVarName<"<enforcement>">,
+  Flags<[FrontendOption, ParseableInterfaceOption]>,
+  MetaVarName<"<enforcement>">,
   HelpText<"Enforce law of exclusivity">;
 
 def working_directory : Separate<["-"], "working-directory">,
