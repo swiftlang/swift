@@ -14,13 +14,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Parse/Parser.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Version.h"
-#include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/Lexer.h"
+#include "swift/Parse/Parser.h"
 #include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Subsystems.h"
 #include "swift/Syntax/TokenSyntax.h"
@@ -2350,6 +2351,43 @@ parseStmtCaseDefault(Parser &P, SourceLoc &CaseLoc,
   return Status;
 }
 
+namespace {
+
+struct FallthroughFinder : ASTWalker {
+  FallthroughStmt *result;
+
+  FallthroughFinder() : result(nullptr) {}
+
+  // We walk through statements.  If we find a fallthrough, then we got what
+  // we came for.
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *s) override {
+    if (auto *f = dyn_cast<FallthroughStmt>(s)) {
+      result = f;
+    }
+
+    return {true, s};
+  }
+
+  // Expressions, patterns and decls cannot contain fallthrough statements, so
+  // there is no reason to walk into them.
+  std::pair<bool, Expr *> walkToExprPre(Expr *e) override { return {false, e}; }
+  std::pair<bool, Pattern *> walkToPatternPre(Pattern *p) override {
+    return {false, p};
+  }
+
+  bool walkToDeclPre(Decl *d) override { return false; }
+  bool walkToTypeLocPre(TypeLoc &tl) override { return false; }
+  bool walkToTypeReprPre(TypeRepr *t) override { return false; }
+
+  static FallthroughStmt *findFallthrough(Stmt *s) {
+    FallthroughFinder finder;
+    s->walk(finder);
+    return finder.result;
+  }
+};
+
+} // end anonymous namespace
+
 ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
   SyntaxParsingContext CaseContext(SyntaxContext, SyntaxKind::SwitchCase);
   // A case block has its own scope for variables bound out of the pattern.
@@ -2424,9 +2462,10 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
   }
 
   return makeParserResult(
-      Status, CaseStmt::create(Context, CaseLoc, CaseLabelItems,
-                               !BoundDecls.empty(), UnknownAttrLoc, ColonLoc,
-                               Body));
+      Status,
+      CaseStmt::create(Context, CaseLoc, CaseLabelItems, !BoundDecls.empty(),
+                       UnknownAttrLoc, ColonLoc, Body, None,
+                       FallthroughFinder::findFallthrough(Body)));
 }
 
 /// stmt-pound-assert:
