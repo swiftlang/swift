@@ -1614,10 +1614,10 @@ bool swift::analyzeStaticInitializer(
 /// FIXME: This must be kept in sync with replaceLoadSequence()
 /// below. What a horrible design.
 bool swift::canReplaceLoadSequence(SILInstruction *I) {
-  if (auto *CAI = dyn_cast<CopyAddrInst>(I))
+  if (isa<CopyAddrInst>(I))
     return true;
 
-  if (auto *LI = dyn_cast<LoadInst>(I))
+  if (isa<LoadInst>(I))
     return true;
 
   if (auto *SEAI = dyn_cast<StructElementAddrInst>(I)) {
