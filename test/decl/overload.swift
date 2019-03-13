@@ -495,15 +495,15 @@ enum SR_10084_E {
 }
 
 enum SR_10084_E_1 {
-  static func foo(_ name: String) -> SR_10084_E_1 { // expected-note {{'foo' previously declared here}}
+  static func foo(_ name: String) -> SR_10084_E_1 {
     return .foo(SR_10084_S(name: name))
   }
 
-  static func foo(_ value: SR_10084_S) -> SR_10084_E_1 { // expected-error {{invalid redeclaration of 'foo'}}
+  static func foo(_ value: SR_10084_S) -> SR_10084_E_1 { // expected-note {{'foo' previously declared here}}
     return .foo(value)
   }
 
-  case foo(SR_10084_S)
+  case foo(SR_10084_S) // expected-error {{invalid redeclaration of 'foo'}}
 }
 
 enum SR_10084_E_2 {

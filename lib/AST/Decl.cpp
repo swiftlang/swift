@@ -2092,15 +2092,15 @@ bool swift::conflicting(ASTContext &ctx,
 
   // Functions and enum elements do not conflict with each other if their types
   // are different.
-  if ((sig1.IsFunction == sig2.IsEnumElement ||
-       sig1.IsEnumElement == sig2.IsFunction) &&
+  if (((sig1.IsFunction && sig2.IsEnumElement) ||
+       (sig1.IsEnumElement && sig2.IsFunction)) &&
       sig1Type != sig2Type) {
     return false;
   }
 
   // Enum elements always conflict with each other. At this point, they
   // have the same base name but different types.
-  if (sig1.IsEnumElement == sig2.IsEnumElement) {
+  if (sig1.IsEnumElement && sig2.IsEnumElement) {
     return true;
   }
 
