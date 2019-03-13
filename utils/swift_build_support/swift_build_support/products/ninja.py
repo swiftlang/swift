@@ -18,7 +18,7 @@ import os.path
 import platform
 import sys
 
-from . import product
+from . import product, product_builder
 from .. import cache_util
 from .. import shell
 
@@ -28,9 +28,21 @@ class Ninja(product.Product):
     def is_build_script_impl_product(cls):
         return False
 
+    @classmethod
+    def make_builder(cls, args, toolchain, workspace, host):
+        return NinjaBuilder(args, toolchain, workspace)
+
+
+class NinjaBuilder(product_builder.ProductBuilder):
+    def __init__(self, args, toolchain, workspace):
+        self.__source_dir = workspace.source_dir(Ninja.product_source_name())
+        self.__build_dir = workspace.build_dir('build', Ninja.product_name())
+        self.__args = args
+        self.__toolchain = toolchain
+
     @cache_util.reify
     def ninja_bin_path(self):
-        return os.path.join(self.build_dir, 'ninja')
+        return os.path.join(self.__build_dir, 'ninja')
 
     def do_build(self):
         if os.path.exists(self.ninja_bin_path):
@@ -40,10 +52,10 @@ class Ninja(product.Product):
         if platform.system() == "Darwin":
             from .. import xcrun
             sysroot = xcrun.sdk_path("macosx")
-            osx_version_min = self.args.darwin_deployment_version_osx
             assert sysroot is not None
+            osx_version_min = self.__args.darwin_deployment_version_osx
             env = {
-                "CXX": self.toolchain.cxx,
+                "CXX": self.__toolchain.cxx,
                 "CFLAGS": (
                     "-isysroot {sysroot} -mmacosx-version-min={osx_version}"
                 ).format(sysroot=sysroot, osx_version=osx_version_min),
@@ -51,15 +63,15 @@ class Ninja(product.Product):
                     "-mmacosx-version-min={osx_version}"
                 ).format(osx_version=osx_version_min),
             }
-        elif self.toolchain.cxx:
+        elif self.__toolchain.cxx:
             env = {
-                "CXX": self.toolchain.cxx,
+                "CXX": self.__toolchain.cxx,
             }
 
         # Ninja can only be built in-tree.  Copy the source tree to the build
         # directory.
-        shell.rmtree(self.build_dir)
-        shell.copytree(self.source_dir, self.build_dir)
-        with shell.pushd(self.build_dir):
+        shell.rmtree(self.__build_dir)
+        shell.copytree(self.__source_dir, self.__build_dir)
+        with shell.pushd(self.__build_dir):
             shell.call([sys.executable, 'configure.py', '--bootstrap'],
                        env=env)

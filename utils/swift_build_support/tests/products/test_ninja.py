@@ -11,6 +11,7 @@
 
 import argparse
 import os
+import os.path
 import platform
 import shutil
 import sys
@@ -26,6 +27,7 @@ except ImportError:
 from swift_build_support import shell
 from swift_build_support import xcrun
 from swift_build_support.products import Ninja
+from swift_build_support.targets import StdlibDeploymentTarget
 from swift_build_support.toolchain import host_toolchain
 from swift_build_support.workspace import Workspace
 
@@ -40,6 +42,8 @@ class NinjaTestCase(unittest.TestCase):
 
         self.workspace = Workspace(source_root=tmpdir1,
                                    build_root=tmpdir2)
+
+        self.host = StdlibDeploymentTarget.host_target()
 
         # Setup toolchain
         self.toolchain = host_toolchain()
@@ -71,20 +75,23 @@ class NinjaTestCase(unittest.TestCase):
         self.args = None
 
     def test_ninja_bin_path(self):
-        ninja_build = Ninja(
+        ninja_build = Ninja.make_builder(
             args=self.args,
             toolchain=self.toolchain,
-            source_dir='/path/to/src',
-            build_dir='/path/to/build')
+            workspace=self.workspace,
+            host=self.host)
 
-        self.assertEqual(ninja_build.ninja_bin_path, '/path/to/build/ninja')
+        self.assertEqual(ninja_build.ninja_bin_path,
+                         os.path.join(
+                            self.workspace.build_dir(self.host.name, 'ninja'),
+                            'ninja'))
 
     def test_do_build(self):
-        ninja_build = Ninja(
+        ninja_build = Ninja.make_builder(
             args=self.args,
             toolchain=self.toolchain,
-            source_dir=self.workspace.source_dir('ninja'),
-            build_dir=self.workspace.build_dir('build', 'ninja'))
+            workspace=self.workspace,
+            host=self.host)
 
         ninja_build.do_build()
 
@@ -114,7 +121,7 @@ class NinjaTestCase(unittest.TestCase):
 + {expect_env}{python} configure.py --bootstrap
 + popd
 """.format(
-            source_dir=os.path.join(self.workspace.source_root, 'ninja'),
-            build_dir=os.path.join(self.workspace.build_root, 'ninja-build'),
+            source_dir=self.workspace.source_dir('ninja'),
+            build_dir=self.workspace.build_dir(self.host.name, 'ninja'),
             expect_env=expect_env,
             python=sys.executable))
