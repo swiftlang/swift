@@ -2613,7 +2613,8 @@ for host in "${ALL_HOSTS[@]}"; do
                 ;;
                 *)
                   # FIXME: Always re-build XCTest on non-darwin platforms.
-                  # Remove this when products build in the CMake system.
+                  # The Swift project might have been changed, but CMake might
+                  # not be aware and will not rebuild.
                   echo "Cleaning the XCTest build directory"
                   call rm -rf "${XCTEST_BUILD_DIR}"
 
@@ -2687,8 +2688,9 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBDISPATCH_BUILD_ARGS=( -DFOUNDATION_ENABLE_LIBDISPATCH=NO )
                 fi
 
-                # FIXME: Always re-build foundation on non-darwin platforms.
-                # Remove this when products build in the CMake system.
+                # FIXME: Always re-build XCTest on non-darwin platforms.
+                # The Swift project might have been changed, but CMake might
+                # not be aware and will not rebuild.
                 echo "Cleaning the Foundation build directory"
                 call rm -rf "${build_dir}"
 
@@ -2763,8 +2765,9 @@ for host in "${ALL_HOSTS[@]}"; do
                   continue
                 ;;
                 *)
-                  # FIXME: Always re-build libdispatch on non-darwin platforms.
-                  # Remove this when products build in the CMake system.
+                  # FIXME: Always re-build XCTest on non-darwin platforms.
+                  # The Swift project might have been changed, but CMake might
+                  # not be aware and will not rebuild.
                   echo "Cleaning the libdispatch build directory"
                   call rm -rf "${LIBDISPATCH_BUILD_DIR}"
 
