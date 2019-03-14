@@ -144,11 +144,11 @@ extension String: BidirectionalCollection {
       var result: Index? = i
       var remainingOffset = n
       var consumed = 0
-      repeat {
+      while let result = result, remainingOffset > 0 {
         (consumed, result) = _searchForASCIIIndex(result, in: ascii,
           offsetBy: remainingOffset, limitedBy: limit)
         remainingOffset &-= consumed
-      } while result != nil && remainingOffset > 0
+      }
       return result
     }
   }
