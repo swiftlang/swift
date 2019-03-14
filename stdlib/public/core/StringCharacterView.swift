@@ -129,11 +129,11 @@ extension String: BidirectionalCollection {
     let searchSlice = ascii[i._encodedOffset ..< i._encodedOffset + n]
     if let cr = searchSlice.firstIndex(of: _CR), cr != ascii.endIndex &- 1 {
       consumed = cr
-      return (consumed, Index(encodedOffset:
-        i._encodedOffset + consumed + (searchSlice[cr &+ 1] == _LF ? 1 : 0))
+      return (consumed, Index(_encodedOffset:
+        i._encodedOffset + consumed + (searchSlice[cr &+ 1] == _LF ? 1 : 0)))
     } else {
       return (searchSlice.count,
-              Index(encodedOffset: i._encodedOffset + searchSlice.count))
+              Index(_encodedOffset: i._encodedOffset + searchSlice.count))
     }
   }
   
