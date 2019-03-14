@@ -1948,6 +1948,10 @@ public:
         if (!MaybeNominalType->mayHaveMembers())
           return T;
 
+        // We can't do anything if the base type has unbound generic parameters.
+        if (MaybeNominalType->hasUnboundGenericType())
+          return T;
+
         // For everything else, substitute in the base type.
         auto Subs = MaybeNominalType->getMemberSubstitutionMap(M, VD);
 
