@@ -1063,7 +1063,7 @@ public:
   }
 
   size_t numTrailingObjects(OverloadToken<FallthroughStmt *>) const {
-    return size_t(hasFallthrough);
+    return hasFallthrough ? 1 : 0;
   }
 };
 
