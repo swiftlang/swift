@@ -205,27 +205,32 @@ internal func _mayNotBeNFCStarter(_ byte:UInt8) -> Bool {
 
 @inlinable
 internal func _fastIsSingleByteGrapheme(
-  _ utf8: UnsafeBufferPointer<UInt8>, at i: Int
+  in guts: _StringGuts, at i: Int
   ) -> Bool {
-  let count = utf8.count
-  _internalInvariant(i < count)
-  
-  let byte = utf8[_unchecked: i]
-  guard _fastPath(_isASCII(byte)) else {
+  guard _fastPath(guts.isFastUTF8) else {
     return false
   }
-  
-  guard _fastPath(i != count &- 1) else {
-    return true
+  return guts.withFastUTF8 { utf8 in
+    let count = utf8.count
+    _internalInvariant(i < count)
+    
+    let byte = utf8[_unchecked: i]
+    guard _fastPath(_isASCII(byte)) else {
+      return false
+    }
+    
+    guard _fastPath(i != count &- 1) else {
+      return true
+    }
+    
+    let secondByte = utf8[_unchecked: i &+ 1]
+    
+    guard !_mayNotBeNFCStarter(secondByte) else {
+      return false
+    }
+    
+    return _fastPath(!(byte == _CR && secondByte == _LF))
   }
-
-  let secondByte = utf8[_unchecked: i &+ 1]
-
-  guard !_mayNotBeNFCStarter(secondByte) else {
-    return false
-  }
-
-  return _fastPath(!(byte == _CR && secondByte == _LF))
 }
 
 @inlinable @inline(__always)

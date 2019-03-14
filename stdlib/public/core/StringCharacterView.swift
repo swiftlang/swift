@@ -208,15 +208,8 @@ extension String: BidirectionalCollection {
 
     if i == endIndex { return 0 }
     
-    if _fastPath(_guts.isFastUTF8) {
-      let isSingleByteGrapheme = _guts.withFastUTF8 {
-        _fastIsSingleByteGrapheme($0, at: i._encodedOffset)
-      }
-      if isSingleByteGrapheme {
-        return 1
-      } else if _guts.isASCII {
-        return 2
-      }
+    if _fastIsSingleByteGrapheme(in: _guts, at: i._encodedOffset) {
+      return 1
     }
 
     return _guts._opaqueCharacterStride(startingAt: i._encodedOffset)
@@ -225,6 +218,10 @@ extension String: BidirectionalCollection {
   @inlinable @inline(__always)
   internal func _characterStride(endingAt i: Index) -> Int {
     if i == startIndex { return 0 }
+    
+    if _fastIsSingleByteGrapheme(in: _guts, at: i._encodedOffset &- 1) {
+      return 1
+    }
 
     return _guts._opaqueCharacterStride(endingAt: i._encodedOffset)
   }
