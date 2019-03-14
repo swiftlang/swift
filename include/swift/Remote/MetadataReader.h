@@ -361,24 +361,21 @@ public:
     bool isObjC = false;
     bool isBridged = false;
 
-    // If we can determine the Objective-C class name, this is probably an
-    // error existential with NSError-compatible layout.
-    std::string ObjCClassName;
-    if (readObjCClassName(*MetadataAddress, ObjCClassName)) {
-      if (ObjCClassName == "__SwiftNativeNSError")
-        isObjC = true;
-      else
+    auto Meta = readMetadata(*MetadataAddress);
+    if (auto ClassMeta = dyn_cast<TargetClassMetadata<Runtime>>(Meta)) {
+      if (ClassMeta->isPureObjC()) {
+        // If we can determine the Objective-C class name, this is probably an
+        // error existential with NSError-compatible layout.
+        std::string ObjCClassName;
+        if (readObjCClassName(*MetadataAddress, ObjCClassName)) {
+          if (ObjCClassName == "__SwiftNativeNSError")
+            isObjC = true;
+          else
+            isBridged = true;
+        }
+      } else {
         isBridged = true;
-    } else {
-      // Otherwise, we can check to see if this is a class metadata with the
-      // kind value's least significant bit set, which indicates a pure
-      // Swift class.
-      auto Meta = readMetadata(*MetadataAddress);
-      auto ClassMeta = dyn_cast<TargetClassMetadata<Runtime>>(Meta);
-      if (!ClassMeta)
-        return None;
-
-      isObjC = ClassMeta->isPureObjC();
+      }
     }
 
     if (isBridged) {
@@ -413,11 +410,15 @@ public:
     StoredPointer InstanceAddress =
         InstanceMetadataAddressAddress + 2 * sizeof(StoredPointer);
 
+    // When built with Objective-C interop, the runtime also stores a conformance
+    // to Hashable and the base type introducing the Hashable conformance.
+    if (isObjC)
+      InstanceAddress += 2 * sizeof(StoredPointer);
+
     // Round up to alignment, and we have the start address of the
     // instance payload.
     auto AlignmentMask = VWT->getAlignmentMask();
-    auto Offset = (sizeof(HeapObject) + AlignmentMask) & ~AlignmentMask;
-    InstanceAddress += Offset;
+    InstanceAddress = (InstanceAddress + AlignmentMask) & ~AlignmentMask;
 
     return RemoteExistential(
         RemoteAddress(*InstanceMetadataAddress),
