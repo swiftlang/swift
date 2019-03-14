@@ -2727,42 +2727,9 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 case "${host}" in
                 macosx-*)
-                  if [[ "${RECONFIGURE}" || ! -f "${LIBDISPATCH_BUILD_DIR}"/config.status ]]; then
-                      echo "Reconfiguring libdispatch"
-                      # First time building; need to run autotools and configure
-                      if [[ "$LIBDISPATCH_BUILD_TYPE" == "Release" ]] ; then
-                          dispatch_build_variant_arg="release"
-                      elif [[ "$LIBDISPATCH_BUILD_TYPE" == "RelWithDebInfo" ]]; then
-                          dispatch_build_variant_arg="releasedebuginfo"
-                      else
-                          dispatch_build_variant_arg="debug"
-                      fi
-
-                      if [ $(true_false "${BUILD_SWIFT_STATIC_STDLIB}") == "TRUE" ]; then
-                          libdispatch_enable_static="--enable-static=yes"
-                      else
-                          libdispatch_enable_static=""
-                      fi
-
-                      call mkdir -p "${LIBDISPATCH_BUILD_DIR}"
-                      with_pushd "${LIBDISPATCH_SOURCE_DIR}" \
-                          call autoreconf -fvi
-                      with_pushd "${LIBDISPATCH_BUILD_DIR}" \
-                          call env CC="${LLVM_BIN}/clang" CXX="${LLVM_BIN}/clang++" SWIFTC="${SWIFTC_BIN}" \
-                              "${LIBDISPATCH_SOURCE_DIR}"/configure --with-swift-toolchain="${SWIFT_BUILD_PATH}" \
-                              --with-build-variant=$dispatch_build_variant_arg \
-                              --prefix="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})" ${libdispatch_enable_static}
-                  else
-                      echo "Skipping reconfiguration of libdispatch"
-                  fi
-
-                  with_pushd "${LIBDISPATCH_BUILD_DIR}" \
-                      call make
-                  with_pushd "${LIBDISPATCH_BUILD_DIR}/tests" \
-                      call make build-tests
-
-                  # libdispatch builds itself and doesn't use cmake
-                  continue
+                  echo "Error: build-script does not support building libdispatch on macOS?!"
+                  usage 1>&2
+                  exit 1
                 ;;
                 *)
                   # FIXME: Always re-build XCTest on non-darwin platforms.
