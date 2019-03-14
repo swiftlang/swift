@@ -86,8 +86,8 @@ class SwiftTestCase(unittest.TestCase):
             build_dir='/path/to/build')
         expected = [
             '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE',
-            '-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER=FALSE',
-            '-DSWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING=FALSE'
+            '-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER:BOOL=FALSE',
+            '-DSWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING:BOOL=FALSE'
         ]
         self.assertEqual(set(swift.cmake_options), set(expected))
 
@@ -101,8 +101,8 @@ class SwiftTestCase(unittest.TestCase):
         flags_set = [
             '-DSWIFT_RUNTIME_USE_SANITIZERS=Thread',
             '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE',
-            '-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER=FALSE',
-            '-DSWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING=FALSE'
+            '-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER:BOOL=FALSE',
+            '-DSWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING:BOOL=FALSE'
         ]
         self.assertEqual(set(swift.cmake_options), set(flags_set))
 
@@ -286,7 +286,7 @@ class SwiftTestCase(unittest.TestCase):
             source_dir='/path/to/src',
             build_dir='/path/to/build')
         self.assertEqual(
-            ['-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER=TRUE'],
+            ['-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER:BOOL=TRUE'],
             [x for x in swift.cmake_options
              if 'SWIFT_FORCE_OPTIMIZED_TYPECHECKER' in x])
 
@@ -298,6 +298,7 @@ class SwiftTestCase(unittest.TestCase):
             source_dir='/path/to/src',
             build_dir='/path/to/build')
         self.assertEqual(
-            ['-DSWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING=TRUE'],
+            ['-DSWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING:BOOL='
+             'TRUE'],
             [x for x in swift.cmake_options
              if 'SWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING' in x])
