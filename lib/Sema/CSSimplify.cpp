@@ -3753,8 +3753,15 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     if (decl->isInstanceMember()) {
       if ((isa<FuncDecl>(decl) && !hasInstanceMethods) ||
           (!isa<FuncDecl>(decl) && !hasInstanceMembers)) {
-        result.addUnviable(candidate,
-                           MemberLookupResult::UR_InstanceMemberOnType);
+        // `AnyObject` has special semantics, so let's just let it be.
+        // Otherwise adjust base type and reference kind to make it
+        // look as if lookup was done on the instance, that helps
+        // with diagnostics.
+        auto choice = instanceTy->isAnyObject()
+                          ? candidate
+                          : OverloadChoice(instanceTy, decl,
+                                           FunctionRefKind::SingleApply);
+        result.addUnviable(choice, MemberLookupResult::UR_InstanceMemberOnType);
         return;
       }
 
