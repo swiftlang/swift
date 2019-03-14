@@ -522,6 +522,7 @@ public:
                              CategorizedRenameRangesReceiver Receiver) override;
 
   void collectExpressionTypes(StringRef FileName, ArrayRef<const char *> Args,
+                              ArrayRef<const char *> ExpectedProtocols,
                               std::function<void(const ExpressionTypesInFile&)> Receiver) override;
 
   void semanticRefactoring(StringRef Filename, SemanticRefactoringInfo Info,
