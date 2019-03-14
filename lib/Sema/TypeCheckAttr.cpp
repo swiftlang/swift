@@ -2064,8 +2064,9 @@ void lookupReplacedDecl(DeclName replacedDeclName,
   if (!typeCtx)
     typeCtx = cast<ExtensionDecl>(declCtxt->getAsDecl())->getExtendedNominal();
 
-  moduleScopeCtxt->lookupQualified({typeCtx}, replacedDeclName,
-                                   NL_QualifiedDefault, results);
+  if (typeCtx)
+    moduleScopeCtxt->lookupQualified({typeCtx}, replacedDeclName,
+                                     NL_QualifiedDefault, results);
 }
 
 /// Remove any argument labels from the interface type of the given value that
