@@ -431,7 +431,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     shimsPath = searchPathOpts.SDKPath;
     llvm::sys::path::append(shimsPath, "usr", "lib", "swift", "shims");
     invocationArgStrs.insert(invocationArgStrs.end(), {
-      "-I", shimsPath.str()
+      "-isystem", shimsPath.str()
     });
   }
 

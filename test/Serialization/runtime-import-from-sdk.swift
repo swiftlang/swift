@@ -43,7 +43,7 @@
 // some other way.
 //
 // We also check that ClangImporter noticed SwiftShims in the toolchain and
-// didn't add a -I flag to look in the SDK.
+// didn't add a -isystem flag to look in the SDK.
 
 // FIXME: We can't properly test this on a non-Darwin platform because we'll get
 // the same error message for "unloadable standard library" and "no standard
@@ -52,7 +52,7 @@
 
 // RUN: %empty-directory(%t/mcp)
 // RUN: not %target-swift-frontend(mock-sdk: -sdk %t/bad-sdk) -resource-dir %t/empty-toolchain/usr/lib/swift -module-cache-path %t/mcp -typecheck %s -dump-clang-diagnostics 2>&1 | %FileCheck --check-prefix CHECK-EMPTY %s
-// CHECK-EMPTY-NOT: '-I' '{{.*}}/bad-sdk/usr/lib/swift/shims'
+// CHECK-EMPTY-NOT: '-isystem' '{{.*}}/bad-sdk/usr/lib/swift/shims'
 // CHECK-EMPTY: error: could not find module 'Swift' for target '{{.*}}'; found: garbage-garbage-garbage
 
 // Check that, when the toolchain *doesn't* have SwiftShims in it, ClagImporter
@@ -60,7 +60,7 @@
 
 // RUN: %empty-directory(%t/mcp)
 // RUN: not %target-swift-frontend(mock-sdk: -sdk %t/bad-sdk) -resource-dir %t/really-empty-toolchain/usr/lib/swift -module-cache-path %t/mcp -typecheck %s -dump-clang-diagnostics 2>&1 | %FileCheck --check-prefix CHECK-REALLY-EMPTY %s
-// CHECK-REALLY-EMPTY: '-I' '{{.*}}/bad-sdk/usr/lib/swift/shims'
+// CHECK-REALLY-EMPTY: '-isystem' '{{.*}}/bad-sdk/usr/lib/swift/shims'
 // CHECK-REALLY-EMPTY: error: could not find module 'Swift' for target '{{.*}}'; found: garbage-garbage-garbage
 
 let x: Int = 1
