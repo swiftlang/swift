@@ -711,8 +711,7 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
 /// \param baseType - the type of the base on which this object
 ///   is being accessed; must be null if and only if this is not
 ///   a type member
-static bool doesStorageProduceLValue(TypeChecker &TC,
-                                     AbstractStorageDecl *storage,
+static bool doesStorageProduceLValue(AbstractStorageDecl *storage,
                                      Type baseType, DeclContext *useDC,
                                      const DeclRefExpr *base = nullptr) {
   // Unsettable storage decls always produce rvalues.
@@ -774,7 +773,7 @@ Type TypeChecker::getUnopenedTypeOfReference(
 
   // Qualify storage declarations with an lvalue when appropriate.
   // Otherwise, they yield rvalues (and the access must be a load).
-  if (doesStorageProduceLValue(*this, value, baseType, UseDC, base) &&
+  if (doesStorageProduceLValue(value, baseType, UseDC, base) &&
       !requestedType->hasError()) {
     return LValueType::get(requestedType);
   }
@@ -1246,7 +1245,7 @@ ConstraintSystem::getTypeOfMemberReference(
     if (auto *subscript = dyn_cast<SubscriptDecl>(value)) {
       auto elementTy = subscript->getElementInterfaceType();
 
-      if (doesStorageProduceLValue(TC, subscript, baseTy, useDC, base))
+      if (doesStorageProduceLValue(subscript, baseTy, useDC, base))
         elementTy = LValueType::get(elementTy);
 
       // See ConstraintSystem::resolveOverload() -- optional and dynamic
@@ -1372,166 +1371,140 @@ ConstraintSystem::getTypeOfMemberReference(
   return { openedType, type };
 }
 
-// Performance hack: if there are two generic overloads, and one is
-// more specialized than the other, prefer the more-specialized one.
-static void tryOptimizeGenericDisjunction(ConstraintSystem &cs,
-                                          ArrayRef<OverloadChoice> choices,
-                                          OverloadChoice *&favoredChoice) {
-  if (favoredChoice || choices.size() != 2)
-    return;
-
-  const auto &choiceA = choices[0];
-  const auto &choiceB = choices[1];
-
-  if (!choiceA.isDecl() || !choiceB.isDecl())
-    return;
-
-  auto isViable = [](ValueDecl *decl) -> bool {
-    assert(decl);
-
-    auto *AFD = dyn_cast<AbstractFunctionDecl>(decl);
-    if (!AFD || !AFD->isGeneric())
-      return false;
-
-    auto funcType = AFD->getInterfaceType();
-    auto hasAnyOrOptional = funcType.findIf([](Type type) -> bool {
-      if (type->getOptionalObjectType())
-        return true;
-
-      return type->isAny();
-    });
-
-    // If function declaration references `Any` or `Any?` type
-    // let's not attempt it, because it's unclear
-    // without solving which overload is going to be better.
-    return !hasAnyOrOptional;
-  };
-
-  auto *declA = choiceA.getDecl();
-  auto *declB = choiceB.getDecl();
-
-  if (!isViable(declA) || !isViable(declB))
-    return;
-
-  auto &TC = cs.TC;
-  auto *DC = cs.DC;
-
-  switch (TC.compareDeclarations(DC, declA, declB)) {
-  case Comparison::Better:
-    favoredChoice = const_cast<OverloadChoice *>(&choiceA);
+Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
+                                                bool allowMembers,
+                                                DeclContext *useDC) {
+  switch (overload.getKind()) {
+  case OverloadChoiceKind::Decl:
+    // Declaration choices are handled below.
     break;
 
-  case Comparison::Worse:
-    favoredChoice = const_cast<OverloadChoice *>(&choiceB);
-    break;
-
-  case Comparison::Unordered:
-    break;
+  case OverloadChoiceKind::BaseType:
+  case OverloadChoiceKind::DeclViaBridge:
+  case OverloadChoiceKind::DeclViaDynamic:
+  case OverloadChoiceKind::DeclViaUnwrappedOptional:
+  case OverloadChoiceKind::DynamicMemberLookup:
+  case OverloadChoiceKind::KeyPathApplication:
+  case OverloadChoiceKind::TupleIndex:
+    return Type();
   }
-}
 
-/// If there are any SIMD operators in the overload set, partition the set so
-/// that the SIMD operators come at the end.
-static ArrayRef<OverloadChoice> partitionSIMDOperators(
-                                  ArrayRef<OverloadChoice> choices,
-                                  SmallVectorImpl<OverloadChoice> &scratch) {
-  // If the first element isn't an operator, none of them are.
-  if (!choices[0].isDecl() ||
-      !isa<FuncDecl>(choices[0].getDecl()) ||
-      !cast<FuncDecl>(choices[0].getDecl())->isOperator() ||
-      choices[0].getDecl()->getASTContext().LangOpts
-        .SolverEnableOperatorDesignatedTypes)
-    return choices;
+  auto decl = overload.getDecl();
 
-  // Check whether we have any SIMD operators.
-  bool foundSIMDOperator = false;
-  for (const auto &choice : choices) {
-    if (isSIMDOperator(choice.getDecl())) {
-      foundSIMDOperator = true;
-      break;
+  // Ignore type declarations.
+  if (isa<TypeDecl>(decl))
+    return Type();
+
+  // Declarations returning unwrapped optionals don't have a single effective
+  // type.
+  if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+    return Type();
+
+  // Retrieve the interface type.
+  auto type = decl->getInterfaceType();
+  if (!type) {
+    decl->getASTContext().getLazyResolver()->resolveDeclSignature(decl);
+    type = decl->getInterfaceType();
+    if (!type) {
+      return Type();
     }
   }
 
-  if (!foundSIMDOperator)
-    return choices;
+  // If we have a generic function type, drop the generic signature; we don't
+  // need it for this comparison.
+  if (auto genericFn = type->getAs<GenericFunctionType>()) {
+    type = FunctionType::get(genericFn->getParams(),
+                             genericFn->getResult(),
+                             genericFn->getExtInfo());
+  }
 
-  scratch.assign(choices.begin(), choices.end());
-  std::stable_partition(scratch.begin(), scratch.end(),
-                        [](const OverloadChoice &choice) {
-                          return !isSIMDOperator(choice.getDecl());
-                        });
+  // If this declaration is within a type context, we might not be able
+  // to handle it.
+  if (decl->getDeclContext()->isTypeContext()) {
+    if (!allowMembers)
+      return Type();
 
-  return scratch;
+    if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+      auto elementTy = subscript->getElementInterfaceType();
+
+      if (doesStorageProduceLValue(subscript, overload.getBaseType(), useDC))
+        elementTy = LValueType::get(elementTy);
+
+      // See ConstraintSystem::resolveOverload() -- optional and dynamic
+      // subscripts are a special case, because the optionality is
+      // applied to the result type and not the type of the reference.
+      if (subscript->getAttrs().hasAttribute<OptionalAttr>())
+        elementTy = OptionalType::get(elementTy->getRValueType());
+
+      auto indices = subscript->getInterfaceType()
+                       ->castTo<AnyFunctionType>()->getParams();
+      type = FunctionType::get(indices, elementTy);
+    } else if (auto var = dyn_cast<VarDecl>(decl)) {
+      type = var->getValueInterfaceType();
+      if (doesStorageProduceLValue(var, overload.getBaseType(), useDC))
+        type = LValueType::get(type);
+    } else if (isa<AbstractFunctionDecl>(decl) || isa<EnumElementDecl>(decl)) {
+      if (decl->isInstanceMember() &&
+          (!overload.getBaseType() ||
+           !overload.getBaseType()->getAnyNominal()))
+        return Type();
+
+      // Cope with 'Self' returns.
+      if (!decl->getDeclContext()->getSelfProtocolDecl()) {
+        if ((isa<FuncDecl>(decl) && cast<FuncDecl>(decl)->hasDynamicSelf()) ||
+            (isa<ConstructorDecl>(decl) &&
+             !overload.getBaseType()->getOptionalObjectType())) {
+          if (!overload.getBaseType())
+            return Type();
+
+          Type selfType = overload.getBaseType()->getRValueType()
+              ->getMetatypeInstanceType()
+              ->lookThroughAllOptionalTypes();
+          type = type->replaceCovariantResultType(selfType, 2);
+        }
+      }
+
+      type = type->castTo<FunctionType>()->getResult();
+    }
+  }
+
+  // Handle "@objc optional" for non-subscripts; subscripts are handled above.
+  if (decl->getAttrs().hasAttribute<OptionalAttr>() &&
+      !isa<SubscriptDecl>(decl))
+    type = OptionalType::get(type->getRValueType());
+
+  return type;
 }
 
 void ConstraintSystem::addOverloadSet(Type boundType,
                                       ArrayRef<OverloadChoice> choices,
                                       DeclContext *useDC,
                                       ConstraintLocator *locator,
-                                      OverloadChoice *favoredChoice,
-                                      ArrayRef<OverloadChoice> outerAlternatives) {
-  assert(!choices.empty() && "Empty overload set");
-
+                                      Optional<unsigned> favoredIndex) {
   // If there is a single choice, add the bind overload directly.
-  if (choices.size() == 1 && outerAlternatives.empty()) {
+  if (choices.size() == 1) {
     addBindOverloadConstraint(boundType, choices.front(), locator, useDC);
     return;
   }
 
-  tryOptimizeGenericDisjunction(*this, choices, favoredChoice);
+  SmallVector<Constraint *, 4> candidates;
+  generateConstraints(candidates, boundType, choices, useDC, locator,
+                      favoredIndex);
+  // For an overload set (disjunction) from newly generated candidates.
+  addOverloadSet(candidates, locator);
+}
 
-  SmallVector<OverloadChoice, 4> scratchChoices;
-  choices = partitionSIMDOperators(choices, scratchChoices);
+void ConstraintSystem::addOverloadSet(ArrayRef<Constraint *> choices,
+                                      ConstraintLocator *locator) {
+  assert(!choices.empty() && "Empty overload set");
 
-  SmallVector<Constraint *, 4> overloads;
-  
-  // As we do for other favored constraints, if a favored overload has been
-  // specified, let it be the first term in the disjunction.
-  if (favoredChoice) {
-    auto bindOverloadConstraint =
-        Constraint::createBindOverload(*this,
-                                       boundType,
-                                       *favoredChoice,
-                                       useDC,
-                                       locator);
-
-    assert((!favoredChoice->isDecl() ||
-            !favoredChoice->getDecl()->getAttrs().isUnavailable(
-                getASTContext())) &&
-           "Cannot make unavailable decl favored!");
-    bindOverloadConstraint->setFavored();
-    
-    overloads.push_back(bindOverloadConstraint);
-  }
-  
-  for (auto &choice : choices) {
-    if (favoredChoice && (favoredChoice == &choice))
-      continue;
-    
-    overloads.push_back(Constraint::createBindOverload(*this, boundType, choice,
-                                                       useDC, locator));
-  }
-
-  auto innerDisjunction = Constraint::createDisjunction(*this, overloads,
-                                                        locator, ForgetChoice);
-  if (outerAlternatives.empty()) {
-    if (favoredChoice)
-      innerDisjunction->setFavored();
-
-    addUnsolvedConstraint(innerDisjunction);
+  // If there is a single choice, attempt it right away.
+  if (choices.size() == 1) {
+    simplifyConstraint(*choices.front());
     return;
   }
 
-  SmallVector<Constraint *, 4> outerConstraints;
-  outerConstraints.push_back(innerDisjunction);
-  innerDisjunction->setFavored();
-  for (auto choice : outerAlternatives) {
-    outerConstraints.push_back(Constraint::createBindOverload(
-                                 *this, boundType, choice,
-                                   useDC, locator));
-  }
-
-  addDisjunctionConstraint(outerConstraints, locator, ForgetChoice, favoredChoice);
+  addDisjunctionConstraint(choices, locator, ForgetChoice);
 }
 
 /// If we're resolving an overload set with a decl that has special type
@@ -1701,168 +1674,6 @@ isInvalidPartialApplication(ConstraintSystem &cs, const ValueDecl *member,
   }
 
   return {true, level};
-}
-
-/// Determine whether the given type refers to a non-final class (or
-/// dynamic self of one).
-static bool isNonFinalClass(Type type) {
-  if (auto dynamicSelf = type->getAs<DynamicSelfType>())
-    type = dynamicSelf->getSelfType();
-
-  if (auto classDecl = type->getClassOrBoundGenericClass())
-    return !classDecl->isFinal();
-
-  if (auto archetype = type->getAs<ArchetypeType>())
-    if (auto super = archetype->getSuperclass())
-      return isNonFinalClass(super);
-
-  if (type->isExistentialType())
-    return true;
-
-  return false;
-}
-
-/// Determine whether given constructor reference is valid or does it require
-/// any fixes e.g. when base is a protocol metatype.
-static void validateInitializerRef(ConstraintSystem &cs, ConstructorDecl *init,
-                                   ConstraintLocator *locator) {
-  auto *anchor = locator->getAnchor();
-  if (!anchor)
-    return;
-
-  auto getType = [&cs](const Expr *expr) -> Type {
-    return cs.simplifyType(cs.getType(expr))->getRValueType();
-  };
-
-  auto locatorEndsWith =
-      [](ConstraintLocator *locator,
-         ConstraintLocator::PathElementKind eltKind) -> bool {
-    auto path = locator->getPath();
-    return !path.empty() && path.back().getKind() == eltKind;
-  };
-
-  Expr *baseExpr = nullptr;
-  Type baseType;
-
-  auto recordOnConstMetatypeFix = [&]() {
-    (void)cs.recordFix(
-        AllowInvalidInitRef::onNonConstMetatype(cs, baseType, init, locator));
-  };
-
-  auto recordOnProtocolMetatypeFix = [&](bool isStaticallyDerived) {
-    (void)cs.recordFix(AllowInvalidInitRef::onProtocolMetatype(
-        cs, baseType, init, isStaticallyDerived, baseExpr->getSourceRange(),
-        locator));
-  };
-
-  // Explicit initializer reference e.g. `T.init(...)` or `T.init`.
-  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
-    baseExpr = UDE->getBase();
-    baseType = getType(baseExpr);
-    if (baseType->is<MetatypeType>()) {
-      auto instanceType = baseType->getAs<MetatypeType>()
-                              ->getInstanceType()
-                              ->getWithoutParens();
-      if (!cs.isTypeReference(baseExpr) && instanceType->isExistentialType()) {
-        recordOnProtocolMetatypeFix(/*isStaticallyDerived*/ true);
-        return;
-      }
-    }
-    // Initializer call e.g. `T(...)`
-  } else if (auto *CE = dyn_cast<CallExpr>(anchor)) {
-    baseExpr = CE->getFn();
-    baseType = getType(baseExpr);
-    // If this is an initializer call without explicit mention
-    // of `.init` on metatype value.
-    if (auto *AMT = baseType->getAs<AnyMetatypeType>()) {
-      auto instanceType = AMT->getInstanceType()->getWithoutParens();
-      if (!cs.isTypeReference(baseExpr)) {
-        if (baseType->is<MetatypeType>() &&
-            instanceType->isAnyExistentialType()) {
-          recordOnProtocolMetatypeFix(cs.isStaticallyDerivedMetatype(baseExpr));
-          return;
-        }
-
-        if (!instanceType->isExistentialType() ||
-            instanceType->isAnyExistentialType()) {
-          recordOnConstMetatypeFix();
-          return;
-        }
-      }
-    }
-    // Initializer reference which requires contextual base type e.g.
-    // `.init(...)`.
-  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
-    // We need to find type variable which represents contextual base.
-    auto *baseLocator = cs.getConstraintLocator(
-        UME, locatorEndsWith(locator, ConstraintLocator::ConstructorMember)
-                 ? ConstraintLocator::UnresolvedMember
-                 : ConstraintLocator::MemberRefBase);
-
-    // FIXME: Type variables responsible for contextual base could be cached
-    // in the constraint system to speed up lookup.
-    auto result = llvm::find_if(
-        cs.getTypeVariables(), [&baseLocator](const TypeVariableType *typeVar) {
-          return typeVar->getImpl().getLocator() == baseLocator;
-        });
-
-    assert(result != cs.getTypeVariables().end());
-    baseType = cs.simplifyType(*result)->getRValueType();
-    // Constraint for member base is formed as '$T.Type[.<member] = ...`
-    // which means MetatypeType has to be added after finding a type variable.
-    if (locatorEndsWith(baseLocator, ConstraintLocator::MemberRefBase))
-      baseType = MetatypeType::get(baseType);
-  }
-
-  if (!baseType)
-    return;
-
-  if (!baseType->is<AnyMetatypeType>()) {
-    bool applicable = false;
-    // Special case -- in a protocol extension initializer with a class
-    // constrainted Self type, 'self' has archetype type, and only
-    // required initializers can be called.
-    if (baseExpr && !baseExpr->isSuperExpr()) {
-      auto &ctx = cs.getASTContext();
-      if (auto *DRE =
-              dyn_cast<DeclRefExpr>(baseExpr->getSemanticsProvidingExpr())) {
-        if (DRE->getDecl()->getFullName() == ctx.Id_self) {
-          if (getType(DRE)->is<ArchetypeType>())
-            applicable = true;
-        }
-      }
-    }
-
-    if (!applicable)
-      return;
-  }
-
-  auto instanceType = baseType->getMetatypeInstanceType();
-  bool isStaticallyDerived = true;
-  // If this is expression like `.init(...)` where base type is
-  // determined by a contextual type.
-  if (!baseExpr) {
-    isStaticallyDerived = !(instanceType->is<DynamicSelfType>() ||
-                            instanceType->is<ArchetypeType>());
-  // Otherwise this is something like `T.init(...)`
-  } else {
-    isStaticallyDerived = cs.isStaticallyDerivedMetatype(baseExpr);
-  }
-
-  auto baseRange = baseExpr ? baseExpr->getSourceRange() : SourceRange();
-  // FIXME: The "hasClangNode" check here is a complete hack.
-  if (isNonFinalClass(instanceType) && !isStaticallyDerived &&
-      !init->hasClangNode() &&
-      !(init->isRequired() || init->getDeclContext()->getSelfProtocolDecl())) {
-    (void)cs.recordFix(AllowInvalidInitRef::dynamicOnMetatype(
-        cs, baseType, init, baseRange, locator));
-  // Constructors cannot be called on a protocol metatype, because there is no
-  // metatype to witness it.
-  } else if (baseType->is<MetatypeType>() &&
-             instanceType->isExistentialType()) {
-    (void)cs.recordFix(AllowInvalidInitRef::onProtocolMetatype(
-        cs, baseType, init, isStaticallyDerived, baseRange, locator));
-  }
 }
 
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
@@ -2117,8 +1928,6 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         boundType = boundFunctionType->withExtInfo(
             boundFunctionType->getExtInfo().withThrows());
       }
-
-      validateInitializerRef(*this, CD, locator);
     }
 
     // Check whether applying this overload would result in invalid
@@ -2678,4 +2487,48 @@ Expr *constraints::getArgumentExpr(Expr *expr, unsigned index) {
 
   assert(isa<TupleExpr>(argExpr));
   return cast<TupleExpr>(argExpr)->getElement(index);
+}
+
+void ConstraintSystem::generateConstraints(
+    SmallVectorImpl<Constraint *> &constraints, Type type,
+    ArrayRef<OverloadChoice> choices, DeclContext *useDC,
+    ConstraintLocator *locator, Optional<unsigned> favoredIndex,
+    bool requiresFix,
+    llvm::function_ref<ConstraintFix *(unsigned, const OverloadChoice &)>
+        getFix) {
+  auto recordChoice = [&](SmallVectorImpl<Constraint *> &choices,
+                          unsigned index, const OverloadChoice &overload,
+                          bool isFavored = false) {
+    auto *fix = getFix(index, overload);
+    // If fix is required but it couldn't be determined, this
+    // choice has be filtered out.
+    if (requiresFix && !fix)
+      return;
+
+    auto *choice = fix ? Constraint::createFixedChoice(*this, type, overload,
+                                                       useDC, fix, locator)
+                       : Constraint::createBindOverload(*this, type, overload,
+                                                        useDC, locator);
+
+    if (isFavored)
+      choice->setFavored();
+
+    choices.push_back(choice);
+  };
+
+  if (favoredIndex) {
+    const auto &choice = choices[*favoredIndex];
+    assert((!choice.isDecl() ||
+            !choice.getDecl()->getAttrs().isUnavailable(getASTContext())) &&
+           "Cannot make unavailable decl favored!");
+    recordChoice(constraints, *favoredIndex, choice, /*isFavored=*/true);
+  }
+
+  for (auto index : indices(choices)) {
+    const auto &choice = choices[index];
+    if (favoredIndex && (*favoredIndex == index))
+      continue;
+
+    recordChoice(constraints, index, choice);
+  }
 }

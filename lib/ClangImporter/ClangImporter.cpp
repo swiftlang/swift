@@ -716,6 +716,8 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
     invocationArgStrs.push_back(importerOpts.IndexStorePath);
   }
 
+  invocationArgStrs.push_back("-fansi-escape-codes");
+
   for (auto extraArg : importerOpts.ExtraArgs) {
     invocationArgStrs.push_back(extraArg);
   }
@@ -876,7 +878,6 @@ ClangImporter::create(ASTContext &ctx,
   // Clang expects this to be like an actual command line. So we need to pass in
   // "clang" for argv[0]
   invocationArgStrs.push_back("clang");
-
   switch (importerOpts.Mode) {
   case ClangImporterOptions::Modes::Normal:
     getNormalInvocationArguments(invocationArgStrs, ctx, importerOpts);
@@ -1684,65 +1685,88 @@ ModuleDecl *ClangImporter::getImportedHeaderModule() const {
   return Impl.ImportedHeaderUnit->getParentModule();
 }
 
-PlatformAvailability::PlatformAvailability(LangOptions &langOpts) {
-  // Add filters to determine if a Clang availability attribute
-  // applies in Swift, and if so, what is the cutoff for deprecated
-  // declarations that are now considered unavailable in Swift.
+PlatformAvailability::PlatformAvailability(LangOptions &langOpts)
+    : platformKind(targetPlatform(langOpts)) {
+  switch (platformKind) {
+  case PlatformKind::iOS:
+  case PlatformKind::iOSApplicationExtension:
+  case PlatformKind::tvOS:
+  case PlatformKind::tvOSApplicationExtension:
+    deprecatedAsUnavailableMessage =
+        "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
+    break;
 
-  if (langOpts.Target.isiOS() && !langOpts.Target.isTvOS()) {
-    if (!langOpts.EnableAppExtensionRestrictions) {
-      filter = [](StringRef Platform) { return Platform == "ios"; };
-    } else {
-      filter = [](StringRef Platform) {
-        return Platform == "ios" || Platform == "ios_app_extension";
-      };
-    }
-    // Anything deprecated in iOS 7.x and earlier is unavailable in Swift.
-    deprecatedAsUnavailableFilter = [](
-        unsigned major, llvm::Optional<unsigned> minor) { return major <= 7; };
-    deprecatedAsUnavailableMessage =
-        "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
-  } else if (langOpts.Target.isTvOS()) {
-    if (!langOpts.EnableAppExtensionRestrictions) {
-      filter = [](StringRef Platform) { return Platform == "tvos"; };
-    } else {
-      filter = [](StringRef Platform) {
-        return Platform == "tvos" || Platform == "tvos_app_extension";
-      };
-    }
-    // Anything deprecated in iOS 7.x and earlier is unavailable in Swift.
-    deprecatedAsUnavailableFilter = [](
-        unsigned major, llvm::Optional<unsigned> minor) { return major <= 7; };
-    deprecatedAsUnavailableMessage =
-        "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
-  } else if (langOpts.Target.isWatchOS()) {
-    if (!langOpts.EnableAppExtensionRestrictions) {
-      filter = [](StringRef Platform) { return Platform == "watchos"; };
-    } else {
-      filter = [](StringRef Platform) {
-        return Platform == "watchos" || Platform == "watchos_app_extension";
-      };
-    }
-    // No deprecation filter on watchOS
-    deprecatedAsUnavailableFilter = [](
-        unsigned major, llvm::Optional<unsigned> minor) { return false; };
+  case PlatformKind::watchOS:
+  case PlatformKind::watchOSApplicationExtension:
     deprecatedAsUnavailableMessage = "";
-  } else if (langOpts.Target.isMacOSX()) {
-    if (!langOpts.EnableAppExtensionRestrictions) {
-      filter = [](StringRef Platform) { return Platform == "macos"; };
-    } else {
-      filter = [](StringRef Platform) {
-        return Platform == "macos" || Platform == "macos_app_extension";
-      };
-    }
-    // Anything deprecated in OSX 10.9.x and earlier is unavailable in Swift.
-    deprecatedAsUnavailableFilter = [](unsigned major,
-                                       llvm::Optional<unsigned> minor) {
-      return major < 10 ||
-             (major == 10 && (!minor.hasValue() || minor.getValue() <= 9));
-    };
+    break;
+
+  case PlatformKind::OSX:
+  case PlatformKind::OSXApplicationExtension:
     deprecatedAsUnavailableMessage =
-        "APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift";
+        "APIs deprecated as of macOS 10.9 and earlier are unavailable in Swift";
+    break;
+
+  default:
+    break;
+  }
+}
+
+bool PlatformAvailability::isPlatformRelevant(StringRef name) const {
+  switch (platformKind) {
+  case PlatformKind::OSX:
+    return name == "macos";
+  case PlatformKind::OSXApplicationExtension:
+    return name == "macos" || name == "macos_app_extension";
+
+  case PlatformKind::iOS:
+    return name == "ios";
+  case PlatformKind::iOSApplicationExtension:
+    return name == "ios" || name == "ios_app_extension";
+
+  case PlatformKind::tvOS:
+    return name == "tvos";
+  case PlatformKind::tvOSApplicationExtension:
+    return name == "tvos" || name == "tvos_app_extension";
+
+  case PlatformKind::watchOS:
+    return name == "watchos";
+  case PlatformKind::watchOSApplicationExtension:
+    return name == "watchos" || name == "watchos_app_extension";
+
+  case PlatformKind::none:
+    return false;
+  }
+
+  llvm_unreachable("Unexpected platform");
+}
+
+bool PlatformAvailability::treatDeprecatedAsUnavailable(
+    const clang::Decl *clangDecl, const llvm::VersionTuple &version) const {
+  assert(!version.empty() && "Must provide version when deprecated");
+  unsigned major = version.getMajor();
+  Optional<unsigned> minor = version.getMinor();
+
+  switch (platformKind) {
+  case PlatformKind::OSX:
+    // Anything deprecated in OSX 10.9.x and earlier is unavailable in Swift.
+    return major < 10 ||
+           (major == 10 && (!minor.hasValue() || minor.getValue() <= 9));
+
+  case PlatformKind::iOS:
+  case PlatformKind::iOSApplicationExtension:
+  case PlatformKind::tvOS:
+  case PlatformKind::tvOSApplicationExtension:
+    // Anything deprecated in iOS 7.x and earlier is unavailable in Swift.
+    return major <= 7;
+
+  case PlatformKind::watchOS:
+  case PlatformKind::watchOSApplicationExtension:
+    // No deprecation filter on watchOS
+    return false;
+
+  default:
+    return false;
   }
 }
 

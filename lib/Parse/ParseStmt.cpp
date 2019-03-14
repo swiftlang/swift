@@ -14,13 +14,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Parse/Parser.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Version.h"
-#include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/Lexer.h"
+#include "swift/Parse/Parser.h"
 #include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Subsystems.h"
 #include "swift/Syntax/TokenSyntax.h"
@@ -90,6 +91,18 @@ bool Parser::isStartOfStmt() {
     consumeToken(tok::colon);
     // For better recovery, we just accept a label on any statement.  We reject
     // putting a label on something inappropriate in parseStmt().
+    return isStartOfStmt();
+  }
+
+  case tok::at_sign: {
+    // Might be a statement or case attribute. The only one of these we have
+    // right now is `@unknown default`, so hardcode a check for an attribute
+    // without any parens.
+    if (!peekToken().is(tok::identifier))
+      return false;
+    Parser::BacktrackingScope backtrack(*this);
+    consumeToken(tok::at_sign);
+    consumeToken(tok::identifier);
     return isStartOfStmt();
   }
   }
@@ -393,6 +406,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       ParserResult<Decl> DeclResult = 
           parseDecl(IsTopLevel ? PD_AllowTopLevel : PD_Default,
                     [&](Decl *D) {TmpDecls.push_back(D);});
+      BraceItemsStatus |= DeclResult;
       if (DeclResult.isParseError()) {
         NeedParseErrorRecovery = true;
         if (DeclResult.hasCodeCompletion() && IsTopLevel &&
@@ -417,6 +431,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       }
 
       ParserStatus Status = parseExprOrStmt(Result);
+      BraceItemsStatus |= Status;
       if (Status.hasCodeCompletion() && isCodeCompletionFirstPass()) {
         consumeTopLevelDecl(BeginParserPosition, TLCD);
         auto Brace = BraceStmt::create(Context, StartLoc, {}, PreviousLoc);
@@ -449,6 +464,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       diagnose(StartLoc, diag::invalid_nested_init, isSelf)
         .fixItInsert(StartLoc, isSelf ? "self." : "super.");
       NeedParseErrorRecovery = true;
+      BraceItemsStatus.setIsParseError();
     } else {
       ParserStatus ExprOrStmtStatus = parseExprOrStmt(Result);
       BraceItemsStatus |= ExprOrStmtStatus;
@@ -2335,6 +2351,43 @@ parseStmtCaseDefault(Parser &P, SourceLoc &CaseLoc,
   return Status;
 }
 
+namespace {
+
+struct FallthroughFinder : ASTWalker {
+  FallthroughStmt *result;
+
+  FallthroughFinder() : result(nullptr) {}
+
+  // We walk through statements.  If we find a fallthrough, then we got what
+  // we came for.
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *s) override {
+    if (auto *f = dyn_cast<FallthroughStmt>(s)) {
+      result = f;
+    }
+
+    return {true, s};
+  }
+
+  // Expressions, patterns and decls cannot contain fallthrough statements, so
+  // there is no reason to walk into them.
+  std::pair<bool, Expr *> walkToExprPre(Expr *e) override { return {false, e}; }
+  std::pair<bool, Pattern *> walkToPatternPre(Pattern *p) override {
+    return {false, p};
+  }
+
+  bool walkToDeclPre(Decl *d) override { return false; }
+  bool walkToTypeLocPre(TypeLoc &tl) override { return false; }
+  bool walkToTypeReprPre(TypeRepr *t) override { return false; }
+
+  static FallthroughStmt *findFallthrough(Stmt *s) {
+    FallthroughFinder finder;
+    s->walk(finder);
+    return finder.result;
+  }
+};
+
+} // end anonymous namespace
+
 ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
   SyntaxParsingContext CaseContext(SyntaxContext, SyntaxKind::SwitchCase);
   // A case block has its own scope for variables bound out of the pattern.
@@ -2409,9 +2462,10 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
   }
 
   return makeParserResult(
-      Status, CaseStmt::create(Context, CaseLoc, CaseLabelItems,
-                               !BoundDecls.empty(), UnknownAttrLoc, ColonLoc,
-                               Body));
+      Status,
+      CaseStmt::create(Context, CaseLoc, CaseLabelItems, !BoundDecls.empty(),
+                       UnknownAttrLoc, ColonLoc, Body, None,
+                       FallthroughFinder::findFallthrough(Body)));
 }
 
 /// stmt-pound-assert:

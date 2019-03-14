@@ -398,6 +398,28 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   return 0;
 }
 
+static int setExpectedTypes(const sourcekitd_test::TestOptions &Opts,
+                            sourcekitd_object_t Req) {
+  for (auto &Opt : Opts.RequestOptions) {
+    auto KeyValue = StringRef(Opt).split('=');
+    if (KeyValue.first == "expectedtypes") {
+      SmallVector<StringRef, 4> expectedTypeNames;
+      KeyValue.second.split(expectedTypeNames, ';');
+
+      auto typenames = sourcekitd_request_array_create(nullptr, 0);
+      for (auto &name : expectedTypeNames) {
+        std::string n = name;
+        sourcekitd_request_array_set_string(typenames, SOURCEKITD_ARRAY_APPEND, n.c_str());
+      }
+      sourcekitd_request_dictionary_set_value(Req, KeyExpectedTypes, typenames);
+    } else {
+      llvm::errs() << "invalid key '" << KeyValue.first << "' in -req-opts\n";
+      return 1;
+    }
+  }
+  return 0;
+}
+
 static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
 
   if (!Opts.JsonRequestPath.empty())
@@ -569,24 +591,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                           RequestConformingMethodList);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
-    for (auto &Opt : Opts.RequestOptions) {
-      auto KeyValue = StringRef(Opt).split('=');
-      if (KeyValue.first == "expectedtypes") {
-        SmallVector<StringRef, 4> expectedTypeNames;
-        KeyValue.second.split(expectedTypeNames, ';');
-
-        auto typenames = sourcekitd_request_array_create(nullptr, 0);
-        for (auto &name : expectedTypeNames) {
-          std::string n = name;
-          sourcekitd_request_array_set_string(typenames, SOURCEKITD_ARRAY_APPEND, n.c_str());
-        }
-
-        sourcekitd_request_dictionary_set_value(Req, KeyExpectedTypes, typenames);
-      } else {
-        llvm::errs() << "invalid key '" << KeyValue.first << "' in -req-opts\n";
-        return 1;
-      }
-    }
+    setExpectedTypes(Opts, Req);
     break;
 
   case SourceKitRequest::CursorInfo:
@@ -617,6 +622,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
 
   case SourceKitRequest::CollectExpresstionType: {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCollectExpressionType);
+    setExpectedTypes(Opts, Req);
     break;
   }
 
@@ -1537,21 +1543,27 @@ static void printRangeInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
 }
 
 static void printExpressionType(sourcekitd_variant_t Info, llvm::raw_ostream &OS) {
-  auto *TypeBuffer = sourcekitd_variant_dictionary_get_string(Info, KeyTypeBuffer);
-  sourcekitd_variant_t ExprList = sourcekitd_variant_dictionary_get_value(Info,
-    KeyExpressionTypeList);
-  unsigned Count = sourcekitd_variant_array_get_count(ExprList);
-  for (unsigned i = 0; i != Count; ++i) {
-    sourcekitd_variant_t Item = sourcekitd_variant_array_get_value(ExprList, i);
-    unsigned Offset = sourcekitd_variant_dictionary_get_int64(Item, KeyExpressionOffset);
-    unsigned Length = sourcekitd_variant_dictionary_get_int64(Item, KeyExpressionLength);
-    StringRef PrintedType(TypeBuffer + sourcekitd_variant_dictionary_get_int64(Item,
-      KeyTypeOffset), sourcekitd_variant_dictionary_get_int64(Item, KeyTypeLength));
-    OS << "(" << Offset << ", " << Offset + Length << "): " << PrintedType << "\n";
-  }
+  auto TypeBuffer = sourcekitd_variant_dictionary_get_value(Info, KeyExpressionTypeList);
+  unsigned Count = sourcekitd_variant_array_get_count(TypeBuffer);
   if (!Count) {
     OS << "cannot find expression types in the file\n";
+    return;
   }
+  OS << "<ExpressionTypes>\n";
+  for (unsigned i = 0; i != Count; ++i) {
+    sourcekitd_variant_t Item = sourcekitd_variant_array_get_value(TypeBuffer, i);
+    unsigned Offset = sourcekitd_variant_dictionary_get_int64(Item, KeyExpressionOffset);
+    unsigned Length = sourcekitd_variant_dictionary_get_int64(Item, KeyExpressionLength);
+    OS << "(" << Offset << ", " << Offset + Length << "): " <<
+      sourcekitd_variant_dictionary_get_string(Item, KeyExpressionType) << "\n";
+    sourcekitd_variant_t protocols = sourcekitd_variant_dictionary_get_value(Item,
+      KeyExpectedTypes);
+    unsigned Count = sourcekitd_variant_array_get_count(protocols);
+    for (unsigned i = 0; i != Count; i ++) {
+      OS << "conforming to: " << sourcekitd_variant_array_get_string(protocols, i) << "\n";
+    }
+  }
+  OS << "</ExpressionTypes>\n";
 }
 
 static void printFoundInterface(sourcekitd_variant_t Info,

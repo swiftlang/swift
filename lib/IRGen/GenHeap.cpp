@@ -1077,7 +1077,7 @@ RESULT IRGenFunction::emit##KIND(TYPE1 val1, ReferenceCounting style) {        \
   llvm_unreachable("bad refcounting style");                                   \
 }
 
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   DEFINE_BINARY_OPERATION(Name##CopyInit, void, Address, Address) \
   DEFINE_BINARY_OPERATION(Name##TakeInit, void, Address, Address) \
   DEFINE_BINARY_OPERATION(Name##CopyAssign, void, Address, Address) \
@@ -1087,8 +1087,6 @@ RESULT IRGenFunction::emit##KIND(TYPE1 val1, ReferenceCounting style) {        \
   DEFINE_BINARY_OPERATION(Name##LoadStrong, llvm::Value *, Address,llvm::Type*)\
   DEFINE_BINARY_OPERATION(Name##TakeStrong, llvm::Value *, Address,llvm::Type*)\
   DEFINE_UNARY_OPERATION(Name##Destroy, void, Address)
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
 #include "swift/AST/ReferenceStorage.def"
 
 

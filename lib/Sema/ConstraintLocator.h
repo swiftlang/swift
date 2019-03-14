@@ -125,6 +125,8 @@ public:
     DynamicLookupResult,
     /// The desired contextual type passed in to the constraint system.
     ContextualType,
+    /// The missing argument synthesized by the solver.
+    SynthesizedArgument,
   };
 
   /// Determine the number of numeric values used for the given path
@@ -162,6 +164,7 @@ public:
     case NamedTupleElement:
     case TupleElement:
     case KeyPathComponent:
+    case SynthesizedArgument:
       return 1;
 
     case TypeParameterRequirement:
@@ -217,6 +220,7 @@ public:
     case ImplicitlyUnwrappedDisjunctionChoice:
     case DynamicLookupResult:
     case ContextualType:
+    case SynthesizedArgument:
       return 0;
 
     case FunctionArgument:
@@ -361,6 +365,10 @@ public:
                          static_cast<unsigned>(kind));
     }
 
+    static PathElement getSynthesizedArgument(unsigned position) {
+      return PathElement(SynthesizedArgument, position);
+    }
+
     /// Retrieve the kind of path element.
     PathElementKind getKind() const {
       switch (static_cast<StoredKind>(storedKind)) {
@@ -446,6 +454,10 @@ public:
 
     bool isConditionalRequirement() const {
       return getKind() == PathElementKind::ConditionalRequirement;
+    }
+
+    bool isSynthesizedArgument() const {
+      return getKind() == PathElementKind::SynthesizedArgument;
     }
   };
 

@@ -42,21 +42,35 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
   setRuntimeResourcePath(LibPath.str());
 }
 
-static void updateRuntimeLibraryPath(SearchPathOptions &SearchPathOpts,
-                                     llvm::Triple &Triple) {
+static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
+                                      llvm::Triple &Triple) {
   llvm::SmallString<128> LibPath(SearchPathOpts.RuntimeResourcePath);
 
   llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
   SearchPathOpts.RuntimeLibraryPath = LibPath.str();
 
+  // Set up the import paths containing the swiftmodules for the libraries in
+  // RuntimeLibraryPath.
+  SearchPathOpts.RuntimeLibraryImportPaths.clear();
+
+  // If this is set, we don't want any runtime import paths.
+  if (SearchPathOpts.SkipRuntimeLibraryImportPaths)
+    return;
+
   if (!Triple.isOSDarwin())
     llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
-  SearchPathOpts.RuntimeLibraryImportPath = LibPath.str();
+  SearchPathOpts.RuntimeLibraryImportPaths.push_back(LibPath.str());
+
+  if (!SearchPathOpts.SDKPath.empty()) {
+    LibPath = SearchPathOpts.SDKPath;
+    llvm::sys::path::append(LibPath, "usr", "lib", "swift");
+    SearchPathOpts.RuntimeLibraryImportPaths.push_back(LibPath.str());
+  }
 }
 
 void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
   SearchPathOpts.RuntimeResourcePath = Path;
-  updateRuntimeLibraryPath(SearchPathOpts, LangOpts.Target);
+  updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
 }
 
 void CompilerInvocation::setTargetTriple(StringRef Triple) {
@@ -65,7 +79,12 @@ void CompilerInvocation::setTargetTriple(StringRef Triple) {
 
 void CompilerInvocation::setTargetTriple(const llvm::Triple &Triple) {
   LangOpts.setTarget(Triple);
-  updateRuntimeLibraryPath(SearchPathOpts, LangOpts.Target);
+  updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
+}
+
+void CompilerInvocation::setSDKPath(const std::string &Path) {
+  SearchPathOpts.SDKPath = Path;
+  updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
 }
 
 SourceFileKind CompilerInvocation::getSourceFileKind() const {
@@ -429,7 +448,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableSILOpaqueValues |= Args.hasArg(OPT_enable_sil_opaque_values);
 
 #if SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
-  Opts.UseDarwinPreStableABIBit = false;
+  Opts.UseDarwinPreStableABIBit =
+    (Target.isMacOSX() && Target.isMacOSXVersionLT(10, 14, 4)) ||
+    (Target.isiOS() && Target.isOSVersionLT(12, 2)) ||
+    (Target.isTvOS() && Target.isOSVersionLT(12, 2)) ||
+    (Target.isWatchOS() && Target.isOSVersionLT(5, 2));
 #else
   Opts.UseDarwinPreStableABIBit = true;
 #endif
@@ -558,7 +581,7 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   if (const Arg *A = Args.getLastArg(OPT_resource_dir))
     Opts.RuntimeResourcePath = A->getValue();
 
-  Opts.SkipRuntimeLibraryImportPath |= Args.hasArg(OPT_nostdimport);
+  Opts.SkipRuntimeLibraryImportPaths |= Args.hasArg(OPT_nostdimport);
 
   // Opts.RuntimeIncludePath is set by calls to
   // setRuntimeIncludePath() or setMainExecutablePath().
@@ -1076,6 +1099,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   // (e.g. NativeObject).  Force the lazy initialization of the VWT always.
   Opts.LazyInitializeClassMetadata = Triple.isOSBinFormatCOFF();
 
+  // PE/COFF cannot deal with cross-module reference to the protocol conformance
+  // witness.  Use a runtime initialized value for the protocol conformance
+  // witness.
+  Opts.LazyInitializeProtocolConformances = Triple.isOSBinFormatCOFF();
+
   if (Args.hasArg(OPT_disable_legacy_type_info)) {
     Opts.DisableLegacyTypeInfo = true;
   }
@@ -1270,7 +1298,7 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
-  updateRuntimeLibraryPath(SearchPathOpts, LangOpts.Target);
+  updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
 
   return false;
 }

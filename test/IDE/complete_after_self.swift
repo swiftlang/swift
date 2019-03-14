@@ -135,7 +135,7 @@ class ThisDerived1 : ThisBase1 {
 // COMMON_SELF_NO_DOT_1: Begin completions
 // COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:    .derivedInstanceVar[#Int#]{{; name=.+$}}
 // COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: .derivedFunc0()[#Void#]{{; name=.+$}}
-// COMMON_SELF_NO_DOT_1-DAG: Decl[Subscript]/CurrNominal:       [{#Double#}][#Int#]{{; name=.+$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[Subscript]/CurrNominal:       [{#(i): Double#}][#Int#]{{; name=.+$}}
 // COMMON_SELF_NO_DOT_1-DAG: Decl[Subscript]/CurrNominal:       [{#s: String#}][#Int#]{{; name=.+$}}
 // COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: .test1()[#Void#]{{; name=.+$}}
 // COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: .test2()[#Void#]{{; name=.+$}}
@@ -145,7 +145,7 @@ class ThisDerived1 : ThisBase1 {
 // COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceVar]/Super:          .baseInstanceVar[#Int#]{{; name=.+$}}
 // COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/Super:       .baseFunc0()[#Void#]{{; name=.+$}}
 // COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/Super:       .baseFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
-// COMMON_SELF_NO_DOT_1-DAG: Decl[Subscript]/Super:            [{#Int#}][#Double#]{{; name=.+$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[Subscript]/Super:            [{#(i): Int#}][#Double#]{{; name=.+$}}
 // COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceVar]/Super:          .baseExtProp[#Int#]{{; name=.+$}}
 // COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/Super:       .baseExtInstanceFunc0()[#Void#]{{; name=.+$}}
 // COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceVar]/Super:          .baseExtStaticProp[#Int#]{{; name=.+$}}
@@ -212,27 +212,27 @@ class ThisDerived1 : ThisBase1 {
   class func staticTest1() {
     self#^FUNC_STATIC_SELF_NO_DOT_1^#
 // FUNC_STATIC_SELF_NO_DOT_1: Begin completions
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .derivedFunc0({#self: ThisDerived1#})[#() -> Void#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .derivedFunc0({#(self): ThisDerived1#})[#() -> Void#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[StaticVar]/CurrNominal:        .derivedStaticVar[#Int#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[StaticMethod]/CurrNominal:     .derivedStaticFunc0()[#Void#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Constructor]/CurrNominal:      .init()[#ThisDerived1#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Constructor]/CurrNominal:      .init({#a: Int#})[#ThisDerived1#]
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .test1({#self: ThisDerived1#})[#() -> Void#]
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .test2({#self: ThisDerived1#})[#() -> Void#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .test1({#(self): ThisDerived1#})[#() -> Void#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .test2({#(self): ThisDerived1#})[#() -> Void#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[StaticMethod]/CurrNominal:     .staticTest1()[#Void#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[StaticMethod]/CurrNominal:     .staticTest2()[#Void#]
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .derivedExtInstanceFunc0({#self: ThisDerived1#})[#() -> Void#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .derivedExtInstanceFunc0({#(self): ThisDerived1#})[#() -> Void#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[StaticMethod]/CurrNominal:     .derivedExtStaticFunc0()[#Void#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Struct]/CurrNominal:           .DerivedExtNestedStruct[#ThisDerived1.DerivedExtNestedStruct#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Class]/CurrNominal:            .DerivedExtNestedClass[#ThisDerived1.DerivedExtNestedClass#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Enum]/CurrNominal:             .DerivedExtNestedEnum[#ThisDerived1.DerivedExtNestedEnum#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[TypeAlias]/CurrNominal:        .DerivedExtNestedTypealias[#Int#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Constructor]/CurrNominal:      .init({#someExtensionArg: Int#})[#ThisDerived1#]
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/Super:         .baseFunc0({#self: ThisBase1#})[#() -> Void#]
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/Super:         .baseFunc1({#self: ThisBase1#})[#(Int) -> Void#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/Super:         .baseFunc0({#(self): ThisBase1#})[#() -> Void#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/Super:         .baseFunc1({#(self): ThisBase1#})[#(Int) -> Void#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[StaticVar]/Super:              .baseStaticVar[#Int#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[StaticMethod]/Super:           .baseStaticFunc0()[#Void#]
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/Super:         .baseExtInstanceFunc0({#self: ThisBase1#})[#() -> Void#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/Super:         .baseExtInstanceFunc0({#(self): ThisBase1#})[#() -> Void#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[StaticMethod]/Super:           .baseExtStaticFunc0()[#Void#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Struct]/Super:                 .BaseExtNestedStruct[#ThisBase1.BaseExtNestedStruct#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Class]/Super:                  .BaseExtNestedClass[#ThisBase1.BaseExtNestedClass#]
@@ -246,27 +246,27 @@ class ThisDerived1 : ThisBase1 {
     self.#^FUNC_STATIC_SELF_DOT_1^#
 // FUNC_STATIC_SELF_DOT_1: Begin completions
 // FUNC_STATIC_SELF_DOT_1-NEXT: Keyword[self]/CurrNominal: self[#ThisDerived1.Type#]; name=self
-// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   derivedFunc0({#self: ThisDerived1#})[#() -> Void#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   derivedFunc0({#(self): ThisDerived1#})[#() -> Void#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[StaticVar]/CurrNominal:        derivedStaticVar[#Int#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[StaticMethod]/CurrNominal:     derivedStaticFunc0()[#Void#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[Constructor]/CurrNominal:      init()[#ThisDerived1#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[Constructor]/CurrNominal:      init({#a: Int#})[#ThisDerived1#]
-// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   test1({#self: ThisDerived1#})[#() -> Void#]
-// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   test2({#self: ThisDerived1#})[#() -> Void#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   test1({#(self): ThisDerived1#})[#() -> Void#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   test2({#(self): ThisDerived1#})[#() -> Void#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[StaticMethod]/CurrNominal:     staticTest1()[#Void#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[StaticMethod]/CurrNominal:     staticTest2()[#Void#]
-// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   derivedExtInstanceFunc0({#self: ThisDerived1#})[#() -> Void#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   derivedExtInstanceFunc0({#(self): ThisDerived1#})[#() -> Void#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[StaticMethod]/CurrNominal:     derivedExtStaticFunc0()[#Void#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[Struct]/CurrNominal:           DerivedExtNestedStruct[#ThisDerived1.DerivedExtNestedStruct#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[Class]/CurrNominal:            DerivedExtNestedClass[#ThisDerived1.DerivedExtNestedClass#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[Enum]/CurrNominal:             DerivedExtNestedEnum[#ThisDerived1.DerivedExtNestedEnum#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[TypeAlias]/CurrNominal:        DerivedExtNestedTypealias[#Int#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[Constructor]/CurrNominal:      init({#someExtensionArg: Int#})[#ThisDerived1#]
-// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/Super:         baseFunc0({#self: ThisBase1#})[#() -> Void#]
-// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/Super:         baseFunc1({#self: ThisBase1#})[#(Int) -> Void#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/Super:         baseFunc0({#(self): ThisBase1#})[#() -> Void#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/Super:         baseFunc1({#(self): ThisBase1#})[#(Int) -> Void#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[StaticVar]/Super:              baseStaticVar[#Int#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[StaticMethod]/Super:           baseStaticFunc0()[#Void#]
-// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/Super:         baseExtInstanceFunc0({#self: ThisBase1#})[#() -> Void#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/Super:         baseExtInstanceFunc0({#(self): ThisBase1#})[#() -> Void#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[StaticMethod]/Super:           baseExtStaticFunc0()[#Void#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[Struct]/Super:                 BaseExtNestedStruct[#ThisBase1.BaseExtNestedStruct#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[Class]/Super:                  BaseExtNestedClass[#ThisBase1.BaseExtNestedClass#]

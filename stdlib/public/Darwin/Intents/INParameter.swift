@@ -18,7 +18,8 @@ import Foundation
 extension INParameter {
   @nonobjc
   public convenience init?<Root, Value>(keyPath: KeyPath<Root, Value>) {
-    if let aClass = Root.self as? AnyClass, let keyPathString = keyPath._kvcKeyPathString {
+    if let aClass = Root.self as? AnyClass,
+       let keyPathString = keyPath._kvcKeyPathString {
       self.init(for: aClass, keyPath: keyPathString)
     } else {
       return nil

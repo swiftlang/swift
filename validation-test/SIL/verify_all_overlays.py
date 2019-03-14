@@ -1,11 +1,13 @@
 #!/usr/bin/python
 # RUN: ${python} %s %target-swiftmodule-name %platform-sdk-overlay-dir \
-# RUN:              %target-sil-opt -sdk %sdk -enable-sil-verify-all
+# RUN:     %target-sil-opt -sdk %sdk -enable-sil-verify-all \
+# RUN:       -F %sdk/System/Library/PrivateFrameworks \
+# RUN:       -F "%xcode-extra-frameworks-dir"
 
 # REQUIRES: long_test
 # REQUIRES: nonexecutable_test
 
-# XFAIL: OS=macosx || OS=ios || OS=tvos || OS=watchos
+# XFAIL: OS=macosx
 # https://bugs.swift.org/browse/SR-9847
 
 from __future__ import print_function
@@ -22,6 +24,7 @@ for module_file in os.listdir(sdk_overlay_dir):
     module_name, ext = os.path.splitext(module_file)
     if ext != ".swiftmodule":
         continue
+    # Skip the standard library because it's tested elsewhere.
     if module_name == "Swift":
         continue
     print("# " + module_name)

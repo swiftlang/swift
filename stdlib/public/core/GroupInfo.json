@@ -40,7 +40,6 @@
     "StringUTF8View.swift",
     "StringUTF8Validation.swift",
     "StringUnicodeScalarView.swift",
-    "StringVariant.swift",
     "Substring.swift",
     "Unicode.swift",
     "UnicodeEncoding.swift",
@@ -82,6 +81,8 @@
     "UnfoldSequence.swift",
     "UIntBuffer.swift",
     "KeyValuePairs.swift",
+    "Diffing.swift",
+    "CollectionDifference.swift",
     {
       "Type-erased": [
         "ExistentialCollection.swift"

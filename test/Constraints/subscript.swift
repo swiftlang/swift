@@ -91,7 +91,7 @@ struct SR718 {
   subscript(a a : UInt) -> Int { return 0 }
 }
 
-SR718()[a: Int()] // expected-error {{extraneous argument label 'a:' in subscript}}
+SR718()[a: Int()] // expected-error {{cannot convert value of type 'Int' to expected argument type 'UInt'}}
 
 // rdar://problem/25601561 - Qol: Bad diagnostic for failed assignment from Any to more specific type
 
@@ -110,7 +110,7 @@ class C_r25601561 {
 // rdar://problem/31977679 - Misleading diagnostics when using subscript with incorrect argument
 
 func r31977679_1(_ properties: [String: String]) -> Any? {
-  return properties[0] // expected-error {{cannot subscript a value of type '[String : String]' with an index of type 'Int'}}
+  return properties[0] // expected-error {{cannot subscript a value of type '[String : String]' with an argument of type 'Int'}}
 }
 
 func r31977679_2(_ properties: [String: String]) -> Any? {

@@ -2241,7 +2241,7 @@ public:
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(NominalType, NominalOrBoundGenericNominalType)
 
 /// EnumType - This represents the type declared by an EnumDecl.
-class EnumType : public NominalType, public llvm::FoldingSetNode {
+class EnumType : public NominalType {
 public:
   /// getDecl() - Returns the decl which declares this type.
   EnumDecl *getDecl() const {
@@ -2251,11 +2251,6 @@ public:
   /// Retrieve the type when we're referencing the given enum
   /// declaration in the parent type \c Parent.
   static EnumType *get(EnumDecl *D, Type Parent, const ASTContext &C);
-
-  void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getDecl(), getParent());
-  }
-  static void Profile(llvm::FoldingSetNodeID &ID, EnumDecl *D, Type Parent);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -2269,7 +2264,7 @@ private:
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(EnumType, NominalType)
 
 /// StructType - This represents the type declared by a StructDecl.
-class StructType : public NominalType, public llvm::FoldingSetNode {  
+class StructType : public NominalType {
 public:
   /// getDecl() - Returns the decl which declares this type.
   StructDecl *getDecl() const {
@@ -2279,11 +2274,6 @@ public:
   /// Retrieve the type when we're referencing the given struct
   /// declaration in the parent type \c Parent.
   static StructType *get(StructDecl *D, Type Parent, const ASTContext &C);
-
-  void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getDecl(), getParent());
-  }
-  static void Profile(llvm::FoldingSetNodeID &ID, StructDecl *D, Type Parent);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -2297,7 +2287,7 @@ private:
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(StructType, NominalType)
 
 /// ClassType - This represents the type declared by a ClassDecl.
-class ClassType : public NominalType, public llvm::FoldingSetNode {  
+class ClassType : public NominalType {
 public:
   /// getDecl() - Returns the decl which declares this type.
   ClassDecl *getDecl() const {
@@ -2307,11 +2297,6 @@ public:
   /// Retrieve the type when we're referencing the given class
   /// declaration in the parent type \c Parent.
   static ClassType *get(ClassDecl *D, Type Parent, const ASTContext &C);
-
-  void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getDecl(), getParent());
-  }
-  static void Profile(llvm::FoldingSetNodeID &ID, ClassDecl *D, Type Parent);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -2762,6 +2747,8 @@ public:
     bool operator!=(Param const &b) const { return !(*this == b); }
 
     Param getWithoutLabel() const { return Param(Ty, Identifier(), Flags); }
+
+    Param withType(Type newType) const { return Param(newType, Label, Flags); }
   };
 
   class CanParam : public Param {
@@ -3551,8 +3538,7 @@ public:
   }
 
   ValueOwnershipKind
-  getOwnershipKind(SILModule &,
-                   CanGenericSignature sig) const; // in SILType.cpp
+  getOwnershipKind(SILFunction &) const; // in SILType.cpp
 
   bool operator==(SILResultInfo rhs) const {
     return TypeAndConvention == rhs.TypeAndConvention;
@@ -4341,7 +4327,7 @@ public:
 
 /// ProtocolType - A protocol type describes an abstract interface implemented
 /// by another type.
-class ProtocolType : public NominalType, public llvm::FoldingSetNode {
+class ProtocolType : public NominalType {
 public:
   /// Retrieve the type when we're referencing the given protocol.
   /// declaration.
@@ -4373,11 +4359,6 @@ public:
   /// otherwise.
   static bool visitAllProtocols(ArrayRef<ProtocolDecl *> protocols,
                                 llvm::function_ref<bool(ProtocolDecl *)> fn);
-
-  void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getDecl(), getParent());
-  }
-  static void Profile(llvm::FoldingSetNodeID &ID, ProtocolDecl *D, Type Parent);
 
 private:
   friend class NominalTypeDecl;

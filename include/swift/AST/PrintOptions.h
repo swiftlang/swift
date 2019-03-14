@@ -275,6 +275,9 @@ struct PrintOptions {
   /// '@sil_weak', '@sil_unmanaged'.
   bool PrintStorageRepresentationAttrs = false;
 
+  /// Whether to print 'static' or 'class' on static decls.
+  bool PrintStaticKeyword = true;
+
   /// Whether to print 'override' keyword on overridden decls.
   bool PrintOverrideKeyword = true;
 
@@ -534,6 +537,7 @@ struct PrintOptions {
   /// Print in the style of quick help declaration.
   static PrintOptions printQuickHelpDeclaration() {
     PrintOptions PO;
+    PO.SkipUnderscoredKeywords = true;
     PO.EnumRawValues = true;
     PO.PrintImplicitAttrs = false;
     PO.PrintFunctionRepresentationAttrs = false;

@@ -355,7 +355,7 @@ namespace {
                                      FieldsAreABIAccessible_t fieldsAccessible,
                                           StructLayout &&layout) {
       auto tupleAccessible = IsABIAccessible_t(
-        IGM.getSILModule().isTypeABIAccessible(TheTuple));
+        IGM.isTypeABIAccessible(TheTuple));
       return NonFixedTupleTypeInfo::create(fields, fieldsAccessible,
                                            layout.getType(),
                                            layout.getAlignment(),

@@ -706,7 +706,7 @@ public:
 #endif
 
 #ifndef NDEBUG
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
                             "Only meant for use in the debugger");
 #endif
 
@@ -1192,6 +1192,31 @@ public:
     return bounds;
   }
 
+  /// Given a statically-emitted metadata template, this sets the correct
+  /// "is Swift" bit for the current runtime. Depending on the deployment
+  /// target a binary was compiled for, statically emitted metadata templates
+  /// may have a different bit set from the one that this runtime canonically
+  /// considers the "is Swift" bit.
+  void setAsTypeMetadata() {
+    // If the wrong "is Swift" bit is set, set the correct one.
+    //
+    // Note that the only time we should see the "new" bit set while
+    // expecting the "old" one is when running a binary built for a
+    // new OS on an old OS, which is not supported, however we do
+    // have tests that exercise this scenario.
+    auto otherSwiftBit = (3ULL - SWIFT_CLASS_IS_SWIFT_MASK);
+    assert(otherSwiftBit == 1ULL || otherSwiftBit == 2ULL);
+
+    if ((this->Data & 3) == otherSwiftBit) {
+      this->Data ^= 3;
+    }
+
+    // Otherwise there should be nothing to do, since only the old "is
+    // Swift" bit is used for backward-deployed runtimes.
+    
+    assert(isTypeMetadata());
+  }
+
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Class;
   }
@@ -1645,7 +1670,11 @@ public:
     assert(!isObjC());
 #endif
 
-    return reinterpret_cast<ProtocolDescriptorPointer>(storage & ~IsObjCBit);
+    // NOTE: we explicitly use a C-style cast here because cl objects to the
+    // reinterpret_cast from a uintptr_t type to an unsigned type which the
+    // Pointer type may be depending on the instantiation.  Using the C-style
+    // cast gives us a single path irrespective of the template type parameters.
+    return (ProtocolDescriptorPointer)(storage & ~IsObjCBit);
   }
 
   /// Retrieve the raw stored pointer and discriminator bit.
@@ -2375,7 +2404,7 @@ public:
   ///
   /// 1. Has a valid TypeReferenceKind.
   /// 2. Has a valid conformance kind.
-  void verify() const LLVM_ATTRIBUTE_USED;
+  void verify() const;
 #endif
 
 private:
@@ -2968,7 +2997,7 @@ public:
   }
 
 #ifndef NDEBUG
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
                             "only for use in the debugger");
 #endif
 

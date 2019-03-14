@@ -213,7 +213,7 @@ ERROR(cannot_apply_lvalue_binop_to_rvalue,none,
       "left side of mutating operator has immutable type %0", (Type))
 
 ERROR(cannot_subscript_with_index,none,
-      "cannot subscript a value of type %0 with an index of type %1",
+      "cannot subscript a value of type %0 with an argument of type %1",
       (Type, Type))
 
 ERROR(cannot_subscript_base,none,
@@ -238,6 +238,8 @@ NOTE(inout_change_var_type_if_possible,none,
 ERROR(cannot_pass_rvalue_inout,none,
       "cannot pass immutable value of type %0 as inout argument",
       (Type))
+ERROR(cannot_provide_default_value_inout,none,
+      "cannot provide default value to inout parameter %0", (Identifier))
 
 ERROR(cannot_assign_to_literal,none,
       "cannot assign to a literal value", ())
@@ -508,10 +510,6 @@ ERROR(expr_swift_keypath_empty, none,
       "key path must have at least one component", ())
 ERROR(expr_string_interpolation_outside_string,none,
       "string interpolation can only appear inside a string literal", ())
-ERROR(unsupported_keypath_tuple_element_reference,none,
-      "key path cannot reference tuple elements", ())
-ERROR(expr_keypath_unimplemented_tuple,none,
-      "key path support for tuples is not implemented", ())
 ERROR(expr_keypath_subscript_index_not_hashable, none,
       "subscript index of type %0 in a key path must be Hashable", (Type))
 ERROR(expr_smart_keypath_application_type_mismatch,none,
@@ -590,8 +588,8 @@ ERROR(cannot_return_value_from_void_func,none,
 
 ERROR(sema_no_import,Fatal,
       "no such module '%0'", (StringRef))
-ERROR(sema_no_import_arch,Fatal,
-      "could not find module '%0' for architecture '%1'; "
+ERROR(sema_no_import_target,Fatal,
+      "could not find module '%0' for target '%1'; "
       "found: %2", (StringRef, StringRef, StringRef))
 ERROR(sema_no_import_repl,none,
       "no such module '%0'", (StringRef))
@@ -905,6 +903,8 @@ WARNING(is_expr_same_type,none,
         "'!= nil'?", (Type, Type))
 WARNING(downcast_to_unrelated,none,
         "cast from %0 to unrelated type %1 always fails", (Type, Type))
+NOTE(downcast_to_unrelated_fixit,none,
+     "did you mean to call %0 with '()'?", (Identifier))
 ERROR(downcast_to_more_optional,none,
       "cannot downcast from %0 to a more optional type %1",
       (Type, Type))

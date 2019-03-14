@@ -166,7 +166,6 @@ set(SWIFTLIB_ESSENTIAL
   StringUTF16View.swift
   StringUTF8View.swift
   StringUTF8Validation.swift
-  StringVariant.swift
   Substring.swift
   SwiftNativeNSArray.swift
   ThreadLocalStorage.swift
@@ -201,7 +200,9 @@ set(SWIFTLIB_SOURCES
   ${SWIFTLIB_ESSENTIAL}
   ### PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
   Availability.swift
+  CollectionDifference.swift
   CollectionOfOne.swift
+  Diffing.swift
   ExistentialCollection.swift.gyb
   Mirror.swift
   PlaygroundDisplay.swift

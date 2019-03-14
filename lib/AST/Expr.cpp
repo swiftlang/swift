@@ -974,8 +974,16 @@ llvm::APFloat FloatLiteralExpr::getValue() const {
   assert(!getType().isNull() && "Semantic analysis has not completed");
   assert(!getType()->hasError() && "Should have a valid type");
 
-  return getFloatLiteralValue(isNegative(), getDigitsText(),
-                  getType()->castTo<BuiltinFloatType>()->getAPFloatSemantics());
+  Type ty = getType();
+  if (!ty->is<BuiltinFloatType>()) {
+    assert(!getBuiltinType().isNull() && "Semantic analysis has not completed");
+    assert(!getBuiltinType()->hasError() && "Should have a valid type");
+    ty = getBuiltinType();
+  }
+
+  return getFloatLiteralValue(
+      isNegative(), getDigitsText(),
+      ty->castTo<BuiltinFloatType>()->getAPFloatSemantics());
 }
 
 StringLiteralExpr::StringLiteralExpr(StringRef Val, SourceRange Range,
@@ -2206,6 +2214,7 @@ KeyPathExpr::Component::Component(ASTContext *ctxForCopyingLabels,
     : Decl(decl), SubscriptIndexExpr(indexExpr), KindValue(kind),
       ComponentType(type), Loc(loc)
 {
+  assert(kind != Kind::TupleElement || subscriptLabels.empty());
   assert(subscriptLabels.size() == indexHashables.size()
          || indexHashables.empty());
   SubscriptLabelsData = subscriptLabels.data();
@@ -2242,6 +2251,7 @@ void KeyPathExpr::Component::setSubscriptIndexHashableConformances(
   case Kind::UnresolvedProperty:
   case Kind::Property:
   case Kind::Identity:
+  case Kind::TupleElement:
     llvm_unreachable("no hashable conformances for this kind");
   }
 }

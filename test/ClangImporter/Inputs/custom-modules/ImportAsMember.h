@@ -14,6 +14,9 @@ extern struct IAMStruct1 IAMStruct1CreateSimple(double value)
 extern struct IAMStruct1 IAMStruct1CreateSpecialLabel(void)
     __attribute__((swift_name("Struct1.init(specialLabel:)")));
 
+extern struct IAMStruct1 IAMStruct1CreateFull(double x, double y, double z)
+    __attribute__((swift_name("Struct1.init(x:y:z:)")));
+
 extern struct IAMStruct1 IAMStruct1Invert(struct IAMStruct1 s)
     __attribute__((swift_name("Struct1.inverted(self:)")));
 

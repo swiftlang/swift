@@ -11,12 +11,17 @@ endif()
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
-# Make a job pool for things that can't yet be distributed
-cmake_host_system_information(
-  RESULT localhost_logical_cores QUERY NUMBER_OF_LOGICAL_CORES)
-set_property(GLOBAL PROPERTY JOB_POOLS local_jobs=${localhost_logical_cores})
-# Put linking in that category
-set_property(GLOBAL PROPERTY JOB_POOL_LINK local_jobs)
+if(DEFINED CMAKE_JOB_POOLS)
+  # CMake < 3.11 doesn't support CMAKE_JOB_POOLS. Manually set the property.
+  set_property(GLOBAL PROPERTY JOB_POOLS "${CMAKE_JOB_POOLS}")
+else()
+  # Make a job pool for things that can't yet be distributed
+  cmake_host_system_information(
+    RESULT localhost_logical_cores QUERY NUMBER_OF_LOGICAL_CORES)
+  set_property(GLOBAL PROPERTY JOB_POOLS local_jobs=${localhost_logical_cores})
+  # Put linking in that category
+  set(CMAKE_JOB_POOL_LINK local_jobs)
+endif()
 
 ENABLE_LANGUAGE(C)
 
@@ -101,25 +106,6 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   message(STATUS "No build type was specified, will default to ${CMAKE_BUILD_TYPE}")
 endif()
 
-set(SWIFT_STDLIB_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
-    "Build type for the Swift standard library and SDK overlays [Debug, RelWithDebInfo, Release, MinSizeRel]")
-set_property(CACHE SWIFT_STDLIB_BUILD_TYPE PROPERTY
-    STRINGS "Debug" "RelWithDebInfo" "Release" "MinSizeRel")
-
-is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" swift_optimized)
-if(swift_optimized)
-  set(SWIFT_STDLIB_ASSERTIONS_default FALSE)
-else()
-  set(SWIFT_STDLIB_ASSERTIONS_default TRUE)
-endif()
-option(SWIFT_STDLIB_ASSERTIONS
-    "Enable internal checks for the Swift standard library (useful for debugging the library itself, does not affect checks required for safety)"
-    "${SWIFT_STDLIB_ASSERTIONS_default}")
-
-option(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER
-       "Use the host compiler and not the internal clang to build the swift runtime"
-       FALSE)
-
 set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
     "Build Swift with code coverage instrumenting enabled [FALSE, NOT-MERGED, MERGED]")
 set_property(CACHE SWIFT_ANALYZE_CODE_COVERAGE PROPERTY
@@ -146,6 +132,53 @@ set(SWIFT_ENABLE_LLD_LINKER TRUE CACHE BOOL
 set(SWIFT_ENABLE_GOLD_LINKER TRUE CACHE BOOL
     "Enable using the gold linker when available")
 
+set(SWIFT_TOOLS_ENABLE_LTO OFF CACHE STRING "Build Swift tools with LTO. One
+    must specify the form of LTO by setting this to one of: 'full', 'thin'. This
+    option only affects the tools that run on the host (the compiler), and has
+    no effect on the target libraries (the standard library and the runtime).")
+
+# The following only works with the Ninja generator in CMake >= 3.0.
+set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
+  "Define the maximum number of linker jobs for swift.")
+
+option(SWIFT_FORCE_OPTIMIZED_TYPECHECKER "Override the optimization setting of
+  the type checker so that it always compiles with optimization. This eases
+  debugging after type checking occurs by speeding up type checking" FALSE)
+
+# Allow building Swift with Clang's Profile Guided Optimization
+if(SWIFT_PROFDATA_FILE AND EXISTS ${SWIFT_PROFDATA_FILE})
+  if(NOT CMAKE_C_COMPILER_ID MATCHES Clang)
+    message(FATAL_ERROR "SWIFT_PROFDATA_FILE can only be specified when compiling with clang")
+  endif()
+  add_definitions("-fprofile-instr-use=${SWIFT_PROFDATA_FILE}")
+endif()
+
+#
+# User-configurable Swift Standard Library specific options.
+#
+# TODO: Once the stdlib/compiler builds are split, this should be sunk into the
+# stdlib cmake.
+#
+
+set(SWIFT_STDLIB_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
+    "Build type for the Swift standard library and SDK overlays [Debug, RelWithDebInfo, Release, MinSizeRel]")
+set_property(CACHE SWIFT_STDLIB_BUILD_TYPE PROPERTY
+    STRINGS "Debug" "RelWithDebInfo" "Release" "MinSizeRel")
+
+is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" swift_optimized)
+if(swift_optimized)
+  set(SWIFT_STDLIB_ASSERTIONS_default FALSE)
+else()
+  set(SWIFT_STDLIB_ASSERTIONS_default TRUE)
+endif()
+option(SWIFT_STDLIB_ASSERTIONS
+    "Enable internal checks for the Swift standard library (useful for debugging the library itself, does not affect checks required for safety)"
+    "${SWIFT_STDLIB_ASSERTIONS_default}")
+
+option(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER
+       "Use the host compiler and not the internal clang to build the swift runtime"
+       FALSE)
+
 set(SWIFT_SDKS "" CACHE STRING
     "If non-empty, limits building target binaries only to specified SDKs (despite other SDKs being available)")
 
@@ -161,32 +194,15 @@ set(SWIFT_NATIVE_CLANG_TOOLS_PATH "" CACHE STRING
     "Path to the directory that contains Clang tools that are executable on the build machine")
 
 set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "" CACHE STRING
-    "Path to the directory that contains Swift tools that are executable on the build machine")
-
-set(SWIFT_TOOLS_ENABLE_LTO OFF CACHE STRING "Build Swift tools with LTO. One
-    must specify the form of LTO by setting this to one of: 'full', 'thin'. This
-    option only affects the tools that run on the host (the compiler), and has
-    no effect on the target libraries (the standard library and the runtime).")
-
-# The following only works with the Ninja generator in CMake >= 3.0.
-set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
-  "Define the maximum number of linker jobs for swift.")
-
-option(SWIFT_FORCE_OPTIMIZED_TYPECHECKER "Override the optimization setting of
-  the type checker so that it always compiles with optimization. This eases
-  debugging after type checking occurs by speeding up type checking" FALSE)
+   "Path to the directory that contains Swift tools that are executable on the build machine")
 
 option(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES
        "Generate .swiftinterface files alongside .swiftmodule files"
        TRUE)
 
-# Allow building Swift with Clang's Profile Guided Optimization
-if(SWIFT_PROFDATA_FILE AND EXISTS ${SWIFT_PROFDATA_FILE})
-  if(NOT CMAKE_C_COMPILER_ID MATCHES Clang)
-    message(FATAL_ERROR "SWIFT_PROFDATA_FILE can only be specified when compiling with clang")
-  endif()
-  add_definitions("-fprofile-instr-use=${SWIFT_PROFDATA_FILE}")
-endif()
+option(SWIFT_STDLIB_ENABLE_SIB_TARGETS
+       "Should we generate sib targets for the stdlib or not?"
+       FALSE)
 
 #
 # User-configurable Android specific options.
@@ -235,8 +251,8 @@ option(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT
     FALSE)
 
 option(SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
-    "Enable the Swift stable ABI's class marker bit"
-    FALSE)
+    "Enable the Swift stable ABI's class marker bit for new deployment targets"
+    TRUE)
 
 set(SWIFT_DARWIN_XCRUN_TOOLCHAIN "XcodeDefault" CACHE STRING
     "The name of the toolchain to pass to 'xcrun'")
@@ -413,6 +429,15 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
     set(SWIFT_BUILD_SYNTAXPARSERLIB_default FALSE)
     set(SWIFT_BUILD_SOURCEKIT_default FALSE)
   endif()
+elseif(CMAKE_SYSTEM_NAME STREQUAL Windows)
+  if(EXISTS ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE} AND
+     CMAKE_CXX_COMPILER_ID STREQUAL Clang)
+    set(SWIFT_BUILD_SYNTAXPARSERLIB_default TRUE)
+    set(SWIFT_BUILD_SOURCEKIT_default TRUE)
+  else()
+    set(SWIFT_BUILD_SYNTAXPARSERLIB_default FALSE)
+    set(SWIFT_BUILD_SOURCEKIT_default FALSE)
+  endif()
 else()
     set(SWIFT_BUILD_SYNTAXPARSERLIB_default FALSE)
     set(SWIFT_BUILD_SOURCEKIT_default FALSE)
@@ -420,6 +445,8 @@ endif()
 option(SWIFT_BUILD_SYNTAXPARSERLIB
     "Build the Swift Syntax Parser library"
     ${SWIFT_BUILD_SYNTAXPARSERLIB_default})
+option(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+    "Only build the Swift Syntax Parser library" FALSE)
 option(SWIFT_BUILD_SOURCEKIT
     "Build SourceKit"
     ${SWIFT_BUILD_SOURCEKIT_default})
@@ -898,8 +925,18 @@ if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
     set(SWIFT_LIBDISPATCH_C_COMPILER ${CMAKE_C_COMPILER})
     set(SWIFT_LIBDISPATCH_CXX_COMPILER ${CMAKE_CXX_COMPILER})
   elseif(${CMAKE_SYSTEM_NAME} STREQUAL ${CMAKE_HOST_SYSTEM_NAME})
-    set(SWIFT_LIBDISPATCH_C_COMPILER $<TARGET_PROPERTY:clang,LOCATION>)
-    set(SWIFT_LIBDISPATCH_CXX_COMPILER $<TARGET_PROPERTY:clang,LOCATION>)
+    get_target_property(CLANG_LOCATION clang LOCATION)
+    get_filename_component(CLANG_LOCATION ${CLANG_LOCATION} DIRECTORY)
+
+    if(CMAKE_SYSTEM_NAME STREQUAL Windows)
+      set(SWIFT_LIBDISPATCH_C_COMPILER
+          ${CLANG_LOCATION}/clang-cl${CMAKE_EXECUTABLE_SUFFIX})
+      set(SWIFT_LIBDISPATCH_CXX_COMPILER
+          ${CLANG_LOCATION}/clang-cl${CMAKE_EXECUTABLE_SUFFIX})
+    else()
+      set(SWIFT_LIBDISPATCH_C_COMPILER ${CLANG_LOCATION}/clang)
+      set(SWIFT_LIBDISPATCH_CXX_COMPILER ${CLANG_LOCATION}/clang++)
+    endif()
   else()
     message(SEND_ERROR "libdispatch requires a newer clang compiler (${CMAKE_C_COMPILER_VERSION} < 3.9)")
   endif()

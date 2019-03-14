@@ -4549,6 +4549,9 @@ public:
   /// other modules.
   bool exportsPropertyDescriptor() const;
 
+  /// True if any of the accessors to the storage is private or fileprivate.
+  bool hasPrivateAccessor() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractStorageDecl &&
@@ -5717,12 +5720,12 @@ class AccessorDecl final : public FuncDecl {
                AccessorKind accessorKind, AbstractStorageDecl *storage,
                SourceLoc staticLoc, StaticSpellingKind staticSpelling,
                bool throws, SourceLoc throwsLoc,
-               unsigned numParameterLists, GenericParamList *genericParams,
+               bool hasImplicitSelfDecl, GenericParamList *genericParams,
                DeclContext *parent)
     : FuncDecl(DeclKind::Accessor,
                staticLoc, staticSpelling, /*func loc*/ declLoc,
                /*name*/ Identifier(), /*name loc*/ declLoc,
-               throws, throwsLoc, numParameterLists, genericParams, parent),
+               throws, throwsLoc, hasImplicitSelfDecl, genericParams, parent),
       AccessorKeywordLoc(accessorKeywordLoc),
       Storage(storage) {
     Bits.AccessorDecl.AccessorKind = unsigned(accessorKind);

@@ -325,6 +325,7 @@ public:
                                              swift::AccessorKind AccKind,
                                              bool IsRef = false);
   static SourceKit::UIdent getUIDForModuleRef();
+  static SourceKit::UIdent getUIDForObjCAttr();
   static SourceKit::UIdent getUIDForSyntaxNodeKind(
       swift::ide::SyntaxNodeKind Kind);
   static SourceKit::UIdent getUIDForSyntaxStructureKind(
@@ -522,6 +523,7 @@ public:
                              CategorizedRenameRangesReceiver Receiver) override;
 
   void collectExpressionTypes(StringRef FileName, ArrayRef<const char *> Args,
+                              ArrayRef<const char *> ExpectedProtocols,
                               std::function<void(const ExpressionTypesInFile&)> Receiver) override;
 
   void semanticRefactoring(StringRef Filename, SemanticRefactoringInfo Info,

@@ -80,7 +80,7 @@ static T unwrap(llvm::Expected<T> value) {
 }
 
 using NativeReflectionContext
-  = ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>;
+    = swift::reflection::ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>;
 
 class ObjectMemoryReader : public MemoryReader {
   const std::vector<const ObjectFile *> &ObjectFiles;

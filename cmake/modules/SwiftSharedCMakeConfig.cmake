@@ -213,10 +213,7 @@ endmacro()
 #     The product name, e.g. Swift or SourceKit. Used as prefix for some
 #     cmake variables.
 macro(swift_common_unified_build_config product)
-  set(PATH_TO_LLVM_SOURCE "${CMAKE_SOURCE_DIR}")
-  set(PATH_TO_LLVM_BUILD "${CMAKE_BINARY_DIR}")
   set(${product}_PATH_TO_CLANG_BUILD "${CMAKE_BINARY_DIR}")
-  set(PATH_TO_CLANG_BUILD "${CMAKE_BINARY_DIR}")
   set(CLANG_MAIN_INCLUDE_DIR "${LLVM_EXTERNAL_CLANG_SOURCE_DIR}/include")
   set(CLANG_BUILD_INCLUDE_DIR "${CMAKE_BINARY_DIR}/tools/clang/include")
   set(${product}_NATIVE_LLVM_TOOLS_PATH "${CMAKE_BINARY_DIR}/bin")

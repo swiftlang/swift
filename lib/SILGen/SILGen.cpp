@@ -112,8 +112,11 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
     auto funcTy = SGM.Types.getConstantFunctionType(c);
     SILFunctionConventions fnConv(funcTy, SGM.M);
 
+    auto toSILType = [&SGM](Type ty) {
+      return SGM.Types.getLoweredType(ty, ResilienceExpansion::Minimal);
+    };
+
     if (inputTypes) {
-      auto toSILType = [&SGM](Type ty) { return SGM.getLoweredType(ty); };
       if (fnConv.hasIndirectSILResults()
           || funcTy->getNumParameters() != inputTypes->size()
           || !std::equal(
@@ -127,7 +130,7 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
     }
 
     if (outputType
-        && fnConv.getSingleSILResultType() != SGM.getLoweredType(*outputType)) {
+        && fnConv.getSingleSILResultType() != toSILType(*outputType)) {
       SGM.diagnose(fd->getLoc(), diag::bridging_function_not_correct_type,
                    moduleName.str(), functionName);
       llvm::report_fatal_error("unable to set up the ObjC bridge!");
@@ -953,7 +956,8 @@ bool SILGenModule::hasNonTrivialIVars(ClassDecl *cd) {
     auto *vd = dyn_cast<VarDecl>(member);
     if (!vd || !vd->hasStorage()) continue;
 
-    const TypeLowering &ti = Types.getTypeLowering(vd->getType());
+    auto &ti = Types.getTypeLowering(vd->getType(),
+                                     ResilienceExpansion::Maximal);
     if (!ti.isTrivial())
       return true;
   }
@@ -1123,7 +1127,8 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto *type = blockParam->getType()->castTo<FunctionType>();
   Type initType = FunctionType::get({}, TupleType::getEmpty(C),
                                     type->getExtInfo());
-  auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
+  auto initSILType = cast<SILFunctionType>(
+      Types.getLoweredRValueType(initType));
 
   SILGenFunctionBuilder builder(*this);
   auto *f = builder.createFunction(
@@ -1337,9 +1342,10 @@ SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
       componentObjTy = genericEnv->mapTypeIntoContext(componentObjTy);
     auto storageTy = M.Types.getSubstitutedStorageType(decl, componentObjTy);
     auto opaqueTy =
-      M.Types.getLoweredType(AbstractionPattern::getOpaque(), componentObjTy);
+      M.Types.getLoweredRValueType(AbstractionPattern::getOpaque(),
+                                   componentObjTy);
     
-    return storageTy.getAddressType() == opaqueTy.getAddressType();
+    return storageTy.getASTType() == opaqueTy;
   }
   case AccessStrategy::DirectToAccessor:
   case AccessStrategy::DispatchToAccessor:

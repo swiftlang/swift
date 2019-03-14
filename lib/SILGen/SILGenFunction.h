@@ -495,27 +495,26 @@ public:
   SILOptions &getOptions() { return getModule().getOptions(); }
 
   const TypeLowering &getTypeLowering(AbstractionPattern orig, Type subst) {
-    return SGM.Types.getTypeLowering(orig, subst);
+    return F.getTypeLowering(orig, subst);
   }
   const TypeLowering &getTypeLowering(Type t) {
-    return SGM.Types.getTypeLowering(t);
+    return F.getTypeLowering(t);
   }
   CanSILFunctionType getSILFunctionType(AbstractionPattern orig,
                                         CanFunctionType substFnType) {
     return SGM.Types.getSILFunctionType(orig, substFnType);
   }
   SILType getLoweredType(AbstractionPattern orig, Type subst) {
-    return SGM.Types.getLoweredType(orig, subst);
+    return F.getLoweredType(orig, subst);
   }
   SILType getLoweredType(Type t) {
-    return SGM.Types.getLoweredType(t);
+    return F.getLoweredType(t);
   }
   SILType getLoweredLoadableType(Type t) {
-    return SGM.Types.getLoweredLoadableType(t);
+    return F.getLoweredLoadableType(t);
   }
-
   const TypeLowering &getTypeLowering(SILType type) {
-    return SGM.Types.getTypeLowering(type);
+    return F.getTypeLowering(type);
   }
 
   SILType getSILType(SILParameterInfo param) const {
@@ -1121,8 +1120,8 @@ public:
   ManagedValue emitRValueAsSingleValue(Expr *E, SGFContext C = SGFContext());
 
   /// Emit 'undef' in a particular formal type.
-  ManagedValue emitUndef(SILLocation loc, Type type);
-  ManagedValue emitUndef(SILLocation loc, SILType type);
+  ManagedValue emitUndef(Type type);
+  ManagedValue emitUndef(SILType type);
   RValue emitUndefRValue(SILLocation loc, Type type);
   
   std::pair<ManagedValue, SILValue>

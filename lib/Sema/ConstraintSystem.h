@@ -892,12 +892,10 @@ struct MemberLookupResult {
   void addUnviable(OverloadChoice candidate, UnviableReason reason) {
     UnviableCandidates.push_back({candidate, reason});
   }
-  
-  OverloadChoice *getFavoredChoice() {
-    if (FavoredChoice == ~0U) return nullptr;
-    return &ViableCandidates[FavoredChoice];
+
+  Optional<unsigned> getFavoredIndex() const {
+    return (FavoredChoice == ~0U) ? Optional<unsigned>() : FavoredChoice;
   }
-  
 };
 
 /// Stores the required methods for @dynamicCallable types.
@@ -1308,12 +1306,54 @@ private:
       }
 
       generatedConstraints.erase(genStart, genEnd);
+
+      for (unsigned constraintIdx :
+             range(scope->numDisabledConstraints, disabledConstraints.size())) {
+        if (disabledConstraints[constraintIdx]->isDisabled())
+          disabledConstraints[constraintIdx]->setEnabled();
+      }
+      disabledConstraints.erase(
+          disabledConstraints.begin() + scope->numDisabledConstraints,
+          disabledConstraints.end());
+
+      for (unsigned constraintIdx :
+             range(scope->numFavoredConstraints, favoredConstraints.size())) {
+        if (favoredConstraints[constraintIdx]->isFavored())
+          favoredConstraints[constraintIdx]->setFavored(false);
+      }
+      favoredConstraints.erase(
+          favoredConstraints.begin() + scope->numFavoredConstraints,
+          favoredConstraints.end());
     }
 
     /// Check whether constraint system is allowed to form solutions
     /// even with unbound type variables present.
     bool allowsFreeTypeVariables() const {
       return AllowFreeTypeVariables != FreeTypeVariableBinding::Disallow;
+    }
+
+    unsigned getNumDisabledConstraints() const {
+      return disabledConstraints.size();
+    }
+
+    /// Disable the given constraint; this change will be rolled back
+    /// when we exit the current solver scope.
+    void disableContraint(Constraint *constraint) {
+      constraint->setDisabled();
+      disabledConstraints.push_back(constraint);
+    }
+
+    unsigned getNumFavoredConstraints() const {
+      return favoredConstraints.size();
+    }
+
+    /// Favor the given constraint; this change will be rolled back
+    /// when we exit the current solver scope.
+    void favorConstraint(Constraint *constraint) {
+      assert(!constraint->isFavored());
+
+      constraint->setFavored();
+      favoredConstraints.push_back(constraint);
     }
 
   private:
@@ -1336,6 +1376,9 @@ private:
     /// each of the registered scopes correct (LIFO) order.
     llvm::SmallVector<
       std::tuple<SolverScope *, ConstraintList::iterator, unsigned>, 4> scopes;
+
+    SmallVector<Constraint *, 4> disabledConstraints;
+    SmallVector<Constraint *, 4> favoredConstraints;
   };
 
   class CacheExprTypes : public ASTWalker {
@@ -1493,6 +1536,10 @@ public:
     unsigned numCheckedConformances;
 
     unsigned numMissingMembers;
+
+    unsigned numDisabledConstraints;
+
+    unsigned numFavoredConstraints;
 
     /// The previous score.
     Score PreviousScore;
@@ -1958,16 +2005,14 @@ public:
                                        ConstraintLocatorBuilder locator);
 
   /// Add a disjunction constraint.
-  void addDisjunctionConstraint(ArrayRef<Constraint *> constraints,
-                                ConstraintLocatorBuilder locator,
-                                RememberChoice_t rememberChoice = ForgetChoice,
-                                bool isFavored = false) {
+  void
+  addDisjunctionConstraint(ArrayRef<Constraint *> constraints,
+                           ConstraintLocatorBuilder locator,
+                           RememberChoice_t rememberChoice = ForgetChoice) {
     auto constraint =
       Constraint::createDisjunction(*this, constraints,
                                     getConstraintLocator(locator),
                                     rememberChoice);
-    if (isFavored)
-      constraint->setFavored();
 
     addUnsolvedConstraint(constraint);
   }
@@ -2034,6 +2079,20 @@ public:
     if (constraint->isActive())
       deactivateConstraint(constraint);
     removeInactiveConstraint(constraint);
+  }
+
+  /// Note that this constraint is "favored" within its disjunction, and
+  /// should be tried first to the exclusion of non-favored constraints in
+  /// the same disjunction.
+  void favorConstraint(Constraint *constraint) {
+    if (constraint->isFavored())
+      return;
+
+    if (solverState) {
+      solverState->favorConstraint(constraint);
+    } else {
+      constraint->setFavored();
+    }
   }
 
   /// Retrieve the list of inactive constraints.
@@ -2326,12 +2385,40 @@ public:
                           const DeclRefExpr *base = nullptr,
                           OpenedTypeMap *replacements = nullptr);
 
+  /// Attempt to simplify the set of overloads corresponding to a given
+  /// function application constraint.
+  ///
+  /// \param fnTypeVar The type variable that describes the set of
+  /// overloads for the function.
+  ///
+  /// \param argFnType The call signature, which includes the call arguments
+  /// (as the function parameters) and the expected result type of the
+  /// call.
+  ///
+  /// \param argumentLabels The argument labels provided at the call site,
+  /// if known.
+  ///
+  /// \returns \c fnType, or some simplified form of it if this function
+  /// was able to find a single overload or derive some common structure
+  /// among the overloads.
+  Type simplifyAppliedOverloads(TypeVariableType *fnTypeVar,
+                                const FunctionType *argFnType,
+                                Optional<ArgumentLabelState> argumentLabels,
+                                ConstraintLocatorBuilder locator);
+
+  /// Retrieve the type that will be used when matching the given overload.
+  Type getEffectiveOverloadType(const OverloadChoice &overload,
+                                bool allowMembers,
+                                DeclContext *useDC);
+
   /// Add a new overload set to the list of unresolved overload
   /// sets.
   void addOverloadSet(Type boundType, ArrayRef<OverloadChoice> choices,
                       DeclContext *useDC, ConstraintLocator *locator,
-                      OverloadChoice *favored = nullptr,
-                      ArrayRef<OverloadChoice> outerAlternatives = {});
+                      Optional<unsigned> favoredIndex = None);
+
+  void addOverloadSet(ArrayRef<Constraint *> choices,
+                      ConstraintLocator *locator);
 
   /// Retrieve the allocator used by this constraint system.
   llvm::BumpPtrAllocator &getAllocator() { return Allocator; }
@@ -2367,6 +2454,37 @@ public:
   ///
   /// \returns a possibly-sanitized initializer, or null if an error occurred.
   Type generateConstraints(Pattern *P, ConstraintLocatorBuilder locator);
+
+  /// Generate constraints for a given set of overload choices.
+  ///
+  /// \param constraints The container of generated constraint choices.
+  ///
+  /// \param type The type each choice should be bound to.
+  ///
+  /// \param choices The set of choices to convert into bind overload
+  /// constraints so solver could attempt each one.
+  ///
+  /// \param useDC The declaration context where each choice is used.
+  ///
+  /// \param locator The locator to use when generating constraints.
+  ///
+  /// \param favoredIndex If there is a "favored" or preferred choice
+  /// this is its index in the set of choices.
+  ///
+  /// \param requiresFix Determines whether choices require a fix to
+  /// be included in the result. If the fix couldn't be provided by
+  /// `getFix` for any given choice, such choice would be filtered out.
+  ////
+  /// \param getFix Optional callback to determine a fix for a given
+  /// choice (first argument is a position of current choice,
+  /// second - the choice in question).
+  void generateConstraints(
+      SmallVectorImpl<Constraint *> &constraints, Type type,
+      ArrayRef<OverloadChoice> choices, DeclContext *useDC,
+      ConstraintLocator *locator, Optional<unsigned> favoredIndex = None,
+      bool requiresFix = false,
+      llvm::function_ref<ConstraintFix *(unsigned, const OverloadChoice &)>
+          getFix = [](unsigned, const OverloadChoice &) { return nullptr; });
 
   /// Propagate constraints in an effort to enforce local
   /// consistency to reduce the time to solve the system.
@@ -3048,6 +3166,45 @@ private:
   /// Collect the current inactive disjunction constraints.
   void collectDisjunctions(SmallVectorImpl<Constraint *> &disjunctions);
 
+  /// Record a particular disjunction choice of
+  void recordDisjunctionChoice(ConstraintLocator *disjunctionLocator,
+                               unsigned index) {
+    DisjunctionChoices.push_back({disjunctionLocator, index});
+  }
+
+  /// Filter the set of disjunction terms, keeping only those where the
+  /// predicate returns \c true.
+  ///
+  /// The terms of the disjunction that are filtered out will be marked as
+  /// "disabled" so they won't be visited later. If only one term remains
+  /// enabled, the disjunction itself will be returned and that term will
+  /// be made active.
+  ///
+  /// \param restoreOnFail If true, then all of the disabled terms will
+  /// be re-enabled when this function returns \c Error.
+  ///
+  /// \returns One of \c Solved (only a single term remained),
+  /// \c Unsolved (more than one disjunction terms remain), or
+  /// \c Error (all terms were filtered out).
+  SolutionKind filterDisjunction(Constraint *disjunction,
+                                  bool restoreOnFail,
+                                  llvm::function_ref<bool(Constraint *)> pred);
+
+public:
+  // Given a type variable, attempt to find the disjunction of
+  // bind overloads associated with it. This may return null in cases where
+  // the disjunction has either not been created or binds the type variable
+  // in some manner other than by binding overloads.
+  ///
+  /// \param numOptionalUnwraps If non-null, this will receive the number
+  /// of "optional object of" constraints that this function looked through
+  /// to uncover the disjunction. The actual overloads will have this number
+  /// of optionals wrapping the type.
+  Constraint *getUnboundBindOverloadDisjunction(
+    TypeVariableType *tyvar,
+    unsigned *numOptionalUnwraps = nullptr);
+
+private:
   /// Solve the system of constraints after it has already been
   /// simplified.
   ///
@@ -3071,16 +3228,6 @@ private:
   Constraint *selectDisjunction();
 
   Constraint *selectApplyDisjunction();
-
-  bool simplifyForConstraintPropagation();
-  void collectNeighboringBindOverloadDisjunctions(
-      llvm::SetVector<Constraint *> &neighbors);
-  bool isBindOverloadConsistent(Constraint *bindConstraint,
-                                llvm::SetVector<Constraint *> &workList);
-  void reviseBindOverloadDisjunction(Constraint *disjunction,
-                                     llvm::SetVector<Constraint *> &workList,
-                                     bool *foundConsistent);
-  bool areBindPairConsistent(Constraint *first, Constraint *second);
 
   /// Solve the system of constraints generated from provided expression.
   ///
@@ -3418,7 +3565,10 @@ public:
   ///
   /// \param argIdx The argument that came too late in the argument list.
   /// \param prevArgIdx The argument that the \c argIdx should have preceded.
-  virtual void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx);
+  ///
+  /// \returns true to indicate that this should cause a failure, false
+  /// otherwise.
+  virtual bool outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx);
 
   /// Indicates that the arguments need to be relabeled to match the parameters.
   ///
@@ -3456,11 +3606,14 @@ matchCallArguments(ConstraintSystem &cs,
                    ArrayRef<AnyFunctionType::Param> params,
                    ConstraintLocatorBuilder locator);
 
+/// Given an expression that is the target of argument labels (for a call,
+/// subscript, etc.), find the underlying target expression.
+Expr *getArgumentLabelTargetExpr(Expr *fn);
+
 /// Attempt to prove that arguments with the given labels at the
 /// given parameter depth cannot be used with the given value.
 /// If this cannot be proven, conservatively returns true.
-bool areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
-                                               bool hasCurriedSelf,
+bool areConservativelyCompatibleArgumentLabels(OverloadChoice choice,
                                                ArrayRef<Identifier> labels,
                                                bool hasTrailingClosure);
 
@@ -3667,7 +3820,7 @@ private:
 /// easy to work with disjunction and encapsulates
 /// some other important information such as locator.
 class DisjunctionChoiceProducer : public BindingProducer<DisjunctionChoice> {
-  // The disjunciton choices that this producer will iterate through.
+  // The disjunction choices that this producer will iterate through.
   ArrayRef<Constraint *> Choices;
 
   // The ordering of disjunction choices. We index into Choices

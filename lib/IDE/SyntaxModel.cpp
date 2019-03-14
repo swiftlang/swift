@@ -178,8 +178,9 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
       }
 
       case tok::unknown: {
-        if (Tok.getRawText().startswith("\"")) {
-          // This is an invalid string literal
+        if (Tok.getRawText().ltrim('#').startswith("\"")) {
+          // This is likely an invalid single-line ("), multi-line ("""),
+          // or raw (#", ##", #""", etc.) string literal.
           Kind = SyntaxNodeKind::String;
           break;
         }
@@ -894,6 +895,13 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
           SourceRange NameRange = SourceRange(EnumElemD->getNameLoc(),
                                               ParamList->getSourceRange().End);
           SN.NameRange = charSourceRangeFromSourceRange(SM, NameRange);
+
+          for (auto Param : ParamList->getArray()) {
+            auto TL = Param->getTypeLoc();
+            CharSourceRange TR = charSourceRangeFromSourceRange(SM,
+                                                                TL.getSourceRange());
+            passNonTokenNode({SyntaxNodeKind::TypeId, TR});
+          }
         } else {
           SN.NameRange = CharSourceRange(EnumElemD->getNameLoc(),
                                          EnumElemD->getName().getLength());

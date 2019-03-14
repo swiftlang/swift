@@ -802,7 +802,7 @@ extension Array: RangeReplaceableCollection {
   ///     print(emptyArray.isEmpty)
   ///     // Prints "true"
   @inlinable
-  @_semantics("array.init")
+  @_semantics("array.init.empty")
   public init() {
     _buffer = _Buffer()
   }

@@ -19,6 +19,7 @@
 #ifndef SWIFT_SEMA_IDETYPECHECKING_H
 #define SWIFT_SEMA_IDETYPECHECKING_H
 
+#include "llvm/ADT/MapVector.h"
 #include "swift/Basic/SourceLoc.h"
 #include <memory>
 
@@ -38,6 +39,9 @@ namespace swift {
 
   /// Typecheck a declaration parsed during code completion.
   void typeCheckCompletionDecl(Decl *D);
+
+  /// Typecheck binding initializer at \p bindingIndex.
+  void typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned bindingIndex);
 
   /// Check if T1 is convertible to T2.
   ///
@@ -177,12 +181,21 @@ namespace swift {
 
     /// The length of the printed type
     uint32_t typeLength;
+
+    /// The offsets and lengths of all protocols the type conforms to
+    std::vector<std::pair<uint32_t, uint32_t>> protocols;
   };
 
   /// Collect type information for every expression in \c SF; all types will
   /// be printed to \c OS.
   ArrayRef<ExpressionTypeInfo> collectExpressionType(SourceFile &SF,
+    ArrayRef<const char *> ExpectedProtocols,
     std::vector<ExpressionTypeInfo> &scratch, llvm::raw_ostream &OS);
+
+  /// Resolve a list of mangled names to accessible protocol decls from
+  /// the decl context.
+  bool resolveProtocolNames(DeclContext *DC, ArrayRef<const char *> names,
+                            llvm::MapVector<ProtocolDecl*, StringRef> &result);
 }
 
 #endif

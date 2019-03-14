@@ -761,7 +761,7 @@ SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
   // Destroy value of an enum with a trivial payload or no-payload is a no-op.
   if (auto *EI = dyn_cast<EnumInst>(Operand)) {
     if (!EI->hasOperand() ||
-        EI->getOperand()->getType().isTrivial(EI->getModule()))
+        EI->getOperand()->getType().isTrivial(*EI->getFunction()))
       return eraseInstFromFunction(*RVI);
 
     // retain_value of an enum_inst where we know that it has a payload can be
@@ -783,7 +783,7 @@ SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
                                        RVI->getAtomicity());
 
   // ReleaseValueInst of a trivial type is a no-op.
-  if (OperandTy.isTrivial(RVI->getModule()))
+  if (OperandTy.isTrivial(*RVI->getFunction()))
     return eraseInstFromFunction(*RVI);
 
   // Do nothing for non-trivial non-reference types.
@@ -798,7 +798,7 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
   // RAUW.
   if (auto *EI = dyn_cast<EnumInst>(Operand)) {
     if (!EI->hasOperand() ||
-        EI->getOperand()->getType().isTrivial(RVI->getModule())) {
+        EI->getOperand()->getType().isTrivial(*RVI->getFunction())) {
       return eraseInstFromFunction(*RVI);
     }
 
@@ -822,7 +822,7 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
   }
 
   // RetainValueInst of a trivial type is a no-op + use propagation.
-  if (OperandTy.isTrivial(RVI->getModule())) {
+  if (OperandTy.isTrivial(*RVI->getFunction())) {
     return eraseInstFromFunction(*RVI);
   }
 
@@ -1616,8 +1616,11 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
 
   SingleValueInstruction *NewInst = nullptr;
   if (auto *MI = dyn_cast<MetatypeInst>(MDVal)) {
-    auto &Mod = ARDI->getModule();
-    auto SILInstanceTy = MI->getType().getMetatypeInstanceType(Mod);
+    auto MetaTy = MI->getType().castTo<MetatypeType>();
+    auto InstanceTy = MetaTy.getInstanceType();
+    if (auto SelfTy = dyn_cast<DynamicSelfType>(InstanceTy))
+      InstanceTy = SelfTy.getSelfType();
+    auto SILInstanceTy = SILType::getPrimitiveObjectType(InstanceTy);
     if (!SILInstanceTy.getClassOrBoundGenericClass())
       return nullptr;
 
@@ -1639,8 +1642,11 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
       return nullptr;
     auto *CCBI = dyn_cast<CheckedCastBranchInst>(PredBB->getTerminator());
     if (CCBI && CCBI->isExact() && ARDI->getParent() == CCBI->getSuccessBB()) {
-      auto &Mod = ARDI->getModule();
-      auto SILInstanceTy = CCBI->getCastType().getMetatypeInstanceType(Mod);
+      auto MetaTy = CCBI->getCastType().castTo<MetatypeType>();
+      auto InstanceTy = MetaTy.getInstanceType();
+      if (auto SelfTy = dyn_cast<DynamicSelfType>(InstanceTy))
+        InstanceTy = SelfTy.getSelfType();
+      auto SILInstanceTy = SILType::getPrimitiveObjectType(InstanceTy);
       if (!SILInstanceTy.getClassOrBoundGenericClass())
         return nullptr;
       NewInst = Builder.createAllocRef(ARDI->getLoc(), SILInstanceTy,

@@ -44,7 +44,7 @@ class Emitter;
 /// \p Subs a container to be used for storing the set of subclasses
 void getAllSubclasses(ClassHierarchyAnalysis *CHA,
                       ClassDecl *CD,
-                      SILType ClassType,
+                      CanType ClassType,
                       SILModule &M,
                       ClassHierarchyAnalysis::ClassList &Subs);
 
@@ -69,18 +69,19 @@ ApplySite tryDevirtualizeApply(ApplySite AI,
                                ClassHierarchyAnalysis *CHA,
                                OptRemark::Emitter *ORE = nullptr);
 bool canDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA);
-bool isNominalTypeWithUnboundGenericParameters(SILType Ty, SILModule &M);
-bool canDevirtualizeClassMethod(FullApplySite AI, SILType ClassInstanceType,
+bool canDevirtualizeClassMethod(FullApplySite AI, ClassDecl *CD,
                                 OptRemark::Emitter *ORE = nullptr,
                                 bool isEffectivelyFinalMethod = false);
-SILFunction *getTargetClassMethod(SILModule &M, SILType ClassOrMetatypeType,
+SILFunction *getTargetClassMethod(SILModule &M, ClassDecl *CD,
                                   MethodInst *MI);
+CanType getSelfInstanceType(CanType ClassOrMetatypeType);
 
 /// Devirtualize the given apply site, which is known to be devirtualizable.
 ///
 /// The caller must call deleteDevirtualizedApply on the original apply site.
 FullApplySite devirtualizeClassMethod(FullApplySite AI,
                                       SILValue ClassInstance,
+                                      ClassDecl *CD,
                                       OptRemark::Emitter *ORE);
 
 /// Attempt to devirtualize the given apply site, which is known to be
@@ -89,7 +90,9 @@ FullApplySite devirtualizeClassMethod(FullApplySite AI,
 /// If this succeeds, the caller must call deleteDevirtualizedApply on
 /// the original apply site.
 FullApplySite
-tryDevirtualizeClassMethod(FullApplySite AI, SILValue ClassInstance,
+tryDevirtualizeClassMethod(FullApplySite AI,
+                           SILValue ClassInstance,
+                           ClassDecl *CD,
                            OptRemark::Emitter *ORE,
                            bool isEffectivelyFinalMethod = false);
 

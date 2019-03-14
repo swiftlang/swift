@@ -823,11 +823,11 @@ public:
   }
 };
 
-  
 /// Integer literal with a '+' or '-' sign, like '+4' or '- 2'.
 ///
-/// After semantic analysis assigns types, this is guaranteed to only have
-/// a BuiltinIntegerType.
+/// After semantic analysis assigns types, this is guaranteed to have
+/// a BuiltinIntegerType or be a normal type and implicitly be
+/// AnyBuiltinIntegerType.
 class IntegerLiteralExpr : public NumberLiteralExpr {
 public:
   IntegerLiteralExpr(StringRef Val, SourceLoc DigitsLoc, bool Implicit = false)
@@ -855,9 +855,12 @@ public:
 };
 
 /// FloatLiteralExpr - Floating point literal, like '4.0'.  After semantic
-/// analysis assigns types, this is guaranteed to only have a
+/// analysis assigns types, BuiltinTy is guaranteed to only have a
 /// BuiltinFloatingPointType.
 class FloatLiteralExpr : public NumberLiteralExpr {
+  /// This is the type of the builtin literal.
+  Type BuiltinTy;
+
 public:
   FloatLiteralExpr(StringRef Val, SourceLoc Loc, bool Implicit = false)
     : NumberLiteralExpr(ExprKind::FloatLiteral, Val, Loc, Implicit)
@@ -870,6 +873,9 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::FloatLiteral;
   }
+
+  Type getBuiltinType() const { return BuiltinTy; }
+  void setBuiltinType(Type ty) { BuiltinTy = ty; }
 };
 
 /// A Boolean literal ('true' or 'false')
@@ -4906,6 +4912,7 @@ public:
       OptionalChain,
       OptionalWrap,
       Identity,
+      TupleElement,
     };
   
   private:
@@ -4922,7 +4929,12 @@ public:
     Expr *SubscriptIndexExpr;
     const Identifier *SubscriptLabelsData;
     const ProtocolConformanceRef *SubscriptHashableConformancesData;
-    unsigned SubscriptSize;
+    
+    union {
+      unsigned SubscriptSize;
+      unsigned TupleIndex;
+    };
+      
     Kind KindValue;
     Type ComponentType;
     SourceLoc Loc;
@@ -4935,6 +4947,13 @@ public:
                        Kind kind,
                        Type type,
                        SourceLoc loc);
+
+    // Private constructor for tuple element kind
+    Component(unsigned tupleIndex, Type elementType, SourceLoc loc)
+      : Component(nullptr, {}, nullptr, {}, {}, Kind::TupleElement,
+        elementType, loc) {
+      TupleIndex = tupleIndex;
+    }
     
   public:
     Component()
@@ -5054,6 +5073,13 @@ public:
                        selfLoc);
     }
     
+    static Component forTupleElement(unsigned fieldNumber,
+                                     Type elementType,
+                                     SourceLoc loc) {
+      return Component(fieldNumber, elementType, loc);
+    }
+      
+      
     SourceLoc getLoc() const {
       return Loc;
     }
@@ -5077,6 +5103,7 @@ public:
       case Kind::OptionalForce:
       case Kind::Property:
       case Kind::Identity:
+      case Kind::TupleElement:
         return true;
 
       case Kind::UnresolvedSubscript:
@@ -5100,6 +5127,7 @@ public:
       case Kind::UnresolvedProperty:
       case Kind::Property:
       case Kind::Identity:
+      case Kind::TupleElement:
         return nullptr;
       }
       llvm_unreachable("unhandled kind");
@@ -5118,6 +5146,7 @@ public:
       case Kind::UnresolvedProperty:
       case Kind::Property:
       case Kind::Identity:
+      case Kind::TupleElement:
         llvm_unreachable("no subscript labels for this kind");
       }
       llvm_unreachable("unhandled kind");
@@ -5139,6 +5168,7 @@ public:
       case Kind::UnresolvedProperty:
       case Kind::Property:
       case Kind::Identity:
+      case Kind::TupleElement:
         return {};
       }
       llvm_unreachable("unhandled kind");
@@ -5160,6 +5190,7 @@ public:
       case Kind::OptionalForce:
       case Kind::Property:
       case Kind::Identity:
+      case Kind::TupleElement:
         llvm_unreachable("no unresolved name for this kind");
       }
       llvm_unreachable("unhandled kind");
@@ -5178,7 +5209,27 @@ public:
       case Kind::OptionalWrap:
       case Kind::OptionalForce:
       case Kind::Identity:
+      case Kind::TupleElement:
         llvm_unreachable("no decl ref for this kind");
+      }
+      llvm_unreachable("unhandled kind");
+    }
+      
+    unsigned getTupleIndex() const {
+      switch (getKind()) {
+        case Kind::TupleElement:
+          return TupleIndex;
+                
+        case Kind::Invalid:
+        case Kind::UnresolvedProperty:
+        case Kind::UnresolvedSubscript:
+        case Kind::OptionalChain:
+        case Kind::OptionalWrap:
+        case Kind::OptionalForce:
+        case Kind::Identity:
+        case Kind::Property:
+        case Kind::Subscript:
+          llvm_unreachable("no field number for this kind");
       }
       llvm_unreachable("unhandled kind");
     }

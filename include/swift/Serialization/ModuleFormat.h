@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 475; // Last change: Generalize nested archetype serialization
+const uint16_t SWIFTMODULE_VERSION_MINOR = 477; // SILUndef serialized with ownership kind
 
 using DeclIDField = BCFixed<31>;
 
@@ -107,7 +107,7 @@ using CharOffset = BitOffset;
 using CharOffsetField = BitOffsetField;
 
 using FileSizeField = BCVBR<16>;
-using FileModTimeField = BCVBR<16>;
+using FileModTimeOrContentHashField = BCVBR<16>;
 using FileHashField = BCVBR<16>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
@@ -671,9 +671,10 @@ namespace input_block {
 
   using FileDependencyLayout = BCRecordLayout<
     FILE_DEPENDENCY,
-    FileSizeField,    // file size (for validation)
-    FileModTimeField, // file mtime (for validation)
-    BCBlob            // path
+    FileSizeField,                 // file size (for validation)
+    FileModTimeOrContentHashField, // mtime or content hash (for validation)
+    BCFixed<1>,                    // are we reading mtime (0) or hash (1)?
+    BCBlob                         // path
   >;
 }
 

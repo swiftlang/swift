@@ -522,11 +522,6 @@ bool simplifyUsers(SingleValueInstruction *I);
 /// without a significant increase to code size.
 bool shouldExpand(SILModule &Module, SILType Ty);
 
-/// Check if a given type is a simple type, i.e. a builtin
-/// integer or floating point type or a struct/tuple whose members
-/// are of simple types.
-bool isSimpleType(SILType SILTy, SILModule& Module);
-
 /// Check if the value of V is computed by means of a simple initialization.
 /// Store the actual SILValue into \p Val and the reversed list of instructions
 /// initializing it in \p Insns.
@@ -556,20 +551,20 @@ bool calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl);
 // can be derived e.g.:
 // - from a constructor or
 // - from a successful outcome of a checked_cast_br [exact] instruction.
-SILValue getInstanceWithExactDynamicType(SILValue S, SILModule &M,
+SILValue getInstanceWithExactDynamicType(SILValue S,
                                          ClassHierarchyAnalysis *CHA);
 
 /// Try to determine the exact dynamic type of an object.
 /// returns the exact dynamic type of the object, or an empty type if the exact
 /// type could not be determined.
-SILType getExactDynamicType(SILValue S, SILModule &M,
+SILType getExactDynamicType(SILValue S,
                             ClassHierarchyAnalysis *CHA,
                             bool ForUnderlyingObject = false);
 
 /// Try to statically determine the exact dynamic type of the underlying object.
 /// returns the exact dynamic type of the underlying object, or an empty SILType
 /// if the exact type could not be determined.
-SILType getExactDynamicTypeOfUnderlyingObject(SILValue S, SILModule &M,
+SILType getExactDynamicTypeOfUnderlyingObject(SILValue S,
                                               ClassHierarchyAnalysis *CHA);
 
 /// Utility class for cloning init values into the static initializer of a

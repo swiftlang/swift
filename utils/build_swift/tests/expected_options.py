@@ -96,6 +96,8 @@ EXPECTED_DEFAULTS = {
     'build_watchos_device': False,
     'build_watchos_simulator': False,
     'build_xctest': False,
+    'cmake_c_launcher': None,
+    'cmake_cxx_launcher': None,
     'clang_compiler_version': None,
     'clang_profile_instr_use': None,
     'clang_user_visible_version': defaults.CLANG_USER_VISIBLE_VERSION,
@@ -537,6 +539,8 @@ EXPECTED_OPTIONS = [
     PathOption('--install-symroot'),
     PathOption('--install-destdir'),
     PathOption('--symbols-package'),
+    PathOption('--cmake-c-launcher'),
+    PathOption('--cmake-cxx-launcher'),
 
     IntOption('--benchmark-num-o-iterations'),
     IntOption('--benchmark-num-onone-iterations'),

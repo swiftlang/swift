@@ -465,11 +465,20 @@ void CharVector::append(StringRef Rhs, NodeFactory &Factory) {
 }
 
 void CharVector::append(int Number, NodeFactory &Factory) {
-  const int MaxIntPrintSize = 8;
+  const int MaxIntPrintSize = 11;
   if (NumElems + MaxIntPrintSize > Capacity)
     Factory.Reallocate(Elems, Capacity, /*Growth*/ MaxIntPrintSize);
   int Length = snprintf(Elems + NumElems, MaxIntPrintSize, "%d", Number);
   assert(Length > 0 && Length < MaxIntPrintSize);
+  NumElems += Length;
+}
+
+void CharVector::append(unsigned long long Number, NodeFactory &Factory) {
+  const int MaxPrintSize = 21;
+  if (NumElems + MaxPrintSize > Capacity)
+    Factory.Reallocate(Elems, Capacity, /*Growth*/ MaxPrintSize);
+  int Length = snprintf(Elems + NumElems, MaxPrintSize, "%llu", Number);
+  assert(Length > 0 && Length < MaxPrintSize);
   NumElems += Length;
 }
 

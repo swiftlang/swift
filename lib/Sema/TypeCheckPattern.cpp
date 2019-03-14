@@ -863,6 +863,14 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL,
         param->setSpecifier(VarDecl::Specifier::Owned);
       }
     }
+
+    if (param->isInOut() && param->isDefaultArgument()) {
+      diagnose(param->getDefaultValue()->getLoc(),
+               swift::diag::cannot_provide_default_value_inout,
+               param->getName());
+      param->markInvalid();
+      hadError = true;
+    }
   }
   
   return hadError;
@@ -1388,19 +1396,26 @@ recur:
             goto recur;
           }
 
-          auto diag = diagnose(EEP->getLoc(),
-                               diag::enum_element_pattern_member_not_found,
-                               EEP->getName().str(), type);
-
-          // If we have an optional type let's try to see if the case
-          // exists in its base type, if so we can suggest a fix-it for that.
+          // If we have an optional type, let's try to see if the case
+          // exists in its base type and if it does then synthesize an
+          // OptionalSomePattern that wraps the case. This uses recursion
+          // to add multiple levels of OptionalSomePattern if the optional
+          // is nested.
           if (auto baseType = type->getOptionalObjectType()) {
-            if (lookupEnumMemberElement(*this, dc, baseType, EEP->getName(),
-                                        EEP->getLoc()))
-              diag.fixItInsertAfter(EEP->getEndLoc(), "?");
+            if (lookupEnumMemberElement(*this, dc,
+                                        baseType->lookThroughAllOptionalTypes(),
+                                        EEP->getName(), EEP->getLoc())) {
+              P = new (Context)
+                  OptionalSomePattern(EEP, EEP->getEndLoc(), /*implicit*/true);
+              return coercePatternToType(P, resolution, type, options);
+            } else {
+              diagnose(EEP->getLoc(),
+                       diag::enum_element_pattern_member_not_found,
+                       EEP->getName().str(), type);
+              return true;
+            }
           }
         }
-        return true;
       }
       enumTy = type;
     } else {

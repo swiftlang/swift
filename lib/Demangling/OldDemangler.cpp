@@ -1374,7 +1374,7 @@ private:
 
   NodePointer getDependentGenericParamType(unsigned depth, unsigned index) {
     DemanglerPrinter PrintName;
-    PrintName << archetypeName(index, depth);
+    PrintName << genericParameterName(depth, index);
 
     auto paramTy = Factory.createNode(Node::Kind::DependentGenericParamType);
     paramTy->addChild(Factory.createNode(Node::Kind::Index, depth), Factory);

@@ -751,13 +751,15 @@ type checking and the necessary compiler arguments to help resolve all dependenc
     <key.compilerargs>:       [string*] // Array of zero or more strings for the compiler arguments,
                                         // e.g ["-sdk", "/path/to/sdk"]. If key.sourcefile is provided,
                                         // these must include the path to that file.
+    <key.expectedtypes>:      [string*] // A list of interested protocol USRs.
+                                        // When empty, we report all expressions in the file.
+                                        // When non-empty, we report expressions whose types conform to any of the give protocols.
 }
 ```
 
 ### Response
 ```
 {
-    <key.printedtypebuffer>:          (string)                    // A text buffer where all expression types are printed to.
     <key.expression_type_list>:       (array) [expr-type-info*]   // A list of expression and type
 }
 ```
@@ -767,8 +769,8 @@ expr-type-info ::=
 {
   <key.expression_offset>:    (int64)    // Offset of an expression in the source file
   <key.expression_length>:    (int64)    // Length of an expression in the source file
-  <key.type_offset>:          (int64)    // Offset of the printed type of the expression in the printed type buffer
-  <key.type_length>:          (int64)    // Length of the printed type of the expression in the printed type buffer
+  <key.expression_type>:      (string)   // Printed type of this expression
+  <key.expectedtypes>:        [string*]  // A list of interested protocol USRs this expression conforms to
 }
 ```
 

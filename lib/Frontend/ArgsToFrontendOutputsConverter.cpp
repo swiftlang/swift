@@ -401,7 +401,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   ID emitModuleOption;
   std::string moduleExtension;
   std::string mainOutputIfUsableForModule;
-  deriveModulePathParameters(emitModuleOption, moduleExtension,
+  deriveModulePathParameters(outputFile, emitModuleOption, moduleExtension,
                              mainOutputIfUsableForModule);
 
   auto moduleOutputPath = determineSupplementaryOutputFilename(
@@ -458,7 +458,7 @@ SupplementaryOutputPathsComputer::determineSupplementaryOutputFilename(
 };
 
 void SupplementaryOutputPathsComputer::deriveModulePathParameters(
-    options::ID &emitOption, std::string &extension,
+    StringRef mainOutputFile, options::ID &emitOption, std::string &extension,
     std::string &mainOutputIfUsable) const {
 
   bool isSIB = RequestedAction == FrontendOptions::ActionType::EmitSIB ||
@@ -477,7 +477,7 @@ void SupplementaryOutputPathsComputer::deriveModulePathParameters(
       isSIB ? file_types::TY_SIB : file_types::TY_SwiftModuleFile);
 
   mainOutputIfUsable =
-      canUseMainOutputForModule && !OutputFiles.empty() ? OutputFiles[0] : "";
+      canUseMainOutputForModule && !OutputFiles.empty() ? mainOutputFile : "";
 }
 
 static SupplementaryOutputPaths

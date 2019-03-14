@@ -151,6 +151,10 @@ protected:
   /// in the root expression or `nullptr` otherwise.
   Expr *findParentExpr(Expr *subExpr) const;
 
+  /// \returns An argument expression if given anchor is a call, member
+  /// reference or subscript, nullptr otherwise.
+  Expr *getArgumentExprFor(Expr *anchor) const;
+
 private:
   /// Compute anchor expression associated with current diagnostic.
   std::pair<Expr *, bool> computeAnchor() const;
@@ -561,6 +565,15 @@ private:
   Type getUnwrappedType() const {
     return resolveType(UnwrappedType, /*reconstituteSugar=*/true);
   }
+
+  /// Suggest a default value via `?? <default value>`
+  void offerDefaultValueUnwrapFixIt(DeclContext *DC, Expr *expr) const;
+  /// Suggest a force optional unwrap via `!`
+  void offerForceUnwrapFixIt(Expr *expr) const;
+
+  /// Determine whether given expression is an argument used in the
+  /// operator invocation, and if so return corresponding parameter.
+  Optional<AnyFunctionType::Param> getOperatorParameterFor(Expr *expr) const;
 };
 
 /// Diagnose errors associated with rvalues in positions
@@ -875,6 +888,72 @@ public:
       : InvalidInitRefFailure(root, cs, baseTy, init, SourceRange(), locator) {}
 
   bool diagnoseAsError() override;
+};
+
+class MissingArgumentsFailure final : public FailureDiagnostic {
+  using Param = AnyFunctionType::Param;
+
+  FunctionType *Fn;
+  unsigned NumSynthesized;
+
+public:
+  MissingArgumentsFailure(Expr *root, ConstraintSystem &cs,
+                          FunctionType *funcType,
+                          unsigned numSynthesized,
+                          ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), Fn(funcType),
+        NumSynthesized(numSynthesized) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  /// If missing arguments come from trailing closure,
+  /// let's produce tailored diagnostics.
+  bool diagnoseTrailingClosure(ClosureExpr *closure);
+};
+
+class OutOfOrderArgumentFailure final : public FailureDiagnostic {
+  using ParamBinding = SmallVector<unsigned, 1>;
+
+  unsigned ArgIdx;
+  unsigned PrevArgIdx;
+
+  SmallVector<ParamBinding, 4> Bindings;
+
+public:
+  OutOfOrderArgumentFailure(Expr *root, ConstraintSystem &cs,
+                            unsigned argIdx,
+                            unsigned prevArgIdx,
+                            ArrayRef<ParamBinding> bindings,
+                            ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), ArgIdx(argIdx),
+        PrevArgIdx(prevArgIdx), Bindings(bindings.begin(), bindings.end()) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an attempt to destructure a single tuple closure parameter
+/// into a multiple (possibly anonymous) arguments e.g.
+///
+/// ```swift
+/// let _: ((Int, Int)) -> Void = { $0 + $1 }
+/// ```
+class ClosureParamDestructuringFailure final : public FailureDiagnostic {
+  FunctionType *ContextualType;
+
+public:
+  ClosureParamDestructuringFailure(Expr *root, ConstraintSystem &cs,
+                                   FunctionType *contextualType,
+                                   ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), ContextualType(contextualType) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  Type getParameterType() const {
+    const auto &param = ContextualType->getParams().front();
+    return resolveType(param.getPlainType());
+  }
 };
 
 } // end namespace constraints

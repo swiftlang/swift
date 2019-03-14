@@ -201,7 +201,7 @@ static ManagedValue borrowedCastToOriginalSelfType(SILGenFunction &SGF,
   // If we have a metatype, then we just return the original self value since
   // metatypes are trivial, so we can avoid ownership concerns.
   if (originalSelfType.is<AnyMetatypeType>()) {
-    assert(originalSelfType.isTrivial(SGF.getModule()) &&
+    assert(originalSelfType.isTrivial(SGF.F) &&
            "Metatypes should always be trivial");
     return ManagedValue::forUnmanaged(originalSelf);
   }
@@ -904,7 +904,7 @@ public:
     // If we are already the right rep, just return.
     auto givenMetatypeRep = givenMetatype->getRepresentation();
     if (givenMetatypeRep == destMetatypeRep) {
-      return {selfMeta, SGF.SGM.getLoweredType(instanceType)};
+      return {selfMeta, SGF.getLoweredType(instanceType)};
     }
 
     CanAnyMetatypeType destMetatype;
@@ -939,7 +939,7 @@ public:
     }
 
     auto result = ManagedValue::forUnmanaged(convertedValue);
-    return {result, SGF.SGM.getLoweredType(instanceType)};
+    return {result, SGF.getLoweredType(instanceType)};
   }
 
   /// Given a metatype value for the type, allocate an Objective-C
@@ -1429,7 +1429,7 @@ public:
       // If the initializer is a C function imported as a member,
       // there is no 'self' parameter. Mark it undef.
       if (ctorRef->getDecl()->isImportAsMember()) {
-        self = SGF.emitUndef(expr, selfFormalType);
+        self = SGF.emitUndef(selfFormalType);
       } else if (SGF.AllocatorMetatype) {
         self = emitCorrespondingSelfValue(
             ManagedValue::forUnmanaged(SGF.AllocatorMetatype), arg);
@@ -4507,8 +4507,6 @@ CallEmission::applyEnumElementConstructor(SGFContext C) {
   // correctly.
   firstLevelResult.formalType = callee.getSubstFormalType();
   auto origFormalType = callee.getOrigFormalType();
-  auto substFnType =
-      SGF.getSILFunctionType(origFormalType, firstLevelResult.formalType);
 
   // We have a fully-applied enum element constructor: open-code the
   // construction.
@@ -4539,8 +4537,6 @@ CallEmission::applyEnumElementConstructor(SGFContext C) {
     assert(uncurriedSites.size() == 1);
   }
 
-  assert(substFnType->getNumResults() == 1);
-  (void)substFnType;
   ManagedValue resultMV = SGF.emitInjectEnum(
       uncurriedLoc, std::move(payload),
       SGF.getLoweredType(formalResultType),
@@ -5543,10 +5539,21 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
             integerLiteral,
             SILType::getBuiltinIntegerLiteralType(getASTContext()),
             integerLiteral->getRawValue()));
-    CanType ty = integerManaged.getType().getASTType()->getCanonicalType();
+    CanType ty = integerManaged.getType().getASTType();
     builtinLiteralArgs = RValue(*this, {integerManaged}, ty);
     builtinInit = integerLiteral->getBuiltinInitializer();
     init = integerLiteral->getInitializer();
+  } else if (auto floatLiteral = dyn_cast<FloatLiteralExpr>(literal)) {
+    auto *litTy = floatLiteral->getBuiltinType()->castTo<BuiltinFloatType>();
+    ManagedValue floatManaged = ManagedValue::forUnmanaged(B.createFloatLiteral(
+        floatLiteral,
+        SILType::getBuiltinFloatType(litTy->getFPKind(), getASTContext()),
+        floatLiteral->getValue()));
+
+    CanType ty = floatManaged.getType().getASTType();
+    builtinLiteralArgs = RValue(*this, {floatManaged}, ty);
+    builtinInit = floatLiteral->getBuiltinInitializer();
+    init = floatLiteral->getInitializer();
   } else {
     ASTContext &ctx = getASTContext();
     SourceLoc loc = literal->getStartLoc();
@@ -5974,19 +5981,19 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
   return Preparer.prepare();
 }
 
-static void collectFakeIndexParameters(SILGenModule &SGM,
+static void collectFakeIndexParameters(SILGenFunction &SGF,
                                        CanType substType,
                                     SmallVectorImpl<SILParameterInfo> &params) {
   if (auto tuple = dyn_cast<TupleType>(substType)) {
     for (auto substEltType : tuple.getElementTypes())
-      collectFakeIndexParameters(SGM, substEltType, params);
+      collectFakeIndexParameters(SGF, substEltType, params);
     return;
   }
 
   // Use conventions that will produce a +1 value.
-  auto &tl = SGM.Types.getTypeLowering(substType);
+  auto &tl = SGF.getTypeLowering(substType);
   ParameterConvention convention;
-  if (tl.isFormallyPassedIndirectly()) {
+  if (tl.isAddressOnly()) {
     convention = ParameterConvention::Indirect_In;
   } else if (tl.isTrivial()) {
     convention = ParameterConvention::Direct_Unowned;
@@ -6007,7 +6014,7 @@ static void emitPseudoFunctionArguments(SILGenFunction &SGF,
   SmallVector<SILParameterInfo, 4> substParamTys;
   for (auto substParam : substParams) {
     auto substParamType = substParam.getParameterType()->getCanonicalType();
-    collectFakeIndexParameters(SGF.SGM, substParamType, substParamTys);
+    collectFakeIndexParameters(SGF, substParamType, substParamTys);
   }
 
   SmallVector<ManagedValue, 4> argValues;

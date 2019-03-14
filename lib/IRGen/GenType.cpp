@@ -1433,13 +1433,26 @@ const TypeInfo &IRGenFunction::getTypeInfo(SILType T) {
 }
 
 /// Return the SIL-lowering of the given type.
-SILType IRGenModule::getLoweredType(AbstractionPattern orig, Type subst) {
-  return getSILTypes().getLoweredType(orig, subst);
+SILType IRGenModule::getLoweredType(AbstractionPattern orig, Type subst) const {
+  return getSILTypes().getLoweredType(orig, subst,
+                                      ResilienceExpansion::Maximal);
 }
 
 /// Return the SIL-lowering of the given type.
-SILType IRGenModule::getLoweredType(Type subst) {
-  return getSILTypes().getLoweredType(subst);
+SILType IRGenModule::getLoweredType(Type subst) const {
+  return getSILTypes().getLoweredType(subst,
+                                      ResilienceExpansion::Maximal);
+}
+
+/// Return the SIL-lowering of the given type.
+const Lowering::TypeLowering &IRGenModule::getTypeLowering(SILType type) const {
+  return getSILTypes().getTypeLowering(type,
+                                       ResilienceExpansion::Maximal);
+}
+
+bool IRGenModule::isTypeABIAccessible(SILType type) const {
+  return getSILModule().isTypeABIAccessible(type,
+                                            ResilienceExpansion::Maximal);
 }
 
 /// Get a pointer to the storage type for the given type.  Note that,
@@ -1456,7 +1469,7 @@ llvm::PointerType *IRGenModule::getStoragePointerTypeForLowered(CanType T) {
 }
 
 llvm::Type *IRGenModule::getStorageTypeForUnlowered(Type subst) {
-  return getStorageType(getSILTypes().getLoweredType(subst));
+  return getStorageType(getLoweredType(subst));
 }
 
 llvm::Type *IRGenModule::getStorageType(SILType T) {
@@ -1486,7 +1499,7 @@ IRGenModule::getTypeInfoForUnlowered(AbstractionPattern orig, Type subst) {
 /// have yet undergone SIL type lowering.
 const TypeInfo &
 IRGenModule::getTypeInfoForUnlowered(AbstractionPattern orig, CanType subst) {
-  return getTypeInfo(getSILTypes().getLoweredType(orig, subst));
+  return getTypeInfo(getLoweredType(orig, subst));
 }
 
 /// Get the fragile type information for the given type, which is known

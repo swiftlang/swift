@@ -304,13 +304,15 @@ func test_isa_1(p: P) {
   case is X:
   // CHECK: [[IS_X]]:
   // CHECK-NEXT: load [trivial] [[TMPBUF]]
+  // CHECK-NEXT: // function_ref
+  // CHECK-NEXT: [[FUNC:%.*]] = function_ref @$s6switch1ayyF
+  // CHECK-NEXT: apply [[FUNC]]()
   // CHECK-NEXT: dealloc_stack [[TMPBUF]]
   // CHECK-NEXT: destroy_addr [[PTMPBUF]]
   // CHECK-NEXT: dealloc_stack [[PTMPBUF]]
     a()
-    // CHECK:   function_ref @$s6switch1ayyF
     // CHECK:   br [[CONT:bb[0-9]+]]
-    
+
   // CHECK: [[IS_NOT_X]]:
   // CHECK:   checked_cast_addr_br copy_on_success P in [[P]] : $*P to Y in {{%.*}} : $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
 
@@ -423,9 +425,9 @@ func test_isa_class_1(x: B) {
 
   // CHECK: [[YES_CASE1]]:
   case is D1 where runced():
+  // CHECK:   function_ref @$s6switch1ayyF
   // CHECK:   destroy_value [[CAST_D1_COPY]]
   // CHECK:   end_borrow [[CAST_D1]]
-  // CHECK:   function_ref @$s6switch1ayyF
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
 
@@ -443,8 +445,8 @@ func test_isa_class_1(x: B) {
   case is D2:
   // CHECK: [[IS_D2]]([[CAST_D2:%.*]] : @guaranteed $D2):
   // CHECK:   [[CAST_D2_COPY:%.*]] = copy_value [[CAST_D2]]
-  // CHECK:   destroy_value [[CAST_D2_COPY]]
   // CHECK:   function_ref @$s6switch1byyF
+  // CHECK:   destroy_value [[CAST_D2_COPY]]
   // CHECK:   br [[CONT]]
     b()
 
@@ -458,8 +460,8 @@ func test_isa_class_1(x: B) {
   // CHECK:   cond_br {{%.*}}, [[CASE3:bb[0-9]+]], [[NO_CASE3:bb[0-9]+]]
 
   // CHECK: [[CASE3]]:
-  // CHECK:   destroy_value [[CAST_E_COPY]]
   // CHECK:   function_ref @$s6switch1cyyF
+  // CHECK:   destroy_value [[CAST_E_COPY]]
   // CHECK:   br [[CONT]]
     c()
 
@@ -478,9 +480,10 @@ func test_isa_class_1(x: B) {
   case is C:
   // CHECK: [[IS_C]]([[CAST_C:%.*]] : @guaranteed $C):
   // CHECK:   [[CAST_C_COPY:%.*]] = copy_value [[CAST_C]]
+  // CHECK:   function_ref @$s6switch1dyyF
+  // CHECK-NEXT: apply
   // CHECK:   destroy_value [[CAST_C_COPY]]
   // CHECK:   end_borrow [[CAST_C]]
-  // CHECK:   function_ref @$s6switch1dyyF
   // CHECK:   br [[CONT]]
     d()
 
@@ -524,7 +527,7 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK: [[NO_CASE1]]:
   // CHECK:   destroy_value [[CAST_D1_COPY]]
   // CHECK:   br [[NEXT_CASE:bb5]]
-  
+
   // CHECK: [[IS_NOT_D1]]([[NOCAST_D1:%.*]] : @guaranteed $B):
   // CHECK:   end_borrow [[NOCAST_D1]]
   // CHECK:   br [[NEXT_CASE]]
@@ -799,8 +802,9 @@ func test_union_addr_only_1(u: MaybeAddressOnlyPair) {
   // CHECK: [[IS_LEFT]]:
   // CHECK:   [[P:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt.1
   case .Left(_):
+  // CHECK:   [[FUNC:%.*]] = function_ref @$s6switch1byyF
+  // CHECK-NEXT: apply [[FUNC]](
   // CHECK:   destroy_addr [[P]]
-  // CHECK:   function_ref @$s6switch1byyF
   // CHECK:   br [[CONT]]
     b()
 
@@ -808,16 +812,18 @@ func test_union_addr_only_1(u: MaybeAddressOnlyPair) {
   // CHECK:   [[STR_ADDR:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Right!enumelt.1
   // CHECK:   [[STR:%.*]] = load [take] [[STR_ADDR]]
   case .Right(_):
+  // CHECK:   [[FUNC:%.*]] = function_ref @$s6switch1cyyF
+  // CHECK:   apply [[FUNC]](
   // CHECK:   destroy_value [[STR]] : $String
-  // CHECK:   function_ref @$s6switch1cyyF
   // CHECK:   br [[CONT]]
     c()
 
   // CHECK: [[IS_BOTH]]:
   // CHECK:   [[P_STR_TUPLE:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Both!enumelt.1
   case .Both(_):
+  // CHECK:   [[FUNC:%.*]] = function_ref @$s6switch1dyyF
+  // CHECK-NEXT: apply [[FUNC]](
   // CHECK:   destroy_addr [[P_STR_TUPLE]]
-  // CHECK:   function_ref @$s6switch1dyyF
   // CHECK:   br [[CONT]]
     d()
   }
@@ -1020,7 +1026,7 @@ func testOptionalEnumMixWithNil(_ a : Int?) -> Int {
 // CHECK-LABEL: sil hidden [ossa] @$s6switch43testMultiPatternsWithOuterScopeSameNamedVar4base6filterySiSg_AEtF
 func testMultiPatternsWithOuterScopeSameNamedVar(base: Int?, filter: Int?) {
   switch(base, filter) {
-    
+
   case (.some(let base), .some(let filter)):
     // CHECK: bb2(%10 : $Int):
     // CHECK-NEXT: debug_value %8 : $Int, let, name "base"
@@ -1034,7 +1040,7 @@ func testMultiPatternsWithOuterScopeSameNamedVar(base: Int?, filter: Int?) {
     // CHECK: bb5([[OTHER_BASE:%.*]] : $Int)
     // CHECK-NEXT: debug_value [[OTHER_BASE]] : $Int, let, name "base"
     // CHECK-NEXT: br bb6([[OTHER_BASE]] : $Int)
-    
+
     // CHECK: bb6([[ARG:%.*]] : $Int):
     print("single: \(base)")
   default:
@@ -1258,6 +1264,42 @@ func partial_address_only_tuple_dispatch_with_fail_case(_ name: Klass, _ value: 
   case let (_, y as AnyObject):
     break
   default:
+    break
+  }
+}
+
+// This was crashing the ownership verifier at some point and was reported in
+// SR-6664. Just make sure that we still pass the ownership verifier.
+
+// `indirect` is necessary; generic parameter is necessary.
+indirect enum SR6664_Base<Element> {
+  // Tuple associated value is necessary; one element must be a function,
+  // the other must be a non-function using the generic parameter.
+  // (The original associated value was `(where: (Element) -> Bool, of: Element?)`,
+  // to give you an idea of the variety of types.)
+  case index((Int) -> Void, Element)
+
+  // Function can be in an extension or not. Can have a return value or not. Can
+  // have a parameter or not. Can be generic or not.
+  func relative() {
+    switch self {
+    // Matching the case is necessary. You can capture or ignore the associated
+    // values.
+    case .index:
+      // Body doesn't matter.
+      break
+    }
+  }
+}
+
+// Make sure that we properly create switch_enum success arguments if we have an
+// associated type that is a void type.
+func testVoidType() {
+  let x: Optional<()> = ()
+  switch x {
+  case .some(let x):
+    break
+  case .none:
     break
   }
 }
