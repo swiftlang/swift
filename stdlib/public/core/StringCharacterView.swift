@@ -110,8 +110,44 @@ extension String: BidirectionalCollection {
   /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
   @inlinable @inline(__always)
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
-    // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
+    // TODO: single-scalar-grapheme fast path, etc.
+    if _guts.isFastASCII {
+      return _asciiIndex(i, offsetBy: n, limitedBy: endIndex)!
+    }
     return _index(i, offsetBy: n)
+  }
+  
+  internal func _searchForASCIIIndex(_ i: Index,
+                                     in ascii: UnsafeBufferPointer<UInt8>,
+                                     offsetBy n: IndexDistance,
+                                     limitedBy limit: Index) -> (Int, Index?) {
+    _precondition(i._encodedOffset + n < endIndex._encodedOffset,
+                  "String index is out of bounds")
+
+    var consumed = 0
+    let searchSlice = ascii[i._encodedOffset ..< i._encodedOffset + n]
+    if let cr = searchSlice.firstIndex(of: _CR) && cr != buffer.endIndex &- 1 {
+      consumed = cr
+      return (consumed, Index(encodedOffset:
+        i._encodedOffset + consumed + (searchSlice[cr &+ 1] == _LF) ? 1 : 0))
+    } else {
+      return (searchSlice.count,
+              Index(encodedOffset: e._encodedOffset + searchSlice.count)
+    }
+  }
+  
+  internal func _asciiIndex(_ i: Index, offsetBy n: IndexDistance,
+                            limitedBy limit: Index) -> Index? {
+    return _guts.withFastUTF8 { ascii in
+      var result: Index? = i
+      var remainingOffset = n
+      repeat {
+        (let consumed, result) = _searchForASCIIIndex(i, in: ascii,
+          offsetBy: remainingOffset, limitedBy: limit)
+        remainingOffset &-= consumed
+      } while result != nil && remainingOffset > 0
+      return result
+    }
   }
 
   /// Returns an index that is the specified distance from the given index,
@@ -155,10 +191,28 @@ extension String: BidirectionalCollection {
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
-    // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
+    // TODO: single-scalar-grapheme fast path, etc.
+    if _guts.isFastASCII {
+      return _asciiIndex(i, offsetBy: n, limitedBy: limit)
+    }
     return _index(i, offsetBy: n, limitedBy: limit)
   }
-
+  
+  private func _asciiDistance(from start: Index, to end: Index)
+    -> IndexDistance {
+      return _guts.withFastUTF8 { ascii in
+        var crlfCount = 0
+        for i in start._encodedOffset ..< end._encodedOffset {
+          if ascii[i] == _CR {
+            if i != end._encodedOffset &- 1 && ascii[i &+ 1] == _LF {
+              crlfCount += 1
+            }
+          }
+        }
+        return end._encodedOffset - (start._encodedOffset - crlfCount)
+      }
+  }
+  
   /// Returns the distance between two indices.
   ///
   /// - Parameters:
@@ -170,7 +224,10 @@ extension String: BidirectionalCollection {
   /// - Complexity: O(*n*), where *n* is the resulting distance.
   @inlinable @inline(__always)
   public func distance(from start: Index, to end: Index) -> IndexDistance {
-    // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
+    // TODO: single-scalar-grapheme fast path, etc.
+    if _guts.isFastASCII {
+      return _asciiDistance(from: start, to: end)
+    }
     return _distance(from: start, to: end)
   }
 
