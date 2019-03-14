@@ -21,6 +21,13 @@ CHANGELOG
 
 </details>
 
+Swift 5.1
+---------
+
+* [SR-1340](https://bugs.swift.org/browse/SR-1340):
+
+`Self` can now be used inside member functions and for function arguments of structs and enums to refer to the containing type.
+
 Swift 5.0
 ---------
 
