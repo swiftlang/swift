@@ -401,6 +401,7 @@ public:
                                  ConstraintLocator *locator);
 
   /// Create a bind overload choice with a fix.
+  /// Note: This constraint is going to be disabled by default.
   static Constraint *createFixedChoice(ConstraintSystem &cs, Type type,
                                        OverloadChoice choice,
                                        DeclContext *useDC, ConstraintFix *fix,
