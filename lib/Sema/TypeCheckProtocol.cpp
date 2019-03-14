@@ -2518,8 +2518,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
       AccessScope requiredAccessScope = getRequiredAccessScope();
 
       if (!TC.Context.isSwiftVersionAtLeast(5) &&
-          DC->getParentModule()->getResilienceStrategy() !=
-              ResilienceStrategy::Resilient) {
+          !DC->getParentModule()->isResilient()) {
         // HACK: In pre-Swift-5, these typealiases were synthesized with the
         // same access level as the conforming type, which might be more
         // visible than the associated type witness. Preserve that behavior
