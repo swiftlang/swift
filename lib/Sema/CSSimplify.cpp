@@ -4203,9 +4203,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     break;
   }
 
+  SmallVector<Constraint *, 4> candidates;
   // If we found viable candidates, then we're done!
   if (!result.ViableCandidates.empty()) {
-    llvm::SmallVector<Constraint *, 8> candidates;
     generateConstraints(
         candidates, memberTy, result.ViableCandidates, useDC, locator,
         result.getFavoredIndex(), /*requiresFix=*/false,
@@ -4222,11 +4222,30 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       generateConstraints(candidates, memberTy, outerAlternatives,
                           useDC, locator);
     }
+  }
 
+  if (!result.UnviableCandidates.empty()) {
+    SmallVector<OverloadChoice, 8> choices;
+    llvm::transform(
+        result.UnviableCandidates, std::back_inserter(choices),
+        [](const std::pair<OverloadChoice, MemberLookupResult::UnviableReason>
+               &candidate) { return candidate.first; });
+
+    // Generate constraints for unvailable choices if they have a fix,
+    // and disable them by default, they'd get picked up in the "salvage" mode.
+    generateConstraints(candidates, memberTy, choices, useDC, locator,
+                        /*favoredChoice=*/None, /*requiresFix=*/true,
+                        [&](unsigned idx, const OverloadChoice &choice) {
+                          return fixMemberRef(
+                              *this, baseTy, member, choice, locator,
+                              result.UnviableCandidates[idx].second);
+                        });
+  }
+
+  if (!candidates.empty()) {
     addOverloadSet(candidates, locator);
     return SolutionKind::Solved;
   }
-  
 
   // If the lookup found no hits at all (either viable or unviable), diagnose it
   // as such and try to recover in various ways.
@@ -4237,30 +4256,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     // off to see if the problem is related to base not being explicitly unwrapped.
     if (!MissingMembers.insert(locator))
       return SolutionKind::Error;
-
-    if (!result.UnviableCandidates.empty()) {
-      SmallVector<OverloadChoice, 8> choices;
-      llvm::transform(
-          result.UnviableCandidates, std::back_inserter(choices),
-          [](const std::pair<OverloadChoice, MemberLookupResult::UnviableReason>
-                 &candidate) { return candidate.first; });
-
-      SmallVector<Constraint *, 4> candidates;
-      generateConstraints(candidates, memberTy, choices, useDC, locator,
-                          /*favoredChoice=*/None, /*requiresFix=*/true,
-                          [&](unsigned idx, const OverloadChoice &choice) {
-                            return fixMemberRef(
-                                *this, baseTy, member, choice, locator,
-                                result.UnviableCandidates[idx].second);
-                          });
-
-      // If there are any viable "fixed" candidates, let's schedule
-      // them to be attempted.
-      if (!candidates.empty()) {
-        addOverloadSet(candidates, locator);
-        return SolutionKind::Solved;
-      }
-    }
 
     if (baseObjTy->getOptionalObjectType()) {
       // If the base type was an optional, look through it.
