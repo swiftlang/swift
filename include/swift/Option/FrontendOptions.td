@@ -177,12 +177,6 @@ def disable_objc_attr_requires_foundation_module :
 def enable_resilience : Flag<["-"], "enable-resilience">,
    HelpText<"Compile the module to export resilient interfaces for all "
             "public declarations by default">;
-
-def disable_legacy_type_info : Flag<["-"], "disable-legacy-type-info">,
-  HelpText<"Completely disable legacy type layout">;
-
-def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">,
-  HelpText<"Read legacy type layout from the given path instead of default path">;
 }
 
 
@@ -552,6 +546,12 @@ def enable_verify_exclusivity : Flag<["-"], "enable-verify-exclusivity">,
 
 def disable_verify_exclusivity : Flag<["-"], "disable-verify-exclusivity">,
   HelpText<"Diable verification of access markers used to enforce exclusivity.">;
+
+def disable_legacy_type_info : Flag<["-"], "disable-legacy-type-info">,
+  HelpText<"Completely disable legacy type layout">;
+
+def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">,
+  HelpText<"Read legacy type layout from the given path instead of default path">;
 
 def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
   Flags<[FrontendOption]>,
