@@ -11,9 +11,9 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func downsample<T, U, V>(_ source: U,
-                                    by decimationFaction: Int,
-                                    using filter: T,
-                                    result: inout V)
+                                           decimationFaction: Int,
+                                           filter: T,
+                                           result: inout V)
         where
         T: _ContiguousCollection,
         U: _ContiguousCollection,
@@ -51,9 +51,9 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func downsample<T, U, V>(_ source: U,
-                                    by decimationFaction: Int,
-                                    using filter: T,
-                                    result: inout V)
+                                           decimationFaction: Int,
+                                           filter: T,
+                                           result: inout V)
         where
         T: _ContiguousCollection,
         U: _ContiguousCollection,

@@ -88,13 +88,13 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         
         let coefficients: [Float] = [0.0, 0.1, 0.2, 0.4, 0.8]
         
-        vDSP.differenceEquation(source,
-                                coefficients: (coefficients[0],
-                                               coefficients[1],
-                                               coefficients[2],
-                                               coefficients[3],
-                                               coefficients[4]),
-                                result: &result)
+        vDSP.twoPoleTwoZeroFilter(source,
+                                  coefficients: (coefficients[0],
+                                                 coefficients[1],
+                                                 coefficients[2],
+                                                 coefficients[3],
+                                                 coefficients[4]),
+                                  result: &result)
         
         legacyResult[0] = 0
         legacyResult[1] = 0
@@ -118,13 +118,13 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         
         let coefficients: [Double] = [0.0, 0.1, 0.2, 0.4, 0.8]
         
-        vDSP.differenceEquation(source,
-                                coefficients: (coefficients[0],
-                                               coefficients[1],
-                                               coefficients[2],
-                                               coefficients[3],
-                                               coefficients[4]),
-                                result: &result)
+        vDSP.twoPoleTwoZeroFilter(source,
+                                  coefficients: (coefficients[0],
+                                                 coefficients[1],
+                                                 coefficients[2],
+                                                 coefficients[3],
+                                                 coefficients[4]),
+                                  result: &result)
         
         legacyResult[0] = 0
         legacyResult[1] = 0
@@ -163,8 +163,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         
         
         vDSP.downsample(originalSignal,
-                        by: decimationFactor,
-                        using: filter,
+                        decimationFaction: decimationFactor,
+                        filter: filter,
                         result: &result)
         
         var legacyResult = [Float](repeating: -1,
@@ -198,8 +198,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         
         
         vDSP.downsample(originalSignal,
-                        by: decimationFactor,
-                        using: filter,
+                        decimationFaction: decimationFactor,
+                        filter: filter,
                         result: &result)
         
         var legacyResult = [Double](repeating: -1,

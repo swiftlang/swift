@@ -23,20 +23,20 @@ extension vDSP {
     /// This function performs the following calculation:
     ///
     ///                for (n = 2; n < N+2; ++n)
-    ///                C[n] =
-    ///                    + A[n-0]*B[0]
-    ///                    + A[n-1]*B[1]
-    ///                    + A[n-2]*B[2]
-    ///                    - C[n-1]*B[3]
-    ///                    - C[n-2]*B[4];
+    ///                    C[n] =
+    ///                        + A[n-0]*B[0]
+    ///                        + A[n-1]*B[1]
+    ///                        + A[n-2]*B[2]
+    ///                        - C[n-1]*B[3]
+    ///                        - C[n-2]*B[4];
     ///
     /// Where `A` is the input vector, `B` is the filter coefficients, and `C`
     /// is the output vector. Note that outputs start with C[2].
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func differenceEquation<U, V>(_ source: U,
-                                         coefficients: (Float, Float, Float, Float, Float),
-                                         result: inout V)
+    public static func twoPoleTwoZeroFilter<U, V>(_ source: U,
+                                                  coefficients: (Float, Float, Float, Float, Float),
+                                                  result: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -68,20 +68,20 @@ extension vDSP {
     /// This function performs the following calculation:
     ///
     ///                for (n = 2; n < N+2; ++n)
-    ///                C[n] =
-    ///                    + A[n-0]*B[0]
-    ///                    + A[n-1]*B[1]
-    ///                    + A[n-2]*B[2]
-    ///                    - C[n-1]*B[3]
-    ///                    - C[n-2]*B[4];
+    ///                    C[n] =
+    ///                        + A[n-0]*B[0]
+    ///                        + A[n-1]*B[1]
+    ///                        + A[n-2]*B[2]
+    ///                        - C[n-1]*B[3]
+    ///                        - C[n-2]*B[4];
     ///
     /// Where `A` is the input vector, `B` is the filter coefficients, and `C`
     /// is the output vector. Note that outputs start with C[2].
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func differenceEquation<U, V>(_ source: U,
-                                         coefficients: (Double, Double, Double, Double, Double),
-                                         result: inout V)
+    public static func twoPoleTwoZeroFilter<U, V>(_ source: U,
+                                                  coefficients: (Double, Double, Double, Double, Double),
+                                                  result: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
