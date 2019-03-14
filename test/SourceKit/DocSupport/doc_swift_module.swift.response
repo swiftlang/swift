@@ -1763,7 +1763,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
         key.usr: "s:4cake2C1C4foo12i02i1ySin_SihtF",
         key.offset: 110,
         key.length: 33,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>__consuming</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo1</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>i0</decl.var.parameter.argument_label>: <syntaxtype.keyword>__owned</syntaxtype.keyword> <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>i1</decl.var.parameter.argument_label>: <syntaxtype.keyword>__shared</syntaxtype.keyword> <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo1</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>i0</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>i1</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
