@@ -132,6 +132,9 @@ enum class FixKind : uint8_t {
 
   /// If there is out-of-order argument, let's fix that by re-ordering.
   MoveOutOfOrderArgument,
+
+  /// Remove an extraneous suppress-unwrap expression.
+  RemoveSuppressUnwrap,
 };
 
 class ConstraintFix {
@@ -711,6 +714,21 @@ public:
                                         unsigned prevArgIdx,
                                         ArrayRef<ParamBinding> bindings,
                                         ConstraintLocator *locator);
+};
+
+class RemoveSuppressUnwrap final : public ConstraintFix {
+  RemoveSuppressUnwrap(ConstraintSystem &cs, ConstraintLocator *locator)
+    : ConstraintFix(cs, FixKind::RemoveSuppressUnwrap, locator) { }
+
+public:
+  std::string getName() const override {
+    return "remove suppress-unwrap";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static RemoveSuppressUnwrap *create(ConstraintSystem &cs,
+                                      ConstraintLocator *locator);
 };
 
 } // end namespace constraints

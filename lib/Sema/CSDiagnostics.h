@@ -956,6 +956,16 @@ private:
   }
 };
 
+/// Diagnose an extraneous suppress-unwrap operator.
+class RemoveSuppressUnwrapFailure final : public FailureDiagnostic {
+public:
+  RemoveSuppressUnwrapFailure(Expr *root, ConstraintSystem &cs,
+                              ConstraintLocator *locator)
+    : FailureDiagnostic(root, cs, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

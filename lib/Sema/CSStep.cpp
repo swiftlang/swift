@@ -295,6 +295,31 @@ StepResult ComponentStep::take(bool prevFailed) {
     }
   }
 
+  // Check whether all suppress-unwrap expressions have been consumed. If not,
+  // fail.
+  if (!CS.UnwrapSuppressions.empty()) {
+    SmallDenseMap<ConstraintLocator *, unsigned> consumedSuppressions(
+        CS.ConsumedUnwrapSuppressions.begin(),
+        CS.ConsumedUnwrapSuppressions.end());
+    for (const auto &suppression : CS.UnwrapSuppressions) {
+      // If we consumed all of the suppressions, it's okay.
+      auto numConsumed = consumedSuppressions[suppression.first];
+      if (numConsumed == suppression.second.size())
+        continue;
+
+      assert(numConsumed < suppression.second.size());
+      if (!CS.shouldAttemptFixes())
+        return done(/*isSuccess=*/false);
+
+      for (unsigned i : range(numConsumed, suppression.second.size())) {
+        auto unwrapExpr = suppression.second[i];
+        CS.recordFix(
+            RemoveSuppressUnwrap::create(CS,
+                                         CS.getConstraintLocator(unwrapExpr)));
+      }
+    }
+  }
+
   auto solution = CS.finalize();
   if (isDebugMode())
     getDebugLogger() << "(found solution " << getCurrentScore() << ")\n";

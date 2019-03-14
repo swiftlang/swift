@@ -155,3 +155,14 @@ func testTwoStepWrapper() {
   let val3 = ^(^doubleWrapped)
   let _: Double = val3 // expected-error{{cannot convert value of type 'TwoStepWrapper<Int>' to specified type 'Double'}}
 }
+
+// ---------------------------------------------------------------------------
+// Diagnostics
+// ---------------------------------------------------------------------------
+func testExtraUnwraps() {
+  var doubleWrapped by TwoStepWrapper = 17
+  _ = ^(^(^(^(doubleWrapped))))
+  // expected-error@-1{{extraneous unwrap suppression operator '^'}}{{11-12=}}
+  // expected-error@-2{{extraneous unwrap suppression operator '^'}}{{13-14=}}
+}
+

@@ -1079,8 +1079,13 @@ private:
   /// For constraint locators that refer to a declaration (e.g., as would
   /// be used for an overload choice), provide the list of suppress-unwrap
   /// expressions that apply to that declaration.
-  llvm::DenseMap<ConstraintLocator *, TinyPtrVector<SuppressUnwrapExpr *>>
+  llvm::MapVector<ConstraintLocator *, TinyPtrVector<SuppressUnwrapExpr *>>
     UnwrapSuppressions;
+
+  /// Keep track of the # of unwrap-suppression operators that have been
+  /// consumed as part of type checking.
+  SmallVector<std::pair<ConstraintLocator *, unsigned>, 4>
+    ConsumedUnwrapSuppressions;
 
 public:
   /// The locators of \c Defaultable constraints whose defaults were used.
@@ -1549,6 +1554,8 @@ public:
     unsigned numDisabledConstraints;
 
     unsigned numFavoredConstraints;
+
+    unsigned numConsumedUnwrapSuppressions;
 
     /// The previous score.
     Score PreviousScore;

@@ -384,3 +384,15 @@ MoveOutOfOrderArgument *MoveOutOfOrderArgument::create(
   return new (cs.getAllocator())
       MoveOutOfOrderArgument(cs, argIdx, prevArgIdx, bindings, locator);
 }
+
+bool RemoveSuppressUnwrap::diagnose(Expr *root, bool asNote) const {
+  RemoveSuppressUnwrapFailure failure(root, getConstraintSystem(),
+                                      getLocator());
+  return failure.diagnose(asNote);
+}
+
+RemoveSuppressUnwrap *RemoveSuppressUnwrap::create(ConstraintSystem &cs,
+                                                   ConstraintLocator *locator) {
+  assert(isa<SuppressUnwrapExpr>(locator->getAnchor()));
+  return new (cs.getAllocator()) RemoveSuppressUnwrap(cs, locator);
+}

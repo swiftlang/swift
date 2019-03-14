@@ -2259,3 +2259,11 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
 
   return true;
 }
+
+bool RemoveSuppressUnwrapFailure::diagnoseAsError() {
+  auto suppressUnwrap = cast<SuppressUnwrapExpr>(getAnchor());
+  emitDiagnostic(suppressUnwrap->getLoc(),
+                 diag::property_behavior_extra_suppress_unwrap)
+    .fixItRemove(suppressUnwrap->getLoc());
+  return true;
+}

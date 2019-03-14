@@ -1925,10 +1925,28 @@ Type ConstraintSystem::unwrapPropertyBehaviorReference(
       suppressions = known->second;
   }
 
-  // If we have as many suppressions as we have unwrapped properties,
-  // don't unwrap anything.
+  // If we have more suppressions than levels of unwrapping, introduce
+  // a diagnostic + fix.
+  while (suppressions.size() > unwrappedProperties.size()) {
+    suppressions = suppressions.drop_back();
+  }
+
+  // Note how many of the suppressions at this locator are being consumed.
+  if (suppressions.size() > 0) {
+    assert(std::find_if(
+             ConsumedUnwrapSuppressions.begin(),
+             ConsumedUnwrapSuppressions.end(),
+             [&](const std::pair<ConstraintLocator *, unsigned> &suppressed) {
+               return suppressed.first == locator;
+             }) == ConsumedUnwrapSuppressions.end() &&
+           "Suppress-unwrap locator conflict");
+    ConsumedUnwrapSuppressions.push_back({locator, suppressions.size()});
+  }
+
+  // If we at least as many suppressions as we have unwrapped properties,
+  // there is nothing to unwrap. Extraneous suppressions will be diagnosed
+  // when forming the solution.
   if (suppressions.size() >= unwrappedProperties.size()) {
-    // FIXME: If we have more suppressions, produce an error.
     return refType;
   }
 

@@ -6018,6 +6018,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowInvalidInitRef:
   case FixKind::AllowClosureParameterDestructuring:
   case FixKind::MoveOutOfOrderArgument:
+  case FixKind::RemoveSuppressUnwrap:
     llvm_unreachable("handled elsewhere");
   }
 

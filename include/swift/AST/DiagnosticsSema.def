@@ -4285,6 +4285,8 @@ ERROR(property_behavior_ambiguous_value_property, none,
 ERROR(property_behavior_unwrap_not_declaration, none,
   "subject of unwrap suppression '^' must refer to a property or variable",
   ())
+ERROR(property_behavior_extra_suppress_unwrap, none,
+      "extraneous unwrap suppression operator '^'", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

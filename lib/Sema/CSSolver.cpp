@@ -425,6 +425,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numMissingMembers = cs.MissingMembers.size();
   numDisabledConstraints = cs.solverState->getNumDisabledConstraints();
   numFavoredConstraints = cs.solverState->getNumFavoredConstraints();
+  numConsumedUnwrapSuppressions = cs.ConsumedUnwrapSuppressions.size();
 
   PreviousScore = cs.CurrentScore;
 
@@ -478,6 +479,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any missing members found along the current path.
   truncate(cs.MissingMembers, numMissingMembers);
+
+  /// Remove any consumed unwrap suppressions that we added.
+  truncate(cs.ConsumedUnwrapSuppressions, numConsumedUnwrapSuppressions);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
