@@ -956,9 +956,8 @@ bool SILGenModule::hasNonTrivialIVars(ClassDecl *cd) {
     auto *vd = dyn_cast<VarDecl>(member);
     if (!vd || !vd->hasStorage()) continue;
 
-    // FIXME: Expansion
     auto &ti = Types.getTypeLowering(vd->getType(),
-                                     ResilienceExpansion::Minimal);
+                                     ResilienceExpansion::Maximal);
     if (!ti.isTrivial())
       return true;
   }
