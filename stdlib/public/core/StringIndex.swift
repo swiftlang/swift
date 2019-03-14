@@ -164,10 +164,12 @@ extension String.Index {
 // Creation helpers, which will make migration easier if we decide to use and
 // propagate the reserved bits.
 extension String.Index {
-  @inlinable
+  @inlinable @inline(__always)
   internal var strippingTranscoding: String.Index {
-    @inline(__always) get {
-      return String.Index(_encodedOffset: self._encodedOffset)
+     get {
+      return String.Index(
+        encodedOffset: self._encodedOffset,
+	characterStride: self.characterStride ?? 0)
     }
   }
 
