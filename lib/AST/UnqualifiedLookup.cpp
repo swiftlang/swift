@@ -643,8 +643,6 @@ UnqualifiedLookupFactory::nonoperatorScopeForASTScopeLookup(
   // Find the source file in which we are performing the lookup.
   SourceFile &sourceFile =
       *contextAndIsCascadingUseArg.whereToLook->getParentSourceFile();
-      
-  stopIfTargetLookup();
 
   // Find the scope from which we will initiate unqualified name lookup.
   const ASTScope *innermostScope =
@@ -660,6 +658,8 @@ UnqualifiedLookupFactory::nonoperatorScopeForASTScopeLookup(
   }
   if (!startingScope)
     startingScope = innermostScope;
+      
+    stopIfTargetLookup();
 
   return std::make_pair(startingScope,
                         contextAndIsCascadingUseArg.isCascadingUse);
