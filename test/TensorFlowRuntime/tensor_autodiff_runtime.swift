@@ -86,6 +86,11 @@ TensorADTests.testAllBackends("negate") {
   expectEqual([-1], gradient(at: [10], in: f))
 }
 
+TensorADTests.testAllBackends("Abs") {
+  let f = { (a: Tensor<Float>) in abs(a) }
+  expectEqual([1, -1, 0], gradient(at: [3.0, -3.0, 0], in: f))
+}
+
 TensorADTests.testAllBackends("sum") {
   let input = Tensor<Float>(shape: [2, 2], repeating: 42)
   let sumPullbackScalar = pullback(at: input) { (a: Tensor<Float>) in a.sum() }
