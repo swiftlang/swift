@@ -631,8 +631,7 @@ deriveEquatable_eq(DerivedConformance &derived,
   auto boolTy = C.getBoolDecl()->getDeclaredType();
 
   Identifier generatedIdentifier;
-  if (parentDC->getParentModule()->getResilienceStrategy() ==
-      ResilienceStrategy::Resilient) {
+  if (parentDC->getParentModule()->isResilient()) {
     generatedIdentifier = C.Id_EqualsOperator;
   } else if (selfIfaceTy->getEnumOrBoundGenericEnum()) {
     generatedIdentifier = C.Id_derived_enum_equals;
