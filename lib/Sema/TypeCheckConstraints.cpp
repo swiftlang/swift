@@ -4041,11 +4041,11 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     //   }
     // }
     auto exceptionType = getExceptionType(dc, SourceLoc());
-    auto toTypeConformsToError =
-        conformsToProtocol(toType, Context.getErrorDecl(), dc,
-                           ConformanceCheckFlags::InExpression);
-    if (fromType->isEqual(exceptionType) && !toTypeConformsToError) {
-      return failed();
+    if (fromType->isEqual(exceptionType)) {
+      if (!conformsToProtocol(toType, Context.getErrorDecl(), dc,
+                              ConformanceCheckFlags::InExpression)) {
+        return failed();
+      }
     }
 
     bool toRequiresClass;
