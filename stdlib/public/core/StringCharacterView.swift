@@ -130,7 +130,7 @@ extension String: BidirectionalCollection {
     if let cr = searchSlice.firstIndex(of: _CR), cr != ascii.endIndex &- 1 {
       consumed = cr
       return (consumed, Index(encodedOffset:
-        i._encodedOffset + consumed + (searchSlice[cr &+ 1] == _LF) ? 1 : 0))
+        i._encodedOffset + consumed + (searchSlice[cr &+ 1] == _LF ? 1 : 0))
     } else {
       return (searchSlice.count,
               Index(encodedOffset: i._encodedOffset + searchSlice.count))
@@ -138,7 +138,7 @@ extension String: BidirectionalCollection {
   }
   
   @usableFromInline
-  private func _asciiIndex(_ i: Index, offsetBy n: IndexDistance,
+  internal func _asciiIndex(_ i: Index, offsetBy n: IndexDistance,
                             limitedBy limit: Index) -> Index? {
     return _guts.withFastUTF8 { ascii in
       var result: Index? = i
@@ -202,7 +202,7 @@ extension String: BidirectionalCollection {
   }
   
   @usableFromInline
-  private func _asciiDistance(from start: Index, to end: Index)
+  internal func _asciiDistance(from start: Index, to end: Index)
     -> IndexDistance {
       return _guts.withFastUTF8 { ascii in
         var crlfCount = 0
