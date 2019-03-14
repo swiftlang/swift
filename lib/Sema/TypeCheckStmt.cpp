@@ -1938,16 +1938,11 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
     //           }
 
     if (fnTypeLoc.isNull() || fnType->isVoid()) {
-      auto voidExpr = TupleExpr::createEmpty(Context,
-                                             E->getStartLoc(),
-                                             E->getEndLoc(),
-                                             /*implicit*/true);
-      returnStmt->setResult(voidExpr);
       BS = BraceStmt::create(Context,
                              BS->getStartLoc(),
-                             { E, returnStmt },
+                             { E },
                              BS->getEndLoc(),
-                             /*implicit=*/true);
+                             /*implicit=*/false);
     } else {
       // FIXME: FIXME_NOW: DETERMINE: Is this the appropriate mechanism to use
       //        to divine the type of E?
@@ -1966,7 +1961,7 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
                                  BS->getStartLoc(),
                                  { E },
                                  BS->getEndLoc(),
-                                 /*implicit=*/true);
+                                 /*implicit=*/false);
         }
       }
     }
