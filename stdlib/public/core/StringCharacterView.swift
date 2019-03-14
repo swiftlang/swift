@@ -117,6 +117,7 @@ extension String: BidirectionalCollection {
     return _index(i, offsetBy: n)
   }
   
+  @inlinable
   internal func _searchForASCIIIndex(_ i: Index,
                                      in ascii: UnsafeBufferPointer<UInt8>,
                                      offsetBy n: IndexDistance,
@@ -126,23 +127,25 @@ extension String: BidirectionalCollection {
 
     var consumed = 0
     let searchSlice = ascii[i._encodedOffset ..< i._encodedOffset + n]
-    if let cr = searchSlice.firstIndex(of: _CR) && cr != buffer.endIndex &- 1 {
+    if let cr = searchSlice.firstIndex(of: _CR), cr != ascii.endIndex &- 1 {
       consumed = cr
       return (consumed, Index(encodedOffset:
         i._encodedOffset + consumed + (searchSlice[cr &+ 1] == _LF) ? 1 : 0))
     } else {
       return (searchSlice.count,
-              Index(encodedOffset: e._encodedOffset + searchSlice.count)
+              Index(encodedOffset: i._encodedOffset + searchSlice.count))
     }
   }
   
-  internal func _asciiIndex(_ i: Index, offsetBy n: IndexDistance,
+  @usableFromInline
+  private func _asciiIndex(_ i: Index, offsetBy n: IndexDistance,
                             limitedBy limit: Index) -> Index? {
     return _guts.withFastUTF8 { ascii in
       var result: Index? = i
       var remainingOffset = n
+      var consumed = 0
       repeat {
-        (let consumed, result) = _searchForASCIIIndex(i, in: ascii,
+        (consumed, result) = _searchForASCIIIndex(i, in: ascii,
           offsetBy: remainingOffset, limitedBy: limit)
         remainingOffset &-= consumed
       } while result != nil && remainingOffset > 0
@@ -198,6 +201,7 @@ extension String: BidirectionalCollection {
     return _index(i, offsetBy: n, limitedBy: limit)
   }
   
+  @usableFromInline
   private func _asciiDistance(from start: Index, to end: Index)
     -> IndexDistance {
       return _guts.withFastUTF8 { ascii in
