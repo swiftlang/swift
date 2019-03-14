@@ -1056,17 +1056,12 @@ public:
     printDebugVar(ABI->getVarInfo());
   }
 
-  void printSubstitutions(SubstitutionMap Subs,
-                          GenericSignature *Sig = nullptr) {
-    if (!Subs.hasAnySubstitutableParams()) return;
-
-    // FIXME: This is a hack to cope with cases where the substitution map uses
-    // a generic signature that's close-to-but-not-the-same-as expected.
-    auto genericSig = Sig ? Sig : Subs.getGenericSignature();
+  void printSubstitutions(SubstitutionMap Subs) {
+    if (Subs.empty()) return;
 
     *this << '<';
     bool first = true;
-    for (auto gp : genericSig->getGenericParams()) {
+    for (auto gp : Subs.getGenericSignature()->getGenericParams()) {
       if (first) first = false;
       else *this << ", ";
 
@@ -1078,8 +1073,7 @@ public:
   template <class Inst>
   void visitApplyInstBase(Inst *AI) {
     *this << Ctx.getID(AI->getCallee());
-    printSubstitutions(AI->getSubstitutionMap(),
-                       AI->getOrigCalleeType()->getGenericSignature());
+    printSubstitutions(AI->getSubstitutionMap());
     *this << '(';
     interleave(AI->getArguments(),
                [&](const SILValue &arg) { *this << Ctx.getID(arg); },
