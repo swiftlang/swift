@@ -1727,8 +1727,7 @@ getTypeLoweringForExpansion(TypeKey key,
 }
 
 /// Get the type of a global variable accessor function, () -> RawPointer.
-static CanAnyFunctionType getGlobalAccessorType(CanType varType) {
-  ASTContext &C = varType->getASTContext();
+static CanAnyFunctionType getGlobalAccessorType(ASTContext &C) {
   return CanFunctionType::get({}, C.TheRawPointerType);
 }
 
@@ -1844,8 +1843,6 @@ TypeConverter::getEffectiveGenericEnvironment(AnyFunctionRef fn,
 CanGenericSignature
 TypeConverter::getEffectiveGenericSignature(DeclContext *dc) {
   if (auto sig = dc->getGenericSignatureOfContext()) {
-    if (sig->areAllParamsConcrete())
-      return nullptr;
     return sig->getCanonicalSignature();
   }
 
@@ -1878,8 +1875,10 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
   auto innerExtInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
                                                funcType->throws());
 
-  return CanAnyFunctionType::get(genericSig, funcType.getParams(),
-                                 funcType.getResult(), innerExtInfo);
+  return CanAnyFunctionType::get(genericSig,
+                                 funcType.getParams(),
+                                 funcType.getResult(),
+                                 innerExtInfo);
 }
 
 CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
@@ -1889,9 +1888,8 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   case SILDeclRef::Kind::Func: {
     if (auto *ACE = c.loc.dyn_cast<AbstractClosureExpr *>()) {
       // FIXME: Closures could have an interface type computed by Sema.
-      auto funcTy = cast<AnyFunctionType>(ACE->getType()->getCanonicalType());
-      funcTy = cast<AnyFunctionType>(
-          funcTy->mapTypeOutOfContext()
+      auto funcTy = cast<AnyFunctionType>(
+          ACE->getType()->mapTypeOutOfContext()
               ->getCanonicalType());
       return getFunctionInterfaceTypeWithCaptures(funcTy, ACE);
     }
@@ -1899,31 +1897,24 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     FuncDecl *func = cast<FuncDecl>(vd);
     auto funcTy = cast<AnyFunctionType>(
         func->getInterfaceType()->getCanonicalType());
+    
+    // Fast path.
+    if (!func->getDeclContext()->isLocalContext())
+      return funcTy;
+
     return getFunctionInterfaceTypeWithCaptures(funcTy, func);
   }
 
-  case SILDeclRef::Kind::EnumElement: {
-    auto funcTy = cast<AnyFunctionType>(
-                                   vd->getInterfaceType()->getCanonicalType());
-    auto sig = getEffectiveGenericSignature(vd->getDeclContext());
-    return CanAnyFunctionType::get(sig,
-                                   funcTy->getParams(),
-                                   funcTy.getResult(),
-                                   funcTy->getExtInfo());
-  }
-  
+  case SILDeclRef::Kind::EnumElement:
   case SILDeclRef::Kind::Allocator: {
-    auto *cd = cast<ConstructorDecl>(vd);
-    auto funcTy = cast<AnyFunctionType>(
-                                   cd->getInterfaceType()->getCanonicalType());
-    return getFunctionInterfaceTypeWithCaptures(funcTy, cd);
+    return cast<AnyFunctionType>(
+        vd->getInterfaceType()->getCanonicalType());
   }
 
   case SILDeclRef::Kind::Initializer: {
     auto *cd = cast<ConstructorDecl>(vd);
-    auto funcTy = cast<AnyFunctionType>(
-                         cd->getInitializerInterfaceType()->getCanonicalType());
-    return getFunctionInterfaceTypeWithCaptures(funcTy, cd);
+    return cast<AnyFunctionType>(
+        cd->getInitializerInterfaceType()->getCanonicalType());
   }
 
   case SILDeclRef::Kind::Destroyer:
@@ -1937,7 +1928,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     VarDecl *var = cast<VarDecl>(vd);
     assert(var->hasStorage() &&
            "constant ref to computed global var");
-    return getGlobalAccessorType(var->getInterfaceType()->getCanonicalType());
+    return getGlobalAccessorType(Context);
   }
   case SILDeclRef::Kind::DefaultArgGenerator:
     return getDefaultArgGeneratorInterfaceType(*this, vd, vd->getDeclContext(),

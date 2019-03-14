@@ -731,9 +731,7 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
                                          SubstitutionMap SubstMap,
                                          bool HasUnboundGenericParams) {
   auto &M = OrigF->getModule();
-  if ((SpecializedGenericSig &&
-       SpecializedGenericSig->areAllParamsConcrete()) ||
-      !HasUnboundGenericParams) {
+  if (!HasUnboundGenericParams) {
     SpecializedGenericSig = nullptr;
     SpecializedGenericEnv = nullptr;
   }

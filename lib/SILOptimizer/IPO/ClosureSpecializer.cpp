@@ -222,7 +222,9 @@ public:
   createNewClosure(SILBuilder &B, SILValue V,
                    llvm::SmallVectorImpl<SILValue> &Args) const {
     if (auto *PA = dyn_cast<PartialApplyInst>(getClosure()))
-      return B.createPartialApply(getClosure()->getLoc(), V, {}, Args,
+      return B.createPartialApply(getClosure()->getLoc(), V,
+                                  PA->getSubstitutionMap(),
+                                  Args,
                                   getClosure()
                                       ->getType()
                                       .getAs<SILFunctionType>()
@@ -436,8 +438,8 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
   case FullApplySiteKind::TryApplyInst: {
     auto *TAI = cast<TryApplyInst>(AI);
     NewAI = Builder.createTryApply(AI.getLoc(), FRI,
-                                   SubstitutionMap(), NewArgs,
-                                   TAI->getNormalBB(), TAI->getErrorBB());
+                                   TAI->getSubstitutionMap(),
+                                   NewArgs, TAI->getNormalBB(), TAI->getErrorBB());
     // If we passed in the original closure as @owned, then insert a release
     // right after NewAI. This is to balance the +1 from being an @owned
     // argument to AI.
@@ -457,7 +459,7 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
   case FullApplySiteKind::ApplyInst: {
     auto oldApply = cast<ApplyInst>(AI);
     auto newApply = Builder.createApply(oldApply->getLoc(), FRI,
-                                        SubstitutionMap(),
+                                        oldApply->getSubstitutionMap(),
                                         NewArgs, oldApply->isNonThrowing());
     // If we passed in the original closure as @owned, then insert a release
     // right after NewAI. This is to balance the +1 from being an @owned
@@ -733,7 +735,9 @@ SILValue ClosureSpecCloner::cloneCalleeConversion(
     auto FunRef = Builder.createFunctionRef(CallSiteDesc.getLoc(),
                                             PAI->getReferencedFunction());
     auto NewPA = Builder.createPartialApply(
-        CallSiteDesc.getLoc(), FunRef, {}, {calleeValue},
+        CallSiteDesc.getLoc(), FunRef,
+        PAI->getSubstitutionMap(),
+        {calleeValue},
         PAI->getType().getAs<SILFunctionType>()->getCalleeConvention(),
         PAI->isOnStack());
     // If the partial_apply is on stack we will emit a dealloc_stack in the

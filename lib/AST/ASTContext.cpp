@@ -3971,12 +3971,8 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
     assert(!WitnessMethodConformance &&
            "non-witness_method SIL function with a conformance");
 
-  // Make sure the interface types are sane.
+  // Make sure the interface types do not contain archetypes or error types.
   if (genericSig) {
-    assert(!genericSig->areAllParamsConcrete() &&
-           "If all generic parameters are concrete, SILFunctionType should "
-           "not have a generic signature at all");
-
     for (auto gparam : genericSig->getGenericParams()) {
       (void)gparam;
       assert(gparam->isCanonical() && "generic signature is not canonicalized");

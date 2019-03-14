@@ -1050,7 +1050,7 @@ public:
     auto fnTy = requireObjectType(SILFunctionType, calleeTy, "callee operand");
 
     // If there are substitutions, verify them and apply them to the callee.
-    if (!subs.hasAnySubstitutableParams()) {
+    if (subs.empty()) {
       require(!fnTy->isPolymorphic(),
               "callee of apply without substitutions must not be polymorphic");
       return fnTy;

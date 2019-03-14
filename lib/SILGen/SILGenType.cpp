@@ -626,13 +626,6 @@ SILFunction *SILGenModule::emitProtocolWitness(
     reqtOrigTy->substGenericArgs(reqtSubMap)
       ->getCanonicalType(genericSig));
 
-  // Generic signatures where all parameters are concrete are lowered away
-  // at the SILFunctionType level.
-  if (genericSig && genericSig->areAllParamsConcrete()) {
-    genericSig = nullptr;
-    genericEnv = nullptr;
-  }
-
   // Rewrite the conformance in terms of the requirement environment's Self
   // type, which might have a different generic signature than the type
   // itself.

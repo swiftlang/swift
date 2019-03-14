@@ -4,14 +4,14 @@
 // RUN: %target-swift-emit-ir -module-name constrained_extensions -primary-file %s > /dev/null
 
 extension Array where Element == Int {
-  // CHECK-LABEL: sil [ossa] @$sSa22constrained_extensionsSiRszlE1xSaySiGyt_tcfC : $@convention(method) (@thin Array<Int>.Type) -> @owned Array<Int>
+  // CHECK-LABEL: sil [ossa] @$sSa22constrained_extensionsSiRszlE1xSaySiGyt_tcfC : $@convention(method) <Element where Element == Int> (@thin Array<Int>.Type) -> @owned Array<Int>
   public init(x: ()) {
     self.init()
   }
 
-  // CHECK-LABEL: sil [ossa] @$sSa22constrained_extensionsSiRszlE16instancePropertySivg : $@convention(method) (@guaranteed Array<Int>) -> Int
-  // CHECK-LABEL: sil [ossa] @$sSa22constrained_extensionsSiRszlE16instancePropertySivs : $@convention(method) (Int, @inout Array<Int>) -> ()
-  // CHECK-LABEL: sil [transparent] [serialized] [ossa] @$sSa22constrained_extensionsSiRszlE16instancePropertySivM : $@yield_once @convention(method) (@inout Array<Int>) -> @yields @inout Int
+  // CHECK-LABEL: sil [ossa] @$sSa22constrained_extensionsSiRszlE16instancePropertySivg : $@convention(method) <Element where Element == Int> (@guaranteed Array<Int>) -> Int
+  // CHECK-LABEL: sil [ossa] @$sSa22constrained_extensionsSiRszlE16instancePropertySivs : $@convention(method) <Element where Element == Int> (Int, @inout Array<Int>) -> ()
+  // CHECK-LABEL: sil [transparent] [serialized] [ossa] @$sSa22constrained_extensionsSiRszlE16instancePropertySivM : $@yield_once @convention(method) <Element where Element == Int> (@inout Array<Int>) -> @yields @inout Int
 
   public var instanceProperty: Element {
     get {
@@ -22,44 +22,59 @@ extension Array where Element == Int {
     }
   }
 
-  // CHECK-LABEL: sil [ossa] @$sSa22constrained_extensionsSiRszlE14instanceMethodSiyF : $@convention(method) (@guaranteed Array<Int>) -> Int
+  // CHECK-LABEL: sil [ossa] @$sSa22constrained_extensionsSiRszlE14instanceMethodSiyF : $@convention(method) <Element where Element == Int> (@guaranteed Array<Int>) -> Int
   public func instanceMethod() -> Element {
     return instanceProperty
   }
 
-  // CHECK-LABEL: sil [ossa] @$sSa22constrained_extensionsSiRszlE14instanceMethod1eS2i_tF : $@convention(method) (Int, @guaranteed Array<Int>) -> Int
+  // CHECK-LABEL: sil [ossa] @$sSa22constrained_extensionsSiRszlE14instanceMethod1eS2i_tF : $@convention(method) <Element where Element == Int> (Int, @guaranteed Array<Int>) -> Int
   public func instanceMethod(e: Element) -> Element {
     return e
   }
 
-  // CHECK-LABEL: sil [ossa] @$sSa22constrained_extensionsSiRszlE14staticPropertySivgZ : $@convention(method) (@thin Array<Int>.Type) -> Int
+  // CHECK-LABEL: sil [ossa] @$sSa22constrained_extensionsSiRszlE14staticPropertySivgZ : $@convention(method) <Element where Element == Int> (@thin Array<Int>.Type) -> Int
   public static var staticProperty: Element {
     return Array(x: ()).instanceProperty
   }
 
-  // CHECK-LABEL: sil [ossa] @$sSa22constrained_extensionsSiRszlE12staticMethodSiyFZ : $@convention(method) (@thin Array<Int>.Type) -> Int
+  // CHECK-LABEL: sil [ossa] @$sSa22constrained_extensionsSiRszlE12staticMethodSiyFZ : $@convention(method) <Element where Element == Int> (@thin Array<Int>.Type) -> Int
   public static func staticMethod() -> Element {
     return staticProperty
   }
 
-  // CHECK-LABEL: sil non_abi [serialized] [ossa] @$sSa22constrained_extensionsSiRszlE12staticMethod1eS2iSg_tFZfA_ : $@convention(thin) () -> Optional<Int>
-  // CHECK-LABEL: sil [ossa] @$sSa22constrained_extensionsSiRszlE12staticMethod1eS2iSg_tFZ : $@convention(method) (Optional<Int>, @thin Array<Int>.Type) -> Int
+  // CHECK-LABEL: sil non_abi [serialized] [ossa] @$sSa22constrained_extensionsSiRszlE12staticMethod1eS2iSg_tFZfA_ : $@convention(thin) <Element where Element == Int> () -> Optional<Int>
+  // CHECK-LABEL: sil [ossa] @$sSa22constrained_extensionsSiRszlE12staticMethod1eS2iSg_tFZ : $@convention(method) <Element where Element == Int> (Optional<Int>, @thin Array<Int>.Type) -> Int
   public static func staticMethod(e: Element? = nil) -> Element {
     return e!
   }
 
-  // CHECK-LABEL: sil [ossa] @$sSa22constrained_extensionsSiRszlEySiyt_tcig : $@convention(method) (@guaranteed Array<Int>) -> Int
+  // CHECK-LABEL: sil [ossa] @$sSa22constrained_extensionsSiRszlEySiyt_tcig : $@convention(method) <Element where Element == Int> (@guaranteed Array<Int>) -> Int
   public subscript(i: ()) -> Element {
     return self[0]
   }
 
-  // CHECK-LABEL: sil [ossa] @$sSa22constrained_extensionsSiRszlE21inoutAccessOfPropertyyyF : $@convention(method) (@inout Array<Int>) -> ()
+  // CHECK-LABEL: sil [ossa] @$sSa22constrained_extensionsSiRszlE21inoutAccessOfPropertyyyF : $@convention(method) <Element where Element == Int> (@inout Array<Int>) -> ()
   public mutating func inoutAccessOfProperty() {
     func increment(x: inout Element) {
       x += 1
     }
 
     increment(x: &instanceProperty)
+  }
+
+  public func closures() {
+    let a = 3
+
+    // Does not capture generic signature
+    _ = {
+      _ = a
+    }
+
+    // Captures generic signature
+    _ = {
+      _ = a
+      _ = self[()]
+    }
   }
 }
 
@@ -186,11 +201,11 @@ extension AnythingGoes where T : VeryConstrained {
 
 extension Array where Element == Int {
   struct Nested {
-    // CHECK-LABEL: sil hidden [transparent] [ossa] @$sSa22constrained_extensionsSiRszlE6NestedV1eSiSgvpfi : $@convention(thin) () -> Optional<Int>
+    // CHECK-LABEL: sil hidden [transparent] [ossa] @$sSa22constrained_extensionsSiRszlE6NestedV1eSiSgvpfi : $@convention(thin) <Element where Element == Int> () -> Optional<Int>
     var e: Element? = nil
 
-    // CHECK-LABEL: sil hidden [ossa] @$sSa22constrained_extensionsSiRszlE6NestedV10hasDefault1eySiSg_tFfA_ : $@convention(thin) () -> Optional<Int>
-    // CHECK-LABEL: sil hidden [ossa] @$sSa22constrained_extensionsSiRszlE6NestedV10hasDefault1eySiSg_tF : $@convention(method) (Optional<Int>, @inout Array<Int>.Nested) -> ()
+    // CHECK-LABEL: sil hidden [ossa] @$sSa22constrained_extensionsSiRszlE6NestedV10hasDefault1eySiSg_tFfA_ : $@convention(thin) <Element where Element == Int> () -> Optional<Int>
+    // CHECK-LABEL: sil hidden [ossa] @$sSa22constrained_extensionsSiRszlE6NestedV10hasDefault1eySiSg_tF : $@convention(method) <Element where Element == Int> (Optional<Int>, @inout Array<Int>.Nested) -> ()
     mutating func hasDefault(e: Element? = nil) {
       self.e = e
     }
@@ -199,17 +214,17 @@ extension Array where Element == Int {
 
 extension Array where Element == AnyObject {
   class NestedClass {
-    // CHECK-LABEL: sil hidden [ossa] @$sSa22constrained_extensionsyXlRszlE11NestedClassCfd : $@convention(method) (@guaranteed Array<AnyObject>.NestedClass) -> @owned Builtin.NativeObject
-    // CHECK-LABEL: sil hidden [ossa] @$sSa22constrained_extensionsyXlRszlE11NestedClassCfD : $@convention(method) (@owned Array<AnyObject>.NestedClass) -> ()
+    // CHECK-LABEL: sil hidden [ossa] @$sSa22constrained_extensionsyXlRszlE11NestedClassCfd : $@convention(method) <Element where Element == AnyObject> (@guaranteed Array<AnyObject>.NestedClass) -> @owned Builtin.NativeObject
+    // CHECK-LABEL: sil hidden [ossa] @$sSa22constrained_extensionsyXlRszlE11NestedClassCfD : $@convention(method) <Element where Element == AnyObject> (@owned Array<AnyObject>.NestedClass) -> ()
     deinit { }
 
-    // CHECK-LABEL: sil hidden [ossa] @$sSa22constrained_extensionsyXlRszlE11NestedClassCACyyXl_GycfC : $@convention(method) (@thick Array<AnyObject>.NestedClass.Type) -> @owned Array<AnyObject>.NestedClass
-    // CHECK-LABEL: sil hidden [ossa] @$sSa22constrained_extensionsyXlRszlE11NestedClassCACyyXl_Gycfc : $@convention(method) (@owned Array<AnyObject>.NestedClass) -> @owned Array<AnyObject>.NestedClass
+    // CHECK-LABEL: sil hidden [ossa] @$sSa22constrained_extensionsyXlRszlE11NestedClassCACyyXl_GycfC : $@convention(method) <Element where Element == AnyObject> (@thick Array<AnyObject>.NestedClass.Type) -> @owned Array<AnyObject>.NestedClass
+    // CHECK-LABEL: sil hidden [ossa] @$sSa22constrained_extensionsyXlRszlE11NestedClassCACyyXl_Gycfc : $@convention(method) <Element where Element == AnyObject> (@owned Array<AnyObject>.NestedClass) -> @owned Array<AnyObject>.NestedClass
   }
 
   class DerivedClass : NestedClass {
-    // CHECK-LABEL: sil hidden [transparent] [ossa] @$sSa22constrained_extensionsyXlRszlE12DerivedClassC1eyXlSgvpfi : $@convention(thin) () -> @owned Optional<AnyObject>
-    // CHECK-LABEL: sil hidden [ossa] @$sSa22constrained_extensionsyXlRszlE12DerivedClassCfE : $@convention(method) (@guaranteed Array<AnyObject>.DerivedClass) -> ()
+    // CHECK-LABEL: sil hidden [transparent] [ossa] @$sSa22constrained_extensionsyXlRszlE12DerivedClassC1eyXlSgvpfi : $@convention(thin) <Element where Element == AnyObject> () -> @owned Optional<AnyObject>
+    // CHECK-LABEL: sil hidden [ossa] @$sSa22constrained_extensionsyXlRszlE12DerivedClassCfE : $@convention(method) <Element where Element == AnyObject> (@guaranteed Array<AnyObject>.DerivedClass) -> ()
     var e: Element? = nil
   }
 

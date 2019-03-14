@@ -1,0 +1,80 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -closure-specialize %s | %FileCheck %s
+
+import Builtin
+import Swift
+
+// Note: currently only the fully constrained case is implemented. The general case is difficult,
+// because both the caller and callee could have different generic signatures.
+
+sil @$callee : $@convention(thin) <T where T == Int> (@noescape @callee_guaranteed (Int) -> (), Int) -> () {
+bb0(%0 : $@noescape @callee_guaranteed (Int) -> (), %1 : $Int):
+  %4 = apply %0(%1) : $@noescape @callee_guaranteed (Int) -> ()
+  %5 = tuple ()
+  return %5 : $()
+}
+
+sil private @$closure1 : $@convention(thin) (Int, Int) -> () {
+bb0(%0 : $Int, %1 : $Int):
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil private @$closure2 : $@convention(thin) <T where T == String> (Int) -> () {
+bb0(%0 : $Int):
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil @$caller1 : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = function_ref @$closure1 : $@convention(thin) (Int, Int) -> ()
+  %3 = partial_apply [callee_guaranteed] [on_stack] %2(%0) : $@convention(thin) (Int, Int) -> ()
+  %4 = function_ref @$callee : $@convention(thin) <τ_0_0 where τ_0_0 == Int> (@noescape @callee_guaranteed (Int) -> (), Int) -> ()
+  %5 = apply %4<Int>(%3, %0) : $@convention(thin) <τ_0_0 where τ_0_0 == Int> (@noescape @callee_guaranteed (Int) -> (), Int) -> ()
+  dealloc_stack %3 : $@noescape @callee_guaranteed (Int) -> ()
+  %7 = tuple ()
+  return %7 : $()
+}
+
+sil @$caller2 : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = function_ref @$closure2 : $@convention(thin) <τ_0_0 where τ_0_0 == String> (Int) -> ()
+  %3 = partial_apply [callee_guaranteed] [on_stack] %2<String>() : $@convention(thin) <τ_0_0 where τ_0_0 == String> (Int) -> ()
+  %4 = function_ref @$callee : $@convention(thin) <τ_0_0 where τ_0_0 == Int> (@noescape @callee_guaranteed (Int) -> (), Int) -> ()
+  %5 = apply %4<Int>(%3, %0) : $@convention(thin) <τ_0_0 where τ_0_0 == Int> (@noescape @callee_guaranteed (Int) -> (), Int) -> ()
+  dealloc_stack %3 : $@noescape @callee_guaranteed (Int) -> ()
+  %7 = tuple ()
+  return %7 : $()
+}
+
+sil @$caller3 : $@convention(thin) <T where T == Int> (Int) -> () {
+bb0(%0 : $Int):
+  %2 = function_ref @$closure1 : $@convention(thin) (Int, Int) -> ()
+  %3 = partial_apply [callee_guaranteed] [on_stack] %2(%0) : $@convention(thin) (Int, Int) -> ()
+  %4 = function_ref @$callee : $@convention(thin) <τ_0_0 where τ_0_0 == Int> (@noescape @callee_guaranteed (Int) -> (), Int) -> ()
+  %5 = apply %4<Int>(%3, %0) : $@convention(thin) <τ_0_0 where τ_0_0 == Int> (@noescape @callee_guaranteed (Int) -> (), Int) -> ()
+  dealloc_stack %3 : $@noescape @callee_guaranteed (Int) -> ()
+  %7 = tuple ()
+  return %7 : $()
+}
+
+sil @$caller4 : $@convention(thin) <T where T == Int> (Int) -> () {
+bb0(%0 : $Int):
+  %2 = function_ref @$closure2 : $@convention(thin) <τ_0_0 where τ_0_0 == String> (Int) -> ()
+  %3 = partial_apply [callee_guaranteed] [on_stack] %2<String>() : $@convention(thin) <τ_0_0 where τ_0_0 == String> (Int) -> ()
+  %4 = function_ref @$callee : $@convention(thin) <τ_0_0 where τ_0_0 == Int> (@noescape @callee_guaranteed (Int) -> (), Int) -> ()
+  %5 = apply %4<Int>(%3, %0) : $@convention(thin) <τ_0_0 where τ_0_0 == Int> (@noescape @callee_guaranteed (Int) -> (), Int) -> ()
+  dealloc_stack %3 : $@noescape @callee_guaranteed (Int) -> ()
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil shared @$s7$callee9$closure1SiTf1cn_n : $@convention(thin) <T where T == Int> (Int, Int) -> ()
+// CHECK: [[FN:%.*]] = function_ref @$closure1 : $@convention(thin) (Int, Int) -> ()
+// CHECK: partial_apply [callee_guaranteed] [on_stack] [[FN]](%1)
+// CHECK: return
+
+// CHECK-LABEL: sil shared @$s7$callee9$closure2Tf1cn_n : $@convention(thin) <T where T == Int> (Int) -> ()
+// CHECK: [[FN:%.*]] = function_ref @$closure2 : $@convention(thin) <τ_0_0 where τ_0_0 == String> (Int) -> ()
+// CHECK: partial_apply [callee_guaranteed] [on_stack] [[FN]]<String>()
+// CHECK: return

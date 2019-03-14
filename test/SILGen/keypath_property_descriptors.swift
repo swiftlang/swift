@@ -131,3 +131,13 @@ public struct FixedLayout {
   // RESILIENT-LABEL: sil_property #FixedLayout.c (stored_property
   public var c: Int
 }
+
+public struct Generic<T> {}
+
+extension Generic where T == Int {
+  public var k: Int { get { } set { } }
+
+  public struct Nested {
+    public var k: Int = 0
+  }
+}

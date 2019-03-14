@@ -1260,9 +1260,8 @@ processPartialApplyInst(SILOptFunctionBuilder &FuncBuilder,
   // consideration any captures.
   auto CalleeFunctionTy = PAI->getCallee()->getType().castTo<SILFunctionType>();
   auto SubstCalleeFunctionTy = CalleeFunctionTy;
-  if (PAI->hasSubstitutions())
-    SubstCalleeFunctionTy =
-        CalleeFunctionTy->substGenericArgs(M, PAI->getSubstitutionMap());
+  SubstCalleeFunctionTy =
+      CalleeFunctionTy->substGenericArgs(M, PAI->getSubstitutionMap());
   SILFunctionConventions calleeConv(SubstCalleeFunctionTy, M);
   auto CalleePInfo = SubstCalleeFunctionTy->getParameters();
   SILFunctionConventions paConv(PAI->getType().castTo<SILFunctionType>(), M);

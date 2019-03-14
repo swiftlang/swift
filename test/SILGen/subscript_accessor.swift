@@ -23,7 +23,7 @@ extension WillBeConcretelyConstrained where T == Int {
 }
 
 // CHECK-LABEL: sil hidden [transparent] @$s18subscript_accessor27WillBeConcretelyConstrainedVAASiRszlEySiSgSiciM
-// CHECK-SAME: $@yield_once @convention(method) (Int, @inout WillBeConcretelyConstrained<Int>) -> @yields @inout Optional<Int>
+// CHECK-SAME: $@yield_once @convention(method) <T where T == Int> (Int, @inout WillBeConcretelyConstrained<Int>) -> @yields @inout Optional<Int>
 
 // CHECK: sil{{.*}}s18subscript_accessor9testXRead1xxAA1XVyxG_tlF
 @_specialize(where T == (Int, Int))

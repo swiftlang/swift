@@ -157,10 +157,6 @@ namespace irgen {
     CanSILFunctionType getSubstFunctionType() const {
       return Info.SubstFnType;
     }
-
-    bool hasSubstitutions() const {
-      return Info.Substitutions.hasAnySubstitutableParams();
-    }
     
     SubstitutionMap getSubstitutions() const { return Info.Substitutions; }
 
