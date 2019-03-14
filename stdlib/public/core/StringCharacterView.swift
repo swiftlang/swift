@@ -145,7 +145,7 @@ extension String: BidirectionalCollection {
       var remainingOffset = n
       var consumed = 0
       repeat {
-        (consumed, result) = _searchForASCIIIndex(i, in: ascii,
+        (consumed, result) = _searchForASCIIIndex(result, in: ascii,
           offsetBy: remainingOffset, limitedBy: limit)
         remainingOffset &-= consumed
       } while result != nil && remainingOffset > 0
