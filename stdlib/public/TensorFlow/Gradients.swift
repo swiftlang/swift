@@ -361,6 +361,14 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
 }
 
 @inlinable
+func _vjpAbs<T : TensorFlowFloatingPoint>(
+  _ x: Tensor<T>
+) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
+  let sign = Raw.sign(x)
+  return (abs(x), { v in v * sign })
+}
+
+@inlinable
 func _vjpLog<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
