@@ -292,7 +292,7 @@ public:
     Optional<bool> isCascadingUse;
     
     ASTScopeLookupState withParentScope() const {
-      auto *const parent = scope->getParent();
+      auto *const parent = scope->getParentForLookup();
       return ASTScopeLookupState{
         parent,
         selfDCIfValidForScope(parent, selfDC),

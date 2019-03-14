@@ -623,6 +623,9 @@ public:
 
   /// Retrieve the parent scope that encloses this one.
   const ASTScope *getParent() const { return parentAndExpanded.getPointer(); }
+  
+  /// Get parent, w.r.t. lookup rules.
+  const ASTScope *getParentForLookup() const;
 
   /// Retrieve the children of this AST scope, expanding if necessary.
   ArrayRef<ASTScope *> children() const {

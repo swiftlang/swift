@@ -2318,3 +2318,27 @@ bool ASTScope::isCloseToTopLevelCode() const {
   }
   return false;
 }
+
+const ASTScope *ASTScope::getParentForLookup() const {
+  // See DeclContext::getParentForLookup
+  if (getKind() == ASTScopeKind::TypeDecl) {
+    const auto *const typeDecl = getTypeDecl();
+    switch (typeDecl->getKind()) {
+      default:
+        // If we are inside a nominal type that is inside a protocol,
+        // skip the protocol.
+        if (const auto *const nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
+          if (isa<ProtocolDecl>(nominal->getParent()))
+            return getSourceFileScope();
+        }
+        break;
+        // If we are inside a protocol or an extension, skip directly
+        // to the module scope context, without looking at any (invalid)
+        // outer types.
+      case DeclKind::Protocol:
+      case DeclKind::Extension:
+        return getSourceFileScope();
+    }
+  }
+  return getParent();
+}
