@@ -3364,8 +3364,7 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
           var->getDeclContext()->getGenericSignatureOfContext();
 
         if (genericEnv && typeGenericSig) {
-          // Get the substitutions from the constructor's generic env.
-          subs = genericEnv->getForwardingSubstitutionMap();
+          subs = info.defaultArgsOwner.getSubstitutions();
         }
 
         value = SGF.emitApplyOfStoredPropertyInitializer(info.loc,
