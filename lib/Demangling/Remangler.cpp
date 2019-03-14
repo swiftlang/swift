@@ -24,10 +24,9 @@
 #include "swift/Strings.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
-#include <vector>
+#include "RemanglerBase.h"
 #include <cstdio>
 #include <cstdlib>
-#include <unordered_map>
 
 using namespace swift;
 using namespace Demangle;
@@ -39,83 +38,61 @@ static void unreachable(const char *Message) {
   std::abort();
 }
 
-static StringRef getTextForSubstitution(Node *node, std::string &tmp) {
+static char getCharOfNodeText(Node *node, unsigned idx) {
   switch (node->getKind()) {
-    case Node::Kind::InfixOperator:
-    case Node::Kind::PrefixOperator:
-    case Node::Kind::PostfixOperator:
-      tmp = Mangle::translateOperator(node->getText());
-      return tmp;
-    default:
-      return node->getText();
+  case Node::Kind::InfixOperator:
+  case Node::Kind::PrefixOperator:
+  case Node::Kind::PostfixOperator:
+    return Mangle::translateOperatorChar(node->getText()[idx]);
+  default:
+    return node->getText()[idx];
   }
 }
 
-namespace {
-
-class SubstitutionEntry {
-  Node *TheNode = nullptr;
-  size_t StoredHash = 0;
-  bool treatAsIdentifier = false;
-
-public:
-  void setNode(Node *node, bool treatAsIdentifier) {
-    this->treatAsIdentifier = treatAsIdentifier;
-    TheNode = node;
-    deepHash(node);
-  }
-
-  struct Hasher {
-    size_t operator()(const SubstitutionEntry &entry) const {
-      return entry.StoredHash;
-    }
-  };
-
-private:
-  friend bool operator==(const SubstitutionEntry &lhs,
-                         const SubstitutionEntry &rhs) {
-    if (lhs.StoredHash != rhs.StoredHash)
+bool SubstitutionEntry::identifierEquals(Node *lhs, Node *rhs) {
+  unsigned length = lhs->getText().size();
+  if (rhs->getText().size() != length)
+    return false;
+  // The fast path.
+  if (lhs->getKind() == rhs->getKind())
+    return lhs->getText() == rhs->getText();
+  // The slow path.
+  for (unsigned i = 0; i < length; ++i) {
+    if (getCharOfNodeText(lhs, i) != getCharOfNodeText(rhs, i))
       return false;
-    if (lhs.treatAsIdentifier != rhs.treatAsIdentifier)
-      return false;
-    if (lhs.treatAsIdentifier) {
-      std::string tmp1, tmp2;
-      return (getTextForSubstitution(lhs.TheNode, tmp1) ==
-              getTextForSubstitution(rhs.TheNode, tmp2));
+  }
+  return true;
+}
+
+void SubstitutionEntry::deepHash(Node *node) {
+  if (treatAsIdentifier) {
+    combineHash((size_t) Node::Kind::Identifier);
+    assert(node->hasText());
+    switch (node->getKind()) {
+    case Node::Kind::InfixOperator:
+    case Node::Kind::PrefixOperator:
+    case Node::Kind::PostfixOperator:
+      for (char c : node->getText()) {
+        combineHash((unsigned char)translateOperatorChar(c));
+      }
+      return;
+    default:
+      break;
     }
-    return lhs.deepEquals(lhs.TheNode, rhs.TheNode);
+  } else {
+    combineHash((size_t) node->getKind());
   }
-
-  void combineHash(size_t newValue) {
-    StoredHash = 33 * StoredHash + newValue;
-  }
-
-  void combineHash(StringRef Text) {
-    for (char c : Text) {
+  if (node->hasIndex()) {
+    combineHash(node->getIndex());
+  } else if (node->hasText()) {
+    for (char c : node->getText()) {
       combineHash((unsigned char) c);
     }
   }
-
-  void deepHash(Node *node) {
-    if (treatAsIdentifier) {
-      combineHash((size_t) Node::Kind::Identifier);
-      std::string tmp;
-      combineHash(getTextForSubstitution(node, tmp));
-      return;
-    }
-    combineHash((size_t) node->getKind());
-    if (node->hasIndex()) {
-      combineHash(node->getIndex());
-    } else if (node->hasText()) {
-      combineHash(node->getText());
-    }
-    for (Node *child : *node) {
-      deepHash(child);
-    }
+  for (Node *child : *node) {
+    deepHash(child);
   }
-
-  bool deepEquals(Node *lhs, Node *rhs) const;
-};
+}
 
 bool SubstitutionEntry::deepEquals(Node *lhs, Node *rhs) const {
   if (lhs->getKind() != rhs->getKind())
@@ -146,49 +123,42 @@ bool SubstitutionEntry::deepEquals(Node *lhs, Node *rhs) const {
   return true;
 }
 
-/// The output string of the Demangler.
-///
-/// It's allocating the string with the provided Factory.
-struct RemanglerBuffer {
-  CharVector Stream;
-  NodeFactory &Factory;
+// Find a substitution and return its index.
+// Returns -1 if no substitution is found.
+int RemanglerBase::findSubstitution(const SubstitutionEntry &entry) {
+  // First search in InlineSubstitutions.
+  SubstitutionEntry *result
+  = std::find(InlineSubstitutions, InlineSubstitutions + NumInlineSubsts,
+              entry);
+  if (result != InlineSubstitutions + NumInlineSubsts)
+    return result - InlineSubstitutions;
 
-  RemanglerBuffer(NodeFactory &Factory) : Factory(Factory) {
-    Stream.init(Factory, 32);
+  // Then search in OverflowSubstitutions.
+  auto it = OverflowSubstitutions.find(entry);
+  if (it == OverflowSubstitutions.end())
+    return -1;
+
+  return it->second;
+}
+
+void RemanglerBase::addSubstitution(const SubstitutionEntry &entry) {
+  assert(findSubstitution(entry) < 0);
+  if (NumInlineSubsts < InlineSubstCapacity) {
+    // There is still free space in NumInlineSubsts.
+    assert(OverflowSubstitutions.empty());
+    InlineSubstitutions[NumInlineSubsts++] = entry;
+    return;
   }
+  // We have to add the entry to OverflowSubstitutions.
+  unsigned Idx = OverflowSubstitutions.size() + InlineSubstCapacity;
+  auto result = OverflowSubstitutions.insert({entry, Idx});
+  assert(result.second);
+  (void) result;
+}
 
-  RemanglerBuffer &operator<<(char c) & {
-    Stream.push_back(c, Factory);
-    return *this;
-  }
+namespace {
 
-  RemanglerBuffer &operator<<(llvm::StringRef Value) & {
-    Stream.append(Value, Factory);
-    return *this;
-  }
-
-  RemanglerBuffer &operator<<(int n) & {
-    Stream.append(n, Factory);
-    return *this;
-  }
-
-  RemanglerBuffer &operator<<(unsigned n) & {
-    Stream.append((unsigned long long)n, Factory);
-    return *this;
-  }
-
-  RemanglerBuffer &operator<<(unsigned long n) & {
-    Stream.append((unsigned long long)n, Factory);
-    return *this;
-  }
-
-  RemanglerBuffer &operator<<(unsigned long long n) & {
-    Stream.append(n, Factory);
-    return *this;
-  }
-};
-
-class Remangler {
+class Remangler : public RemanglerBase {
   template <typename Mangler>
   friend void Mangle::mangleIdentifier(Mangler &M, StringRef ident);
   friend class Mangle::SubstitutionMerging;
@@ -200,27 +170,7 @@ class Remangler {
 
   static const size_t MaxNumWords = 26;
 
-  // An efficient hash-map implementation in the spirit of llvm's SmallPtrSet:
-  // The first 16 substitutions are stored in an inline-allocated array to avoid
-  // malloc calls in the common case.
-  // Lookup is still reasonable fast because there are max 16 elements in the
-  // array.
-  static const size_t InlineSubstCapacity = 16;
-  SubstitutionEntry InlineSubstitutions[InlineSubstCapacity];
-  size_t NumInlineSubsts = 0;
-
-  // The "overflow" for InlineSubstitutions. Only if InlineSubstitutions is
-  // full, new substitutions are stored in OverflowSubstitutions.
-  std::unordered_map<SubstitutionEntry, unsigned,
-                     SubstitutionEntry::Hasher> OverflowSubstitutions;
-
   SubstitutionMerging SubstMerging;
-
-  // We have to cons up temporary nodes sometimes when remangling
-  // nested generics. This factory owns them.
-  NodeFactory &Factory;
-
-  RemanglerBuffer Buffer;
 
   // A callback for resolving symbolic references.
   SymbolicResolver Resolver;
@@ -232,28 +182,6 @@ class Remangler {
   void addWord(const SubstitutionWord &word) {
     Words.push_back(word, Factory);
   }
-
-  // Find a substitution and return its index.
-  // Returns -1 if no substitution is found.
-  int findSubstitution(const SubstitutionEntry &entry) {
-    // First search in InlineSubstitutions.
-    SubstitutionEntry *result
-      = std::find(InlineSubstitutions, InlineSubstitutions + NumInlineSubsts,
-                  entry);
-    if (result != InlineSubstitutions + NumInlineSubsts)
-      return result - InlineSubstitutions;
-
-    // Then search in OverflowSubstitutions.
-    auto it = OverflowSubstitutions.find(entry);
-    if (it == OverflowSubstitutions.end())
-      return -1;
-
-    return it->second;
-  }
-
-  StringRef getBufferStr() const { return Buffer.Stream.str(); }
-
-  void resetBuffer(size_t toPos) { Buffer.Stream.resetSize(toPos); }
 
   template <typename Mangler>
   friend void mangleIdentifier(Mangler &M, StringRef ident);
@@ -356,7 +284,6 @@ class Remangler {
 
   bool trySubstitution(Node *node, SubstitutionEntry &entry,
                        bool treatAsIdentifier = false);
-  void addSubstitution(const SubstitutionEntry &entry);
 
   void mangleIdentifierImpl(Node *node, bool isOperator);
 
@@ -391,7 +318,7 @@ class Remangler {
 
 public:
   Remangler(SymbolicResolver Resolver, NodeFactory &Factory)
-       : Factory(Factory), Buffer(Factory), Resolver(Resolver) { }
+       : RemanglerBase(Factory), Resolver(Resolver) { }
 
   void mangle(Node *node) {
     switch (node->getKind()) {
@@ -399,14 +326,6 @@ public:
 #include "swift/Demangling/DemangleNodes.def"
     }
     unreachable("bad demangling tree node");
-  }
-
-  StringRef strRef() {
-    return Buffer.Stream.str();
-  }
-
-  std::string str() {
-    return strRef().str();
   }
 };
 
@@ -432,21 +351,6 @@ bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry,
     Buffer << 'A' << Subst;
   }
   return true;
-}
-
-void Remangler::addSubstitution(const SubstitutionEntry &entry) {
-  assert(findSubstitution(entry) < 0);
-  if (NumInlineSubsts < InlineSubstCapacity) {
-    // There is still free space in NumInlineSubsts.
-    assert(OverflowSubstitutions.empty());
-    InlineSubstitutions[NumInlineSubsts++] = entry;
-    return;
-  }
-  // We have to add the entry to OverflowSubstitutions.
-  unsigned Idx = OverflowSubstitutions.size() + InlineSubstCapacity;
-  auto result = OverflowSubstitutions.insert({entry, Idx});
-  assert(result.second);
-  (void) result;
 }
 
 void Remangler::mangleIdentifierImpl(Node *node, bool isOperator) {
@@ -514,9 +418,9 @@ std::pair<int, Node *> Remangler::mangleConstrainedType(Node *node) {
   if (trySubstitution(node, entry))
     return {-1, nullptr};
 
-  std::vector<Node *> Chain;
+  Vector<Node *> Chain;
   while (node->getKind() == Node::Kind::DependentMemberType) {
-    Chain.push_back(node->getChild(1));
+    Chain.push_back(node->getChild(1), Factory);
     node = getChildOfType(node->getFirstChild());
   }
   assert(node->getKind() == Node::Kind::DependentGenericParamType);
@@ -2446,7 +2350,7 @@ Demangle::mangleNode(NodePointer node, SymbolicResolver resolver,
   Remangler remangler(resolver, Factory);
   remangler.mangle(node);
 
-  return remangler.strRef();
+  return remangler.getBufferStr();
 }
 
 bool Demangle::isSpecialized(Node *node) {
