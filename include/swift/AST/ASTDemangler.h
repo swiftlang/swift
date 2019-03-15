@@ -82,6 +82,10 @@ public:
   Type createTypeAliasType(GenericTypeDecl *decl, Type parent);
 
   Type createBoundGenericType(GenericTypeDecl *decl, ArrayRef<Type> args);
+  
+  Type resolveOpaqueType(NodePointer opaqueDescriptor,
+                         ArrayRef<Type> args,
+                         unsigned ordinal);
 
   Type createBoundGenericType(GenericTypeDecl *decl, ArrayRef<Type> args,
                               Type parent);
