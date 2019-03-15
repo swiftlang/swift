@@ -2623,7 +2623,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       }
       else {
         bool suggestLet = true;
-        if (auto *stmt = var->getParentPatternStmt()) {
+        if (auto *stmt = var->getRecursiveParentPatternStmt()) {
           // Don't try to suggest 'var' -> 'let' conversion
           // in case of 'for' loop because it's an implicitly
           // immutable context.
