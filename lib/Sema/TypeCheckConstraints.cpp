@@ -4028,8 +4028,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     if (toType->isAnyObject() || fromType->isAnyObject())
       return CheckedCastKind::ValueCast;
 
-    // A checked cast from Swift.Error to a type that does not conform to
-    // Swift.Error cannot succeed.
+    // A cast from an existential type to a concrete type does not succeed.
     //
     // struct S {}
     // enum FooError: Error { case bar }
@@ -4040,11 +4039,19 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     //     print("Caught bar error")
     //   }
     // }
-    auto exceptionType = getExceptionType(dc, SourceLoc());
-    if (fromType->isEqual(exceptionType)) {
-      if (!conformsToProtocol(toType, Context.getErrorDecl(), dc,
-                              ConformanceCheckFlags::InExpression)) {
-        return failed();
+    if (fromExistential) {
+      if (auto NTD = toType->getAnyNominal()) {
+        if (NTD->getAllConformances().empty()) {
+          return failed();
+        }
+
+        auto protocolDecl =
+            dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal());
+        if (protocolDecl &&
+            !conformsToProtocol(toType, protocolDecl, dc,
+                                ConformanceCheckFlags::InExpression)) {
+          return failed();
+        }
       }
     }
 
