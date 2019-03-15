@@ -1,5 +1,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MYSTRUCT_INT_DOT | %FileCheck %s -check-prefix=MYSTRUCT_INT_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=META_MYSTRUCT_INT_DOT | %FileCheck %s -check-prefix=META_MYSTRUCT_INT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONDITIONAL_OVERLOAD_ARG | %FileCheck %s -check-prefix=CONDITIONAL_OVERLOAD_ARG
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONDITIONAL_OVERLOAD_INIT_ARG | %FileCheck %s -check-prefix=CONDITIONAL_OVERLOAD_ARG
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONDITIONAL_INAPPLICABLE_ARG | %FileCheck %s -check-prefix=CONDITIONAL_INAPPLICABLE_ARG
 
 protocol SomeProto {
   associatedtype Assoc
@@ -69,4 +72,45 @@ func foo(s: MyStruct<Int>) {
 // META_MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/Super:         protoExt_AssocEqInt_None({#(self): MyStruct<Int>#})[#() -> Int#]; name=protoExt_AssocEqInt_None(self: MyStruct<Int>)
 // META_MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/Super:         protoExt_None_AssocEqInt({#(self): MyStruct<Int>#})[#(U) -> Int#]; name=protoExt_None_AssocEqInt(self: MyStruct<Int>)
 // META_MYSTRUCT_INT_DOT: End completions
+}
+
+//https://bugs.swift.org/browse/SR-9938
+enum Fruit     { case apple }
+enum Vegetable { case broccoli }
+enum Meat      { case chicken }
+
+protocol EatsFruit      { }
+protocol EatsVegetables { }
+protocol EatsMeat       { }
+
+struct Chef <Client> { }
+
+extension Chef where Client: EatsFruit {
+  init(_ favorite: Fruit) {}
+  func cook(_ food: Fruit) { }
+}
+extension Chef where Client: EatsVegetables {
+  init(_ favorite: Vegetable) {}
+  func cook(_ food: Vegetable) { }
+}
+extension Chef where Client: EatsMeat {
+  init(favorite: Meat) {}
+  func cook(_ food: Meat) { }
+  func eat(_ food: Meat) {}
+}
+
+struct Vegetarian: EatsFruit, EatsVegetables { }
+
+func testVegetarian(chef: Chef<Vegetarian>) {
+  chef.cook(.#^CONDITIONAL_OVERLOAD_ARG^#)
+// CONDITIONAL_OVERLOAD_ARG: Begin completions, 2 items
+// CONDITIONAL_OVERLOAD_ARG-DAG: Decl[EnumElement]/ExprSpecific:     apple[#Fruit#]; name=apple
+// CONDITIONAL_OVERLOAD_ARG-DAG: Decl[EnumElement]/ExprSpecific:     broccoli[#Vegetable#]; name=broccoli
+// CONDITIONAL_OVERLOAD_ARG: End completions
+
+  var chefMeta: Chef<Vegetarian>.Type = Chef<Vegetarian>.self
+  let _ = chefMeta.init(.#^CONDITIONAL_OVERLOAD_INIT_ARG^#)
+
+  chef.eat(.#^CONDITIONAL_INAPPLICABLE_ARG^#)
+// CONDITIONAL_INAPPLICABLE_ARG-NOT: Begin completion
 }
