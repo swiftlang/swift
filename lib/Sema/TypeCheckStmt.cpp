@@ -946,29 +946,30 @@ public:
     PreviousFallthrough = S;
     return S;
   }
-  
-  Stmt *visitSwitchStmt(SwitchStmt *S) {
+
+  Stmt *visitSwitchStmt(SwitchStmt *switchStmt) {
     // Type-check the subject expression.
-    Expr *subjectExpr = S->getSubjectExpr();
+    Expr *subjectExpr = switchStmt->getSubjectExpr();
     auto resultTy = TC.typeCheckExpression(subjectExpr, DC);
     auto limitExhaustivityChecks = !resultTy;
     if (Expr *newSubjectExpr = TC.coerceToRValue(subjectExpr))
       subjectExpr = newSubjectExpr;
-    S->setSubjectExpr(subjectExpr);
-    Type subjectType = S->getSubjectExpr()->getType();
+    switchStmt->setSubjectExpr(subjectExpr);
+    Type subjectType = switchStmt->getSubjectExpr()->getType();
 
     // Type-check the case blocks.
     AddSwitchNest switchNest(*this);
-    AddLabeledStmt labelNest(*this, S);
+    AddLabeledStmt labelNest(*this, switchStmt);
 
     // Pre-emptively visit all Decls (#if/#warning/#error) that still exist in
     // the list of raw cases.
-    for (auto node : S->getRawCases()) {
-      if (!node.is<Decl*>()) continue;
-      TC.typeCheckDecl(node.get<Decl*>());
+    for (auto &node : switchStmt->getRawCases()) {
+      if (!node.is<Decl *>())
+        continue;
+      TC.typeCheckDecl(node.get<Decl *>());
     }
 
-    auto cases = S->getCases();
+    auto cases = switchStmt->getCases();
     CaseStmt *previousBlock = nullptr;
     for (auto i = cases.begin(), e = cases.end(); i != e; ++i) {
       auto *caseBlock = *i;
@@ -1000,36 +1001,39 @@ public:
           
           // For each variable in the pattern, make sure its type is identical to what it
           // was in the first label item's pattern.
-          auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
+          auto *firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
           SmallVector<VarDecl *, 4> vars;
           firstPattern->collectVariables(vars);
-          pattern->forEachVariable([&](VarDecl *VD) {
-            if (!VD->hasName())
+          pattern->forEachVariable([&](VarDecl *vd) {
+            if (!vd->hasName())
               return;
             for (auto *expected : vars) {
-              if (expected->hasName() && expected->getName() == VD->getName()) {
-                if (VD->hasType() && expected->hasType() && !expected->isInvalid() &&
-                    !VD->getType()->isEqual(expected->getType())) {
-                  TC.diagnose(VD->getLoc(), diag::type_mismatch_multiple_pattern_list,
-                              VD->getType(), expected->getType());
-                  VD->markInvalid();
+              if (expected->hasName() && expected->getName() == vd->getName()) {
+                if (vd->hasType() && expected->hasType() &&
+                    !expected->isInvalid() &&
+                    !vd->getType()->isEqual(expected->getType())) {
+                  TC.diagnose(vd->getLoc(),
+                              diag::type_mismatch_multiple_pattern_list,
+                              vd->getType(), expected->getType());
+                  vd->markInvalid();
                   expected->markInvalid();
                 }
-                if (expected->isLet() != VD->isLet()) {
-                  auto diag = TC.diagnose(VD->getLoc(),
-                                          diag::mutability_mismatch_multiple_pattern_list,
-                                          VD->isLet(), expected->isLet());
+                if (expected->isLet() != vd->isLet()) {
+                  auto diag = TC.diagnose(
+                      vd->getLoc(),
+                      diag::mutability_mismatch_multiple_pattern_list,
+                      vd->isLet(), expected->isLet());
 
                   VarPattern *foundVP = nullptr;
-                  VD->getParentPattern()->forEachNode([&](Pattern *P) {
+                  vd->getParentPattern()->forEachNode([&](Pattern *P) {
                     if (auto *VP = dyn_cast<VarPattern>(P))
-                      if (VP->getSingleVar() == VD)
+                      if (VP->getSingleVar() == vd)
                         foundVP = VP;
                   });
                   if (foundVP)
                     diag.fixItReplace(foundVP->getLoc(),
                                       expected->isLet() ? "let" : "var");
-                  VD->markInvalid();
+                  vd->markInvalid();
                   expected->markInvalid();
                 }
                 return;
@@ -1061,7 +1065,7 @@ public:
           limitExhaustivityChecks = true;
         }
 
-        const CaseLabelItem &labelItem = caseBlock->getCaseLabelItems().front();
+        const auto &labelItem = caseBlock->getCaseLabelItems().front();
         if (labelItem.getGuardExpr() && !labelItem.isDefault()) {
           TC.diagnose(labelItem.getStartLoc(),
                       diag::unknown_case_where_clause)
@@ -1081,14 +1085,14 @@ public:
       // includes our first label item's pattern bindings and types.
       if (PreviousFallthrough && previousBlock) {
         auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
-        SmallVector<VarDecl *, 4> Vars;
-        firstPattern->collectVariables(Vars);
+        SmallVector<VarDecl *, 4> vars;
+        firstPattern->collectVariables(vars);
 
         for (auto &labelItem : previousBlock->getCaseLabelItems()) {
           const Pattern *pattern = labelItem.getPattern();
           SmallVector<VarDecl *, 4> PreviousVars;
           pattern->collectVariables(PreviousVars);
-          for (auto expected : Vars) {
+          for (auto expected : vars) {
             bool matched = false;
             if (!expected->hasName())
               continue;
@@ -1120,11 +1124,11 @@ public:
       previousBlock = caseBlock;
     }
 
-    if (!S->isImplicit()) {
-      TC.checkSwitchExhaustiveness(S, DC, limitExhaustivityChecks);
+    if (!switchStmt->isImplicit()) {
+      TC.checkSwitchExhaustiveness(switchStmt, DC, limitExhaustivityChecks);
     }
 
-    return S;
+    return switchStmt;
   }
 
   Stmt *visitCaseStmt(CaseStmt *S) {
