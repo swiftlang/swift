@@ -1521,8 +1521,9 @@ NodePointer Demangler::demangleRetroactiveConformance() {
   return createWithChildren(Node::Kind::RetroactiveConformance, index, conformance);
 }
 
-NodePointer Demangler::demangleBoundGenericType() {
-  NodePointer RetroactiveConformances = nullptr;
+bool Demangler::demangleBoundGenerics(Vector<NodePointer> &TypeListList,
+                                      NodePointer &RetroactiveConformances) {
+  RetroactiveConformances = nullptr;
   while (auto RetroactiveConformance =
          popNode(Node::Kind::RetroactiveConformance)) {
     if (!RetroactiveConformances)
@@ -1531,8 +1532,7 @@ NodePointer Demangler::demangleBoundGenericType() {
   }
   if (RetroactiveConformances)
     RetroactiveConformances->reverseChildren();
-
-  Vector<NodePointer> TypeListList(*this, 4);
+  
   for (;;) {
     NodePointer TList = createNode(Node::Kind::TypeList);
     TypeListList.push_back(TList, *this);
@@ -1540,14 +1540,28 @@ NodePointer Demangler::demangleBoundGenericType() {
       TList->addChild(Ty, *this);
     }
     TList->reverseChildren();
-
+    
     if (popNode(Node::Kind::EmptyList))
       break;
     if (!popNode(Node::Kind::FirstElementMarker))
-      return nullptr;
+      return false;
   }
+  return true;
+}
+
+NodePointer Demangler::demangleBoundGenericType() {
+  NodePointer RetroactiveConformances;
+  Vector<NodePointer> TypeListList(*this, 4);
+  
+  if (!demangleBoundGenerics(TypeListList, RetroactiveConformances))
+    return nullptr;
+
   NodePointer Nominal = popTypeAndGetAnyGeneric();
+  if (!Nominal)
+    return nullptr;
   NodePointer BoundNode = demangleBoundGenericArgs(Nominal, TypeListList, 0);
+  if (!BoundNode)
+    return nullptr;
   addChild(BoundNode, RetroactiveConformances);
   NodePointer NTy = createType(BoundNode);
   addSubstitution(NTy);
@@ -1811,7 +1825,7 @@ NodePointer Demangler::demangleMetatype() {
     case 'p':
       return createWithChild(Node::Kind::ProtocolDescriptor, popProtocol());
     case 'Q':
-      return createWithPoppedType(Node::Kind::OpaqueTypeDescriptor);
+      return createWithChild(Node::Kind::OpaqueTypeDescriptor, popNode());
     case 'S':
       return createWithChild(Node::Kind::ProtocolSelfConformanceDescriptor,
                              popProtocol());
@@ -1909,14 +1923,25 @@ NodePointer Demangler::demangleArchetype() {
     }
     case 'O': {
       auto definingContext = popContext();
-      return createType(
-              createWithChild(Node::Kind::OpaqueReturnTypeOf, definingContext));
+      return createWithChild(Node::Kind::OpaqueReturnTypeOf, definingContext);
     }
     case 'o': {
-      auto GenericArgs = popNode(/*Node::Kind::BoundGenericArgs*/);
+      auto index = demangleIndex();
+      Vector<NodePointer> boundGenericArgs;
+      NodePointer retroactiveConformances;
+      if (!demangleBoundGenerics(boundGenericArgs, retroactiveConformances))
+        return nullptr;
       auto Name = popNode();
-      return createType(
-                 createWithChildren(Node::Kind::OpaqueType, Name, GenericArgs));
+      auto opaque = createWithChildren(Node::Kind::OpaqueType, Name,
+                                     createNode(Node::Kind::Index, index));
+      auto boundGenerics = createNode(Node::Kind::TypeList);
+      for (unsigned i = boundGenericArgs.size(); i-- > 0;)
+        boundGenerics->addChild(boundGenericArgs[i], *this);
+      opaque->addChild(boundGenerics, *this);
+      if (retroactiveConformances)
+        opaque->addChild(retroactiveConformances, *this);
+      
+      return createType(opaque);
     }
     case 'r': {
       return createType(createNode(Node::Kind::OpaqueReturnType));

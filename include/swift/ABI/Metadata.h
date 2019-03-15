@@ -3027,6 +3027,11 @@ private:
   using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
 
 public:
+  using TrailingGenericContextObjects::getGenericContext;
+  using TrailingGenericContextObjects::getGenericContextHeader;
+  using TrailingGenericContextObjects::getFullGenericContextHeader;
+  using TrailingGenericContextObjects::getGenericParams;
+
   // The kind-specific flags area is used to store the count of the generic
   // arguments for underlying type(s) encoded in the descriptor.
   unsigned getNumUnderlyingTypeArguments() const {
@@ -3038,9 +3043,12 @@ public:
     return getNumUnderlyingTypeArguments();
   }
   
-  const char * getUnderlyingTypeArgument(unsigned i) const {
+  StringRef getUnderlyingTypeArgument(unsigned i) const {
     assert(i < getNumUnderlyingTypeArguments());
-    return (this->template getTrailingObjects<RelativeDirectPointer<const char>>())[i];
+    const char *ptr =
+    (this->template getTrailingObjects<RelativeDirectPointer<const char>>())[i];
+    
+    return Demangle::makeSymbolicMangledNameStringRef(ptr);
   }
   
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
@@ -4257,6 +4265,9 @@ TargetContextDescriptor<Runtime>::getGenericContext() const {
   case ContextDescriptorKind::Struct:
     return llvm::cast<TargetStructDescriptor<Runtime>>(this)
         ->getGenericContext();
+  case ContextDescriptorKind::OpaqueType:
+    return llvm::cast<TargetOpaqueTypeDescriptor<Runtime>>(this)
+        ->getGenericContext();
   default:    
     // We don't know about this kind of descriptor.
     return nullptr;
@@ -4308,6 +4319,8 @@ TargetTypeContextDescriptor<Runtime>::getGenericParams() const {
     return llvm::cast<TargetEnumDescriptor<Runtime>>(this)->getGenericParams();
   case ContextDescriptorKind::Struct:
     return llvm::cast<TargetStructDescriptor<Runtime>>(this)->getGenericParams();
+  case ContextDescriptorKind::OpaqueType:
+    return llvm::cast<TargetOpaqueTypeDescriptor<Runtime>>(this)->getGenericParams();
   default:
     swift_runtime_unreachable("Not a type context descriptor.");
   }

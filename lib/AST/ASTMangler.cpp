@@ -732,7 +732,9 @@ static bool shouldMangleAsGeneric(Type type) {
 }
 
 void ASTMangler::appendOpaqueDeclName(const OpaqueTypeDecl *opaqueDecl) {
-  if (auto namingDecl = opaqueDecl->getNamingDecl()) {
+  if (canSymbolicReference(opaqueDecl)) {
+    appendSymbolicReference(opaqueDecl);
+  } else if (auto namingDecl = opaqueDecl->getNamingDecl()) {
     appendEntity(namingDecl);
     appendOperator("QO");
   } else {
@@ -976,13 +978,24 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
         }
       }
       
-      // Otherwise, use the fully qualified mangling.
+      // Otherwise, try to substitute it.
+      if (tryMangleTypeSubstitution(type))
+        return;
+      
+      // Use the fully elaborated explicit mangling.
       appendOpaqueDeclName(opaqueDecl);
       bool isFirstArgList = true;
       appendBoundGenericArgs(opaqueDecl->getInnermostDeclContext(),
                              opaqueType->getSubstitutions(),
                              isFirstArgList);
-      appendOperator("Qo");
+      appendRetroactiveConformances(opaqueType->getSubstitutions(),
+                                    opaqueDecl->getParentModule());
+      
+      // TODO: If we support multiple opaque types in a return, put the
+      // ordinal for this archetype here.
+      appendOperator("Qo", Index(0));
+
+      addTypeSubstitution(type);
       return;
     }
       
@@ -1297,6 +1310,29 @@ static bool containsRetroactiveConformance(
   return false;
 }
 
+void ASTMangler::appendRetroactiveConformances(SubstitutionMap subMap,
+                                               ModuleDecl *fromModule) {
+  if (subMap.empty()) return;
+
+  unsigned numProtocolRequirements = 0;
+  for (auto conformance : subMap.getConformances()) {
+    SWIFT_DEFER {
+      ++numProtocolRequirements;
+    };
+
+    // Ignore abstract conformances.
+    if (!conformance.isConcrete())
+      continue;
+
+    // Skip non-retroactive conformances.
+    if (!containsRetroactiveConformance(conformance.getConcrete(), fromModule))
+      continue;
+
+    appendConcreteProtocolConformance(conformance.getConcrete());
+    appendOperator("g", Index(numProtocolRequirements));
+  }
+}
+
 void ASTMangler::appendRetroactiveConformances(Type type) {
   // Dig out the substitution map to use.
   SubstitutionMap subMap;
@@ -1314,26 +1350,8 @@ void ASTMangler::appendRetroactiveConformances(Type type) {
     module = Mod ? Mod : nominal->getModuleContext();
     subMap = type->getContextSubstitutionMap(module, nominal);
   }
-
-  if (subMap.empty()) return;
-
-  unsigned numProtocolRequirements = 0;
-  for (auto conformance : subMap.getConformances()) {
-    SWIFT_DEFER {
-      ++numProtocolRequirements;
-    };
-
-    // Ignore abstract conformances.
-    if (!conformance.isConcrete())
-      continue;
-
-    // Skip non-retroactive conformances.
-    if (!containsRetroactiveConformance(conformance.getConcrete(), module))
-      continue;
-
-    appendConcreteProtocolConformance(conformance.getConcrete());
-    appendOperator("g", Index(numProtocolRequirements));
-  }
+  
+  appendRetroactiveConformances(subMap, module);
 }
 
 static char getParamConvention(ParameterConvention conv) {
@@ -1700,8 +1718,7 @@ void ASTMangler::appendProtocolName(const ProtocolDecl *protocol,
     return;
 
   // We can use a symbolic reference if they're allowed in this context.
-  if (AllowSymbolicReferences
-      && (!CanSymbolicReference || CanSymbolicReference(protocol))) {
+  if (canSymbolicReference(protocol)) {
     // Try to use a symbolic reference substitution.
     if (tryMangleSubstitution(protocol))
       return;
@@ -1761,16 +1778,13 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
     if (tryMangleSubstitution(cast<TypeAliasDecl>(decl)))
       return;
   }
-
   
   // Try to mangle a symbolic reference for a nominal type.
-  if (AllowSymbolicReferences) {
-    if (nominal && (!CanSymbolicReference || CanSymbolicReference(nominal))) {
-      appendSymbolicReference(nominal);
-      // Substitutions can refer back to the symbolic reference.
-      addTypeSubstitution(nominal->getDeclaredType());
-      return;
-    }
+  if (nominal && canSymbolicReference(nominal)) {
+    appendSymbolicReference(nominal);
+    // Substitutions can refer back to the symbolic reference.
+    addTypeSubstitution(nominal->getDeclaredType());
+    return;
   }
 
   appendContextOf(decl);

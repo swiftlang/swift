@@ -318,7 +318,8 @@ class TypeDecoder {
       SmallVector<BuiltType, 8> args;
 
       const auto &genericArgs = Node->getChild(1);
-      assert(genericArgs->getKind() == NodeKind::TypeList);
+      if (genericArgs->getKind() != NodeKind::TypeList)
+        return BuiltType();
 
       for (auto genericArg : *genericArgs) {
         auto paramType = decodeMangledType(genericArg);
@@ -777,6 +778,35 @@ class TypeDecoder {
 
       return Builder.createParenType(base);
     }
+    case NodeKind::OpaqueType: {
+      if (Node->getNumChildren() < 3)
+        return BuiltType();
+      auto descriptor = Node->getChild(0);
+      auto ordinalNode = Node->getChild(1);
+
+      if (ordinalNode->getKind() != NodeKind::Index
+          || !ordinalNode->hasIndex())
+        return BuiltType();
+      auto ordinal = ordinalNode->getIndex();
+
+      std::vector<BuiltType> genericArgs;
+      auto boundGenerics = Node->getChild(2);
+      for (unsigned i = 0; i < boundGenerics->getNumChildren(); ++i) {
+        auto genericsNode = boundGenerics->getChild(i);
+        if (genericsNode->getKind() != NodeKind::TypeList)
+          break;
+        for (auto argNode : *genericsNode) {
+          auto arg = decodeMangledType(argNode);
+          if (!arg)
+            return BuiltType();
+          genericArgs.push_back(arg);
+        }
+      }
+      
+      return Builder.resolveOpaqueType(descriptor, genericArgs, ordinal);
+    }
+    // TODO: Handle OpaqueReturnType, when we're in the middle of reconstructing
+    // the defining decl
     default:
       return BuiltType();
     }

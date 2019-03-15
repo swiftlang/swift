@@ -78,8 +78,13 @@ The following symbolic reference kinds are currently implemented:
 
 ::
 
-   {any-generic-type, protocol} ::= '\x01' .{4}              // Reference points directly to context descriptor
-   {any-generic-type, protocol} ::= '\x02' .{4}              // Reference points indirectly to context descriptor
+   #if SWIFT_RUNTIME_VERSION < 5.1
+     {any-generic-type, protocol} ::= '\x01' .{4} // Reference points directly to context descriptor
+     {any-generic-type, protocol} ::= '\x02' .{4} // Reference points indirectly to context descriptor
+   #else
+     {any-generic-type, protocol, opaque-type-decl-name} ::= '\x01' .{4} // Reference points directly to context descriptor
+     {any-generic-type, protocol, opaque-type-decl-name} ::= '\x02' .{4} // Reference points indirectly to context descriptor
+   #endif
    // The grammatical role of the symbolic reference is determined by the
    // kind of context descriptor referenced
 
@@ -93,15 +98,13 @@ The following symbolic reference kinds are currently implemented:
    associated-conformance-access-function ::= '\x08' .{4}  // Reference points directly to associated conformance access function relative to the conforming type
 
    // keypaths only in Swift 5.0, generalized in Swift 5.1
-   metadata-access-function ::= '\x09' .{4}  // Reference points directly to metadata access function that can be invoked to produce referenced object
+   #if SWIFT_RUNTIME_VERSION >= 5.1
+     metadata-access-function ::= '\x09' .{4}  // Reference points directly to metadata access function that can be invoked to produce referenced object
+   #endif
 
-   // begin added in Swift 5.1
-   any-generic-type ::= '\x0B' .{4} // Reference points directly to an opaque type descriptor
-   any-generic-type ::= '\x0C' .{4} // Reference points indirectly to an opaque type descriptor
-   // end added in Swift 5.1
-
-A mangled name may also include ``\xFF`` bytes, which are only used for alignment
-padding. They can be skipped over and ignored.
+A mangled name may also include ``\xFF`` bytes, which are only used for
+alignment padding. They do not affect what the mangled name references and can
+be skipped over and ignored.
 
 Globals
 ~~~~~~~
@@ -120,7 +123,9 @@ Globals
   global ::= nominal-type 'Ml'           // in-place type initialization cache
   global ::= nominal-type 'Mm'           // class metaclass
   global ::= nominal-type 'Mn'           // nominal type descriptor
-  global ::= opaque-type-decl-name 'MQ'  // opaque type descriptor -- added in Swift 5.1
+  #if SWIFT_RUNTIME_VERSION >= 5.1
+    global ::= opaque-type-decl-name 'MQ'  // opaque type descriptor -- added in Swift 5.1
+  #endif
   global ::= nominal-type 'Mu'           // class method lookup function
   global ::= nominal-type 'MU'           // ObjC metadata update callback function
   global ::= nominal-type 'Ms'           // ObjC resilient class stub
@@ -613,14 +618,12 @@ implementation details of a function type.
 
 ::
 
-  // begin added in Swift 5.1
+  #if SWIFT_VERSION >= 5.1
+    type ::= 'Qr'                         // opaque result type (of current decl)
+    type ::= opaque-type-decl-name bound-generic-args 'Qo' INDEX // opaque type
 
-  type ::= 'Qr'                         // opaque result type (of current decl)
-  type ::= opaque-type-decl-name bound-generic-args 'Qo' // opaque type
-
-  opaque-type-decl-name ::= entity 'QO' // opaque result type of specified decl
-
-  // end added in Swift 5.1
+    opaque-type-decl-name ::= entity 'QO' // opaque result type of specified decl
+  #endif
 
 Opaque return types have a special short representation in the mangling of
 their defining entity. In structural position, opaque types are fully qualified
