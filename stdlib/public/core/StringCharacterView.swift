@@ -128,12 +128,14 @@ extension String: BidirectionalCollection {
     var consumed = 0
     let searchSlice = ascii[i._encodedOffset ..< i._encodedOffset + n]
     if let cr = searchSlice.firstIndex(of: _CR), cr != ascii.endIndex &- 1 {
-      consumed = cr
-      return (consumed, Index(_encodedOffset:
-        i._encodedOffset + consumed + (searchSlice[cr &+ 1] == _LF ? 1 : 0)))
+      consumed = cr &+ 1
+      let result = Index(_encodedOffset:
+        i._encodedOffset + consumed + (searchSlice[cr &+ 1] == _LF ? 1 : 0))
+      return (consumed, result < limit ? result : nil)
+
     } else {
-      return (searchSlice.count,
-              Index(_encodedOffset: i._encodedOffset + searchSlice.count))
+      let result = Index(_encodedOffset: i._encodedOffset + searchSlice.count)
+      return (searchSlice.count, result < limit ? result : nil)
     }
   }
   
