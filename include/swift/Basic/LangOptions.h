@@ -274,12 +274,6 @@ namespace swift {
     std::shared_ptr<llvm::Regex> OptimizationRemarkPassedPattern;
     std::shared_ptr<llvm::Regex> OptimizationRemarkMissedPattern;
 
-    /// When a conversion from String to Substring fails, emit a fix-it to append
-    /// the void subscript '[]'.
-    /// FIXME: Remove this flag when void subscripts are implemented.
-    /// This is used to guard preemptive testing for the fix-it.
-    bool FixStringToSubstringConversions = false;
-
     /// Whether collect tokens during parsing for syntax coloring.
     bool CollectParsedToken = false;
 
