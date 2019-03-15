@@ -1923,11 +1923,7 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
     //           }
 
     if (fnTypeLoc.isNull() || fnType->isVoid()) {
-      BS = BraceStmt::create(Context,
-                             BS->getStartLoc(),
-                             { E },
-                             BS->getEndLoc(),
-                             /*implicit=*/false);
+      BS->setElement(0, E);
     } else {
       // FIXME: FIXME_NOW: DETERMINE: Is this the appropriate mechanism to use
       //        to divine the type of E?
@@ -1942,11 +1938,7 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
         Type exprType = solution.simplifyType(solutionCS.getType(E));
         if (!exprType.isNull() && exprType->isUninhabited() &&
             exprType->getCanonicalType() != fnType->getCanonicalType()) {
-          BS = BraceStmt::create(Context,
-                                 BS->getStartLoc(),
-                                 { E },
-                                 BS->getEndLoc(),
-                                 /*implicit=*/false);
+          BS->setElement(0, E);
         }
       }
     }
