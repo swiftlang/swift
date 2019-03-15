@@ -59,12 +59,18 @@ protected:
 
 public:
   using SymbolicReferent = llvm::PointerUnion<const NominalTypeDecl *,
-                                              const ProtocolConformance *>;
+                                              const OpaqueTypeDecl *>;
 protected:
 
   /// If set, the mangler calls this function to determine whether to symbolic
-  /// reference a given entity. Defaults to always returning true.
+  /// reference a given entity. If null, the mangler acts as if it's set to
+  /// always return true.
   std::function<bool (SymbolicReferent)> CanSymbolicReference;
+  
+  bool canSymbolicReference(SymbolicReferent referent) {
+    return AllowSymbolicReferences
+      && (!CanSymbolicReference || CanSymbolicReference(referent));
+  }
 
   std::vector<std::pair<SymbolicReferent, unsigned>> SymbolicReferences;
   
@@ -237,7 +243,8 @@ protected:
 
   /// Append any retroactive conformances.
   void appendRetroactiveConformances(Type type);
-
+  void appendRetroactiveConformances(SubstitutionMap subMap,
+                                     ModuleDecl *fromModule);
   void appendImplFunctionType(SILFunctionType *fn);
 
   void appendContextOf(const ValueDecl *decl);

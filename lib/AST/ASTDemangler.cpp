@@ -247,6 +247,13 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
   return substType;
 }
 
+Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
+                                   ArrayRef<Type> args,
+                                   unsigned ordinal) {
+  // TODO
+  return Type();
+}
+
 Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
                                         ArrayRef<Type> args,
                                         Type parent) {

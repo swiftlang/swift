@@ -278,6 +278,14 @@ public:
                          const TypeRef *parent) {
     return BoundGenericTypeRef::create(*this, *mangledName, args, parent);
   }
+  
+  const TypeRef *
+  resolveOpaqueType(NodePointer opaqueDescriptor,
+                    const std::vector<const TypeRef *> &genericArgs,
+                    unsigned ordinal) {
+    // TODO
+    return nullptr;
+  }
 
   const TupleTypeRef *
   createTupleType(ArrayRef<const TypeRef *> elements,

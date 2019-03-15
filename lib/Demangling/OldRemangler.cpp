@@ -2006,6 +2006,10 @@ void Remangler::mangleProtocolSymbolicReference(Node *node, EntityContext&) {
   unreachable("unsupported");
 }
 
+void Remangler::mangleOpaqueTypeDescriptorSymbolicReference(Node *node) {
+  unreachable("unsupported");
+}
+
 void Remangler::mangleSugaredOptional(Node *node) {
   unreachable("unsupported");
 }
