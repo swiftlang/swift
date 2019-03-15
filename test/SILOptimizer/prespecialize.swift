@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend  %s -Onone -Xllvm -sil-inline-generics=false -emit-sil | %FileCheck %s
 
+// This is disabled for now.
+// REQUIRES: rdar48924409
+
 // REQUIRES: optimized_stdlib
 
 // Check that pre-specialization works at -Onone.
