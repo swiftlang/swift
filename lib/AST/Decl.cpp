@@ -466,16 +466,16 @@ Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
   auto braceStmt = getBody();
   assert(braceStmt != nullptr && "No body currently available.");
   auto body = getBody()->getElement(0);
-  if (body.is<Stmt *>())
-    return cast<ReturnStmt>(body.get<Stmt *>())->getResult();
+  if (auto *stmt = body.dyn_cast<Stmt *>())
+    return cast<ReturnStmt>(stmt)->getResult();
   return body.get<Expr *>();
 }
 
 void AbstractFunctionDecl::setSingleExpressionBody(Expr *NewBody) {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
   auto body = getBody()->getElement(0);
-  if (body.is<Stmt *>()) {
-    cast<ReturnStmt>(body.get<Stmt *>())->setResult(NewBody);
+  if (auto *stmt = body.dyn_cast<Stmt *>()) {
+    cast<ReturnStmt>(stmt)->setResult(NewBody);
     return;
   }
   getBody()->setElement(0, NewBody);

@@ -5646,34 +5646,25 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
     //        (Parser::parseExprClosure).
     if (BS->getNumElements() == 1) {
       auto Element = BS->getElement(0);
-      // FIXME: FIXME_NOW: DETERMINE: Do we need to do this?  It's being done
-      //        for closures (Parser::parseExprClosure) but it may not be 
-      //        relevant here.
-      //
-      //           if (Element.is<Stmt *>()) {
-      //             if (auto returnStmt =
-      //                         dyn_cast_or_null<ReturnStmt>(Element.get<Stmt*>())) {
-      //               
-      //               if (!returnStmt->hasResult()) {
-      //                 Expr *returnExpr = TupleExpr::createEmpty(Context,
-      //                                                           SourceLoc(),
-      //                                                           SourceLoc(),
-      //                                                           /*implicit*/true);
-      //                 
-      //                 returnStmt->setResult(returnExpr);
-      //                 AFD->setHasSingleExpressionBody();
-      //                 AFD->setSingleExpressionBody(returnExpr);
-      //               }
-      //             }
-      //           } else 
-      if (Element.is<Expr *>()) {
-        auto E = Element.get<Expr *>();
-        if (auto F = dyn_cast_or_null<FuncDecl>(AFD)) {
+      if (auto *stmt = Element.dyn_cast<Stmt *>()) {
+        if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
+          if (!returnStmt->hasResult()) {
+            auto returnExpr = TupleExpr::createEmpty(Context,
+                                                     SourceLoc(),
+                                                     SourceLoc(),
+                                                     /*implicit*/true);
+            returnStmt->setResult(returnExpr);
+            AFD->setHasSingleExpressionBody();
+            AFD->setSingleExpressionBody(returnExpr);
+          }
+        }
+      } else if (auto *E = Element.dyn_cast<Expr *>()) {
+        if (auto F = dyn_cast<FuncDecl>(AFD)) {
           auto RS = new (Context) ReturnStmt(SourceLoc(), E);
           BS->setElement(0, RS); 
           AFD->setHasSingleExpressionBody();
           AFD->setSingleExpressionBody(E);
-        } else if (auto F = dyn_cast_or_null<ConstructorDecl>(AFD)) {
+        } else if (auto *F = dyn_cast<ConstructorDecl>(AFD)) {
           if (F->getFailability() != OTK_None && isa<NilLiteralExpr>(E)) {
             // If it's a nil literal, just insert return.  This is the only 
             // legal thing to return.
