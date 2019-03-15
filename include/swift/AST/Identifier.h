@@ -221,8 +221,8 @@ public:
   };
   
 private:
-  /// In a special DeclName represenenting a subscript, this opaque pointer
-  /// is used as the data of the base name identifier.
+  /// In a special DeclName representing a subscript, this opaque pointer is
+  /// used as the data of the base name identifier.
   /// This is an implementation detail that should never leak outside of
   /// DeclName.
   static void *SubscriptIdentifierData;

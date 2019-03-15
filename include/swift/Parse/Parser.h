@@ -520,7 +520,8 @@ public:
   }
 
   SourceLoc consumeIdentifier(Identifier *Result = nullptr) {
-    assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self));
+    assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self,
+                     tok::kw_call));
     if (Result)
       *Result = Context.getIdentifier(Tok.getText());
     return consumeToken();
@@ -1005,6 +1006,8 @@ public:
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
 
+  ParserResult<CallDecl>
+  parseDeclCall(ParseDeclOptions Flags, DeclAttributes &Attributes);
   ParserResult<SubscriptDecl>
   parseDeclSubscript(ParseDeclOptions Flags, DeclAttributes &Attributes,
                      SmallVectorImpl<Decl *> &Decls);
@@ -1160,6 +1163,8 @@ public:
     Closure,
     /// A subscript.
     Subscript,
+    /// A call declaration.
+    Call,
     /// A curried argument clause.
     Curried,
     /// An enum element.
@@ -1198,6 +1203,7 @@ public:
                                       DefaultArgumentInfo &defaultArgs);
   ParserStatus parseFunctionSignature(Identifier functionName,
                                       DeclName &fullName,
+                                      ParameterContextKind paramContext,
                                       ParameterList *&bodyParams,
                                       DefaultArgumentInfo &defaultArgs,
                                       SourceLoc &throws,

@@ -324,6 +324,7 @@ private:
     case Node::Kind::AutoClosureType:
     case Node::Kind::BaseConformanceDescriptor:
     case Node::Kind::BaseWitnessTableAccessor:
+    case Node::Kind::CallDeclaration:
     case Node::Kind::ClassMetadataBaseOffset:
     case Node::Kind::CFunctionPointer:
     case Node::Kind::Constructor:
@@ -1068,6 +1069,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return printEntity(Node, asPrefixContext, TypePrinting::FunctionStyle,
                        /*hasName*/false, /*ExtraName*/"", /*ExtraIndex*/-1,
                        "subscript");
+  case Node::Kind::CallDeclaration:
+    return printEntity(Node, asPrefixContext, TypePrinting::FunctionStyle,
+                       /*hasName*/false, /*ExtraName*/"", /*ExtraIndex*/-1,
+                       "call");
   case Node::Kind::GenericTypeParamDecl:
     return printEntity(Node, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/true);

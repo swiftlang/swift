@@ -29,7 +29,8 @@ namespace swift {
       Constructor,
       Func,
       Var,
-      Subscript
+      Subscript,
+      Call
     };
 
   // Declare common diagnostics objects with their appropriate types.

@@ -150,6 +150,7 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(GenericTypeParam);
   TRIVIAL_KIND(AssociatedType);
   TRIVIAL_KIND(Protocol);
+  TRIVIAL_KIND(Call);
   TRIVIAL_KIND(Subscript);
   TRIVIAL_KIND(Constructor);
   TRIVIAL_KIND(Destructor);
@@ -278,6 +279,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(GenericStruct, "generic struct");
   ENTRY(GenericClass, "generic class");
   ENTRY(GenericType, "generic type");
+  ENTRY(Call, "call method");
   ENTRY(Subscript, "subscript");
   ENTRY(Constructor, "initializer");
   ENTRY(Destructor, "deinitializer");
@@ -888,6 +890,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
   case DeclKind::Constructor:
   case DeclKind::Destructor:
   case DeclKind::GenericTypeParam:
+  case DeclKind::Call:
   case DeclKind::Subscript:
   case DeclKind::EnumElement:
   case DeclKind::Param:
@@ -2012,6 +2015,10 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::Param:
     // enum elements and function parameters are not instance members.
     return false;
+
+  case DeclKind::Call:
+    // Call declarations are always instance members.
+    return true;
 
   case DeclKind::Subscript:
     // Subscripts are always instance members.
@@ -3207,6 +3214,10 @@ auto NominalTypeDecl::getStoredProperties(bool skipInaccessible) const
 
   return StoredPropertyRange(getMembers(),
                              ToStoredProperty(skipInaccessible));
+}
+
+auto NominalTypeDecl::getCallDeclarations() const -> CallDeclRange {
+  return CallDeclRange(getMembers(), ToCallDecl());
 }
 
 bool NominalTypeDecl::isOptionalDecl() const {
@@ -6092,6 +6103,40 @@ bool FuncDecl::isBinaryOperator() const {
   return params->size() == 2 &&
     !params->get(0)->isVariadic() &&
     !params->get(1)->isVariadic();
+}
+
+CallDecl *CallDecl::createImpl(ASTContext &ctx, DeclName name,
+                               SourceLoc declLoc, bool throws,
+                               SourceLoc throwsLoc,
+                               GenericParamList *genericParams,
+                               DeclContext *parent, ClangNode clangNode) {
+  bool hasImplicitSelfDecl = parent->isTypeContext();
+  size_t size = sizeof(CallDecl) + (hasImplicitSelfDecl
+                                        ? sizeof(ParamDecl *)
+                                        : 0);
+  void *buffer =
+      allocateMemoryForDecl<CallDecl>(ctx, size, !clangNode.isNull());
+  auto *D = ::new (buffer)
+      CallDecl(name, declLoc, throws, throwsLoc, hasImplicitSelfDecl,
+               genericParams, parent);
+  if (clangNode)
+    D->setClangNode(clangNode);
+  if (hasImplicitSelfDecl)
+    *D->getImplicitSelfDeclStorage() = nullptr;
+
+  return D;
+}
+
+CallDecl *CallDecl::create(ASTContext &ctx, DeclName name, SourceLoc declLoc,
+                           bool throws, SourceLoc throwsLoc,
+                           GenericParamList *genericParams,
+                           ParameterList *bodyParams, TypeLoc fnRetType,
+                           DeclContext *parent, ClangNode clangNode) {
+  auto *D = CallDecl::createImpl(
+      ctx, name, declLoc, throws, throwsLoc, genericParams, parent, clangNode);
+  D->setParameters(bodyParams);
+  D->getBodyResultTypeLoc() = fnRetType;
+  return D;
 }
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,

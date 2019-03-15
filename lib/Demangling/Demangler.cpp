@@ -2829,6 +2829,8 @@ NodePointer Demangler::demangleFunctionEntity() {
       Args = TypeAndMaybePrivateName; Kind = Node::Kind::Allocator; break;
     case 'c':
       Args = TypeAndMaybePrivateName; Kind = Node::Kind::Constructor; break;
+    case 'F':
+      Args = TypeAndMaybePrivateName; Kind = Node::Kind::CallDeclaration; break;
     case 'U': Args = TypeAndIndex; Kind = Node::Kind::ExplicitClosure; break;
     case 'u': Args = TypeAndIndex; Kind = Node::Kind::ImplicitClosure; break;
     case 'A': Args = Index; Kind = Node::Kind::DefaultArgumentInitializer; break;

@@ -54,6 +54,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case MemberRefBase:
     case UnresolvedMember:
     case SubscriptMember:
+    case CallMember:
     case ConstructorMember:
     case LValueConversion:
     case RValueAdjustment:
@@ -216,6 +217,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case SubscriptMember:
       out << "subscript member";
+      break;
+
+    case CallMember:
+      out << "call member";
       break;
 
     case TupleElement:

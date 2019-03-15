@@ -2966,6 +2966,41 @@ public:
     }
   }
 
+  void visitCallDecl(CallDecl *CD) {
+    TC.validateDecl(CD);
+
+    if (!CD->isInvalid()) {
+      checkGenericParams(CD->getGenericParams(), CD, TC);
+      TC.checkReferencedGenericParams(CD);
+      TC.checkProtocolSelfRequirements(CD);
+    }
+
+    checkAccessControl(TC, CD);
+
+    if (!checkOverrides(CD)) {
+      // If a method has an 'override' keyword but does not
+      // override anything, complain.
+      if (auto *OA = CD->getAttrs().getAttribute<OverrideAttr>()) {
+        if (!CD->getOverriddenDecl()) {
+          TC.diagnose(CD, diag::method_does_not_override)
+            .highlight(OA->getLocation());
+          OA->setInvalid();
+        }
+      }
+    }
+
+    if (requiresDefinition(CD) && !CD->hasBody()) {
+      // Complain if we should have a body.
+      TC.diagnose(CD->getLoc(), diag::func_decl_without_brace);
+    } else {
+      // Record the body.
+      TC.definedFunctions.push_back(CD);
+    }
+
+    if (CD->getAttrs().hasAttribute<DynamicReplacementAttr>())
+      TC.checkDynamicReplacementAttribute(CD);
+  }
+
   void visitModuleDecl(ModuleDecl *) { }
 
   void visitEnumCaseDecl(EnumCaseDecl *ECD) {
@@ -4117,6 +4152,30 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // Perform accessor-related validation.
     validateAbstractStorageDecl(*this, SD);
+
+    break;
+  }
+
+  case DeclKind::Call: {
+    auto *CD = cast<CallDecl>(D);
+    DeclValidationRAII IBV(CD);
+    validateGenericFuncSignature(CD);
+    CD->setSignatureIsValidated();
+    checkDeclAttributesEarly(CD);
+    validateAttributes(*this, CD);
+
+    auto *TyR = CD->getBodyResultTypeLoc().getTypeRepr();
+    if (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
+      auto &C = CD->getASTContext();
+      CD->getAttrs().add(
+          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+    }
+
+    // Member subscripts need some special validation logic.
+    if (CD->getDeclContext()->isTypeContext()) {
+      // If this is a class member, mark it final if the class is final.
+      inferFinalAndDiagnoseIfNeeded(*this, CD, StaticSpellingKind::None);
+    }
 
     break;
   }

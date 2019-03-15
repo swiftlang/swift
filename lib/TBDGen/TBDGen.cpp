@@ -460,6 +460,7 @@ static bool isValidProtocolMemberForTBDGen(const Decl *D) {
   case DeclKind::PatternBinding:
   case DeclKind::Func:
   case DeclKind::Accessor:
+  case DeclKind::Call:
   case DeclKind::Constructor:
   case DeclKind::Destructor:
   case DeclKind::IfConfig:

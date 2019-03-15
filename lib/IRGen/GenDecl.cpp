@@ -1717,6 +1717,9 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::Param:
     llvm_unreachable("there are no global function parameters");
 
+  case DeclKind::Call:
+    llvm_unreachable("there are no global callable methods");
+
   case DeclKind::Subscript:
     llvm_unreachable("there are no global subscript operations");
       
@@ -3665,6 +3668,7 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
       continue;
 
     case DeclKind::Var:
+    case DeclKind::Call:
     case DeclKind::Subscript:
     case DeclKind::PatternBinding:
     case DeclKind::Func:

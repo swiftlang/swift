@@ -74,6 +74,7 @@ EXPR_NODES = [
                        'IdentifierToken',
                        'SelfToken',
                        'CapitalSelfToken',
+                       'CallToken',
                        'DollarIdentifierToken',
                        'SpacedBinaryOperatorToken',
                    ]),

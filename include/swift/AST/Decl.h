@@ -54,6 +54,7 @@ namespace swift {
   struct ASTNode;
   class ASTPrinter;
   class ASTWalker;
+  class CallDecl;
   class ConstructorDecl;
   class DestructorDecl;
   class DiagnosticEngine;
@@ -137,6 +138,7 @@ enum class DescriptiveDeclKind : uint8_t {
   GenericStruct,
   GenericClass,
   GenericType,
+  Call,
   Subscript,
   Constructor,
   Destructor,
@@ -3296,6 +3298,21 @@ public:
                              ToStoredPropertyOrMissingMemberPlaceholder());
   }
 
+private:
+  /// Predicate used to filter CallDeclRange.
+  struct ToCallDecl {
+    ToCallDecl() {}
+    Optional<CallDecl *> operator()(Decl *decl) const;
+  };
+
+public:
+  /// A range for iterating the call declarations of a nominal type.
+  using CallDeclRange = OptionalTransformRange<DeclRange,
+                                               ToCallDecl>;
+
+  /// Return a collection of the call declarations of this nominal type.
+  CallDeclRange getCallDeclarations() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_NominalTypeDecl &&
@@ -5732,7 +5749,8 @@ public:
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Func ||
-           D->getKind() == DeclKind::Accessor;
+           D->getKind() == DeclKind::Accessor ||
+           D->getKind() == DeclKind::Call;
   }
   static bool classof(const AbstractFunctionDecl *D) {
     return classof(static_cast<const Decl*>(D));
@@ -5885,7 +5903,53 @@ AbstractStorageDecl::AccessorRecord::getAccessor(AccessorKind kind) const {
   }
   return nullptr;
 }
-  
+
+/// CallDecl - Declares a callable method for a type. For example:
+///
+/// \code
+/// struct Adder {
+///   var base: Int
+///   call(_ x: Int) -> Int {
+///      return base + x
+///   }
+/// }
+/// \endcode
+class CallDecl final : public FuncDecl {
+  CallDecl(DeclName fullName, SourceLoc declLoc, bool throws,
+           SourceLoc throwsLoc, unsigned numParameterLists,
+           GenericParamList *genericParams, DeclContext *parent)
+    : FuncDecl(DeclKind::Call,
+               /*staticLoc*/ SourceLoc(), StaticSpellingKind::None,
+               /*func loc*/ declLoc, /*name*/ fullName, /*name loc*/ declLoc,
+               throws, throwsLoc, numParameterLists, genericParams, parent) {}
+
+  static CallDecl *createImpl(ASTContext &ctx, DeclName fullName,
+                              SourceLoc declLoc, bool throws,
+                              SourceLoc throwsLoc,
+                              GenericParamList *genericParams,
+                              DeclContext *parent, ClangNode clangNode);
+
+public:
+  static CallDecl *create(ASTContext &ctx, DeclName fullName, SourceLoc declLoc,
+                          bool throws, SourceLoc throwsLoc,
+                          GenericParamList *genericParams,
+                          ParameterList *parameterList,
+                          TypeLoc fnRetType, DeclContext *parent,
+                          ClangNode clangNode = ClangNode());
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::Call;
+  }
+  static bool classof(const AbstractFunctionDecl *D) {
+    return classof(static_cast<const Decl*>(D));
+  }
+  static bool classof(const DeclContext *DC) {
+    if (auto D = DC->getAsDecl())
+      return classof(D);
+    return false;
+  }
+};
+
 /// This represents a 'case' declaration in an 'enum', which may declare
 /// one or more individual comma-separated EnumElementDecls.
 class EnumCaseDecl final : public Decl,
@@ -6775,6 +6839,13 @@ NominalTypeDecl::ToStoredPropertyOrMissingMemberPlaceholder
   return None;
 }
 
+inline Optional<CallDecl *>
+NominalTypeDecl::ToCallDecl::operator()(Decl *decl) const {
+  if (auto callDecl = dyn_cast<CallDecl>(decl))
+    return callDecl;
+  return None;
+}
+
 inline void
 AbstractStorageDecl::overwriteSetterAccess(AccessLevel accessLevel) {
   Accessors.setInt(accessLevel);
@@ -6808,6 +6879,7 @@ inline ParamDecl **AbstractFunctionDecl::getImplicitSelfDeclStorage() {
     return cast<DestructorDecl>(this)->getImplicitSelfDeclStorage();
   case DeclKind::Func:
   case DeclKind::Accessor:
+  case DeclKind::Call:
     return cast<FuncDecl>(this)->getImplicitSelfDeclStorage();
   }
 }
@@ -6816,11 +6888,12 @@ inline ParamDecl **FuncDecl::getImplicitSelfDeclStorage() {
   if (!hasImplicitSelfDecl())
     return nullptr;
 
-  if (!isa<AccessorDecl>(this)) {
-    assert(getKind() == DeclKind::Func && "no new kinds of functions");
-    return reinterpret_cast<ParamDecl **>(this+1);
-  }
-  return reinterpret_cast<ParamDecl **>(static_cast<AccessorDecl*>(this)+1);
+  if (isa<AccessorDecl>(this))
+    return reinterpret_cast<ParamDecl **>(static_cast<AccessorDecl *>(this)+1);
+  else if (isa<CallDecl>(this))
+    return reinterpret_cast<ParamDecl **>(static_cast<CallDecl *>(this)+1);
+  assert(getKind() == DeclKind::Func && "no new kinds of functions");
+  return reinterpret_cast<ParamDecl **>(this+1);
 }
 
 inline DeclIterator &DeclIterator::operator++() {

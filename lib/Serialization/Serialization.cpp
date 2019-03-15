@@ -1767,6 +1767,7 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::Var:
   case DeclKind::Param:
   case DeclKind::Func:
+  case DeclKind::Call:
   case DeclKind::Accessor:
     return true;
   }
@@ -3408,6 +3409,69 @@ void Serializer::writeDecl(const Decl *D) {
 
     break;
   }
+
+  // TODO: Revisit serialization.
+  // Create `CallLayout`? Not all fields from `FuncLayout` are necessary:
+  // `call` declarations cannot be static.
+  case DeclKind::Call: {
+    auto fn = cast<CallDecl>(D);
+    verifyAttrSerializable(fn);
+
+    auto contextID = addDeclContextRef(fn->getDeclContext());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[FuncLayout::Code];
+    SmallVector<IdentifierID, 4> nameComponentsAndDependencies;
+    nameComponentsAndDependencies.push_back(
+        addDeclBaseNameRef(fn->getFullName().getBaseName()));
+    for (auto argName : fn->getFullName().getArgumentNames())
+      nameComponentsAndDependencies.push_back(addDeclBaseNameRef(argName));
+
+    uint8_t rawAccessLevel = getRawStableAccessLevel(fn->getFormalAccess());
+    uint8_t rawDefaultArgumentResilienceExpansion =
+      getRawStableResilienceExpansion(
+          fn->getDefaultArgumentResilienceExpansion());
+
+    Type ty = fn->getInterfaceType();
+    for (auto dependency : collectDependenciesFromType(ty->getCanonicalType()))
+      nameComponentsAndDependencies.push_back(addTypeRef(dependency));
+
+    FuncLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                           contextID,
+                           fn->isImplicit(),
+                           fn->isStatic(),
+                           uint8_t(
+                             getStableStaticSpelling(fn->getStaticSpelling())),
+                           fn->isObjC(),
+                           uint8_t(
+                             getStableSelfAccessKind(fn->getSelfAccessKind())),
+                           fn->hasDynamicSelf(),
+                           fn->hasForcedStaticDispatch(),
+                           fn->hasThrows(),
+                           addGenericEnvironmentRef(
+                                                  fn->getGenericEnvironment()),
+                           addTypeRef(fn->getResultInterfaceType()),
+                           addDeclRef(fn->getOperatorDecl()),
+                           addDeclRef(fn->getOverriddenDecl()),
+                           fn->getFullName().getArgumentNames().size() +
+                             fn->getFullName().isCompoundName(),
+                           rawAccessLevel,
+                           fn->needsNewVTableEntry(),
+                           rawDefaultArgumentResilienceExpansion,
+                           nameComponentsAndDependencies);
+
+    writeGenericParams(fn->getGenericParams());
+
+    // Write the body parameters.
+    writeParameterList(fn->getParameters());
+
+    if (auto errorConvention = fn->getForeignErrorConvention())
+      writeForeignErrorConvention(*errorConvention);
+
+    writeInlinableBodyTextIfNeeded(fn);
+
+    break;
+  }
+
 
   case DeclKind::EnumElement: {
     auto elem = cast<EnumElementDecl>(D);

@@ -4847,19 +4847,26 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // non-function/non-metatype type, then we cannot call it!
   if (!isUnresolvedOrTypeVarType(fnType) &&
       !fnType->is<AnyFunctionType>() && !fnType->is<MetatypeType>()) {
-
     auto arg = callExpr->getArg();
+    auto isDynamicCallable =
+        CS.DynamicCallableCache[fnType->getCanonicalType()].isValid();
+
+    auto *nominal = fnType->getAnyNominal();
+    auto hasCallDecls = nominal &&
+        llvm::any_of(nominal->getMembers(), [](Decl *member) {
+          return isa<CallDecl>(member);
+        });
 
     // Diagnose @dynamicCallable errors.
-    if (CS.DynamicCallableCache[fnType->getCanonicalType()].isValid()) {
+    if (isDynamicCallable) {
       auto dynamicCallableMethods =
-        CS.DynamicCallableCache[fnType->getCanonicalType()];
+          CS.DynamicCallableCache[fnType->getCanonicalType()];
 
       // Diagnose dynamic calls with keywords on @dynamicCallable types that
       // don't define the `withKeywordArguments` method.
       if (auto tuple = dyn_cast<TupleExpr>(arg)) {
         bool hasArgLabel = llvm::any_of(
-          tuple->getElementNames(), [](Identifier i) { return !i.empty(); });
+            tuple->getElementNames(), [](Identifier i) { return !i.empty(); });
         if (hasArgLabel &&
             dynamicCallableMethods.keywordArgumentsMethods.empty()) {
           diagnose(callExpr->getFn()->getStartLoc(),
@@ -4894,7 +4901,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     // the line after the callee, then it's likely the user forgot to
     // write "do" before their brace stmt.
     // Note that line differences of more than 1 are diagnosed during parsing.
-    if (auto *PE = dyn_cast<ParenExpr>(arg))
+    if (auto *PE = dyn_cast<ParenExpr>(arg)) {
       if (PE->hasTrailingClosure() && isa<ClosureExpr>(PE->getSubExpr())) {
         auto *closure = cast<ClosureExpr>(PE->getSubExpr());
         auto &SM = CS.getASTContext().SourceMgr;
@@ -4903,11 +4910,13 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
             1 + SM.getLineNumber(callExpr->getFn()->getEndLoc()) ==
             SM.getLineNumber(closure->getStartLoc())) {
           diagnose(closure->getStartLoc(), diag::brace_stmt_suggest_do)
-            .fixItInsert(closure->getStartLoc(), "do ");
+          .fixItInsert(closure->getStartLoc(), "do ");
         }
       }
+    }
 
-    return true;
+    if (!isDynamicCallable && !hasCallDecls)
+      return true;
   }
   
   bool hasTrailingClosure = callArgHasTrailingClosure(callExpr->getArg());

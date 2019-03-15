@@ -97,6 +97,7 @@ enum class SyntaxStructureKind : uint8_t {
   EnumElement,
   TypeAlias,
   Subscript,
+  Call,
   AssociatedType,
   GenericTypeParam,
 

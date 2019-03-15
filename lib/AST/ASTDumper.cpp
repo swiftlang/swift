@@ -1054,6 +1054,12 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
+    void visitCallDecl(CallDecl *CD) {
+      printCommonAFD(CD, "call_decl");
+      printAbstractFunctionDecl(CD);
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
     void visitAccessorDecl(AccessorDecl *AD) {
       printCommonFD(AD, "accessor_decl");
       OS << " " << getAccessorKindString(AD->getAccessorKind());

@@ -1395,6 +1395,10 @@ bool irgen::requiresObjCMethodDescriptor(ConstructorDecl *constructor) {
   return constructor->isObjC();
 }
 
+bool irgen::requiresObjCMethodDescriptor(CallDecl *method) {
+  return method->isObjC();
+}
+
 bool irgen::requiresObjCPropertyDescriptor(IRGenModule &IGM,
                                            VarDecl *property) {
   // Don't generate a descriptor for a property without any accessors.

@@ -398,6 +398,7 @@ enum class CodeCompletionDeclKind {
   Constructor,
   Destructor,
   Subscript,
+  Call,
   StaticMethod,
   InstanceMethod,
   PrefixOperatorFunction,

@@ -120,6 +120,7 @@ static void toDisplayString(CodeCompletionResult *Result,
           continue;
 
         case CodeCompletionDeclKind::Subscript:
+        case CodeCompletionDeclKind::Call:
         case CodeCompletionDeclKind::StaticMethod:
         case CodeCompletionDeclKind::InstanceMethod:
         case CodeCompletionDeclKind::PrefixOperatorFunction:

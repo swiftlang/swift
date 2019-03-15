@@ -1931,6 +1931,9 @@ static diag::RequirementKind getRequirementKind(ValueDecl *VD) {
   if (isa<ConstructorDecl>(VD))
     return diag::RequirementKind::Constructor;
 
+  if (isa<CallDecl>(VD))
+    return diag::RequirementKind::Call;
+
   if (isa<FuncDecl>(VD))
     return diag::RequirementKind::Func;
 

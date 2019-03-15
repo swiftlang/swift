@@ -199,6 +199,9 @@ namespace irgen {
   /// True if the FuncDecl requires an ObjC method descriptor.
   bool requiresObjCMethodDescriptor(FuncDecl *method);
 
+  /// True if the CallDecl requires an ObjC method descriptor.
+  bool requiresObjCMethodDescriptor(CallDecl *method);
+
   /// True if the ConstructorDecl requires an ObjC method descriptor.
   bool requiresObjCMethodDescriptor(ConstructorDecl *constructor);
 

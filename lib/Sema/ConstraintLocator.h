@@ -85,6 +85,8 @@ public:
     MemberRefBase,
     /// The lookup for a subscript member.
     SubscriptMember,
+    /// The lookup for a call member.
+    CallMember,
     /// The lookup for a constructor member.
     ConstructorMember,
     /// An implicit @lvalue-to-inout conversion; only valid for operator
@@ -143,6 +145,7 @@ public:
     case MemberRefBase:
     case UnresolvedMember:
     case SubscriptMember:
+    case CallMember:
     case ConstructorMember:
     case LValueConversion:
     case RValueAdjustment:
@@ -207,6 +210,7 @@ public:
     case LValueConversion:
     case RValueAdjustment:
     case SubscriptMember:
+    case CallMember:
     case OpenedGeneric:
     case GenericParameter:
     case GenericArgument:

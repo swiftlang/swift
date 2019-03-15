@@ -7320,6 +7320,40 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     return finishApply(apply, openedType, locator);
   }
 
+  // Handle `call` method applications.
+  auto &ctx = cs.getASTContext();
+
+  TupleExpr *arg = dyn_cast<TupleExpr>(apply->getArg());
+  if (auto parenExpr = dyn_cast<ParenExpr>(apply->getArg()))
+    arg = TupleExpr::createImplicit(ctx, parenExpr->getSubExpr(), {});
+
+  // Get resolved `call` method and verify it.
+  auto loc = locator.withPathElement(ConstraintLocator::ApplyFunction);
+  auto selected = solution.getOverloadChoice(cs.getConstraintLocator(loc));
+  auto choice = selected.choice;
+  if (auto *method = dyn_cast<CallDecl>(selected.choice.getDecl())) {
+    bool isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
+    auto callDeclLocator = cs.getConstraintLocator(
+        locator.withPathElement(ConstraintLocator::ApplyFunction)
+        .withPathElement(ConstraintLocator::CallMember));
+    // Create direct reference to `call` method.
+    Expr *declRef = buildMemberRef(fn, selected.openedFullType,
+                                   /*dotLoc=*/SourceLoc(), choice,
+                                   DeclNameLoc(fn->getEndLoc()),
+                                   selected.openedType, locator,
+                                   callDeclLocator, /*Implicit=*/true,
+                                   choice.getFunctionRefKind(),
+                                   AccessSemantics::Ordinary, isDynamic);
+    if (!declRef)
+      return nullptr;
+    declRef->setImplicit(apply->isImplicit());
+    apply->setFn(declRef) ;
+    Expr *result = apply;
+    cs.TC.typeCheckExpression(result, cs.DC);
+    cs.cacheExprTypes(result);
+    return result;
+  }
+
   // Handle @dynamicCallable applications.
   // At this point, all other ApplyExpr cases have been handled.
   return finishApplyDynamicCallable(cs, solution, apply, locator);

@@ -1051,6 +1051,9 @@ NOTE(archetype_declared_in_type,none,
 NOTE(unbound_generic_parameter_explicit_fix,none,
      "explicitly specify the generic arguments to fix this issue", ())
 
+ERROR(missing_call_decl,none,
+      "%0 does not define 'call' declaration of type", (Type))
+
 ERROR(invalid_dynamic_callable_type,none,
       "@dynamicCallable attribute requires %0 to have either a valid "
       "'dynamicallyCall(withArguments:)' method or "
@@ -1765,8 +1768,8 @@ NOTE(inherited_protocol_does_not_conform,none,
      "type %0 does not conform to inherited protocol %1", (Type, Type))
 NOTE(no_witnesses,none,
      "protocol requires "
-     "%select{initializer %1|function %1|property %1|subscript}0 with type %2"
-     "%select{|; do you want to add a stub?}3",
+     "%select{initializer %1|function %1|property %1|subscript|'call' member}0 "
+     "with type %2%select{|; do you want to add a stub?}3",
      (RequirementKind, DeclName, Type, bool))
 NOTE(missing_witnesses_general,none, "do you want to add protocol stubs?",
      ())

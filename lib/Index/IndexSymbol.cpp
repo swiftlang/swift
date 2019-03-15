@@ -199,6 +199,10 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
       info.Kind = SymbolKind::InstanceProperty;
       info.SubKind = SymbolSubKind::SwiftSubscript;
       break;
+    case DeclKind::Call:
+      info.Kind = SymbolKind::InstanceProperty;
+      info.SubKind = SymbolSubKind::SwiftCall;
+      break;
     case DeclKind::Constructor:      info.Kind = SymbolKind::Constructor; break;
     case DeclKind::Destructor:       info.Kind = SymbolKind::Destructor; break;
     case DeclKind::Param:

@@ -1418,7 +1418,8 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
 
   switch (d->getKind()) {
   case DeclKind::Func:
-  case DeclKind::Accessor: {
+  case DeclKind::Accessor:
+  case DeclKind::Call: {
     emitFunction(cast<FuncDecl>(d));
     break;
   }

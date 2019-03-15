@@ -2361,6 +2361,22 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
         getCodeForAccessorKind(accessor->getAccessorKind()),
         accessor->getStorage(), accessor->isStatic());
   }
+  // Handle call declarations specially, they are mangled as modifiers on the
+  // accessed declaration.
+  if (auto callDecl = dyn_cast<CallDecl>(decl)) {
+    appendContextOf(decl);
+    bindGenericParameters(decl->getDeclContext());
+    appendDeclType(decl);
+    StringRef privateDiscriminator = getPrivateDiscriminatorIfNecessary(decl);
+    if (!privateDiscriminator.empty()) {
+      appendIdentifier(privateDiscriminator);
+      appendOperator("Ll");
+    }
+    appendOperator("fF");
+    if (callDecl->isStatic())
+      appendOperator("Z");
+    return;
+  }
 
   if (auto storageDecl = dyn_cast<AbstractStorageDecl>(decl))
     return appendAccessorEntity("p", storageDecl, decl->isStatic());

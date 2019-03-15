@@ -557,6 +557,8 @@ CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
     return CodeCompletionDeclKind::PrecedenceGroup;
   case DeclKind::EnumElement:
     return CodeCompletionDeclKind::EnumElement;
+  case DeclKind::Call:
+    return CodeCompletionDeclKind::Call;
   case DeclKind::Subscript:
     return CodeCompletionDeclKind::Subscript;
   }
@@ -598,6 +600,9 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
       break;
     case CodeCompletionDeclKind::Destructor:
       Prefix.append("[Destructor]");
+      break;
+    case CodeCompletionDeclKind::Call:
+      Prefix.append("[Call]");
       break;
     case CodeCompletionDeclKind::Subscript:
       Prefix.append("[Subscript]");
@@ -5398,6 +5403,7 @@ void swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
       case CodeCompletionDeclKind::Constructor:
       case CodeCompletionDeclKind::Destructor:
       case CodeCompletionDeclKind::Subscript:
+      case CodeCompletionDeclKind::Call:
       case CodeCompletionDeclKind::StaticMethod:
       case CodeCompletionDeclKind::InstanceMethod:
       case CodeCompletionDeclKind::PrefixOperatorFunction:
