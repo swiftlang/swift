@@ -316,6 +316,7 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
     llvm::DenseMap<Type, ArraySliceType*> ArraySliceTypes;
     llvm::DenseMap<std::pair<Type, Type>, DictionaryType *> DictionaryTypes;
     llvm::DenseMap<Type, OptionalType*> OptionalTypes;
+    llvm::DenseMap<Type, ParenType*> SimpleParenTypes; // Most are simple
     llvm::DenseMap<std::pair<Type, unsigned>, ParenType*> ParenTypes;
     llvm::DenseMap<uintptr_t, ReferenceStorageType*> ReferenceStorageTypes;
     llvm::DenseMap<Type, LValueType*> LValueTypes;
@@ -2094,6 +2095,7 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     llvm::capacity_in_bytes(ArraySliceTypes) +
     llvm::capacity_in_bytes(DictionaryTypes) +
     llvm::capacity_in_bytes(OptionalTypes) +
+    llvm::capacity_in_bytes(SimpleParenTypes) +
     llvm::capacity_in_bytes(ParenTypes) +
     llvm::capacity_in_bytes(ReferenceStorageTypes) +
     llvm::capacity_in_bytes(LValueTypes) +
@@ -3051,8 +3053,10 @@ ParenType *ParenType::get(const ASTContext &C, Type underlying,
   
   auto properties = underlying->getRecursiveProperties();
   auto arena = getArena(properties);
-  ParenType *&Result =
-      C.getImpl().getArena(arena).ParenTypes[{underlying, fl.toRaw()}];
+  auto flags = fl.toRaw();
+  ParenType *&Result = flags == 0
+      ? C.getImpl().getArena(arena).SimpleParenTypes[underlying]
+      : C.getImpl().getArena(arena).ParenTypes[{underlying, flags}];
   if (Result == nullptr) {
     Result = new (C, arena) ParenType(underlying,
                                       properties, fl);
