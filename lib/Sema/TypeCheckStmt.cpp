@@ -947,6 +947,75 @@ public:
     return S;
   }
 
+  void checkCaseLabelItem(CaseStmt *caseBlock, CaseLabelItem &labelItem,
+                          bool &limitExhaustivityChecks, Type subjectType) {
+    SWIFT_DEFER {
+      // Check the guard expression, if present.
+      if (auto *guard = labelItem.getGuardExpr()) {
+        limitExhaustivityChecks |= TC.typeCheckCondition(guard, DC);
+        labelItem.setGuardExpr(guard);
+      }
+    };
+
+    Pattern *pattern = labelItem.getPattern();
+    auto *newPattern = TC.resolvePattern(pattern, DC,
+                                         /*isStmtCondition*/ false);
+    if (!newPattern)
+      return;
+    pattern = newPattern;
+    // Coerce the pattern to the subject's type.
+    TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
+    if (!subjectType ||
+        TC.coercePatternToType(pattern, TypeResolution::forContextual(DC),
+                               subjectType, patternOptions)) {
+      limitExhaustivityChecks = true;
+
+      // If that failed, mark any variables binding pieces of the pattern
+      // as invalid to silence follow-on errors.
+      pattern->forEachVariable([&](VarDecl *VD) { VD->markInvalid(); });
+    }
+    labelItem.setPattern(pattern);
+
+    // For each variable in the pattern, make sure its type is identical to what
+    // it was in the first label item's pattern.
+    auto *firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
+    SmallVector<VarDecl *, 4> vars;
+    firstPattern->collectVariables(vars);
+    pattern->forEachVariable([&](VarDecl *vd) {
+      if (!vd->hasName())
+        return;
+      for (auto *expected : vars) {
+        if (expected->hasName() && expected->getName() == vd->getName()) {
+          if (vd->hasType() && expected->hasType() && !expected->isInvalid() &&
+              !vd->getType()->isEqual(expected->getType())) {
+            TC.diagnose(vd->getLoc(), diag::type_mismatch_multiple_pattern_list,
+                        vd->getType(), expected->getType());
+            vd->markInvalid();
+            expected->markInvalid();
+          }
+          if (expected->isLet() != vd->isLet()) {
+            auto diag = TC.diagnose(
+                vd->getLoc(), diag::mutability_mismatch_multiple_pattern_list,
+                vd->isLet(), expected->isLet());
+
+            VarPattern *foundVP = nullptr;
+            vd->getParentPattern()->forEachNode([&](Pattern *P) {
+              if (auto *VP = dyn_cast<VarPattern>(P))
+                if (VP->getSingleVar() == vd)
+                  foundVP = VP;
+            });
+            if (foundVP)
+              diag.fixItReplace(foundVP->getLoc(),
+                                expected->isLet() ? "let" : "var");
+            vd->markInvalid();
+            expected->markInvalid();
+          }
+          return;
+        }
+      }
+    });
+  }
+
   Stmt *visitSwitchStmt(SwitchStmt *switchStmt) {
     // Type-check the subject expression.
     Expr *subjectExpr = switchStmt->getSubjectExpr();
@@ -979,73 +1048,10 @@ public:
       FallthroughDest = std::next(i) == e ? nullptr : *std::next(i);
 
       for (auto &labelItem : caseBlock->getMutableCaseLabelItems()) {
-        // Resolve the pattern in the label.
-        Pattern *pattern = labelItem.getPattern();
-        if (auto *newPattern = TC.resolvePattern(pattern, DC,
-                                                 /*isStmtCondition*/false)) {
-          pattern = newPattern;
-          // Coerce the pattern to the subject's type.
-          TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
-          if (!subjectType ||
-              TC.coercePatternToType(pattern, TypeResolution::forContextual(DC),
-                                     subjectType, patternOptions)) {
-            limitExhaustivityChecks = true;
-
-            // If that failed, mark any variables binding pieces of the pattern
-            // as invalid to silence follow-on errors.
-            pattern->forEachVariable([&](VarDecl *VD) {
-              VD->markInvalid();
-            });
-          }
-          labelItem.setPattern(pattern);
-          
-          // For each variable in the pattern, make sure its type is identical to what it
-          // was in the first label item's pattern.
-          auto *firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
-          SmallVector<VarDecl *, 4> vars;
-          firstPattern->collectVariables(vars);
-          pattern->forEachVariable([&](VarDecl *vd) {
-            if (!vd->hasName())
-              return;
-            for (auto *expected : vars) {
-              if (expected->hasName() && expected->getName() == vd->getName()) {
-                if (vd->hasType() && expected->hasType() &&
-                    !expected->isInvalid() &&
-                    !vd->getType()->isEqual(expected->getType())) {
-                  TC.diagnose(vd->getLoc(),
-                              diag::type_mismatch_multiple_pattern_list,
-                              vd->getType(), expected->getType());
-                  vd->markInvalid();
-                  expected->markInvalid();
-                }
-                if (expected->isLet() != vd->isLet()) {
-                  auto diag = TC.diagnose(
-                      vd->getLoc(),
-                      diag::mutability_mismatch_multiple_pattern_list,
-                      vd->isLet(), expected->isLet());
-
-                  VarPattern *foundVP = nullptr;
-                  vd->getParentPattern()->forEachNode([&](Pattern *P) {
-                    if (auto *VP = dyn_cast<VarPattern>(P))
-                      if (VP->getSingleVar() == vd)
-                        foundVP = VP;
-                  });
-                  if (foundVP)
-                    diag.fixItReplace(foundVP->getLoc(),
-                                      expected->isLet() ? "let" : "var");
-                  vd->markInvalid();
-                  expected->markInvalid();
-                }
-                return;
-              }
-            }
-          });
-        }
-        // Check the guard expression, if present.
-        if (auto *guard = labelItem.getGuardExpr()) {
-          limitExhaustivityChecks |= TC.typeCheckCondition(guard, DC);
-          labelItem.setGuardExpr(guard);
-        }
+        // Resolve the pattern in our case label if it has not been resolved
+        // and check that our var decls follow invariants.
+        checkCaseLabelItem(caseBlock, labelItem, limitExhaustivityChecks,
+                           subjectType);
       }
 
       // Check restrictions on '@unknown'.
