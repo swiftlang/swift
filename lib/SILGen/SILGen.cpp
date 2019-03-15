@@ -1286,7 +1286,9 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
       auto impl = vd->getImplInfo();
       switch (kind) {
       case AccessorKind::Get:
-        return impl.getReadImpl() != ReadImplKind::Get;
+        return impl.getReadImpl() != ReadImplKind::Get &&
+               !(impl.getReadImpl() == ReadImplKind::Stored &&
+                 impl.getWriteImpl() == WriteImplKind::StoredWithObservers);
       case AccessorKind::Read:
         return impl.getReadImpl() != ReadImplKind::Read;
       case AccessorKind::Set:
