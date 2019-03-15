@@ -2074,14 +2074,10 @@ protocol ExistentialProto {
 
 func testExistential() {
   let _ = ExistentialProto.#^PROTOCOLTYPE_DOT_1^#
-// PROTOCOLTYPE_DOT_1: Begin completions, 5 items
+// PROTOCOLTYPE_DOT_1: Begin completions, 3 items
 // PROTOCOLTYPE_DOT_1-DAG: Keyword[self]/CurrNominal:          self[#ExistentialProto.Protocol#]; name=self
 // PROTOCOLTYPE_DOT_1-DAG: Keyword/CurrNominal:                Protocol[#ExistentialProto.Protocol#]; name=Protocol
 // PROTOCOLTYPE_DOT_1-DAG: Keyword/CurrNominal:                Type[#ExistentialProto.Type#]; name=Type
-// FIXME(SR-75, rdar://problem/21289579): These 2 are invalid: {
-// PROTOCOLTYPE_DOT_1-DAG: Decl[StaticMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: staticMethod()[#Void#]; name=staticMethod()
-// PROTOCOLTYPE_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: instanceMethod({#(self): ExistentialProto#})[#() -> Void#]; name=instanceMethod(self: ExistentialProto)
-// }
 // PROTOCOLTYPE_DOT_1: End completions
 
   let _ = ExistentialProto.Type.#^PROTOCOLTYPE_DOT_2^#
