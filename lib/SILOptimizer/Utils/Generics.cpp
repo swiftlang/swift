@@ -2527,6 +2527,8 @@ static const char *const KnownPrespecializations[] = {
 };
 
 bool swift::isKnownPrespecialization(StringRef SpecName) {
+  // Completely disable for now.
+#if false
   // TODO: Once there is an efficient API to check if
   // a given symbol is a specialization of a specific type,
   // use it instead. Doing demangling just for this check
@@ -2577,6 +2579,7 @@ bool swift::isKnownPrespecialization(StringRef SpecName) {
     }
   }
 
+#endif
   return false;
 }
 
