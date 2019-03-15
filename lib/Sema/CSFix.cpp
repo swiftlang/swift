@@ -384,3 +384,13 @@ MoveOutOfOrderArgument *MoveOutOfOrderArgument::create(
   return new (cs.getAllocator())
       MoveOutOfOrderArgument(cs, argIdx, prevArgIdx, bindings, locator);
 }
+
+bool AllowInaccessibleMember::diagnose(Expr *root, bool asNote) const {
+  return false;
+}
+
+AllowInaccessibleMember *
+AllowInaccessibleMember::create(ConstraintSystem &cs, ValueDecl *member,
+                                ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowInaccessibleMember(cs, member, locator);
+}
