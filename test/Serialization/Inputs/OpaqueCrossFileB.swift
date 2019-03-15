@@ -4,6 +4,6 @@ public struct FooImpl: Foo {
   public init() {}
 }
 
-public func anyFoo() -> __opaque Foo {
+public func anyFoo() -> some Foo {
   return FooImpl()
 }

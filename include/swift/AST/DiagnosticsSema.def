@@ -1502,7 +1502,7 @@ ERROR(opaque_type_invalid_constraint,none,
       "an 'opaque' type must specify only 'Any', 'AnyObject', protocols, "
       "and/or a base class", ())
 ERROR(inferred_opaque_type,none,
-      "property definition has inferred type %0, involving the '__opaque' "
+      "property definition has inferred type %0, involving the 'some' "
       "return type of another declaration", (Type))
 
 // Extensions

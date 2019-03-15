@@ -36,7 +36,7 @@ extension String: P {
   // -- conformance to O
   // CHECK-SAME:         @"get_witness_table S2i18opaque_result_type1OHpyHC
   // CHECK-SAME:  }>
-  func poo() -> __opaque O {
+  func poo() -> some O {
     return 0
   }
 }
@@ -52,7 +52,7 @@ public class C: P, Q {
   // -- conformance to O
   // CHECK-SAME:         @"get_witness_table S2i18opaque_result_type1OHpyHC
   // CHECK-SAME:  }>
-  func poo() -> __opaque O {
+  func poo() -> some O {
     return 0
   }
 
@@ -68,7 +68,7 @@ public class C: P, Q {
   // -- conformance to O2
   // CHECK-SAME:         @"get_witness_table S2i18opaque_result_type2O2HpyHC
   // CHECK-SAME:  }>
-  func qoo() -> __opaque O & O2 {
+  func qoo() -> some O & O2 {
     return 0
   }
 }
@@ -83,7 +83,7 @@ public class C: P, Q {
 // -- conformance to P
 // CHECK-SAME:         @"get_witness_table S2S18opaque_result_type1PHpyHC
 // CHECK-SAME:  }>
-func foo(x: String) -> __opaque P {
+func foo(x: String) -> some P {
   return x
 }
 
@@ -97,7 +97,7 @@ func foo(x: String) -> __opaque P {
 // -- conformance to Q
 // CHECK-SAME:         @"get_witness_table 18opaque_result_type1CCAcA1QHPyHC
 // CHECK-SAME:  }>
-func bar(y: C) -> __opaque Q {
+func bar(y: C) -> some Q {
   return y
 }
 
@@ -113,7 +113,7 @@ func bar(y: C) -> __opaque Q {
 // -- conformance to Q
 // CHECK-SAME:         @"get_witness_table 18opaque_result_type1PRzAA1QRzlxAaC
 // CHECK-SAME:  }>
-func baz<T: P & Q>(z: T) -> __opaque P & Q {
+func baz<T: P & Q>(z: T) -> some P & Q {
   return z
 }
 
