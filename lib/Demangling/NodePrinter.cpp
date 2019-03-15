@@ -2260,7 +2260,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << ")";
     return nullptr;
   case Node::Kind::OpaqueReturnType:
-    Printer << "__opaque";
+    Printer << "some";
     return nullptr;
   case Node::Kind::OpaqueReturnTypeOf:
     Printer << "<<opaque return type of ";
