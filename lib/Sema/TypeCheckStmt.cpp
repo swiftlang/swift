@@ -969,14 +969,12 @@ public:
       TC.typeCheckDecl(node.get<Decl *>());
     }
 
-    auto cases = switchStmt->getCases();
     CaseStmt *previousBlock = nullptr;
-    for (auto i = cases.begin(), e = cases.end(); i != e; ++i) {
-      auto *caseBlock = *i;
+    for (auto *caseBlock : switchStmt->getCases()) {
       // Fallthrough transfers control to the next case block. In the
       // final case block, it is invalid.
       FallthroughSource = caseBlock;
-      FallthroughDest = std::next(i) == e ? nullptr : *std::next(i);
+      FallthroughDest = caseBlock->getFallthroughDest().getPtrOrNull();
 
       for (auto &labelItem : caseBlock->getMutableCaseLabelItems()) {
         // Resolve the pattern in the label.
