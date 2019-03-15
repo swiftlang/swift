@@ -4667,18 +4667,31 @@ public:
   /// returns null.
   ///
   Pattern *getParentPattern() const;
-  
+
   /// Return the statement that owns the pattern associated with this VarDecl,
   /// if one exists.
+  ///
+  /// NOTE: After parsing and before type checking, all VarDecls from
+  /// CaseLabelItem's Patterns return their CaseStmt. After type checking, we
+  /// will have constructed the CaseLabelItem VarDecl linked list implying this
+  /// will return nullptr. After type checking, if one wishes to find a parent
+  /// pattern of a VarDecl of a CaseStmt, \see getRecursiveParentPatternStmt
+  /// instead.
   Stmt *getParentPatternStmt() const {
     if (!Parent)
       return nullptr;
     return Parent.dyn_cast<Stmt *>();
   }
+
   void setParentPatternStmt(Stmt *s) {
     assert(s);
     Parent = s;
   }
+
+  /// Look for the parent pattern stmt of this var decl, recursively
+  /// looking through var decl pointers and then through any
+  /// fallthroughts.
+  Stmt *getRecursiveParentPatternStmt() const;
 
   /// Returns the var decl that this var decl is an implicit reference to if
   /// such a var decl exists.
@@ -4694,6 +4707,12 @@ public:
     assert(v);
     Parent = v;
   }
+
+  /// If this is a VarDecl that does not belong to a CaseLabelItem's pattern,
+  /// return this. Otherwise, this VarDecl must belong to a CaseStmt's
+  /// CaseLabelItem. In that case, return the first case label item of the first
+  /// case stmt in a sequence of case stmts that fallthrough into each other.
+  VarDecl *getCanonicalVarDecl() const;
 
   /// True if the global stored property requires lazy initialization.
   bool isLazilyInitializedGlobal() const;
