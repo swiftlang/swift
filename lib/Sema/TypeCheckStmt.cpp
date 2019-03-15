@@ -1909,10 +1909,8 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
   // FIXME: FIXME_NOW: DETERMINE: What is the appropriate place for this code to
   //        live?
   if (FD->hasSingleExpressionBody()) {
-    auto fnTypeLoc = FD->getBodyResultTypeLoc();
-    auto fnType = fnTypeLoc.getType();
-    auto returnStmt = cast<ReturnStmt>(BS->getElement(0).get<Stmt *>());
-    auto E = returnStmt->getResult();
+    auto resultTypeLoc = FD->getBodyResultTypeLoc();
+    auto E = FD->getSingleExpressionBody();
 
     // FIXME: FIXME_NOW: DETERMINE: Does this actually need to be here?  It's 
     //        being done for closures, but there may be a reason that applies
@@ -1922,7 +1920,7 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
     //             FD->setSingleExpressionBody(E);
     //           }
 
-    if (fnTypeLoc.isNull() || fnType->isVoid()) {
+    if (resultTypeLoc.isNull() || resultTypeLoc.getType()->isVoid()) {
       BS->setElement(0, E);
     } else {
       // FIXME: FIXME_NOW: DETERMINE: Is this the appropriate mechanism to use
@@ -1937,7 +1935,7 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
         auto &solutionCS = solution.getConstraintSystem();
         Type exprType = solution.simplifyType(solutionCS.getType(E));
         if (!exprType.isNull() && exprType->isUninhabited() &&
-            exprType->getCanonicalType() != fnType->getCanonicalType()) {
+            exprType->getCanonicalType() != resultTypeLoc.getType()->getCanonicalType()) {
           BS->setElement(0, E);
         }
       }
