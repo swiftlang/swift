@@ -17,7 +17,8 @@
 //
 // An ASTScope (hereafter "scope") defines a contiguous region of source code
 // with a uniform context for lookup. In other words, every symbolic reference
-// within a scope will be resolved by examinine the same set of definitions.
+// within a scope (but not in its children) will be resolved by examinine the
+// same set of definitions.
 // Each scope "knows" how to look up the symbols mentioned within it.
 //
 // Scopes form an ordered tree that respects source locations:
@@ -26,9 +27,10 @@
 // 2. The child scopes of any parent scope must have disjoint source ranges and
 // they must be ordered in source order.
 //
-// The scope tree implies nothing about the locus of name resolution. For
-// example, a child scope may lookup symbols in a completely different place
-// than its parent. Swift is not stricly lexical.
+// In Swift, lookup is a combination of lexical nesting and type-based lookup.
+// For example, an identifier in a method may resolve to either a file-private
+// variable or an instance variable in a superclass. The scope tree
+// attempts to capture the lexical portion of lookup.
 //
 // Each scope may also have local bindings. These are definitions occuring
 // within that scope.
