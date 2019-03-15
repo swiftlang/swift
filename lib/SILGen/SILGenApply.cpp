@@ -3357,15 +3357,7 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
 
         auto pbd = var->getParentPatternBinding();
         auto entry = pbd->getPatternEntryForVarDecl(var);
-
-        SubstitutionMap subs;
-        auto *genericEnv = ctor->getGenericEnvironmentOfContext();
-        auto typeGenericSig = 
-          var->getDeclContext()->getGenericSignatureOfContext();
-
-        if (genericEnv && typeGenericSig) {
-          subs = info.defaultArgsOwner.getSubstitutions();
-        }
+        auto subs = info.defaultArgsOwner.getSubstitutions();
 
         value = SGF.emitApplyOfStoredPropertyInitializer(info.loc,
                                                          entry, subs,

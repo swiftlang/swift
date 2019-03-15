@@ -1679,7 +1679,7 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
   // to nil literal. This is useful when we need to print the constructor.
   // Note, this will always be the sugared T? because we don't default init an
   // explicit Optional<T>.
-  if (isa<OptionalType>(var->getType().getPointer()) &&
+  if (isa<OptionalType>(var->getValueInterfaceType().getPointer()) &&
       !var->getParentInitializer())
     arg->setDefaultArgumentKind(DefaultArgumentKind::NilLiteral);
 }
