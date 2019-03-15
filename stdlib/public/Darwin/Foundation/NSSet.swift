@@ -78,7 +78,7 @@ extension Set : _ObjectiveCBridgeable {
       var set = Set(minimumCapacity: s.count)
       s.enumerateObjects({ (anyMember: Any, _) in
         // FIXME: Log a warning if `member` is already in the set.
-        set.insert(anyMember as AnyObject as! Element)
+        set.insert(anyMember as! Element)
       })
       result = set
       return
@@ -88,7 +88,7 @@ extension Set : _ObjectiveCBridgeable {
     // an NSSet.
     var builder = _SetBuilder<Element>(count: s.count)
     s.enumerateObjects({ (anyMember: Any, _) in
-      builder.add(member: anyMember as AnyObject as! Element)
+      builder.add(member: anyMember as! Element)
     })
     result = builder.take()
   }

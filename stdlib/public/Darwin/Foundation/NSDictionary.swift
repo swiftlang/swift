@@ -222,11 +222,9 @@ extension Dictionary : _ObjectiveCBridgeable {
     if keyStride < objectStride || valueStride < objectStride {
       var builder = _DictionaryBuilder<Key, Value>(count: d.count)
       d.enumerateKeysAndObjects({ (anyKey: Any, anyValue: Any, _) in
-        let anyObjectKey = anyKey as AnyObject
-        let anyObjectValue = anyValue as AnyObject
         builder.add(
-          key: anyObjectKey as! Key,
-          value: anyObjectValue as! Value)
+          key: anyKey as! Key,
+          value: anyValue as! Value)
       })
       result = builder.take()
     } else {
