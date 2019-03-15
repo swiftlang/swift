@@ -1,7 +1,7 @@
 // This file is also used by witness_tables_serialized_import.swift.
 
 // RUN: %target-swift-emit-silgen %s | %FileCheck -check-prefix CHECK -check-prefix CHECK-NONRESILIENT %s
-// RUN: %target-swift-emit-silgen -enable-resilience %s | %FileCheck -check-prefix CHECK -check-prefix CHECK-RESILIENT %s
+// RUN: %target-swift-emit-silgen -enable-library-evolution %s | %FileCheck -check-prefix CHECK -check-prefix CHECK-RESILIENT %s
 
 public protocol PublicProtocol {}
 
