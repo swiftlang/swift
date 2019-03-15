@@ -44,6 +44,20 @@ Swift Next
 Swift 5.1
 ---------
 
+* [SE-0244][]:
+
+  Functions can now hide their concrete return type by declaring what protocols
+  it conforms to instead of specifying the exact return type:
+
+  ```
+  func makeMeACollection() -> some Collection {
+    return [1, 2, 3]
+  }
+  ```
+
+  Code that calls the function can use the interface of the protocol, but
+  does not have visibility into the underlying type.
+
 * [SE-0256][]:
 
   Subscripts can now be declared `static` or (inside classes) `class`.
