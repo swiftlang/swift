@@ -670,7 +670,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
 /// parseTypeSimpleOrComposition
 ///
 ///   type-composition:
-///     '__opaque'? type-simple
+///     'some'? type-simple
 ///     type-composition '&' type-simple
 ParserResult<TypeRepr>
 Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
@@ -681,7 +681,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
   SourceLoc opaqueLoc;
   if (Context.LangOpts.EnableOpaqueResultTypes
       && Tok.is(tok::identifier)
-      && Tok.getRawText() == "__opaque") {
+      && Tok.getRawText() == "some") {
     opaqueLoc = consumeToken();
   }
   
@@ -741,10 +741,10 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
       consumeToken(); // consume '&'
     }
     
-    // Diagnose invalid `__opaque` after an ampersand.
+    // Diagnose invalid `some` after an ampersand.
     if (Context.LangOpts.EnableOpaqueResultTypes
         && Tok.is(tok::identifier)
-        && Tok.getRawText() == "__opaque") {
+        && Tok.getRawText() == "some") {
       auto badLoc = consumeToken();
       
       // TODO: Fixit to move to beginning of composition.
@@ -894,7 +894,7 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
 ///   type-tuple-body:
 ///     type-tuple-element (',' type-tuple-element)* '...'?
 ///   type-tuple-element:
-///     identifier ':' type
+///     identifier? identifier ':' type
 ///     type
 ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
   SyntaxParsingContext TypeContext(SyntaxContext, SyntaxKind::TupleType);
@@ -928,16 +928,20 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
       Backtracking.emplace(*this);
       ObsoletedInOutLoc = consumeToken(tok::kw_inout);
     }
+                                    
+    // If the label is "some", this could end up being an opaque type
+    // description if there's `some <identifier>` without a following colon,
+    // so we may need to backtrack as well.
+    if (Tok.getText().equals("some")) {
+      Backtracking.emplace(*this);
+    }
 
     // If the tuple element starts with a potential argument label followed by a
     // ':' or another potential argument label, then the identifier is an
     // element tag, and it is followed by a type annotation.
-    if (Tok.canBeArgumentLabel() &&
-        (peekToken().is(tok::colon) || peekToken().canBeArgumentLabel())) {
-      if (Backtracking)
-        // Found obsoleted 'inout' use.
-        Backtracking->cancelBacktrack();
-
+    if (Tok.canBeArgumentLabel()
+        && (peekToken().is(tok::colon)
+            || peekToken().canBeArgumentLabel())) {
       // Consume a name.
       element.NameLoc = consumeArgumentLabel(element.Name);
 
@@ -946,8 +950,19 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
         element.SecondNameLoc = consumeArgumentLabel(element.SecondName);
 
       // Consume the ':'.
-      if (!consumeIf(tok::colon, element.ColonLoc))
-        diagnose(Tok, diag::expected_parameter_colon);
+      if (consumeIf(tok::colon, element.ColonLoc)) {
+        // If we succeed, then we successfully parsed a label.
+        if (Backtracking)
+          Backtracking->cancelBacktrack();
+      // Otherwise, if we can't backtrack to parse this as a type,
+      // this is a syntax error.
+      } else {
+        if (!Backtracking) {
+          diagnose(Tok, diag::expected_parameter_colon);
+        }
+        element.NameLoc = SourceLoc();
+        element.SecondNameLoc = SourceLoc();
+      }
 
     } else if (Backtracking) {
       // If we don't have labels, 'inout' is not a obsoleted use.

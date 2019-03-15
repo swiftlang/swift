@@ -166,9 +166,9 @@ public:
           getRawText().equals("__owned"))
         return false;
       
-      // ...or __opaque
-      if (getRawText().equals("__opaque"))
-        return false;
+/*      // ...or some
+      if (getRawText().equals("some"))
+        return false;*/
 
       return true;
     }

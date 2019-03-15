@@ -14,45 +14,45 @@ class D: C, P, Q { func paul() {}; func priscilla() {}; func quinn() {} }
 
 // TODO: Should be valid
 
-let foo: __opaque P = 1 // FIXME expected-error{{'opaque' types are only implemented}}
-var computedFoo: __opaque P {  // FIXME expected-error{{'opaque' types are only implemented}}
+let foo: some P = 1 // FIXME expected-error{{'opaque' types are only implemented}}
+var computedFoo: some P {  // FIXME expected-error{{'opaque' types are only implemented}}
   get { return 1 }
   set { _ = newValue + 1 }
 }
 struct SubscriptTest {
-  subscript(_ x: Int) -> __opaque P { // expected-error{{'opaque' types are only implemented}}
+  subscript(_ x: Int) -> some P { // expected-error{{'opaque' types are only implemented}}
     return x
   }
 }
 
-func bar() -> __opaque P {
+func bar() -> some P {
   return 1
 }
-func bas() -> __opaque P & Q {
+func bas() -> some P & Q {
   return 1
 }
-func zim() -> __opaque C {
+func zim() -> some C {
   return D()
 }
-func zang() -> __opaque C & P & Q {
+func zang() -> some C & P & Q {
   return D()
 }
-func zung() -> __opaque AnyObject {
+func zung() -> some AnyObject {
   return D()
 }
-func zoop() -> __opaque Any {
+func zoop() -> some Any {
   return D()
 }
-func zup() -> __opaque Any & P {
+func zup() -> some Any & P {
   return D()
 }
-func zip() -> __opaque AnyObject & P {
+func zip() -> some AnyObject & P {
   return D()
 }
-func zorp() -> __opaque Any & C & P {
+func zorp() -> some Any & C & P {
   return D()
 }
-func zlop() -> __opaque C & AnyObject & P {
+func zlop() -> some C & AnyObject & P {
   return D()
 }
 
@@ -64,41 +64,41 @@ struct Test {
   let inferredOpaqueStructural2 = (bar(), bas()) // expected-error{{inferred type}}
 }
 
-//let zingle = {() -> __opaque P in 1 } // FIXME ex/pected-error{{'opaque' types are only implemented}}
+//let zingle = {() -> some P in 1 } // FIXME ex/pected-error{{'opaque' types are only implemented}}
 
 // Invalid positions
 
-typealias Foo = __opaque P // expected-error{{'opaque' types are only implemented}}
+typealias Foo = some P // expected-error{{'opaque' types are only implemented}}
 
-func blibble(blobble: __opaque P) {} // expected-error{{'opaque' types are only implemented}}
+func blibble(blobble: some P) {} // expected-error{{'opaque' types are only implemented}}
 
-let blubble: () -> __opaque P = { 1 } // expected-error{{'opaque' types are only implemented}}
+let blubble: () -> some P = { 1 } // expected-error{{'opaque' types are only implemented}}
 
-func blib() -> P & __opaque Q { return 1 } // expected-error{{'opaque' should appear at the beginning}}
-func blab() -> (P, __opaque Q) { return (1, 2) } // expected-error{{'opaque' types are only implemented}}
-func blob() -> (__opaque P) -> P { return { $0 } } // expected-error{{'opaque' types are only implemented}}
-func blorb<T: __opaque P>(_: T) { } // expected-error{{'opaque' types are only implemented}}
-func blub<T>() -> T where T == __opaque P { return 1 } // expected-error{{'opaque' types are only implemented}} expected-error{{cannot convert}}
+func blib() -> P & some Q { return 1 } // expected-error{{'opaque' should appear at the beginning}}
+func blab() -> (P, some Q) { return (1, 2) } // expected-error{{'opaque' types are only implemented}}
+func blob() -> (some P) -> P { return { $0 } } // expected-error{{'opaque' types are only implemented}}
+func blorb<T: some P>(_: T) { } // expected-error{{'opaque' types are only implemented}}
+func blub<T>() -> T where T == some P { return 1 } // expected-error{{'opaque' types are only implemented}} expected-error{{cannot convert}}
 
-protocol OP: __opaque P {} // expected-error{{'opaque' types are only implemented}}
+protocol OP: some P {} // expected-error{{'opaque' types are only implemented}}
 
-func foo() -> __opaque P {
-  let x = (__opaque P).self // expected-error*{{}}
+func foo() -> some P {
+  let x = (some P).self // expected-error*{{}}
   return 1
 }
 
 // Invalid constraints
 
-let zug: __opaque Int = 1 // FIXME expected-error{{'opaque' types are only implemented}}
-let zwang: __opaque () = () // FIXME expected-error{{'opaque' types are only implemented}}
-let zwoggle: __opaque (() -> ()) = {} // FIXME expected-error{{'opaque' types are only implemented}}
+let zug: some Int = 1 // FIXME expected-error{{'opaque' types are only implemented}}
+let zwang: some () = () // FIXME expected-error{{'opaque' types are only implemented}}
+let zwoggle: some (() -> ()) = {} // FIXME expected-error{{'opaque' types are only implemented}}
 
 // Type-checking of expressions of opaque type
 
-func alice() -> __opaque P { return 1 }
-func bob() -> __opaque P { return 1 }
+func alice() -> some P { return 1 }
+func bob() -> some P { return 1 }
 
-func grace<T: P>(_ x: T) -> __opaque P { return x }
+func grace<T: P>(_ x: T) -> some P { return x }
 
 func typeIdentity() {
   do {
@@ -157,16 +157,16 @@ func typeIdentity() {
   }
 }
 
-func recursion(x: Int) -> __opaque P {
+func recursion(x: Int) -> some P {
   if x == 0 {
     return 0
   }
   return recursion(x: x - 1)
 }
 
-func noReturnStmts() -> __opaque P { fatalError() } // expected-error{{no return statements}}
+func noReturnStmts() -> some P { fatalError() } // expected-error{{no return statements}}
 
-func mismatchedReturnTypes(_ x: Bool, _ y: Int, _ z: String) -> __opaque P { // expected-error{{do not have matching underlying types}}
+func mismatchedReturnTypes(_ x: Bool, _ y: Int, _ z: String) -> some P { // expected-error{{do not have matching underlying types}}
   if x {
     return y // expected-note{{underlying type 'Int'}}
   } else {
@@ -174,10 +174,10 @@ func mismatchedReturnTypes(_ x: Bool, _ y: Int, _ z: String) -> __opaque P { // 
   }
 }
 
-func jan() -> __opaque P {
+func jan() -> some P {
   return [marcia(), marcia(), marcia()]
 }
-func marcia() -> __opaque P {
+func marcia() -> some P {
   return [marcia(), marcia(), marcia()] // expected-error{{defines the opaque type in terms of itself}}
 }
 
@@ -195,14 +195,14 @@ extension Int: R {
   func r_in(_: String) {}
 }
 
-func candace() -> __opaque R {
+func candace() -> some R {
   return 0
 }
-func doug() -> __opaque R {
+func doug() -> some R {
   return 0
 }
 
-func gary<T: R>(_ x: T) -> __opaque R {
+func gary<T: R>(_ x: T) -> some R {
   return x
 }
 
@@ -248,7 +248,7 @@ func associatedTypeIdentity() {
 /* TODO: diagnostics
 struct DoesNotConform {}
 
-func doesNotConform() -> __opaque P {
+func doesNotConform() -> some P {
   return DoesNotConform()
 }
 */

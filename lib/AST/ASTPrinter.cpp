@@ -4157,7 +4157,7 @@ public:
   
   void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T) {
     // TODO(opaque): present opaque types with user-facing syntax
-    Printer << "(__opaque " << T->getOpaqueDecl()->getNamingDecl()->printRef();
+    Printer << "(some " << T->getOpaqueDecl()->getNamingDecl()->printRef();
     if (!T->getSubstitutions().empty()) {
       Printer << '<';
       auto replacements = T->getSubstitutions().getReplacementTypes();
