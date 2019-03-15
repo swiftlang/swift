@@ -1016,6 +1016,36 @@ public:
     });
   }
 
+  void checkUnknownAttrRestrictions(CaseStmt *caseBlock,
+                                    bool &limitExhaustivityChecks) {
+    if (caseBlock->getCaseLabelItems().size() != 1) {
+      assert(!caseBlock->getCaseLabelItems().empty() &&
+             "parser should not produce case blocks with no items");
+      TC.diagnose(caseBlock->getLoc(), diag::unknown_case_multiple_patterns)
+          .highlight(caseBlock->getCaseLabelItems()[1].getSourceRange());
+      limitExhaustivityChecks = true;
+    }
+
+    if (FallthroughDest != nullptr) {
+      if (!caseBlock->isDefault())
+        TC.diagnose(caseBlock->getLoc(), diag::unknown_case_must_be_last);
+      limitExhaustivityChecks = true;
+    }
+
+    const auto &labelItem = caseBlock->getCaseLabelItems().front();
+    if (labelItem.getGuardExpr() && !labelItem.isDefault()) {
+      TC.diagnose(labelItem.getStartLoc(), diag::unknown_case_where_clause)
+          .highlight(labelItem.getGuardExpr()->getSourceRange());
+    }
+
+    const Pattern *pattern =
+        labelItem.getPattern()->getSemanticsProvidingPattern();
+    if (!isa<AnyPattern>(pattern)) {
+      TC.diagnose(labelItem.getStartLoc(), diag::unknown_case_must_be_catchall)
+          .highlight(pattern->getSourceRange());
+    }
+  }
+
   Stmt *visitSwitchStmt(SwitchStmt *switchStmt) {
     // Type-check the subject expression.
     Expr *subjectExpr = switchStmt->getSubjectExpr();
@@ -1056,35 +1086,7 @@ public:
 
       // Check restrictions on '@unknown'.
       if (caseBlock->hasUnknownAttr()) {
-        if (caseBlock->getCaseLabelItems().size() != 1) {
-          assert(!caseBlock->getCaseLabelItems().empty() &&
-                 "parser should not produce case blocks with no items");
-          TC.diagnose(caseBlock->getLoc(),
-                      diag::unknown_case_multiple_patterns)
-            .highlight(caseBlock->getCaseLabelItems()[1].getSourceRange());
-          limitExhaustivityChecks = true;
-        }
-
-        if (FallthroughDest != nullptr) {
-          if (!caseBlock->isDefault())
-            TC.diagnose(caseBlock->getLoc(), diag::unknown_case_must_be_last);
-          limitExhaustivityChecks = true;
-        }
-
-        const auto &labelItem = caseBlock->getCaseLabelItems().front();
-        if (labelItem.getGuardExpr() && !labelItem.isDefault()) {
-          TC.diagnose(labelItem.getStartLoc(),
-                      diag::unknown_case_where_clause)
-            .highlight(labelItem.getGuardExpr()->getSourceRange());
-        }
-
-        const Pattern *pattern =
-            labelItem.getPattern()->getSemanticsProvidingPattern();
-        if (!isa<AnyPattern>(pattern)) {
-          TC.diagnose(labelItem.getStartLoc(),
-                      diag::unknown_case_must_be_catchall)
-            .highlight(pattern->getSourceRange());
-        }
+        checkUnknownAttrRestrictions(caseBlock, limitExhaustivityChecks);
       }
 
       // If the previous case fellthrough, similarly check that that case's bindings
