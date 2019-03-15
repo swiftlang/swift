@@ -135,10 +135,10 @@ public func useFoo(x: String, y: C) {
   pqb.baz()
 }
 
-// CHECK-LABEL: define {{.*}} @"$s18opaque_result_type3baz1zQrx_tAA1PRzAA1QRzlFQOyAA1CCQo1BQaMa"
+// CHECK-LABEL: define {{.*}} @"$s18opaque_result_type3baz1zQrx_tAA1PRzAA1QRzlFQOyAA1CCQo_1BQaMa"
 // CHECK: call swiftcc i8** @swift_getOpaqueTypeConformance(i8* {{.*}}, %swift.type_descriptor*  {{.*}} [[DESCRIPTOR:@"\$s18opaque_result_type3baz1zQrx_tAA1PRzAA1QRzlFQOMQ"]] {{.*}}, i64 1)
 // CHECK: call swiftcc %swift.metadata_response @swift_getOpaqueTypeMetadata(i64 255, i8* {{.*}}, %swift.type_descriptor* {{.*}} [[DESCRIPTOR]] {{.*}})
 // CHECK: call swiftcc %swift.metadata_response @swift_getAssociatedTypeWitness
 
 // CHECK-LABEL: define {{.*}} @"$sSS18opaque_result_type1PAA1AAaBP_AA1OPWT"
-// CHECK: call swiftcc i8** @swift_getOpaqueTypeConformance(i8* {{.*}}, %swift.type_descriptor* {{.*}} [[DESCRIPTOR:@"\$sSS18opaque_result_typeE3pooQryFQOMQ"]] {{.*}}, i64 0)
+// CHECK: call swiftcc i8** @swift_getOpaqueTypeConformance(i8* {{.*}}, %swift.type_descriptor* {{.*}} [[DESCRIPTOR:@"\$sSS18opaque_result_typeE3pooQryFQOMQ"]] {{.*}}, i64 1)
