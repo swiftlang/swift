@@ -4287,6 +4287,8 @@ ERROR(property_behavior_unwrap_not_declaration, none,
   ())
 ERROR(property_behavior_extra_suppress_unwrap, none,
       "extraneous unwrap suppression operator '^'", ())
+ERROR(property_behavior_cyclic, none,
+      "cyclic property behavior definition: %0", (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

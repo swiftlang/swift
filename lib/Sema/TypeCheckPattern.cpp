@@ -973,11 +973,38 @@ SmallVector<VarDecl *, 2>
 TypeChecker::getPropertyBehaviorUnwrapPath(VarDecl *var) {
   SmallVector<VarDecl *, 2> unwrappedProperties;
 
-  // FIXME: Detect recursive property behavior definitions.
   VarDecl *currentVar = var;
+  SmallPtrSet<VarDecl *, 8> known;
   while (auto nextVar = getPropertyBehaviorUnwrapProperty(currentVar)) {
     unwrappedProperties.push_back(nextVar);
     currentVar = nextVar;
+
+    // If we've already seen this variable, we have a cyclic property
+    // behavior. Diagnose the cycle.
+    if (!known.insert(nextVar).second) {
+      std::string cyclicPath;
+      {
+        llvm::raw_string_ostream out(cyclicPath);
+        interleave(unwrappedProperties.begin(), unwrappedProperties.end(),
+                   [&](VarDecl *var) {
+                     auto nominal =
+                       var->getDeclContext()->getSelfNominalTypeDecl();
+                     if (nominal) {
+                       SmallString<16> scratch;
+                       out << "'" << nominal->getFullName().getString(scratch)
+                           << "'";
+                     } else {
+                       out << "<<error>>";
+                     }
+                   },
+                   [&] { out << " -> "; });
+      }
+      var->diagnose(diag::property_behavior_cyclic, cyclicPath);
+
+      // Remnove the redundant property.
+      unwrappedProperties.pop_back();
+      break;
+    }
   }
 
   return unwrappedProperties;

@@ -166,3 +166,29 @@ func testExtraUnwraps() {
   // expected-error@-2{{extraneous unwrap suppression operator '^'}}{{13-14=}}
 }
 
+class SelfRecursiveBehavior<T> {
+  init() { }
+  var value: T by property_behaviors.SelfRecursiveBehavior // expected-error{{'SelfRecursiveBehavior' -> 'SelfRecursiveBehavior'}}
+}
+
+class RecursiveBehavior1<T> {
+  init() { }
+  var value: T by RecursiveBehavior2
+}
+
+class RecursiveBehavior2<T> {
+  init() { }
+  var value: T by RecursiveBehavior3 // expected-error{{cyclic property behavior definition: 'RecursiveBehavior3' -> 'RecursiveBehavior1' -> 'RecursiveBehavior2' -> 'RecursiveBehavior3'}}
+}
+
+class RecursiveBehavior3<T> {
+  init() { }
+  var value: T by RecursiveBehavior1
+}
+
+func testRecursive(selfRecursive: SelfRecursiveBehavior<Int>,
+                   recursive2: RecursiveBehavior2<Int>) {
+  // FIXME: Shouldn't need these to trigger warning.
+  _ = selfRecursive.value
+  _ = recursive2.value
+}
