@@ -2864,7 +2864,7 @@ llvm::Constant *IRGenModule::emitFieldDescriptors() {
     break;
   case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
-    sectionName = ".swift5_fieldmd";
+    sectionName = ".sw5flmd$B";
     break;
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("Don't know how to emit field records table for "
