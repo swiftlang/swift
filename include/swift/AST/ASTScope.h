@@ -13,6 +13,26 @@
 // This file defines the ASTScope class and related functionality, which
 // describes the scopes that exist within a Swift AST.
 //
+// What is an ASTScope supposed to be?
+//
+// An ASTScope (hereafter "scope") defines a contiguous region of source code
+// with a uniform context for lookup. In other words, every symbolic reference
+// within a scope will be resolved by examinine the same set of definitions.
+// Each scope "knows" how to look up the symbols mentioned within it.
+//
+// Scopes form an ordered tree that respects source locations:
+// 1. Every descendant of a given scope must have a source range that inclusively
+// nests within the source range of the ancestor.
+// 2. The child scopes of any parent scope must have disjoint source ranges and
+// they must be ordered in source order.
+//
+// The scope tree implies nothing about the locus of name resolution. For
+// example, a child scope may lookup symbols in a completely different place
+// than its parent. Swift is not stricly lexical.
+//
+// Each scope may also have local bindings. These are definitions occuring
+// within that scope.
+//
 //===----------------------------------------------------------------------===//
 #ifndef SWIFT_AST_AST_SCOPE_H
 #define SWIFT_AST_AST_SCOPE_H
