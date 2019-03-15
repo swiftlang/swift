@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -swift-version 4 -verify -enable-resilience %s -DRESILIENT
-// RUN: %target-swift-frontend -typecheck -swift-version 5 -verify -enable-resilience %s -DRESILIENT
+// RUN: %target-swift-frontend -typecheck -swift-version 4 -verify -enable-library-evolution %s -DRESILIENT
+// RUN: %target-swift-frontend -typecheck -swift-version 5 -verify -enable-library-evolution %s -DRESILIENT
 
 // There should be no errors when run without resilience enabled.
 // RUN: %target-swift-frontend -typecheck -swift-version 4 %s

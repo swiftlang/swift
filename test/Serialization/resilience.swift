@@ -1,13 +1,13 @@
 // RUN: %empty-directory(%t)
 
-// This test checks that we serialize the -enable-resilience and -sil-serialize-all
+// This test checks that we serialize the -enable-library-evolution and -sil-serialize-all
 // flags correctly.
 
 // RUN: %target-swift-frontend -emit-module -o %t %s
 // RUN: llvm-bcanalyzer -dump %t/resilience.swiftmodule > %t/resilience.dump.txt
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=DEFAULT %s < %t/resilience.dump.txt
 
-// RUN: %target-swift-frontend -emit-module -o %t -enable-resilience %s
+// RUN: %target-swift-frontend -emit-module -o %t -enable-library-evolution %s
 // RUN: llvm-bcanalyzer -dump %t/resilience.swiftmodule > %t/resilience2.dump.txt
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=RESILIENCE %s < %t/resilience2.dump.txt
 

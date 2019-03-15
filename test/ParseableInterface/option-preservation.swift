@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -enable-resilience -emit-parseable-module-interface-path %t.swiftinterface -module-name t %s -emit-module -o /dev/null -Onone -enforce-exclusivity=unchecked
+// RUN: %target-swift-frontend -enable-library-evolution -emit-parseable-module-interface-path %t.swiftinterface -module-name t %s -emit-module -o /dev/null -Onone -enforce-exclusivity=unchecked
 // RUN: %FileCheck %s < %t.swiftinterface -check-prefix=CHECK-SWIFTINTERFACE
 //
 // CHECK-SWIFTINTERFACE: swift-module-flags:
-// CHECK-SWIFTINTERFACE-SAME: -enable-resilience
+// CHECK-SWIFTINTERFACE-SAME: -enable-library-evolution
 // CHECK-SWIFTINTERFACE-SAME: -Onone
 // CHECK-SWIFTINTERFACE-SAME: -enforce-exclusivity=unchecked
 
