@@ -301,11 +301,17 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// Structure that captures data that is segregated into different
   /// arenas.
   struct Arena {
+    static_assert(alignof(TypeBase) >= 8, "TypeBase not 8-byte aligned?");
+    static_assert(alignof(TypeBase) > static_cast<unsigned>(
+               MetatypeRepresentation::Last_MetatypeRepresentation) + 1,
+               "Use std::pair for MetatypeTypes and ExistentialMetatypeTypes.");
+
     llvm::DenseMap<Type, ErrorType *> ErrorTypesWithOriginal;
     llvm::FoldingSet<TypeAliasType> TypeAliasTypes;
     llvm::FoldingSet<TupleType> TupleTypes;
-    llvm::DenseMap<std::pair<Type,char>, MetatypeType*> MetatypeTypes;
-    llvm::DenseMap<std::pair<Type,char>,
+    llvm::DenseMap<llvm::PointerIntPair<TypeBase*, 3, unsigned>,
+                   MetatypeType*> MetatypeTypes;
+    llvm::DenseMap<llvm::PointerIntPair<TypeBase*, 3, unsigned>,
                    ExistentialMetatypeType*> ExistentialMetatypeTypes;
     llvm::DenseMap<Type, ArraySliceType*> ArraySliceTypes;
     llvm::DenseMap<std::pair<Type, Type>, DictionaryType *> DictionaryTypes;
@@ -3492,13 +3498,16 @@ MetatypeType *MetatypeType::get(Type T, Optional<MetatypeRepresentation> Repr,
   auto properties = T->getRecursiveProperties();
   auto arena = getArena(properties);
 
-  char reprKey;
+  unsigned reprKey;
   if (Repr.hasValue())
-    reprKey = static_cast<char>(*Repr) + 1;
+    reprKey = static_cast<unsigned>(*Repr) + 1;
   else
     reprKey = 0;
 
-  MetatypeType *&Entry = Ctx.getImpl().getArena(arena).MetatypeTypes[{T, reprKey}];
+  auto pair = llvm::PointerIntPair<TypeBase*, 3, unsigned>(T.getPointer(),
+                                                           reprKey);
+
+  MetatypeType *&Entry = Ctx.getImpl().getArena(arena).MetatypeTypes[pair];
   if (Entry) return Entry;
 
   return Entry = new (Ctx, arena) MetatypeType(
@@ -3517,13 +3526,16 @@ ExistentialMetatypeType::get(Type T, Optional<MetatypeRepresentation> repr,
   auto properties = T->getRecursiveProperties();
   auto arena = getArena(properties);
 
-  char reprKey;
+  unsigned reprKey;
   if (repr.hasValue())
-    reprKey = static_cast<char>(*repr) + 1;
+    reprKey = static_cast<unsigned>(*repr) + 1;
   else
     reprKey = 0;
 
-  auto &entry = ctx.getImpl().getArena(arena).ExistentialMetatypeTypes[{T, reprKey}];
+  auto pair = llvm::PointerIntPair<TypeBase*, 3, unsigned>(T.getPointer(),
+                                                           reprKey);
+
+  auto &entry = ctx.getImpl().getArena(arena).ExistentialMetatypeTypes[pair];
   if (entry) return entry;
 
   return entry = new (ctx, arena) ExistentialMetatypeType(
