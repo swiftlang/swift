@@ -1046,6 +1046,43 @@ public:
     }
   }
 
+  void checkFallthroughPatternBindingsAndTypes(CaseStmt *caseBlock,
+                                               CaseStmt *previousBlock) {
+    auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
+    SmallVector<VarDecl *, 4> vars;
+    firstPattern->collectVariables(vars);
+
+    for (auto &labelItem : previousBlock->getCaseLabelItems()) {
+      const Pattern *pattern = labelItem.getPattern();
+      SmallVector<VarDecl *, 4> PreviousVars;
+      pattern->collectVariables(PreviousVars);
+      for (auto expected : vars) {
+        bool matched = false;
+        if (!expected->hasName())
+          continue;
+        for (auto previous : PreviousVars) {
+          if (previous->hasName() &&
+              expected->getName() == previous->getName()) {
+            if (!previous->getType()->isEqual(expected->getType())) {
+              TC.diagnose(previous->getLoc(),
+                          diag::type_mismatch_fallthrough_pattern_list,
+                          previous->getType(), expected->getType());
+              previous->markInvalid();
+              expected->markInvalid();
+            }
+            matched = true;
+            break;
+          }
+        }
+        if (!matched) {
+          TC.diagnose(PreviousFallthrough->getLoc(),
+                      diag::fallthrough_into_case_with_var_binding,
+                      expected->getName());
+        }
+      }
+    }
+  }
+
   Stmt *visitSwitchStmt(SwitchStmt *switchStmt) {
     // Type-check the subject expression.
     Expr *subjectExpr = switchStmt->getSubjectExpr();
@@ -1092,36 +1129,7 @@ public:
       // If the previous case fellthrough, similarly check that that case's bindings
       // includes our first label item's pattern bindings and types.
       if (PreviousFallthrough && previousBlock) {
-        auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
-        SmallVector<VarDecl *, 4> vars;
-        firstPattern->collectVariables(vars);
-
-        for (auto &labelItem : previousBlock->getCaseLabelItems()) {
-          const Pattern *pattern = labelItem.getPattern();
-          SmallVector<VarDecl *, 4> PreviousVars;
-          pattern->collectVariables(PreviousVars);
-          for (auto expected : vars) {
-            bool matched = false;
-            if (!expected->hasName())
-              continue;
-            for (auto previous: PreviousVars) {
-              if (previous->hasName() && expected->getName() == previous->getName()) {
-                if (!previous->getType()->isEqual(expected->getType())) {
-                  TC.diagnose(previous->getLoc(), diag::type_mismatch_fallthrough_pattern_list,
-                              previous->getType(), expected->getType());
-                  previous->markInvalid();
-                  expected->markInvalid();
-                }
-                matched = true;
-                break;
-              }
-            }
-            if (!matched) {
-              TC.diagnose(PreviousFallthrough->getLoc(),
-                          diag::fallthrough_into_case_with_var_binding, expected->getName());
-            }
-          }
-        }
+        checkFallthroughPatternBindingsAndTypes(caseBlock, previousBlock);
       }
       
       // Type-check the body statements.
