@@ -45,19 +45,31 @@ extension MyStruct {
   func concreteExt_None_TConformsToSomeProto<U>(_ x: U) -> Int where T: SomeProto { return 1 }
 }
 
+protocol Proto_Int {}
+extension Proto_Int {
+  func conditional_Int() -> Int { return 1 }
+}
+protocol Proto_String {}
+extension Proto_String {
+  func conditional_String() -> Int { return 1 }
+}
+extension MyStruct: Proto_Int where T == Int{}
+extension MyStruct: Proto_String where T == String {}
+
 func foo(s: MyStruct<Int>) {
   let _ = s.#^MYSTRUCT_INT_DOT^#
-// MYSTRUCT_INT_DOT: Begin completions, 6 items
+// MYSTRUCT_INT_DOT: Begin completions, 7 items
 // MYSTRUCT_INT_DOT-DAG: Keyword[self]/CurrNominal:          self[#MyStruct<Int>#]; name=self
 // MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   methodWithConstrainedGenericParam({#x: SomeProto#})[#Int#]; name=methodWithConstrainedGenericParam(x: SomeProto)
 // MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   concreteExt_TEqInt_None()[#Int#]; name=concreteExt_TEqInt_None()
 // MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   concreteExt_None_TEqInt({#(x): U#})[#Int#]; name=concreteExt_None_TEqInt(x: U)
 // MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/Super:         protoExt_AssocEqInt_None()[#Int#]; name=protoExt_AssocEqInt_None()
 // MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/Super:         protoExt_None_AssocEqInt({#(x): U#})[#Int#]; name=protoExt_None_AssocEqInt(x: U)
+// MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/Super:         conditional_Int()[#Int#]; name=conditional_Int()
 // MYSTRUCT_INT_DOT: End completions
 
   let _ = MyStruct<Int>.#^META_MYSTRUCT_INT_DOT^#
-// META_MYSTRUCT_INT_DOT: Begin completions, 10 items
+// META_MYSTRUCT_INT_DOT: Begin completions, 11 items
 // META_MYSTRUCT_INT_DOT-DAG: Keyword[self]/CurrNominal:          self[#MyStruct<Int>.Type#]; name=self
 // META_MYSTRUCT_INT_DOT-DAG: Keyword/CurrNominal:                Type[#MyStruct<Int>.Type#]; name=Type
 // META_MYSTRUCT_INT_DOT-DAG: Decl[TypeAlias]/CurrNominal:        Assoc[#T#]; name=Assoc
@@ -68,5 +80,6 @@ func foo(s: MyStruct<Int>) {
 // META_MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   concreteExt_None_TEqInt({#(self): MyStruct<Int>#})[#(U) -> Int#]; name=concreteExt_None_TEqInt(self: MyStruct<Int>)
 // META_MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/Super:         protoExt_AssocEqInt_None({#(self): MyStruct<Int>#})[#() -> Int#]; name=protoExt_AssocEqInt_None(self: MyStruct<Int>)
 // META_MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/Super:         protoExt_None_AssocEqInt({#(self): MyStruct<Int>#})[#(U) -> Int#]; name=protoExt_None_AssocEqInt(self: MyStruct<Int>)
+// META_MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/Super:         conditional_Int({#(self): MyStruct<Int>#})[#() -> Int#]; name=conditional_Int(self: MyStruct<Int>)
 // META_MYSTRUCT_INT_DOT: End completions
 }
