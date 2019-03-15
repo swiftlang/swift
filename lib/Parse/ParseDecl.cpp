@@ -889,7 +889,7 @@ bool Parser::parseDifferentiableAttributeArguments(
   }
   if (Tok.is(tok::identifier) && Tok.getText() == "wrt") {
     SyntaxParsingContext DiffParamsClauseContext(
-        SyntaxContext, SyntaxKind::DifferentiableAttributeDiffParamsClause);
+        SyntaxContext, SyntaxKind::DifferentiationParamsClause);
     consumeToken(tok::identifier);
     if (!consumeIf(tok::colon)) {
       diagnose(Tok, diag::attr_differentiable_expected_colon_after_label,
@@ -901,7 +901,7 @@ bool Parser::parseDifferentiableAttributeArguments(
     // occurred.
     auto parseParam = [&](bool parseTrailingComma = true) -> bool {
       SyntaxParsingContext DiffParamContext(
-          SyntaxContext, SyntaxKind::DifferentiableAttributeDiffParam);
+          SyntaxContext, SyntaxKind::DifferentiationParam);
       SourceLoc paramLoc;
       switch (Tok.getKind()) {
       case tok::identifier: {
@@ -931,7 +931,7 @@ bool Parser::parseDifferentiableAttributeArguments(
     // Parse opening '(' of the parameter list.
     if (Tok.is(tok::l_paren)) {
       SyntaxParsingContext DiffParamsContext(
-          SyntaxContext, SyntaxKind::DifferentiableAttributeDiffParams);
+          SyntaxContext, SyntaxKind::DifferentiationParams);
       consumeToken(tok::l_paren);
       // Parse first parameter. At least one is required.
       if (parseParam())
@@ -940,8 +940,7 @@ bool Parser::parseDifferentiableAttributeArguments(
       while (Tok.isNot(tok::r_paren))
         if (parseParam())
           return errorAndSkipToEnd(2);
-      SyntaxContext->collectNodesInPlace(
-          SyntaxKind::DifferentiableAttributeDiffParamList);
+      SyntaxContext->collectNodesInPlace(SyntaxKind::DifferentiationParamList);
       // Parse closing ')' of the parameter list.
       consumeToken(tok::r_paren);
     }
@@ -969,6 +968,8 @@ bool Parser::parseDifferentiableAttributeArguments(
             diag::attr_differentiable_expected_colon_after_label, label))
       return true;
     // Parse the name of the function.
+    SyntaxParsingContext FuncDeclNameContext(
+         SyntaxContext, SyntaxKind::FunctionDeclName);
     Diagnostic funcDiag(diag::attr_differentiable_expected_function_name.ID,
                         { label });
     result.Name =
@@ -1044,12 +1045,20 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
              /*DeclModifier*/ false);
     return makeParserError();
   }
-  // Parse the name of the function.
-  original.Name =
-    parseUnqualifiedDeclName(/*afterDot*/ false, original.Loc,
-                             diag::attr_differentiating_expected_original_name,
-                             /*allowOperators*/ true,
-                             /*allowZeroArgCompoundNames*/ true);
+
+  {
+    SyntaxParsingContext ContentContext(
+        SyntaxContext, SyntaxKind::DifferentiatingAttributeArguments);
+
+    // Parse the name of the function.
+    SyntaxParsingContext FuncDeclNameContext(
+        SyntaxContext, SyntaxKind::FunctionDeclName);
+    original.Name = parseUnqualifiedDeclName(
+        /*afterDot*/ false, original.Loc,
+        diag::attr_differentiating_expected_original_name,
+        /*allowOperators*/ true, /*allowZeroArgCompoundNames*/ true);
+  }
+
   // Parse ')'.
   if (!consumeIf(tok::r_paren, rParenLoc)) {
     diagnose(getEndOfPreviousLoc(), diag::attr_expected_rparen, AttrName,
