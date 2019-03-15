@@ -293,10 +293,7 @@ bool CompilerInstance::setUpModuleLoaders() {
                                                   enableLibraryEvolution,
                                                   getDependencyTracker()));
   }
-  auto MLM = ModuleLoadingMode::OnlySerialized;
-  if (Invocation.getFrontendOptions().EnableParseableModuleInterface) {
-    MLM = ModuleLoadingMode::PreferSerialized;
-  }
+  auto MLM = ModuleLoadingMode::PreferSerialized;
   if (auto forceModuleLoadingMode =
       llvm::sys::Process::GetEnv("SWIFT_FORCE_MODULE_LOADING")) {
     if (*forceModuleLoadingMode == "prefer-parseable")
