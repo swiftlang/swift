@@ -873,11 +873,12 @@ struct MemberLookupResult {
     /// The member is inaccessible (e.g. a private member in another file).
     UR_Inaccessible,
   };
-  
-  /// This is a list of considered (but rejected) candidates, along with a
-  /// reason for their rejection.
-  SmallVector<std::pair<OverloadChoice, UnviableReason>, 4> UnviableCandidates;
 
+  /// This is a list of considered (but rejected) candidates, along with a
+  /// reason for their rejection. Split into separate collections to make
+  /// it easier to use in conjunction with viable candidates.
+  SmallVector<OverloadChoice, 4> UnviableCandidates;
+  SmallVector<UnviableReason, 4> UnviableReasons;
 
   /// Mark this as being an already-diagnosed error and return itself.
   MemberLookupResult &markErrorAlreadyDiagnosed() {
@@ -890,7 +891,8 @@ struct MemberLookupResult {
   }
   
   void addUnviable(OverloadChoice candidate, UnviableReason reason) {
-    UnviableCandidates.push_back({candidate, reason});
+    UnviableCandidates.push_back(candidate);
+    UnviableReasons.push_back(reason);
   }
 
   Optional<unsigned> getFavoredIndex() const {

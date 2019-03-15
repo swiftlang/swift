@@ -3933,10 +3933,10 @@ retry_after_fail:
           result.addViable(
             OverloadChoice::getDynamicMemberLookup(baseTy, decl, name));
       }
-      for (auto candidate : subscripts.UnviableCandidates) {
-        auto decl = candidate.first.getDecl();
+      for (auto index : indices(subscripts.UnviableCandidates)) {
+        auto decl = subscripts.UnviableCandidates[index].getDecl();
         auto choice = OverloadChoice::getDynamicMemberLookup(baseTy, decl,name);
-        result.addUnviable(choice, candidate.second);
+        result.addUnviable(choice, subscripts.UnviableReasons[index]);
       }
     }
   }
@@ -4232,21 +4232,15 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   }
 
   if (!result.UnviableCandidates.empty()) {
-    SmallVector<OverloadChoice, 8> choices;
-    llvm::transform(
-        result.UnviableCandidates, std::back_inserter(choices),
-        [](const std::pair<OverloadChoice, MemberLookupResult::UnviableReason>
-               &candidate) { return candidate.first; });
-
     // Generate constraints for unvailable choices if they have a fix,
     // and disable them by default, they'd get picked up in the "salvage" mode.
-    generateConstraints(candidates, memberTy, choices, useDC, locator,
-                        /*favoredChoice=*/None, /*requiresFix=*/true,
-                        [&](unsigned idx, const OverloadChoice &choice) {
-                          return fixMemberRef(
-                              *this, baseTy, member, choice, locator,
-                              result.UnviableCandidates[idx].second);
-                        });
+    generateConstraints(
+        candidates, memberTy, result.UnviableCandidates, useDC, locator,
+        /*favoredChoice=*/None, /*requiresFix=*/true,
+        [&](unsigned idx, const OverloadChoice &choice) {
+          return fixMemberRef(*this, baseTy, member, choice, locator,
+                              result.UnviableReasons[idx]);
+        });
   }
 
   if (!candidates.empty()) {
