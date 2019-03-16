@@ -386,7 +386,9 @@ MoveOutOfOrderArgument *MoveOutOfOrderArgument::create(
 }
 
 bool AllowInaccessibleMember::diagnose(Expr *root, bool asNote) const {
-  return false;
+  InaccessibleMemberFailure failure(root, getConstraintSystem(), Member,
+                                    getLocator());
+  return failure.diagnose(asNote);
 }
 
 AllowInaccessibleMember *
