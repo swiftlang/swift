@@ -334,7 +334,7 @@ protected:
     IsUserAccessible : 1
   );
 
-  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1+1+2+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1+1+2+1+1+1,
     /// Whether the getter is mutating.
     IsGetterMutating : 1,
 
@@ -353,14 +353,14 @@ protected:
     /// Whether a keypath component can directly reference this storage,
     /// or if it must use the overridden declaration instead.
     HasComputedValidKeyPathComponent : 1,
-    ValidKeyPathComponent : 1
-  );
-
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+4+1+1+1+1,
+    ValidKeyPathComponent : 1,
+    
     /// Whether this property is a type property (currently unfortunately
     /// called 'static').
-    IsStatic : 1,
+    IsStatic : 1
+  );
 
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 4+1+1+1+1,
     /// The specifier associated with this variable or parameter.  This
     /// determines the storage semantics of the value e.g. mutability.
     Specifier : 4,
@@ -4263,8 +4263,9 @@ private:
   }
 
 protected:
-  AbstractStorageDecl(DeclKind Kind, DeclContext *DC, DeclName Name,
-                      SourceLoc NameLoc, StorageIsMutable_t supportsMutation)
+  AbstractStorageDecl(DeclKind Kind, bool IsStatic, DeclContext *DC,
+                      DeclName Name, SourceLoc NameLoc,
+                      StorageIsMutable_t supportsMutation)
     : ValueDecl(Kind, DC, Name, NameLoc) {
     Bits.AbstractStorageDecl.HasStorage = true;
     Bits.AbstractStorageDecl.SupportsMutation = supportsMutation;
@@ -4272,6 +4273,7 @@ protected:
     Bits.AbstractStorageDecl.IsSetterMutating = true;
     Bits.AbstractStorageDecl.OpaqueReadOwnership =
       unsigned(OpaqueReadOwnership::Owned);
+    Bits.AbstractStorageDecl.IsStatic = IsStatic;
   }
 
   void setSupportsMutationIfStillStored(StorageIsMutable_t supportsMutation) {
@@ -4292,9 +4294,16 @@ public:
   /// attribute.
   bool isTransparent() const;
 
-  /// Determine whether this storage is a static member, if it
-  /// is a member.  Currently only variables can be static.
-  inline bool isStatic() const; // defined in this header
+  /// Is this a type ('static') variable?
+  bool isStatic() const {
+    return Bits.AbstractStorageDecl.IsStatic;
+  }
+  void setStatic(bool IsStatic) {
+    Bits.AbstractStorageDecl.IsStatic = IsStatic;
+  }
+
+  /// \returns the way 'static'/'class' should be spelled for this declaration.
+  StaticSpellingKind getCorrectStaticSpelling() const;
 
   /// Return the interface type of the stored value.
   Type getValueInterfaceType() const;
@@ -4592,10 +4601,9 @@ protected:
 
   VarDecl(DeclKind Kind, bool IsStatic, Specifier Sp, bool IsCaptureList,
           SourceLoc NameLoc, Identifier Name, DeclContext *DC)
-    : AbstractStorageDecl(Kind, DC, Name, NameLoc,
+    : AbstractStorageDecl(Kind, IsStatic, DC, Name, NameLoc,
                           StorageIsMutable_t(!isImmutableSpecifier(Sp)))
   {
-    Bits.VarDecl.IsStatic = IsStatic;
     Bits.VarDecl.Specifier = static_cast<unsigned>(Sp);
     Bits.VarDecl.IsCaptureList = IsCaptureList;
     Bits.VarDecl.IsDebuggerVar = false;
@@ -4774,14 +4782,6 @@ public:
     return getSpecifier() == Specifier::InOut;
   }
   
-  
-  /// Is this a type ('static') variable?
-  bool isStatic() const { return Bits.VarDecl.IsStatic; }
-  void setStatic(bool IsStatic) { Bits.VarDecl.IsStatic = IsStatic; }
-
-  /// \returns the way 'static'/'class' should be spelled for this declaration.
-  StaticSpellingKind getCorrectStaticSpelling() const;
-
   bool isImmutable() const {
     return isImmutableSpecifier(getSpecifier());
   }
@@ -5099,7 +5099,8 @@ public:
                 SourceLoc ArrowLoc, TypeLoc ElementTy, DeclContext *Parent,
                 GenericParamList *GenericParams)
     : GenericContext(DeclContextKind::SubscriptDecl, Parent),
-      AbstractStorageDecl(DeclKind::Subscript, Parent, Name, SubscriptLoc,
+      AbstractStorageDecl(DeclKind::Subscript, false,
+                          Parent, Name, SubscriptLoc,
                           /*will be overwritten*/ StorageIsNotMutable),
       ArrowLoc(ArrowLoc), Indices(nullptr), ElementTy(ElementTy) {
     setIndices(Indices);
@@ -6803,15 +6804,6 @@ AbstractStorageDecl::overwriteSetterAccess(AccessLevel accessLevel) {
     modify->overwriteAccess(accessLevel);
   if (auto mutableAddressor = getMutableAddressor())
     mutableAddressor->overwriteAccess(accessLevel);
-}
-
-inline bool AbstractStorageDecl::isStatic() const {
-  if (auto var = dyn_cast<VarDecl>(this)) {
-    return var->isStatic();
-  }
-
-  // Currently, subscripts are never static.
-  return false;
 }
 
 /// Constructors and destructors always have a 'self' parameter,
