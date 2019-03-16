@@ -5656,14 +5656,16 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
 
   ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
   if (!Body.isNull()) {
-    // If the body consists of a single expression, turn it into a return 
-    // statement.
     BraceStmt * BS = Body.get();
     AFD->setBody(BS);
-    // FIXME: FIXME_NOW: DETERMINE: Do we need to handle the code completion 
-    //        case here?  It is being handled for closure 
-    //        (Parser::parseExprClosure).
-    if (BS->getNumElements() == 1) {
+
+    // If the body consists of a single expression, turn it into a return
+    // statement.
+    //
+    // But don't do this transformation during code completion, as the source
+    // may be incomplete and the type mismatch in return statement will just
+    // confuse the type checker.
+    if (!Body.hasCodeCompletion() && BS->getNumElements() == 1) {
       auto Element = BS->getElement(0);
       if (auto *stmt = Element.dyn_cast<Stmt *>()) {
         if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
