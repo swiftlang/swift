@@ -3,7 +3,19 @@
 
 import StdlibUnittest
 
-var RetroactiveDerivativeTests = TestSuite("RetroactiveDerivative")
+var DerivativeRegistrationTests = TestSuite("DerivativeRegistration")
+
+@_semantics("autodiff.opaque")
+func unary(x: Float) -> Float {
+  return x
+}
+@differentiating(unary)
+func _vjpUnary(x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  return (value: x, pullback: { v in v })
+}
+DerivativeRegistrationTests.test("UnaryFreeFunction") {
+  expectEqual(1, gradient(at: 3.0, in: unary))
+}
 
 @_semantics("autodiff.opaque")
 func multiply(_ x: Float, _ y: Float) -> Float {
@@ -14,7 +26,7 @@ func _vjpMultiply(_ x: Float, _ y: Float)
   -> (value: Float, pullback: (Float) -> (Float, Float)) {
   return (x * y, { v in (v * y, v * x) })
 }
-RetroactiveDerivativeTests.test("TestFreeFunction") {
+DerivativeRegistrationTests.test("BinaryFreeFunction") {
   expectEqual((3.0, 2.0), gradient(at: 2.0, 3.0, in: { x, y in multiply(x, y) }))
 }
 
@@ -34,7 +46,7 @@ extension Wrapper {
     return (x * y, { v in (v * y, v * x) })
   }
 }
-RetroactiveDerivativeTests.test("TestStaticMethod") {
+DerivativeRegistrationTests.test("StaticMethod") {
   expectEqual((3.0, 2.0), gradient(at: 2.0, 3.0, in: { x, y in Wrapper.multiply(x, y) }))
 }
 
@@ -52,7 +64,7 @@ extension Wrapper {
     })
   }
 }
-RetroactiveDerivativeTests.test("TestInstanceMethod") {
+DerivativeRegistrationTests.test("InstanceMethod") {
   let x: Float = 2
   let wrapper = Wrapper(float: 3)
   let (𝛁wrapper, 𝛁x) = wrapper.gradient(at: x) { wrapper, x in wrapper.multiply(x) }

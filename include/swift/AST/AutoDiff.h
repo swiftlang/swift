@@ -192,6 +192,10 @@ public:
 
   /// Creates a `AutoDiffParameterIndicesBuilder` for the given function type,
   /// inferring all differentiation parameters.
+  /// The differentiation parameters are inferred to be:
+  /// - All parameters of the function type that conform to `Differentiable`.
+  /// - If the function type's result is a function type, then also all
+  ///   parameters of the function result type that conform to `Dfiferentiable`.
   static AutoDiffParameterIndicesBuilder inferParameters(
       AnyFunctionType *functionType, ModuleDecl *module);
 

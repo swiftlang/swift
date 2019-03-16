@@ -303,7 +303,8 @@ AutoDiffParameterIndicesBuilder::inferParameters(AnyFunctionType *functionType,
   // Get all parameter types.
   // NOTE: To be robust, result function type parameters should be added only if
   // `functionType` comes from a static/instance method, and not a free function
-  // returning a function type.
+  // returning a function type. In practice, this code path should not be
+  // reachable for free functions returning a function type.
   if (auto resultFnType = functionType->getResult()->getAs<AnyFunctionType>())
     for (auto &param : resultFnType->getParams())
       allParamTypes.push_back(param.getPlainType());
