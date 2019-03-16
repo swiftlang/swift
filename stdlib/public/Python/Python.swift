@@ -979,6 +979,27 @@ extension Float : PythonConvertible {
 }
 
 //===----------------------------------------------------------------------===//
+// `PythonConvertible` conformance for `Optional`
+//===----------------------------------------------------------------------===//
+
+extension Optional : PythonConvertible where Wrapped : PythonConvertible {
+  public init?(_ object: PythonObject) {
+    if object == Python.None {
+      self = .none
+    } else {
+      guard let converted = Wrapped(object) else {
+        return nil
+      }
+      self = .some(converted)
+    }
+  }
+
+  public var pythonObject: PythonObject {
+    return self?.pythonObject ?? Python.None
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // `PythonConvertible` conformance for `Array` and `Dictionary`
 //===----------------------------------------------------------------------===//
 
