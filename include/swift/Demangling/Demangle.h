@@ -484,11 +484,6 @@ enum class OperatorKind {
   Infix,
 };
 
-/// Mangle an identifier using Swift's mangling rules.
-void mangleIdentifier(const char *data, size_t length,
-                      OperatorKind operatorKind, std::string &out,
-                      bool usePunycode = true);
-
 /// Remangle a demangled parse tree.
 std::string mangleNode(NodePointer root);
 
@@ -511,9 +506,20 @@ llvm::StringRef mangleNode(NodePointer root, SymbolicResolver resolver,
 /// Remangle in the old mangling scheme.
 ///
 /// This is only used for objc-runtime names.
-/// If \p BorrowFrom is specified, the initial bump pointer memory is
-/// borrowed from the free memory of BorrowFrom.
-std::string mangleNodeOld(NodePointer root, NodeFactory *BorrowFrom = nullptr);
+std::string mangleNodeOld(NodePointer root);
+
+/// Remangle in the old mangling scheme.
+///
+/// This is only used for objc-runtime names.
+/// The returned string is owned by \p Factory. This means \p Factory must stay
+/// alive as long as the returned string is used.
+llvm::StringRef mangleNodeOld(NodePointer node, NodeFactory &Factory);
+
+/// Remangle in the old mangling scheme and embed the name in "_Tt<name>_".
+///
+/// The returned string is null terminated and owned by \p Factory. This means
+/// \p Factory must stay alive as long as the returned string is used.
+const char *mangleNodeAsObjcCString(NodePointer node, NodeFactory &Factory);
 
 /// Transform the node structure to a string.
 ///

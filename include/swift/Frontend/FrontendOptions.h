@@ -214,7 +214,7 @@ public:
   /// Enables the "fully resilient" resilience strategy.
   ///
   /// \see ResilienceStrategy::Resilient
-  bool EnableResilience = false;
+  bool EnableLibraryEvolution = false;
 
   /// Indicates that the frontend should emit "verbose" SIL
   /// (if asked to emit SIL).
@@ -266,6 +266,10 @@ public:
   /// Indicates whether the dependency tracker should track system
   /// dependencies as well.
   bool TrackSystemDeps = false;
+
+  /// Should we serialize the hashes of dependencies (vs. the modification
+  /// times) when compiling a parseable module interface?
+  bool SerializeParseableModuleInterfaceDependencyHashes = false;
 
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {

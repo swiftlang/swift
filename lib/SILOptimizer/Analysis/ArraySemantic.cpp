@@ -55,7 +55,7 @@ bool swift::ArraySemanticsCall::isValidSignature() {
   case ArrayCallKind::kCheckIndex: {
     // Int, @guaranteed/@owned Self
     if (SemanticsCall->getNumArguments() != 2 ||
-        !SemanticsCall->getArgument(0)->getType().isTrivial(Mod))
+        !SemanticsCall->getArgument(0)->getType().isTrivial(*F))
       return false;
     auto SelfConvention = FnTy->getSelfParameter().getConvention();
     return SelfConvention == ParameterConvention::Direct_Guaranteed ||
@@ -64,9 +64,9 @@ bool swift::ArraySemanticsCall::isValidSignature() {
   case ArrayCallKind::kCheckSubscript: {
     // Int, Bool, Self
     if (SemanticsCall->getNumArguments() != 3 ||
-        !SemanticsCall->getArgument(0)->getType().isTrivial(Mod))
+        !SemanticsCall->getArgument(0)->getType().isTrivial(*F))
       return false;
-    if (!SemanticsCall->getArgument(1)->getType().isTrivial(Mod))
+    if (!SemanticsCall->getArgument(1)->getType().isTrivial(*F))
       return false;
     auto SelfConvention = FnTy->getSelfParameter().getConvention();
     return SelfConvention == ParameterConvention::Direct_Guaranteed ||

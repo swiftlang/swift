@@ -184,9 +184,7 @@ public:
 
   void setRuntimeResourcePath(StringRef Path);
 
-  void setSDKPath(const std::string &Path) {
-    SearchPathOpts.SDKPath = Path;
-  }
+  void setSDKPath(const std::string &Path);
 
   StringRef getSDKPath() const {
     return SearchPathOpts.SDKPath;

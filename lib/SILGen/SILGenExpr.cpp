@@ -273,7 +273,7 @@ SILGenFunction::emitFormalEvaluationManagedBorrowedRValueWithCleanup(
 ManagedValue
 SILGenFunction::emitManagedBorrowedArgumentWithCleanup(SILPhiArgument *arg) {
   if (arg->getOwnershipKind() == ValueOwnershipKind::Any ||
-      arg->getType().isTrivial(arg->getModule())) {
+      arg->getType().isTrivial(F)) {
     return ManagedValue::forUnmanaged(arg);
   }
 
@@ -856,29 +856,22 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 
   // If this is a decl that we have an lvalue for, produce and return it.
   ValueDecl *decl = declRef.getDecl();
-  
-  if (!ncRefType) {
-    ncRefType = decl->getInnermostDeclContext()->mapTypeIntoContext(
-        decl->getInterfaceType());
-  }
-  CanType refType = ncRefType->getCanonicalType();
 
-  auto getUnmanagedRValue = [&](SILValue value) -> RValue {
-    return RValue(*this, loc, refType, ManagedValue::forUnmanaged(value));
-  };
+  CanType refType = ncRefType->getCanonicalType();
 
   // If this is a reference to a module, produce an undef value. The
   // module value should never actually be used.
   if (isa<ModuleDecl>(decl)) {
-    return getUnmanagedRValue(
-             SILUndef::get(getLoweredLoadableType(ncRefType), SGM.M));
+    return emitUndefRValue(loc, refType);
   }
 
   // If this is a reference to a type, produce a metatype.
   if (isa<TypeDecl>(decl)) {
     assert(refType->is<MetatypeType>() &&
            "type declref does not have metatype type?!");
-    return getUnmanagedRValue(B.createMetatype(loc, getLoweredType(refType)));
+    return RValue(*this, loc, refType,
+                  ManagedValue::forUnmanaged(
+                    B.createMetatype(loc, getLoweredType(refType))));
   }
   
   // If this is a reference to a var, emit it as an l-value and then load.
@@ -1473,7 +1466,7 @@ static ManagedValue convertCFunctionSignature(SILGenFunction &SGF,
     // just runs the risk of tripping up asserts in SILGenBridging.cpp
     SGF.SGM.diagnose(e, diag::unsupported_c_function_pointer_conversion,
                      e->getSubExpr()->getType(), e->getType());
-    result = SGF.emitUndef(e, loweredDestTy);
+    result = SGF.emitUndef(loweredDestTy);
     break;
 
   case TypeConverter::ABIDifference::ThinToThick:
@@ -1657,13 +1650,13 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
       } else {
         SGF.SGM.diagnose(e->getLoc(), diag::not_implemented,
                          "nontrivial thin function reference");
-        value = ManagedValue::forUnmanaged(SILUndef::get(expectedTy, SGF.SGM.M));
+        value = SGF.emitUndef(expectedTy);
       }
       
       if (value.getType() != expectedTy) {
         SGF.SGM.diagnose(e->getLoc(), diag::not_implemented,
                          "nontrivial thin function reference");
-        value = ManagedValue::forUnmanaged(SILUndef::get(expectedTy, SGF.SGM.M));
+        value = SGF.emitUndef(expectedTy);
       }
       return RValue(SGF, e, value);
     }
@@ -1992,7 +1985,7 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
 
     if (I->canPerformInPlaceInitialization() &&
         I->isInPlaceInitializationOfGlobal() &&
-        SGF.getTypeLowering(type).getLoweredType().isTrivial(SGF.SGM.M)) {
+        SGF.getLoweredType(type).isTrivial(SGF.F)) {
       // Implode tuples in initialization of globals if they are
       // of trivial types.
       implodeTuple = true;
@@ -2524,7 +2517,7 @@ RValue RValueEmitter::visitObjCSelectorExpr(ObjCSelectorExpr *e, SGFContext C) {
   }
   if (!selectorMemberTy) {
     SGF.SGM.diagnose(e, diag::objc_selector_malformed);
-    return RValue(SGF, e, SGF.emitUndef(e, loweredSelectorTy));
+    return RValue(SGF, e, SGF.emitUndef(loweredSelectorTy));
   }
 
   // Form the selector string.
@@ -3320,6 +3313,7 @@ lowerKeyPathSubscriptIndexTypes(
                  SmallVectorImpl<IndexTypePair> &indexPatterns,
                  SubscriptDecl *subscript,
                  SubstitutionMap subscriptSubs,
+                 ResilienceExpansion expansion,
                  bool &needsGenericContext) {
   // Capturing an index value dependent on the generic context means we
   // need the generic context captured in the key path.
@@ -3337,11 +3331,9 @@ lowerKeyPathSubscriptIndexTypes(
       indexTy = indexTy.subst(subscriptSubs);
     }
 
-    // FIXME: Expansion
     auto indexLoweredTy = SGM.Types.getLoweredType(
                                                 AbstractionPattern::getOpaque(),
-                                                indexTy,
-                                                ResilienceExpansion::Minimal);
+                                                indexTy, expansion);
     indexLoweredTy = indexLoweredTy.mapTypeOutOfContext();
     indexPatterns.push_back({indexTy->mapTypeOutOfContext()
                                     ->getCanonicalType(),
@@ -3538,6 +3530,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     SmallVector<IndexTypePair, 4> indexTypes;
     lowerKeyPathSubscriptIndexTypes(*this, indexTypes,
                                     decl, subs,
+                                    expansion,
                                     needsGenericContext);
     
     SmallVector<KeyPathPatternComponent::Index, 4> indexPatterns;
@@ -5488,14 +5481,14 @@ ManagedValue SILGenFunction::emitRValueAsSingleValue(Expr *E, SGFContext C) {
 
 RValue SILGenFunction::emitUndefRValue(SILLocation loc, Type type) {
   return RValue(*this, loc, type->getCanonicalType(),
-                emitUndef(loc, getLoweredType(type)));
+                emitUndef(getLoweredType(type)));
 }
 
-ManagedValue SILGenFunction::emitUndef(SILLocation loc, Type type) {
-  return emitUndef(loc, getLoweredType(type));
+ManagedValue SILGenFunction::emitUndef(Type type) {
+  return emitUndef(getLoweredType(type));
 }
 
-ManagedValue SILGenFunction::emitUndef(SILLocation loc, SILType type) {
-  SILValue undef = SILUndef::get(type, SGM.M);
+ManagedValue SILGenFunction::emitUndef(SILType type) {
+  SILValue undef = SILUndef::get(type, F);
   return ManagedValue::forUnmanaged(undef);
 }

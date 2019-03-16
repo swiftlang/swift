@@ -155,7 +155,7 @@ static void extendLifetimeToEndOfFunction(SILFunction &Fn,
   // Ok. At this point we know that Cvt is not in the entry block... so we can
   // use SILSSAUpdater::GetValueInMiddleOfBlock() to extend the object's
   // lifetime respecting loops.
-  SILSSAUpdater Updater(Cvt->getModule());
+  SILSSAUpdater Updater;
   Updater.Initialize(OptionalEscapingClosureTy);
 
   // Create an Optional<() -> ()>.none in the entry block of the function and
@@ -257,7 +257,7 @@ static SILValue insertMarkDependenceForCapturedArguments(PartialApplyInst *PAI,
   SILValue curr(PAI);
   // Mark dependence on all non-trivial arguments.
   for (auto &arg : PAI->getArgumentOperands()) {
-    if (arg.get()->getType().isTrivial(PAI->getModule()))
+    if (arg.get()->getType().isTrivial(*PAI->getFunction()))
       continue;
     curr = B.createMarkDependence(PAI->getLoc(), curr, arg.get());
   }
@@ -692,7 +692,7 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *CB,
   auto OptionalEscapingClosureTy =
       SILType::getOptionalType(SentinelClosure->getType());
 
-  SILSSAUpdater Updater(Fn.getModule());
+  SILSSAUpdater Updater;
   Updater.Initialize(OptionalEscapingClosureTy);
 
   // Create the Optional.none as the beginning available value.

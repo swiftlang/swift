@@ -16,7 +16,7 @@
 
 using namespace swift;
 
-bool swift::isValueAddressOrTrivial(SILValue v, SILModule &m) {
+bool swift::isValueAddressOrTrivial(SILValue v) {
   return v->getType().isAddress() ||
          v.getOwnershipKind() == ValueOwnershipKind::Any;
 }

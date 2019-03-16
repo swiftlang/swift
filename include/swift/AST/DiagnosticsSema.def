@@ -238,6 +238,8 @@ NOTE(inout_change_var_type_if_possible,none,
 ERROR(cannot_pass_rvalue_inout,none,
       "cannot pass immutable value of type %0 as inout argument",
       (Type))
+ERROR(cannot_provide_default_value_inout,none,
+      "cannot provide default value to inout parameter %0", (Identifier))
 
 ERROR(cannot_assign_to_literal,none,
       "cannot assign to a literal value", ())
@@ -1303,7 +1305,7 @@ ERROR(indirect_case_without_payload,none,
 ERROR(indirect_case_in_indirect_enum,none,
       "enum case in 'indirect' enum cannot also be 'indirect'", ())
 WARNING(enum_frozen_nonresilient,none,
-        "%0 has no effect without -enable-resilience", (DeclAttribute))
+        "%0 has no effect without -enable-library-evolution", (DeclAttribute))
 WARNING(enum_frozen_nonpublic,none,
         "%0 has no effect on non-public enums", (DeclAttribute))
 

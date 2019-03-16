@@ -1,5 +1,5 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -module-name SerializedSIL -enable-resilience
+// swift-module-flags: -module-name SerializedSIL -enable-library-evolution
 
 // RUN: %empty-directory(%t)
 // RUN: echo 'import SerializedSIL' | %target-swift-frontend -typecheck -enable-parseable-module-interface -module-cache-path %t -I %S -

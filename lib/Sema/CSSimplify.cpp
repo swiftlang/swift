@@ -3980,6 +3980,191 @@ retry_after_fail:
   return result;
 }
 
+/// Determine whether the given type refers to a non-final class (or
+/// dynamic self of one).
+static bool isNonFinalClass(Type type) {
+  if (auto dynamicSelf = type->getAs<DynamicSelfType>())
+    type = dynamicSelf->getSelfType();
+
+  if (auto classDecl = type->getClassOrBoundGenericClass())
+    return !classDecl->isFinal();
+
+  if (auto archetype = type->getAs<ArchetypeType>())
+    if (auto super = archetype->getSuperclass())
+      return isNonFinalClass(super);
+
+  return type->isExistentialType();
+}
+
+/// Determine whether given constructor reference is valid or does it require
+/// any fixes e.g. when base is a protocol metatype.
+static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
+                                             ConstructorDecl *init,
+                                             ConstraintLocator *locator) {
+  auto *anchor = locator->getAnchor();
+  if (!anchor)
+    return nullptr;
+
+  auto getType = [&cs](const Expr *expr) -> Type {
+    return cs.simplifyType(cs.getType(expr))->getRValueType();
+  };
+
+  auto locatorEndsWith =
+      [](ConstraintLocator *locator,
+         ConstraintLocator::PathElementKind eltKind) -> bool {
+    auto path = locator->getPath();
+    return !path.empty() && path.back().getKind() == eltKind;
+  };
+
+  Expr *baseExpr = nullptr;
+  Type baseType;
+
+  // Explicit initializer reference e.g. `T.init(...)` or `T.init`.
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
+    baseExpr = UDE->getBase();
+    baseType = getType(baseExpr);
+    if (baseType->is<MetatypeType>()) {
+      auto instanceType = baseType->getAs<MetatypeType>()
+                              ->getInstanceType()
+                              ->getWithoutParens();
+      if (!cs.isTypeReference(baseExpr) && instanceType->isExistentialType()) {
+        return AllowInvalidInitRef::onProtocolMetatype(
+            cs, baseType, init, /*isStaticallyDerived=*/true,
+            baseExpr->getSourceRange(), locator);
+      }
+    }
+    // Initializer call e.g. `T(...)`
+  } else if (auto *CE = dyn_cast<CallExpr>(anchor)) {
+    baseExpr = CE->getFn();
+    baseType = getType(baseExpr);
+    // If this is an initializer call without explicit mention
+    // of `.init` on metatype value.
+    if (auto *AMT = baseType->getAs<AnyMetatypeType>()) {
+      auto instanceType = AMT->getInstanceType()->getWithoutParens();
+      if (!cs.isTypeReference(baseExpr)) {
+        if (baseType->is<MetatypeType>() &&
+            instanceType->isAnyExistentialType()) {
+          return AllowInvalidInitRef::onProtocolMetatype(
+              cs, baseType, init, cs.isStaticallyDerivedMetatype(baseExpr),
+              baseExpr->getSourceRange(), locator);
+        }
+
+        if (!instanceType->isExistentialType() ||
+            instanceType->isAnyExistentialType()) {
+          return AllowInvalidInitRef::onNonConstMetatype(cs, baseType, init,
+                                                         locator);
+        }
+      }
+    }
+    // Initializer reference which requires contextual base type e.g.
+    // `.init(...)`.
+  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
+    // We need to find type variable which represents contextual base.
+    auto *baseLocator = cs.getConstraintLocator(
+        UME, locatorEndsWith(locator, ConstraintLocator::ConstructorMember)
+                 ? ConstraintLocator::UnresolvedMember
+                 : ConstraintLocator::MemberRefBase);
+
+    // FIXME: Type variables responsible for contextual base could be cached
+    // in the constraint system to speed up lookup.
+    auto result = llvm::find_if(
+        cs.getTypeVariables(), [&baseLocator](const TypeVariableType *typeVar) {
+          return typeVar->getImpl().getLocator() == baseLocator;
+        });
+
+    assert(result != cs.getTypeVariables().end());
+    baseType = cs.simplifyType(*result)->getRValueType();
+    // Constraint for member base is formed as '$T.Type[.<member] = ...`
+    // which means MetatypeType has to be added after finding a type variable.
+    if (locatorEndsWith(baseLocator, ConstraintLocator::MemberRefBase))
+      baseType = MetatypeType::get(baseType);
+  }
+
+  if (!baseType)
+    return nullptr;
+
+  if (!baseType->is<AnyMetatypeType>()) {
+    bool applicable = false;
+    // Special case -- in a protocol extension initializer with a class
+    // constrainted Self type, 'self' has archetype type, and only
+    // required initializers can be called.
+    if (baseExpr && !baseExpr->isSuperExpr()) {
+      auto &ctx = cs.getASTContext();
+      if (auto *DRE =
+              dyn_cast<DeclRefExpr>(baseExpr->getSemanticsProvidingExpr())) {
+        if (DRE->getDecl()->getFullName() == ctx.Id_self) {
+          if (getType(DRE)->is<ArchetypeType>())
+            applicable = true;
+        }
+      }
+    }
+
+    if (!applicable)
+      return nullptr;
+  }
+
+  auto instanceType = baseType->getMetatypeInstanceType();
+  bool isStaticallyDerived = true;
+  // If this is expression like `.init(...)` where base type is
+  // determined by a contextual type.
+  if (!baseExpr) {
+    isStaticallyDerived = !(instanceType->is<DynamicSelfType>() ||
+                            instanceType->is<ArchetypeType>());
+  // Otherwise this is something like `T.init(...)`
+  } else {
+    isStaticallyDerived = cs.isStaticallyDerivedMetatype(baseExpr);
+  }
+
+  auto baseRange = baseExpr ? baseExpr->getSourceRange() : SourceRange();
+  // FIXME: The "hasClangNode" check here is a complete hack.
+  if (isNonFinalClass(instanceType) && !isStaticallyDerived &&
+      !init->hasClangNode() &&
+      !(init->isRequired() || init->getDeclContext()->getSelfProtocolDecl())) {
+    return AllowInvalidInitRef::dynamicOnMetatype(cs, baseType, init, baseRange,
+                                                  locator);
+    // Constructors cannot be called on a protocol metatype, because there is no
+    // metatype to witness it.
+  } else if (baseType->is<MetatypeType>() &&
+             instanceType->isExistentialType()) {
+    return AllowInvalidInitRef::onProtocolMetatype(
+        cs, baseType, init, isStaticallyDerived, baseRange, locator);
+  }
+
+  return nullptr;
+}
+
+static ConstraintFix *
+fixMemberRef(ConstraintSystem &cs, Type baseTy,
+             DeclName memberName, const OverloadChoice &choice,
+             ConstraintLocator *locator,
+             Optional<MemberLookupResult::UnviableReason> reason = None) {
+  if (!choice.isDecl())
+    return nullptr;
+
+  auto *decl = choice.getDecl();
+  if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
+    if (auto *fix = validateInitializerRef(cs, CD, locator))
+      return fix;
+  }
+
+  if (reason) {
+    switch (*reason) {
+    case MemberLookupResult::UR_InstanceMemberOnType:
+    case MemberLookupResult::UR_TypeMemberOnInstance:
+      return AllowTypeOrInstanceMember::create(cs, baseTy, memberName, locator);
+
+    case MemberLookupResult::UR_MutatingMemberOnRValue:
+    case MemberLookupResult::UR_MutatingGetterOnRValue:
+    case MemberLookupResult::UR_LabelMismatch:
+    case MemberLookupResult::UR_Inaccessible:
+    case MemberLookupResult::UR_UnavailableInExistential:
+      break;
+    }
+  }
+
+  return nullptr;
+}
+
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     ConstraintKind kind, Type baseTy, DeclName member, Type memberTy,
     DeclContext *useDC, FunctionRefKind functionRefKind,
@@ -4020,9 +4205,25 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
   // If we found viable candidates, then we're done!
   if (!result.ViableCandidates.empty()) {
-    addOverloadSet(memberTy, result.ViableCandidates, useDC, locator,
-                   result.getFavoredChoice(), outerAlternatives);
+    llvm::SmallVector<Constraint *, 8> candidates;
+    generateConstraints(
+        candidates, memberTy, result.ViableCandidates, useDC, locator,
+        result.getFavoredIndex(), /*requiresFix=*/false,
+        [&](unsigned, const OverloadChoice &choice) {
+          return fixMemberRef(*this, baseTy, member, choice, locator);
+        });
 
+    if (!outerAlternatives.empty()) {
+      // If local scope has a single choice,
+      // it should always be preferred.
+      if (candidates.size() == 1)
+        candidates.front()->setFavored();
+
+      generateConstraints(candidates, memberTy, outerAlternatives,
+                          useDC, locator);
+    }
+
+    addOverloadSet(candidates, locator);
     return SolutionKind::Solved;
   }
   
@@ -4037,46 +4238,26 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     if (!MissingMembers.insert(locator))
       return SolutionKind::Error;
 
-    // FIXME(diagnostics): If there were no viable results, but there are
-    // unviable ones, we'd have to introduce fix for each specific problem.
     if (!result.UnviableCandidates.empty()) {
-      // Check if we have unviable candidates whose reason for rejection
-      // is either UR_InstanceMemberOnType or UR_TypeMemberOnInstance
-      SmallVector<OverloadChoice, 4> filteredCandidates;
+      SmallVector<OverloadChoice, 8> choices;
+      llvm::transform(
+          result.UnviableCandidates, std::back_inserter(choices),
+          [](const std::pair<OverloadChoice, MemberLookupResult::UnviableReason>
+                 &candidate) { return candidate.first; });
 
-      llvm::for_each(
-          result.UnviableCandidates,
-          [&](const std::pair<OverloadChoice,
-                              MemberLookupResult::UnviableReason> &c) {
-            if (c.second == MemberLookupResult::UR_InstanceMemberOnType ||
-                c.second == MemberLookupResult::UR_TypeMemberOnInstance) {
-              filteredCandidates.push_back(std::move(c.first));
-            }
-          });
+      SmallVector<Constraint *, 4> candidates;
+      generateConstraints(candidates, memberTy, choices, useDC, locator,
+                          /*favoredChoice=*/None, /*requiresFix=*/true,
+                          [&](unsigned idx, const OverloadChoice &choice) {
+                            return fixMemberRef(
+                                *this, baseTy, member, choice, locator,
+                                result.UnviableCandidates[idx].second);
+                          });
 
-      // If we do, then allow them
-      if (!filteredCandidates.empty()) {
-
-        auto meetsProtocolBaseMetatypeCriteria =
-            baseTy->is<AnyMetatypeType>() && baseTy->getMetatypeInstanceType()
-                                                 ->getWithoutParens()
-                                                 ->isAnyExistentialType();
-
-        auto requiresProtocolMetatypeFix =
-            llvm::any_of(filteredCandidates, [&](const OverloadChoice &c) {
-              return c.isDecl() && isa<ConstructorDecl>(c.getDecl());
-            });
-
-        if (!meetsProtocolBaseMetatypeCriteria ||
-            !requiresProtocolMetatypeFix) {
-          auto fix =
-              AllowTypeOrInstanceMember::create(*this, baseTy, member, locator);
-          if (recordFix(fix))
-            // The fix wasn't successful, so return an error
-            return SolutionKind::Error;
-        }
-
-        addOverloadSet(memberTy, filteredCandidates, useDC, locator);
+      // If there are any viable "fixed" candidates, let's schedule
+      // them to be attempted.
+      if (!candidates.empty()) {
+        addOverloadSet(candidates, locator);
         return SolutionKind::Solved;
       }
     }
@@ -6367,6 +6548,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
       None, constraint.getLocator());
 
   case ConstraintKind::BindOverload:
+    if (auto *fix = constraint.getFix()) {
+      if (recordFix(fix))
+        return SolutionKind::Error;
+    }
+
     resolveOverload(constraint.getLocator(), constraint.getFirstType(),
                     constraint.getOverloadChoice(),
                     constraint.getOverloadUseDC());

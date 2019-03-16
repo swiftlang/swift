@@ -1364,19 +1364,6 @@ bool ContextualFailure::trySequenceSubsequenceFixIts(InFlightDiagnostic &diag,
   if (!String || !Substring)
     return false;
 
-  /// FIXME: Remove this flag when void subscripts are implemented.
-  /// Make this unconditional and remove the if statement.
-  if (CS.TC.getLangOpts().FixStringToSubstringConversions) {
-    // String -> Substring conversion
-    // Add '[]' void subscript call to turn the whole String into a Substring
-    if (fromType->isEqual(String)) {
-      if (toType->isEqual(Substring)) {
-        diag.fixItInsertAfter(expr->getEndLoc(), "[]");
-        return true;
-      }
-    }
-  }
-
   // Substring -> String conversion
   // Wrap in String.init
   if (fromType->isEqual(Substring)) {

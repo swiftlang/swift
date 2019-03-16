@@ -602,7 +602,7 @@ public:
 
   /// Return true if the given projection paths in \p CPaths does not cover
   /// all the fields with non-trivial semantics, false otherwise.
-  static bool hasUncoveredNonTrivials(SILType B, SILModule *Mod,
+  static bool hasUncoveredNonTrivials(SILType B, const SILFunction &F,
                                       ProjectionPathSet &CPaths);
 
   /// Returns true if the two paths have a non-empty symmetric

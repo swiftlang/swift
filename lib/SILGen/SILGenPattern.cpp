@@ -1441,7 +1441,7 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
   if (src.getType().isObject()) {
     // Make sure that if we have a copy_on_success, non-trivial value that we do
     // not have a value with @owned ownership.
-    assert((!src.getType().isTrivial(SGF.getModule()) ||
+    assert((!src.getType().isTrivial(SGF.F) ||
             src.getFinalConsumption() != CastConsumptionKind::CopyOnSuccess ||
             src.getOwnershipKind() != ValueOwnershipKind::Owned) &&
            "@owned value without cleanup + copy_on_success");
@@ -1868,37 +1868,44 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
     // instruction to receive the enum case data if it has any.
 
     SILType eltTy;
-    bool hasElt = false;
-    if (elt->hasAssociatedValues()) {
+    bool hasNonVoidAssocValue = false;
+    bool hasAssocValue = elt->hasAssociatedValues();
+    if (hasAssocValue) {
       eltTy = src.getType().getEnumElementType(elt, SGF.SGM.M);
-      hasElt = !eltTy.getASTType()->isVoid();
+      hasNonVoidAssocValue = !eltTy.getASTType()->isVoid();
     }
 
     ConsumableManagedValue eltCMV, origCMV;
 
-    // Empty cases.  Try to avoid making an empty tuple value if it's
-    // obviously going to be ignored.  This assumes that we won't even
-    // try to touch the value in such cases, although we may touch the
-    // cleanup (enough to see that it's not present).
-    if (!hasElt) {
-      bool hasNonAny = false;
-      for (auto &specRow : specializedRows) {
-        auto pattern = specRow.Patterns[0];
-        if (pattern &&
-            !isa<AnyPattern>(pattern->getSemanticsProvidingPattern())) {
-          hasNonAny = true;
-          break;
+    // Void (i.e. empty) cases.
+    //
+    if (!hasNonVoidAssocValue) {
+      // Inline constructor.
+      eltCMV = [&]() -> ConsumableManagedValue {
+        // If we have an associated value, rather than no payload at all, we
+        // still need to create the argument. So do that instead of creating the
+        // empty-tuple. Otherwise, we need to create undef or the empty-tuple.
+        if (hasAssocValue) {
+          return {SGF.B.createOwnedPhiArgument(eltTy),
+                  CastConsumptionKind::TakeAlways};
         }
-      }
 
-      SILValue result;
-      if (hasNonAny) {
-        result = SGF.emitEmptyTuple(loc);
-      } else {
-        result = SILUndef::get(SGF.SGM.Types.getEmptyTupleType(), SGF.SGM.M);
-      }
-      origCMV = ConsumableManagedValue::forUnmanaged(result);
-      eltCMV = origCMV;
+        // Otherwise, try to avoid making an empty tuple value if it's obviously
+        // going to be ignored. This assumes that we won't even try to touch the
+        // value in such cases, although we may touch the cleanup (enough to see
+        // that it's not present).
+        bool hasNonAny =
+            llvm::any_of(specializedRows, [&](const SpecializedRow &row) {
+              auto *p = row.Patterns[0];
+              return p && !isa<AnyPattern>(p->getSemanticsProvidingPattern());
+            });
+        if (hasNonAny) {
+          return ConsumableManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
+        }
+
+        return ConsumableManagedValue::forUnmanaged(
+            SILUndef::get(SGF.SGM.Types.getEmptyTupleType(), SGF.F));
+      }();
 
       // Okay, specialize on the argument.
     } else {
@@ -2071,7 +2078,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
       if (hasNonAny) {
         result = SGF.emitEmptyTuple(loc);
       } else {
-        result = SILUndef::get(SGF.SGM.Types.getEmptyTupleType(), SGF.SGM.M);
+        result = SILUndef::get(SGF.SGM.Types.getEmptyTupleType(), SGF.F);
       }
       origCMV = ConsumableManagedValue::forUnmanaged(result);
       eltCMV = origCMV;
@@ -2278,7 +2285,7 @@ emitBoolDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     Scope scope(SGF.Cleanups, CleanupLocation::get(loc));
 
     SILValue result
-      = SILUndef::get(SGF.SGM.Types.getEmptyTupleType(), SGF.SGM.M);
+      = SILUndef::get(SGF.SGM.Types.getEmptyTupleType(), SGF.F);
     ConsumableManagedValue CMV =
       ConsumableManagedValue::forUnmanaged(result);
 
@@ -2514,44 +2521,6 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
   }
 }
 
-namespace {
-  class FallthroughFinder : public ASTWalker {
-    bool &Result;
-  public:
-    FallthroughFinder(bool &Result) : Result(Result) {}
-
-    // We walk through statements.  If we find a fallthrough, then we got what
-    // we came for.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      if (isa<FallthroughStmt>(S))
-        Result = true;
-      
-      return { true, S };
-    }
-
-    // Expressions, patterns and decls cannot contain fallthrough statements, so
-    // there is no reason to walk into them.
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      return { false, E };
-    }
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-      return { false, P };
-    }
-
-    bool walkToDeclPre(Decl *D) override { return false; }
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
-    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
-  };
-} // end anonymous namespace
-
-
-static bool containsFallthrough(Stmt *S) {
-  bool Result = false;
-  S->walk(FallthroughFinder(Result));
-  return Result;
-}
-
-
 /// Context info used to emit FallthroughStmts.
 /// Since fallthrough-able case blocks must not bind variables, they are always
 /// emitted in the outermost scope of the switch.
@@ -2574,7 +2543,7 @@ static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
 
   assert(enumDecl->isObjC());
   assert(enumDecl->hasRawType());
-  assert(value.getType().isTrivial(SGF.getModule()));
+  assert(value.getType().isTrivial(SGF.F));
 
   // Get the enum type as an Any.Type value.
   SILType metatypeType = SGF.getLoweredType(
@@ -2585,7 +2554,7 @@ static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
   // Bitcast the enum value to its raw type. (This is only safe for @objc
   // enums.)
   SILType loweredRawType = SGF.getLoweredType(enumDecl->getRawType());
-  assert(loweredRawType.isTrivial(SGF.getModule()));
+  assert(loweredRawType.isTrivial(SGF.F));
   assert(loweredRawType.isObject());
   auto rawValue = SGF.B.createUncheckedTrivialBitCast(loc, value,
                                                       loweredRawType);
@@ -2763,8 +2732,8 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
                               const_cast<Expr*>(labelItem.getGuardExpr()),
                               hasFallthrough);
     }
-    
-    hasFallthrough = containsFallthrough(caseBlock->getBody());
+
+    hasFallthrough = caseBlock->hasFallthroughDest();
   }
 
   // Emit alloc_stacks for address-only variables appearing in

@@ -4700,14 +4700,14 @@ public:
   /// Search the operands of this struct for a unique non-trivial field. If we
   /// find it, return it. Otherwise return SILValue().
   SILValue getUniqueNonTrivialFieldValue() {
-    SILModule &Mod = getModule();
+    auto *F = getFunction();
     ArrayRef<Operand> Ops = getAllOperands();
 
     Optional<unsigned> Index;
     // For each operand...
     for (unsigned i = 0, e = Ops.size(); i != e; ++i) {
       // If the operand is not trivial...
-      if (!Ops[i].get()->getType().isTrivial(Mod)) {
+      if (!Ops[i].get()->getType().isTrivial(*F)) {
         // And we have not found an Index yet, set index to i and continue.
         if (!Index.hasValue()) {
           Index = i;
@@ -4993,14 +4993,14 @@ public:
   /// Search the operands of this tuple for a unique non-trivial elt. If we find
   /// it, return it. Otherwise return SILValue().
   SILValue getUniqueNonTrivialElt() {
-    SILModule &Mod = getModule();
+    auto *F = getFunction();
     ArrayRef<Operand> Ops = getAllOperands();
 
     Optional<unsigned> Index;
     // For each operand...
     for (unsigned i = 0, e = Ops.size(); i != e; ++i) {
       // If the operand is not trivial...
-      if (!Ops[i].get()->getType().isTrivial(Mod)) {
+      if (!Ops[i].get()->getType().isTrivial(*F)) {
         // And we have not found an Index yet, set index to i and continue.
         if (!Index.hasValue()) {
           Index = i;
@@ -5959,7 +5959,7 @@ public:
 class InitExistentialRefInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
           SILInstructionKind::InitExistentialRefInst, InitExistentialRefInst,
-          OwnershipForwardingSingleValueInst> {
+          SingleValueInstruction> {
   friend SILBuilder;
 
   CanType ConcreteType;
@@ -5970,8 +5970,7 @@ class InitExistentialRefInst final
                          ArrayRef<SILValue> TypeDependentOperands,
                          ArrayRef<ProtocolConformanceRef> Conformances)
       : UnaryInstructionWithTypeDependentOperandsBase(
-            DebugLoc, Instance, TypeDependentOperands, ExistentialType,
-            Instance.getOwnershipKind()),
+            DebugLoc, Instance, TypeDependentOperands, ExistentialType),
         ConcreteType(FormalConcreteType), Conformances(Conformances) {}
 
   static InitExistentialRefInst *
@@ -7189,6 +7188,15 @@ public:
     assert(hasDefault() && "doesn't have a default");
     return getSuccessorBuf()[getNumCases()];
   }
+
+  Optional<unsigned> getUniqueCaseForDestination(SILBasicBlock *bb) const {
+    for (unsigned i = 0; i < getNumCases(); ++i) {
+      if (getCase(i).second == bb) {
+        return i + 1;
+      }
+    }
+    return None;
+  }
 };
 
 /// Common implementation for the switch_enum and
@@ -7715,7 +7723,8 @@ class DestructureStructInst final
         MultipleValueInstructionTrailingObjects(this, Types, OwnershipKinds) {}
 
 public:
-  static DestructureStructInst *create(SILModule &M, SILDebugLocation Loc,
+  static DestructureStructInst *create(const SILFunction &F,
+                                       SILDebugLocation Loc,
                                        SILValue Operand);
   static bool classof(const SILNode *N) {
     return N->getKind() == SILNodeKind::DestructureStructInst;
@@ -7763,7 +7772,8 @@ class DestructureTupleInst final
         MultipleValueInstructionTrailingObjects(this, Types, OwnershipKinds) {}
 
 public:
-  static DestructureTupleInst *create(SILModule &M, SILDebugLocation Loc,
+  static DestructureTupleInst *create(const SILFunction &F,
+                                      SILDebugLocation Loc,
                                       SILValue Operand);
   static bool classof(const SILNode *N) {
     return N->getKind() == SILNodeKind::DestructureTupleInst;

@@ -64,6 +64,10 @@ def emit_interface_path
   : Separate<["-"], "emit-interface-path">,
     Alias<emit_parseable_module_interface_path>;
 
+def serialize_parseable_module_interface_dependency_hashes
+  : Flag<["-"], "serialize-parseable-module-interface-dependency-hashes">,
+    Flags<[HelpHidden]>;
+
 def tbd_install_name
   : Separate<["-"], "tbd-install_name">, MetaVarName<"<path>">,
     HelpText<"The install_name to use in an emitted TBD file">;
@@ -171,14 +175,8 @@ def disable_objc_attr_requires_foundation_module :
            "Foundation module">;
 
 def enable_resilience : Flag<["-"], "enable-resilience">,
-   HelpText<"Compile the module to export resilient interfaces for all "
-            "public declarations by default">;
+   HelpText<"Deprecated, use -enable-library-evolution instead">;
 
-def disable_legacy_type_info : Flag<["-"], "disable-legacy-type-info">,
-  HelpText<"Completely disable legacy type layout">;
-
-def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">,
-  HelpText<"Read legacy type layout from the given path instead of default path">;
 }
 
 
@@ -535,11 +533,6 @@ def validate_tbd_against_ir_EQ: Joined<["-"], "validate-tbd-against-ir=">,
     HelpText<"Compare the symbols in the IR against the TBD file that would be generated.">,
     MetaVarName<"<level>">;
 
-// FIXME: Remove this flag when void subscripts are implemented.
-// This is used to guard preemptive testing for the fix-it.
-def fix_string_substring_conversion: Flag<["-"], "fix-string-substring-conversion">,
-    HelpText<"Emit a fix-it to append '[]' to String expressions when converting to Substring.">;
-    
 def bypass_batch_mode_checks: Flag<["-"], "bypass-batch-mode-checks">,
     HelpText<"Bypass checks for batch-mode errors.">;
 
@@ -548,6 +541,12 @@ def enable_verify_exclusivity : Flag<["-"], "enable-verify-exclusivity">,
 
 def disable_verify_exclusivity : Flag<["-"], "disable-verify-exclusivity">,
   HelpText<"Diable verification of access markers used to enforce exclusivity.">;
+
+def disable_legacy_type_info : Flag<["-"], "disable-legacy-type-info">,
+  HelpText<"Completely disable legacy type layout">;
+
+def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">,
+  HelpText<"Read legacy type layout from the given path instead of default path">;
 
 def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
   Flags<[FrontendOption]>,

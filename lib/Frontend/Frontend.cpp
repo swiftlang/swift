@@ -24,6 +24,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/DWARFImporter/DWARFImporter.h"
+#include "swift/Frontend/ParseableInterfaceModuleLoader.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
@@ -285,10 +286,11 @@ bool CompilerInstance::setUpModuleLoaders() {
   if (hasSourceImport()) {
     bool immediate = FrontendOptions::isActionImmediate(
         Invocation.getFrontendOptions().RequestedAction);
-    bool enableResilience = Invocation.getFrontendOptions().EnableResilience;
+    bool enableLibraryEvolution =
+      Invocation.getFrontendOptions().EnableLibraryEvolution;
     Context->addModuleLoader(SourceLoader::create(*Context,
                                                   !immediate,
-                                                  enableResilience,
+                                                  enableLibraryEvolution,
                                                   getDependencyTracker()));
   }
   auto MLM = ModuleLoadingMode::OnlySerialized;
@@ -530,7 +532,7 @@ ModuleDecl *CompilerInstance::getMainModule() {
     if (Invocation.getFrontendOptions().EnableImplicitDynamic)
       MainModule->setImplicitDynamicEnabled();
 
-    if (Invocation.getFrontendOptions().EnableResilience)
+    if (Invocation.getFrontendOptions().EnableLibraryEvolution)
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
   }
   return MainModule;
