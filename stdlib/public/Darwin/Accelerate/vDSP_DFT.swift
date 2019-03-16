@@ -12,6 +12,80 @@
 
 import Accelerate
 
+//===----------------------------------------------------------------------===//
+//
+//  Discrete Fourier Transform
+//
+//===----------------------------------------------------------------------===//
+
+extension vDSP {
+    
+    public enum DFTTransformType {
+        case complexComplex
+        case complexReal
+    }
+    
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public class DFT <T: vDSP_FloatingPointDiscreteFourierTransformable> {
+        fileprivate let dftSetup: vDSP_DFT_Setup
+        
+        /// Initializes a new discrete Fourier transform structure.
+        ///
+        /// - Parameter previous: a previous vDSP_DFT instance to share data with.
+        /// - Parameter count: the number of real elements to be transformed.
+        /// - Parameter direction: Specifies the transform direction.
+        /// - Parameter transformType: Specficies whether to forward transform is real-to-complex or complex-to-complex.
+        public init?(previous: DFT? = nil,
+                     count: Int,
+                     direction: vDSP.FourierTransformDirection,
+                     transformType: DFTTransformType,
+                     ofType: T.Type) {
+            
+            guard let setup = T.DFTFunctions.makeDFTSetup(previous: previous,
+                                                          count: count,
+                                                          direction: direction,
+                                                          transformType: transformType) else {
+                                                            return nil
+            }
+            
+            dftSetup = setup
+        }
+        
+        /// Computes an out-of-place single-precision real discrete Fourier transform.
+        ///
+        /// - Parameter inputReal: Input vector - real part.
+        /// - Parameter inputImaginary: Input vector - imaginary part.
+        /// - Parameter outputReal: Output vector - real part.
+        /// - Parameter outputImaginary: Output vector - imaginary part.
+        ///
+        /// When the `transformType` is `complexComplex`, each array (Ir, Ii,
+        /// Or, and Oi) must have `count` elements.
+        ///
+        /// When the `transformType` is `complexReal`, each array (Ir, Ii,
+        /// Or, and Oi) must have `count/2` elements.
+        
+        public func transform<U, V>(inputReal: U,
+                                    inputImaginary: U,
+                                    outputReal: inout V,
+                                    outputImaginary: inout V)
+            where
+            U: _ContiguousCollection,
+            V: _MutableContiguousCollection,
+            U.Element == T, V.Element == T {
+                
+                T.DFTFunctions.transform(dftSetup: dftSetup,
+                                         inputReal: inputReal,
+                                         inputImaginary: inputImaginary,
+                                         outputReal: &outputReal,
+                                         outputImaginary: &outputImaginary)
+        }
+        
+        deinit {
+            T.DFTFunctions.destroySetup(dftSetup)
+        }
+    }
+}
+
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 public protocol vDSP_FloatingPointDiscreteFourierTransformable: BinaryFloatingPoint {
     associatedtype DFTFunctions: vDSP_DFTFunctions where DFTFunctions.Scalar == Self
@@ -51,6 +125,12 @@ public protocol vDSP_DFTFunctions {
     @inline(__always)
     static func destroySetup(_ setup: OpaquePointer)
 }
+
+//===----------------------------------------------------------------------===//
+//
+//  Type-specific DFT function implementations
+//
+//===----------------------------------------------------------------------===//
 
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 extension vDSP.VectorizableFloat: vDSP_DFTFunctions {
@@ -158,71 +238,4 @@ extension vDSP.VectorizableDouble: vDSP_DFTFunctions {
     }
 }
 
-extension vDSP {
-    
-    public enum DFTTransformType {
-        case complexComplex
-        case complexReal
-    }
-    
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public class DFT <T: vDSP_FloatingPointDiscreteFourierTransformable> {
-        fileprivate let dftSetup: vDSP_DFT_Setup
-        
-        /// Initializes a new discrete Fourier transform structure.
-        ///
-        /// - Parameter previous: a previous vDSP_DFT instance to share data with.
-        /// - Parameter count: the number of real elements to be transformed.
-        /// - Parameter direction: Specifies the transform direction.
-        /// - Parameter transformType: Specficies whether to forward transform is real-to-complex or complex-to-complex.
-        public init?(previous: DFT? = nil,
-                     count: Int,
-                     direction: vDSP.FourierTransformDirection,
-                     transformType: DFTTransformType,
-                     ofType: T.Type) {
-            
-            guard let setup = T.DFTFunctions.makeDFTSetup(previous: previous,
-                                                          count: count,
-                                                          direction: direction,
-                                                          transformType: transformType) else {
-                                                            return nil
-            }
-            
-            dftSetup = setup
-        }
-        
-        /// Computes an out-of-place single-precision real discrete Fourier transform.
-        ///
-        /// - Parameter inputReal: Input vector - real part.
-        /// - Parameter inputImaginary: Input vector - imaginary part.
-        /// - Parameter outputReal: Output vector - real part.
-        /// - Parameter outputImaginary: Output vector - imaginary part.
-        ///
-        /// When the `transformType` is `complexComplex`, each array (Ir, Ii,
-        /// Or, and Oi) must have `count` elements.
-        ///
-        /// When the `transformType` is `complexReal`, each array (Ir, Ii,
-        /// Or, and Oi) must have `count/2` elements.
-        
-        public func transform<U, V>(inputReal: U,
-                                    inputImaginary: U,
-                                    outputReal: inout V,
-                                    outputImaginary: inout V)
-            where
-            U: _ContiguousCollection,
-            V: _MutableContiguousCollection,
-            U.Element == T, V.Element == T {
-                
-                T.DFTFunctions.transform(dftSetup: dftSetup,
-                                         inputReal: inputReal,
-                                         inputImaginary: inputImaginary,
-                                         outputReal: &outputReal,
-                                         outputImaginary: &outputImaginary)
-        }
-        
-        deinit {
-            T.DFTFunctions.destroySetup(dftSetup)
-        }
-    }
-    
-}
+

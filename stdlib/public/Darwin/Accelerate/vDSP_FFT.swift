@@ -12,6 +12,151 @@
 
 import Accelerate
 
+//===----------------------------------------------------------------------===//
+//
+//  1D and 2D Fast Fourier Transform
+//
+//===----------------------------------------------------------------------===//
+
+@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+extension vDSP {
+    
+    /// An enumeration that defines the size of the FFT decomposition.
+    public enum Radix {
+        case radix2
+        case radix3
+        case radix5
+        
+        public var fftRadix: FFTRadix {
+            switch self {
+            case .radix2:
+                return FFTRadix(kFFTRadix2)
+            case .radix3:
+                return FFTRadix(kFFTRadix3)
+            case .radix5:
+                return FFTRadix(kFFTRadix5)
+            }
+        }
+    }
+    
+    /// A class that provides forward and inverse FFT on `DSPSplitComplex` or `DSPDoubleSplitComplex` structure.
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public class FFT<T: vDSP_FourierTransformable> {
+        
+        let log2n: vDSP_Length
+        let radix: Radix
+        
+        fileprivate let fftSetup: OpaquePointer
+        
+        /// Initializes a new fast Fourier transform structure.
+        ///
+        /// - Parameter log2n: The base-two logarithm of the maximum number of elements to be transformed.
+        /// - Parameter radix: Specifies radix options.
+        @inline(__always)
+        public init?(log2n: vDSP_Length,
+                     radix: Radix,
+                     ofType: T.Type) {
+            
+            self.log2n = log2n
+            self.radix = radix
+            
+            guard let setup = T.vDSP.makeFFTSetup(log2n: log2n,
+                                                  radix: radix) else {
+                                                    return nil
+            }
+            
+            fftSetup = setup
+        }
+        
+        @inline(__always)
+        /// Computes an out-of-place single-precision real forward or inverse fast Fourier transform.
+        ///
+        /// - Parameter input: Complex input vector.
+        /// - Parameter output: Complex output vector.
+        /// - Parameter direction: The transform direction.
+        public func transform<T: vDSP_FourierTransformable>(input: T,
+                                                            output: inout T,
+                                                            direction: vDSP.FourierTransformDirection) {
+            
+            vDSP_FFTFunctions.fftTransform(fftSetup: fftSetup,
+                                           log2n: log2n,
+                                           source: input,
+                                           destination: &output,
+                                           direction: direction)
+        }
+        
+        /// Computes an out-of-place single-precision real forward fast Fourier transform.
+        ///
+        /// - Parameter input: Complex input vector.
+        /// - Parameter output: Complex output vector.
+        public func forward(input: DSPSplitComplex,
+                            output: inout DSPSplitComplex) {
+            transform(input: input,
+                      output: &output,
+                      direction: .forward)
+        }
+        
+        /// Computes an out-of-place single-precision real inverse fast Fourier transform.
+        ///
+        /// - Parameter input: Complex input vector.
+        /// - Parameter output: Complex output vector.
+        public func inverse(input: DSPSplitComplex,
+                            output: inout DSPSplitComplex) {
+            transform(input: input,
+                      output: &output,
+                      direction: .inverse)
+        }
+        
+        /// Frees memory associated with this `FFT` struct.
+        deinit {
+            // vDSP_destroy_fftsetup(fftSetup)
+        }
+    }
+    
+    // MARK: 2D FFT
+    
+     /// A class that provides forward and inverse 2D FFT on `DSPSplitComplex` or `DSPDoubleSplitComplex` structure.
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public class FFT2D<T: vDSP_FourierTransformable>: FFT<T> {
+        
+        let width: Int
+        let height: Int
+        
+        @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+        @inline(__always)
+        required public init?(width: Int,
+                              height: Int,
+                              ofType: T.Type) {
+            self.width = width
+            self.height = height
+            
+            let log2n = vDSP_Length(log2(Float(width * height)))
+            
+            super.init(log2n: log2n,
+                       radix: .radix2,
+                       ofType: ofType)
+        }
+        
+        /// Computes an out-of-place single-precision real discrete Fourier transform.
+        ///
+        /// - Parameter input: Complex input vector.
+        /// - Parameter output: Complex output vector.
+        /// - Parameter direction: Specifies transform direction.
+        @inline(__always)
+        override public func transform<T: vDSP_FourierTransformable>(input: T,
+                                                                     output: inout T,
+                                                                     direction: vDSP.FourierTransformDirection) {
+            vDSP_FFTFunctions.fftTransform2D(fftSetup: fftSetup,
+                                             width: width,
+                                             height: height,
+                                             source: input,
+                                             destination: &output,
+                                             direction: direction)
+        }
+    }
+    
+}
+
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 public protocol vDSP_FourierTransformFunctions {
     associatedtype SplitComplex
@@ -32,6 +177,12 @@ public protocol vDSP_FourierTransformFunctions {
                             destination: UnsafeMutablePointer<SplitComplex>,
                             direction: vDSP.FourierTransformDirection)
 }
+
+//===----------------------------------------------------------------------===//
+//
+//  Type-specific FFT function implementations
+//
+//===----------------------------------------------------------------------===//
 
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 public struct vDSP_SplitComplexFloat: vDSP_FourierTransformFunctions {
@@ -167,139 +318,7 @@ struct vDSP_FFTFunctions {
     }
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-extension vDSP {
-    
-    public enum Radix {
-        case radix2
-        case radix3
-        case radix5
-        
-        public var fftRadix: FFTRadix {
-            switch self {
-            case .radix2:
-                return FFTRadix(kFFTRadix2)
-            case .radix3:
-                return FFTRadix(kFFTRadix3)
-            case .radix5:
-                return FFTRadix(kFFTRadix5)
-            }
-        }
-    }
-    
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public class FFT<T: vDSP_FourierTransformable> {
-        
-        let log2n: vDSP_Length
-        let radix: Radix
-        
-        fileprivate let fftSetup: OpaquePointer
-        
-        /// Initializes a new fast Fourier transform structure.
-        ///
-        /// - Parameter log2n: The base-two logarithm of the maximum number of elements to be transformed.
-        /// - Parameter radix: Specifies radix options.
-        @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-        @inline(__always)
-        public init?(log2n: vDSP_Length,
-              radix: Radix,
-              ofType: T.Type) {
-            
-            self.log2n = log2n
-            self.radix = radix
-            
-            guard let setup = T.vDSP.makeFFTSetup(log2n: log2n,
-                                                  radix: radix) else {
-                                                    return nil
-            }
-            
-            fftSetup = setup
-        }
-        
-        @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-        @inline(__always)
-        public func transform<T: vDSP_FourierTransformable>(input: T,
-                                                     output: inout T,
-                                                     direction: vDSP.FourierTransformDirection) {
-            
-            vDSP_FFTFunctions.fftTransform(fftSetup: fftSetup,
-                                           log2n: log2n,
-                                           source: input,
-                                           destination: &output,
-                                           direction: direction)
-        }
-        
-        /// Computes an out-of-place single-precision real forward discrete Fourier transform.
-        ///
-        /// - Parameter input: Complex input vector.
-        /// - Parameter output: Complex output vector.
-        public func forward(input: DSPSplitComplex,
-                     output: inout DSPSplitComplex) {
-            transform(input: input,
-                      output: &output,
-                      direction: .forward)
-        }
-        
-        /// Computes an out-of-place single-precision real inverse discrete Fourier transform.
-        ///
-        /// - Parameter input: Complex input vector.
-        /// - Parameter output: Complex output vector.
-        public func inverse(input: DSPSplitComplex,
-                     output: inout DSPSplitComplex) {
-            transform(input: input,
-                      output: &output,
-                      direction: .inverse)
-        }
-        
-        /// Frees memory associated with this `FFT` struct.
-        deinit {
-            // vDSP_destroy_fftsetup(fftSetup)
-        }
-    }
-    
-    // MARK: 2D FFT
-    
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public class FFT2D<T: vDSP_FourierTransformable>: FFT<T> {
-        
-        let width: Int
-        let height: Int
-        
-        @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-        @inline(__always)
-        required public init?(width: Int,
-                       height: Int,
-                       ofType: T.Type) {
-            self.width = width
-            self.height = height
-            
-            let log2n = vDSP_Length(log2(Float(width * height)))
-            
-            super.init(log2n: log2n,
-                       radix: .radix2,
-                       ofType: ofType)
-        }
-        
-        /// Computes an out-of-place single-precision real discrete Fourier transform.
-        ///
-        /// - Parameter input: Complex input vector.
-        /// - Parameter output: Complex output vector.
-        /// - Parameter direction: Specifies transform direction.
-        @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-        @inline(__always)
-        override public func transform<T: vDSP_FourierTransformable>(input: T,
-                                                              output: inout T,
-                                                              direction: vDSP.FourierTransformDirection) {
-            vDSP_FFTFunctions.fftTransform2D(fftSetup: fftSetup,
-                                             width: width,
-                                             height: height,
-                                             source: input,
-                                             destination: &output,
-                                             direction: direction)
-        }
-    }
-    
-}
+
 
 extension DSPSplitComplex {
     
