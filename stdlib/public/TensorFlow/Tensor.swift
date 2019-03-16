@@ -683,12 +683,14 @@ public extension Tensor {
   /// Return a copy of the tensor collapsed into a 1-D `Tensor`, in row-major
   /// order.
   @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func flattened() -> Tensor {
     return reshaped(to: [-1])
   }
 
   /// Returns a rank-lifted `Tensor` with a leading dimension of 1.
   @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func rankLifted() -> Tensor {
     return expandingShape(at: 0)
   }
@@ -710,6 +712,10 @@ public extension Tensor {
   // FIXME: The gradient for variadic `squeezed` is difficult to express because
   // ExpandDims only expands one axis at a time.
   @inlinable @inline(__always)
+  @differentiable(
+    wrt: self, vjp: _vjpSqueezingShape(at:)
+    where Scalar : TensorFlowFloatingPoint
+  )
   func squeezingShape(at axes: Int32...) -> Tensor {
     return Raw.squeeze(self, squeezeDims: axes)
   }

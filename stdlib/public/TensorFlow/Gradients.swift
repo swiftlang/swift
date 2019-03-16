@@ -540,8 +540,17 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
   ) -> (Tensor, (Tensor) -> Tensor) {
     let value = reshaped(toShape: newShape)
     return (value, { v in
-      return v.reshaped(toShape: self.shapeTensor)
+      return v.scalarCount == 1 ?
+        v.broadcast(toShape: self.shapeTensor) :
+        v.reshaped(toShape: self.shapeTensor)
     })
+  }
+
+  @inlinable
+  func _vjpSqueezingShape(at axes: Int32...) -> (Tensor, (Tensor) -> Tensor) {
+    // Cannot call squeezingShape(at:) since it has variadic arguments
+    let value = Raw.squeeze(self, squeezeDims: axes)
+    return (value, { $0.broadcast(toShape: self.shapeTensor) })
   }
 
   @inlinable
@@ -550,7 +559,9 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
   ) -> (Tensor, (Tensor) -> Tensor) {
     let value = expandingShape(at: shapeIndex)
     return (value, { v in
-      return v.squeezingShape(at: shapeIndex)
+      return v.scalarCount == 1 ?
+        v.broadcast(toShape: self.shapeTensor) :
+        v.reshaped(toShape: self.shapeTensor)
     })
   }
 }
