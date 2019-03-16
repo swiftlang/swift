@@ -393,6 +393,10 @@ protected:
     /// Information about a symbolic default argument, like #file.
     defaultArgumentKind : NumDefaultArgumentKindBits
   );
+  
+  SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2,
+    StaticSpelling : 2
+  );
 
   SWIFT_INLINE_BITFIELD(EnumElementDecl, ValueDecl, 1,
     /// The ResilienceExpansion to use for default arguments.
@@ -5090,25 +5094,40 @@ enum class ObjCSubscriptKind {
 /// signatures (indices and element type) are distinct.
 ///
 class SubscriptDecl : public GenericContext, public AbstractStorageDecl {
+  SourceLoc StaticLoc;
   SourceLoc ArrowLoc;
   ParameterList *Indices;
   TypeLoc ElementTy;
 
 public:
-  SubscriptDecl(DeclName Name, SourceLoc SubscriptLoc, ParameterList *Indices,
+  SubscriptDecl(DeclName Name,
+                SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
+                SourceLoc SubscriptLoc, ParameterList *Indices,
                 SourceLoc ArrowLoc, TypeLoc ElementTy, DeclContext *Parent,
                 GenericParamList *GenericParams)
     : GenericContext(DeclContextKind::SubscriptDecl, Parent),
-      AbstractStorageDecl(DeclKind::Subscript, false,
+      AbstractStorageDecl(DeclKind::Subscript,
+                          StaticSpelling != StaticSpellingKind::None,
                           Parent, Name, SubscriptLoc,
                           /*will be overwritten*/ StorageIsNotMutable),
-      ArrowLoc(ArrowLoc), Indices(nullptr), ElementTy(ElementTy) {
+      StaticLoc(StaticLoc), ArrowLoc(ArrowLoc),
+      Indices(nullptr), ElementTy(ElementTy) {
+    Bits.SubscriptDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     setIndices(Indices);
     setGenericParams(GenericParams);
   }
   
+  /// \returns the way 'static'/'class' was spelled in the source.
+  StaticSpellingKind getStaticSpelling() const {
+    return static_cast<StaticSpellingKind>(Bits.SubscriptDecl.StaticSpelling);
+  }
+  
+  SourceLoc getStaticLoc() const { return StaticLoc; }
   SourceLoc getSubscriptLoc() const { return getNameLoc(); }
-  SourceLoc getStartLoc() const { return getSubscriptLoc(); }
+  
+  SourceLoc getStartLoc() const {
+    return getStaticLoc().isValid() ? getStaticLoc() : getSubscriptLoc();
+  }
   SourceRange getSourceRange() const;
   SourceRange getSignatureSourceRange() const;
 
