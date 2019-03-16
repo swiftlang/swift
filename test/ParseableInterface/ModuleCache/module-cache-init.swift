@@ -17,7 +17,7 @@
 //
 // Phase 2: build OtherModule into a .swiftinterface _using_ LeafModule via LeafModule.swiftinterface, creating LeafModule-*.swiftmodule along the way.
 //
-// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -enable-parseable-module-interface -emit-parseable-module-interface-path %t/OtherModule.swiftinterface -module-name OtherModule %t/other.swift -emit-module -o /dev/null
+// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -emit-parseable-module-interface-path %t/OtherModule.swiftinterface -module-name OtherModule %t/other.swift -emit-module -o /dev/null
 // RUN: test -f %t/OtherModule.swiftinterface
 // RUN: %FileCheck %s -check-prefix=CHECK-OTHERINTERFACE <%t/OtherModule.swiftinterface
 // CHECK-OTHERINTERFACE: OtherFunc
@@ -31,7 +31,7 @@
 //
 // Phase 3: build TestModule into a .swiftmodule explicitly us OtherModule via OtherModule.swiftinterface, creating OtherModule-*.swiftmodule along the way.
 //
-// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -enable-parseable-module-interface -emit-module -emit-dependencies -emit-dependencies-path %t/TestModule.d -o %t/TestModule.swiftmodule -module-name TestModule %s
+// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -emit-module -emit-dependencies -emit-dependencies-path %t/TestModule.d -o %t/TestModule.swiftmodule -module-name TestModule %s
 // RUN: test -f %t/TestModule.swiftmodule
 // RUN: test -f %t/modulecache/OtherModule-*.swiftmodule
 // RUN: test -f %t/TestModule.d
