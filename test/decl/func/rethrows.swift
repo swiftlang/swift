@@ -10,6 +10,14 @@ let r3 : Optional<() rethrows -> ()> = nil // expected-error {{only function dec
 func f1(_ f: () throws -> ()) rethrows { try f() }
 func f2(_ f: () -> ()) rethrows { f() } // expected-error {{'rethrows' function must take a throwing function argument}}
 func f3(_ f: UndeclaredFunctionType) rethrows { f() } // expected-error {{use of undeclared type 'UndeclaredFunctionType'}}
+func f4(_ f: (() throws -> Void)?...) rethrows {} // expected-error {{'rethrows' function must take a throwing function argument}}
+func f5(_ f: ((() throws -> Void)?, Bool)) rethrows {} // expected-error {{'rethrows' function must take a throwing function argument}}
+
+typealias VoidToVoidThrows = () throws -> Void
+
+func f6(_ f: () throws -> Void...) rethrows {} // Ok
+func f7(_ f: [VoidToVoidThrows]) rethrows {} // Ok
+func f8(_ f: [() throws -> Void]?) rethrows {} // Ok
 
 /** Protocol conformance checking ********************************************/
 

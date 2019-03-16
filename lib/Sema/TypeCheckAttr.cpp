@@ -1567,6 +1567,16 @@ static bool hasThrowingFunctionParameter(CanType type) {
     return false;
   }
 
+  // Look into Array.Element.
+  if (auto boundStruct = dyn_cast<BoundGenericStructType>(type)) {
+    if (type->getASTContext().getArrayDecl() ==
+        boundStruct->getDecl()) {
+      return hasThrowingFunctionParameter(boundStruct
+                 ->getGenericArgs().front()
+                 ->getCanonicalType());
+    }
+  }
+
   // Suppress diagnostics in the presence of errors.
   if (type->hasError()) {
     return true;
