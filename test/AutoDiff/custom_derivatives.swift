@@ -70,20 +70,6 @@ CustomDerivativesTests.test("Checkpointing") {
   expectEqual(2, count)
 }
 
-
-@_semantics("autodiff.opaque")
-func functionWithRetroDeriv(x: Float) -> Float {
-  return x
-}
-@differentiating(functionWithRetroDeriv)
-func retroDeriv(x: Float) -> (value: Float, pullback: (Float) -> Float) {
-  return (value: x, pullback: { _ in 100 })
-}
-
-CustomDerivativesTests.test("Retroactive") {
-  expectEqual(100, gradient(at: 3, in: functionWithRetroDeriv))
-}
-
 CustomDerivativesTests.test("SumOfGradPieces") {
   var grad: Float = 0
   let addToGrad = { grad += $0 }

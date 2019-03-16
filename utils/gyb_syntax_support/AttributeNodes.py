@@ -293,8 +293,7 @@ ATTRIBUTE_NODES = [
     # SWIFT_ENABLE_TENSORFLOW
     # The argument of '@differentiating(...)'.
     # differentiating-attr-arguments ->
-    #     differentiable-attr-func-specifier # original
-    #     ','? differentiable-attr-parameters?
+    #     func-decl-name ','? differentiable-attr-parameters?
     Node('DifferentiatingAttributeArguments', kind='Syntax',
          description='''
          The arguments for the `@differentiating` attribute: the original
