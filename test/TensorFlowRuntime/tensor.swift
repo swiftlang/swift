@@ -38,7 +38,7 @@ TensorTests.testAllBackends("Initializers") {
 
 TensorTests.testAllBackends("FactoryInitializers") {
   let x = Tensor<Float>(ones: [1, 10])
-  expectEqual(ShapedArray(shape: [1, 10], repeating: 1), x.array)
+  expectEqual(ShapedArray(repeating: 1, shape: [1, 10]), x.array)
 }
 
 TensorTests.testAllBackends("NumericInitializers") {
@@ -57,7 +57,7 @@ TensorTests.testAllBackends("ScalarToTensorConversion") {
 }
 
 TensorTests.testAllBackends("ArrayConversion") {
-  let array3D = ShapedArray(shape: [2, 3, 4], repeating: 1.0)
+  let array3D = ShapedArray(repeating: 1.0, shape: [2, 3, 4])
   let tensor3D = Tensor(array3D)
   expectEqual(array3D, tensor3D.array)
 }
@@ -70,9 +70,9 @@ TensorTests.testAllBackends("DataTypeCast_NonTPU") {
   let ints = Tensor<Int64>(x)
   let floats = Tensor<Float>(x)
   let i8s = Tensor<Int8>(floats)
-  expectEqual(ShapedArray(shape: [5, 5], repeating: 1), ints.array)
-  expectEqual(ShapedArray(shape: [5, 5], repeating: 1), floats.array)
-  expectEqual(ShapedArray(shape: [5, 5], repeating: 1), i8s.array)
+  expectEqual(ShapedArray(repeating: 1, shape: [5, 5]), ints.array)
+  expectEqual(ShapedArray(repeating: 1, shape: [5, 5]), floats.array)
+  expectEqual(ShapedArray(repeating: 1, shape: [5, 5]), i8s.array)
 }
 
 TensorTests.testAllBackends("DataTypeCast_TPU") {
@@ -83,9 +83,9 @@ TensorTests.testAllBackends("DataTypeCast_TPU") {
   let ints = Tensor<Int64>(x)
   let floats = Tensor<Float>(x)
   let u32s = Tensor<UInt32>(floats)
-  expectEqual(ShapedArray(shape: [5, 5], repeating: 1), ints.array)
-  expectEqual(ShapedArray(shape: [5, 5], repeating: 1), floats.array)
-  expectEqual(ShapedArray(shape: [5, 5], repeating: 1), u32s.array)
+  expectEqual(ShapedArray(repeating: 1, shape: [5, 5]), ints.array)
+  expectEqual(ShapedArray(repeating: 1, shape: [5, 5]), floats.array)
+  expectEqual(ShapedArray(repeating: 1, shape: [5, 5]), u32s.array)
 }
 
 TensorTests.testAllBackends("BoolToNumericCast_NonTPU") {
@@ -285,7 +285,7 @@ TensorTests.testAllBackends("BatchNormalization") {
 }
 
 TensorTests.testAllBackends("Convolution") {
-  let x = Tensor<Float>(shape: [1, 1, 3, 3], repeating: 0.5)
+  let x = Tensor<Float>(repeating: 0.5, shape: [1, 1, 3, 3])
   let filter = Tensor<Float>(shape: [1, 1, 3, 3],
                              scalars: [0, 1, 0, 1, 1, 1, 0, 1, 0])
   let y = x.convolved2D(withFilter: filter, strides: (1, 1, 1, 1),
@@ -443,27 +443,25 @@ TensorTests.testAllBackends("ReshapeToScalar") {
 
 TensorTests.testAllBackends("ReshapeTensor") {
   // 2 x 3 -> 1 x 3 x 1 x 2 x 1
-  let x = Tensor<Float>(shape: [2, 3], repeating: 0.0)
-  let y = Tensor<Float>(shape: [1, 3, 1, 2, 1], repeating: 0.0)
+  let x = Tensor<Float>(repeating: 0.0, shape: [2, 3])
+  let y = Tensor<Float>(repeating: 0.0, shape: [1, 3, 1, 2, 1])
   let result = x.reshaped(like: y)
   expectEqual([1, 3, 1, 2, 1], result.shape)
 }
 
 TensorTests.testAllBackends("Unbroadcast1") {
-  let x = Tensor<Float>(shape: [2, 3, 4, 5], repeating: 1)
-  let y = Tensor<Float>(shape: [4, 5], repeating: 1)
+  let x = Tensor<Float>(repeating: 1, shape: [2, 3, 4, 5])
+  let y = Tensor<Float>(repeating: 1, shape: [4, 5])
   let z = x.unbroadcast(like: y)
-  expectEqual(ShapedArray<Float>(shape: [4, 5],
-                                 repeating: 6),
+  expectEqual(ShapedArray<Float>(repeating: 6, shape: [4, 5]),
               z.array)
 }
 
 TensorTests.testAllBackends("Unbroadcast2") {
-  let x = Tensor<Float>(shape: [2, 3, 4, 5], repeating: 1)
-  let y = Tensor<Float>(shape: [3, 1, 5], repeating: 1)
+  let x = Tensor<Float>(repeating: 1, shape: [2, 3, 4, 5])
+  let y = Tensor<Float>(repeating: 1, shape: [3, 1, 5])
   let z = x.unbroadcast(like: y)
-  expectEqual(ShapedArray<Float>(shape: [3, 1, 5],
-                                 repeating: 8),
+  expectEqual(ShapedArray<Float>(repeating: 8, shape: [3, 1, 5]),
               z.array)
 }
 
