@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 481; // Last change: custom attrs
+const uint16_t SWIFTMODULE_VERSION_MINOR = 482; // static subscripts
 
 using DeclIDField = BCFixed<31>;
 
@@ -1183,6 +1183,7 @@ namespace decls_block {
     DeclIDField, // overridden decl
     AccessLevelField, // access level
     AccessLevelField, // setter access, if applicable
+    StaticSpellingKindField,    // is subscript static?
     BCVBR<5>,    // number of parameter name components
     BCArray<IdentifierIDField> // name components,
                                // followed by DeclID accessors,
