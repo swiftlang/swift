@@ -41,7 +41,7 @@ NumpyConversionTests.test("shaped-array-conversion") {
   expectNil(ShapedArray<Double>(numpy: numpyArrayFloat))
   expectNil(ShapedArray<Int32>(numpy: numpyArrayFloat))
   if let array = expectNotNil(ShapedArray<Float>(numpy: numpyArrayFloat)) {
-    expectEqual(ShapedArray(shape: [2, 3], repeating: 1), array)
+    expectEqual(ShapedArray(repeating: 1, shape: [2, 3]), array)
   }
 
   let numpyArrayInt32 = np.array([[[1, 2, 3], [4, 5, 6]]], dtype: np.int32)
@@ -84,7 +84,7 @@ NumpyConversionTests.test("tensor-conversion") {
   expectNil(Tensor<Double>(numpy: numpyArrayFloat))
   expectNil(Tensor<Int32>(numpy: numpyArrayFloat))
   if let tensor = expectNotNil(Tensor<Float>(numpy: numpyArrayFloat)) {
-    expectEqual(ShapedArray(shape: [2, 3], repeating: 1), tensor.array)
+    expectEqual(ShapedArray(repeating: 1, shape: [2, 3]), tensor.array)
   }
 
   let numpyArrayInt32 = np.array([[[1, 2, 3], [4, 5, 6]]], dtype: np.int32)
@@ -109,13 +109,13 @@ NumpyConversionTests.test("tensor-round-trip") {
   guard numpyModule != nil else { return }
   guard ctypesModule != nil else { return }
 
-  let t1 = Tensor<Float>(shape: [1,2,3,4], repeating: 3.0)
+  let t1 = Tensor<Float>(repeating: 3.0, shape: [1,2,3,4])
   expectEqual(t1, Tensor<Float>(numpy: t1.makeNumpyArray())!)
 
   let t2 = Tensor<UInt8>(shape: [2,3], scalars: [1, 2, 3, 4, 5, 6])
   expectEqual(t2, Tensor<UInt8>(numpy: t2.makeNumpyArray())!)
 
-  let t3 = Tensor<Int32>(shape: [8,5,4], repeating: 30)
+  let t3 = Tensor<Int32>(repeating: 30, shape: [8,5,4])
   expectEqual(t3, Tensor<Int32>(numpy: t3.makeNumpyArray())!)
 }
 #endif

@@ -92,7 +92,7 @@ TensorADTests.testAllBackends("Abs") {
 }
 
 TensorADTests.testAllBackends("sum") {
-  let input = Tensor<Float>(shape: [2, 2], repeating: 42)
+  let input = Tensor<Float>(repeating: 42, shape: [2, 2])
   let sumPullbackScalar = pullback(at: input) { (a: Tensor<Float>) in a.sum() }
   let sumPullbackAlongAxes = pullback(at: input) { (a: Tensor<Float>) in a.sum(alongAxes: 0, 1) }
 
@@ -111,7 +111,7 @@ TensorADTests.testAllBackends("mean") {
   let meanGradAlongAxes = gradient { (a: Tensor<Float>) in a.mean(alongAxes: 0, 1) }
 
   let input = Tensor<Float>(ones: [2, 2])
-  let expected = Tensor<Float>(shape: [2, 2], repeating: 0.25)
+  let expected = Tensor<Float>(repeating: 0.25, shape: [2, 2])
   expectEqual(expected, meanGradScalar(input))
   // expectEqual(expected, meanGradSqueezingAxes(input))
   expectEqual(expected, meanGradAlongAxes(input))
@@ -150,7 +150,7 @@ TensorADTests.testAllBackends("softmax") {
 
 TensorADTests.testAllBackends("log_softmax") {
   let pb = pullback(at: Tensor(ones: [3, 3])) { (a: Tensor<Float>) in logSoftmax(a) }
-  expectEqual(Tensor(shape: [3, 3], repeating: 5.9604645e-08), pb(Tensor(ones: [3, 3])))
+  expectEqual(Tensor(repeating: 5.9604645e-08, shape: [3, 3]), pb(Tensor(ones: [3, 3])))
 }
 
 TensorADTests.testAllBackends("SR-9345: OwnedCheckpoints") {
