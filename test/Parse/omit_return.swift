@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %s -typecheck -verify
 
+import Foundation
+
 // MARK: - Helpers
 
 
@@ -26,6 +28,68 @@ func failableIdentity<T>(_ t: T) throws -> T { t }
 enum MyOwnNever {}
 
 func myOwnFatalError() -> MyOwnNever { fatalError() }
+
+struct MyOwnInt : ExpressibleByIntegerLiteral { init(integerLiteral: Int) {} }
+struct MyOwnFloat : ExpressibleByFloatLiteral { init(floatLiteral: Double) {} }
+struct MyOwnBoolean : ExpressibleByBooleanLiteral { init(booleanLiteral: Bool) {} }
+struct MyOwnString : ExpressibleByStringLiteral { init(stringLiteral: String) {} }
+struct MyOwnInterpolation : ExpressibleByStringInterpolation { init(stringLiteral: String) {} }
+
+enum Unit {
+    case only
+}
+
+struct Initable {}
+
+struct StructWithProperty {
+    var foo: Int
+}
+
+@dynamicMemberLookup
+struct DynamicStruct {
+    subscript(dynamicMember input: String) -> String { return input } 
+}
+
+class DynamicSubscriptClass {
+  @objc subscript (i : Int) -> String { "howdy" }
+}
+
+struct MyOwnArray<Element> : ExpressibleByArrayLiteral {
+    init(arrayLiteral elements: Element...) {}
+}
+
+struct MyOwnDictionary<Key, Value> : ExpressibleByDictionaryLiteral {
+    init(dictionaryLiteral elements: (Key, Value)...) {}
+}
+
+struct SubscriptableStruct {
+    subscript(int: Int) -> Int { int }
+}
+
+extension Int {
+    var zero: Int { 0 }
+}
+
+extension Optional where Wrapped == Int {
+    var someZero: Int? { .some(0) }
+}
+
+protocol SomeProto {
+    func foo() -> String
+}
+
+struct SomeProtoConformer : SomeProto {
+    func foo() -> String { "howdy" }
+}
+
+class SomeClass {}
+
+class Base {}
+class Derived : Base {}
+
+extension Int {
+    init() { self = 0 }
+}
 
 
 // MARK: - Notable Free Functions
@@ -245,6 +309,257 @@ func ff_optionalTryExplicitAddingThrows() throws -> String? {
 
 func ff_optionalTryImplicitAddingThrows() throws -> String? {
     try? failableIdentity("howdy")
+}
+
+// Inferred Return Types
+
+func ff_inferredIntegerLiteralInt() -> Int {
+    0
+}
+
+func ff_inferredIntegerLiteralInt8() -> Int8 {
+    0
+}
+
+func ff_inferredIntegerLiteralInt16() -> Int16 {
+    0
+}
+
+func ff_inferredIntegerLiteralInt32() -> Int32 {
+    0
+}
+
+func ff_inferredIntegerLiteralInt64() -> Int64 {
+    0
+}
+
+func ff_inferredIntegerLiteralMyOwnInt() -> MyOwnInt {
+    0
+}
+
+func ff_nilLiteralInt() -> Int? {
+    nil
+}
+
+func ff_inferredFloatLiteralFloat() -> Float {
+    0.0
+}
+
+func ff_inferredFloatLiteralDouble() -> Double {
+    0.0
+}
+
+func ff_inferredFloatLiteralMyOwnDouble() -> MyOwnFloat {
+    0.0
+}
+
+func ff_inferredBooleanLiteralBool() -> Bool {
+    true
+}
+
+func ff_inferredBooleanLiteralMyOwnBoolean() -> MyOwnBoolean {
+    true
+}
+
+func ff_inferredStringLiteralString() -> String {
+    "howdy"
+}
+
+func ff_inferredStringLiteralMyOwnString() -> MyOwnString {
+    "howdy"
+}
+
+func ff_inferredInterpolatedStringLiteralString() -> String {
+    "\(0) \(1)"
+}
+
+func ff_inferredInterpolatedStringLiteralString() -> MyOwnInterpolation {
+    "\(0) \(1)"
+}
+
+func ff_inferredMagicFile() -> StaticString {
+    #file
+}
+
+func ff_inferredMagicLine() -> UInt {
+    #line
+}
+
+func ff_inferredMagicColumn() -> UInt {
+    #column
+}
+
+func ff_inferredMagicFunction() -> StaticString {
+    #function
+}
+
+func ff_inferredMagicDSOHandle() -> UnsafeRawPointer {
+    #dsohandle
+}
+
+func ff_implicitDiscardExpr() {
+    _ = 3
+}
+
+func ff_implicitMetatype() -> String.Type {
+    String.self
+}
+
+func ff_implicitMemberRef(_ instance: StructWithProperty) -> Int {
+    instance.foo
+}
+
+func ff_implicitDynamicMember(_ s: DynamicStruct) -> String {
+    s.foo
+}
+
+func ff_implicitDynamicSubscript(_ c: DynamicSubscriptClass) -> String {
+    c[13]
+}
+
+func ff_implicitParenExpr() -> Int {
+    (3 + 5)
+}
+
+func ff_implicitTupleExpr() -> (Int, Int) {
+    (3, 5)
+}
+
+func ff_implicitArrayExprArray() -> [Int] {
+    [1, 3, 5]
+}
+
+func ff_implicitArrayExprSet() -> Set<Int> {
+    [1, 3, 5]
+}
+
+func ff_implicitArrayExprMyOwnArray() -> MyOwnArray<Int> {
+    [1, 3, 5]
+}
+
+func ff_implicitDictionaryExprDictionary() -> [Int : Int] {
+    [1 : 1, 2 : 2]
+}
+
+func ff_implicitDictionaryExprMyOwnDictionary() -> MyOwnDictionary<Int, Int> {
+    [1 : 1, 2 : 2]
+}
+
+func ff_implicitSubscriptExpr(_ s: SubscriptableStruct) -> Int {
+    s[13]
+}
+
+func ff_implicitKeyPathExprWritableKeyPath() -> WritableKeyPath<Int, Int> {
+    \Int.self
+}
+
+func ff_implicitKeyPathExprKeyPath() -> WritableKeyPath<Int, Int> {
+    \Int.self.self
+}
+
+func ff_implicitTupleElementExpr() -> Int {
+    (1,field:2).field
+}
+
+func ff_implicitBindExpr(_ opt: Int?) -> Int? {
+    opt?.zero
+}
+
+func ff_implicitOptionalEvaluation(_ opt: Int?) -> Int? {
+    (opt?.zero.zero).someZero
+}
+
+func ff_implicitForceValue(_ opt: Int?) -> Int {
+    opt!
+}
+
+func ff_implicitTemporarilyEscapableExpr(_ cl: () -> Void) -> () -> Void {
+    withoutActuallyEscaping(cl) { $0 }
+}
+
+func ff_implicitOpenExistentialExpr(_ f: SomeProto) -> String {
+    f.foo()
+}
+
+func ff_implicitClassMetatypeToAnyObjectExpr() -> AnyObject {
+    SomeClass.self
+}
+
+func ff_implicitInjectIntoOptionalExpr(_ int: Int) -> Int? {
+    int
+}
+
+func ff_implicitTupleShuffle(_ input: (one: Int, two: Int)) -> (two: Int, one: Int) {
+    input
+}
+
+func ff_implicitCollectionUpcast(_ deriveds: [Derived]) -> [Base] {
+    deriveds
+}
+
+func ff_implicitErasureExpr(_ conformer: SomeProtoConformer) -> SomeProto {
+    conformer
+}
+
+func ff_implicitAnyHashableErasureExpr(_ int: Int) -> AnyHashable {
+    int
+}
+
+func ff_implicitCallExpr<Input, Output>(input: Input, function: (Input) -> Output) -> Output {
+    function(input)
+}
+
+func ff_implicitPrefixUnaryOperator(int: Int) -> Int {
+    -int
+}
+
+func ff_implicitBinaryOperator(lhs: Int, rhs: Int) -> Int {
+    lhs - rhs
+}
+
+func ff_implicitConstructorCallRefExpr(lhs: Int, rhs: Int) -> Int {
+    Int()
+}
+
+func ff_implicitIsExpr<T>(t: T) -> Bool {
+    t is Int
+}
+
+func ff_implicitCoerceExpr<T>() -> T.Type {
+    T.self as T.Type
+}
+
+func ff_implicitConditionalCheckedCastExprAs<T>(t: T) -> Int? {
+    t as? Int
+}
+
+func ff_implicitForceCheckedCastExpr<T>(t: T) -> Int {
+    t as! Int
+}
+
+func ff_conditional(_ condition: Bool) -> Int {
+    condition ? 1 : -1
+}
+
+var __ff_implicitAssignExpr: Int = 0
+func ff_implicitAssignExpr(newValue: Int) -> Void {
+    __ff_implicitAssignExpr = newValue
+}
+
+func ff_implicitObjcSelectorExpr() -> Selector {
+    #selector(NSArray.object(at:))
+}
+
+func ff_implicitKeyPathExpr() -> String {
+    #keyPath(NSArray.count)
+}
+
+func ff_implicitMemberAccessInit() -> Initable {
+    .init()
+}
+
+func ff_implicitMemberAccessEnumCase() -> Unit {
+    .only
 }
 
 
@@ -1406,3 +1721,15 @@ class D_optionalTryUnusedImplicit {
         try? failableLogAndReturn("oh") // expected-warning {{result of 'try?' is unused}}
     }
 }
+
+
+
+// Miscellanceous
+
+class CSuperExpr_Base { init() {} }
+class CSuperExpr_Derived : CSuperExpr_Base { override init() { super.init() } }
+
+class CImplicitIdentityExpr { func gimme() -> CImplicitIdentityExpr { self } }
+
+class CImplicitDotSelfExpr { func gimme() -> CImplicitDotSelfExpr { self.self } }
+
