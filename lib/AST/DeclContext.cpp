@@ -223,9 +223,8 @@ bool DeclContext::isTypeContext() const {
 DeclContext *DeclContext::getInnermostTypeContext() {
   auto dc = this;
   do {
-    if (auto decl = dc->getAsDecl())
-      if (isa<NominalTypeDecl>(decl) || isa<ExtensionDecl>(decl))
-        return dc;
+    if (dc->isTypeContext())
+      return dc;
   } while ((dc = dc->getParent()));
 
   return nullptr;
