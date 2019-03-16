@@ -188,7 +188,7 @@ extension vDSP {
     }
     
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    class FFT<T: vDSP_FourierTransformable> {
+    public class FFT<T: vDSP_FourierTransformable> {
         
         let log2n: vDSP_Length
         let radix: Radix
@@ -201,7 +201,7 @@ extension vDSP {
         /// - Parameter radix: Specifies radix options.
         @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
         @inline(__always)
-        init?(log2n: vDSP_Length,
+        public init?(log2n: vDSP_Length,
               radix: Radix,
               ofType: T.Type) {
             
@@ -218,7 +218,7 @@ extension vDSP {
         
         @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
         @inline(__always)
-        func transform<T: vDSP_FourierTransformable>(input: T,
+        public func transform<T: vDSP_FourierTransformable>(input: T,
                                                      output: inout T,
                                                      direction: vDSP.FourierTransformDirection) {
             
@@ -233,7 +233,7 @@ extension vDSP {
         ///
         /// - Parameter input: Complex input vector.
         /// - Parameter output: Complex output vector.
-        func forward(input: DSPSplitComplex,
+        public func forward(input: DSPSplitComplex,
                      output: inout DSPSplitComplex) {
             transform(input: input,
                       output: &output,
@@ -244,7 +244,7 @@ extension vDSP {
         ///
         /// - Parameter input: Complex input vector.
         /// - Parameter output: Complex output vector.
-        func inverse(input: DSPSplitComplex,
+        public func inverse(input: DSPSplitComplex,
                      output: inout DSPSplitComplex) {
             transform(input: input,
                       output: &output,
@@ -260,14 +260,14 @@ extension vDSP {
     // MARK: 2D FFT
     
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    class FFT2D<T: vDSP_FourierTransformable>: FFT<T> {
+    public class FFT2D<T: vDSP_FourierTransformable>: FFT<T> {
         
         let width: Int
         let height: Int
         
         @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
         @inline(__always)
-        required init?(width: Int,
+        required public init?(width: Int,
                        height: Int,
                        ofType: T.Type) {
             self.width = width
@@ -287,7 +287,7 @@ extension vDSP {
         /// - Parameter direction: Specifies transform direction.
         @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
         @inline(__always)
-        override func transform<T: vDSP_FourierTransformable>(input: T,
+        override public func transform<T: vDSP_FourierTransformable>(input: T,
                                                               output: inout T,
                                                               direction: vDSP.FourierTransformDirection) {
             vDSP_FFTFunctions.fftTransform2D(fftSetup: fftSetup,
@@ -308,7 +308,7 @@ extension DSPSplitComplex {
     /// - Parameter inputArray: The source array of contiguous values.
     /// - Parameter realParts: An array of real parts of the complex numbers.
     /// - Parameter imaginaryParts: An array of imaginary parts of the complex numbers.
-    init(fromInputArray inputArray: [Float],
+    public init(fromInputArray inputArray: [Float],
          realParts: inout [Float],
          imaginaryParts: inout [Float]) {
         
@@ -330,7 +330,7 @@ extension DSPDoubleSplitComplex {
     /// - Parameter inputArray: The source array of contiguous values.
     /// - Parameter realParts: An array of real parts of the complex numbers.
     /// - Parameter imaginaryParts: An array of imaginary parts of the complex numbers.
-    init(fromInputArray inputArray: [Double],
+    public init(fromInputArray inputArray: [Double],
          realParts: inout [Double],
          imaginaryParts: inout [Double]) {
         
@@ -350,7 +350,7 @@ extension Array where Element == Float {
     ///
     /// - Parameter scale: A multiplier to apply during conversion.
     /// - Parameter count: The length of the required resulting array (typically half the count of either the real or imaginary parts of the `DSPSplitComplex`.
-    init(fromSplitComplex splitComplex: DSPSplitComplex,
+    public init(fromSplitComplex splitComplex: DSPSplitComplex,
          scale: Float,
          count: Int) {
         var complexPairs = [DSPComplex](repeating: DSPComplex(real: 0, imag: 0),
@@ -382,7 +382,7 @@ extension Array where Element == Double {
     ///
     /// - Parameter scale: A multiplier to apply during conversion.
     /// - Parameter count: The length of the required resulting array (typically half the count of either the real or imaginary parts of the `DSPSplitComplex`.
-    init(fromSplitComplex splitComplex: DSPDoubleSplitComplex,
+    public init(fromSplitComplex splitComplex: DSPDoubleSplitComplex,
          scale: Double,
          count: Int) {
         var complexPairs = [DSPDoubleComplex](repeating: DSPDoubleComplex(real: 0, imag: 0),

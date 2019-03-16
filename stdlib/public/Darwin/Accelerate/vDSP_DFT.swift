@@ -13,22 +13,22 @@
 import Accelerate
 
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-protocol vDSP_FloatingPointDiscreteFourierTransformable: BinaryFloatingPoint {
+public protocol vDSP_FloatingPointDiscreteFourierTransformable: BinaryFloatingPoint {
     associatedtype DFTFunctions: vDSP_DFTFunctions where DFTFunctions.Scalar == Self
 }
 
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 extension Float: vDSP_FloatingPointDiscreteFourierTransformable {
-    typealias DFTFunctions = vDSP.VectorizableFloat
+    public typealias DFTFunctions = vDSP.VectorizableFloat
 }
 
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 extension Double: vDSP_FloatingPointDiscreteFourierTransformable {
-    typealias DFTFunctions = vDSP.VectorizableDouble
+    public typealias DFTFunctions = vDSP.VectorizableDouble
 }
 
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-protocol vDSP_DFTFunctions {
+public protocol vDSP_DFTFunctions {
     associatedtype Scalar
     
     @inline(__always)
@@ -56,7 +56,7 @@ protocol vDSP_DFTFunctions {
 extension vDSP.VectorizableFloat: vDSP_DFTFunctions {
     
     @inline(__always)
-    static func makeDFTSetup<T>(previous: vDSP.DFT<T>? = nil,
+    public static func makeDFTSetup<T>(previous: vDSP.DFT<T>? = nil,
                                 count: Int,
                                 direction: vDSP.FourierTransformDirection,
                                 transformType: vDSP.DFTTransformType) -> OpaquePointer?
@@ -75,7 +75,7 @@ extension vDSP.VectorizableFloat: vDSP_DFTFunctions {
     }
     
     @inline(__always)
-    static func transform<U, V>(dftSetup: OpaquePointer,
+    public static func transform<U, V>(dftSetup: OpaquePointer,
                                 inputReal: U, inputImaginary: U,
                                 outputReal: inout V, outputImaginary: inout V)
         where
@@ -100,7 +100,7 @@ extension vDSP.VectorizableFloat: vDSP_DFTFunctions {
     }
     
     @inline(__always)
-    static func destroySetup(_ setup: OpaquePointer) {
+    public static func destroySetup(_ setup: OpaquePointer) {
         vDSP_DFT_DestroySetup(setup)
     }
 }
@@ -109,7 +109,7 @@ extension vDSP.VectorizableFloat: vDSP_DFTFunctions {
 extension vDSP.VectorizableDouble: vDSP_DFTFunctions {
     
     @inline(__always)
-    static func makeDFTSetup<T>(previous: vDSP.DFT<T>? = nil,
+    public static func makeDFTSetup<T>(previous: vDSP.DFT<T>? = nil,
                                 count: Int,
                                 direction: vDSP.FourierTransformDirection,
                                 transformType: vDSP.DFTTransformType) -> OpaquePointer?
@@ -128,7 +128,7 @@ extension vDSP.VectorizableDouble: vDSP_DFTFunctions {
     }
     
     @inline(__always)
-    static func transform<U, V>(dftSetup: OpaquePointer,
+    public static func transform<U, V>(dftSetup: OpaquePointer,
                                 inputReal: U, inputImaginary: U,
                                 outputReal: inout V, outputImaginary: inout V)
         where
@@ -153,7 +153,7 @@ extension vDSP.VectorizableDouble: vDSP_DFTFunctions {
     }
     
     @inline(__always)
-    static func destroySetup(_ setup: OpaquePointer) {
+    public static func destroySetup(_ setup: OpaquePointer) {
         vDSP_DFT_DestroySetupD(setup)
     }
 }
@@ -166,7 +166,7 @@ extension vDSP {
     }
     
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    class DFT <T: vDSP_FloatingPointDiscreteFourierTransformable> {
+    public class DFT <T: vDSP_FloatingPointDiscreteFourierTransformable> {
         fileprivate let dftSetup: vDSP_DFT_Setup
         
         /// Initializes a new discrete Fourier transform structure.
@@ -175,11 +175,11 @@ extension vDSP {
         /// - Parameter count: the number of real elements to be transformed.
         /// - Parameter direction: Specifies the transform direction.
         /// - Parameter transformType: Specficies whether to forward transform is real-to-complex or complex-to-complex.
-        init?(previous: DFT? = nil,
-              count: Int,
-              direction: vDSP.FourierTransformDirection,
-              transformType: DFTTransformType,
-              ofType: T.Type) {
+        public init?(previous: DFT? = nil,
+                     count: Int,
+                     direction: vDSP.FourierTransformDirection,
+                     transformType: DFTTransformType,
+                     ofType: T.Type) {
             
             guard let setup = T.DFTFunctions.makeDFTSetup(previous: previous,
                                                           count: count,
@@ -204,10 +204,10 @@ extension vDSP {
         /// When the `transformType` is `complexReal`, each array (Ir, Ii,
         /// Or, and Oi) must have `count/2` elements.
         
-        func transform<U, V>(inputReal: U,
-                             inputImaginary: U,
-                             outputReal: inout V,
-                             outputImaginary: inout V)
+        public func transform<U, V>(inputReal: U,
+                                    inputImaginary: U,
+                                    outputReal: inout V,
+                                    outputImaginary: inout V)
             where
             U: _ContiguousCollection,
             V: _MutableContiguousCollection,
