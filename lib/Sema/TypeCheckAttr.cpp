@@ -2968,7 +2968,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   Identifier autoDiffAssocTyId;
   if (valueResultElt.getName().str() != "value") {
     TC.diagnose(attr->getLocation(),
-                diag::differentiating_attr_expected_result_tuple_value_label);
+                diag::differentiating_attr_invalid_result_tuple_value_label);
     attr->setInvalid();
     return;
   }
@@ -2980,7 +2980,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     autoDiffAssocTyId = ctx.Id_CotangentVector;
   } else {
     TC.diagnose(attr->getLocation(),
-                diag::differentiating_attr_expected_result_tuple_func_label);
+                diag::differentiating_attr_invalid_result_tuple_func_label);
     attr->setInvalid();
     return;
   }
@@ -2999,27 +2999,9 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     attr->setInvalid();
     return;
   }
-  // Pullback must take one parameter with type `R.CotangentVector`.
-  // FIXME(TF-363): Fix type-checking for differentials. The current logic is
-  // completely wrong.
-  auto seedTy = ProtocolConformanceRef::getTypeWitnessByName(
-      valueResultType, *valueResultConf, autoDiffAssocTyId,
-      ctx.getLazyResolver());
-  auto funcEltType = funcResultElt.getType()->getAs<AnyFunctionType>();
-  if (funcEltType->hasTypeParameter())
-    funcEltType = derivative->mapTypeIntoContext(
-        funcResultElt.getType())->getAs<AnyFunctionType>();
-  if (!funcEltType || funcEltType->getNumParams() != 1 ||
-      !funcEltType->getParams().front().getPlainType()->isEqual(seedTy)) {
-    TC.diagnose(attr->getLocation(),
-                diag::differentiating_attr_result_func_invalid_parameter,
-                funcResultElt.getName(), seedTy);
-    attr->setInvalid();
-    return;
-  }
 
   // Gather inferred differentiation parameters.
-  SmallVector<TupleTypeElt, 4> diffParams;
+  SmallVector<TupleTypeElt, 4> diffParamElts;
   auto addDiffParam = [&](Type paramType) {
     auto conf = TC.conformsToProtocol(paramType, diffableProto, derivative,
                                       ConformanceCheckFlags::Used);
@@ -3027,7 +3009,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
       return;
     auto diffParamType = ProtocolConformanceRef::getTypeWitnessByName(
         paramType, *conf, autoDiffAssocTyId, ctx.getLazyResolver());
-    diffParams.push_back(TupleTypeElt(diffParamType));
+    diffParamElts.push_back(TupleTypeElt(diffParamType));
   };
 
   auto *derivativeInterfaceType =
@@ -3053,20 +3035,37 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     addDiffParam(paramType);
   }
   // There must be at least one differentiation parameter.
-  if (diffParams.empty()) {
+  if (diffParamElts.empty()) {
     TC.diagnose(attr->getLocation(),
                 diag::differentiating_attr_no_diff_parameters);
     attr->setInvalid();
     return;
   }
 
-  // Check returned parameter derivatives type against expected type.
-  auto expectedDiffParamsType = TupleType::get(diffParams, ctx);
-  auto diffParamsType = funcEltType->getResult();
-  if (!diffParamsType || !diffParamsType->isEqual(expectedDiffParamsType)) {
+  // Get vector type: the associated type of the value result type.
+  auto vectorTy = ProtocolConformanceRef::getTypeWitnessByName(
+      valueResultType, *valueResultConf, autoDiffAssocTyId,
+      ctx.getLazyResolver());
+
+  // Compute expected differential/pullback type.
+  auto funcEltType = funcResultElt.getType();
+  Type expectedFuncEltType;
+  if (kind == AutoDiffAssociatedFunctionKind::JVP) {
+    auto diffParams = map<SmallVector<AnyFunctionType::Param, 4>>(
+        diffParamElts, [&](TupleTypeElt elt) {
+          return AnyFunctionType::Param(elt.getType());
+        });
+    expectedFuncEltType = FunctionType::get(diffParams, vectorTy);
+  } else {
+    expectedFuncEltType = FunctionType::get({AnyFunctionType::Param(vectorTy)},
+                                            TupleType::get(diffParamElts, ctx));
+  }
+  expectedFuncEltType = expectedFuncEltType->mapTypeOutOfContext();
+  // Check if differential/pullback type matches expected type.
+  if (!funcEltType->isEqual(expectedFuncEltType)) {
     TC.diagnose(attr->getLocation(),
-                diag::differentiating_attr_unexpected_diff_params_type,
-                diffParamsType, expectedDiffParamsType);
+                diag::differentiating_attr_result_func_invalid_type,
+                funcResultElt.getName(), funcEltType, expectedFuncEltType);
     attr->setInvalid();
     return;
   }
