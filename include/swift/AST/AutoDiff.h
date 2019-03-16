@@ -187,9 +187,13 @@ class AutoDiffParameterIndicesBuilder {
   llvm::SmallBitVector parameters;
 
 public:
-  /// Start building an `AutoDiffParameterIndices` for the given function type.
-  AutoDiffParameterIndicesBuilder(AnyFunctionType *functionType,
-                                  bool setAllParams = false);
+  /// Creates a `AutoDiffParameterIndicesBuilder` for the given function type.
+  AutoDiffParameterIndicesBuilder(AnyFunctionType *functionType);
+
+  /// Creates a `AutoDiffParameterIndicesBuilder` for the given function type,
+  /// inferring all differentiation parameters.
+  static AutoDiffParameterIndicesBuilder inferParameters(
+      AnyFunctionType *functionType, ModuleDecl *module);
 
   /// Builds the `AutoDiffParameterIndices`, returning a pointer to an existing
   /// one if it has already been allocated in the `ASTContext`.
@@ -201,9 +205,6 @@ public:
 
   /// Sets the parameters at indices in the specified range.
   void setParameters(unsigned lowerBound, unsigned upperBound);
-
-  /// Sets all parameters.
-  void setAllParameters();
 
   /// Returns the number of parameters.
   unsigned size() { return parameters.size(); }

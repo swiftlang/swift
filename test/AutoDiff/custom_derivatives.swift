@@ -70,7 +70,6 @@ CustomDerivativesTests.test("Checkpointing") {
   expectEqual(2, count)
 }
 
-
 @_semantics("autodiff.opaque")
 func functionWithRetroDeriv(x: Float) -> Float {
   return x
