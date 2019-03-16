@@ -114,9 +114,11 @@ extension Tracked : Strideable where T : Strideable, T.Stride == T.Stride.Magnit
   }
 }
 
-// For now, `T` must be restricted to trivial types (like `Float` or `Tensor`)
-extension Tracked : Differentiable where T : Differentiable, T : AdditiveArithmetic
-   , T.AllDifferentiableVariables == T, T.CotangentVector == T, T.TangentVector == T {
+// For now, `T` must be restricted to trivial types (like `Float` or `Tensor`).
+extension Tracked : Differentiable
+  where T : Differentiable, T == T.AllDifferentiableVariables,
+        T == T.TangentVector, T == T.CotangentVector
+{
   public typealias AllDifferentiableVariables = Tracked<T.AllDifferentiableVariables>
   public typealias TangentVector = Tracked<T.TangentVector>
   public typealias CotangentVector = Tracked<T.CotangentVector>
@@ -127,15 +129,15 @@ extension Tracked : Differentiable where T : Differentiable, T : AdditiveArithme
 }
 
 @differentiable(vjp: _vjpAdd)
-public func +(_ a: Tracked<Float>, _ b: Tracked<Float>) -> Tracked<Float> {
+public func + (_ a: Tracked<Float>, _ b: Tracked<Float>) -> Tracked<Float> {
   return Tracked<Float>(a.value + b.value)
 }
 
 @usableFromInline
 func _vjpAdd(_ a: Tracked<Float>, _ b: Tracked<Float>)
     -> (Tracked<Float>, (Tracked<Float>) -> (Tracked<Float>, Tracked<Float>)) {
-  return (Tracked<Float>(a.value + b.value), { r in
-    return (r, r)
+  return (Tracked<Float>(a.value + b.value), { v in
+    return (v, v)
   })
 }
 
