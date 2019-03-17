@@ -1465,12 +1465,6 @@ public:
   Pattern *resolvePattern(Pattern *P, DeclContext *dc,
                           bool isStmtCondition);
 
-  /// Given the type of the given variable (which must have a property
-  /// behavior), form the stored property type that results from applying
-  /// the behavior.
-  Type applyPropertyBehaviorType(Type type, VarDecl *var,
-                                 TypeResolution resolution);
-
   /// Type check the given pattern.
   ///
   /// \param P The pattern to type check.

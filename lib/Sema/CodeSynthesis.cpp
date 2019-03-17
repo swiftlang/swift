@@ -20,6 +20,7 @@
 #include "TypeChecker.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
+#include "TypeCheckPropertyBehaviors.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Expr.h"
@@ -732,7 +733,9 @@ void createPropertyStoreOrCallSuperclassSetter(AccessorDecl *accessor,
 LLVM_ATTRIBUTE_UNUSED
 static bool isSynthesizedComputedProperty(AbstractStorageDecl *storage) {
   return (storage->getAttrs().hasAttribute<LazyAttr>() ||
-          storage->getAttrs().hasAttribute<NSManagedAttr>());
+          storage->getAttrs().hasAttribute<NSManagedAttr>() ||
+          (isa<VarDecl>(storage) &&
+           cast<VarDecl>(storage)->hasPropertyBehavior()));
 }
 
 /// Synthesize the body of a trivial getter.  For a non-member vardecl or one
@@ -743,8 +746,7 @@ static void synthesizeTrivialGetterBody(AccessorDecl *getter,
                                         TargetImpl target,
                                         ASTContext &ctx) {
   auto storage = getter->getStorage();
-  assert(!storage->getAttrs().hasAttribute<LazyAttr>() &&
-         !storage->getAttrs().hasAttribute<NSManagedAttr>());
+  assert(!isSynthesizedComputedProperty(storage));
 
   SourceLoc loc = storage->getLoc();
 
@@ -792,6 +794,26 @@ static void synthesizeReadCoroutineGetterBody(AccessorDecl *getter,
   synthesizeTrivialGetterBody(getter, TargetImpl::Implementation, ctx);
 }
 
+/// Synthesize the body of a getter for a property behavior, which
+/// delegates to the behavior's unwrap property.
+static void synthesizePropertyBehaviorGetterBody(AccessorDecl *getter,
+                                                 ASTContext &ctx) {
+  auto var = cast<VarDecl>(getter->getStorage());
+  auto backingVar = getOrSynthesizePropertyBehaviorBackingProperty(var);
+  auto unwrapVar = getPropertyBehaviorUnwrapProperty(var);
+
+  if (!backingVar || !unwrapVar)
+    return;
+
+  auto backingValue = createPropertyLoadOrCallSuperclassGetter(
+      getter, backingVar, TargetImpl::Storage, ctx);
+  auto unwrapRef = new (ctx) MemberRefExpr(
+      backingValue, SourceLoc(), unwrapVar, DeclNameLoc(), /*Implicit=*/true);
+  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), unwrapRef);
+  getter->setBody(
+      BraceStmt::create(ctx, SourceLoc(), { returnStmt }, SourceLoc()));
+}
+
 /// Synthesize the body of a setter which just stores to the given storage
 /// declaration (which doesn't have to be the storage for the setter).
 static void
@@ -820,6 +842,31 @@ static void synthesizeTrivialSetterBody(AccessorDecl *setter,
   assert(!isSynthesizedComputedProperty(storage));
   synthesizeTrivialSetterBodyWithStorage(setter, TargetImpl::Storage,
                                          storage, ctx);
+}
+
+/// Synthesize the body of a setter for a property behavior, which
+/// delegates to the behavior's unwrap property.
+static void synthesizePropertyBehaviorSetterBody(AccessorDecl *setter,
+                                                 ASTContext &ctx) {
+  auto var = cast<VarDecl>(setter->getStorage());
+  auto backingVar = getOrSynthesizePropertyBehaviorBackingProperty(var);
+  auto unwrapVar = getPropertyBehaviorUnwrapProperty(var);
+
+  if (!backingVar || !unwrapVar)
+    return;
+
+  VarDecl *newValueParamDecl = getFirstParamDecl(setter);
+  auto *newValueDRE =
+    new (ctx) DeclRefExpr(newValueParamDecl, DeclNameLoc(), IsImplicit);
+
+  auto backingValue =
+      buildStorageReference(setter, backingVar, TargetImpl::Storage, ctx);
+  auto unwrapRef = new (ctx) MemberRefExpr(
+      backingValue, SourceLoc(), unwrapVar, DeclNameLoc(), /*Implicit=*/true);
+  auto assign =
+      new (ctx) AssignExpr(unwrapRef, SourceLoc(), newValueDRE, IsImplicit);
+  setter->setBody(
+      BraceStmt::create(ctx, SourceLoc(), { assign }, SourceLoc()));
 }
 
 static void synthesizeCoroutineAccessorBody(AccessorDecl *accessor,
@@ -1386,6 +1433,61 @@ void swift::completeLazyVarImplementation(VarDecl *VD) {
   Storage->overwriteSetterAccess(AccessLevel::Private);
 }
 
+VarDecl *swift::getOrSynthesizePropertyBehaviorBackingProperty(VarDecl *var) {
+  // FIXME: Didn't want to recompile everything just yet. Don't merge this :)
+  static llvm::DenseMap<VarDecl *, VarDecl *> backingVars;
+  VarDecl *backingVar = backingVars[var];
+  if (backingVar) return backingVar;
+
+  ASTContext &ctx = var->getASTContext();
+
+  // Compute the name of the storage type.
+  SmallString<64> nameBuf;
+  nameBuf = "$";
+  nameBuf += var->getName().str();
+  Identifier name = ctx.getIdentifier(nameBuf);
+
+  // Determine the type of the storage.
+  auto dc = var->getDeclContext();
+  Type storageInterfaceType =
+      applyPropertyBehaviorType(var->getInterfaceType(), var,
+                                TypeResolution::forInterface(dc));
+  Type storageType = dc->mapTypeIntoContext(storageInterfaceType);
+
+  // Create the backing storage property and note it in the cache.
+  backingVar = new (ctx) VarDecl(/*IsStatic=*/var->isStatic(),
+                                 VarDecl::Specifier::Var,
+                                 /*IsCaptureList=*/false,
+                                 var->getPropertyBehaviorByLoc(),
+                                 name, dc);
+  backingVars[var] = backingVar;
+
+  backingVar->setInterfaceType(storageInterfaceType);
+  backingVar->setType(storageType);
+  backingVar->setImplicit();
+  addMemberToContextIfNeeded(backingVar, dc, var);
+
+  // Create the pattern binding declaration for the backing property.
+  // FIXME: If the original property had an initializer, we'll have an
+  // initializer.
+  Pattern *pbdPattern = new (ctx) NamedPattern(backingVar, /*implicit=*/true);
+  pbdPattern = TypedPattern::createImplicit(ctx, pbdPattern, storageType);
+  auto pbd = PatternBindingDecl::createImplicit(
+      ctx, backingVar->getCorrectStaticSpelling(), pbdPattern,
+      /*init*/nullptr, dc, var->getPropertyBehaviorByLoc());
+  addMemberToContextIfNeeded(pbd, dc, var);
+
+  // Mark the backing property as 'final'. There's no sensible way to override.
+  if (dc->getSelfClassDecl())
+    makeFinal(ctx, backingVar);
+
+  // FIXME: Extra syntax could escalate the access level.
+  backingVar->overwriteAccess(AccessLevel::Private);
+  backingVar->overwriteSetterAccess(AccessLevel::Private);
+
+  return backingVar;
+}
+
 static bool wouldBeCircularSynthesis(AbstractStorageDecl *storage,
                                      AccessorKind kind) {
   switch (kind) {
@@ -1463,6 +1565,32 @@ static void maybeAddAccessorsToLazyVariable(VarDecl *var, ASTContext &ctx) {
   addExpectedOpaqueAccessorsToStorage(var, ctx);
 }
 
+static void maybeAddAccessorsForPropertyBehavior(VarDecl *var,
+                                                 ASTContext &ctx) {
+  auto behaviorVar = getPropertyBehaviorUnwrapProperty(var);
+  if (!behaviorVar)
+    return;
+
+  // If there are already accessors, something is invalid; bail out.
+  if (!var->getImplInfo().isSimpleStored())
+    return;
+
+  if (!var->getGetter()) {
+    addGetterToStorage(var, ctx);
+  }
+
+  if (!var->getSetter() && behaviorVar->isSettable(nullptr)) {
+    addSetterToStorage(var, ctx);
+  }
+
+  if (behaviorVar->isSettable(nullptr))
+    var->overwriteImplInfo(StorageImplInfo::getMutableComputed());
+  else
+    var->overwriteImplInfo(StorageImplInfo::getImmutableComputed());
+
+  addExpectedOpaqueAccessorsToStorage(var, ctx);
+}
+
 /// Try to add the appropriate accessors required a storage declaration.
 /// This needs to be idempotent.
 ///
@@ -1476,6 +1604,14 @@ void swift::maybeAddAccessorsToStorage(AbstractStorageDecl *storage) {
   if (storage->getAttrs().hasAttribute<LazyAttr>()) {
     maybeAddAccessorsToLazyVariable(cast<VarDecl>(storage), ctx);
     return;
+  }
+
+  // Property behaviors require backing storage.
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    if (var->hasPropertyBehavior()) {
+      maybeAddAccessorsForPropertyBehavior(var, ctx);
+      return;
+    }
   }
 
   auto *dc = storage->getDeclContext();
@@ -1555,6 +1691,16 @@ void swift::maybeAddAccessorsToStorage(AbstractStorageDecl *storage) {
 
 static void synthesizeGetterBody(AccessorDecl *getter,
                                  ASTContext &ctx) {
+  auto storage = getter->getStorage();
+
+  // Synthesize the getter for a property behavior.
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    if (var->hasPropertyBehavior()) {
+      synthesizePropertyBehaviorGetterBody(getter, ctx);
+      return;
+    }
+  }
+
   if (getter->hasForcedStaticDispatch()) {
     synthesizeTrivialGetterBody(getter, TargetImpl::Ordinary, ctx);
     return;
@@ -1585,7 +1731,17 @@ static void synthesizeGetterBody(AccessorDecl *getter,
 
 static void synthesizeSetterBody(AccessorDecl *setter,
                                  ASTContext &ctx) {
-  switch (setter->getStorage()->getWriteImpl()) {
+  auto storage = setter->getStorage();
+
+  // Synthesize the setter for a property behavior.
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    if (var->hasPropertyBehavior()) {
+      synthesizePropertyBehaviorSetterBody(setter, ctx);
+      return;
+    }
+  }
+
+  switch (storage->getWriteImpl()) {
   case WriteImplKind::Immutable:
     llvm_unreachable("synthesizing setter from immutable storage");
 

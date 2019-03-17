@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -debugger-support
 
 struct Wrapper<T> {
   var value: T
@@ -9,9 +9,9 @@ struct Wrapper<T> {
 // ---------------------------------------------------------------------------
 
 func testParsing() {
-  let wrapped1: Int by Wrapper
-  let wrapped2: Int by Wrapper = Wrapper(value: 5)
-  let wrapped3 by Wrapper = Wrapper(value: 5)
+  var wrapped1: Int by Wrapper
+  var wrapped2: Int by Wrapper = 5
+  var wrapped3 by Wrapper = 5
 
   _ = wrapped1
   _ = wrapped2
@@ -34,13 +34,7 @@ func testParseError() {
 func testExplicitWrapperType() {
   var wrapped1: Int by Wrapper
 
-  wrapped1 = "Hello" // expected-error{{cannot assign value of type 'String' to type 'Wrapper<Int>'}}
-}
-
-func testImplicitWrapperType() {
-  var wrapped1 by Wrapper = .init(value: 5)
-
-  wrapped1 = "Hello" // expected-error{{cannot assign value of type 'String' to type 'Wrapper<Int>'}}
+  wrapped1 = "Hello" // expected-error{{cannot assign value of type 'String' to type 'Int'}}
 }
 
 struct NonGenericWrapper { }
@@ -56,4 +50,11 @@ func testBadWrapperTypes() {
   _ = wrapped2
   _ = wrapped3
   _ = wrapped4
+}
+
+// ---------------------------------------------------------------------------
+// Property behaviors as members
+// ---------------------------------------------------------------------------
+struct HasBehavior {
+  var wrapped1: Int by Wrapper
 }

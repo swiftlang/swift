@@ -57,6 +57,10 @@ void triggerAccessorSynthesis(TypeChecker &TC, AbstractStorageDecl *storage);
 /// which must be lazy.
 void completeLazyVarImplementation(VarDecl *lazyVar);
 
+/// Retrieve or synthesize the backing property for the given property
+/// behavior.
+VarDecl *getOrSynthesizePropertyBehaviorBackingProperty(VarDecl *var);
+
 /// Describes the kind of implicit constructor that will be
 /// generated.
 enum class ImplicitConstructorKind {
