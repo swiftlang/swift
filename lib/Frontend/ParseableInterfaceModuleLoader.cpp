@@ -258,7 +258,6 @@ class swift::ParseableInterfaceBuilder {
   void configureSubInvocationInputsAndOutputs(StringRef OutPath) {
     auto &SubFEOpts = subInvocation.getFrontendOptions();
     SubFEOpts.RequestedAction = FrontendOptions::ActionType::EmitModuleOnly;
-    SubFEOpts.EnableParseableModuleInterface = true;
     SubFEOpts.InputsAndOutputs.addPrimaryInputFile(interfacePath);
     SupplementaryOutputPaths SOPs;
     SOPs.ModuleOutputPath = OutPath.str();
@@ -712,9 +711,6 @@ class ParseableInterfaceModuleLoaderImpl {
 
     if (validationInfo.status != serialization::Status::Valid)
       return false;
-
-    assert(validationInfo.name == moduleName &&
-           "we built a module at this path with a different name?");
 
     return dependenciesAreUpToDate(allDeps);
   }

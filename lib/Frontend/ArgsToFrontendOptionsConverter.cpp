@@ -163,8 +163,6 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
   Opts.ImportUnderlyingModule |= Args.hasArg(OPT_import_underlying_module);
-  Opts.EnableParseableModuleInterface |=
-      Args.hasArg(OPT_enable_parseable_module_interface);
   Opts.EnableSerializationNestedTypeLookupTable &=
       !Args.hasArg(OPT_disable_serialization_nested_type_lookup_table);
 
