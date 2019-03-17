@@ -11,10 +11,15 @@ func sin(_ x: Float) -> Float {
 func vjpSin(x: Float) -> (value: Float, pullback: (Float) -> Float) {
   return (x, { $0 })
 }
-@differentiating(sin)
+@differentiating(sin, wrt: x) // ok
+func vjpSinExplicitWrt(x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  return (x, { $0 })
+}
+@differentiating(sin) // ok
 func jvpSin(x: @nondiff Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
+
 // expected-error @+1 {{'@differentiating' attribute requires function to return a two-element tuple of type '(value: T..., pullback: (U.CotangentVector) -> T.CotangentVector...)' or '(value: T..., differential: (T.TangentVector...) -> U.TangentVector)'}}
 @differentiating(sin)
 func jvpSinResultInvalid(x: @nondiff Float) -> Float {
@@ -44,7 +49,7 @@ func generic<T : Differentiable>(_ x: T, _ y: T) -> T {
 func vjpGeneric<T : Differentiable>(x: T, y: T) -> (value: T, pullback: (T.CotangentVector) -> (T.CotangentVector, T.CotangentVector)) {
   return (x, { ($0, $0) })
 }
-@differentiating(generic)
+@differentiating(generic) // ok
 func jvpGeneric<T : Differentiable>(x: T, y: T) -> (value: T, differential: (T.TangentVector, T.TangentVector) -> T.TangentVector) {
   return (x, { $0 + $1 })
 }
@@ -58,12 +63,65 @@ func vjpGenericWrongLabel<T : Differentiable>(x: T, y: T) -> (value: T, (T) -> (
 func vjpGenericDiffParamMismatch<T : Differentiable>(x: T) -> (value: T, pullback: (T) -> (T, T)) where T == T.CotangentVector {
   return (x, { ($0, $0) })
 }
-@differentiating(generic)
+@differentiating(generic) // ok
 func vjpGenericExtraGenericRequirements<T : Differentiable & FloatingPoint>(x: T, y: T) -> (value: T, pullback: (T) -> (T, T)) where T == T.CotangentVector {
   return (x, { ($0, $0) })
 }
 
 func foo<T : FloatingPoint & Differentiable>(_ x: T) -> T { return x }
+
+// Test `wrt` clauses.
+
+func add(x: Float, y: Float) -> Float {
+  return x + y
+}
+@differentiating(add, wrt: x) // ok
+func vjpAddWrtX(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float)) {
+  return (x + y, { $0 })
+}
+@differentiating(add, wrt: (x, y)) // ok
+func vjpAddWrtXY(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float, Float)) {
+  return (x + y, { ($0, $0) })
+}
+// expected-error @+1 {{unknown parameter name 'z'}}
+@differentiating(add, wrt: z)
+func vjpUnknownParam(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float)) {
+  return (x + y, { $0 })
+}
+// expected-error @+1 {{parameter names must be specified in original order}}
+@differentiating(add, wrt: (y, x))
+func vjpParamOrderNotIncreasing(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float, Float)) {
+  return (x + y, { ($0, $0) })
+}
+// expected-error @+1 {{'self' parameter is only applicable to instance methods}}
+@differentiating(add, wrt: self)
+func vjpInvalidSelfParam(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float, Float)) {
+  return (x + y, { ($0, $0) })
+}
+
+func noParams() -> Float {
+  return 1
+}
+// expected-error @+1 {{'vjpNoParams()' has no parameters to differentiate with respect to}}
+@differentiating(noParams)
+func vjpNoParams() -> (value: Float, pullback: (Float) -> Float) {
+  return (1, { $0 })
+}
+
+func noDiffParams(x: Int) -> Float {
+  return 1
+}
+// expected-error @+1 {{no differentiation parameters could be inferred; must differentiate with respect to at least one parameter conforming to 'Differentiable'}}
+@differentiating(noDiffParams)
+func vjpNoDiffParams(x: Int) -> (value: Float, pullback: (Float) -> Int) {
+  return (1, { _ in 0 })
+}
+
+// expected-error @+1 {{functions ('@differentiable (Float) -> Float') cannot be differentiated with respect to}}
+@differentiable(wrt: fn)
+func invalidDiffWrtFunction(_ fn: @differentiable(Float) -> Float) -> Float {
+  return fn(.pi)
+}
 
 // expected-error @+2 {{type 'T' does not conform to protocol 'FloatingPoint'}}
 // expected-error @+1 {{could not find function 'foo' with expected type '<T where T : AdditiveArithmetic, T : Differentiable> (T) -> T'}}
@@ -136,6 +194,11 @@ extension InstanceMethod {
   func vjpFoo(x: Self) -> (value: Self, pullback: (Self.CotangentVector) -> (Self.CotangentVector, Self.CotangentVector)) {
     return (x, { ($0, $0) })
   }
+
+  @differentiating(foo, wrt: (self, x))
+  func vjpFooWrt(x: Self) -> (value: Self, pullback: (Self.CotangentVector) -> (Self.CotangentVector, Self.CotangentVector)) {
+    return (x, { ($0, $0) })
+  }
 }
 
 extension InstanceMethod {
@@ -153,6 +216,11 @@ extension InstanceMethod {
 
   @differentiating(bar)
   func jvpBar<T : Differentiable>(_ x: T) -> (value: Self, differential: (Self.TangentVector, T.TangentVector) -> Self.TangentVector) {
+    return (self, { dself, dx in dself })
+  }
+
+  @differentiating(bar, wrt: (self, x))
+  func jvpBarWrt<T : Differentiable>(_ x: T) -> (value: Self, differential: (Self.TangentVector, T.TangentVector) -> Self.TangentVector) {
     return (self, { dself, dx in dself })
   }
 }
