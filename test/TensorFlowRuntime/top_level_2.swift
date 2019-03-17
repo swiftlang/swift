@@ -7,7 +7,11 @@
 // lib/Sema/PlaygroundTransform.cpp generates calls into.
 
 import TensorFlow
+#if TPU
+import TensorFlowUnittestTPU
+#else
 import TensorFlowUnittest
+#endif
 import StdlibUnittest
 
 var TopLevelTests = TestSuite("TopLevel")

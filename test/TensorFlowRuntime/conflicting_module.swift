@@ -11,7 +11,11 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
+#if TPU
+import TensorFlowUnittestTPU
+#else
 import TensorFlowUnittest
+#endif
 
 import ConflictingModule1
 import ConflictingModule2

@@ -16,7 +16,7 @@ import StdlibUnittest
 
 var RawOpsTests = TestSuite("RawOps")
 
-@_inlineable @inline(__always)
+@inlinable @inline(__always)
 public func testPointwiseBinaryOp<T : TensorFlowScalar & Equatable>(
   tfOp: (Tensor<Float>, Tensor<Float>) -> Tensor<T>,
   swiftOp: (Float, Float) -> T) {

@@ -8,7 +8,11 @@
 
 import CTensorFlow
 import TensorFlow
+#if TPU
+import TensorFlowUnittestTPU
+#else
 import TensorFlowUnittest
+#endif
 import StdlibUnittest
 
 var RuntimeEntryPointTests = TestSuite("RuntimeEntryPoint")
