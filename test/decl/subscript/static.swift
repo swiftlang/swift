@@ -9,4 +9,4 @@ struct MyStruct {
 }
 
 print(MyStruct.self[0])
-//print(MyStruct[0])
+print(MyStruct[0])
