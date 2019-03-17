@@ -2893,10 +2893,10 @@ makeFunctionType(AnyFunctionType *copy, ArrayRef<AnyFunctionType::Param> params,
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-// Return the original function type corresponding to the given derivative
+// Compute the original function type corresponding to the given derivative
 // function type.
 static AnyFunctionType *
-getAutoDiffOriginalFunctionType(AnyFunctionType *derivativeType) {
+computeAutoDiffOriginalFunctionType(AnyFunctionType *derivativeType) {
   // Unwrap curry levels.
   SmallVector<AnyFunctionType *, 2> curryLevels;
   auto *currentLevel = derivativeType;
@@ -2936,6 +2936,14 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   auto lookupConformance =
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
   auto original = attr->getOriginal();
+
+  auto *derivativeInterfaceType = derivative->getInterfaceType()
+      ->eraseDynamicSelfType()->castTo<AnyFunctionType>();
+  auto *derivativeType = isMethod
+      ? derivative->getMethodInterfaceType()->castTo<AnyFunctionType>()
+      : derivativeInterfaceType;
+
+  // Perform preliminary checks.
 
   // If the original function has no parameters or returns the empty tuple
   // type, there's nothing to differentiate from or with-respect-to.
@@ -3000,83 +3008,9 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     return;
   }
 
-  // Gather inferred differentiation parameters.
-  SmallVector<TupleTypeElt, 4> diffParamElts;
-  auto addDiffParam = [&](Type paramType) {
-    auto conf = TC.conformsToProtocol(paramType, diffableProto, derivative,
-                                      ConformanceCheckFlags::Used);
-    if (!conf)
-      return;
-    auto diffParamType = ProtocolConformanceRef::getTypeWitnessByName(
-        paramType, *conf, autoDiffAssocTyId, ctx.getLazyResolver());
-    diffParamElts.push_back(TupleTypeElt(diffParamType));
-  };
-
-  auto *derivativeInterfaceType =
-      derivative->getInterfaceType()->castTo<AnyFunctionType>();
-  auto *derivativeType = isMethod
-      ? derivative->getMethodInterfaceType()->castTo<AnyFunctionType>()
-      : derivativeInterfaceType;
-  // If `derivative` is an instance method, check whether `Self` conforms to
-  // `Differentiable`.
-  if (isInstanceMethod) {
-    auto selfType = derivative->getImplicitSelfDecl()->getInterfaceType();
-    if (selfType->hasTypeParameter())
-      selfType = derivative->getParent()->mapTypeIntoContext(selfType);
-    addDiffParam(selfType);
-  }
-  // Check whether every parameter conforms to `Differentiable`.
-  for (auto param : derivativeType->getParams()) {
-    auto paramType = param.getPlainType();
-    if (param.isNonDifferentiable())
-      continue;
-    if (paramType->hasTypeParameter())
-      paramType = derivative->mapTypeIntoContext(paramType);
-    addDiffParam(paramType);
-  }
-  // There must be at least one differentiation parameter.
-  if (diffParamElts.empty()) {
-    TC.diagnose(attr->getLocation(),
-                diag::differentiating_attr_no_diff_parameters);
-    attr->setInvalid();
-    return;
-  }
-
-  // Get vector type: the associated type of the value result type.
-  auto vectorTy = ProtocolConformanceRef::getTypeWitnessByName(
-      valueResultType, *valueResultConf, autoDiffAssocTyId,
-      ctx.getLazyResolver());
-
-  // Compute expected differential/pullback type.
-  auto funcEltType = funcResultElt.getType();
-  Type expectedFuncEltType;
-  if (kind == AutoDiffAssociatedFunctionKind::JVP) {
-    auto diffParams = map<SmallVector<AnyFunctionType::Param, 4>>(
-        diffParamElts, [&](TupleTypeElt elt) {
-          return AnyFunctionType::Param(elt.getType());
-        });
-    expectedFuncEltType = FunctionType::get(diffParams, vectorTy);
-  } else {
-    expectedFuncEltType = FunctionType::get({AnyFunctionType::Param(vectorTy)},
-                                            TupleType::get(diffParamElts, ctx));
-  }
-  expectedFuncEltType = expectedFuncEltType->mapTypeOutOfContext();
-  // Check if differential/pullback type matches expected type.
-  if (!funcEltType->isEqual(expectedFuncEltType)) {
-    // Emit an error highlighting the differential/pullback type.
-    auto *tupleReturnTypeRepr =
-        cast<TupleTypeRepr>(derivative->getReturnTypeLoc().getTypeRepr());
-    auto *funcEltTypeRepr = tupleReturnTypeRepr->getElementType(1);
-    TC.diagnose(funcEltTypeRepr->getStartLoc(),
-                diag::differentiating_attr_result_func_unexpected_type,
-                funcResultElt.getName(), expectedFuncEltType)
-        .highlight(funcEltTypeRepr->getSourceRange());
-    attr->setInvalid();
-    return;
-  }
-
+  // Compute expected original function type and look up original function.
   auto *originalFnType =
-      getAutoDiffOriginalFunctionType(derivativeInterfaceType);
+      computeAutoDiffOriginalFunctionType(derivativeInterfaceType);
 
   std::function<bool(GenericSignature *, GenericSignature *)>
     checkGenericSignatureSatisfied =
@@ -3106,6 +3040,8 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
         checkGenericSignatureSatisfied);
   };
 
+  // TODO: Do not reuse incompatible `@differentiable` attribute diagnostics.
+  // Rename compatible diagnostics so that they're not attribute-specific.
   auto overloadDiagnostic = [&]() {
     TC.diagnose(original.Loc, diag::differentiating_attr_overload_not_found,
                 original.Name, originalFnType);
@@ -3159,6 +3095,87 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     return;
   }
   attr->setOriginalFunction(originalFn);
+
+  // Gather inferred differentiation parameters.
+  SmallVector<TupleTypeElt, 4> diffParamElts;
+  auto addDiffParam = [&](Type paramType) {
+    auto conf = TC.conformsToProtocol(paramType, diffableProto, derivative,
+                                      ConformanceCheckFlags::Used);
+    if (!conf)
+      return;
+    auto diffParamType = ProtocolConformanceRef::getTypeWitnessByName(
+        paramType, *conf, autoDiffAssocTyId, ctx.getLazyResolver());
+    diffParamElts.push_back(TupleTypeElt(diffParamType));
+  };
+
+  // If `derivative` is an instance method, check whether `Self` conforms to
+  // `Differentiable`.
+  if (isInstanceMethod) {
+    auto selfType = derivative->getImplicitSelfDecl()->getInterfaceType();
+    if (selfType->hasTypeParameter())
+      selfType = derivative->getParent()->mapTypeIntoContext(selfType);
+    addDiffParam(selfType);
+  }
+  // Check whether every parameter conforms to `Differentiable`.
+  for (auto param : derivativeType->getParams()) {
+    auto paramType = param.getPlainType();
+    if (param.isNonDifferentiable())
+      continue;
+    if (paramType->hasTypeParameter())
+      paramType = derivative->mapTypeIntoContext(paramType);
+    addDiffParam(paramType);
+  }
+  // There must be at least one differentiation parameter.
+  if (diffParamElts.empty()) {
+    TC.diagnose(attr->getLocation(),
+                diag::differentiating_attr_no_diff_parameters);
+    attr->setInvalid();
+    return;
+  }
+
+  // Check differentiation parameters.
+  // Get vector type: the associated type of the value result type.
+  auto vectorTy = ProtocolConformanceRef::getTypeWitnessByName(
+      valueResultType, *valueResultConf, autoDiffAssocTyId,
+      ctx.getLazyResolver());
+
+  // Compute expected differential/pullback type.
+  auto funcEltType = funcResultElt.getType();
+  Type expectedFuncEltType;
+  if (kind == AutoDiffAssociatedFunctionKind::JVP) {
+    auto diffParams = map<SmallVector<AnyFunctionType::Param, 4>>(
+        diffParamElts, [&](TupleTypeElt elt) {
+          return AnyFunctionType::Param(elt.getType());
+        });
+    expectedFuncEltType = FunctionType::get(diffParams, vectorTy);
+  } else {
+    expectedFuncEltType = FunctionType::get({AnyFunctionType::Param(vectorTy)},
+                                            TupleType::get(diffParamElts, ctx));
+  }
+  expectedFuncEltType = expectedFuncEltType->mapTypeOutOfContext();
+  // Check if differential/pullback type matches expected type.
+  if (!funcEltType->isEqual(expectedFuncEltType)) {
+    // Emit differential/pullback type mismatch error on attribute.
+    TC.diagnose(attr->getLocation(),
+                diag::differentiating_attr_result_func_type_mismatch,
+                funcResultElt.getName(), originalFn->getFullName());
+    // Emit note with expected differential/pullback type on actual type
+    // location.
+    auto *tupleReturnTypeRepr =
+        cast<TupleTypeRepr>(derivative->getReturnTypeLoc().getTypeRepr());
+    auto *funcEltTypeRepr = tupleReturnTypeRepr->getElementType(1);
+    TC.diagnose(funcEltTypeRepr->getStartLoc(),
+                diag::differentiating_attr_result_func_type_mismatch_note,
+                funcResultElt.getName(), expectedFuncEltType)
+        .highlight(funcEltTypeRepr->getSourceRange());
+    // Emit note showing original function location, if possible.
+    if (originalFn->getLoc().isValid())
+      TC.diagnose(originalFn->getLoc(),
+                  diag::differentiating_attr_result_func_original_note,
+                  originalFn->getFullName());
+    attr->setInvalid();
+    return;
+  }
 
   // Reject different-file retroactive derivatives.
   // TODO(TF-136): Full support for cross-file/cross-module retroactive

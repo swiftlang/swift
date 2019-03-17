@@ -2753,13 +2753,17 @@ ERROR(differentiating_attr_invalid_result_tuple_func_label,none,
 ERROR(differentiating_attr_result_value_not_differentiable,none,
       "'@differentiating' attribute requires function to return a two-element "
       "tuple (first element type %0 must conform to 'Differentiable')", (Type))
-ERROR(differentiating_attr_result_func_unexpected_type,none,
-      "%0 does not have expected type %1", (Identifier, Type))
+ERROR(differentiating_attr_result_func_type_mismatch,none,
+      "function result's %0 type does not match %1", (Identifier, DeclName))
+NOTE(differentiating_attr_result_func_type_mismatch_note,none,
+     "%0 does not have expected type %1", (Identifier, Type))
+NOTE(differentiating_attr_result_func_original_note,none,
+     "%0 defined here", (DeclName))
 ERROR(differentiating_attr_no_diff_parameters,none,
       "'@differentiating' attribute requires function to have at least one "
       "differentiation parameter", ())
 ERROR(differentiating_attr_overload_not_found,none,
-      "%0 does not have expected type %1", (DeclName, Type))
+      "could not find function %0 with expected type %1", (DeclName, Type))
 ERROR(differentiating_attr_not_in_same_file_as_original,none,
       "derivative not in the same file as the original function", ())
 ERROR(differentiating_attr_original_already_has_derivative,none,
