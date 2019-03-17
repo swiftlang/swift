@@ -2739,25 +2739,31 @@ ERROR(differentiable_attr_class_unsupported,none,
 NOTE(protocol_witness_missing_specific_differentiable_attr,none,
      "candidate is missing attribute '%0'", (StringRef))
 
-// @differentiang
+// @differentiating
 ERROR(differentiating_attr_expected_result_tuple,none,
       "'@differentiating' attribute requires function to return a two-element tuple of type "
       "'(value: T..., pullback: (U.CotangentVector) -> T.CotangentVector...)' or "
       "'(value: T..., differential: (T.TangentVector...) -> U.TangentVector)'", ())
-ERROR(differentiating_attr_expected_result_tuple_value_label,none,
-      "'@differentiating' attribute requires function to return a two-element tuple (first element must have label 'value:')", ())
-ERROR(differentiating_attr_expected_result_tuple_func_label,none,
-      "'@differentiating' attribute requires function to return a two-element tuple (second element must have label 'pullback:' or 'differential:')", ())
+ERROR(differentiating_attr_invalid_result_tuple_value_label,none,
+      "'@differentiating' attribute requires function to return a two-element "
+      "tuple (first element must have label 'value:')", ())
+ERROR(differentiating_attr_invalid_result_tuple_func_label,none,
+      "'@differentiating' attribute requires function to return a two-element "
+      "tuple (second element must have label 'pullback:' or 'differential:')", ())
 ERROR(differentiating_attr_result_value_not_differentiable,none,
-      "'@differentiating' attribute requires function to return a two-element tuple (first element type %0 must conform to 'Differentiable')", (Type))
-ERROR(differentiating_attr_result_func_invalid_parameter,none,
-      "expected %0 to be a function with a single parameter of type %1", (Identifier, Type))
+      "'@differentiating' attribute requires function to return a two-element "
+      "tuple (first element type %0 must conform to 'Differentiable')", (Type))
+ERROR(differentiating_attr_result_func_type_mismatch,none,
+      "function result's %0 type does not match %1", (Identifier, DeclName))
+NOTE(differentiating_attr_result_func_type_mismatch_note,none,
+     "%0 does not have expected type %1", (Identifier, Type))
+NOTE(differentiating_attr_result_func_original_note,none,
+     "%0 defined here", (DeclName))
 ERROR(differentiating_attr_no_diff_parameters,none,
-      "'@differentiating' attribute requires function to have at least one differentiation parameter", ())
-ERROR(differentiating_attr_unexpected_diff_params_type,none,
-      "unexpected differentiation parameters type; got %0, but expected %1", (Type, Type))
+      "'@differentiating' attribute requires function to have at least one "
+      "differentiation parameter", ())
 ERROR(differentiating_attr_overload_not_found,none,
-      "%0 does not have expected type %1", (DeclName, Type))
+      "could not find function %0 with expected type %1", (DeclName, Type))
 ERROR(differentiating_attr_not_in_same_file_as_original,none,
       "derivative not in the same file as the original function", ())
 ERROR(differentiating_attr_original_already_has_derivative,none,
