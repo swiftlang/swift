@@ -3868,7 +3868,7 @@ public:
     // have a zero derivative.
     if (!activityInfo.isVaried(origResult, task->getIndices().parameters)) {
       // Emit fixit if original result has a valid source location.
-      auto sourceLoc = origResult.getLoc().getSourceLoc();
+      auto sourceLoc = origResult.getLoc().getEndSourceLoc();
       if (sourceLoc.isValid()) {
         getContext()
             .diagnose(sourceLoc, diag::autodiff_nonvaried_result_fixit)
