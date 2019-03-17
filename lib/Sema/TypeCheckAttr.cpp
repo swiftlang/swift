@@ -975,23 +975,59 @@ visitDynamicCallableAttr(DynamicCallableAttr *attr) {
   }
 }
 
+static bool hasSingleNonVariadicParam(SubscriptDecl *decl) {
+  auto *indices = decl->getIndices();
+  return indices->size() == 1 && !indices->get(0)->isVariadic();
+}
+
 /// Returns true if the given subscript method is an valid implementation of
 /// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
 /// The method is given to be defined as `subscript(dynamicMember:)`.
 bool swift::isValidDynamicMemberLookupSubscript(SubscriptDecl *decl,
                                                 DeclContext *DC,
                                                 TypeChecker &TC) {
+  // It could be
+  // - `subscript(dynamicMember: {Writable}KeyPath<...>)`; or
+  // - `subscript(dynamicMember: String*)`
+  return isValidKeyPathDynamicMemberLookup(decl, TC) ||
+         isValidStringDynamicMemberLookup(decl, DC, TC);
+
+}
+
+bool swift::isValidStringDynamicMemberLookup(SubscriptDecl *decl,
+                                             DeclContext *DC,
+                                             TypeChecker &TC) {
   // There are two requirements:
   // - The subscript method has exactly one, non-variadic parameter.
   // - The parameter type conforms to `ExpressibleByStringLiteral`.
-  auto indices = decl->getIndices();
+  if (!hasSingleNonVariadicParam(decl))
+    return false;
+
+  const auto *param = decl->getIndices()->get(0);
+  auto paramType = param->getType();
 
   auto stringLitProto =
     TC.Context.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
-  
-  return indices->size() == 1 && !indices->get(0)->isVariadic() &&
-    TC.conformsToProtocol(indices->get(0)->getType(),
-                          stringLitProto, DC, ConformanceCheckOptions());
+
+  // If this is `subscript(dynamicMember: String*)`
+  return bool(TC.conformsToProtocol(paramType, stringLitProto, DC,
+                                    ConformanceCheckOptions()));
+}
+
+bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
+                                              TypeChecker &TC) {
+  if (!hasSingleNonVariadicParam(decl))
+    return false;
+
+  const auto *param = decl->getIndices()->get(0);
+  if (param->isVariadic())
+    return false;
+
+  if (auto NTD = param->getType()->getAnyNominal()) {
+    return NTD == TC.Context.getKeyPathDecl() ||
+           NTD == TC.Context.getWritableKeyPathDecl();
+  }
+  return false;
 }
 
 /// The @dynamicMemberLookup attribute is only allowed on types that have at
