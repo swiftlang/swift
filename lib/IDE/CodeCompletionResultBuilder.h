@@ -267,9 +267,8 @@ public:
       addTypeAnnotation(Annotation);
   }
 
-  StringRef escapeArgumentLabel(StringRef Word,
-                                bool escapeAllKeywords,
-                                llvm::SmallString<16> &EscapedKeyword) {
+  StringRef escapeKeyword(StringRef Word, bool escapeAllKeywords,
+                          llvm::SmallString<16> &EscapedKeyword) {
     bool shouldEscape = false;
     if (escapeAllKeywords) {
 #define KEYWORD(kw) .Case(#kw, true)
@@ -325,7 +324,7 @@ public:
       llvm::SmallString<16> EscapedKeyword;
       addChunkWithText(
           CodeCompletionString::Chunk::ChunkKind::CallParameterName,
-          escapeArgumentLabel(Name.str(), false, EscapedKeyword));
+          escapeKeyword(Name.str(), false, EscapedKeyword));
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
     } else if (!LocalName.empty()) {
@@ -333,7 +332,7 @@ public:
       llvm::SmallString<16> EscapedKeyword;
       addChunkWithText(
           CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName,
-            escapeArgumentLabel(LocalName.str(), false, EscapedKeyword));
+            escapeKeyword(LocalName.str(), false, EscapedKeyword));
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
     }
