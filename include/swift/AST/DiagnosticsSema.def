@@ -2745,15 +2745,19 @@ ERROR(differentiating_attr_expected_result_tuple,none,
       "'(value: T..., pullback: (U.CotangentVector) -> T.CotangentVector...)' or "
       "'(value: T..., differential: (T.TangentVector...) -> U.TangentVector)'", ())
 ERROR(differentiating_attr_invalid_result_tuple_value_label,none,
-      "'@differentiating' attribute requires function to return a two-element tuple (first element must have label 'value:')", ())
+      "'@differentiating' attribute requires function to return a two-element "
+      "tuple (first element must have label 'value:')", ())
 ERROR(differentiating_attr_invalid_result_tuple_func_label,none,
-      "'@differentiating' attribute requires function to return a two-element tuple (second element must have label 'pullback:' or 'differential:')", ())
+      "'@differentiating' attribute requires function to return a two-element "
+      "tuple (second element must have label 'pullback:' or 'differential:')", ())
 ERROR(differentiating_attr_result_value_not_differentiable,none,
-      "'@differentiating' attribute requires function to return a two-element tuple (first element type %0 must conform to 'Differentiable')", (Type))
-ERROR(differentiating_attr_result_func_invalid_type,none,
-      "unexpected %0 type; got %1, but expected %2", (Identifier, Type, Type))
+      "'@differentiating' attribute requires function to return a two-element "
+      "tuple (first element type %0 must conform to 'Differentiable')", (Type))
+ERROR(differentiating_attr_result_func_unexpected_type,none,
+      "%0 does not have expected type %1", (Identifier, Type))
 ERROR(differentiating_attr_no_diff_parameters,none,
-      "'@differentiating' attribute requires function to have at least one differentiation parameter", ())
+      "'@differentiating' attribute requires function to have at least one "
+      "differentiation parameter", ())
 ERROR(differentiating_attr_overload_not_found,none,
       "%0 does not have expected type %1", (DeclName, Type))
 ERROR(differentiating_attr_not_in_same_file_as_original,none,

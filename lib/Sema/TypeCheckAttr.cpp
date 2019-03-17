@@ -3063,9 +3063,14 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   expectedFuncEltType = expectedFuncEltType->mapTypeOutOfContext();
   // Check if differential/pullback type matches expected type.
   if (!funcEltType->isEqual(expectedFuncEltType)) {
-    TC.diagnose(attr->getLocation(),
-                diag::differentiating_attr_result_func_invalid_type,
-                funcResultElt.getName(), funcEltType, expectedFuncEltType);
+    // Emit an error highlighting the differential/pullback type.
+    auto *tupleReturnTypeRepr =
+        cast<TupleTypeRepr>(derivative->getReturnTypeLoc().getTypeRepr());
+    auto *funcEltTypeRepr = tupleReturnTypeRepr->getElementType(1);
+    TC.diagnose(funcEltTypeRepr->getStartLoc(),
+                diag::differentiating_attr_result_func_unexpected_type,
+                funcResultElt.getName(), expectedFuncEltType)
+        .highlight(funcEltTypeRepr->getSourceRange());
     attr->setInvalid();
     return;
   }

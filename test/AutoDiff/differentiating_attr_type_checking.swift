@@ -29,7 +29,7 @@ func vjpSinResultWrongLabel(x: Float) -> (value: Float, (Float) -> Float) {
 func vjpSinResultNotDifferentiable(x: Int) -> (value: Int, pullback: (Int) -> Int) {
   return (x, { $0 })
 }
-// expected-error @+1 {{unexpected 'pullback' type; got '(Double) -> Double', but expected '(Float.CotangentVector) -> (Float.CotangentVector)' (aka '(Float) -> Float')}}
+// expected-error @+2 {{'pullback' does not have expected type '(Float.CotangentVector) -> (Float.CotangentVector)' (aka '(Float) -> Float')}}
 @differentiating(sin)
 func vjpSinResultInvalidSeedType(x: Float) -> (value: Float, pullback: (Double) -> Double) {
   return (x, { $0 })
@@ -51,7 +51,7 @@ func jvpGeneric<T : Differentiable>(x: T, y: T) -> (value: T, differential: (T.T
 func vjpGenericWrongLabel<T : Differentiable>(x: T, y: T) -> (value: T, (T) -> (T, T)) {
   return (x, { ($0, $0) })
 }
-// expected-error @+1 {{unexpected 'pullback' type; got '(T) -> (T, T)', but expected '(T) -> (T)'}}
+// expected-error @+2 {{'pullback' does not have expected type '(T) -> (T)'}}
 @differentiating(generic)
 func vjpGenericDiffParamMismatch<T : Differentiable>(x: T) -> (value: T, pullback: (T) -> (T, T)) where T == T.CotangentVector {
   return (x, { ($0, $0) })
@@ -105,7 +105,7 @@ extension Differentiable where Self : AdditiveArithmetic {
 }
 
 extension AdditiveArithmetic where Self : Differentiable, Self == Self.CotangentVector {
-  // expected-error @+1 {{unexpected 'pullback' type; got '(Self) -> (Self, Self)', but expected '(Self) -> (Self, Self, Self)'}}
+  // expected-error @+2 {{'pullback' does not have expected type '(Self) -> (Self, Self, Self)'}}
   @differentiating(+)
   func vjpPlusInstanceMethod(x: Self, y: Self) -> (value: Self, pullback: (Self) -> (Self, Self)) {
     return (x + y, { v in (v, v) })
@@ -121,7 +121,7 @@ protocol InstanceMethod : Differentiable {
 
 extension InstanceMethod {
   // If `Self` conforms to `Differentiable`, then `Self` is currently always inferred to be a differentiation parameter.
-  // expected-error @+1 {{unexpected 'pullback' type; got '(Self.CotangentVector) -> Self.CotangentVector', but expected '(Self.CotangentVector) -> (Self.CotangentVector, Self.CotangentVector)'}}
+  // expected-error @+2 {{'pullback' does not have expected type '(Self.CotangentVector) -> (Self.CotangentVector, Self.CotangentVector)'}}
   @differentiating(foo)
   func vjpFoo(x: Self) -> (value: Self, pullback: (Self.CotangentVector) -> Self.CotangentVector) {
     return (x, { $0 })
@@ -134,7 +134,7 @@ extension InstanceMethod {
 }
 
 extension InstanceMethod {
-  // expected-error @+1 {{unexpected 'pullback' type; got '(Self.CotangentVector) -> T.CotangentVector', but expected '(Self.CotangentVector) -> (Self.CotangentVector, T.CotangentVector)'}}
+  // expected-error @+2 {{'pullback' does not have expected type '(Self.CotangentVector) -> (Self.CotangentVector, T.CotangentVector)'}}
   @differentiating(bar)
   func vjpBar<T : Differentiable>(_ x: T) -> (value: Self, pullback: (Self.CotangentVector) -> T.CotangentVector) {
     return (self, { _ in .zero })
