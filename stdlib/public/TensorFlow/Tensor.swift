@@ -709,14 +709,21 @@ public extension Tensor {
   /// Remove the specified dimensions of size 1 from the shape of a tensor. If
   /// no dimensions are specified, then all dimensions of size 1 will be
   /// removed.
-  // FIXME: The gradient for variadic `squeezed` is difficult to express because
-  // ExpandDims only expands one axis at a time.
+  @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
+  func squeezingShape(at axes: Int32...) -> Tensor {
+    return squeezingShape(at: axes)
+  }
+
+  /// Remove the specified dimensions of size 1 from the shape of a tensor. If
+  /// no dimensions are specified, then all dimensions of size 1 will be
+  /// removed.
   @inlinable @inline(__always)
   @differentiable(
     wrt: self, vjp: _vjpSqueezingShape(at:)
     where Scalar : TensorFlowFloatingPoint
   )
-  func squeezingShape(at axes: Int32...) -> Tensor {
+  func squeezingShape(at axes: [Int32]) -> Tensor {
     return Raw.squeeze(self, squeezeDims: axes)
   }
 
