@@ -1066,7 +1066,7 @@ public:
                                 bool allowClassRequirement,
                                 bool allowAnyObject);
   ParserStatus parseDeclItem(bool &PreviousHadSemi,
-                             Parser::ParseDeclOptions Options,
+                             ParseDeclOptions Options,
                              llvm::function_ref<void(Decl*)> handler);
   std::pair<std::vector<Decl *>, Optional<std::string>>
   parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
@@ -1634,14 +1634,10 @@ public:
   void
   diagnoseWhereClauseInGenericParamList(const GenericParamList *GenericParams);
 
-  enum class WhereClauseKind : unsigned {
-    Declaration,
-    Protocol,
-    AssociatedType
-  };
   ParserStatus
-  parseFreestandingGenericWhereClause(GenericParamList *GPList,
-                             WhereClauseKind kind=WhereClauseKind::Declaration);
+  parseFreestandingGenericWhereClause(GenericContext *genCtx,
+                                      GenericParamList *&GPList,
+                                      ParseDeclOptions flags);
 
   ParserStatus parseGenericWhereClause(
       SourceLoc &WhereLoc, SmallVectorImpl<RequirementRepr> &Requirements,

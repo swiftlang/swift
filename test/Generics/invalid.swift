@@ -1,11 +1,16 @@
 // RUN: %target-typecheck-verify-swift
 
-func bet() where A : B {} // expected-error {{'where' clause cannot be attached to a non-generic declaration}}
+func bet() where A : B {} // expected-error {{'where' clause cannot be attached to non-generic top-level declaration}}
 
-typealias gimel where A : B // expected-error {{'where' clause cannot be attached to a non-generic declaration}}
-// expected-error@-1 {{expected '=' in type alias declaration}}
+typealias gimel = Int where A : B // expected-error {{'where' clause cannot be attached to non-generic top-level declaration}}
 
-class dalet where A : B {} // expected-error {{'where' clause cannot be attached to a non-generic declaration}}
+class dalet where A : B {} // expected-error {{'where' clause cannot be attached to non-generic top-level declaration}}
+
+struct Where {
+  func bet() where A == B {}  // expected-error {{'where' clause on non-generic member declaration requires a generic context}}
+  typealias gimel = Int where A : B  // expected-error {{'where' clause on non-generic member declaration requires a generic context}}
+  class dalet where A : B {}  // expected-error {{'where' clause on non-generic member declaration requires a generic context}}
+}
 
 protocol he where A : B { // expected-error {{use of undeclared type 'A'}}
   // expected-error@-1 {{use of undeclared type 'B'}}
