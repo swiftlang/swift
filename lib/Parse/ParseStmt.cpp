@@ -601,6 +601,11 @@ ParserResult<Stmt> Parser::parseStmt() {
     LLVM_FALLTHROUGH;
   default:
     diagnose(Tok, tryLoc.isValid() ? diag::expected_expr : diag::expected_stmt);
+    if (Tok.is(tok::at_sign)) {
+      // Recover from erroneously placed attribute.
+      consumeToken(tok::at_sign);
+      consumeIf(tok::identifier);
+    }
     return nullptr;
   case tok::kw_return:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
