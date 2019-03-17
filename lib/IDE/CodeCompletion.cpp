@@ -1823,6 +1823,32 @@ public:
     llvm_unreachable("unhandled kind");
   }
 
+  void addValueBaseName(CodeCompletionResultBuilder &Builder,
+                        DeclBaseName Name) {
+    auto NameStr = Name.userFacingName();
+    bool shouldEscapeKeywords;
+    if (Name.isSpecial()) {
+      // Special names (i.e. 'init') are always displayed as its user facing
+      // name.
+      shouldEscapeKeywords = false;
+    } else if (ExprType) {
+      // After dot. User can write any keyword after '.' except for `init` and
+      // `self`. E.g. 'func `init`()' must be called by 'expr.`init`()'.
+      shouldEscapeKeywords = NameStr == "self" || NameStr == "init";
+    } else {
+      // As primary expresson. We have to escape almost every keywords except
+      // for 'self' and 'Self'.
+      shouldEscapeKeywords = NameStr != "self" && NameStr != "Self";
+    }
+
+    if (!shouldEscapeKeywords) {
+      Builder.addTextChunk(NameStr);
+    } else {
+      SmallString<16> buffer;
+      Builder.addTextChunk(Builder.escapeKeyword(NameStr, true, buffer));
+    }
+  }
+
   void addLeadingDot(CodeCompletionResultBuilder &Builder) {
     if (NeedOptionalUnwrap) {
       Builder.setNumBytesToErase(NumBytesToEraseForOptionalUnwrap);
@@ -1995,7 +2021,7 @@ public:
         VD->shouldHideFromEditor())
       return;
 
-    StringRef Name = VD->getName().get();
+    Identifier Name = VD->getName();
     assert(!Name.empty() && "name should not be empty");
 
     CommandWordsPairs Pairs;
@@ -2005,7 +2031,7 @@ public:
         getSemanticContext(VD, Reason), ExpectedTypes);
     Builder.setAssociatedDecl(VD);
     addLeadingDot(Builder);
-    Builder.addTextChunk(Name);
+    addValueBaseName(Builder, Name);
     setClangDeclKeywords(VD, Pairs, Builder);
 
     if (!VD->hasValidSignature())
@@ -2013,7 +2039,7 @@ public:
 
     // Add a type annotation.
     Type VarType = getTypeOfMember(VD);
-    if (VD->getName() != Ctx.Id_self && VD->isInOut()) {
+    if (Name != Ctx.Id_self && VD->isInOut()) {
       // It is useful to show inout for function parameters.
       // But for 'self' it is just noise.
       VarType = InOutType::get(VarType);
@@ -2319,7 +2345,7 @@ public:
       return;
     foundFunction(FD);
 
-    StringRef Name = FD->getName().get();
+    Identifier Name = FD->getName();
     assert(!Name.empty() && "name should not be empty");
 
     Type FunctionType = getTypeOfMember(FD);
@@ -2350,7 +2376,7 @@ public:
       setClangDeclKeywords(FD, Pairs, Builder);
       Builder.setAssociatedDecl(FD);
       addLeadingDot(Builder);
-      Builder.addTextChunk(Name);
+      addValueBaseName(Builder, Name);
       if (IsDynamicLookup)
         Builder.addDynamicLookupMethodCallTail();
       else if (FD->getAttrs().hasAttribute<OptionalAttr>())
@@ -2680,8 +2706,7 @@ public:
     Builder.setAssociatedDecl(EED);
     setClangDeclKeywords(EED, Pairs, Builder);
     addLeadingDot(Builder);
-
-    Builder.addTextChunk(EED->getName().str());
+    addValueBaseName(Builder, EED->getName());
 
     // Enum element is of function type; (Self.type) -> Self or
     // (Self.Type) -> (Args...) -> Self.
@@ -2759,7 +2784,7 @@ public:
 
     // Base name
     addLeadingDot(Builder);
-    Builder.addTextChunk(AFD->getBaseName().userFacingName());
+    addValueBaseName(Builder, AFD->getBaseName());
 
     // Add the argument labels.
     auto ArgLabels = AFD->getFullName().getArgumentNames();
