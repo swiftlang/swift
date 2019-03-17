@@ -1099,6 +1099,17 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
       return;
     }
 
+    // SWIFT_ENABLE_TENSORFLOW
+    case TypeKind::SILDifferentiableFunction: {
+      auto box = cast<SILDifferentiableFunctionType>(tybase);
+      for (auto ty : {box->getOriginalFunctionType(),
+                      box->getDifferentialType(), box->getPullbackType()}) {
+        appendType(ty);
+      }
+      appendOperator("df");
+      return;
+    }
+
     case TypeKind::SILBlockStorage:
       llvm_unreachable("should never be mangled");
   }

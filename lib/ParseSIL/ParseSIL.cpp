@@ -1374,6 +1374,13 @@ bool SILParser::parseSILType(SILType &Result,
           boxType->setGenericEnvironment(env);
         }
       }
+      // SWIFT_ENABLE_TENSORFLOW
+      if (auto diffFnType = dyn_cast<SILDifferentiableFunctionTypeRepr>(T)) {
+        if (auto generics = diffFnType->getGenericParams()) {
+          auto env = handleSILGenericParams(C, generics, SF);
+          diffFnType->setGenericEnvironment(env);
+        }
+      }
       return true;
     }
   };
@@ -1385,7 +1392,11 @@ bool SILParser::parseSILType(SILType &Result,
   if (auto fnType = dyn_cast<FunctionTypeRepr>(TyR.get()))
     if (auto env = fnType->getGenericEnvironment())
       ParsedGenericEnv = env;
-  
+  // SWIFT_ENABLE_TENSORFLOW
+  if (auto diffFnType = dyn_cast<SILDifferentiableFunctionTypeRepr>(TyR.get()))
+    if (auto env = diffFnType->getGenericEnvironment())
+      ParsedGenericEnv = env;
+
   // Apply attributes to the type.
   TypeLoc Ty = P.applyAttributeToType(TyR.get(), attrs, specifier, specifierLoc);
 

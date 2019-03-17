@@ -7766,6 +7766,9 @@ private:
   AutoDiffIndexSubset *parameterIndices;
   /// The order of differentiation.
   unsigned differentiationOrder;
+  /// Whether this instruction produces a legacy '@differentiable' function.
+  /// When false, this instruction produces a `@sil_differentiable` type.
+  bool useNewSILDiffFuncType;
   /// The number of operands. The first operand is always the original function.
   /// The rest of operands determined by the order of differentiation and whether
   /// this is the new AD model or the legacy reverse-mode AD model.
@@ -7775,7 +7778,8 @@ private:
                        AutoDiffIndexSubset *parameterIndices,
                        unsigned differentiationOrder,
                        SILValue originalFunction,
-                       ArrayRef<SILValue> associatedFunctions);
+                       ArrayRef<SILValue> associatedFunctions,
+                       bool useNewSILDiffFuncType = false);
 
 public:
   static AutoDiffFunctionInst *create(SILModule &module,
@@ -7783,11 +7787,13 @@ public:
                                       AutoDiffIndexSubset *parameterIndices,
                                       unsigned differentiationOrder,
                                       SILValue originalFunction,
-                                      ArrayRef<SILValue> associatedFunctions);
+                                      ArrayRef<SILValue> associatedFunctions,
+                                      bool useNewSILDiffFuncType = false);
 
   static SILType getAutoDiffType(SILValue original,
                                  unsigned differentiationOrder,
-                                 AutoDiffIndexSubset *parameterIndices);
+                                 AutoDiffIndexSubset *parameterIndices,
+                                 bool useNewSILDiffFuncType);
 
   /// Returns the original function.
   SILValue getOriginalFunction() const { return getAllOperands()[0].get(); }

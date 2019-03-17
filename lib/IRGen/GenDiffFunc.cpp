@@ -32,21 +32,23 @@
 using namespace swift;
 using namespace irgen;
 
-using DiffFuncIndex =
+using LegacyDiffFuncIndex =
     std::pair<AutoDiffFunctionExtractInst::Extractee, unsigned>;
 
 namespace {
-class DiffFuncFieldInfo final : public RecordField<DiffFuncFieldInfo> {
+class LegacyDiffFuncFieldInfo final
+    : public RecordField<LegacyDiffFuncFieldInfo> {
 public:
-  DiffFuncFieldInfo(DiffFuncIndex index, const TypeInfo &type,
-                    AutoDiffIndexSubset *parameterIndices)
-      : RecordField(type), Index(index), ParameterIndices(parameterIndices) {}
-
   /// The field index.
-  const DiffFuncIndex Index;
+  const LegacyDiffFuncIndex Index;
 
   /// The parameter indices.
   AutoDiffIndexSubset *ParameterIndices;
+
+  LegacyDiffFuncFieldInfo(LegacyDiffFuncIndex index,
+                          AutoDiffIndexSubset *ParameterIndices,
+                          const TypeInfo &type)
+      : RecordField(type), Index(index), ParameterIndices(ParameterIndices) {}
 
   std::string getFieldName() const {
     auto extractee = std::get<0>(Index);
@@ -75,19 +77,169 @@ public:
   }
 };
 
+class LegacyDiffFuncTypeInfo final
+    : public RecordTypeInfo<LegacyDiffFuncTypeInfo, LoadableTypeInfo,
+                            LegacyDiffFuncFieldInfo> {
+  using super =
+      RecordTypeInfo<LegacyDiffFuncTypeInfo, LoadableTypeInfo,
+                     LegacyDiffFuncFieldInfo>;
+
+public:
+  LegacyDiffFuncTypeInfo(ArrayRef<LegacyDiffFuncFieldInfo> fields,
+                         unsigned explosionSize,
+                         llvm::Type *ty, Size size, SpareBitVector &&spareBits,
+                         Alignment align, IsPOD_t isPOD,
+                         IsFixedSize_t alwaysFixedSize)
+      : super(fields, explosionSize, ty, size, std::move(spareBits), align,
+              isPOD, alwaysFixedSize) {}
+
+  Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
+                              const LegacyDiffFuncFieldInfo &field) const {
+    return field.projectAddress(IGF, addr, getNonFixedOffsets(IGF, T));
+  }
+
+  void initializeFromParams(IRGenFunction &IGF, Explosion &params, Address src,
+                            SILType T, bool isOutlined) const override {
+    llvm_unreachable("unexploded @differentiable function as argument?");
+  }
+
+  void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                        Size offset) const override {
+    for (auto &field : getFields()) {
+      auto fieldOffset = offset + field.getFixedByteOffset();
+      cast<LoadableTypeInfo>(field.getTypeInfo())
+          .addToAggLowering(IGM, lowering, fieldOffset);
+    }
+  }
+
+  llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const { return None; }
+  llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+    return None;
+  }
+};
+
+class LegacyDiffFuncTypeBuilder
+    : public RecordTypeBuilder<LegacyDiffFuncTypeBuilder,
+                               LegacyDiffFuncFieldInfo,
+                               LegacyDiffFuncIndex> {
+
+  SILFunctionType *origFnTy;
+  AutoDiffIndexSubset *parameterIndices;
+
+public:
+  LegacyDiffFuncTypeBuilder(IRGenModule &IGM, SILFunctionType *fnTy)
+      : RecordTypeBuilder(IGM), origFnTy(fnTy->getWithoutDifferentiability()),
+        parameterIndices(fnTy->getDifferentiationParameterIndices()) {
+    assert(fnTy->isDifferentiable());
+  }
+
+  TypeInfo *createFixed(ArrayRef<LegacyDiffFuncFieldInfo> fields,
+                        StructLayout &&layout) {
+    llvm_unreachable("@differentiable functions are always loadable");
+  }
+
+  LegacyDiffFuncTypeInfo *createLoadable(
+      ArrayRef<LegacyDiffFuncFieldInfo> fields, StructLayout &&layout,
+      unsigned explosionSize) {
+    return LegacyDiffFuncTypeInfo::create(
+        fields, explosionSize, layout.getType(), layout.getSize(),
+        std::move(layout.getSpareBits()), layout.getAlignment(), layout.isPOD(),
+        layout.isAlwaysFixedSize());
+  }
+
+  TypeInfo *createNonFixed(ArrayRef<LegacyDiffFuncFieldInfo> fields,
+                           FieldsAreABIAccessible_t fieldsAccessible,
+                           StructLayout &&layout) {
+    llvm_unreachable("@differentiable functions are always loadable");
+  }
+
+  LegacyDiffFuncFieldInfo getFieldInfo(
+      unsigned index, LegacyDiffFuncIndex field, const TypeInfo &fieldTI) {
+    return LegacyDiffFuncFieldInfo(field, parameterIndices, fieldTI);
+  }
+
+  SILType getType(LegacyDiffFuncIndex field) {
+    if (std::get<0>(field) == AutoDiffFunctionExtractInst::Extractee::Original)
+      return SILType::getPrimitiveObjectType(origFnTy->getCanonicalType());
+    auto differentiationOrder = std::get<1>(field);
+    auto kind = *std::get<0>(field).getExtracteeAsAssociatedFunction();
+    auto assocTy = origFnTy->getAutoDiffAssociatedFunctionType(
+        parameterIndices, /*resultIndex*/ 0, differentiationOrder, kind,
+        IGM.getSILModule(), LookUpConformanceInModule(IGM.getSwiftModule()));
+    return SILType::getPrimitiveObjectType(assocTy);
+  }
+
+  StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
+    return StructLayout(IGM, /*decl=*/nullptr, LayoutKind::NonHeapObject,
+                        LayoutStrategy::Universal, fieldTypes);
+  }
+};
+} // end anonymous namespace
+
+const TypeInfo *
+TypeConverter::convertLegacyDifferentiableFunctionType(SILFunctionType *type) {
+  assert(type->isDifferentiable());
+  LegacyDiffFuncTypeBuilder builder(IGM, type);
+  SmallVector<LegacyDiffFuncIndex, 3> fields;
+  fields.push_back(
+      std::make_pair(AutoDiffFunctionExtractInst::Extractee::Original, 0));
+  fields.push_back(
+      std::make_pair(AutoDiffFunctionExtractInst::Extractee::JVP, 1));
+  fields.push_back(
+      std::make_pair(AutoDiffFunctionExtractInst::Extractee::VJP, 1));
+  return builder.layout(fields);
+}
+
+// New differnetiable function type.
+
+namespace {
+class DiffFuncFieldInfo final : public RecordField<DiffFuncFieldInfo> {
+public:
+  DiffFuncFieldInfo(unsigned index, const TypeInfo &type)
+      : RecordField(type), Index(index) {}
+
+  /// The field index.
+  const unsigned Index;
+
+  std::string getFieldName() const {
+    if (Index == 0)
+      return "original";
+    return "assoc_" + llvm::utostr(Index);
+  }
+
+  SILType getType(IRGenModule &IGM, SILType t) const {
+    auto diffFnTy = t.castTo<SILDifferentiableFunctionType>();
+    if (Index == 0)
+      return SILType::getPrimitiveObjectType(
+          diffFnTy->getOriginalFunctionType());
+    switch (diffFnTy->getRepresentationKind()) {
+    case DifferentiabilityRepresentationKind::Normal:
+      assert((int)Index <= diffFnTy->getMaxOrder());
+      return SILType::getPrimitiveObjectType(
+          diffFnTy->getAssociatedFunctionType(
+              AutoDiffAssociatedFunctionKind::JVP, Index));
+    case DifferentiabilityRepresentationKind::Linear:
+      assert(Index == 1);
+      return SILType::getPrimitiveObjectType(diffFnTy->getPullbackType());
+    }
+  }
+};
+
 class DiffFuncTypeInfo final
     : public RecordTypeInfo<DiffFuncTypeInfo, LoadableTypeInfo,
                             DiffFuncFieldInfo> {
   using super =
-      RecordTypeInfo<DiffFuncTypeInfo, LoadableTypeInfo, DiffFuncFieldInfo>;
+    RecordTypeInfo<DiffFuncTypeInfo, LoadableTypeInfo,
+                   DiffFuncFieldInfo>;
 
 public:
-  DiffFuncTypeInfo(ArrayRef<DiffFuncFieldInfo> fields, unsigned explosionSize,
+  DiffFuncTypeInfo(ArrayRef<DiffFuncFieldInfo> fields,
+                   unsigned explosionSize,
                    llvm::Type *ty, Size size, SpareBitVector &&spareBits,
                    Alignment align, IsPOD_t isPOD,
                    IsFixedSize_t alwaysFixedSize)
-      : super(fields, explosionSize, ty, size, std::move(spareBits), align,
-              isPOD, alwaysFixedSize) {}
+    : super(fields, explosionSize, ty, size, std::move(spareBits), align,
+            isPOD, alwaysFixedSize) {}
 
   Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
                               const DiffFuncFieldInfo &field) const {
@@ -116,16 +268,12 @@ public:
 
 class DiffFuncTypeBuilder
     : public RecordTypeBuilder<DiffFuncTypeBuilder, DiffFuncFieldInfo,
-                               DiffFuncIndex> {
+                               unsigned> {
+  SILDifferentiableFunctionType *type;
 
-  SILFunctionType *origFnTy;
-  AutoDiffIndexSubset *parameterIndices;
-
-public:
-  DiffFuncTypeBuilder(IRGenModule &IGM, SILFunctionType *fnTy)
-      : RecordTypeBuilder(IGM), origFnTy(fnTy->getWithoutDifferentiability()),
-        parameterIndices(fnTy->getDifferentiationParameterIndices()) {
-    assert(fnTy->isDifferentiable());
+  public:
+  DiffFuncTypeBuilder(IRGenModule &IGM, SILDifferentiableFunctionType *diffFnTy)
+      : RecordTypeBuilder(IGM), type(diffFnTy) {
   }
 
   TypeInfo *createFixed(ArrayRef<DiffFuncFieldInfo> fields,
@@ -133,13 +281,13 @@ public:
     llvm_unreachable("@differentiable functions are always loadable");
   }
 
-  DiffFuncTypeInfo *createLoadable(ArrayRef<DiffFuncFieldInfo> fields,
-                                   StructLayout &&layout,
-                                   unsigned explosionSize) {
+  DiffFuncTypeInfo *createLoadable(
+    ArrayRef<DiffFuncFieldInfo> fields, StructLayout &&layout,
+    unsigned explosionSize) {
     return DiffFuncTypeInfo::create(
-        fields, explosionSize, layout.getType(), layout.getSize(),
-        std::move(layout.getSpareBits()), layout.getAlignment(), layout.isPOD(),
-        layout.isAlwaysFixedSize());
+      fields, explosionSize, layout.getType(), layout.getSize(),
+      std::move(layout.getSpareBits()), layout.getAlignment(), layout.isPOD(),
+      layout.isAlwaysFixedSize());
   }
 
   TypeInfo *createNonFixed(ArrayRef<DiffFuncFieldInfo> fields,
@@ -148,20 +296,24 @@ public:
     llvm_unreachable("@differentiable functions are always loadable");
   }
 
-  DiffFuncFieldInfo getFieldInfo(unsigned index, DiffFuncIndex field,
+  DiffFuncFieldInfo getFieldInfo(unsigned, unsigned index,
                                  const TypeInfo &fieldTI) {
-    return DiffFuncFieldInfo(field, fieldTI, parameterIndices);
+    return DiffFuncFieldInfo(index, fieldTI);
   }
 
-  SILType getType(DiffFuncIndex field) {
-    if (std::get<0>(field) == AutoDiffFunctionExtractInst::Extractee::Original)
-      return SILType::getPrimitiveObjectType(origFnTy->getCanonicalType());
-    auto differentiationOrder = std::get<1>(field);
-    auto kind = *std::get<0>(field).getExtracteeAsAssociatedFunction();
-    auto assocTy = origFnTy->getAutoDiffAssociatedFunctionType(
-        parameterIndices, /*resultIndex*/ 0, differentiationOrder, kind,
-        IGM.getSILModule(), LookUpConformanceInModule(IGM.getSwiftModule()));
-    return SILType::getPrimitiveObjectType(assocTy);
+  SILType getType(unsigned index) {
+    if (index == 0)
+      return SILType::getPrimitiveObjectType(type->getOriginalFunctionType());
+    switch (type->getRepresentationKind()) {
+    case DifferentiabilityRepresentationKind::Normal:
+      assert((int)index <= type->getMaxOrder());
+      return SILType::getPrimitiveObjectType(
+          type->getAssociatedFunctionType(
+              AutoDiffAssociatedFunctionKind::JVP, index));
+    case DifferentiabilityRepresentationKind::Linear:
+      assert(index == 1);
+      return SILType::getPrimitiveObjectType(type->getPullbackType());
+    }
   }
 
   StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
@@ -171,16 +323,8 @@ public:
 };
 } // end anonymous namespace
 
-const TypeInfo *
-TypeConverter::convertDifferentiableFunctionType(SILFunctionType *type) {
-  assert(type->isDifferentiable());
+const TypeInfo *TypeConverter::convertDifferentiableFunctionType(
+  SILDifferentiableFunctionType *type) {
   DiffFuncTypeBuilder builder(IGM, type);
-  SmallVector<DiffFuncIndex, 3> fields;
-  fields.push_back(
-      std::make_pair(AutoDiffFunctionExtractInst::Extractee::Original, 0));
-  fields.push_back(
-      std::make_pair(AutoDiffFunctionExtractInst::Extractee::JVP, 1));
-  fields.push_back(
-      std::make_pair(AutoDiffFunctionExtractInst::Extractee::VJP, 1));
-  return builder.layout(fields);
+  return builder.layout({0, 1});
 }

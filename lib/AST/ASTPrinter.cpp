@@ -4071,6 +4071,28 @@ public:
     if (totalResults != 1) Printer << ")";
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  void visitSILDifferentiableFunctionType(SILDifferentiableFunctionType *T) {
+    Printer << "@sil_differentiable(";
+    switch (T->getRepresentationKind()) {
+    case DifferentiabilityRepresentationKind::Linear:
+      Printer << "linear) {";
+      visit(T->getOriginalFunctionTypeWithDifferentiabilityFlags());
+      Printer << ", transpose: ";
+      visit(T->getPullbackType());
+      break;
+    case DifferentiabilityRepresentationKind::Normal:
+      Printer << T->getMaxOrder() << ") {";
+      visit(T->getOriginalFunctionType());
+      Printer << ", differential: ";
+      visit(T->getDifferentialType());
+      Printer << ", pullback: ";
+      visit(T->getDifferentialType());
+      break;
+    }
+    Printer << '}';
+  }
+
   void visitSILBlockStorageType(SILBlockStorageType *T) {
     Printer << "@block_storage ";
     printWithParensIfNotSimple(T->getCaptureType());

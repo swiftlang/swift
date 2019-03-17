@@ -1530,6 +1530,8 @@ private:
     case TypeKind::SILBlockStorage:
     case TypeKind::SILBox:
     case TypeKind::SILToken:
+    // SWIFT_ENABLE_TENSORFLOW:
+    case TypeKind::SILDifferentiableFunction:
     case TypeKind::BuiltinUnsafeValueBuffer:
 
       LLVM_DEBUG(llvm::errs() << "Unhandled type: "; DbgTy.getType()->dump();

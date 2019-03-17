@@ -5342,9 +5342,8 @@ void AdjointEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
     }
     return;
   }
-  case VectorSpace::Kind::Function: {
-    llvm_unreachable(
-      "Unimplemented: Emit thunks for abstracting zero initialization");
+  case VectorSpace::Kind::Existential: {
+    llvm_unreachable("Unimplemented: 'AnyDerivative.zero'");
   }
   }
 }
@@ -5522,9 +5521,9 @@ SILValue AdjointEmitter::accumulateDirect(SILValue lhs, SILValue rhs) {
     }
     return builder.createTuple(loc, adjointTy, adjElements);
   }
-  case VectorSpace::Kind::Function: {
+  case VectorSpace::Kind::Existential: {
     llvm_unreachable(
-      "Unimplemented: Emit thunks for abstracting adjoint accumulation");
+        "Unimplemented: 'AnyDerivative' accumulation");
   }
   }
 }
@@ -5583,9 +5582,8 @@ void AdjointEmitter::accumulateIndirect(
     }
     return;
   }
-  case VectorSpace::Kind::Function: {
-    llvm_unreachable(
-        "Unimplemented: Emit thunks for abstracting adjoint accumulation");
+  case VectorSpace::Kind::Existential: {
+    llvm_unreachable("Unimplemented: 'AnyDerivative' accumulation");
   }
   }
 }
@@ -5637,9 +5635,9 @@ void AdjointEmitter::accumulateIndirect(SILValue lhsDestAccess,
     }
     return;
   }
-  case VectorSpace::Kind::Function: {
+  case VectorSpace::Kind::Existential: {
     llvm_unreachable(
-        "Unimplemented: Emit thunks for abstracting adjoint accumulation");
+        "Unimplemented: 'AnyDerivative' accumulation");
   }
   }
 }
@@ -5982,10 +5980,11 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
     case VectorSpace::Kind::Tuple: {
       llvm_unreachable(
           "Unimplemented: Handle zero initialization for tuples");
-    }
-    case VectorSpace::Kind::Function:
+    case VectorSpace::Kind::Existential: {
       llvm_unreachable(
-          "Unimplemented: Emit thunks for abstracting zero initialization");
+          "Unimplemented: Handle zero initialization for AnyDerivative");
+    }
+    }
     }
   };
 

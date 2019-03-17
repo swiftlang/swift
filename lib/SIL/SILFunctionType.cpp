@@ -98,17 +98,6 @@ CanType SILFunctionType::getSelfInstanceType() const {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-AutoDiffIndexSubset *
-SILFunctionType::getDifferentiationParameterIndices() {
-  assert(isDifferentiable());
-  SmallVector<unsigned, 8> result;
-  for (auto valueAndIndex : enumerate(getParameters()))
-    if (valueAndIndex.value().getDifferentiability() !=
-            SILParameterDifferentiability::NotDifferentiable)
-      result.push_back(valueAndIndex.index());
-  return AutoDiffIndexSubset::get(getASTContext(), getNumParameters(), result);
-}
-
 CanSILFunctionType SILFunctionType::getWithDifferentiability(
     unsigned differentiationOrder, AutoDiffIndexSubset *parameterIndices) {
   // FIXME(rxwei): Handle differentiation order.
@@ -133,8 +122,6 @@ CanSILFunctionType SILFunctionType::getWithDifferentiability(
 }
 
 CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
-  if (!isDifferentiable())
-    return CanSILFunctionType(this);
   auto nondiffExtInfo = getExtInfo().withDifferentiable(false);
   SmallVector<SILParameterInfo, 8> newParams;
   for (auto &param : getParameters())

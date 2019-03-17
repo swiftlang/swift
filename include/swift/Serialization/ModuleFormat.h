@@ -878,6 +878,18 @@ namespace decls_block {
                            // followed by error result type/convention
     // Optionally a protocol conformance (for witness_methods)
   >;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  using SILDifferentiableFunctionTypeLayout = BCRecordLayout<
+    SIL_DIFFERENTIABLE_FUNCTION_TYPE,
+    BCVBR<4>,                // max order
+    BCVBR<4>,                // representation kind
+    GenericSignatureIDField, // generic signature
+    TypeIDField,             // original function type
+    TypeIDField,             // differential type
+    TypeIDField,             // pullback type
+    BCArray<BCFixed<31>>     // parameter indices and result indices
+  >;
   
   using SILBlockStorageTypeLayout = BCRecordLayout<
     SIL_BLOCK_STORAGE_TYPE,

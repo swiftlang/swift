@@ -5252,6 +5252,52 @@ public:
                                 errorResult, ctx, witnessMethodConformance);
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  Expected<Type>
+  deserializeSILDifferentiableFunctionType(ArrayRef<uint64_t> scratch,
+                                           StringRef blobData) {
+    unsigned maxOrder, representationKind;
+    GenericSignatureID genericSigID;
+    TypeID originalTypeID, differentialTypeID, pullbackTypeID;
+    ArrayRef<uint64_t> parameterAndResultIndices;
+    decls_block::SILDifferentiableFunctionTypeLayout::readRecord(
+        scratch, maxOrder, genericSigID, representationKind, originalTypeID,
+        differentialTypeID, pullbackTypeID, parameterAndResultIndices);
+    auto *genericSig = MF.getGenericSignature(genericSigID);
+    auto originalType = MF.getTypeChecked(originalTypeID);
+    if (!originalType)
+      return originalType.takeError();
+    auto differentialType = MF.getTypeChecked(differentialTypeID);
+    if (!differentialType)
+      return differentialType.takeError();
+    auto pullbackType = MF.getTypeChecked(pullbackTypeID);
+    if (!pullbackType)
+      return pullbackType.takeError();
+
+    // Convert parameter indices and result indices to bit vectors.
+    auto originalFnType =
+        CanSILFunctionType(originalType.get()->castTo<SILFunctionType>());
+    auto numParameters = originalFnType->getNumParameters();
+    auto numResults = originalFnType->getNumResults();
+    SmallBitVector parameterIndices(numParameters);
+    for (auto index : parameterAndResultIndices.take_front(numParameters))
+      parameterIndices.set(index);
+    SmallBitVector resultIndices(numResults);
+    auto rawResultIndices = parameterAndResultIndices.drop_front(numParameters);
+    assert(rawResultIndices.size() == numResults);
+    for (auto index : rawResultIndices)
+      resultIndices.set(index);
+    return SILDifferentiableFunctionType::get(
+        ctx, maxOrder,
+        (DifferentiabilityRepresentationKind)representationKind,
+        genericSig ? genericSig->getCanonicalSignature() : nullptr,
+        AutoDiffIndexSubset::get(MF.getContext(), parameterIndices),
+        AutoDiffIndexSubset::get(MF.getContext(), resultIndices),
+        originalFnType,
+        CanSILFunctionType(differentialType.get()->castTo<SILFunctionType>()),
+        CanSILFunctionType(pullbackType.get()->castTo<SILFunctionType>()));
+  }
+
   Expected<Type> deserializeArraySliceType(ArrayRef<uint64_t> scratch,
                                            StringRef blobData) {
     TypeID baseID;

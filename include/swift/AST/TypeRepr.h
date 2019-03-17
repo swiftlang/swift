@@ -1150,6 +1150,8 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::InOut:
   case TypeReprKind::Composition:
   case TypeReprKind::OpaqueReturn:
+  // SWIFT_ENABLE_TENSORFLOW
+  case TypeReprKind::SILDifferentiableFunction:
     return false;
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:
@@ -1169,6 +1171,54 @@ inline bool TypeRepr::isSimple() const {
   }
   llvm_unreachable("bad TypeRepr kind");
 }
+
+// SWIFT_ENABLE_TENSORFLOW
+class SILDifferentiableFunctionTypeRepr final : public TypeRepr {
+  GenericParamList *GenericParams;
+  GenericEnvironment *GenericEnv = nullptr;
+  TypeRepr *Original;
+  TypeRepr *Differential;
+  TypeRepr *Pullback;
+  TypeRepr *Transpose;
+  SourceRange Braces;
+
+public:
+  SILDifferentiableFunctionTypeRepr(
+      GenericParamList *genericParams, TypeRepr *original,
+      TypeRepr *differential, TypeRepr *pullback, TypeRepr *transpose,
+      SourceRange braces)
+      : TypeRepr(TypeReprKind::SILDifferentiableFunction),
+        GenericParams(genericParams), Original(original),
+        Differential(differential), Pullback(pullback), Transpose(transpose),
+        Braces(braces) {}
+
+  GenericParamList *getGenericParams() const { return GenericParams; };
+  GenericEnvironment *getGenericEnvironment() const { return GenericEnv; };
+  void setGenericEnvironment(GenericEnvironment *env) {
+    assert(GenericEnv == nullptr);
+    GenericEnv = env;
+  }
+  TypeRepr *getOriginal() const { return Original; }
+  TypeRepr *getDifferential() const { return Differential; }
+  TypeRepr *getPullback() const { return Pullback; }
+  TypeRepr *getTranspose() const { return Transpose; }
+
+  SourceRange getBraces() const { return Braces; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::SILDifferentiableFunction;
+  }
+
+  static bool classof(const SILDifferentiableFunctionTypeRepr *T) {
+    return true;
+  }
+
+private:
+  SourceLoc getStartLocImpl() const { return Braces.Start; }
+  SourceLoc getEndLocImpl() const { return Braces.End; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
 
 } // end namespace swift
 

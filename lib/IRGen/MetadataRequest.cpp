@@ -1323,6 +1323,13 @@ namespace {
       llvm_unreachable("should not be asking for metadata of a lowered SIL "
                        "function type--SILGen should have used the AST type");
     }
+    // SWIFT_ENABLE_TENSORFLOW
+    MetadataResponse visitSILDifferentiableFunctionType(
+        CanSILDifferentiableFunctionType type, DynamicMetadataRequest request) {
+      llvm_unreachable("should not be asking for metadata of a lowered SIL "
+                       "differentiable function type--SILGen should have used "
+                       "the AST type");
+    }
     MetadataResponse visitSILTokenType(CanSILTokenType type,
                                           DynamicMetadataRequest request) {
       llvm_unreachable("should not be asking for metadata of a SILToken type");
@@ -2072,6 +2079,17 @@ namespace {
       llvm_unreachable("Not a valid SILFunctionType.");
     }
 
+    // SWIFT_ENABLE_TENSORFLOW
+    llvm::Value *visitSILDifferentiableFunctionType(
+        CanSILDifferentiableFunctionType type,
+        DynamicMetadataRequest request) {
+      // All differentiable function types look like () -> ().
+      // FIXME: It'd be nice not to have to call through the runtime here.
+      return IGF.emitTypeMetadataRef(
+          CanFunctionType::get({}, type->getASTContext().TheEmptyTupleType),
+          request).getMetadata();
+    }
+
     llvm::Value *visitAnyMetatypeType(CanAnyMetatypeType type,
                                       DynamicMetadataRequest request) {
       
@@ -2280,6 +2298,13 @@ namespace {
       }
 
       llvm_unreachable("Not a valid SILFunctionType.");
+    }
+
+                              // SWIFT_ENABLE_TENSORFLOW
+    llvm::Value *visitSILDifferentiableFunctionType(
+        CanSILDifferentiableFunctionType type, DynamicMetadataRequest request) {
+      return emitFromValueWitnessTable(
+        CanFunctionType::get({}, type->getASTContext().TheEmptyTupleType));
     }
 
     llvm::Value *visitAnyMetatypeType(CanAnyMetatypeType type,

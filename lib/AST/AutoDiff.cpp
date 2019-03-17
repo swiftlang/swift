@@ -345,14 +345,18 @@ void AutoDiffParameterIndicesBuilder::setParameters(unsigned lowerBound,
   parameters.set(lowerBound, upperBound);
 }
 
+VectorSpace VectorSpace::getExistential(ASTContext &ctx) {
+  return {Kind::Existential, ctx.getAnyDerivativeType()};
+}
+
 Type VectorSpace::getType() const {
   switch (kind) {
   case Kind::Vector:
     return value.vectorType;
   case Kind::Tuple:
     return value.tupleType;
-  case Kind::Function:
-    return value.functionType;
+  case Kind::Existential:
+    return value.vectorType;
   }
 }
 

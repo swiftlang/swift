@@ -239,6 +239,8 @@ class TypeMatcher {
     TRIVIAL_CASE(SILFunctionType)
     TRIVIAL_CASE(SILBlockStorageType)
     TRIVIAL_CASE(SILBoxType)
+    // SWIFT_ENABLE_TENSORFLOW
+    TRIVIAL_CASE(SILDifferentiableFunctionType)
     TRIVIAL_CASE(ProtocolCompositionType)
 
     bool visitLValueType(CanLValueType firstLValue, Type secondType,

@@ -351,6 +351,55 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
                                                SourceLoc()));
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+ParserResult<TypeRepr> Parser::parseSILDifferentiableFunctionType(
+    GenericParamList *generics, const TypeAttributes &attrs,
+    Optional<Scope> &GenericsScope) {
+  SyntaxParsingContext TypeParsingContext(SyntaxContext,
+                                          SyntaxContextKind::Type);
+  SourceLoc lBraceLoc, rBraceLoc;
+  TypeRepr *originalType = nullptr;
+  constexpr unsigned numAssocFns = 3;
+  std::array<StringRef, numAssocFns> assocFnLabels(
+      {"differential", "pullback", "transpose"});
+  std::array<TypeRepr *, numAssocFns> assocFnTypes({nullptr, nullptr, nullptr});
+
+  if (parseToken(tok::l_brace, lBraceLoc,
+                 diag::sil_differentiable_attribute_expected_lbrace))
+    return makeParserError();
+  
+  auto originalTypeParseResult = parseType();
+  if (originalTypeParseResult.isParseError())
+    return makeParserError();
+  originalType = originalTypeParseResult.get();
+
+  for (auto i : range(numAssocFns)) {
+    if (Tok.isNot(tok::comma) || peekToken().isNot(tok::identifier) ||
+        peekToken().getText() != assocFnLabels[i])
+      continue;
+    consumeToken(tok::comma);
+    consumeToken(tok::identifier);
+    if (parseToken(tok::colon, diag::expected_colon_after_label,
+                   assocFnLabels[i]))
+      return makeParserError();
+    auto parseResult = parseType();
+    if (parseResult.isParseError())
+      return makeParserError();
+    assocFnTypes[i] = parseResult.get();
+  }
+
+  if (parseToken(tok::r_brace, rBraceLoc,
+                 diag::sil_differentiable_attribute_expected_rbrace))
+    return makeParserError();
+
+  auto *diffFnType = new (Context) SILDifferentiableFunctionTypeRepr(
+      generics, originalType, std::get<0>(assocFnTypes),
+      std::get<1>(assocFnTypes), std::get<2>(assocFnTypes),
+      SourceRange(lBraceLoc, rBraceLoc));
+  return makeParserResult(applyAttributeToType(diffFnType, attrs,
+                                               VarDecl::Specifier::Default,
+                                               SourceLoc()));
+}
 
 /// parseType
 ///   type:
@@ -382,6 +431,12 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     if (!IsSILFuncDecl)
       GenericsScope.emplace(this, ScopeKind::Generics);
     generics = maybeParseGenericParams().getPtrOrNull();
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // In SIL mode, parse differentiable function type.
+  if (isInSILMode() && attrs.has(TAK_sil_differentiable)) {
+    return parseSILDifferentiableFunctionType(generics, attrs, GenericsScope);
   }
   
   // In SIL mode, parse box types { ... }.

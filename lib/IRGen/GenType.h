@@ -135,7 +135,9 @@ private:
   const TypeInfo *convertStructType(TypeBase *key, CanType type, StructDecl *D);
   const TypeInfo *convertFunctionType(SILFunctionType *T);
   // SWIFT_ENABLE_TENSORFLOW
-  const TypeInfo *convertDifferentiableFunctionType(SILFunctionType *T);
+  const TypeInfo *
+  convertDifferentiableFunctionType(SILDifferentiableFunctionType *T);
+  const TypeInfo *convertLegacyDifferentiableFunctionType(SILFunctionType *T);
   const TypeInfo *convertBlockStorageType(SILBlockStorageType *T);
   const TypeInfo *convertBoxType(SILBoxType *T);
   const TypeInfo *convertArchetypeType(ArchetypeType *T);

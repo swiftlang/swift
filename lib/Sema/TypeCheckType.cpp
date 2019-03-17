@@ -1867,6 +1867,10 @@ namespace {
                              TypeResolutionOptions options);
     Type resolveSILBoxType(SILBoxTypeRepr *repr,
                            TypeResolutionOptions options);
+    // SWIFT_ENABLE_TENSORFLOW
+    Type resolveSILDifferentiableFunctionType(
+        SILDifferentiableFunctionTypeRepr *repr, TypeResolutionOptions options,
+        DifferentiabilityRepresentationKind reprKind, unsigned maxOrder);
 
     Type buildMetatypeType(MetatypeTypeRepr *repr,
                            Type instanceType,
@@ -1957,6 +1961,11 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   case TypeReprKind::SILBox:
     assert((options & TypeResolutionFlags::SILType) && "SILBox repr in non-SIL type context?!");
     return resolveSILBoxType(cast<SILBoxTypeRepr>(repr), options);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  case TypeReprKind::SILDifferentiableFunction:
+    llvm_unreachable("SILDifferentiableFunction is always attributed with "
+                     "'@sil_differentiable'");
 
   case TypeReprKind::Array:
     return resolveArrayType(cast<ArrayTypeRepr>(repr), options);
@@ -2144,10 +2153,26 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                              TAK_callee_guaranteed,
                              TAK_noescape,
                              TAK_yield_once,
-                             TAK_yield_many}) {
+                             TAK_yield_many,
+                             // SWIFT_ENABLE_TENSORFLOW
+                             TAK_sil_differentiable}) {
       checkUnsupportedAttr(silOnlyAttr);
     }
-  }  
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  if (attrs.has(TAK_sil_differentiable)) {
+    auto *diffFnTy = dyn_cast<SILDifferentiableFunctionTypeRepr>(repr);
+    if (!diffFnTy) {
+      diagnose(attrs.getLoc(TAK_sil_differentiable),
+               diag::sil_differentiable_attr_not_applicable);
+      return Type();
+    }
+    auto reprKindAndOrder =
+        attrs.getDifferentiabilityRepresentationKindAndOrder();
+    return resolveSILDifferentiableFunctionType(
+        diffFnTy, options, reprKindAndOrder.first, reprKindAndOrder.second);
+  }
 
   // Other function representation attributes are not normally supported at
   // source level, but we want to support them there in SIL files.
@@ -2716,6 +2741,146 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
   
   auto layout = SILLayout::get(Context, genericSig, fields);
   return SILBoxType::get(Context, layout, subMap);
+}
+
+Type TypeResolver::resolveSILDifferentiableFunctionType(
+    SILDifferentiableFunctionTypeRepr *repr, TypeResolutionOptions options,
+    DifferentiabilityRepresentationKind reprKind, unsigned maxOrder) {
+  // Resolve generic params using the function's generic environment, if it
+  // has one.
+  Optional<TypeResolution> resolveSILFunctionGenericParams;
+  Optional<llvm::SaveAndRestore<TypeResolution>> useSILFunctionGenericEnv;
+  CanGenericSignature genericSig;
+  if (auto *genEnv = repr->getGenericEnvironment()) {
+    genericSig = genEnv->getGenericSignature()->getCanonicalSignature();
+    resolveSILFunctionGenericParams = TypeResolution::forContextual(DC, genEnv);
+    useSILFunctionGenericEnv.emplace(resolution,
+                                     *resolveSILFunctionGenericParams);
+  }
+
+  // Resolve the original type.
+  auto originalTypeRepr = repr->getOriginal();
+  if (!originalTypeRepr) {
+    diagnose(repr->getLoc(),
+             diag::sil_differentiable_required_original_function_field);
+    return ErrorType::get(Context);
+  }
+  auto originalType = resolveType(repr->getOriginal(), options);
+  if (!originalType || originalType->hasError())
+    return ErrorType::get(Context);
+  auto originalSILFnType = originalType->getAs<SILFunctionType>();
+  if (!originalSILFnType) {
+    diagnose(originalTypeRepr->getLoc(),
+             diag::sil_differentiable_fields_must_be_function_type);
+    return ErrorType::get(Context);
+  }
+  if (originalSILFnType->getGenericSignature()) {
+    diagnose(originalTypeRepr->getLoc(),
+             diag::sil_differentiable_field_cannot_be_generic);
+    return ErrorType::get(Context);
+  }
+  auto *parameterIndices =
+      originalSILFnType->getDifferentiationParameterIndices();
+  auto *resultIndices =
+      originalSILFnType->getDifferentiationResultIndices();
+
+  auto checkAndDiagnoseInvalidField = [this, repr](
+      TypeRepr *fieldRepr, StringRef fieldName) -> TypeRepr * {
+          if (fieldRepr)
+            return fieldRepr;
+          diagnose(repr->getLoc(),
+                   diag::sil_differentiable_required_field, fieldName);
+          return nullptr;
+      };
+
+  switch (reprKind) {
+  case DifferentiabilityRepresentationKind::Normal: {
+    auto *differentialTypeRepr =
+        checkAndDiagnoseInvalidField(repr->getDifferential(), "differential:");
+    auto *pullbackTypeRepr =
+        checkAndDiagnoseInvalidField(repr->getPullback(), "pullback:");
+    if (!differentialTypeRepr || !pullbackTypeRepr)
+      return ErrorType::get(Context);
+    // The type should not specify transpose.
+    if (auto *transposeRepr = repr->getTranspose()) {
+      diagnose(transposeRepr->getLoc(), diag::sil_differentiable_invalid_field);
+      return ErrorType::get(Context);
+    }
+
+    // Resolve differential type.
+    auto differentialType = resolveType(differentialTypeRepr, options);
+    if (!differentialType || differentialType->hasError())
+      return ErrorType::get(Context);
+    auto *differentialSILFnType = differentialType->getAs<SILFunctionType>();
+    if (!differentialSILFnType) {
+      diagnose(differentialTypeRepr->getLoc(),
+               diag::sil_differentiable_fields_must_be_function_type);
+      return ErrorType::get(Context);
+    }
+    if (differentialSILFnType->getGenericSignature()) {
+      diagnose(differentialTypeRepr->getLoc(),
+               diag::sil_differentiable_field_cannot_be_generic);
+      return ErrorType::get(Context);
+    }
+    // Resolve pullback type.
+    auto pullbackType = resolveType(pullbackTypeRepr, options);
+    if (!pullbackType || pullbackType->hasError())
+      return ErrorType::get(Context);
+    auto *pullbackSILFnType = pullbackType->getAs<SILFunctionType>();
+    if (!pullbackSILFnType) {
+      diagnose(pullbackTypeRepr->getLoc(),
+               diag::sil_differentiable_fields_must_be_function_type);
+      return ErrorType::get(Context);
+    }
+    if (pullbackSILFnType->getGenericSignature()) {
+      diagnose(pullbackTypeRepr->getLoc(),
+               diag::sil_differentiable_field_cannot_be_generic);
+      return ErrorType::get(Context);
+    }
+
+    return SILDifferentiableFunctionType::get(
+        Context, maxOrder, DifferentiabilityRepresentationKind::Normal,
+        genericSig, parameterIndices, resultIndices,
+        originalSILFnType->getWithoutDifferentiability(),
+        CanSILFunctionType(differentialSILFnType),
+        CanSILFunctionType(pullbackSILFnType));
+  }
+
+  case DifferentiabilityRepresentationKind::Linear: {
+    auto *transposeTypeRepr =
+        checkAndDiagnoseInvalidField(repr->getTranspose(), "transpose:");
+    if (!transposeTypeRepr)
+      return ErrorType::get(Context);
+    // The type should not specify differential or pullback.
+    for (auto *nonapplicableRepr :
+             {repr->getDifferential(), repr->getPullback()}) {
+      if (!nonapplicableRepr)
+        continue;
+      diagnose(nonapplicableRepr->getLoc(),
+               diag::sil_differentiable_invalid_field);
+      return ErrorType::get(Context);
+    }
+    // Resolve transpose type.
+    auto transposeType = resolveType(transposeTypeRepr, options);
+    if (!transposeType || transposeType->hasError())
+      return ErrorType::get(Context);
+    auto *transposeSILFnType = transposeType->getAs<SILFunctionType>();
+    if (!transposeSILFnType) {
+      diagnose(transposeTypeRepr->getLoc(),
+               diag::sil_differentiable_fields_must_be_function_type);
+      return ErrorType::get(Context);
+    }
+    if (transposeSILFnType->getGenericSignature()) {
+      diagnose(transposeTypeRepr->getLoc(),
+               diag::sil_differentiable_field_cannot_be_generic);
+      return ErrorType::get(Context);
+    }
+    return SILDifferentiableFunctionType::getLinear(
+        Context, genericSig, parameterIndices, resultIndices,
+        originalSILFnType->getWithoutDifferentiability(),
+        CanSILFunctionType(transposeSILFnType));
+  }
+  }
 }
 
 Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,

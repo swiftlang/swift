@@ -382,6 +382,9 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   llvm::FoldingSet<SILFunctionType> SILFunctionTypes;
   llvm::DenseMap<CanType, SILBlockStorageType *> SILBlockStorageTypes;
   llvm::FoldingSet<SILBoxType> SILBoxTypes;
+  // SWIFT_ENABLE_TENSORFLOW
+  llvm::FoldingSet
+      <SILDifferentiableFunctionType> SILDifferentiableFunctionTypes;
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> IntegerTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
@@ -826,6 +829,12 @@ StructDecl *ASTContext::getTensorDataTypeDecl() const {
     if (auto CD = dyn_cast<StructDecl>(result))
       return getImpl().TensorDataTypeDecl = CD;
   return nullptr;
+}
+
+CanType ASTContext::getAnyDerivativeType() const {
+  if (auto *anyDerivativeDecl = getAnyDerivativeDecl())
+    return anyDerivativeDecl->getDeclaredType()->getCanonicalType();
+  return CanType();
 }
 
 CanType ASTContext::getNeverType() const {
@@ -3274,15 +3283,6 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
              "Cannot return an @noescape function type");
     }
   }
-
-  // SWIFT_ENABLE_TENSORFLOW
-  // Make sure that NotDifferentiable parameters only exist on differentiable
-  // functions.
-  if (!ext.isDifferentiable())
-    for (auto param : getParameters())
-      assert(param.getDifferentiability() ==
-                 SILParameterDifferentiability::DifferentiableOrNotApplicable &&
-             "non-differentiable function has NotDifferentiable parameter");
 #endif
 }
 
@@ -4411,6 +4411,31 @@ CanSILBoxType SILBoxType::get(CanType boxedType) {
       },
       MakeAbstractConformanceForGenericType());
   return get(boxedType->getASTContext(), layout, subMap);
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+CanSILDifferentiableFunctionType SILDifferentiableFunctionType::get(
+    ASTContext &C, int maxOrder, DifferentiabilityRepresentationKind reprKind,
+    CanGenericSignature genericSig, AutoDiffIndexSubset *parameterIndices,
+    AutoDiffIndexSubset *resultIndices, CanSILFunctionType originalType,
+    CanSILFunctionType differentialType, CanSILFunctionType pullbackType) {
+  void *insertPos = nullptr;
+  auto &types = C.getImpl().SILDifferentiableFunctionTypes;
+  llvm::FoldingSetNodeID id;
+  SILDifferentiableFunctionType::Profile(id, maxOrder, reprKind, genericSig,
+                                         parameterIndices, resultIndices,
+                                         originalType, differentialType,
+                                         pullbackType);
+  if (auto existing = types.FindNodeOrInsertPos(id, insertPos))
+    return CanSILDifferentiableFunctionType(existing);
+
+  auto newFn = new (C, AllocationArena::Permanent)
+      SILDifferentiableFunctionType(C, maxOrder, reprKind, genericSig,
+                                    parameterIndices, resultIndices,
+                                    originalType, differentialType,
+                                    pullbackType);
+  types.InsertNode(newFn, insertPos);
+  return CanSILDifferentiableFunctionType(newFn);
 }
 
 LayoutConstraint

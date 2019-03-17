@@ -1840,6 +1840,17 @@ bool Traversal::visitSILBoxTypeRepr(SILBoxTypeRepr *T) {
   return false;
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+bool Traversal::visitSILDifferentiableFunctionTypeRepr(
+    SILDifferentiableFunctionTypeRepr *T) {
+  for (auto *repr : {T->getOriginal(), T->getDifferential(),
+                     T->getPullback(), T->getTranspose()})
+    if (repr)
+      if (doIt(repr))
+        return true;
+  return false;
+}
+
 Expr *Expr::walk(ASTWalker &walker) {
   return Traversal(walker).doIt(this);
 }

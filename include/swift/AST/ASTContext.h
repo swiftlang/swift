@@ -494,6 +494,9 @@ public:
   /// has been imported.  Otherwise, this returns null.
   StructDecl *getTensorDataTypeDecl() const;
 
+  /// Retrieve the type for Swift.AnyDerivative.
+  CanType getAnyDerivativeType() const;
+
   /// Retrieve the type Swift.Never.
   CanType getNeverType() const;
 

@@ -301,7 +301,7 @@ public:
     SmallBitVector indicesBitVec(capacity, false);
     for (auto index : indices)
       indicesBitVec.set(index);
-    return AutoDiffIndexSubset::get(ctx, indicesBitVec);
+    return get(ctx, indicesBitVec);
   }
 
   static AutoDiffIndexSubset *getDefault(ASTContext &ctx, unsigned capacity,
@@ -557,6 +557,31 @@ public:
   }
 };
 
+/// The kind of ABI used to represent a differentiable function.
+enum class DifferentiabilityRepresentationKind : unsigned {
+  /// The function is linear and is represented as a bundle of the original
+  /// function and its transpose. Its differential is the function itself. Its
+  /// pullback is its transpose.
+  ///
+  /// For original function `(T...) -> U`, there are a few typing invariants:
+  /// 1. T = T.TangentVector = T.CotangentVector
+  /// 2. U = U.TangentVector = U.CotangentVector
+  ///
+  /// |----------------------|
+  /// | Original | Transpose |
+  /// |----------------------|
+  Linear = 0,
+
+  /// The function is represented as a bundle of the original function and
+  /// JVP functions at every order. JVP functions must be thin.
+  ///
+  ///                1        2    ...     n
+  /// |----------------------------------------|
+  /// | Original | JVP@1 | JVP@2 | ... | JVP@n |
+  /// |----------------------------------------|
+  Normal = 1
+};
+
 /// Automatic differentiation utility namespace.
 namespace autodiff {
 
@@ -606,8 +631,8 @@ public:
     Vector,
     /// A product of vector spaces as a tuple.
     Tuple,
-    /// A function type whose innermost result conforms to `AdditiveArithmetic`.
-    Function
+    /// An existential `AdditiveArithmetic` type.
+    Existential
   };
 
 private:
@@ -617,16 +642,12 @@ private:
     Type vectorType;
     // Tuple
     TupleType *tupleType;
-    // Function
-    AnyFunctionType *functionType;
 
     Value(Type vectorType) : vectorType(vectorType) {}
     Value(TupleType *tupleType) : tupleType(tupleType) {}
-    Value(AnyFunctionType *functionType) : functionType(functionType) {}
   } value;
 
-  VectorSpace(Kind kind, Value value)
-      : kind(kind), value(value) {}
+  VectorSpace(Kind kind, Value value) : kind(kind), value(value) {}
 
 public:
   VectorSpace() = delete;
@@ -637,12 +658,11 @@ public:
   static VectorSpace getTuple(TupleType *tupleTy) {
     return {Kind::Tuple, tupleTy};
   }
-  static VectorSpace getFunction(AnyFunctionType *fnTy) {
-    return {Kind::Function, fnTy};
-  }
+  static VectorSpace getExistential(ASTContext &ctx);
 
   bool isVector() const { return kind == Kind::Vector; }
   bool isTuple() const { return kind == Kind::Tuple; }
+  bool isExistential() const { return kind == Kind::Existential; }
 
   Kind getKind() const { return kind; }
   Type getVector() const {
@@ -652,10 +672,6 @@ public:
   TupleType *getTuple() const {
     assert(kind == Kind::Tuple);
     return value.tupleType;
-  }
-  AnyFunctionType *getFunction() const {
-    assert(kind == Kind::Function);
-    return value.functionType;
   }
 
   Type getType() const;

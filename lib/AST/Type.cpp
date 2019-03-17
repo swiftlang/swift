@@ -221,6 +221,8 @@ bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
   case TypeKind::SILToken:
+  // SWIFT_ENABLE_TENSORFLOW
+  case TypeKind::SILDifferentiableFunction:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
@@ -1118,6 +1120,8 @@ CanType TypeBase::computeCanonicalType() {
   case TypeKind::SILBox:
   case TypeKind::SILFunction:
   case TypeKind::SILToken:
+  // SWIFT_ENABLE_TENSORFLOW
+  case TypeKind::SILDifferentiableFunction:
     llvm_unreachable("SIL-only types are always canonical!");
 
   case TypeKind::ProtocolComposition: {
@@ -3650,6 +3654,23 @@ case TypeKind::Id:
 #endif
     return base;
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  case TypeKind::SILDifferentiableFunction: {
+    auto type = cast<SILDifferentiableFunctionType>(base);
+    CanSILFunctionType fnTypes[3] = {
+      type->getOriginalFunctionType(),
+      type->getDifferentialType(),
+      type->getPullbackType()
+    };
+    for (Type &fnType : fnTypes)
+      fnType = fnType.transformRec(fn);
+    return SILDifferentiableFunctionType::get(
+        type->getASTContext(), type->getMaxOrder(),
+        type->getRepresentationKind(), type->getGenericSignature(),
+        type->getParameterIndices(), type->getResultIndices(),
+        fnTypes[0], fnTypes[1], fnTypes[2]);
+  }
   
   case TypeKind::SILFunction: {
     auto fnTy = cast<SILFunctionType>(base);
@@ -4279,6 +4300,8 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::Function:
   case TypeKind::GenericFunction:
   case TypeKind::SILFunction:
+  // SWIFT_ENABLE_TENSORFLOW
+  case TypeKind::SILDifferentiableFunction:
   case TypeKind::SILBlockStorage:
   case TypeKind::Error:
   case TypeKind::Unresolved:
@@ -4358,6 +4381,165 @@ Type TypeBase::openAnyExistentialType(OpenedArchetypeType *&opened) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
+AutoDiffIndexSubset *
+SILFunctionType::getDifferentiationParameterIndices() {
+  SmallBitVector indices(getNumParameters(), true);
+  for (auto valueAndIndex : enumerate(getParameters()))
+    if (valueAndIndex.value().getDifferentiability() ==
+        SILParameterDifferentiability::NotDifferentiable)
+      indices.reset(valueAndIndex.index());
+  return AutoDiffIndexSubset::get(getASTContext(), indices);
+}
+
+AutoDiffIndexSubset *
+SILFunctionType::getDifferentiationResultIndices() {
+  SmallBitVector indices(getNumResults(), true);
+  // TODO(rxwei): Add result differentiability and compute the correct result
+  // indices.
+  return AutoDiffIndexSubset::get(getASTContext(), indices);
+}
+
+SILDifferentiableFunctionType::SILDifferentiableFunctionType(
+    ASTContext &C, int maxOrder, DifferentiabilityRepresentationKind reprKind,
+    CanGenericSignature genericSig, AutoDiffIndexSubset *parameterIndices,
+    AutoDiffIndexSubset *resultIndices, CanSILFunctionType originalType,
+    CanSILFunctionType differentialType, CanSILFunctionType pullbackType)
+    : TypeBase(TypeKind::SILDifferentiableFunction, &C,
+               originalType->getRecursiveProperties()),
+      maxOrder(maxOrder), representationKind(reprKind), genericSig(genericSig),
+      parameterIndices(parameterIndices), resultIndices(resultIndices),
+      originalType(originalType), differentialType(differentialType),
+      pullbackType(pullbackType) {
+  assert(parameterIndices->getCapacity() == originalType->getNumParameters());
+  assert(resultIndices->getCapacity() == originalType->getNumResults());
+  assert(!originalType->getGenericSignature());
+  assert(!differentialType->getGenericSignature());
+  assert(!pullbackType->getGenericSignature());
+#ifndef NDEBUG
+  auto hasNondiff = [](CanSILFunctionType fnType) -> bool {
+    return llvm::any_of(fnType->getParameters(),
+                        [&](const SILParameterInfo &param) {
+      // TODO(rxwei): Handle result differentiability.
+      return param.getDifferentiability() ==
+          SILParameterDifferentiability::NotDifferentiable;
+    });
+  };
+  assert(!hasNondiff(originalType) &&
+         "Original function type should not have '@nondiff'");
+  assert(!hasNondiff(differentialType) &&
+         "Differential function type should not have '@nondiff'");
+  assert(!hasNondiff(originalType) &&
+         "Differential function type should not have '@nondiff'");
+
+  switch (reprKind) {
+  case DifferentiabilityRepresentationKind::Linear:
+    assert(originalType->isEqual(differentialType) &&
+           "Linear functions' differential must equal themselves");
+    assert(maxOrder == -1 &&
+           "'maxOrder' must be -1 if the function is linear");
+    break;
+  case DifferentiabilityRepresentationKind::Normal:
+    break;
+  }
+#endif
+}
+
+CanSILDifferentiableFunctionType
+SILDifferentiableFunctionType::getLinear(
+    ASTContext &C, CanGenericSignature genericSig,
+    AutoDiffIndexSubset *parameterIndices, AutoDiffIndexSubset *resultIndices,
+    CanSILFunctionType originalType, CanSILFunctionType transposeType) {
+  return get(C, /*maxOrder*/ -1, DifferentiabilityRepresentationKind::Linear,
+             genericSig, parameterIndices, resultIndices, originalType,
+             /*differnetialType*/ originalType,
+             /*pullbackType*/ transposeType);
+}
+
+CanSILFunctionType SILDifferentiableFunctionType::
+getOriginalFunctionTypeWithDifferentiabilityFlags() {
+  SmallVector<SILParameterInfo, 8> parametersWithFlags;
+  for (auto indexAndParam : enumerate(originalType->getParameters())) {
+    if (parameterIndices->contains(indexAndParam.index())) {
+      assert(indexAndParam.value().getDifferentiability() ==
+                 SILParameterDifferentiability::DifferentiableOrNotApplicable &&
+             "Original function type should not have '@nondiff' parameters");
+      parametersWithFlags.push_back(indexAndParam.value());
+    } else {
+      parametersWithFlags.push_back(
+          indexAndParam.value().getWithDifferentiability(
+              SILParameterDifferentiability::NotDifferentiable));
+    }
+  }
+  // TODO(rxwei): Handle result differentiability.
+  return SILFunctionType::get(originalType->getGenericSignature(),
+                              originalType->getExtInfo(),
+                              originalType->getCoroutineKind(),
+                              originalType->getCalleeConvention(),
+                              parametersWithFlags, originalType->getYields(),
+                              originalType->getResults(),
+                              originalType->getOptionalErrorResult(),
+                              getASTContext());
+}
+
+CanSILFunctionType
+SILDifferentiableFunctionType::getAssociatedFunctionType(
+    AutoDiffAssociatedFunctionKind kind, unsigned order) const {
+  SmallVector<SILResultInfo, 8> resultsWithLinearMap(
+      originalType->getResults().begin(), originalType->getResults().end());
+  auto getResultConventionForFunction = [&](CanSILFunctionType type) {
+    if (type->getExtInfo().getRepresentation() ==
+            SILFunctionTypeRepresentation::Thin)
+      return ResultConvention::Unowned;
+    return ResultConvention::Owned;
+  };
+  switch (kind) {
+  case AutoDiffAssociatedFunctionKind::JVP:
+    resultsWithLinearMap.push_back(
+        {differentialType, getResultConventionForFunction(differentialType)});
+    break;
+  case AutoDiffAssociatedFunctionKind::VJP: {
+    resultsWithLinearMap.push_back(
+        {pullbackType, getResultConventionForFunction(pullbackType)});
+    break;
+  }
+  }
+  return SILFunctionType::get(originalType->getGenericSignature(),
+                              originalType->getExtInfo(),
+                              originalType->getCoroutineKind(),
+                              originalType->getCalleeConvention(),
+                              originalType->getParameters(),
+                              originalType->getYields(), resultsWithLinearMap,
+                              originalType->getOptionalErrorResult(),
+                              originalType->getASTContext());
+}
+
+CanSILDifferentiableFunctionType
+SILDifferentiableFunctionType::getLinearTransposeType() const {
+  assert(representationKind == DifferentiabilityRepresentationKind::Linear);
+  return SILDifferentiableFunctionType::get(originalType->getASTContext(),
+                                            maxOrder, representationKind,
+                                            genericSig, parameterIndices,
+                                            resultIndices, originalType,
+                                            pullbackType, differentialType);
+}
+
+void SILDifferentiableFunctionType::Profile(
+    llvm::FoldingSetNodeID &id, int maxOrder,
+    DifferentiabilityRepresentationKind reprKind,
+    CanGenericSignature genericSig, AutoDiffIndexSubset *parameterIndices,
+    AutoDiffIndexSubset *resultIndices, CanSILFunctionType originalType,
+    CanSILFunctionType differentialType, CanSILFunctionType pullbackType) {
+  id.AddInteger(maxOrder);
+  id.AddInteger((unsigned)reprKind);
+  id.AddPointer(genericSig.getPointer());
+  id.AddPointer(parameterIndices);
+  id.AddPointer(resultIndices);
+  id.AddPointer(originalType.getPointer());
+  id.AddPointer(differentialType.getPointer());
+  id.AddPointer(pullbackType.getPointer());
+}
+
+// SWIFT_ENABLE_TENSORFLOW
 // Makes a function with the same generic signature and extinfo as `copy`, but
 // with `params` parameters and `retTy` return type.
 static AnyFunctionType *
@@ -4386,17 +4568,10 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedTangentSpace(
     return vs;
   };
 
-  // Functions' tangent is the same function except the innermost return type
-  // being replaced by its tangent.
-  if (auto *fnTy = getAs<AnyFunctionType>()) {
-    auto resultSpace = fnTy->getResult()->getAutoDiffAssociatedTangentSpace(
-        lookupConformance);
-    if (!resultSpace)
-      return cache(None);
-    return cache(VectorSpace::getFunction(
-        makeFunctionType(fnTy, fnTy->getParams(), resultSpace->getType(),
-                         fnTy->getOptGenericSignature())));
-  }
+  // Functions' tangent/cotangent is `AnyDerivative`.
+  // TODO: Change this to `AnyDerivative` when it is implemented.
+  if (is<AnyFunctionType>() || is<SILDifferentiableFunctionType>())
+    return VectorSpace::getExistential(ctx);
 
   // Tuples' tangent is a tuple of each element's Tangent.
   if (auto *tupleTy = getAs<TupleType>()) {

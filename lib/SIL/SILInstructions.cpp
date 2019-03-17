@@ -569,7 +569,8 @@ TryApplyInst *TryApplyInst::create(
 SILType
 AutoDiffFunctionInst::getAutoDiffType(SILValue originalFunction,
                                       unsigned differentiationOrder,
-                                      AutoDiffIndexSubset *parameterIndices) {
+                                      AutoDiffIndexSubset *parameterIndices,
+                                      bool useNewSILDiffFuncType) {
   auto fnTy = originalFunction->getType().castTo<SILFunctionType>();
   auto diffTy =
       fnTy->getWithDifferentiability(differentiationOrder, parameterIndices);
@@ -579,28 +580,32 @@ AutoDiffFunctionInst::getAutoDiffType(SILValue originalFunction,
 AutoDiffFunctionInst::AutoDiffFunctionInst(
     SILModule &module, SILDebugLocation debugLoc,
     AutoDiffIndexSubset *parameterIndices, unsigned differentiationOrder,
-    SILValue originalFunction, ArrayRef<SILValue> associatedFunctions)
+    SILValue originalFunction, ArrayRef<SILValue> associatedFunctions,
+    bool useNewSILDiffFuncType)
     : InstructionBaseWithTrailingOperands(
           originalFunction, associatedFunctions, debugLoc,
           getAutoDiffType(originalFunction, differentiationOrder,
-                          parameterIndices),
+                          parameterIndices, useNewSILDiffFuncType),
           originalFunction.getOwnershipKind()),
       parameterIndices(parameterIndices),
       differentiationOrder(differentiationOrder),
+      useNewSILDiffFuncType(useNewSILDiffFuncType),
       numOperands(1 + associatedFunctions.size()) {}
 
 AutoDiffFunctionInst *AutoDiffFunctionInst::create(
     SILModule &module, SILDebugLocation debugLoc,
     AutoDiffIndexSubset *parameterIndices,
     unsigned differentiationOrder, SILValue originalFunction,
-    ArrayRef<SILValue> associatedFunctions) {
+    ArrayRef<SILValue> associatedFunctions,
+    bool useNewSILDiffFuncType) {
   size_t size = totalSizeToAlloc<Operand>(associatedFunctions.size() + 1);
   void *buffer = module.allocateInst(size, alignof(AutoDiffFunctionInst));
   return ::new (buffer) AutoDiffFunctionInst(module, debugLoc,
                                              parameterIndices,
                                              differentiationOrder,
                                              originalFunction,
-                                             associatedFunctions);
+                                             associatedFunctions,
+                                             useNewSILDiffFuncType);
 }
 
 std::pair<SILValue, SILValue> AutoDiffFunctionInst::

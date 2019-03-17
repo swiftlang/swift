@@ -222,6 +222,8 @@ namespace {
     IMPL(BuiltinUnknownObject, Reference)
     IMPL(BuiltinVector, Trivial)
     IMPL(SILToken, Trivial)
+    // SWIFT_ENABLE_TENSORFLOW
+    IMPL(SILDifferentiableFunction, Trivial)
     IMPL(Class, Reference)
     IMPL(BoundGenericClass, Reference)
     IMPL(AnyMetatype, Trivial)

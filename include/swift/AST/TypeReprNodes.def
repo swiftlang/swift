@@ -60,6 +60,8 @@ ABSTRACT_TYPEREPR(Specifier, TypeRepr)
   TYPEREPR(Owned, SpecifierTypeRepr)
 TYPEREPR(Fixed, TypeRepr)
 TYPEREPR(SILBox, TypeRepr)
+// SWIFT_ENABLE_TENSORFLOW
+TYPEREPR(SILDifferentiableFunction, TypeRepr)
 LAST_TYPEREPR(SILBox)
 
 #undef ABSTRACT_TYPEREPR

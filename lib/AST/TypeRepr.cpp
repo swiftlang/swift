@@ -258,6 +258,13 @@ TypeRepr *CloneVisitor::visitSILBoxTypeRepr(SILBoxTypeRepr *type) {
                                 type->getArgumentRAngleLoc());
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+TypeRepr *CloneVisitor::visitSILDifferentiableFunctionTypeRepr(
+    SILDifferentiableFunctionTypeRepr *type) {
+  // TODO(rxwei): implement.
+  llvm_unreachable("Unimplemented");
+}
+
 TypeRepr *CloneVisitor::visitOpaqueReturnTypeRepr(OpaqueReturnTypeRepr *type) {
   return new (Ctx) OpaqueReturnTypeRepr(type->getOpaqueLoc(),
                                         visit(type->getConstraint()));
@@ -591,6 +598,26 @@ void SILBoxTypeRepr::printImpl(ASTPrinter &Printer,
                                const PrintOptions &Opts) const {
   // TODO
   Printer.printKeyword("sil_box", Opts);
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+void SILDifferentiableFunctionTypeRepr::printImpl(
+    ASTPrinter &Printer, const PrintOptions &Opts) const {
+  Printer << '{';
+  printTypeRepr(getOriginal(), Printer, Opts);
+  if (auto *differential = getDifferential()) {
+    Printer << "differential: ";
+    printTypeRepr(differential, Printer, Opts);
+  }
+  if (auto *pullback = getPullback()) {
+    Printer << "pullback: ";
+    printTypeRepr(pullback, Printer, Opts);
+  }
+  if (auto *transpose = getTranspose()) {
+    Printer << "transpose: ";
+    printTypeRepr(transpose, Printer, Opts);
+  }
+  Printer << '}';
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing

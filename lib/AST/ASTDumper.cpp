@@ -3614,6 +3614,37 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
+    // SWIFT_ENABLE_TENSORFLOW
+    void visitSILDifferentiableFunctionType(SILDifferentiableFunctionType *T,
+                                            StringRef label) {
+      printCommon(label, "sil_differentiable_function_type");
+      printField("max_order", T->getMaxOrder());
+      StringRef reprKindStr;
+      switch (T->getRepresentationKind()) {
+      case DifferentiabilityRepresentationKind::Linear:
+        reprKindStr = "linear";
+        break;
+      case DifferentiabilityRepresentationKind::Normal:
+        reprKindStr = "normal";
+        break;
+      }
+      printField("representation_kind", reprKindStr);
+      auto getIndicesString = [&](AutoDiffIndexSubset *indices) {
+        std::string result = "(";
+        interleave(indices->getIndices(), [&result](unsigned index) {
+          result += llvm::utostr(index);
+        }, [&result] { result += ' '; });
+        return result;
+      };
+      printField("parameter_indices",
+                 getIndicesString(T->getParameterIndices()));
+      printField("result_indices", getIndicesString(T->getResultIndices()));
+      printField("original", T->getOriginalFunctionType()->getString());
+      printField("differential", T->getDifferentialType()->getString());
+      printField("pullback", T->getPullbackType()->getString());
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
     void visitArraySliceType(ArraySliceType *T, StringRef label) {
       printCommon(label, "array_slice_type");
       printRec(T->getBaseType());

@@ -4241,6 +4241,29 @@ void Serializer::writeType(Type ty) {
 
     break;
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  case TypeKind::SILDifferentiableFunction: {
+    auto fnTy = cast<SILDifferentiableFunctionType>(ty.getPointer());
+    auto abbrCode =
+        DeclTypeAbbrCodes[SILDifferentiableFunctionTypeLayout::Code];
+    SmallVector<unsigned, 8> parameterAndResultIndices;
+    AutoDiffIndexSubset *paramIndices = fnTy->getParameterIndices();
+    for (auto i : paramIndices->getIndices())
+      parameterAndResultIndices.push_back(i);
+    AutoDiffIndexSubset *resultIndices = fnTy->getResultIndices();
+    for (auto i : resultIndices->getIndices())
+      parameterAndResultIndices.push_back(i);
+    SILDifferentiableFunctionTypeLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, fnTy->getMaxOrder(),
+        (unsigned)fnTy->getRepresentationKind(),
+        addGenericSignatureRef(fnTy->getGenericSignature()),
+        addTypeRef(fnTy->getOriginalFunctionType()),
+        addTypeRef(fnTy->getDifferentialType()),
+        addTypeRef(fnTy->getPullbackType()),
+        parameterAndResultIndices);
+    break;
+  }
       
   case TypeKind::ArraySlice: {
     auto sliceTy = cast<ArraySliceType>(ty.getPointer());
@@ -4365,6 +4388,8 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<SILBlockStorageTypeLayout>();
   registerDeclTypeAbbr<SILBoxTypeLayout>();
   registerDeclTypeAbbr<SILFunctionTypeLayout>();
+  // SWIFT_ENABLE_TENSORFLOW
+  registerDeclTypeAbbr<SILDifferentiableFunctionTypeLayout>();
   registerDeclTypeAbbr<ArraySliceTypeLayout>();
   registerDeclTypeAbbr<DictionaryTypeLayout>();
   registerDeclTypeAbbr<ReferenceStorageTypeLayout>();

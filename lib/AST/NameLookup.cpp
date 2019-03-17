@@ -1953,6 +1953,8 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::Protocol:
   case TypeReprKind::Shared:
   case TypeReprKind::SILBox:
+  // SWIFT_ENABLE_TENSORFLOW
+  case TypeReprKind::SILDifferentiableFunction:
     return { };
       
   case TypeReprKind::OpaqueReturn:

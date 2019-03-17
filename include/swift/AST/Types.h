@@ -4155,11 +4155,15 @@ public:
       SILModule &module, LookupConformanceFn lookupConformance,
       CanGenericSignature whereClauseGenericSignature = nullptr);
 
-  /// Returns a bit vector that specifices which parameters you can
+  /// Returns an index subset that specifices which parameters you can
   /// differentiate with respect to for this differentiable function type. (e.g.
-  /// which parameters are not @nondiff). The function type must be
-  /// differentiable.
+  /// which parameters are not `@nondiff`).
   AutoDiffIndexSubset *getDifferentiationParameterIndices();
+
+  /// Returns an index subset that specifices which results you can
+  /// differentiate for this differentiable function type. (e.g. which
+  /// parameters are not `@nondiff`).
+  AutoDiffIndexSubset *getDifferentiationResultIndices();
 
   /// If this is a @convention(witness_method) function with a class
   /// constrained self parameter, return the class constraint for the
@@ -4386,6 +4390,112 @@ public:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILTokenType, Type)
+
+// SWIFT_ENABLE_TENSORFLOW
+class SILDifferentiableFunctionType;
+typedef CanTypeWrapper<SILDifferentiableFunctionType>
+    CanSILDifferentiableFunctionType;
+
+/// The SIL-only type for differentiable functions, which represent a bundle of
+/// the original function and autodiff-asssociated functions. A SIL
+/// differentiable function type stores 3 types: the original function type, the
+/// type of the first-order differential and the type of the first-order
+/// pullback. These types help keep track of the abstraction pattern of all
+/// autodiff-associated functions. The generic signature of this function
+/// redirects to that of the original function, which serves as the source of
+/// truth.
+class SILDifferentiableFunctionType final
+    : public TypeBase, public llvm::FoldingSetNode {
+  int maxOrder;
+  DifferentiabilityRepresentationKind representationKind;
+  CanGenericSignature genericSig;
+  AutoDiffIndexSubset *parameterIndices, *resultIndices;
+  CanSILFunctionType originalType, differentialType, pullbackType;
+
+  SILDifferentiableFunctionType(
+      ASTContext &C, int maxOrder, DifferentiabilityRepresentationKind reprKind,
+      CanGenericSignature genericSig, AutoDiffIndexSubset *parameterIndices,
+      AutoDiffIndexSubset *resultIndices, CanSILFunctionType originalType,
+      CanSILFunctionType differentialType, CanSILFunctionType pullbackType);
+
+public:
+  static CanSILDifferentiableFunctionType get(
+      ASTContext &C, int maxOrder, DifferentiabilityRepresentationKind reprKind,
+      CanGenericSignature genericSig, AutoDiffIndexSubset *parameterIndices,
+      AutoDiffIndexSubset *resultIndices, CanSILFunctionType originalType,
+      CanSILFunctionType differentialType, CanSILFunctionType pullbackType);
+
+  static CanSILDifferentiableFunctionType getLinear(
+      ASTContext &C, CanGenericSignature genericSig,
+      AutoDiffIndexSubset *parameterIndices, AutoDiffIndexSubset *resultIndices,
+      CanSILFunctionType originalType, CanSILFunctionType transposeType);
+
+  CanGenericSignature getGenericSignature() const {
+    return genericSig;
+  }
+
+  /// Returns the maximum order that this function can be differentiated at.
+  /// `-1` if the function can be differentiated at any order.
+  int getMaxOrder() const {
+    return maxOrder;
+  }
+
+  DifferentiabilityRepresentationKind getRepresentationKind() const {
+    return representationKind;
+  }
+
+  AutoDiffIndexSubset *getParameterIndices() const {
+    return parameterIndices;
+  }
+
+  AutoDiffIndexSubset *getResultIndices() const {
+    return resultIndices;
+  }
+
+  CanSILFunctionType getOriginalFunctionType() const {
+    return originalType;
+  }
+
+  // Returns the original function type that reflects differentiation parameter
+  // indices and result indices with '@nondiff' attributes on parameters and
+  // results. This is used primarily for printing.
+  CanSILFunctionType getOriginalFunctionTypeWithDifferentiabilityFlags();
+
+  CanSILFunctionType getDifferentialType() const {
+    return differentialType;
+  }
+
+  CanSILFunctionType getPullbackType() const {
+    return pullbackType;
+  }
+
+  CanSILFunctionType
+  getAssociatedFunctionType(AutoDiffAssociatedFunctionKind kind,
+                            unsigned order) const;
+
+  CanSILDifferentiableFunctionType getLinearTransposeType() const;
+
+  static void Profile(llvm::FoldingSetNodeID &id,
+                      int maxOrder,
+                      DifferentiabilityRepresentationKind reprKind,
+                      CanGenericSignature genericSig,
+                      AutoDiffIndexSubset *parameterIndices,
+                      AutoDiffIndexSubset *resultIndices,
+                      CanSILFunctionType originalType,
+                      CanSILFunctionType differentialType,
+                      CanSILFunctionType pullbackType);
+
+  void Profile(llvm::FoldingSetNodeID &id) {
+    return Profile(id, maxOrder, representationKind, genericSig,
+                   parameterIndices, resultIndices, originalType,
+                   differentialType, pullbackType);
+  }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::SILDifferentiableFunction;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILDifferentiableFunctionType, Type)
 
 /// A type with a special syntax that is always sugar for a library type. The
 /// library type may have multiple base types. For unary syntax sugar, see
@@ -5738,6 +5848,8 @@ inline bool TypeBase::hasSimpleTypeRepr() const {
   switch (getKind()) {
   case TypeKind::Function:
   case TypeKind::GenericFunction:
+  // SWIFT_ENABLE_TENSORFLOW
+  case TypeKind::SILDifferentiableFunction:
     return false;
 
   case TypeKind::Metatype:

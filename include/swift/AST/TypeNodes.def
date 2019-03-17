@@ -148,6 +148,8 @@ ARTIFICIAL_TYPE(SILFunction, Type)
 ARTIFICIAL_TYPE(SILBlockStorage, Type)
 ARTIFICIAL_TYPE(SILBox, Type)
 ARTIFICIAL_TYPE(SILToken, Type)
+// SWIFT_ENABLE_TENSORFLOW
+ARTIFICIAL_TYPE(SILDifferentiableFunction, Type)
 TYPE(ProtocolComposition, Type)
 TYPE(LValue, Type)
 TYPE(InOut, Type)

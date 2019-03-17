@@ -197,6 +197,16 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return false;
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  bool visitSILDifferentiableFunctionType(SILDifferentiableFunctionType *ty) {
+    for (Type type : {ty->getOriginalFunctionType(),
+                      ty->getDifferentialType(), ty->getPullbackType()}) {
+      if (type && doIt(type))
+        return true;
+    }
+    return false;
+  }
+
 public:
   explicit Traversal(TypeWalker &walker) : Walker(walker) {}
 

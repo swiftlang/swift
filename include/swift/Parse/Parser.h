@@ -1114,7 +1114,11 @@ public:
   ParserResult<TypeRepr> parseSILBoxType(GenericParamList *generics,
                                          const TypeAttributes &attrs,
                                          Optional<Scope> &GenericsScope);
-  
+  // SWIFT_ENABLE_TENSORFLOW
+  ParserResult<TypeRepr> parseSILDifferentiableFunctionType(
+      GenericParamList *generics, const TypeAttributes &attrs,
+      Optional<Scope> &GenericsScope);
+
   ParserResult<TupleTypeRepr> parseTypeTupleBody();
   ParserResult<TypeRepr> parseTypeArray(TypeRepr *Base);
 

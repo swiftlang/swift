@@ -1,0 +1,22 @@
+// RUN: %target-swift-frontend -typecheck -verify %s
+
+sil_stage raw
+
+import Swift
+
+sil @foo1 : $(@sil_differentiable(1) {(Float) -> Float, differential: (Float) -> Float, pullback: (Float) -> Float}) -> ()
+sil @foo2 : $(@sil_differentiable(linear) {(Float) -> Float, transpose: (Float) -> Float}) -> ()
+sil @foo3 : $(@sil_differentiable(linear) {(Float, @nondiff Float) -> Float, transpose: (Float) -> Float}) -> ()
+sil @foo4 : $(@sil_differentiable(2) <T: Differentiable>{(T) -> T, differential: (T.TangentVector) -> T.TangentVector, pullback: (T.TangentVector) -> T.TangentVector}) -> ()
+
+// expected-error @+1 {{invalid field for the specified '@sil_differentiable' representation kind}}
+sil @foo5 : $(@sil_differentiable(1) {(Float) -> Float, differential: (Float) -> Float, pullback: (Float) -> Float, transpose: (Float) -> Float}) -> ()
+
+// expected-error @+1 {{a 'pullback:' function type field is required in a '@sil_differentiable'}}
+sil @foo6 : $(@sil_differentiable(1) {(Float) -> Float, differential: (Float) -> Float}) -> ()
+
+// expected-error @+1 {{a 'transpose:' function type field is required in a '@sil_differentiable'}}
+sil @foo7 : $(@sil_differentiable(linear) {(Float) -> Float, differential: (Float) -> Float, pullback: (Float) -> Float}) -> ()
+
+// expected-error @+1 {{'@sil_differentiable' field type cannot be generic}}
+sil @foo8 : $(@sil_differentiable(linear) {(Float) -> Float, transpose: <T>(T) -> T}) -> ()

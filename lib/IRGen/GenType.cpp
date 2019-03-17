@@ -1820,6 +1820,10 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     llvm_unreachable("AST FunctionTypes should be lowered by SILGen");
   case TypeKind::SILFunction:
     return convertFunctionType(cast<SILFunctionType>(ty));
+  // SWIFT_ENABLE_TENSORFLOW
+  case TypeKind::SILDifferentiableFunction:
+    return convertDifferentiableFunctionType(
+      cast<SILDifferentiableFunctionType>(ty));
   case TypeKind::Protocol:
     return convertProtocolType(cast<ProtocolType>(ty));
   case TypeKind::ProtocolComposition:
