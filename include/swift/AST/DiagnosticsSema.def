@@ -4278,6 +4278,12 @@ ERROR(property_behavior_not_unbound, none,
   "property behavior must name a generic type without any generic arguments", ())
 ERROR(property_behavior_not_single_parameter, none,
   "property behavior must refer to a single-parameter generic type", ())
+ERROR(property_behavior_no_value_property, none,
+  "property behavior type %0 does not contain a non-static property "
+  "named 'value'", (Type))
+ERROR(property_behavior_ambiguous_value_property, none,
+  "property behavior type %0 has multiple non-static properties "
+  "named 'value'", (Type))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
