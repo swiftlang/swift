@@ -60,9 +60,9 @@ extension vDSP {
             self.log2n = log2n
             self.radix = radix
             
-            guard let setup = T.vDSP.makeFFTSetup(log2n: log2n,
-                                                  radix: radix) else {
-                                                    return nil
+            guard let setup = T.FFTFunctions.makeFFTSetup(log2n: log2n,
+                                                          radix: radix) else {
+                                                            return nil
             }
             
             fftSetup = setup
@@ -109,19 +109,23 @@ extension vDSP {
         
         /// Frees memory associated with this `FFT` struct.
         deinit {
-            // vDSP_destroy_fftsetup(fftSetup)
+            T.FFTFunctions.destroySetup(fftSetup)
         }
     }
     
     // MARK: 2D FFT
     
-     /// A class that provides forward and inverse 2D FFT on `DSPSplitComplex` or `DSPDoubleSplitComplex` structure.
+    /// A class that provides forward and inverse 2D FFT on `DSPSplitComplex` or `DSPDoubleSplitComplex` structure.
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public class FFT2D<T: vDSP_FourierTransformable>: FFT<T> {
         
         let width: Int
         let height: Int
         
+        /// Initializes a new fast Fourier transform structure for 2D FFT.
+        ///
+        /// - Parameter width: The width of the matrix to be transformed.
+        /// - Parameter height: The width of the matrix to be transformed.
         @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
         @inline(__always)
         required public init?(width: Int,
@@ -137,7 +141,7 @@ extension vDSP {
                        ofType: ofType)
         }
         
-        /// Computes an out-of-place single-precision real discrete Fourier transform.
+        /// Computes an out-of-place 2D fast Fourier transform.
         ///
         /// - Parameter input: Complex input vector.
         /// - Parameter output: Complex output vector.
@@ -176,6 +180,8 @@ public protocol vDSP_FourierTransformFunctions {
                             source: UnsafePointer<SplitComplex>,
                             destination: UnsafeMutablePointer<SplitComplex>,
                             direction: vDSP.FourierTransformDirection)
+    
+    static func destroySetup(_ setup: OpaquePointer)
 }
 
 //===----------------------------------------------------------------------===//
@@ -188,6 +194,7 @@ public protocol vDSP_FourierTransformFunctions {
 public struct vDSP_SplitComplexFloat: vDSP_FourierTransformFunctions {
     public typealias SplitComplex = DSPSplitComplex
     
+    /// Returns a setup structure to perform a fast Fourier transform.
     @inline(__always)
     public static func makeFFTSetup(log2n: vDSP_Length,
                                     radix: vDSP.Radix) -> OpaquePointer? {
@@ -197,6 +204,7 @@ public struct vDSP_SplitComplexFloat: vDSP_FourierTransformFunctions {
             radix.fftRadix)
     }
     
+    /// Performs a 1D fast Fourier transform.
     @inline(__always)
     public static func transform(fftSetup: OpaquePointer,
                                  log2n: vDSP_Length,
@@ -210,6 +218,7 @@ public struct vDSP_SplitComplexFloat: vDSP_FourierTransformFunctions {
                       direction.fftDirection)
     }
     
+    /// Performs a 2D fast Fourier transform.
     public static func transform2D(fftSetup: OpaquePointer,
                                    width: Int,
                                    height: Int,
@@ -223,12 +232,19 @@ public struct vDSP_SplitComplexFloat: vDSP_FourierTransformFunctions {
                         vDSP_Length(log2(Float(height))),
                         direction.fftDirection)
     }
+    
+    /// Releases an FFT setup object.
+    @inline(__always)
+    public static func destroySetup(_ setup: OpaquePointer) {
+        vDSP_destroy_fftsetup(setup)
+    }
 }
 
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 public struct vDSP_SplitComplexDouble: vDSP_FourierTransformFunctions {
     public typealias SplitComplex = DSPDoubleSplitComplex
     
+    /// Returns a setup structure to perform a fast Fourier transform.
     @inline(__always)
     public static func makeFFTSetup(log2n: vDSP_Length,
                                     radix: vDSP.Radix) -> OpaquePointer? {
@@ -238,6 +254,7 @@ public struct vDSP_SplitComplexDouble: vDSP_FourierTransformFunctions {
             radix.fftRadix)
     }
     
+    /// Performs a 1D fast Fourier transform.
     @inline(__always)
     public static func transform(fftSetup: OpaquePointer,
                                  log2n: vDSP_Length,
@@ -251,6 +268,7 @@ public struct vDSP_SplitComplexDouble: vDSP_FourierTransformFunctions {
                        direction.fftDirection)
     }
     
+    /// Performs a 2D fast Fourier transform.
     public static func transform2D(fftSetup: OpaquePointer,
                                    width: Int,
                                    height: Int,
@@ -264,25 +282,32 @@ public struct vDSP_SplitComplexDouble: vDSP_FourierTransformFunctions {
                          vDSP_Length(log2(Float(height))),
                          direction.fftDirection)
     }
+    
+    /// Releases an FFT setup object.
+    @inline(__always)
+    public static func destroySetup(_ setup: OpaquePointer) {
+        vDSP_destroy_fftsetupD(setup)
+    }
 }
 
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 public protocol vDSP_FourierTransformable {
-    associatedtype vDSP: vDSP_FourierTransformFunctions where vDSP.SplitComplex == Self
+    associatedtype FFTFunctions: vDSP_FourierTransformFunctions where FFTFunctions.SplitComplex == Self
 }
 
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 extension DSPSplitComplex: vDSP_FourierTransformable {
-    public typealias vDSP = vDSP_SplitComplexFloat
+    public typealias FFTFunctions = vDSP_SplitComplexFloat
 }
 
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 extension DSPDoubleSplitComplex: vDSP_FourierTransformable {
-    public typealias vDSP = vDSP_SplitComplexDouble
+    public typealias FFTFunctions = vDSP_SplitComplexDouble
 }
 
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 struct vDSP_FFTFunctions {
+    /// Performs a 1D fast Fourier transform.
     @inlinable
     static func fftTransform<SplitComplex>(fftSetup: OpaquePointer,
                                            log2n: vDSP_Length,
@@ -291,14 +316,15 @@ struct vDSP_FFTFunctions {
                                            direction: vDSP.FourierTransformDirection) where SplitComplex: vDSP_FourierTransformable {
         
         withUnsafePointer(to: source) { sourcePointer in
-            SplitComplex.vDSP.transform(fftSetup: fftSetup,
-                                        log2n: log2n,
-                                        source: sourcePointer,
-                                        destination: &destination,
-                                        direction: direction)
+            SplitComplex.FFTFunctions.transform(fftSetup: fftSetup,
+                                                log2n: log2n,
+                                                source: sourcePointer,
+                                                destination: &destination,
+                                                direction: direction)
         }
     }
     
+    /// Performs a 2D fast Fourier transform.
     @inlinable
     static func fftTransform2D<SplitComplex>(fftSetup: OpaquePointer,
                                              width: Int,
@@ -308,12 +334,12 @@ struct vDSP_FFTFunctions {
                                              direction: vDSP.FourierTransformDirection) where SplitComplex: vDSP_FourierTransformable {
         
         withUnsafePointer(to: source) { sourcePointer in
-            SplitComplex.vDSP.transform2D(fftSetup: fftSetup,
-                                          width: width,
-                                          height: height,
-                                          source: sourcePointer,
-                                          destination: &destination,
-                                          direction: direction)
+            SplitComplex.FFTFunctions.transform2D(fftSetup: fftSetup,
+                                                  width: width,
+                                                  height: height,
+                                                  source: sourcePointer,
+                                                  destination: &destination,
+                                                  direction: direction)
         }
     }
 }
@@ -328,8 +354,8 @@ extension DSPSplitComplex {
     /// - Parameter realParts: An array of real parts of the complex numbers.
     /// - Parameter imaginaryParts: An array of imaginary parts of the complex numbers.
     public init(fromInputArray inputArray: [Float],
-         realParts: inout [Float],
-         imaginaryParts: inout [Float]) {
+                realParts: inout [Float],
+                imaginaryParts: inout [Float]) {
         
         self.init(realp: &realParts,
                   imagp: &imaginaryParts)
@@ -350,8 +376,8 @@ extension DSPDoubleSplitComplex {
     /// - Parameter realParts: An array of real parts of the complex numbers.
     /// - Parameter imaginaryParts: An array of imaginary parts of the complex numbers.
     public init(fromInputArray inputArray: [Double],
-         realParts: inout [Double],
-         imaginaryParts: inout [Double]) {
+                realParts: inout [Double],
+                imaginaryParts: inout [Double]) {
         
         self.init(realp: &realParts,
                   imagp: &imaginaryParts)
@@ -370,8 +396,8 @@ extension Array where Element == Float {
     /// - Parameter scale: A multiplier to apply during conversion.
     /// - Parameter count: The length of the required resulting array (typically half the count of either the real or imaginary parts of the `DSPSplitComplex`.
     public init(fromSplitComplex splitComplex: DSPSplitComplex,
-         scale: Float,
-         count: Int) {
+                scale: Float,
+                count: Int) {
         var complexPairs = [DSPComplex](repeating: DSPComplex(real: 0, imag: 0),
                                         count: count / 2)
         
@@ -402,8 +428,8 @@ extension Array where Element == Double {
     /// - Parameter scale: A multiplier to apply during conversion.
     /// - Parameter count: The length of the required resulting array (typically half the count of either the real or imaginary parts of the `DSPSplitComplex`.
     public init(fromSplitComplex splitComplex: DSPDoubleSplitComplex,
-         scale: Double,
-         count: Int) {
+                scale: Double,
+                count: Int) {
         var complexPairs = [DSPDoubleComplex](repeating: DSPDoubleComplex(real: 0, imag: 0),
                                               count: count / 2)
         

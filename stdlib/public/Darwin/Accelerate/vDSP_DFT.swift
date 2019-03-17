@@ -20,11 +20,19 @@ import Accelerate
 
 extension vDSP {
     
+    /// An enumeration that specifies whether to perform complex-to-complex or
+    /// complex-to-real discrete Fourier transform.
     public enum DFTTransformType {
+        /// Specifies complex-to-complex discrete Fourier transform, forward
+        /// or inverse
         case complexComplex
+        
+        /// Specifies real-to-complex (forward) or complex-to-real (inverse)
+        /// discrete Fourier transform.
         case complexReal
     }
     
+    /// A class that provides single- and double-precision discrete Fourier transform.
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public class DFT <T: vDSP_FloatingPointDiscreteFourierTransformable> {
         fileprivate let dftSetup: vDSP_DFT_Setup
@@ -63,7 +71,6 @@ extension vDSP {
         ///
         /// When the `transformType` is `complexReal`, each array (Ir, Ii,
         /// Or, and Oi) must have `count/2` elements.
-        
         public func transform<U, V>(inputReal: U,
                                     inputImaginary: U,
                                     outputReal: inout V,
@@ -135,11 +142,12 @@ public protocol vDSP_DFTFunctions {
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 extension vDSP.VectorizableFloat: vDSP_DFTFunctions {
     
+    /// Returns a setup structure to perform a discrete Fourier transform
     @inline(__always)
     public static func makeDFTSetup<T>(previous: vDSP.DFT<T>? = nil,
-                                count: Int,
-                                direction: vDSP.FourierTransformDirection,
-                                transformType: vDSP.DFTTransformType) -> OpaquePointer?
+                                       count: Int,
+                                       direction: vDSP.FourierTransformDirection,
+                                       transformType: vDSP.DFTTransformType) -> OpaquePointer?
         where T : vDSP_FloatingPointDiscreteFourierTransformable {
             
             switch transformType {
@@ -154,10 +162,19 @@ extension vDSP.VectorizableFloat: vDSP_DFTFunctions {
             }
     }
     
+    /// Computes an out-of-place single-precision real discrete Fourier transform.
+    ///
+    /// - Parameter dftSetup: A DCT setup object.
+    /// - Parameter inputReal: Input vector - real part.
+    /// - Parameter inputImaginary: Input vector - imaginary part.
+    /// - Parameter outputReal: Output vector - real part.
+    /// - Parameter outputImaginary: Output vector - imaginary part.
     @inline(__always)
     public static func transform<U, V>(dftSetup: OpaquePointer,
-                                inputReal: U, inputImaginary: U,
-                                outputReal: inout V, outputImaginary: inout V)
+                                       inputReal: U,
+                                       inputImaginary: U,
+                                       outputReal: inout V,
+                                       outputImaginary: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -179,6 +196,7 @@ extension vDSP.VectorizableFloat: vDSP_DFTFunctions {
             }
     }
     
+    /// Releases a DFT setup object.
     @inline(__always)
     public static func destroySetup(_ setup: OpaquePointer) {
         vDSP_DFT_DestroySetup(setup)
@@ -188,11 +206,12 @@ extension vDSP.VectorizableFloat: vDSP_DFTFunctions {
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 extension vDSP.VectorizableDouble: vDSP_DFTFunctions {
     
+    /// Returns a data structure for use with to perform a discrete Fourier transform
     @inline(__always)
     public static func makeDFTSetup<T>(previous: vDSP.DFT<T>? = nil,
-                                count: Int,
-                                direction: vDSP.FourierTransformDirection,
-                                transformType: vDSP.DFTTransformType) -> OpaquePointer?
+                                       count: Int,
+                                       direction: vDSP.FourierTransformDirection,
+                                       transformType: vDSP.DFTTransformType) -> OpaquePointer?
         where T : vDSP_FloatingPointDiscreteFourierTransformable {
             
             switch transformType {
@@ -207,10 +226,17 @@ extension vDSP.VectorizableDouble: vDSP_DFTFunctions {
             }
     }
     
+    /// Computes an out-of-place single-precision real discrete Fourier transform.
+    ///
+    /// - Parameter dftSetup: A DCT setup object.
+    /// - Parameter inputReal: Input vector - real part.
+    /// - Parameter inputImaginary: Input vector - imaginary part.
+    /// - Parameter outputReal: Output vector - real part.
+    /// - Parameter outputImaginary: Output vector - imaginary part.
     @inline(__always)
     public static func transform<U, V>(dftSetup: OpaquePointer,
-                                inputReal: U, inputImaginary: U,
-                                outputReal: inout V, outputImaginary: inout V)
+                                       inputReal: U, inputImaginary: U,
+                                       outputReal: inout V, outputImaginary: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -232,6 +258,7 @@ extension vDSP.VectorizableDouble: vDSP_DFTFunctions {
             }
     }
     
+    /// Releases a DFT setup object.
     @inline(__always)
     public static func destroySetup(_ setup: OpaquePointer) {
         vDSP_DFT_DestroySetupD(setup)
