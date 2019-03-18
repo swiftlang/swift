@@ -2797,6 +2797,9 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return;
   }
 
+  // Set the checked differentiation parameter indices in the attribute.
+  attr->setParameterIndices(checkedWrtParamIndices);
+
   auto insertion =
       ctx.DifferentiableAttrs.try_emplace({D, checkedWrtParamIndices}, attr);
   // Differentiable attributes are uniqued by their parameter indices.
@@ -2806,7 +2809,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return;
   }
 
-  // Check that result type conforms to `Differentiable`.
+  // Check that original function's result type conforms to `Differentiable`.
   if (whereClauseGenEnv) {
     auto originalResultInterfaceType = !originalResultTy->hasTypeParameter()
         ? originalResultTy->mapTypeOutOfContext()
@@ -2821,9 +2824,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     attr->setInvalid();
     return;
   }
-
-  // Memorize the checked parameter indices in the attribute.
-  attr->setParameterIndices(checkedWrtParamIndices);
 
   // Checks that the `candidate` function type equals the `required` function
   // type, disregarding parameter labels.

@@ -29,6 +29,22 @@ func vjpSimpleVJP(x: Float) -> (Float, (Float) -> Float) {
   return (x, { v in v })
 }
 
+// CHECK-DAG: @differentiable(wrt: x)
+// CHECK-DAG: func testWrtClause(x: Float, y: Float) -> Float
+@differentiable(wrt: x)
+func testWrtClause(x: Float, y: Float) -> Float {
+  return x + y
+}
+
+struct InstanceMethod : Differentiable {
+  // CHECK-DAG: @differentiable(wrt: (self, y))
+  // CHECK-DAG: func testWrtClause(x: Float, y: Float) -> Float
+  @differentiable(wrt: (self, y))
+  func testWrtClause(x: Float, y: Float) -> Float {
+    return x + y
+  }
+}
+
 // CHECK-DAG: @differentiable(vjp: vjpTestWhereClause where T : Differentiable, T : Numeric)
 // CHECK-DAG: func testWhereClause<T>(x: T) -> T where T : Numeric
 @differentiable(vjp: vjpTestWhereClause where T : Differentiable)
@@ -55,9 +71,6 @@ extension P where Self : Differentiable {
     return (self, { v in v })
   }
 }
-
-// NOTE: The failing tests involve where clauses with member type constraints.
-// They pass type-checking but crash during serialization.
 
 // CHECK-DAG: @differentiable(vjp: vjpTestWhereClauseMemberTypeConstraint where T : Differentiable, T : Numeric, T == T.CotangentVector)
 // CHECK-DAG: func testWhereClauseMemberTypeConstraint<T>(x: T) -> T where T : Numeric
