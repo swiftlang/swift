@@ -605,9 +605,7 @@ struct ConformingWithErrors : DiffReq {
     return x + y
   }
 
-  // FIXME(TF-371): Fix misleading `@differentiable` attribute shown in diagnostic.
-  // The `Self : DiffRep` requirement should not be shown.
-  // expected-note @+1 {{candidate is missing attribute '@differentiable(where Self : DiffReq, T : Differentiable)'}}
+  // expected-note @+1 {{candidate is missing attribute '@differentiable(where T : Differentiable)'}}
   func generic<T>(_ x: T) -> T {
     return x
   }
