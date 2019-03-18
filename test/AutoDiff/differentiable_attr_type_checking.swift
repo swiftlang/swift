@@ -56,6 +56,50 @@ func invalidDiffWrtFunction(_ fn: @differentiable(Float) -> Float) -> Float {
   return fn(.pi)
 }
 
+// expected-error @+1 {{'invalidDiffNoParams()' has no parameters to differentiate with respect to}}
+@differentiable
+func invalidDiffNoParams() -> Float {
+  return 1
+}
+
+// expected-error @+1 {{cannot differentiate void function 'invalidDiffVoidResult(x:)'}}
+@differentiable
+func invalidDiffVoidResult(x: Float) {}
+
+// Test static methods.
+struct StaticMethod {
+  // expected-error @+1 {{'invalidDiffNoParams()' has no parameters to differentiate with respect to}}
+  @differentiable
+  static func invalidDiffNoParams() -> Float {
+    return 1
+  }
+
+  // expected-error @+1 {{cannot differentiate void function 'invalidDiffVoidResult(x:)'}}
+  @differentiable
+  static func invalidDiffVoidResult(x: Float) {}
+}
+
+// Test instance methods.
+struct InstanceMethod {
+  // expected-error @+1 {{'invalidDiffNoParams()' has no parameters to differentiate with respect to}}
+  @differentiable
+  func invalidDiffNoParams() -> Float {
+    return 1
+  }
+
+  // expected-error @+1 {{cannot differentiate void function 'invalidDiffVoidResult(x:)'}}
+  @differentiable
+  func invalidDiffVoidResult(x: Float) {}
+}
+
+// Test instance methods for a `Differentiable` type.
+struct DifferentiableInstanceMethod : Differentiable {
+  @differentiable // ok
+  func noParams() -> Float {
+    return 1
+  }
+}
+
 // Test subscript methods.
 struct SubscriptMethod {
   @differentiable // ok
@@ -140,7 +184,7 @@ func jvpWrongTypeJVP(x: Float) -> (Float, (Float) -> Int) {
   return (x, { v in Int(v) })
 }
 
-// expected-error @+1 {{specify at least one parameter to differentiate with respect to}}
+// expected-error @+1 {{no differentiation parameters could be inferred; must differentiate with respect to at least one parameter conforming to 'Differentiable'}}
 @differentiable(jvp: jvpSimpleJVP)
 func jvpNonDiffParam(x: Int) -> Float {
   return Float(x)
@@ -152,7 +196,7 @@ func jvpNonDiffResult(x: Float) -> Int {
   return Int(x)
 }
 
-// expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
+// expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but '(Float, Int)' does not conform to 'Differentiable'}}
 @differentiable(jvp: jvpSimpleJVP)
 func jvpNonDiffResult2(x: Float) -> (Float, Int) {
   return (x, Int(x))
@@ -319,7 +363,7 @@ func vjpWrongTypeVJP(x: Float) -> (Float, (Float) -> Int) {
   return (x, { v in Int(v) })
 }
 
-// expected-error @+1 {{specify at least one parameter to differentiate with respect to}}
+// expected-error @+1 {{no differentiation parameters could be inferred; must differentiate with respect to at least one parameter conforming to 'Differentiable'}}
 @differentiable(vjp: vjpSimpleVJP)
 func vjpNonDiffParam(x: Int) -> Float {
   return Float(x)
@@ -331,7 +375,7 @@ func vjpNonDiffResult(x: Float) -> Int {
   return Int(x)
 }
 
-// expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
+// expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but '(Float, Int)' does not conform to 'Differentiable'}}
 @differentiable(vjp: vjpSimpleVJP)
 func vjpNonDiffResult2(x: Float) -> (Float, Int) {
   return (x, Int(x))
@@ -521,7 +565,7 @@ func vjpNonvariadic(_ x: Float, indices: [Int32]) -> (Float, (Float) -> Float) {
 }
 
 // expected-error @+2 {{type 'Scalar' constrained to non-protocol, non-class type 'Float'}}
-// expected-error @+1 {{specify at least one parameter to differentiate with respect to}}
+// expected-error @+1 {{can only differentiate with respect to parameters that conform to 'Differentiable', but 'Scalar' does not conform to 'Differentiable'}}
 @differentiable(where Scalar : Float)
 func invalidRequirementConformance<Scalar>(x: Scalar) -> Scalar {
   return x

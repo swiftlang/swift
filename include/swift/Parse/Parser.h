@@ -861,6 +861,10 @@ public:
       Optional<DeclNameWithLoc> &jvpSpec, Optional<DeclNameWithLoc> &vjpSpec,
       TrailingWhereClause *&whereClause);
 
+  /// Parse a differentiation parameters clause.
+  bool parseDifferentiationParametersClause(
+      SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName);
+
   /// SWIFT_ENABLE_TENSORFLOW
   /// Parse the @differentiating attribute.
   ParserResult<DifferentiatingAttr>

@@ -171,7 +171,7 @@ ATTRIBUTE_NODES = [
     # SWIFT_ENABLE_TENSORFLOW
     # The argument of '@differentiable(...)'.
     # differentiable-attr-arguments ->
-    #     differentiation-params-clause?
+    #     differentiation-params-clause? ','?
     #     differentiable-attr-func-specifier? # primal
     #     differentiable-attr-func-specifier? # adjoint
     #     differentiable-attr-func-specifier? # jvp
@@ -190,6 +190,10 @@ ATTRIBUTE_NODES = [
          children=[
              Child('DiffParams', kind='DifferentiationParamsClause',
                    is_optional=True),
+             Child('DiffParamsComma', kind='CommaToken', description='''
+                   The comma following the differentiation parameters clause,
+                   if it exists.
+                   ''', is_optional=True),
              Child('MaybePrimal', kind='DifferentiableAttributeFuncSpecifier',
                    is_optional=True),
              Child('MaybeAdjoint', kind='DifferentiableAttributeFuncSpecifier',
@@ -202,10 +206,9 @@ ATTRIBUTE_NODES = [
          ]),
 
     # differentiation-params-clause ->
-    #     'wrt' ':' (differentiation-param | differentiation-params) ','?
+    #     'wrt' ':' (differentiation-param | differentiation-params)
     Node('DifferentiationParamsClause', kind='Syntax',
-         description='The clause containing the differentiation parameters.',
-         traits=['WithTrailingComma'],
+         description='A clause containing differentiation parameters.',
          children=[
              Child('WrtLabel', kind='IdentifierToken',
                    text_choices=['wrt'], description='The "wrt" label.'),
@@ -217,7 +220,6 @@ ATTRIBUTE_NODES = [
                        Child('Parameter', kind='DifferentiationParam'),
                        Child('ParameterList', kind='DifferentiationParams'),
                    ]),
-             Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
 
     # differentiation-params -> '(' differentiation-param-list ')'

@@ -215,7 +215,7 @@ SimpleMathTests.test("StructMemberwiseInitializer") {
     let foo = Custom(x: input)
     return foo + foo
   })(Custom.CotangentVector(x: 1))
-  expectEqual(2, 𝛁foo)
+  expectEqual(2, 𝛁custom)
 }
 
 // Tests TF-319: struct with non-differentiable constant stored property.
