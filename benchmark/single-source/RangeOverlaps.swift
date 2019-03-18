@@ -16,27 +16,30 @@ public let RangeOverlaps = [
   BenchmarkInfo(
     name: "RangeOverlapsRange",
     runFunction: run_RangeOverlapsRange,
-    tags: [.validation, .api]),
+    tags: [.validation, .api],
+    setUpFunction: buildRanges),
   BenchmarkInfo(
     name: "RangeOverlapsClosedRange",
     runFunction: run_RangeOverlapsClosedRange,
-    tags: [.validation, .api]),
+    tags: [.validation, .api],
+    setUpFunction: buildRanges),
   BenchmarkInfo(
     name: "ClosedRangeOverlapsClosedRange",
     runFunction: run_ClosedRangeOverlapsClosedRange,
-    tags: [.validation, .api]),
+    tags: [.validation, .api],
+    setUpFunction: buildRanges)
 ]
 
-@inline(never) func foo() { }
+private func buildRanges() {
+  blackHole(ranges)
+  blackHole(closedRanges)
+}
+
+private let ranges: [Range<Int>] = (-8...8).flatMap { a in (0...16).map { l in a..<(a+l) } }
+private let closedRanges: [ClosedRange<Int>] = (-8...8).flatMap { a in (0...16).map { l in a...(a+l) } }
 
 @inline(never)
 public func run_RangeOverlapsRange(_ N: Int) {
-  var ranges: [Range<Int>] = []
-  for a in -20 ... 20 {
-    for b in 0 ... 40 {
-      ranges.append(a ..< (a+b))
-    }
-  }
   var check: UInt64 = 0
   for _ in 0..<N {
     for lhs in ranges {
@@ -45,19 +48,11 @@ public func run_RangeOverlapsRange(_ N: Int) {
       }
     }
   }
-  CheckResults(check == 1771200 * UInt64(N))
+  CheckResults(check == 47872 * UInt64(N))
 }
 
 @inline(never)
 public func run_RangeOverlapsClosedRange(_ N: Int) {
-  var ranges: [Range<Int>] = []
-  var closedRanges: [ClosedRange<Int>] = []
-  for a in -20 ... 20 {
-    for b in 0 ... 40 {
-      ranges.append(a ..< (a+b))
-      closedRanges.append(a ... (a+b))
-    }
-  }
   var check: UInt64 = 0
   for _ in 0..<N {
     for lhs in ranges {
@@ -66,17 +61,11 @@ public func run_RangeOverlapsClosedRange(_ N: Int) {
       }
     }
   }
-  CheckResults(check == 1826960 * UInt64(N))
+  CheckResults(check == 51680 * UInt64(N))
 }
 
 @inline(never)
 public func run_ClosedRangeOverlapsClosedRange(_ N: Int) {
-  var closedRanges: [ClosedRange<Int>] = []
-  for a in -20 ... 20 {
-    for b in 0 ... 40 {
-      closedRanges.append(a ... (a+b))
-    }
-  }
   var check: UInt64 = 0
   for _ in 0..<N {
     for lhs in closedRanges {
@@ -85,5 +74,5 @@ public func run_ClosedRangeOverlapsClosedRange(_ N: Int) {
       }
     }
   }
-  CheckResults(check == 1884401 * UInt64(N))
+  CheckResults(check == 55777 * UInt64(N))
 }
