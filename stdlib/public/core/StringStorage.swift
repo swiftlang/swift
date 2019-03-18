@@ -32,6 +32,13 @@ private func _isNSString(_ str:AnyObject) -> UInt8 {
   return _swift_stdlib_isNSString(str)
 }
 
+@_effects(releasenone)
+private func _unsafeAddressOfCocoaStringClass(
+  _ str: _CocoaString
+) -> UInt {
+  return _swift_stdlib_unsafeAddressOfClass(str)
+}
+
 #else
 
 internal protocol _AbstractStringStorage {
@@ -118,46 +125,50 @@ extension _AbstractStringStorage {
     if self === other {
       return 1
     }
-
-    // Handle the case where both strings were bridged from Swift.
-    // We can't use String.== because it doesn't match NSString semantics.
-    let knownOther = _KnownCocoaString(other)
-    switch knownOther {
-    case .storage:
-      return _nativeIsEqual(
-        _unsafeUncheckedDowncast(other, to: __StringStorage.self))
-    case .shared:
-      return _nativeIsEqual(
-        _unsafeUncheckedDowncast(other, to: __SharedStringStorage.self))
-#if !(arch(i386) || arch(arm))
-    case .tagged:
-      fallthrough
-#endif
-    case .cocoa:
-      // We're allowed to crash, but for compatibility reasons NSCFString allows
-      // non-strings here.
-      if _isNSString(other) != 1 {
-        return 0
+    
+    #if !(arch(i386) || arch(arm))
+    let tagged = _isObjCTaggedPointer(other)
+    #else
+    let tagged = false
+    #endif
+    
+    if !tagged {
+      // Handle the case where both strings were bridged from Swift.
+      // We can't use String.== because it doesn't match NSString semantics.
+      let cls = _unsafeAddressOfCocoaStringClass(other)
+      if cls == unsafeBitCast(__StringStorage.self, to: UInt.self) {
+        return _nativeIsEqual(
+          _unsafeUncheckedDowncast(other, to: __StringStorage.self))
       }
-      // At this point we've proven that it is an NSString of some sort, but not
-      // one of ours.
-      if length != _stdlib_binary_CFStringGetLength(other) {
-        return 0
+      if cls == unsafeBitCast(__SharedStringStorage.self, to: UInt.self) {
+        return _nativeIsEqual(
+          _unsafeUncheckedDowncast(other, to: __SharedStringStorage.self))
       }
-      defer { _fixLifetime(other) }
-      // CFString will only give us ASCII bytes here, but that's fine.
-      // We already handled non-ASCII UTF8 strings earlier since they're Swift.
-      if let otherStart = _cocoaUTF8Pointer(other) {
-        return (start == otherStart ||
-          (memcmp(start, otherStart, count) == 0)) ? 1 : 0
-      }
-      /*
-       The abstract implementation of -isEqualToString: falls back to -compare:
-       immediately, so when we run out of fast options to try, do the same.
-       We can likely be more clever here if need be
-      */
-      return _cocoaStringCompare(self, other) == 0 ? 1 : 0
     }
+
+    // We're allowed to crash, but for compatibility reasons NSCFString allows
+    // non-strings here.
+    if _isNSString(other) != 1 {
+      return 0
+    }
+    // At this point we've proven that it is an NSString of some sort, but not
+    // a Swift one.
+    if length != _stdlib_binary_CFStringGetLength(other) {
+      return 0
+    }
+    defer { _fixLifetime(other) }
+    // CFString will only give us ASCII bytes here, but that's fine.
+    // We already handled non-ASCII UTF8 strings earlier since they're Swift.
+    if let otherStart = _cocoaUTF8Pointer(other) {
+      return (start == otherStart ||
+        (memcmp(start, otherStart, count) == 0)) ? 1 : 0
+    }
+    /*
+     The abstract implementation of -isEqualToString: falls back to -compare:
+     immediately, so when we run out of fast options to try, do the same.
+     We can likely be more clever here if need be
+     */
+    return _cocoaStringCompare(self, other) == 0 ? 1 : 0
   }
 
 #endif //_runtime(_ObjC)
@@ -210,7 +221,14 @@ final internal class __StringStorage
 #endif
 
   @inline(__always)
-  final internal var isASCII: Bool { return _countAndFlags.isASCII }
+  final internal var isASCII: Bool {
+    return _countAndFlags.isASCII
+  }
+  
+  internal func forceSetIsASCII(_ value: Bool) {
+    _countAndFlags = CountAndFlags(mortalCount: count, isASCII: value)
+    _invariantCheck()
+  }
 
   final internal var asString: String {
     @_effects(readonly) @inline(__always) get {
@@ -390,6 +408,28 @@ extension __StringStorage {
     return __StringStorage.create(
       realCodeUnitCapacity: realCapacity, countAndFlags: countAndFlags)
   }
+  
+  // The caller is expected to check UTF8 validity and ASCII-ness and update
+  // the resulting StringStorage accordingly
+  @_effects(releasenone)
+  internal static func create(
+    unsafeUninitializedCapacity capacity: Int,
+    initializingUncheckedUTF8With initializer: (
+      _ buffer: UnsafeMutableBufferPointer<UInt8>,
+      _ initializedCount: inout Int
+    ) throws -> Void
+  ) rethrows -> __StringStorage {
+    let storage = __StringStorage.create(
+      capacity: capacity,
+      countAndFlags: CountAndFlags(mortalCount: 0, isASCII: false)
+    )
+    let buffer = UnsafeMutableBufferPointer(start: storage.mutableStart,
+                                            count: capacity)
+    var count = 0
+    try initializer(buffer, &count)
+    storage._countAndFlags = CountAndFlags(mortalCount: count, isASCII: false)
+    return storage
+  }
 
   @_effects(releasenone)
   internal static func create(
@@ -445,7 +485,7 @@ extension __StringStorage {
   }
 
   @inline(__always)
-  private var codeUnits: UnsafeBufferPointer<UInt8> {
+  internal var codeUnits: UnsafeBufferPointer<UInt8> {
     return UnsafeBufferPointer(start: start, count: count)
   }
 
@@ -690,7 +730,9 @@ final internal class __SharedStringStorage
   }
 
   @inline(__always)
-  final internal var isASCII: Bool { return _countAndFlags.isASCII }
+  final internal var isASCII: Bool {
+    return _countAndFlags.isASCII
+  }
 
   final internal var asString: String {
     @_effects(readonly) @inline(__always) get {

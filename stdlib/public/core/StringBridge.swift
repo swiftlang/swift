@@ -125,40 +125,6 @@ private var kCFStringEncodingUTF8 : _swift_shims_CFStringEncoding {
   @inline(__always) get { return 0x8000100 }
 }
 
-@_effects(readonly)
-private func _unsafeAddressOfCocoaStringClass(_ str: _CocoaString) -> UInt {
-  return _swift_stdlib_unsafeAddressOfClass(str)
-}
-
-internal enum _KnownCocoaString {
-  case storage
-  case shared
-  case cocoa
-#if !(arch(i386) || arch(arm))
-  case tagged
-#endif
-  
-  @inline(__always)
-  init(_ str: _CocoaString) {
-    
-#if !(arch(i386) || arch(arm))
-    if _isObjCTaggedPointer(str) {
-      self = .tagged
-      return
-    }
-#endif
-    
-    switch _unsafeAddressOfCocoaStringClass(str) {
-    case unsafeBitCast(__StringStorage.self, to: UInt.self):
-      self = .storage
-    case unsafeBitCast(__SharedStringStorage.self, to: UInt.self):
-      self = .shared
-    default:
-      self = .cocoa
-    }
-  }
-}
-
 #if !(arch(i386) || arch(arm))
 // Resiliently write a tagged _CocoaString's contents into a buffer.
 @_effects(releasenone) // @opaque
@@ -210,53 +176,43 @@ private func _getCocoaStringPointer(
   return .none
 }
 
+@_effects(releasenone)
+public //SPI(Foundation)
+func _bridgeCocoaStringLazily(
+  _ cocoaString: AnyObject,
+  _ cls: AnyClass,
+  _ length: Int
+) -> String {
+  
+  if cls == __StringStorage.self {
+    return String(_unsafeUncheckedDowncast(
+      cocoaString, to: __StringStorage.self).asString._guts)
+  }
+  if cls == __SharedStringStorage.self {
+    return String(_unsafeUncheckedDowncast(
+      cocoaString, to: __SharedStringStorage.self).asString._guts)
+  }
+  
+  let (fastUTF8, isASCII): (Bool, Bool)
+  switch _getCocoaStringPointer(cocoaString) {
+  case .ascii(_): (fastUTF8, isASCII) = (true, true)
+  case .utf8(_): (fastUTF8, isASCII) = (true, false)
+  default:  (fastUTF8, isASCII) = (false, false)
+  }
+  
+  return String(_StringGuts(
+    cocoa: cocoaString,
+    providesFastUTF8: fastUTF8,
+    isASCII: isASCII,
+    length: length))
+}
+
 @usableFromInline
 @_effects(releasenone) // @opaque
-internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
-  switch _KnownCocoaString(cocoaString) {
-  case .storage:
-    return _unsafeUncheckedDowncast(
-      cocoaString, to: __StringStorage.self).asString._guts
-  case .shared:
-    return _unsafeUncheckedDowncast(
-      cocoaString, to: __SharedStringStorage.self).asString._guts
-#if !(arch(i386) || arch(arm))
-  case .tagged:
-    return _StringGuts(_SmallString(taggedCocoa: cocoaString))
-#endif
-  case .cocoa:
-    // "Copy" it into a value to be sure nobody will modify behind
-    // our backs. In practice, when value is already immutable, this
-    // just does a retain.
-    //
-    // TODO: Only in certain circumstances should we emit this call:
-    //   1) If it's immutable, just retain it.
-    //   2) If it's mutable with no associated information, then a copy must
-    //      happen; might as well eagerly bridge it in.
-    //   3) If it's mutable with associated information, must make the call
-    let immutableCopy
-      = _stdlib_binary_CFStringCreateCopy(cocoaString) as AnyObject
-    
-#if !(arch(i386) || arch(arm))
-    if _isObjCTaggedPointer(immutableCopy) {
-      return _StringGuts(_SmallString(taggedCocoa: immutableCopy))
-    }
-#endif
-    
-    let (fastUTF8, isASCII): (Bool, Bool)
-    switch _getCocoaStringPointer(immutableCopy) {
-    case .ascii(_): (fastUTF8, isASCII) = (true, true)
-    case .utf8(_): (fastUTF8, isASCII) = (true, false)
-    default:  (fastUTF8, isASCII) = (false, false)
-    }
-    let length = _stdlib_binary_CFStringGetLength(immutableCopy)
-    
-    return _StringGuts(
-      cocoa: immutableCopy,
-      providesFastUTF8: fastUTF8,
-      isASCII: isASCII,
-      length: length)
-  }
+internal func _bridgeCocoaString(
+  _ cocoaString: _CocoaString
+) -> _StringGuts {
+  return (cocoaString as Any as! String)._guts
 }
 
 extension String {

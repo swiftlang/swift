@@ -427,6 +427,79 @@ extension String {
     }
     return
   }
+  
+  /// Creates a new String with the specified capacity in UTF-8 code units, then
+  /// calls the given closure with a buffer covering the String's uninitialized
+  /// memory.
+  ///
+  /// The closure should set `initializedCount` to the number of
+  /// initialized code units, or 0 if it couldn't initialize the buffer
+  /// (for example if the requested capacity was too small).
+  ///
+  /// This method replaces ill-formed UTF-8 sequences with the Unicode
+  /// replacement character (`"\u{FFFD}"`); this may require resizing
+  /// the buffer beyond its original capacity.
+  ///
+  /// The following examples use this initializer with the contents of two
+  /// different `UInt8` arrays---the first with well-formed UTF-8 code unit
+  /// sequences and the second with an ill-formed sequence at the end.
+  ///
+  ///     let validUTF8: [UInt8] = [67, 97, 102, -61, -87, 0]
+  ///     let s = String(unsafeUninitializedCapacity: validUTF8.count,
+  ///                    initializingUTF8With: { (ptr, count) in
+  ///         ptr.initializeFrom(validUTF8)
+  ///         count = validUTF8.count
+  ///     })
+  ///     // Prints "Optional(Café)"
+  ///
+  ///     let invalidUTF8: [UInt8] = [67, 97, 102, -61, 0]
+  ///     let s = String(unsafeUninitializedCapacity: invalidUTF8.count,
+  ///                    initializingUTF8With: { (ptr, count) in
+  ///         ptr.initializeFrom(invalidUTF8)
+  ///         count = invalidUTF8.count
+  ///     })
+  ///     // Prints "Optional(Caf�)"
+  ///
+  ///     let s = String(unsafeUninitializedCapacity: invalidUTF8.count,
+  ///                    initializingUTF8With: { (ptr, count) in
+  ///         ptr.initializeFrom(invalidUTF8)
+  ///         count = 0
+  ///     })
+  ///     // Prints "Optional("")"
+  ///
+  /// - Parameters:
+  ///   - capacity: The amount of memory (in UTF-8 code units) to allocate
+  ///   - initializer: A closure that initializes elements and sets the count of
+  ///       the new String
+  ///     - Parameters:
+  ///       - buffer: A buffer covering uninitialized memory with room for the
+  ///           specified number of UTF-8 code units.
+  ///       - initializedCount: Set this to the number of elements in `buffer`
+  ///           that were actually initialized by the `initializer`
+  @inlinable @inline(__always)
+  public init(
+    unsafeUninitializedCapacity capacity: Int,
+    initializingUTF8With initializer: (
+    _ buffer: UnsafeMutableBufferPointer<UInt8>,
+    _ initializedCount: inout Int
+    ) throws -> Void
+  ) rethrows {
+    if _fastPath(capacity <= _SmallString.capacity) {
+      let smol = try _SmallString(initializingUTF8With: initializer)
+      // Fast case where we fit in a _SmallString and don't need UTF8 validation
+      if _fastPath(smol.isASCII) {
+        self = String(_StringGuts(smol))
+      } else {
+        //We succeeded in making a _SmallString, but may need to repair UTF8
+        self = smol.withUTF8 { String._fromUTF8Repairing($0).result }
+      }
+      return
+    }
+    
+    self = try String._fromUTF8Repairing(
+      unsafeUninitializedCapacity: capacity,
+      initializingWith: initializer)
+  }
 
   /// Calls the given closure with a pointer to the contents of the string,
   /// represented as a null-terminated sequence of code units.

@@ -918,7 +918,7 @@ StringTests.test("stringGutsReserve")
   .code {
 #if _runtime(_ObjC)
   guard #available(macOS 10.13, iOS 11.0, tvOS 11.0, *) else { return }
-  for k in 0...7 {
+  for k in 0...15 {
     var base: String
     var startedNative: Bool
     let shared: String = "X"
@@ -945,10 +945,28 @@ StringTests.test("stringGutsReserve")
     case 4: (base, startedNative) = ("x" as NSMutableString as String, true)
 #endif
     case 5: (base, startedNative) = (shared, true)
-    case 6: (base, startedNative) = ("xá" as NSString as String, false)
-    case 7: (base, startedNative) = ("xá" as NSMutableString as String, false)
+    case 6: (base, startedNative) = ("xá" as NSString as String, true)
+    case 7: (base, startedNative) = ("xá" as NSMutableString as String, true)
+#if arch(i386) || arch(arm)
+    case 8: (base, startedNative) = ("xaxaxaxaxaxa" as NSString as String, false)
+    case 9: (base, startedNative) = ("xaxaxaxaxaxa" as NSMutableString as String, false)
+    case 10: (base, startedNative) = ("xäxaxaxaxaxa" as NSString as String, false)
+    case 11: (base, startedNative) = ("xäxaxaxaxaxa" as NSMutableString as String, false)
+#else
+    case 8: (base, startedNative) = ("xaxaxaxaxaxa" as NSString as String, true)
+    case 9: (base, startedNative) = ("xaxaxaxaxaxa" as NSMutableString as String, true)
+    case 10: (base, startedNative) = ("xäxaxaxaxaxa" as NSString as String, true)
+    case 11: (base, startedNative) = ("xäxaxaxaxaxa" as NSMutableString as String, true)
+#endif
+    case 12: (base, startedNative) = ("xaxaxaxaxaxaxaxa" as NSString as String, false)
+    case 13: (base, startedNative) = ("xaxaxaxaxaxaxaxa" as NSMutableString as String, false)
+    case 14: (base, startedNative) = ("xäxaxaxaxaxaxax" as NSString as String, false)
+    case 15: (base, startedNative) = ("xäxaxaxaxaxaxax" as NSMutableString as String, false)
     default:
       fatalError("case unhandled!")
+    }
+    if isSwiftNative(base) != startedNative {
+      print(k)
     }
     expectEqual(isSwiftNative(base), startedNative)
     
@@ -988,6 +1006,10 @@ StringTests.test("stringGutsReserve")
     case 2: expected = "Ξ"
     case 5: expected = shared
     case 6,7: expected = "xá"
+    case 8,9: expected = "xaxaxaxaxaxa"
+    case 10,11: expected = "xäxaxaxaxaxa"
+    case 12,13: expected = "xaxaxaxaxaxaxaxa"
+    case 14,15: expected = "xäxaxaxaxaxaxax"
     default:
       fatalError("case unhandled!")
     }

@@ -207,7 +207,7 @@ extension _SmallString {
 
   // Overwrite stored code units, including uninitialized. `f` should return the
   // new count.
-  @inline(__always)
+  @inlinable @inline(__always)
   internal mutating func withMutableCapacity(
     _ f: (UnsafeMutableBufferPointer<UInt8>) throws -> Int
   ) rethrows {
@@ -217,6 +217,10 @@ extension _SmallString {
         .assumingMemoryBound(to: UInt8.self)
       return try f(UnsafeMutableBufferPointer(
         start: ptr, count: _SmallString.capacity))
+    }
+    if len == 0 {
+      self = _SmallString()
+      return
     }
     _internalInvariant(len <= _SmallString.capacity)
 
@@ -260,6 +264,22 @@ extension _SmallString {
 
     self.init(leading: leading, trailing: trailing, count: count)
   }
+  
+  @inlinable @inline(__always)
+  internal init(
+    initializingUTF8With initializer: (
+      _ buffer: UnsafeMutableBufferPointer<UInt8>,
+      _ initializedCount: inout Int
+    ) throws -> Void
+  ) rethrows {
+    self.init()
+    try self.withMutableCapacity {
+      var count = 0
+      try initializer($0, &count)
+      return count
+    }
+    self._invariantCheck()
+  }
 
   @usableFromInline // @testable
   internal init?(_ base: _SmallString, appending other: _SmallString) {
@@ -292,7 +312,7 @@ extension _SmallString {
     self.init()
     self.withMutableCapacity {
       let len = _bridgeTagged(cocoa, intoUTF8: $0)
-      _internalInvariant(len != nil && len! < _SmallString.capacity,
+      _internalInvariant(len != nil && len! <= _SmallString.capacity,
         "Internal invariant violated: large tagged NSStrings")
       return len._unsafelyUnwrappedUnchecked
     }
