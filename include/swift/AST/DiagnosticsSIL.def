@@ -364,6 +364,9 @@ ERROR(pound_assert_failure,none,
 // Automatic differentiation diagnostics
 ERROR(autodiff_internal_swift_not_imported,none,
       "AD internal error: the Swift module is not imported", ())
+// FIXME: Find a more informative workaround for this generic error.
+ERROR(autodiff_generic_nondifferentiable_error,none,
+      "value is not differentiable", ())
 ERROR(autodiff_function_not_differentiable,none,
       "function is not differentiable", ())
 NOTE(autodiff_external_nondifferentiable_function,none,

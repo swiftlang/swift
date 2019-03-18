@@ -4,9 +4,9 @@
 // Top-level (before primal/adjoint synthesis)
 //===----------------------------------------------------------------------===//
 
+// expected-error @+2 {{value is not differentiable}}
 // expected-note @+1 {{opaque non-'@differentiable' function is not differentiable}}
 func foo(_ f: (Float) -> Float) -> Float {
-  // expected-error @+1 {{function is not differentiable}}
   return gradient(at: 0, in: f)
 }
 
@@ -187,15 +187,14 @@ class Foo {
 }
 
 // Nested call case.
-@differentiable // expected-error 2 {{function is not differentiable}}
-// expected-note @+1 2 {{when differentiating this function definition}}
+@differentiable // expected-error {{function is not differentiable}}
+// expected-note @+1 {{when differentiating this function definition}}
 func triesToDifferentiateClassMethod(x: Float) -> Float {
-  // expected-note @+2 {{expression is not differentiable}}
   // expected-note @+1 {{differentiating class members is not supported yet}}
   return Foo().class_method(x)
 }
 
-// expected-error @+2 {{function is not differentiable}}
+// expected-error @+2 {{value is not differentiable}}
 // expected-note @+1 {{opaque non-'@differentiable' function is not differentiable}}
 _ = gradient(at: .zero, in: Foo().class_method)
 
@@ -210,12 +209,11 @@ let no_return: @differentiable (Float) -> Float = { x in
 // expected-error @+1 {{missing return in a closure expected to return 'Float'}}
 }
 
-// expected-error @+1 2 {{function is not differentiable}}
+// expected-error @+1 {{function is not differentiable}}
 @differentiable
-// expected-note @+1 2 {{when differentiating this function definition}}
+// expected-note @+1 {{when differentiating this function definition}}
 func roundingGivesError(x: Float) -> Float {
-  // expected-note @+2 {{cannot differentiate through a non-differentiable result; do you want to add '.withoutDerivative()'?}}
-  // expected-note @+1 {{expression is not differentiable}}
+  // expected-note @+1 {{cannot differentiate through a non-differentiable result; do you want to add '.withoutDerivative()'?}}
   return Float(Int(x))
 }
 

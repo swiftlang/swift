@@ -1032,8 +1032,16 @@ ADContext::emitNondifferentiabilityError(SILValue value,
                                          Optional<Diag<>> diag) {
   auto *inst = value->getDefiningInstruction();
   if (!inst) {
-    return diagnose(value.getLoc().getSourceLoc(),
-        diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
+    auto valueLoc = value.getLoc().getSourceLoc();
+    if (!task) {
+      // FIXME: Update generic nondifferentiability error.
+      if (diag) {
+        diagnose(valueLoc, diag::autodiff_generic_nondifferentiable_error);
+        return diagnose(valueLoc, *diag);
+      }
+      return diagnose(valueLoc, diag::autodiff_generic_nondifferentiable_error);
+    }
+    return emitNondifferentiabilityError(valueLoc, task, diag);
   }
   return emitNondifferentiabilityError(inst, task, diag);
 }
@@ -1045,8 +1053,12 @@ ADContext::emitNondifferentiabilityError(SILInstruction *inst,
   // Location of the instruction.
   auto opLoc = inst->getLoc().getSourceLoc();
   if (!task) {
-    return diagnose(opLoc,
-        diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
+    // FIXME: Update generic nondifferentiability error.
+    if (diag) {
+      diagnose(opLoc, diag::autodiff_generic_nondifferentiable_error);
+      return diagnose(opLoc, *diag);
+    }
+    return diagnose(opLoc, diag::autodiff_generic_nondifferentiable_error);
   }
   LLVM_DEBUG({
     auto &s = getADDebugStream()
@@ -1068,9 +1080,12 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
   // that is not associated with any source location, we emit a diagnostic at
   // the instruction source location.
   case DifferentiationInvoker::Kind::AutoDiffFunctionInst:
-    // FIXME: This will not report an error to the user.
-    return diagnose(loc,
-        diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
+    // FIXME: Update generic nondifferentiability error.
+    if (diag) {
+      diagnose(loc, diag::autodiff_generic_nondifferentiable_error);
+      return diagnose(loc, *diag);
+    }
+    return diagnose(loc, diag::autodiff_generic_nondifferentiable_error);
   case DifferentiationInvoker::Kind::SILDifferentiableAttribute: {
     auto attr = invoker.getSILDifferentiableAttribute();
     bool foundAttr = false;
@@ -1078,7 +1093,7 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
       if (auto *fnDecl = declContext->getInnermostDeclarationDeclContext()) {
         if (auto *diffAttr =
                 fnDecl->getAttrs().getAttribute<DifferentiableAttr>()) {
-          diagnose(diffAttr->getLocation(),
+          diagnose(diffAttr->AtLoc,
                    diag::autodiff_function_not_differentiable)
               .highlight(diffAttr->getRangeWithAt());
           diagnose(attr.second->getLocation().getSourceLoc(),
@@ -1098,18 +1113,18 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
 
   // For indirect differentiation, emit a "not differentiable" note on the
   // expression first. Then emit an error at the source invoker of
-  // differentiation, and a "when differentiating this"  note at each indirect
+  // differentiation, and a "when differentiating this" note at each indirect
   // invoker.
   case DifferentiationInvoker::Kind::IndirectDifferentiation: {
     SILInstruction *inst;
     std::tie(inst, task) = task->getInvoker().getIndirectDifferentiation();
-    emitNondifferentiabilityError(inst, task, None);
+    emitNondifferentiabilityError(inst, task);
     return diagnose(loc,
         diag.getValueOr(diag::autodiff_when_differentiating_function_call));
   }
 
-  // For a function conversion, emit a "not differentiable" error on the
-  // attribute first and a note on the non-differentiable operation.
+  // For function conversions, emit a "not differentiable" error on the
+  // conversion expression first and a note on the non-differentiable operation.
   case DifferentiationInvoker::Kind::FunctionConversion: {
     auto *expr = invoker.getFunctionConversion();
     diagnose(expr->getLoc(), diag::autodiff_function_not_differentiable)
@@ -1768,7 +1783,8 @@ static Inst *peerThroughFunctionConversions(SILValue value) {
 ///
 /// FIXME: This is too complicated and needs to be rewritten.
 static Optional<std::pair<SILValue, SILAutoDiffIndices>>
-emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
+emitAssociatedFunctionReference(
+    ADContext &context, SILBuilder &builder,
     const DifferentiationTask *parentTask, SILAutoDiffIndices desiredIndices,
     AutoDiffAssociatedFunctionKind kind, SILValue original,
     DifferentiationInvoker invoker,
@@ -1827,7 +1843,7 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
             !originalFnTy->getParameters()[paramIndex]
                  .getSILStorageType()
                  .isDifferentiable(context.getModule())) {
-          auto diag = context.emitNondifferentiabilityError(
+          context.emitNondifferentiabilityError(
               original, parentTask, diag::autodiff_nondifferentiable_argument);
           return None;
         }
@@ -2966,7 +2982,6 @@ public:
           primalGen.schedulePrimalSynthesisIfNeeded(newTask);
         });
     if (!vjpAndVJPIndices) {
-      context.emitNondifferentiabilityError(ai, synthesis.task);
       errorOccurred = true;
       return;
     }
@@ -5792,13 +5807,8 @@ SILValue ADContext::promoteToDifferentiableFunction(
     auto assocFnAndIndices = emitAssociatedFunctionReference(
         *this, builder, /*parentTask*/ nullptr, desiredIndices, assocFnKind,
         origFnOperand, invoker, [](DifferentiationTask *newTask) {});
-    if (!assocFnAndIndices) {
-      // Show an error at the operator, highlight the argument, and show a note
-      // at the definition site of the argument.
-      auto loc = invoker.getLocation();
-      diagnose(loc, diag::autodiff_function_not_differentiable).highlight(loc);
+    if (!assocFnAndIndices)
       return nullptr;
-    }
     assert(assocFnAndIndices->second == desiredIndices &&
            "FIXME: We could emit a thunk that converts the VJP to have the "
            "desired indices.");
