@@ -2248,7 +2248,8 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
       assert(da);
       std::string diffAttrReq;
       llvm::raw_string_ostream stream(diffAttrReq);
-      da->print(stream, req);
+      da->print(stream, req,
+                /*prettyPrintInModule*/ match.Witness->getModuleContext());
       diags.diagnose(match.Witness,
           diag::protocol_witness_missing_specific_differentiable_attr,
           StringRef(stream.str()).trim());

@@ -283,9 +283,10 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
 // SWIFT_ENABLE_TENSORFLOW
 // Returns the differentiation parameters clause string for the given function,
 // parameter indices, and parsed parameters.
-std::string getDifferentiationParametersClauseString(
+static std::string getDifferentiationParametersClauseString(
     const AbstractFunctionDecl *function, AutoDiffParameterIndices *indices,
-    ArrayRef<ParsedAutoDiffParameter> parsedParams) {
+    ArrayRef<ParsedAutoDiffParameter> parsedParams,
+    ModuleDecl *prettyPrintInModule = nullptr) {
   auto *functionType = function->getInterfaceType()->eraseDynamicSelfType()
       ->castTo<AnyFunctionType>();
   bool isInstanceMethod = function && function->isInstanceMember();
@@ -294,9 +295,11 @@ std::string getDifferentiationParametersClauseString(
   // differentiation parameters, then return an empty string.
   auto parameterCount =
       indices ? indices->parameters.count() : parsedParams.size();
+  if (!prettyPrintInModule)
+    prettyPrintInModule = function->getModuleContext();
   auto inferredParametersCount =
       AutoDiffParameterIndicesBuilder::inferParameters(
-          functionType, function->getModuleContext()).count();
+          functionType, prettyPrintInModule).count();
   if (parameterCount == inferredParametersCount)
     return "";
 
@@ -343,6 +346,90 @@ std::string getDifferentiationParametersClauseString(
       printer << ')';
   }
   return printer.str();
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+// Print the arguments of the given `@differentiable` attribute.
+static void printDifferentiableAttrArguments(
+    const DifferentiableAttr *attr, ASTPrinter &printer, PrintOptions Options,
+    const Decl *D, ModuleDecl *prettyPrintInModule = nullptr) {
+  // Create a temporary string for the attribute argument text.
+  std::string attrArgText;
+  llvm::raw_string_ostream stream(attrArgText);
+
+  // Get original function.
+  auto *original = dyn_cast_or_null<AbstractFunctionDecl>(D);
+  // Handle stored/computed properties and subscript methods.
+  if (auto *asd = dyn_cast_or_null<AbstractStorageDecl>(D))
+    original = asd->getGetter();
+
+  // Print comma if not leading clause.
+  bool isLeadingClause = true;
+  auto printCommaIfNecessary = [&] {
+    if (isLeadingClause) {
+      isLeadingClause = false;
+      return;
+    }
+    stream << ", ";
+  };
+
+  // Print differentiation parameters, if any.
+  auto diffParamsString = getDifferentiationParametersClauseString(
+      original, attr->getParameterIndices(), attr->getParsedParameters(),
+      prettyPrintInModule);
+  if (!diffParamsString.empty()) {
+    isLeadingClause = false;
+    stream << diffParamsString;
+  }
+  // Print jvp function name.
+  if (auto jvp = attr->getJVP()) {
+    printCommaIfNecessary();
+    stream << "jvp: " << jvp->Name;
+  }
+  // Print vjp function name.
+  if (auto vjp = attr->getVJP()) {
+    printCommaIfNecessary();
+    stream << "vjp: " << vjp->Name;
+  }
+  // Print 'where' clause, if any.
+  if (!attr->getRequirements().empty()) {
+    stream << " where ";
+    std::function<Type(Type)> getInterfaceType;
+    if (!original || !original->getGenericEnvironment()) {
+      getInterfaceType = [](Type Ty) -> Type { return Ty; };
+    } else {
+      // Use GenericEnvironment to produce user-friendly
+      // names instead of something like 't_0_0'.
+      auto *genericEnv = original->getGenericEnvironment();
+      assert(genericEnv);
+      getInterfaceType = [=](Type Ty) -> Type {
+        return genericEnv->getSugaredType(Ty);
+      };
+    }
+    interleave(attr->getRequirements(), [&](Requirement req) {
+      auto FirstTy = getInterfaceType(req.getFirstType());
+      if (req.getKind() != RequirementKind::Layout) {
+        auto SecondTy = getInterfaceType(req.getSecondType());
+        Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
+        ReqWithDecls.print(stream, Options);
+      } else {
+        Requirement ReqWithDecls(req.getKind(), FirstTy,
+        req.getLayoutConstraint());
+        ReqWithDecls.print(stream, Options);
+      }
+    }, [&] {
+      stream << ", ";
+    });
+  }
+
+  // If the attribute argument text is empty, return. Do not print parentheses.
+  if (stream.str().empty())
+    return;
+
+  // Otherwise, print the attribute argument text enclosed in parentheses.
+  printer << '(';
+  printer << stream.str();
+  printer << ')';
 }
 
 void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
@@ -623,81 +710,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_Differentiable: {
     Printer.printAttrName("@differentiable");
     auto *attr = cast<DifferentiableAttr>(this);
-    // Create a temporary string for the attribute argument text.
-    std::string attrArgText;
-    llvm::raw_string_ostream stream(attrArgText);
-
-    // Get original function.
-    auto *original = dyn_cast_or_null<AbstractFunctionDecl>(D);
-    // Handle stored/computed properties and subscript methods.
-    if (auto *asd = dyn_cast_or_null<AbstractStorageDecl>(D))
-      original = asd->getGetter();
-
-    // Print comma if not leading clause.
-    bool isLeadingClause = true;
-    auto printCommaIfNecessary = [&] {
-      if (isLeadingClause) {
-        isLeadingClause = false;
-        return;
-      }
-      stream << ", ";
-    };
-
-    // Print differentiation parameters, if any.
-    auto diffParamsString = getDifferentiationParametersClauseString(
-        original, attr->getParameterIndices(), attr->getParsedParameters());
-    if (!diffParamsString.empty()) {
-      isLeadingClause = false;
-      stream << diffParamsString;
-    }
-    // Print jvp function name.
-    if (auto jvp = attr->getJVP()) {
-      printCommaIfNecessary();
-      stream << "jvp: " << jvp->Name;
-    }
-    // Print vjp function name.
-    if (auto vjp = attr->getVJP()) {
-      printCommaIfNecessary();
-      stream << "vjp: " << vjp->Name;
-    }
-    // Print 'where' clause, if any.
-    if (!attr->getRequirements().empty()) {
-      stream << " where ";
-      std::function<Type(Type)> getInterfaceType;
-      if (!original || !original->getGenericEnvironment()) {
-        getInterfaceType = [](Type Ty) -> Type { return Ty; };
-      } else {
-        // Use GenericEnvironment to produce user-friendly
-        // names instead of something like 't_0_0'.
-        auto *genericEnv = original->getGenericEnvironment();
-        assert(genericEnv);
-        getInterfaceType = [=](Type Ty) -> Type {
-          return genericEnv->getSugaredType(Ty);
-        };
-      }
-      interleave(attr->getRequirements(), [&](Requirement req) {
-        auto FirstTy = getInterfaceType(req.getFirstType());
-        if (req.getKind() != RequirementKind::Layout) {
-          auto SecondTy = getInterfaceType(req.getSecondType());
-          Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
-          ReqWithDecls.print(stream, Options);
-        } else {
-          Requirement ReqWithDecls(req.getKind(), FirstTy,
-          req.getLayoutConstraint());
-          ReqWithDecls.print(stream, Options);
-        }
-      }, [&] {
-        stream << ", ";
-      });
-    }
-
-    // If the attribute argument text is empty, break. Do not print parentheses.
-    if (stream.str().empty())
-      break;
-    // Otherwise, print the attribute argument text enclosed in parentheses.
-    Printer << '(';
-    Printer << stream.str();
-    Printer << ')';
+    printDifferentiableAttrArguments(attr, Printer, Options, D);
     break;
   }
 
@@ -1245,6 +1258,14 @@ DifferentiableAttr::create(ASTContext &context, bool implicit,
 void DifferentiableAttr::setRequirements(ASTContext &context,
                                          ArrayRef<Requirement> requirements) {
   Requirements = context.AllocateCopy(requirements);
+}
+
+void DifferentiableAttr::print(llvm::raw_ostream &OS, const Decl *D,
+                               ModuleDecl *prettyPrintInModule) const {
+  StreamPrinter P(OS);
+  P << "@" << getAttrName();
+  printDifferentiableAttrArguments(this, P, PrintOptions(), D,
+                                   prettyPrintInModule);
 }
 
 // SWIFT_ENABLE_TENSORFLOW
