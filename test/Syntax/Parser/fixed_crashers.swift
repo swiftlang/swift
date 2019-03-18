@@ -2,4 +2,7 @@
 // RUN: %swift-syntax-parser-test %s -dump-tree | %FileCheck %s
 
 let x: a[i] & b
-// CHECK: |let|
+// CHECK: |x|
+
+let x2: a & b[1]
+// CHECK: |x2|

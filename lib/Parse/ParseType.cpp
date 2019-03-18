@@ -729,11 +729,12 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
     addType(ty.getPtrOrNull());
   } while (Tok.isContextualPunctuator("&"));
 
-  if (SyntaxContext->isEnabled() && Status.isSuccess()) {
-    auto LastNode = ParsedSyntaxRecorder::makeCompositionTypeElement(
-        SyntaxContext->popIf<ParsedTypeSyntax>().getValue(), None,
-        *SyntaxContext);
-    SyntaxContext->addSyntax(LastNode);
+  if (SyntaxContext->isEnabled()) {
+    if (auto synType = SyntaxContext->popIf<ParsedTypeSyntax>()) {
+      auto LastNode = ParsedSyntaxRecorder::makeCompositionTypeElement(
+          synType.getValue(), None, *SyntaxContext);
+      SyntaxContext->addSyntax(LastNode);
+    }
   }
   SyntaxContext->collectNodesInPlace(SyntaxKind::CompositionTypeElementList);
   
