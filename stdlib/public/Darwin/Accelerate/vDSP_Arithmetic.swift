@@ -610,15 +610,15 @@ extension vDSP {
     
     // MARK: d[i] = (a[i] + b[i]) * c                       vDSP_vasm
     
-    /// Populates `result` with the elementwise product of the sum of the vectors in `vectorSum` and `byScalar`,
+    /// Populates `result` with the elementwise product of the sum of the vectors in `vectorAddition` and `byScalar`,
     /// single-precision.
     ///
-    /// - Parameter vectorSum: the `a` and `b` in `d[i] = (a[i] + b[i]) * c`.
+    /// - Parameter vectorAddition: the `a` and `b` in `d[i] = (a[i] + b[i]) * c`.
     /// - Parameter scalar: the `c` in `d[i] = `(a[i] + b[i]) * c`.
     /// - Parameter result: The `d` in `d[i] = `(a[i] + b[i]) * c`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func multiply<T, U, V>(vectorSum: (a: T, b: U),
+    public static func multiply<T, U, V>(vectorAddition: (a: T, b: U),
                                          _ scalar: Float,
                                          result: inout V)
         where
@@ -628,12 +628,12 @@ extension vDSP {
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             let n = result.count
-            precondition(vectorSum.a.count == n &&
-                vectorSum.b.count == n)
+            precondition(vectorAddition.a.count == n &&
+                vectorAddition.b.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorSum.a.withUnsafeBufferPointer { a in
-                    vectorSum.b.withUnsafeBufferPointer { b in
+                vectorAddition.a.withUnsafeBufferPointer { a in
+                    vectorAddition.b.withUnsafeBufferPointer { b in
                         withUnsafePointer(to: scalar) { s in
                             vDSP_vasm(a.baseAddress!, 1,
                                       b.baseAddress!, 1,
@@ -646,15 +646,15 @@ extension vDSP {
             }
     }
     
-    /// Populates `result` with the elementwise product of the sum of the vectors in `vectorSum` and `byScalar`,
+    /// Populates `result` with the elementwise product of the sum of the vectors in `vectorAddition` and `byScalar`,
     /// double-precision.
     ///
-    /// - Parameter vectorSum: the `a` and `b` in `d[i] = (a[i] + b[i]) * c`.
+    /// - Parameter vectorAddition: the `a` and `b` in `d[i] = (a[i] + b[i]) * c`.
     /// - Parameter scalar: the `c` in `d[i] = `(a[i] + b[i]) * c`.
     /// - Parameter result: The `d` in `d[i] = `(a[i] + b[i]) * c`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func multiply<T, U, V>(vectorSum: (a: T, b: U),
+    public static func multiply<T, U, V>(vectorAddition: (a: T, b: U),
                                          _ scalar: Double,
                                          result: inout V)
         where
@@ -664,12 +664,12 @@ extension vDSP {
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             let n = result.count
-            precondition(vectorSum.a.count == n &&
-                vectorSum.b.count == n)
+            precondition(vectorAddition.a.count == n &&
+                vectorAddition.b.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorSum.a.withUnsafeBufferPointer { a in
-                    vectorSum.b.withUnsafeBufferPointer { b in
+                vectorAddition.a.withUnsafeBufferPointer { a in
+                    vectorAddition.b.withUnsafeBufferPointer { b in
                         withUnsafePointer(to: scalar) { s in
                             vDSP_vasmD(a.baseAddress!, 1,
                                        b.baseAddress!, 1,
@@ -684,15 +684,15 @@ extension vDSP {
     
     // MARK: d[i] = (a[i] + b[i]) * c[i]                    vDSP_vam
     
-    /// Populates `result` with the elementwise product of the sum of the vectors in `vectorSum` and `vector`,
+    /// Populates `result` with the elementwise product of the sum of the vectors in `vectorAddition` and `vector`,
     /// single-precision.
     ///
-    /// - Parameter vectorSum: the `a` and `b` in `d[i] = (a[i] + b[i]) * c[i]`.
+    /// - Parameter vectorAddition: the `a` and `b` in `d[i] = (a[i] + b[i]) * c[i]`.
     /// - Parameter vector: the `c` in `d[i] = (a[i] + b[i]) * c[i]`.
     /// - Parameter result: The `d` in `d[i] = (a[i] + b[i]) * c[i]`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func multiply<S, T, U, V>(vectorSum: (a: S, b: T),
+    public static func multiply<S, T, U, V>(vectorAddition: (a: S, b: T),
                                             _ vector: U,
                                             result: inout V)
         where
@@ -704,12 +704,12 @@ extension vDSP {
         U.Element == Float, V.Element == Float {
             
             let n = result.count
-            precondition(vectorSum.a.count == n &&
-                vectorSum.b.count == n)
+            precondition(vectorAddition.a.count == n &&
+                vectorAddition.b.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorSum.a.withUnsafeBufferPointer { a in
-                    vectorSum.b.withUnsafeBufferPointer { b in
+                vectorAddition.a.withUnsafeBufferPointer { a in
+                    vectorAddition.b.withUnsafeBufferPointer { b in
                         vector.withUnsafeBufferPointer { c in
                             vDSP_vam(a.baseAddress!, 1,
                                      b.baseAddress!, 1,
@@ -722,15 +722,15 @@ extension vDSP {
             }
     }
     
-    /// Populates `result` with the elementwise product of the sum of the vectors in `vectorSum` and `vector`,
+    /// Populates `result` with the elementwise product of the sum of the vectors in `vectorAddition` and `vector`,
     /// double-precision.
     ///
-    /// - Parameter vectorSum: the `a` and `b` in `d[i] = (a[i] + b[i]) * c[i]`.
+    /// - Parameter vectorAddition: the `a` and `b` in `d[i] = (a[i] + b[i]) * c[i]`.
     /// - Parameter vector: the `c` in `d[i] = (a[i] + b[i]) * c[i]`.
     /// - Parameter result: The `d` in `d[i] = (a[i] + b[i]) * c[i]`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func multiply<S, T, U, V>(vectorSum: (a: S, b: T),
+    public static func multiply<S, T, U, V>(vectorAddition: (a: S, b: T),
                                             _ vector: U,
                                             result: inout V)
         where
@@ -742,12 +742,12 @@ extension vDSP {
         U.Element == Double, V.Element == Double {
             
             let n = result.count
-            precondition(vectorSum.a.count == n &&
-                vectorSum.b.count == n)
+            precondition(vectorAddition.a.count == n &&
+                vectorAddition.b.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorSum.a.withUnsafeBufferPointer { a in
-                    vectorSum.b.withUnsafeBufferPointer { b in
+                vectorAddition.a.withUnsafeBufferPointer { a in
+                    vectorAddition.b.withUnsafeBufferPointer { b in
                         vector.withUnsafeBufferPointer { c in
                             vDSP_vamD(a.baseAddress!, 1,
                                       b.baseAddress!, 1,
@@ -762,15 +762,15 @@ extension vDSP {
     
     // MARK: d[i] = (a[i] - b[i]) * c                       vDSP_vsbsm
     
-    /// Populates `result` with the elementwise product of the difference of the vectors in `vectorDifference` and `scalar`,
+    /// Populates `result` with the elementwise product of the difference of the vectors in `vectorSubtraction` and `scalar`,
     /// single-precision.
     ///
-    /// - Parameter vectorDifference: the `a` and `b` in `d[i] = (a[i] - b[i]) * c`.
+    /// - Parameter vectorSubtraction: the `a` and `b` in `d[i] = (a[i] - b[i]) * c`.
     /// - Parameter scalar: the `c` in `d[i] = `(a[i] - b[i]) * c`.
     /// - Parameter result: The `d` in `d[i] = `(a[i] - b[i]) * c`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func multiply<T, U, V>(vectorDifference: (a: T, b: U),
+    public static func multiply<T, U, V>(vectorSubtraction: (a: T, b: U),
                                          _ scalar: Float,
                                          result: inout V)
         where
@@ -780,12 +780,12 @@ extension vDSP {
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             let n = result.count
-            precondition(vectorDifference.a.count == n &&
-                vectorDifference.b.count == n)
+            precondition(vectorSubtraction.a.count == n &&
+                vectorSubtraction.b.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorDifference.a.withUnsafeBufferPointer { a in
-                    vectorDifference.b.withUnsafeBufferPointer { b in
+                vectorSubtraction.a.withUnsafeBufferPointer { a in
+                    vectorSubtraction.b.withUnsafeBufferPointer { b in
                         withUnsafePointer(to: scalar) { s in
                             vDSP_vsbsm(a.baseAddress!, 1,
                                        b.baseAddress!, 1,
@@ -798,15 +798,15 @@ extension vDSP {
             }
     }
     
-    /// Populates `result` with the elementwise product of the difference of the vectors in `vectorDifference` and `scalar`,
+    /// Populates `result` with the elementwise product of the difference of the vectors in `vectorSubtraction` and `scalar`,
     /// double-precision.
     ///
-    /// - Parameter vectorDifference: the `a` and `b` in `d[i] = (a[i] - b[i]) * c`.
+    /// - Parameter vectorSubtraction: the `a` and `b` in `d[i] = (a[i] - b[i]) * c`.
     /// - Parameter scalar: the `c` in `d[i] = `(a[i] - b[i]) * c`.
     /// - Parameter result: The `d` in `d[i] = `(a[i] - b[i]) * c`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func multiply<T, U, V>(vectorDifference: (a: T, b: U),
+    public static func multiply<T, U, V>(vectorSubtraction: (a: T, b: U),
                                          _ scalar: Double,
                                          result: inout V)
         where
@@ -816,12 +816,12 @@ extension vDSP {
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             let n = result.count
-            precondition(vectorDifference.a.count == n &&
-                vectorDifference.b.count == n)
+            precondition(vectorSubtraction.a.count == n &&
+                vectorSubtraction.b.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorDifference.a.withUnsafeBufferPointer { a in
-                    vectorDifference.b.withUnsafeBufferPointer { b in
+                vectorSubtraction.a.withUnsafeBufferPointer { a in
+                    vectorSubtraction.b.withUnsafeBufferPointer { b in
                         withUnsafePointer(to: scalar) { s in
                             vDSP_vsbsmD(a.baseAddress!, 1,
                                         b.baseAddress!, 1,
@@ -836,15 +836,15 @@ extension vDSP {
     
     // MARK: d[i] = (a[i] - b[i]) * c[i]                    vDSP_vsbm
     
-    /// Populates `result` with the elementwise product of the difference of the vectors in `vectorDifference` and `vector`,
+    /// Populates `result` with the elementwise product of the difference of the vectors in `vectorSubtraction` and `vector`,
     /// single-precision.
     ///
-    /// - Parameter vectorDifference: the `a` and `b` in `d[i] = (a[i] - b[i]) * c[i]`.
+    /// - Parameter vectorSubtraction: the `a` and `b` in `d[i] = (a[i] - b[i]) * c[i]`.
     /// - Parameter vector: the `c` in `d[i] = `(a[i] - b[i]) * c[i]`.
     /// - Parameter result: The `d` in `d[i] = `(a[i] - b[i]) * c[i]`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func multiply<S, T, U, V>(vectorDifference: (a: S, b: T),
+    public static func multiply<S, T, U, V>(vectorSubtraction: (a: S, b: T),
                                             _ vector: U,
                                             result: inout V)
         where
@@ -856,12 +856,12 @@ extension vDSP {
         U.Element == Float, V.Element == Float {
             
             let n = result.count
-            precondition(vectorDifference.a.count == n &&
-                vectorDifference.b.count == n)
+            precondition(vectorSubtraction.a.count == n &&
+                vectorSubtraction.b.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorDifference.a.withUnsafeBufferPointer { a in
-                    vectorDifference.b.withUnsafeBufferPointer { b in
+                vectorSubtraction.a.withUnsafeBufferPointer { a in
+                    vectorSubtraction.b.withUnsafeBufferPointer { b in
                         vector.withUnsafeBufferPointer { c in
                             vDSP_vsbm(a.baseAddress!, 1,
                                       b.baseAddress!, 1,
@@ -874,15 +874,15 @@ extension vDSP {
             }
     }
     
-    /// Populates `result` with the elementwise product of the difference of the vectors in `vectorDifference` and `vector`,
+    /// Populates `result` with the elementwise product of the difference of the vectors in `vectorSubtraction` and `vector`,
     /// double-precision.
     ///
-    /// - Parameter vectorDifference: the `a` and `b` in `d[i] = (a[i] - b[i]) * c[i]`.
+    /// - Parameter vectorSubtraction: the `a` and `b` in `d[i] = (a[i] - b[i]) * c[i]`.
     /// - Parameter vector: the `c` in `d[i] = `(a[i] - b[i]) * c[i]`.
     /// - Parameter result: The `d` in `d[i] = `(a[i] - b[i]) * c[i]`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func multiply<S, T, U, V>(vectorDifference: (a: S, b: T),
+    public static func multiply<S, T, U, V>(vectorSubtraction: (a: S, b: T),
                                             _ vector: U,
                                             result: inout V)
         where
@@ -894,12 +894,12 @@ extension vDSP {
         U.Element == Double, V.Element == Double {
             
             let n = result.count
-            precondition(vectorDifference.a.count == n &&
-                vectorDifference.b.count == n)
+            precondition(vectorSubtraction.a.count == n &&
+                vectorSubtraction.b.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorDifference.a.withUnsafeBufferPointer { a in
-                    vectorDifference.b.withUnsafeBufferPointer { b in
+                vectorSubtraction.a.withUnsafeBufferPointer { a in
+                    vectorSubtraction.b.withUnsafeBufferPointer { b in
                         vector.withUnsafeBufferPointer { c in
                             vDSP_vsbmD(a.baseAddress!, 1,
                                        b.baseAddress!, 1,
@@ -915,15 +915,15 @@ extension vDSP {
     // MARK: d[i] = a[i]*b[i] + c;                       vDSP_vmsa
     
     /// Populates `result` with the elementwise sum of `scalar`
-    /// and the product of the two vectors in `vectorProduct`,
+    /// and the product of the two vectors in `vectorMultiplication`,
     /// single-precision.
     ///
-    /// - Parameter vectorProduct: the `a` and `b` in `d[i] = a[i]*b[i] + c`.
+    /// - Parameter vectorMultiplication: the `a` and `b` in `d[i] = a[i]*b[i] + c`.
     /// - Parameter scalar: the `c` in `d[i] = a[i]*b[i] + c`.
     /// - Parameter result: the `d` in `d[i] = a[i]*b[i] + c`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func add<T, U, V>(vectorProduct: (a: T, b: U),
+    public static func add<T, U, V>(vectorMultiplication: (a: T, b: U),
                                     _ scalar: Float,
                                     result: inout V)
         where
@@ -933,12 +933,12 @@ extension vDSP {
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             let n = result.count
-            precondition(vectorProduct.a.count == n &&
-                vectorProduct.b.count == n)
+            precondition(vectorMultiplication.a.count == n &&
+                vectorMultiplication.b.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorProduct.a.withUnsafeBufferPointer { a in
-                    vectorProduct.b.withUnsafeBufferPointer { b in
+                vectorMultiplication.a.withUnsafeBufferPointer { a in
+                    vectorMultiplication.b.withUnsafeBufferPointer { b in
                         withUnsafePointer(to: scalar) { s in
                             vDSP_vmsa(a.baseAddress!, 1,
                                       b.baseAddress!, 1,
@@ -952,15 +952,15 @@ extension vDSP {
     }
     
     /// Populates `result` with the elementwise sum of `scalar`
-    /// and the product of the two vectors in `vectorProduct`,
+    /// and the product of the two vectors in `vectorMultiplication`,
     /// double-precision.
     ///
-    /// - Parameter vectorProduct: the `a` and `b` in `d[i] = a[i]*b[i] + c`.
+    /// - Parameter vectorMultiplication: the `a` and `b` in `d[i] = a[i]*b[i] + c`.
     /// - Parameter scalar: the `c` in `d[i] = a[i]*b[i] + c`.
     /// - Parameter result: the `d` in `d[i] = a[i]*b[i] + c`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func add<T, U, V>(vectorProduct: (a: T, b: U),
+    public static func add<T, U, V>(vectorMultiplication: (a: T, b: U),
                                     _ scalar: Double,
                                     result: inout V)
         where
@@ -970,12 +970,12 @@ extension vDSP {
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             let n = result.count
-            precondition(vectorProduct.a.count == n &&
-                vectorProduct.b.count == n)
+            precondition(vectorMultiplication.a.count == n &&
+                vectorMultiplication.b.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorProduct.a.withUnsafeBufferPointer { a in
-                    vectorProduct.b.withUnsafeBufferPointer { b in
+                vectorMultiplication.a.withUnsafeBufferPointer { a in
+                    vectorMultiplication.b.withUnsafeBufferPointer { b in
                         withUnsafePointer(to: scalar) { s in
                             vDSP_vmsaD(a.baseAddress!, 1,
                                        b.baseAddress!, 1,
@@ -991,15 +991,15 @@ extension vDSP {
     // MARK: d[i] = (a[i] * b) + c[i]                       vDSP_vsma
     
     /// Populates `result` with the elementwise sum of `toVector`
-    /// and the product of the vector and scalar in `vectorScalarProduct`,
+    /// and the product of the vector and scalar in `vectorScalarMultiplication`,
     /// single-precision.
     ///
-    /// - Parameter vectorScalarProduct: the `a` and `b` in `d[i] = (a[i] * b) + c[i]`.
+    /// - Parameter vectorScalarMultiplication: the `a` and `b` in `d[i] = (a[i] * b) + c[i]`.
     /// - Parameter vector: the `c` in `d[i] = (a[i] * b) + c[i]`.
     /// - Parameter result: the `d` in `d[i] = (a[i] * b) + c[i]`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func add<T, U, V>(vectorScalarProduct: (a: T, b: Float),
+    public static func add<T, U, V>(vectorScalarMultiplication: (a: T, b: Float),
                                     _ vector: U,
                                     result: inout V)
         where
@@ -1009,12 +1009,12 @@ extension vDSP {
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             let n = result.count
-            precondition(vectorScalarProduct.a.count == n)
+            precondition(vectorScalarMultiplication.a.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorScalarProduct.a.withUnsafeBufferPointer { a in
+                vectorScalarMultiplication.a.withUnsafeBufferPointer { a in
                     vector.withUnsafeBufferPointer { c in
-                        withUnsafePointer(to: vectorScalarProduct.b) { b in
+                        withUnsafePointer(to: vectorScalarMultiplication.b) { b in
                             vDSP_vsma(a.baseAddress!, 1,
                                       b,
                                       c.baseAddress!, 1,
@@ -1027,15 +1027,15 @@ extension vDSP {
     }
     
     /// Populates `result` with the elementwise sum of `toVector`
-    /// and the product of the vector and scalar in `vectorScalarProduct`,
+    /// and the product of the vector and scalar in `vectorScalarMultiplication`,
     /// double-precision.
     ///
-    /// - Parameter vectorScalarProduct: the `a` and `b` in `d[i] = (a[i] * b) + c[i]`.
+    /// - Parameter vectorScalarMultiplication: the `a` and `b` in `d[i] = (a[i] * b) + c[i]`.
     /// - Parameter vector: the `c` in `d[i] = (a[i] * b) + c[i]`.
     /// - Parameter result: the `d` in `d[i] = (a[i] * b) + c[i]`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func add<T, U, V>(vectorScalarProduct: (a: T, b: Double),
+    public static func add<T, U, V>(vectorScalarMultiplication: (a: T, b: Double),
                                     _ vector: U,
                                     result: inout V)
         where
@@ -1045,12 +1045,12 @@ extension vDSP {
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             let n = result.count
-            precondition(vectorScalarProduct.a.count == n)
+            precondition(vectorScalarMultiplication.a.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorScalarProduct.a.withUnsafeBufferPointer { a in
+                vectorScalarMultiplication.a.withUnsafeBufferPointer { a in
                     vector.withUnsafeBufferPointer { c in
-                        withUnsafePointer(to: vectorScalarProduct.b) { b in
+                        withUnsafePointer(to: vectorScalarMultiplication.b) { b in
                             vDSP_vsmaD(a.baseAddress!, 1,
                                        b,
                                        c.baseAddress!, 1,
@@ -1065,15 +1065,15 @@ extension vDSP {
     // MARK: d[i] = (a[i] * b[i]) + c[i]                    vDSP_vma
     
     /// Populates `result` with the elementwise sum of `vector`
-    /// and the product of the two vectors in `vectorProduct`,
+    /// and the product of the two vectors in `vectorMultiplication`,
     /// single-precision.
     ///
-    /// - Parameter vectorProduct: the `a` and `b` in `d[i] = (a[i] * b[i]) + c[i]`.
+    /// - Parameter vectorMultiplication: the `a` and `b` in `d[i] = (a[i] * b[i]) + c[i]`.
     /// - Parameter vector: the `c` in `d[i] = (a[i] * b[i]) + c[i]`.
     /// - Parameter result: the `d` in `d[i] = (a[i] * b[i]) + c[i]`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func add<S, T, U, V>(vectorProduct: (a: S, b: T),
+    public static func add<S, T, U, V>(vectorMultiplication: (a: S, b: T),
                                        _ vector: U,
                                        result: inout V)
         where
@@ -1085,12 +1085,12 @@ extension vDSP {
         U.Element == Float, V.Element == Float {
             
             let n = result.count
-            precondition(vectorProduct.a.count == n &&
-                vectorProduct.b.count == n)
+            precondition(vectorMultiplication.a.count == n &&
+                vectorMultiplication.b.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorProduct.a.withUnsafeBufferPointer { a in
-                    vectorProduct.b.withUnsafeBufferPointer { b in
+                vectorMultiplication.a.withUnsafeBufferPointer { a in
+                    vectorMultiplication.b.withUnsafeBufferPointer { b in
                         vector.withUnsafeBufferPointer { c in
                             vDSP_vma(a.baseAddress!, 1,
                                      b.baseAddress!, 1,
@@ -1104,15 +1104,15 @@ extension vDSP {
     }
     
     /// Populates `result` with the elementwise sum of `vector`
-    /// and the product of the two vectors in `vectorProduct`,
+    /// and the product of the two vectors in `vectorMultiplication`,
     /// double-precision.
     ///
-    /// - Parameter vectorProduct: the `a` and `b` in `d[i] = (a[i] * b[i]) + c[i]`.
+    /// - Parameter vectorMultiplication: the `a` and `b` in `d[i] = (a[i] * b[i]) + c[i]`.
     /// - Parameter vector: the `c` in `d[i] = (a[i] * b[i]) + c[i]`.
     /// - Parameter result: the `d` in `d[i] = (a[i] * b[i]) + c[i]`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func add<S, T, U, V>(vectorProduct: (a: S, b: T),
+    public static func add<S, T, U, V>(vectorMultiplication: (a: S, b: T),
                                        _ vector: U,
                                        result: inout V)
         where
@@ -1124,12 +1124,12 @@ extension vDSP {
         U.Element == Double, V.Element == Double {
             
             let n = result.count
-            precondition(vectorProduct.a.count == n &&
-                vectorProduct.b.count == n)
+            precondition(vectorMultiplication.a.count == n &&
+                vectorMultiplication.b.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorProduct.a.withUnsafeBufferPointer { a in
-                    vectorProduct.b.withUnsafeBufferPointer { b in
+                vectorMultiplication.a.withUnsafeBufferPointer { a in
+                    vectorMultiplication.b.withUnsafeBufferPointer { b in
                         vector.withUnsafeBufferPointer { c in
                             vDSP_vmaD(a.baseAddress!, 1,
                                       b.baseAddress!, 1,
@@ -1145,16 +1145,16 @@ extension vDSP {
     // MARK: d[i] = (a[i] * b[i]) - c[i]             vDSP_vmsb
     
     /// Populates `result` with the elementwise difference of `vector`
-    /// and the product of the two vectors in `toVectorProduct`,
+    /// and the product of the two vectors in `vectorMultiplication`,
     /// single-precision.
     ///
     /// - Parameter vector: the `c` in `d[i] = (a[i] * b[i]) - c[i]`.
-    /// - Parameter vectorProduct: the `a` and `b` in `d[i] = (a[i] * b[i]) - c[i]`.
+    /// - Parameter vectorMultiplication: the `a` and `b` in `d[i] = (a[i] * b[i]) - c[i]`.
     /// - Parameter result: the `d` in `d[i] = (a[i] * b[i]) - c[i]`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func subtract<S, T, U, V>(_ vector: S,
-                                            fromVectorProduct vectorProduct: (a: T, b: U),
+                                            fromVectorMultiplication vectorMultiplication: (a: T, b: U),
                                             result: inout V)
         where
         S: _ContiguousCollection,
@@ -1165,12 +1165,12 @@ extension vDSP {
         U.Element == Float, V.Element == Float {
             
             let n = result.count
-            precondition(vectorProduct.a.count == n &&
-                vectorProduct.b.count == n)
+            precondition(vectorMultiplication.a.count == n &&
+                vectorMultiplication.b.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorProduct.a.withUnsafeBufferPointer { a in
-                    vectorProduct.b.withUnsafeBufferPointer { b in
+                vectorMultiplication.a.withUnsafeBufferPointer { a in
+                    vectorMultiplication.b.withUnsafeBufferPointer { b in
                         vector.withUnsafeBufferPointer { c in
                             vDSP_vmsb(a.baseAddress!, 1,
                                       b.baseAddress!, 1,
@@ -1184,16 +1184,16 @@ extension vDSP {
     }
     
     /// Populates `result` with the elementwise difference of `vector`
-    /// and the product of the two vectors in `toVectorProduct`,
+    /// and the product of the two vectors in `vectorMultiplication`,
     /// double-precision.
     ///
     /// - Parameter vector: the `c` in `d[i] = (a[i] * b[i]) - c[i]`.
-    /// - Parameter vectorProduct: the `a` and `b` in `d[i] = (a[i] * b[i]) - c[i]`.
+    /// - Parameter vectorMultiplication: the `a` and `b` in `d[i] = (a[i] * b[i]) - c[i]`.
     /// - Parameter result: the `d` in `d[i] = (a[i] * b[i]) - c[i]`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func subtract<S, T, U, V>(_ vector: S,
-                                            fromVectorProduct vectorProduct: (a: T, b: U),
+                                            fromVectorMultiplication vectorMultiplication: (a: T, b: U),
                                             result: inout V)
         where
         S: _ContiguousCollection,
@@ -1204,12 +1204,12 @@ extension vDSP {
         U.Element == Double, V.Element == Double {
             
             let n = result.count
-            precondition(vectorProduct.a.count == n &&
-                vectorProduct.b.count == n)
+            precondition(vectorMultiplication.a.count == n &&
+                vectorMultiplication.b.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorProduct.a.withUnsafeBufferPointer { a in
-                    vectorProduct.b.withUnsafeBufferPointer { b in
+                vectorMultiplication.a.withUnsafeBufferPointer { a in
+                    vectorMultiplication.b.withUnsafeBufferPointer { b in
                         vector.withUnsafeBufferPointer { c in
                             vDSP_vmsbD(a.baseAddress!, 1,
                                        b.baseAddress!, 1,
@@ -1227,13 +1227,13 @@ extension vDSP {
     /// Populates `result` with the elementwise sum of two elementwise
     /// vector-scalar products, single-precision.
     ///
-    /// - Parameter vectorScalarProductAB: the `a` and `b` in `e[i] = (a[i] * b) + (c[i] * d)`.
-    /// - Parameter vectorScalarProductCD: the `c` and `d` in `e[i] = (a[i] * b) + (c[i] * d)`.
+    /// - Parameter vectorScalarMultiplicationAB: the `a` and `b` in `e[i] = (a[i] * b) + (c[i] * d)`.
+    /// - Parameter vectorScalarMultiplicationCD: the `c` and `d` in `e[i] = (a[i] * b) + (c[i] * d)`.
     /// - Parameter result: the `e` in `e[i] = (a[i] * b) + (c[i] * d)`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func add<T, U, V>(vectorScalarProduct vectorScalarProductAB: (a: T, b: Float),
-                                    toVectorScalarProduct vectorScalarProductCD: (c: U, d: Float),
+    public static func add<T, U, V>(vectorScalarMultiplication vectorScalarMultiplicationAB: (a: T, b: Float),
+                                    vectorScalarMultiplication vectorScalarMultiplicationCD: (c: U, d: Float),
                                     result: inout V)
         where
         T: _ContiguousCollection,
@@ -1242,14 +1242,14 @@ extension vDSP {
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             let n = result.count
-            precondition(vectorScalarProductAB.a.count == n &&
-                vectorScalarProductCD.c.count == n)
+            precondition(vectorScalarMultiplicationAB.a.count == n &&
+                vectorScalarMultiplicationCD.c.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorScalarProductAB.a.withUnsafeBufferPointer { a in
-                    vectorScalarProductCD.c.withUnsafeBufferPointer { c in
-                        withUnsafePointer(to: vectorScalarProductAB.b) { b in
-                            withUnsafePointer(to: vectorScalarProductCD.d) { d in
+                vectorScalarMultiplicationAB.a.withUnsafeBufferPointer { a in
+                    vectorScalarMultiplicationCD.c.withUnsafeBufferPointer { c in
+                        withUnsafePointer(to: vectorScalarMultiplicationAB.b) { b in
+                            withUnsafePointer(to: vectorScalarMultiplicationCD.d) { d in
                                 vDSP_vsmsma(a.baseAddress!, 1,
                                             b,
                                             c.baseAddress!, 1,
@@ -1266,13 +1266,13 @@ extension vDSP {
     /// Populates `result` with the elementwise sum of two elementwise
     /// vector-scalar products, double-precision.
     ///
-    /// - Parameter vectorScalarProductAB: the `a` and `b` in `e[i] = (a[i] * b) + (c[i] * d)`.
-    /// - Parameter vectorScalarProductCD: the `c` and `d` in `e[i] = (a[i] * b) + (c[i] * d)`.
+    /// - Parameter vectorScalarMultiplicationAB: the `a` and `b` in `e[i] = (a[i] * b) + (c[i] * d)`.
+    /// - Parameter vectorScalarMultiplicationCD: the `c` and `d` in `e[i] = (a[i] * b) + (c[i] * d)`.
     /// - Parameter result: the `e` in `e[i] = (a[i] * b) + (c[i] * d)`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func add<T, U, V>(vectorScalarProduct vectorScalarProductAB: (a: T, b: Double),
-                                    toVectorScalarProduct vectorScalarProductCD: (c: U, d: Double),
+    public static func add<T, U, V>(vectorScalarMultiplication vectorScalarMultiplicationAB: (a: T, b: Double),
+                                    vectorScalarMultiplication vectorScalarMultiplicationCD: (c: U, d: Double),
                                     result: inout V)
         where
         T: _ContiguousCollection,
@@ -1281,14 +1281,14 @@ extension vDSP {
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             let n = result.count
-            precondition(vectorScalarProductAB.a.count == n &&
-                vectorScalarProductCD.c.count == n)
+            precondition(vectorScalarMultiplicationAB.a.count == n &&
+                vectorScalarMultiplicationCD.c.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorScalarProductAB.a.withUnsafeBufferPointer { a in
-                    vectorScalarProductCD.c.withUnsafeBufferPointer { c in
-                        withUnsafePointer(to: vectorScalarProductAB.b) { b in
-                            withUnsafePointer(to: vectorScalarProductCD.d) { d in
+                vectorScalarMultiplicationAB.a.withUnsafeBufferPointer { a in
+                    vectorScalarMultiplicationCD.c.withUnsafeBufferPointer { c in
+                        withUnsafePointer(to: vectorScalarMultiplicationAB.b) { b in
+                            withUnsafePointer(to: vectorScalarMultiplicationCD.d) { d in
                                 vDSP_vsmsmaD(a.baseAddress!, 1,
                                              b,
                                              c.baseAddress!, 1,
@@ -1307,13 +1307,13 @@ extension vDSP {
     /// Populates `result` with the elementwise sum of two elementwise
     /// vector-vector products, single-precision.
     ///
-    /// - Parameter vectorProductAB: the `a` and `b` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
-    /// - Parameter vectorProductCD: the `c` and `d` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
+    /// - Parameter vectorMultiplicationAB: the `a` and `b` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
+    /// - Parameter vectorMultiplicationCD: the `c` and `d` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
     /// - Parameter result: the `e` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func add<R, S, T, U, V>(vectorProduct vectorProductAB: (a: R, b: S),
-                                          toVectorProduct vectorProductCD: (c: T, d: U),
+    public static func add<R, S, T, U, V>(vectorMultiplication vectorMultiplicationAB: (a: R, b: S),
+                                          vectorMultiplication vectorMultiplicationCD: (c: T, d: U),
                                           result: inout V)
         where
         R: _ContiguousCollection,
@@ -1326,16 +1326,16 @@ extension vDSP {
         U.Element == Float, V.Element == Float {
             
             let n = result.count
-            precondition(vectorProductAB.a.count == n &&
-                vectorProductAB.b.count == n &&
-                vectorProductCD.c.count == n &&
-                vectorProductCD.d.count == n)
+            precondition(vectorMultiplicationAB.a.count == n &&
+                vectorMultiplicationAB.b.count == n &&
+                vectorMultiplicationCD.c.count == n &&
+                vectorMultiplicationCD.d.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorProductAB.a.withUnsafeBufferPointer { a in
-                    vectorProductAB.b.withUnsafeBufferPointer { b in
-                        vectorProductCD.c.withUnsafeBufferPointer { c in
-                            vectorProductCD.d.withUnsafeBufferPointer { d in
+                vectorMultiplicationAB.a.withUnsafeBufferPointer { a in
+                    vectorMultiplicationAB.b.withUnsafeBufferPointer { b in
+                        vectorMultiplicationCD.c.withUnsafeBufferPointer { c in
+                            vectorMultiplicationCD.d.withUnsafeBufferPointer { d in
                                 vDSP_vmma(a.baseAddress!, 1,
                                           b.baseAddress!, 1,
                                           c.baseAddress!, 1,
@@ -1352,13 +1352,13 @@ extension vDSP {
     /// Populates `result` with the elementwise sum of two elementwise
     /// vector-vector products, double-precision.
     ///
-    /// - Parameter vectorProductAB: the `a` and `b` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
-    /// - Parameter vectorProductCD: the `c` and `d` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
+    /// - Parameter vectorMultiplicationAB: the `a` and `b` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
+    /// - Parameter vectorMultiplicationCD: the `c` and `d` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
     /// - Parameter result: the `e` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func add<R, S, T, U, V>(vectorProduct vectorProductAB: (a: R, b: S),
-                                          toVectorProduct vectorProductCD: (c: T, d: U),
+    public static func add<R, S, T, U, V>(vectorMultiplication vectorMultiplicationAB: (a: R, b: S),
+                                          vectorMultiplication vectorMultiplicationCD: (c: T, d: U),
                                           result: inout V)
         where
         R: _ContiguousCollection,
@@ -1371,16 +1371,16 @@ extension vDSP {
         U.Element == Double, V.Element == Double {
             
             let n = result.count
-            precondition(vectorProductAB.a.count == n &&
-                vectorProductAB.b.count == n &&
-                vectorProductCD.c.count == n &&
-                vectorProductCD.d.count == n)
+            precondition(vectorMultiplicationAB.a.count == n &&
+                vectorMultiplicationAB.b.count == n &&
+                vectorMultiplicationCD.c.count == n &&
+                vectorMultiplicationCD.d.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorProductAB.a.withUnsafeBufferPointer { a in
-                    vectorProductAB.b.withUnsafeBufferPointer { b in
-                        vectorProductCD.c.withUnsafeBufferPointer { c in
-                            vectorProductCD.d.withUnsafeBufferPointer { d in
+                vectorMultiplicationAB.a.withUnsafeBufferPointer { a in
+                    vectorMultiplicationAB.b.withUnsafeBufferPointer { b in
+                        vectorMultiplicationCD.c.withUnsafeBufferPointer { c in
+                            vectorMultiplicationCD.d.withUnsafeBufferPointer { d in
                                 vDSP_vmmaD(a.baseAddress!, 1,
                                            b.baseAddress!, 1,
                                            c.baseAddress!, 1,
@@ -1399,13 +1399,13 @@ extension vDSP {
     /// Populates `result` with the elementwise product of two elementwise
     /// vector-vector sums, single-precision.
     ///
-    /// - Parameter vectorSumAB: the `a` and `b` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
-    /// - Parameter vectorSumCD: the `c` and `d` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
+    /// - Parameter vectorAdditionAB: the `a` and `b` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
+    /// - Parameter vectorAdditionCD: the `c` and `d` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
     /// - Parameter result: the `e` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func multiply<S, T, U, V>(vectorSum vectorSumAB: (a: S, b: T),
-                                            toVectorSum vectorSumCD: (c: U, d: U),
+    public static func multiply<S, T, U, V>(vectorAddition vectorAdditionAB: (a: S, b: T),
+                                            toVectorAddition vectorAdditionCD: (c: U, d: U),
                                             result: inout V)
         where
         S: _ContiguousCollection,
@@ -1416,16 +1416,16 @@ extension vDSP {
         U.Element == Float, V.Element == Float {
             
             let n = result.count
-            precondition(vectorSumAB.a.count == n &&
-                vectorSumAB.b.count == n &&
-                vectorSumCD.c.count == n &&
-                vectorSumCD.d.count == n)
+            precondition(vectorAdditionAB.a.count == n &&
+                vectorAdditionAB.b.count == n &&
+                vectorAdditionCD.c.count == n &&
+                vectorAdditionCD.d.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorSumAB.a.withUnsafeBufferPointer { a in
-                    vectorSumAB.b.withUnsafeBufferPointer { b in
-                        vectorSumCD.c.withUnsafeBufferPointer { c in
-                            vectorSumCD.d.withUnsafeBufferPointer { d in
+                vectorAdditionAB.a.withUnsafeBufferPointer { a in
+                    vectorAdditionAB.b.withUnsafeBufferPointer { b in
+                        vectorAdditionCD.c.withUnsafeBufferPointer { c in
+                            vectorAdditionCD.d.withUnsafeBufferPointer { d in
                                 vDSP_vaam(a.baseAddress!, 1,
                                           b.baseAddress!, 1,
                                           c.baseAddress!, 1,
@@ -1442,13 +1442,13 @@ extension vDSP {
     /// Populates `result` with the elementwise product of two elementwise
     /// vector-vector sums, double-precision.
     ///
-    /// - Parameter vectorSumAB: the `a` and `b` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
-    /// - Parameter vectorSumCD: the `c` and `d` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
+    /// - Parameter vectorAdditionAB: the `a` and `b` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
+    /// - Parameter vectorAdditionCD: the `c` and `d` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
     /// - Parameter result: the `e` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func multiply<S, T, U, V>(vectorSum vectorSumAB: (a: S, b: T),
-                                            toVectorSum vectorSumCD: (c: U, d: U),
+    public static func multiply<S, T, U, V>(vectorAddition vectorAdditionAB: (a: S, b: T),
+                                            toVectorAddition vectorAdditionCD: (c: U, d: U),
                                             result: inout V)
         where
         S: _ContiguousCollection,
@@ -1459,16 +1459,16 @@ extension vDSP {
         U.Element == Double, V.Element == Double {
             
             let n = result.count
-            precondition(vectorSumAB.a.count == n &&
-                vectorSumAB.b.count == n &&
-                vectorSumCD.c.count == n &&
-                vectorSumCD.d.count == n)
+            precondition(vectorAdditionAB.a.count == n &&
+                vectorAdditionAB.b.count == n &&
+                vectorAdditionCD.c.count == n &&
+                vectorAdditionCD.d.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorSumAB.a.withUnsafeBufferPointer { a in
-                    vectorSumAB.b.withUnsafeBufferPointer { b in
-                        vectorSumCD.c.withUnsafeBufferPointer { c in
-                            vectorSumCD.d.withUnsafeBufferPointer { d in
+                vectorAdditionAB.a.withUnsafeBufferPointer { a in
+                    vectorAdditionAB.b.withUnsafeBufferPointer { b in
+                        vectorAdditionCD.c.withUnsafeBufferPointer { c in
+                            vectorAdditionCD.d.withUnsafeBufferPointer { d in
                                 vDSP_vaamD(a.baseAddress!, 1,
                                            b.baseAddress!, 1,
                                            c.baseAddress!, 1,
@@ -1487,13 +1487,13 @@ extension vDSP {
     /// Populates `result` with the elementwise difference of two elementwise
     /// vector-vector products, single-precision.
     ///
-    /// - Parameter vectorProductCD: the `c` and `d` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
-    /// - Parameter vectorProductAB: the `a` and `b` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
+    /// - Parameter vectorMultiplicationCD: the `c` and `d` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
+    /// - Parameter vectorMultiplicationAB: the `a` and `b` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
     /// - Parameter result: the `e` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func subtract<R, S, T, U, V>(vectorProduct vectorProductCD: (c: R, d: S),
-                                               fromVectorProduct vectorProductAB: (a: T, b: U),
+    public static func subtract<R, S, T, U, V>(vectorMultiplication vectorMultiplicationCD: (c: R, d: S),
+                                               fromVectorMultiplication vectorMultiplicationAB: (a: T, b: U),
                                                result: inout V)
         where
         R: _ContiguousCollection,
@@ -1506,16 +1506,16 @@ extension vDSP {
         U.Element == Float, V.Element == Float {
             
             let n = result.count
-            precondition(vectorProductAB.a.count == n &&
-                vectorProductAB.b.count == n &&
-                vectorProductCD.c.count == n &&
-                vectorProductCD.d.count == n)
+            precondition(vectorMultiplicationAB.a.count == n &&
+                vectorMultiplicationAB.b.count == n &&
+                vectorMultiplicationCD.c.count == n &&
+                vectorMultiplicationCD.d.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorProductAB.a.withUnsafeBufferPointer { a in
-                    vectorProductAB.b.withUnsafeBufferPointer { b in
-                        vectorProductCD.c.withUnsafeBufferPointer { c in
-                            vectorProductCD.d.withUnsafeBufferPointer { d in
+                vectorMultiplicationAB.a.withUnsafeBufferPointer { a in
+                    vectorMultiplicationAB.b.withUnsafeBufferPointer { b in
+                        vectorMultiplicationCD.c.withUnsafeBufferPointer { c in
+                            vectorMultiplicationCD.d.withUnsafeBufferPointer { d in
                                 vDSP_vmmsb(a.baseAddress!, 1,
                                            b.baseAddress!, 1,
                                            c.baseAddress!, 1,
@@ -1532,13 +1532,13 @@ extension vDSP {
     /// Populates `result` with the elementwise difference of two elementwise
     /// vector-vector products, double-precision.
     ///
-    /// - Parameter vectorProductCD: the `c` and `d` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
-    /// - Parameter vectorProductAB: the `a` and `b` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
+    /// - Parameter vectorMultiplicationCD: the `c` and `d` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
+    /// - Parameter vectorMultiplicationAB: the `a` and `b` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
     /// - Parameter result: the `e` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func subtract<R, S, T, U, V>(vectorProduct vectorProductCD: (c: R, d: S),
-                                               fromVectorProduct vectorProductAB: (a: T, b: U),
+    public static func subtract<R, S, T, U, V>(vectorMultiplication vectorMultiplicationCD: (c: R, d: S),
+                                               fromVectorMultiplication vectorMultiplicationAB: (a: T, b: U),
                                                result: inout V)
         where
         R: _ContiguousCollection,
@@ -1551,16 +1551,16 @@ extension vDSP {
         U.Element == Double, V.Element == Double {
             
             let n = result.count
-            precondition(vectorProductAB.a.count == n &&
-                vectorProductAB.b.count == n &&
-                vectorProductCD.c.count == n &&
-                vectorProductCD.d.count == n)
+            precondition(vectorMultiplicationAB.a.count == n &&
+                vectorMultiplicationAB.b.count == n &&
+                vectorMultiplicationCD.c.count == n &&
+                vectorMultiplicationCD.d.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorProductAB.a.withUnsafeBufferPointer { a in
-                    vectorProductAB.b.withUnsafeBufferPointer { b in
-                        vectorProductCD.c.withUnsafeBufferPointer { c in
-                            vectorProductCD.d.withUnsafeBufferPointer { d in
+                vectorMultiplicationAB.a.withUnsafeBufferPointer { a in
+                    vectorMultiplicationAB.b.withUnsafeBufferPointer { b in
+                        vectorMultiplicationCD.c.withUnsafeBufferPointer { c in
+                            vectorMultiplicationCD.d.withUnsafeBufferPointer { d in
                                 vDSP_vmmsbD(a.baseAddress!, 1,
                                             b.baseAddress!, 1,
                                             c.baseAddress!, 1,
@@ -1579,13 +1579,13 @@ extension vDSP {
     /// Populates `result` with the elementwise product of two elementwise
     /// vector-vector differences, single-precision.
     ///
-    /// - Parameter vectorDifferenceAB: the `a` and `b` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
-    /// - Parameter vectorDifferenceCD: the `c` and `d` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
+    /// - Parameter vectorSubtractionAB: the `a` and `b` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
+    /// - Parameter vectorSubtractionCD: the `c` and `d` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
     /// - Parameter result: the `e` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func multiply<R, S, T, U, V>(vectorDifference vectorDifferenceAB: (a: R, b: S),
-                                               byVectorDifference vectorDifferenceCD: (c: T, d: U),
+    public static func multiply<R, S, T, U, V>(vectorSubtraction vectorSubtractionAB: (a: R, b: S),
+                                               vectorSubtraction vectorSubtractionCD: (c: T, d: U),
                                                result: inout V)
         where
         R: _ContiguousCollection,
@@ -1598,16 +1598,16 @@ extension vDSP {
         U.Element == Float, V.Element == Float {
             
             let n = result.count
-            precondition(vectorDifferenceAB.a.count == n &&
-                vectorDifferenceAB.b.count == n &&
-                vectorDifferenceCD.c.count == n &&
-                vectorDifferenceCD.d.count == n)
+            precondition(vectorSubtractionAB.a.count == n &&
+                vectorSubtractionAB.b.count == n &&
+                vectorSubtractionCD.c.count == n &&
+                vectorSubtractionCD.d.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorDifferenceAB.a.withUnsafeBufferPointer { a in
-                    vectorDifferenceAB.b.withUnsafeBufferPointer { b in
-                        vectorDifferenceCD.c.withUnsafeBufferPointer { c in
-                            vectorDifferenceCD.d.withUnsafeBufferPointer { d in
+                vectorSubtractionAB.a.withUnsafeBufferPointer { a in
+                    vectorSubtractionAB.b.withUnsafeBufferPointer { b in
+                        vectorSubtractionCD.c.withUnsafeBufferPointer { c in
+                            vectorSubtractionCD.d.withUnsafeBufferPointer { d in
                                 vDSP_vsbsbm(a.baseAddress!, 1,
                                             b.baseAddress!, 1,
                                             c.baseAddress!, 1,
@@ -1624,13 +1624,13 @@ extension vDSP {
     /// Populates `result` with the elementwise product of two elementwise
     /// vector-vector differences, double-precision.
     ///
-    /// - Parameter vectorDifferenceAB: the `a` and `b` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
-    /// - Parameter vectorDifferenceCD: the `c` and `d` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
+    /// - Parameter vectorSubtractionAB: the `a` and `b` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
+    /// - Parameter vectorSubtractionCD: the `c` and `d` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
     /// - Parameter result: the `e` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func multiply<R, S, T, U, V>(vectorDifference vectorDifferenceAB: (a: R, b: S),
-                                               byVectorDifference vectorDifferenceCD: (c: T, d: U),
+    public static func multiply<R, S, T, U, V>(vectorSubtraction vectorSubtractionAB: (a: R, b: S),
+                                               vectorSubtraction vectorSubtractionCD: (c: T, d: U),
                                                result: inout V)
         where
         R: _ContiguousCollection,
@@ -1643,16 +1643,16 @@ extension vDSP {
         U.Element == Double, V.Element == Double {
             
             let n = result.count
-            precondition(vectorDifferenceAB.a.count == n &&
-                vectorDifferenceAB.b.count == n &&
-                vectorDifferenceCD.c.count == n &&
-                vectorDifferenceCD.d.count == n)
+            precondition(vectorSubtractionAB.a.count == n &&
+                vectorSubtractionAB.b.count == n &&
+                vectorSubtractionCD.c.count == n &&
+                vectorSubtractionCD.d.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorDifferenceAB.a.withUnsafeBufferPointer { a in
-                    vectorDifferenceAB.b.withUnsafeBufferPointer { b in
-                        vectorDifferenceCD.c.withUnsafeBufferPointer { c in
-                            vectorDifferenceCD.d.withUnsafeBufferPointer { d in
+                vectorSubtractionAB.a.withUnsafeBufferPointer { a in
+                    vectorSubtractionAB.b.withUnsafeBufferPointer { b in
+                        vectorSubtractionCD.c.withUnsafeBufferPointer { c in
+                            vectorSubtractionCD.d.withUnsafeBufferPointer { d in
                                 vDSP_vsbsbmD(a.baseAddress!, 1,
                                              b.baseAddress!, 1,
                                              c.baseAddress!, 1,
@@ -1671,13 +1671,13 @@ extension vDSP {
     /// Populates `result` with the elementwise product of an elementwise
     /// vector-vector sum and an elementwise vector-vector sum, single-precision.
     ///
-    /// - Parameter vectorSum: the `a` and `b` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
-    /// - Parameter vectorDifference: the `c` and `d` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
+    /// - Parameter vectorAddition: the `a` and `b` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
+    /// - Parameter vectorSubtraction: the `c` and `d` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
     /// - Parameter result: the `e` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func multiply<R, S, T, U, V>(vectorSum: (a: R, b: S),
-                                               byVectorDifference vectorDifference: (c: T, d: U),
+    public static func multiply<R, S, T, U, V>(vectorAddition: (a: R, b: S),
+                                               vectorSubtraction: (c: T, d: U),
                                                result: inout V)
         where
         R: _ContiguousCollection,
@@ -1690,16 +1690,16 @@ extension vDSP {
         U.Element == Float, V.Element == Float {
             
             let n = result.count
-            precondition(vectorSum.a.count == n &&
-                vectorSum.b.count == n &&
-                vectorDifference.c.count == n &&
-                vectorDifference.d.count == n)
+            precondition(vectorAddition.a.count == n &&
+                vectorAddition.b.count == n &&
+                vectorSubtraction.c.count == n &&
+                vectorSubtraction.d.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorSum.a.withUnsafeBufferPointer { a in
-                    vectorSum.b.withUnsafeBufferPointer { b in
-                        vectorDifference.c.withUnsafeBufferPointer { c in
-                            vectorDifference.d.withUnsafeBufferPointer { d in
+                vectorAddition.a.withUnsafeBufferPointer { a in
+                    vectorAddition.b.withUnsafeBufferPointer { b in
+                        vectorSubtraction.c.withUnsafeBufferPointer { c in
+                            vectorSubtraction.d.withUnsafeBufferPointer { d in
                                 vDSP_vasbm(a.baseAddress!, 1,
                                            b.baseAddress!, 1,
                                            c.baseAddress!, 1,
@@ -1716,13 +1716,13 @@ extension vDSP {
     /// Populates `result` with the elementwise product of an elementwise
     /// vector-vector sum and an elementwise vector-vector sum, double-precision.
     ///
-    /// - Parameter vectorSum: the `a` and `b` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
-    /// - Parameter vectorDifference: the `c` and `d` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
+    /// - Parameter vectorAddition: the `a` and `b` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
+    /// - Parameter vectorSubtraction: the `c` and `d` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
     /// - Parameter result: the `e` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func multiply<R, S, T, U, V>(vectorSum: (a: R, b: S),
-                                               byVectorDifference vectorDifference: (c: T, d: U),
+    public static func multiply<R, S, T, U, V>(vectorAddition: (a: R, b: S),
+                                               vectorSubtraction: (c: T, d: U),
                                                result: inout V)
         where
         R: _ContiguousCollection,
@@ -1735,16 +1735,16 @@ extension vDSP {
         U.Element == Double, V.Element == Double {
             
             let n = result.count
-            precondition(vectorSum.a.count == n &&
-                vectorSum.b.count == n &&
-                vectorDifference.c.count == n &&
-                vectorDifference.d.count == n)
+            precondition(vectorAddition.a.count == n &&
+                vectorAddition.b.count == n &&
+                vectorSubtraction.c.count == n &&
+                vectorSubtraction.d.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorSum.a.withUnsafeBufferPointer { a in
-                    vectorSum.b.withUnsafeBufferPointer { b in
-                        vectorDifference.c.withUnsafeBufferPointer { c in
-                            vectorDifference.d.withUnsafeBufferPointer { d in
+                vectorAddition.a.withUnsafeBufferPointer { a in
+                    vectorAddition.b.withUnsafeBufferPointer { b in
+                        vectorSubtraction.c.withUnsafeBufferPointer { c in
+                            vectorSubtraction.d.withUnsafeBufferPointer { d in
                                 vDSP_vasbmD(a.baseAddress!, 1,
                                             b.baseAddress!, 1,
                                             c.baseAddress!, 1,
@@ -1763,12 +1763,12 @@ extension vDSP {
     /// Populates `result` with the elementwise sum of an elementwise
     /// vector-scalar product and aa scalar value, single-precision.
     ///
-    /// - Parameter vectorScalarProduct: the `a` and `b` in `d[n] = a[n]*b + c`.
+    /// - Parameter vectorScalarMultiplication: the `a` and `b` in `d[n] = a[n]*b + c`.
     /// - Parameter scalar: the `c` in `d[n] = a[n]*b + c`.
     /// - Parameter result: the `e` in `d[n] = a[n]*b + c`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func add<U, V>(vectorScalarProduct: (a: U, b: Float),
+    public static func add<U, V>(vectorScalarMultiplication: (a: U, b: Float),
                                  _ scalar: Float,
                                  result: inout V)
         where
@@ -1776,11 +1776,11 @@ extension vDSP {
         V: _MutableContiguousCollection,
         U.Element == Float, V.Element == Float {
             let n = result.count
-            precondition(vectorScalarProduct.a.count == n)
+            precondition(vectorScalarMultiplication.a.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorScalarProduct.a.withUnsafeBufferPointer { a in
-                    withUnsafePointer(to: vectorScalarProduct.b) { b in
+                vectorScalarMultiplication.a.withUnsafeBufferPointer { a in
+                    withUnsafePointer(to: vectorScalarMultiplication.b) { b in
                         withUnsafePointer(to: scalar) { c in
                             vDSP_vsmsa(a.baseAddress!, 1,
                                        b,
@@ -1796,12 +1796,12 @@ extension vDSP {
     /// Populates `result` with the elementwise sum of an elementwise
     /// vector-scalar product and aa scalar value, double-precision.
     ///
-    /// - Parameter vectorScalarProduct: the `a` and `b` in `d[n] = a[n]*b + c`.
+    /// - Parameter vectorScalarMultiplication: the `a` and `b` in `d[n] = a[n]*b + c`.
     /// - Parameter scalar: the `c`in `d[n] = a[n]*b + c`.
     /// - Parameter result: the `e` in `d[n] = a[n]*b + c`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func add<U, V>(vectorScalarProduct: (a: U, b: Double),
+    public static func add<U, V>(vectorScalarMultiplication: (a: U, b: Double),
                                  _ scalar: Double,
                                  result: inout V)
         where
@@ -1809,11 +1809,11 @@ extension vDSP {
         V: _MutableContiguousCollection,
         U.Element == Double, V.Element == Double {
             let n = result.count
-            precondition(vectorScalarProduct.a.count == n)
+            precondition(vectorScalarMultiplication.a.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorScalarProduct.a.withUnsafeBufferPointer { a in
-                    withUnsafePointer(to: vectorScalarProduct.b) { b in
+                vectorScalarMultiplication.a.withUnsafeBufferPointer { a in
+                    withUnsafePointer(to: vectorScalarMultiplication.b) { b in
                         withUnsafePointer(to: scalar) { c in
                             vDSP_vsmsaD(a.baseAddress!, 1,
                                         b,
@@ -1829,16 +1829,16 @@ extension vDSP {
     // MARK: D[n] = A[n]*B - C[n];       vDSP_vsmsb
     
     /// Populates `result` with the elementwise difference of `vector`
-    /// and the product of the vector and scalar in `vectorScalarProduct`,
+    /// and the product of the vector and scalar in `vectorScalarMultiplication`,
     /// single-precision.
     ///
     /// - Parameter vector: the `c` in `D[n] = A[n]*B - C[n]`.
-    /// - Parameter vectorScalarProduct: the `a` and `b` in `D[n] = A[n]*B - C[n]`.
+    /// - Parameter vectorScalarMultiplication: the `a` and `b` in `D[n] = A[n]*B - C[n]`.
     /// - Parameter result: the `d` in `D[n] = A[n]*B - C[n]`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func subtract<T, U, V>(_ vector: T,
-                                         fromVectorScalarProduct vectorScalarProduct: (a: U, b: Float),
+                                         fromVectorScalarMultiplication vectorScalarMultiplication: (a: U, b: Float),
                                          result: inout V)
         where
         T: _ContiguousCollection,
@@ -1848,12 +1848,12 @@ extension vDSP {
         U.Element == Float, V.Element == Float {
             
             let n = result.count
-            precondition(vectorScalarProduct.a.count == n)
+            precondition(vectorScalarMultiplication.a.count == n)
             precondition(vector.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorScalarProduct.a.withUnsafeBufferPointer { a in
-                    withUnsafePointer(to: vectorScalarProduct.b) { b in
+                vectorScalarMultiplication.a.withUnsafeBufferPointer { a in
+                    withUnsafePointer(to: vectorScalarMultiplication.b) { b in
                         vector.withUnsafeBufferPointer { c in
                             vDSP_vsmsb(a.baseAddress!, 1,
                                        b,
@@ -1867,16 +1867,16 @@ extension vDSP {
     }
     
     /// Populates `result` with the elementwise difference of `vector`
-    /// and the product of the vector and scalar in `vectorScalarProduct`,
+    /// and the product of the vector and scalar in `vectorScalarMultiplication`,
     /// double-precision.
     ///
     /// - Parameter vector: the `c` in `D[n] = A[n]*B - C[n]`.
-    /// - Parameter vectorScalarProduct: the `a` and `b` in `D[n] = A[n]*B - C[n]`.
+    /// - Parameter vectorScalarMultiplication: the `a` and `b` in `D[n] = A[n]*B - C[n]`.
     /// - Parameter result: the `d` in `D[n] = A[n]*B - C[n]`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func subtract<T, U, V>(_ vector: T,
-                                         fromVectorScalarProduct vectorScalarProduct: (a: U, b: Double),
+                                         fromVectorScalarMultiplication vectorScalarMultiplication: (a: U, b: Double),
                                          result: inout V)
         where
         T: _ContiguousCollection,
@@ -1886,12 +1886,12 @@ extension vDSP {
         U.Element == Double, V.Element == Double {
             
             let n = result.count
-            precondition(vectorScalarProduct.a.count == n)
+            precondition(vectorScalarMultiplication.a.count == n)
             precondition(vector.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorScalarProduct.a.withUnsafeBufferPointer { a in
-                    withUnsafePointer(to: vectorScalarProduct.b) { b in
+                vectorScalarMultiplication.a.withUnsafeBufferPointer { a in
+                    withUnsafePointer(to: vectorScalarMultiplication.b) { b in
                         vector.withUnsafeBufferPointer { c in
                             vDSP_vsmsbD(a.baseAddress!, 1,
                                         b,

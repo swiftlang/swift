@@ -204,7 +204,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorB = [16]
         scalarA = 4
         
-        vDSP.multiply(vectorSum: (vectorA, vectorB),
+        vDSP.multiply(vectorAddition: (vectorA, vectorB),
                       scalarA,
                       result: &result)
         
@@ -217,7 +217,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorB = [16]
         vectorC = [5]
         
-        vDSP.multiply(vectorSum: (vectorA, vectorB),
+        vDSP.multiply(vectorAddition: (vectorA, vectorB),
                       vectorC,
                       result: &result)
         
@@ -230,7 +230,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorB = [5]
         scalarA = 2
         
-        vDSP.multiply(vectorDifference: (vectorA, vectorB),
+        vDSP.multiply(vectorSubtraction: (vectorA, vectorB),
                       scalarA,
                       result: &result)
         
@@ -244,7 +244,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorB = [5]
         vectorC = [2]
         
-        vDSP.multiply(vectorDifference: (vectorA, vectorB),
+        vDSP.multiply(vectorSubtraction: (vectorA, vectorB),
                       vectorC,
                       result: &result)
         
@@ -257,7 +257,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorB = [10]
         scalarA = 20
         
-        vDSP.add(vectorProduct: (vectorA, vectorB),
+        vDSP.add(vectorMultiplication: (vectorA, vectorB),
                  scalarA,
                  result: &result)
         
@@ -270,7 +270,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         scalarB = 10
         vectorC = [120]
         
-        vDSP.add(vectorScalarProduct: (vectorA, scalarB),
+        vDSP.add(vectorScalarMultiplication: (vectorA, scalarB),
                  vectorC,
                  result: &result)
         
@@ -283,7 +283,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorB = [20]
         vectorC = [6]
         
-        vDSP.add(vectorProduct: (vectorA, vectorB),
+        vDSP.add(vectorMultiplication: (vectorA, vectorB),
                  vectorC,
                  result: &result)
         
@@ -297,7 +297,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorC = [50]
         
         vDSP.subtract(vectorA,
-                      fromVectorProduct: (vectorB, vectorC),
+                      fromVectorMultiplication: (vectorB, vectorC),
                       result: &result)
         
         expectEqual(Int(result.first!), 75)
@@ -310,8 +310,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorB = [50]
         scalarB = 4
         
-        vDSP.add(vectorScalarProduct: (vectorA, scalarA),
-                 toVectorScalarProduct: (vectorB, scalarB),
+        vDSP.add(vectorScalarMultiplication: (vectorA, scalarA),
+                 vectorScalarMultiplication: (vectorB, scalarB),
                  result: &result)
         
         expectEqual(Int(result.first!), 700)
@@ -324,8 +324,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorC = [3]
         let vectorD: [Float] = [20]
         
-        vDSP.add(vectorProduct: (vectorA, vectorB),
-                 toVectorProduct: (vectorC, vectorD),
+        vDSP.add(vectorMultiplication: (vectorA, vectorB),
+                 vectorMultiplication: (vectorC, vectorD),
                  result: &result)
         
         expectEqual(Int(result.first!), 80)
@@ -338,8 +338,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorC = [3]
         let vectorD: [Float] = [17]
         
-        vDSP.multiply(vectorSum: (vectorA, vectorB),
-                      toVectorSum: (vectorC, vectorD),
+        vDSP.multiply(vectorAddition: (vectorA, vectorB),
+                      toVectorAddition: (vectorC, vectorD),
                       result: &result)
     }
     
@@ -350,8 +350,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorC = [5]
         let vectorD: [Float] = [15]
         
-        vDSP.subtract(vectorProduct: (vectorA, vectorB),
-                      fromVectorProduct: (vectorC, vectorD),
+        vDSP.subtract(vectorMultiplication: (vectorA, vectorB),
+                      fromVectorMultiplication: (vectorC, vectorD),
                       result: &result)
         
         expectEqual(Int(result.first!), 69)
@@ -364,8 +364,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorC = [20]
         let vectorD: [Float] = [3]
         
-        vDSP.multiply(vectorDifference: (vectorA, vectorB),
-                      byVectorDifference: (vectorC, vectorD),
+        vDSP.multiply(vectorSubtraction: (vectorA, vectorB),
+                      vectorSubtraction: (vectorC, vectorD),
                       result: &result)
         
         expectEqual(Int(result.first!), 170)
@@ -378,8 +378,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorC = [102]
         let vectorD: [Float] = [2]
         
-        vDSP.multiply(vectorSum: (vectorA, vectorB),
-                      byVectorDifference: (vectorC, vectorD),
+        vDSP.multiply(vectorAddition: (vectorA, vectorB),
+                      vectorSubtraction: (vectorC, vectorD),
                       result: &result)
         
         expectEqual(Int(result.first!), 2000)
@@ -391,7 +391,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         scalarA = 2
         scalarB = 6
         
-        vDSP.add(vectorScalarProduct: (vectorA, scalarA),
+        vDSP.add(vectorScalarMultiplication: (vectorA, scalarA),
                  scalarB,
                  result: &result)
         
@@ -405,7 +405,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorC = [25]
         
         vDSP.subtract(vectorC,
-                      fromVectorScalarProduct: (vectorA, scalarB),
+                      fromVectorScalarMultiplication: (vectorA, scalarB),
                       result: &result)
         
         expectEqual(Int(result.first!), 25)
@@ -548,7 +548,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorB = [16]
         scalarA = 4
         
-        vDSP.multiply(vectorSum: (vectorA, vectorB),
+        vDSP.multiply(vectorAddition: (vectorA, vectorB),
                       scalarA,
                       result: &result)
         
@@ -561,7 +561,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorB = [16]
         vectorC = [5]
         
-        vDSP.multiply(vectorSum: (vectorA, vectorB),
+        vDSP.multiply(vectorAddition: (vectorA, vectorB),
                       vectorC,
                       result: &result)
         
@@ -574,7 +574,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorB = [5]
         scalarA = 2
         
-        vDSP.multiply(vectorDifference: (vectorA, vectorB),
+        vDSP.multiply(vectorSubtraction: (vectorA, vectorB),
                       scalarA,
                       result: &result)
         
@@ -588,7 +588,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorB = [5]
         vectorC = [2]
         
-        vDSP.multiply(vectorDifference: (vectorA, vectorB),
+        vDSP.multiply(vectorSubtraction: (vectorA, vectorB),
                       vectorC,
                       result: &result)
         
@@ -601,7 +601,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorB = [10]
         scalarA = 20
         
-        vDSP.add(vectorProduct: (vectorA, vectorB),
+        vDSP.add(vectorMultiplication: (vectorA, vectorB),
                  scalarA,
                  result: &result)
         
@@ -614,7 +614,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         scalarB = 10
         vectorC = [120]
         
-        vDSP.add(vectorScalarProduct: (vectorA, scalarB),
+        vDSP.add(vectorScalarMultiplication: (vectorA, scalarB),
                  vectorC,
                  result: &result)
         
@@ -627,7 +627,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorB = [20]
         vectorC = [6]
         
-        vDSP.add(vectorProduct: (vectorA, vectorB),
+        vDSP.add(vectorMultiplication: (vectorA, vectorB),
                  vectorC,
                  result: &result)
         
@@ -641,7 +641,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorC = [50]
         
         vDSP.subtract(vectorA,
-                      fromVectorProduct: (vectorB, vectorC),
+                      fromVectorMultiplication: (vectorB, vectorC),
                       result: &result)
         
         expectEqual(Int(result.first!), 75)
@@ -654,8 +654,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorB = [50]
         scalarB = 4
         
-        vDSP.add(vectorScalarProduct: (vectorA, scalarA),
-                 toVectorScalarProduct: (vectorB, scalarB),
+        vDSP.add(vectorScalarMultiplication: (vectorA, scalarA),
+                 vectorScalarMultiplication: (vectorB, scalarB),
                  result: &result)
         
         expectEqual(Int(result.first!), 700)
@@ -668,8 +668,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorC = [3]
         let vectorD: [Double] = [20]
         
-        vDSP.add(vectorProduct: (vectorA, vectorB),
-                 toVectorProduct: (vectorC, vectorD),
+        vDSP.add(vectorMultiplication: (vectorA, vectorB),
+                 vectorMultiplication: (vectorC, vectorD),
                  result: &result)
         
         expectEqual(Int(result.first!), 80)
@@ -682,8 +682,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorC = [3]
         let vectorD: [Double] = [17]
         
-        vDSP.multiply(vectorSum: (vectorA, vectorB),
-                      toVectorSum: (vectorC, vectorD),
+        vDSP.multiply(vectorAddition: (vectorA, vectorB),
+                      toVectorAddition: (vectorC, vectorD),
                       result: &result)
     }
     
@@ -694,8 +694,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorC = [5]
         let vectorD: [Double] = [15]
         
-        vDSP.subtract(vectorProduct: (vectorA, vectorB),
-                      fromVectorProduct: (vectorC, vectorD),
+        vDSP.subtract(vectorMultiplication: (vectorA, vectorB),
+                      fromVectorMultiplication: (vectorC, vectorD),
                       result: &result)
         
         expectEqual(Int(result.first!), 69)
@@ -708,8 +708,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorC = [20]
         let vectorD: [Double] = [3]
         
-        vDSP.multiply(vectorDifference: (vectorA, vectorB),
-                      byVectorDifference: (vectorC, vectorD),
+        vDSP.multiply(vectorSubtraction: (vectorA, vectorB),
+                      vectorSubtraction: (vectorC, vectorD),
                       result: &result)
         
         expectEqual(Int(result.first!), 170)
@@ -722,8 +722,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorC = [102]
         let vectorD: [Double] = [2]
         
-        vDSP.multiply(vectorSum: (vectorA, vectorB),
-                      byVectorDifference: (vectorC, vectorD),
+        vDSP.multiply(vectorAddition: (vectorA, vectorB),
+                      vectorSubtraction: (vectorC, vectorD),
                       result: &result)
         
         expectEqual(Int(result.first!), 2000)
@@ -735,7 +735,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         scalarA = 2
         scalarB = 6
         
-        vDSP.add(vectorScalarProduct: (vectorA, scalarA),
+        vDSP.add(vectorScalarMultiplication: (vectorA, scalarA),
                  scalarB,
                  result: &result)
         
@@ -749,7 +749,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorC = [25]
         
         vDSP.subtract(vectorC,
-                      fromVectorScalarProduct: (vectorA, scalarB),
+                      fromVectorScalarMultiplication: (vectorA, scalarB),
                       result: &result)
         
         expectEqual(Int(result.first!), 25)
