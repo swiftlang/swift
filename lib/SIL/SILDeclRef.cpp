@@ -1026,7 +1026,8 @@ static bool isDesignatedConstructorForClass(ValueDecl *decl) {
 }
 
 bool SILDeclRef::canBeDynamicReplacement() const {
-  if (kind == SILDeclRef::Kind::Destroyer)
+  if (kind == SILDeclRef::Kind::Destroyer ||
+      kind == SILDeclRef::Kind::DefaultArgGenerator)
     return false;
   if (kind == SILDeclRef::Kind::Initializer)
     return isDesignatedConstructorForClass(getDecl());
@@ -1036,6 +1037,8 @@ bool SILDeclRef::canBeDynamicReplacement() const {
 }
 
 bool SILDeclRef::isDynamicallyReplaceable() const {
+  if (kind == SILDeclRef::Kind::DefaultArgGenerator)
+    return false;
   if (isStoredPropertyInitializer())
     return false;
 
