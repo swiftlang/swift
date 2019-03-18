@@ -1395,8 +1395,7 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
   invocation->getPreprocessorOpts().resetNonModularOptions();
 
   clang::CompilerInstance rewriteInstance(
-    Impl.Instance->getPCHContainerOperations(),
-    &Impl.Instance->getModuleCache());
+    Impl.Instance->getPCHContainerOperations());
   rewriteInstance.setInvocation(invocation);
   rewriteInstance.createDiagnostics(new clang::IgnoringDiagConsumer);
 
@@ -1455,8 +1454,7 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   invocation->getLangOpts()->CacheGeneratedPCH = true;
 
   clang::CompilerInstance emitInstance(
-    Impl.Instance->getPCHContainerOperations(),
-    &Impl.Instance->getModuleCache());
+    Impl.Instance->getPCHContainerOperations());
   emitInstance.setInvocation(std::move(invocation));
   emitInstance.createDiagnostics(&Impl.Instance->getDiagnosticClient(),
                                  /*ShouldOwnClient=*/false);
