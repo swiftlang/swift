@@ -1941,7 +1941,8 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
                                        constraints::ConstraintSystemFlags::SuppressDiagnostics);
       SmallVector<constraints::Solution, 4> viable;
       if(!cs.solve(E, /*convertType*/Type(), nullptr, viable,
-                   FreeTypeVariableBinding::Disallow)) {
+                   FreeTypeVariableBinding::Disallow) &&
+         viable.size() == 1) {
         auto &solution = viable[0];
         auto &solutionCS = solution.getConstraintSystem();
         Type exprType = solution.simplifyType(solutionCS.getType(E));
