@@ -5,7 +5,11 @@
 // REQUIRES: swift_test_mode_optimize
 
 import TensorFlow
+#if TPU
+import TensorFlowUnittestTPU
+#else
 import TensorFlowUnittest
+#endif
 import StdlibUnittest
 
 var SESERegionTests = TestSuite("SESERegion")

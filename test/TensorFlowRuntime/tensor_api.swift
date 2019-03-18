@@ -11,7 +11,11 @@
 // resolved, API tests that incur send/receive should reside here.“
 
 import TensorFlow
+#if TPU
+import TensorFlowUnittestTPU
+#else
 import TensorFlowUnittest
+#endif
 import StdlibUnittest
 
 var TensorNonTPUTests = TestSuite("TensorNonTPU")

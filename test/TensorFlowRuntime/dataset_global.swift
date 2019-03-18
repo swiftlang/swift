@@ -7,7 +7,11 @@
 // sends/recvs support for variant handles.
 
 import TensorFlow
+#if TPU
+import TensorFlowUnittestTPU
+#else
 import TensorFlowUnittest
+#endif
 import StdlibUnittest
 
 var DatasetGlobalTests = TestSuite("DatasetGlobal")
