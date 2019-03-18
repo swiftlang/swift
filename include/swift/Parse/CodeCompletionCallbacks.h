@@ -123,7 +123,7 @@ public:
   virtual void completeDotExpr(Expr *E, SourceLoc DotLoc) {};
 
   /// Complete the beginning of a statement or expression.
-  virtual void completeStmtOrExpr() {};
+  virtual void completeStmtOrExpr(CodeCompletionExpr *E) {};
 
   /// Complete the beginning of expr-postfix -- no tokens provided
   /// by user.

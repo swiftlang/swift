@@ -31,6 +31,8 @@ class ModuleDecl;
 
 namespace ide {
 
+struct ExpectedTypeContext;
+
 class CodeCompletionResultBuilder {
   CodeCompletionResultSink &Sink;
   CodeCompletionResult::ResultKind Kind;
@@ -43,7 +45,7 @@ class CodeCompletionResultBuilder {
   SmallVector<CodeCompletionString::Chunk, 4> Chunks;
   llvm::PointerUnion<const ModuleDecl *, const clang::Module *>
       CurrentModule;
-  ArrayRef<Type> ExpectedDeclTypes;
+  const ExpectedTypeContext &declTypeContext;
   CodeCompletionResult::ExpectedTypeRelation ExpectedTypeRelation =
       CodeCompletionResult::Unrelated;
   bool Cancelled = false;
@@ -78,9 +80,9 @@ public:
   CodeCompletionResultBuilder(CodeCompletionResultSink &Sink,
                               CodeCompletionResult::ResultKind Kind,
                               SemanticContextKind SemanticContext,
-                              ArrayRef<Type> ExpectedDeclTypes)
+                              const ExpectedTypeContext &declTypeContext)
       : Sink(Sink), Kind(Kind), SemanticContext(SemanticContext),
-        ExpectedDeclTypes(ExpectedDeclTypes) {}
+        declTypeContext(declTypeContext) {}
 
   ~CodeCompletionResultBuilder() {
     finishResult();

@@ -144,8 +144,10 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
     CodeCompletion->setExprBeginning(getParserPosition());
 
   if (Tok.is(tok::code_complete)) {
+    auto *CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
+    Result = CCE;
     if (CodeCompletion)
-      CodeCompletion->completeStmtOrExpr();
+      CodeCompletion->completeStmtOrExpr(CCE);
     SyntaxParsingContext ErrorCtxt(SyntaxContext, SyntaxContextKind::Stmt);
     consumeToken(tok::code_complete);
     return makeParserCodeCompletionStatus();

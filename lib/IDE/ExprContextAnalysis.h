@@ -50,12 +50,20 @@ class ExprContextInfo {
   SmallVector<Type, 2> PossibleTypes;
   SmallVector<StringRef, 2> PossibleNames;
   SmallVector<FunctionTypeAndDecl, 2> PossibleCallees;
+  bool singleExpressionBody = false;
 
 public:
   ExprContextInfo(DeclContext *DC, Expr *TargetExpr);
 
   // Returns a list of possible context types.
   ArrayRef<Type> getPossibleTypes() const { return PossibleTypes; }
+
+  /// Whether the type context comes from a single-expression body, e.g.
+  /// `foo({ here })`.
+  ///
+  /// If the input may be incomplete, such as in code-completion, take into
+  /// account that the types returned by `getPossibleTypes()` are only a hint.
+  bool isSingleExpressionBody() const { return singleExpressionBody; }
 
   // Returns a list of possible argument label names.
   // Valid only if \c getKind() is \c CallArgument.
