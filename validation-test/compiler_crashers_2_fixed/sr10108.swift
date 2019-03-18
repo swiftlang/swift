@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s
+// RUN: not %target-swift-frontend -typecheck %s
 
 // Just make sure we don't crash.
 
