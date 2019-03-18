@@ -2623,7 +2623,8 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     // Don't turn stored into computed properties. This could conflict with
     // exclusivity checking.
-    if (VD->hasStorage())
+    // If there is a didSet or willSet function we allow dynamic replacement.
+    if (VD->hasStorage() && !VD->getDidSetFunc() && !VD->getWillSetFunc())
       return;
     // Don't add dynamic to local variables.
     if (VD->getDeclContext()->isLocalContext())
