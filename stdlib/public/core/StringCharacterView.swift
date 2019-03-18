@@ -86,6 +86,106 @@ extension String: BidirectionalCollection {
     let priorOffset = i._encodedOffset &- stride
     return Index(encodedOffset: priorOffset, characterStride: stride)
   }
+  
+  @inlinable
+  internal func _asciiDistance(from start: Index,
+                               to end: Index,
+                               in ascii: UnsafeBufferPointer<UInt8>)
+    -> IndexDistance {
+      if start._encodedOffset - end._encodedOffset == 0 {
+        return 1
+      }
+      var crlfCount = 0
+      //we don't check if the last character is a CR because there's no room
+      //for it to be followed by an LF
+      for i in start._encodedOffset ..< end._encodedOffset &- 1
+        where ascii[_unchecked: i] == _CR &&
+          ascii[_unchecked: i &+ 1] == _LF {
+            crlfCount += 1
+      }
+      return (end._encodedOffset - start._encodedOffset) - crlfCount
+  }
+  
+  @usableFromInline
+  internal func _asciiDistance(from start: Index, to end: Index)
+    -> IndexDistance {
+      if start._encodedOffset - end._encodedOffset == 0 {
+        return 1
+      }
+      return _guts.withFastUTF8 { ascii in
+        return _asciiDistance(from: start, to: end, in: ascii)
+      }
+  }
+  
+  @inlinable
+  internal func _asciiIndex(_ i: Index,
+                            in ascii: UnsafeBufferPointer<UInt8>,
+                            offsetBy n: IndexDistance,
+                            limitedBy limit: Index) -> Index? {
+    let newOffset = i._encodedOffset &+ n
+    var naiveResult = Index(_encodedOffset: newOffset)
+    if _slowPath(naiveResult >= limit) {
+      return nil
+    }
+    
+    //If the speculative index we're about to form would split a CRLF
+    //Then we bump it to the end of the CRLF so that _asciiDistance always gets
+    //a valid index
+    if naiveResult < endIndex &&
+      _slowPath(ascii[_unchecked: newOffset] == _CR) {
+      naiveResult = Index(_encodedOffset: newOffset &+ 1)
+    }
+    
+    let naiveDistance = _asciiDistance(from: i, to: naiveResult, in: ascii)
+    if _fastPath(naiveDistance == n) {
+      return naiveResult
+    }
+    return _asciiIndex(naiveResult,
+                       in: ascii,
+                       offsetBy: n - naiveDistance,
+                       limitedBy: limit)
+  }
+  
+  @usableFromInline
+  internal func _asciiIndex(_ i: Index, offsetBy n: IndexDistance,
+                            limitedBy limit: Index) -> Index? {
+    return _guts.withFastUTF8 { ascii in
+      return _asciiIndex(i, in: ascii, offsetBy: n, limitedBy: limit)
+    }
+  }
+  
+  @inlinable
+  internal func _asciiIndex(_ i: Index,
+                            in ascii: UnsafeBufferPointer<UInt8>,
+                            offsetBy n: IndexDistance) -> Index {
+    let newOffset = i._encodedOffset &+ n
+    var naiveResult = Index(_encodedOffset: newOffset)
+    _precondition(naiveResult <= endIndex, "String index is out of bounds")
+    
+    //If the speculative index we're about to form would split a CRLF
+    //Then we bump it to the end of the CRLF so that _asciiDistance always gets
+    //a valid index
+    if naiveResult < endIndex &&
+      _slowPath(ascii[_unchecked: newOffset] == _CR) {
+      naiveResult = Index(_encodedOffset: newOffset &+ 1)
+    }
+    
+    let naiveDistance = _asciiDistance(from: i, to: naiveResult, in: ascii)
+    if _fastPath(naiveDistance == n) {
+      return naiveResult
+    }
+    return _asciiIndex(naiveResult,
+                       in: ascii,
+                       offsetBy: n - naiveDistance)
+  }
+  
+  @usableFromInline
+  internal func _asciiIndex(_ i: Index, offsetBy n: IndexDistance) -> Index {
+    return _guts.withFastUTF8 { ascii in
+      return _asciiIndex(i, in: ascii, offsetBy: n)
+    }
+  }
+  
   /// Returns an index that is the specified distance from the given index.
   ///
   /// The following example obtains an index advanced four positions from a
@@ -111,48 +211,12 @@ extension String: BidirectionalCollection {
   @inlinable @inline(__always)
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     // TODO: single-scalar-grapheme fast path, etc.
-    if _guts.isFastASCII {
-      return _asciiIndex(i, offsetBy: n, limitedBy: endIndex)!
-    }
-    return _index(i, offsetBy: n)
-  }
-  
-  @inlinable
-  internal func _searchForASCIIIndex(_ i: Index,
-                                     in ascii: UnsafeBufferPointer<UInt8>,
-                                     offsetBy n: IndexDistance,
-                                     limitedBy limit: Index) -> (Int, Index?) {
-    _precondition(i._encodedOffset + n < endIndex._encodedOffset,
-                  "String index is out of bounds")
-
-    var consumed = 0
-    let searchSlice = ascii[i._encodedOffset ..< i._encodedOffset + n]
-    if let cr = searchSlice.firstIndex(of: _CR), cr != ascii.endIndex &- 1 {
-      consumed = cr &+ 1
-      let result = Index(_encodedOffset:
-        i._encodedOffset + consumed + (searchSlice[cr &+ 1] == _LF ? 1 : 0))
-      return (consumed, result < limit ? result : nil)
-
-    } else {
-      let result = Index(_encodedOffset: i._encodedOffset + searchSlice.count)
-      return (searchSlice.count, result < limit ? result : nil)
-    }
-  }
-  
-  @usableFromInline
-  internal func _asciiIndex(_ i: Index, offsetBy n: IndexDistance,
-                            limitedBy limit: Index) -> Index? {
-    return _guts.withFastUTF8 { ascii in
-      var result: Index? = i
-      var remainingOffset = n
-      var consumed = 0
-      while result != nil && remainingOffset > 0 {
-        (consumed, result) = _searchForASCIIIndex(result!, in: ascii,
-          offsetBy: remainingOffset, limitedBy: limit)
-        remainingOffset &-= consumed
-      }
+    if _guts.isFastASCII && n > 0 {
+      let result = _asciiIndex(i, offsetBy: n)
+      _internalInvariant(result == _index(i, offsetBy: n))
       return result
     }
+    return _index(i, offsetBy: n)
   }
 
   /// Returns an index that is the specified distance from the given index,
@@ -197,26 +261,12 @@ extension String: BidirectionalCollection {
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
     // TODO: single-scalar-grapheme fast path, etc.
-    if _guts.isFastASCII {
-      return _asciiIndex(i, offsetBy: n, limitedBy: limit)
+    if _guts.isFastASCII && n > 0 {
+      let result = _asciiIndex(i, offsetBy: n, limitedBy: limit)
+      _internalInvariant(result == _index(i, offsetBy: n, limitedBy: limit))
+      return result
     }
     return _index(i, offsetBy: n, limitedBy: limit)
-  }
-  
-  @usableFromInline
-  internal func _asciiDistance(from start: Index, to end: Index)
-    -> IndexDistance {
-      return _guts.withFastUTF8 { ascii in
-        var crlfCount = 0
-        for i in start._encodedOffset ..< end._encodedOffset {
-          if ascii[i] == _CR {
-            if i != end._encodedOffset &- 1 && ascii[i &+ 1] == _LF {
-              crlfCount += 1
-            }
-          }
-        }
-        return end._encodedOffset - (start._encodedOffset - crlfCount)
-      }
   }
   
   /// Returns the distance between two indices.
@@ -231,8 +281,10 @@ extension String: BidirectionalCollection {
   @inlinable @inline(__always)
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     // TODO: single-scalar-grapheme fast path, etc.
-    if _guts.isFastASCII {
-      return _asciiDistance(from: start, to: end)
+    if _guts.isFastASCII && start < end {
+      let result = _asciiDistance(from: start, to: end)
+      _internalInvariant(result == _distance(from: start, to: end))
+      return result
     }
     return _distance(from: start, to: end)
   }
@@ -271,8 +323,10 @@ extension String: BidirectionalCollection {
 
     if i == endIndex { return 0 }
     
-    if _fastIsSingleByteGrapheme(in: _guts, at: i._encodedOffset) {
-      return 1
+    if _fastIsSingleByteGrapheme(in: _guts, startingAt: i._encodedOffset) {
+      let result = 1
+      _internalInvariant(result == _guts._opaqueCharacterStride(startingAt: i._encodedOffset))
+      return result
     }
 
     return _guts._opaqueCharacterStride(startingAt: i._encodedOffset)
@@ -282,8 +336,10 @@ extension String: BidirectionalCollection {
   internal func _characterStride(endingAt i: Index) -> Int {
     if i == startIndex { return 0 }
     
-    if _fastIsSingleByteGrapheme(in: _guts, at: i._encodedOffset &- 1) {
-      return 1
+    if _fastIsSingleByteGrapheme(in: _guts, endingAt: i._encodedOffset &- 1) {
+      let result = 1
+      _internalInvariant(result == _guts._opaqueCharacterStride(endingAt: i._encodedOffset))
+      return result
     }
 
     return _guts._opaqueCharacterStride(endingAt: i._encodedOffset)
