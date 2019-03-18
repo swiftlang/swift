@@ -3215,12 +3215,22 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
 
   // Reject different-file retroactive derivatives.
   // TODO(TF-136): Full support for cross-file/cross-module retroactive
-  // differentiability will require SIL differnetiability witnesses and lots of
+  // differentiability will require SIL differentiability witnesses and lots of
   // plumbing.
   if (originalFn->getParentSourceFile() != derivative->getParentSourceFile()) {
     diagnoseAndRemoveAttr(
         attr, diag::differentiating_attr_not_in_same_file_as_original);
     return;
+  }
+
+  // Compute derivative generic requirements that are not satisfied by original
+  // function.
+  SmallVector<Requirement, 8> derivativeRequirements;
+  if (auto derivativeGenSig = derivative->getGenericSignature()) {
+    auto originalGenSig = originalFn->getGenericSignature();
+    for (auto req : derivativeGenSig->getRequirements())
+      if (!originalGenSig->isRequirementSatisfied(req))
+        derivativeRequirements.push_back(req);
   }
 
   // Add the derivative to a `@differentiable` attribute on the original
@@ -3230,11 +3240,18 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   for (auto *cda : originalFn->getAttrs().getAttributes<DifferentiableAttr>())
     if (checkedWrtParamIndices == cda->getParameterIndices())
       da = const_cast<DifferentiableAttr *>(cda);
-  // TODO: Infer the original `@differentiable`'s generic requirements.
   if (!da) {
-    da = DifferentiableAttr::create(ctx, /*implicit*/ true, SourceLoc(),
-                                    SourceRange(), checkedWrtParamIndices, None,
-                                    None, {});
+    da = DifferentiableAttr::create(ctx, /*implicit*/ true, attr->AtLoc,
+                                    attr->getRange(), checkedWrtParamIndices,
+                                    None, None, derivativeRequirements);
+    auto insertion = ctx.DifferentiableAttrs.try_emplace(
+        {originalFn, checkedWrtParamIndices}, da);
+    // Differentiable attributes are uniqued by their parameter indices.
+    // Reject duplicate attributes for the same decl and parameter indices pair.
+    if (!insertion.second && insertion.first->getSecond() != da) {
+      diagnoseAndRemoveAttr(da, diag::differentiable_attr_duplicate);
+      return;
+    }
     originalFn->getAttrs().add(da);
   }
   switch (kind) {
