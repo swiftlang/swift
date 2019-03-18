@@ -800,7 +800,10 @@ public:
                       OtherSignature, OtherSignatureType,
                       /*wouldConflictInSwift5*/nullptr,
                       /*skipProtocolExtensionCheck*/true)) {
-        if (VD->getFormalAccess() > OtherVD->getFormalAccess()) {
+        if (VD->getFormalAccess() > OtherVD->getFormalAccess() ||
+            //Prefer available one.
+            (!AvailableAttr::isUnavailable(VD) &&
+             AvailableAttr::isUnavailable(OtherVD))) {
           PossiblyConflicting.erase(I);
           PossiblyConflicting.insert(VD);
 
