@@ -1266,7 +1266,6 @@ extension PythonObject : Sequence {
         try! throwPythonErrorIfPresent()
         return nil
       }
-
       return PythonObject(consuming: result)
     }
   }
