@@ -52,14 +52,9 @@ func generic2<T>(_ t: T) -> ((Big<T>, Big<T>), () -> Big<T>) {
 }
 
 // CHECK-LABEL: sil hidden @$s17big_types_generic8useStuffyyF : $@convention(thin) () -> ()
-// CHECK: bb0:
-// CHECK: switch_enum_addr %{{.*}} : $*Optional<((Big<Int32>, Big<Int32>), @callee_guaranteed () -> @out Big<Int32>)>, case #Optional.some!enumelt.1: bb7, case #Optional.none!enumelt: bb1
-// CHECK: bb7:
-// CHECK: switch_enum_addr %{{.*}} : $*Optional<((Big<Int32>, Big<Int32>), @callee_guaranteed () -> @out Big<Int32>)>, case #Optional.some!enumelt.1: bb14, case #Optional.none!enumelt: bb8
-// CHECK: bb14:
-// CHECK: bb17(%{{.*}} : $Optional<((Big<Int>, Big<Int>), @callee_guaranteed () -> @out Big<Int>)>):
-// CHECK: switch_enum %{{.*}} : $Optional<((Big<Int>, Big<Int>), @callee_guaranteed () -> @out Big<Int>)>, case #Optional.some!enumelt.1: bb24, case #Optional.none!enumelt: bb18
-// CHECK: bb24(%{{.*}} : $((Big<Int>, Big<Int>), @callee_guaranteed () -> @out Big<Int>)):
+// CHECK: switch_enum_addr %{{.*}} : $*Optional<((Big<Int32>, Big<Int32>), @callee_guaranteed () -> @out Big<Int32>)>, case #Optional.some!enumelt.1
+// CHECK: switch_enum_addr %{{.*}} : $*Optional<((Big<Int32>, Big<Int32>), @callee_guaranteed () -> @out Big<Int32>)>, case #Optional.some!enumelt.1
+// CHECK: switch_enum %{{.*}} : $Optional<((Big<Int>, Big<Int>), @callee_guaranteed () -> @out Big<Int>)>, case #Optional.some!enumelt.1
 // CHECK: return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '$s17big_types_generic8useStuffyyF'
 func useStuff() {
