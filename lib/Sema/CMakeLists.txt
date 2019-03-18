@@ -59,6 +59,7 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckSwitchStmt.cpp
   TypeCheckType.cpp
   TypeChecker.cpp
+  VarDeclUsageChecker.cpp
 
   ${EXTRA_TYPECHECKER_FLAGS})
 target_link_libraries(swiftSema PRIVATE
