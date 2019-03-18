@@ -67,7 +67,7 @@ ShapedArrayTests.test("Indexing") {
 
 ShapedArrayTests.test("ElementMutation") {
   var tensor = ShapedArray(shape: [3, 4, 5], scalars: Array(0..<60))
-  tensor[0] = ShapedArraySlice<Int>(shape: [4, 5], repeating: 1)
+  tensor[0] = ShapedArraySlice<Int>(repeating: 1, shape: [4, 5])
   expectEqual(Array(repeating: 1, count: 20) + Array(20..<60), tensor.scalars)
 
   tensor[0..<2] = ShapedArraySlice<Int>(shape: [2, 4, 5], scalars: Array(0..<40))
@@ -106,25 +106,25 @@ struct Foo : Equatable, Hashable {
 
 ShapedArrayTests.test("Equatable") {
   checkEquatable([ShapedArray(shape: [], scalars: [1.0])], oracle: { $0 == $1 })
-  checkEquatable([ShapedArray(shape: [3, 4, 5], repeating: true)], oracle: { $0 == $1 })
-  checkEquatable([ShapedArray(shape: [3, 4, 5], repeating: Foo())], oracle: { $0 == $1 })
+  checkEquatable([ShapedArray(repeating: true, shape: [3, 4, 5])], oracle: { $0 == $1 })
+  checkEquatable([ShapedArray(repeating: Foo(), shape: [3, 4, 5])], oracle: { $0 == $1 })
   checkEquatable([ShapedArray(shape: [2, 3], scalars: Array(0..<6))], oracle: { $0 == $1 })
 
   checkEquatable([ShapedArraySlice(shape: [], scalars: [1.0])], oracle: { $0 == $1 })
-  checkEquatable([ShapedArraySlice(shape: [3, 4, 5], repeating: true)], oracle: { $0 == $1 })
-  checkEquatable([ShapedArraySlice(shape: [3, 4, 5], repeating: Foo())], oracle: { $0 == $1 })
+  checkEquatable([ShapedArraySlice(repeating: true, shape: [3, 4, 5])], oracle: { $0 == $1 })
+  checkEquatable([ShapedArraySlice(repeating: Foo(), shape: [3, 4, 5])], oracle: { $0 == $1 })
   checkEquatable([ShapedArraySlice(shape: [2, 3], scalars: Array(0..<6))], oracle: { $0 == $1 })
 }
 
 ShapedArrayTests.test("Hashable") {
   checkHashable([ShapedArray(shape: [], scalars: [1.0])], equalityOracle: { $0 == $1 })
-  checkHashable([ShapedArray(shape: [3, 4, 5], repeating: true)], equalityOracle: { $0 == $1 })
-  checkHashable([ShapedArray(shape: [3, 4, 5], repeating: Foo())], equalityOracle: { $0 == $1 })
+  checkHashable([ShapedArray(repeating: true, shape: [3, 4, 5])], equalityOracle: { $0 == $1 })
+  checkHashable([ShapedArray(repeating: Foo(), shape: [3, 4, 5])], equalityOracle: { $0 == $1 })
   checkHashable([ShapedArray(shape: [2, 3], scalars: Array(0..<6))], equalityOracle: { $0 == $1 })
 
   checkHashable([ShapedArraySlice(shape: [], scalars: [1.0])], equalityOracle: { $0 == $1 })
-  checkHashable([ShapedArraySlice(shape: [3, 4, 5], repeating: true)], equalityOracle: { $0 == $1 })
-  checkHashable([ShapedArraySlice(shape: [3, 4, 5], repeating: Foo())], equalityOracle: { $0 == $1 })
+  checkHashable([ShapedArraySlice(repeating: true, shape: [3, 4, 5])], equalityOracle: { $0 == $1 })
+  checkHashable([ShapedArraySlice(repeating: Foo(), shape: [3, 4, 5])], equalityOracle: { $0 == $1 })
   checkHashable([ShapedArraySlice(shape: [2, 3], scalars: Array(0..<6))], equalityOracle: { $0 == $1 })
 }
 

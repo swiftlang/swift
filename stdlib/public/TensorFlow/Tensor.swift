@@ -337,24 +337,22 @@ public extension Tensor {
 }
 
 public extension Tensor {
-  /// Creates a tensor with the specified shape and a single, repeated value.
+  /// Creates a tensor with the specified shape and a single, repeated scalar value.
   ///
   /// - Parameters:
   ///   - shape: The dimensions of the tensor.
   ///   - repeatedValue: The scalar value to repeat.
-  ///
   @inlinable @inline(__always)
   @available(*, deprecated, renamed: "init(repeating:shape:)")
   init(shape: TensorShape, repeating repeatedValue: Scalar) {
     self.init(repeating: repeatedValue, shape: shape)
   }
 
-  /// Creates a tensor with the specified shape and a single, repeated value.
+  /// Creates a tensor with the specified shape and a single, repeated scalar value.
   ///
   /// - Parameters:
-  ///   - shape: The dimensions of the tensor.
   ///   - repeatedValue: The scalar value to repeat.
-  ///
+  ///   - shape: The dimensions of the tensor.
   @inlinable @inline(__always)
   @differentiable(vjp: _vjpInit(repeating:shape:)
                   where Scalar : TensorFlowFloatingPoint)

@@ -406,11 +406,22 @@ public extension ShapedArray {
   }
 
   /// Creates a `ShapedArray` with the specified shape and a single, repeated
-  /// value.
+  /// scalar value.
   /// - Parameters:
   ///   - shape: The shape of the `ShapedArray`.
   ///   - repeatedValue: The scalar value to repeat.
+  @inlinable @inline(__always)
+  @available(*, deprecated, renamed: "init(repeating:shape:)")
   init(shape: __owned [Int], repeating repeatedValue: __owned Scalar) {
+    self.init(repeating: repeatedValue, shape: shape)
+  }
+
+  /// Creates a `ShapedArray` with the specified shape and a single, repeated
+  /// scalar value.
+  /// - Parameters:
+  ///   - repeatedValue: The scalar value to repeat.
+  ///   - shape: The shape of the `ShapedArray`.
+  init(repeating repeatedValue: __owned Scalar, shape: __owned [Int]) {
     let scalarCount = shape.reduce(1, *)
     let buffer = TensorBuffer<Scalar>(
       allocation: .native(.init(Array(repeating: repeatedValue,
@@ -676,7 +687,7 @@ extension ShapedArray : Codable where Scalar : Codable {
 ///
 /// For example:
 ///
-///     let zeros = ShapedArray(shape: [3, 2], repeating: 0)
+///     let zeros = ShapedArray(repeating: 0, shape: [3, 2])
 ///     var matrix = ShapedArray(shape: [3, 2], scalars: Array(0..<6))
 ///     // `zeros` represents [[0, 0], [0, 0], [0, 0]].
 ///     // `matrix` represents [[0, 1], [2, 3], [4, 5]].
@@ -766,12 +777,23 @@ public extension ShapedArraySlice {
   }
 
   /// Creates a `ShapedArraySlice` with the specified shape and a single,
-  /// repeated value.
+  /// repeated scalar value.
   /// - Parameters:
-  ///   - shape: The shape of the `ShapedArraySlice`.
   ///   - repeatedValue: The scalar value to repeat.
+  ///   - shape: The shape of the `ShapedArraySlice`.
+  @inlinable @inline(__always)
+  @available(*, deprecated, renamed: "init(repeating:shape:)")
   init(shape: __owned [Int], repeating repeatedValue: __owned Scalar) {
-    self.init(base: ShapedArray(shape: shape, repeating: repeatedValue))
+    self.init(repeating: repeatedValue, shape: shape)
+  }
+
+  /// Creates a `ShapedArraySlice` with the specified shape and a single,
+  /// repeated scalar value.
+  /// - Parameters:
+  ///   - repeatedValue: The scalar value to repeat.
+  ///   - shape: The shape of the `ShapedArraySlice`.
+  init(repeating repeatedValue: __owned Scalar, shape: __owned [Int]) {
+    self.init(base: ShapedArray(repeating: repeatedValue, shape: shape))
   }
 }
 

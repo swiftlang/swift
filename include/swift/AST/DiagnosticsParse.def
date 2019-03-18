@@ -1510,18 +1510,21 @@ ERROR(attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
       "expected a list of parameters to differentiate with respect to", ())
 ERROR(attr_differentiable_use_wrt_not_withrespectto,none,
       "use 'wrt:' to specify parameters to differentiate with respect to", ())
-ERROR(attr_differentiable_expected_parameter,PointsToFirstBadToken,
-      "expected a parameter, which can be a function parameter name or 'self'", ())
 ERROR(attr_differentiable_missing_label,PointsToFirstBadToken,
       "missing label '%0:' in '@differentiable' attribute", (StringRef))
-ERROR(attr_differentiable_expected_colon_after_label,PointsToFirstBadToken,
-      "expected a colon ':' after '%0'", (StringRef))
 ERROR(attr_differentiable_expected_label,none,
       "expected a function specifier label, e.g. 'wrt:', 'jvp:', or 'vjp:'", ())
 
 // differentiating
 ERROR(attr_differentiating_expected_original_name,PointsToFirstBadToken,
       "expected an original function name", ())
+
+// differentiation `wrt` parameters clause
+ERROR(expected_colon_after_label,PointsToFirstBadToken,
+      "expected a colon ':' after '%0'", (StringRef))
+ERROR(diff_params_clause_expected_parameter,PointsToFirstBadToken,
+      "expected a parameter, which can be a function parameter name or 'self'",
+      ())
 
 // [differentiable ...] (sil-decl attr)
 ERROR(sil_attr_differentiable_expected_keyword,PointsToFirstBadToken,

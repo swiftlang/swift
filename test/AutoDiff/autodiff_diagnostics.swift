@@ -176,7 +176,7 @@ struct TF_305 : Differentiable {
 }
 
 //===----------------------------------------------------------------------===//
-// Classes and existentials (unsupported yet)
+// Classes and existentials (not yet supported)
 //===----------------------------------------------------------------------===//
 
 class Foo {
@@ -241,3 +241,16 @@ func activeInoutArgTuple(_ x: Float) -> Float {
 }
 // expected-error @+1 {{function is not differentiable}}
 _ = pullback(at: .zero, in: activeInoutArgTuple(_:))
+
+//===----------------------------------------------------------------------===//
+// Non-varied results
+//===----------------------------------------------------------------------===//
+
+func one() -> Float {
+  return 1
+}
+@differentiable
+func nonVariedResult(_ x: Float) -> Float {
+  // expected-warning @+1 {{result does not depend on differentiation arguments and will always have a zero derivative; do you want to add '.withoutDerivative()'?}} {{15-15=.withoutDerivative()}}
+  return one()
+}

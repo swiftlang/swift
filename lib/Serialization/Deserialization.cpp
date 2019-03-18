@@ -2595,14 +2595,21 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
         bool isImplicit;
         uint64_t origNameId;
         DeclID origDeclId;
+        ArrayRef<uint64_t> parameters;
 
         serialization::decls_block::DifferentiatingDeclAttrLayout::readRecord(
-            scratch, isImplicit, origNameId, origDeclId);
+            scratch, isImplicit, origNameId, origDeclId, parameters);
 
         DeclNameWithLoc origName = {getIdentifier(origNameId), DeclNameLoc()};
         FuncDecl *origDecl = cast<FuncDecl>(getDecl(origDeclId));
+
+        llvm::SmallBitVector parametersBitVector(parameters.size());
+        for (unsigned i : indices(parameters))
+          parametersBitVector[i] = parameters[i];
+        auto *indices = AutoDiffParameterIndices::get(parametersBitVector, ctx);
+
         auto diffAttr = DifferentiatingAttr::create(
-            ctx, isImplicit, SourceLoc(), SourceRange(), origName);
+            ctx, isImplicit, SourceLoc(), SourceRange(), origName, indices);
         diffAttr->setOriginalFunction(origDecl);
         Attr = diffAttr;
         break;

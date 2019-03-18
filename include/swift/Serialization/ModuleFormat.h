@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 471; // Last change: add parameter differentiability to SILFunctionType serialization
+const uint16_t SWIFTMODULE_VERSION_MINOR = 472; // Last change: `@differentiating` wrt
 
 using DeclIDField = BCFixed<31>;
 
@@ -1610,7 +1610,8 @@ namespace decls_block {
     Differentiating_DECL_ATTR,
     BCFixed<1>, // Implicit flag.
     IdentifierIDField, // Original name.
-    DeclIDField // Original function declaration.
+    DeclIDField, // Original function declaration.
+    BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
   >;
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) \
