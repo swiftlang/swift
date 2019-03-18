@@ -1348,6 +1348,7 @@ public:
   void completeTypeIdentifierWithDot(IdentTypeRepr *ITR) override;
   void completeTypeIdentifierWithoutDot(IdentTypeRepr *ITR) override;
 
+  void completeCaseStmtKeyword() override;
   void completeCaseStmtBeginning() override;
   void completeCaseStmtDotPrefix() override;
   void completeDeclAttrKeyword(Decl *D, bool Sil, bool Param) override;
@@ -4442,6 +4443,11 @@ void CodeCompletionCallbacksImpl::completeTypeIdentifierWithoutDot(
   CurDeclContext = P.CurDeclContext;
 }
 
+void CodeCompletionCallbacksImpl::completeCaseStmtKeyword() {
+  Kind = CompletionKind::CaseStmtKeyword;
+  CurDeclContext = P.CurDeclContext;
+}
+
 void CodeCompletionCallbacksImpl::completeCaseStmtBeginning() {
   assert(!InEnumElementRawValue);
 
@@ -4623,6 +4629,11 @@ static void addStmtKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody) 
 #include "swift/Syntax/TokenKinds.def"
 }
 
+static void addCaseStmtKeywords(CodeCompletionResultSink &Sink) {
+  addKeyword(Sink, "case", CodeCompletionKeywordKind::kw_case);
+  addKeyword(Sink, "default", CodeCompletionKeywordKind::kw_default);
+}
+
 static void addLetVarKeywords(CodeCompletionResultSink &Sink) {
   addKeyword(Sink, "let", CodeCompletionKeywordKind::kw_let);
   addKeyword(Sink, "var", CodeCompletionKeywordKind::kw_var);
@@ -4710,6 +4721,10 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     addLetVarKeywords(Sink);
     addExprKeywords(Sink);
     addAnyTypeKeyword(Sink);
+    break;
+
+  case CompletionKind::CaseStmtKeyword:
+    addCaseStmtKeywords(Sink);
     break;
 
   case CompletionKind::PostfixExpr:
@@ -5214,11 +5229,12 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       }
     }
     break;
-  case CompletionKind::AfterIfStmtElse:
-    // Handled earlier by keyword completions.
-    break;
   case CompletionKind::PrecedenceGroup:
     Lookup.getPrecedenceGroupCompletions(SyntxKind);
+    break;
+  case CompletionKind::AfterIfStmtElse:
+  case CompletionKind::CaseStmtKeyword:
+    // Handled earlier by keyword completions.
     break;
   }
 

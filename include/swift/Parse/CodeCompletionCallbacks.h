@@ -165,6 +165,9 @@ public:
   /// Complete a given type-identifier when there is no trailing dot.
   virtual void completeTypeIdentifierWithoutDot(IdentTypeRepr *ITR) {};
 
+  /// Complete the beginning of a case statement at the top of switch stmt.
+  virtual void completeCaseStmtKeyword() {};
+
   /// Complete at the beginning of a case stmt pattern.
   virtual void completeCaseStmtBeginning() {};
 
