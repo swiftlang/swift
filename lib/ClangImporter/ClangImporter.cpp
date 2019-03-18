@@ -770,6 +770,7 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
                          *clangDiags,
                          CI.getLangOpts(),
                          clangSrcMgr,
+                         CI.getPCMCache(),
                          headerSearchInfo,
                          (clang::ModuleLoader &)CI,
                          /*IILookup=*/nullptr,
@@ -782,7 +783,7 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   // Note: Reusing the PCHContainerReader or ModuleFileExtensions could be
   // dangerous.
   std::unique_ptr<clang::ASTReader> Reader(new clang::ASTReader(
-      PP, CI.getModuleCache(), &ctx, CI.getPCHContainerReader(),
+      PP, &ctx, CI.getPCHContainerReader(),
       CI.getFrontendOpts().ModuleFileExtensions,
       CI.getHeaderSearchOpts().Sysroot,
       /*DisableValidation*/ false,
@@ -1393,8 +1394,7 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
   invocation->getPreprocessorOpts().resetNonModularOptions();
 
   clang::CompilerInstance rewriteInstance(
-    Impl.Instance->getPCHContainerOperations(),
-    &Impl.Instance->getModuleCache());
+    Impl.Instance->getPCHContainerOperations());
   rewriteInstance.setInvocation(invocation);
   rewriteInstance.createDiagnostics(new clang::IgnoringDiagConsumer);
 
@@ -1450,11 +1450,9 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   invocation->getFrontendOpts().ProgramAction = clang::frontend::GeneratePCH;
   invocation->getPreprocessorOpts().resetNonModularOptions();
   invocation->getLangOpts()->NeededByPCHOrCompilationUsesPCH = true;
-  invocation->getLangOpts()->CacheGeneratedPCH = true;
 
   clang::CompilerInstance emitInstance(
-    Impl.Instance->getPCHContainerOperations(),
-    &Impl.Instance->getModuleCache());
+    Impl.Instance->getPCHContainerOperations());
   emitInstance.setInvocation(std::move(invocation));
   emitInstance.createDiagnostics(&Impl.Instance->getDiagnosticClient(),
                                  /*ShouldOwnClient=*/false);
