@@ -27,7 +27,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func add<U, V>(_ scalar: Float,
-                                 to vector: U,
+                                 _ vector: U,
                                  result: inout V)
         where
         U: _ContiguousCollection,
@@ -57,7 +57,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func add<U, V>(_ scalar: Double,
-                                 to vector: U,
+                                 _ vector: U,
                                  result: inout V)
         where
         U: _ContiguousCollection,
@@ -89,7 +89,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func add<T, U, V>(_ vectorA: T,
-                                    to vectorB: U,
+                                    _ vectorB: U,
                                     result: inout V)
         where
         T: _ContiguousCollection,
@@ -121,7 +121,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func add<T, U, V>(_ vectorA: T,
-                                    to vectorB: U,
+                                    _ vectorB: U,
                                     result: inout V)
         where
         T: _ContiguousCollection,
@@ -149,13 +149,13 @@ extension vDSP {
     /// Populates `result` with the elementwise difference of `vector` and `fromVector`,
     /// single-precision.
     ///
-    /// - Parameter vectorA: the `b` in `c[i] = a[i] - b[i]`.
-    /// - Parameter vectorB: the `a` in `c[i] = a[i] - b[i]`.
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] - b[i]`.
+    /// - Parameter vectorA: the `a` in `c[i] = a[i] - b[i]`.
     /// - Parameter result: The `c` in `c[i] = a[i] - b[i]`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func subtract<T, U, V>(_ vectorA: T,
-                                         from vectorB: U,
+    public static func subtract<T, U, V>(_ vectorB: T,
+                                         from vectorA: U,
                                          result: inout V)
         where
         T: _ContiguousCollection,
@@ -167,8 +167,8 @@ extension vDSP {
             precondition(vectorA.count == n && vectorB.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorA.withUnsafeBufferPointer { a in
-                    vectorB.withUnsafeBufferPointer { b in
+                vectorB.withUnsafeBufferPointer { a in
+                    vectorA.withUnsafeBufferPointer { b in
                         vDSP_vsub(a.baseAddress!, 1,
                                   b.baseAddress!, 1,
                                   r.baseAddress!, 1,
@@ -181,13 +181,13 @@ extension vDSP {
     /// Populates `result` with the elementwise difference of `vector` and `fromVector`,
     /// double-precision.
     ///
-    /// - Parameter vectorA: the `b` in `c[i] = a[i] - b[i]`.
-    /// - Parameter vectorB: the `a` in `c[i] = a[i] - b[i]`.
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] - b[i]`.
+    /// - Parameter vectorA: the `a` in `c[i] = a[i] - b[i]`.
     /// - Parameter result: The `c` in `c[i] = a[i] - b[i]`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func subtract<T, U, V>(_ vectorA: T,
-                                         from vectorB: U,
+    public static func subtract<T, U, V>(_ vectorB: T,
+                                         from vectorA: U,
                                          result: inout V)
         where
         T: _ContiguousCollection,
@@ -199,8 +199,8 @@ extension vDSP {
             precondition(vectorA.count == n && vectorB.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorA.withUnsafeBufferPointer { a in
-                    vectorB.withUnsafeBufferPointer { b in
+                vectorB.withUnsafeBufferPointer { a in
+                    vectorA.withUnsafeBufferPointer { b in
                         vDSP_vsubD(a.baseAddress!, 1,
                                    b.baseAddress!, 1,
                                    r.baseAddress!, 1,
@@ -221,7 +221,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func multiply<U, V>(_ scalar: Float,
-                                      by vector: U,
+                                      _ vector: U,
                                       result: inout V)
         where
         U: _ContiguousCollection,
@@ -251,7 +251,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func multiply<U, V>(_ scalar: Double,
-                                      by vector: U,
+                                      _ vector: U,
                                       result: inout V)
         where
         U: _ContiguousCollection,
@@ -283,7 +283,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func multiply<T, U, V>(_ vectorA: T,
-                                         by vectorB: U,
+                                         _ vectorB: U,
                                          result: inout V)
         where
         T: _ContiguousCollection,
@@ -314,7 +314,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func multiply<T, U, V>(_ vectorA: T,
-                                         by vectorB: U,
+                                         _ vectorB: U,
                                          result: inout V)
         where
         T: _ContiguousCollection,
@@ -619,7 +619,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func multiply<T, U, V>(vectorSum: (a: T, b: U),
-                                         by scalar: Float,
+                                         _ scalar: Float,
                                          result: inout V)
         where
         T: _ContiguousCollection,
@@ -655,7 +655,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func multiply<T, U, V>(vectorSum: (a: T, b: U),
-                                         by scalar: Double,
+                                         _ scalar: Double,
                                          result: inout V)
         where
         T: _ContiguousCollection,
@@ -693,7 +693,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func multiply<S, T, U, V>(vectorSum: (a: S, b: T),
-                                            by vector: U,
+                                            _ vector: U,
                                             result: inout V)
         where
         S: _ContiguousCollection,
@@ -731,7 +731,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func multiply<S, T, U, V>(vectorSum: (a: S, b: T),
-                                            by vector: U,
+                                            _ vector: U,
                                             result: inout V)
         where
         S: _ContiguousCollection,
@@ -771,7 +771,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func multiply<T, U, V>(vectorDifference: (a: T, b: U),
-                                         by scalar: Float,
+                                         _ scalar: Float,
                                          result: inout V)
         where
         T: _ContiguousCollection,
@@ -807,7 +807,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func multiply<T, U, V>(vectorDifference: (a: T, b: U),
-                                         by scalar: Double,
+                                         _ scalar: Double,
                                          result: inout V)
         where
         T: _ContiguousCollection,
@@ -845,7 +845,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func multiply<S, T, U, V>(vectorDifference: (a: S, b: T),
-                                            by vector: U,
+                                            _ vector: U,
                                             result: inout V)
         where
         S: _ContiguousCollection,
@@ -883,7 +883,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func multiply<S, T, U, V>(vectorDifference: (a: S, b: T),
-                                            by vector: U,
+                                            _ vector: U,
                                             result: inout V)
         where
         S: _ContiguousCollection,
@@ -924,7 +924,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func add<T, U, V>(vectorProduct: (a: T, b: U),
-                                    to scalar: Float,
+                                    _ scalar: Float,
                                     result: inout V)
         where
         T: _ContiguousCollection,
@@ -961,7 +961,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func add<T, U, V>(vectorProduct: (a: T, b: U),
-                                    to scalar: Double,
+                                    _ scalar: Double,
                                     result: inout V)
         where
         T: _ContiguousCollection,
@@ -1000,7 +1000,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func add<T, U, V>(vectorScalarProduct: (a: T, b: Float),
-                                    to vector: U,
+                                    _ vector: U,
                                     result: inout V)
         where
         T: _ContiguousCollection,
@@ -1036,7 +1036,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func add<T, U, V>(vectorScalarProduct: (a: T, b: Double),
-                                    to vector: U,
+                                    _ vector: U,
                                     result: inout V)
         where
         T: _ContiguousCollection,
@@ -1074,7 +1074,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func add<S, T, U, V>(vectorProduct: (a: S, b: T),
-                                       to vector: U,
+                                       _ vector: U,
                                        result: inout V)
         where
         S: _ContiguousCollection,
@@ -1113,7 +1113,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func add<S, T, U, V>(vectorProduct: (a: S, b: T),
-                                       to vector: U,
+                                       _ vector: U,
                                        result: inout V)
         where
         S: _ContiguousCollection,
@@ -1769,7 +1769,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func add<U, V>(vectorScalarProduct: (a: U, b: Float),
-                                 to scalar: Float,
+                                 _ scalar: Float,
                                  result: inout V)
         where
         U: _ContiguousCollection,
@@ -1802,7 +1802,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func add<U, V>(vectorScalarProduct: (a: U, b: Double),
-                                 to scalar: Double,
+                                 _ scalar: Double,
                                  result: inout V)
         where
         U: _ContiguousCollection,
