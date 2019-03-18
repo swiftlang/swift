@@ -1224,7 +1224,7 @@ createValueConstructor(ClangImporter::Implementation &Impl,
     auto param = new (context)
         ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), argName,
                   SourceLoc(), var->getName(), structDecl);
-    param->setInterfaceType(var->getInterfaceType());
+    param->setInterfaceType(var->getValueInterfaceType());
     param->setValidationToChecked();
     Impl.recordImplicitUnwrapForDecl(
         param, var->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>());
@@ -1971,6 +1971,64 @@ applyPropertyOwnership(VarDecl *prop,
     prop->setInterfaceType(UnmanagedStorageType::get(
         prop->getInterfaceType(), ctx));
     return;
+  }
+}
+
+/// Turn T into Unmanaged<T>, or into Unmanaged<T>? if `isOptional` is true.
+static Type getUnmanagedType(swift::ASTContext& Ctx,
+                             Type payloadType, bool isOptional) {
+  NominalTypeDecl *unmanagedDecl = Ctx.getUnmanagedDecl();
+  if (!unmanagedDecl || unmanagedDecl->getGenericParams()->size() != 1)
+    return payloadType;
+
+  Type result = BoundGenericType::get(unmanagedDecl, /*parent*/ Type(),
+                                      payloadType);
+  if (isOptional)
+    result = OptionalType::get(result);
+  return result;
+}
+
+static void
+applyPropertyOwnership(VarDecl *prop,
+                       clang::Qualifiers::ObjCLifetime lifetime) {
+  Type ty = prop->getInterfaceType();
+  bool wasOptional = false;
+  if (auto innerTy = ty->getOptionalObjectType()) {
+    ty = innerTy;
+    wasOptional = true;
+  }
+  if (!ty->allowsOwnership())
+    return;
+
+  ASTContext &ctx = prop->getASTContext();
+  switch (lifetime) {
+  case clang::Qualifiers::OCL_Weak:
+    prop->getAttrs().add(new (ctx)
+                             ReferenceOwnershipAttr(ReferenceOwnership::Weak));
+    prop->setType(WeakStorageType::get(prop->getType(), ctx));
+    prop->setInterfaceType(WeakStorageType::get(
+        prop->getInterfaceType(), ctx));
+    return;
+  case clang::Qualifiers::OCL_ExplicitNone:
+    // For __unsafe_unretained, we keep the old behavior of wrapping the type
+    // in Unmanaged instead of using UnmanagedStorageType. We need to make sure
+    // to pop the optionality out, though; e.g., `Foo?` becomes
+    // `Unmanaged<Foo>?`, not `Unmanaged<Foo?>`.
+    //
+    // TODO: Should we use UnmanagedStorageType? Unmanaged does feel safer
+    // because it makes the unowned-ness explicit in the type of the field,
+    // which is more obvious than `unowned(unsafe)` when imported from C.
+    prop->setType(getUnmanagedType(prop->getASTContext(), ty, wasOptional));
+    prop->setInterfaceType(getUnmanagedType(prop->getASTContext(), ty,
+                                            wasOptional));
+    return;
+  case clang::Qualifiers::OCL_None:
+  case clang::Qualifiers::OCL_Strong:
+    // Nothing to do here; the storage-less type is correct.
+    return;
+  case clang::Qualifiers::OCL_Autoreleasing:
+    llvm_unreachable("__autoreleasing struct fields are not supported; "
+        "ClangImporter should have errored before this point.");
   }
 }
 
@@ -3008,23 +3066,6 @@ namespace {
       if (Impl.isOverAligned(decl))
         return nullptr;
 
-      // FIXME: We should actually support strong ARC references and similar in
-      // C structs. That'll require some SIL and IRGen work, though.
-      if (decl->isNonTrivialToPrimitiveCopy() ||
-          decl->isNonTrivialToPrimitiveDestroy()) {
-        // Note that there is a third predicate related to these,
-        // isNonTrivialToPrimitiveDefaultInitialize. That one's not important
-        // for us because Swift never "trivially default-initializes" a struct
-        // (i.e. uses whatever bits were lying around as an initial value).
-
-        // FIXME: It would be nice to instead import the declaration but mark
-        // it as unavailable, but then it might get used as a type for an
-        // imported function and the developer would be able to use it without
-        // referencing the name, which would sidestep our availability
-        // diagnostics.
-        return nullptr;
-      }
-
       // Import the name.
       Optional<ImportedName> correctSwiftName;
       auto importedName = getClangDeclName(decl, correctSwiftName);
@@ -3606,6 +3647,8 @@ namespace {
       result->setIsObjC(false);
       result->setIsDynamic(false);
       result->setInterfaceType(type);
+      applyPropertyOwnership(result, decl->getType().getObjCLifetime());
+
       Impl.recordImplicitUnwrapForDecl(result,
                                        importedType.isImplicitlyUnwrapped());
 

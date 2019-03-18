@@ -1414,17 +1414,6 @@ static ImportedType adjustTypeForConcreteImport(
   if (!importedType)
     return {importedType, false};
 
-  if (importKind == ImportTypeKind::RecordField &&
-      importedType->isAnyClassReferenceType()) {
-    // Wrap retainable struct fields in Unmanaged.
-    // FIXME: Eventually we might get C++-like support for strong pointers in
-    // structs, at which point we should really be checking the lifetime
-    // qualifiers.
-    // FIXME: This should apply to blocks as well, but Unmanaged is constrained
-    // to AnyObject.
-    importedType = getUnmanagedType(impl, importedType);
-  }
-
   // Treat va_list specially: null-unspecified va_list parameters should be
   // assumed to be non-optional. (Most people don't even think of va_list as a
   // pointer, and it's not a portable assumption anyway.)
