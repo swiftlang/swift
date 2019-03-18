@@ -260,3 +260,34 @@ extension GenericInstanceMethod {
     return (x, { v in (self, v) })
   }
 }
+
+// Test extra generic constraints.
+
+func bar<T>(_ x: T) -> T {
+  return x
+}
+@differentiating(bar)
+func vjpBar<T : Differentiable & VectorNumeric>(_ x: T) -> (value: T, pullback: (T.CotangentVector) -> T.CotangentVector) {
+  return (x, { $0 })
+}
+
+func baz<T, U>(_ x: T, _ y: U) -> T {
+  return x
+}
+@differentiating(baz)
+func vjpBaz<T : Differentiable & VectorNumeric, U : Differentiable>(_ x: T, _ y: U)
+    -> (value: T, pullback: (T) -> (T, U))
+  where T == T.CotangentVector, U == U.CotangentVector
+{
+  return (x, { ($0, .zero) })
+}
+
+protocol InstanceMethodProto {
+  func bar() -> Float
+}
+extension InstanceMethodProto where Self : Differentiable {
+  @differentiating(bar)
+  func vjpBar() -> (value: Float, pullback: (Float) -> CotangentVector) {
+    return (bar(), { _ in .zero })
+  }
+}
