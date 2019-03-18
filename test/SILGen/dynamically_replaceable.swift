@@ -350,3 +350,9 @@ func getsetX(_ x: Int) -> Int {
   globalX = x
   return globalX
 }
+
+// CHECK-LABEL: sil hidden [ossa] @$s23dynamically_replaceable18funcWithDefaultArgyySSFfA_
+// CHECK-LABEL: sil hidden [dynamically_replacable] [ossa] @$s23dynamically_replaceable18funcWithDefaultArgyySSF
+dynamic func funcWithDefaultArg(_ arg : String = String("hello")) {
+  print("hello")
+}
