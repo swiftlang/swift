@@ -45,14 +45,14 @@ struct InstanceMethod : Differentiable {
   }
 }
 
-// CHECK-DAG: @differentiable(where T : Differentiable, T : Numeric)
+// CHECK-DAG: @differentiable(where T : Differentiable)
 // CHECK-DAG: func testOnlyWhereClause<T>(x: T) -> T where T : Numeric
 @differentiable(where T : Differentiable)
 func testOnlyWhereClause<T : Numeric>(x: T) -> T {
   return x
 }
 
-// CHECK-DAG: @differentiable(vjp: vjpTestWhereClause where T : Differentiable, T : Numeric)
+// CHECK-DAG: @differentiable(vjp: vjpTestWhereClause where T : Differentiable)
 // CHECK-DAG: func testWhereClause<T>(x: T) -> T where T : Numeric
 @differentiable(vjp: vjpTestWhereClause where T : Differentiable)
 func testWhereClause<T : Numeric>(x: T) -> T {
@@ -66,7 +66,7 @@ func vjpTestWhereClause<T>(x: T) -> (T, (T.CotangentVector) -> T.CotangentVector
 
 protocol P {}
 extension P {
-  // CHECK-DAG: @differentiable(vjp: vjpTestWhereClause where Self : Differentiable, Self : P)
+  // CHECK-DAG: @differentiable(vjp: vjpTestWhereClause where Self : Differentiable)
   // CHECK-DAG: func testWhereClause() -> Self
   @differentiable(wrt: self, vjp: vjpTestWhereClause where Self : Differentiable)
   func testWhereClause() -> Self {
@@ -79,7 +79,7 @@ extension P where Self : Differentiable {
   }
 }
 
-// CHECK-DAG: @differentiable(vjp: vjpTestWhereClauseMemberTypeConstraint where T : Differentiable, T : Numeric, T == T.CotangentVector)
+// CHECK-DAG: @differentiable(vjp: vjpTestWhereClauseMemberTypeConstraint where T : Differentiable, T == T.CotangentVector)
 // CHECK-DAG: func testWhereClauseMemberTypeConstraint<T>(x: T) -> T where T : Numeric
 @differentiable(vjp: vjpTestWhereClauseMemberTypeConstraint where T : Differentiable, T == T.CotangentVector)
 func testWhereClauseMemberTypeConstraint<T : Numeric>(x: T) -> T {
@@ -92,7 +92,7 @@ func vjpTestWhereClauseMemberTypeConstraint<T>(x: T) -> (T, (T) -> T)
 }
 
 extension P {
-  // CHECK-DAG: @differentiable(vjp: vjpTestWhereClauseMemberTypeConstraint where Self : Differentiable, Self : P, Self == Self.CotangentVector)
+  // CHECK-DAG: @differentiable(vjp: vjpTestWhereClauseMemberTypeConstraint where Self : Differentiable, Self == Self.CotangentVector)
   // CHECK-DAG: func testWhereClauseMemberTypeConstraint() -> Self
   @differentiable(wrt: self, vjp: vjpTestWhereClauseMemberTypeConstraint where Self.CotangentVector == Self, Self : Differentiable)
   func testWhereClauseMemberTypeConstraint() -> Self {

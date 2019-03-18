@@ -408,7 +408,19 @@ static void printDifferentiableAttrArguments(
         return genericEnv->getSugaredType(Ty);
       };
     }
-    interleave(attr->getRequirements(), [&](Requirement req) {
+    // Filter out requirements satisfied by original function's generic
+    // signature. They should not be printed.
+    auto requirementsToPrint =
+        makeFilterRange(attr->getRequirements(), [&](Requirement req) {
+          if (auto *originalGenSig = original->getGenericSignature())
+            if (originalGenSig->isRequirementSatisfied(req))
+              return false;
+          return true;
+        });
+    interleave(requirementsToPrint, [&](Requirement req) {
+      if (auto *originalGenSig = original->getGenericSignature())
+        if (originalGenSig->isRequirementSatisfied(req))
+          return;
       auto FirstTy = getInterfaceType(req.getFirstType());
       if (req.getKind() != RequirementKind::Layout) {
         auto SecondTy = getInterfaceType(req.getSecondType());
