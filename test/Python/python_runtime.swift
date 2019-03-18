@@ -298,6 +298,17 @@ PythonRuntimeTestSuite.testWithLeakChecking("PythonConvertible") {
   expectEqual(five, Double(5).pythonObject)
 }
 
+PythonRuntimeTestSuite.testWithLeakChecking("Optional") {
+  let five: PythonObject = 5
+  expectEqual(five, (5 as Int?).pythonObject)
+  expectEqual(Python.None, (nil as Int?).pythonObject)
+
+  let xx: [Int?] = [1, 2, nil, 3, nil, 4]
+  let pyxx: PythonObject = [1, 2, Python.None, 3, Python.None, 4]
+  expectEqual(pyxx, xx.pythonObject)
+  expectEqual(xx, [Int?](pyxx))
+}
+
 PythonRuntimeTestSuite.testWithLeakChecking("SR-9230") {
   expectEqual(2, Python.len(Python.dict(a: "a", b: "b")))
 }
