@@ -1912,20 +1912,16 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
     auto resultTypeLoc = FD->getBodyResultTypeLoc();
     auto E = FD->getSingleExpressionBody();
 
-    // FIXME: FIXME_NOW: DETERMINE: Does this actually need to be here?  It's 
-    //        being done for closures, but there may be a reason that applies
-    //        there but not here.
-    //
-    //           if (E != FD->getSingleExpressionBody()) {
-    //             FD->setSingleExpressionBody(E);
-    //           }
-
     if (resultTypeLoc.isNull() || resultTypeLoc.getType()->isVoid()) {
       BS->setElement(0, E);
     } else {
       // FIXME: FIXME_NOW: DETERMINE: Is this the appropriate mechanism to use
       //        to divine the type of E?
       preCheckExpression(E, FD);
+      if (E != FD->getSingleExpressionBody()) {
+        FD->setSingleExpressionBody(E);
+      }
+
       constraints::ConstraintSystem cs(*this, FD, 
                                        constraints::ConstraintSystemFlags::SuppressDiagnostics);
       SmallVector<constraints::Solution, 4> viable;
