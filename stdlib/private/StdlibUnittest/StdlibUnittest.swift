@@ -839,7 +839,7 @@ func _childProcess() {
     var stderr = _Stderr()
     print("\(_stdlibUnittestStreamPrefix);end", to: &stderr)
 
-    if !testSuite._testByName(testName).canReuseChildProcessAfterTest {
+    if testSuite._shouldShutDownChildProcess(forTestNamed: testName) {
       return
     }
   }
@@ -1104,7 +1104,7 @@ class _ParentProcess {
     // Check if the child has sent us "end" markers for the current test.
     if stdoutEnd && stderrEnd {
       var status: ProcessTerminationStatus?
-      if !testSuite._testByName(testName).canReuseChildProcessAfterTest {
+      if testSuite._shouldShutDownChildProcess(forTestNamed: testName) {
         status = _waitForChild()
         switch status! {
         case .exit(0):
@@ -1144,7 +1144,11 @@ class _ParentProcess {
       return (failed: false, ())
     }
 #endif
-    print("\(_stdlibUnittestStreamPrefix);shutdown", to: &_childStdin)
+    // If the child process expects an EOF, its stdin fd has already been closed and
+    // it will shut itself down automatically.
+    if !_childStdin.isClosed {
+      print("\(_stdlibUnittestStreamPrefix);shutdown", to: &_childStdin)
+    }
 
     var childCrashed = false
 
@@ -1205,6 +1209,9 @@ class _ParentProcess {
     if _runTestsInProcess {
       if t.stdinText != nil {
         print("The test \(fullTestName) requires stdin input and can't be run in-process, marking as failed")
+        _anyExpectFailed = true
+      } else if t.requiresOwnProcess {
+        print("The test \(fullTestName) requires running in a child process and can't be run in-process, marking as failed.")
         _anyExpectFailed = true
       } else {
         _anyExpectFailed = false
@@ -1547,6 +1554,17 @@ public final class TestSuite {
     return _tests[_testNameToIndex[testName]!]
   }
 
+  /// Determines if we should shut down the current test process, i.e. if this
+  /// test or the next test requires executing in its own process.
+  func _shouldShutDownChildProcess(forTestNamed testName: String) -> Bool {
+    let index = _testNameToIndex[testName]!
+    if index == _tests.count - 1 { return false }
+    let currentTest = _tests[index]
+    let nextTest = _tests[index + 1]
+    if !currentTest.canReuseChildProcessAfterTest { return true }
+    return currentTest.requiresOwnProcess || nextTest.requiresOwnProcess
+  }
+
   internal enum _TestCode {
     case single(code: () -> Void)
     case parameterized(code: (Int) -> Void, count: Int)
@@ -1561,6 +1579,7 @@ public final class TestSuite {
     let stdinEndsWithEOF: Bool
     let crashOutputMatches: [String]
     let code: _TestCode
+    let requiresOwnProcess: Bool
 
     /// Whether the test harness should stop reusing the child process after
     /// running this test.
@@ -1598,6 +1617,7 @@ public final class TestSuite {
       var _stdinEndsWithEOF: Bool = false
       var _crashOutputMatches: [String] = []
       var _testLoc: SourceLoc?
+      var _requiresOwnProcess: Bool = false
     }
 
     init(testSuite: TestSuite, name: String, loc: SourceLoc) {
@@ -1627,6 +1647,11 @@ public final class TestSuite {
       return self
     }
 
+    public func requireOwnProcess() -> _TestBuilder {
+      _data._requiresOwnProcess = true
+      return self
+    }
+
     internal func _build(_ testCode: _TestCode) {
       _testSuite._tests.append(
         _Test(
@@ -1635,7 +1660,8 @@ public final class TestSuite {
           stdinText: _data._stdinText,
           stdinEndsWithEOF: _data._stdinEndsWithEOF,
           crashOutputMatches: _data._crashOutputMatches,
-          code: testCode))
+          code: testCode,
+          requiresOwnProcess: _data._requiresOwnProcess))
       _testSuite._testNameToIndex[_name] = _testSuite._tests.count - 1
     }
 
