@@ -455,4 +455,110 @@ extension vDSP {
             }
         }
     }
+    
+    //===----------------------------------------------------------------------===//
+    //
+    //  Complex vector absolute
+    //
+    //===----------------------------------------------------------------------===//
+    
+    /// Populates `result` with the absolute values of `vector`,
+    /// single-precision.
+    ///
+    /// - Parameter vector: The input vector.
+    /// - Parameter result: The output vector.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func absolute<V>(_ vector: DSPSplitComplex,
+                                   result: inout V)
+        where
+        V: _MutableContiguousCollection,
+        V.Element == Float {
+            
+            let n = result.count
+            
+            result.withUnsafeMutableBufferPointer { r in
+                withUnsafePointer(to: vector) { v in
+                    vDSP_zvabs(v, 1,
+                               r.baseAddress!, 1,
+                               vDSP_Length(n))
+                }
+            }
+    }
+    
+    /// Populates `result` with the absolute values of `vector`,
+    /// double-precision.
+    ///
+    /// - Parameter vector: The input vector.
+    /// - Parameter result: The output vector.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func absolute<V>(_ vector: DSPDoubleSplitComplex,
+                                   result: inout V)
+        where
+        V: _MutableContiguousCollection,
+        V.Element == Double {
+            
+            let n = result.count
+            
+            result.withUnsafeMutableBufferPointer { r in
+                withUnsafePointer(to: vector) { v in
+                    vDSP_zvabsD(v, 1,
+                                r.baseAddress!, 1,
+                                vDSP_Length(n))
+                }
+            }
+    }
+    
+    //===----------------------------------------------------------------------===//
+    //
+    //  Complex squared magnitude
+    //
+    //===----------------------------------------------------------------------===//
+    
+    /// Calculates the squared magnitude of each element in `vector`, writing the result to `result`; single-precision.
+    ///
+    /// - Parameter splitComplex: Input values.
+    /// - Parameter result: Output values.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func squareMagnitudes<V>(_ splitComplex: DSPSplitComplex,
+                                           result: inout V)
+        where
+        V : _MutableContiguousCollection,
+        V.Element == Float {
+            
+            let n = vDSP_Length(result.count)
+            
+            result.withUnsafeMutableBufferPointer { dest in
+                withUnsafePointer(to: splitComplex) { src in
+                    vDSP_zvmags(src, 1,
+                                dest.baseAddress!, 1,
+                                n)
+                }
+            }
+    }
+    
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    /// Calculates the squared magnitude of each element in `vector`, writing the result to `result`; double-precision.
+    ///
+    /// - Parameter splitComplex: Input values.
+    /// - Parameter result: Output values.
+    public static func squareMagnitudes<V>(_ splitComplex: DSPDoubleSplitComplex,
+                                           result: inout V)
+        where
+        V : _MutableContiguousCollection,
+        V.Element == Double {
+            
+            let n = vDSP_Length(result.count)
+            
+            result.withUnsafeMutableBufferPointer { dest in
+                withUnsafePointer(to: splitComplex) { src in
+                    vDSP_zvmagsD(src, 1,
+                                 dest.baseAddress!, 1,
+                                 n)
+                }
+            }
+    }
 }

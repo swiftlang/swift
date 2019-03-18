@@ -104,6 +104,28 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     var splitComplexLegacyResult = DSPSplitComplex(realp: &realLegacyResult,
                                                    imagp: &imaginaryLegacyResult)
     
+    AccelerateTests.test("vDSP/ComplexAbsolute") {
+        vDSP.absolute(splitComplexSource,
+                      result: &realResult)
+        
+        vDSP_zvabs(&splitComplexSource, 1,
+                   &realLegacyResult, 1,
+                   vDSP_Length(n))
+        
+        expectTrue(realResult.elementsEqual(realLegacyResult))
+    }
+    
+    AccelerateTests.test("vDSP/SquareMagnitudes") {
+        vDSP.squareMagnitudes(splitComplexSource,
+                              result: &realResult)
+        
+        vDSP_zvmags(&splitComplexSource, 1,
+                    &realLegacyResult, 1,
+                    vDSP_Length(n))
+        
+        expectTrue(realResult.elementsEqual(realLegacyResult))
+    }
+    
     AccelerateTests.test("vDSP/Conjugate") {
         vDSP.conjugate(splitComplexSource,
                        count: n,
@@ -341,6 +363,28 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     var imaginaryLegacyResult = [Double](repeating: -1, count: n)
     var splitComplexLegacyResult = DSPDoubleSplitComplex(realp: &realLegacyResult,
                                                          imagp: &imaginaryLegacyResult)
+    
+    AccelerateTests.test("vDSP/ComplexAbsolute") {
+        vDSP.absolute(splitComplexSource,
+                      result: &realResult)
+        
+        vDSP_zvabsD(&splitComplexSource, 1,
+                    &realLegacyResult, 1,
+                    vDSP_Length(n))
+        
+        expectTrue(realResult.elementsEqual(realLegacyResult))
+    }
+    
+    AccelerateTests.test("vDSP/SquareMagnitudes") {
+        vDSP.squareMagnitudes(splitComplexSource,
+                              result: &realResult)
+        
+        vDSP_zvmagsD(&splitComplexSource, 1,
+                     &realLegacyResult, 1,
+                     vDSP_Length(n))
+        
+        expectTrue(realResult.elementsEqual(realLegacyResult))
+    }
     
     AccelerateTests.test("vDSP/Conjugate") {
         vDSP.conjugate(splitComplexSource,
