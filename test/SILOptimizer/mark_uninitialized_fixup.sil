@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-ownership -mark-uninitialized-fixup %s | %FileCheck %s
+// RUN: %target-sil-opt -verify-sil-ownership -mark-uninitialized-fixup %s | %FileCheck %s
 
 sil_stage raw
 
