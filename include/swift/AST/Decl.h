@@ -4579,7 +4579,7 @@ public:
   };
 
 protected:
-  llvm::PointerUnion<PatternBindingDecl*, Stmt*> ParentPattern;
+  PointerUnion3<PatternBindingDecl *, Stmt *, VarDecl *> Parent;
 
   VarDecl(DeclKind Kind, bool IsStatic, Specifier Sp, bool IsCaptureList,
           SourceLoc NameLoc, Identifier Name, DeclContext *DC)
@@ -4650,12 +4650,15 @@ public:
   /// Return the parent pattern binding that may provide an initializer for this
   /// VarDecl.  This returns null if there is none associated with the VarDecl.
   PatternBindingDecl *getParentPatternBinding() const {
-    return ParentPattern.dyn_cast<PatternBindingDecl *>();
+    if (!Parent)
+      return nullptr;
+    return Parent.dyn_cast<PatternBindingDecl *>();
   }
   void setParentPatternBinding(PatternBindingDecl *PBD) {
-    ParentPattern = PBD;
+    assert(PBD);
+    Parent = PBD;
   }
-  
+
   /// Return the Pattern involved in initializing this VarDecl.  However, recall
   /// that the Pattern may be involved in initializing more than just this one
   /// vardecl.  For example, if this is a VarDecl for "x", the pattern may be
@@ -4666,15 +4669,52 @@ public:
   /// returns null.
   ///
   Pattern *getParentPattern() const;
-  
+
   /// Return the statement that owns the pattern associated with this VarDecl,
   /// if one exists.
+  ///
+  /// NOTE: After parsing and before type checking, all VarDecls from
+  /// CaseLabelItem's Patterns return their CaseStmt. After type checking, we
+  /// will have constructed the CaseLabelItem VarDecl linked list implying this
+  /// will return nullptr. After type checking, if one wishes to find a parent
+  /// pattern of a VarDecl of a CaseStmt, \see getRecursiveParentPatternStmt
+  /// instead.
   Stmt *getParentPatternStmt() const {
-    return ParentPattern.dyn_cast<Stmt*>();
+    if (!Parent)
+      return nullptr;
+    return Parent.dyn_cast<Stmt *>();
   }
-  void setParentPatternStmt(Stmt *S) {
-    ParentPattern = S;
+
+  void setParentPatternStmt(Stmt *s) {
+    assert(s);
+    Parent = s;
   }
+
+  /// Look for the parent pattern stmt of this var decl, recursively
+  /// looking through var decl pointers and then through any
+  /// fallthroughts.
+  Stmt *getRecursiveParentPatternStmt() const;
+
+  /// Returns the var decl that this var decl is an implicit reference to if
+  /// such a var decl exists.
+  VarDecl *getParentVarDecl() const {
+    if (!Parent)
+      return nullptr;
+    return Parent.dyn_cast<VarDecl *>();
+  }
+
+  /// Set \p v to be the pattern produced VarDecl that is the parent of this
+  /// var decl.
+  void setParentVarDecl(VarDecl *v) {
+    assert(v);
+    Parent = v;
+  }
+
+  /// If this is a VarDecl that does not belong to a CaseLabelItem's pattern,
+  /// return this. Otherwise, this VarDecl must belong to a CaseStmt's
+  /// CaseLabelItem. In that case, return the first case label item of the first
+  /// case stmt in a sequence of case stmts that fallthrough into each other.
+  VarDecl *getCanonicalVarDecl() const;
 
   /// True if the global stored property requires lazy initialization.
   bool isLazilyInitializedGlobal() const;
