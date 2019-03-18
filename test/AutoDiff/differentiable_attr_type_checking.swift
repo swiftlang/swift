@@ -1,7 +1,22 @@
 // RUN: %target-swift-frontend -typecheck -verify %s
 
-@differentiable(vjp: dfoo) // expected-error {{'@differentiable' attribute cannot be applied to this declaration}}
-let x: Float = 1
+@differentiable // expected-error {{'@differentiable' attribute cannot be applied to this declaration}}
+let global: Float = 1
+
+func testLocalVariables() {
+  // expected-error @+1 {{'_' has no parameters to differentiate with respect to}}
+  @differentiable
+  var getter: Float {
+    return 1
+  }
+
+  // expected-error @+1 {{'_' has no parameters to differentiate with respect to}}
+  @differentiable
+  var getterSetter: Float {
+    get { return 1 }
+    set {}
+  }
+}
 
 @differentiable(vjp: dfoo) // expected-error {{'@differentiable' attribute cannot be applied to this declaration}}
 protocol P {}
@@ -82,6 +97,34 @@ struct DifferentiableInstanceMethod : Differentiable {
   @differentiable // ok
   func noParams() -> Float {
     return 1
+  }
+}
+
+// Test subscript methods.
+struct SubscriptMethod {
+  @differentiable // ok
+  subscript(implicitGetter x: Float) -> Float {
+    return x
+  }
+
+  @differentiable // ok
+  subscript(implicitGetterSetter x: Float) -> Float {
+    get { return x }
+    set {}
+  }
+
+  subscript(explicit x: Float) -> Float {
+    @differentiable // ok
+    get { return x }
+    @differentiable // expected-error {{'@differentiable' attribute cannot be applied to this declaration}}
+    set {}
+  }
+
+  subscript(x: Float, y: Float) -> Float {
+    @differentiable // ok
+    get { return x + y }
+    @differentiable // expected-error {{'@differentiable' attribute cannot be applied to this declaration}}
+    set {}
   }
 }
 

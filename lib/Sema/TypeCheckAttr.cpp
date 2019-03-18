@@ -2637,18 +2637,19 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto lookupConformance =
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
 
-  AbstractFunctionDecl *original = nullptr;
-  if (auto *vd = dyn_cast<VarDecl>(D)) {
-    // When used on a storage decl, @differentiable refers to its getter.
-    original = vd->getGetter();
-  } else if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
-    original = afd;
-    if (auto *accessor = dyn_cast<AccessorDecl>(afd)) {
-      // We do not support setters yet because inout is not supported yet.
-      if (accessor->isSetter())
-        original = nullptr;
-    }
+  AbstractFunctionDecl *original = dyn_cast<AbstractFunctionDecl>(D);
+  if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
+    // When used directly on a storage decl (stored/computed property or
+    // subscript), the getter is currently inferred to be `@differentiable`.
+    // TODO(TF-129): Infer setter to also be `@differentiable` after
+    // differentiation supports inout parameters.
+    original = asd->getGetter();
   }
+  // Setters are not yet supported.
+  // TODO(TF-129): Remove this when differentiation supports inout parameters.
+  if (auto *accessor = dyn_cast_or_null<AccessorDecl>(original))
+    if (accessor->isSetter())
+      original = nullptr;
 
   // Global immutable vars, for example, have no getter, and therefore trigger
   // this.
