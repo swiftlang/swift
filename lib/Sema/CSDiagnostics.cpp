@@ -856,7 +856,9 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
 
     if (auto resolvedOverload = getResolvedOverload(getLocator()))
       if (resolvedOverload->Choice.getKind() ==
-          OverloadChoiceKind::DynamicMemberLookup)
+              OverloadChoiceKind::DynamicMemberLookup ||
+          resolvedOverload->Choice.getKind() ==
+              OverloadChoiceKind::KeyPathDynamicMemberLookup)
         subElementDiagID = diag::assignment_dynamic_property_has_immutable_base;
   } else if (auto sub = dyn_cast<SubscriptExpr>(diagExpr)) {
       subElementDiagID = diag::assignment_subscript_has_immutable_base;

@@ -2695,6 +2695,10 @@ namespace {
                               /*isImplicit*/false,
                               AccessSemantics::Ordinary, selected);
       }
+
+      case OverloadChoiceKind::KeyPathDynamicMemberLookup: {
+        break;
+      }
       }
 
       llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
@@ -4194,8 +4198,10 @@ namespace {
           if (foundDecl) {
             // If this was a @dynamicMemberLookup property, then we actually
             // form a subscript reference, so switch the kind.
-            if (foundDecl->choice.getKind()
-                    == OverloadChoiceKind::DynamicMemberLookup) {
+            if (foundDecl->choice.getKind() ==
+                    OverloadChoiceKind::DynamicMemberLookup ||
+                foundDecl->choice.getKind() ==
+                    OverloadChoiceKind::KeyPathDynamicMemberLookup) {
               kind = KeyPathExpr::Component::Kind::UnresolvedSubscript;
             }
           }

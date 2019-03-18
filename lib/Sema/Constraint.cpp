@@ -356,6 +356,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
       printDecl();
       break;
     case OverloadChoiceKind::DynamicMemberLookup:
+    case OverloadChoiceKind::KeyPathDynamicMemberLookup:
       Out << "dynamic member lookup '" << overload.getName() << "'";
       break;
     case OverloadChoiceKind::BaseType:

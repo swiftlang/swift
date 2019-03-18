@@ -117,6 +117,7 @@ bool constraints::areConservativelyCompatibleArgumentLabels(
 
   case OverloadChoiceKind::BaseType:
   case OverloadChoiceKind::DynamicMemberLookup:
+  case OverloadChoiceKind::KeyPathDynamicMemberLookup:
   case OverloadChoiceKind::TupleIndex:
     return true;
   }
@@ -3946,17 +3947,21 @@ retry_after_fail:
                                             baseTy, functionRefKind,
                                             memberLocator,
                                             includeInaccessibleMembers);
-        
+
       // Reflect the candidates found as `DynamicMemberLookup` results.
       for (auto candidate : subscripts.ViableCandidates) {
-        auto decl = cast<SubscriptDecl>(candidate.getDecl());
-        if (isValidDynamicMemberLookupSubscript(decl, DC, TC))
-          result.addViable(
-            OverloadChoice::getDynamicMemberLookup(baseTy, decl, name));
+        auto *SD = cast<SubscriptDecl>(candidate.getDecl());
+        bool isKeyPathBased = isValidKeyPathDynamicMemberLookup(SD, TC);
+
+        if (isValidStringDynamicMemberLookup(SD, DC, TC) || isKeyPathBased)
+          result.addViable(OverloadChoice::getDynamicMemberLookup(
+              baseTy, SD, name, isKeyPathBased));
       }
+
       for (auto index : indices(subscripts.UnviableCandidates)) {
-        auto decl = subscripts.UnviableCandidates[index].getDecl();
-        auto choice = OverloadChoice::getDynamicMemberLookup(baseTy, decl,name);
+        auto *SD = cast<SubscriptDecl>(subscripts.UnviableCandidates[index].getDecl());
+        auto choice = OverloadChoice::getDynamicMemberLookup(
+          baseTy, SD, name, isValidKeyPathDynamicMemberLookup(SD, TC));
         result.addUnviable(choice, subscripts.UnviableReasons[index]);
       }
     }

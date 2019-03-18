@@ -1401,6 +1401,7 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
   case OverloadChoiceKind::DeclViaDynamic:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
   case OverloadChoiceKind::DynamicMemberLookup:
+  case OverloadChoiceKind::KeyPathDynamicMemberLookup:
   case OverloadChoiceKind::KeyPathApplication:
   case OverloadChoiceKind::TupleIndex:
     return Type();
@@ -1717,7 +1718,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaDynamic:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
-  case OverloadChoiceKind::DynamicMemberLookup: {
+  case OverloadChoiceKind::DynamicMemberLookup:
+  case OverloadChoiceKind::KeyPathDynamicMemberLookup: {
     // Retrieve the type of a reference to the specific declaration choice.
     if (auto baseTy = choice.getBaseType()) {
       assert(!baseTy->hasTypeParameter());
@@ -1878,6 +1880,10 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       addConstraint(ConstraintKind::LiteralConformsTo, argType,
                     protocol->getDeclaredType(),
                     locator);
+    }
+
+    if (kind == OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+      assert(false && "not yet implemented");
     }
     break;
   }
@@ -2115,8 +2121,9 @@ DeclName OverloadChoice::getName() const {
       return DeclBaseName::createSubscript();
     
     case OverloadChoiceKind::DynamicMemberLookup:
-      return DeclName(DynamicNameAndFRK.getPointer());
-      
+    case OverloadChoiceKind::KeyPathDynamicMemberLookup:
+      return DeclName(DynamicMember.getPointer());
+
     case OverloadChoiceKind::BaseType:
     case OverloadChoiceKind::TupleIndex:
       llvm_unreachable("no name!");
@@ -2453,6 +2460,7 @@ bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
 
       case OverloadChoiceKind::KeyPathApplication:
       case OverloadChoiceKind::DynamicMemberLookup:
+      case OverloadChoiceKind::KeyPathDynamicMemberLookup:
         // Skip key path applications and dynamic member lookups, since we don't
         // want them to noise up unrelated subscript diagnostics.
         break;
