@@ -47,6 +47,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_IN_INIT_3 | %FileCheck %s -check-prefix=CLOSURE_IN_INIT_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_IN_INIT_4 | %FileCheck %s -check-prefix=CLOSURE_IN_INIT_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AVAILABLE_1 | %FileCheck %s -check-prefix=AVAILABLE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AVAILABLE_2 | %FileCheck %s -check-prefix=AVAILABLE_2
+
 func freeFunc() {}
 
 //===---
@@ -331,4 +334,34 @@ struct ClosureInInit1 {
   var prop3: S = {
     S(#^CLOSURE_IN_INIT_4^#
   }()
+}
+
+public class AvailableTest {
+
+  @available(swift, obsoleted: 4)
+  init(opt: Int) { }
+
+  @available(swift, introduced: 4)
+  init?(opt: Int) { }
+
+  init(normal1: Int) { }
+  init(normal2: Int) { }
+
+
+}
+func testAvailable() {
+  let _ = AvailableTest(#^AVAILABLE_1^#
+// AVAILABLE_1: Begin completions, 3 items
+// AVAILABLE_1-DAG: Decl[Constructor]/CurrNominal:      ['(']{#opt: Int#}[')'][#AvailableTest?#]; name=opt: Int
+// AVAILABLE_1-DAG: Decl[Constructor]/CurrNominal:      ['(']{#normal1: Int#}[')'][#AvailableTest#]; name=normal1: Int
+// AVAILABLE_1-DAG: Decl[Constructor]/CurrNominal:      ['(']{#normal2: Int#}[')'][#AvailableTest#]; name=normal2: Int
+// AVAILABLE_1: End completions
+
+  let _ = AvailableTest.init(#^AVAILABLE_2^#
+// AVAILABLE_2: Begin completions, 3 items
+// AVAILABLE_2-DAG: Pattern/CurrModule:                 ['(']{#opt: Int#}[')'][#AvailableTest?#]; name=opt: Int
+// AVAILABLE_2-DAG: Pattern/CurrModule:                 ['(']{#normal1: Int#}[')'][#AvailableTest#]; name=normal1: Int
+// AVAILABLE_2-DAG: Pattern/CurrModule:                 ['(']{#normal2: Int#}[')'][#AvailableTest#]; name=normal2: Int
+// AVAILABLE_2: End completions
+
 }
