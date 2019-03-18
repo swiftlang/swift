@@ -2274,6 +2274,11 @@ Parser::parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive) {
       if (auto PDD = PoundDiagnosticResult.getPtrOrNull()) {
         cases.emplace_back(PDD);
       }
+    } else if (Tok.is(tok::code_complete)) {
+      if (CodeCompletion)
+        CodeCompletion->completeCaseStmtKeyword();
+      consumeToken(tok::code_complete);
+      return makeParserCodeCompletionStatus();
     } else {
       // If there are non-case-label statements at the start of the switch body,
       // raise an error and recover by discarding them.
