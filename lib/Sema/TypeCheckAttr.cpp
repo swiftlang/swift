@@ -2566,6 +2566,12 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
       D->getAttrs().hasAttribute<InlinableAttr>())
     return;
 
+  if (auto *FD = dyn_cast<FuncDecl>(D)) {
+    // Don't add dynamic to defer bodies.
+    if (FD->isDeferBody())
+      return;
+  }
+
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     // Don't turn stored into computed properties. This could conflict with
     // exclusivity checking.
