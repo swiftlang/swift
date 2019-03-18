@@ -169,7 +169,7 @@ Constraint::Constraint(Type type, OverloadChoice choice, DeclContext *useDC,
                        ConstraintFix *fix, ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
     : Kind(ConstraintKind::BindOverload), TheFix(fix), HasRestriction(false),
-      IsActive(false), IsDisabled(false), RememberChoice(false),
+      IsActive(false), IsDisabled(bool(fix)), RememberChoice(false),
       IsFavored(false),
       NumTypeVariables(typeVars.size()), Overload{type, choice, useDC},
       Locator(locator) {

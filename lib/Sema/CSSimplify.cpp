@@ -3753,8 +3753,15 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     if (decl->isInstanceMember()) {
       if ((isa<FuncDecl>(decl) && !hasInstanceMethods) ||
           (!isa<FuncDecl>(decl) && !hasInstanceMembers)) {
-        result.addUnviable(candidate,
-                           MemberLookupResult::UR_InstanceMemberOnType);
+        // `AnyObject` has special semantics, so let's just let it be.
+        // Otherwise adjust base type and reference kind to make it
+        // look as if lookup was done on the instance, that helps
+        // with diagnostics.
+        auto choice = instanceTy->isAnyObject()
+                          ? candidate
+                          : OverloadChoice(instanceTy, decl,
+                                           FunctionRefKind::SingleApply);
+        result.addUnviable(choice, MemberLookupResult::UR_InstanceMemberOnType);
         return;
       }
 
@@ -3926,10 +3933,10 @@ retry_after_fail:
           result.addViable(
             OverloadChoice::getDynamicMemberLookup(baseTy, decl, name));
       }
-      for (auto candidate : subscripts.UnviableCandidates) {
-        auto decl = candidate.first.getDecl();
+      for (auto index : indices(subscripts.UnviableCandidates)) {
+        auto decl = subscripts.UnviableCandidates[index].getDecl();
         auto choice = OverloadChoice::getDynamicMemberLookup(baseTy, decl,name);
-        result.addUnviable(choice, candidate.second);
+        result.addUnviable(choice, subscripts.UnviableReasons[index]);
       }
     }
   }
@@ -4203,9 +4210,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     break;
   }
 
+  SmallVector<Constraint *, 4> candidates;
   // If we found viable candidates, then we're done!
   if (!result.ViableCandidates.empty()) {
-    llvm::SmallVector<Constraint *, 8> candidates;
     generateConstraints(
         candidates, memberTy, result.ViableCandidates, useDC, locator,
         result.getFavoredIndex(), /*requiresFix=*/false,
@@ -4222,11 +4229,24 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       generateConstraints(candidates, memberTy, outerAlternatives,
                           useDC, locator);
     }
+  }
 
+  if (!result.UnviableCandidates.empty()) {
+    // Generate constraints for unvailable choices if they have a fix,
+    // and disable them by default, they'd get picked up in the "salvage" mode.
+    generateConstraints(
+        candidates, memberTy, result.UnviableCandidates, useDC, locator,
+        /*favoredChoice=*/None, /*requiresFix=*/true,
+        [&](unsigned idx, const OverloadChoice &choice) {
+          return fixMemberRef(*this, baseTy, member, choice, locator,
+                              result.UnviableReasons[idx]);
+        });
+  }
+
+  if (!candidates.empty()) {
     addOverloadSet(candidates, locator);
     return SolutionKind::Solved;
   }
-  
 
   // If the lookup found no hits at all (either viable or unviable), diagnose it
   // as such and try to recover in various ways.
@@ -4237,30 +4257,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     // off to see if the problem is related to base not being explicitly unwrapped.
     if (!MissingMembers.insert(locator))
       return SolutionKind::Error;
-
-    if (!result.UnviableCandidates.empty()) {
-      SmallVector<OverloadChoice, 8> choices;
-      llvm::transform(
-          result.UnviableCandidates, std::back_inserter(choices),
-          [](const std::pair<OverloadChoice, MemberLookupResult::UnviableReason>
-                 &candidate) { return candidate.first; });
-
-      SmallVector<Constraint *, 4> candidates;
-      generateConstraints(candidates, memberTy, choices, useDC, locator,
-                          /*favoredChoice=*/None, /*requiresFix=*/true,
-                          [&](unsigned idx, const OverloadChoice &choice) {
-                            return fixMemberRef(
-                                *this, baseTy, member, choice, locator,
-                                result.UnviableCandidates[idx].second);
-                          });
-
-      // If there are any viable "fixed" candidates, let's schedule
-      // them to be attempted.
-      if (!candidates.empty()) {
-        addOverloadSet(candidates, locator);
-        return SolutionKind::Solved;
-      }
-    }
 
     if (baseObjTy->getOptionalObjectType()) {
       // If the base type was an optional, look through it.
