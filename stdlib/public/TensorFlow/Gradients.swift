@@ -547,7 +547,9 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
   @inlinable
   func _vjpSqueezingShape(at axes: [Int32]) -> (Tensor, (Tensor) -> Tensor) {
     let value = squeezingShape(at: axes)
-    return (value, { $0.broadcast(toShape: self.shapeTensor) })
+    return (value, { v in
+      return v.reshaped(toShape: self.shapeTensor)
+    })
   }
 
   @inlinable
