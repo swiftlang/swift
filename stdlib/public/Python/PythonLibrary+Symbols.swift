@@ -123,6 +123,14 @@ let PyDict_Next: @convention(c) (
   UnsafeMutablePointer<PyObjectPointer?>) -> Int32 =
   PythonLibrary.loadSymbol(name: "PyDict_Next")
 
+let PyIter_Next: @convention(c) (
+  PyObjectPointer) -> PyObjectPointer? =
+  PythonLibrary.loadSymbol(name: "PyIter_Next")
+
+let PyObject_GetIter: @convention(c) (
+  PyObjectPointer) -> PyObjectPointer? =
+  PythonLibrary.loadSymbol(name: "PyObject_GetIter")
+
 let PyList_New: @convention(c) (Int) -> PyObjectPointer? =
   PythonLibrary.loadSymbol(name: "PyList_New")
 
