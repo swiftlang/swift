@@ -393,7 +393,9 @@ static void printDifferentiableAttrArguments(
   }
   // Print 'where' clause, if any.
   if (!attr->getRequirements().empty()) {
-    stream << " where ";
+    if (!isLeadingClause)
+      stream << ' ';
+    stream << "where ";
     std::function<Type(Type)> getInterfaceType;
     if (!original || !original->getGenericEnvironment()) {
       getInterfaceType = [](Type Ty) -> Type { return Ty; };
