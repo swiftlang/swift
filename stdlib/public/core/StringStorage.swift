@@ -32,6 +32,12 @@ private func _isNSString(_ str:AnyObject) -> UInt8 {
   return _swift_stdlib_isNSString(str)
 }
 
+@_effects(releasenone)
+private func _unsafeAddressOfCocoaStringClass(
+  _ str: _CocoaString) -> UInt {
+  return _swift_stdlib_unsafeAddressOfClass(str)
+}
+
 #else
 
 internal protocol _AbstractStringStorage {
@@ -118,46 +124,50 @@ extension _AbstractStringStorage {
     if self === other {
       return 1
     }
-
-    // Handle the case where both strings were bridged from Swift.
-    // We can't use String.== because it doesn't match NSString semantics.
-    let knownOther = _KnownCocoaString(other)
-    switch knownOther {
-    case .storage:
-      return _nativeIsEqual(
-        _unsafeUncheckedDowncast(other, to: __StringStorage.self))
-    case .shared:
-      return _nativeIsEqual(
-        _unsafeUncheckedDowncast(other, to: __SharedStringStorage.self))
-#if !(arch(i386) || arch(arm))
-    case .tagged:
-      fallthrough
-#endif
-    case .cocoa:
-      // We're allowed to crash, but for compatibility reasons NSCFString allows
-      // non-strings here.
-      if _isNSString(other) != 1 {
-        return 0
+    
+    #if !(arch(i386) || arch(arm))
+    let tagged = _isObjCTaggedPointer(other)
+    #else
+    let tagged = false
+    #endif
+    
+    if !tagged {
+      // Handle the case where both strings were bridged from Swift.
+      // We can't use String.== because it doesn't match NSString semantics.
+      let cls = _unsafeAddressOfCocoaStringClass(other)
+      if cls == unsafeBitCast(__StringStorage.self, to: UInt.self) {
+        return _nativeIsEqual(
+          _unsafeUncheckedDowncast(other, to: __StringStorage.self))
       }
-      // At this point we've proven that it is an NSString of some sort, but not
-      // one of ours.
-      if length != _stdlib_binary_CFStringGetLength(other) {
-        return 0
+      if cls == unsafeBitCast(__SharedStringStorage.self, to: UInt.self) {
+        return _nativeIsEqual(
+          _unsafeUncheckedDowncast(other, to: __SharedStringStorage.self))
       }
-      defer { _fixLifetime(other) }
-      // CFString will only give us ASCII bytes here, but that's fine.
-      // We already handled non-ASCII UTF8 strings earlier since they're Swift.
-      if let otherStart = _cocoaUTF8Pointer(other) {
-        return (start == otherStart ||
-          (memcmp(start, otherStart, count) == 0)) ? 1 : 0
-      }
-      /*
-       The abstract implementation of -isEqualToString: falls back to -compare:
-       immediately, so when we run out of fast options to try, do the same.
-       We can likely be more clever here if need be
-      */
-      return _cocoaStringCompare(self, other) == 0 ? 1 : 0
     }
+
+    // We're allowed to crash, but for compatibility reasons NSCFString allows
+    // non-strings here.
+    if _isNSString(other) != 1 {
+      return 0
+    }
+    // At this point we've proven that it is an NSString of some sort, but not
+    // a Swift one.
+    if length != _stdlib_binary_CFStringGetLength(other) {
+      return 0
+    }
+    defer { _fixLifetime(other) }
+    // CFString will only give us ASCII bytes here, but that's fine.
+    // We already handled non-ASCII UTF8 strings earlier since they're Swift.
+    if let otherStart = _cocoaUTF8Pointer(other) {
+      return (start == otherStart ||
+        (memcmp(start, otherStart, count) == 0)) ? 1 : 0
+    }
+    /*
+     The abstract implementation of -isEqualToString: falls back to -compare:
+     immediately, so when we run out of fast options to try, do the same.
+     We can likely be more clever here if need be
+     */
+    return _cocoaStringCompare(self, other) == 0 ? 1 : 0
   }
 
 #endif //_runtime(_ObjC)

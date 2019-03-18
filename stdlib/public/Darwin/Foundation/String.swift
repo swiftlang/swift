@@ -26,6 +26,25 @@ extension String {
   }
 }
 
+@_effects(readonly)
+private func _getClass(_ obj: AnyObject) -> AnyClass {
+  return object_getClass(obj)!
+}
+
+@_effects(readonly)
+private func _length(_ obj: AnyObject) -> Int {
+  return CFStringGetLength(unsafeBitCast(obj, to: CFString.self))
+}
+
+@_effects(releasenone)
+private func _copyString(_ obj: AnyObject) -> AnyObject {
+  return CFStringCreateCopy(kCFAllocatorSystemDefault, unsafeBitCast(obj, to: CFString.self))
+}
+
+private let (nscfClass, nscfConstantClass): (AnyClass, AnyClass) =
+  (objc_lookUpClass("__NSCFString")!,
+   objc_lookUpClass("__NSCFConstantString")!)
+
 extension String : _ObjectiveCBridgeable {
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSString {
@@ -39,7 +58,7 @@ extension String : _ObjectiveCBridgeable {
     _ x: NSString,
     result: inout String?
   ) {
-    result = String(x)
+    result = String._unconditionallyBridgeFromObjectiveC(x)
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
@@ -54,10 +73,47 @@ extension String : _ObjectiveCBridgeable {
   public static func _unconditionallyBridgeFromObjectiveC(
     _ source: NSString?
   ) -> String {
+    if let source = source {
+      #if !(arch(i386) || arch(arm))
+      if let result = _bridgeTaggedCocoaString(source) {
+        return result
+      }
+      #endif
+      
+      let sourceClass:AnyClass = _getClass(source)
+      
+      if _isRebridgedSwiftStringClass(sourceClass) {
+        return _rebridgeSwiftString(source, sourceClass)
+      }
+      
+      let len = _length(source)
+
+      //We *may* not be able to form a SmallString from this, but above 15 we
+      //definitely can't. It's worth trying because eager bridging is almost
+      //always good if we don't have to allocate for it.
+      if len <= 15 && sourceClass == nscfClass,
+        let result = _bridgeShortCFString(source, len) {
+        return result
+      }
+      
+      if sourceClass == nscfConstantClass {
+        return _bridgeConstantCocoaString(source, len)
+      }
+      
+      let immutableCopy = _copyString(source)
+      
+      //mutable->immutable might make it start being a tagged pointer
+      #if !(arch(i386) || arch(arm))
+      if let result = _bridgeTaggedCocoaString(immutableCopy) {
+        return result
+      }
+      #endif
+      
+      return _bridgeUnknownCocoaString(immutableCopy, len)
+    }
     // `nil` has historically been used as a stand-in for an empty
     // string; map it to an empty string.
-    if _slowPath(source == nil) { return String() }
-    return String(source!)
+    return String()
   }
 }
 
@@ -87,11 +143,8 @@ extension Substring : _ObjectiveCBridgeable {
   public static func _unconditionallyBridgeFromObjectiveC(
     _ source: NSString?
   ) -> Substring {
-    // `nil` has historically been used as a stand-in for an empty
-    // string; map it to an empty substring.
-    if _slowPath(source == nil) { return Substring() }
-    let s = String(source!)
-    return s[...]
+    let str = String._unconditionallyBridgeFromObjectiveC(source)
+    return str[...]
   }
 }
 

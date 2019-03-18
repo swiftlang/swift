@@ -290,14 +290,33 @@ extension _SmallString {
   @usableFromInline // testable
   internal init(taggedCocoa cocoa: AnyObject) {
     self.init()
+    let length = _stdlib_binary_CFStringGetLength(cocoa)
     self.withMutableCapacity {
-      let len = _bridgeTagged(cocoa, intoUTF8: $0)
-      _internalInvariant(len != nil && len! < _SmallString.capacity,
+      let len = _bridgeTagged(cocoa, length: length, intoUTF8: $0)
+      _internalInvariant(len != nil && len! <= _SmallString.capacity,
         "Internal invariant violated: large tagged NSStrings")
       return len._unsafelyUnwrappedUnchecked
     }
     self._invariantCheck()
   }
+  
+  @_effects(readonly)
+  @usableFromInline
+  internal init?(nonTaggedCocoa cocoa: AnyObject, length cfLength: Int) {
+    self.init()
+    var len = 0
+    self.withMutableCapacity {
+      len = _bridgeNonTagged(cocoa, length: cfLength, intoUTF8: $0) ?? 0
+      _internalInvariant(len == 0 || len <= _SmallString.capacity,
+        "Internal invariant violated: tried to small-bridge a large NSString")
+      return len
+    }
+    if len == 0 {
+      return nil
+    }
+    self._invariantCheck()
+  }
+
 }
 #endif
 

@@ -125,56 +125,33 @@ private var kCFStringEncodingUTF8 : _swift_shims_CFStringEncoding {
   @inline(__always) get { return 0x8000100 }
 }
 
-@_effects(readonly)
-private func _unsafeAddressOfCocoaStringClass(_ str: _CocoaString) -> UInt {
-  return _swift_stdlib_unsafeAddressOfClass(str)
-}
-
-internal enum _KnownCocoaString {
-  case storage
-  case shared
-  case cocoa
-#if !(arch(i386) || arch(arm))
-  case tagged
-#endif
-  
-  @inline(__always)
-  init(_ str: _CocoaString) {
-    
-#if !(arch(i386) || arch(arm))
-    if _isObjCTaggedPointer(str) {
-      self = .tagged
-      return
-    }
-#endif
-    
-    switch _unsafeAddressOfCocoaStringClass(str) {
-    case unsafeBitCast(__StringStorage.self, to: UInt.self):
-      self = .storage
-    case unsafeBitCast(__SharedStringStorage.self, to: UInt.self):
-      self = .shared
-    default:
-      self = .cocoa
-    }
-  }
-}
-
 #if !(arch(i386) || arch(arm))
 // Resiliently write a tagged _CocoaString's contents into a buffer.
 @_effects(releasenone) // @opaque
 internal func _bridgeTagged(
   _ cocoa: _CocoaString,
+  length: Int,
   intoUTF8 bufPtr: UnsafeMutableBufferPointer<UInt8>
 ) -> Int? {
-  _internalInvariant(_isObjCTaggedPointer(cocoa))
   let ptr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
-  let length = _stdlib_binary_CFStringGetLength(cocoa)
   _internalInvariant(length <= _SmallString.capacity)
   var count = 0
   let numCharWritten = _swift_stdlib_CFStringGetBytes(
     cocoa, _swift_shims_CFRange(location: 0, length: length),
     kCFStringEncodingUTF8, 0, 0, ptr, bufPtr.count, &count)
   return length == numCharWritten ? count : nil
+}
+
+//In the future we may want to try CFStringGetCStringPtr and so on here,
+//or _bridgeTagged may want to use faster tagged-specific accessors than
+//CFStringGetCString, but for now they're the same
+@_effects(releasenone)
+internal func _bridgeNonTagged(
+  _ cocoa: _CocoaString,
+  length: Int,
+  intoUTF8 bufPtr: UnsafeMutableBufferPointer<UInt8>
+  ) -> Int? {
+  return _bridgeTagged(cocoa, length: length, intoUTF8: bufPtr)
 }
 #endif
 
@@ -210,53 +187,77 @@ private func _getCocoaStringPointer(
   return .none
 }
 
+@_effects(releasenone)
+public //SPI(Foundation)
+func _bridgeConstantCocoaString(
+  _ cocoaString: __owned AnyObject, _ length: Int) -> String {
+  let (fastUTF8, isASCII): (Bool, Bool)
+  switch _getCocoaStringPointer(cocoaString) {
+  case .ascii(_): (fastUTF8, isASCII) = (true, true)
+  case .utf8(_): (fastUTF8, isASCII) = (true, false)
+  default:  (fastUTF8, isASCII) = (false, false)
+  }
+  
+  return String(_StringGuts(
+    cocoa: cocoaString,
+    providesFastUTF8: fastUTF8,
+    isASCII: isASCII,
+    length: length))
+}
+
+@_effects(releasenone)
+public //SPI(Foundation)
+func _bridgeUnknownCocoaString(
+  _ cocoaString: __owned AnyObject, _ length: Int) -> String {
+ return _bridgeConstantCocoaString(cocoaString, length)
+}
+
+@_effects(readonly)
+public //SPI(Foundation)
+func _isRebridgedSwiftStringClass(_ cls: AnyClass) -> Bool {
+  return cls == __StringStorage.self || cls == __SharedStringStorage.self
+}
+
+@_effects(releasenone)
+public //SPI(Foundation)
+func _rebridgeSwiftString(
+  _ cocoaString: __owned AnyObject, _ cls: AnyClass) -> String {
+  _internalInvariant(_isRebridgedSwiftStringClass(cls))
+  if cls == __StringStorage.self {
+    return String(_unsafeUncheckedDowncast(
+      cocoaString, to: __StringStorage.self).asString._guts)
+  }
+  return String(_unsafeUncheckedDowncast(
+    cocoaString, to: __SharedStringStorage.self).asString._guts)
+}
+
+@_effects(releasenone)
+public //SPI(Foundation)
+func _bridgeTaggedCocoaString(_ cocoaString: AnyObject) -> String? {
+  #if !(arch(i386) || arch(arm))
+  if _isObjCTaggedPointer(cocoaString) {
+    return String(_StringGuts(_SmallString(taggedCocoa: cocoaString)))
+  }
+  #endif
+  return nil
+}
+
+@_effects(releasenone)
+public //SPI(Foundation)
+func _bridgeShortCFString(
+  _ cocoaString: AnyObject, _ length: Int) -> String? {
+  if length <= _SmallString.capacity,
+     let smol = _SmallString(nonTaggedCocoa: cocoaString, length: length) {
+    return String(_StringGuts(smol))
+  }
+  return nil
+}
+
 @usableFromInline
 @_effects(releasenone) // @opaque
-internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
-  switch _KnownCocoaString(cocoaString) {
-  case .storage:
-    return _unsafeUncheckedDowncast(
-      cocoaString, to: __StringStorage.self).asString._guts
-  case .shared:
-    return _unsafeUncheckedDowncast(
-      cocoaString, to: __SharedStringStorage.self).asString._guts
-#if !(arch(i386) || arch(arm))
-  case .tagged:
-    return _StringGuts(_SmallString(taggedCocoa: cocoaString))
-#endif
-  case .cocoa:
-    // "Copy" it into a value to be sure nobody will modify behind
-    // our backs. In practice, when value is already immutable, this
-    // just does a retain.
-    //
-    // TODO: Only in certain circumstances should we emit this call:
-    //   1) If it's immutable, just retain it.
-    //   2) If it's mutable with no associated information, then a copy must
-    //      happen; might as well eagerly bridge it in.
-    //   3) If it's mutable with associated information, must make the call
-    let immutableCopy
-      = _stdlib_binary_CFStringCreateCopy(cocoaString) as AnyObject
-    
-#if !(arch(i386) || arch(arm))
-    if _isObjCTaggedPointer(immutableCopy) {
-      return _StringGuts(_SmallString(taggedCocoa: immutableCopy))
-    }
-#endif
-    
-    let (fastUTF8, isASCII): (Bool, Bool)
-    switch _getCocoaStringPointer(immutableCopy) {
-    case .ascii(_): (fastUTF8, isASCII) = (true, true)
-    case .utf8(_): (fastUTF8, isASCII) = (true, false)
-    default:  (fastUTF8, isASCII) = (false, false)
-    }
-    let length = _stdlib_binary_CFStringGetLength(immutableCopy)
-    
-    return _StringGuts(
-      cocoa: immutableCopy,
-      providesFastUTF8: fastUTF8,
-      isASCII: isASCII,
-      length: length)
-  }
+internal func _bridgeCocoaString(_ cocoaString: _CocoaString)
+  -> _StringGuts {
+    return (cocoaString as Any as! String)._guts
 }
 
 extension String {
