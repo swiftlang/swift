@@ -1781,6 +1781,7 @@ extension ${Self} {
 extension ${Self} {
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
+  @differentiating(+)
   static func _vjpAdd(
     lhs: ${Self}, rhs: ${Self}
   ) -> (value: ${Self}, pullback: (${Self}) -> (${Self}, ${Self})) {
@@ -1789,6 +1790,7 @@ extension ${Self} {
 
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
+  @differentiating(-)
   static func _vjpSubtract(
     lhs: ${Self}, rhs: ${Self}
   ) -> (value: ${Self}, pullback: (${Self}) -> (${Self}, ${Self})) {
@@ -1797,6 +1799,7 @@ extension ${Self} {
 
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
+  @differentiating(*)
   static func _vjpMultiply(
     lhs: ${Self}, rhs: ${Self}
   ) -> (value: ${Self}, pullback: (${Self}) -> (${Self}, ${Self})) {
@@ -1805,6 +1808,7 @@ extension ${Self} {
 
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
+  @differentiating(/)
   static func _vjpDivide(
     lhs: ${Self}, rhs: ${Self}
   ) -> (value: ${Self}, pullback: (${Self}) -> (${Self}, ${Self})) {
