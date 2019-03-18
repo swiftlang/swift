@@ -2682,32 +2682,15 @@ ERROR(implements_attr_protocol_not_conformed_to,none,
 
 // SWIFT_ENABLE_TENSORFLOW
 // @differentiable
-ERROR(differentiable_attr_no_parameters,none,
-      "%0 has no parameters to differentiate with respect to", (DeclName))
 ERROR(differentiable_attr_void_result,none,
       "cannot differentiate void function %0", (DeclName))
 ERROR(differentiable_attr_associated_function_protocol,none,
       "cannot specify associated differentiation function on protocol "
       "requirement", ())
-ERROR(differentiable_attr_wrt_nothing,none,
-      "specify at least one parameter to differentiate with respect to", (DeclName))
 ERROR(differentiable_attr_overload_not_found,none,
       "%0 does not have expected type %1", (DeclName, Type))
-ERROR(differentiable_attr_wrt_self_must_be_first,none,
-      "'self' parameter must come first in the parameter list", ())
-ERROR(differentiable_attr_wrt_names_not_original_order,none,
-      "parameter names must be specified in original order", ())
-ERROR(differentiable_attr_wrt_name_unknown,none,
-      "unknown parameter name %0", (Identifier))
 ERROR(differentiable_attr_no_currying,none,
       "'@differentiable' cannot be defined on functions that return functions", ())
-ERROR(differentiable_attr_wrt_self_instance_method_only,none,
-      "'self' parameter is only applicable to instance methods", ())
-ERROR(differentiable_attr_cannot_diff_wrt_objects_or_existentials,none,
-      "class objects and protocol existentials (%0) cannot be differentiated "
-      "with respect to", (Type))
-ERROR(differentiable_attr_cannot_diff_wrt_functions,none,
-      "functions (%0) cannot be differentiated with respect to", (Type))
 ERROR(differentiable_attr_duplicate,none,
       "duplicate '@differentiable' attribute", ())
 ERROR(differentiable_attr_function_not_same_type_context,none,
@@ -2722,9 +2705,6 @@ ERROR(differentiable_attr_invalid_access,none,
       "associated differentiation function %0 is required to either be public "
       "or @usableFromInline because the original function %1 is public or "
       "@usableFromInline", (DeclName, DeclName))
-ERROR(differentiable_attr_wrt_not_differentiable,none,
-      "can only differentiate with respect to parameters that conform to "
-      "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
 ERROR(differentiable_attr_result_not_differentiable,none,
       "can only differentiate functions with results that conform to "
       "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
@@ -2759,15 +2739,36 @@ NOTE(differentiating_attr_result_func_type_mismatch_note,none,
      "%0 does not have expected type %1", (Identifier, Type))
 NOTE(differentiating_attr_result_func_original_note,none,
      "%0 defined here", (DeclName))
-ERROR(differentiating_attr_no_diff_parameters,none,
-      "'@differentiating' attribute requires function to have at least one "
-      "differentiation parameter", ())
 ERROR(differentiating_attr_overload_not_found,none,
       "could not find function %0 with expected type %1", (DeclName, Type))
 ERROR(differentiating_attr_not_in_same_file_as_original,none,
       "derivative not in the same file as the original function", ())
 ERROR(differentiating_attr_original_already_has_derivative,none,
       "a derivative already exists for %0", (DeclName))
+
+// differentiation `wrt` parameters clause
+ERROR(diff_function_no_parameters,none,
+      "%0 has no parameters to differentiate with respect to", (DeclName))
+ERROR(diff_params_clause_param_name_unknown,none,
+      "unknown parameter name %0", (Identifier))
+ERROR(diff_params_clause_self_instance_method_only,none,
+      "'self' parameter is only applicable to instance methods", ())
+ERROR(diff_params_clause_self_must_be_first,none,
+      "'self' parameter must come first in the parameter list", ())
+ERROR(diff_params_clause_params_not_original_order,none,
+      "parameter names must be specified in original order", ())
+ERROR(diff_params_clause_no_inferred_parameters,PointsToFirstBadToken,
+      "no differentiation parameters could be inferred; must differentiate "
+      "with respect to at least one parameter conforming to 'Differentiable'",
+      ())
+ERROR(diff_params_clause_cannot_diff_wrt_objects_or_existentials,none,
+      "class objects and protocol existentials (%0) cannot be differentiated "
+      "with respect to", (Type))
+ERROR(diff_params_clause_cannot_diff_wrt_functions,none,
+      "functions (%0) cannot be differentiated with respect to", (Type))
+ERROR(diff_params_clause_param_not_differentiable,none,
+      "can only differentiate with respect to parameters that conform to "
+      "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
 
 // @compilerEvaluable
 ERROR(compiler_evaluable_bad_context,none,

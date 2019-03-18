@@ -2405,8 +2405,16 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     IdentifierID origName =
         addDeclBaseNameRef(attr->getOriginal().Name.getBaseName());
     DeclID origRef = addDeclRef(attr->getOriginalFunction());
+
+    auto paramIndices = attr->getParameterIndices();
+    assert(paramIndices && "Checked parameter indices must be resolved");
+    SmallVector<bool, 4> indices;
+    for (unsigned i : swift::indices(paramIndices->parameters))
+      indices.push_back(paramIndices->parameters[i]);
+
     DifferentiatingDeclAttrLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, attr->isImplicit(), origName, origRef);
+        Out, ScratchRecord, abbrCode, attr->isImplicit(), origName, origRef,
+        indices);
     return;
   }
   }

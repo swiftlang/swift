@@ -2359,8 +2359,8 @@ static FuncDecl *resolveAutoDiffAssociatedFunction(
                 specifier.Name);
   };
 
-  // Returns true if the original function and associated function candidate
-  // are defined in compatible type contexts. If the original function and the
+  // Returns true if the original function and associated function candidate are
+  // defined in compatible type contexts. If the original function and the
   // associated function have different parents, or if they both have no type
   // context and are in different modules, return false.
   std::function<bool(FuncDecl *)> hasValidTypeContext = [&](FuncDecl *func) {
@@ -2468,6 +2468,170 @@ static bool checkFunctionSignature(
 };
 
 // SWIFT_ENABLE_TENSORFLOW
+// Computes `AutoDiffParameterIndices` from the given parsed differentiation
+// parameters (possibly empty) for the given function and derivative generic
+// environment, then verifies that the parameter indices are valid.
+// - If parsed parameters are empty, infer parameter indices.
+// - Otherwise, build parameter indices from parsed parameters.
+// The attribute name/location are used in diagnostics.
+static AutoDiffParameterIndices *computeDifferentiationParameters(
+    TypeChecker &TC, ArrayRef<ParsedAutoDiffParameter> parsedWrtParams,
+    AbstractFunctionDecl *function, GenericEnvironment *derivativeGenEnv,
+    StringRef attrName, SourceLoc attrLoc
+) {
+  // Get function type and parameters.
+  TC.resolveDeclSignature(function);
+  auto *functionType = function->getInterfaceType()->eraseDynamicSelfType()
+      ->castTo<AnyFunctionType>();
+  auto &params = *function->getParameters();
+  auto isInstanceMethod = function->isInstanceMember();
+
+  // Diagnose if function has no parameters.
+  if (params.size() == 0) {
+    // If function is not an instance method, diagnose immediately.
+    if (!isInstanceMethod) {
+      TC.diagnose(attrLoc, diag::diff_function_no_parameters,
+                  function->getFullName())
+          .highlight(function->getSignatureSourceRange());
+      return nullptr;
+    }
+    // If function is an instance method, diagnose only if `self` does not
+    // conform to `Differentiable`.
+    else {
+      auto selfType = function->getImplicitSelfDecl()->getInterfaceType();
+      if (derivativeGenEnv) {
+        auto selfInterfaceType = selfType->hasTypeParameter()
+            ? selfType
+            : selfType->mapTypeOutOfContext();
+        selfType =
+            derivativeGenEnv->mapTypeIntoContext(selfInterfaceType);
+      }
+      if (!conformsToDifferentiableInModule(
+              selfType, function->getModuleContext())) {
+        TC.diagnose(attrLoc, diag::diff_function_no_parameters,
+                    function->getFullName())
+            .highlight(function->getSignatureSourceRange());
+        return nullptr;
+      }
+    }
+  }
+
+  // If parsed differentiation parameters are empty, infer parameter indices
+  // from the function type.
+  if (parsedWrtParams.empty()) {
+    return AutoDiffParameterIndicesBuilder::inferParameters(
+        functionType, function->getModuleContext())
+        .build(TC.Context);
+  }
+
+  // Otherwise, build parameter indices from parsed differentiation parameters.
+  AutoDiffParameterIndicesBuilder builder(functionType);
+  int lastIndex = -1;
+  for (unsigned i : indices(parsedWrtParams)) {
+    auto paramLoc = parsedWrtParams[i].getLoc();
+    switch (parsedWrtParams[i].getKind()) {
+      case ParsedAutoDiffParameter::Kind::Named: {
+        auto nameIter =
+            llvm::find_if(params.getArray(), [&](ParamDecl *param) {
+              return param->getName() == parsedWrtParams[i].getName();
+            });
+        // Parameter name must exist.
+        if (nameIter == params.end()) {
+          TC.diagnose(paramLoc, diag::diff_params_clause_param_name_unknown,
+                      parsedWrtParams[i].getName());
+          return nullptr;
+        }
+        // Parameter names must be specified in the original order.
+        unsigned index = std::distance(params.begin(), nameIter);
+        if ((int)index <= lastIndex) {
+          TC.diagnose(paramLoc,
+                      diag::diff_params_clause_params_not_original_order);
+          return nullptr;
+        }
+        builder.setParameter(index);
+        lastIndex = index;
+        break;
+      }
+      case ParsedAutoDiffParameter::Kind::Self: {
+        // 'self' is only applicable to instance methods.
+        if (!isInstanceMethod) {
+          TC.diagnose(paramLoc,
+                      diag::diff_params_clause_self_instance_method_only);
+          return nullptr;
+        }
+        // 'self' can only be the first in the list.
+        if (i > 0) {
+          TC.diagnose(paramLoc, diag::diff_params_clause_self_must_be_first);
+          return nullptr;
+        }
+        builder.setParameter(builder.size() - 1);
+        break;
+      }
+    }
+  }
+  return builder.build(TC.Context);
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+// Checks if the given `AutoDiffParameterIndices` instance is valid for the
+// given function type in the given derivative generic environment and module
+// context. Returns true on error.
+// The parsed differentiation parameters and attribute location are used in
+// diagnostics.
+static bool checkDifferentiationParameters(
+    TypeChecker &TC, AutoDiffParameterIndices *indices,
+    AnyFunctionType *functionType, GenericEnvironment *derivativeGenEnv,
+    ModuleDecl *module, ArrayRef<ParsedAutoDiffParameter> parsedWrtParams,
+    SourceLoc attrLoc) {
+  // Diagnose empty parameter indices. This occurs when no `wrt` clause is
+  // declared and no differentiation parameters can be inferred.
+  if (indices->isEmpty()) {
+    TC.diagnose(attrLoc, diag::diff_params_clause_no_inferred_parameters);
+    return true;
+  }
+
+  // Check that differentiation parameters have allowed types.
+  SmallVector<Type, 4> wrtParamTypes;
+  indices->getSubsetParameterTypes(functionType, wrtParamTypes);
+  for (unsigned i : range(wrtParamTypes.size())) {
+    auto wrtParamType = wrtParamTypes[i];
+    if (derivativeGenEnv) {
+      auto wrtParamInterfaceType = wrtParamType->hasTypeParameter()
+          ? wrtParamType
+          : wrtParamType->mapTypeOutOfContext();
+      wrtParamType =
+          derivativeGenEnv->mapTypeIntoContext(wrtParamInterfaceType);
+    }
+    SourceLoc loc = parsedWrtParams.empty()
+        ? attrLoc
+        : parsedWrtParams[i].getLoc();
+    // Parameter cannot have a class or existential type.
+    if ((!wrtParamType->hasTypeParameter() &&
+         wrtParamType->isAnyClassReferenceType()) ||
+        wrtParamType->isExistentialType()) {
+      TC.diagnose(
+           loc,
+           diag::diff_params_clause_cannot_diff_wrt_objects_or_existentials,
+           wrtParamType);
+      return true;
+    }
+    // Parameter cannot have a function type.
+    if (wrtParamType->is<AnyFunctionType>()) {
+      TC.diagnose(loc, diag::diff_params_clause_cannot_diff_wrt_functions,
+                  wrtParamType);
+      return true;
+    }
+    // Parameter must conform to `Differentiable`.
+    if (!conformsToDifferentiableInModule(wrtParamType, module)) {
+      TC.diagnose(loc, diag::diff_params_clause_param_not_differentiable,
+                  wrtParamType);
+      return true;
+    }
+  }
+  return false;
+}
+
+// SWIFT_ENABLE_TENSORFLOW
 void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto &ctx = TC.Context;
   auto lookupConformance =
@@ -2503,19 +2667,13 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   TC.resolveDeclSignature(original);
   auto *originalFnTy = original->getInterfaceType()->eraseDynamicSelfType()
       ->castTo<AnyFunctionType>();
-  auto isInstanceMethod = original->isInstanceMember();
+  bool isMethod = original->hasImplicitSelfDecl();
 
-  // If the original function has no parameters or returns the empty tuple
-  // type, there's nothing to differentiate from or with-respect-to.
-  auto &originalParams = *original->getParameters();
-  if (!isInstanceMethod && originalParams.size() == 0) {
-    TC.diagnose(attr->getLocation(), diag::differentiable_attr_no_parameters,
-                original->getFullName())
-        .highlight(original->getSourceRange());
-    attr->setInvalid();
-    return;
-  }
+  // If the original function returns the empty tuple type, there's no output to
+  // differentiate from.
   auto originalResultTy = originalFnTy->getResult();
+  if (isMethod)
+    originalResultTy = originalResultTy->castTo<AnyFunctionType>()->getResult();
   if (originalResultTy->isEqual(ctx.TheEmptyTupleType)) {
     TC.diagnose(attr->getLocation(), diag::differentiable_attr_void_result,
                 original->getFullName())
@@ -2598,7 +2756,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   }
 
   // Validate the 'wrt:' parameters.
-  bool isMethod = original->hasImplicitSelfDecl();
 
   // Get the parsed wrt param indices, which have not yet been checked.
   // This is defined for parsed attributes.
@@ -2614,71 +2771,29 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         type, original->getModuleContext());
   };
 
-  // If checked wrt param indices are not specified, compute them using parsed
-  // wrt param indices.
+  // Compute the derivative function type.
+  auto derivativeFnTy = originalFnTy;
+  if (whereClauseGenEnv)
+    derivativeFnTy = whereClauseGenEnv->mapTypeIntoContext(derivativeFnTy)
+        ->castTo<AnyFunctionType>();
+
+  // If checked wrt param indices are not specified, compute them.
+  if (!checkedWrtParamIndices)
+    checkedWrtParamIndices =
+        computeDifferentiationParameters(TC, parsedWrtParams, original,
+                                         whereClauseGenEnv, attr->getAttrName(),
+                                         attr->getLocation());
   if (!checkedWrtParamIndices) {
-    // If parsed wrt param indices are not specified, infer differentiation
-    // parameters.
-    if (parsedWrtParams.empty()) {
-      auto derivativeFnTy = originalFnTy;
-      if (whereClauseGenEnv)
-        derivativeFnTy = whereClauseGenEnv->mapTypeIntoContext(derivativeFnTy)
-            ->castTo<AnyFunctionType>();
-      checkedWrtParamIndices = AutoDiffParameterIndicesBuilder::inferParameters(
-          derivativeFnTy, original->getModuleContext())
-          .build(ctx);
-    } else {
-      AutoDiffParameterIndicesBuilder autoDiffParameterIndicesBuilder(
-          originalFnTy);
-      // 'wrt:' is specified. Validate and collect the selected parameters.
-      int lastIndex = -1;
-      for (unsigned i : indices(parsedWrtParams)) {
-        auto paramLoc = parsedWrtParams[i].getLoc();
-        switch (parsedWrtParams[i].getKind()) {
-        case ParsedAutoDiffParameter::Kind::Named: {
-          auto nameIter =
-              llvm::find_if(originalParams.getArray(), [&](ParamDecl *param) {
-                return param->getName() == parsedWrtParams[i].getName();
-              });
-          // Parameter name must exist.
-          if (nameIter == originalParams.end()) {
-            TC.diagnose(paramLoc, diag::differentiable_attr_wrt_name_unknown,
-                        parsedWrtParams[i].getName());
-            return;
-          }
-          // Parameter names must be specified in the original order.
-          unsigned index = std::distance(originalParams.begin(), nameIter);
-          if ((int)index <= lastIndex) {
-            TC.diagnose(paramLoc,
-                        diag::differentiable_attr_wrt_names_not_original_order);
-            return;
-          }
-          autoDiffParameterIndicesBuilder.setParameter(index);
-          lastIndex = index;
-          break;
-        }
-        case ParsedAutoDiffParameter::Kind::Self: {
-          // 'self' is only applicable to instance methods.
-          if (!isInstanceMethod) {
-            TC.diagnose(
-                paramLoc,
-                diag::differentiable_attr_wrt_self_instance_method_only);
-            return;
-          }
-          // 'self' can only be the first in the list.
-          if (i > 0) {
-            TC.diagnose(paramLoc,
-                        diag::differentiable_attr_wrt_self_must_be_first);
-            return;
-          }
-          autoDiffParameterIndicesBuilder.setParameter(
-              autoDiffParameterIndicesBuilder.size() - 1);
-          break;
-        }
-        }
-      }
-      checkedWrtParamIndices = autoDiffParameterIndicesBuilder.build(ctx);
-    }
+    attr->setInvalid();
+    return;
+  }
+
+  // Check if differentiation parameter indices are valid.
+  if (checkDifferentiationParameters(
+          TC, checkedWrtParamIndices, derivativeFnTy, whereClauseGenEnv,
+          original->getModuleContext(), parsedWrtParams, attr->getLocation())) {
+    attr->setInvalid();
+    return;
   }
 
   auto insertion =
@@ -2690,96 +2805,20 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return;
   }
 
-  // This can happen when someone puts the attribute on an instance method with
-  // no parameters (other than the self parameter), and does not specify a wrt
-  // list.
-  if (checkedWrtParamIndices->isEmpty()) {
-    TC.diagnose(attr->getLocation(), diag::differentiable_attr_wrt_nothing,
-                original->getFullName())
-        .highlight(original->getSourceRange());
+  // Check that result type conforms to `Differentiable`.
+  if (whereClauseGenEnv) {
+    auto originalResultInterfaceType = !originalResultTy->hasTypeParameter()
+        ? originalResultTy->mapTypeOutOfContext()
+        : originalResultTy;
+    originalResultTy =
+        whereClauseGenEnv->mapTypeIntoContext(originalResultInterfaceType);
+  }
+  if (!conformsToDifferentiable(originalResultTy)) {
+    TC.diagnose(attr->getLocation(),
+                diag::differentiable_attr_result_not_differentiable,
+                originalResultTy);
     attr->setInvalid();
     return;
-  }
-
-  // Check that the user has only selected wrt params with allowed types.
-  SmallVector<Type, 4> wrtParamTypes;
-  checkedWrtParamIndices->getSubsetParameterTypes(originalFnTy, wrtParamTypes);
-  for (unsigned i : range(wrtParamTypes.size())) {
-    auto wrtParamType = original->mapTypeIntoContext(wrtParamTypes[i]);
-    SourceLoc loc = parsedWrtParams.empty()
-        ? attr->getLocation()
-        : parsedWrtParams[i].getLoc();
-    if (wrtParamType->isAnyClassReferenceType() ||
-        wrtParamType->isExistentialType()) {
-      TC.diagnose(
-          loc,
-          diag::differentiable_attr_cannot_diff_wrt_objects_or_existentials,
-          wrtParamType);
-      attr->setInvalid();
-      return;
-    }
-    if (wrtParamType->is<AnyFunctionType>()) {
-      TC.diagnose(loc, diag::differentiable_attr_cannot_diff_wrt_functions,
-                  wrtParamType);
-      attr->setInvalid();
-      return;
-    }
-
-    // We also require that all the wrt params have associated tangent/cotangent
-    // spaces.
-    if (whereClauseGenEnv) {
-      auto wrtParamInterfaceType = !wrtParamType->hasTypeParameter() ?
-          wrtParamType->mapTypeOutOfContext() :
-          wrtParamType;
-      wrtParamType =
-          whereClauseGenEnv->mapTypeIntoContext(wrtParamInterfaceType);
-    }
-    if (!conformsToDifferentiable(wrtParamType)) {
-      TC.diagnose(loc, diag::differentiable_attr_wrt_not_differentiable,
-                  wrtParamType);
-      attr->setInvalid();
-      return;
-    }
-  }
-
-  // Check that all the result types have associated tangent/cotangent spaces.
-  {
-    auto *unwrapped = originalFnTy;
-    if (isMethod)
-      unwrapped = unwrapped->getResult()->castTo<AnyFunctionType>();
-    Type originalResult = unwrapped->getResult();
-    if (auto *resultTuple = originalResult->getAs<TupleType>()) {
-      for (unsigned i : range(resultTuple->getNumElements())) {
-        auto &resultTupleElt = resultTuple->getElement(i);
-        auto resultTupleEltType = resultTupleElt.getType();
-        if (whereClauseGenEnv) {
-          resultTupleEltType = whereClauseGenEnv->mapTypeIntoContext(
-              resultTupleEltType->mapTypeOutOfContext());
-        }
-        if (!conformsToDifferentiable(resultTupleEltType)) {
-          TC.diagnose(attr->getLocation(),
-                      diag::differentiable_attr_result_not_differentiable,
-                      resultTupleElt.getType());
-          attr->setInvalid();
-          return;
-        }
-      }
-    } else {
-      if (whereClauseGenEnv) {
-        auto originalResultInterfaceType = !originalResult->hasTypeParameter()
-            ? originalResult->mapTypeOutOfContext()
-            : originalResult;
-        originalResult =
-            whereClauseGenEnv->mapTypeIntoContext(originalResultInterfaceType);
-      }
-      if (!conformsToDifferentiable(originalResult)) {
-        TC.diagnose(attr->getLocation(),
-                    diag::differentiable_attr_result_not_differentiable,
-                    originalResult);
-        attr->setInvalid();
-        return;
-      }
-    }
   }
 
   // Memorize the checked parameter indices in the attribute.
@@ -2931,30 +2970,15 @@ computeAutoDiffOriginalFunctionType(AnyFunctionType *derivativeType) {
 void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   auto &ctx = TC.Context;
   FuncDecl *derivative = dyn_cast<FuncDecl>(D);
-  auto isMethod = derivative->hasImplicitSelfDecl();
-  auto isInstanceMethod = derivative->isInstanceMember();
   auto lookupConformance =
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
   auto original = attr->getOriginal();
 
   auto *derivativeInterfaceType = derivative->getInterfaceType()
       ->eraseDynamicSelfType()->castTo<AnyFunctionType>();
-  auto *derivativeType = isMethod
-      ? derivative->getMethodInterfaceType()->castTo<AnyFunctionType>()
-      : derivativeInterfaceType;
 
-  // Perform preliminary checks.
+  // Perform preliminary derivative checks.
 
-  // If the original function has no parameters or returns the empty tuple
-  // type, there's nothing to differentiate from or with-respect-to.
-  auto &derivativeParams = *derivative->getParameters();
-  if (!isInstanceMethod && derivativeParams.size() == 0) {
-    TC.diagnose(attr->getLocation(), diag::differentiable_attr_no_parameters,
-                derivative->getName())
-    .highlight(derivative->getSourceRange());
-    attr->setInvalid();
-    return;
-  }
   // The result type should be a two-element tuple.
   // Either a value and pullback:
   //     (value: R, pullback: (R.CotangentVector) -> (T.CotangentVector...)
@@ -3061,8 +3085,8 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
                 original.Name);
   };
 
-  // Returns true if the derivative function and original function candidate
-  // are defined in compatible type contexts. If the derivative function and the
+  // Returns true if the derivative function and original function candidate are
+  // defined in compatible type contexts. If the derivative function and the
   // original function candidate have different parents, return false.
   std::function<bool(FuncDecl *)> hasValidTypeContext = [&](FuncDecl *func) {
     // Check if both functions are top-level.
@@ -3096,44 +3120,54 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   }
   attr->setOriginalFunction(originalFn);
 
-  // Gather inferred differentiation parameters.
-  SmallVector<TupleTypeElt, 4> diffParamElts;
-  auto addDiffParam = [&](Type paramType) {
-    auto conf = TC.conformsToProtocol(paramType, diffableProto, derivative,
-                                      ConformanceCheckFlags::Used);
-    if (!conf)
-      return;
-    auto diffParamType = ProtocolConformanceRef::getTypeWitnessByName(
-        paramType, *conf, autoDiffAssocTyId, ctx.getLazyResolver());
-    diffParamElts.push_back(TupleTypeElt(diffParamType));
-  };
+  // Get checked wrt param indices.
+  AutoDiffParameterIndices *checkedWrtParamIndices =
+      attr->getParameterIndices();
 
-  // If `derivative` is an instance method, check whether `Self` conforms to
-  // `Differentiable`.
-  if (isInstanceMethod) {
-    auto selfType = derivative->getImplicitSelfDecl()->getInterfaceType();
-    if (selfType->hasTypeParameter())
-      selfType = derivative->getParent()->mapTypeIntoContext(selfType);
-    addDiffParam(selfType);
-  }
-  // Check whether every parameter conforms to `Differentiable`.
-  for (auto param : derivativeType->getParams()) {
-    auto paramType = param.getPlainType();
-    if (param.isNonDifferentiable())
-      continue;
-    if (paramType->hasTypeParameter())
-      paramType = derivative->mapTypeIntoContext(paramType);
-    addDiffParam(paramType);
-  }
-  // There must be at least one differentiation parameter.
-  if (diffParamElts.empty()) {
-    TC.diagnose(attr->getLocation(),
-                diag::differentiating_attr_no_diff_parameters);
+  // Get the parsed wrt param indices, which have not yet been checked.
+  // This is defined for parsed attributes.
+  auto parsedWrtParams = attr->getParsedParameters();
+
+  // If checked wrt param indices are not specified, compute them.
+  if (!checkedWrtParamIndices)
+    checkedWrtParamIndices =
+        computeDifferentiationParameters(TC, parsedWrtParams, derivative,
+                                         derivative->getGenericEnvironment(),
+                                         attr->getAttrName(),
+                                         attr->getLocation());
+  if (!checkedWrtParamIndices) {
     attr->setInvalid();
     return;
   }
 
-  // Check differentiation parameters.
+  // Check if differentiation parameter indices are valid.
+  if (checkDifferentiationParameters(
+          TC, checkedWrtParamIndices, originalFnType,
+          derivative->getGenericEnvironment(), derivative->getModuleContext(),
+          parsedWrtParams, attr->getLocation())) {
+    attr->setInvalid();
+    return;
+  }
+
+  // Gather differentiation parameters.
+  SmallVector<Type, 4> wrtParamTypes;
+  checkedWrtParamIndices->getSubsetParameterTypes(
+      originalFnType, wrtParamTypes);
+
+  auto diffParamElts =
+      map<SmallVector<TupleTypeElt, 4>>(wrtParamTypes, [&](Type paramType) {
+        if (paramType->hasTypeParameter())
+          paramType = derivative->mapTypeIntoContext(paramType);
+        auto conf = TC.conformsToProtocol(paramType, diffableProto, derivative,
+                                          ConformanceCheckFlags::Used);
+        assert(conf &&
+               "Expected checked parameter to conform to `Differentiable`");
+        auto paramAssocType = ProtocolConformanceRef::getTypeWitnessByName(
+            paramType, *conf, autoDiffAssocTyId, ctx.getLazyResolver());
+        return TupleTypeElt(paramAssocType);
+      });
+
+  // Check differential/pullback type.
   // Get vector type: the associated type of the value result type.
   auto vectorTy = ProtocolConformanceRef::getTypeWitnessByName(
       valueResultType, *valueResultConf, autoDiffAssocTyId,
@@ -3153,6 +3187,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
                                             TupleType::get(diffParamElts, ctx));
   }
   expectedFuncEltType = expectedFuncEltType->mapTypeOutOfContext();
+
   // Check if differential/pullback type matches expected type.
   if (!funcEltType->isEqual(expectedFuncEltType)) {
     // Emit differential/pullback type mismatch error on attribute.
@@ -3187,25 +3222,17 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     return;
   }
 
-  // TODO: When `wrt:` is supported in the `@differentiating` attribute, replace
-  // this with the parameter indices resolved by the earlier checking logic in
-  // this function.
-  auto allParameterIndices = AutoDiffParameterIndicesBuilder::inferParameters(
-      originalFnType, originalFn->getModuleContext())
-      .build(ctx);
-
-  // Add the derivative function to the original function's `@differentiable`
-  // attribute with the same parameters. If this attribute does not exist,
-  // create one.
+  // Add the derivative to a `@differentiable` attribute on the original
+  // function with the same differentiation parameters. If no such
+  // `@differentiable` attribute exists, create one.
   DifferentiableAttr *da = nullptr;
   for (auto *cda : originalFn->getAttrs().getAttributes<DifferentiableAttr>())
-    if (allParameterIndices == cda->getParameterIndices())
+    if (checkedWrtParamIndices == cda->getParameterIndices())
       da = const_cast<DifferentiableAttr *>(cda);
-
   // TODO: Infer the original `@differentiable`'s generic requirements.
   if (!da) {
     da = DifferentiableAttr::create(ctx, /*implicit*/ true, SourceLoc(),
-                                    SourceRange(), allParameterIndices, None,
+                                    SourceRange(), checkedWrtParamIndices, None,
                                     None, {});
     originalFn->getAttrs().add(da);
   }
