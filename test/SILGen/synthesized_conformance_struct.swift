@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -emit-silgen %s -swift-version 4 | %FileCheck -check-prefix CHECK -check-prefix CHECK-FRAGILE %s
-// RUN: %target-swift-frontend -emit-silgen %s -swift-version 4 -enable-resilience | %FileCheck -check-prefix CHECK -check-prefix CHECK-RESILIENT %s
+// RUN: %target-swift-frontend -emit-silgen %s -swift-version 4 -enable-library-evolution | %FileCheck -check-prefix CHECK -check-prefix CHECK-RESILIENT %s
 
 struct Struct<T> {
     var x: T
@@ -10,14 +10,14 @@ struct Struct<T> {
 // CHECK:   init(x: T)
 // CHECK:   enum CodingKeys : CodingKey {
 // CHECK:     case x
-// CHECK:     var stringValue: String { get }
-// CHECK:     init?(stringValue: String)
-// CHECK:     var intValue: Int? { get }
-// CHECK:     init?(intValue: Int)
 // CHECK-FRAGILE:   @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: Struct<T>.CodingKeys, _ b: Struct<T>.CodingKeys) -> Bool
 // CHECK-RESILIENT: static func == (a: Struct<T>.CodingKeys, b: Struct<T>.CodingKeys) -> Bool
 // CHECK:     var hashValue: Int { get }
 // CHECK:     func hash(into hasher: inout Hasher)
+// CHECK:     var stringValue: String { get }
+// CHECK:     init?(stringValue: String)
+// CHECK:     var intValue: Int? { get }
+// CHECK:     init?(intValue: Int)
 // CHECK:   }
 // CHECK: }
 // CHECK-LABEL: extension Struct : Equatable where T : Equatable {

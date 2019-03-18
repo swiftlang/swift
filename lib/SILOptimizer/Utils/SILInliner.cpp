@@ -214,7 +214,7 @@ public:
       // Replace all the yielded values in the callee with undef.
       for (auto calleeYield : BeginApply->getYieldedValues()) {
         calleeYield->replaceAllUsesWith(
-            SILUndef::get(calleeYield->getType(), Builder->getModule()));
+            SILUndef::get(calleeYield->getType(), Builder->getFunction()));
       }
     }
 

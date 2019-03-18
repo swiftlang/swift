@@ -39,7 +39,10 @@ it provides some of the needed headers and libraries.
 1. Clone `apple/swift` into a folder named `swift`
 1. Clone `apple/swift-corelibs-libdispatch` into a folder named `swift-corelibs-libdispatch`
 1. Clone `apple/swift-corelibs-foundation` into a folder named `swift-corelibs-foundation`
+1. Clone `apple/swift-corelibs-xctest` into a folder name `swift-corelibs-xctest`
 1. Clone `apple/swift-lldb` into a folder named `lldb`
+1. Clone `curl` into a folder named `curl`
+1. Clone `libxml2` into a folder named `libxml2`
 
 - Currently, other repositories in the Swift project have not been tested and
   may not be supported.
@@ -60,7 +63,10 @@ git clone https://github.com/apple/swift-compiler-rt compiler-rt
 git clone https://github.com/apple/swift
 git clone https://github.com/apple/swift-corelibs-libdispatch
 git clone https://github.com/apple/swift-corelibs-foundation
+git clone https://github.com/apple/swift-corelibs-xctest
 git clone https://github.com/apple/swift-lldb lldb
+git clone https://github.com/curl/curl.git curl
+git clone https://gitlab.gnome.org/GNOME/libxml2.git libxml2
 ```
 
 ### 3. Acquire ICU
@@ -100,28 +106,14 @@ mklink "%VCToolsInstallDir%\include\module.modulemap" S:\swift\stdlib\public\Pla
 mklink "%VCToolsInstallDir%\include\visualc.apinotes" S:\swift\stdlib\public\Platform\visualc.apinotes
 ```
 
-Warning: Creating the above links usually requires adminstrator privileges. The quick and easy way to do this is to open a second developer prompt by right clicking whatever shortcut you used to open the first one, choosing Run As Administrator, and pasting the above commands into the resulting window. You can then close the privileged prompt; this is the only step which requires elevation.
+Warning: Creating the above links usually requires administrator privileges. The quick and easy way to do this is to open a second developer prompt by right clicking whatever shortcut you used to open the first one, choosing Run As Administrator, and pasting the above commands into the resulting window. You can then close the privileged prompt; this is the only step which requires elevation.
 
-### 5. Build CMark
-- This must be done from within a developer command prompt. CMark is a fairly
-  small project and should only take a few minutes to build.
-```cmd
-mkdir "S:\b\cmark"
-pushd "S:\b\cmark"
-cmake -G Ninja^
-  -DCMAKE_BUILD_TYPE=RelWithDebInfo^
-  -DCMAKE_C_COMPILER=cl^
-  -DCMAKE_CXX_COMPILER=cl^
-  S:/cmark
-popd
-cmake --build "S:\b\cmark"
-```
-
-### 6. Build LLVM/Clang
+### 5. Build LLVM/Clang
 - This must be done from within a developer command prompt. LLVM and Clang are
   large projects, so building might take a few hours. Make sure that the build
-  type (e.g. `Debug`, `Release`, `RelWithDebInfoAssert`) for LLVM/Clang matches the
-  build type for Swift.
+  type for LLVM/Clang is compatbile with the build type for Swift. That is,
+  either build everything `Debug` or some variant of `Release` (e.g. `Release`,
+  `RelWithDebInfo`).
 ```cmd
 mkdir "S:\b\llvm"
 pushd "S:\b\llvm"
@@ -142,38 +134,49 @@ cmake --build "S:\b\llvm"
 - Update your path to include the LLVM tools.
 
 ```cmd
-PATH S:\b\llvm\bin;%PATH%
+path S:\b\llvm\bin;%PATH%
+```
+
+### 6. Build CMark
+- This must be done from within a developer command prompt. CMark is a fairly
+  small project and should only take a few minutes to build.
+```cmd
+mkdir "S:\b\cmark"
+pushd "S:\b\cmark"
+cmake -G Ninja^
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo^
+  -DCMAKE_C_COMPILER=cl^
+  -DCMAKE_CXX_COMPILER=cl^
+  S:\cmark
+popd
+cmake --build "S:\b\cmark"
 ```
 
 ### 7. Build Swift
-- This must be done from within a developer command prompt and could take hours 
-  depending on your system.
-- You may need to adjust the `SWIFT_WINDOWS_LIB_DIRECTORY` parameter depending on
-  your target platform or Windows SDK version.
+- This must be done from within a developer command prompt
+- Note that Visual Studio vends a 32-bit python 2.7 installation in `C:\Python27` and a 64-bit python in `C:\Python27amd64`.  You may use either one based on your installation.
+
 ```cmd
 mkdir "S:\b\swift"
 pushd "S:\b\swift"
 cmake -G Ninja^
  -DCMAKE_BUILD_TYPE=RelWithDebInfo^
- -DCMAKE_C_COMPILER=clang-cl^
- -DCMAKE_CXX_COMPILER=clang-cl^
- -DCMAKE_CXX_FLAGS:STRING="-Wno-c++98-compat -Wno-c++98-compat-pedantic"^
+ -DCMAKE_C_COMPILER=cl^
+ -DCMAKE_CXX_COMPILER=cl^
  -DCMAKE_EXE_LINKER_FLAGS:STRING="/INCREMENTAL:NO"^
  -DCMAKE_SHARED_LINKER_FLAGS:STRING="/INCREMENTAL:NO"^
- -DSWIFT_BUILD_SOURCEKIT=ON^
  -DSWIFT_INCLUDE_DOCS=OFF^
  -DSWIFT_PATH_TO_CMARK_SOURCE="S:\cmark"^
  -DSWIFT_PATH_TO_CMARK_BUILD="S:\b\cmark"^
- -DSWIFT_PATH_TO_LLVM_SOURCE="S:\llvm"^
- -DSWIFT_PATH_TO_LLVM_BUILD="S:\b\llvm"^
- -DSWIFT_PATH_TO_CLANG_SOURCE="S:\clang"^
- -DSWIFT_PATH_TO_CLANG_BUILD="S:\b\llvm"^
+ -DLLVM_DIR=S:\b\llvm\lib\cmake\llvm^
+ -DClang_DIR=S:\b\llvm\lib\cmake\clang^
  -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE="S:\swift-corelibs-libdispatch"^
  -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="S:/thirdparty/icu4c-63_1-Win64-MSVC2017/include"^
  -DSWIFT_WINDOWS_x86_64_ICU_UC="S:/thirdparty/icu4c-63_1-Win64-MSVC2017/lib64/icuuc.lib"^
  -DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="S:/thirdparty/icu4c-63_1-Win64-MSVC2017/include"^
  -DSWIFT_WINDOWS_x86_64_ICU_I18N="S:/thirdparty/icu4c-63_1-Win64-MSVC2017/lib64/icuin.lib"^
  -DCMAKE_INSTALL_PREFIX="C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr"^
+ -DPYTHON_EXECUTABLE=C:\Python27\python.exe^
  S:\swift
 popd
 cmake --build "S:\b\swift"
@@ -199,10 +202,8 @@ pushd "S:\b\lldb"
 cmake -G Ninja^
   -DCMAKE_BUILD_TYPE=RelWithDebInfo^
   -DLLDB_ALLOW_STATIC_BINDINGS=YES^
-  -DLLDB_PATH_TO_LLVM_SOURCE="S:\llvm"^
   -DLLDB_PATH_TO_CLANG_SOURCE="S:\clang"^
   -DLLDB_PATH_TO_SWIFT_SOURCE="S:\swift"^
-  -DLLDB_PATH_TO_CMARK_BUILD="S:\b\cmark"^
   -DLLDB_PATH_TO_CLANG_BUILD="S:\b\llvm"^
   -DLLDB_PATH_TO_LLVM_BUILD="S:\b\llvm"^
   -DLLDB_PATH_TO_SWIFT_BUILD="S:\b\swift"^
@@ -219,12 +220,11 @@ Running the testsuite on Windows has additional external dependencies.  You must
 
   1. coreutils
   2. diffutils
-  3. file
-  4. grep
-  5. sed
-  
+  3. grep
+  4. sed
+
 ```cmd
-path S:\b\swift\bin;S:\b\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles(x86)%\GnuWin32\bin
+path S:\thirdparty\icu4c-63_1-Win64-MSVC2017\bin64;S:\b\swift\bin;S:\b\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles(x86)%\GnuWin32\bin
 ninja -C S:\b\swift check-swift
 ```
 
@@ -238,7 +238,6 @@ cmake -G Ninja^
   -DCMAKE_C_COMPILER=clang-cl^
   -DCMAKE_CXX_COMPILER=clang-cl^
   -DCMAKE_SWIFT_COMPILER=S:\b\swift\bin\swiftc.exe^
-  -DSwift_DIR=S:\b\swift\lib\cmake\swift^
   -DENABLE_SWIFT=ON^
   -DENABLE_TESTING=OFF^
   S:\swift-corelibs-libdispatch
@@ -246,12 +245,31 @@ popd
 cmake --build S:\b\libdispatch
 ```
 
-### 11. Build swift-corelibs-foundation
+- Add libdispatch to your path:
+```cmd
+path S:\b\libdispatch;S:\b\libdispatch\src;%PATH%
+```
 
-To build Foundation you will need builds of:
+### 11. Build curl
 
-- `libxml2` (http://xmlsoft.org, download and unzip the Windows prebuilt or build your own)
-- `libcurl` (https://curl.haxx.se, download the source, `cd` into `winbuild`, and run `nmake /f Makefile.vc mode=static VC=15 MACHINE=x64`)
+```cmd
+pushd "S:\curl"
+.\buildconf.bat
+cd winbuild
+nmake /f Makefile.vc mode=static VC=15 MACHINE=x64
+popd
+```
+
+### 12. Build libxml2
+
+```cmd
+pushd "S:\libxml2\win32"
+cscript configure.js iconv=no
+nmake /f Makefile.msvc
+popd
+```
+
+### 13. Build swift-corelibs-foundation
 
 ```cmd
 mkdir "S:\b\foundation"
@@ -262,17 +280,84 @@ cmake -G Ninja^
   -DCMAKE_SWIFT_COMPILER=S:\b\swift\bin\swiftc.exe^
   -DCURL_LIBRARY="S:/curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/lib/libcurl_a.lib"^
   -DCURL_INCLUDE_DIR="S:/curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/include"^
+  -DENABLE_TESTING=NO^
   -DICU_ROOT="S:/thirdparty/icu4c-63_1-Win64-MSVC2017"^
   -DLIBXML2_LIBRARY="S:/libxml2/win32/bin.msvc/libxml2_a.lib"^
   -DLIBXML2_INCLUDE_DIR="S:/libxml2/include"^
   -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch^
   -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=S:\b\libdispatch^
    S:\swift-corelibs-foundation
+ popd
  cmake --build S:\b\foundation
-
 ```
 
-### 12. Install Swift on Windows
+- Add Foundation to your path:
+```cmd
+path S:\b\foundation;%PATH%
+```
+
+### 14. Build swift-corelibs-xctest
+
+```cmd
+mkdir "S:\b\xctest"
+pushd "S:\b\xctest"
+cmake -G Ninja^
+  -DBUILD_SHARED_LIBS=YES^
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo^
+  -DCMAKE_SWIFT_COMPILER=S:\b\swift\bin\swiftc.exe^
+  -DXCTEST_PATH_TO_COREFOUNDATION_BUILD=S:\b\foundation\CoreFoundation-prefix^
+  -DXCTEST_PATH_TO_FOUNDATION_BUILD=S:\b\foundation^
+  -DXCTEST_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch^
+  -DXCTEST_PATH_TO_LIBDISPATCH_BUILD=S:\b\libdispatch^
+  -DLIT_COMMAND=S:\llvm\utils\lit\lit.py^
+  -DPYTHON_EXECUTABLE=C:\Python27\python.exe^
+  S:\swift-corelibs-xctest
+popd
+cmake --build S:\b\xctest
+```
+
+- Add XCTest to your path:
+```cmd
+path S:\b\xctest;%PATH%
+```
+
+### 15. Test XCTest
+
+```cmd
+ninja -C S:\b\xctest check-xctest
+```
+
+### 16. Rebuild Foundation
+
+```cmd
+mkdir "S:\b\foundation"
+pushd "S:\b\foundation
+cmake -G Ninja^
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo^
+  -DCMAKE_C_COMPILER=clang-cl^
+  -DCMAKE_SWIFT_COMPILER=S:\b\swift\bin\swiftc.exe^
+  -DCURL_LIBRARY="S:/curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/lib/libcurl_a.lib"^
+  -DCURL_INCLUDE_DIR="S:/curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/include"^
+  -DENABLE_TESTING=YES^
+  -DICU_ROOT="S:/thirdparty/icu4c-63_1-Win64-MSVC2017"^
+  -DLIBXML2_LIBRARY="S:/libxml2/win32/bin.msvc/libxml2_a.lib"^
+  -DLIBXML2_INCLUDE_DIR="S:/libxml2/include"^
+  -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch^
+  -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=S:\b\libdispatch^
+  -DFOUNDATION_PATH_TO_XCTEST_BUILD=S:\b\xctest^
+   S:\swift-corelibs-foundation
+ popd
+ cmake --build S:\b\foundation
+```
+
+### 17. Test Foundation
+
+```cmd
+cmake --build S:\b\foundation
+ninja -C S:\b\foundation test 
+```
+
+### 18. Install Swift on Windows
 
 - Run ninja install:
 

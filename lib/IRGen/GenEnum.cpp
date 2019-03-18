@@ -5429,7 +5429,8 @@ namespace {
       llvm::BasicBlock *conditionalBlock = nullptr;
       llvm::BasicBlock *afterConditionalBlock = nullptr;
       llvm::BasicBlock *beforeNullPtrCheck = nullptr;
-      if (Case->isWeakImported(IGM.getSwiftModule())) {
+      if (Case->isWeakImported(IGM.getSwiftModule(),
+                               IGM.getAvailabilityContext())) {
         beforeNullPtrCheck = IGF.Builder.GetInsertBlock();
         auto address = IGM.getAddrOfEnumCase(Case, NotForDefinition);
         conditionalBlock = llvm::BasicBlock::Create(C);
@@ -6201,8 +6202,7 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
     if (TIK <= Opaque) {
       auto alignment = eltTI.getBestKnownAlignment();
       applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/false, alignment);
-      auto enumAccessible =
-        IsABIAccessible_t(TC.IGM.getSILModule().isTypeABIAccessible(Type));
+      auto enumAccessible = IsABIAccessible_t(TC.IGM.isTypeABIAccessible(Type));
       return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
                              alignment,
                              eltTI.isPOD(ResilienceExpansion::Maximal),
@@ -6388,8 +6388,7 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeDynamicLayout(
   
   applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/false, alignment);
   
-  auto enumAccessible =
-    IsABIAccessible_t(TC.IGM.getSILModule().isTypeABIAccessible(Type));
+  auto enumAccessible = IsABIAccessible_t(TC.IGM.isTypeABIAccessible(Type));
 
   return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
          alignment,
@@ -6589,8 +6588,7 @@ TypeInfo *MultiPayloadEnumImplStrategy::completeDynamicLayout(
   
   applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/false, alignment);
 
-  auto enumAccessible =
-    IsABIAccessible_t(TC.IGM.getSILModule().isTypeABIAccessible(Type));
+  auto enumAccessible = IsABIAccessible_t(TC.IGM.isTypeABIAccessible(Type));
   
   return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
                                                        alignment, pod, bt,
@@ -6613,8 +6611,7 @@ ResilientEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                                                   SILType Type,
                                                   EnumDecl *theEnum,
                                                   llvm::StructType *enumTy) {
-  auto abiAccessible =
-    IsABIAccessible_t(TC.IGM.getSILModule().isTypeABIAccessible(Type));
+  auto abiAccessible = IsABIAccessible_t(TC.IGM.isTypeABIAccessible(Type));
   return registerEnumTypeInfo(
                        new ResilientEnumTypeInfo(*this, enumTy, abiAccessible));
 }

@@ -793,7 +793,7 @@ void ASTMangler::appendType(Type type) {
         return appendType(aliasTy->getSinglyDesugaredType());
       }
 
-      if (aliasTy->getSubstitutionMap().hasAnySubstitutableParams()) {
+      if (aliasTy->getSubstitutionMap()) {
         // Try to mangle the entire name as a substitution.
         if (tryMangleTypeSubstitution(tybase))
           return;
@@ -947,22 +947,6 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::NestedArchetype:
       llvm_unreachable("Cannot mangle free-standing archetypes");
 
-    case TypeKind::OpaqueTypeArchetype: {
-      // TODO: Mangle opaque archetypes as themselves, not their underlying type
-      auto opaqueTy = cast<OpaqueTypeArchetypeType>(tybase);
-      
-      // Currently an opaque type will only lack an underlying type when in
-      // error. Mangle an error type for USRs and other queries that might apply
-      // to a failed AST.
-      if (!opaqueTy->getOpaqueDecl()->getUnderlyingTypeSubstitutions()) {
-        return appendType(ErrorType::get(opaqueTy->getASTContext()));
-      }
-      auto underlyingType =
-        type.substOpaqueTypesWithUnderlyingTypes();
-      assert(!underlyingType->isEqual(type));
-      return appendType(underlyingType->getCanonicalType());
-    }
-      
     case TypeKind::DynamicSelf: {
       auto dynamicSelf = cast<DynamicSelfType>(tybase);
       if (dynamicSelf->getSelfType()->getAnyNominal()) {
@@ -1009,8 +993,8 @@ void ASTMangler::appendType(Type type) {
         // Dependent members of non-generic-param types are not canonical, but
         // we may still want to mangle them for debugging or indexing purposes.
         appendType(DepTy->getBase());
-        appendAssociatedTypeName(DepTy);
-        appendOperator("qa");
+        appendIdentifier(DepTy->getName().str());
+        appendOperator("Qa");
       }
       addTypeSubstitution(DepTy);
       return;

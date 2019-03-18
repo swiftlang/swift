@@ -81,6 +81,8 @@ extension Character {
   internal func _invariantCheck() {
     _internalInvariant(_str.count == 1)
     _internalInvariant(_str._guts.isFastUTF8)
+
+    _internalInvariant(_str._guts._object.isPreferredRepresentation)
   }
   #endif // INTERNAL_CHECKS_ENABLED
 }
@@ -173,7 +175,12 @@ extension Character :
       "Can't form a Character from an empty String")
     _debugPrecondition(s.index(after: s.startIndex) == s.endIndex,
       "Can't form a Character from a String containing more than one extended grapheme cluster")
-    self.init(unchecked: s)
+
+    if _fastPath(s._guts._object.isPreferredRepresentation) {
+      self.init(unchecked: s)
+      return
+    }
+    self.init(unchecked: String._copying(s))
   }
 }
 

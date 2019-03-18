@@ -1,5 +1,5 @@
 // Windows does not support batch-mode yet
-// XFAIL: win32
+// XFAIL: windows
 //
 // RUN: %empty-directory(%t)
 // RUN: touch %t/file-01.swift %t/file-02.swift %t/file-03.swift %t/file-04.swift %t/file-05.swift

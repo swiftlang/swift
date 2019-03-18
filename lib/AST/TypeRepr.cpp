@@ -258,11 +258,6 @@ TypeRepr *CloneVisitor::visitSILBoxTypeRepr(SILBoxTypeRepr *type) {
                                 type->getArgumentRAngleLoc());
 }
 
-TypeRepr *CloneVisitor::visitOpaqueReturnTypeRepr(OpaqueReturnTypeRepr *type) {
-  return new (Ctx) OpaqueReturnTypeRepr(type->getOpaqueLoc(),
-                                        visit(type->getConstraint()));
-}
-
 TypeRepr *TypeRepr::clone(const ASTContext &ctx) const {
   CloneVisitor visitor(ctx);
   return visitor.visit(const_cast<TypeRepr *>(this));
@@ -553,11 +548,6 @@ void ProtocolTypeRepr::printImpl(ASTPrinter &Printer,
   Printer << ".Protocol";
 }
 
-void OpaqueReturnTypeRepr::printImpl(ASTPrinter &Printer,
-                                     const PrintOptions &Opts) const {
-  Printer << "opaque ";
-  printTypeRepr(Constraint, Printer, Opts);
-}
 
 void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
                                   const PrintOptions &Opts) const {

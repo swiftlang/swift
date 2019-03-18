@@ -201,7 +201,7 @@ bool PartialApplyCombiner::allocateTemporaries() {
         return false;
 
       // If the temporary is non-trivial, we need to release it later.
-      if (!Arg->getType().isTrivial(PAI->getModule()))
+      if (!Arg->getType().isTrivial(*PAI->getFunction()))
         needsReleases = true;
       ArgsToHandle.push_back(std::make_pair(Arg, i));
     }
@@ -256,7 +256,7 @@ void PartialApplyCombiner::releaseTemporaries() {
   // its really needed.
   for (auto Op : Tmps) {
     auto TmpType = Op->getType().getObjectType();
-    if (TmpType.isTrivial(PAI->getModule()))
+    if (TmpType.isTrivial(*PAI->getFunction()))
       continue;
     for (auto *EndPoint : PAFrontier) {
       Builder.setInsertionPoint(EndPoint);
@@ -668,6 +668,7 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
     Operand &ArgOperand) {
   SILInstruction *AI = ArgOperand.getUser();
   SILModule &M = AI->getModule();
+  SILFunction *F = AI->getFunction();
 
   // SoleConformingType is only applicable in whole-module compilation.
   if (!M.isWholeModule())
@@ -689,10 +690,18 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
   } else {
     auto ArgType = ArgOperand.get()->getType();
     auto SwiftArgType = ArgType.getASTType();
-    if (!ArgType.isExistentialType() || ArgType.isAnyObject() ||
-        SwiftArgType->isAny())
-      return None;
-    PD = dyn_cast<ProtocolDecl>(SwiftArgType->getAnyNominal());
+    /// If the argtype is an opened existential conforming to a protocol type
+    /// and that the protocol type has a sole conformance, then we can propagate
+    /// concrete type for it as well.
+    ArchetypeType *archetypeTy;
+    if (SwiftArgType->isOpenedExistential() &&
+        (archetypeTy = dyn_cast<ArchetypeType>(SwiftArgType)) &&
+        (archetypeTy->getConformsTo().size() == 1)) {
+      PD = archetypeTy->getConformsTo()[0];
+    } else if (ArgType.isExistentialType() && !ArgType.isAnyObject() &&
+               !SwiftArgType->isAny()) {
+      PD = dyn_cast<ProtocolDecl>(SwiftArgType->getAnyNominal());
+    }
   }
 
   if (!PD)
@@ -716,7 +725,7 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
     return COAI;
 
   // Create SIL type for the concrete type.
-  SILType concreteSILType = M.Types.getLoweredType(ConcreteType);
+  SILType concreteSILType = F->getLoweredType(ConcreteType);
 
   // Prepare the code by adding UncheckedCast instructions that cast opened
   // existentials to concrete types. Set the ConcreteValue of CEI.
@@ -729,7 +738,7 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
     // Bail if ConcreteSILType is not the same SILType as the type stored in the
     // existential after maximal reabstraction.
     auto abstractionPattern = Lowering::AbstractionPattern::getOpaque();
-    auto abstractTy = M.Types.getLoweredType(abstractionPattern, ConcreteType);
+    auto abstractTy = F->getLoweredType(abstractionPattern, ConcreteType);
     if (abstractTy != concreteSILType)
        return None;
 

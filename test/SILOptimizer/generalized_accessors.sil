@@ -1,0 +1,107 @@
+// RUN: %target-sil-opt %s -yield-once-check -o /dev/null -verify
+//
+// SIL-level tests for yield-once diagnostics emitted for yield-once coroutines.
+// Note that the yield-once check runs on all functions with yield_once
+// qualifier in their type, regardless of whether or not they are
+// accessors of a property. In fact, currently it is not possible to parse
+// a property with _read and _modify accessors from a SIL source.
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+sil @testNoYield : $@yield_once @convention(thin) () -> @yields Int {
+bb0:
+%2 = tuple ()
+return %2 : $() // expected-error {{accessor must yield before returning}}
+}
+
+struct TestYield {
+  var flag : Builtin.Int1
+  var stored: Int64
+}
+
+sil @testMultipleYields : $@yield_once @convention(thin) (TestYield) -> @yields Int64 {
+bb0(%0 : $TestYield):
+%1 = struct_extract %0 : $TestYield, #TestYield.flag
+cond_br %1, bb1, bb3
+
+bb1:
+%5 = struct_extract %0 : $TestYield, #TestYield.stored
+yield %5 : $Int64, resume bb2, unwind bb6 // expected-note {{previous yield was here}}
+
+bb2:
+br bb4
+
+bb3:
+br bb4
+
+bb4:
+%9 = struct_extract %0 : $TestYield, #TestYield.stored
+yield %9 : $Int64, resume bb5, unwind bb7 // expected-error {{accessor must not yield more than once}}
+
+bb5:
+%11 = tuple ()
+return %11 : $()
+
+bb6:
+br bb8
+
+bb7:
+br bb8
+
+bb8:
+unwind
+}
+
+sil @testPartialReturnWithoutYield : $@yield_once @convention(thin) (TestYield) -> @yields Int64 {
+bb0(%0 : $TestYield):
+%1 = struct_extract %0 : $TestYield, #TestYield.flag
+cond_br %1, bb1, bb3					   // expected-note {{missing yield when the condition is false}}
+
+bb1:
+%5 = struct_extract %0 : $TestYield, #TestYield.stored
+yield %5 : $Int64, resume bb2, unwind bb5
+
+bb2:
+br bb4
+
+bb3:
+br bb4
+
+bb4:
+%21 = tuple ()
+return %21 : $()                          // expected-error {{accessor must yield on all paths before returning}}
+
+bb5:
+unwind
+}
+
+sil @testExplicitReturns : $@yield_once @convention(thin) (TestYield) -> @yields Int64 {
+bb0(%0 : $TestYield):
+%2 = struct_extract %0 : $TestYield, #TestYield.stored
+%3 = integer_literal $Builtin.Int64, 0
+%4 = struct_extract %2 : $Int64, #Int64._value
+%5 = builtin "cmp_slt_Int64"(%3 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int1
+%6 = struct $Bool (%5 : $Builtin.Int1)
+%7 = struct_extract %6 : $Bool, #Bool._value
+cond_br %7, bb1, bb2						// expected-note {{missing yield when the condition is true}}
+
+bb1:
+br bb4
+
+bb2:
+%10 = struct_extract %0 : $TestYield, #TestYield.stored
+yield %10 : $Int64, resume bb3, unwind bb5
+
+bb3:
+br bb4
+
+bb4:
+%13 = tuple ()
+return %13 : $()                            // expected-error {{accessor must yield on all paths before returning}}
+
+bb5:
+unwind
+}

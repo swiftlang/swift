@@ -106,6 +106,9 @@ enum class FixKind : uint8_t {
   /// given arguments/result types exactly.
   DefineMemberBasedOnUse,
 
+  /// Allow access to type member on instance or instance member on type
+  AllowTypeOrInstanceMember,
+
   /// Allow expressions where 'mutating' method is only partially applied,
   /// which means either not applied at all e.g. `Foo.bar` or only `Self`
   /// is applied e.g. `foo.bar` or `Foo.bar(&foo)`.
@@ -119,6 +122,16 @@ enum class FixKind : uint8_t {
   /// derived (rather than an arbitrary value of metatype type) or the
   /// referenced constructor must be required.
   AllowInvalidInitRef,
+
+  /// If there are fewer arguments than parameters, let's fix that up
+  /// by adding new arguments to the list represented as type variables.
+  AddMissingArguments,
+
+  /// Allow single tuple closure parameter destructuring into N arguments.
+  AllowClosureParameterDestructuring,
+
+  /// If there is out-of-order argument, let's fix that by re-ordering.
+  MoveOutOfOrderArgument,
 };
 
 class ConstraintFix {
@@ -441,10 +454,10 @@ public:
 /// }
 /// ```
 class AutoClosureForwarding final : public ConstraintFix {
-public:
   AutoClosureForwarding(ConstraintSystem &cs, ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::AutoClosureForwarding, locator) {}
 
+public:
   std::string getName() const override { return "fix @autoclosure forwarding"; }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
@@ -456,10 +469,10 @@ public:
 class RemoveUnwrap final : public ConstraintFix {
   Type BaseType;
 
-public:
   RemoveUnwrap(ConstraintSystem &cs, Type baseType, ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::RemoveUnwrap, locator), BaseType(baseType) {}
 
+public:
   std::string getName() const override {
     return "remove unwrap operator `!` or `?`";
   }
@@ -471,10 +484,10 @@ public:
 };
 
 class InsertExplicitCall final : public ConstraintFix {
-public:
   InsertExplicitCall(ConstraintSystem &cs, ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::InsertCall, locator) {}
 
+public:
   std::string getName() const override {
     return "insert explicit `()` to make a call";
   }
@@ -486,10 +499,10 @@ public:
 };
 
 class UseSubscriptOperator final : public ConstraintFix {
-public:
   UseSubscriptOperator(ConstraintSystem &cs, ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::UseSubscriptOperator, locator) {}
 
+public:
   std::string getName() const override {
     return "replace '.subscript(...)' with subscript operator";
   }
@@ -504,12 +517,12 @@ class DefineMemberBasedOnUse final : public ConstraintFix {
   Type BaseType;
   DeclName Name;
 
-public:
   DefineMemberBasedOnUse(ConstraintSystem &cs, Type baseType, DeclName member,
                          ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::DefineMemberBasedOnUse, locator),
         BaseType(baseType), Name(member) {}
 
+public:
   std::string getName() const override {
     llvm::SmallVector<char, 16> scratch;
     auto memberName = Name.getString(scratch);
@@ -523,14 +536,35 @@ public:
                                         DeclName member,
                                         ConstraintLocator *locator);
 };
+	
+class AllowTypeOrInstanceMember final : public ConstraintFix {
+  Type BaseType;
+  DeclName Name;
+
+public:
+  AllowTypeOrInstanceMember(ConstraintSystem &cs, Type baseType, DeclName member,
+                            ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowTypeOrInstanceMember, locator),
+        BaseType(baseType), Name(member) {}
+
+  std::string getName() const override {
+    return "allow access to instance member on type or a type member on instance";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowTypeOrInstanceMember *create(ConstraintSystem &cs, Type baseType,
+                                           DeclName member,
+                                           ConstraintLocator *locator);
+};
 
 class AllowInvalidPartialApplication final : public ConstraintFix {
-public:
   AllowInvalidPartialApplication(bool isWarning, ConstraintSystem &cs,
                                  ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::AllowInvalidPartialApplication, locator,
                       isWarning) {}
 
+public:
   std::string getName() const override {
     return "allow partially applied 'mutating' method";
   }
@@ -588,6 +622,95 @@ private:
                                      bool isStaticallyDerived,
                                      SourceRange baseRange,
                                      ConstraintLocator *locator);
+};
+
+class AllowClosureParamDestructuring final : public ConstraintFix {
+  FunctionType *ContextualType;
+
+  AllowClosureParamDestructuring(ConstraintSystem &cs,
+                                 FunctionType *contextualType,
+                                 ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowClosureParameterDestructuring, locator),
+        ContextualType(contextualType) {}
+
+public:
+  std::string getName() const override {
+    return "allow closure parameter destructuring";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowClosureParamDestructuring *create(ConstraintSystem &cs,
+                                                FunctionType *contextualType,
+                                                ConstraintLocator *locator);
+};
+
+class AddMissingArguments final
+    : public ConstraintFix,
+      private llvm::TrailingObjects<AddMissingArguments,
+                                    AnyFunctionType::Param> {
+  friend TrailingObjects;
+
+  using Param = AnyFunctionType::Param;
+
+  FunctionType *Fn;
+  unsigned NumSynthesized;
+
+  AddMissingArguments(ConstraintSystem &cs, FunctionType *funcType,
+                      llvm::ArrayRef<AnyFunctionType::Param> synthesizedArgs,
+                      ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AddMissingArguments, locator), Fn(funcType),
+        NumSynthesized(synthesizedArgs.size()) {
+    std::uninitialized_copy(synthesizedArgs.begin(), synthesizedArgs.end(),
+                            getSynthesizedArgumentsBuf().begin());
+  }
+
+public:
+  std::string getName() const override { return "synthesize missing argument(s)"; }
+
+  ArrayRef<Param> getSynthesizedArguments() const {
+    return {getTrailingObjects<Param>(), NumSynthesized};
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AddMissingArguments *create(ConstraintSystem &cs, FunctionType *fnType,
+                                     llvm::ArrayRef<Param> synthesizedArgs,
+                                     ConstraintLocator *locator);
+
+private:
+  MutableArrayRef<Param> getSynthesizedArgumentsBuf() {
+    return {getTrailingObjects<Param>(), NumSynthesized};
+  }
+};
+
+class MoveOutOfOrderArgument final : public ConstraintFix {
+  using ParamBinding = SmallVector<unsigned, 1>;
+
+  unsigned ArgIdx;
+  unsigned PrevArgIdx;
+
+  SmallVector<ParamBinding, 4> Bindings;
+
+  MoveOutOfOrderArgument(ConstraintSystem &cs, unsigned argIdx,
+                         unsigned prevArgIdx, ArrayRef<ParamBinding> bindings,
+                         ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::MoveOutOfOrderArgument, locator),
+        ArgIdx(argIdx), PrevArgIdx(prevArgIdx),
+        Bindings(bindings.begin(), bindings.end()) {}
+
+public:
+  std::string getName() const override {
+    return "move out-of-order argument to correct position";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static MoveOutOfOrderArgument *create(ConstraintSystem &cs,
+                                        unsigned argIdx,
+                                        unsigned prevArgIdx,
+                                        ArrayRef<ParamBinding> bindings,
+                                        ConstraintLocator *locator);
 };
 
 } // end namespace constraints

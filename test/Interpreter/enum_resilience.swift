@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_struct)) -Xfrontend -enable-resilience %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_struct)) -enable-library-evolution %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct
 // RUN: %target-codesign %t/%target-library-name(resilient_struct)
 
-// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_enum)) -Xfrontend -enable-resilience %S/../Inputs/resilient_enum.swift -emit-module -emit-module-path %t/resilient_enum.swiftmodule -module-name resilient_enum -I%t -L%t -lresilient_struct
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_enum)) -enable-library-evolution %S/../Inputs/resilient_enum.swift -emit-module -emit-module-path %t/resilient_enum.swiftmodule -module-name resilient_enum -I%t -L%t -lresilient_struct
 // RUN: %target-codesign %t/%target-library-name(resilient_enum)
 
 // RUN: %target-build-swift %s -L %t -I %t -lresilient_struct -lresilient_enum -o %t/main %target-rpath(%t)
@@ -11,10 +11,10 @@
 
 // RUN: %target-run %t/main %t/%target-library-name(resilient_struct) %t/%target-library-name(resilient_enum)
 
-// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_struct_wmo)) -Xfrontend -enable-resilience %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct -whole-module-optimization
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_struct_wmo)) -enable-library-evolution %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct -whole-module-optimization
 // RUN: %target-codesign %t/%target-library-name(resilient_struct_wmo)
 
-// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_enum_wmo)) -Xfrontend -enable-resilience %S/../Inputs/resilient_enum.swift -emit-module -emit-module-path %t/resilient_enum.swiftmodule -module-name resilient_enum -I%t -L%t -lresilient_struct_wmo -whole-module-optimization
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_enum_wmo)) -enable-library-evolution %S/../Inputs/resilient_enum.swift -emit-module -emit-module-path %t/resilient_enum.swiftmodule -module-name resilient_enum -I%t -L%t -lresilient_struct_wmo -whole-module-optimization
 // RUN: %target-codesign %t/%target-library-name(resilient_enum_wmo)
 
 // RUN: %target-build-swift %s -L %t -I %t -lresilient_struct_wmo -lresilient_enum_wmo -o %t/main2 %target-rpath(%t)

@@ -271,13 +271,6 @@ enum class TypeCheckExprFlags {
   /// as part of the expression diagnostics, which is attempting to narrow
   /// down failure location.
   SubExpressionDiagnostics = 0x400,
-  
-  /// If set, the 'convertType' specified to typeCheckExpression is the opaque
-  /// return type of the declaration being checked. The archetype should be
-  /// opened into a type variable to provide context to the expression, and
-  /// the resulting type will be a candidate for binding the underlying
-  /// type.
-  ConvertTypeIsOpaqueReturnType = 0x800,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;
@@ -1856,9 +1849,6 @@ public:
   /// operator \c name appended to the expression.
   Expr *findLHS(DeclContext *DC, Expr *E, Identifier name);
 
-  /// Look up the Bool type in the standard library.
-  Type lookupBoolType(const DeclContext *dc);
-
   /// @}
 
   /// \name Overload resolution
@@ -1936,6 +1926,7 @@ public:
   enum class FragileFunctionKind : unsigned {
     Transparent,
     Inlinable,
+    AlwaysEmitIntoClient,
     DefaultArgument,
     PropertyInitializer
   };

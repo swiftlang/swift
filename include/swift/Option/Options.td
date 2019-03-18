@@ -97,7 +97,7 @@ def driver_skip_execution : Flag<["-"], "driver-skip-execution">,
   HelpText<"Skip execution of subtasks when performing compilation">;
 def driver_use_frontend_path : Separate<["-"], "driver-use-frontend-path">,
   InternalDebugOpt,
-  HelpText<"Use the given executable to perform compilations">;
+  HelpText<"Use the given executable to perform compilations. Arguments can be passed as a ';' separated list">;
 def driver_show_incremental : Flag<["-"], "driver-show-incremental">,
   InternalDebugOpt,
   HelpText<"With -v, dump information about why files are being rebuilt">;
@@ -304,6 +304,10 @@ def serialize_diagnostics_path_EQ: Joined<["-"], "serialize-diagnostics-path=">,
 def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Specifies the Clang module cache path">;
+
+def enable_library_evolution : Flag<["-"], "enable-library-evolution">,
+  Flags<[FrontendOption, ParseableInterfaceOption]>,
+  HelpText<"Build the module to allow binary-compatible library evolution">;
 
 def module_name : Separate<["-"], "module-name">,
   Flags<[FrontendOption, ParseableInterfaceOption]>,

@@ -488,6 +488,20 @@ function(_add_variant_link_flags)
     endif()
   endif()
 
+  # Enable dead stripping. Portions of this logic were copied from llvm's
+  # `add_link_opts` function (which, perhaps, should have been used here in the
+  # first place, but at this point it's hard to say whether that's feasible).
+  #
+  # TODO: Evaluate/enable -f{function,data}-sections --gc-sections for bfd,
+  # gold, and lld.
+  if(NOT CMAKE_BUILD_TYPE STREQUAL Debug)
+    if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+      # See rdar://48283130: This gives 6MB+ size reductions for swift and
+      # SourceKitService, and much larger size reductions for sil-opt etc.
+      list(APPEND result "-Wl,-dead_strip")
+    endif()
+  endif()
+
   set("${LFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
   set("${LFLAGS_LINK_LIBRARIES_VAR_NAME}" "${link_libraries}" PARENT_SCOPE)
   set("${LFLAGS_LIBRARY_SEARCH_DIRECTORIES_VAR_NAME}" "${library_search_directories}" PARENT_SCOPE)
@@ -825,10 +839,10 @@ function(_add_swift_library_single target name)
     endif()
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-autolink-library;-Xfrontend;oldnames)
     # TODO(compnerd) handle /MT and /MTd
-    if("${CMAKE_BUILD_TYPE}" STREQUAL "RELEASE")
-      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-autolink-library;-Xfrontend;msvcrt)
-    else()
+    if(CMAKE_BUILD_TYPE MATCHES Debug)
       list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-autolink-library;-Xfrontend;msvcrtd)
+    else()
+      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-autolink-library;-Xfrontend;msvcrt)
     endif()
   endif()
 
@@ -1204,6 +1218,11 @@ function(_add_swift_library_single target name)
       "-DLLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1")
   endif()
 
+  if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS)
+    if(libkind STREQUAL SHARED)
+      list(APPEND c_compile_flags -D_WINDLL)
+    endif()
+  endif()
   _add_variant_link_flags(
     SDK "${SWIFTLIB_SINGLE_SDK}"
     ARCH "${SWIFTLIB_SINGLE_ARCHITECTURE}"
@@ -1335,7 +1354,6 @@ endfunction()
 #     [SHARED]
 #     [STATIC]
 #     [DEPENDS dep1 ...]
-#     [LINK_LIBRARIES dep1 ...]
 #     [INTERFACE_LINK_LIBRARIES dep1 ...]
 #     [SWIFT_MODULE_DEPENDS dep1 ...]
 #     [LLVM_COMPONENT_DEPENDS comp1 ...]
@@ -1357,9 +1375,6 @@ endfunction()
 #
 # DEPENDS
 #   Targets that this library depends on.
-#
-# LINK_LIBRARIES
-#   Libraries this library depends on.
 #
 # LLVM_COMPONENT_DEPENDS
 #   LLVM components this library depends on.
@@ -1400,6 +1415,10 @@ function(add_swift_host_library name)
                         ${ARGN})
   set(ASHL_SOURCES ${ASHL_UNPARSED_ARGUMENTS})
 
+  if(ASHL_LINK_LIBRARIES)
+    message(SEND_ERROR "library ${name} is using LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead")
+  endif()
+
   translate_flags(ASHL "${options}")
 
   if(NOT ASHL_SHARED AND NOT ASHL_STATIC)
@@ -1416,7 +1435,6 @@ function(add_swift_host_library name)
     SDK ${SWIFT_HOST_VARIANT_SDK}
     ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
     DEPENDS ${ASHL_DEPENDS}
-    LINK_LIBRARIES ${ASHL_LINK_LIBRARIES}
     LLVM_COMPONENT_DEPENDS ${ASHL_LLVM_COMPONENT_DEPENDS}
     FILE_DEPENDS ${ASHL_FILE_DEPENDS}
     C_COMPILE_FLAGS ${ASHL_C_COMPILE_FLAGS}
@@ -1783,7 +1801,7 @@ function(add_swift_target_library name)
       # building both simultaneously.  Effectively, only shared builds are
       # supported on windows currently.
       if(SWIFTLIB_SHARED)
-        list(APPEND swiftlib_swift_compile_flags_all -D_USRDLL)
+        list(APPEND swiftlib_swift_compile_flags_all -D_WINDLL)
         if(SWIFTLIB_IS_STDLIB_CORE)
           list(APPEND swiftlib_swift_compile_flags_all -DswiftCore_EXPORTS)
         endif()
@@ -2086,15 +2104,12 @@ endfunction()
 #
 #   [ARCHITECTURE architecture]
 #     Architecture to build for.
-#
-#   [LINK_FAT_LIBRARIES lipo_target1 ...]
-#     Fat libraries to link with.
 function(_add_swift_executable_single name)
   # Parse the arguments we were given.
   cmake_parse_arguments(SWIFTEXE_SINGLE
     "EXCLUDE_FROM_ALL"
     "SDK;ARCHITECTURE"
-    "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_LIBRARIES;LINK_FAT_LIBRARIES;COMPILE_FLAGS"
+    "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_LIBRARIES;COMPILE_FLAGS"
     ${ARGN})
 
   set(SWIFTEXE_SINGLE_SOURCES ${SWIFTEXE_SINGLE_UNPARSED_ARGUMENTS})
@@ -2142,27 +2157,11 @@ function(_add_swift_executable_single name)
         "-Xlinker" "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
   endif()
 
-  # Find the names of dependency library targets.
-  #
-  # We don't add the ${ARCH} to the target suffix because we want to link
-  # against fat libraries.  This only works for the Darwin targets as MachO is
-  # the only format with the fat libraries.
-  if(${SWIFTEXE_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
-    _list_add_string_suffix(
-        "${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES}"
-        "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}"
-        SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS)
-    _list_add_string_suffix(
-        "${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES}"
-        "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
-        SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES)
-  else()
-    _list_add_string_suffix(
-        "${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES}"
-        "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
-        SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS)
-    set(SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS})
-  endif()
+  _list_add_string_suffix(
+      "${SWIFTEXE_SINGLE_LINK_LIBRARIES}"
+      "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
+      SWIFTEXE_SINGLE_LINK_LIBRARIES_TARGETS)
+  set(SWIFTEXE_SINGLE_LINK_LIBRARIES ${SWIFTEXE_SINGLE_LINK_LIBRARIES_TARGETS})
 
   handle_swift_sources(
       dependency_target
@@ -2173,7 +2172,6 @@ function(_add_swift_executable_single name)
       SWIFTEXE_SINGLE_SOURCES SWIFTEXE_SINGLE_EXTERNAL_SOURCES ${name}
       DEPENDS
         ${SWIFTEXE_SINGLE_DEPENDS}
-        ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS}
       MODULE_NAME ${name}
       SDK ${SWIFTEXE_SINGLE_SDK}
       ARCHITECTURE ${SWIFTEXE_SINGLE_ARCHITECTURE}
@@ -2191,8 +2189,7 @@ function(_add_swift_executable_single name)
       DEPENDS
         ${dependency_target}
         ${LLVM_COMMON_DEPENDS}
-        ${SWIFTEXE_SINGLE_DEPENDS}
-        ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS})
+        ${SWIFTEXE_SINGLE_DEPENDS})
   llvm_update_compile_flags("${name}")
 
   # Convert variables to space-separated strings.
@@ -2212,11 +2209,10 @@ function(_add_swift_executable_single name)
       BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
       LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
-  target_link_libraries("${name}" PRIVATE ${SWIFTEXE_SINGLE_LINK_LIBRARIES} ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES})
+  target_link_libraries("${name}" PRIVATE ${SWIFTEXE_SINGLE_LINK_LIBRARIES})
   swift_common_llvm_config("${name}" ${SWIFTEXE_SINGLE_LLVM_COMPONENT_DEPENDS})
 
-  set_target_properties(${name}
-      PROPERTIES FOLDER "Swift executables")
+  set_target_properties(${name} PROPERTIES FOLDER "Swift executables")
 endfunction()
 
 macro(add_swift_tool_subdirectory name)
@@ -2230,13 +2226,17 @@ endmacro()
 function(add_swift_host_tool executable)
   set(options)
   set(single_parameter_options SWIFT_COMPONENT)
-  set(multiple_parameter_options)
+  set(multiple_parameter_options LINK_LIBRARIES)
 
   cmake_parse_arguments(ASHT
     "${options}"
     "${single_parameter_options}"
     "${multiple_parameter_options}"
     ${ARGN})
+
+  if(ASHT_LINK_LIBRARIES)
+    message(SEND_ERROR "${executable} is using LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead")
+  endif()
 
   precondition(ASHT_SWIFT_COMPONENT
                MESSAGE "Swift Component is required to add a host tool")

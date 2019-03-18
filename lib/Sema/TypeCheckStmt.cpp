@@ -437,7 +437,7 @@ public:
     // In an initializer, the only expression allowed is "nil", which indicates
     // failure from a failable initializer.
     if (auto ctor = dyn_cast_or_null<ConstructorDecl>(
-                                          TheFunc->getAbstractFunctionDecl())) {
+                      TheFunc->getAbstractFunctionDecl())) {
       // The only valid return expression in an initializer is the literal
       // 'nil'.
       auto nilExpr = dyn_cast<NilLiteralExpr>(E->getSemanticsProvidingExpr());
@@ -463,23 +463,9 @@ public:
       return new (TC.Context) FailStmt(RS->getReturnLoc(), nilExpr->getLoc(),
                                        RS->isImplicit());
     }
-    
-    TypeCheckExprOptions options = {};
-    
-    // If the result type is an opaque type, this is an opportunity to resolve
-    // the underlying type.
-    if (auto opaque = ResultTy->getAs<OpaqueTypeArchetypeType>()) {
-      if (auto funcDecl = TheFunc->getAbstractFunctionDecl()) {
-        if (opaque->getOpaqueDecl()->getNamingDecl() == funcDecl) {
-          options |= TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType;
-        }
-      }
-    }
 
     auto exprTy = TC.typeCheckExpression(E, DC, TypeLoc::withoutLoc(ResultTy),
-                                         CTP_ReturnStmt,
-                                         options);
-    
+                                         CTP_ReturnStmt);
     RS->setResult(E);
 
     if (!exprTy) {
@@ -960,29 +946,166 @@ public:
     PreviousFallthrough = S;
     return S;
   }
-  
-  Stmt *visitSwitchStmt(SwitchStmt *S) {
+
+  void checkCaseLabelItem(CaseStmt *caseBlock, CaseLabelItem &labelItem,
+                          bool &limitExhaustivityChecks, Type subjectType) {
+    SWIFT_DEFER {
+      // Check the guard expression, if present.
+      if (auto *guard = labelItem.getGuardExpr()) {
+        limitExhaustivityChecks |= TC.typeCheckCondition(guard, DC);
+        labelItem.setGuardExpr(guard);
+      }
+    };
+
+    Pattern *pattern = labelItem.getPattern();
+    auto *newPattern = TC.resolvePattern(pattern, DC,
+                                         /*isStmtCondition*/ false);
+    if (!newPattern)
+      return;
+    pattern = newPattern;
+    // Coerce the pattern to the subject's type.
+    TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
+    if (!subjectType ||
+        TC.coercePatternToType(pattern, TypeResolution::forContextual(DC),
+                               subjectType, patternOptions)) {
+      limitExhaustivityChecks = true;
+
+      // If that failed, mark any variables binding pieces of the pattern
+      // as invalid to silence follow-on errors.
+      pattern->forEachVariable([&](VarDecl *VD) { VD->markInvalid(); });
+    }
+    labelItem.setPattern(pattern);
+
+    // For each variable in the pattern, make sure its type is identical to what
+    // it was in the first label item's pattern.
+    auto *firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
+    SmallVector<VarDecl *, 4> vars;
+    firstPattern->collectVariables(vars);
+    pattern->forEachVariable([&](VarDecl *vd) {
+      if (!vd->hasName())
+        return;
+      for (auto *expected : vars) {
+        if (expected->hasName() && expected->getName() == vd->getName()) {
+          if (vd->hasType() && expected->hasType() && !expected->isInvalid() &&
+              !vd->getType()->isEqual(expected->getType())) {
+            TC.diagnose(vd->getLoc(), diag::type_mismatch_multiple_pattern_list,
+                        vd->getType(), expected->getType());
+            vd->markInvalid();
+            expected->markInvalid();
+          }
+          if (expected->isLet() != vd->isLet()) {
+            auto diag = TC.diagnose(
+                vd->getLoc(), diag::mutability_mismatch_multiple_pattern_list,
+                vd->isLet(), expected->isLet());
+
+            VarPattern *foundVP = nullptr;
+            vd->getParentPattern()->forEachNode([&](Pattern *P) {
+              if (auto *VP = dyn_cast<VarPattern>(P))
+                if (VP->getSingleVar() == vd)
+                  foundVP = VP;
+            });
+            if (foundVP)
+              diag.fixItReplace(foundVP->getLoc(),
+                                expected->isLet() ? "let" : "var");
+            vd->markInvalid();
+            expected->markInvalid();
+          }
+          return;
+        }
+      }
+    });
+  }
+
+  void checkUnknownAttrRestrictions(CaseStmt *caseBlock,
+                                    bool &limitExhaustivityChecks) {
+    if (caseBlock->getCaseLabelItems().size() != 1) {
+      assert(!caseBlock->getCaseLabelItems().empty() &&
+             "parser should not produce case blocks with no items");
+      TC.diagnose(caseBlock->getLoc(), diag::unknown_case_multiple_patterns)
+          .highlight(caseBlock->getCaseLabelItems()[1].getSourceRange());
+      limitExhaustivityChecks = true;
+    }
+
+    if (FallthroughDest != nullptr) {
+      if (!caseBlock->isDefault())
+        TC.diagnose(caseBlock->getLoc(), diag::unknown_case_must_be_last);
+      limitExhaustivityChecks = true;
+    }
+
+    const auto &labelItem = caseBlock->getCaseLabelItems().front();
+    if (labelItem.getGuardExpr() && !labelItem.isDefault()) {
+      TC.diagnose(labelItem.getStartLoc(), diag::unknown_case_where_clause)
+          .highlight(labelItem.getGuardExpr()->getSourceRange());
+    }
+
+    const Pattern *pattern =
+        labelItem.getPattern()->getSemanticsProvidingPattern();
+    if (!isa<AnyPattern>(pattern)) {
+      TC.diagnose(labelItem.getStartLoc(), diag::unknown_case_must_be_catchall)
+          .highlight(pattern->getSourceRange());
+    }
+  }
+
+  void checkFallthroughPatternBindingsAndTypes(CaseStmt *caseBlock,
+                                               CaseStmt *previousBlock) {
+    auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
+    SmallVector<VarDecl *, 4> vars;
+    firstPattern->collectVariables(vars);
+
+    for (auto &labelItem : previousBlock->getCaseLabelItems()) {
+      const Pattern *pattern = labelItem.getPattern();
+      SmallVector<VarDecl *, 4> PreviousVars;
+      pattern->collectVariables(PreviousVars);
+      for (auto expected : vars) {
+        bool matched = false;
+        if (!expected->hasName())
+          continue;
+        for (auto previous : PreviousVars) {
+          if (previous->hasName() &&
+              expected->getName() == previous->getName()) {
+            if (!previous->getType()->isEqual(expected->getType())) {
+              TC.diagnose(previous->getLoc(),
+                          diag::type_mismatch_fallthrough_pattern_list,
+                          previous->getType(), expected->getType());
+              previous->markInvalid();
+              expected->markInvalid();
+            }
+            matched = true;
+            break;
+          }
+        }
+        if (!matched) {
+          TC.diagnose(PreviousFallthrough->getLoc(),
+                      diag::fallthrough_into_case_with_var_binding,
+                      expected->getName());
+        }
+      }
+    }
+  }
+
+  Stmt *visitSwitchStmt(SwitchStmt *switchStmt) {
     // Type-check the subject expression.
-    Expr *subjectExpr = S->getSubjectExpr();
+    Expr *subjectExpr = switchStmt->getSubjectExpr();
     auto resultTy = TC.typeCheckExpression(subjectExpr, DC);
     auto limitExhaustivityChecks = !resultTy;
     if (Expr *newSubjectExpr = TC.coerceToRValue(subjectExpr))
       subjectExpr = newSubjectExpr;
-    S->setSubjectExpr(subjectExpr);
-    Type subjectType = S->getSubjectExpr()->getType();
+    switchStmt->setSubjectExpr(subjectExpr);
+    Type subjectType = switchStmt->getSubjectExpr()->getType();
 
     // Type-check the case blocks.
     AddSwitchNest switchNest(*this);
-    AddLabeledStmt labelNest(*this, S);
+    AddLabeledStmt labelNest(*this, switchStmt);
 
     // Pre-emptively visit all Decls (#if/#warning/#error) that still exist in
     // the list of raw cases.
-    for (auto node : S->getRawCases()) {
-      if (!node.is<Decl*>()) continue;
-      TC.typeCheckDecl(node.get<Decl*>());
+    for (auto &node : switchStmt->getRawCases()) {
+      if (!node.is<Decl *>())
+        continue;
+      TC.typeCheckDecl(node.get<Decl *>());
     }
 
-    auto cases = S->getCases();
+    auto cases = switchStmt->getCases();
     CaseStmt *previousBlock = nullptr;
     for (auto i = cases.begin(), e = cases.end(); i != e; ++i) {
       auto *caseBlock = *i;
@@ -992,138 +1115,21 @@ public:
       FallthroughDest = std::next(i) == e ? nullptr : *std::next(i);
 
       for (auto &labelItem : caseBlock->getMutableCaseLabelItems()) {
-        // Resolve the pattern in the label.
-        Pattern *pattern = labelItem.getPattern();
-        if (auto *newPattern = TC.resolvePattern(pattern, DC,
-                                                 /*isStmtCondition*/false)) {
-          pattern = newPattern;
-          // Coerce the pattern to the subject's type.
-          TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
-          if (!subjectType ||
-              TC.coercePatternToType(pattern, TypeResolution::forContextual(DC),
-                                     subjectType, patternOptions)) {
-            limitExhaustivityChecks = true;
-
-            // If that failed, mark any variables binding pieces of the pattern
-            // as invalid to silence follow-on errors.
-            pattern->forEachVariable([&](VarDecl *VD) {
-              VD->markInvalid();
-            });
-          }
-          labelItem.setPattern(pattern);
-          
-          // For each variable in the pattern, make sure its type is identical to what it
-          // was in the first label item's pattern.
-          auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
-          SmallVector<VarDecl *, 4> vars;
-          firstPattern->collectVariables(vars);
-          pattern->forEachVariable([&](VarDecl *VD) {
-            if (!VD->hasName())
-              return;
-            for (auto *expected : vars) {
-              if (expected->hasName() && expected->getName() == VD->getName()) {
-                if (VD->hasType() && expected->hasType() && !expected->isInvalid() &&
-                    !VD->getType()->isEqual(expected->getType())) {
-                  TC.diagnose(VD->getLoc(), diag::type_mismatch_multiple_pattern_list,
-                              VD->getType(), expected->getType());
-                  VD->markInvalid();
-                  expected->markInvalid();
-                }
-                if (expected->isLet() != VD->isLet()) {
-                  auto diag = TC.diagnose(VD->getLoc(),
-                                          diag::mutability_mismatch_multiple_pattern_list,
-                                          VD->isLet(), expected->isLet());
-
-                  VarPattern *foundVP = nullptr;
-                  VD->getParentPattern()->forEachNode([&](Pattern *P) {
-                    if (auto *VP = dyn_cast<VarPattern>(P))
-                      if (VP->getSingleVar() == VD)
-                        foundVP = VP;
-                  });
-                  if (foundVP)
-                    diag.fixItReplace(foundVP->getLoc(),
-                                      expected->isLet() ? "let" : "var");
-                  VD->markInvalid();
-                  expected->markInvalid();
-                }
-                return;
-              }
-            }
-          });
-        }
-        // Check the guard expression, if present.
-        if (auto *guard = labelItem.getGuardExpr()) {
-          limitExhaustivityChecks |= TC.typeCheckCondition(guard, DC);
-          labelItem.setGuardExpr(guard);
-        }
+        // Resolve the pattern in our case label if it has not been resolved
+        // and check that our var decls follow invariants.
+        checkCaseLabelItem(caseBlock, labelItem, limitExhaustivityChecks,
+                           subjectType);
       }
 
       // Check restrictions on '@unknown'.
       if (caseBlock->hasUnknownAttr()) {
-        if (caseBlock->getCaseLabelItems().size() != 1) {
-          assert(!caseBlock->getCaseLabelItems().empty() &&
-                 "parser should not produce case blocks with no items");
-          TC.diagnose(caseBlock->getLoc(),
-                      diag::unknown_case_multiple_patterns)
-            .highlight(caseBlock->getCaseLabelItems()[1].getSourceRange());
-          limitExhaustivityChecks = true;
-        }
-
-        if (FallthroughDest != nullptr) {
-          if (!caseBlock->isDefault())
-            TC.diagnose(caseBlock->getLoc(), diag::unknown_case_must_be_last);
-          limitExhaustivityChecks = true;
-        }
-
-        const CaseLabelItem &labelItem = caseBlock->getCaseLabelItems().front();
-        if (labelItem.getGuardExpr() && !labelItem.isDefault()) {
-          TC.diagnose(labelItem.getStartLoc(),
-                      diag::unknown_case_where_clause)
-            .highlight(labelItem.getGuardExpr()->getSourceRange());
-        }
-
-        const Pattern *pattern =
-            labelItem.getPattern()->getSemanticsProvidingPattern();
-        if (!isa<AnyPattern>(pattern)) {
-          TC.diagnose(labelItem.getStartLoc(),
-                      diag::unknown_case_must_be_catchall)
-            .highlight(pattern->getSourceRange());
-        }
+        checkUnknownAttrRestrictions(caseBlock, limitExhaustivityChecks);
       }
 
       // If the previous case fellthrough, similarly check that that case's bindings
       // includes our first label item's pattern bindings and types.
       if (PreviousFallthrough && previousBlock) {
-        auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
-        SmallVector<VarDecl *, 4> Vars;
-        firstPattern->collectVariables(Vars);
-
-        for (auto &labelItem : previousBlock->getCaseLabelItems()) {
-          const Pattern *pattern = labelItem.getPattern();
-          SmallVector<VarDecl *, 4> PreviousVars;
-          pattern->collectVariables(PreviousVars);
-          for (auto expected : Vars) {
-            bool matched = false;
-            if (!expected->hasName())
-              continue;
-            for (auto previous: PreviousVars) {
-              if (previous->hasName() && expected->getName() == previous->getName()) {
-                if (!previous->getType()->isEqual(expected->getType())) {
-                  TC.diagnose(previous->getLoc(), diag::type_mismatch_fallthrough_pattern_list,
-                              previous->getType(), expected->getType());
-                  previous->markInvalid();
-                  expected->markInvalid();
-                }
-                matched = true;
-                break;
-              }
-            }
-            if (!matched) {
-              TC.diagnose(PreviousFallthrough->getLoc(),
-                          diag::fallthrough_into_case_with_var_binding, expected->getName());
-            }
-          }
-        }
+        checkFallthroughPatternBindingsAndTypes(caseBlock, previousBlock);
       }
       
       // Type-check the body statements.
@@ -1134,11 +1140,11 @@ public:
       previousBlock = caseBlock;
     }
 
-    if (!S->isImplicit()) {
-      TC.checkSwitchExhaustiveness(S, DC, limitExhaustivityChecks);
+    if (!switchStmt->isImplicit()) {
+      TC.checkSwitchExhaustiveness(switchStmt, DC, limitExhaustivityChecks);
     }
 
-    return S;
+    return switchStmt;
   }
 
   Stmt *visitCaseStmt(CaseStmt *S) {
@@ -1275,8 +1281,8 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     }
     return;
   }
-  
-  // Skip checking if there is no type, which presumably means there was a 
+
+  // Skip checking if there is no type, which presumably means there was a
   // type error.
   if (!E->getType()) {
     return;
@@ -1322,7 +1328,25 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
   // dead?
   if (E->getType()->is<AnyFunctionType>()) {
     bool isDiscardable = false;
-    if (auto *Fn = dyn_cast<ApplyExpr>(E)) {
+
+    // The called function could be wrapped inside a `dot_syntax_call_expr`
+    // node, for example:
+    //
+    // class Bar {
+    //   @discardableResult
+    //   func foo() -> Int { return 0 }
+    //
+    //   func baz() {
+    //     self.foo
+    //     foo
+    //   }
+    // }
+    //
+    // So look through the DSCE and get the function being called.
+    auto expr =
+        isa<DotSyntaxCallExpr>(E) ? cast<DotSyntaxCallExpr>(E)->getFn() : E;
+
+    if (auto *Fn = dyn_cast<ApplyExpr>(expr)) {
       if (auto *declRef = dyn_cast<DeclRefExpr>(Fn->getFn())) {
         if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(declRef->getDecl())) {
           if (funcDecl->getAttrs().hasAttribute<DiscardableResultAttr>()) {

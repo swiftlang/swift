@@ -65,7 +65,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::OptionalObject:
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
-  case ConstraintKind::OpaqueUnderlyingType:
     assert(!First.isNull());
     assert(!Second.isNull());
     break;
@@ -133,7 +132,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::Disjunction:
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
-  case ConstraintKind::OpaqueUnderlyingType:
     llvm_unreachable("Wrong constructor");
 
   case ConstraintKind::KeyPath:
@@ -168,10 +166,10 @@ Constraint::Constraint(ConstraintKind kind, Type first, Type second,
 }
 
 Constraint::Constraint(Type type, OverloadChoice choice, DeclContext *useDC,
-                       ConstraintLocator *locator,
+                       ConstraintFix *fix, ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
-    : Kind(ConstraintKind::BindOverload), HasRestriction(false),
-      IsActive(false), IsDisabled(false), RememberChoice(false),
+    : Kind(ConstraintKind::BindOverload), TheFix(fix), HasRestriction(false),
+      IsActive(false), IsDisabled(bool(fix)), RememberChoice(false),
       IsFavored(false),
       NumTypeVariables(typeVars.size()), Overload{type, choice, useDC},
       Locator(locator) {
@@ -236,7 +234,6 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::Defaultable:
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
-  case ConstraintKind::OpaqueUnderlyingType:
     return create(cs, getKind(), getFirstType(), getSecondType(), getLocator());
 
   case ConstraintKind::BindOverload:
@@ -294,7 +291,6 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::BindToPointerType: Out << " bind to pointer "; break;
   case ConstraintKind::Subtype: Out << " subtype "; break;
   case ConstraintKind::Conversion: Out << " conv "; break;
-  case ConstraintKind::OpaqueUnderlyingType: Out << " underlying type of opaque "; break;
   case ConstraintKind::BridgingConversion: Out << " bridging conv "; break;
   case ConstraintKind::ArgumentConversion: Out << " arg conv "; break;
   case ConstraintKind::OperatorArgumentConversion:
@@ -515,7 +511,6 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
-  case ConstraintKind::OpaqueUnderlyingType:
     constraint->getFirstType()->getTypeVariables(typeVars);
     constraint->getSecondType()->getTypeVariables(typeVars);
     break;
@@ -644,18 +639,7 @@ Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type,
                                            OverloadChoice choice, 
                                            DeclContext *useDC,
                                            ConstraintLocator *locator) {
-  // Collect type variables.
-  SmallVector<TypeVariableType *, 4> typeVars;
-  if (type->hasTypeVariable())
-    type->getTypeVariables(typeVars);
-  if (auto baseType = choice.getBaseType()) {
-    baseType->getTypeVariables(typeVars);
-  }
-
-  // Create the constraint.
-  unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
-  void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  return new (mem) Constraint(type, choice, useDC, locator, typeVars);
+  return createFixedChoice(cs, type, choice, useDC, /*fix=*/nullptr, locator);
 }
 
 Constraint *Constraint::createRestricted(ConstraintSystem &cs, 
@@ -693,6 +677,25 @@ Constraint *Constraint::createFixed(ConstraintSystem &cs, ConstraintKind kind,
   unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(kind, fix, first, second, locator, typeVars);
+}
+
+Constraint *Constraint::createFixedChoice(ConstraintSystem &cs, Type type,
+                                          OverloadChoice choice,
+                                          DeclContext *useDC,
+                                          ConstraintFix *fix,
+                                          ConstraintLocator *locator) {
+  // Collect type variables.
+  SmallVector<TypeVariableType *, 4> typeVars;
+  if (type->hasTypeVariable())
+    type->getTypeVariables(typeVars);
+  if (auto baseType = choice.getBaseType()) {
+    baseType->getTypeVariables(typeVars);
+  }
+
+  // Create the constraint.
+  unsigned size = totalSizeToAlloc<TypeVariableType *>(typeVars.size());
+  void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
+  return new (mem) Constraint(type, choice, useDC, fix, locator, typeVars);
 }
 
 Constraint *Constraint::createDisjunction(ConstraintSystem &cs,

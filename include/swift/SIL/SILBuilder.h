@@ -198,7 +198,9 @@ public:
   SILModule &getModule() const { return C.Module; }
   ASTContext &getASTContext() const { return getModule().getASTContext(); }
   const Lowering::TypeLowering &getTypeLowering(SILType T) const {
-    return getModule().getTypeLowering(T);
+    // FIXME: Expansion
+    return getModule().Types.getTypeLowering(T,
+                                             ResilienceExpansion::Minimal);
   }
 
   void setOpenedArchetypesTracker(SILOpenedArchetypesTracker *Tracker) {
@@ -669,7 +671,7 @@ public:
       return createLoad(Loc, LV, LoadOwnershipQualifier::Unqualified);
     }
 
-    if (LV->getType().isTrivial(getModule())) {
+    if (LV->getType().isTrivial(getFunction())) {
       return createLoad(Loc, LV, LoadOwnershipQualifier::Trivial);
     }
     return createLoad(Loc, LV, Qualifier);
@@ -716,6 +718,27 @@ public:
                       BeginBorrowInst(getSILDebugLocation(Loc), LV));
   }
 
+  SILValue emitLoadBorrowOperation(SILLocation loc, SILValue v) {
+    if (!hasOwnership()) {
+      return emitLoadValueOperation(loc, v,
+                                    LoadOwnershipQualifier::Unqualified);
+    }
+    return createLoadBorrow(loc, v);
+  }
+
+  SILValue emitBeginBorrowOperation(SILLocation loc, SILValue v) {
+    if (!hasOwnership() ||
+        v.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Guaranteed))
+      return v;
+    return createBeginBorrow(loc, v);
+  }
+
+  void emitEndBorrowOperation(SILLocation loc, SILValue v) {
+    if (!hasOwnership())
+      return;
+    createEndBorrow(loc, v);
+  }
+
   // Pass in an address or value, perform a begin_borrow/load_borrow and pass
   // the value to the passed in closure. After the closure has finished
   // executing, automatically insert the end_borrow. The closure can assume that
@@ -741,7 +764,7 @@ public:
       return createStore(Loc, Src, DestAddr,
                          StoreOwnershipQualifier::Unqualified);
     }
-    if (Src->getType().isTrivial(getModule())) {
+    if (Src->getType().isTrivial(getFunction())) {
       return createStore(Loc, Src, DestAddr, StoreOwnershipQualifier::Trivial);
     }
     return createStore(Loc, Src, DestAddr, Qualifier);
@@ -812,9 +835,11 @@ public:
         getSILDebugLocation(loc), buffer, enforcement, aborted, fromBuiltin));
   }
 
-  AssignInst *createAssign(SILLocation Loc, SILValue Src, SILValue DestAddr) {
+  AssignInst *createAssign(SILLocation Loc, SILValue Src, SILValue DestAddr,
+                           AssignOwnershipQualifier Qualifier) {
     return insert(new (getModule())
-                      AssignInst(getSILDebugLocation(Loc), Src, DestAddr));
+                      AssignInst(getSILDebugLocation(Loc), Src, DestAddr,
+                                 Qualifier));
   }
 
   StoreBorrowInst *createStoreBorrow(SILLocation Loc, SILValue Src,
@@ -895,8 +920,10 @@ public:
   } \
   Copy##Name##ValueInst *createCopy##Name##Value(SILLocation Loc, \
                                                  SILValue operand) { \
+    auto type = getFunction().getLoweredType( \
+      operand->getType().getASTType().getReferenceStorageReferent()); \
     return insert(new (getModule()) \
-      Copy##Name##ValueInst(getSILDebugLocation(Loc), operand, getModule())); \
+      Copy##Name##ValueInst(getSILDebugLocation(Loc), operand, type)); \
   }
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
@@ -1068,7 +1095,7 @@ public:
   }
 
   CopyValueInst *createCopyValue(SILLocation Loc, SILValue operand) {
-    assert(!operand->getType().isTrivial(getModule()) &&
+    assert(!operand->getType().isTrivial(getFunction()) &&
            "Should not be passing trivial values to this api. Use instead "
            "emitCopyValueOperation");
     return insert(new (getModule())
@@ -1077,7 +1104,7 @@ public:
 
   DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand) {
     assert(isLoadableOrOpaque(operand->getType()));
-    assert(!operand->getType().isTrivial(getModule()) &&
+    assert(!operand->getType().isTrivial(getFunction()) &&
            "Should not be passing trivial values to this api. Use instead "
            "emitDestroyValueOperation");
     return insert(new (getModule())
@@ -1371,13 +1398,13 @@ public:
   DestructureStructInst *createDestructureStruct(SILLocation Loc,
                                                  SILValue Operand) {
     return insert(DestructureStructInst::create(
-        getModule(), getSILDebugLocation(Loc), Operand));
+        getFunction(), getSILDebugLocation(Loc), Operand));
   }
 
   DestructureTupleInst *createDestructureTuple(SILLocation Loc,
                                                SILValue Operand) {
     return insert(DestructureTupleInst::create(
-        getModule(), getSILDebugLocation(Loc), Operand));
+        getFunction(), getSILDebugLocation(Loc), Operand));
   }
 
   MultipleValueInstruction *emitDestructureValueOperation(SILLocation loc,
@@ -2130,13 +2157,15 @@ private:
     if (!SILModuleConventions(M).useLoweredAddresses())
       return true;
 
+    // FIXME: Just call getTypeLowering() here, and move this code there
+
     auto expansion = ResilienceExpansion::Maximal;
     // If there's no current SILFunction, we're inserting into a global
     // variable initializer.
     if (F)
       expansion = F->getResilienceExpansion();
 
-    return M.getTypeLowering(Ty, expansion).isLoadable();
+    return M.Types.getTypeLowering(Ty, expansion).isLoadable();
   }
 
   void appendOperandTypeName(SILType OpdTy, llvm::SmallString<16> &Name) {
@@ -2232,18 +2261,45 @@ public:
 };
 
 class SavedInsertionPointRAII {
-  SILBuilder &Builder;
-  PointerUnion<SILInstruction *, SILBasicBlock *> SavedIP;
+  SILBuilder &builder;
+  PointerUnion<SILInstruction *, SILBasicBlock *> savedInsertionPoint;
 
 public:
-  SavedInsertionPointRAII(SILBuilder &B, SILInstruction *NewIP)
-      : Builder(B), SavedIP(&*B.getInsertionPoint()) {
-    Builder.setInsertionPoint(NewIP);
+  /// Constructor that saves a Builder's insertion point without changing the
+  /// builder's underlying insertion point.
+  SavedInsertionPointRAII(SILBuilder &B) : builder(B), savedInsertionPoint() {
+    // If our builder does not have a valid insertion point, just put nullptr
+    // into SavedIP.
+    if (!builder.hasValidInsertionPoint()) {
+      savedInsertionPoint = static_cast<SILBasicBlock *>(nullptr);
+      return;
+    }
+
+    // If we are inserting into the end of the block, stash the insertion block.
+    if (builder.insertingAtEndOfBlock()) {
+      savedInsertionPoint = builder.getInsertionBB();
+      return;
+    }
+
+    // Otherwise, stash the instruction.
+    SILInstruction *i = &*builder.getInsertionPoint();
+    savedInsertionPoint = i;
   }
 
-  SavedInsertionPointRAII(SILBuilder &B, SILBasicBlock *NewIP)
-      : Builder(B), SavedIP(B.getInsertionBB()) {
-    Builder.setInsertionPoint(NewIP);
+  SavedInsertionPointRAII(SILBuilder &b, SILInstruction *insertionPoint)
+      : SavedInsertionPointRAII(b) {
+    builder.setInsertionPoint(insertionPoint);
+  }
+
+  SavedInsertionPointRAII(SILBuilder &b, SILBasicBlock *block,
+                          SILBasicBlock::iterator iter)
+      : SavedInsertionPointRAII(b) {
+    builder.setInsertionPoint(block, iter);
+  }
+
+  SavedInsertionPointRAII(SILBuilder &b, SILBasicBlock *insertionBlock)
+      : SavedInsertionPointRAII(b) {
+    builder.setInsertionPoint(insertionBlock);
   }
 
   SavedInsertionPointRAII(const SavedInsertionPointRAII &) = delete;
@@ -2252,12 +2308,12 @@ public:
   SavedInsertionPointRAII &operator=(SavedInsertionPointRAII &&) = delete;
 
   ~SavedInsertionPointRAII() {
-    if (SavedIP.isNull()) {
-      Builder.clearInsertionPoint();
-    } else if (SavedIP.is<SILInstruction *>()) {
-      Builder.setInsertionPoint(SavedIP.get<SILInstruction *>());
+    if (savedInsertionPoint.isNull()) {
+      builder.clearInsertionPoint();
+    } else if (savedInsertionPoint.is<SILInstruction *>()) {
+      builder.setInsertionPoint(savedInsertionPoint.get<SILInstruction *>());
     } else {
-      Builder.setInsertionPoint(SavedIP.get<SILBasicBlock *>());
+      builder.setInsertionPoint(savedInsertionPoint.get<SILBasicBlock *>());
     }
   }
 };

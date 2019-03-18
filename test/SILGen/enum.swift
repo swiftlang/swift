@@ -73,13 +73,16 @@ func AddressOnly_cases(_ s: S) {
   _ = AddressOnly.nought
 
   // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin AddressOnly.Type
+  // CHECK-NEXT:  [[P_BUF:%.*]] = alloc_stack $P
+  // CHECK-NEXT:  [[PAYLOAD_ADDR:%.*]] = init_existential_addr [[P_BUF]]
+  // CHECK-NEXT:  store %0 to [trivial] [[PAYLOAD_ADDR]]
   // CHECK-NEXT:  [[MERE:%.*]] = alloc_stack $AddressOnly
   // CHECK-NEXT:  [[PAYLOAD:%.*]] = init_enum_data_addr [[MERE]]
-  // CHECK-NEXT:  [[PAYLOAD_ADDR:%.*]] = init_existential_addr [[PAYLOAD]]
-  // CHECK-NEXT:  store %0 to [trivial] [[PAYLOAD_ADDR]]
+  // CHECK-NEXT:  copy_addr [take] [[P_BUF]] to [initialization] [[PAYLOAD]] : $*P
   // CHECK-NEXT:  inject_enum_addr [[MERE]]
   // CHECK-NEXT:  destroy_addr [[MERE]]
   // CHECK-NEXT:  dealloc_stack [[MERE]]
+  // CHECK-NEXT:  dealloc_stack [[P_BUF]] : $*P
   _ = AddressOnly.mere(s)
 
   // Address-only enum vs loadable payload
@@ -129,13 +132,15 @@ func PolyOptionable_cases<T>(_ t: T) {
   _ = PolyOptionable<T>.nought
 
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin PolyOptionable<T>.Type
+// CHECK-NEXT:    [[T_BUF:%.*]] = alloc_stack $T
+// CHECK-NEXT:    copy_addr %0 to [initialization] [[T_BUF]]
 // CHECK-NEXT:    [[MERE:%.*]] = alloc_stack $PolyOptionable<T>
 // CHECK-NEXT:    [[PAYLOAD:%.*]] = init_enum_data_addr [[MERE]]
-// CHECK-NEXT:    copy_addr %0 to [initialization] [[PAYLOAD]]
+// CHECK-NEXT:    copy_addr [take] [[T_BUF]] to [initialization] [[PAYLOAD]] : $*T
 // CHECK-NEXT:    inject_enum_addr [[MERE]]
 // CHECK-NEXT:    destroy_addr [[MERE]]
 // CHECK-NEXT:    dealloc_stack [[MERE]]
-
+// CHECK-NEXT:    dealloc_stack [[T_BUF]] : $*T
   _ = PolyOptionable<T>.mere(t)
 
 // CHECK-NOT:    destroy_addr %0
@@ -233,4 +238,34 @@ func useTrailingClosureGeneric<T>(t: T) {
   _ = TrailingClosureGeneric<T>.noLabel { t }
   _ = TrailingClosureGeneric<T>.twoElementsLabel(x: t) { t }
   _ = TrailingClosureGeneric<T>.twoElementsNoLabel(t) { t }
+}
+
+enum SR7799 {
+  case one
+  case two
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4enum6sr77993baryAA6SR7799OSg_tF : $@convention(thin) (Optional<SR7799>) -> () {
+// CHECK: bb0(%0 : $Optional<SR7799>):
+// CHECK-NEXT:  debug_value %0 : $Optional<SR7799>, let, name "bar", argno 1
+// CHECK-NEXT:  switch_enum %0 : $Optional<SR7799>, case #Optional.some!enumelt.1: bb1, default bb4
+// CHECK: bb1(%3 : $SR7799):
+// CHECK-NEXT:  switch_enum %3 : $SR7799, case #SR7799.one!enumelt: bb2, case #SR7799.two!enumelt: bb3
+func sr7799(bar: SR7799?) {
+  switch bar {
+  case .one: print("one")
+  case .two?: print("two")
+  default: print("default")
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4enum8sr7799_13baryAA6SR7799OSgSg_tF : $@convention(thin) (Optional<Optional<SR7799>>) -> () {
+// CHECK: bb0(%0 : $Optional<Optional<SR7799>>):
+// CHECK-NEXT: debug_value %0 : $Optional<Optional<SR7799>>, let, name "bar", argno 1
+// CHECK-NEXT: switch_enum %0 : $Optional<Optional<SR7799>>, case #Optional.none!enumelt: bb1, default bb2
+func sr7799_1(bar: SR7799??) {
+  switch bar {
+  case .none: print("none")
+  default: print("default")
+  }
 }

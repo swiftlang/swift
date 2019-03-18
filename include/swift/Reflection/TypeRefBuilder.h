@@ -82,36 +82,36 @@ using GenericSection = ReflectionSection<const void *>;
 struct ReflectionInfo {
   struct {
     FieldSection Metadata;
-    uintptr_t SectionOffset;
+    uint64_t SectionOffset;
   } Field;
 
   struct {
     AssociatedTypeSection Metadata;
-    uintptr_t SectionOffset;
+    uint64_t SectionOffset;
   } AssociatedType;
 
   struct {
     BuiltinTypeSection Metadata;
-    uintptr_t SectionOffset;
+    uint64_t SectionOffset;
   } Builtin;
 
   struct {
     CaptureSection Metadata;
-    uintptr_t SectionOffset;
+    uint64_t SectionOffset;
   } Capture;
 
   struct {
     GenericSection Metadata;
-    uintptr_t SectionOffset;
+    uint64_t SectionOffset;
   } TypeReference;
 
   struct {
     GenericSection Metadata;
-    uintptr_t SectionOffset;
+    uint64_t SectionOffset;
   } ReflectionString;
 
-  uintptr_t LocalStartAddress;
-  uintptr_t RemoteStartAddress;
+  uint64_t LocalStartAddress;
+  uint64_t RemoteStartAddress;
 };
 
 struct ClosureContextInfo {
@@ -274,13 +274,13 @@ public:
 
   const BoundGenericTypeRef *
   createBoundGenericType(const Optional<std::string> &mangledName,
-                         const std::vector<const TypeRef *> &args,
+                         ArrayRef<const TypeRef *> args,
                          const TypeRef *parent) {
     return BoundGenericTypeRef::create(*this, *mangledName, args, parent);
   }
 
   const TupleTypeRef *
-  createTupleType(const std::vector<const TypeRef *> &elements,
+  createTupleType(ArrayRef<const TypeRef *> elements,
                   std::string &&labels, bool isVariadic) {
     // FIXME: Add uniqueness checks in TupleTypeRef::Profile and
     // unittests/Reflection/TypeRef.cpp if using labels for identity.
@@ -288,7 +288,7 @@ public:
   }
 
   const FunctionTypeRef *createFunctionType(
-      const std::vector<remote::FunctionParam<const TypeRef *>> &params,
+      ArrayRef<remote::FunctionParam<const TypeRef *>> params,
       const TypeRef *result, FunctionTypeFlags flags) {
     return FunctionTypeRef::create(*this, params, result, flags);
   }
@@ -406,7 +406,7 @@ public:
 
   const ObjCClassTypeRef *
   createBoundGenericObjCClassType(const std::string &name,
-                                  std::vector<const TypeRef *> &args) {
+                                  ArrayRef<const TypeRef *> args) {
     // Remote reflection just ignores generic arguments for Objective-C
     // lightweight generic types, since they don't affect layout.
     return createObjCClassType(name);
@@ -506,11 +506,11 @@ public:
 
   /// Get the raw capture descriptor for a remote capture descriptor
   /// address.
-  const CaptureDescriptor *getCaptureDescriptor(uintptr_t RemoteAddress);
+  const CaptureDescriptor *getCaptureDescriptor(uint64_t RemoteAddress);
 
   /// Get the unsubstituted capture types for a closure context.
   ClosureContextInfo getClosureContextInfo(const CaptureDescriptor &CD,
-                                           uintptr_t Offset);
+                                           uint64_t Offset);
 
   ///
   /// Dumping typerefs, field declarations, associated types

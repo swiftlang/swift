@@ -21,18 +21,15 @@ public var DictionaryOfAnyHashableStrings = [
     name: "DictionaryOfAnyHashableStrings_insert",
     runFunction: run_DictionaryOfAnyHashableStrings_insert,
     tags: [.abstraction, .runtime, .cpubench],
-    setUpFunction: {
-      keys = buildKeys(500)
-    }
+    setUpFunction: { keys = buildKeys(50) },
+    legacyFactor: 14
   ),
   BenchmarkInfo(
     name: "DictionaryOfAnyHashableStrings_lookup",
     runFunction: run_DictionaryOfAnyHashableStrings_lookup,
     tags: [.abstraction, .runtime, .cpubench],
-    setUpFunction: {
-      keys = buildKeys(500)
-      workload = buildWorkload()
-    }
+    setUpFunction: { keys = buildKeys(50); workload = buildWorkload() },
+    legacyFactor: 24
   ),
 ]
 
@@ -65,7 +62,7 @@ func buildWorkload() -> [AnyHashable: Any] {
 @inline(never)
 public func run_DictionaryOfAnyHashableStrings_insert(_ n: Int) {
   precondition(keys.count > 0)
-  for _ in 0 ... n {
+  for _ in 1...n {
     blackHole(buildWorkload())
   }
 }
@@ -74,7 +71,7 @@ public func run_DictionaryOfAnyHashableStrings_insert(_ n: Int) {
 public func run_DictionaryOfAnyHashableStrings_lookup(_ n: Int) {
   precondition(workload.count > 0)
   precondition(keys.count > 0)
-  for _ in 0 ... n {
+  for _ in 1...n {
     for i in 0 ..< keys.count {
       let key = keys[i]
       CheckResults((workload[key] as! Int) == i)

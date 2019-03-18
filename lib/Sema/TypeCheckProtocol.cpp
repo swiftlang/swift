@@ -1623,6 +1623,8 @@ static void diagnoseConformanceImpliedByConditionalConformance(
 ProtocolConformance *MultiConformanceChecker::
 checkIndividualConformance(NormalProtocolConformance *conformance,
                            bool issueFixit) {
+  PrettyStackTraceConformance trace(TC.Context, "type-checking", conformance);
+
   std::vector<ValueDecl*> revivedMissingWitnesses;
   switch (conformance->getState()) {
     case ProtocolConformanceState::Incomplete:
@@ -2463,16 +2465,19 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     if (checkWitnessAccess(assocType, typeDecl, &isSetter)) {
       assert(!isSetter);
 
-      // Avoid relying on the lifetime of 'this'.
+      // Note: you must not capture 'this' in the below closure.
       const DeclContext *DC = this->DC;
+      auto requiredAccessScope = getRequiredAccessScope();
+
       diagnoseOrDefer(assocType, false,
-          [this, DC, typeDecl](NormalProtocolConformance *conformance) {
+          [DC, requiredAccessScope, typeDecl](
+            NormalProtocolConformance *conformance) {
         AccessLevel requiredAccess =
-            getRequiredAccessScope().requiredAccessForDiagnostics();
+            requiredAccessScope.requiredAccessForDiagnostics();
         auto proto = conformance->getProtocol();
         auto protoAccessScope = proto->getFormalAccessScope(DC);
         bool protoForcesAccess =
-            getRequiredAccessScope().hasEqualDeclContextWith(protoAccessScope);
+            requiredAccessScope.hasEqualDeclContextWith(protoAccessScope);
         auto diagKind = protoForcesAccess
                           ? diag::type_witness_not_accessible_proto
                           : diag::type_witness_not_accessible_type;
@@ -2545,11 +2550,6 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
         auto *attr = new (TC.Context) UsableFromInlineAttr(/*implicit=*/true);
         aliasDecl->getAttrs().add(attr);
       }
-
-      bool unused;
-      assert(TC.Context.hadError() ||
-             !checkWitnessAccess(assocType, aliasDecl, &unused));
-      (void)unused;
 
       if (nominal == DC) {
         nominal->addMember(aliasDecl);
@@ -4394,8 +4394,6 @@ void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
 }
 
 void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {
-  PrettyStackTraceConformance trace(Context, "type-checking", conformance);
-
   MultiConformanceChecker checker(*this);
   checker.addConformance(conformance);
   checker.checkAllConformances();
@@ -5020,8 +5018,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
   // Check each of the conformances associated with this context.
   SmallVector<ConformanceDiagnostic, 4> diagnostics;
   auto conformances = dc->getLocalConformances(ConformanceLookupKind::All,
-                                               &diagnostics,
-                                               /*sorted=*/true);
+                                               &diagnostics);
 
   // The conformance checker bundle that checks all conformances in the context.
   MultiConformanceChecker groupChecker(*this);

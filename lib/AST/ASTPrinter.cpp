@@ -826,6 +826,10 @@ public:
   using ASTVisitor::visit;
 
   bool visit(Decl *D) {
+    #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+      return false; // not needed for the parser library.
+    #endif
+
     if (!shouldPrint(D, true))
       return false;
 
@@ -1501,6 +1505,10 @@ bool ShouldPrintChecker::shouldPrint(const Pattern *P,
 
 bool ShouldPrintChecker::shouldPrint(const Decl *D,
                                      const PrintOptions &Options) {
+  #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+    return false; // not needed for the parser library.
+  #endif
+
   if (auto *ED= dyn_cast<ExtensionDecl>(D)) {
     if (Options.printExtensionContentAsMembers(ED))
       return false;
@@ -2189,10 +2197,6 @@ void PrintAST::visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
   Printer << "(\"" << PDD->getMessage()->getValue() << "\")";
 }
 
-void PrintAST::visitOpaqueTypeDecl(OpaqueTypeDecl *decl) {
-  // TODO: Need a parsable representation for generated interfaces.
-}
-
 void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
@@ -2429,7 +2433,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   printAttributes(decl);
   printAccess(decl);
   if (!Options.SkipIntroducerKeywords) {
-    if (decl->isStatic())
+    if (decl->isStatic() && Options.PrintStaticKeyword)
       printStaticKeyword(decl->getCorrectStaticSpelling());
     if (decl->getKind() == DeclKind::Var
         || Options.PrintParameterSpecifiers) {
@@ -2705,7 +2709,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     printSourceRange(Range, Ctx);
   } else {
     if (!Options.SkipIntroducerKeywords) {
-      if (decl->isStatic())
+      if (decl->isStatic() && Options.PrintStaticKeyword)
         printStaticKeyword(decl->getCorrectStaticSpelling());
       if (decl->isMutating() && !decl->getAttrs().hasAttribute<MutatingAttr>()) {
         Printer.printKeyword("mutating", Options, " ");
@@ -4074,20 +4078,6 @@ public:
   
   void visitPrimaryArchetypeType(PrimaryArchetypeType *T) {
     printArchetypeCommon(T);
-  }
-  
-  void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T) {
-    // TODO(opaque): present opaque types with user-facing syntax
-    Printer << "(__opaque " << T->getOpaqueDecl()->getNamingDecl()->printRef();
-    if (!T->getSubstitutions().empty()) {
-      Printer << '<';
-      auto replacements = T->getSubstitutions().getReplacementTypes();
-      interleave(replacements.begin(), replacements.end(),
-                 [&](Type t) { visit(t); },
-                 [&] { Printer << ", "; });
-      Printer << '>';
-    }
-    Printer << ')';
   }
 
   void visitGenericTypeParamType(GenericTypeParamType *T) {

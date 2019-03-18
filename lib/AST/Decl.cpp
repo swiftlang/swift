@@ -157,7 +157,6 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(Param);
   TRIVIAL_KIND(Module);
   TRIVIAL_KIND(MissingMember);
-  TRIVIAL_KIND(OpaqueType);
 
    case DeclKind::Enum:
      return cast<EnumDecl>(this)->getGenericParams()
@@ -300,7 +299,6 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(Module, "module");
   ENTRY(MissingMember, "missing member placeholder");
   ENTRY(Requirement, "requirement");
-  ENTRY(OpaqueType, "opaque type");
   }
 #undef ENTRY
   llvm_unreachable("bad DescriptiveDeclKind");
@@ -538,7 +536,8 @@ bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
   return false;
 }
 
-bool Decl::isWeakImported(ModuleDecl *fromModule) const {
+bool Decl::isWeakImported(ModuleDecl *fromModule,
+                          AvailabilityContext fromContext) const {
   // For a Clang declaration, trust Clang.
   if (auto clangDecl = getClangDecl()) {
     return clangDecl->isWeakImported();
@@ -548,22 +547,28 @@ bool Decl::isWeakImported(ModuleDecl *fromModule) const {
   if (containingModule == fromModule)
     return false;
 
+  auto containingContext =
+      AvailabilityInference::availableRange(this,
+                                            containingModule->getASTContext());
+  if (!fromContext.isContainedIn(containingContext))
+    return true;
+
   if (getAttrs().hasAttribute<WeakLinkedAttr>())
     return true;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
-    return accessor->getStorage()->isWeakImported(fromModule);
+    return accessor->getStorage()->isWeakImported(fromModule, fromContext);
 
   if (auto *dtor = dyn_cast<DestructorDecl>(this))
-    return cast<ClassDecl>(dtor->getDeclContext())->isWeakImported(fromModule);
+    return cast<ClassDecl>(dtor->getDeclContext())->isWeakImported(
+        fromModule, fromContext);
 
   auto *dc = getDeclContext();
   if (auto *ext = dyn_cast<ExtensionDecl>(dc))
-    return ext->isWeakImported(fromModule);
+    return ext->isWeakImported(fromModule, fromContext);
   if (auto *ntd = dyn_cast<NominalTypeDecl>(dc))
-    return ntd->isWeakImported(fromModule);
+    return ntd->isWeakImported(fromModule, fromContext);
 
-  // FIXME: Also check availability when containingModule is resilient.
   return false;
 }
 
@@ -897,9 +902,6 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
     return ImportKind::Enum;
   case DeclKind::Struct:
     return ImportKind::Struct;
-      
-  case DeclKind::OpaqueType:
-    return ImportKind::Type;
 
   case DeclKind::TypeAlias: {
     Type type = cast<TypeAliasDecl>(VD)->getDeclaredInterfaceType();
@@ -1989,7 +1991,6 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::TypeAlias:
   case DeclKind::GenericTypeParam:
   case DeclKind::AssociatedType:
-  case DeclKind::OpaqueType:
     // Types are not instance members.
     return false;
 
@@ -2312,22 +2313,6 @@ void ValueDecl::setOverriddenDecls(ArrayRef<ValueDecl *> overridden) {
   request.cacheResult(overriddenVec);
 }
 
-OpaqueTypeDecl *ValueDecl::getOpaqueResultTypeDecl() const {
-  if (auto func = dyn_cast<FuncDecl>(this)) {
-    return func->getOpaqueResultTypeDecl();
-  } else {
-    return nullptr;
-  }
-}
-
-void ValueDecl::setOpaqueResultTypeDecl(OpaqueTypeDecl *D) {
-  if (auto func = dyn_cast<FuncDecl>(this)) {
-    func->setOpaqueResultTypeDecl(D);
-  } else {
-    llvm_unreachable("decl does not support opaque result types");
-  }
-}
-
 bool ValueDecl::isObjC() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
@@ -2428,14 +2413,9 @@ void ValueDecl::setInterfaceType(Type type) {
     assert(!type->hasTypeVariable() && "Type variable in interface type");
     assert(!type->is<InOutType>() && "Interface type must be materializable");
 
-    // lldb creates global typealiases with archetypes in them.
-    // FIXME: Add an isDebugAlias() flag, like isDebugVar().
-    //
-    // Also, ParamDecls in closure contexts can have type variables
+    // ParamDecls in closure contexts can have type variables
     // archetype in them during constraint generation.
-    if (!isa<TypeAliasDecl>(this) &&
-        !(isa<ParamDecl>(this) &&
-          isa<AbstractClosureExpr>(getDeclContext()))) {
+    if (!(isa<ParamDecl>(this) && isa<AbstractClosureExpr>(getDeclContext()))) {
       assert(!type->hasArchetype() &&
              "Archetype in interface type");
     }
@@ -2545,12 +2525,14 @@ bool ValueDecl::isUsableFromInline() const {
   assert(getFormalAccess() == AccessLevel::Internal);
 
   if (getAttrs().hasAttribute<UsableFromInlineAttr>() ||
+      getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
       getAttrs().hasAttribute<InlinableAttr>())
     return true;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this)) {
     auto *storage = accessor->getStorage();
     if (storage->getAttrs().hasAttribute<UsableFromInlineAttr>() ||
+        storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
         storage->getAttrs().hasAttribute<InlinableAttr>())
       return true;
   }
@@ -2842,6 +2824,13 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
   auto access = getAccessLevel();
   auto *sourceDC = VD->getDeclContext();
 
+  // Preserve "fast path" behavior for everything inside
+  // protocol extensions and operators, otherwise allow access
+  // check declarations inside inaccessible members via slower
+  // access scope based check, which is helpful for diagnostics.
+  if (!(sourceDC->getSelfProtocolDecl() || VD->isOperator()))
+    return checkAccessUsingAccessScopes(useDC, VD, access);
+
   if (!forConformance) {
     if (auto *proto = sourceDC->getSelfProtocolDecl()) {
       // FIXME: Swift 4.1 allowed accessing protocol extension methods that were
@@ -2896,21 +2885,8 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
 
 bool ValueDecl::isAccessibleFrom(const DeclContext *useDC,
                                  bool forConformance) const {
-  bool result = checkAccess(useDC, this, forConformance,
-                            [&]() { return getFormalAccess(); });
-
-  // For everything outside of protocols and operators, we should get the same
-  // result using either implementation of checkAccess, because useDC must
-  // already have access to this declaration's DeclContext.
-  // FIXME: Arguably, we're doing the wrong thing for operators here too,
-  // because we're finding internal operators within private types. Fortunately
-  // we have a requirement that a member operator take the enclosing type as an
-  // argument, so it won't ever match.
-  assert(getDeclContext()->getSelfProtocolDecl() || isOperator() ||
-         result ==
-             checkAccessUsingAccessScopes(useDC, this, getFormalAccess()));
-
-  return result;
+  return checkAccess(useDC, this, forConformance,
+                     [&]() { return getFormalAccess(); });
 }
 
 bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC,
@@ -3293,7 +3269,9 @@ void TypeAliasDecl::setUnderlyingType(Type underlying) {
     ASTContext &ctx = getASTContext();
 
     auto *genericSig = getGenericSignature();
-    auto subs = genericSig->getIdentitySubstitutionMap();
+    auto subs = SubstitutionMap::get(
+        genericSig, [&](SubstitutableType *type) -> Type { return type; },
+        MakeAbstractConformanceForGenericType());
 
     Type parent;
     auto parentDC = getDeclContext();
@@ -5758,21 +5736,6 @@ void AbstractFunctionDecl::setParameters(ParameterList *BodyParams) {
   BodyParams->setDeclContextOfParamDecls(this);
 }
 
-OpaqueTypeDecl::OpaqueTypeDecl(ValueDecl *NamingDecl,
-                               GenericParamList *GenericParams,
-                               DeclContext *DC,
-                               GenericSignature *OpaqueInterfaceGenericSignature,
-                               GenericTypeParamType *UnderlyingInterfaceType)
-  : GenericTypeDecl(DeclKind::OpaqueType, DC, Identifier(), SourceLoc(), {},
-                    GenericParams),
-    NamingDecl(NamingDecl),
-    OpaqueInterfaceGenericSignature(OpaqueInterfaceGenericSignature),
-    UnderlyingInterfaceType(UnderlyingInterfaceType)
-{
-  // Always implicit.
-  setImplicit();
-}
-
 void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
   auto &ctx = getASTContext();
   auto *sig = getGenericSignature();
@@ -5782,9 +5745,8 @@ void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
   Type resultTy;
   if (auto fn = dyn_cast<FuncDecl>(this)) {
     resultTy = fn->getBodyResultTypeLoc().getType();
-    if (!resultTy) {
+    if (!resultTy)
       resultTy = TupleType::getEmpty(ctx);
-    }
 
   } else if (auto ctor = dyn_cast<ConstructorDecl>(this)) {
     auto *dc = ctor->getDeclContext();

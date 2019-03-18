@@ -238,6 +238,68 @@ class TestData : TestDataSuper {
         let data3 = Data(bytes: [1, 2, 3, 4, 5][1..<3])
         expectEqual(2, data3.count)
     }
+
+    func testInitializationWithBufferPointer() {
+        let nilBuffer = UnsafeBufferPointer<UInt8>(start: nil, count: 0)
+        let data = Data(buffer: nilBuffer)
+        expectEqual(data, Data())
+
+        let validPointer = UnsafeMutablePointer<UInt8>.allocate(capacity: 2)
+        validPointer[0] = 0xCA
+        validPointer[1] = 0xFE
+        defer { validPointer.deallocate() }
+
+        let emptyBuffer = UnsafeBufferPointer<UInt8>(start: validPointer, count: 0)
+        let data2 = Data(buffer: emptyBuffer)
+        expectEqual(data2, Data())
+
+        let shortBuffer = UnsafeBufferPointer<UInt8>(start: validPointer, count: 1)
+        let data3 = Data(buffer: shortBuffer)
+        expectEqual(data3, Data([0xCA]))
+
+        let fullBuffer = UnsafeBufferPointer<UInt8>(start: validPointer, count: 2)
+        let data4 = Data(buffer: fullBuffer)
+        expectEqual(data4, Data([0xCA, 0xFE]))
+
+        let tuple: (UInt16, UInt16, UInt16, UInt16) = (0xFF, 0xFE, 0xFD, 0xFC)
+        withUnsafeBytes(of: tuple) {
+            // If necessary, port this to big-endian.
+            let tupleBuffer: UnsafeBufferPointer<UInt8> = $0.bindMemory(to: UInt8.self)
+            let data5 = Data(buffer: tupleBuffer)
+            expectEqual(data5, Data([0xFF, 0x00, 0xFE, 0x00, 0xFD, 0x00, 0xFC, 0x00]))
+        }
+    }
+
+    func testInitializationWithMutableBufferPointer() {
+        let nilBuffer = UnsafeMutableBufferPointer<UInt8>(start: nil, count: 0)
+        let data = Data(buffer: nilBuffer)
+        expectEqual(data, Data())
+
+        let validPointer = UnsafeMutablePointer<UInt8>.allocate(capacity: 2)
+        validPointer[0] = 0xCA
+        validPointer[1] = 0xFE
+        defer { validPointer.deallocate() }
+
+        let emptyBuffer = UnsafeMutableBufferPointer<UInt8>(start: validPointer, count: 0)
+        let data2 = Data(buffer: emptyBuffer)
+        expectEqual(data2, Data())
+
+        let shortBuffer = UnsafeMutableBufferPointer<UInt8>(start: validPointer, count: 1)
+        let data3 = Data(buffer: shortBuffer)
+        expectEqual(data3, Data([0xCA]))
+
+        let fullBuffer = UnsafeMutableBufferPointer<UInt8>(start: validPointer, count: 2)
+        let data4 = Data(buffer: fullBuffer)
+        expectEqual(data4, Data([0xCA, 0xFE]))
+
+        var tuple: (UInt16, UInt16, UInt16, UInt16) = (0xFF, 0xFE, 0xFD, 0xFC)
+        withUnsafeMutableBytes(of: &tuple) {
+            // If necessary, port this to big-endian.
+            let tupleBuffer: UnsafeMutableBufferPointer<UInt8> = $0.bindMemory(to: UInt8.self)
+            let data5 = Data(buffer: tupleBuffer)
+            expectEqual(data5, Data([0xFF, 0x00, 0xFE, 0x00, 0xFD, 0x00, 0xFC, 0x00]))
+        }
+    }
     
     func testMutableData() {
         let hello = dataFrom("hello")
@@ -1198,10 +1260,13 @@ class TestData : TestDataSuper {
 
         // If we append a sequence of elements larger than a single InlineData, the internal append here should buffer.
         // We want to make sure that buffering in this way does not accidentally drop trailing elements on the floor.
-        d.append(contentsOf: 0x03...0x17)
+        d.append(contentsOf: 0x03...0x2F)
         expectEqual(Data([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
                           0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
-                          0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17]), d)
+                          0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                          0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,
+                          0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
+                          0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F]), d)
     }
 
     // This test is like test_appendingNonContiguousSequence_exactCount but uses a sequence which reports 0 for its `.underestimatedCount`.
@@ -1220,10 +1285,13 @@ class TestData : TestDataSuper {
 
         // If we append a sequence of elements larger than a single InlineData, the internal append here should buffer.
         // We want to make sure that buffering in this way does not accidentally drop trailing elements on the floor.
-        d.append(contentsOf: (0x03...0x17).makeIterator()) // `.makeIterator()` produces a sequence whose `.underestimatedCount` is 0.
+        d.append(contentsOf: (0x03...0x2F).makeIterator()) // `.makeIterator()` produces a sequence whose `.underestimatedCount` is 0.
         expectEqual(Data([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
                           0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
-                          0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17]), d)
+                          0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                          0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,
+                          0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
+                          0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F]), d)
     }
 
     func test_sequenceInitializers() {
@@ -3742,6 +3810,8 @@ class TestData : TestDataSuper {
 var DataTests = TestSuite("TestData")
 DataTests.test("testBasicConstruction") { TestData().testBasicConstruction() }
 DataTests.test("testInitializationWithArray") { TestData().testInitializationWithArray() }
+DataTests.test("testInitializationWithBufferPointer") { TestData().testInitializationWithBufferPointer() }
+DataTests.test("testInitializationWithMutableBufferPointer") { TestData().testInitializationWithMutableBufferPointer() }
 DataTests.test("testMutableData") { TestData().testMutableData() }
 DataTests.test("testCustomData") { TestData().testCustomData() }
 DataTests.test("testBridgingDefault") { TestData().testBridgingDefault() }

@@ -436,7 +436,7 @@ public:
     if (!Reader->readBytes(RemoteAddress(ExistentialAddress),
                            (uint8_t *)&Container, sizeof(Container)))
       return None;
-    auto MetadataAddress = reinterpret_cast<StoredPointer>(Container.Type);
+    auto MetadataAddress = static_cast<StoredPointer>(Container.Type);
     auto Metadata = readMetadata(MetadataAddress);
     if (!Metadata)
       return None;
@@ -530,28 +530,8 @@ public:
     if (!Meta) return BuiltType();
 
     switch (Meta->getKind()) {
-    case MetadataKind::Class: {
-      auto classMeta = cast<TargetClassMetadata<Runtime>>(Meta);
-      if (!classMeta->isTypeMetadata()) {
-        std::string className;
-        if (!readObjCClassName(MetadataAddress, className))
-          return BuiltType();
-
-        BuiltType BuiltObjCClass = Builder.createObjCClassType(std::move(className));
-        if (!BuiltObjCClass) {
-          // Try the superclass.
-          if (!classMeta->Superclass)
-            return BuiltType();
-
-          BuiltObjCClass = readTypeFromMetadata(classMeta->Superclass,
-                                                skipArtificialSubclasses);
-        }
-
-        TypeCache[MetadataAddress] = BuiltObjCClass;
-        return BuiltObjCClass;
-      }
-      return readNominalTypeFromMetadata(Meta, skipArtificialSubclasses);
-    }
+    case MetadataKind::Class:
+      return readNominalTypeFromClassMetadata(Meta, skipArtificialSubclasses);
     case MetadataKind::Struct:
     case MetadataKind::Enum:
     case MetadataKind::Optional:
@@ -2318,6 +2298,30 @@ private:
     return nominal;
   }
 
+  BuiltType readNominalTypeFromClassMetadata(MetadataRef origMetadata,
+                                       bool skipArtificialSubclasses = false) {
+    auto classMeta = cast<TargetClassMetadata<Runtime>>(origMetadata);
+    if (classMeta->isTypeMetadata())
+      return readNominalTypeFromMetadata(origMetadata, skipArtificialSubclasses);
+
+    std::string className;
+    if (!readObjCClassName(origMetadata.getAddress(), className))
+      return BuiltType();
+
+    BuiltType BuiltObjCClass = Builder.createObjCClassType(std::move(className));
+    if (!BuiltObjCClass) {
+      // Try the superclass.
+      if (!classMeta->Superclass)
+        return BuiltType();
+
+      BuiltObjCClass = readTypeFromMetadata(classMeta->Superclass,
+                                            skipArtificialSubclasses);
+    }
+
+    TypeCache[origMetadata.getAddress()] = BuiltObjCClass;
+    return BuiltObjCClass;
+  }
+
   /// Given that the remote process is running the non-fragile Apple runtime,
   /// grab the ro-data from a class pointer.
   StoredPointer readObjCRODataPtr(StoredPointer classAddress) {
@@ -2447,6 +2451,12 @@ private:
       tryFindSymbol(_address, symbolName);                   \
       tryReadSymbol(_address, dest);                         \
     } while (0)
+#   define tryFindAndReadSymbolWithDefault(dest, symbolName, default) do { \
+      dest = default;                                                      \
+      auto _address = Reader->getSymbolAddress(symbolName);                \
+      if (_address)                                                        \
+        tryReadSymbol(_address, dest);                                     \
+    } while (0)
 
     tryFindAndReadSymbol(TaggedPointerMask,
                          "objc_debug_taggedpointer_mask");
@@ -2459,30 +2469,34 @@ private:
     if (!TaggedPointerClassesAddr)
       finish(TaggedPointerEncodingKind::Error);
     TaggedPointerClasses = TaggedPointerClassesAddr.getAddressData();
-    tryFindAndReadSymbol(TaggedPointerExtendedMask,
-                         "objc_debug_taggedpointer_ext_mask");
-    tryFindAndReadSymbol(TaggedPointerExtendedSlotShift,
-                         "objc_debug_taggedpointer_ext_slot_shift");
-    tryFindAndReadSymbol(TaggedPointerExtendedSlotMask,
-                         "objc_debug_taggedpointer_ext_slot_mask");
-    tryFindSymbol(TaggedPointerExtendedClassesAddr,
-                  "objc_debug_taggedpointer_ext_classes");
-    if (!TaggedPointerExtendedClassesAddr)
-      finish(TaggedPointerEncodingKind::Error);
-    TaggedPointerExtendedClasses =
-        TaggedPointerExtendedClassesAddr.getAddressData();
+    
+    // Extended tagged pointers don't exist on older OSes. Handle those
+    // by setting the variables to zero.
+    tryFindAndReadSymbolWithDefault(TaggedPointerExtendedMask,
+                                    "objc_debug_taggedpointer_ext_mask",
+                                    0);
+    tryFindAndReadSymbolWithDefault(TaggedPointerExtendedSlotShift,
+                                    "objc_debug_taggedpointer_ext_slot_shift",
+                                    0);
+    tryFindAndReadSymbolWithDefault(TaggedPointerExtendedSlotMask,
+                                    "objc_debug_taggedpointer_ext_slot_mask",
+                                    0);
+    auto TaggedPointerExtendedClassesAddr =
+      Reader->getSymbolAddress("objc_debug_taggedpointer_ext_classes");
+    if (TaggedPointerExtendedClassesAddr)
+      TaggedPointerExtendedClasses =
+          TaggedPointerExtendedClassesAddr.getAddressData();
 
     // The tagged pointer obfuscator is not present on older OSes, in
     // which case we can treat it as zero.
-    TaggedPointerObfuscator = 0;
-    auto TaggedPointerObfuscatorAddr = Reader->getSymbolAddress(
-      "objc_debug_taggedpointer_obfuscator");
-    if (TaggedPointerObfuscatorAddr)
-      tryReadSymbol(TaggedPointerObfuscatorAddr, TaggedPointerObfuscator);
-
+    tryFindAndReadSymbolWithDefault(TaggedPointerObfuscator,
+                                    "objc_debug_taggedpointer_obfuscator",
+                                    0);
+    
 #   undef tryFindSymbol
 #   undef tryReadSymbol
 #   undef tryFindAndReadSymbol
+#   undef tryFindAndReadSymbolWithDefault
 
     return finish(TaggedPointerEncodingKind::Extended);
   }

@@ -47,18 +47,6 @@ static bool isDeclName(Node::Kind kind) {
   }
 }
 
-static bool isContext(Node::Kind kind) {
-  switch (kind) {
-#define NODE(ID)
-#define CONTEXT_NODE(ID)                                                \
-    case Node::Kind::ID:
-#include "swift/Demangling/DemangleNodes.def"
-      return true;
-    default:
-      return false;
-  }
-}
-
 static bool isAnyGeneric(Node::Kind kind) {
   switch (kind) {
     case Node::Kind::Structure:
@@ -93,7 +81,25 @@ static bool isRequirement(Node::Kind kind) {
   }
 }
 
-static bool isFunctionAttr(Node::Kind kind) {
+} // anonymous namespace
+
+//////////////////////////////////
+// Public utility functions    //
+//////////////////////////////////
+
+bool swift::Demangle::isContext(Node::Kind kind) {
+  switch (kind) {
+#define NODE(ID)
+#define CONTEXT_NODE(ID)                                                \
+    case Node::Kind::ID:
+#include "swift/Demangling/DemangleNodes.def"
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
   switch (kind) {
     case Node::Kind::FunctionSignatureSpecialization:
     case Node::Kind::GenericSpecialization:
@@ -119,12 +125,6 @@ static bool isFunctionAttr(Node::Kind kind) {
       return false;
   }
 }
-
-} // anonymous namespace
-
-//////////////////////////////////
-// Public utility functions    //
-//////////////////////////////////
 
 llvm::StringRef
 swift::Demangle::makeSymbolicMangledNameStringRef(const char *base) {
@@ -402,16 +402,18 @@ void Node::reverseChildren(size_t StartingAt) {
 void NodeFactory::freeSlabs(Slab *slab) {
   while (slab) {
     Slab *prev = slab->Previous;
-#ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << "  free slab = " << slab << "\n";
-#endif
     free(slab);
     slab = prev;
   }
 }
   
 void NodeFactory::clear() {
+  assert(!isBorrowed);
   if (CurrentSlab) {
+#ifdef NODE_FACTORY_DEBUGGING
+    std::cerr << indent() << "## clear: allocated memory = " << allocatedMemory  << "\n";
+#endif
+
     freeSlabs(CurrentSlab->Previous);
     
     // Recycle the last allocated slab.
@@ -423,6 +425,9 @@ void NodeFactory::clear() {
     CurrentSlab->Previous = nullptr;
     CurPtr = (char *)(CurrentSlab + 1);
     assert(End == CurPtr + SlabSize);
+#ifdef NODE_FACTORY_DEBUGGING
+    allocatedMemory = 0;
+#endif
   }
 }
 
@@ -443,6 +448,10 @@ NodePointer NodeFactory::createNode(Node::Kind K, const char *Text) {
   return new (Allocate<Node>()) Node(K, llvm::StringRef(Text));
 }
 
+#ifdef NODE_FACTORY_DEBUGGING
+int NodeFactory::nestingLevel = 0;
+#endif
+
 //////////////////////////////////
 // CharVector member functions  //
 //////////////////////////////////
@@ -456,11 +465,20 @@ void CharVector::append(StringRef Rhs, NodeFactory &Factory) {
 }
 
 void CharVector::append(int Number, NodeFactory &Factory) {
-  const int MaxIntPrintSize = 8;
+  const int MaxIntPrintSize = 11;
   if (NumElems + MaxIntPrintSize > Capacity)
     Factory.Reallocate(Elems, Capacity, /*Growth*/ MaxIntPrintSize);
   int Length = snprintf(Elems + NumElems, MaxIntPrintSize, "%d", Number);
   assert(Length > 0 && Length < MaxIntPrintSize);
+  NumElems += Length;
+}
+
+void CharVector::append(unsigned long long Number, NodeFactory &Factory) {
+  const int MaxPrintSize = 21;
+  if (NumElems + MaxPrintSize > Capacity)
+    Factory.Reallocate(Elems, Capacity, /*Growth*/ MaxPrintSize);
+  int Length = snprintf(Elems + NumElems, MaxPrintSize, "%llu", Number);
+  assert(Length > 0 && Length < MaxPrintSize);
   NumElems += Length;
 }
 

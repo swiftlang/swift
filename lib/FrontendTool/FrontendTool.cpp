@@ -100,6 +100,40 @@ static std::string displayName(StringRef MainExecutablePath) {
   return Name;
 }
 
+StringRef
+swift::frontend::utils::escapeForMake(StringRef raw,
+                                      llvm::SmallVectorImpl<char> &buffer) {
+  buffer.clear();
+
+  // The escaping rules for GNU make are complicated due to the various
+  // subsitutions and use of the tab in the leading position for recipes.
+  // Various symbols have significance in different contexts.  It is not
+  // possible to correctly quote all characters in Make (as of 3.7).  Match
+  // gcc and clang's behaviour for the escaping which covers only a subset of
+  // characters.
+  for (unsigned I = 0, E = raw.size(); I != E; ++I) {
+    switch (raw[I]) {
+    case '#': // Handle '#' the broken GCC way
+      buffer.push_back('\\');
+      break;
+
+    case ' ':
+      for (unsigned J = I; J && raw[J - 1] == '\\'; --J)
+        buffer.push_back('\\');
+      buffer.push_back('\\');
+      break;
+
+    case '$': // $ is escaped by $
+      buffer.push_back('$');
+      break;
+    }
+    buffer.push_back(raw[I]);
+  }
+  buffer.push_back('\0');
+
+  return buffer.data();
+}
+
 /// Emits a Make-style dependencies file.
 static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
                                          DependencyTracker *depTracker,
@@ -119,39 +153,21 @@ static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
     return true;
   }
 
-  // Declare a helper for escaping file names for use in Makefiles.
-  llvm::SmallString<256> pathBuf;
-  auto escape = [&](StringRef raw) -> StringRef {
-    pathBuf.clear();
-
-    static const char badChars[] = " $#:\n";
-    size_t prev = 0;
-    for (auto index = raw.find_first_of(badChars); index != StringRef::npos;
-         index = raw.find_first_of(badChars, index+1)) {
-      pathBuf.append(raw.slice(prev, index));
-      if (raw[index] == '$')
-        pathBuf.push_back('$');
-      else
-        pathBuf.push_back('\\');
-      prev = index;
-    }
-    pathBuf.append(raw.substr(prev));
-    return pathBuf;
-  };
+  llvm::SmallString<256> buffer;
 
   // FIXME: Xcode can't currently handle multiple targets in a single
   // dependency line.
   opts.forAllOutputPaths(input, [&](const StringRef targetName) {
-    out << escape(targetName) << " :";
+    out << swift::frontend::utils::escapeForMake(targetName, buffer) << " :";
     // First include all other files in the module. Make-style dependencies
     // need to be conservative!
     for (auto const &path :
          reversePathSortedFilenames(opts.InputsAndOutputs.getInputFilenames()))
-      out << ' ' << escape(path);
+      out << ' ' << swift::frontend::utils::escapeForMake(path, buffer);
     // Then print dependencies we've picked up during compilation.
     for (auto const &path :
            reversePathSortedFilenames(depTracker->getDependencies()))
-      out << ' ' << escape(path);
+      out << ' ' << swift::frontend::utils::escapeForMake(path, buffer);
     out << '\n';
   });
 

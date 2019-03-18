@@ -145,7 +145,8 @@ MarkExplicitlyEscaping::create(ConstraintSystem &cs, ConstraintLocator *locator,
 }
 
 bool RelabelArguments::diagnose(Expr *root, bool asNote) const {
-  LabelingFailure failure(getConstraintSystem(), getLocator(), getLabels());
+  LabelingFailure failure(root, getConstraintSystem(), getLocator(),
+                          getLabels());
   return failure.diagnose(asNote);
 }
 
@@ -263,6 +264,18 @@ DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
       DefineMemberBasedOnUse(cs, baseType, member, locator);
 }
 
+bool AllowTypeOrInstanceMember::diagnose(Expr *root, bool asNote) const {
+  auto failure = AllowTypeOrInstanceMemberFailure(root, getConstraintSystem(),
+                                                  BaseType, Name, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowTypeOrInstanceMember *AllowTypeOrInstanceMember::create(ConstraintSystem &cs,
+                                                             Type baseType,
+                                                             DeclName member,
+                                                             ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowTypeOrInstanceMember(cs, baseType, member, locator);
+}
 bool AllowInvalidPartialApplication::diagnose(Expr *root, bool asNote) const {
   auto failure = PartialApplicationFailure(root, isWarning(),
                                            getConstraintSystem(), getLocator());
@@ -328,4 +341,46 @@ AllowInvalidInitRef::create(RefKind kind, ConstraintSystem &cs, Type baseTy,
                             SourceRange baseRange, ConstraintLocator *locator) {
   return new (cs.getAllocator()) AllowInvalidInitRef(
       cs, kind, baseTy, init, isStaticallyDerived, baseRange, locator);
+}
+
+bool AllowClosureParamDestructuring::diagnose(Expr *root, bool asNote) const {
+  ClosureParamDestructuringFailure failure(root, getConstraintSystem(),
+                                           ContextualType, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowClosureParamDestructuring *
+AllowClosureParamDestructuring::create(ConstraintSystem &cs,
+                                       FunctionType *contextualType,
+                                       ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowClosureParamDestructuring(cs, contextualType, locator);
+}
+
+bool AddMissingArguments::diagnose(Expr *root, bool asNote) const {
+  MissingArgumentsFailure failure(root, getConstraintSystem(), Fn,
+                                  NumSynthesized, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AddMissingArguments *
+AddMissingArguments::create(ConstraintSystem &cs, FunctionType *funcType,
+                            llvm::ArrayRef<Param> synthesizedArgs,
+                            ConstraintLocator *locator) {
+  unsigned size = totalSizeToAlloc<Param>(synthesizedArgs.size());
+  void *mem = cs.getAllocator().Allocate(size, alignof(AddMissingArguments));
+  return new (mem) AddMissingArguments(cs, funcType, synthesizedArgs, locator);
+}
+
+bool MoveOutOfOrderArgument::diagnose(Expr *root, bool asNote) const {
+  OutOfOrderArgumentFailure failure(root, getConstraintSystem(), ArgIdx,
+                                    PrevArgIdx, Bindings, getLocator());
+  return failure.diagnose(asNote);
+}
+
+MoveOutOfOrderArgument *MoveOutOfOrderArgument::create(
+    ConstraintSystem &cs, unsigned argIdx, unsigned prevArgIdx,
+    ArrayRef<ParamBinding> bindings, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      MoveOutOfOrderArgument(cs, argIdx, prevArgIdx, bindings, locator);
 }

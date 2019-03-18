@@ -1135,7 +1135,7 @@ Operators and Precedence Groups
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Operator and precedence group declarations are entirely compile-time
-constructs, so changing them does not have any affect on binary compatibility.
+constructs, so changing them does not have any effect on binary compatibility.
 However, they do affect *source* compatibility, so it is recommended that
 existing operators are not changed at all except for the following:
 

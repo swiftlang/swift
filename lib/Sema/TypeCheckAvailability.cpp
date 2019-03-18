@@ -592,8 +592,7 @@ void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF,
     // The root type refinement context reflects the fact that all parts of
     // the source file are guaranteed to be executing on at least the minimum
     // platform version.
-    AvailabilityContext MinPlatformReq{
-        VersionRange::allGTE(AC.LangOpts.getMinPlatformVersion())};
+    auto MinPlatformReq = AvailabilityContext::forDeploymentTarget(AC);
     RootTRC = TypeRefinementContext::createRoot(&SF, MinPlatformReq);
     SF.setTypeRefinementContext(RootTRC);
   }
@@ -638,8 +637,8 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
   // this will be a real problem.
 
   // We can assume we are running on at least the minimum deployment target.
-  AvailabilityContext OverApproximateContext{
-    VersionRange::allGTE(getLangOpts().getMinPlatformVersion())};
+  auto OverApproximateContext =
+    AvailabilityContext::forDeploymentTarget(Context);
 
   while (DC && loc.isInvalid()) {
     const Decl *D = DC->getInnermostDeclarationDeclContext();
@@ -1110,35 +1109,17 @@ static void findAvailabilityFixItNodes(SourceRange ReferenceRange,
   FoundVersionCheckNode =
       findInnermostAncestor(ReferenceRange, SM, SearchRoot, IsGuardable);
 
-  // Find some Decl that contains the reference range. We use this declaration
-  // as a starting place to climb the DeclContext hierarchy to find
-  // places to suggest adding @available() annotations.
-  InnermostAncestorFinder::MatchPredicate IsDeclaration = [](
-      ASTNode Node, ASTWalker::ParentTy Parent) { return Node.is<Decl *>(); };
-
-  Optional<ASTNode> FoundDeclarationNode =
-      findInnermostAncestor(ReferenceRange, SM, SearchRoot, IsDeclaration);
-
-  const Decl *ContainingDecl = nullptr;
-  if (FoundDeclarationNode.hasValue()) {
-    ContainingDecl = FoundDeclarationNode.getValue().get<Decl *>();
-  }
-
-  if (!ContainingDecl) {
-    ContainingDecl = ReferenceDC->getInnermostMethodContext();
-  }
-
   // Try to find declarations on which @available attributes can be added.
   // The heuristics for finding these declarations are biased towards deeper
   // nodes in the AST to limit the scope of suggested availability regions
   // and provide a better IDE experience (it can get jumpy if Fix-It locations
   // are far away from the error needing the Fix-It).
-  if (ContainingDecl) {
+  if (DeclarationToSearch) {
     FoundMemberLevelDecl =
-        ancestorMemberLevelDeclForAvailabilityFixit(ContainingDecl);
+        ancestorMemberLevelDeclForAvailabilityFixit(DeclarationToSearch);
 
     FoundTypeLevelDecl =
-        ancestorTypeLevelDeclForAvailabilityFixit(ContainingDecl);
+        ancestorTypeLevelDeclForAvailabilityFixit(DeclarationToSearch);
   }
 }
 
@@ -2298,6 +2279,19 @@ class AvailabilityWalker : public ASTWalker {
   Optional<TypeChecker::FragileFunctionKind> FragileKind;
   bool TreatUsableFromInlineAsPublic = false;
 
+  /// Returns true if DC is an \c init(rawValue:) declaration and it is marked
+  /// implicit.
+  bool inSynthesizedInitRawValue() {
+    auto init = dyn_cast_or_null<ConstructorDecl>(
+                    DC->getInnermostDeclarationDeclContext());
+
+    return init &&
+           init->isImplicit() &&
+           init->getParameters()->size() == 1 &&
+           init->getParameters()->get(0)->getArgumentName() ==
+                   TC.Context.Id_rawValue;
+  }
+
 public:
   AvailabilityWalker(
       TypeChecker &TC, DeclContext *DC) : TC(TC), DC(DC) {
@@ -2317,8 +2311,20 @@ public:
     };
 
     if (auto DR = dyn_cast<DeclRefExpr>(E)) {
+      DeclAvailabilityFlags flags = None;
+      if (inSynthesizedInitRawValue())
+        // HACK: If a raw-value enum has cases with `@available(introduced:)`
+        // attributes, the auto-derived `init(rawValue:)` will contain
+        // DeclRefExprs which reference those cases. It will also contain
+        // appropriate `guard #available` statements to keep them from running
+        // on older versions, but the availability checker can't verify that
+        // because the synthesized code uses invalid SourceLocs. Don't diagnose
+        // these errors; instead, take it on faith that
+        // DerivedConformanceRawRepresentable will do the right thing.
+        flags |= DeclAvailabilityFlag::AllowPotentiallyUnavailable;
+
       diagAvailability(DR->getDecl(), DR->getSourceRange(),
-                       getEnclosingApplyExpr());
+                       getEnclosingApplyExpr(), flags);
       maybeDiagStorageAccess(DR->getDecl(), DR->getSourceRange(), DC);
     }
     if (auto MR = dyn_cast<MemberRefExpr>(E)) {
@@ -2365,9 +2371,7 @@ public:
 
   bool diagAvailability(const ValueDecl *D, SourceRange R,
                         const ApplyExpr *call = nullptr,
-                        bool AllowPotentiallyUnavailableProtocol = false,
-                        bool SignalOnPotentialUnavailability = true,
-                        bool ForInout = false);
+                        DeclAvailabilityFlags flags = None);
 
 private:
   bool diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
@@ -2453,6 +2457,9 @@ private:
         break;
       }
 
+      case KeyPathExpr::Component::Kind::TupleElement:
+        break;
+
       case KeyPathExpr::Component::Kind::Invalid:
       case KeyPathExpr::Component::Kind::UnresolvedProperty:
       case KeyPathExpr::Component::Kind::UnresolvedSubscript:
@@ -2501,20 +2508,20 @@ private:
     switch (AccessContext) {
     case MemberAccessContext::Getter:
       diagAccessorAvailability(D->getGetter(), ReferenceRange, ReferenceDC,
-                               /*ForInout=*/false);
+                               None);
       break;
 
     case MemberAccessContext::Setter:
       diagAccessorAvailability(D->getSetter(), ReferenceRange, ReferenceDC,
-                               /*ForInout=*/false);
+                               None);
       break;
 
     case MemberAccessContext::InOut:
       diagAccessorAvailability(D->getGetter(), ReferenceRange, ReferenceDC,
-                               /*ForInout=*/true);
+                               DeclAvailabilityFlag::ForInout);
 
       diagAccessorAvailability(D->getSetter(), ReferenceRange, ReferenceDC,
-                               /*ForInout=*/true);
+                               DeclAvailabilityFlag::ForInout);
       break;
     }
   }
@@ -2522,13 +2529,13 @@ private:
   /// Emit a diagnostic, if necessary for a potentially unavailable accessor.
   void diagAccessorAvailability(AccessorDecl *D, SourceRange ReferenceRange,
                                 const DeclContext *ReferenceDC,
-                                bool ForInout) const {
+                                DeclAvailabilityFlags Flags) const {
+    Flags &= DeclAvailabilityFlag::ForInout;
+    Flags |= DeclAvailabilityFlag::ContinueOnPotentialUnavailability;
     if (diagnoseDeclAvailability(D, TC,
                                  const_cast<DeclContext*>(ReferenceDC),
                                  ReferenceRange,
-                                 /*AllowPotentiallyUnavailableProtocol*/false,
-                                 /*SignalOnPotentialUnavailability*/false,
-                                 ForInout))
+                                 Flags))
       return;
   }
 };
@@ -2536,11 +2543,10 @@ private:
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
-bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
-                                          const ApplyExpr *call,
-                                          bool AllowPotentiallyUnavailableProtocol,
-                                          bool SignalOnPotentialUnavailability,
-                                          bool ForInout) {
+bool
+AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
+                                     const ApplyExpr *call,
+                                     DeclAvailabilityFlags Flags) {
   if (!D)
     return false;
 
@@ -2579,20 +2585,25 @@ bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
   if (!isAccessorWithDeprecatedStorage)
     TC.diagnoseIfDeprecated(R, DC, D, call);
 
-  if (AllowPotentiallyUnavailableProtocol && isa<ProtocolDecl>(D))
+  if (Flags.contains(DeclAvailabilityFlag::AllowPotentiallyUnavailable))
+    return false;
+
+  if (Flags.contains(DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol)
+        && isa<ProtocolDecl>(D))
     return false;
 
   // Diagnose (and possibly signal) for potential unavailability
   auto maybeUnavail = TC.checkDeclarationAvailability(D, R.Start, DC);
   if (maybeUnavail.hasValue()) {
     if (accessor) {
+      bool forInout = Flags.contains(DeclAvailabilityFlag::ForInout);
       TC.diagnosePotentialAccessorUnavailability(accessor, R, DC,
                                                  maybeUnavail.getValue(),
-                                                 ForInout);
+                                                 forInout);
     } else {
       TC.diagnosePotentialUnavailability(D, R, DC, maybeUnavail.getValue());
     }
-    if (SignalOnPotentialUnavailability)
+    if (!Flags.contains(DeclAvailabilityFlag::ContinueOnPotentialUnavailability))
       return true;
   }
   return false;
@@ -2766,13 +2777,8 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *Decl,
                                      TypeChecker &TC,
                                      DeclContext *DC,
                                      SourceRange R,
-                                     bool AllowPotentiallyUnavailableProtocol,
-                                     bool SignalOnPotentialUnavailability,
-                                     bool ForInout)
+                                     DeclAvailabilityFlags Flags)
 {
   AvailabilityWalker AW(TC, DC);
-  return AW.diagAvailability(Decl, R, nullptr,
-                             AllowPotentiallyUnavailableProtocol,
-                             SignalOnPotentialUnavailability,
-                             ForInout);
+  return AW.diagAvailability(Decl, R, nullptr, Flags);
 }

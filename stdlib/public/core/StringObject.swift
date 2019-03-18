@@ -485,8 +485,15 @@ extension _StringObject {
     _internalInvariant(isLarge)
     return (discriminatedObjectRawBits & 0x4000_0000_0000_0000) != 0
   }
-}
 
+  // Whether this string is in one of our fastest representations:
+  // small or tail-allocated (i.e. mortal/immortal native)
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal var isPreferredRepresentation: Bool {
+    return _fastPath(isSmall || _countAndFlags.isTailAllocated)
+  }
+}
 
 /*
 
@@ -499,20 +506,20 @@ extension _StringObject {
  ├───┬───┬───┬───┬───┬───┬───┬───┼───┬───┬────┬────┬────┬────┬────┬────────────┤
  │ 0 │ 1 │ 2 │ 3 │ 4 │ 5 │ 6 │ 7 │ 8 │ 9 │ 10 │ 11 │ 12 │ 13 │ 14 │     15     │
  ├───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼────┼────┼────┼────┼────┼────────────┤
- │ a │ b │ c │ d │ e │ f │ g │ h │ i │ j │ k  │ l  │ m  │ n  │ o  │ 1x0x count │
+ │ a │ b │ c │ d │ e │ f │ g │ h │ i │ j │ k  │ l  │ m  │ n  │ o  │ 1x10 count │
  └───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴────┴────┴────┴────┴────┴────────────┘
 
  On 32-bit platforms, we have less space to store code units, and it isn't
  contiguous. However, we still use the above layout for the RawBitPattern
  representation.
 
- ┌───────────────┬───────────────────┬───────┬─────────┐
- │ _count        │_variant .immortal │_discr │ _flags  │
- ├───┬───┬───┬───┼───┬───┬───┬───┬───┼───────┼────┬────┤
- │ 0 │ 1 │ 2 │ 3 │ 4 │ 5 │ 6 │ 7 │ 8 │   9   │ 10 │ 11 │
- ├───┼───┼───┼───┼───┴───┴───┴───┴───┼───────┼────┼────┤
- │ a │ b │ c │ d │   e   f   g   h   │x10 cnt│ i  │ j  │
- └───┴───┴───┴───┴───────────────────┴───────┴────┴────┘
+ ┌───────────────┬───────────────────┬────────┬─────────┐
+ │ _count        │_variant .immortal │ _discr │ _flags  │
+ ├───┬───┬───┬───┼───┬───┬───┬───┬───┼────────┼────┬────┤
+ │ 0 │ 1 │ 2 │ 3 │ 4 │ 5 │ 6 │ 7 │ 8 │   9    │ 10 │ 11 │
+ ├───┼───┼───┼───┼───┴───┴───┴───┴───┼────────┼────┼────┤
+ │ a │ b │ c │ d │   e   f   g   h   │1x10 cnt│ i  │ j  │
+ └───┴───┴───┴───┴───────────────────┴────────┴────┴────┘
 
  */
 extension _StringObject {
@@ -617,9 +624,10 @@ extension _StringObject {
  isNativelyStored: set for native stored strings
    - `largeAddressBits` holds an instance of `_StringStorage`.
    - I.e. the start of the code units is at the stored address + `nativeBias`
- isTailAllocated: start of the code units is at the stored address + `nativeBias`
+ isTailAllocated: contiguous UTF-8 code units starts at address + `nativeBias`
    - `isNativelyStored` always implies `isTailAllocated`, but not vice versa
       (e.g. literals)
+   - `isTailAllocated` always implies `isFastUTF8`
  TBD: Reserved for future usage
    - Setting a TBD bit to 1 must be semantically equivalent to 0
    - I.e. it can only be used to "cache" fast-path information in the future
@@ -1073,6 +1081,9 @@ extension _StringObject {
     } else {
       _internalInvariant(isLarge)
       _internalInvariant(largeCount == count)
+      if _countAndFlags.isTailAllocated {
+        _internalInvariant(providesFastUTF8)
+      }
       if providesFastUTF8 && largeFastIsTailAllocated {
         _internalInvariant(!isSmall)
         _internalInvariant(!largeIsCocoa)

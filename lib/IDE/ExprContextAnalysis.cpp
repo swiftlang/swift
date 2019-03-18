@@ -93,12 +93,25 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
   // Type-check this context.
   switch (DC->getContextKind()) {
   case DeclContextKind::AbstractClosureExpr:
-  case DeclContextKind::Initializer:
   case DeclContextKind::Module:
   case DeclContextKind::SerializedLocal:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::EnumElementDecl:
     // Nothing to do for these.
+    break;
+
+  case DeclContextKind::Initializer:
+    if (auto *patternInit = dyn_cast<PatternBindingInitializer>(DC)) {
+      auto *PBD = patternInit->getBinding();
+      auto i = patternInit->getBindingIndex();
+      if (PBD->getInit(i)) {
+        PBD->getPattern(i)->forEachVariable([](VarDecl *VD) {
+          typeCheckCompletionDecl(VD);
+        });
+        if (!PBD->isInitializerChecked(i))
+          typeCheckPatternBinding(PBD, i);
+      }
+    }
     break;
 
   case DeclContextKind::AbstractFunctionDecl: {
@@ -140,6 +153,58 @@ void swift::ide::typeCheckContextUntil(DeclContext *DC, SourceLoc Loc) {
     typeCheckTopLevelCodeDecl(TLCD);
   else
     typeCheckContextImpl(DC, Loc);
+}
+
+//===----------------------------------------------------------------------===//
+// findParsedExpr(DeclContext, Expr)
+//===----------------------------------------------------------------------===//
+
+namespace {
+class ExprFinder : public ASTWalker {
+  SourceManager &SM;
+  SourceRange TargetRange;
+  Expr *FoundExpr = nullptr;
+
+  template <typename NodeType> bool isInterstingRange(NodeType *Node) {
+    return SM.rangeContains(Node->getSourceRange(), TargetRange);
+  }
+
+public:
+  ExprFinder(SourceManager &SM, SourceRange TargetRange)
+      : SM(SM), TargetRange(TargetRange) {}
+
+  Expr *get() const { return FoundExpr; }
+
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    if (TargetRange == E->getSourceRange() && !isa<ImplicitConversionExpr>(E) &&
+        !isa<AutoClosureExpr>(E) && !isa<ConstructorRefCallExpr>(E)) {
+      assert(!FoundExpr && "non-nullptr for found expr");
+      FoundExpr = E;
+      return {false, nullptr};
+    }
+    return {isInterstingRange(E), E};
+  }
+
+  std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
+    return {isInterstingRange(P), P};
+  }
+
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    return {isInterstingRange(S), S};
+  }
+
+  bool walkToDeclPre(Decl *D) override { return isInterstingRange(D); }
+
+  bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
+  bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+};
+} // anonymous namespace
+
+Expr *swift::ide::findParsedExpr(const DeclContext *DC,
+                                 SourceRange TargetRange) {
+  ExprFinder finder(DC->getASTContext().SourceMgr, TargetRange);
+  const_cast<DeclContext *>(DC)->walkContext(finder);
+  return finder.get();
 }
 
 //===----------------------------------------------------------------------===//
@@ -252,24 +317,36 @@ void collectPossibleCalleesByQualifiedLookup(
 
   SmallVector<ValueDecl *, 2> decls;
   auto resolver = DC.getASTContext().getLazyResolver();
-  if (!DC.lookupQualified(baseTy, name, NL_QualifiedDefault, resolver, decls))
+  if (!DC.lookupQualified(baseTy->getMetatypeInstanceType(), name,
+                          NL_QualifiedDefault, resolver, decls))
     return;
 
   for (auto *VD : decls) {
     if ((!isa<AbstractFunctionDecl>(VD) && !isa<SubscriptDecl>(VD)) ||
         VD->shouldHideFromEditor())
       continue;
+    if (!isMemberDeclApplied(&DC, baseTy->getMetatypeInstanceType(), VD))
+      continue;
     resolver->resolveDeclSignature(VD);
     if (!VD->hasInterfaceType())
       continue;
     Type declaredMemberType = VD->getInterfaceType();
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
-      if (AFD->getDeclContext()->isTypeContext())
+    if (VD->getDeclContext()->isTypeContext()) {
+      if (auto *FD = dyn_cast<FuncDecl>(VD)) {
+        if (!baseTy->is<AnyMetatypeType>())
+          declaredMemberType =
+              declaredMemberType->castTo<AnyFunctionType>()->getResult();
+      }
+      if (auto *CD = dyn_cast<ConstructorDecl>(VD)) {
+        if (!baseTy->is<AnyMetatypeType>())
+          continue;
         declaredMemberType =
             declaredMemberType->castTo<AnyFunctionType>()->getResult();
+      }
+    }
 
-    auto fnType =
-        baseTy->getTypeOfMember(DC.getParentModule(), VD, declaredMemberType);
+    auto fnType = baseTy->getMetatypeInstanceType()->getTypeOfMember(
+        DC.getParentModule(), VD, declaredMemberType);
 
     if (!fnType)
       continue;
@@ -289,8 +366,8 @@ void collectPossibleCalleesByQualifiedLookup(
       DC.getASTContext(), &DC, CompletionTypeCheckKind::Normal, baseExpr, ref);
   if (!baseTyOpt)
     return;
-  auto baseTy = (*baseTyOpt)->getRValueType()->getMetatypeInstanceType();
-  if (!baseTy->mayHaveMembers())
+  auto baseTy = (*baseTyOpt)->getRValueType();
+  if (!baseTy->getMetatypeInstanceType()->mayHaveMembers())
     return;
 
   collectPossibleCalleesByQualifiedLookup(DC, baseTy, name, candidates);
@@ -335,7 +412,7 @@ bool collectPossibleCalleesForApply(
       auto baseTy = AMT->getInstanceType();
       if (baseTy->mayHaveMembers())
         collectPossibleCalleesByQualifiedLookup(
-            DC, baseTy, DeclBaseName::createConstructor(), candidates);
+            DC, AMT, DeclBaseName::createConstructor(), candidates);
     }
   }
 

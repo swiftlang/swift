@@ -6,7 +6,7 @@ add_swift_host_library(swiftSerialization STATIC
   SerializedModuleLoader.cpp
   SerializedSILLoader.cpp
   SerializeDoc.cpp
-  SerializeSIL.cpp
-  LINK_LIBRARIES
-    swiftClangImporter)
+  SerializeSIL.cpp)
+target_link_libraries(swiftSerialization PRIVATE
+  swiftClangImporter)
 

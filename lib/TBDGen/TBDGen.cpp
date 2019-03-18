@@ -16,6 +16,7 @@
 
 #include "swift/TBDGen/TBDGen.h"
 
+#include "swift/AST/Availability.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Module.h"
@@ -69,7 +70,8 @@ void TBDGenVisitor::addSymbol(SILDeclRef declRef) {
 
 void TBDGenVisitor::addSymbol(LinkEntity entity) {
   auto linkage =
-      LinkInfo::get(UniversalLinkInfo, SwiftModule, entity, ForDefinition);
+      LinkInfo::get(UniversalLinkInfo, SwiftModule, AvailCtx,
+                    entity, ForDefinition);
 
   auto externallyVisible =
       llvm::GlobalValue::isExternalLinkage(linkage.getLinkage()) &&
@@ -462,7 +464,6 @@ static bool isValidProtocolMemberForTBDGen(const Decl *D) {
   case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
     return true;
-  case DeclKind::OpaqueType:
   case DeclKind::Enum:
   case DeclKind::Struct:
   case DeclKind::Class:
@@ -585,9 +586,11 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
                                            StringSet *symbols,
                                            llvm::raw_ostream *os,
                                            const TBDGenOptions &opts) {
+  auto &ctx = M->getASTContext();
   auto isWholeModule = singleFile == nullptr;
-  const auto &target = M->getASTContext().LangOpts.Target;
+  const auto &target = ctx.LangOpts.Target;
   UniversalLinkageInfo linkInfo(target, opts.HasMultipleIGMs, isWholeModule);
+  auto availCtx = AvailabilityContext::forDeploymentTarget(ctx);
 
   tapi::internal::InterfaceFile file;
   file.setFileType(tapi::internal::FileType::TBD_V3);
@@ -603,7 +606,7 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   file.setArch(arch);
   file.setInstallAPI();
 
-  TBDGenVisitor visitor(file, arch, symbols, linkInfo, M, opts);
+  TBDGenVisitor visitor(file, arch, symbols, linkInfo, M, availCtx, opts);
 
   auto visitFile = [&](FileUnit *file) {
     if (file == M->getFiles()[0]) {

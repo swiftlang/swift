@@ -485,6 +485,8 @@ ERROR(expected_sil_value_ownership_kind,none,
       "expected value ownership kind in SIL code", ())
 ERROR(expected_sil_colon,none,
       "expected ':' before %0", (StringRef))
+ERROR(expected_sil_tuple_index,none,
+      "expected tuple element index", ())
 
 // SIL Values
 ERROR(sil_value_redefinition,none,
@@ -784,10 +786,6 @@ ERROR(sil_box_expected_r_brace,none,
 ERROR(sil_box_expected_r_angle,none,
       "expected '>' to complete SIL box generic argument list", ())
 
-// Opaque types
-ERROR(opaque_mid_composition,none,
-      "'opaque' should appear at the beginning of a composition", ())
-
 //------------------------------------------------------------------------------
 // MARK: Layout constraint diagnostics
 //------------------------------------------------------------------------------
@@ -827,8 +825,6 @@ ERROR(no_default_arg_subscript,none,
       "default arguments are not allowed in subscripts", ())
 ERROR(no_default_arg_curried,none,
       "default arguments are not allowed in curried parameter lists", ())
-ERROR(no_default_arg_enum_elt,none,
-      "default arguments are not allowed in enum cases", ())
 ERROR(var_pattern_in_var,none,
       "'%select{var|let}0' cannot appear nested inside another 'var' or "
       "'let' pattern", (unsigned))

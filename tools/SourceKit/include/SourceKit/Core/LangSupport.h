@@ -44,6 +44,7 @@ struct EntityInfo {
   StringRef ReceiverUSR;
   bool IsDynamic = false;
   bool IsTestCandidate = false;
+  bool IsImplicit = false;
   unsigned Line = 0;
   unsigned Column = 0;
   ArrayRef<UIdent> Attrs;

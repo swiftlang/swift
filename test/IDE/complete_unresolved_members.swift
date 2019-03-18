@@ -251,16 +251,16 @@ class C4 {
 // UNRESOLVED_3_OPT: Begin completions
 // UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     North[#SomeEnum1#];
 // UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     South[#SomeEnum1#];
-// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     none[#Optional<Wrapped>#]; name=none
-// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     some({#Wrapped#})[#(Wrapped) -> Optional<Wrapped>#];
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     none[#Optional<SomeEnum1>#]; name=none
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     some({#SomeEnum1#})[#Optional<SomeEnum1>#];
 // UNRESOLVED_3_OPT-DAG: Decl[Constructor]/CurrNominal:      init({#(some): SomeEnum1#})[#Optional<SomeEnum1>#];
 // UNRESOLVED_3_OPT-DAG: Decl[Constructor]/CurrNominal:      init({#nilLiteral: ()#})[#Optional<SomeEnum1>#];
 
 // UNRESOLVED_3_OPTOPTOPT: Begin completions
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     North[#SomeEnum1#];
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     South[#SomeEnum1#];
-// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     none[#Optional<Wrapped>#]; name=none
-// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     some({#Wrapped#})[#(Wrapped) -> Optional<Wrapped>#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     none[#Optional<SomeEnum1??>#]; name=none
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     some({#SomeEnum1??#})[#Optional<SomeEnum1??>#];
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[Constructor]/CurrNominal:      init({#(some): SomeEnum1??#})[#Optional<SomeEnum1??>#];
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[Constructor]/CurrNominal:      init({#nilLiteral: ()#})[#Optional<SomeEnum1??>#];
 
@@ -421,8 +421,8 @@ func enumFromOtherFile() -> EnumFromOtherFile {
   return .#^OTHER_FILE_1^# // Don't crash.
 }
 // OTHER_FILE_1: Begin completions
-// OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific:     b({#String#})[#(String) -> EnumFromOtherFile#];
-// OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific:     a({#Int#})[#(Int) -> EnumFromOtherFile#];
+// OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific:     b({#String#})[#EnumFromOtherFile#];
+// OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific:     a({#Int#})[#EnumFromOtherFile#];
 // OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific:     c[#EnumFromOtherFile#];
 // OTHER_FILE_1: End completions
 
@@ -493,11 +493,7 @@ func testSubType() {
 func testMemberTypealias() {
   var _: MyProtocol = .#^SUBTYPE_2^#
 }
-// SUBTYPE_2: Begin completions, 2 items
-// SUBTYPE_1-NOT: Concrete1(failable:
-// SUBTYPE_2-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: Concrete1()[#BaseClass#];
-// SUBTYPE_2-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: Concrete2()[#AnotherTy#];
-// SUBTYPE_2: End completions
+// SUBTYPE_2-NOT: Begin completions
 
 enum Generic<T> {
   case contains(content: T)
@@ -517,12 +513,17 @@ func testGeneric() {
 switch Generic<Int>.empty {
 case let .#^GENERIC_4^#
 }
-// GENERIC_1: Begin completions
-// GENERIC_1:     Decl[EnumElement]/ExprSpecific:     contains({#content: T#})[#(T) -> Generic<T>#];
-// GENERIC_1:     Decl[EnumElement]/ExprSpecific:     empty[#Generic<T>#];
-// GENERIC_1_INT: Decl[StaticMethod]/CurrNominal:     create({#Int#})[#Generic<Int>#];
-// GENERIC_1_U:   Decl[StaticMethod]/CurrNominal:     create({#U#})[#Generic<U>#];
-// GENERIC_1: End completions
+// GENERIC_1_INT: Begin completions
+// GENERIC_1_INT-DAG: Decl[EnumElement]/ExprSpecific: contains({#content: Int#})[#Generic<Int>#];
+// GENERIC_1_INT-DAG: Decl[EnumElement]/ExprSpecific: empty[#Generic<Int>#];
+// GENERIC_1_INT-DAG: Decl[StaticMethod]/CurrNominal: create({#Int#})[#Generic<Int>#];
+// GENERIC_1_INT: End completions
+
+// GENERIC_1_U: Begin completions
+// GENERIC_1_U-DAG: Decl[EnumElement]/ExprSpecific: contains({#content: U#})[#Generic<U>#];
+// GENERIC_1_U-DAG: Decl[EnumElement]/ExprSpecific: empty[#Generic<U>#];
+// GENERIC_1_U-DAG: Decl[StaticMethod]/CurrNominal: create({#U#})[#Generic<U>#];
+// GENERIC_1_U: End completions
 
 struct HasCreator {
   static var create: () -> HasCreator = { fatalError() }

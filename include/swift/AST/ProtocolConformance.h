@@ -323,8 +323,7 @@ public:
   /// Substitute the conforming type and produce a ProtocolConformance that
   /// applies to the substituted type.
   ProtocolConformance *subst(TypeSubstitutionFn subs,
-                             LookupConformanceFn conformances,
-                             SubstOptions options = None) const;
+                             LookupConformanceFn conformances) const;
 
   void dump() const;
   void dump(llvm::raw_ostream &out, unsigned indent = 0) const;
@@ -349,7 +348,8 @@ public:
   bool isInvalid() const;
 
   /// Whether this conformance is weak-imported.
-  bool isWeakImported(ModuleDecl *fromModule) const;
+  bool isWeakImported(ModuleDecl *fromModule,
+                      AvailabilityContext fromContext) const;
 
   bool hasWitness(ValueDecl *requirement) const;
   Witness getWitness(ValueDecl *requirement, LazyResolver *resolver) const;

@@ -143,6 +143,7 @@ namespace irgen {
   class TypeConverter;
   class TypeInfo;
   enum class ValueWitness : unsigned;
+  enum class ClassMetadataStrategy;
 
 class IRGenModule;
 
@@ -473,6 +474,7 @@ public:
   const llvm::Triple Triple;
   std::unique_ptr<llvm::TargetMachine> TargetMachine;
   ModuleDecl *getSwiftModule() const;
+  AvailabilityContext getAvailabilityContext() const;
   Lowering::TypeConverter &getSILTypes() const;
   SILModule &getSILModule() const { return IRGen.SIL; }
   const IRGenOptions &getOptions() const { return IRGen.Opts; }
@@ -745,8 +747,11 @@ public:
   getConformanceInfo(const ProtocolDecl *protocol,
                      const ProtocolConformance *conformance);
 
-  SILType getLoweredType(AbstractionPattern orig, Type subst);
-  SILType getLoweredType(Type subst);
+  SILType getLoweredType(AbstractionPattern orig, Type subst) const;
+  SILType getLoweredType(Type subst) const;
+  const Lowering::TypeLowering &getTypeLowering(SILType type) const;
+  bool isTypeABIAccessible(SILType type) const;
+
   const TypeInfo &getTypeInfoForUnlowered(AbstractionPattern orig,
                                           CanType subst);
   const TypeInfo &getTypeInfoForUnlowered(AbstractionPattern orig,
@@ -792,8 +797,7 @@ public:
 
   bool isResilientConformance(const NormalProtocolConformance *conformance);
   bool isResilientConformance(const RootProtocolConformance *root);
-  bool isDependentConformance(const RootProtocolConformance *conformance,
-                              bool considerResilience);
+  bool isDependentConformance(const RootProtocolConformance *conformance);
 
   Alignment getCappedAlignment(Alignment alignment);
 
@@ -805,6 +809,8 @@ public:
   ClassMetadataLayout &getClassMetadataLayout(ClassDecl *decl);
   EnumMetadataLayout &getMetadataLayout(EnumDecl *decl);
   ForeignClassMetadataLayout &getForeignMetadataLayout(ClassDecl *decl);
+
+  ClassMetadataStrategy getClassMetadataStrategy(const ClassDecl *theClass);
 
 private:
   TypeConverter &Types;

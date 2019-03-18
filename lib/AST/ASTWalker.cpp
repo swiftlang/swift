@@ -213,15 +213,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
     return doIt(TAD->getUnderlyingTypeLoc());
   }
-  
-  bool visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
-    if (OTD->getGenericParams() &&
-        Walker.shouldWalkIntoGenericParams()) {
-      if (visitGenericParamList(OTD->getGenericParams()))
-        return true;
-    }
-    return false;
-  }
 
   bool visitAbstractTypeParamDecl(AbstractTypeParamDecl *TPD) {
     for (auto Inherit: TPD->getInherited()) {
@@ -1043,6 +1034,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       case KeyPathExpr::Component::Kind::UnresolvedProperty:
       case KeyPathExpr::Component::Kind::Invalid:
       case KeyPathExpr::Component::Kind::Identity:
+      case KeyPathExpr::Component::Kind::TupleElement:
         // No subexpr to visit.
         break;
       }
@@ -1766,10 +1758,6 @@ bool Traversal::visitSharedTypeRepr(SharedTypeRepr *T) {
 
 bool Traversal::visitOwnedTypeRepr(OwnedTypeRepr *T) {
   return doIt(T->getBase());
-}
-
-bool Traversal::visitOpaqueReturnTypeRepr(OpaqueReturnTypeRepr *T) {
-  return doIt(T->getConstraint());
 }
 
 bool Traversal::visitFixedTypeRepr(FixedTypeRepr *T) {

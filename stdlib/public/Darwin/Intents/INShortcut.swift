@@ -35,7 +35,7 @@ public enum INShortcut : ReferenceConvertible {
 
 // Convenience initializers, to mimic the ObjC initializer API
 @available(iOS 12.0, watchOS 5.0, *)
-public extension INShortcut {
+extension INShortcut {
   public init?(intent: INIntent) {
     // use the ObjC initializer, to re-use its validation of the intent
     guard let ref = INShortcutReference(intent: intent) else { return nil }
@@ -48,7 +48,7 @@ public extension INShortcut {
 
 // Convenience properties, to mimic the ObjC API
 @available(iOS 12.0, watchOS 5.0, *)
-public extension INShortcut {
+extension INShortcut {
   public var intent: INIntent? {
     guard case let .intent(intent) = self else { return nil }
     return intent
@@ -84,7 +84,7 @@ extension INShortcut : Hashable {
 extension INShortcut : Equatable {}
 
 @available(iOS 12.0, watchOS 5.0, *)
-private extension INShortcut {
+extension INShortcut {
   fileprivate var reference: INShortcutReference {
     switch self {
     case .intent(let intent):

@@ -12,7 +12,6 @@
 
 #define DEBUG_TYPE "definite-init"
 #include "DIMemoryUseCollector.h"
-#include "MandatoryOptUtils.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
@@ -377,6 +376,7 @@ namespace {
   /// LifetimeChecker - This is the main heavy lifting for definite
   /// initialization checking of a memory object.
   class LifetimeChecker {
+    SILFunction &F;
     SILModule &Module;
 
     /// TheMemory - This holds information about the memory object being
@@ -508,8 +508,11 @@ namespace {
 
 LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
                                  DIElementUseInfo &UseInfo)
-    : Module(TheMemory.MemoryInst->getModule()), TheMemory(TheMemory),
-      Uses(UseInfo.Uses), StoresToSelf(UseInfo.StoresToSelf),
+    : F(*TheMemory.MemoryInst->getFunction()),
+      Module(TheMemory.MemoryInst->getModule()),
+      TheMemory(TheMemory),
+      Uses(UseInfo.Uses),
+      StoresToSelf(UseInfo.StoresToSelf),
       Destroys(UseInfo.Releases) {
 
   // The first step of processing an element is to collect information about the
@@ -789,7 +792,7 @@ void LifetimeChecker::doIt() {
   // memory object will destruct the memory.  If the memory (or some element
   // thereof) is not initialized on some path, the bad things happen.  Process
   // releases to adjust for this.
-  if (!TheMemory.MemorySILType.isTrivial(Module)) {
+  if (!TheMemory.MemorySILType.isTrivial(F)) {
     for (unsigned i = 0, e = Destroys.size(); i != e; ++i)
       processNonTrivialRelease(i);
   }
@@ -1884,20 +1887,16 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
     Use.Inst = nullptr;
     NonLoadUses.erase(Inst);
 
-    PartialInitializationKind PartialInitKind;
-
     if (TheMemory.isClassInitSelf() &&
         Use.Kind == DIUseKind::SelfInit) {
       assert(InitKind == IsInitialization);
-      PartialInitKind = PartialInitializationKind::IsReinitialization;
+      AI->setOwnershipQualifier(AssignOwnershipQualifier::Reinit);
     } else {
-      PartialInitKind = (InitKind == IsInitialization
-                         ? PartialInitializationKind::IsInitialization
-                         : PartialInitializationKind::IsNotInitialization);
+      AI->setOwnershipQualifier((InitKind == IsInitialization
+                                ? AssignOwnershipQualifier::Init
+                                : AssignOwnershipQualifier::Reassign));
     }
 
-    SILBuilderWithScope B(Inst);
-    lowerAssignInstruction(B, AI, PartialInitKind);
     return;
   }
 

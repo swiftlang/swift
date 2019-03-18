@@ -169,12 +169,7 @@ public:
   /// Apply a substitution to all replacement types in the map. Does not
   /// change keys.
   SubstitutionMap subst(TypeSubstitutionFn subs,
-                        LookupConformanceFn conformances,
-                        SubstOptions options = None) const;
-  
-  /// Replace opaque types in the replacement types in the map with their
-  /// underlying types. Does not change keys.
-  SubstitutionMap substOpaqueTypesWithUnderlyingTypes() const;
+                        LookupConformanceFn conformances) const;
 
   /// Create a substitution map for a protocol conformance.
   static SubstitutionMap

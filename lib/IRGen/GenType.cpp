@@ -21,11 +21,13 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Platform.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/Path.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
 
 #include "EnumPayload.h"
@@ -1114,6 +1116,56 @@ TypeConverter::getLegacyTypeInfo(NominalTypeDecl *decl) const {
   return found->second;
 }
 
+// The following Apple platforms support backward deployment of Swift
+// code built with Swift 5.0 running on an old Objective-C runtime
+// that does not support the class metadata update hook.
+//
+// We ship a YAML legacy type info file for these platforms as part
+// of the toolchain.
+static llvm::StringLiteral platformsWithLegacyLayouts[][2] = {
+  {"appletvos", "arm64"},
+  {"appletvsimulator", "x86_64"},
+  {"iphoneos", "armv7"},
+  {"iphoneos", "armv7s"},
+  {"iphoneos", "arm64"},
+  {"iphonesimulator", "i386"},
+  {"iphonesimulator", "x86_64"},
+  {"macosx", "x86_64"},
+  {"watchos", "armv7k"},
+  {"watchsimulator", "i386"}
+};
+
+static bool doesPlatformUseLegacyLayouts(StringRef platformName,
+                                         StringRef archName) {
+  for (auto platformArchPair : platformsWithLegacyLayouts) {
+    if (platformName == platformArchPair[0] &&
+        archName == platformArchPair[1]) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// The following Apple platforms ship an Objective-C runtime supporting
+// the class metadata update hook:
+//
+// - macOS 10.14.4
+// - iOS 12.2
+// - tvOS 12.2
+// - watchOS 5.2
+static bool doesPlatformSupportObjCMetadataUpdateCallback(
+    const llvm::Triple &triple) {
+  if (triple.isMacOSX())
+    return !triple.isMacOSXVersionLT(10, 14, 4);
+  if (triple.isiOS()) // also returns true on tvOS
+    return !triple.isOSVersionLT(12, 2);
+  if (triple.isWatchOS())
+    return !triple.isOSVersionLT(5, 2);
+
+  return false;
+}
+
 TypeConverter::TypeConverter(IRGenModule &IGM)
   : IGM(IGM),
     FirstType(invalidTypeInfo()) {
@@ -1125,13 +1177,48 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
   if (IGM.IRGen.Opts.EnableResilienceBypass)
     LoweringMode = Mode::CompletelyFragile;
 
-  StringRef path = IGM.IRGen.Opts.ReadTypeInfoPath;
-  if (!path.empty()) {
-    bool error = readLegacyTypeInfo(path);
-    if (error) {
-      llvm::report_fatal_error("Cannot read '" + path + "'");
-    }
+  const auto &Triple = IGM.Context.LangOpts.Target;
+
+  SupportsObjCMetadataUpdateCallback =
+    ::doesPlatformSupportObjCMetadataUpdateCallback(Triple);
+
+  // If our deployment target allows us to rely on the metadata update
+  // callback being called, we don't have to emit a legacy layout for a
+  // class with resiliently-sized fields.
+  if (SupportsObjCMetadataUpdateCallback)
+    return;
+
+  // We have a bunch of -parse-stdlib tests that pass a -target in the test
+  // suite. To prevent these from failing when the user hasn't build the
+  // standard library for that target, we pass -disable-legacy-type-info to
+  // disable trying to load the legacy type info.
+  if (IGM.IRGen.Opts.DisableLegacyTypeInfo)
+    return;
+
+  llvm::SmallString<128> defaultPath;
+
+  StringRef path = IGM.IRGen.Opts.ReadLegacyTypeInfoPath;
+  if (path.empty()) {
+    // If the flag was not explicitly specified, look for a file in a
+    // platform-specific location, if this platform is known to require
+    // one.
+    auto platformName = getPlatformNameForTriple(Triple);
+    auto archName = swift::getMajorArchitectureName(Triple);
+
+    if (!doesPlatformUseLegacyLayouts(platformName, archName))
+      return;
+
+    defaultPath.append(IGM.Context.SearchPathOpts.RuntimeLibraryPath);
+    llvm::sys::path::append(defaultPath, "layouts-");
+    defaultPath.append(archName);
+    defaultPath.append(".yaml");
+
+    path = defaultPath;
   }
+
+  bool error = readLegacyTypeInfo(path);
+  if (error)
+    llvm::report_fatal_error("Cannot read '" + path + "'");
 }
 
 TypeConverter::~TypeConverter() {
@@ -1346,13 +1433,26 @@ const TypeInfo &IRGenFunction::getTypeInfo(SILType T) {
 }
 
 /// Return the SIL-lowering of the given type.
-SILType IRGenModule::getLoweredType(AbstractionPattern orig, Type subst) {
-  return getSILTypes().getLoweredType(orig, subst);
+SILType IRGenModule::getLoweredType(AbstractionPattern orig, Type subst) const {
+  return getSILTypes().getLoweredType(orig, subst,
+                                      ResilienceExpansion::Maximal);
 }
 
 /// Return the SIL-lowering of the given type.
-SILType IRGenModule::getLoweredType(Type subst) {
-  return getSILTypes().getLoweredType(subst);
+SILType IRGenModule::getLoweredType(Type subst) const {
+  return getSILTypes().getLoweredType(subst,
+                                      ResilienceExpansion::Maximal);
+}
+
+/// Return the SIL-lowering of the given type.
+const Lowering::TypeLowering &IRGenModule::getTypeLowering(SILType type) const {
+  return getSILTypes().getTypeLowering(type,
+                                       ResilienceExpansion::Maximal);
+}
+
+bool IRGenModule::isTypeABIAccessible(SILType type) const {
+  return getSILModule().isTypeABIAccessible(type,
+                                            ResilienceExpansion::Maximal);
 }
 
 /// Get a pointer to the storage type for the given type.  Note that,
@@ -1369,7 +1469,7 @@ llvm::PointerType *IRGenModule::getStoragePointerTypeForLowered(CanType T) {
 }
 
 llvm::Type *IRGenModule::getStorageTypeForUnlowered(Type subst) {
-  return getStorageType(getSILTypes().getLoweredType(subst));
+  return getStorageType(getLoweredType(subst));
 }
 
 llvm::Type *IRGenModule::getStorageType(SILType T) {
@@ -1399,7 +1499,7 @@ IRGenModule::getTypeInfoForUnlowered(AbstractionPattern orig, Type subst) {
 /// have yet undergone SIL type lowering.
 const TypeInfo &
 IRGenModule::getTypeInfoForUnlowered(AbstractionPattern orig, CanType subst) {
-  return getTypeInfo(getSILTypes().getLoweredType(orig, subst));
+  return getTypeInfo(getLoweredType(orig, subst));
 }
 
 /// Get the fragile type information for the given type, which is known
@@ -1686,9 +1786,6 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   case TypeKind::OpenedArchetype:
   case TypeKind::NestedArchetype:
     return convertArchetypeType(cast<ArchetypeType>(ty));
-  case TypeKind::OpaqueTypeArchetype:
-    // TODO: opaque type resilience
-    llvm_unreachable("should be lowered to underlying type; resilience not implemented");
   case TypeKind::Class:
   case TypeKind::Enum:
   case TypeKind::Struct:

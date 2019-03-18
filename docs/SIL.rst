@@ -28,7 +28,7 @@ representation that can be used for code distribution, but it can also express
 target-specific concepts as well as LLVM can.
 
 For more information on developing the implementation of SIL and SIL passes, see
-SILProgrammersManual.md.
+`SILProgrammersManual.md <SILProgrammersManual.md>`_.
 
 SIL in the Swift Compiler
 -------------------------
@@ -122,7 +122,7 @@ IR.
   high-level optimizations on basic Swift containers such as Array or String.
   Domain specific optimizations require a defined interface between
   the standard library and the optimizer. More details can be found here:
-  :ref:`HighLevelSILOptimizations`
+  `HighLevelSILOptimizations <HighLevelSILOptimizations.rst>`_
 
 Syntax
 ------
@@ -2709,7 +2709,7 @@ strong reference type have ownership semantics for the referenced heap
 object. Retain and release operations, however,
 are never implicit in SIL and always must be explicitly performed where needed.
 Retains and releases on the value may be freely moved, and balancing
-retains and releases may deleted, so long as an owning retain count is
+retains and releases may be deleted, so long as an owning retain count is
 maintained for the uses of the value.
 
 All reference-counting operations are defined to work correctly on
@@ -2937,6 +2937,7 @@ is_escaping_closure
 ```````````````````
 
 ::
+
   sil-instruction ::= 'is_escaping_closure' sil-operand
 
   %1 = is_escaping_closure %0 : $@callee_guaranteed () -> ()
@@ -2948,6 +2949,7 @@ true if it is.
 
 copy_block
 ``````````
+
 ::
 
   sil-instruction :: 'copy_block' sil-operand
@@ -2960,6 +2962,7 @@ if the block is copied from the stack to the heap.
 
 copy_block_without_escaping
 ```````````````````````````
+
 ::
 
   sil-instruction :: 'copy_block_without_escaping' sil-operand 'withoutEscaping' sil-operand
@@ -2991,7 +2994,7 @@ Asserts that there exists another reference of the value ``%0`` for the scope
 delineated by the call of this builtin up to the first call of a ``builtin
 "unsafeGuaranteedEnd"`` instruction that uses the second element ``%1.1`` of the
 returned value. If no such instruction can be found nothing can be assumed. This
-assertions holds for uses of the first tuple element of the returned value
+assertion holds for uses of the first tuple element of the returned value
 ``%1.0`` within this scope. The returned reference value equals the input
 ``%0``.
 
@@ -3391,7 +3394,7 @@ separately before the ``partial_apply``. The closure does however take ownership
 of the partially applied arguments; when the closure reference count reaches
 zero, the contained values will be destroyed. If the ``partial_apply`` has a
 ``@noescape`` function type (``partial_apply [on_stack]``) the closure context
-is allocated on the stack and intialized to contain the closed-over values. The
+is allocated on the stack and initialized to contain the closed-over values. The
 closed-over values are not retained, lifetime of the closed-over values must be
 managed separately. The lifetime of the stack context of a ``partial_apply
 [on_stack]`` must be terminated with a ``dealloc_stack``.
@@ -3958,7 +3961,7 @@ unless the enum can be exhaustively switched in the current function, i.e. when
 the compiler can be sure that it knows all possible present and future values
 of the enum in question. This is generally true for enums defined in Swift, but
 there are two exceptions: *non-frozen enums* declared in libraries compiled
-with the ``-enable-resilience`` flag, which may grow new cases in the future in
+with the ``-enable-library-evolution`` flag, which may grow new cases in the future in
 an ABI-compatible way; and enums marked with the ``objc`` attribute, for which
 other bit patterns are permitted for compatibility with C. All enums imported
 from C are treated as "non-exhaustive" for the same reason, regardless of the
@@ -4308,7 +4311,7 @@ open_existential_addr
   //   type P
   // $*@opened P must be a unique archetype that refers to an opened
   // existential type P.
-  // %1 will be of type $*P
+  // %1 will be of type $*@opened P
 
 Obtains the address of the concrete value inside the existential
 container referenced by ``%0``. The protocol conformances associated
@@ -4331,7 +4334,7 @@ open_existential_value
   //   type P
   // $@opened P must be a unique archetype that refers to an opened
   // existential type P.
-  // %1 will be of type $P
+  // %1 will be of type $@opened P
 
 Loadable version of the above: Opens-up the existential
 container associated with ``%0``. The protocol conformances associated

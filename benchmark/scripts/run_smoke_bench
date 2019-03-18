@@ -185,7 +185,7 @@ def test_performance(opt_level, old_dir, new_dir, threshold, num_samples,
     tests = TestComparator(results[0], results[1], threshold)
     changed = tests.decreased + tests.increased
 
-    while len(changed) > 0 and unchanged_length_count < 5:
+    while len(changed) > 0 and unchanged_length_count < 10:
         i += 1
         if VERBOSE:
             log('        test again: ' + str([test.name for test in changed]))
@@ -203,25 +203,6 @@ def test_performance(opt_level, old_dir, new_dir, threshold, num_samples,
     log('')
     return report_results("Performance: -" + opt_level, None, None,
                           threshold * 1.4, output_file, *results)
-
-
-def get_results(bench_dir, opt_level, num_samples, to_test):
-    try:
-        exe = os.path.join(bench_dir, 'bin', 'Benchmark_' + opt_level)
-        args = [exe, '--num-samples=' + str(num_samples),
-                '--sample-time=0.0025']
-        if to_test:
-            args += to_test
-        env = {'DYLD_LIBRARY_PATH': os.path.join(bench_dir, 'lib', 'swift',
-               'macos'),
-               'SWIFT_DETERMINISTIC_HASHING': '1'}
-        output = subprocess.check_output(args, env=env)
-    except subprocess.CalledProcessError as e:
-        sys.stderr.write(e.output)
-        sys.stderr.flush()
-        return sys.exit(e.returncode)
-    else:
-        return output
 
 
 def report_code_size(opt_level, old_dir, new_dir, platform, output_file):

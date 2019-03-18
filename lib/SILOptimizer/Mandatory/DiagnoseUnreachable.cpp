@@ -91,6 +91,18 @@ public:
   llvm::DenseMap<const SILBasicBlock*, UnreachableInfo> MetaMap;
 };
 
+static void deleteEndBorrows(SILValue v) {
+  SmallVector<SILInstruction *, 4> endBorrowList;
+  for (auto *use : v->getUses()) {
+    if (auto *ebi = dyn_cast<EndBorrowInst>(use->getUser())) {
+      endBorrowList.push_back(ebi);
+    }
+  }
+  while (!endBorrowList.empty()) {
+    endBorrowList.pop_back_val()->eraseFromParent();
+  }
+}
+
 /// Propagate/remove basic block input values when all predecessors
 /// supply the same arguments.
 static void propagateBasicBlockArgs(SILBasicBlock &BB) {
@@ -172,6 +184,13 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
     // FIXME: These could be further propagatable now, we might want to move
     // this to CCP and trigger another round of copy propagation.
     SILArgument *Arg = *AI;
+
+    // If this argument is guaranteed and Args[Idx] is a SILFunctionArgument,
+    // delete the end_borrow.
+    if (Arg->getOwnershipKind() == ValueOwnershipKind::Guaranteed &&
+        isa<SILFunctionArgument>(Args[Idx])) {
+      deleteEndBorrows(Arg);
+    }
 
     // We were able to fold, so all users should use the new folded value.
     Arg->replaceAllUsesWith(Args[Idx]);
@@ -265,14 +284,16 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
         }
       }
 
-      if (!TheSuccessorBlock)
+      SILBasicBlock *DB = nullptr;
+      if (!TheSuccessorBlock) {
         if (SUI->hasDefault()) {
-          SILBasicBlock *DB= SUI->getDefaultBB();
+          DB = SUI->getDefaultBB();
           if (!isa<UnreachableInst>(DB->getTerminator())) {
             TheSuccessorBlock = DB;
             ReachableBlockIdx = SUI->getNumCases();
           }
         }
+      }
 
       // Not fully covered switches will be diagnosed later. SILGen represents
       // them with a Default basic block with an unreachable instruction.
@@ -285,8 +306,17 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
       SILBuilderWithScope B(&BB, TI);
       SILLocation Loc = TI->getLoc();
       if (!TheSuccessorBlock->args_empty()) {
-        assert(TheEnum->hasOperand());
-        B.createBranch(Loc, TheSuccessorBlock, TheEnum->getOperand());
+        // If the successor block that we are looking at is the default block,
+        // we create an argument not for the enum case, but for the original
+        // value.
+        SILValue branchOperand;
+        if (TheSuccessorBlock != DB) {
+          assert(TheEnum->hasOperand());
+          branchOperand = TheEnum->getOperand();
+        } else {
+          branchOperand = TheEnum;
+        }
+        B.createBranch(Loc, TheSuccessorBlock, branchOperand);
       } else
         B.createBranch(Loc, TheSuccessorBlock);
 
@@ -403,7 +433,7 @@ static void setOutsideBlockUsesToUndef(SILInstruction *I) {
     return;
 
   SILBasicBlock *BB = I->getParent();
-  SILModule &Mod = BB->getModule();
+  auto *F = BB->getParent();
 
   // Replace all uses outside of I's basic block by undef.
   llvm::SmallVector<Operand *, 16> Uses;
@@ -412,7 +442,7 @@ static void setOutsideBlockUsesToUndef(SILInstruction *I) {
 
   for (auto *Use : Uses)
     if (Use->getUser()->getParent() != BB)
-      Use->set(SILUndef::get(Use->get()->getType(), Mod));
+      Use->set(SILUndef::get(Use->get()->getType(), *F));
 }
 
 static SILInstruction *getAsCallToNoReturn(SILInstruction *I) {

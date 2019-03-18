@@ -1700,11 +1700,11 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
   }
 
   // If we were given a mangled name, only print that declaration.
-  std::string error;
-  const Decl *D = ide::getDeclFromMangledSymbolName(CI.getASTContext(),
-                                                    MangledNameToFind, error);
+  const TypeDecl *D = Demangle::getTypeDeclForMangling(CI.getASTContext(),
+                                                       MangledNameToFind);
   if (!D) {
-    llvm::errs() << "Unable to find decl for symbol: " << error << "\n";
+    llvm::errs() << "Unable to find decl for symbol: "
+                 << MangledNameToFind << "\n";
     return EXIT_FAILURE;
   }
 
@@ -2847,6 +2847,9 @@ private:
   }
 
   void tryDemangleDecl(ValueDecl *VD, CharSourceRange range, bool isRef) {
+    if (!isa<TypeDecl>(VD) || isa<GenericTypeParamDecl>(VD))
+      return;
+
     std::string USR;
     {
       llvm::raw_string_ostream OS(USR);
@@ -2860,7 +2863,7 @@ private:
       Stream << "decl: ";
     }
 
-    if (Decl *reDecl = getDeclFromUSR(Ctx, USR, error)) {
+    if (TypeDecl *reDecl = Demangle::getTypeDeclForUSR(Ctx, USR)) {
       PrintOptions POpts;
       POpts.PreferTypeRepr = false;
       POpts.PrintParameterSpecifiers = true;
@@ -2868,8 +2871,7 @@ private:
     } else {
       Stream << "FAILURE";
     }
-    Stream << "\tfor '" << range.str() << "' usr=" << USR << " " << error
-           << "\n";
+    Stream << "\tfor '" << range.str() << "' usr=" << USR << "\n";
   }
 };
 

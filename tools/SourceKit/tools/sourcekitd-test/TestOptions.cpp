@@ -105,6 +105,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
     case OPT_req:
       Request = llvm::StringSwitch<SourceKitRequest>(InputArg->getValue())
         .Case("version", SourceKitRequest::ProtocolVersion)
+        .Case("compiler-version", SourceKitRequest::CompilerVersion)
         .Case("demangle", SourceKitRequest::DemangleNames)
         .Case("mangle", SourceKitRequest::MangleSimpleClasses)
         .Case("index", SourceKitRequest::Index)

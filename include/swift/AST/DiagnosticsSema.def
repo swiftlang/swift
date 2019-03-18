@@ -213,7 +213,7 @@ ERROR(cannot_apply_lvalue_binop_to_rvalue,none,
       "left side of mutating operator has immutable type %0", (Type))
 
 ERROR(cannot_subscript_with_index,none,
-      "cannot subscript a value of type %0 with an index of type %1",
+      "cannot subscript a value of type %0 with an argument of type %1",
       (Type, Type))
 
 ERROR(cannot_subscript_base,none,
@@ -238,6 +238,8 @@ NOTE(inout_change_var_type_if_possible,none,
 ERROR(cannot_pass_rvalue_inout,none,
       "cannot pass immutable value of type %0 as inout argument",
       (Type))
+ERROR(cannot_provide_default_value_inout,none,
+      "cannot provide default value to inout parameter %0", (Identifier))
 
 ERROR(cannot_assign_to_literal,none,
       "cannot assign to a literal value", ())
@@ -508,10 +510,6 @@ ERROR(expr_swift_keypath_empty, none,
       "key path must have at least one component", ())
 ERROR(expr_string_interpolation_outside_string,none,
       "string interpolation can only appear inside a string literal", ())
-ERROR(unsupported_keypath_tuple_element_reference,none,
-      "key path cannot reference tuple elements", ())
-ERROR(expr_keypath_unimplemented_tuple,none,
-      "key path support for tuples is not implemented", ())
 ERROR(expr_keypath_subscript_index_not_hashable, none,
       "subscript index of type %0 in a key path must be Hashable", (Type))
 ERROR(expr_smart_keypath_application_type_mismatch,none,
@@ -905,6 +903,8 @@ WARNING(is_expr_same_type,none,
         "'!= nil'?", (Type, Type))
 WARNING(downcast_to_unrelated,none,
         "cast from %0 to unrelated type %1 always fails", (Type, Type))
+NOTE(downcast_to_unrelated_fixit,none,
+     "did you mean to call %0 with '()'?", (Identifier))
 ERROR(downcast_to_more_optional,none,
       "cannot downcast from %0 to a more optional type %1",
       (Type, Type))
@@ -1305,7 +1305,7 @@ ERROR(indirect_case_without_payload,none,
 ERROR(indirect_case_in_indirect_enum,none,
       "enum case in 'indirect' enum cannot also be 'indirect'", ())
 WARNING(enum_frozen_nonresilient,none,
-        "%0 has no effect without -enable-resilience", (DeclAttribute))
+        "%0 has no effect without -enable-library-evolution", (DeclAttribute))
 WARNING(enum_frozen_nonpublic,none,
         "%0 has no effect on non-public enums", (DeclAttribute))
 
@@ -1508,17 +1508,6 @@ WARNING(function_type_usable_from_inline_warn,none,
         "'@usableFromInline' %select{function|method|initializer}0 "
         "should be '@usableFromInline' or public",
         (unsigned, bool))
-ERROR(noreturn_not_supported,none,
-      "'@noreturn' has been removed; functions that never return should have a "
-      "return type of 'Never' instead", ())
-
-// Opaque return types
-ERROR(opaque_type_invalid_constraint,none,
-      "an 'opaque' type must specify only 'Any', 'AnyObject', protocols, "
-      "and/or a base class", ())
-ERROR(inferred_opaque_type,none,
-      "property definition has inferred type %0, involving the '__opaque' "
-      "return type of another declaration", (Type))
 
 // Extensions
 ERROR(non_nominal_extension,none,
@@ -3238,18 +3227,6 @@ ERROR(trailing_closure_requires_parens,none,
       "trailing closure requires parentheses for disambiguation in this"
       " context", ())
 
-ERROR(opaque_type_no_underlying_type_candidates,none,
-      "function declares an opaque return type, but has no return statements "
-      "in its body from which to infer an underlying type", ())
-ERROR(opaque_type_mismatched_underlying_type_candidates,none,
-      "function declares an opaque return type, but the return statements "
-      "in its body do not have matching underlying types", ())
-NOTE(opaque_type_underlying_type_candidate_here,none,
-     "return statement has underlying type %0", (Type))
-ERROR(opaque_type_self_referential_underlying_type,none,
-      "function opaque return type was inferred as %0, which defines the "
-      "opaque type in terms of itself", (Type))
-
 //------------------------------------------------------------------------------
 // MARK: Type Check Patterns
 //------------------------------------------------------------------------------
@@ -3559,10 +3536,6 @@ ERROR(unsupported_convention,none,
       "convention '%0' not supported", (StringRef))
 ERROR(unreferenced_generic_parameter,none,
       "generic parameter '%0' is not used in function signature", (StringRef))
-
-// Opaque types
-ERROR(unsupported_opaque_type,none,
-      "'opaque' types are only implemented for the declared type of properties and subscripts and the return type of functions", ())
 
 // SIL
 ERROR(opened_non_protocol,none,
@@ -4114,6 +4087,7 @@ ERROR(usable_from_inline_attr_in_protocol,none,
 #define FRAGILE_FUNC_KIND \
   "%select{a '@_transparent' function|" \
   "an '@inlinable' function|" \
+  "an '@_alwaysEmitIntoClient' function|" \
   "a default argument value|" \
   "a property initializer in a '@_fixed_layout' type}"
 
@@ -4147,7 +4121,7 @@ NOTE(resilience_decl_declared_here,
 
 ERROR(class_designated_init_inlinable_resilient,none,
       "initializer for class %0 is "
-      "'%select{@_transparent|@inlinable|%error}1' and must "
+      "'%select{@_transparent|@inlinable|@_alwaysEmitIntoClient|%error}1' and must "
       "delegate to another initializer", (Type, unsigned))
 
 ERROR(attribute_invalid_on_stored_property,

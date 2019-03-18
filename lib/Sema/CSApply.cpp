@@ -295,8 +295,9 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
       buf.append(objcName.begin(), objcName.end());
       continue;
     }
-    case KeyPathExpr::Component::Kind::Subscript: {
-      // Subscripts aren't generally represented in KVC.
+    case KeyPathExpr::Component::Kind::TupleElement:
+    case KeyPathExpr::Component::Kind::Subscript:
+      // Subscripts and tuples aren't generally represented in KVC.
       // TODO: There are some subscript forms we could map to KVC, such as
       // when indexing a Dictionary or NSDictionary by string, or when applying
       // a mapping subscript operation to Array/Set or NSArray/NSSet.
@@ -307,7 +308,6 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
       // Don't bother building the key path string if the key path didn't even
       // resolve.
       return false;
-    }
     }
   }
   
@@ -1072,65 +1072,6 @@ namespace {
     /// \param type The literal type. This type conforms to \c protocol,
     /// and may also conform to \c builtinProtocol.
     ///
-    /// \param openedType The literal type as it was opened in the type system.
-    ///
-    /// \param protocol The protocol that describes the literal requirement.
-    ///
-    /// \param literalType Either the name of the associated type in
-    /// \c protocol that describes the argument type of the conversion function
-    /// (\c literalFuncName) or the argument type itself.
-    ///
-    /// \param literalFuncName The name of the conversion function requirement
-    /// in \c protocol.
-    ///
-    /// \param builtinProtocol The "builtin" form of the protocol, which
-    /// always takes builtin types and can only be properly implemented
-    /// by standard library types. If \c type does not conform to this
-    /// protocol, it's literal type will.
-    ///
-    /// \param builtinLiteralType Either the name of the associated type in
-    /// \c builtinProtocol that describes the argument type of the builtin
-    /// conversion function (\c builtinLiteralFuncName) or the argument type
-    /// itself.
-    ///
-    /// \param builtinLiteralFuncName The name of the conversion function
-    /// requirement in \c builtinProtocol.
-    ///
-    /// \param isBuiltinArgType Function that determines whether the given
-    /// type is acceptable as the argument type for the builtin conversion.
-    ///
-    /// \param brokenProtocolDiag The diagnostic to emit if the protocol
-    /// is broken.
-    ///
-    /// \param brokenBuiltinProtocolDiag The diagnostic to emit if the builtin
-    /// protocol is broken.
-    ///
-    /// \returns the converted literal expression.
-    Expr *convertLiteral(Expr *literal,
-                         Type type,
-                         Type openedType,
-                         ProtocolDecl *protocol,
-                         TypeOrName literalType,
-                         DeclName literalFuncName,
-                         ProtocolDecl *builtinProtocol,
-                         TypeOrName builtinLiteralType,
-                         DeclName builtinLiteralFuncName,
-                         bool (*isBuiltinArgType)(Type),
-                         Diag<> brokenProtocolDiag,
-                         Diag<> brokenBuiltinProtocolDiag);
-
-    /// Convert the given literal expression via a protocol pair.
-    ///
-    /// This routine handles the two-step literal conversion process used
-    /// by integer, float, character, extended grapheme cluster, and string
-    /// literals. The first step uses \c builtinProtocol while the second
-    /// step uses \c protocol.
-    ///
-    /// \param literal The literal expression.
-    ///
-    /// \param type The literal type. This type conforms to \c protocol,
-    /// and may also conform to \c builtinProtocol.
-    ///
     /// \param protocol The protocol that describes the literal requirement.
     ///
     /// \param literalType The name of the associated type in \c protocol that
@@ -1778,19 +1719,15 @@ namespace {
       DeclName builtinInitName(tc.Context, DeclBaseName::createConstructor(),
                                { tc.Context.Id_builtinIntegerLiteral });
 
-      return convertLiteral(
-               expr,
-               type,
-               cs.getType(expr),
-               protocol,
-               tc.Context.Id_IntegerLiteralType,
-               initName,
-               builtinProtocol,
-               tc.Context.TheIntegerLiteralType,
-               builtinInitName,
-               nullptr,
-               diag::integer_literal_broken_proto,
-               diag::builtin_integer_literal_broken_proto);
+      auto *result = convertLiteralInPlace(
+          expr, type, protocol, tc.Context.Id_IntegerLiteralType, initName,
+          builtinProtocol, builtinInitName, diag::integer_literal_broken_proto,
+          diag::builtin_integer_literal_broken_proto);
+      if (result) {
+        // TODO: It seems that callers expect this to have types assigned...
+        result->setType(cs.getType(result));
+      }
+      return result;
     }
     
     Expr *visitNilLiteralExpr(NilLiteralExpr *expr) {
@@ -1907,19 +1844,11 @@ namespace {
       DeclName builtinInitName(tc.Context, DeclBaseName::createConstructor(),
                                { tc.Context.Id_builtinFloatLiteral });
 
-      return convertLiteral(
-               expr,
-               type,
-               cs.getType(expr),
-               protocol,
-               tc.Context.Id_FloatLiteralType,
-               initName,
-               builtinProtocol,
-               maxType,
-               builtinInitName,
-               nullptr,
-               diag::float_literal_broken_proto,
-               diag::builtin_float_literal_broken_proto);
+      expr->setBuiltinType(maxType);
+      return convertLiteralInPlace(
+          expr, type, protocol, tc.Context.Id_FloatLiteralType, initName,
+          builtinProtocol, builtinInitName, diag::float_literal_broken_proto,
+          diag::builtin_float_literal_broken_proto);
     }
 
     Expr *visitBooleanLiteralExpr(BooleanLiteralExpr *expr) {
@@ -2448,8 +2377,16 @@ namespace {
             expr->getArgumentLabelLocs(), expr->hasTrailingClosure(),
             /*implicit=*/expr->isImplicit(), Type(), getType);
         result = finishApply(apply, Type(), cs.getConstraintLocator(expr));
+
+        // FIXME: Application could fail, because some of the solutions
+        // are not expressible in AST (yet?), like certain tuple-to-tuple
+        // conversions. Better solution here would be not to form solutions
+        // which couldn't be applied by e.g. detecting situations like that
+        // and inserting fixes early.
+        if (!result)
+          return nullptr;
       }
-			
+
       // Check for ambiguous member if the base is an Optional
       if (baseTy->getOptionalObjectType()) {
         diagnoseAmbiguousNominalMember(baseTy, result);
@@ -3556,7 +3493,11 @@ namespace {
           });
         }
 
-        literalInit->setImplicit(false);
+        if (auto *literal = dyn_cast<NumberLiteralExpr>(literalInit)) {
+          literal->setExplicitConversion();
+        } else {
+          literalInit->setImplicit(false);
+        }
 
         cs.setType(expr, toType);
         // Keep the coercion around, because it contains the source range
@@ -4308,48 +4249,59 @@ namespace {
             break;
           }
 
-          auto property = foundDecl->choice.getDecl();
-          
-          // Key paths can only refer to properties currently.
-          if (!isa<VarDecl>(property)) {
-            cs.TC.diagnose(origComponent.getLoc(),
-                           diag::expr_keypath_not_property,
-                           property->getDescriptiveKind(),
-                           property->getFullName());
-          } else {
-            // Key paths don't work with mutating-get properties.
-            auto varDecl = cast<VarDecl>(property);
-            if (varDecl->isGetterMutating()) {
+          if (foundDecl->choice.isDecl()) {
+            auto property = foundDecl->choice.getDecl();
+              
+            // Key paths can only refer to properties currently.
+            if (!isa<VarDecl>(property)) {
               cs.TC.diagnose(origComponent.getLoc(),
-                             diag::expr_keypath_mutating_getter,
+                             diag::expr_keypath_not_property,
+                             property->getDescriptiveKind(),
                              property->getFullName());
+            } else {
+              // Key paths don't work with mutating-get properties.
+              auto varDecl = cast<VarDecl>(property);
+              if (varDecl->isGetterMutating()) {
+                cs.TC.diagnose(origComponent.getLoc(),
+                               diag::expr_keypath_mutating_getter,
+                               property->getFullName());
+              }
+                  
+              // Key paths don't currently support static members.
+              if (varDecl->isStatic()) {
+                cs.TC.diagnose(origComponent.getLoc(),
+                               diag::expr_keypath_static_member,
+                               property->getFullName());
+              }
             }
-            
-            // Key paths don't currently support static members.
-            if (varDecl->isStatic()) {
-              cs.TC.diagnose(origComponent.getLoc(),
-                             diag::expr_keypath_static_member,
-                             property->getFullName());
-            }
-          }
-          
-          cs.TC.requestMemberLayout(property);
-
-          auto dc = property->getInnermostDeclContext();
-
-          // Compute substitutions to refer to the member.
-          SubstitutionMap subs =
+              
+            cs.TC.requestMemberLayout(property);
+              
+            auto dc = property->getInnermostDeclContext();
+              
+            // Compute substitutions to refer to the member.
+            SubstitutionMap subs =
             solution.computeSubstitutions(dc->getGenericSignatureOfContext(),
                                           locator);
+              
+            auto resolvedTy = foundDecl->openedType;
+            resolvedTy = simplifyType(resolvedTy);
+              
+            auto ref = ConcreteDeclRef(property, subs);
+              
+            component = KeyPathExpr::Component::forProperty(ref,
+                                                            resolvedTy,
+                                                            origComponent.getLoc());
+          } else {
+            auto fieldIndex = foundDecl->choice.getTupleIndex();
 
-          auto resolvedTy = foundDecl->openedType;
-          resolvedTy = simplifyType(resolvedTy);
-          
-          auto ref = ConcreteDeclRef(property, subs);
+            auto resolvedTy = foundDecl->openedType;
+            resolvedTy = simplifyType(resolvedTy);
 
-          component = KeyPathExpr::Component::forProperty(ref,
-                                                       resolvedTy,
-                                                       origComponent.getLoc());
+            component = KeyPathExpr::Component::forTupleElement(fieldIndex,
+                                                                resolvedTy,
+                                                                origComponent.getLoc());
+          }
 
           baseTy = component.getComponentType();
           resolvedComponents.push_back(component);
@@ -4494,6 +4446,7 @@ namespace {
         case KeyPathExpr::Component::Kind::Property:
         case KeyPathExpr::Component::Kind::Subscript:
         case KeyPathExpr::Component::Kind::OptionalWrap:
+        case KeyPathExpr::Component::Kind::TupleElement:
           llvm_unreachable("already resolved");
         }
       }
@@ -6516,41 +6469,56 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
   }
 
+  // Handle "from specific" coercions before "catch all" coercions.
+  auto desugaredFromType = fromType->getDesugaredType();
+  switch (desugaredFromType->getKind()) {
   // Coercions from an lvalue: load or perform implicit address-of. We perform
   // these coercions first because they are often the first step in a multi-step
   // coercion.
-  if (auto fromLValue = fromType->getAs<LValueType>()) {
-    if (auto *toIO = toType->getAs<InOutType>()) {
-      // In an 'inout' operator like "i += 1", the operand is converted from
-      // an implicit lvalue to an inout argument.
-      assert(toIO->getObjectType()->isEqual(fromLValue->getObjectType()));
-      return cs.cacheType(new (tc.Context)
-                              InOutExpr(expr->getStartLoc(), expr,
-                                        toIO->getObjectType(),
-                                        /*isImplicit*/ true));
-    }
+  case TypeKind::LValue: {
+    auto fromLValue = cast<LValueType>(desugaredFromType);
+    auto toIO = toType->getAs<InOutType>();
+    if (!toIO)
+      return coerceToType(addImplicitLoadExpr(cs, expr), toType, locator);
 
-    return coerceToType(addImplicitLoadExpr(cs, expr), toType, locator);
+    // In an 'inout' operator like "i += 1", the operand is converted from
+    // an implicit lvalue to an inout argument.
+    assert(toIO->getObjectType()->isEqual(fromLValue->getObjectType()));
+    return cs.cacheType(new (tc.Context) InOutExpr(expr->getStartLoc(), expr,
+                                                   toIO->getObjectType(),
+                                                   /*isImplicit*/ true));
   }
 
-  // Coercions to tuple type.
-  if (auto toTuple = toType->getAs<TupleType>()) {
-    // Coerce from a tuple to a tuple.
-    if (auto fromTuple = fromType->getAs<TupleType>()) {
-      SmallVector<unsigned, 4> sources;
-      if (!computeTupleShuffle(fromTuple, toTuple, sources)) {
-        return coerceTupleToTuple(expr, fromTuple, toTuple,
-                                  locator, sources);
-      }
+  // Coerce from a tuple to a tuple.
+  case TypeKind::Tuple: {
+    auto fromTuple = cast<TupleType>(desugaredFromType);
+    auto toTuple = toType->getAs<TupleType>();
+    if (!toTuple)
+      break;
+    SmallVector<unsigned, 4> sources;
+    if (!computeTupleShuffle(fromTuple, toTuple, sources)) {
+      return coerceTupleToTuple(expr, fromTuple, toTuple,
+                                locator, sources);
     }
+    break;
   }
+
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::OpenedArchetype:
+  case TypeKind::NestedArchetype:
+    if (!cast<ArchetypeType>(desugaredFromType)->requiresClass())
+      break;
+    LLVM_FALLTHROUGH;
 
   // Coercion from a subclass to a superclass.
   //
   // FIXME: Can we rig things up so that we always have a Superclass
   // conversion restriction in this case?
-  if (fromType->mayHaveSuperclass() &&
-      toType->getClassOrBoundGenericClass()) {
+  case TypeKind::DynamicSelf:
+  case TypeKind::BoundGenericClass:
+  case TypeKind::Class: {
+    if (!toType->getClassOrBoundGenericClass())
+      break;
     for (auto fromSuperClass = fromType->getSuperclass();
          fromSuperClass;
          fromSuperClass = fromSuperClass->getSuperclass()) {
@@ -6558,10 +6526,17 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         return coerceSuperclass(expr, toType, locator);
       }
     }
+    break;
   }
 
-  // Coercions to function type.
-  if (auto toFunc = toType->getAs<FunctionType>()) {
+  // Coercion from one function type to another, this produces a
+  // FunctionConversionExpr in its full generality.
+  case TypeKind::Function: {
+    auto fromFunc = cast<FunctionType>(desugaredFromType);
+    auto toFunc = toType->getAs<FunctionType>();
+    if (!toFunc)
+      break;
+
     // Default argument generator must return escaping functions. Therefore, we
     // leave an explicit escape to noescape cast here such that SILGen can skip
     // the cast and emit a code for the escaping function.
@@ -6570,49 +6545,52 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       isInDefaultArgumentContext = (initalizerCtx->getInitializerKind() ==
                                     InitializerKind::DefaultArgument);
     auto toEI = toFunc->getExtInfo();
-    // Coercion from one function type to another, this produces a
-    // FunctionConversionExpr in its full generality.
-    if (auto fromFunc = fromType->getAs<FunctionType>()) {
-      assert(toType->is<FunctionType>());
-      // If we have a ClosureExpr, then we can safely propagate the 'no escape'
-      // bit to the closure without invalidating prior analysis.
-      auto fromEI = fromFunc->getExtInfo();
-      if (toEI.isNoEscape() && !fromEI.isNoEscape()) {
-        auto newFromFuncType = fromFunc->withExtInfo(fromEI.withNoEscape());
-        if (!isInDefaultArgumentContext &&
-            applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
-          fromFunc = newFromFuncType->castTo<FunctionType>();
-          // Propagating the 'no escape' bit might have satisfied the entire
-          // conversion.  If so, we're done, otherwise keep converting.
-          if (fromFunc->isEqual(toType))
-            return expr;
-        } else if (isInDefaultArgumentContext) {
-          // First apply the conversion *without* noescape attribute.
-          if (!newFromFuncType->isEqual(toType)) {
-            auto escapingToFuncTy =
-                toFunc->withExtInfo(toEI.withNoEscape(false));
-            maybeDiagnoseUnsupportedFunctionConversion(cs, expr, toFunc);
-            expr = cs.cacheType(new (tc.Context) FunctionConversionExpr(
-                expr, escapingToFuncTy));
-          }
-          // Apply an explict function conversion *only* for the escape to
-          // noescape conversion. This conversion will be stripped by the
-          // default argument generator. (We can't return a @noescape function)
-          auto newExpr = cs.cacheType(new (tc.Context)
-                                          FunctionConversionExpr(expr, toFunc));
-          return newExpr;
+    assert(toType->is<FunctionType>());
+    // If we have a ClosureExpr, then we can safely propagate the 'no escape'
+    // bit to the closure without invalidating prior analysis.
+    auto fromEI = fromFunc->getExtInfo();
+    if (toEI.isNoEscape() && !fromEI.isNoEscape()) {
+      auto newFromFuncType = fromFunc->withExtInfo(fromEI.withNoEscape());
+      if (!isInDefaultArgumentContext &&
+          applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
+        fromFunc = newFromFuncType->castTo<FunctionType>();
+        // Propagating the 'no escape' bit might have satisfied the entire
+        // conversion.  If so, we're done, otherwise keep converting.
+        if (fromFunc->isEqual(toType))
+          return expr;
+      } else if (isInDefaultArgumentContext) {
+        // First apply the conversion *without* noescape attribute.
+        if (!newFromFuncType->isEqual(toType)) {
+          auto escapingToFuncTy =
+              toFunc->withExtInfo(toEI.withNoEscape(false));
+          maybeDiagnoseUnsupportedFunctionConversion(cs, expr, toFunc);
+          expr = cs.cacheType(new (tc.Context) FunctionConversionExpr(
+              expr, escapingToFuncTy));
         }
+        // Apply an explict function conversion *only* for the escape to
+        // noescape conversion. This conversion will be stripped by the
+        // default argument generator. (We can't return a @noescape function)
+        auto newExpr = cs.cacheType(new (tc.Context)
+                                        FunctionConversionExpr(expr, toFunc));
+        return newExpr;
       }
-
-      maybeDiagnoseUnsupportedFunctionConversion(cs, expr, toFunc);
-
-      return cs.cacheType(new (tc.Context)
-                              FunctionConversionExpr(expr, toType));
     }
+
+    maybeDiagnoseUnsupportedFunctionConversion(cs, expr, toFunc);
+
+    return cs.cacheType(new (tc.Context)
+                            FunctionConversionExpr(expr, toType));
   }
 
-  // Coercions from metadata to objects.
-  if (auto fromMeta = fromType->getAs<AnyMetatypeType>()) {
+  // Coercions from one metatype to another.
+  case TypeKind::Metatype: {
+    if (auto toMeta = toType->getAs<MetatypeType>())
+      return cs.cacheType(new(tc.Context) MetatypeConversionExpr(expr, toMeta));
+    LLVM_FALLTHROUGH;
+  }
+  // Coercions from metatype to objects.
+  case TypeKind::ExistentialMetatype: {
+    auto fromMeta = cast<AnyMetatypeType>(desugaredFromType);
     if (toType->isAnyObject()) {
       assert(cs.getASTContext().LangOpts.EnableObjCInterop
              && "metatype-to-object conversion requires objc interop");
@@ -6648,39 +6626,86 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
           new (tc.Context) ProtocolMetatypeToObjectExpr(expr, toType));
       }
     }
+
+    break;
   }
 
+#define SUGARED_TYPE(Name, Parent) case TypeKind::Name:
+#define BUILTIN_TYPE(Name, Parent) case TypeKind::Name:
+#define UNCHECKED_TYPE(Name, Parent) case TypeKind::Name:
+#define ARTIFICIAL_TYPE(Name, Parent) case TypeKind::Name:
+#define TYPE(Name, Parent)
+#include "swift/AST/TypeNodes.def"
+  case TypeKind::Error:
+  case TypeKind::InOut:
+  case TypeKind::Module:
+  case TypeKind::Enum:
+  case TypeKind::Struct:
+  case TypeKind::Protocol:
+  case TypeKind::ProtocolComposition:
+  case TypeKind::BoundGenericEnum:
+  case TypeKind::BoundGenericStruct:
+  case TypeKind::GenericFunction:
+  case TypeKind::GenericTypeParam:
+  case TypeKind::DependentMember:
+    break;
+  }
+
+  // "Catch all" coercions.
+  auto desugaredToType = toType->getDesugaredType();
+  switch (desugaredToType->getKind()) {
   // Coercions from a type to an existential type.
-  if (toType->isAnyExistentialType()) {
+  case TypeKind::ExistentialMetatype:
+  case TypeKind::ProtocolComposition:
+  case TypeKind::Protocol:
     return coerceExistential(expr, toType, locator);
-  }
-
-  if (toType->getOptionalObjectType() &&
-      cs.getType(expr)->getOptionalObjectType()) {
-    return coerceOptionalToOptional(expr, toType, locator, typeFromPattern);
-  }
 
   // Coercion to Optional<T>.
-  if (auto toGenericType = toType->getAs<BoundGenericType>()) {
-    if (toGenericType->getDecl()->isOptionalDecl()) {
-      tc.requireOptionalIntrinsics(expr->getLoc());
+  case TypeKind::BoundGenericEnum: {
+    auto toGenericType = cast<BoundGenericEnumType>(desugaredToType);
+    if (!toGenericType->getDecl()->isOptionalDecl())
+      break;
+    tc.requireOptionalIntrinsics(expr->getLoc());
 
-      Type valueType = toGenericType->getGenericArgs()[0];
-      expr = coerceToType(expr, valueType, locator);
-      if (!expr) return nullptr;
+    if (cs.getType(expr)->getOptionalObjectType())
+      return coerceOptionalToOptional(expr, toType, locator, typeFromPattern);
 
-      auto *result =
-          cs.cacheType(new (tc.Context) InjectIntoOptionalExpr(expr, toType));
-      diagnoseOptionalInjection(result);
-      return result;
-    }
+    Type valueType = toGenericType->getGenericArgs()[0];
+    expr = coerceToType(expr, valueType, locator);
+    if (!expr) return nullptr;
+
+    auto *result =
+        cs.cacheType(new (tc.Context) InjectIntoOptionalExpr(expr, toType));
+    diagnoseOptionalInjection(result);
+    return result;
   }
 
-  // Coercion from one metatype to another.
-  if (fromType->is<MetatypeType>() &&
-      toType->is<MetatypeType>()) {
-    auto toMeta = toType->castTo<MetatypeType>();
-    return cs.cacheType(new (tc.Context) MetatypeConversionExpr(expr, toMeta));
+#define SUGARED_TYPE(Name, Parent) case TypeKind::Name:
+#define BUILTIN_TYPE(Name, Parent) case TypeKind::Name:
+#define UNCHECKED_TYPE(Name, Parent) case TypeKind::Name:
+#define ARTIFICIAL_TYPE(Name, Parent) case TypeKind::Name:
+#define TYPE(Name, Parent)
+#include "swift/AST/TypeNodes.def"
+  case TypeKind::Error:
+  case TypeKind::Module:
+  case TypeKind::Tuple:
+  case TypeKind::Enum:
+  case TypeKind::Struct:
+  case TypeKind::Class:
+  case TypeKind::BoundGenericClass:
+  case TypeKind::BoundGenericStruct:
+  case TypeKind::Metatype:
+  case TypeKind::DynamicSelf:
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::OpenedArchetype:
+  case TypeKind::NestedArchetype:
+  case TypeKind::GenericTypeParam:
+  case TypeKind::DependentMember:
+  case TypeKind::Function:
+  case TypeKind::GenericFunction:
+  case TypeKind::LValue:
+  case TypeKind::InOut:
+    break;
   }
 
   // Unresolved types come up in diagnostics for lvalue and inout types.
@@ -6688,12 +6713,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     return cs.cacheType(new (tc.Context)
                             UnresolvedTypeConversionExpr(expr, toType));
 
-  // Use an opaque type to abstract a value of the underlying concrete type.
-  if (toType->getAs<OpaqueTypeArchetypeType>()) {
-    return cs.cacheType(new (tc.Context)
-                        UnderlyingToOpaqueExpr(expr, toType));
-  }
-  
   llvm_unreachable("Unhandled coercion");
 }
 
@@ -6779,157 +6798,6 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr,
                                           /*isImplicit*/ true));
 }
 
-Expr *ExprRewriter::convertLiteral(Expr *literal,
-                                   Type type,
-                                   Type openedType,
-                                   ProtocolDecl *protocol,
-                                   TypeOrName literalType,
-                                   DeclName literalFuncName,
-                                   ProtocolDecl *builtinProtocol,
-                                   TypeOrName builtinLiteralType,
-                                   DeclName builtinLiteralFuncName,
-                                   bool (*isBuiltinArgType)(Type),
-                                   Diag<> brokenProtocolDiag,
-                                   Diag<> brokenBuiltinProtocolDiag) {
-  auto &tc = cs.getTypeChecker();
-
-  auto getType = [&](const Expr *E) -> Type {
-    return cs.getType(E);
-  };
-
-  auto setType = [&](Expr *E, Type Ty) {
-    cs.setType(E, Ty);
-  };
-
-  // If coercing a literal to an unresolved type, we don't try to look up the
-  // witness members, just do it.
-  if (type->is<UnresolvedType>()) {
-    // Instead of updating the literal expr in place, allocate a new node.  This
-    // avoids issues where Builtin types end up on expr nodes and pollute
-    // diagnostics.
-    literal = cast<LiteralExpr>(literal)->shallowClone(tc.Context, setType,
-                                                       getType);
-
-    // The literal expression has this type.
-    cs.setType(literal, type);
-    return literal;
-  }
-  
-  // Check whether this literal type conforms to the builtin protocol.
-  Optional<ProtocolConformanceRef> builtinConformance;
-  if (builtinProtocol &&
-      (builtinConformance =
-         tc.conformsToProtocol(
-                      type, builtinProtocol, cs.DC,
-                      (ConformanceCheckFlags::InExpression)))) {
-
-    // Find the builtin argument type we'll use.
-    Type argType;
-    if (builtinLiteralType.is<Type>())
-      argType = builtinLiteralType.get<Type>();
-    else
-      argType = tc.getWitnessType(type, builtinProtocol,
-                                  *builtinConformance,
-                                  builtinLiteralType.get<Identifier>(),
-                                  brokenBuiltinProtocolDiag);
-
-    if (!argType)
-      return nullptr;
-
-    // Make sure it's of an appropriate builtin type.
-    if (isBuiltinArgType && !isBuiltinArgType(argType)) {
-      tc.diagnose(builtinProtocol->getLoc(), brokenBuiltinProtocolDiag);
-      return nullptr;
-    }
-
-    // Instead of updating the literal expr in place, allocate a new node.  This
-    // avoids issues where Builtin types end up on expr nodes and pollute
-    // diagnostics.
-    literal = cast<LiteralExpr>(literal)->shallowClone(tc.Context, setType,
-                                                       getType);
-
-    // The literal expression has this type.
-    cs.setType(literal, argType);
-
-    // Call the builtin conversion operation.
-    // FIXME: Bogus location info.
-    Expr *base =
-      TypeExpr::createImplicitHack(literal->getLoc(), type, tc.Context);
-
-    cs.cacheExprTypes(base);
-    cs.setExprTypes(base);
-    cs.setExprTypes(literal);
-    SmallVector<Expr *, 1> arguments = { literal };
-
-    Expr *result = tc.callWitness(base, dc,
-                                  builtinProtocol, *builtinConformance,
-                                  builtinLiteralFuncName,
-                                  arguments,
-                                  brokenBuiltinProtocolDiag);
-    if (result)
-      cs.cacheExprTypes(result);
-
-    return result;
-  }
-
-  // This literal type must conform to the (non-builtin) protocol.
-  assert(protocol && "requirements should have stopped recursion");
-  auto conformance = tc.conformsToProtocol(type, protocol, cs.DC,
-                                           ConformanceCheckFlags::InExpression);
-  assert(conformance && "must conform to literal protocol");
-
-  // Figure out the (non-builtin) argument type if there is one.
-  Type argType;
-  if (literalType.is<Identifier>() &&
-      literalType.get<Identifier>().empty()) {
-    // If there is no argument to the constructor function, then just pass in
-    // the empty tuple.
-    literal =
-      cs.cacheType(
-          TupleExpr::createEmpty(tc.Context, literal->getLoc(),
-                                 literal->getLoc(),
-                                 /*implicit*/!literal->getLoc().isValid()));
-  } else {
-    // Otherwise, figure out the type of the constructor function and coerce to
-    // it.
-    if (literalType.is<Type>())
-      argType = literalType.get<Type>();
-    else
-      argType = tc.getWitnessType(type, protocol, *conformance,
-                                  literalType.get<Identifier>(),
-                                  brokenProtocolDiag);
-    if (!argType)
-      return nullptr;
-
-    // Convert the literal to the non-builtin argument type via the
-    // builtin protocol, first.
-    // FIXME: Do we need an opened type here?
-    literal = convertLiteral(literal, argType, argType, nullptr, Identifier(),
-                             Identifier(), builtinProtocol,
-                             builtinLiteralType, builtinLiteralFuncName,
-                             isBuiltinArgType, brokenProtocolDiag,
-                             brokenBuiltinProtocolDiag);
-    if (!literal)
-      return nullptr;
-  }
-
-  // Convert the resulting expression to the final literal type.
-  // FIXME: Bogus location info.
-  Expr *base = TypeExpr::createImplicitHack(literal->getLoc(), type,
-                                            tc.Context);
-  cs.cacheExprTypes(base);
-  cs.setExprTypes(base);
-  cs.setExprTypes(literal);
-
-  literal = tc.callWitness(base, dc,
-                           protocol, *conformance, literalFuncName,
-                           literal, brokenProtocolDiag);
-  if (literal)
-    cs.cacheExprTypes(literal);
-
-  return literal;
-}
-
 Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
                                           Type type,
                                           ProtocolDecl *protocol,
@@ -6987,6 +6855,8 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
       stringLiteral->setBuiltinInitializer(witness);
     else if (auto booleanLiteral = dyn_cast<BooleanLiteralExpr>(literal))
       booleanLiteral->setBuiltinInitializer(witness);
+    else if (auto numberLiteral = dyn_cast<NumberLiteralExpr>(literal))
+      numberLiteral->setBuiltinInitializer(witness);
     else {
       cast<MagicIdentifierLiteralExpr>(literal)
         ->setBuiltinInitializer(witness);
@@ -7036,6 +6906,8 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
     stringLiteral->setInitializer(witness);
   else if (auto booleanLiteral = dyn_cast<BooleanLiteralExpr>(literal))
     booleanLiteral->setInitializer(witness);
+  else if (auto numberLiteral = dyn_cast<NumberLiteralExpr>(literal))
+    numberLiteral->setInitializer(witness);
   else
     cast<MagicIdentifierLiteralExpr>(literal)->setInitializer(witness);
 
@@ -7548,9 +7420,13 @@ bool swift::exprNeedsParensOutsideFollowingOperator(
   Expr *parent;
   unsigned index;
   std::tie(parent, index) = getPrecedenceParentAndIndex(expr, rootExpr);
-  if (!parent || isa<TupleExpr>(parent) || isa<ParenExpr>(parent)) {
+  if (!parent || isa<TupleExpr>(parent)) {
     return false;
   }
+
+  if (auto parenExp = dyn_cast<ParenExpr>(parent))
+    if (!parenExp->isImplicit())
+      return false;
 
   if (parent->isInfixOperator()) {
     auto parentPG = TC.lookupPrecedenceGroupForInfixOperator(DC, parent);
@@ -8019,6 +7895,12 @@ Expr *Solution::convertOptionalToBool(Expr *expr,
   // Match the optional value against its `Some` case.
   auto &ctx = tc.Context;
   auto isSomeExpr = new (ctx) EnumIsCaseExpr(expr, ctx.getOptionalSomeDecl());
-  cs.setType(isSomeExpr, tc.lookupBoolType(cs.DC));
+  auto boolDecl = ctx.getBoolDecl();
+
+  if (!boolDecl) {
+    tc.diagnose(SourceLoc(), diag::broken_bool);
+  }
+
+  cs.setType(isSomeExpr, boolDecl ? boolDecl->getDeclaredType() : Type());
   return isSomeExpr;
 }

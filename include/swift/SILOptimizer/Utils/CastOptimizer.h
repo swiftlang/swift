@@ -1,4 +1,4 @@
-//===--- CastOptimizer.h --------------------------------------------------===//
+//===--- CastOptimizer.h ----------------------------------*- C++ -*-------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -30,6 +30,7 @@
 namespace swift {
 
 class SILOptFunctionBuilder;
+struct SILDynamicCastInst;
 
 /// This is a helper class used to optimize casts.
 class CastOptimizer {
@@ -61,24 +62,6 @@ class CastOptimizer {
   /// Callback to call after an optimization was performed based on the fact
   /// that a cast will fail.
   std::function<void()> WillFailAction;
-
-  /// Optimize a cast from a bridged ObjC type into
-  /// a corresponding Swift type implementing _ObjectiveCBridgeable.
-  SILInstruction *optimizeBridgedObjCToSwiftCast(
-      SILInstruction *Inst, bool isConditional, SILValue Src, SILValue Dest,
-      CanType Source, CanType Target, Type BridgedSourceTy,
-      Type BridgedTargetTy, SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB);
-
-  /// Optimize a cast from a Swift type implementing _ObjectiveCBridgeable
-  /// into a bridged ObjC type.
-  SILInstruction *optimizeBridgedSwiftToObjCCast(
-      SILInstruction *Inst, CastConsumptionKind ConsumptionKind,
-      bool isConditional, SILValue Src, SILValue Dest, CanType Source,
-      CanType Target, Type BridgedSourceTy, Type BridgedTargetTy,
-      SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB);
-
-  void deleteInstructionsAfterUnreachable(SILInstruction *UnreachableInst,
-                                          SILInstruction *TrapInst);
 
 public:
   CastOptimizer(SILOptFunctionBuilder &FunctionBuilder,
@@ -144,13 +127,22 @@ public:
       UnconditionalCheckedCastAddrInst *Inst);
 
   /// Check if it is a bridged cast and optimize it.
+  ///
   /// May change the control flow.
-  SILInstruction *optimizeBridgedCasts(SILInstruction *Inst,
-                                       CastConsumptionKind ConsumptionKind,
-                                       bool isConditional, SILValue Src,
-                                       SILValue Dest, CanType Source,
-                                       CanType Target, SILBasicBlock *SuccessBB,
-                                       SILBasicBlock *FailureBB);
+  SILInstruction *optimizeBridgedCasts(SILDynamicCastInst cast);
+
+  /// Optimize a cast from a bridged ObjC type into
+  /// a corresponding Swift type implementing _ObjectiveCBridgeable.
+  SILInstruction *
+  optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast);
+
+  /// Optimize a cast from a Swift type implementing _ObjectiveCBridgeable
+  /// into a bridged ObjC type.
+  SILInstruction *
+  optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast);
+
+  void deleteInstructionsAfterUnreachable(SILInstruction *UnreachableInst,
+                                          SILInstruction *TrapInst);
 
   SILValue optimizeMetatypeConversion(ConversionInst *mci,
                                       MetatypeRepresentation representation);

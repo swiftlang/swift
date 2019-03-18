@@ -1057,10 +1057,23 @@ static Type diagnoseUnknownType(TypeResolution resolution,
       NominalTypeDecl *nominal = nullptr;
       if ((nominalDC = dc->getInnermostTypeContext()) &&
           (nominal = nominalDC->getSelfNominalTypeDecl())) {
-        // Attempt to refer to 'Self' within a non-protocol nominal
-        // type. Fix this by replacing 'Self' with the nominal type name.
         assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
 
+        bool insideClass = nominalDC->getSelfClassDecl() != nullptr;
+        AbstractFunctionDecl *methodDecl = dc->getInnermostMethodContext();
+        bool declaringMethod = methodDecl &&
+          methodDecl->getDeclContext() == dc->getParentForLookup();
+
+        if (((!insideClass || !declaringMethod) &&
+             !options.is(TypeResolverContext::GenericRequirement)) ||
+            options.is(TypeResolverContext::ExplicitCastExpr)) {
+          Type SelfType = nominal->getSelfInterfaceType();
+          if (insideClass)
+            SelfType = DynamicSelfType::get(SelfType, ctx);
+          return resolution.mapTypeIntoContext(SelfType);
+        }
+
+        // Attempt to refer to 'Self' within a non-protocol nominal type.
         // Produce a Fix-It replacing 'Self' with the nominal type name.
         auto name = getDeclNameFromContext(dc, nominal);
         diags.diagnose(comp->getIdLoc(), diag::self_in_nominal, name)
@@ -1547,16 +1560,17 @@ static Type resolveIdentTypeComponent(
 static bool diagnoseAvailability(IdentTypeRepr *IdType,
                                  DeclContext *DC,
                                  bool AllowPotentiallyUnavailableProtocol) {
+  DeclAvailabilityFlags flags =
+    DeclAvailabilityFlag::ContinueOnPotentialUnavailability;
+  if (AllowPotentiallyUnavailableProtocol)
+    flags |= DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
   ASTContext &ctx = DC->getASTContext();
   auto componentRange = IdType->getComponentRange();
   for (auto comp : componentRange) {
     if (auto *typeDecl = comp->getBoundDecl()) {
       assert(ctx.getLazyResolver() && "Must have a type checker!");
       TypeChecker &tc = static_cast<TypeChecker &>(*ctx.getLazyResolver());
-      if (diagnoseDeclAvailability(typeDecl, tc, DC, comp->getIdLoc(),
-                                   AllowPotentiallyUnavailableProtocol,
-                                   /*SignalOnPotentialUnavailability*/false,
-                                   /*ForInout*/false)) {
+      if (diagnoseDeclAvailability(typeDecl, tc, DC, comp->getIdLoc(), flags)) {
         return true;
       }
     }
@@ -1919,24 +1933,6 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
 
   case TypeReprKind::Protocol:
     return resolveProtocolType(cast<ProtocolTypeRepr>(repr), options);
-      
-  case TypeReprKind::OpaqueReturn: {
-    // Only valid as the return type of a function, which should be handled
-    // during function decl type checking.
-    auto opaqueRepr = cast<OpaqueReturnTypeRepr>(repr);
-    if (!(options & TypeResolutionFlags::SilenceErrors)) {
-      diagnose(opaqueRepr->getOpaqueLoc(),
-               diag::unsupported_opaque_type);
-    }
-    
-    // Try to resolve the constraint upper bound type as a placeholder.
-    options |= TypeResolutionFlags::SilenceErrors;
-    auto constraintType = resolveType(opaqueRepr->getConstraint(),
-                                      options);
-    
-    return constraintType && !constraintType->hasError()
-      ? ErrorType::get(constraintType) : ErrorType::get(Context);
-  }
 
   case TypeReprKind::Fixed:
     return cast<FixedTypeRepr>(repr)->getType();
@@ -2048,7 +2044,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // Pass down the variable function type attributes to the
   // function-type creator.
   static const TypeAttrKind FunctionAttrs[] = {
-    TAK_convention, TAK_noreturn, TAK_pseudogeneric,
+    TAK_convention, TAK_pseudogeneric,
     TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape, TAK_autoclosure,
     TAK_escaping, TAK_yield_once, TAK_yield_many
   };
@@ -2180,17 +2176,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                          : diag::attr_only_on_parameters,
                  "@autoclosure");
         attrs.clearAttribute(TAK_autoclosure);
-      }
-
-      // @noreturn has been replaced with a 'Never' return type.
-      if (attrs.has(TAK_noreturn)) {
-        auto loc = attrs.getLoc(TAK_noreturn);
-        auto attrRange = getTypeAttrRangeWithAt(Context, loc);
-        auto resultRange = fnRepr->getResultTypeRepr()->getSourceRange();
-
-        diagnose(loc, diag::noreturn_not_supported)
-            .fixItRemove(attrRange)
-            .fixItReplace(resultRange, "Never");
       }
 
       // Resolve the function type directly with these attributes.
@@ -3073,14 +3058,19 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     complained = true;
   }
 
+  bool hadError = false;
   for (unsigned i = 0, end = repr->getNumElements(); i != end; ++i) {
     auto *tyR = repr->getElementType(i);
 
     Type ty = resolveType(tyR, elementOptions);
-    if (!ty || ty->hasError()) return ty;
+    if (!ty || ty->hasError())
+      hadError = true;
 
     elements.emplace_back(ty, repr->getElementName(i), ParameterTypeFlags());
   }
+
+  if (hadError)
+    return ErrorType::get(Context);
 
   // Single-element labeled tuples are not permitted outside of declarations
   // or SIL, either.
@@ -3345,10 +3335,6 @@ public:
       visit(compound->getComponentRange().back());
       return false;
     }
-    // Arbitrary protocol constraints are OK on opaque types.
-    if (isa<OpaqueReturnTypeRepr>(T))
-      return false;
-    
     visit(T);
     return true;
   }

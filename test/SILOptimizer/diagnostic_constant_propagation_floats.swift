@@ -214,10 +214,7 @@ func testIntToFloatConversion() {
   let d1: Double = 9_007_199_254_740_992 // This value is 2^53
   _blackHole(d1)
 
-  // FIXME: False Negative: no warning is produced here since we do not
-  // distinguish between implicit Double conversion that are within the
-  // context of an explicit conversion from others.
-  let d2: Double = 9_007_199_254_740_993
+  let d2: Double = 9_007_199_254_740_993 // expected-warning {{'9007199254740993' is not exactly representable as 'Double'; it becomes '9007199254740992'}}
   _blackHole(d2)
 
    // No warnings are emitted for conversion through explicit constructor calls.

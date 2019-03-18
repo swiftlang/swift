@@ -358,6 +358,32 @@ WARNING(warning_int_to_fp_inexact, none,
   "'%1' is not exactly representable as %0; it becomes '%2'",
   (Type, StringRef, StringRef))
 
+
+// Yield usage errors
+ERROR(return_before_yield, none, "accessor must yield before returning",())
+
+ERROR(multiple_yields, none, "accessor must not yield more than once", ())
+
+NOTE(previous_yield, none, "previous yield was here", ())
+
+ERROR(possible_return_before_yield, none,
+      "accessor must yield on all paths before returning", ())
+
+NOTE(branch_doesnt_yield, none,
+     "missing yield when the condition is %select{false|true}0", (bool))
+
+NOTE(named_case_doesnt_yield, none, "missing yield in the %0 case",
+    (Identifier))
+
+NOTE(case_doesnt_yield, none, "missing yield in "
+     "%select{this|the nil|the non-nil}0 case", (unsigned))
+
+NOTE(switch_value_case_doesnt_yield, none, "missing yield in the %0 case",
+    (StringRef))
+
+NOTE(try_branch_doesnt_yield, none, "missing yield when error is "
+     "%select{not |}0thrown", (bool))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

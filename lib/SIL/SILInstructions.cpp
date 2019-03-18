@@ -467,7 +467,7 @@ BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
     auto convention = SILArgumentConvention(yield.getConvention());
     resultTypes.push_back(yieldType);
     resultOwnerships.push_back(
-      ValueOwnershipKind(F.getModule(), yieldType, convention));
+      ValueOwnershipKind(F, yieldType, convention));
   }
 
   resultTypes.push_back(SILType::getSILTokenType(F.getASTContext()));
@@ -812,8 +812,11 @@ StringRef swift::getSILAccessEnforcementName(SILAccessEnforcement enforcement) {
   llvm_unreachable("bad access enforcement");
 }
 
-AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest)
-    : InstructionBase(Loc), Operands(this, Src, Dest) {}
+AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest,
+                       AssignOwnershipQualifier Qualifier)
+    : InstructionBase(Loc), Operands(this, Src, Dest) {
+  SILInstruction::Bits.AssignInst.OwnershipQualifier = unsigned(Qualifier);
+}
 
 MarkFunctionEscapeInst *
 MarkFunctionEscapeInst::create(SILDebugLocation Loc,
@@ -896,15 +899,15 @@ TupleInst *TupleInst::create(SILDebugLocation Loc, SILType Ty,
 }
 
 bool TupleExtractInst::isTrivialEltOfOneRCIDTuple() const {
-  SILModule &Mod = getModule();
+  auto *F = getFunction();
 
   // If we are not trivial, bail.
-  if (!getType().isTrivial(Mod))
+  if (!getType().isTrivial(*F))
     return false;
 
   // If the elt we are extracting is trivial, we cannot have any non trivial
   // fields.
-  if (getOperand()->getType().isTrivial(Mod))
+  if (getOperand()->getType().isTrivial(*F))
     return false;
 
   // Ok, now we know that our tuple has non-trivial fields. Make sure that our
@@ -921,7 +924,7 @@ bool TupleExtractInst::isTrivialEltOfOneRCIDTuple() const {
 
     // Otherwise check if we have a non-trivial type. If we don't have one,
     // continue.
-    if (OpTy.getTupleElementType(i).isTrivial(Mod))
+    if (OpTy.getTupleElementType(i).isTrivial(*F))
       continue;
 
     // Ok, this type is non-trivial. If we have not seen a non-trivial field
@@ -943,11 +946,11 @@ bool TupleExtractInst::isTrivialEltOfOneRCIDTuple() const {
 }
 
 bool TupleExtractInst::isEltOnlyNonTrivialElt() const {
-  SILModule &Mod = getModule();
+  auto *F = getFunction();
 
   // If the elt we are extracting is trivial, we cannot be a non-trivial
   // field... return false.
-  if (getType().isTrivial(Mod))
+  if (getType().isTrivial(*F))
     return false;
 
   // Ok, we know that the elt we are extracting is non-trivial. Make sure that
@@ -963,7 +966,7 @@ bool TupleExtractInst::isEltOnlyNonTrivialElt() const {
 
     // Otherwise check if we have a non-trivial type. If we don't have one,
     // continue.
-    if (OpTy.getTupleElementType(i).isTrivial(Mod))
+    if (OpTy.getTupleElementType(i).isTrivial(*F))
       continue;
 
     // If we do have a non-trivial type, return false. We have multiple
@@ -977,17 +980,17 @@ bool TupleExtractInst::isEltOnlyNonTrivialElt() const {
 }
 
 bool StructExtractInst::isTrivialFieldOfOneRCIDStruct() const {
-  SILModule &Mod = getModule();
+  auto *F = getFunction();
 
   // If we are not trivial, bail.
-  if (!getType().isTrivial(Mod))
+  if (!getType().isTrivial(*F))
     return false;
 
   SILType StructTy = getOperand()->getType();
 
   // If the elt we are extracting is trivial, we cannot have any non trivial
   // fields.
-  if (StructTy.isTrivial(Mod))
+  if (StructTy.isTrivial(*F))
     return false;
 
   // Ok, now we know that our tuple has non-trivial fields. Make sure that our
@@ -1002,7 +1005,7 @@ bool StructExtractInst::isTrivialFieldOfOneRCIDStruct() const {
 
     // Otherwise check if we have a non-trivial type. If we don't have one,
     // continue.
-    if (StructTy.getFieldType(D, Mod).isTrivial(Mod))
+    if (StructTy.getFieldType(D, F->getModule()).isTrivial(*F))
       continue;
 
     // Ok, this type is non-trivial. If we have not seen a non-trivial field
@@ -1027,11 +1030,11 @@ bool StructExtractInst::isTrivialFieldOfOneRCIDStruct() const {
 /// struct. This implies that a ref count operation on the aggregate is
 /// equivalent to a ref count operation on this field.
 bool StructExtractInst::isFieldOnlyNonTrivialField() const {
-  SILModule &Mod = getModule();
+  auto *F = getFunction();
 
   // If the field we are extracting is trivial, we cannot be a non-trivial
   // field... return false.
-  if (getType().isTrivial(Mod))
+  if (getType().isTrivial(*F))
     return false;
 
   SILType StructTy = getOperand()->getType();
@@ -1045,7 +1048,7 @@ bool StructExtractInst::isFieldOnlyNonTrivialField() const {
     // Ok, we have a field that is not equal to the field we are
     // extracting. If that field is trivial, we do not care about
     // it... continue.
-    if (StructTy.getFieldType(D, Mod).isTrivial(Mod))
+    if (StructTy.getFieldType(D, F->getModule()).isTrivial(*F))
       continue;
 
     // We have found a non trivial member that is not the member we are
@@ -2035,6 +2038,7 @@ bool KeyPathPatternComponent::isComputedSettablePropertyMutating() const {
   case Kind::OptionalChain:
   case Kind::OptionalWrap:
   case Kind::OptionalForce:
+  case Kind::TupleElement:
     llvm_unreachable("not a settable computed property");
   case Kind::SettableProperty: {
     auto setter = getComputedPropertySetter();
@@ -2053,6 +2057,7 @@ forEachRefcountableReference(const KeyPathPatternComponent &component,
   case KeyPathPatternComponent::Kind::OptionalChain:
   case KeyPathPatternComponent::Kind::OptionalWrap:
   case KeyPathPatternComponent::Kind::OptionalForce:
+  case KeyPathPatternComponent::Kind::TupleElement:
     return;
   case KeyPathPatternComponent::Kind::SettableProperty:
     forFunction(component.getComputedPropertySetter());
@@ -2109,6 +2114,7 @@ KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
     case KeyPathPatternComponent::Kind::OptionalChain:
     case KeyPathPatternComponent::Kind::OptionalWrap:
     case KeyPathPatternComponent::Kind::OptionalForce:
+    case KeyPathPatternComponent::Kind::TupleElement:
       break;
     
     case KeyPathPatternComponent::Kind::GettableProperty:
@@ -2119,14 +2125,6 @@ KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
     }
   }
   
-  // TODO: support resilient opaque types
-  rootType = rootType
-    .substOpaqueTypesWithUnderlyingTypes()
-    ->getCanonicalType();
-  valueType = valueType
-    .substOpaqueTypesWithUnderlyingTypes()
-    ->getCanonicalType();
-
   auto newPattern = KeyPathPattern::create(M, signature, rootType, valueType,
                                            components, objcString,
                                            maxOperandNo + 1);
@@ -2196,7 +2194,11 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
     case KeyPathPatternComponent::Kind::StoredProperty:
       ID.AddPointer(component.getStoredPropertyDecl());
       break;
-            
+    
+    case KeyPathPatternComponent::Kind::TupleElement:
+      ID.AddInteger(component.getTupleIndex());
+      break;
+    
     case KeyPathPatternComponent::Kind::SettableProperty:
       ID.AddPointer(component.getComputedPropertySetter());
       LLVM_FALLTHROUGH;
@@ -2342,8 +2344,10 @@ GenericSpecializationInformation::create(SILInstruction *Inst, SILBuilder &B) {
 }
 
 static void computeAggregateFirstLevelSubtypeInfo(
-    SILModule &M, SILValue Operand, llvm::SmallVectorImpl<SILType> &Types,
+    const SILFunction &F, SILValue Operand,
+    llvm::SmallVectorImpl<SILType> &Types,
     llvm::SmallVectorImpl<ValueOwnershipKind> &OwnershipKinds) {
+  auto &M = F.getModule();
   SILType OpType = Operand->getType();
 
   // TODO: Create an iterator for accessing first level projections to eliminate
@@ -2356,19 +2360,21 @@ static void computeAggregateFirstLevelSubtypeInfo(
     SILType ProjType = P.getType(OpType, M);
     Types.emplace_back(ProjType);
     OwnershipKinds.emplace_back(
-        OpOwnershipKind.getProjectedOwnershipKind(M, ProjType));
+        OpOwnershipKind.getProjectedOwnershipKind(F, ProjType));
   }
 }
 
-DestructureStructInst *DestructureStructInst::create(SILModule &M,
+DestructureStructInst *DestructureStructInst::create(const SILFunction &F,
                                                      SILDebugLocation Loc,
                                                      SILValue Operand) {
+  auto &M = F.getModule();
+
   assert(Operand->getType().getStructOrBoundGenericStruct() &&
          "Expected a struct typed operand?!");
 
   llvm::SmallVector<SILType, 8> Types;
   llvm::SmallVector<ValueOwnershipKind, 8> OwnershipKinds;
-  computeAggregateFirstLevelSubtypeInfo(M, Operand, Types, OwnershipKinds);
+  computeAggregateFirstLevelSubtypeInfo(F, Operand, Types, OwnershipKinds);
   assert(Types.size() == OwnershipKinds.size() &&
          "Expected same number of Types and OwnerKinds");
 
@@ -2383,15 +2389,17 @@ DestructureStructInst *DestructureStructInst::create(SILModule &M,
       DestructureStructInst(M, Loc, Operand, Types, OwnershipKinds);
 }
 
-DestructureTupleInst *DestructureTupleInst::create(SILModule &M,
+DestructureTupleInst *DestructureTupleInst::create(const SILFunction &F,
                                                    SILDebugLocation Loc,
                                                    SILValue Operand) {
+  auto &M = F.getModule();
+
   assert(Operand->getType().is<TupleType>() &&
          "Expected a tuple typed operand?!");
 
   llvm::SmallVector<SILType, 8> Types;
   llvm::SmallVector<ValueOwnershipKind, 8> OwnershipKinds;
-  computeAggregateFirstLevelSubtypeInfo(M, Operand, Types, OwnershipKinds);
+  computeAggregateFirstLevelSubtypeInfo(F, Operand, Types, OwnershipKinds);
   assert(Types.size() == OwnershipKinds.size() &&
          "Expected same number of Types and OwnerKinds");
 

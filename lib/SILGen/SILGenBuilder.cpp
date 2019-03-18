@@ -90,60 +90,10 @@ MetatypeInst *SILGenBuilder::createMetatype(SILLocation loc, SILType metatype) {
   return SILBuilder::createMetatype(loc, metatype);
 }
 
-/// Look through fragile opaque types to get the underlying type and
-/// conformances.
-static void lookThroughOpaqueTypes(CanType &concreteType) {
-  concreteType = concreteType
-    .substOpaqueTypesWithUnderlyingTypes()
-    ->getCanonicalType();
-}
-
-static void lookThroughOpaqueTypes(CanType &concreteType,
-                                   ProtocolConformanceRef &conformance) {
-  auto underlyingConcreteType = concreteType
-    .substOpaqueTypesWithUnderlyingTypes()
-    ->getCanonicalType();
-  
-  if (underlyingConcreteType == concreteType)
-    return;
-  
-  conformance = conformance.substOpaqueTypesWithUnderlyingTypes(concreteType);
-  concreteType = underlyingConcreteType;
-}
-
-static void lookThroughOpaqueTypes(CanType &concreteType,
-                               ArrayRef<ProtocolConformanceRef> &conformances) {
-  auto underlyingConcreteType = concreteType
-    .substOpaqueTypesWithUnderlyingTypes()
-    ->getCanonicalType();
-  
-  if (underlyingConcreteType == concreteType)
-    return;
-  
-  SmallVector<ProtocolConformanceRef, 4> underlyingConformances;
-  bool didChangeConformances = false;
-  for (auto conformance : conformances) {
-    auto underlyingConformance = conformance
-      .substOpaqueTypesWithUnderlyingTypes(concreteType);
-    didChangeConformances |= underlyingConformance != conformance;
-    underlyingConformances.push_back(underlyingConformance);
-  }
-  
-  concreteType = underlyingConcreteType;
-  if (didChangeConformances)
-    conformances = concreteType->getASTContext()
-      .AllocateCopy(underlyingConformances);
-}
-
-static void lookThroughOpaqueTypes(SubstitutionMap &subs) {
-  subs = subs.substOpaqueTypesWithUnderlyingTypes();
-}
-
 ApplyInst *SILGenBuilder::createApply(SILLocation loc, SILValue fn,
                                       SILType substFnTy, SILType result,
                                       SubstitutionMap subs,
                                       ArrayRef<SILValue> args) {
-  lookThroughOpaqueTypes(subs);
   getSILGenModule().useConformancesFromSubstitutions(subs);
   return SILBuilder::createApply(loc, fn, subs, args, false);
 }
@@ -152,7 +102,6 @@ TryApplyInst *
 SILGenBuilder::createTryApply(SILLocation loc, SILValue fn, SILType substFnTy,
                               SubstitutionMap subs, ArrayRef<SILValue> args,
                               SILBasicBlock *normalBB, SILBasicBlock *errorBB) {
-  lookThroughOpaqueTypes(subs);
   getSILGenModule().useConformancesFromSubstitutions(subs);
   return SILBuilder::createTryApply(loc, fn, subs, args, normalBB, errorBB);
 }
@@ -161,7 +110,6 @@ BeginApplyInst *
 SILGenBuilder::createBeginApply(SILLocation loc, SILValue fn,
                                 SubstitutionMap subs,
                                 ArrayRef<SILValue> args) {
-  lookThroughOpaqueTypes(subs);
   getSILGenModule().useConformancesFromSubstitutions(subs);
   return SILBuilder::createBeginApply(loc, fn, subs, args, false);
 }
@@ -170,7 +118,6 @@ PartialApplyInst *
 SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
                                   SILType substFnTy, SubstitutionMap subs,
                                   ArrayRef<SILValue> args, SILType closureTy) {
-  lookThroughOpaqueTypes(subs);
   getSILGenModule().useConformancesFromSubstitutions(subs);
   return SILBuilder::createPartialApply(
       loc, fn, subs, args,
@@ -182,7 +129,6 @@ BuiltinInst *SILGenBuilder::createBuiltin(SILLocation loc, Identifier name,
                                           SILType resultTy,
                                           SubstitutionMap subs,
                                           ArrayRef<SILValue> args) {
-  lookThroughOpaqueTypes(subs);
   getSILGenModule().useConformancesFromSubstitutions(subs);
   return SILBuilder::createBuiltin(loc, name, resultTy, subs, args);
 }
@@ -191,9 +137,9 @@ InitExistentialAddrInst *SILGenBuilder::createInitExistentialAddr(
     SILLocation loc, SILValue existential, CanType formalConcreteType,
     SILType loweredConcreteType,
     ArrayRef<ProtocolConformanceRef> conformances) {
-  lookThroughOpaqueTypes(formalConcreteType, conformances);
   for (auto conformance : conformances)
     getSILGenModule().useConformance(conformance);
+
   return SILBuilder::createInitExistentialAddr(
       loc, existential, formalConcreteType, loweredConcreteType, conformances);
 }
@@ -201,7 +147,6 @@ InitExistentialAddrInst *SILGenBuilder::createInitExistentialAddr(
 InitExistentialValueInst *SILGenBuilder::createInitExistentialValue(
     SILLocation Loc, SILType ExistentialType, CanType FormalConcreteType,
     SILValue Concrete, ArrayRef<ProtocolConformanceRef> Conformances) {
-  lookThroughOpaqueTypes(FormalConcreteType, Conformances);
   for (auto conformance : Conformances)
     getSILGenModule().useConformance(conformance);
 
@@ -211,9 +156,7 @@ InitExistentialValueInst *SILGenBuilder::createInitExistentialValue(
 
 InitExistentialMetatypeInst *SILGenBuilder::createInitExistentialMetatype(
     SILLocation loc, SILValue metatype, SILType existentialType,
-    CanType formalConcreteInstanceType,
     ArrayRef<ProtocolConformanceRef> conformances) {
-  lookThroughOpaqueTypes(formalConcreteInstanceType, conformances);
   for (auto conformance : conformances)
     getSILGenModule().useConformance(conformance);
 
@@ -224,7 +167,6 @@ InitExistentialMetatypeInst *SILGenBuilder::createInitExistentialMetatype(
 InitExistentialRefInst *SILGenBuilder::createInitExistentialRef(
     SILLocation loc, SILType existentialType, CanType formalConcreteType,
     SILValue concreteValue, ArrayRef<ProtocolConformanceRef> conformances) {
-  lookThroughOpaqueTypes(formalConcreteType, conformances);
   for (auto conformance : conformances)
     getSILGenModule().useConformance(conformance);
 
@@ -235,78 +177,11 @@ InitExistentialRefInst *SILGenBuilder::createInitExistentialRef(
 AllocExistentialBoxInst *SILGenBuilder::createAllocExistentialBox(
     SILLocation loc, SILType existentialType, CanType concreteType,
     ArrayRef<ProtocolConformanceRef> conformances) {
-  lookThroughOpaqueTypes(concreteType, conformances);
   for (auto conformance : conformances)
     getSILGenModule().useConformance(conformance);
 
   return SILBuilder::createAllocExistentialBox(loc, existentialType,
-                                               concreteType,
-                                               conformances);
-}
-
-DeallocExistentialBoxInst *
-SILGenBuilder::createDeallocExistentialBox(SILLocation Loc,
-                                           CanType concreteType,
-                                           SILValue operand) {
-  lookThroughOpaqueTypes(concreteType);
-  return SILBuilder::createDeallocExistentialBox(Loc, concreteType, operand);
-}
-
-UncheckedRefCastAddrInst *
-SILGenBuilder::createUncheckedRefCastAddr(SILLocation Loc,
-                                          SILValue src, CanType sourceType,
-                                          SILValue dest, CanType targetType) {
-  lookThroughOpaqueTypes(sourceType);
-  lookThroughOpaqueTypes(targetType);
-  return SILBuilder::createUncheckedRefCastAddr(Loc, src, sourceType,
-                                                dest, targetType);
-}
-
-UnconditionalCheckedCastAddrInst *
-SILGenBuilder::createUnconditionalCheckedCastAddr(SILLocation Loc, SILValue src,
-                                              CanType sourceType, SILValue dest,
-                                              CanType targetType) {
-  lookThroughOpaqueTypes(sourceType);
-  lookThroughOpaqueTypes(targetType);
-  return SILBuilder::createUnconditionalCheckedCastAddr(Loc, src, sourceType,
-                                                        dest, targetType);
-}
-
-WitnessMethodInst *
-SILGenBuilder::createWitnessMethod(SILLocation Loc, CanType LookupTy,
-                                   ProtocolConformanceRef Conformance,
-                                   SILDeclRef Member, SILType MethodTy) {
-  lookThroughOpaqueTypes(LookupTy, Conformance);
-  return SILBuilder::createWitnessMethod(Loc, LookupTy, Conformance, Member,
-                                         MethodTy);
-}
-
-SILType
-SILGenBuilder::getPartialApplyResultType(SILType Ty, unsigned ArgCount,
-                                         SILModule &M,
-                                         SubstitutionMap subs,
-                                         ParameterConvention calleeConvention) {
-  lookThroughOpaqueTypes(subs);
-  return SILBuilder::getPartialApplyResultType(Ty, ArgCount, M, subs,
-                                               calleeConvention);
-}
-
-KeyPathInst *
-SILGenBuilder::createKeyPath(SILLocation Loc,
-                             KeyPathPattern *Pattern,
-                             SubstitutionMap Subs,
-                             ArrayRef<SILValue> Args,
-                             SILType Ty) {
-  lookThroughOpaqueTypes(Subs);
-  return SILBuilder::createKeyPath(Loc, Pattern, Subs, Args, Ty);
-}
-InitBlockStorageHeaderInst *
-SILGenBuilder::createInitBlockStorageHeader(SILLocation Loc, SILValue BlockStorage,
-                                            SILValue InvokeFunction, SILType BlockType,
-                                            SubstitutionMap Subs) {
-  lookThroughOpaqueTypes(Subs);
-  return SILBuilder::createInitBlockStorageHeader(Loc, BlockStorage,
-                                               InvokeFunction, BlockType, Subs);
+                                               concreteType, conformances);
 }
 
 //===----------------------------------------------------------------------===//
@@ -366,8 +241,6 @@ ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(
 ManagedValue SILGenBuilder::createInitExistentialValue(
     SILLocation loc, SILType existentialType, CanType formalConcreteType,
     ManagedValue concrete, ArrayRef<ProtocolConformanceRef> conformances) {
-  lookThroughOpaqueTypes(formalConcreteType, conformances);
-
   // *NOTE* we purposely do not use a cleanup cloner here. The reason why is no
   // matter whether we have a trivial or non-trivial input,
   // init_existential_value returns a +1 value (the COW box).
@@ -380,8 +253,6 @@ ManagedValue SILGenBuilder::createInitExistentialValue(
 ManagedValue SILGenBuilder::createInitExistentialRef(
     SILLocation Loc, SILType ExistentialType, CanType FormalConcreteType,
     ManagedValue Concrete, ArrayRef<ProtocolConformanceRef> Conformances) {
-  lookThroughOpaqueTypes(FormalConcreteType, Conformances);
-
   CleanupCloner Cloner(*this, Concrete);
   InitExistentialRefInst *IERI =
       createInitExistentialRef(Loc, ExistentialType, FormalConcreteType,
@@ -936,9 +807,9 @@ ManagedValue SILGenBuilder::createOpenExistentialMetatype(SILLocation loc,
 ManagedValue SILGenBuilder::createStore(SILLocation loc, ManagedValue value,
                                         SILValue address,
                                         StoreOwnershipQualifier qualifier) {
-  SILModule &M = SGF.F.getModule();
   CleanupCloner cloner(*this, value);
-  if (value.getType().isTrivial(M) || value.getOwnershipKind() == ValueOwnershipKind::Any)
+  if (value.getType().isTrivial(SGF.F) ||
+      value.getOwnershipKind() == ValueOwnershipKind::Any)
     qualifier = StoreOwnershipQualifier::Trivial;
   createStore(loc, value.forward(SGF), address, qualifier);
   return cloner.clone(address);
@@ -1038,7 +909,7 @@ ManagedValue SILGenBuilder::createTuple(SILLocation loc, SILType type,
   // We need to look for the first non-trivial value and use that as our cleanup
   // cloner value.
   auto iter = find_if(elements, [&](ManagedValue mv) -> bool {
-    return !mv.getType().isTrivial(getModule());
+    return !mv.getType().isTrivial(getFunction());
   });
 
   llvm::SmallVector<SILValue, 8> forwardedValues;

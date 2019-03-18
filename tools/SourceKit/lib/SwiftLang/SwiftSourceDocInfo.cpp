@@ -16,6 +16,7 @@
 #include "SourceKit/Support/ImmutableTextBuffer.h"
 #include "SourceKit/Support/Logging.h"
 
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
@@ -1724,8 +1725,7 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
       }
 
       auto &context = CompIns.getASTContext();
-      std::string error;
-      Decl *D = ide::getDeclFromUSR(context, USR, error);
+      TypeDecl *D = Demangle::getTypeDeclForUSR(context, USR);
 
       if (!D) {
         Receiver(CursorInfoData());
@@ -1738,15 +1738,15 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
       if (auto *M = dyn_cast<ModuleDecl>(D)) {
         passCursorInfoForModule(M, Lang.getIFaceGenContexts(), CompInvok,
                                 Receiver);
-      } else if (auto *VD = dyn_cast<ValueDecl>(D)) {
-        auto *DC = VD->getDeclContext();
+      } else {
+        auto *DC = D->getDeclContext();
         Type selfTy;
         if (DC->isTypeContext()) {
           selfTy = DC->getSelfInterfaceType();
-          selfTy = VD->getInnermostDeclContext()->mapTypeIntoContext(selfTy);
+          selfTy = D->getInnermostDeclContext()->mapTypeIntoContext(selfTy);
         }
         bool Failed =
-            passCursorInfoForDecl(/*SourceFile*/nullptr, VD, MainModule, selfTy,
+            passCursorInfoForDecl(/*SourceFile*/nullptr, D, MainModule, selfTy,
                                   /*IsRef=*/false, false, ResolvedCursorInfo(),
                                   BufferID, SourceLoc(), {}, Lang, CompInvok,
                                   PreviousASTSnaps, Receiver);

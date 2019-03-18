@@ -624,7 +624,7 @@ bb0(%0 : $Int, %closure: $@callee_owned (@inout Int) -> (@out (), @error Error))
   // pass the array to the withUnsafeMutableBufferPointer closure.
   %21 = function_ref @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error Error), @inout Array<Int>) -> (@out (), @error Error)
   %22 = alloc_stack $()
-  %23 = apply [nothrow]%21(%22, %closure, %the_array) : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error Error), @inout Array<Int>) -> (@out (), @error Error)
+  %23 = apply [nothrow] %21(%22, %closure, %the_array) : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error Error), @inout Array<Int>) -> (@out (), @error Error)
   dealloc_stack %22 : $*()
 
   dealloc_stack %the_array: $*Array<Int>

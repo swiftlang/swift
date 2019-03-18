@@ -486,7 +486,6 @@ CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
   case DeclKind::MissingMember:
-  case DeclKind::OpaqueType:
     llvm_unreachable("not expecting such a declaration result");
   case DeclKind::Module:
     return CodeCompletionDeclKind::Module;
@@ -1251,6 +1250,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   Optional<StmtKind> ParentStmtKind;
 
   SmallVector<StringRef, 3> ParsedKeywords;
+  SourceLoc introducerLoc;
 
   std::vector<std::pair<std::string, bool>> SubModuleNameVisibilityPairs;
 
@@ -1292,9 +1292,14 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     // FIXME: if it's ErrorType but we've already typechecked we shouldn't
     // typecheck again. rdar://21466394
     if (CheckKind == CompletionTypeCheckKind::Normal &&
-        ParsedExpr->getType() && !ParsedExpr->getType()->is<ErrorType>())
-      return std::make_pair(ParsedExpr->getType(),
-                            ParsedExpr->getReferencedDecl());
+        ParsedExpr->getType() && !ParsedExpr->getType()->is<ErrorType>()) {
+      auto refDecl = ParsedExpr->getReferencedDecl();
+      if (!refDecl) {
+        if (auto apply = dyn_cast<ApplyExpr>(ParsedExpr))
+          refDecl = apply->getFn()->getReferencedDecl();
+      }
+      return std::make_pair(ParsedExpr->getType(), refDecl);
+    }
 
     prepareForRetypechecking(ParsedExpr);
 
@@ -1349,7 +1354,7 @@ public:
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
   void completeInPrecedenceGroup(SyntaxKind SK) override;
   void completeNominalMemberBeginning(
-      SmallVectorImpl<StringRef> &Keywords) override;
+      SmallVectorImpl<StringRef> &Keywords, SourceLoc introducerLoc) override;
   void completeAccessorBeginning() override;
 
   void completePoundAvailablePlatform() override;
@@ -1943,6 +1948,10 @@ public:
         if (!MaybeNominalType->mayHaveMembers())
           return T;
 
+        // We can't do anything if the base type has unbound generic parameters.
+        if (MaybeNominalType->hasUnboundGenericType())
+          return T;
+
         // For everything else, substitute in the base type.
         auto Subs = MaybeNominalType->getMemberSubstitutionMap(M, VD);
 
@@ -2023,27 +2032,6 @@ public:
       addTypeAnnotation(Builder, VarType);
   }
 
-  void addParameters(CodeCompletionResultBuilder &Builder,
-                     const ParameterList *params) {
-    bool NeedComma = false;
-    for (auto &param : *params) {
-      if (NeedComma)
-        Builder.addComma();
-      NeedComma = true;
-
-      Type type = param->getInterfaceType();
-      if (param->isVariadic())
-        type = ParamDecl::getVarargBaseTy(type);
-
-      auto isIUO =
-          param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-
-      Builder.addCallParameter(param->getArgumentName(), type,
-                               param->isVariadic(), /*Outermost*/ true,
-                               param->isInOut(), isIUO, param->isAutoClosure());
-    }
-  }
-
   static bool hasInterestingDefaultValues(const AbstractFunctionDecl *func) {
     if (!func) return false;
 
@@ -2059,58 +2047,39 @@ public:
     return false;
   }
 
-  // Returns true if any content was added to Builder.
-  bool addParamPatternFromFunction(CodeCompletionResultBuilder &Builder,
-                                   const AnyFunctionType *AFT,
-                                   const AbstractFunctionDecl *AFD,
-                                   bool includeDefaultArgs = true) {
-
-    const ParameterList *BodyParams = nullptr;
-    const ParamDecl *SelfDecl = nullptr;
-
-    if (AFD) {
-      BodyParams = AFD->getParameters();
-
-      // FIXME: Hack because we don't know which parameter list we're
-      // actually working with.
-      const unsigned expectedNumParams = AFT->getParams().size();
-      if (expectedNumParams != BodyParams->size()) {
-        BodyParams = nullptr;
-
-        // Adjust to the "self" list if that is present, otherwise give up.
-        if (expectedNumParams == 1 && AFD->getImplicitSelfDecl())
-          SelfDecl = AFD->getImplicitSelfDecl();
-        BodyParams = nullptr;
-      }
-    }
+  /// Build argument patterns for calling. Returns \c true if any content was
+  /// added to \p Builder. If \p declParams is non-empty, the size must match
+  /// with \p typeParams.
+  bool addCallArgumentPatterns(CodeCompletionResultBuilder &Builder,
+                               ArrayRef<AnyFunctionType::Param> typeParams,
+                               ArrayRef<const ParamDecl *> declParams,
+                               bool includeDefaultArgs = true) {
+    assert(declParams.empty() || typeParams.size() == declParams.size());
 
     bool modifiedBuilder = false;
 
     // Determine whether we should skip this argument because it is defaulted.
-    auto shouldSkipArg = [&](unsigned i) -> bool {
-      if (!BodyParams || i >= BodyParams->size())
+    auto shouldSkipArg = [&](const ParamDecl *PD) -> bool {
+      switch (PD->getDefaultArgumentKind()) {
+      case DefaultArgumentKind::None:
         return false;
 
-      switch (BodyParams->get(i)->getDefaultArgumentKind()) {
-        case DefaultArgumentKind::None:
-          return false;
+      case DefaultArgumentKind::Normal:
+      case DefaultArgumentKind::Inherited:
+      case DefaultArgumentKind::NilLiteral:
+      case DefaultArgumentKind::EmptyArray:
+      case DefaultArgumentKind::EmptyDictionary:
+        return !includeDefaultArgs;
 
-        case DefaultArgumentKind::Normal:
-        case DefaultArgumentKind::Inherited:
-        case DefaultArgumentKind::NilLiteral:
-        case DefaultArgumentKind::EmptyArray:
-        case DefaultArgumentKind::EmptyDictionary:
-          return !includeDefaultArgs;
-
-        case DefaultArgumentKind::File:
-        case DefaultArgumentKind::Line:
-        case DefaultArgumentKind::Column:
-        case DefaultArgumentKind::Function:
-        case DefaultArgumentKind::DSOHandle:
-          // Skip parameters that are defaulted to source location or other
-          // caller context information.  Users typically don't want to specify
-          // these parameters.
-          return true;
+      case DefaultArgumentKind::File:
+      case DefaultArgumentKind::Line:
+      case DefaultArgumentKind::Column:
+      case DefaultArgumentKind::Function:
+      case DefaultArgumentKind::DSOHandle:
+        // Skip parameters that are defaulted to source location or other
+        // caller context information.  Users typically don't want to specify
+        // these parameters.
+        return true;
       }
 
       llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
@@ -2118,38 +2087,55 @@ public:
 
     bool NeedComma = false;
     // Iterate over each parameter.
-    for (unsigned i = 0, e = AFT->getParams().size(); i != e; ++i) {
-      // If we should skip this argument, do so.
-      if (shouldSkipArg(i)) continue;
+    for (unsigned i = 0; i != typeParams.size(); ++i) {
+      auto &typeParam = typeParams[i];
 
-      const auto &Param = AFT->getParams()[i];
-      auto ParamType = Param.isVariadic()
-                     ? ParamDecl::getVarargBaseTy(Param.getPlainType())
-                     : Param.getPlainType();
+      Identifier argName;
+      Identifier bodyName;
+      bool isIUO = false;
+
+      if (!declParams.empty()) {
+        auto *PD = declParams[i];
+        if (shouldSkipArg(PD))
+          continue;
+        argName = PD->getArgumentName();
+        bodyName = PD->getParameterName();
+        isIUO = PD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+      } else {
+        isIUO = false;
+        argName = typeParam.getLabel();
+      }
+
+      bool isVariadic = typeParam.isVariadic();
+      bool isInOut = typeParam.isInOut();
+      bool isAutoclosure = typeParam.isAutoClosure();
+      Type paramTy = typeParam.getPlainType();
+      if (isVariadic)
+        paramTy = ParamDecl::getVarargBaseTy(paramTy);
 
       if (NeedComma)
         Builder.addComma();
-      if (BodyParams || SelfDecl) {
-        auto *PD = (BodyParams ? BodyParams->get(i) : SelfDecl);
 
-        // If we have a local name for the parameter, pass in that as well.
-        auto argName = PD->getArgumentName();
-        auto bodyName = PD->getName();
-        auto isIUO =
-            PD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-        Builder.addCallParameter(argName, bodyName, ParamType,
-                                 Param.isVariadic(), /*TopLevel*/ true,
-                                 Param.isInOut(), isIUO, Param.isAutoClosure());
-      } else {
-        Builder.addCallParameter(
-            Param.getLabel(), ParamType, Param.isVariadic(), /*TopLevel*/ true,
-            Param.isInOut(), /*isIUO*/ false, Param.isAutoClosure());
-      }
+      Builder.addCallParameter(argName, bodyName, paramTy, isVariadic, isInOut,
+                               isIUO, isAutoclosure);
+
       modifiedBuilder = true;
       NeedComma = true;
     }
-
     return modifiedBuilder;
+  }
+
+  /// Build argument patterns for calling. Returns \c true if any content was
+  /// added to \p Builder. If \p Params is non-nullptr, \F
+  bool addCallArgumentPatterns(CodeCompletionResultBuilder &Builder,
+                               const AnyFunctionType *AFT,
+                               const ParameterList *Params,
+                               bool includeDefaultArgs = true) {
+    ArrayRef<const ParamDecl *> declParams;
+    if (Params)
+      declParams = Params->getArray();
+    return addCallArgumentPatterns(Builder, AFT->getParams(), declParams,
+                                   includeDefaultArgs);
   }
 
   static void addThrows(CodeCompletionResultBuilder &Builder,
@@ -2221,13 +2207,10 @@ public:
 
   void addFunctionCallPattern(const AnyFunctionType *AFT,
                               const AbstractFunctionDecl *AFD = nullptr) {
-    if (AFD)
-      foundFunction(AFD);
-    else
-      foundFunction(AFT);
 
     // Add the pattern, possibly including any default arguments.
-    auto addPattern = [&](bool includeDefaultArgs = true) {
+    auto addPattern = [&](ArrayRef<const ParamDecl *> declParams = {},
+                          bool includeDefaultArgs = true) {
       // FIXME: to get the corect semantic context we need to know how lookup
       // would have found the declaration AFD. For now, just choose a reasonable
       // default, it's most likely to be CurrentModule or CurrentNominal.
@@ -2239,7 +2222,8 @@ public:
       else
         Builder.addAnnotatedLeftParen();
 
-      bool anyParam = addParamPatternFromFunction(Builder, AFT, AFD, includeDefaultArgs);
+      bool anyParam = addCallArgumentPatterns(Builder, AFT->getParams(),
+                                              declParams, includeDefaultArgs);
 
       if (HaveLParen && !anyParam) {
         // Empty result, don't add it.
@@ -2263,10 +2247,49 @@ public:
         addTypeAnnotation(Builder, AFT->getResult());
     };
 
-    if (hasInterestingDefaultValues(AFD))
-      addPattern(/*includeDefaultArgs*/ false);
-    addPattern();
+    if (!AFD || !AFD->hasInterfaceType() ||
+        !AFD->getInterfaceType()->is<AnyFunctionType>()) {
+      // Probably, calling closure type expression.
+      foundFunction(AFT);
+      addPattern();
+      return;
+    } else {
+      // Calling function or method.
+      foundFunction(AFD);
+
+      // FIXME: Hack because we don't know we are calling instance
+      // method or not. There's invariant that funcTy is derived from AFD.
+      // Only if we are calling instance method on meta type, AFT is still
+      // curried. So we should be able to detect that by comparing curried level
+      // of AFT and the interface type of AFD.
+      auto getCurriedLevel = [](const AnyFunctionType *funcTy) -> unsigned {
+        unsigned level = 0;
+        while ((funcTy = funcTy->getResult()->getAs<AnyFunctionType>()))
+          ++level;
+        return level;
+      };
+      bool isImplicitlyCurriedInstanceMethod =
+          (AFD->hasImplicitSelfDecl() &&
+           getCurriedLevel(AFT) ==
+               getCurriedLevel(
+                   AFD->getInterfaceType()->castTo<AnyFunctionType>()) &&
+           // NOTE: shouldn't be necessary, but just in case curried level check
+           // is insufficient.
+           AFT->getParams().size() == 1 &&
+           AFT->getParams()[0].getLabel().empty());
+
+      if (isImplicitlyCurriedInstanceMethod) {
+        addPattern({AFD->getImplicitSelfDecl()}, /*includeDefaultArgs=*/true);
+      } else {
+        if (hasInterestingDefaultValues(AFD))
+          addPattern(AFD->getParameters()->getArray(),
+                     /*includeDefaultArgs=*/false);
+        addPattern(AFD->getParameters()->getArray(),
+                   /*includeDefaultArgs=*/true);
+      }
+    }
   }
+  
   bool isImplicitlyCurriedInstanceMethod(const AbstractFunctionDecl *FD) {
     switch (Kind) {
     case LookupKind::ValueExpr:
@@ -2295,8 +2318,6 @@ public:
     if (FD->getName().empty())
       return;
     foundFunction(FD);
-    bool IsImplicitlyCurriedInstanceMethod =
-        isImplicitlyCurriedInstanceMethod(FD);
 
     StringRef Name = FD->getName().get();
     assert(!Name.empty() && "name should not be empty");
@@ -2304,27 +2325,20 @@ public:
     Type FunctionType = getTypeOfMember(FD);
     assert(FunctionType);
 
-    unsigned NumParamLists;
-    if (FD->hasImplicitSelfDecl()) {
-      if (IsImplicitlyCurriedInstanceMethod)
-        NumParamLists = 2;
-      else {
-        NumParamLists = 1;
+    auto AFT = FunctionType->getAs<AnyFunctionType>();
 
-        // Strip off 'self'
-        if (FunctionType->is<AnyFunctionType>())
-          FunctionType = FunctionType->castTo<AnyFunctionType>()->getResult();
-      }
-    } else {
-      NumParamLists = 1;
+    bool IsImplicitlyCurriedInstanceMethod = false;
+    if (FD->hasImplicitSelfDecl()) {
+      IsImplicitlyCurriedInstanceMethod = isImplicitlyCurriedInstanceMethod(FD);
+
+      // Strip off '(_ self: Self)' if needed.
+      if (AFT && !IsImplicitlyCurriedInstanceMethod)
+        AFT = AFT->getResult()->getAs<AnyFunctionType>();
     }
 
     bool trivialTrailingClosure = false;
-    if (!IsImplicitlyCurriedInstanceMethod &&
-        FunctionType->is<AnyFunctionType>()) {
-      trivialTrailingClosure = hasTrivialTrailingClosure(
-          FD, FunctionType->castTo<AnyFunctionType>());
-    }
+    if (AFT && !IsImplicitlyCurriedInstanceMethod)
+      trivialTrailingClosure = hasTrivialTrailingClosure(FD, AFT);
 
     // Add the method, possibly including any default arguments.
     auto addMethodImpl = [&](bool includeDefaultArgs = true,
@@ -2344,27 +2358,26 @@ public:
 
       llvm::SmallString<32> TypeStr;
 
-      if (!FunctionType->is<AnyFunctionType>()) {
+      if (!AFT) {
         llvm::raw_svector_ostream OS(TypeStr);
         FunctionType.print(OS);
         Builder.addTypeAnnotation(OS.str());
         return;
       }
 
-      auto AFT = FunctionType->castTo<AnyFunctionType>();
       if (IsImplicitlyCurriedInstanceMethod) {
         Builder.addLeftParen();
-        auto SelfParam = AFT->getParams()[0];
-        Builder.addCallParameter(Ctx.Id_self, SelfParam.getPlainType(),
-                                 /*IsVarArg*/ false, /*TopLevel*/ true,
-                                 SelfParam.isInOut(),
-                                 /*isIUO*/ false, /*isAutoClosure*/ false);
+        addCallArgumentPatterns(Builder, AFT->getParams(),
+                                {FD->getImplicitSelfDecl()},
+                                includeDefaultArgs);
         Builder.addRightParen();
       } else if (trivialTrailingClosure) {
         Builder.addBraceStmtWithCursor(" { code }");
+        addThrows(Builder, AFT, FD);
       } else {
         Builder.addLeftParen();
-        addParamPatternFromFunction(Builder, AFT, FD, includeDefaultArgs);
+        addCallArgumentPatterns(Builder, AFT, FD->getParameters(),
+                                includeDefaultArgs);
         Builder.addRightParen();
         addThrows(Builder, AFT, FD);
       }
@@ -2374,11 +2387,12 @@ public:
       // Build type annotation.
       {
         llvm::raw_svector_ostream OS(TypeStr);
-        for (unsigned i = 0; i < NumParamLists - 1; ++i) {
+        if (IsImplicitlyCurriedInstanceMethod) {
           ResultType->castTo<AnyFunctionType>()->printParams(OS);
           ResultType = ResultType->castTo<AnyFunctionType>()->getResult();
           OS << " -> ";
         }
+
         // What's left is the result type.
         if (ResultType->isVoid()) {
           OS << "Void";
@@ -2398,15 +2412,16 @@ public:
       Builder.addTypeAnnotation(TypeStr);
     };
 
-    if (FunctionType->is<AnyFunctionType>() &&
-        hasInterestingDefaultValues(FD)) {
-      addMethodImpl(/*includeDefaultArgs*/ false);
+    if (!AFT || IsImplicitlyCurriedInstanceMethod) {
+      addMethodImpl();
+    } else {
+      if (trivialTrailingClosure)
+        addMethodImpl(/*includeDefaultArgs=*/false,
+                      /*trivialTrailingClosure=*/true);
+      if (hasInterestingDefaultValues(FD))
+        addMethodImpl(/*includeDefaultArgs=*/false);
+      addMethodImpl(/*includeDefaultArgs=*/true);
     }
-    if (trivialTrailingClosure) {
-      addMethodImpl(/*includeDefaultArgs=*/false,
-                    /*trivialTrailingClosure=*/true);
-    }
-    addMethodImpl();
   }
 
   void addConstructorCall(const ConstructorDecl *CD, DeclVisibilityKind Reason,
@@ -2460,8 +2475,8 @@ public:
       else
         Builder.addAnnotatedLeftParen();
 
-      bool anyParam = addParamPatternFromFunction(Builder, ConstructorType, CD,
-                                  includeDefaultArgs);
+      bool anyParam = addCallArgumentPatterns(
+          Builder, ConstructorType, CD->getParameters(), includeDefaultArgs);
 
       if (HaveLParen && !anyParam) {
         // Empty result, don't add it.
@@ -2526,6 +2541,10 @@ public:
     if (HaveDot && !IsAfterSwiftKeyPathRoot)
       return;
 
+    auto subscriptType = getTypeOfMember(SD)->getAs<AnyFunctionType>();
+    if (!subscriptType)
+      return;
+
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
@@ -2544,17 +2563,17 @@ public:
     }
 
     Builder.addLeftBracket();
-    addParameters(Builder, SD->getIndices());
+    addCallArgumentPatterns(Builder, subscriptType, SD->getIndices(), true);
     Builder.addRightBracket();
 
     // Add a type annotation.
-    Type T = SD->getElementInterfaceType();
+    Type resultTy = subscriptType->getResult();
     if (IsDynamicLookup) {
       // Values of properties that were found on a AnyObject have
       // Optional<T> type.
-      T = OptionalType::get(T);
+      resultTy = OptionalType::get(resultTy);
     }
-    addTypeAnnotation(Builder, T);
+    addTypeAnnotation(Builder, resultTy);
   }
 
   void addNominalTypeRef(const NominalTypeDecl *NTD,
@@ -2661,24 +2680,26 @@ public:
     Builder.setAssociatedDecl(EED);
     setClangDeclKeywords(EED, Pairs, Builder);
     addLeadingDot(Builder);
+
     Builder.addTextChunk(EED->getName().str());
-    if (auto *params = EED->getParameterList()) {
+
+    // Enum element is of function type; (Self.type) -> Self or
+    // (Self.Type) -> (Args...) -> Self.
+    Type EnumType = getTypeOfMember(EED);
+    if (EnumType->is<AnyFunctionType>())
+      EnumType = EnumType->castTo<AnyFunctionType>()->getResult();
+
+    if (EnumType->is<FunctionType>()) {
       Builder.addLeftParen();
-      addParameters(Builder, params);
+      addCallArgumentPatterns(Builder, EnumType->castTo<FunctionType>(),
+                              EED->getParameterList());
       Builder.addRightParen();
+
+      // Extract result as the enum type.
+      EnumType = EnumType->castTo<FunctionType>()->getResult();
     }
 
-    // Enum element is of function type such as EnumName.type -> Int ->
-    // EnumName; however we should show Int -> EnumName as the type
-    Type EnumType;
-    if (EED->hasInterfaceType()) {
-      EnumType = EED->getInterfaceType();
-      if (auto FuncType = EnumType->getAs<AnyFunctionType>()) {
-        EnumType = FuncType->getResult();
-      }
-    }
-    if (EnumType)
-      addTypeAnnotation(Builder, EnumType);
+    addTypeAnnotation(Builder, EnumType);
   }
 
   void addKeyword(StringRef Name, Type TypeAnnotation = Type(),
@@ -3043,6 +3064,29 @@ public:
     return false;
   }
 
+  void getPostfixKeywordCompletions(Type ExprType, Expr *ParsedExpr) {
+    if (!ExprType->getAs<ModuleType>()) {
+      addKeyword(getTokenText(tok::kw_self), ExprType->getRValueType(),
+                 SemanticContextKind::CurrentNominal,
+                 CodeCompletionKeywordKind::kw_self);
+    }
+
+    if (isa<TypeExpr>(ParsedExpr)) {
+      if (auto *T = ExprType->getAs<AnyMetatypeType>()) {
+        auto instanceTy = T->getInstanceType();
+        if (instanceTy->isAnyExistentialType()) {
+          addKeyword("Protocol", MetatypeType::get(instanceTy),
+                     SemanticContextKind::CurrentNominal);
+          addKeyword("Type", ExistentialMetatypeType::get(instanceTy),
+                     SemanticContextKind::CurrentNominal);
+        } else {
+          addKeyword("Type", MetatypeType::get(instanceTy),
+                     SemanticContextKind::CurrentNominal);
+        }
+      }
+    }
+  }
+
   void getValueExprCompletions(Type ExprType, ValueDecl *VD = nullptr) {
     Kind = LookupKind::ValueExpr;
     NeedLeadingDot = !HaveDot;
@@ -3190,9 +3234,8 @@ public:
     builder.addWhitespace(" ");
     assert(RHSType && resultType);
     builder.addCallParameter(Identifier(), Identifier(), RHSType,
-                             /*IsVarArg*/ false, /*TopLevel*/ true,
-                             /*IsInOut*/ false, /*isIUO*/ false,
-                             /*isAutoClosure*/ false);
+                             /*IsVarArg*/ false, /*IsInOut*/ false,
+                             /*isIUO*/ false, /*isAutoClosure*/ false);
     addTypeAnnotation(builder, resultType);
   }
 
@@ -3214,9 +3257,9 @@ public:
     builder.addTextChunk(op->getName().str());
     builder.addWhitespace(" ");
     if (RHSType)
-      builder.addCallParameter(Identifier(), Identifier(), RHSType, false, true,
-                               /*IsInOut*/ false, /*isIUO*/ false,
-                               /*isAutoClosure*/ false);
+      builder.addCallParameter(Identifier(), Identifier(), RHSType,
+                               /*IsVarArg*/ false, /*IsInOut*/ false,
+                               /*isIUO*/ false, /*isAutoClosure*/ false);
     if (resultType)
       addTypeAnnotation(builder, resultType);
   }
@@ -3259,18 +3302,18 @@ public:
     if (leadingSequence.empty())
       return LHS;
 
-    assert(leadingSequence.size() % 2 == 0);
-    SmallVector<Expr *, 3> sequence(leadingSequence.begin(),
-                                    leadingSequence.end());
-    sequence.push_back(LHS);
+    SourceRange sequenceRange(leadingSequence.front()->getStartLoc(),
+                              LHS->getEndLoc());
+    auto *expr = findParsedExpr(CurrDeclContext, sequenceRange);
+    if (!expr)
+      return LHS;
 
-    Expr *expr =
-        SequenceExpr::create(CurrDeclContext->getASTContext(), sequence);
-    prepareForRetypechecking(expr);
-    if (!typeCheckExpression(const_cast<DeclContext *>(CurrDeclContext),
-                             expr)) {
+    if (expr->getType() && !expr->getType()->hasError())
       return expr;
-    }
+
+    prepareForRetypechecking(expr);
+    if (!typeCheckExpression(const_cast<DeclContext *>(CurrDeclContext), expr))
+      return expr;
     return LHS;
   }
 
@@ -3401,21 +3444,21 @@ public:
     addFromProto(LK::ColorLiteral, "", [&](Builder &builder) {
       builder.addTextChunk("#colorLiteral");
       builder.addLeftParen();
-      builder.addCallParameter(context.getIdentifier("red"), floatType, false,
-                               true, /*IsInOut*/ false,
+      builder.addCallParameter(context.getIdentifier("red"), floatType,
+                               /*IsVarArg*/ false, /*IsInOut*/ false,
                                /*isIUO*/ false, /*isAutoClosure*/ false);
       builder.addComma();
-      builder.addCallParameter(context.getIdentifier("green"), floatType, false,
-                               true, /*IsInOut*/ false, /*isIUO*/ false,
-                               /*isAutoClosure*/ false);
+      builder.addCallParameter(context.getIdentifier("green"), floatType,
+                               /*IsVarArg*/ false, /*IsInOut*/ false,
+                               /*isIUO*/ false, /*isAutoClosure*/ false);
       builder.addComma();
-      builder.addCallParameter(context.getIdentifier("blue"), floatType, false,
-                               true, /*IsInOut*/ false, /*isIUO*/ false,
-                               /*isAutoClosure*/ false);
+      builder.addCallParameter(context.getIdentifier("blue"), floatType,
+                               /*IsVarArg*/ false, /*IsInOut*/ false,
+                               /*isIUO*/ false, /*isAutoClosure*/ false);
       builder.addComma();
-      builder.addCallParameter(context.getIdentifier("alpha"), floatType, false,
-                               true, /*IsInOut*/ false, /*isIUO*/ false,
-                               /*isAutoClosure*/ false);
+      builder.addCallParameter(context.getIdentifier("alpha"), floatType,
+                               /*IsVarArg*/ false, /*IsInOut*/ false,
+                               /*isIUO*/ false, /*isAutoClosure*/ false);
       builder.addRightParen();
     });
 
@@ -3424,8 +3467,9 @@ public:
       builder.addTextChunk("#imageLiteral");
       builder.addLeftParen();
       builder.addCallParameter(context.getIdentifier("resourceName"),
-                               stringType, false, true, /*IsInOut*/ false,
-                               /*isIUO*/ false, /*isAutoClosure*/ false);
+                               stringType, /*IsVarArg*/ false,
+                               /*IsInOut*/ false, /*isIUO*/ false,
+                               /*isAutoClosure*/ false);
       builder.addRightParen();
     });
 
@@ -3654,6 +3698,7 @@ public:
     auto Ty = Switch->getSubjectExpr()->getType();
     if (!Ty)
       return;
+    ExprType = Ty;
     auto *TheEnumDecl = dyn_cast_or_null<EnumDecl>(Ty->getAnyNominal());
     if (!TheEnumDecl)
       return;
@@ -3666,11 +3711,15 @@ public:
     Kind = LookupKind::Type;
     this->BaseType = BaseType;
     NeedLeadingDot = !HaveDot;
-    Type MetaBase = MetatypeType::get(BaseType);
-    lookupVisibleMemberDecls(*this, MetaBase,
+    lookupVisibleMemberDecls(*this, MetatypeType::get(BaseType),
                              CurrDeclContext, TypeResolver,
                              IncludeInstanceMembers);
-    addKeyword("Type", MetaBase);
+    if (BaseType->isAnyExistentialType()) {
+      addKeyword("Protocol", MetatypeType::get(BaseType));
+      addKeyword("Type", ExistentialMetatypeType::get(BaseType));
+    } else {
+      addKeyword("Type", MetatypeType::get(BaseType));
+    }
   }
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
@@ -3830,9 +3879,11 @@ public:
 
 class CompletionOverrideLookup : public swift::VisibleDeclConsumer {
   CodeCompletionResultSink &Sink;
+  ASTContext &Ctx;
   const DeclContext *CurrDeclContext;
   LazyResolver *TypeResolver;
   SmallVectorImpl<StringRef> &ParsedKeywords;
+  SourceLoc introducerLoc;
 
   bool hasFuncIntroducer = false;
   bool hasVarIntroducer = false;
@@ -3841,13 +3892,15 @@ class CompletionOverrideLookup : public swift::VisibleDeclConsumer {
   bool hasAccessModifier = false;
   bool hasOverride = false;
   bool hasOverridabilityModifier = false;
+  bool hasStaticOrClass = false;
 
 public:
   CompletionOverrideLookup(CodeCompletionResultSink &Sink, ASTContext &Ctx,
                            const DeclContext *CurrDeclContext,
-                           SmallVectorImpl<StringRef> &ParsedKeywords)
-      : Sink(Sink),
-        CurrDeclContext(CurrDeclContext), ParsedKeywords(ParsedKeywords) {
+                           SmallVectorImpl<StringRef> &ParsedKeywords,
+                           SourceLoc introducerLoc)
+      : Sink(Sink), Ctx(Ctx), CurrDeclContext(CurrDeclContext),
+        ParsedKeywords(ParsedKeywords), introducerLoc(introducerLoc) {
     (void)createTypeChecker(Ctx);
     TypeResolver = Ctx.getLazyResolver();
 
@@ -3865,6 +3918,8 @@ public:
     hasOverride = isKeywordSpecified("override");
     hasOverridabilityModifier = isKeywordSpecified("final") ||
                                 isKeywordSpecified("open");
+    hasStaticOrClass = isKeywordSpecified(getTokenText(tok::kw_class)) ||
+                       isKeywordSpecified(getTokenText(tok::kw_static));
   }
 
   bool isKeywordSpecified(StringRef Word) {
@@ -3914,8 +3969,10 @@ public:
         Options.setBaseType(transformType);
       Options.PrintImplicitAttrs = false;
       Options.ExclusiveAttrList.push_back(TAK_escaping);
+      Options.ExclusiveAttrList.push_back(TAK_autoclosure);
       Options.PrintOverrideKeyword = false;
       Options.PrintPropertyAccessors = false;
+      Options.PrintStaticKeyword = !hasStaticOrClass;
       VD->print(Printer, Options);
       NameOffset = Printer.NameOffset.getValue();
     }
@@ -3923,10 +3980,17 @@ public:
     if (!hasDeclIntroducer && !hasAccessModifier)
       addAccessControl(VD, Builder);
 
-    // FIXME: if we're missing 'override', but have the decl introducer we
-    // should delete it and re-add both in the correct order.
-    if (!hasDeclIntroducer && missingOverride(Reason))
-      Builder.addOverrideKeyword();
+    if (missingOverride(Reason)) {
+      if (!hasDeclIntroducer)
+        Builder.addOverrideKeyword();
+      else {
+        auto dist = Ctx.SourceMgr.getByteDistance(
+                      introducerLoc, Ctx.SourceMgr.getCodeCompletionLoc());
+        Builder.setNumBytesToErase(dist);
+        Builder.addOverrideKeyword();
+        Builder.addDeclIntroducer(DeclStr.str().substr(0, NameOffset));
+      }
+    }
 
     if (!hasDeclIntroducer)
       Builder.addDeclIntroducer(DeclStr.str().substr(0, NameOffset));
@@ -4022,7 +4086,9 @@ public:
     if (D->shouldHideFromEditor())
       return;
 
-    if (D->getAttrs().hasAttribute<FinalAttr>())
+    if (D->getAttrs().hasAttribute<FinalAttr>() ||
+        // A 'class' member with an initial value cannot be overriden either.
+        (D->isStatic() && D->getAttrs().hasAttribute<HasInitialValueAttr>()))
       return;
 
     if (!D->hasInterfaceType())
@@ -4031,6 +4097,15 @@ public:
     bool hasIntroducer = hasFuncIntroducer ||
                          hasVarIntroducer ||
                          hasTypealiasIntroducer;
+
+    if (hasStaticOrClass && !D->isStatic())
+      return;
+
+    // As per the current convention, only instance members are
+    // suggested if an introducer is not accompanied by a 'static' or
+    // 'class' modifier.
+    if (hasIntroducer && !hasStaticOrClass && D->isStatic())
+      return;
 
     if (auto *FD = dyn_cast<FuncDecl>(D)) {
       // We cannot override operators as members.
@@ -4055,7 +4130,8 @@ public:
     if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
       if (!isa<ProtocolDecl>(CD->getDeclContext()))
         return;
-      if (hasIntroducer || hasOverride || hasOverridabilityModifier)
+      if (hasIntroducer || hasOverride || hasOverridabilityModifier ||
+          hasStaticOrClass)
         return;
       if (CD->isRequired() || CD->isDesignatedInit())
         addConstructor(CD, Reason);
@@ -4065,7 +4141,7 @@ public:
 
   void addDesignatedInitializers(NominalTypeDecl *NTD) {
     if (hasFuncIntroducer || hasVarIntroducer || hasTypealiasIntroducer ||
-        hasOverridabilityModifier)
+        hasOverridabilityModifier || hasStaticOrClass)
       return;
 
     const auto *CD = dyn_cast<ClassDecl>(NTD);
@@ -4088,7 +4164,7 @@ public:
   void addAssociatedTypes(NominalTypeDecl *NTD) {
     if (!hasTypealiasIntroducer &&
         (hasFuncIntroducer || hasVarIntroducer || hasInitializerModifier ||
-         hasOverride || hasOverridabilityModifier))
+         hasOverride || hasOverridabilityModifier || hasStaticOrClass))
       return;
 
     for (auto Conformance : NTD->getAllConformances()) {
@@ -4119,9 +4195,11 @@ public:
     Type CurrTy = CurrDeclContext->getSelfTypeInContext();
     auto *NTD = CurrDeclContext->getSelfNominalTypeDecl();
     if (CurrTy && !CurrTy->is<ErrorType>()) {
-      lookupVisibleMemberDecls(*this, CurrTy, CurrDeclContext,
+      // Look for overridable static members too.
+      Type Meta = MetatypeType::get(CurrTy);
+      lookupVisibleMemberDecls(*this, Meta, CurrDeclContext,
                                TypeResolver,
-                               /*includeInstanceMembers=*/false);
+                               /*includeInstanceMembers=*/true);
       addDesignatedInitializers(NTD);
       addAssociatedTypes(NTD);
     }
@@ -4443,8 +4521,9 @@ void CodeCompletionCallbacksImpl::completeGenericParams(TypeLoc TL) {
 }
 
 void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
-    SmallVectorImpl<StringRef> &Keywords) {
+    SmallVectorImpl<StringRef> &Keywords, SourceLoc introducerLoc) {
   assert(!InEnumElementRawValue);
+  this->introducerLoc = introducerLoc;
   ParsedKeywords.clear();
   ParsedKeywords.append(Keywords.begin(), Keywords.end());
   Kind = CompletionKind::NominalMemberBeginning;
@@ -4623,10 +4702,11 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     break;
       
   case CompletionKind::NominalMemberBeginning: {
-    bool HasDeclIntroducer = llvm::find_if(ParsedKeywords, [](const StringRef kw) {
+    bool HasDeclIntroducer = llvm::find_if(ParsedKeywords,
+                                           [this](const StringRef kw) {
       return llvm::StringSwitch<bool>(kw)
         .Case("associatedtype", true)
-        .Case("class", true)
+        .Case("class", !CurDeclContext || !isa<ClassDecl>(CurDeclContext))
         .Case("deinit", true)
         .Case("enum", true)
         .Case("extension", true)
@@ -4800,6 +4880,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   Optional<Type> ExprType;
   ConcreteDeclRef ReferencedDecl = nullptr;
   if (ParsedExpr) {
+    if (auto *checkedExpr = findParsedExpr(CurDeclContext,
+                                           ParsedExpr->getSourceRange())) {
+      ParsedExpr = checkedExpr;
+    }
+
     if (auto typechecked = typeCheckParsedExpr()) {
       ExprType = typechecked->first;
       ReferencedDecl = typechecked->second;
@@ -4845,11 +4930,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (isDynamicLookup(*ExprType))
       Lookup.setIsDynamicLookup();
 
-    if (!ExprType.getValue()->getAs<ModuleType>())
-      Lookup.addKeyword(getTokenText(tok::kw_self),
-                        (*ExprType)->getRValueType(),
-                        SemanticContextKind::CurrentNominal,
-                        CodeCompletionKeywordKind::kw_self);
+    Lookup.getPostfixKeywordCompletions(*ExprType, ParsedExpr);
 
     if (isa<BindOptionalExpr>(ParsedExpr) || isa<ForceValueExpr>(ParsedExpr))
       Lookup.setIsUnwrappedOptional(true);
@@ -4907,12 +4988,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       Lookup.setIsDynamicLookup();
     Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
     Lookup.getOperatorCompletions(ParsedExpr, leadingSequenceExprs);
-
-    if (!ExprType.getValue()->getAs<ModuleType>())
-      Lookup.addKeyword(getTokenText(tok::kw_self),
-                        (*ExprType)->getRValueType(),
-                        SemanticContextKind::CurrentNominal,
-                        CodeCompletionKeywordKind::kw_self);
+    Lookup.getPostfixKeywordCompletions(*ExprType, ParsedExpr);
     break;
   }
 
@@ -5008,7 +5084,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::NominalMemberBeginning: {
     CompletionOverrideLookup OverrideLookup(CompletionContext.getResultSink(),
                                             P.Context, CurDeclContext,
-                                            ParsedKeywords);
+                                            ParsedKeywords, introducerLoc);
     OverrideLookup.getOverrideCompletions(SourceLoc());
     break;
   }

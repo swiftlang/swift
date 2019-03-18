@@ -166,7 +166,6 @@ set(SWIFTLIB_ESSENTIAL
   StringUTF16View.swift
   StringUTF8View.swift
   StringUTF8Validation.swift
-  StringVariant.swift
   Substring.swift
   SwiftNativeNSArray.swift
   ThreadLocalStorage.swift
@@ -265,7 +264,7 @@ elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL LINUX)
     list(APPEND swift_core_private_link_libraries swiftImageInspectionShared)
   endif()
 elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL WINDOWS)
-  list(APPEND swift_core_private_link_libraries shell32)
+  list(APPEND swift_core_private_link_libraries shell32;DbgHelp)
 endif()
 
 option(SWIFT_CHECK_ESSENTIAL_STDLIB

@@ -374,7 +374,7 @@ public:
 
     auto boxType = SGF.SGM.Types
       .getContextBoxTypeForCapture(decl,
-                     SGF.getLoweredType(decl->getType()).getASTType(),
+                     SGF.SGM.Types.getLoweredRValueType(decl->getType()),
                      SGF.F.getGenericEnvironment(),
                      /*mutable*/ true);
 
@@ -1438,7 +1438,7 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
     // Emit witness tables.
     auto nom = cast<NominalTypeDecl>(d);
     for (auto c : nom->getLocalConformances(ConformanceLookupKind::All,
-                                            nullptr, /*sorted=*/true)) {
+                                            nullptr)) {
       auto *proto = c->getProtocol();
       if (Lowering::TypeConverter::protocolRequiresWitnessTable(proto) &&
           isa<NormalProtocolConformance>(c) &&
@@ -1476,7 +1476,6 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   case DeclKind::PrecedenceGroup:
   case DeclKind::Module:
   case DeclKind::MissingMember:
-  case DeclKind::OpaqueType:
     llvm_unreachable("Not a valid external definition for SILGen");
   }
 }

@@ -10,6 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SwiftRemoteMirror/Platform.h"
+
+#define SWIFT_CLASS_IS_SWIFT_MASK swift_reflection_classIsSwiftMask
+extern "C" {
+SWIFT_REMOTE_MIRROR_LINKAGE
+unsigned long long swift_reflection_classIsSwiftMask = 2;
+}
+
 #include "swift/Reflection/ReflectionContext.h"
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Remote/CMemoryReader.h"
@@ -20,8 +28,8 @@ using namespace swift;
 using namespace swift::reflection;
 using namespace swift::remote;
 
-using NativeReflectionContext
-  = ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>;
+using NativeReflectionContext = swift::reflection::ReflectionContext<
+    External<RuntimeTarget<sizeof(uintptr_t)>>>;
 
 struct SwiftReflectionContext {
   NativeReflectionContext *nativeContext;

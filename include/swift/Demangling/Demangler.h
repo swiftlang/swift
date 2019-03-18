@@ -69,31 +69,81 @@ class NodeFactory {
   }
 
   static void freeSlabs(Slab *slab);
-  
+
+  /// If not null, the NodeFactory from which this factory borrowed free memory.
+  NodeFactory *BorrowedFrom = nullptr;
+
+  /// True if some other NodeFactory borrowed free memory from this factory.
+  bool isBorrowed = false;
+
+#ifdef NODE_FACTORY_DEBUGGING
+  size_t allocatedMemory = 0;
+  static int nestingLevel;
+  std::string indent() { return std::string(nestingLevel * 2, ' '); }
+#endif
+
 public:
 
   NodeFactory() {
 #ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << "## New NodeFactory " << this << "\n";
+    std::cerr << indent() << "## New NodeFactory\n";
+    nestingLevel++;
 #endif
   }
-  
+
+  /// Provide pre-allocated memory, e.g. memory on the stack.
+  ///
+  /// Only if this memory overflows, the factory begins to malloc.
+  void providePreallocatedMemory(char *Memory, size_t Size) {
+#ifdef NODE_FACTORY_DEBUGGING
+    std::cerr << indent() << "++ provide preallocated memory, size = "
+                          << Size << '\n';
+#endif
+    assert(!CurPtr && !End && !CurrentSlab);
+    CurPtr = Memory;
+    End = CurPtr + Size;
+  }
+
+  /// Borrow free memory from another factory \p BorrowFrom.
+  ///
+  /// While this factory is alive, no allocations can be done in the
+  /// \p BorrowFrom factory.
+  void providePreallocatedMemory(NodeFactory &BorrowFrom) {
+    assert(!CurPtr && !End && !CurrentSlab);
+    assert(!BorrowFrom.isBorrowed && !BorrowedFrom);
+    BorrowFrom.isBorrowed = true;
+    BorrowedFrom = &BorrowFrom;
+    CurPtr = BorrowFrom.CurPtr;
+    End = BorrowFrom.End;
+#ifdef NODE_FACTORY_DEBUGGING
+    std::cerr << indent() << "++ borrow memory, size = "
+                          << (End - CurPtr) << '\n';
+#endif
+  }
+
   virtual ~NodeFactory() {
     freeSlabs(CurrentSlab);
 #ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << "Delete NodeFactory " << this << "\n";
+    nestingLevel--;
+    std::cerr << indent() << "## Delete NodeFactory: allocated memory = "
+                          << allocatedMemory  << '\n';
 #endif
+    if (BorrowedFrom) {
+      BorrowedFrom->isBorrowed = false;
+    }
   }
   
   virtual void clear();
   
   /// Allocates an object of type T or an array of objects of type T.
   template<typename T> T *Allocate(size_t NumObjects = 1) {
+    assert(!isBorrowed);
     size_t ObjectSize = NumObjects * sizeof(T);
     CurPtr = align(CurPtr, alignof(T));
 #ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << "  alloc " << ObjectSize << ", CurPtr = "
+    std::cerr << indent() << "alloc " << ObjectSize << ", CurPtr = "
               << (void *)CurPtr << "\n";
+    allocatedMemory += ObjectSize;
 #endif
 
     // Do we have enough space in the current slab?
@@ -113,7 +163,7 @@ public:
       End = (char *)newSlab + AllocSize;
       assert(CurPtr + ObjectSize <= End);
 #ifdef NODE_FACTORY_DEBUGGING
-      std::cerr << "    ** new slab " << newSlab << ", allocsize = "
+      std::cerr << indent() << "** new slab " << newSlab << ", allocsize = "
                 << AllocSize << ", CurPtr = " << (void *)CurPtr
                 << ", End = " << (void *)End << "\n";
 #endif
@@ -134,12 +184,13 @@ public:
   /// enlarged by a bigger value.
   template<typename T> void Reallocate(T *&Objects, uint32_t &Capacity,
                                        size_t MinGrowth) {
+    assert(!isBorrowed);
     size_t OldAllocSize = Capacity * sizeof(T);
     size_t AdditionalAlloc = MinGrowth * sizeof(T);
 
 #ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << "  realloc " << Objects << ", num = " << NumObjects
-              << " (size = " << OldAllocSize << "), Growth = " << Growth
+    std::cerr << indent() << "realloc: capacity = " << Capacity
+              << " (size = " << OldAllocSize << "), growth = " << MinGrowth
               << " (size = " << AdditionalAlloc << ")\n";
 #endif
     if ((char *)Objects + OldAllocSize == CurPtr
@@ -149,7 +200,8 @@ public:
       CurPtr += AdditionalAlloc;
       Capacity += MinGrowth;
 #ifdef NODE_FACTORY_DEBUGGING
-      std::cerr << "    ** can grow: CurPtr = " << (void *)CurPtr << "\n";
+      std::cerr << indent() << "** can grow: " << (void *)CurPtr << '\n';
+      allocatedMemory += AdditionalAlloc;
 #endif
       return;
     }
@@ -227,7 +279,11 @@ public:
     Capacity = 0;
     Elems = 0;
   }
-  
+
+  void clear() {
+    NumElems = 0;
+  }
+
   iterator begin() { return Elems; }
   iterator end() { return Elems + NumElems; }
   
@@ -246,6 +302,11 @@ public:
   bool empty() const { return NumElems == 0; }
 
   T &back() { return (*this)[NumElems - 1]; }
+
+  void resetSize(size_t toPos) {
+    assert(toPos <= NumElems);
+    NumElems = toPos;
+  }
 
   void push_back(const T &NewElem, NodeFactory &Factory) {
     if (NumElems >= Capacity)
@@ -274,6 +335,9 @@ public:
 
   // Append an integer as readable number.
   void append(int Number, NodeFactory &Factory);
+
+  // Append an unsigned 64 bit integer as readable number.
+  void append(unsigned long long Number, NodeFactory &Factory);
 
   StringRef str() const {
     return StringRef(Elems, NumElems);
@@ -536,7 +600,19 @@ public:
   /// Demangler or with a call of clear().
   NodePointer demangleType(StringRef MangledName);
 };
-  
+
+/// A demangler which uses stack space for its initial memory.
+///
+/// The \p Size paramter specifies the size of the stack space.
+template <size_t Size> class StackAllocatedDemangler : public Demangler {
+  char StackSpace[Size];
+
+public:
+  StackAllocatedDemangler() {
+    providePreallocatedMemory(StackSpace, Size);
+  }
+};
+
 NodePointer demangleOldSymbolAsNode(StringRef MangledName,
                                     NodeFactory &Factory);
 } // end namespace Demangle

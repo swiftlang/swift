@@ -56,6 +56,13 @@ struct HeapObject {
     : metadata(newMetadata)
     , refCounts(InlineRefCounts::Initialized)
   { }
+  
+  // Initialize a HeapObject header for an immortal object
+  constexpr HeapObject(HeapMetadata const *newMetadata,
+                       InlineRefCounts::Immortal_t immortal)
+  : metadata(newMetadata)
+  , refCounts(InlineRefCounts::Immortal)
+  { }
 
 #ifndef NDEBUG
   void dump() const LLVM_ATTRIBUTE_USED;
@@ -86,8 +93,6 @@ __swift_size_t swift_weakRetainCount(HeapObject *obj);
 #endif
 
 #ifdef __cplusplus
-static_assert(swift::IsTriviallyConstructible<HeapObject>::value,
-              "HeapObject must be trivially initializable");
 static_assert(std::is_trivially_destructible<HeapObject>::value,
               "HeapObject must be trivially destructible");
 

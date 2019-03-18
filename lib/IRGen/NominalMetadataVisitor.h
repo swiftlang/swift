@@ -18,39 +18,26 @@
 #ifndef SWIFT_IRGEN_NOMINALMETADATAVISITOR_H
 #define SWIFT_IRGEN_NOMINALMETADATAVISITOR_H
 
-#include "llvm/ADT/SmallVector.h"
-#include "swift/AST/Decl.h"
-#include "swift/AST/SubstitutionMap.h"
-#include "swift/SIL/TypeLowering.h"
 #include "GenericRequirement.h"
 #include "GenProto.h"
 #include "IRGenModule.h"
+#include "MetadataVisitor.h"
 
 namespace swift {
 namespace irgen {
 
-/// A CRTP class for laying out type metadata.  Note that this does
-/// *not* handle the metadata template stuff.
-template <class Impl> class NominalMetadataVisitor {
-protected:
-  Impl &asImpl() { return *static_cast<Impl*>(this); }
+/// A CRTP class for laying out type metadata for nominal types. Note that this
+/// does *not* handle the metadata template stuff.
+template <class Impl> class NominalMetadataVisitor
+       : public MetadataVisitor<Impl> {
+  using super = MetadataVisitor<Impl>;
 
 protected:
-  IRGenModule &IGM;
+  using super::asImpl;
 
-  NominalMetadataVisitor(IRGenModule &IGM) : IGM(IGM) {}
+  NominalMetadataVisitor(IRGenModule &IGM) : super(IGM) {}
 
 public:
-  void layout() {
-    // Common fields.
-    asImpl().addValueWitnessTable();
-    asImpl().noteAddressPoint();
-    asImpl().addMetadataFlags();
-  }
-
-  /// This is the address point.
-  void noteAddressPoint() {}
-
   /// Add fields related to the generics of this class declaration.
   /// TODO: don't add new fields that are implied by the superclass
   /// fields.  e.g., if B<T> extends A<T>, the witness for T in A's
@@ -63,7 +50,7 @@ public:
     // Note that we intentionally don't std::forward 'args'.
     asImpl().noteStartOfGenericRequirements(args...);
 
-    GenericTypeRequirements requirements(IGM, typeDecl);
+    GenericTypeRequirements requirements(super::IGM, typeDecl);
     for (auto reqt : requirements.getRequirements()) {
       if (reqt.Protocol) {
         asImpl().addGenericWitnessTable(args...);

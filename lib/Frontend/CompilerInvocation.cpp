@@ -201,12 +201,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                           const FrontendOptions &FrontendOpts) {
   using namespace options;
 
-  /// FIXME: Remove this flag when void subscripts are implemented.
-  /// This is used to guard preemptive testing for the fix-it.
-  if (Args.hasArg(OPT_fix_string_substring_conversion)) {
-    Opts.FixStringToSubstringConversions = true;
-  }
-
   if (auto A = Args.getLastArg(OPT_swift_version)) {
     auto vers = version::Version::parseVersionString(
       A->getValue(), SourceLoc(), &Diags);
@@ -243,9 +237,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableOperatorDesignatedTypes |=
       Args.hasArg(OPT_enable_operator_designated_types);
-  
-  Opts.EnableOpaqueResultTypes |=
-      Args.hasArg(OPT_enable_opaque_result_types);
 
   // Always enable operator designated types for the standard library.
   Opts.EnableOperatorDesignatedTypes |= FrontendOpts.ParseStdlib;
@@ -450,11 +441,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                    Target.isOSDarwin());
   Opts.EnableSILOpaqueValues |= Args.hasArg(OPT_enable_sil_opaque_values);
 
-#if SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
-  Opts.UseDarwinPreStableABIBit = false;
-#else
-  Opts.UseDarwinPreStableABIBit = true;
-#endif
+  Opts.UseDarwinPreStableABIBit =
+    (Target.isMacOSX() && Target.isMacOSXVersionLT(10, 14, 4)) ||
+    (Target.isiOS() && Target.isOSVersionLT(12, 2)) ||
+    (Target.isTvOS() && Target.isOSVersionLT(12, 2)) ||
+    (Target.isWatchOS() && Target.isOSVersionLT(5, 2));
 
   Opts.DisableConstraintSolverPerformanceHacks |=
       Args.hasArg(OPT_disable_constraint_solver_performance_hacks);
@@ -776,7 +767,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EmitProfileCoverageMapping |= Args.hasArg(OPT_profile_coverage_mapping);
   Opts.DisableSILPartialApply |=
     Args.hasArg(OPT_disable_sil_partial_apply);
-  Opts.EnableSILOwnership |= Args.hasArg(OPT_enable_sil_ownership);
+  Opts.VerifySILOwnership |= Args.hasArg(OPT_verify_sil_ownership);
   Opts.EnableMandatorySemanticARCOpts |=
       Args.hasArg(OPT_enable_mandatory_semantic_arc_opts);
   Opts.EnableLargeLoadableTypes |= Args.hasArg(OPT_enable_large_loadable_types);
@@ -1090,10 +1081,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.EnableReflectionNames = false;
   }
 
-  if (Args.hasArg(OPT_enable_class_resilience)) {
-    Opts.EnableClassResilience = true;
-  }
-
   if (Args.hasArg(OPT_enable_resilience_bypass)) {
     Opts.EnableResilienceBypass = true;
   }
@@ -1102,8 +1089,17 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   // (e.g. NativeObject).  Force the lazy initialization of the VWT always.
   Opts.LazyInitializeClassMetadata = Triple.isOSBinFormatCOFF();
 
-  if (const Arg *A = Args.getLastArg(OPT_read_type_info_path_EQ)) {
-    Opts.ReadTypeInfoPath = A->getValue();
+  // PE/COFF cannot deal with cross-module reference to the protocol conformance
+  // witness.  Use a runtime initialized value for the protocol conformance
+  // witness.
+  Opts.LazyInitializeProtocolConformances = Triple.isOSBinFormatCOFF();
+
+  if (Args.hasArg(OPT_disable_legacy_type_info)) {
+    Opts.DisableLegacyTypeInfo = true;
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_read_legacy_type_info_path_EQ)) {
+    Opts.ReadLegacyTypeInfoPath = A->getValue();
   }
 
   for (const auto &Lib : Args.getAllArgValues(options::OPT_autolink_library))

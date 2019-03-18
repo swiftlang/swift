@@ -1,12 +1,12 @@
 // RUN: %empty-directory(%t)
 
 // Resilient protocol definition
-// RUN: %target-swift-frontend -emit-ir -enable-resilience -module-name=resilient_protocol %S/../Inputs/resilient_protocol.swift | %FileCheck -DINT=i%target-ptrsize -check-prefix=CHECK-DEFINITION %s
+// RUN: %target-swift-frontend -emit-ir -enable-library-evolution -module-name=resilient_protocol %S/../Inputs/resilient_protocol.swift | %FileCheck -DINT=i%target-ptrsize -check-prefix=CHECK-DEFINITION %s
 
 // Resilient protocol usage
-// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_protocol.swiftmodule -module-name=resilient_protocol %S/../Inputs/resilient_protocol.swift
+// RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_protocol.swiftmodule -module-name=resilient_protocol %S/../Inputs/resilient_protocol.swift
 
-// RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience %s | %FileCheck %s -DINT=i%target-ptrsize -check-prefix=CHECK-USAGE
+// RUN: %target-swift-frontend -I %t -emit-ir -enable-library-evolution %s | %FileCheck %s -DINT=i%target-ptrsize -check-prefix=CHECK-USAGE
 
 // ----------------------------------------------------------------------------
 // Resilient protocol definition
@@ -60,10 +60,18 @@ public struct ConditionallyConforms<Element> { }
 public struct Y { }
 
 // CHECK-USAGE-LABEL: @"$s31protocol_resilience_descriptors1YV010resilient_A022OtherResilientProtocolAAMc" =
+// -- flags: has generic witness table
 // CHECK-USAGE-SAME: i32 131072,
+// -- number of witness table entries
 // CHECK-USAGE-SAME: i16 0,
-// CHECK-USAGE-SAME: i16 0,
-// CHECK-USAGE-SAME: i32 0
+// -- size of private area + 'requires instantiation' bit
+// CHECK-USAGE-SAME: i16 1,
+// -- instantiator function
+// CHECK-USAGE-SAME: i32 0,
+// -- private data area
+// CHECK-USAGE-SAME: {{@[0-9]+}}
+// --
+// CHECK-USAGE-SAME: }
 extension Y: OtherResilientProtocol { }
 
 // CHECK-USAGE: @"$s31protocol_resilience_descriptors29ConformsWithAssocRequirementsV010resilient_A008ProtocoleF12TypeDefaultsAAMc" =

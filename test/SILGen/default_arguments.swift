@@ -8,8 +8,8 @@
 
 // Default argument for first parameter.
 // CHECK-LABEL: sil hidden [ossa] @$s17default_arguments7defarg11i1d1sySi_SdSStFfA_ : $@convention(thin) () -> Int
-// CHECK: [[INT:%[0-9]+]] = metatype $@thin Int.Type
 // CHECK: [[LIT:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 17
+// CHECK: [[INT:%[0-9]+]] = metatype $@thin Int.Type
 // CHECK: [[CVT:%[0-9]+]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC
 // CHECK: [[RESULT:%[0-9]+]] = apply [[CVT]]([[LIT]], [[INT]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK: return [[RESULT]] : $Int
@@ -26,8 +26,8 @@ func defarg1(i: Int = 17, d: Double, s: String = "Hello") { }
 
 // CHECK-LABEL: sil hidden [ossa] @$s17default_arguments15testDefaultArg1yyF
 func testDefaultArg1() {
-  // CHECK: [[FLOAT64:%[0-9]+]] = metatype $@thin Double.Type
   // CHECK: [[FLOATLIT:%[0-9]+]] = float_literal $Builtin.FPIEEE{{64|80}}, {{0x4009000000000000|0x4000C800000000000000}}
+  // CHECK: [[FLOAT64:%[0-9]+]] = metatype $@thin Double.Type
   // CHECK: [[LITFN:%[0-9]+]] = function_ref @$sSd20_builtinFloatLiteralSdBf{{[_0-9]*}}__tcfC
   // CHECK: [[FLOATVAL:%[0-9]+]] = apply [[LITFN]]([[FLOATLIT]], [[FLOAT64]])
   // CHECK: [[DEF0FN:%[0-9]+]] = function_ref @$s17default_arguments7defarg1{{.*}}A_
@@ -43,8 +43,8 @@ func defarg2(_ i: Int, d: Double = 3.125, s: String = "Hello") { }
 
 // CHECK-LABEL: sil hidden [ossa] @$s17default_arguments15testDefaultArg2{{[_0-9a-zA-Z]*}}F
 func testDefaultArg2() {
-// CHECK:  [[INT64:%[0-9]+]] = metatype $@thin Int.Type
 // CHECK:  [[INTLIT:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 5
+// CHECK:  [[INT64:%[0-9]+]] = metatype $@thin Int.Type
 // CHECK:  [[LITFN:%[0-9]+]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC
 // CHECK:  [[I:%[0-9]+]] = apply [[LITFN]]([[INTLIT]], [[INT64]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK:  [[DFN:%[0-9]+]] = function_ref @$s17default_arguments7defarg2{{.*}}A0_ : $@convention(thin) () -> Double

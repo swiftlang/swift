@@ -43,7 +43,7 @@ class MyCls {
 class MySub : MyCls {
   func #^METHODNAME_OVERRIDE^#
 // METHODNAME_OVERRIDE: Begin completions, 1 items
-// METHODNAME_OVERRIDE-NEXT: Decl[InstanceMethod]/Super: foo() {|}; name=foo()
+// METHODNAME_OVERRIDE-NEXT: Decl[InstanceMethod]/Super/Erase[5]: override func foo() {|}; name=foo()
 // METHODNAME_OVERRIDE-NEXT: End completions
 }
 

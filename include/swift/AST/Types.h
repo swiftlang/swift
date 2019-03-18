@@ -53,10 +53,8 @@ namespace swift {
   class GenericTypeParamType;
   class GenericParamList;
   class GenericSignature;
-  class GenericSignatureBuilder;
   class Identifier;
   class InOutType;
-  class OpaqueTypeDecl;
   class OpenedArchetypeType;
   enum class ReferenceCounting : uint8_t;
   enum class ResilienceExpansion : unsigned;
@@ -100,8 +98,7 @@ public:
     /// This type expression contains a TypeVariableType.
     HasTypeVariable      = 0x01,
 
-    /// This type expression contains a context-dependent archetype, either a
-    /// PrimaryArchetypeType or OpenedArchetypeType.
+    /// This type expression contains an ArchetypeType.
     HasArchetype         = 0x02,
 
     /// This type expression contains a GenericTypeParamType.
@@ -128,11 +125,8 @@ public:
 
     /// This type contains a DependentMemberType.
     HasDependentMember   = 0x200,
-    
-    /// This type contains an OpaqueTypeArchetype.
-    HasOpaqueArchetype   = 0x400,
 
-    Last_Property = HasOpaqueArchetype
+    Last_Property = HasDependentMember
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -151,14 +145,10 @@ public:
   /// variable?
   bool hasTypeVariable() const { return Bits & HasTypeVariable; }
 
-  /// Does a type with these properties structurally contain a
-  /// context-dependent archetype (that is, a Primary- or OpenedArchetype)?
+  /// Does a type with these properties structurally contain an
+  /// archetype?
   bool hasArchetype() const { return Bits & HasArchetype; }
 
-  /// Does a type with these properties structurally contain an
-  /// archetype from an opaque type declaration?
-  bool hasOpaqueArchetype() const { return Bits & HasOpaqueArchetype; }
-  
   /// Does a type with these properties have a type parameter somewhere in it?
   bool hasTypeParameter() const { return Bits & HasTypeParameter; }
 
@@ -547,11 +537,11 @@ public:
     return getRecursiveProperties().hasUnresolvedType();
   }
   
-  /// Determine whether the type involves a context-dependent archetype.
+  /// Determine whether the type involves an archetype.
   bool hasArchetype() const {
     return getRecursiveProperties().hasArchetype();
   }
-  
+
   /// Determine whether the type involves an opened existential archetype.
   bool hasOpenedExistential() const {
     return getRecursiveProperties().hasOpenedExistential();
@@ -561,11 +551,6 @@ public:
   /// archetype.
   bool hasOpenedExistential(OpenedArchetypeType *opened);
 
-  /// Determine whether the type involves an opaque type.
-  bool hasOpaqueArchetype() const {
-    return getRecursiveProperties().hasOpaqueArchetype();
-  }
-  
   /// Determine whether the type is an opened existential type.
   ///
   /// To determine whether there is an opened existential type
@@ -2256,7 +2241,7 @@ public:
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(NominalType, NominalOrBoundGenericNominalType)
 
 /// EnumType - This represents the type declared by an EnumDecl.
-class EnumType : public NominalType, public llvm::FoldingSetNode {
+class EnumType : public NominalType {
 public:
   /// getDecl() - Returns the decl which declares this type.
   EnumDecl *getDecl() const {
@@ -2266,11 +2251,6 @@ public:
   /// Retrieve the type when we're referencing the given enum
   /// declaration in the parent type \c Parent.
   static EnumType *get(EnumDecl *D, Type Parent, const ASTContext &C);
-
-  void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getDecl(), getParent());
-  }
-  static void Profile(llvm::FoldingSetNodeID &ID, EnumDecl *D, Type Parent);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -2284,7 +2264,7 @@ private:
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(EnumType, NominalType)
 
 /// StructType - This represents the type declared by a StructDecl.
-class StructType : public NominalType, public llvm::FoldingSetNode {  
+class StructType : public NominalType {
 public:
   /// getDecl() - Returns the decl which declares this type.
   StructDecl *getDecl() const {
@@ -2294,11 +2274,6 @@ public:
   /// Retrieve the type when we're referencing the given struct
   /// declaration in the parent type \c Parent.
   static StructType *get(StructDecl *D, Type Parent, const ASTContext &C);
-
-  void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getDecl(), getParent());
-  }
-  static void Profile(llvm::FoldingSetNodeID &ID, StructDecl *D, Type Parent);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -2312,7 +2287,7 @@ private:
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(StructType, NominalType)
 
 /// ClassType - This represents the type declared by a ClassDecl.
-class ClassType : public NominalType, public llvm::FoldingSetNode {  
+class ClassType : public NominalType {
 public:
   /// getDecl() - Returns the decl which declares this type.
   ClassDecl *getDecl() const {
@@ -2322,11 +2297,6 @@ public:
   /// Retrieve the type when we're referencing the given class
   /// declaration in the parent type \c Parent.
   static ClassType *get(ClassDecl *D, Type Parent, const ASTContext &C);
-
-  void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getDecl(), getParent());
-  }
-  static void Profile(llvm::FoldingSetNodeID &ID, ClassDecl *D, Type Parent);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -2362,7 +2332,9 @@ enum class MetatypeRepresentation : char {
   /// which permit dynamic behavior.
   Thick,
   /// An Objective-C metatype refers to an Objective-C class object.
-  ObjC
+  ObjC,
+
+  Last_MetatypeRepresentation = ObjC
 };
 
 /// AnyMetatypeType - A common parent class of MetatypeType and
@@ -2777,6 +2749,8 @@ public:
     bool operator!=(Param const &b) const { return !(*this == b); }
 
     Param getWithoutLabel() const { return Param(Ty, Identifier(), Flags); }
+
+    Param withType(Type newType) const { return Param(newType, Label, Flags); }
   };
 
   class CanParam : public Param {
@@ -3566,8 +3540,7 @@ public:
   }
 
   ValueOwnershipKind
-  getOwnershipKind(SILModule &,
-                   CanGenericSignature sig) const; // in SILType.cpp
+  getOwnershipKind(SILFunction &) const; // in SILType.cpp
 
   bool operator==(SILResultInfo rhs) const {
     return TypeAndConvention == rhs.TypeAndConvention;
@@ -4356,7 +4329,7 @@ public:
 
 /// ProtocolType - A protocol type describes an abstract interface implemented
 /// by another type.
-class ProtocolType : public NominalType, public llvm::FoldingSetNode {
+class ProtocolType : public NominalType {
 public:
   /// Retrieve the type when we're referencing the given protocol.
   /// declaration.
@@ -4388,11 +4361,6 @@ public:
   /// otherwise.
   static bool visitAllProtocols(ArrayRef<ProtocolDecl *> protocols,
                                 llvm::function_ref<bool(ProtocolDecl *)> fn);
-
-  void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getDecl(), getParent());
-  }
-  static void Profile(llvm::FoldingSetNodeID &ID, ProtocolDecl *D, Type Parent);
 
 private:
   friend class NominalTypeDecl;
@@ -4586,7 +4554,6 @@ using ArchetypeTrailingObjects = llvm::TrailingObjects<Base,
   ProtocolDecl *, Type, LayoutConstraint, AdditionalTrailingObjects...>;
 
 class PrimaryArchetypeType;
-class OpaqueTypeArchetypeType;
   
 /// An archetype is a type that represents a runtime type that is
 /// known to conform to some set of requirements.
@@ -4773,90 +4740,6 @@ private:
 BEGIN_CAN_TYPE_WRAPPER(PrimaryArchetypeType, ArchetypeType)
 END_CAN_TYPE_WRAPPER(PrimaryArchetypeType, ArchetypeType)
 
-/// An archetype that represents an opaque type.
-class OpaqueTypeArchetypeType final : public ArchetypeType,
-    public llvm::FoldingSetNode,
-    private ArchetypeTrailingObjects<OpaqueTypeArchetypeType>
-{
-  friend TrailingObjects;
-  friend ArchetypeType;
-  friend GenericSignatureBuilder;
-
-  /// The declaration that defines the opaque type.
-  OpaqueTypeDecl *OpaqueDecl;
-  /// The substitutions into the interface signature of the opaque type.
-  SubstitutionMap Substitutions;
-  
-  /// A GenericEnvironment with this opaque archetype bound to the interface
-  /// type of the output type from the OpaqueDecl.
-  GenericEnvironment *Environment;
-  
-public:
-  /// Get 
-  
-  /// Get an opaque archetype representing the underlying type of the given
-  /// opaque type decl.
-  static OpaqueTypeArchetypeType *get(OpaqueTypeDecl *Decl,
-                                      SubstitutionMap Substitutions);
-  
-  OpaqueTypeDecl *getOpaqueDecl() const {
-    return OpaqueDecl;
-  }
-  SubstitutionMap getSubstitutions() const {
-    return Substitutions;
-  }
-  
-  /// Get the generic signature used to build out this archetype. This is
-  /// equivalent to the OpaqueTypeDecl's interface generic signature, with
-  /// all of the generic parameters aside from the opaque type's interface
-  /// type same-type-constrained to their substitutions for this type.
-  GenericSignature *getBoundSignature() const;
-  
-  /// Get a generic environment that has this opaque archetype bound within it.
-  GenericEnvironment *getGenericEnvironment() const {
-    return Environment;
-  }
-  
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::OpaqueTypeArchetype;
-  }
-  
-  static void Profile(llvm::FoldingSetNodeID &ID,
-                      OpaqueTypeDecl *OpaqueDecl,
-                      SubstitutionMap Substitutions);
-  
-  void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getOpaqueDecl(), getSubstitutions());
-  };
-  
-private:
-  OpaqueTypeArchetypeType(OpaqueTypeDecl *OpaqueDecl,
-                          SubstitutionMap Substitutions,
-                          RecursiveTypeProperties Props,
-                          Type InterfaceType,
-                          ArrayRef<ProtocolDecl*> ConformsTo,
-                          Type Superclass, LayoutConstraint Layout);
-};
-BEGIN_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
-END_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
-
-/// A function object that can be used as a \c TypeSubstitutionFn and
-/// \c LookupConformanceFn for \c Type::subst style APIs to map opaque
-/// archetypes with underlying types visible at a given resilience expansion
-/// to their underlying types.
-class ReplaceOpaqueTypesWithUnderlyingTypes {
-public:
-  ReplaceOpaqueTypesWithUnderlyingTypes() {}
-  
-  /// TypeSubstitutionFn
-  Type operator()(SubstitutableType *maybeOpaqueType) const;
-  
-  /// LookupConformanceFn
-  Optional<ProtocolConformanceRef> operator()(CanType maybeOpaqueType,
-                                              Type replacementType,
-                                              ProtocolDecl *protocol) const;
-};
-  
 /// An archetype that represents the dynamic type of an opened existential.
 class OpenedArchetypeType final : public ArchetypeType,
     private ArchetypeTrailingObjects<OpenedArchetypeType>
@@ -4962,9 +4845,6 @@ template<typename Type>
 const Type *ArchetypeType::getSubclassTrailingObjects() const {
   if (auto contextTy = dyn_cast<PrimaryArchetypeType>(this)) {
     return contextTy->getTrailingObjects<Type>();
-  }
-  if (auto opaqueTy = dyn_cast<OpaqueTypeArchetypeType>(this)) {
-    return opaqueTy->getTrailingObjects<Type>();
   }
   if (auto openedTy = dyn_cast<OpenedArchetypeType>(this)) {
     return openedTy->getTrailingObjects<Type>();
@@ -5108,6 +4988,7 @@ BEGIN_CAN_TYPE_WRAPPER(DependentMemberType, Type)
 
   PROXY_CAN_TYPE_SIMPLE_GETTER(getBase)
 END_CAN_TYPE_WRAPPER(DependentMemberType, Type)
+
 
 /// The storage type of a variable with non-strong reference
 /// ownership semantics.

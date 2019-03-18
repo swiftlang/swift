@@ -301,15 +301,22 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// Structure that captures data that is segregated into different
   /// arenas.
   struct Arena {
+    static_assert(alignof(TypeBase) >= 8, "TypeBase not 8-byte aligned?");
+    static_assert(alignof(TypeBase) > static_cast<unsigned>(
+               MetatypeRepresentation::Last_MetatypeRepresentation) + 1,
+               "Use std::pair for MetatypeTypes and ExistentialMetatypeTypes.");
+
     llvm::DenseMap<Type, ErrorType *> ErrorTypesWithOriginal;
     llvm::FoldingSet<TypeAliasType> TypeAliasTypes;
     llvm::FoldingSet<TupleType> TupleTypes;
-    llvm::DenseMap<std::pair<Type,char>, MetatypeType*> MetatypeTypes;
-    llvm::DenseMap<std::pair<Type,char>,
+    llvm::DenseMap<llvm::PointerIntPair<TypeBase*, 3, unsigned>,
+                   MetatypeType*> MetatypeTypes;
+    llvm::DenseMap<llvm::PointerIntPair<TypeBase*, 3, unsigned>,
                    ExistentialMetatypeType*> ExistentialMetatypeTypes;
     llvm::DenseMap<Type, ArraySliceType*> ArraySliceTypes;
     llvm::DenseMap<std::pair<Type, Type>, DictionaryType *> DictionaryTypes;
     llvm::DenseMap<Type, OptionalType*> OptionalTypes;
+    llvm::DenseMap<Type, ParenType*> SimpleParenTypes; // Most are simple
     llvm::DenseMap<std::pair<Type, unsigned>, ParenType*> ParenTypes;
     llvm::DenseMap<uintptr_t, ReferenceStorageType*> ReferenceStorageTypes;
     llvm::DenseMap<Type, LValueType*> LValueTypes;
@@ -317,15 +324,14 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
     llvm::DenseMap<std::pair<Type, void*>, DependentMemberType *>
       DependentMemberTypes;
     llvm::DenseMap<Type, DynamicSelfType *> DynamicSelfTypes;
-    llvm::FoldingSet<EnumType> EnumTypes;
-    llvm::FoldingSet<StructType> StructTypes;
-    llvm::FoldingSet<ClassType> ClassTypes;
+    llvm::DenseMap<std::pair<EnumDecl*, Type>, EnumType*> EnumTypes;
+    llvm::DenseMap<std::pair<StructDecl*, Type>, StructType*> StructTypes;
+    llvm::DenseMap<std::pair<ClassDecl*, Type>, ClassType*> ClassTypes;
+    llvm::DenseMap<std::pair<ProtocolDecl*, Type>, ProtocolType*> ProtocolTypes;
     llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
     llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
-    llvm::FoldingSet<ProtocolType> ProtocolTypes;
     llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
     llvm::FoldingSet<LayoutConstraintInfo> LayoutConstraints;
-    llvm::FoldingSet<OpaqueTypeArchetypeType> OpaqueArchetypes;
 
     /// The set of function types.
     llvm::FoldingSet<FunctionType> FunctionTypes;
@@ -2089,16 +2095,18 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     llvm::capacity_in_bytes(ArraySliceTypes) +
     llvm::capacity_in_bytes(DictionaryTypes) +
     llvm::capacity_in_bytes(OptionalTypes) +
+    llvm::capacity_in_bytes(SimpleParenTypes) +
     llvm::capacity_in_bytes(ParenTypes) +
     llvm::capacity_in_bytes(ReferenceStorageTypes) +
     llvm::capacity_in_bytes(LValueTypes) +
     llvm::capacity_in_bytes(InOutTypes) +
     llvm::capacity_in_bytes(DependentMemberTypes) +
+    llvm::capacity_in_bytes(EnumTypes) +
+    llvm::capacity_in_bytes(StructTypes) +
+    llvm::capacity_in_bytes(ClassTypes) +
+    llvm::capacity_in_bytes(ProtocolTypes) +
     llvm::capacity_in_bytes(DynamicSelfTypes);
     // FunctionTypes ?
-    // EnumTypes ?
-    // StructTypes ?
-    // ClassTypes ?
     // UnboundGenericTypes ?
     // BoundGenericTypes ?
     // NormalConformances ?
@@ -3045,8 +3053,10 @@ ParenType *ParenType::get(const ASTContext &C, Type underlying,
   
   auto properties = underlying->getRecursiveProperties();
   auto arena = getArena(properties);
-  ParenType *&Result =
-      C.getImpl().getArena(arena).ParenTypes[{underlying, fl.toRaw()}];
+  auto flags = fl.toRaw();
+  ParenType *&Result = flags == 0
+      ? C.getImpl().getArena(arena).SimpleParenTypes[underlying]
+      : C.getImpl().getArena(arena).ParenTypes[{underlying, flags}];
   if (Result == nullptr) {
     Result = new (C, arena) ParenType(underlying,
                                       properties, fl);
@@ -3363,26 +3373,15 @@ EnumType::EnumType(EnumDecl *TheDecl, Type Parent, const ASTContext &C,
   : NominalType(TypeKind::Enum, &C, TheDecl, Parent, properties) { }
 
 EnumType *EnumType::get(EnumDecl *D, Type Parent, const ASTContext &C) {
-  llvm::FoldingSetNodeID id;
-  EnumType::Profile(id, D, Parent);
-
   RecursiveTypeProperties properties;
   if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
-  void *insertPos = nullptr;
-  if (auto enumTy
-        = C.getImpl().getArena(arena).EnumTypes.FindNodeOrInsertPos(id, insertPos))
-    return enumTy;
-
-  auto enumTy = new (C, arena) EnumType(D, Parent, C, properties);
-  C.getImpl().getArena(arena).EnumTypes.InsertNode(enumTy, insertPos);
-  return enumTy;
-}
-
-void EnumType::Profile(llvm::FoldingSetNodeID &ID, EnumDecl *D, Type Parent) {
-  ID.AddPointer(D);
-  ID.AddPointer(Parent.getPointer());
+  auto *&known = C.getImpl().getArena(arena).EnumTypes[{D, Parent}];
+  if (!known) {
+    known = new (C, arena) EnumType(D, Parent, C, properties);
+  }
+  return known;
 }
 
 StructType::StructType(StructDecl *TheDecl, Type Parent, const ASTContext &C,
@@ -3390,26 +3389,15 @@ StructType::StructType(StructDecl *TheDecl, Type Parent, const ASTContext &C,
   : NominalType(TypeKind::Struct, &C, TheDecl, Parent, properties) { }
 
 StructType *StructType::get(StructDecl *D, Type Parent, const ASTContext &C) {
-  llvm::FoldingSetNodeID id;
-  StructType::Profile(id, D, Parent);
-
   RecursiveTypeProperties properties;
   if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
-  void *insertPos = nullptr;
-  if (auto structTy
-        = C.getImpl().getArena(arena).StructTypes.FindNodeOrInsertPos(id, insertPos))
-    return structTy;
-
-  auto structTy = new (C, arena) StructType(D, Parent, C, properties);
-  C.getImpl().getArena(arena).StructTypes.InsertNode(structTy, insertPos);
-  return structTy;
-}
-
-void StructType::Profile(llvm::FoldingSetNodeID &ID, StructDecl *D, Type Parent) {
-  ID.AddPointer(D);
-  ID.AddPointer(Parent.getPointer());
+  auto *&known = C.getImpl().getArena(arena).StructTypes[{D, Parent}];
+  if (!known) {
+    known = new (C, arena) StructType(D, Parent, C, properties);
+  }
+  return known;
 }
 
 ClassType::ClassType(ClassDecl *TheDecl, Type Parent, const ASTContext &C,
@@ -3417,26 +3405,15 @@ ClassType::ClassType(ClassDecl *TheDecl, Type Parent, const ASTContext &C,
   : NominalType(TypeKind::Class, &C, TheDecl, Parent, properties) { }
 
 ClassType *ClassType::get(ClassDecl *D, Type Parent, const ASTContext &C) {
-  llvm::FoldingSetNodeID id;
-  ClassType::Profile(id, D, Parent);
-
   RecursiveTypeProperties properties;
   if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
-  void *insertPos = nullptr;
-  if (auto classTy
-        = C.getImpl().getArena(arena).ClassTypes.FindNodeOrInsertPos(id, insertPos))
-    return classTy;
-
-  auto classTy = new (C, arena) ClassType(D, Parent, C, properties);
-  C.getImpl().getArena(arena).ClassTypes.InsertNode(classTy, insertPos);
-  return classTy;
-}
-
-void ClassType::Profile(llvm::FoldingSetNodeID &ID, ClassDecl *D, Type Parent) {
-  ID.AddPointer(D);
-  ID.AddPointer(Parent.getPointer());
+  auto *&known = C.getImpl().getArena(arena).ClassTypes[{D, Parent}];
+  if (!known) {
+    known = new (C, arena) ClassType(D, Parent, C, properties);
+  }
+  return known;
 }
 
 ProtocolCompositionType *
@@ -3525,13 +3502,16 @@ MetatypeType *MetatypeType::get(Type T, Optional<MetatypeRepresentation> Repr,
   auto properties = T->getRecursiveProperties();
   auto arena = getArena(properties);
 
-  char reprKey;
+  unsigned reprKey;
   if (Repr.hasValue())
-    reprKey = static_cast<char>(*Repr) + 1;
+    reprKey = static_cast<unsigned>(*Repr) + 1;
   else
     reprKey = 0;
 
-  MetatypeType *&Entry = Ctx.getImpl().getArena(arena).MetatypeTypes[{T, reprKey}];
+  auto pair = llvm::PointerIntPair<TypeBase*, 3, unsigned>(T.getPointer(),
+                                                           reprKey);
+
+  MetatypeType *&Entry = Ctx.getImpl().getArena(arena).MetatypeTypes[pair];
   if (Entry) return Entry;
 
   return Entry = new (Ctx, arena) MetatypeType(
@@ -3550,13 +3530,16 @@ ExistentialMetatypeType::get(Type T, Optional<MetatypeRepresentation> repr,
   auto properties = T->getRecursiveProperties();
   auto arena = getArena(properties);
 
-  char reprKey;
+  unsigned reprKey;
   if (repr.hasValue())
-    reprKey = static_cast<char>(*repr) + 1;
+    reprKey = static_cast<unsigned>(*repr) + 1;
   else
     reprKey = 0;
 
-  auto &entry = ctx.getImpl().getArena(arena).ExistentialMetatypeTypes[{T, reprKey}];
+  auto pair = llvm::PointerIntPair<TypeBase*, 3, unsigned>(T.getPointer(),
+                                                           reprKey);
+
+  auto &entry = ctx.getImpl().getArena(arena).ExistentialMetatypeTypes[pair];
   if (entry) return entry;
 
   return entry = new (ctx, arena) ExistentialMetatypeType(
@@ -3630,7 +3613,7 @@ isFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
 static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                                       Type result) {
-  static_assert(RecursiveTypeProperties::BitWidth == 11,
+  static_assert(RecursiveTypeProperties::BitWidth == 10,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
 
@@ -4104,7 +4087,7 @@ CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 11,
+  static_assert(RecursiveTypeProperties::BitWidth == 10,
                 "revisit this if you add new recursive type properties");
   for (auto &param : params)
     properties |= param.getType()->getRecursiveProperties();
@@ -4172,34 +4155,21 @@ OptionalType *OptionalType::get(Type base) {
 
 ProtocolType *ProtocolType::get(ProtocolDecl *D, Type Parent,
                                 const ASTContext &C) {
-  llvm::FoldingSetNodeID id;
-  ProtocolType::Profile(id, D, Parent);
-
   RecursiveTypeProperties properties;
   if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
-  void *insertPos = nullptr;
-  if (auto protoTy
-        = C.getImpl().getArena(arena).ProtocolTypes.FindNodeOrInsertPos(id, insertPos))
-    return protoTy;
-
-  auto protoTy = new (C, arena) ProtocolType(D, Parent, C, properties);
-  C.getImpl().getArena(arena).ProtocolTypes.InsertNode(protoTy, insertPos);
-
-  return protoTy;
+  auto *&known = C.getImpl().getArena(arena).ProtocolTypes[{D, Parent}];
+  if (!known) {
+    known = new (C, arena) ProtocolType(D, Parent, C, properties);
+  }
+  return known;
 }
 
 ProtocolType::ProtocolType(ProtocolDecl *TheDecl, Type Parent,
                            const ASTContext &Ctx,
                            RecursiveTypeProperties properties)
   : NominalType(TypeKind::Protocol, &Ctx, TheDecl, Parent, properties) { }
-
-void ProtocolType::Profile(llvm::FoldingSetNodeID &ID, ProtocolDecl *D,
-                           Type Parent) {
-  ID.AddPointer(D);
-  ID.AddPointer(Parent.getPointer());
-}
 
 LValueType *LValueType::get(Type objectTy) {
   assert(!objectTy->hasError() &&
@@ -4274,139 +4244,6 @@ DependentMemberType *DependentMemberType::get(Type base,
                                                  properties);
   }
   return known;
-}
-
-OpaqueTypeArchetypeType *
-OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
-                             SubstitutionMap Substitutions) {
-  // TODO: We could attempt to preserve type sugar in the substitution map.
-  Substitutions = Substitutions.getCanonical();
-  
-  // TODO: Eventually an opaque archetype ought to be arbitrarily substitutable
-  // into any generic environment. However, there isn't currently a good way to
-  // do this with GenericSignatureBuilder; in a situation like this:
-  //
-  // __opaque_type Foo<t_0_0: P>: Q // internal signature <t_0_0: P, t_1_0: Q>
-  //
-  // func bar<t_0_0, t_0_1, t_0_2: P>() -> Foo<t_0_2>
-  //
-  // we'd want to feed the GSB constraints to form:
-  //
-  // <t_0_0: P, t_1_0: Q where t_0_0 == t_0_2>
-  //
-  // even though t_0_2 isn't *in* this generic signature; it represents a type
-  // bound elsewhere from some other generic context. If we knew the generic
-  // environment `t_0_2` came from, then maybe we could map it into that context,
-  // but currently we have no way to know that with certainty.
-  //
-  // For now, opaque types cannot propagate across decls; every declaration
-  // with an opaque type has a unique opaque decl. Therefore, the only
-  // expressions involving opaque types ought to be contextualized inside
-  // function bodies, and the only time we need an opaque interface type should
-  // be for the opaque decl itself and the originating decl with the opaque
-  // result type, in which case the interface type mapping is identity and
-  // this problem can be temporarily avoided.
-#ifndef NDEBUG
-  for (unsigned i : indices(Substitutions.getReplacementTypes())) {
-    auto replacement = Substitutions.getReplacementTypes()[i];
-    
-    if (!replacement->hasTypeParameter())
-      continue;
-    
-    auto replacementParam = replacement->getAs<GenericTypeParamType>();
-    if (!replacementParam)
-      llvm_unreachable("opaque types cannot currently be parameterized by non-identity type parameter mappings");
-    
-    assert(i == Decl->getGenericSignature()->getGenericParamOrdinal(replacementParam)
-           && "opaque types cannot currently be parameterized by non-identity type parameter mappings");
-  }
-#endif
-  
-  llvm::FoldingSetNodeID id;
-  Profile(id, Decl, Substitutions);
-  
-  auto &ctx = Decl->getASTContext();
-
-  // An opaque type isn't contextually dependent like other archetypes, so
-  // by itself, it doesn't impose the "Has Archetype" recursive property,
-  // but the substituted types might. A disjoint "Has Opaque Archetype" tracks
-  // the presence of opaque archetypes.
-  RecursiveTypeProperties properties =
-    RecursiveTypeProperties::HasOpaqueArchetype;
-  for (auto type : Substitutions.getReplacementTypes()) {
-    properties |= type->getRecursiveProperties();
-  }
-  
-  auto arena = getArena(properties);
-  
-  llvm::FoldingSet<OpaqueTypeArchetypeType> &set
-    = ctx.getImpl().getArena(arena).OpaqueArchetypes;
-  
-  {
-    void *insertPos; // Discarded because the work below may invalidate the
-                     // insertion point inside the folding set
-    if (auto existing = set.FindNodeOrInsertPos(id, insertPos)) {
-      return existing;
-    }
-  }
-  
-  // Create a new opaque archetype.
-  // It lives in an environment in which the interface generic arguments of the
-  // decl have all been same-type-bound to the arguments from our substitution
-  // map.
-  GenericSignatureBuilder builder(ctx);
-  builder.addGenericSignature(Decl->getOpaqueInterfaceGenericSignature());
-  // Same-type-constrain the arguments in the outer signature to their
-  // replacements in the substitution map.
-  if (auto outerSig = Decl->getGenericSignature()) {
-    for (auto outerParam : outerSig->getGenericParams()) {
-      auto boundType = Type(outerParam).subst(Substitutions);
-      builder.addSameTypeRequirement(Type(outerParam), boundType,
-         GenericSignatureBuilder::FloatingRequirementSource::forAbstract(),
-         GenericSignatureBuilder::UnresolvedHandlingKind::GenerateConstraints,
-         [](Type, Type) { llvm_unreachable("error?"); });
-    }
-  }
-  
-  auto signature = std::move(builder)
-    .computeGenericSignature(SourceLoc());
-  
-  auto opaqueInterfaceTy = Decl->getUnderlyingInterfaceType();
-  auto layout = signature->getLayoutConstraint(opaqueInterfaceTy);
-  auto superclass = signature->getSuperclassBound(opaqueInterfaceTy);
-  SmallVector<ProtocolDecl*, 4> protos;
-  for (auto proto : signature->getConformsTo(opaqueInterfaceTy)) {
-    protos.push_back(proto);
-  }
-  
-  auto mem = ctx.Allocate(
-    OpaqueTypeArchetypeType::totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint>(
-      protos.size(), superclass ? 1 : 0, layout ? 1 : 0),
-      alignof(OpaqueTypeArchetypeType),
-      arena);
-  
-  auto newOpaque = ::new (mem) OpaqueTypeArchetypeType(Decl, Substitutions,
-                                                    properties,
-                                                    opaqueInterfaceTy,
-                                                    protos, superclass, layout);
-  
-  // Create a generic environment and bind the opaque archetype to the
-  // opaque interface type from the decl's signature.
-  auto env = signature->createGenericEnvironment();
-  env->addMapping(GenericParamKey(opaqueInterfaceTy), newOpaque);
-  newOpaque->Environment = env;
-  
-  // Look up the insertion point in the folding set again in case something
-  // invalidated it above.
-  {
-    void *insertPos;
-    auto existing = set.FindNodeOrInsertPos(id, insertPos);
-    (void)existing;
-    assert(!existing && "race to create opaque archetype?!");
-    set.InsertNode(newOpaque, insertPos);
-  }
-  
-  return newOpaque;
 }
 
 CanOpenedArchetypeType OpenedArchetypeType::get(Type existential,
@@ -5142,9 +4979,6 @@ SILLayout *SILLayout::get(ASTContext &C,
 CanSILBoxType SILBoxType::get(ASTContext &C,
                               SILLayout *Layout,
                               SubstitutionMap Substitutions) {
-  // TODO: Support resilient opaque types.
-  Substitutions = Substitutions
-    .substOpaqueTypesWithUnderlyingTypes();
   // Canonicalize substitutions.
   Substitutions = Substitutions.getCanonical();
 

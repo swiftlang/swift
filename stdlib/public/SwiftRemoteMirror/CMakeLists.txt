@@ -30,6 +30,7 @@ if(SWIFT_INCLUDE_TOOLS)
 
   add_swift_host_library(swiftRemoteMirror STATIC
     SwiftRemoteMirror.cpp)
+  target_compile_definitions(swiftRemoteMirror PRIVATE _LIB)
   target_compile_options(swiftRemoteMirror PRIVATE
     ${SWIFT_RUNTIME_CXX_FLAGS})
   set_property(TARGET swiftRemoteMirror APPEND_STRING PROPERTY LINK_FLAGS

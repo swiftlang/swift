@@ -77,7 +77,6 @@ set(SWIFT_BENCH_MODULES
     single-source/DictionaryRemove
     single-source/DictionarySubscriptDefault
     single-source/DictionarySwap
-    single-source/DoubleWidthDivision
     single-source/DropFirst
     single-source/DropLast
     single-source/DropWhile
@@ -89,7 +88,6 @@ set(SWIFT_BENCH_MODULES
     single-source/FloatingPointPrinting
     single-source/Hanoi
     single-source/Hash
-    single-source/HashQuadratic
     single-source/Histogram
     single-source/InsertCharacter  
     single-source/Integrate
@@ -136,6 +134,7 @@ set(SWIFT_BENCH_MODULES
     single-source/RandomValues
     single-source/RangeAssignment
     single-source/RangeIteration
+    single-source/RangeOverlaps
     single-source/RangeReplaceableCollectionPlusDefault
     single-source/RecursiveOwnedParameter
     single-source/ReduceInto

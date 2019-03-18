@@ -290,9 +290,17 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     /// or shared linkage.
     OnDemand,
     /// The declaration should never be made public.
-    NeverPublic 
+    NeverPublic,
+    /// The declaration should always be emitted into the client,
+    AlwaysEmitIntoClient,
   };
   auto limit = Limit::None;
+
+  // @_alwaysEmitIntoClient declarations are like the default arguments of
+  // public functions; they are roots for dead code elimination and have
+  // serialized bodies, but no public symbol in the generated binary.
+  if (d->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    limit = Limit::AlwaysEmitIntoClient;
 
   // ivar initializers and destroyers are completely contained within the class
   // from which they come, and never get seen externally.
@@ -369,6 +377,8 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
       return SILLinkage::Shared;
     if (limit == Limit::NeverPublic)
       return maybeAddExternal(SILLinkage::Hidden);
+    if (limit == Limit::AlwaysEmitIntoClient)
+      return maybeAddExternal(SILLinkage::PublicNonABI);
     return maybeAddExternal(SILLinkage::Public);
   }
   llvm_unreachable("unhandled access");
@@ -464,11 +474,17 @@ IsSerialized_t SILDeclRef::isSerialized() const {
 
   auto *d = getDecl();
 
-  // Default argument generators are serialized if the function was
-  // type-checked in Swift 4 mode.
+  // Default argument generators are serialized if the containing
+  // declaration is public.
   if (isDefaultArgGenerator()) {
-    auto *afd = cast<AbstractFunctionDecl>(d);
-    switch (afd->getDefaultArgumentResilienceExpansion()) {
+    ResilienceExpansion expansion;
+    if (auto *EED = dyn_cast<EnumElementDecl>(d)) {
+      expansion = EED->getDefaultArgumentResilienceExpansion();
+    } else {
+      expansion = cast<AbstractFunctionDecl>(d)
+                    ->getDefaultArgumentResilienceExpansion();
+    }
+    switch (expansion) {
     case ResilienceExpansion::Minimal:
       return IsSerialized;
     case ResilienceExpansion::Maximal:
@@ -580,10 +596,6 @@ bool SILDeclRef::isNoinline() const {
       if (attr->getKind() == InlineKind::Never)
         return true;
   }
-
-  if (auto *attr = decl->getAttrs().getAttribute<SemanticsAttr>())
-    if (attr->Value.equals("keypath.entry"))
-      return true;
 
   return false;
 }
@@ -770,7 +782,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   case SILDeclRef::Kind::DefaultArgGenerator:
     assert(!isCurried);
     return mangler.mangleDefaultArgumentEntity(
-                                        cast<AbstractFunctionDecl>(getDecl()),
+                                        cast<DeclContext>(getDecl()),
                                         defaultArgIndex,
                                         SKind);
 

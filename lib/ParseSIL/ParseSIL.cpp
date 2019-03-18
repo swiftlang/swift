@@ -738,7 +738,7 @@ bool SILParser::parseGlobalName(Identifier &Name) {
 SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type,
                                   SILLocation Loc, SILBuilder &B) {
   if (Name.isUndef())
-    return SILUndef::get(Type, &SILMod);
+    return SILUndef::get(Type, B.getFunction());
 
   // Check to see if this is already defined.
   ValueBase *&Entry = LocalValues[Name.Name];
@@ -1956,6 +1956,32 @@ static bool parseStoreOwnershipQualifier(StoreOwnershipQualifier &Result,
   return false;
 }
 
+static bool parseAssignOwnershipQualifier(AssignOwnershipQualifier &Result,
+                                          SILParser &P) {
+  StringRef Str;
+  // If we do not parse '[' ... ']', we have unknown. Set value and return.
+  if (!parseSILOptional(Str, P)) {
+    Result = AssignOwnershipQualifier::Unknown;
+    return false;
+  }
+
+  // Then try to parse one of our other initialization kinds. We do not support
+  // parsing unknown here so we use that as our fail value.
+  auto Tmp = llvm::StringSwitch<AssignOwnershipQualifier>(Str)
+                 .Case("reassign", AssignOwnershipQualifier::Reassign)
+                 .Case("reinit", AssignOwnershipQualifier::Reinit)
+                 .Case("init", AssignOwnershipQualifier::Init)
+                 .Default(AssignOwnershipQualifier::Unknown);
+
+  // Thus return true (following the conventions in this file) if we fail.
+  if (Tmp == AssignOwnershipQualifier::Unknown)
+    return true;
+
+  // Otherwise, assign Result and return false.
+  Result = Tmp;
+  return false;
+}
+
 bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
   SourceLoc TyLoc;
   SmallVector<ValueDecl *, 4> values;
@@ -2299,6 +2325,19 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
     }
     
     component = KeyPathPatternComponent::forOptional(kind, ty);
+    return false;
+  } else if (componentKind.str() == "tuple_element") {
+    unsigned tupleIndex;
+    CanType ty;
+
+    if (P.parseToken(tok::pound, diag::expected_sil_constant)
+        || parseInteger(tupleIndex, diag::expected_sil_tuple_index)
+        || P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
+        || P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$")
+        || parseASTType(ty, patternEnv))
+      return true;
+      
+    component = KeyPathPatternComponent::forTupleElement(tupleIndex, ty);
     return false;
   } else {
     P.diagnose(componentLoc, diag::sil_keypath_unknown_component_kind,
@@ -3448,18 +3487,25 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     break;
   }
 
+  case SILInstructionKind::AssignInst:
   case SILInstructionKind::StoreInst: {
     UnresolvedValueName From;
     SourceLoc ToLoc, AddrLoc;
     Identifier ToToken;
     SILValue AddrVal;
-    StoreOwnershipQualifier Qualifier;
+    StoreOwnershipQualifier StoreQualifier;
+    AssignOwnershipQualifier AssignQualifier;
+    bool IsStore = Opcode == SILInstructionKind::StoreInst;
+    bool IsAssign = Opcode == SILInstructionKind::AssignInst;
     if (parseValueName(From) ||
         parseSILIdentifier(ToToken, ToLoc, diag::expected_tok_in_sil_instr,
                            "to"))
       return true;
 
-    if (parseStoreOwnershipQualifier(Qualifier, *this))
+    if (IsStore && parseStoreOwnershipQualifier(StoreQualifier, *this))
+      return true;
+
+    if (IsAssign && parseAssignOwnershipQualifier(AssignQualifier, *this))
       return true;
 
     if (parseTypedValueRef(AddrVal, AddrLoc, B) ||
@@ -3479,8 +3525,18 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
 
     SILType ValType = AddrVal->getType().getObjectType();
 
-    ResultVal = B.createStore(InstLoc, getLocalValue(From, ValType, InstLoc, B),
-                              AddrVal, Qualifier);
+    if (IsStore) {
+      ResultVal = B.createStore(InstLoc,
+                                getLocalValue(From, ValType, InstLoc, B),
+                                AddrVal, StoreQualifier);
+    } else {
+      assert(IsAssign);
+
+      ResultVal = B.createAssign(InstLoc,
+                                getLocalValue(From, ValType, InstLoc, B),
+                                AddrVal, AssignQualifier);
+    }
+
     break;
   }
 
@@ -3619,8 +3675,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Store##Name##Inst:
 #include "swift/AST/ReferenceStorage.def"
-  case SILInstructionKind::StoreBorrowInst:
-  case SILInstructionKind::AssignInst: {
+  case SILInstructionKind::StoreBorrowInst: {
     UnresolvedValueName from;
     bool isRefStorage = false;
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
@@ -3673,12 +3728,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     }
 #include "swift/AST/ReferenceStorage.def"
 
-    SILType ValType = addrVal->getType().getObjectType();
-
-    assert(Opcode == SILInstructionKind::AssignInst);
-    ResultVal = B.createAssign(InstLoc,
-                               getLocalValue(from, ValType, InstLoc, B),
-                               addrVal);
     break;
   }
   case SILInstructionKind::AllocStackInst:
@@ -4718,8 +4767,9 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       = OpenedArchetypeType::get(Val->getType().getASTType())
         ->getCanonicalType();
     
-    SILType LoweredTy = SILMod.Types.getLoweredType(
-                                    Lowering::AbstractionPattern(archetype), Ty)
+    auto &F = B.getFunction();
+    SILType LoweredTy = F.getLoweredType(
+        Lowering::AbstractionPattern(archetype), Ty)
       .getAddressType();
     
     // Collect conformances for the type.

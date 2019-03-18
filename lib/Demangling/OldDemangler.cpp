@@ -1319,7 +1319,7 @@ private:
 
             auto discriminator = name->getChild(0);
 
-            // Create new PrivateDeclName with no 'subscript' identifer child
+            // Create new PrivateDeclName with no 'subscript' identifier child
             name = Factory.createNode(Node::Kind::PrivateDeclName);
             name->addChild(discriminator, Factory);
           }

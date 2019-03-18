@@ -48,6 +48,7 @@ public:
 
   const UniversalLinkageInfo &UniversalLinkInfo;
   ModuleDecl *SwiftModule;
+  AvailabilityContext AvailCtx;
   const TBDGenOptions &Opts;
 
 private:
@@ -73,10 +74,11 @@ public:
   TBDGenVisitor(tapi::internal::InterfaceFile &symbols,
                 tapi::internal::ArchitectureSet archs, StringSet *stringSymbols,
                 const UniversalLinkageInfo &universalLinkInfo,
-                ModuleDecl *swiftModule, const TBDGenOptions &opts)
+                ModuleDecl *swiftModule, AvailabilityContext availCtx,
+                const TBDGenOptions &opts)
       : Symbols(symbols), Archs(archs), StringSymbols(stringSymbols),
         UniversalLinkInfo(universalLinkInfo), SwiftModule(swiftModule),
-        Opts(opts) {}
+        AvailCtx(availCtx), Opts(opts) {}
 
   void addMainIfNecessary(FileUnit *file) {
     // HACK: 'main' is a special symbol that's always emitted in SILGen if

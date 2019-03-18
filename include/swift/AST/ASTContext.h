@@ -84,7 +84,6 @@ namespace swift {
   class ModuleLoader;
   class NominalTypeDecl;
   class NormalProtocolConformance;
-  class OpaqueTypeDecl;
   class InheritedProtocolConformance;
   class SelfProtocolConformance;
   class SpecializedProtocolConformance;
@@ -953,7 +952,6 @@ private:
 
   friend TypeBase;
   friend ArchetypeType;
-  friend OpaqueTypeDecl;
 
   /// Provide context-level uniquing for SIL lowered type layouts and boxes.
   friend SILLayout;

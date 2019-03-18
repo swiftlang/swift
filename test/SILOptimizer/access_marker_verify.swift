@@ -1,7 +1,6 @@
-
-// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -emit-silgen -swift-version 4 -parse-as-library %s | %FileCheck %s
-// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -Onone -emit-sil -swift-version 4 -parse-as-library %s -o /dev/null
-// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -O -emit-sil -swift-version 4 -parse-as-library %s -o /dev/null
+// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -emit-silgen -swift-version 4 -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -Onone -emit-sil -swift-version 4 -parse-as-library %s -o /dev/null
+// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -O -emit-sil -swift-version 4 -parse-as-library %s -o /dev/null
 // REQUIRES: asserts
 
 // Test the combination of SILGen + DiagnoseStaticExclusivity with verification.
@@ -329,10 +328,13 @@ func testInitGenericEnum<T>(t: T) -> GenericEnum<T>? {
 // CHECK:   alloc_box $<τ_0_0> { var GenericEnum<τ_0_0> } <T>, var, name "self"
 // CHECK:   mark_uninitialized [delegatingself] %3 : $<τ_0_0> { var GenericEnum<τ_0_0> } <T>
 // CHECK:   [[PROJ:%.*]] = project_box
-// CHECK:   [[STK:%.*]] = alloc_stack $GenericEnum<T>
-// CHECK:   [[ADR1:%.*]] = init_enum_data_addr [[STK]]
+// CHECK:   [[ADR1:%.*]] = alloc_stack $T
 // CHECK-NOT: begin_access
 // CHECK:   copy_addr %1 to [initialization] [[ADR1]] : $*T
+// CHECK:   [[STK:%.*]] = alloc_stack $GenericEnum<T>
+// CHECK:   [[ENUMDATAADDR:%.*]] = init_enum_data_addr [[STK]]
+// CHECK-NOT: begin_access
+// CHECK:   copy_addr [take] [[ADR1]] to [initialization] [[ENUMDATAADDR]] : $*T
 // CHECK:   inject_enum_addr
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unknown] [[PROJ]]
 // CHECK:   copy_addr [take] %{{.*}} to [[ACCESS]] : $*GenericEnum<T>
@@ -353,9 +355,9 @@ func testIndirectEnum() -> IndirectEnum {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify16testIndirectEnumAA0eF0OyF : $@convention(thin) () -> @owned IndirectEnum {
 // CHECK: bb0:
+// CHECK:   apply
 // CHECK:   alloc_box ${ var Int }
 // CHECK:   [[PROJ:%.*]] = project_box
-// CHECK:   apply
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[PROJ]]
 // CHECK:   store %{{.*}} to [trivial] [[ACCESS]] : $*Int
 // CHECK:   end_access
@@ -381,6 +383,31 @@ enum IntEnum {
 // CHECK-NOT: begin_access
 // CHECK:   load [trivial] [[PROJ]] : $*Int
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify7IntEnumO8getValueSivg'
+
+// Also test SILGenPattern for address-only enums with indirect loadable payloads.
+enum IntTEnum<T> {
+  indirect case int(Int)
+  case other(T)
+
+  var getValue: Int {
+    switch self {
+    case .int(let x): return x
+    case .other: return 0
+    }
+  }
+}
+// IntTEnum.getValue.getter
+// CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify8IntTEnumO8getValueSivg : $@convention(method) <T> (@in_guaranteed IntTEnum<T>) -> Int {
+// CHECK: bb0(%0 : $*IntTEnum<T>):
+// CHECK:   switch_enum_addr %{{.*}} : $*IntTEnum<T>, case #IntTEnum.int!enumelt.1: bb1, case #IntTEnum.other!enumelt.1: bb2
+// CHECK: bb1:
+// CHECK:   [[UTEDA:%.*]] = unchecked_take_enum_data_addr %{{.*}} : $*IntTEnum<T>, #IntTEnum.int!enumelt.1
+// CHECK-NOT: begin_access
+// CHECK:   [[BOX:%.*]] = load [take] [[UTEDA]] : $*<τ_0_0> { var Int } <T>
+// CHECK:   [[PROJ:%.*]] = project_box [[BOX]] : $<τ_0_0> { var Int } <T>, 0
+// CHECK-NOT: begin_access
+// CHECK:   load [trivial] [[PROJ]] : $*Int
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify8IntTEnumO8getValueSivg'
 
 // -- indirect enum reference.
 enum RefEnum {

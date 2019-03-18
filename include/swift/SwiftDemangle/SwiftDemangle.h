@@ -57,6 +57,16 @@ size_t swift_demangle_getSimplifiedDemangledName(const char *MangledName,
                                                  char *OutputBuffer,
                                                  size_t Length);
 
+/// Demangle a Swift symbol and return the module name of the mangled entity.
+///
+/// \returns the length of the demangled module name (even if greater than the
+/// size of the output buffer) or 0 if the input is not a Swift-mangled name
+/// (in which cases \p OutputBuffer is left untouched).
+SWIFT_DEMANGLE_LINKAGE
+size_t swift_demangle_getModuleName(const char *MangledName,
+                                    char *OutputBuffer,
+                                    size_t Length);
+
 /// Demangles a Swift function name and returns true if the function
 /// conforms to the Swift calling convention.
 ///

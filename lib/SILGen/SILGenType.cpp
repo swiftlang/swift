@@ -159,7 +159,7 @@ bool SILGenModule::requiresObjCMethodEntryPoint(FuncDecl *method) {
   if (method->getAttrs().hasAttribute<NSManagedAttr>())
     return false;
 
-  return method->isObjC() || method->getAttrs().hasAttribute<IBActionAttr>();
+  return method->isObjC();
 }
 
 bool SILGenModule::requiresObjCMethodEntryPoint(ConstructorDecl *constructor) {
@@ -977,8 +977,7 @@ public:
     // Emit witness tables for conformances of concrete types. Protocol types
     // are existential and do not have witness tables.
     for (auto *conformance : theType->getLocalConformances(
-                               ConformanceLookupKind::All,
-                               nullptr, /*sorted=*/true)) {
+                               ConformanceLookupKind::All, nullptr)) {
       if (conformance->isComplete() &&
           isa<NormalProtocolConformance>(conformance))
         SGM.getWitnessTable(conformance);
@@ -989,7 +988,6 @@ public:
   // Visitors for subdeclarations
   //===--------------------------------------------------------------------===//
   void visitTypeAliasDecl(TypeAliasDecl *tad) {}
-  void visitOpaqueTypeDecl(OpaqueTypeDecl *otd) {}
   void visitAbstractTypeParamDecl(AbstractTypeParamDecl *tpd) {}
   void visitModuleDecl(ModuleDecl *md) {}
   void visitMissingMemberDecl(MissingMemberDecl *) {}
@@ -1016,7 +1014,13 @@ public:
   }
 
   void visitEnumCaseDecl(EnumCaseDecl *ecd) {}
-  void visitEnumElementDecl(EnumElementDecl *ued) {}
+  void visitEnumElementDecl(EnumElementDecl *EED) {
+    if (!EED->hasAssociatedValues())
+      return;
+
+    // Emit any default argument generators.
+    SGM.emitDefaultArgGenerators(EED, EED->getParameterList());
+  }
 
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     // Emit initializers.
@@ -1074,7 +1078,7 @@ public:
       // extension.
       for (auto *conformance : e->getLocalConformances(
                                  ConformanceLookupKind::All,
-                                 nullptr, /*sorted=*/true)) {
+                                 nullptr)) {
         if (conformance->isComplete() &&
             isa<NormalProtocolConformance>(conformance))
           SGM.getWitnessTable(conformance);
@@ -1086,7 +1090,6 @@ public:
   // Visitors for subdeclarations
   //===--------------------------------------------------------------------===//
   void visitTypeAliasDecl(TypeAliasDecl *tad) {}
-  void visitOpaqueTypeDecl(OpaqueTypeDecl *tad) {}
   void visitAbstractTypeParamDecl(AbstractTypeParamDecl *tpd) {}
   void visitModuleDecl(ModuleDecl *md) {}
   void visitMissingMemberDecl(MissingMemberDecl *) {}

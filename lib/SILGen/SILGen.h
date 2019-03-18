@@ -166,11 +166,6 @@ public:
 
   /// True if a function has been emitted for a given SILDeclRef.
   bool hasFunction(SILDeclRef constant);
-  
-  /// Get the lowered type for a Swift type.
-  SILType getLoweredType(Type t) {
-    return Types.getTypeLowering(t).getLoweredType();
-  }
 
   /// Get or create the declaration of a reabstraction thunk with the
   /// given signature.
@@ -201,7 +196,6 @@ public:
   void visitOperatorDecl(OperatorDecl *d) {}
   void visitPrecedenceGroupDecl(PrecedenceGroupDecl *d) {}
   void visitTypeAliasDecl(TypeAliasDecl *d) {}
-  void visitOpaqueTypeDecl(OpaqueTypeDecl *d) {}
   void visitAbstractTypeParamDecl(AbstractTypeParamDecl *d) {}
   void visitSubscriptDecl(SubscriptDecl *d) {}
   void visitConstructorDecl(ConstructorDecl *d) {}

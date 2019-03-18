@@ -185,6 +185,7 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_warn_implicit_overrides);
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
+  inputArgs.AddLastArg(arguments, options::OPT_enable_library_evolution);
   inputArgs.AddLastArg(arguments, options::OPT_enable_testing);
   inputArgs.AddLastArg(arguments, options::OPT_enable_private_imports);
   inputArgs.AddLastArg(arguments, options::OPT_g_Group);
@@ -267,6 +268,8 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   ArgStringList &Arguments = II.Arguments;
   II.allowsResponseFiles = true;
 
+  for (auto &s : getDriver().getSwiftProgramArgs())
+    Arguments.push_back(s.c_str());
   Arguments.push_back("-frontend");
 
   {
@@ -594,6 +597,8 @@ ToolChain::constructInvocation(const InterpretJobAction &job,
   ArgStringList &Arguments = II.Arguments;
   II.allowsResponseFiles = true;
 
+  for (auto &s : getDriver().getSwiftProgramArgs())
+    Arguments.push_back(s.c_str());
   Arguments.push_back("-frontend");
   Arguments.push_back("-interpret");
 
@@ -630,6 +635,8 @@ ToolChain::constructInvocation(const BackendJobAction &job,
   assert(context.Args.hasArg(options::OPT_embed_bitcode));
   ArgStringList Arguments;
 
+  for (auto &s : getDriver().getSwiftProgramArgs())
+    Arguments.push_back(s.c_str());
   Arguments.push_back("-frontend");
 
   // Determine the frontend mode option.
@@ -772,6 +779,8 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   ArgStringList &Arguments = II.Arguments;
   II.allowsResponseFiles = true;
 
+  for (auto &s : getDriver().getSwiftProgramArgs())
+    Arguments.push_back(s.c_str());
   Arguments.push_back("-frontend");
 
   Arguments.push_back("-merge-modules");
@@ -852,6 +861,8 @@ ToolChain::constructInvocation(const ModuleWrapJobAction &job,
   ArgStringList &Arguments = II.Arguments;
   II.allowsResponseFiles = true;
 
+  for (auto &s : getDriver().getSwiftProgramArgs())
+    Arguments.push_back(s.c_str());
   Arguments.push_back("-modulewrap");
 
   addInputsOfType(Arguments, context.Inputs, context.Args,
@@ -895,6 +906,8 @@ ToolChain::constructInvocation(const REPLJobAction &job,
   }
 
   ArgStringList FrontendArgs;
+  for (auto &s : getDriver().getSwiftProgramArgs())
+    FrontendArgs.push_back(s.c_str());
   addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
                         FrontendArgs);
   context.Args.AddLastArg(FrontendArgs, options::OPT_import_objc_header);
@@ -975,6 +988,8 @@ ToolChain::constructInvocation(const GeneratePCHJobAction &job,
   ArgStringList &Arguments = II.Arguments;
   II.allowsResponseFiles = true;
 
+  for (auto &s : getDriver().getSwiftProgramArgs())
+    Arguments.push_back(s.c_str());
   Arguments.push_back("-frontend");
 
   addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,

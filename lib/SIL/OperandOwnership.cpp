@@ -150,7 +150,6 @@ NO_OPERAND_INST(Unwind)
         ValueOwnershipKind::OWNERSHIP,                                         \
         UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT);                       \
   }
-CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, IsEscapingClosure)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, RefElementAddr)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialValue)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialBoxValue)
@@ -162,8 +161,8 @@ CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DestroyValue)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, ReleaseValue)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, ReleaseValueAddr)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, StrongRelease)
-CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, InitExistentialRef)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, EndLifetime)
+CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, InitExistentialRef)
 CONSTANT_OWNERSHIP_INST(Any, MustBeLive, AbortApply)
 CONSTANT_OWNERSHIP_INST(Any, MustBeLive, AddressToPointer)
 CONSTANT_OWNERSHIP_INST(Any, MustBeLive, BeginAccess)
@@ -266,6 +265,7 @@ ACCEPTS_ANY_OWNERSHIP_INST(ExistentialMetatype)
 ACCEPTS_ANY_OWNERSHIP_INST(ValueMetatype)
 ACCEPTS_ANY_OWNERSHIP_INST(UncheckedOwnershipConversion)
 ACCEPTS_ANY_OWNERSHIP_INST(ValueToBridgeObject)
+ACCEPTS_ANY_OWNERSHIP_INST(IsEscapingClosure)
 #undef ACCEPTS_ANY_OWNERSHIP_INST
 
 // Trivial if trivial typed, otherwise must accept owned?
@@ -467,10 +467,10 @@ OperandOwnershipKindClassifier::visitCondBranchInst(CondBranchInst *cbi) {
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitSwitchEnumInst(SwitchEnumInst *sei) {
   auto opTy = sei->getOperand()->getType();
-  auto &mod = sei->getModule();
+
   // If our passed in type is trivial, we shouldn't have any non-trivial
   // successors. Just bail early returning trivial.
-  if (opTy.isTrivial(mod))
+  if (opTy.isTrivial(*sei->getFunction()))
     return Map::allLive();
 
   // Otherwise, go through the ownership constraints of our successor arguments
@@ -534,22 +534,23 @@ OperandOwnershipKindClassifier::visitCheckedCastBranchInst(
 //// FIX THIS HERE
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitReturnInst(ReturnInst *ri) {
+  auto *f =ri->getFunction();
+
   // If we have a trivial value, return allLive().
-  bool isTrivial = ri->getOperand()->getType().isTrivial(mod);
+  bool isTrivial = ri->getOperand()->getType().isTrivial(*f);
   if (isTrivial) {
     return Map::allLive();
   }
 
-  SILFunctionConventions fnConv = ri->getFunction()->getConventions();
+  SILFunctionConventions fnConv = f->getConventions();
 
   auto results = fnConv.getDirectSILResults();
   if (results.empty())
     return Map();
 
-  CanGenericSignature sig = fnConv.funcTy->getGenericSignature();
   auto ownershipKindRange = makeTransformRange(results,
                                                [&](const SILResultInfo &info) {
-                                                 return info.getOwnershipKind(mod, sig);
+                                                 return info.getOwnershipKind(*f);
                                                });
 
   // Then merge all of our ownership kinds. If we fail to merge, return an empty
@@ -859,19 +860,19 @@ OperandOwnershipKindClassifier::visitCopyBlockWithoutEscapingInst(
 
 OperandOwnershipKindMap OperandOwnershipKindClassifier::visitMarkDependenceInst(
     MarkDependenceInst *mdi) {
+  // If we are analyzing "the value", we forward ownership.
+  if (getValue() == mdi->getValue()) {
+    auto kind = getValue().getOwnershipKind();
+    if (kind == ValueOwnershipKind::Any)
+      return Map::allLive();
+    auto lifetimeConstraint = kind.getForwardingLifetimeConstraint();
+    return Map::compatibilityMap(kind, lifetimeConstraint);
+  }
 
-  // Forward ownership if the mark_dependence instruction marks a dependence
-  // on a @noescape function type for an escaping function type.
-  if (getValue() == mdi->getValue())
-    if (auto resFnTy = mdi->getType().getAs<SILFunctionType>())
-      if (auto baseFnTy = mdi->getBase()->getType().getAs<SILFunctionType>())
-        if (!resFnTy->isNoEscape() && baseFnTy->isNoEscape())
-          return Map::compatibilityMap(
-              ValueOwnershipKind::Owned,
-              UseLifetimeConstraint::MustBeInvalidated);
-
-  // We always treat mark dependence as a use that keeps a value alive. We will
-  // be introducing a begin_dependence/end_dependence version of this later.
+  // If we are not the "value" of the mark_dependence, then we must be the
+  // "base". This means that any use that would destroy "value" can not be moved
+  // before any uses of "base". We treat this as non-consuming and rely on the
+  // rest of the optimizer to respect the movement restrictions.
   return Map::allLive();
 }
 

@@ -19,6 +19,7 @@ class KIND(object):
 UID_KEYS = [
     KEY('VersionMajor', 'key.version_major'),
     KEY('VersionMinor', 'key.version_minor'),
+    KEY('VersionPatch', 'key.version_patch'),
     KEY('Results', 'key.results'),
     KEY('Request', 'key.request'),
     KEY('Notification', 'key.notification'),
@@ -38,6 +39,7 @@ UID_KEYS = [
     KEY('Column', 'key.column'),
     KEY('ReceiverUSR', 'key.receiver_usr'),
     KEY('IsDynamic', 'key.is_dynamic'),
+    KEY('IsImplicit', 'key.is_implicit'),
     KEY('FilePath', 'key.filepath'),
     KEY('ModuleInterfaceName', 'key.module_interface_name'),
     KEY('Hash', 'key.hash'),
@@ -172,6 +174,7 @@ UID_KEYS = [
 
 UID_REQUESTS = [
     REQUEST('ProtocolVersion', 'source.request.protocol_version'),
+    REQUEST('CompilerVersion', 'source.request.compiler_version'),
     REQUEST('CrashWithExit', 'source.request.crash_exit'),
     REQUEST('Demangle', 'source.request.demangle'),
     REQUEST('MangleSimpleClass', 'source.request.mangle_simple_class'),

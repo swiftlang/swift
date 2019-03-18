@@ -2,11 +2,11 @@
 // RUN: %empty-directory(%t)
 //
 // Compile the external swift module.
-// RUN: %target-swift-frontend -g -emit-module -enable-resilience \
+// RUN: %target-swift-frontend -g -emit-module -enable-library-evolution \
 // RUN:   -emit-module-path=%t/resilient_struct.swiftmodule \
 // RUN:   -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 //
-// RUN: %target-swift-frontend -g -I %t -emit-ir -enable-resilience %s  -o - \
+// RUN: %target-swift-frontend -g -I %t -emit-ir -enable-library-evolution %s  -o - \
 // RUN:  | %FileCheck %s
 import resilient_struct
 

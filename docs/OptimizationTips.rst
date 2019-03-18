@@ -184,7 +184,7 @@ that value types cannot be included inside an NSArray. Thus when using value
 types, the optimizer can remove most of the overhead in Array that is necessary
 to handle the possibility of the array being backed an NSArray.
 
-Additionally, In contrast to reference types, value types only need reference
+Additionally, in contrast to reference types, value types only need reference
 counting if they contain, recursively, a reference type. By using value types
 without reference types, one can avoid additional retain, release traffic inside
 Array.

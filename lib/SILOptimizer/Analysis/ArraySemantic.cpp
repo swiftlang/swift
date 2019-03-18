@@ -55,7 +55,7 @@ bool swift::ArraySemanticsCall::isValidSignature() {
   case ArrayCallKind::kCheckIndex: {
     // Int, @guaranteed/@owned Self
     if (SemanticsCall->getNumArguments() != 2 ||
-        !SemanticsCall->getArgument(0)->getType().isTrivial(Mod))
+        !SemanticsCall->getArgument(0)->getType().isTrivial(*F))
       return false;
     auto SelfConvention = FnTy->getSelfParameter().getConvention();
     return SelfConvention == ParameterConvention::Direct_Guaranteed ||
@@ -64,9 +64,9 @@ bool swift::ArraySemanticsCall::isValidSignature() {
   case ArrayCallKind::kCheckSubscript: {
     // Int, Bool, Self
     if (SemanticsCall->getNumArguments() != 3 ||
-        !SemanticsCall->getArgument(0)->getType().isTrivial(Mod))
+        !SemanticsCall->getArgument(0)->getType().isTrivial(*F))
       return false;
-    if (!SemanticsCall->getArgument(1)->getType().isTrivial(Mod))
+    if (!SemanticsCall->getArgument(1)->getType().isTrivial(*F))
       return false;
     auto SelfConvention = FnTy->getSelfParameter().getConvention();
     return SelfConvention == ParameterConvention::Direct_Guaranteed ||
@@ -168,7 +168,7 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() const {
         llvm::StringSwitch<ArrayCallKind>(Attrs)
             .Case("array.props.isNativeTypeChecked",
                   ArrayCallKind::kArrayPropsIsNativeTypeChecked)
-            .Case("array.init", ArrayCallKind::kArrayInit)
+            .StartsWith("array.init", ArrayCallKind::kArrayInit)
             .Case("array.uninitialized", ArrayCallKind::kArrayUninitialized)
             .Case("array.check_subscript", ArrayCallKind::kCheckSubscript)
             .Case("array.check_index", ArrayCallKind::kCheckIndex)
@@ -694,7 +694,7 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
     return false;
 
   SILBuilderWithScope Builder(SemanticsCall);
-  auto &ValLowering = Builder.getModule().getTypeLowering(V->getType());
+  auto &ValLowering = Builder.getTypeLowering(V->getType());
   if (hasGetElementDirectResult()) {
     ValLowering.emitCopyValue(Builder, SemanticsCall->getLoc(), V);
     SemanticsCall->replaceAllUsesWith(V);
@@ -756,7 +756,7 @@ bool swift::ArraySemanticsCall::replaceByAppendingValues(
 
   for (SILValue V : Vals) {
     auto SubTy = V->getType();
-    auto &ValLowering = Builder.getModule().getTypeLowering(SubTy);
+    auto &ValLowering = Builder.getTypeLowering(SubTy);
     auto CopiedVal = ValLowering.emitCopyValue(Builder, Loc, V);
     auto *AllocStackInst = Builder.createAllocStack(Loc, SubTy);
 

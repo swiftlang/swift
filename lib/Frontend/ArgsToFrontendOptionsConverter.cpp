@@ -71,7 +71,11 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.EnableTesting |= Args.hasArg(OPT_enable_testing);
   Opts.EnablePrivateImports |= Args.hasArg(OPT_enable_private_imports);
-  Opts.EnableResilience |= Args.hasArg(OPT_enable_resilience);
+  Opts.EnableLibraryEvolution |= Args.hasArg(OPT_enable_library_evolution);
+
+  // FIXME: Remove this flag
+  Opts.EnableLibraryEvolution |= Args.hasArg(OPT_enable_resilience);
+
   Opts.EnableImplicitDynamic |= Args.hasArg(OPT_enable_implicit_dynamic);
 
   Opts.TrackSystemDeps |= Args.hasArg(OPT_track_system_dependencies);

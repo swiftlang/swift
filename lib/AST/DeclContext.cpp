@@ -223,9 +223,8 @@ bool DeclContext::isTypeContext() const {
 DeclContext *DeclContext::getInnermostTypeContext() {
   auto dc = this;
   do {
-    if (auto decl = dc->getAsDecl())
-      if (isa<NominalTypeDecl>(decl) || isa<ExtensionDecl>(decl))
-        return dc;
+    if (dc->isTypeContext())
+      return dc;
   } while ((dc = dc->getParent()));
 
   return nullptr;
@@ -314,6 +313,9 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
     // Default argument initializer contexts have their resilience expansion
     // set when they're type checked.
     if (isa<DefaultArgumentInitializer>(dc)) {
+      if (auto *EED = dyn_cast<EnumElementDecl>(dc->getParent())) {
+        return EED->getDefaultArgumentResilienceExpansion();
+      }
       return cast<AbstractFunctionDecl>(dc->getParent())
           ->getDefaultArgumentResilienceExpansion();
     }
@@ -357,11 +359,18 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
       if (AFD->getAttrs().hasAttribute<InlinableAttr>())
         return ResilienceExpansion::Minimal;
 
-      // If a property or subscript is @inlinable, the accessors are
-      // @inlinable also.
-      if (auto accessor = dyn_cast<AccessorDecl>(AFD))
-        if (accessor->getStorage()->getAttrs().getAttribute<InlinableAttr>())
+      if (AFD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+        return ResilienceExpansion::Minimal;
+
+      // If a property or subscript is @inlinable or @_alwaysEmitIntoClient,
+      // the accessors are @inlinable or @_alwaysEmitIntoClient also.
+      if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
+        auto *storage = accessor->getStorage();
+        if (storage->getAttrs().getAttribute<InlinableAttr>())
           return ResilienceExpansion::Minimal;
+        if (storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+          return ResilienceExpansion::Minimal;
+      }
     }
   }
 

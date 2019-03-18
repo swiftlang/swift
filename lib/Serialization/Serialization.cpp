@@ -1752,9 +1752,6 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::EnumCase:
     return false;
 
-  case DeclKind::OpaqueType:
-    return true;
-      
   case DeclKind::EnumElement:
   case DeclKind::Protocol:
   case DeclKind::Constructor:
@@ -2798,8 +2795,7 @@ void Serializer::writeDecl(const Decl *D) {
     (void)addDeclRef(baseNominal);
 
     auto conformances = extension->getLocalConformances(
-                          ConformanceLookupKind::All,
-                          nullptr, /*sorted=*/true);
+                          ConformanceLookupKind::All, nullptr);
 
     SmallVector<TypeID, 8> inheritedAndDependencyTypes;
     for (auto inherited : extension->getInherited()) {
@@ -3054,8 +3050,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(theStruct->getDeclContext());
 
     auto conformances = theStruct->getLocalConformances(
-                          ConformanceLookupKind::All,
-                          nullptr, /*sorted=*/true);
+                          ConformanceLookupKind::All, nullptr);
 
     SmallVector<TypeID, 4> inheritedTypes;
     for (auto inherited : theStruct->getInherited()) {
@@ -3092,8 +3087,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(theEnum->getDeclContext());
 
     auto conformances = theEnum->getLocalConformances(
-                          ConformanceLookupKind::All,
-                          nullptr, /*sorted=*/true);
+                          ConformanceLookupKind::All, nullptr);
 
     SmallVector<TypeID, 4> inheritedAndDependencyTypes;
     for (auto inherited : theEnum->getInherited()) {
@@ -3147,8 +3141,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(theClass->getDeclContext());
 
     auto conformances = theClass->getLocalConformances(
-                          ConformanceLookupKind::All,
-                          nullptr, /*sorted=*/true);
+                          ConformanceLookupKind::All, nullptr);
 
     SmallVector<TypeID, 4> inheritedTypes;
     for (auto inherited : theClass->getInherited()) {
@@ -3345,7 +3338,6 @@ void Serializer::writeDecl(const Decl *D) {
                            rawAccessLevel,
                            fn->needsNewVTableEntry(),
                            rawDefaultArgumentResilienceExpansion,
-                           addDeclRef(fn->getOpaqueResultTypeDecl()),
                            nameComponentsAndDependencies);
 
     writeGenericParams(fn->getGenericParams());
@@ -3361,31 +3353,6 @@ void Serializer::writeDecl(const Decl *D) {
     break;
   }
       
-  case DeclKind::OpaqueType: {
-    auto opaqueDecl = cast<OpaqueTypeDecl>(D);
-    verifyAttrSerializable(opaqueDecl);
-    
-    auto namingDeclID = addDeclRef(opaqueDecl->getNamingDecl());
-    auto contextID = addDeclContextRef(opaqueDecl->getDeclContext());
-    auto interfaceSigID =
-      addGenericSignatureRef(opaqueDecl->getOpaqueInterfaceGenericSignature());
-    auto interfaceTypeID =
-      addTypeRef(opaqueDecl->getUnderlyingInterfaceType());
-    
-    auto genericEnvID = addGenericEnvironmentRef(opaqueDecl->getGenericEnvironment());
-    
-    SubstitutionMapID underlyingTypeID = 0;
-    if (auto underlying = opaqueDecl->getUnderlyingTypeSubstitutions())
-      underlyingTypeID = addSubstitutionMapRef(*underlying);
-    
-    unsigned abbrCode = DeclTypeAbbrCodes[OpaqueTypeLayout::Code];
-    OpaqueTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                 contextID, namingDeclID, interfaceSigID,
-                                 interfaceTypeID, genericEnvID,
-                                 underlyingTypeID);
-    break;
-  }
-
   case DeclKind::Accessor: {
     auto fn = cast<AccessorDecl>(D);
     verifyAttrSerializable(fn);
@@ -3900,15 +3867,6 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
-  case TypeKind::OpaqueTypeArchetype: {
-    auto archetypeTy = cast<OpaqueTypeArchetypeType>(ty.getPointer());
-    auto declID = addDeclRef(archetypeTy->getOpaqueDecl());
-    auto substMapID = addSubstitutionMapRef(archetypeTy->getSubstitutions());
-    unsigned abbrCode = DeclTypeAbbrCodes[OpaqueArchetypeTypeLayout::Code];
-    OpaqueArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                          declID, substMapID);
-    break;
-  }
   case TypeKind::NestedArchetype: {
     auto archetypeTy = cast<NestedArchetypeType>(ty.getPointer());
     auto rootTypeID = addTypeRef(archetypeTy->getRoot());
@@ -4175,7 +4133,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<ExistentialMetatypeTypeLayout>();
   registerDeclTypeAbbr<PrimaryArchetypeTypeLayout>();
   registerDeclTypeAbbr<OpenedArchetypeTypeLayout>();
-  registerDeclTypeAbbr<OpaqueArchetypeTypeLayout>();
   registerDeclTypeAbbr<NestedArchetypeTypeLayout>();
   registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
   registerDeclTypeAbbr<BoundGenericTypeLayout>();
@@ -4199,7 +4156,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<ParamLayout>();
   registerDeclTypeAbbr<FuncLayout>();
   registerDeclTypeAbbr<AccessorLayout>();
-  registerDeclTypeAbbr<OpaqueTypeLayout>();
   registerDeclTypeAbbr<PatternBindingLayout>();
   registerDeclTypeAbbr<ProtocolLayout>();
   registerDeclTypeAbbr<DefaultWitnessTableLayout>();

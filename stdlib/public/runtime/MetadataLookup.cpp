@@ -50,16 +50,17 @@ using namespace reflection;
 #include <dlfcn.h>
 #endif
 
-/// Produce a Demangler value suitable for resolving runtime type metadata
-/// strings.
-static Demangler getDemanglerForRuntimeTypeResolution() {
-  Demangler dem;
-  // Resolve symbolic references to type contexts into the absolute address of
-  // the type context descriptor, so that if we see a symbolic reference in the
-  // mangled name we can immediately find the associated metadata.
-  dem.setSymbolicReferenceResolver(ResolveAsSymbolicReference(dem));
-  return dem;
-}
+/// A Demangler suitable for resolving runtime type metadata strings.
+template <class Base = Demangler>
+class DemanglerForRuntimeTypeResolution : public Base {
+public:
+  DemanglerForRuntimeTypeResolution() {
+    // Resolve symbolic references to type contexts into the absolute address of
+    // the type context descriptor, so that if we see a symbolic reference in
+    // the mangled name we can immediately find the associated metadata.
+    Base::setSymbolicReferenceResolver(ResolveAsSymbolicReference(*this));
+  }
+};
 
 NodePointer
 ResolveAsSymbolicReference::operator()(SymbolicReferenceKind kind,
@@ -416,7 +417,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
       
       // Check that the context being extended matches as well.
       auto extendedContextNode = node->getChild(1);
-      auto demangler = getDemanglerForRuntimeTypeResolution();
+      DemanglerForRuntimeTypeResolution<> demangler;
 
       auto extendedDescriptorFromNode =
         _findNominalTypeDescriptor(extendedContextNode, demangler);
@@ -592,8 +593,8 @@ _findNominalTypeDescriptor(Demangle::NodePointer node,
     return cast<TypeContextDescriptor>(
       (const ContextDescriptor *)symbolicNode->getIndex());
 
-  auto mangledName =
-    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem));
+  StringRef mangledName =
+    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem);
 
   // Look for an existing entry.
   // Find the bucket for the metadata entry.
@@ -723,7 +724,7 @@ _findProtocolDescriptor(NodePointer node,
       (const ContextDescriptor *)symbolicNode->getIndex());
 
   mangledName =
-    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem));
+    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem).str();
 
   // Look for an existing entry.
   // Find the bucket for the metadata entry.
@@ -820,10 +821,13 @@ Optional<unsigned> swift::_depthIndexToFlatIndex(
 /// \returns true if the innermost descriptor is generic.
 bool swift::_gatherGenericParameterCounts(
                                  const ContextDescriptor *descriptor,
-                                 std::vector<unsigned> &genericParamCounts) {
+                                 SmallVectorImpl<unsigned> &genericParamCounts,
+                                 Demangler &BorrowFrom) {
   // If we have an extension descriptor, extract the extended type and use
   // that.
-  auto demangler = getDemanglerForRuntimeTypeResolution();
+  DemanglerForRuntimeTypeResolution<> demangler;
+  demangler.providePreallocatedMemory(BorrowFrom);
+
   if (auto extension = dyn_cast<ExtensionContextDescriptor>(descriptor)) {
     if (auto extendedType =
             _findExtendedTypeContextDescriptor(extension, demangler))
@@ -835,7 +839,7 @@ bool swift::_gatherGenericParameterCounts(
 
   // Recurse to record the parent context's generic parameters.
   if (auto parent = descriptor->Parent.get())
-    (void)_gatherGenericParameterCounts(parent, genericParamCounts);
+    (void)_gatherGenericParameterCounts(parent, genericParamCounts, demangler);
 
   // Record a new level of generic parameters if the count exceeds the
   // previous count.
@@ -961,8 +965,8 @@ public:
 #if SWIFT_OBJC_INTEROP
     // Look for a Swift-defined @objc protocol with the Swift 3 mangling that
     // is used for Objective-C entities.
-    std::string objcMangledName = "_Tt" + mangleNodeOld(node) + "_";
-    if (auto protocol = objc_getProtocol(objcMangledName.c_str()))
+    const char *objcMangledName = mangleNodeAsObjcCString(node, demangler);
+    if (auto protocol = objc_getProtocol(objcMangledName))
       return ProtocolDescriptorRef::forObjC(protocol);
 #endif
 
@@ -1023,8 +1027,8 @@ public:
 
     // Figure out the various levels of generic parameters we have in
     // this type.
-    std::vector<unsigned> genericParamCounts;
-    (void)_gatherGenericParameterCounts(typeDecl, genericParamCounts);
+    SmallVector<unsigned, 8> genericParamCounts;
+    (void)_gatherGenericParameterCounts(typeDecl, genericParamCounts, demangler);
     unsigned numTotalGenericParams =
         genericParamCounts.empty() ? 0 : genericParamCounts.back();
 
@@ -1037,18 +1041,18 @@ public:
       return BuiltType();
     }
 
-    std::vector<const void *> allGenericArgsVec;
+    SmallVector<const void *, 8> allGenericArgsVec;
 
     // If there are generic parameters at any level, check the generic
     // requirements and fill in the generic arguments vector.
     if (!genericParamCounts.empty()) {
       // Compute the set of generic arguments "as written".
-      std::vector<const Metadata *> allGenericArgs;
+      SmallVector<const Metadata *, 8> allGenericArgs;
 
       // If we have a parent, gather it's generic arguments "as written".
       if (parent) {
         gatherWrittenGenericArgs(parent, parent->getTypeContextDescriptor(),
-                                 allGenericArgs);
+                                 allGenericArgs, demangler);
       }
 
       // Add the generic arguments we were given.
@@ -1060,7 +1064,10 @@ public:
       auto genericContext = typeDecl->getGenericContext();
       {
         auto genericParams = genericContext->getGenericParams();
-        for (unsigned i = 0, n = genericParams.size(); i != n; ++i) {
+        unsigned n = genericParams.size();
+        if (allGenericArgs.size() != n)
+          return BuiltType();
+        for (unsigned i = 0; i != n; ++i) {
           const auto &param = genericParams[i];
           if (param.getKind() != GenericParamKind::Type)
             return BuiltType();
@@ -1080,8 +1087,13 @@ public:
                                                           genericParamCounts);
       bool failed =
         _checkGenericRequirements(genericContext->getGenericRequirements(),
-                                  allGenericArgsVec, substitutions,
-                                  substitutions);
+          allGenericArgsVec,
+          [&substitutions](unsigned depth, unsigned index) {
+            return substitutions.getMetadata(depth, index);
+          },
+          [&substitutions](const Metadata *type, unsigned index) {
+            return substitutions.getWitnessTable(type, index);
+          });
       if (failed)
         return BuiltType();
 
@@ -1155,8 +1167,8 @@ public:
   BuiltType createFunctionType(
                            ArrayRef<Demangle::FunctionParam<BuiltType>> params,
                            BuiltType result, FunctionTypeFlags flags) const {
-    std::vector<BuiltType> paramTypes;
-    std::vector<uint32_t> paramFlags;
+    SmallVector<BuiltType, 8> paramTypes;
+    SmallVector<uint32_t, 8> paramFlags;
 
     // Fill in the parameters.
     paramTypes.reserve(params.size());
@@ -1294,7 +1306,8 @@ static TypeInfo swift_getTypeByMangledNameImpl(
                               StringRef typeName,
                               SubstGenericParameterFn substGenericParam,
                               SubstDependentWitnessTableFn substWitnessTable) {
-  auto demangler = getDemanglerForRuntimeTypeResolution();
+  DemanglerForRuntimeTypeResolution<StackAllocatedDemangler<2048>> demangler;
+
   NodePointer node;
 
   // Check whether this is the convenience syntax "ModuleName.ClassName".
@@ -1352,7 +1365,12 @@ swift_getTypeByMangledNameInEnvironment(
   llvm::StringRef typeName(typeNameStart, typeNameLength);
   SubstGenericParametersFromMetadata substitutions(environment, genericArgs);
   return swift_getTypeByMangledName(MetadataState::Complete, typeName,
-                                    substitutions, substitutions).getMetadata();
+    [&substitutions](unsigned depth, unsigned index) {
+      return substitutions.getMetadata(depth, index);
+    },
+    [&substitutions](const Metadata *type, unsigned index) {
+      return substitutions.getWitnessTable(type, index);
+    }).getMetadata();
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
@@ -1365,7 +1383,12 @@ swift_getTypeByMangledNameInContext(
   llvm::StringRef typeName(typeNameStart, typeNameLength);
   SubstGenericParametersFromMetadata substitutions(context, genericArgs);
   return swift_getTypeByMangledName(MetadataState::Complete, typeName,
-                                    substitutions, substitutions).getMetadata();
+    [&substitutions](unsigned depth, unsigned index) {
+      return substitutions.getMetadata(depth, index);
+    },
+    [&substitutions](const Metadata *type, unsigned index) {
+      return substitutions.getWitnessTable(type, index);
+    }).getMetadata();
 }
 
 /// Demangle a mangled name, but don't allow symbolic references.
@@ -1550,7 +1573,7 @@ void SubstGenericParametersFromMetadata::setup() const {
 }
 
 const Metadata *
-SubstGenericParametersFromMetadata::operator()(
+SubstGenericParametersFromMetadata::getMetadata(
                                         unsigned depth, unsigned index) const {
   // On first access, compute the descriptor path.
   setup();
@@ -1591,17 +1614,16 @@ SubstGenericParametersFromMetadata::operator()(
 }
 
 const WitnessTable *
-SubstGenericParametersFromMetadata::operator()(const Metadata *type,
-                                               unsigned index) const {
+SubstGenericParametersFromMetadata::getWitnessTable(const Metadata *type,
+                                                    unsigned index) const {
   // On first access, compute the descriptor path.
   setup();
 
   return (const WitnessTable *)genericArgs[index + numKeyGenericParameters];
 }
 
-const Metadata *SubstGenericParametersFromWrittenArgs::operator()(
-                                                        unsigned depth,
-                                                        unsigned index) const {
+const Metadata *SubstGenericParametersFromWrittenArgs::getMetadata(
+                                        unsigned depth, unsigned index) const {
   if (auto flatIndex =
           _depthIndexToFlatIndex(depth, index, genericParamCounts)) {
     if (*flatIndex < allGenericArgs.size())
@@ -1612,8 +1634,8 @@ const Metadata *SubstGenericParametersFromWrittenArgs::operator()(
 }
 
 const WitnessTable *
-SubstGenericParametersFromWrittenArgs::operator()(const Metadata *type,
-                                                  unsigned index) const {
+SubstGenericParametersFromWrittenArgs::getWitnessTable(const Metadata *type,
+                                                       unsigned index) const {
   return nullptr;
 }
 
@@ -1639,7 +1661,8 @@ demangleToGenericParamRef(StringRef typeName) {
 void swift::gatherWrittenGenericArgs(
                              const Metadata *metadata,
                              const TypeContextDescriptor *description,
-                             std::vector<const Metadata *> &allGenericArgs) {
+                             SmallVectorImpl<const Metadata *> &allGenericArgs,
+                             Demangler &BorrowFrom) {
   auto generics = description->getGenericContext();
   if (!generics)
     return;
@@ -1692,8 +1715,9 @@ void swift::gatherWrittenGenericArgs(
   // canonicalized away. Use same-type requirements to reconstitute them.
 
   // Retrieve the mapping information needed for depth/index -> flat index.
-  std::vector<unsigned> genericParamCounts;
-  (void)_gatherGenericParameterCounts(description, genericParamCounts);
+  SmallVector<unsigned, 8> genericParamCounts;
+  (void)_gatherGenericParameterCounts(description, genericParamCounts,
+                                      BorrowFrom);
 
   // Walk through the generic requirements to evaluate same-type
   // constraints that are needed to fill in missing generic arguments.
@@ -1720,8 +1744,13 @@ void swift::gatherWrittenGenericArgs(
                                                           genericParamCounts);
       allGenericArgs[*lhsFlatIndex] =
           swift_getTypeByMangledName(MetadataState::Abstract,
-                                     req.getMangledTypeName(), substitutions,
-                                     substitutions).getMetadata();
+            req.getMangledTypeName(),
+            [&substitutions](unsigned depth, unsigned index) {
+              return substitutions.getMetadata(depth, index);
+            },
+            [&substitutions](const Metadata *type, unsigned index) {
+              return substitutions.getWitnessTable(type, index);
+            }).getMetadata();
       continue;
     }
 

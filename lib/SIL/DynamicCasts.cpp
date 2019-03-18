@@ -798,7 +798,7 @@ namespace {
 
   private:
     const TypeLowering &getTypeLowering(SILType type) {
-      return M.Types.getTypeLowering(type);
+      return B.getFunction().getTypeLowering(type);
     }
 
     SILValue getOwnedScalar(Source source, const TypeLowering &srcTL) {
@@ -1036,6 +1036,15 @@ namespace {
   };
 } // end anonymous namespace
 
+SILValue
+swift::emitSuccessfulScalarUnconditionalCast(SILBuilder &B, SILLocation loc,
+                                             SILDynamicCastInst dynamicCast) {
+  return emitSuccessfulScalarUnconditionalCast(
+      B, B.getModule().getSwiftModule(), loc, dynamicCast.getSource(),
+      dynamicCast.getLoweredTargetType(), dynamicCast.getSourceType(),
+      dynamicCast.getTargetType(), dynamicCast.getInstruction());
+}
+
 /// Emit an unconditional scalar cast that's known to succeed.
 SILValue
 swift::emitSuccessfulScalarUnconditionalCast(SILBuilder &B, ModuleDecl *M,
@@ -1067,6 +1076,14 @@ swift::emitSuccessfulScalarUnconditionalCast(SILBuilder &B, ModuleDecl *M,
   assert(!result.isAddress());
   assert(result.Value->getType() == loweredTargetType);
   return result.Value;
+}
+
+bool swift::emitSuccessfulIndirectUnconditionalCast(
+    SILBuilder &B, SILLocation loc, SILDynamicCastInst dynamicCast) {
+  return emitSuccessfulIndirectUnconditionalCast(
+      B, B.getModule().getSwiftModule(), loc, dynamicCast.getSource(),
+      dynamicCast.getSourceType(), dynamicCast.getDest(),
+      dynamicCast.getTargetType(), dynamicCast.getInstruction());
 }
 
 bool swift::emitSuccessfulIndirectUnconditionalCast(
@@ -1182,51 +1199,103 @@ bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
 /// using a scalar cast operation.
 void swift::emitIndirectConditionalCastWithScalar(
     SILBuilder &B, ModuleDecl *M, SILLocation loc,
-    CastConsumptionKind consumption, SILValue src, CanType sourceType,
-    SILValue dest, CanType targetType, SILBasicBlock *indirectSuccBB,
+    CastConsumptionKind consumption, SILValue srcAddr, CanType sourceType,
+    SILValue destAddr, CanType targetType, SILBasicBlock *indirectSuccBB,
     SILBasicBlock *indirectFailBB, ProfileCounter TrueCount,
     ProfileCounter FalseCount) {
   assert(canUseScalarCheckedCastInstructions(B.getModule(),
                                              sourceType, targetType));
 
-  // We only need a different failure block if the cast consumption
-  // requires us to destroy the source value.
-  SILBasicBlock *scalarFailBB;
-  if (!shouldDestroyOnFailure(consumption)) {
-    scalarFailBB = indirectFailBB;
-  } else {
-    scalarFailBB = B.splitBlockForFallthrough();
-  }
-
-  // We always need a different success block.
+  // Create our successor and fail blocks.
+  SILBasicBlock *scalarFailBB = B.splitBlockForFallthrough();
   SILBasicBlock *scalarSuccBB = B.splitBlockForFallthrough();
 
-  auto &srcTL = B.getModule().Types.getTypeLowering(src->getType());
+  // Always take; this works under an assumption that retaining the result is
+  // equivalent to retaining the source. That means that these casts would not
+  // be appropriate for bridging-like conversions.
+  //
+  // Our plan is:
+  //
+  // 1. If the original cast was a take_always cast, then we take from our
+  // memory location in the caller, store the value into dest in the success
+  // block, and perform a destroy of our default argument in the failure block.
+  //
+  // 2. If the original cast was copy_on_success, then with ownership we borrow,
+  // copy in the success path and store back into the source slot after copying.
+  //
+  // 3. If the original cast was take_on_success, then on success we place the
+  // casted value into dest and on failure, store the original value back into
+  // src.
+  SILType targetValueType = destAddr->getType().getObjectType();
+  // Inline constructor
+  auto srcValue = ([&]() -> SILValue {
+    if (consumption == CastConsumptionKind::CopyOnSuccess)
+      return B.emitLoadBorrowOperation(loc, srcAddr);
+    return B.emitLoadValueOperation(loc, srcAddr, LoadOwnershipQualifier::Take);
+  })();
 
-  // Always take; this works under an assumption that retaining the
-  // result is equivalent to retaining the source.  That means that
-  // these casts would not be appropriate for bridging-like conversions.
-  SILValue srcValue = srcTL.emitLoadOfCopy(B, loc, src, IsTake);
-
-  SILType targetValueType = dest->getType().getObjectType();
   B.createCheckedCastBranch(loc, /*exact*/ false, srcValue, targetValueType,
                             scalarSuccBB, scalarFailBB, TrueCount, FalseCount);
 
   // Emit the success block.
   B.setInsertionPoint(scalarSuccBB); {
-    auto &targetTL = B.getModule().Types.getTypeLowering(targetValueType);
     SILValue succValue = scalarSuccBB->createPhiArgument(
-        targetValueType, ValueOwnershipKind::Owned);
-    if (!shouldTakeOnSuccess(consumption))
-      targetTL.emitCopyValue(B, loc, succValue);
-    targetTL.emitStoreOfCopy(B, loc, succValue, dest, IsInitialization);
+        targetValueType, srcValue.getOwnershipKind());
+
+    switch (consumption) {
+    // On success, we take with both take_always and take_on_success.
+    case CastConsumptionKind::TakeAlways:
+    case CastConsumptionKind::TakeOnSuccess:
+      break;
+    case CastConsumptionKind::CopyOnSuccess: {
+      SILValue originalSuccValue = succValue;
+      succValue = B.emitCopyValueOperation(loc, succValue);
+      B.emitEndBorrowOperation(loc, originalSuccValue);
+      B.emitEndBorrowOperation(loc, srcValue);
+      break;
+    }
+    case CastConsumptionKind::BorrowAlways:
+      llvm_unreachable("should never see a borrow_always here");
+    }
+
+    // And then store the succValue into dest.
+    B.emitStoreValueOperation(loc, succValue, destAddr,
+                              StoreOwnershipQualifier::Init);
     B.createBranch(loc, indirectSuccBB);
   }
 
   // Emit the failure block.
-  if (shouldDestroyOnFailure(consumption)) {
-    B.setInsertionPoint(scalarFailBB);
-    srcTL.emitDestroyValue(B, loc, srcValue);
+  B.setInsertionPoint(scalarFailBB);
+  {
+    SILValue failValue = srcValue;
+
+    // If we have ownership, we need to create something for the default
+    // argument. Otherwise, we just use the input argument to the
+    // checked_cast_br.
+    if (B.hasOwnership()) {
+      failValue = scalarFailBB->createPhiArgument(srcValue->getType(),
+                                                  srcValue.getOwnershipKind());
+    }
+
+    switch (consumption) {
+    case CastConsumptionKind::TakeAlways:
+      // We need to destroy the fail value if we have take_always.
+      B.emitDestroyValueOperation(loc, failValue);
+      break;
+    case CastConsumptionKind::TakeOnSuccess:
+      // If we have take_on_success, since we failed, just store the value back
+      // into the src location that we originally took from.
+      B.emitStoreValueOperation(loc, failValue, srcAddr,
+                                StoreOwnershipQualifier::Init);
+      break;
+    case CastConsumptionKind::CopyOnSuccess:
+      B.emitEndBorrowOperation(loc, failValue);
+      B.emitEndBorrowOperation(loc, srcValue);
+      break;
+    case CastConsumptionKind::BorrowAlways:
+      llvm_unreachable("borrow_on_success should never appear here");
+    }
+
     B.createBranch(loc, indirectFailBB);
   }
 }

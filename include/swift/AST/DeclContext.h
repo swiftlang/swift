@@ -541,17 +541,13 @@ public:
   ///
   /// \param diagnostics If non-null, will be populated with the set of
   /// diagnostics that should be emitted for this declaration context.
-  ///
-  /// \param sorted Whether to sort the results in a canonical order.
-  ///
   /// FIXME: This likely makes more sense on IterableDeclContext or
   /// something similar.
   SmallVector<ProtocolDecl *, 2>
   getLocalProtocols(ConformanceLookupKind lookupKind
                       = ConformanceLookupKind::All,
                     SmallVectorImpl<ConformanceDiagnostic> *diagnostics
-                      = nullptr,
-                    bool sorted = false) const;
+                      = nullptr) const;
 
   /// Retrieve the set of protocol conformances associated with this
   /// declaration context.
@@ -561,16 +557,13 @@ public:
   /// \param diagnostics If non-null, will be populated with the set of
   /// diagnostics that should be emitted for this declaration context.
   ///
-  /// \param sorted Whether to sort the results in a canonical order.
-  ///
   /// FIXME: This likely makes more sense on IterableDeclContext or
   /// something similar.
   SmallVector<ProtocolConformance *, 2>
   getLocalConformances(ConformanceLookupKind lookupKind
                          = ConformanceLookupKind::All,
                        SmallVectorImpl<ConformanceDiagnostic> *diagnostics
-                         = nullptr,
-                       bool sorted = false) const;
+                         = nullptr) const;
 
   /// Retrieve the syntactic depth of this declaration context, i.e.,
   /// the number of non-module-scoped contexts.

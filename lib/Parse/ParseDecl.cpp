@@ -2281,9 +2281,18 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
       {
         BacktrackingScope Scope(*this);
         consumeToken(tok::kw_class);
-        if (!isStartOfDecl())
+        // When followed by an 'override' or CC token inside a class,
+        // treat 'class' as a modifier; in the case of a following CC
+        // token, we cannot be sure there is no intention to override
+        // or witness something static.
+        if (isStartOfDecl() || (isa<ClassDecl>(CurDeclContext) &&
+                                (Tok.is(tok::code_complete) ||
+                                 Tok.getRawText().equals("override")))) {
+          /* We're OK */
+        } else {
           // This 'class' is a real ClassDecl introducer.
           break;
+        }
       }
       if (StaticLoc.isValid()) {
         diagnose(Tok, diag::decl_already_static,
@@ -2331,7 +2340,6 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
 ///     'inout' attribute-list-clause attribute-list
 ///     '__shared' attribute-list-clause attribute-list
 ///     '__owned' attribute-list-clause attribute-list
-///     '__opaque' attribute-list-clause attribute-list
 ///   attribute-list-clause:
 ///     '@' attribute
 ///     '@' attribute attribute-list-clause
@@ -2794,6 +2802,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
                               StaticSpelling, tryLoc);
     StaticLoc = SourceLoc(); // we handled static if present.
     MayNeedOverrideCompletion = true;
+    if (DeclResult.hasCodeCompletion() && isCodeCompletionFirstPass())
+      break;
     std::for_each(Entries.begin(), Entries.end(), Handler);
     if (auto *D = DeclResult.getPtrOrNull())
       markWasHandled(D);
@@ -2816,6 +2826,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
     llvm::SmallVector<Decl *, 4> Entries;
     DeclParsingContext.setCreateSyntax(SyntaxKind::EnumCaseDecl);
     DeclResult = parseDeclEnumCase(Flags, Attributes, Entries);
+    if (DeclResult.hasCodeCompletion() && isCodeCompletionFirstPass())
+      break;
     std::for_each(Entries.begin(), Entries.end(), Handler);
     if (auto *D = DeclResult.getPtrOrNull())
       markWasHandled(D);
@@ -2865,6 +2877,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
     }
     llvm::SmallVector<Decl *, 4> Entries;
     DeclResult = parseDeclSubscript(Flags, Attributes, Entries);
+    if (DeclResult.hasCodeCompletion() && isCodeCompletionFirstPass())
+      break;
     std::for_each(Entries.begin(), Entries.end(), Handler);
     MayNeedOverrideCompletion = true;
     if (auto *D = DeclResult.getPtrOrNull())
@@ -2933,6 +2947,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
       // specified so that we do not duplicate them in code completion
       // strings.
       SmallVector<StringRef, 3> Keywords;
+      SourceLoc introducerLoc;
       switch (OrigTok.getKind()) {
       case tok::kw_func:
       case tok::kw_subscript:
@@ -2940,15 +2955,22 @@ Parser::parseDecl(ParseDeclOptions Flags,
       case tok::kw_let:
       case tok::kw_typealias:
         Keywords.push_back(OrigTok.getText());
+        introducerLoc = OrigTok.getLoc();
         break;
       default:
         // Other tokens are already accounted for.
         break;
       }
+      if (StaticSpelling == StaticSpellingKind::KeywordStatic) {
+        Keywords.push_back(getTokenText(tok::kw_static));
+      } else if (StaticSpelling == StaticSpellingKind::KeywordClass) {
+        Keywords.push_back(getTokenText(tok::kw_class));
+      }
       for (auto attr : Attributes) {
         Keywords.push_back(attr->getAttrName());
       }
-      CodeCompletion->completeNominalMemberBeginning(Keywords);
+      CodeCompletion->completeNominalMemberBeginning(Keywords,
+                                                     introducerLoc);
     }
 
     DeclResult = makeParserCodeCompletionStatus();
@@ -2979,7 +3001,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
   }
 
   if (DeclResult.hasCodeCompletion() && isCodeCompletionFirstPass() &&
-      !CurDeclContext->isModuleScopeContext()) {
+      !CurDeclContext->isModuleScopeContext() &&
+      !isa<TopLevelCodeDecl>(CurDeclContext)) {
     // Only consume non-toplevel decls.
     consumeDecl(BeginParserPosition, Flags, /*IsTopLevel=*/false);
 
@@ -5824,13 +5847,14 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     // See if there's a following argument type.
     ParserResult<ParameterList> ArgParams;
     SmallVector<Identifier, 4> argumentNames;
+    DefaultArgumentInfo DefaultArgs;
     if (Tok.isFollowingLParen()) {
       ArgParams = parseSingleParameterClause(ParameterContextKind::EnumElement,
-                                             &argumentNames);
+                                             &argumentNames, &DefaultArgs);
       if (ArgParams.isNull() || ArgParams.hasCodeCompletion())
         return ParserStatus(ArgParams);
     }
-    
+
     // See if there's a raw value expression.
     SourceLoc EqualsLoc;
     ParserResult<Expr> RawValueExpr;
@@ -5896,6 +5920,8 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
                                                  EqualsLoc,
                                                  LiteralRawValueExpr,
                                                  CurDeclContext);
+
+    DefaultArgs.setFunctionContext(result, result->getParameterList());
 
     if (NameLoc == CaseLoc) {
       result->setImplicit(); // Parse error

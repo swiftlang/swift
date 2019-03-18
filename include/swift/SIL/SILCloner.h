@@ -526,7 +526,7 @@ SILCloner<ImplClass>::getMappedValue(SILValue Value) {
   if (auto *U = dyn_cast<SILUndef>(Value)) {
     auto type = getOpType(U->getType());
     ValueBase *undef =
-      (type == U->getType() ? U : SILUndef::get(type, Builder.getModule()));
+      (type == U->getType() ? U : SILUndef::get(type, Builder.getFunction()));
     return SILValue(undef);
   }
 
@@ -1200,7 +1200,8 @@ void SILCloner<ImplClass>::visitAssignInst(AssignInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createAssign(getOpLocation(Inst->getLoc()),
                                       getOpValue(Inst->getSrc()),
-                                      getOpValue(Inst->getDest())));
+                                      getOpValue(Inst->getDest()),
+                                      Inst->getOwnershipQualifier()));
 }
 
 template<typename ImplClass>

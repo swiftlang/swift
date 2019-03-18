@@ -151,6 +151,10 @@ protected:
   /// in the root expression or `nullptr` otherwise.
   Expr *findParentExpr(Expr *subExpr) const;
 
+  /// \returns An argument expression if given anchor is a call, member
+  /// reference or subscript, nullptr otherwise.
+  Expr *getArgumentExprFor(Expr *anchor) const;
+
 private:
   /// Compute anchor expression associated with current diagnostic.
   std::pair<Expr *, bool> computeAnchor() const;
@@ -166,6 +170,15 @@ protected:
   using DiagInReference = Diag<DescriptiveDeclKind, DeclName, Type, Type, Type>;
   using DiagAsNote = Diag<Type, Type, Type, Type, StringRef>;
 
+  /// If this failure associated with one of the conditional requirements,
+  /// this field would represent conformance where requirement comes from.
+  const ProtocolConformance *Conformance = nullptr;
+
+  /// The source of the requirement, if available. One exception
+  /// is failure associated with conditional requirement where
+  /// underlying conformance is specialized.
+  const GenericSignature *Signature;
+
   const ValueDecl *AffectedDecl;
   /// If possible, find application expression associated
   /// with current generic requirement failure, that helps
@@ -175,22 +188,26 @@ protected:
 public:
   RequirementFailure(ConstraintSystem &cs, Expr *expr, RequirementKind kind,
                      ConstraintLocator *locator)
-      : FailureDiagnostic(expr, cs, locator), AffectedDecl(getDeclRef()) {
+      : FailureDiagnostic(expr, cs, locator),
+        Conformance(getConformanceForConditionalReq(locator)),
+        Signature(getSignature(locator)), AffectedDecl(getDeclRef()) {
     assert(locator);
+    assert(isConditional() || Signature);
     assert(AffectedDecl);
 
     auto path = locator->getPath();
     assert(!path.empty());
 
     auto &last = path.back();
-    assert(last.getKind() == ConstraintLocator::TypeParameterRequirement);
+    assert(last.isTypeParameterRequirement() ||
+           last.isConditionalRequirement());
     assert(static_cast<RequirementKind>(last.getValue2()) == kind);
 
     // It's possible sometimes not to have no base expression.
     if (!expr)
       return;
 
-    if (auto *parentExpr = findParentExpr(getAnchor()))
+    if (auto *parentExpr = findParentExpr(getRawAnchor()))
       Apply = dyn_cast<ApplyExpr>(parentExpr);
   }
 
@@ -199,7 +216,8 @@ public:
     assert(!path.empty());
 
     auto &requirementLoc = path.back();
-    assert(requirementLoc.getKind() == PathEltKind::TypeParameterRequirement);
+    assert(requirementLoc.isTypeParameterRequirement() ||
+           requirementLoc.isConditionalRequirement());
     return requirementLoc.getValue();
   }
 
@@ -219,6 +237,13 @@ public:
   bool diagnoseAsNote() override;
 
 protected:
+  /// Determine whether this is a conditional requirement failure.
+  bool isConditional() const { return bool(Conformance); }
+
+  /// Check whether this requirement comes from the contextual type
+  /// that root expression is coerced/converted into.
+  bool isFromContextualType() const;
+
   /// Retrieve declaration contextual where current
   /// requirement has been introduced.
   const DeclContext *getRequirementDC() const;
@@ -230,12 +255,38 @@ protected:
   /// Determine whether it would be possible to diagnose
   /// current requirement failure.
   bool canDiagnoseFailure() const {
+    // If this is a conditional requirement failure,
+    // we have a lot more information compared to
+    // type requirement case, because we know that
+    // underlying conformance requirement matched.
+    if (isConditional())
+      return true;
+
+    auto *anchor = getAnchor();
+    // In the situations like this:
+    //
+    // ```swift
+    // enum E<T: P> { case foo(T) }
+    // let _: E = .foo(...)
+    // ```
+    //
+    // `E` is going to be opened twice. First, when
+    // it's used as a contextual type, and when `E.foo`
+    // is found and its function type is opened.
+    // We still want to record both fixes but should
+    // avoid diagnosing the same problem multiple times.
+    if (isa<UnresolvedMemberExpr>(anchor)) {
+      auto path = getLocator()->getPath();
+      if (path.front().getKind() != ConstraintLocator::UnresolvedMember)
+        return false;
+    }
+
     // For static/initializer calls there is going to be
     // a separate fix, attached to the argument, which is
     // much easier to diagnose.
     // For operator calls we can't currently produce a good
     // diagnostic, so instead let's refer to expression diagnostics.
-    return !(Apply && (isOperator(Apply) || isa<TypeExpr>(getAnchor())));
+    return !(Apply && (isOperator(Apply) || isa<TypeExpr>(anchor)));
   }
 
   static bool isOperator(const ApplyExpr *apply) {
@@ -247,7 +298,19 @@ private:
   /// Retrieve declaration associated with failing generic requirement.
   ValueDecl *getDeclRef() const;
 
-  void emitRequirementNote(const Decl *anchor) const;
+  /// Retrieve generic signature where this parameter originates from.
+  GenericSignature *getSignature(ConstraintLocator *locator);
+
+  void emitRequirementNote(const Decl *anchor, Type lhs, Type rhs) const;
+
+  /// Determine whether given declaration represents a static
+  /// or instance property/method, excluding operators.
+  static bool isStaticOrInstanceMember(const ValueDecl *decl);
+
+  /// If this is a failure in conditional requirement, retrieve
+  /// conformance information.
+  ProtocolConformance *
+  getConformanceForConditionalReq(ConstraintLocator *locator);
 };
 
 /// Diagnostics for failed conformance checks originating from
@@ -384,9 +447,9 @@ class LabelingFailure final : public FailureDiagnostic {
   ArrayRef<Identifier> CorrectLabels;
 
 public:
-  LabelingFailure(ConstraintSystem &cs, ConstraintLocator *locator,
+  LabelingFailure(Expr *root, ConstraintSystem &cs, ConstraintLocator *locator,
                   ArrayRef<Identifier> labels)
-      : FailureDiagnostic(nullptr, cs, locator), CorrectLabels(labels) {}
+      : FailureDiagnostic(root, cs, locator), CorrectLabels(labels) {}
 
   bool diagnoseAsError() override;
 };
@@ -502,6 +565,15 @@ private:
   Type getUnwrappedType() const {
     return resolveType(UnwrappedType, /*reconstituteSugar=*/true);
   }
+
+  /// Suggest a default value via `?? <default value>`
+  void offerDefaultValueUnwrapFixIt(DeclContext *DC, Expr *expr) const;
+  /// Suggest a force optional unwrap via `!`
+  void offerForceUnwrapFixIt(Expr *expr) const;
+
+  /// Determine whether given expression is an argument used in the
+  /// operator invocation, and if so return corresponding parameter.
+  Optional<AnyFunctionType::Param> getOperatorParameterFor(Expr *expr) const;
 };
 
 /// Diagnose errors associated with rvalues in positions
@@ -690,6 +762,34 @@ private:
                                           DeclName memberName);
 };
 
+/// Diagnose situations when we use an instance member on a type
+/// or a type member on an instance
+///
+/// ```swift
+/// class Bar {}
+///
+/// enum Foo {
+///
+///   static func f() {
+///     g(Bar())
+///   }
+///
+///   func g(_: Bar) {}
+///
+/// }
+/// ```
+class AllowTypeOrInstanceMemberFailure final : public FailureDiagnostic {
+  Type BaseType;
+  DeclName Name;
+
+public:
+  AllowTypeOrInstanceMemberFailure(Expr *root, ConstraintSystem &cs, Type baseType,
+                                   DeclName memberName, ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), BaseType(baseType),
+        Name(memberName) {}
+    
+  bool diagnoseAsError() override;
+};
 class PartialApplicationFailure final : public FailureDiagnostic {
   enum RefKind : unsigned {
     MutatingMethod,
@@ -788,6 +888,72 @@ public:
       : InvalidInitRefFailure(root, cs, baseTy, init, SourceRange(), locator) {}
 
   bool diagnoseAsError() override;
+};
+
+class MissingArgumentsFailure final : public FailureDiagnostic {
+  using Param = AnyFunctionType::Param;
+
+  FunctionType *Fn;
+  unsigned NumSynthesized;
+
+public:
+  MissingArgumentsFailure(Expr *root, ConstraintSystem &cs,
+                          FunctionType *funcType,
+                          unsigned numSynthesized,
+                          ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), Fn(funcType),
+        NumSynthesized(numSynthesized) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  /// If missing arguments come from trailing closure,
+  /// let's produce tailored diagnostics.
+  bool diagnoseTrailingClosure(ClosureExpr *closure);
+};
+
+class OutOfOrderArgumentFailure final : public FailureDiagnostic {
+  using ParamBinding = SmallVector<unsigned, 1>;
+
+  unsigned ArgIdx;
+  unsigned PrevArgIdx;
+
+  SmallVector<ParamBinding, 4> Bindings;
+
+public:
+  OutOfOrderArgumentFailure(Expr *root, ConstraintSystem &cs,
+                            unsigned argIdx,
+                            unsigned prevArgIdx,
+                            ArrayRef<ParamBinding> bindings,
+                            ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), ArgIdx(argIdx),
+        PrevArgIdx(prevArgIdx), Bindings(bindings.begin(), bindings.end()) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an attempt to destructure a single tuple closure parameter
+/// into a multiple (possibly anonymous) arguments e.g.
+///
+/// ```swift
+/// let _: ((Int, Int)) -> Void = { $0 + $1 }
+/// ```
+class ClosureParamDestructuringFailure final : public FailureDiagnostic {
+  FunctionType *ContextualType;
+
+public:
+  ClosureParamDestructuringFailure(Expr *root, ConstraintSystem &cs,
+                                   FunctionType *contextualType,
+                                   ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), ContextualType(contextualType) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  Type getParameterType() const {
+    const auto &param = ContextualType->getParams().front();
+    return resolveType(param.getPlainType());
+  }
 };
 
 } // end namespace constraints

@@ -347,7 +347,6 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   PASS_THROUGH_REFERENCE(BridgeToObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(BridgeFromObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(ConditionalBridgeFromObjC, getSubExpr);
-  PASS_THROUGH_REFERENCE(UnderlyingToOpaque, getSubExpr);
   NO_REFERENCE(Coerce);
   NO_REFERENCE(ForcedCheckedCast);
   NO_REFERENCE(ConditionalCheckedCast);
@@ -663,7 +662,6 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::ConditionalBridgeFromObjC:
   case ExprKind::BridgeFromObjC:
   case ExprKind::BridgeToObjC:
-  case ExprKind::UnderlyingToOpaque:
     // Implicit conversion nodes have no syntax of their own; defer to the
     // subexpression.
     return cast<ImplicitConversionExpr>(this)->getSubExpr()
@@ -878,6 +876,8 @@ APInt IntegerLiteralExpr::getRawValue() const {
 APInt IntegerLiteralExpr::getValue() const {
   assert(!getType().isNull() && "Semantic analysis has not completed");
   assert(!getType()->hasError() && "Should have a valid type");
+  if (!getType()->is<AnyBuiltinIntegerType>())
+    return getRawValue();
   auto width = getType()->castTo<AnyBuiltinIntegerType>()->getWidth();
   return width.parse(getDigitsText(), /*radix*/ 0, isNegative());
 }
@@ -974,8 +974,16 @@ llvm::APFloat FloatLiteralExpr::getValue() const {
   assert(!getType().isNull() && "Semantic analysis has not completed");
   assert(!getType()->hasError() && "Should have a valid type");
 
-  return getFloatLiteralValue(isNegative(), getDigitsText(),
-                  getType()->castTo<BuiltinFloatType>()->getAPFloatSemantics());
+  Type ty = getType();
+  if (!ty->is<BuiltinFloatType>()) {
+    assert(!getBuiltinType().isNull() && "Semantic analysis has not completed");
+    assert(!getBuiltinType()->hasError() && "Should have a valid type");
+    ty = getBuiltinType();
+  }
+
+  return getFloatLiteralValue(
+      isNegative(), getDigitsText(),
+      ty->castTo<BuiltinFloatType>()->getAPFloatSemantics());
 }
 
 StringLiteralExpr::StringLiteralExpr(StringRef Val, SourceRange Range,
@@ -2206,6 +2214,7 @@ KeyPathExpr::Component::Component(ASTContext *ctxForCopyingLabels,
     : Decl(decl), SubscriptIndexExpr(indexExpr), KindValue(kind),
       ComponentType(type), Loc(loc)
 {
+  assert(kind != Kind::TupleElement || subscriptLabels.empty());
   assert(subscriptLabels.size() == indexHashables.size()
          || indexHashables.empty());
   SubscriptLabelsData = subscriptLabels.data();
@@ -2242,6 +2251,7 @@ void KeyPathExpr::Component::setSubscriptIndexHashableConformances(
   case Kind::UnresolvedProperty:
   case Kind::Property:
   case Kind::Identity:
+  case Kind::TupleElement:
     llvm_unreachable("no hashable conformances for this kind");
   }
 }

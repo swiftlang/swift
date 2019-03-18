@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/generic_classes.sil
-// RUN: %target-swift-frontend %t/generic_classes.sil -emit-ir | %FileCheck %t/generic_classes.sil --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend %t/generic_classes.sil -emit-ir | %FileCheck %t/generic_classes.sil --check-prefix=CHECK --check-prefix=CHECK-%target-runtime -check-prefix CHECK-%target-import-type
 // RUN: %target-swift-frontend -Osize %t/generic_classes.sil -emit-ir | %FileCheck %t/generic_classes.sil --check-prefix=OSIZE
 
 // REQUIRES: CPU=x86_64
@@ -80,7 +80,8 @@ import Swift
 // CHECK: [[ROOTNONGENERIC_NAME:@.*]] = private constant [15 x i8] c"RootNonGeneric\00"
 // CHECK: @"$s15generic_classes14RootNonGenericCMn" = hidden constant <{ {{.*}} %swift.method_descriptor }> <{
 // --       flags: class, unique, has vtable
-// CHECK-SAME:   <i32 0x8000_0050>
+// CHECK-DIRECT-SAME:   <i32 0x8000_0050>
+// CHECK-INDIRECT-SAME:   <i32 0x8001_0050>
 // --       name
 // CHECK-SAME:   [15 x i8]* [[ROOTNONGENERIC_NAME]]
 // --       num fields
@@ -91,7 +92,8 @@ import Swift
 
 // CHECK: @"$s15generic_classes14RootNonGenericCMf" = internal global <{ {{.*}} }> <{
 // CHECK-SAME:   void (%T15generic_classes14RootNonGenericC*)* @"$s15generic_classes14RootNonGenericCfD",
-// CHECK-SAME:   i8** @"$sBoWV",
+// CHECK-DIRECT-SAME:   i8** @"$sBoWV",
+// CHECK-INDIRECT-SAME:   i8** null,
 // CHECK-SAME-native: i64 0,
 // CHECK-SAME-native: %swift.type* null,
 // CHECK-SAME-native: %swift.opaque* null,
@@ -264,10 +266,10 @@ entry:
 // RootGeneric.x has fixed layout
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc i8 @RootGeneric_concrete_fragile_dependent_member_access_x
 // CHECK:   getelementptr inbounds [[ROOTGENERIC]], [[ROOTGENERIC]]* %0, i32 0, i32 1
-sil [ossa] @RootGeneric_concrete_fragile_dependent_member_access_x : $<F> (RootGeneric<F>) -> UInt8 {
-entry(%c : @unowned $RootGeneric<F>):
+sil @RootGeneric_concrete_fragile_dependent_member_access_x : $<F> (RootGeneric<F>) -> UInt8 {
+entry(%c : $RootGeneric<F>):
   %p = ref_element_addr %c : $RootGeneric<F>, #RootGeneric.x
-  %x = load_borrow %p : $*UInt8
+  %x = load %p : $*UInt8
   return %x : $UInt8
 }
 
@@ -279,8 +281,8 @@ entry(%c : @unowned $RootGeneric<F>):
 // CHECK:   [[CLASS_BYTE_ARRAY:%.*]] = bitcast [[ROOTGENERIC]]* {{%.*}} to i8*
 // CHECK:   [[Y_ADDR:%.*]] = getelementptr inbounds i8, i8* [[CLASS_BYTE_ARRAY]], i64 [[Y_OFFSET]]
 // CHECK:   bitcast i8* [[Y_ADDR]] to %swift.opaque*
-sil [ossa] @RootGeneric_concrete_fragile_dependent_member_access_y : $<F> (RootGeneric<F>) -> @out F {
-entry(%z : $*F, %c : @unowned $RootGeneric<F>):
+sil @RootGeneric_concrete_fragile_dependent_member_access_y : $<F> (RootGeneric<F>) -> @out F {
+entry(%z : $*F, %c : $RootGeneric<F>):
   %p = ref_element_addr %c : $RootGeneric<F>, #RootGeneric.y
   copy_addr %p to [initialization] %z : $*F
   %t = tuple ()
@@ -290,8 +292,8 @@ entry(%z : $*F, %c : @unowned $RootGeneric<F>):
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @RootGeneric_subst_concrete_fragile_dependent_member_access_y
 // CHECK:   [[Y_ADDR:%.*]] = getelementptr inbounds {{.*}}, {{.*}}* %1, i32 0, i32 3
 // CHECK:   bitcast %TSi* [[Y_ADDR]] to i8*
-sil [ossa] @RootGeneric_subst_concrete_fragile_dependent_member_access_y : $(RootGeneric<Int>) -> @out Int {
-entry(%z : $*Int, %c : @unowned $RootGeneric<Int>):
+sil @RootGeneric_subst_concrete_fragile_dependent_member_access_y : $(RootGeneric<Int>) -> @out Int {
+entry(%z : $*Int, %c : $RootGeneric<Int>):
   %p = ref_element_addr %c : $RootGeneric<Int>, #RootGeneric.y
   copy_addr %p to [initialization] %z : $*Int
   %t = tuple ()
@@ -306,10 +308,10 @@ entry(%z : $*Int, %c : @unowned $RootGeneric<Int>):
 // CHECK:   [[CLASS_BYTE_ARRAY:%.*]] = bitcast [[ROOTGENERIC]]* {{%.*}} to i8*
 // CHECK:   [[Z_ADDR:%.*]] = getelementptr inbounds i8, i8* [[CLASS_BYTE_ARRAY]], i64 [[Z_OFFSET]]
 // CHECK:   bitcast i8* [[Z_ADDR]] to %Ts5UInt8V*
-sil [ossa] @RootGeneric_concrete_fragile_dependent_member_access_z : $<F> (RootGeneric<F>) -> UInt8 {
-entry(%c : @unowned $RootGeneric<F>):
+sil @RootGeneric_concrete_fragile_dependent_member_access_z : $<F> (RootGeneric<F>) -> UInt8 {
+entry(%c : $RootGeneric<F>):
   %p = ref_element_addr %c : $RootGeneric<F>, #RootGeneric.z
-  %z = load_borrow %p : $*UInt8
+  %z = load %p : $*UInt8
   return %z : $UInt8
 }
 
@@ -317,10 +319,10 @@ entry(%c : @unowned $RootGeneric<F>):
 // CHECK:   [[Z_ADDR:%.*]] = getelementptr inbounds {{.*}}, {{.*}}* %0, i32 0, i32 4
 // CHECK:   [[T0:%.*]] = getelementptr inbounds %Ts5UInt8V, %Ts5UInt8V* [[Z_ADDR]], i32 0, i32 0
 // CHECK:   load i8, i8* [[T0]], align
-sil [ossa] @RootGeneric_subst_concrete_fragile_dependent_member_access_z : $(RootGeneric<Int>) -> UInt8 {
-entry(%c : @unowned $RootGeneric<Int>):
+sil @RootGeneric_subst_concrete_fragile_dependent_member_access_z : $(RootGeneric<Int>) -> UInt8 {
+entry(%c : $RootGeneric<Int>):
   %p = ref_element_addr %c : $RootGeneric<Int>, #RootGeneric.z
-  %z = load_borrow %p : $*UInt8
+  %z = load %p : $*UInt8
   return %z : $UInt8
 }
 

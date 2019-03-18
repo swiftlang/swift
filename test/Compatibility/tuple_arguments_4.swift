@@ -1464,7 +1464,9 @@ let _ = sr4745.enumerated().map { (count, element) in "\(count): \(element)" }
 // SR-4738
 
 let sr4738 = (1, (2, 3))
-[sr4738].map { (x, (y, z)) -> Int in x + y + z } // expected-error {{use of undeclared type 'y'}}
+// expected-error @+2{{use of undeclared type 'y'}}
+// expected-error @+1{{use of undeclared type 'z'}}
+[sr4738].map { (x, (y, z)) -> Int in x + y + z }
 // expected-error@-1 {{closure tuple parameter does not support destructuring}} {{20-26=arg1}} {{38-38=let (y, z) = arg1; }}
 
 // rdar://problem/31892961
@@ -1472,6 +1474,7 @@ let r31892961_1 = [1: 1, 2: 2]
 r31892961_1.forEach { (k, v) in print(k + v) }
 
 let r31892961_2 = [1, 2, 3]
+// expected-error @+1{{use of undeclared type 'val'}}
 let _: [Int] = r31892961_2.enumerated().map { ((index, val)) in
   // expected-error@-1 {{closure tuple parameter does not support destructuring}} {{48-60=arg0}} {{3-3=\n  let (index, val) = arg0\n  }}
   // expected-error@-2 {{use of undeclared type 'index'}}
@@ -1642,10 +1645,17 @@ public extension Optional {
 }
 
 // https://bugs.swift.org/browse/SR-6837
+
+// FIXME: Can't overlaod local functions so these must be top-level
+func takePairOverload(_ pair: (Int, Int?)) {}
+func takePairOverload(_: () -> ()) {}
+
 do {
   func takeFn(fn: (_ i: Int, _ j: Int?) -> ()) {}
   func takePair(_ pair: (Int, Int?)) {}
   takeFn(fn: takePair) // Allow for -swift-version 4, but not later
+  takeFn(fn: takePairOverload) // Allow for -swift-version 4, but not later
+
   takeFn(fn: { (pair: (Int, Int?)) in } ) // Disallow for -swift-version 4 and later
   // expected-error@-1 {{contextual closure type '(Int, Int?) -> ()' expects 2 arguments, but 1 was used in closure body}}
   takeFn { (pair: (Int, Int?)) in } // Disallow for -swift-version 4 and later

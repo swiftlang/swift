@@ -388,6 +388,14 @@ public:
   /// function symbol.
   bool hasSwiftCallingConvention(llvm::StringRef MangledName);
 
+  /// Demangle the given symbol and return the module name of the symbol.
+  ///
+  /// \param mangledName The mangled symbol string, which start a mangling
+  /// prefix: _T, _T0, $S, _$S.
+  ///
+  /// \returns The module name.
+  std::string getModuleName(llvm::StringRef mangledName);
+
   /// Deallocates all nodes.
   ///
   /// The memory which is used for nodes is not freed but recycled for the next
@@ -476,14 +484,7 @@ enum class OperatorKind {
   Infix,
 };
 
-/// Mangle an identifier using Swift's mangling rules.
-void mangleIdentifier(const char *data, size_t length,
-                      OperatorKind operatorKind, std::string &out,
-                      bool usePunycode = true);
-
 /// Remangle a demangled parse tree.
-///
-/// This should always round-trip perfectly with demangleSymbolAsNode.
 std::string mangleNode(NodePointer root);
 
 using SymbolicResolver =
@@ -492,15 +493,33 @@ using SymbolicResolver =
 
 /// Remangle a demangled parse tree, using a callback to resolve
 /// symbolic references.
-///
-/// This should always round-trip perfectly with demangleSymbolAsNode.
 std::string mangleNode(NodePointer root, SymbolicResolver resolver);
+
+/// Remangle a demangled parse tree, using a callback to resolve
+/// symbolic references.
+///
+/// The returned string is owned by \p Factory. This means \p Factory must stay
+/// alive as long as the returned string is used.
+llvm::StringRef mangleNode(NodePointer root, SymbolicResolver resolver,
+                           NodeFactory &Factory);
 
 /// Remangle in the old mangling scheme.
 ///
-/// This is only used for objc-runtime names and should be removed as soon as
-/// we switch to the new mangling for those names as well.
+/// This is only used for objc-runtime names.
 std::string mangleNodeOld(NodePointer root);
+
+/// Remangle in the old mangling scheme.
+///
+/// This is only used for objc-runtime names.
+/// The returned string is owned by \p Factory. This means \p Factory must stay
+/// alive as long as the returned string is used.
+llvm::StringRef mangleNodeOld(NodePointer node, NodeFactory &Factory);
+
+/// Remangle in the old mangling scheme and embed the name in "_Tt<name>_".
+///
+/// The returned string is null terminated and owned by \p Factory. This means
+/// \p Factory must stay alive as long as the returned string is used.
+const char *mangleNodeAsObjcCString(NodePointer node, NodeFactory &Factory);
 
 /// Transform the node structure to a string.
 ///
@@ -580,6 +599,14 @@ bool nodeConsumesGenericArgs(Node *node);
 bool isSpecialized(Node *node);
 
 NodePointer getUnspecialized(Node *node, NodeFactory &Factory);
+
+/// Returns true if the node \p kind refers to a context node, e.g. a nominal
+/// type or a function.
+bool isContext(Node::Kind kind);
+
+/// Returns true if the node \p kind refers to a node which is placed before a
+/// function node, e.g. a specialization attribute.
+bool isFunctionAttr(Node::Kind kind);
 
 /// Form a StringRef around the mangled name starting at base, if the name may
 /// contain symbolic references.

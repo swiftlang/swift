@@ -16,6 +16,7 @@
 
 #include "ConformanceLookupTable.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Availability.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -93,28 +94,18 @@ ProtocolConformanceRef::subst(Type origType,
 ProtocolConformanceRef
 ProtocolConformanceRef::subst(Type origType,
                               TypeSubstitutionFn subs,
-                              LookupConformanceFn conformances,
-                              SubstOptions options) const {
+                              LookupConformanceFn conformances) const {
   if (isInvalid())
     return *this;
 
   // If we have a concrete conformance, we need to substitute the
   // conformance to apply to the new type.
   if (isConcrete())
-    return ProtocolConformanceRef(getConcrete()->subst(subs, conformances,
-                                                       options));
-  // If the type is an opaque archetype, the conformance will remain abstract,
-  // unless we're specifically substituting opaque types.
-  if (auto origArchetype = origType->getAs<ArchetypeType>()) {
-    if (!options.contains(SubstFlags::SubstituteOpaqueArchetypes)
-        && isa<OpaqueTypeArchetypeType>(origArchetype->getRoot())) {
-      return *this;
-    }
-  }
+    return ProtocolConformanceRef(getConcrete()->subst(subs, conformances));
 
   // Otherwise, compute the substituted type.
   auto substType = origType.subst(subs, conformances,
-                                  options | SubstFlags::UseErrorType);
+                                  SubstFlags::UseErrorType);
 
   // Opened existentials trivially conform and do not need to go through
   // substitution map lookup.
@@ -138,13 +129,6 @@ ProtocolConformanceRef::subst(Type origType,
   }
 
   llvm_unreachable("Invalid conformance substitution");
-}
-
-ProtocolConformanceRef
-ProtocolConformanceRef::substOpaqueTypesWithUnderlyingTypes(Type origType) const {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer;
-  return subst(origType, replacer, replacer,
-               SubstFlags::SubstituteOpaqueArchetypes);
 }
 
 Type
@@ -400,24 +384,26 @@ SourceLoc RootProtocolConformance::getLoc() const {
   ROOT_CONFORMANCE_SUBCLASS_DISPATCH(getLoc, ())
 }
 
-bool RootProtocolConformance::isWeakImported(ModuleDecl *fromModule) const {
+bool
+RootProtocolConformance::isWeakImported(ModuleDecl *fromModule,
+                                        AvailabilityContext fromContext) const {
   auto *dc = getDeclContext();
   if (dc->getParentModule() == fromModule)
     return false;
 
   // If the protocol is weak imported, so are any conformances to it.
-  if (getProtocol()->isWeakImported(fromModule))
+  if (getProtocol()->isWeakImported(fromModule, fromContext))
     return true;
 
   // If the conforming type is weak imported, so are any of its conformances.
   if (auto *nominal = getType()->getAnyNominal())
-    if (nominal->isWeakImported(fromModule))
+    if (nominal->isWeakImported(fromModule, fromContext))
       return true;
 
   // If the conformance is declared in an extension with the @_weakLinked
   // attribute, it is weak imported.
   if (auto *ext = dyn_cast<ExtensionDecl>(dc))
-    if (ext->isWeakImported(fromModule))
+    if (ext->isWeakImported(fromModule, fromContext))
       return true;
 
   return false;
@@ -1221,8 +1207,7 @@ ProtocolConformance::subst(SubstitutionMap subMap) const {
 
 ProtocolConformance *
 ProtocolConformance::subst(TypeSubstitutionFn subs,
-                           LookupConformanceFn conformances,
-                           SubstOptions options) const {
+                           LookupConformanceFn conformances) const {
   switch (getKind()) {
   case ProtocolConformanceKind::Normal: {
     auto origType = getType();
@@ -1232,7 +1217,7 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
 
     auto subMap = SubstitutionMap::get(getGenericSignature(),
                                        subs, conformances);
-    auto substType = origType.subst(subMap, options | SubstFlags::UseErrorType);
+    auto substType = origType.subst(subMap, SubstFlags::UseErrorType);
     if (substType->isEqual(origType))
       return const_cast<ProtocolConformance *>(this);
 
@@ -1258,12 +1243,11 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
     if (origBaseType->hasTypeParameter() ||
         origBaseType->hasArchetype()) {
       // Substitute into the superclass.
-      inheritedConformance = inheritedConformance->subst(subs, conformances,
-                                                         options);
+      inheritedConformance = inheritedConformance->subst(subs, conformances);
     }
 
     auto substType = origType.subst(subs, conformances,
-                                    options | SubstFlags::UseErrorType);
+                                    SubstFlags::UseErrorType);
     return substType->getASTContext()
       .getInheritedConformance(substType, inheritedConformance);
   }
@@ -1275,10 +1259,10 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
 
     auto origType = getType();
     auto substType = origType.subst(subs, conformances,
-                                    options | SubstFlags::UseErrorType);
+                                    SubstFlags::UseErrorType);
     return substType->getASTContext()
       .getSpecializedConformance(substType, genericConformance,
-                                 subMap.subst(subs, conformances, options));
+                                 subMap.subst(subs, conformances));
   }
   }
   llvm_unreachable("bad ProtocolConformanceKind");
@@ -1337,7 +1321,7 @@ void NominalTypeDecl::prepareConformanceTable() const {
     }
 
     // Enumerations with a raw type conform to RawRepresentable.
-    if (theEnum->hasRawType()) {
+    if (theEnum->hasRawType() && !theEnum->getRawType()->hasError()) {
       addSynthesized(KnownProtocolKind::RawRepresentable);
     }
   }
@@ -1400,8 +1384,7 @@ NominalTypeDecl::getSatisfiedProtocolRequirementsForMember(
 SmallVector<ProtocolDecl *, 2>
 DeclContext::getLocalProtocols(
   ConformanceLookupKind lookupKind,
-  SmallVectorImpl<ConformanceDiagnostic> *diagnostics,
-  bool sorted) const
+  SmallVectorImpl<ConformanceDiagnostic> *diagnostics) const
 {
   SmallVector<ProtocolDecl *, 2> result;
 
@@ -1420,19 +1403,13 @@ DeclContext::getLocalProtocols(
     nullptr,
     diagnostics);
 
-  // Sort if required.
-  if (sorted) {
-    llvm::array_pod_sort(result.begin(), result.end(), TypeDecl::compare);
-  }
-
   return result;
 }
 
 SmallVector<ProtocolConformance *, 2>
 DeclContext::getLocalConformances(
   ConformanceLookupKind lookupKind,
-  SmallVectorImpl<ConformanceDiagnostic> *diagnostics,
-  bool sorted) const
+  SmallVectorImpl<ConformanceDiagnostic> *diagnostics) const
 {
   SmallVector<ProtocolConformance *, 2> result;
 
@@ -1457,12 +1434,6 @@ DeclContext::getLocalConformances(
     nullptr,
     &result,
     diagnostics);
-
-  // If requested, sort the results.
-  if (sorted) {
-    llvm::array_pod_sort(result.begin(), result.end(),
-                         &ConformanceLookupTable::compareProtocolConformances);
-  }
 
   return result;
 }

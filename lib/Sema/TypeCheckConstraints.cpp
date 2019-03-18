@@ -551,6 +551,18 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     };
 
     if (!isConfused) {
+      if (Name == Context.Id_Self) {
+        if (DeclContext *typeContext = DC->getInnermostTypeContext()){
+          Type SelfType = typeContext->getSelfInterfaceType();
+
+          if (typeContext->getSelfClassDecl())
+            SelfType = DynamicSelfType::get(SelfType, Context);
+          SelfType = DC->mapTypeIntoContext(SelfType);
+          return new (Context) TypeExpr(TypeLoc(new (Context)
+                                                FixedTypeRepr(SelfType, Loc)));
+        }
+      }
+
       TypoCorrectionResults corrections(*this, Name, nameLoc);
       performTypoCorrection(DC, UDRE->getRefKind(), Type(),
                             lookupOptions, corrections);
@@ -2066,9 +2078,6 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
     csOptions |= ConstraintSystemFlags::AllowUnresolvedTypeVariables;
 
-  if (options.contains(TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType))
-    csOptions |= ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType;
-
   ConstraintSystem cs(*this, dc, csOptions, expr);
   cs.baseCS = baseCS;
 
@@ -2469,7 +2478,8 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       assert(!expr->isSemanticallyInOutExpr());
 
       // Save the locator we're using for the expression.
-      Locator = cs.getConstraintLocator(expr);
+      Locator =
+          cs.getConstraintLocator(expr, ConstraintLocator::ContextualType);
 
       // Collect constraints from the pattern.
       initType = cs.generateConstraints(pattern, Locator);
@@ -2954,13 +2964,9 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
 
       if (auto archetypeType = dyn_cast<ArchetypeType>(origType)) {
         auto root = archetypeType->getRoot();
-        // We leave opaque types and their nested associated types alone here.
-        // They're globally available.
-        if (isa<OpaqueTypeArchetypeType>(root))
-          return origType;
         // For other nested types, fail here so the default logic in subst()
         // for nested types applies.
-        else if (root != archetypeType)
+        if (root != archetypeType)
           return Type();
         
         auto locator = cs.getConstraintLocator(nullptr);
@@ -3899,6 +3905,53 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       case CheckedCastKind::Unresolved:
         return failed();
       }
+    }
+  }
+
+  assert(!toType->isAny() && "casts to 'Any' should've been handled above");
+  assert(!toType->isAnyObject() &&
+         "casts to 'AnyObject' should've been handled above");
+
+  // A cast from a function type to an existential type (except `Any`)
+  // or an archetype type (with constraints) cannot succeed
+  auto toArchetypeType = toType->is<ArchetypeType>();
+  auto fromFunctionType = fromType->is<FunctionType>();
+  auto toExistentialType = toType->isAnyExistentialType();
+
+  auto toConstrainedArchetype = false;
+  if (toArchetypeType) {
+    auto archetype = toType->castTo<ArchetypeType>();
+    toConstrainedArchetype = !archetype->getConformsTo().empty();
+  }
+
+  if (fromFunctionType &&
+      (toExistentialType || (toArchetypeType && toConstrainedArchetype))) {
+    switch (contextKind) {
+    case CheckedCastContextKind::ConditionalCast:
+    case CheckedCastContextKind::ForcedCast:
+      diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, origToType)
+          .highlight(diagFromRange)
+          .highlight(diagToRange);
+
+      // If we're referring to a function with a return value (not Void) then
+      // emit a fix-it suggesting to add `()` to call the function
+      if (auto DRE = dyn_cast<DeclRefExpr>(fromExpr)) {
+        if (auto FD = dyn_cast<FuncDecl>(DRE->getDecl())) {
+          if (!FD->getResultInterfaceType()->isVoid()) {
+            diagnose(diagLoc, diag::downcast_to_unrelated_fixit, FD->getName())
+                .fixItInsertAfter(fromExpr->getEndLoc(), "()");
+          }
+        }
+      }
+
+      return CheckedCastKind::ValueCast;
+      break;
+
+    case CheckedCastContextKind::IsPattern:
+    case CheckedCastContextKind::EnumElementPattern:
+    case CheckedCastContextKind::IsExpr:
+    case CheckedCastContextKind::None:
+      break;
     }
   }
 

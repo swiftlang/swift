@@ -114,4 +114,4 @@ func myprint(_ value: TriValue) {
 }
 myprint(unknown)
 
-// CHECK-DAG: !DIFile(filename: "variables.swift"
+// CHECK-DAG: !DIFile(filename: "{{.*}}variables.swift"

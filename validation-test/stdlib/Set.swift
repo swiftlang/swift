@@ -1986,7 +1986,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     expectEqual(0, s.count)
 
     let emptySet = Set<Int>()
-    expectNotEqual(emptySet._rawIdentifier(), s._rawIdentifier())
+    expectEqual(emptySet._rawIdentifier(), s._rawIdentifier())
 
     s.removeAll()
     expectEqual(emptySet._rawIdentifier(), s._rawIdentifier())
@@ -2178,7 +2178,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
   var s2 = getBridgedNonverbatimSet([])
   let identity2 = s2._rawIdentifier()
   expectTrue(isNativeSet(s2))
-  expectNotEqual(identity1, identity2)
+  expectEqual(identity1, identity2)
 
   expectEqual(s1, s2)
   expectEqual(identity1, s1._rawIdentifier())
@@ -2186,11 +2186,11 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
 
   s2.insert(TestObjCKeyTy(4040) as TestBridgedKeyTy)
   expectTrue(isNativeSet(s2))
-  expectEqual(identity2, s2._rawIdentifier())
+  expectNotEqual(identity2, s2._rawIdentifier())
 
   expectNotEqual(s1, s2)
   expectEqual(identity1, s1._rawIdentifier())
-  expectEqual(identity2, s2._rawIdentifier())
+  expectNotEqual(identity2, s2._rawIdentifier())
 }
 
 SetTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
@@ -4612,5 +4612,103 @@ SetTestSuite.test("IndexValidation.RemoveAt.AfterGrow") {
   expectCrashLater()
   s.remove(at: i)
 }
+
+#if _runtime(_ObjC)
+SetTestSuite.test("ForcedNonverbatimBridge.Trap.String")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type")
+  .code {
+
+  let s1: NSSet = [
+    "Gordon" as NSString,
+    "William" as NSString,
+    "Katherine" as NSString,
+    "Lynn" as NSString,
+    "Brian" as NSString,
+    1756 as NSNumber]
+
+  expectCrashLater()
+  _ = s1 as! Set<String>
+}
+#endif
+
+#if _runtime(_ObjC)
+SetTestSuite.test("ForcedNonverbatimBridge.Trap.Int")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type")
+  .code {
+
+  let s1: NSSet = [
+    4 as NSNumber,
+    8 as NSNumber,
+    15 as NSNumber,
+    16 as NSNumber,
+    23 as NSNumber,
+    42 as NSNumber,
+    "John" as NSString]
+
+  expectCrashLater()
+  _ = s1 as! Set<Int>
+}
+#endif
+
+#if _runtime(_ObjC)
+SetTestSuite.test("ForcedVerbatimBridge.Trap.NSString")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type")
+  .code {
+
+  let s1: NSSet = [
+    "Gordon" as NSString,
+    "William" as NSString,
+    "Katherine" as NSString,
+    "Lynn" as NSString,
+    "Brian" as NSString,
+    1756 as NSNumber]
+
+  // With the ObjC runtime, the verbatim downcast is O(1); it performs no
+  // runtime checks.
+  let s2 = s1 as! Set<NSString>
+  // Element access goes through the bridged path and performs forced downcasts.
+  // This is where the odd numeric value is caught.
+  expectCrashLater()
+  for string in s2 {
+    _ = string
+  }
+}
+#endif
+
+#if _runtime(_ObjC)
+SetTestSuite.test("ForcedVerbatimBridge.Trap.NSNumber")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type")
+  .code {
+  let s1: NSSet = [
+    4 as NSNumber,
+    8 as NSNumber,
+    15 as NSNumber,
+    16 as NSNumber,
+    23 as NSNumber,
+    42 as NSNumber,
+    "John" as NSString]
+  // With the ObjC runtime, the verbatim downcast is O(1); it performs no
+  // runtime checks.
+  let s2 = s1 as! Set<NSNumber>
+  // Element access goes through the bridged path and performs forced downcasts.
+  // This is where the odd numeric value is caught.
+  expectCrashLater()
+  for string in s2 {
+    _ = string
+  }
+}
+#endif
 
 runAllTests()

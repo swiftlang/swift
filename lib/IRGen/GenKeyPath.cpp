@@ -24,6 +24,7 @@
 #include "GenMeta.h"
 #include "GenProto.h"
 #include "GenStruct.h"
+#include "GenTuple.h"
 #include "GenType.h"
 #include "GenericRequirement.h"
 #include "IRGenDebugInfo.h"
@@ -1146,6 +1147,39 @@ emitKeyPathComponent(IRGenModule &IGM,
   case KeyPathPatternComponent::Kind::OptionalWrap:
     fields.addInt32(KeyPathComponentHeader::forOptionalWrap().getData());
     break;
+  case KeyPathPatternComponent::Kind::TupleElement:
+    assert(baseTy->is<TupleType>() && "not a tuple");
+
+    SILType loweredTy = IGM.getLoweredType(baseTy);
+
+    // Tuple with fixed layout
+    //
+    // This code is ALSO executed in the case of a tuple with dynamic layout,
+    // (see below) but only if `component.getTupleIndex()` is 0 - in that case
+    // the compiler knows that the tuple element is always at offset 0.
+    // TODO: If this is behavior is not desired we should find a way to skip to
+    // the next section of code e.g. check if baseTy has archetypes?
+    if (auto offset = getFixedTupleElementOffset(IGM, loweredTy, component.getTupleIndex())) {
+      auto header = KeyPathComponentHeader
+                      ::forStructComponentWithInlineOffset(/*isLet*/ false,
+                                                           offset->getValue());
+
+      fields.addInt32(header.getData());
+      break;
+    }
+
+    // Tuple with dynamic layout
+    auto elementOffset = getStaticTupleElementOffset(IGM,
+                                                     loweredTy,
+                                                     component.getTupleIndex());
+
+    auto header = KeyPathComponentHeader
+      ::forStructComponentWithUnresolvedFieldOffset(/*isLet*/ false);
+    fields.addInt32(header.getData());
+    fields.addInt32(elementOffset.getValue());
+    break;
+
+    llvm_unreachable("could not get tuple element offset");
   }
 }
 
@@ -1239,6 +1273,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
     case KeyPathPatternComponent::Kind::OptionalChain:
     case KeyPathPatternComponent::Kind::OptionalForce:
     case KeyPathPatternComponent::Kind::OptionalWrap:
+    case KeyPathPatternComponent::Kind::TupleElement:
       break;
     }
   }

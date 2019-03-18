@@ -861,7 +861,7 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
     }
   } else if (baseHasOpenAccess &&
              classDecl->hasOpenAccess(dc) &&
-             decl->getFormalAccess() != AccessLevel::Open &&
+             decl->getFormalAccess() < AccessLevel::Public &&
              !decl->isFinal()) {
     {
       auto diag = diags.diagnose(decl, diag::override_not_accessible,
@@ -1246,6 +1246,7 @@ namespace  {
 
     UNINTERESTING_ATTR(AccessControl)
     UNINTERESTING_ATTR(Alignment)
+    UNINTERESTING_ATTR(AlwaysEmitIntoClient)
     UNINTERESTING_ATTR(Borrowed)
     UNINTERESTING_ATTR(CDecl)
     UNINTERESTING_ATTR(Consuming)
@@ -1273,7 +1274,6 @@ namespace  {
     UNINTERESTING_ATTR(NonMutating)
     UNINTERESTING_ATTR(NonObjC)
     UNINTERESTING_ATTR(NonOverride)
-    UNINTERESTING_ATTR(NoReturn)
     UNINTERESTING_ATTR(NSApplicationMain)
     UNINTERESTING_ATTR(NSCopying)
     UNINTERESTING_ATTR(NSManaged)
