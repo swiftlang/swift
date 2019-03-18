@@ -15,6 +15,9 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// Requires explicit swift-version 4.
+// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
+
 import StdlibUnittest
 import Foundation
 
