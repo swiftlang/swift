@@ -3150,6 +3150,9 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     return;
   }
 
+  // Set the checked differentiation parameter indices in the attribute.
+  attr->setParameterIndices(checkedWrtParamIndices);
+
   // Gather differentiation parameters.
   SmallVector<Type, 4> wrtParamTypes;
   checkedWrtParamIndices->getSubsetParameterTypes(
