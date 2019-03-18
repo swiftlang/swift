@@ -586,6 +586,10 @@ protocol DiffReq : Differentiable {
   // expected-note @+2 {{protocol requires function 'f2'}}
   @differentiable(wrt: (self, x, y))
   func f2(_ x: Float, _ y: Float) -> Float
+
+  // expected-note @+2 {{protocol requires function 'generic'}}
+  @differentiable(where T : Differentiable)
+  func generic<T>(_ x: T) -> T
 }
 
 // expected-error @+1 {{does not conform to protocol 'DiffReq'}}
@@ -599,6 +603,13 @@ struct ConformingWithErrors : DiffReq {
   @differentiable(wrt: (self, x))
   func f2(_ x: Float, _ y: Float) -> Float {
     return x + y
+  }
+
+  // FIXME(TF-371): Fix misleading `@differentiable` attribute shown in diagnostic.
+  // The `Self : DiffRep` requirement should not be shown.
+  // expected-note @+1 {{candidate is missing attribute '@differentiable(where Self : DiffReq, T : Differentiable)'}}
+  func generic<T>(_ x: T) -> T {
+    return x
   }
 }
 

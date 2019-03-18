@@ -45,6 +45,13 @@ struct InstanceMethod : Differentiable {
   }
 }
 
+// CHECK-DAG: @differentiable(where T : Differentiable, T : Numeric)
+// CHECK-DAG: func testOnlyWhereClause<T>(x: T) -> T where T : Numeric
+@differentiable(where T : Differentiable)
+func testOnlyWhereClause<T : Numeric>(x: T) -> T {
+  return x
+}
+
 // CHECK-DAG: @differentiable(vjp: vjpTestWhereClause where T : Differentiable, T : Numeric)
 // CHECK-DAG: func testWhereClause<T>(x: T) -> T where T : Numeric
 @differentiable(vjp: vjpTestWhereClause where T : Differentiable)
