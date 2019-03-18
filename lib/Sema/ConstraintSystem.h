@@ -873,11 +873,12 @@ struct MemberLookupResult {
     /// The member is inaccessible (e.g. a private member in another file).
     UR_Inaccessible,
   };
-  
-  /// This is a list of considered (but rejected) candidates, along with a
-  /// reason for their rejection.
-  SmallVector<std::pair<OverloadChoice, UnviableReason>, 4> UnviableCandidates;
 
+  /// This is a list of considered (but rejected) candidates, along with a
+  /// reason for their rejection. Split into separate collections to make
+  /// it easier to use in conjunction with viable candidates.
+  SmallVector<OverloadChoice, 4> UnviableCandidates;
+  SmallVector<UnviableReason, 4> UnviableReasons;
 
   /// Mark this as being an already-diagnosed error and return itself.
   MemberLookupResult &markErrorAlreadyDiagnosed() {
@@ -890,7 +891,8 @@ struct MemberLookupResult {
   }
   
   void addUnviable(OverloadChoice candidate, UnviableReason reason) {
-    UnviableCandidates.push_back({candidate, reason});
+    UnviableCandidates.push_back(candidate);
+    UnviableReasons.push_back(reason);
   }
 
   Optional<unsigned> getFavoredIndex() const {
@@ -2474,7 +2476,7 @@ public:
   /// \param requiresFix Determines whether choices require a fix to
   /// be included in the result. If the fix couldn't be provided by
   /// `getFix` for any given choice, such choice would be filtered out.
-  ////
+  ///
   /// \param getFix Optional callback to determine a fix for a given
   /// choice (first argument is a position of current choice,
   /// second - the choice in question).
@@ -3677,6 +3679,10 @@ public:
   bool attempt(ConstraintSystem &cs) const;
 
   bool isDisabled() const { return Choice->isDisabled(); }
+
+  bool hasFix() const {
+    return bool(Choice->getFix());
+  }
 
   bool isUnavailable() const {
     if (auto *decl = getDecl(Choice))

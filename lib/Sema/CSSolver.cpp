@@ -1305,8 +1305,10 @@ ConstraintSystem::filterDisjunction(
   for (unsigned constraintIdx : indices(disjunction->getNestedConstraints())) {
     auto constraint = disjunction->getNestedConstraints()[constraintIdx];
 
-    // Skip already-disabled constraints.
-    if (constraint->isDisabled())
+    // Skip already-disabled constraints. Let's treat disabled
+    // choices which have a fix as "enabled" ones here, so we can
+    // potentially infer some type information from them.
+    if (constraint->isDisabled() && !constraint->getFix())
       continue;
 
     if (pred(constraint)) {

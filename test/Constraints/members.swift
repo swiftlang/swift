@@ -359,19 +359,19 @@ extension Sequence {
 }
 
 class C_25341015 {
-  static func baz(_ x: Int, _ y: Int) {} // expected-note {{'baz' declared here}}
+  static func baz(_ x: Int, _ y: Int) {}
   func baz() {}
   func qux() {
-    baz(1, 2) // expected-error {{use of 'baz' refers to instance method 'baz()' rather than static method 'baz' in class 'C_25341015'}} expected-note {{use 'C_25341015.' to reference the static method}}
+    baz(1, 2) // expected-error {{static member 'baz' cannot be used on instance of type 'C_25341015'}} {{5-5=C_25341015.}}
   }
 }
 
 struct S_25341015 {
-  static func foo(_ x: Int, y: Int) {} // expected-note {{'foo(_:y:)' declared here}}
+  static func foo(_ x: Int, y: Int) {}
 
   func foo(z: Int) {}
   func bar() {
-    foo(1, y: 2) // expected-error {{use of 'foo' refers to instance method 'foo(z:)' rather than static method 'foo(_:y:)' in struct 'S_25341015'}} expected-note {{use 'S_25341015.' to reference the static method}}
+    foo(1, y: 2) // expected-error {{static member 'foo' cannot be used on instance of type 'S_25341015'}} {{5-5=S_25341015.}}
   }
 }
 
