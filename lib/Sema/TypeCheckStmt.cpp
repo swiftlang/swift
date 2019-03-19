@@ -1928,28 +1928,92 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
     auto E = FD->getSingleExpressionBody();
 
     if (resultTypeLoc.isNull() || resultTypeLoc.getType()->isVoid()) {
+      // The function returns void.  We don't need an explicit return, no matter
+      // what the type of the expression is.  Take the inserted return back out.
       BS->setElement(0, E);
+      // Fall through to type-checking the body as if we were not a single 
+      // expression function.
     } else {
+      auto resultType = Optional<AnyFunctionRef>(FD)->getBodyResultType();
       // FIXME: FIXME_NOW: DETERMINE: Is this the appropriate mechanism to use
       //        to divine the type of E?
       preCheckExpression(E, FD);
-      if (E != FD->getSingleExpressionBody()) {
+      if (E != FD->getSingleExpressionBody())
         FD->setSingleExpressionBody(E);
-      }
 
       constraints::ConstraintSystem cs(*this, FD, 
                                        constraints::ConstraintSystemFlags::SuppressDiagnostics);
+      cs.setContextualType(E, TypeLoc::withoutLoc(resultType), CTP_ReturnStmt);
+
       SmallVector<constraints::Solution, 4> viable;
-      if(!cs.solve(E, /*convertType*/Type(), nullptr, viable,
-                   FreeTypeVariableBinding::Disallow) &&
-         viable.size() == 1) {
+      if(!cs.solve(E, resultType, /*listener=*/nullptr, viable,
+                    FreeTypeVariableBinding::Disallow)) {
         auto &solution = viable[0];
-        auto &solutionCS = solution.getConstraintSystem();
-        Type exprType = solution.simplifyType(solutionCS.getType(E));
-        if (!exprType.isNull() && exprType->isUninhabited() &&
-            exprType->getCanonicalType() != resultTypeLoc.getType()->getCanonicalType()) {
-          BS->setElement(0, E);
+        E = cs.applySolution(solution, E, resultType, /*discardedExpr=*/false, 
+                             /*skipClosures*/false);
+        if (E != FD->getSingleExpressionBody())
+          FD->setSingleExpressionBody(E);
+        FD->setBody(BS);
+        return false;
+      } else {
+        // There is exactly one scenario we have to look for, where the single
+        // expression is uninhabited and different from the return type of the
+        // function.
+        // 
+        // Try solving the constraint system again without a return type.
+        constraints::ConstraintSystem ucs(*this, FD, 
+                                          constraints::ConstraintSystemFlags::SuppressDiagnostics);
+        SmallVector<constraints::Solution, 4> uviable;
+        if (!ucs.solve(E, /*convertType*/Type(), /*listener=*/nullptr, uviable,
+                       FreeTypeVariableBinding::Disallow)) {
+          auto &solution = uviable[0];
+          auto &solutionCS = solution.getConstraintSystem();
+          Type exprType = solution.simplifyType(solutionCS.getType(E));
+          if (!exprType.isNull() && exprType->isUninhabited() &&
+              exprType->getCanonicalType() != resultType->getCanonicalType()) {
+            // The expression is an uninhabited type distinct from the 
+            // function's.  Remove the return we inserted.
+            E = ucs.applySolution(solution, E, /*convertType*/Type(), 
+                                  /*discardedExpr=*/false, 
+                                  /*skipClosures*/false);
+            BS->setElement(0, E);
+            FD->setBody(BS);
+            return false;
+          }
         }
+        // There are two ways to reach this point.
+        // (1) The system doesn't have a (unique) solution when we don't treat
+        // the single expression as being implicitly returned.  For example:
+        //
+        // enum Nevah {}
+        // enum Nevah2 {}
+        // func nevah() -> Nevah { fatalError() }
+        // func nevah() -> Nevah2 { fatalError() }
+        // 
+        // func die() -> Never { nevah() }
+        //
+        // (2) When we don't assume the intent was to implicitly return the 
+        // single expression, the constraint system has a solution, but the
+        // expression's type in that solution is not some uninhabited type
+        // distinct from the return type of the function.  For example,
+        //
+        //   func foo() -> Int {
+        //       "hi"
+        //   }
+        // 
+        // In either case, we should assume that the intent was to implicitly
+        // return the single expression and diagnose accordingly, per the first
+        // call to solve.
+        auto HadSalvageError = cs.salvage(viable, E);
+        if (!HadSalvageError) {
+          auto &solution = viable[0];
+          E = cs.applySolution(solution, E, resultType, /*discardedExpr=*/false, 
+                               /*skipClosures*/false);
+          if (E != FD->getSingleExpressionBody())
+            FD->setSingleExpressionBody(E);
+          FD->setBody(BS);
+        }
+        return HadSalvageError;
       }
     }
   }
