@@ -2802,7 +2802,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 
   auto insertion =
       ctx.DifferentiableAttrs.try_emplace({D, checkedWrtParamIndices}, attr);
-  // Differentiable attributes are uniqued by their parameter indices.
+  // `@differentiable` attributes are uniqued by their parameter indices.
   // Reject duplicate attributes for the same decl and parameter indices pair.
   if (!insertion.second && insertion.first->getSecond() != attr) {
     diagnoseAndRemoveAttr(attr, diag::differentiable_attr_duplicate);
@@ -3249,7 +3249,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
                                     None, None, derivativeRequirements);
     auto insertion = ctx.DifferentiableAttrs.try_emplace(
         {originalFn, checkedWrtParamIndices}, da);
-    // Differentiable attributes are uniqued by their parameter indices.
+    // `@differentiable` attributes are uniqued by their parameter indices.
     // Reject duplicate attributes for the same decl and parameter indices pair.
     if (!insertion.second && insertion.first->getSecond() != da) {
       diagnoseAndRemoveAttr(da, diag::differentiable_attr_duplicate);
@@ -3257,21 +3257,24 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     }
     originalFn->getAttrs().add(da);
   }
+  // Check if the `@differentiable` attribute already has a registered
+  // derivative. If so, emit an error on the `@differentiating` attribute.
+  // Otherwise, register the derivative in the `@differentiable` attribute.
   switch (kind) {
   case AutoDiffAssociatedFunctionKind::JVP:
-    if (auto jvp = da->getJVP()) {
+    if (da->getJVP() || da->getJVPFunction()) {
       diagnoseAndRemoveAttr(
           attr, diag::differentiating_attr_original_already_has_derivative,
-          jvp->Name);
+          originalFn->getFullName());
       return;
     }
     da->setJVPFunction(derivative);
     break;
   case AutoDiffAssociatedFunctionKind::VJP:
-    if (auto vjp = da->getVJP()) {
+    if (da->getVJP() || da->getVJPFunction()) {
       diagnoseAndRemoveAttr(
           attr, diag::differentiating_attr_original_already_has_derivative,
-          vjp->Name);
+          originalFn->getFullName());
       return;
     }
     da->setVJPFunction(derivative);
