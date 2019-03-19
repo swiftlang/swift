@@ -867,25 +867,6 @@ ArrayRef<StringRef> copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator,
   return ArrayRef<StringRef>();
 }
 
-/// The expected contextual type(s) for code-completion.
-struct ide::ExpectedTypeContext {
-  /// Possible types of the code completion expression.
-  std::vector<Type> possibleTypes;
-
-  /// Whether the `ExpectedTypes` comes from a single-expression body, e.g.
-  /// `foo({ here })`.
-  ///
-  /// Since the input may be incomplete, we take into account that the types are
-  /// only a hint.
-  bool isSingleExpressionBody = false;
-
-  bool empty() const { return possibleTypes.empty(); }
-
-  ExpectedTypeContext() = default;
-  ExpectedTypeContext(std::vector<Type> types, bool isSingleExpressionBody)
-      : possibleTypes(types), isSingleExpressionBody(isSingleExpressionBody) {}
-};
-
 static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelation(
                                                                 Type Ty,
                                                                 Type ExpectedTy,
@@ -1287,11 +1268,10 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     if (ST.isNull() || ST->is<ErrorType>())
       return;
 
-    ExpectedTypeContext empty;
     CodeCompletionResultBuilder Builder(Sink,
                                         CodeCompletionResult::ResultKind::Keyword,
                                         SemanticContextKind::CurrentNominal,
-                                        empty);
+                                        {});
     Builder.setKeywordKind(CodeCompletionKeywordKind::kw_super);
     Builder.addTextChunk("super");
     Builder.addTypeAnnotation(ST.getString());
