@@ -2215,23 +2215,33 @@ static LValue visitRecInOut(SILGenLValue &SGL, Expr *e,
 
 // Otherwise we have a non-lvalue type (references, values, metatypes,
 // etc). These act as the root of a logical lvalue.
-static ManagedValue visitRecNonInOutBase(SILGenLValue &SGL, Expr *e,
-                                         SGFAccessKind accessKind,
-                                         LValueOptions options,
-                                         AbstractionPattern orig) {
+static LValue visitRecNonInOutBase(SILGenLValue &SGL, Expr *baseExpr,
+                                   SGFAccessKind accessKind,
+                                   LValueOptions options,
+                                   AbstractionPattern orig) {
+  auto wrapValueInValueComponent = [&](ManagedValue mv) -> LValue {
+    CanType formalType = getSubstFormalRValueType(baseExpr);
+    auto typeData = getValueTypeData(accessKind, formalType, mv.getValue());
+    LValue lv;
+    lv.add<ValueComponent>(mv, None, typeData, /*isRValue=*/true);
+    return lv;
+  };
+
   auto &SGF = SGL.SGF;
 
   // For an rvalue base, apply the reabstraction (if any) eagerly, since
   // there's no need for writeback.
   if (orig.isValid()) {
-    return SGF.emitRValueAsOrig(
-        e, orig, SGF.getTypeLowering(orig, e->getType()->getRValueType()));
+    auto mv = SGF.emitRValueAsOrig(
+        baseExpr, orig,
+        SGF.getTypeLowering(orig, baseExpr->getType()->getRValueType()));
+    return wrapValueInValueComponent(mv);
   }
 
   // Ok, at this point we know that re-abstraction is not required.
   SGFContext ctx;
 
-  if (auto *dre = dyn_cast<DeclRefExpr>(e)) {
+  if (auto *dre = dyn_cast<DeclRefExpr>(baseExpr)) {
     // Any reference to "self" can be done at +0 so long as it is a direct
     // access, since we know it is guaranteed.
     //
@@ -2252,12 +2262,12 @@ static ManagedValue visitRecNonInOutBase(SILGenLValue &SGL, Expr *e,
         ManagedValue selfLValue =
           SGF.emitAddressOfLocalVarDecl(dre, vd, formalRValueType,
                                         SGFAccessKind::OwnedObjectRead);
-        selfLValue = SGF.emitFormalEvaluationRValueForSelfInDelegationInit(
-                            e, formalRValueType,
-                            selfLValue.getLValueAddress(), ctx)
-                         .getAsSingleValue(SGF, e);
+        selfLValue =
+            SGF.emitFormalEvaluationRValueForSelfInDelegationInit(
+                   dre, formalRValueType, selfLValue.getLValueAddress(), ctx)
+                .getAsSingleValue(SGF, dre);
 
-        return selfLValue;
+        return wrapValueInValueComponent(selfLValue);
       }
     }
 
@@ -2271,13 +2281,13 @@ static ManagedValue visitRecNonInOutBase(SILGenLValue &SGL, Expr *e,
     }
   }
 
-  if (SGF.SGM.Types.isIndirectPlusZeroSelfParameter(e->getType())) {
+  if (SGF.SGM.Types.isIndirectPlusZeroSelfParameter(baseExpr->getType())) {
     ctx = SGFContext::AllowGuaranteedPlusZero;
   }
 
-  ManagedValue mv = SGF.emitRValueAsSingleValue(e, ctx);
+  ManagedValue mv = SGF.emitRValueAsSingleValue(baseExpr, ctx);
   if (mv.isPlusZeroRValueOrTrivial())
-    return mv;
+    return wrapValueInValueComponent(mv);
 
   // Any temporaries needed to materialize the lvalue must be destroyed when
   // at the end of the lvalue's formal evaluation scope.
@@ -2287,8 +2297,9 @@ static ManagedValue visitRecNonInOutBase(SILGenLValue &SGL, Expr *e,
   //   destroy_value %self // self must be released before calling foo.
   //   foo(%rvalue)
   SILValue value = mv.forward(SGF);
-  return SGF.emitFormalAccessManagedRValueWithCleanup(CleanupLocation(e),
-                                                      value);
+  auto finalMV = SGF.emitFormalAccessManagedRValueWithCleanup(
+      CleanupLocation(baseExpr), value);
+  return wrapValueInValueComponent(finalMV);
 }
 
 LValue SILGenLValue::visitRec(Expr *e, SGFAccessKind accessKind,
@@ -2302,12 +2313,7 @@ LValue SILGenLValue::visitRec(Expr *e, SGFAccessKind accessKind,
   // Otherwise we have a non-lvalue type (references, values, metatypes,
   // etc). These act as the root of a logical lvalue. Compute the root value,
   // wrap it in a ValueComponent, and return it for our caller.
-  ManagedValue rv = visitRecNonInOutBase(*this, e, accessKind, options, orig);
-  CanType formalType = getSubstFormalRValueType(e);
-  auto typeData = getValueTypeData(accessKind, formalType, rv.getValue());
-  LValue lv;
-  lv.add<ValueComponent>(rv, None, typeData, /*isRValue=*/true);
-  return lv;
+  return visitRecNonInOutBase(*this, e, accessKind, options, orig);
 }
 
 LValue SILGenLValue::visitExpr(Expr *e, SGFAccessKind accessKind,
@@ -2846,7 +2852,6 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
                            SGF.F.getResilienceExpansion());
 
   bool isOnSelfParameter = isCallToSelfOfCurrentFunction(SGF, e);
-
   bool isContextRead = isCurrentFunctionReadAccess(SGF);
 
   // If we are inside _read, calling self.get, and the _read we are inside of is
