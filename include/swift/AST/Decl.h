@@ -542,7 +542,7 @@ protected:
     NumRequirementsInSignature : 16
   );
 
-  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+2+1+2+1+3+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+2+1+2+1+6+1+1+1,
     /// Whether this class requires all of its instance variables to
     /// have in-class initializers.
     RequiresStoredPropertyInits : 1,
@@ -563,12 +563,11 @@ protected:
     /// control inserting the implicit destructor.
     HasDestructorDecl : 1,
 
-    /// Whether the class has @objc ancestry.
-    ObjCKind : 3,
+    /// Information about the class's ancestry.
+    Ancestry : 6,
 
-    /// Whether this class has @objc members.
-    HasObjCMembersComputed : 1,
-    HasObjCMembers : 1,
+    /// Whether we have computed the above field or not.
+    AncestryComputed : 1,
 
     HasMissingDesignatedInitializers : 1,
     HasMissingVTableEntries : 1
@@ -3545,20 +3544,32 @@ enum class ArtificialMainKind : uint8_t {
   UIApplicationMain,
 };
 
-enum class ObjCClassKind : uint8_t {
-  /// Neither the class nor any of its superclasses are @objc.
-  NonObjC,
-  /// One of the superclasses is @objc but another superclass or the
-  /// class itself has generic parameters, so while it cannot be
-  /// directly represented in Objective-C, it has implicitly @objc
-  /// members.
-  ObjCMembers,
-  /// The top-level ancestor of this class is not @objc, but the
-  /// class itself is.
-  ObjCWithSwiftRoot,
-  /// The class is bona-fide @objc.
-  ObjC,
+/// This is the base type for AncestryOptions. Each flag describes possible
+/// interesting kinds of superclasses that a class may have.
+enum class AncestryFlags : uint8_t {
+  /// The class or one of its superclasses is @objc.
+  ObjC = (1<<0),
+
+  /// The class or one of its superclasses is @objcMembers.
+  ObjCMembers = (1<<1),
+
+  /// The class or one of its superclasses is generic.
+  Generic = (1<<2),
+
+  /// The class or one of its superclasses is resilient.
+  Resilient = (1<<3),
+
+  /// The class or one of its superclasses has resilient metadata and is in a
+  /// different resilience domain.
+  ResilientOther = (1<<4),
+
+  /// The class or one of its superclasses is imported from Clang.
+  ClangImported = (1<<5),
 };
+
+/// Return type of ClassDecl::checkAncestry(). Describes a set of interesting
+/// kinds of superclasses that a class may have.
+using AncestryOptions = OptionSet<AncestryFlags>;
 
 /// ClassDecl - This is the declaration of a class, for example:
 ///
@@ -3588,8 +3599,6 @@ class ClassDecl final : public NominalTypeDecl {
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
   friend class TypeChecker;
-
-  bool hasObjCMembersSlow();
 
 public:
   ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
@@ -3749,18 +3758,13 @@ public:
     Bits.ClassDecl.InheritsSuperclassInits = true;
   }
 
-  /// Returns if this class has any @objc ancestors, or if it is directly
-  /// visible to Objective-C. The latter is a stronger condition which is only
-  /// true if the class does not have any generic ancestry.
-  ObjCClassKind checkObjCAncestry() const;
+  /// Walks the class hierarchy starting from this class, checking various
+  /// conditions.
+  AncestryOptions checkAncestry() const;
 
-  /// Returns if the class has implicitly @objc members. This is true if any
-  /// ancestor class has the @objcMembers attribute.
-  bool hasObjCMembers() const {
-    if (Bits.ClassDecl.HasObjCMembersComputed)
-      return Bits.ClassDecl.HasObjCMembers;
-
-    return const_cast<ClassDecl *>(this)->hasObjCMembersSlow();
+  /// Check if the class has ancestry of the given kind.
+  bool checkAncestry(AncestryFlags flag) const {
+    return checkAncestry().contains(flag);
   }
 
   /// The type of metaclass to use for a class.

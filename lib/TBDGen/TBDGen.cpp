@@ -343,17 +343,9 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
 
   visitNominalTypeDecl(CD);
 
-  auto hasResilientAncestor =
-      CD->hasResilientMetadata(SwiftModule, ResilienceExpansion::Minimal);
-  auto ancestor = CD->getSuperclassDecl();
-  while (ancestor && !hasResilientAncestor) {
-    hasResilientAncestor |=
-        ancestor->hasResilientMetadata(SwiftModule, ResilienceExpansion::Maximal);
-    ancestor = ancestor->getSuperclassDecl();
-  }
-
   // Types with resilient superclasses have some extra symbols.
-  if (hasResilientAncestor)
+  if (CD->checkAncestry(AncestryFlags::ResilientOther) ||
+      CD->hasResilientMetadata())
     addSymbol(LinkEntity::forClassMetadataBaseOffset(CD));
 
   // Emit dispatch thunks for every new vtable entry.

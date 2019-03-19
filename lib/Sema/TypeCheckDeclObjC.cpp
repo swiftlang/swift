@@ -993,17 +993,17 @@ static bool isMemberOfObjCMembersClass(const ValueDecl *VD) {
   auto classDecl = VD->getDeclContext()->getSelfClassDecl();
   if (!classDecl) return false;
 
-  return classDecl->hasObjCMembers();
+  return classDecl->checkAncestry(AncestryFlags::ObjCMembers);
 }
 
 // A class is @objc if it does not have generic ancestry, and it either has
 // an explicit @objc attribute, or its superclass is @objc.
 static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
   ASTContext &ctx = CD->getASTContext();
-  ObjCClassKind kind = CD->checkObjCAncestry();
+  auto ancestry = CD->checkAncestry();
 
   if (auto attr = CD->getAttrs().getAttribute<ObjCAttr>()) {
-    if (kind == ObjCClassKind::ObjCMembers) {
+    if (ancestry.contains(AncestryFlags::Generic)) {
       if (attr->hasName() && !CD->isGenericContext()) {
         // @objc with a name on a non-generic subclass of a generic class is
         // just controlling the runtime name. Don't diagnose this case.
@@ -1018,7 +1018,8 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
 
     // Only allow ObjC-rooted classes to be @objc.
     // (Leave a hole for test cases.)
-    if (kind == ObjCClassKind::ObjCWithSwiftRoot) {
+    if (ancestry.contains(AncestryFlags::ObjC) &&
+        !ancestry.contains(AncestryFlags::ClangImported)) {
       if (ctx.LangOpts.EnableObjCAttrRequiresFoundation)
         ctx.Diags.diagnose(attr->getLocation(),
                            diag::invalid_objc_swift_rooted_class)
@@ -1031,9 +1032,10 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
     return ObjCReason(ObjCReason::ExplicitlyObjC);
   }
 
-  if (kind == ObjCClassKind::ObjCWithSwiftRoot ||
-      kind == ObjCClassKind::ObjC)
+  if (ancestry.contains(AncestryFlags::ObjC) &&
+      !ancestry.contains(AncestryFlags::Generic)) {
     return ObjCReason(ObjCReason::ImplicitlyObjC);
+  }
 
   return None;
 }
@@ -1214,9 +1216,8 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
     if (classDecl->isForeign())
       return None;
 
-    if (classDecl->checkObjCAncestry() != ObjCClassKind::NonObjC) {
+    if (classDecl->checkAncestry(AncestryFlags::ObjC))
       return ObjCReason(ObjCReason::MemberOfObjCSubclass);
-    }
   }
 
   return None;

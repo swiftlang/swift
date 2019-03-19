@@ -3519,9 +3519,8 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
   Bits.ClassDecl.InheritsSuperclassInits = 0;
   Bits.ClassDecl.RawForeignKind = 0;
   Bits.ClassDecl.HasDestructorDecl = 0;
-  Bits.ClassDecl.ObjCKind = 0;
-  Bits.ClassDecl.HasObjCMembersComputed = 0;
-  Bits.ClassDecl.HasObjCMembers = 0;
+  Bits.ClassDecl.Ancestry = 0;
+  Bits.ClassDecl.AncestryComputed = 0;
   Bits.ClassDecl.HasMissingDesignatedInitializers = 0;
   Bits.ClassDecl.HasMissingVTableEntries = 0;
 }
@@ -3634,16 +3633,18 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
   return Bits.ClassDecl.InheritsSuperclassInits;
 }
 
-ObjCClassKind ClassDecl::checkObjCAncestry() const {
+AncestryOptions ClassDecl::checkAncestry() const {
   // See if we've already computed this.
-  if (Bits.ClassDecl.ObjCKind)
-    return ObjCClassKind(Bits.ClassDecl.ObjCKind - 1);
+  if (Bits.ClassDecl.AncestryComputed)
+    return AncestryOptions(Bits.ClassDecl.Ancestry);
 
   llvm::SmallPtrSet<const ClassDecl *, 8> visited;
-  bool genericAncestry = false, isObjC = false;
-  const ClassDecl *CD = this;
 
-  for (;;) {
+  AncestryOptions result;
+  const ClassDecl *CD = this;
+  auto *M = getParentModule();
+
+  do {
     // If we hit circularity, we will diagnose at some point in typeCheckDecl().
     // However we have to explicitly guard against that here because we get
     // called as part of validateDecl().
@@ -3651,55 +3652,38 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
       break;
 
     if (CD->isGenericContext())
-      genericAncestry = true;
+      result |= AncestryFlags::Generic;
 
-    // Is this class @objc? For the current class, only look at the attribute
-    // to avoid cycles; for superclasses, compute @objc completely.
-    if ((CD == this && CD->getAttrs().hasAttribute<ObjCAttr>()) ||
-        (CD != this && CD->isObjC()))
-      isObjC = true;
+    // Note: it's OK to check for @objc explicitly instead of calling isObjC()
+    // to infer it since we're going to visit every superclass.
+    if (CD->getAttrs().hasAttribute<ObjCAttr>())
+      result |= AncestryFlags::ObjC;
 
-    if (!CD->hasSuperclass())
-      break;
+    if (CD->getAttrs().hasAttribute<ObjCMembersAttr>())
+      result |= AncestryFlags::ObjCMembers;
+
+    if (CD->hasClangNode())
+      result |= AncestryFlags::ClangImported;
+
+    if (CD->hasResilientMetadata())
+      result |= AncestryFlags::Resilient;
+
+    if (CD->hasResilientMetadata(M, ResilienceExpansion::Maximal))
+      result |= AncestryFlags::ResilientOther;
+
     CD = CD->getSuperclassDecl();
-    // If we don't have a valid class here, we should have diagnosed
-    // elsewhere.
-    if (!CD)
-      break;
-  }
-
-  ObjCClassKind kind = ObjCClassKind::ObjC;
-  if (!isObjC)
-    kind = ObjCClassKind::NonObjC;
-  else if (genericAncestry)
-    kind = ObjCClassKind::ObjCMembers;
-  else if (CD == this || !CD->isObjC())
-    kind = ObjCClassKind::ObjCWithSwiftRoot;
+  } while (CD != nullptr);
 
   // Save the result for later.
-  const_cast<ClassDecl *>(this)->Bits.ClassDecl.ObjCKind
-    = unsigned(kind) + 1;
-  return kind;
-}
-
-bool ClassDecl::hasObjCMembersSlow() {
-  // Don't attempt to calculate this again.
-  Bits.ClassDecl.HasObjCMembersComputed = true;
-
-  bool result = false;
-  if (getAttrs().hasAttribute<ObjCMembersAttr>())
-    result = true;
-  else if (auto *superclassDecl = getSuperclassDecl())
-    result = superclassDecl->hasObjCMembers();
-
-  Bits.ClassDecl.HasObjCMembers = result;
+  const_cast<ClassDecl *>(this)->Bits.ClassDecl.Ancestry = result.toRaw();
+  const_cast<ClassDecl *>(this)->Bits.ClassDecl.AncestryComputed = 1;
   return result;
 }
 
 ClassDecl::MetaclassKind ClassDecl::getMetaclassKind() const {
   assert(getASTContext().LangOpts.EnableObjCInterop &&
          "querying metaclass kind without objc interop");
-  auto objc = checkObjCAncestry() != ObjCClassKind::NonObjC;
+  auto objc = checkAncestry(AncestryFlags::ObjC);
   return objc ? MetaclassKind::ObjC : MetaclassKind::SwiftStub;
 }
 
