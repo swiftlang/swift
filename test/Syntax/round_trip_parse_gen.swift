@@ -563,3 +563,57 @@ func foo() {}
 #assert(true)
 #assert(false)
 #assert(true, "hello world")
+
+func optionalCommas() {
+  _ = [
+    1
+    2
+   ,4
+    5
+    6, 7
+    8
+    9
+    .member
+  ]
+  _ = [
+    1 : x
+    2 : x
+   ,4 : x
+    5 :
+    x
+    6: x, 7 : x
+    8: x
+    9: x
+    .member
+  ]
+  subscript_me[
+    1
+    2
+   ,4
+    5
+    6, 7
+    8
+    9
+    .member
+  ]
+  call(
+    1
+    2
+   ,4
+    5
+    6, 7
+    8
+    9
+    .member
+  )
+  _ = (
+    1
+    2
+   ,4
+    5
+    6, 7
+    8
+    9
+    .member
+  )
+}

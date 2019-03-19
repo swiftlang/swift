@@ -70,6 +70,30 @@ class Foo2 {
   }
 }
 
+func nocommas() {
+  [
+    1
+      2
+  ]
+  [
+    1
+    .member
+  ]
+  [
+    1
+        .member
+      2
+  ]
+  foo(
+    1
+           2
+  )
+  bar[
+    1
+        2
+  ]
+}
+
 // RUN: %sourcekitd-test -req=format -line=3 -length=1 %s >%t.response
 // RUN: %sourcekitd-test -req=format -line=6 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=7 -length=1 %s >>%t.response
@@ -99,6 +123,12 @@ class Foo2 {
 // RUN: %sourcekitd-test -req=format -line=65 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=67 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=69 -length=1 %s >>%t.response
+// RUN: %sourcekitd-test -req=format -line=76 -length=1 %s >>%t.response
+// RUN: %sourcekitd-test -req=format -line=80 -length=1 %s >>%t.response
+// RUN: %sourcekitd-test -req=format -line=85 -length=1 %s >>%t.response
+// RUN: %sourcekitd-test -req=format -line=89 -length=1 %s >>%t.response
+// RUN: %sourcekitd-test -req=format -line=93 -length=1 %s >>%t.response
+
 // RUN: %FileCheck --strict-whitespace %s <%t.response
 
 //                        "  func foo(Value1 : Int,"
@@ -187,3 +217,18 @@ class Foo2 {
 
 //                        "    foo2(1,"
 // CHECK: key.sourcetext: "         "
+
+//                        "    1"
+// CHECK: key.sourcetext: "    2"
+
+//                        "    1"
+// CHECK: key.sourcetext: "        .member"
+
+//                        "        .member"
+// CHECK: key.sourcetext: "    2"
+
+//                        "    1"
+// CHECK: key.sourcetext: "    2"
+
+//                        "    1"
+// CHECK: key.sourcetext: "    2"

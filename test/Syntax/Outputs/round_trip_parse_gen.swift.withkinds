@@ -562,4 +562,58 @@ func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSigna
 
 #assert(<BooleanLiteralExpr>true</BooleanLiteralExpr>)</PoundAssertStmt><PoundAssertStmt>
 #assert(<BooleanLiteralExpr>false</BooleanLiteralExpr>)</PoundAssertStmt><PoundAssertStmt>
-#assert(<BooleanLiteralExpr>true</BooleanLiteralExpr>, "hello world")</PoundAssertStmt>
+#assert(<BooleanLiteralExpr>true</BooleanLiteralExpr>, "hello world")</PoundAssertStmt><FunctionDecl>
+
+func optionalCommas<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<SequenceExpr><DiscardAssignmentExpr>
+  _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><ArrayExpr>[<ArrayElement><IntegerLiteralExpr>
+    1</IntegerLiteralExpr></ArrayElement><ArrayElement><IntegerLiteralExpr>
+    2</IntegerLiteralExpr>
+   ,</ArrayElement><ArrayElement><IntegerLiteralExpr>4</IntegerLiteralExpr></ArrayElement><ArrayElement><IntegerLiteralExpr>
+    5</IntegerLiteralExpr></ArrayElement><ArrayElement><IntegerLiteralExpr>
+    6</IntegerLiteralExpr>, </ArrayElement><ArrayElement><IntegerLiteralExpr>7</IntegerLiteralExpr></ArrayElement><ArrayElement><IntegerLiteralExpr>
+    8</IntegerLiteralExpr></ArrayElement><ArrayElement><MemberAccessExpr><IntegerLiteralExpr>
+    9</IntegerLiteralExpr>
+    .member</MemberAccessExpr></ArrayElement>
+  ]</ArrayExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
+  _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><DictionaryExpr>[<DictionaryElement><IntegerLiteralExpr>
+    1 </IntegerLiteralExpr>: <IdentifierExpr>x</IdentifierExpr></DictionaryElement><DictionaryElement><IntegerLiteralExpr>
+    2 </IntegerLiteralExpr>: <IdentifierExpr>x</IdentifierExpr>
+   ,</DictionaryElement><DictionaryElement><IntegerLiteralExpr>4 </IntegerLiteralExpr>: <IdentifierExpr>x</IdentifierExpr></DictionaryElement><DictionaryElement><IntegerLiteralExpr>
+    5 </IntegerLiteralExpr>:<IdentifierExpr>
+    x</IdentifierExpr></DictionaryElement><DictionaryElement><IntegerLiteralExpr>
+    6</IntegerLiteralExpr>: <IdentifierExpr>x</IdentifierExpr>, </DictionaryElement><DictionaryElement><IntegerLiteralExpr>7 </IntegerLiteralExpr>: <IdentifierExpr>x</IdentifierExpr></DictionaryElement><DictionaryElement><IntegerLiteralExpr>
+    8</IntegerLiteralExpr>: <IdentifierExpr>x</IdentifierExpr></DictionaryElement><DictionaryElement><IntegerLiteralExpr>
+    9</IntegerLiteralExpr>: <MemberAccessExpr><IdentifierExpr>x</IdentifierExpr>
+    .member</MemberAccessExpr></DictionaryElement>
+  ]</DictionaryExpr></SequenceExpr><SubscriptExpr><IdentifierExpr>
+  subscript_me</IdentifierExpr>[<FunctionCallArgument><IntegerLiteralExpr>
+    1</IntegerLiteralExpr></FunctionCallArgument><FunctionCallArgument><IntegerLiteralExpr>
+    2</IntegerLiteralExpr>
+   ,</FunctionCallArgument><FunctionCallArgument><IntegerLiteralExpr>4</IntegerLiteralExpr></FunctionCallArgument><FunctionCallArgument><IntegerLiteralExpr>
+    5</IntegerLiteralExpr></FunctionCallArgument><FunctionCallArgument><IntegerLiteralExpr>
+    6</IntegerLiteralExpr>, </FunctionCallArgument><FunctionCallArgument><IntegerLiteralExpr>7</IntegerLiteralExpr></FunctionCallArgument><FunctionCallArgument><IntegerLiteralExpr>
+    8</IntegerLiteralExpr></FunctionCallArgument><FunctionCallArgument><MemberAccessExpr><IntegerLiteralExpr>
+    9</IntegerLiteralExpr>
+    .member</MemberAccessExpr></FunctionCallArgument>
+  ]</SubscriptExpr><FunctionCallExpr><IdentifierExpr>
+  call</IdentifierExpr>(<FunctionCallArgument><IntegerLiteralExpr>
+    1</IntegerLiteralExpr></FunctionCallArgument><FunctionCallArgument><IntegerLiteralExpr>
+    2</IntegerLiteralExpr>
+   ,</FunctionCallArgument><FunctionCallArgument><IntegerLiteralExpr>4</IntegerLiteralExpr></FunctionCallArgument><FunctionCallArgument><IntegerLiteralExpr>
+    5</IntegerLiteralExpr></FunctionCallArgument><FunctionCallArgument><IntegerLiteralExpr>
+    6</IntegerLiteralExpr>, </FunctionCallArgument><FunctionCallArgument><IntegerLiteralExpr>7</IntegerLiteralExpr></FunctionCallArgument><FunctionCallArgument><IntegerLiteralExpr>
+    8</IntegerLiteralExpr></FunctionCallArgument><FunctionCallArgument><MemberAccessExpr><IntegerLiteralExpr>
+    9</IntegerLiteralExpr>
+    .member</MemberAccessExpr></FunctionCallArgument>
+  )</FunctionCallExpr><SequenceExpr><DiscardAssignmentExpr>
+  _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><TupleExpr>(<TupleElement><IntegerLiteralExpr>
+    1</IntegerLiteralExpr></TupleElement><TupleElement><IntegerLiteralExpr>
+    2</IntegerLiteralExpr>
+   ,</TupleElement><TupleElement><IntegerLiteralExpr>4</IntegerLiteralExpr></TupleElement><TupleElement><IntegerLiteralExpr>
+    5</IntegerLiteralExpr></TupleElement><TupleElement><IntegerLiteralExpr>
+    6</IntegerLiteralExpr>, </TupleElement><TupleElement><IntegerLiteralExpr>7</IntegerLiteralExpr></TupleElement><TupleElement><IntegerLiteralExpr>
+    8</IntegerLiteralExpr></TupleElement><TupleElement><MemberAccessExpr><IntegerLiteralExpr>
+    9</IntegerLiteralExpr>
+    .member</MemberAccessExpr></TupleElement>
+  )</TupleExpr></SequenceExpr>
+}</CodeBlock></FunctionDecl>
