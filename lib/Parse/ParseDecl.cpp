@@ -5227,7 +5227,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
 
       if (behaviorType.isNonNull()) {
         if (auto var = pattern->getSingleVar()) {
-          var->setPropertyBehavior(byLoc, behaviorType.get());
+          var->addPropertyBehavior(byLoc, behaviorType.get());
         } else {
           // FIXME: Support AnyPattern as well, somehow.
           diagnose(byLoc, diag::property_behavior_not_named)

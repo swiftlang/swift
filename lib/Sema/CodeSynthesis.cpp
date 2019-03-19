@@ -1434,9 +1434,7 @@ void swift::completeLazyVarImplementation(VarDecl *VD) {
 }
 
 VarDecl *swift::getOrSynthesizePropertyBehaviorBackingProperty(VarDecl *var) {
-  // FIXME: Didn't want to recompile everything just yet. Don't merge this :)
-  static llvm::DenseMap<VarDecl *, VarDecl *> backingVars;
-  VarDecl *backingVar = backingVars[var];
+  VarDecl *backingVar = var->getPropertyBehaviorBackingVar();
   if (backingVar) return backingVar;
 
   ASTContext &ctx = var->getASTContext();
@@ -1460,7 +1458,7 @@ VarDecl *swift::getOrSynthesizePropertyBehaviorBackingProperty(VarDecl *var) {
                                  /*IsCaptureList=*/false,
                                  var->getPropertyBehaviorByLoc(),
                                  name, dc);
-  backingVars[var] = backingVar;
+  var->setPropertyBehaviorBackingVar(backingVar);
 
   backingVar->setInterfaceType(storageInterfaceType);
   backingVar->setType(storageType);

@@ -356,7 +356,7 @@ protected:
     ValidKeyPathComponent : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+4+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+4+1+1+1+1+1,
     /// Whether this property is a type property (currently unfortunately
     /// called 'static').
     IsStatic : 1,
@@ -379,7 +379,10 @@ protected:
 
     /// Whether this is a property defined in the debugger's REPL.
     /// FIXME: Remove this once LLDB has proper support for resilience.
-    IsREPLVar : 1
+    IsREPLVar : 1,
+
+    /// Whether this property has an associated property behavior.
+    HasPropertyBehavior : 1
   );
 
   SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1 + NumDefaultArgumentKindBits,
@@ -4600,6 +4603,7 @@ protected:
     Bits.VarDecl.IsCaptureList = IsCaptureList;
     Bits.VarDecl.IsDebuggerVar = false;
     Bits.VarDecl.IsREPLVar = false;
+    Bits.VarDecl.HasPropertyBehavior = false;
     Bits.VarDecl.HasNonPatternBindingInit = false;
   }
 
@@ -4607,10 +4611,6 @@ protected:
   TypeLoc typeLoc;
 
   Type typeInContext;
-
-  /// Property behavior information.
-  SourceLoc byLoc;
-  TypeLoc behaviorTypeLoc;
 
 public:
   VarDecl(bool IsStatic, Specifier Sp, bool IsCaptureList, SourceLoc NameLoc,
@@ -4878,21 +4878,25 @@ public:
 
   /// Whether this variable has a property behavior attached.
   bool hasPropertyBehavior() const {
-    return !behaviorTypeLoc.isNull();
+    return Bits.VarDecl.HasPropertyBehavior;
   }
 
-  SourceLoc getPropertyBehaviorByLoc() const {
-    return byLoc;
-  }
+  /// For a property behavior, retrieve the source location for the
+  /// 'by' keyword.
+  SourceLoc getPropertyBehaviorByLoc() const;
 
-  TypeLoc &getPropertyBehaviorTypeLoc() {
-    return behaviorTypeLoc;
-  }
+  /// For a property behavior, retrieve the behavior type location
+  /// information.
+  TypeLoc &getPropertyBehaviorTypeLoc();
 
-  void setPropertyBehavior(SourceLoc byLoc, TypeLoc typeLoc) {
-    this->byLoc = byLoc;
-    this->behaviorTypeLoc = typeLoc;
-  }
+  /// Add a property behavior to this variable.
+  void addPropertyBehavior(SourceLoc byLoc, TypeLoc typeLoc);
+
+  /// Retrieve the backing variable for the property behavior.
+  VarDecl *getPropertyBehaviorBackingVar() const;
+
+  /// Set the backing variable for the property behavior.
+  void setPropertyBehaviorBackingVar(VarDecl *backingVar);
 
   /// Return the Objective-C runtime name for this property.
   Identifier getObjCPropertyName() const;
