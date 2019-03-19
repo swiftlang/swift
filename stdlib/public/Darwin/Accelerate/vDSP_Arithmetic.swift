@@ -149,13 +149,13 @@ extension vDSP {
     /// Populates `result` with the elementwise difference of `vector` and `fromVector`,
     /// single-precision.
     ///
-    /// - Parameter vectorB: the `b` in `c[i] = a[i] - b[i]`.
     /// - Parameter vectorA: the `a` in `c[i] = a[i] - b[i]`.
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] - b[i]`.
     /// - Parameter result: The `c` in `c[i] = a[i] - b[i]`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func subtract<T, U, V>(_ vectorB: T,
-                                         from vectorA: U,
+    public static func subtract<T, U, V>(_ vectorA: U,
+                                         _ vectorB: T,
                                          result: inout V)
         where
         T: _ContiguousCollection,
@@ -181,13 +181,13 @@ extension vDSP {
     /// Populates `result` with the elementwise difference of `vector` and `fromVector`,
     /// double-precision.
     ///
-    /// - Parameter vectorB: the `b` in `c[i] = a[i] - b[i]`.
     /// - Parameter vectorA: the `a` in `c[i] = a[i] - b[i]`.
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] - b[i]`.
     /// - Parameter result: The `c` in `c[i] = a[i] - b[i]`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func subtract<T, U, V>(_ vectorB: T,
-                                         from vectorA: U,
+    public static func subtract<T, U, V>(_ vectorA: U,
+                                         _ vectorB: T,
                                          result: inout V)
         where
         T: _ContiguousCollection,
@@ -347,7 +347,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func divide<U, V>(_ vector: U,
-                                    by scalar: Float,
+                                    _ scalar: Float,
                                     result: inout V)
         where
         U: _ContiguousCollection,
@@ -377,7 +377,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func divide<U, V>(_ vector: U,
-                                    by scalar: Double,
+                                    _ scalar: Double,
                                     result: inout V)
         where
         U: _ContiguousCollection,
@@ -409,7 +409,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func divide<U, V>(_ scalar: Float,
-                                    by vector: U,
+                                    _ vector: U,
                                     result: inout V)
         where
         U: _ContiguousCollection,
@@ -439,7 +439,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func divide<U, V>(_ scalar: Double,
-                                    by vector: U,
+                                    _ vector: U,
                                     result: inout V)
         where
         U: _ContiguousCollection,
@@ -471,7 +471,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func divide<T, U, V>(_ vectorA: T,
-                                       by vectorB: U,
+                                       _ vectorB: U,
                                        result: inout V)
         where
         T: _ContiguousCollection,
@@ -502,7 +502,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func divide<T, U, V>(_ vectorA: T,
-                                       by vectorB: U,
+                                       _ vectorB: U,
                                        result: inout V)
         where
         T: _ContiguousCollection,
@@ -529,8 +529,8 @@ extension vDSP {
     /// Calculates elementwise sum and difference of `vectorA` and `vectorB`,
     /// single-precision.
     ///
-    /// - Parameter vectorA: the `i0` in `o0[i] = i1[i] + i0[i]; o1[i] = i1[i] - i0[i]`.
-    /// - Parameter vectorB: the `i1` in o0[i] = i1[i] + i0[i]; o1[i] = i1[i] - i0[i]`.
+    /// - Parameter vectorA: the `i1` in `o0[i] = i1[i] + i0[i]; o1[i] = i1[i] - i0[i]`.
+    /// - Parameter vectorB: the `i0` in o0[i] = i1[i] + i0[i]; o1[i] = i1[i] - i0[i]`.
     /// - Parameter addResult: The `o0` in o0[i] = i1[i] + i0[i]; o1[i] = i1[i] - i0[i]`.
     /// - Parameter subtractResult: The `o1` in o0[i] = i1[i] + i0[i]; o1[i] = i1[i] - i0[i]`.
     @inline(__always)
@@ -554,8 +554,8 @@ extension vDSP {
             
             addResult.withUnsafeMutableBufferPointer { o0 in
                 subtractResult.withUnsafeMutableBufferPointer { o1 in
-                    vectorA.withUnsafeBufferPointer { i0 in
-                        vectorB.withUnsafeBufferPointer { i1 in
+                    vectorA.withUnsafeBufferPointer { i1 in
+                        vectorB.withUnsafeBufferPointer { i0 in
                             vDSP_vaddsub(i0.baseAddress!, 1,
                                          i1.baseAddress!, 1,
                                          o0.baseAddress!, 1,
@@ -570,8 +570,8 @@ extension vDSP {
     /// Calculates elementwise sum and difference of `vectorA` and `vectorB`,
     /// double-precision.
     ///
-    /// - Parameter vectorA: the `i0` in `o0[i] = i1[i] + i0[i]; o1[i] = i1[i] - i0[i]`.
-    /// - Parameter vectorB: the `i1` in o0[i] = i1[i] + i0[i]; o1[i] = i1[i] - i0[i]`.
+    /// - Parameter vectorA: the `i1` in `o0[i] = i1[i] + i0[i]; o1[i] = i1[i] - i0[i]`.
+    /// - Parameter vectorB: the `i0` in o0[i] = i1[i] + i0[i]; o1[i] = i1[i] - i0[i]`.
     /// - Parameter addResult: The `o0` in o0[i] = i1[i] + i0[i]; o1[i] = i1[i] - i0[i]`.
     /// - Parameter subtractResult: The `o1` in o0[i] = i1[i] + i0[i]; o1[i] = i1[i] - i0[i]`.
     @inline(__always)
@@ -595,8 +595,8 @@ extension vDSP {
             
             addResult.withUnsafeMutableBufferPointer { o0 in
                 subtractResult.withUnsafeMutableBufferPointer { o1 in
-                    vectorA.withUnsafeBufferPointer { i0 in
-                        vectorB.withUnsafeBufferPointer { i1 in
+                    vectorA.withUnsafeBufferPointer { i1 in
+                        vectorB.withUnsafeBufferPointer { i0 in
                             vDSP_vaddsubD(i0.baseAddress!, 1,
                                           i1.baseAddress!, 1,
                                           o0.baseAddress!, 1,
@@ -1148,13 +1148,13 @@ extension vDSP {
     /// and the product of the two vectors in `multiplication`,
     /// single-precision.
     ///
-    /// - Parameter vector: the `c` in `d[i] = (a[i] * b[i]) - c[i]`.
     /// - Parameter multiplication: the `a` and `b` in `d[i] = (a[i] * b[i]) - c[i]`.
+    /// - Parameter vector: the `c` in `d[i] = (a[i] * b[i]) - c[i]`.
     /// - Parameter result: the `d` in `d[i] = (a[i] * b[i]) - c[i]`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func subtract<S, T, U, V>(_ vector: S,
-                                            fromMultiplication multiplication: (a: T, b: U),
+    public static func subtract<S, T, U, V>(multiplication: (a: T, b: U),
+                                            _ vector: S,
                                             result: inout V)
         where
         S: _ContiguousCollection,
@@ -1187,13 +1187,13 @@ extension vDSP {
     /// and the product of the two vectors in `multiplication`,
     /// double-precision.
     ///
-    /// - Parameter vector: the `c` in `d[i] = (a[i] * b[i]) - c[i]`.
     /// - Parameter multiplication: the `a` and `b` in `d[i] = (a[i] * b[i]) - c[i]`.
+    /// - Parameter vector: the `c` in `d[i] = (a[i] * b[i]) - c[i]`.
     /// - Parameter result: the `d` in `d[i] = (a[i] * b[i]) - c[i]`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func subtract<S, T, U, V>(_ vector: S,
-                                            fromMultiplication multiplication: (a: T, b: U),
+    public static func subtract<S, T, U, V>(multiplication: (a: T, b: U),
+                                            _ vector: S,
                                             result: inout V)
         where
         S: _ContiguousCollection,
@@ -1487,13 +1487,13 @@ extension vDSP {
     /// Populates `result` with the elementwise difference of two elementwise
     /// vector-vector products, single-precision.
     ///
-    /// - Parameter multiplicationCD: the `c` and `d` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
     /// - Parameter multiplicationAB: the `a` and `b` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
+    /// - Parameter multiplicationCD: the `c` and `d` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
     /// - Parameter result: the `e` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func subtract<R, S, T, U, V>(multiplication multiplicationCD: (c: R, d: S),
-                                               fromMultiplication multiplicationAB: (a: T, b: U),
+    public static func subtract<R, S, T, U, V>(multiplication multiplicationAB: (a: T, b: U),
+                                               multiplication multiplicationCD: (c: R, d: S),
                                                result: inout V)
         where
         R: _ContiguousCollection,
@@ -1532,13 +1532,13 @@ extension vDSP {
     /// Populates `result` with the elementwise difference of two elementwise
     /// vector-vector products, double-precision.
     ///
-    /// - Parameter multiplicationCD: the `c` and `d` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
     /// - Parameter multiplicationAB: the `a` and `b` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
+    /// - Parameter multiplicationCD: the `c` and `d` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
     /// - Parameter result: the `e` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func subtract<R, S, T, U, V>(multiplication multiplicationCD: (c: R, d: S),
-                                               fromMultiplication multiplicationAB: (a: T, b: U),
+    public static func subtract<R, S, T, U, V>(multiplication multiplicationAB: (a: T, b: U),
+                                               multiplication multiplicationCD: (c: R, d: S),
                                                result: inout V)
         where
         R: _ContiguousCollection,
@@ -1832,13 +1832,13 @@ extension vDSP {
     /// and the product of the vector and scalar in `multiplication`,
     /// single-precision.
     ///
-    /// - Parameter vector: the `c` in `D[n] = A[n]*B - C[n]`.
     /// - Parameter multiplication: the `a` and `b` in `D[n] = A[n]*B - C[n]`.
+    /// - Parameter vector: the `c` in `D[n] = A[n]*B - C[n]`.
     /// - Parameter result: the `d` in `D[n] = A[n]*B - C[n]`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func subtract<T, U, V>(_ vector: T,
-                                         fromMultiplication multiplication: (a: U, b: Float),
+    public static func subtract<T, U, V>(multiplication: (a: U, b: Float),
+                                         _ vector: T,
                                          result: inout V)
         where
         T: _ContiguousCollection,
@@ -1875,8 +1875,8 @@ extension vDSP {
     /// - Parameter result: the `d` in `D[n] = A[n]*B - C[n]`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func subtract<T, U, V>(_ vector: T,
-                                         fromMultiplication multiplication: (a: U, b: Double),
+    public static func subtract<T, U, V>(multiplication multiplication: (a: U, b: Double),
+                                         _ vector: T,
                                          result: inout V)
         where
         T: _ContiguousCollection,

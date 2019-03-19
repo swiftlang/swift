@@ -116,10 +116,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorB = [30]
         
         vDSP.subtract(vectorA,
-                      from: vectorB,
+                      vectorB,
                       result: &result)
         
-        expectEqual(Int(result.first!), 25)
+        expectEqual(Int(result.first!), -25)
     }
     
     // c[i] = a[i] * b
@@ -152,7 +152,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorB = [100]
         
         vDSP.divide(vectorB,
-                    by: scalarA,
+                    scalarA,
                     result: &result)
         
         expectEqual(Int(result.first!), 25)
@@ -164,7 +164,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorB = [4]
         
         vDSP.divide(scalarA,
-                    by: vectorB,
+                    vectorB,
                     result: &result)
         
         expectEqual(Int(result.first!), 50)
@@ -176,7 +176,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorB = [3]
         
         vDSP.divide(vectorA,
-                    by: vectorB,
+                    vectorB,
                     result: &result)
         
         expectEqual(Int(result.first!), 200)
@@ -184,8 +184,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     
     // o0[i] = i1[i] + i0[i]; o1[i] = i1[i] - i0[i]
     AccelerateTests.test("vDSP/vaddsub") {
-        vectorA = [4]
-        vectorB = [16]
+        vectorA = [16]
+        vectorB = [4]
         var subtractResult = [ Float.nan ]
         
         vDSP.addSubtract(vectorA,
@@ -296,8 +296,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorB = [2]
         vectorC = [50]
         
-        vDSP.subtract(vectorA,
-                      fromMultiplication: (vectorB, vectorC),
+        vDSP.subtract(multiplication: (vectorB, vectorC),
+                      vectorA,
                       result: &result)
         
         expectEqual(Int(result.first!), 75)
@@ -351,10 +351,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let vectorD: [Float] = [15]
         
         vDSP.subtract(multiplication: (vectorA, vectorB),
-                      fromMultiplication: (vectorC, vectorD),
+                      multiplication: (vectorC, vectorD),
                       result: &result)
         
-        expectEqual(Int(result.first!), 69)
+        expectEqual(Int(result.first!), -69)
     }
     
     // e[i] = (a[i] - b[i]) * (c[i] - d[i])
@@ -404,8 +404,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         scalarB = 5
         vectorC = [25]
         
-        vDSP.subtract(vectorC,
-                      fromMultiplication: (vectorA, scalarB),
+        vDSP.subtract(multiplication: (vectorA, scalarB),
+                      vectorC,
                       result: &result)
         
         expectEqual(Int(result.first!), 25)
@@ -460,10 +460,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorB = [30]
         
         vDSP.subtract(vectorA,
-                      from: vectorB,
+                      vectorB,
                       result: &result)
         
-        expectEqual(Int(result.first!), 25)
+        expectEqual(Int(result.first!), -25)
     }
     
     // c[i] = a[i] * b
@@ -496,7 +496,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorB = [100]
         
         vDSP.divide(vectorB,
-                    by: scalarA,
+                    scalarA,
                     result: &result)
         
         expectEqual(Int(result.first!), 25)
@@ -508,7 +508,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorB = [4]
         
         vDSP.divide(scalarA,
-                    by: vectorB,
+                    vectorB,
                     result: &result)
         
         expectEqual(Int(result.first!), 50)
@@ -520,7 +520,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorB = [3]
         
         vDSP.divide(vectorA,
-                    by: vectorB,
+                    vectorB,
                     result: &result)
         
         expectEqual(Int(result.first!), 200)
@@ -528,8 +528,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     
     // o0[i] = i1[i] + i0[i]; o1[i] = i1[i] - i0[i]
     AccelerateTests.test("vDSP/vaddsubD") {
-        vectorA = [4]
-        vectorB = [16]
+        vectorA = [16]
+        vectorB = [4]
         var subtractResult = [ Double.nan ]
         
         vDSP.addSubtract(vectorA,
@@ -539,7 +539,6 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         
         expectEqual(Int(result.first!), 20)
         expectEqual(Int(subtractResult.first!), 12)
-        
     }
     
     // d[i] = (a[i] + b[i]) * c
@@ -640,8 +639,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         vectorB = [2]
         vectorC = [50]
         
-        vDSP.subtract(vectorA,
-                      fromMultiplication: (vectorB, vectorC),
+        vDSP.subtract(multiplication: (vectorB, vectorC),
+                      vectorA,
                       result: &result)
         
         expectEqual(Int(result.first!), 75)
@@ -695,10 +694,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let vectorD: [Double] = [15]
         
         vDSP.subtract(multiplication: (vectorA, vectorB),
-                      fromMultiplication: (vectorC, vectorD),
+                      multiplication: (vectorC, vectorD),
                       result: &result)
         
-        expectEqual(Int(result.first!), 69)
+        expectEqual(Int(result.first!), -69)
     }
     
     // e[i] = (a[i] - b[i]) * (c[i] - d[i])
@@ -748,8 +747,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         scalarB = 5
         vectorC = [25]
         
-        vDSP.subtract(vectorC,
-                      fromMultiplication: (vectorA, scalarB),
+        vDSP.subtract(multiplication: (vectorA, scalarB),
+                      vectorC,
                       result: &result)
         
         expectEqual(Int(result.first!), 25)
