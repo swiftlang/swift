@@ -175,9 +175,6 @@ public:
   /// expression evaluator.
   unsigned ForcePublicLinkage : 1;
   
-  /// Bypass resilience when accessing resilient frameworks.
-  unsigned EnableResilienceBypass : 1;
-
   /// Force lazy initialization of class metadata
   /// Used on Windows to avoid cross-module references.
   unsigned LazyInitializeClassMetadata : 1;
@@ -242,13 +239,12 @@ public:
         EmbedMode(IRGenEmbedMode::None), HasValueNamesSetting(false),
         ValueNames(false), EnableReflectionMetadata(true),
         EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
-        ForcePublicLinkage(false),
-        EnableResilienceBypass(false), LazyInitializeClassMetadata(false),
+        ForcePublicLinkage(false), LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false), DisableLegacyTypeInfo(false),
         UseIncrementalLLVMCodeGen(true), UseSwiftCall(false),
         GenerateProfile(false), EnableDynamicReplacementChaining(false),
-        DisableRoundTripDebugTypes(false),
-        CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
+        DisableRoundTripDebugTypes(false), CmdArgs(),
+        SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}
 
   // Get a hash of all options which influence the llvm compilation but are not
