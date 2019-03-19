@@ -14,7 +14,7 @@ import Accelerate
 
 // Array-Oriented Arithmetic and Auxiliary Functions
 
-extension vDSP {
+extension vForce {
     
     // MARK: Ceiling
     
@@ -614,7 +614,7 @@ extension vDSP {
 
 // Array-Oriented Exponential and Logarithmic Functions
 
-extension vDSP {
+extension vForce {
     
     // MARK: Exponential
     
@@ -844,7 +844,7 @@ extension vDSP {
 
 // Array-Oriented Power Functions
 
-extension vDSP {
+extension vForce {
     
     // MARK: Power
     
@@ -919,7 +919,7 @@ extension vDSP {
 
 // Array-Oriented Trigonometric Functions
 
-extension vDSP {
+extension vForce {
     
     // MARK: Sine
     
@@ -1470,7 +1470,7 @@ extension vDSP {
 
 // Array-Oriented Hyperbolic Functions
 
-extension vDSP {
+extension vForce {
     
     // MARK: Hyperbolic Sine
     
