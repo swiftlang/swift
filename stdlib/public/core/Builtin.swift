@@ -273,24 +273,18 @@ internal func _minAllocationAlignment() -> Int {
 // semantics of these function calls. This won't be necessary with
 // mandatory generic inlining.
 
-@usableFromInline @_transparent
-@_semantics("branchhint")
-internal func _branchHint(_ actual: Bool, expected: Bool) -> Bool {
-  return Bool(Builtin.int_expect_Int1(actual._value, expected._value))
-}
-
 /// Optimizer hint that `x` is expected to be `true`.
 @_transparent
 @_semantics("fastpath")
 public func _fastPath(_ x: Bool) -> Bool {
-  return _branchHint(x, expected: true)
+  return Bool(Builtin.int_expect_Int1(x._value, true._value))
 }
 
 /// Optimizer hint that `x` is expected to be `false`.
 @_transparent
 @_semantics("slowpath")
 public func _slowPath(_ x: Bool) -> Bool {
-  return _branchHint(x, expected: false)
+  return Bool(Builtin.int_expect_Int1(x._value, false._value))
 }
 
 /// Optimizer hint that the code where this function is called is on the fast
@@ -305,6 +299,17 @@ public func _onFastPath() {
 @usableFromInline @_transparent
 func _uncheckedUnsafeAssume(_ condition: Bool) {
   _ = Builtin.assume_Int1(condition._value)
+}
+
+// This function is no longer used but must be kept for ABI compatibility
+// because references to it may have been inlined.
+@usableFromInline
+internal func _branchHint(_ actual: Bool, expected: Bool) -> Bool {
+  // The LLVM intrinsic underlying int_expect_Int1 now requires an immediate
+  // argument for the expected value so we cannot call it here. This should
+  // never be called in cases where performance matters, so just return the
+  // value without any branch hint.
+  return actual
 }
 
 //===--- Runtime shim wrappers --------------------------------------------===//
