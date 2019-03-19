@@ -92,7 +92,9 @@ import MonteCarloPi
 import NibbleSort
 import NSDictionaryCastToSwift
 import NSError
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 import NSStringConversion
+#endif
 import NopDeinit
 import ObjectAllocation
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
@@ -262,7 +264,9 @@ registerBenchmark(MonteCarloE)
 registerBenchmark(MonteCarloPi)
 registerBenchmark(NSDictionaryCastToSwift)
 registerBenchmark(NSErrorTest)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 registerBenchmark(NSStringConversion)
+#endif
 registerBenchmark(NibbleSort)
 registerBenchmark(NopDeinit)
 registerBenchmark(ObjectAllocation)
