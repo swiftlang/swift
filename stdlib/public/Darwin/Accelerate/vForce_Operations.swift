@@ -618,21 +618,13 @@ extension vForce {
     
     // MARK: Exponential
     
-    public enum ExponentialType {
-        case exp    // eˣ
-        case expm1  // eˣ˗1
-        case exp2   // 2ˣ
-    }
-    
-    /// Calculates an exponential function of each element in `vector`, writing the result to `result`, single-precision.
+    /// Calculates e raised to the power of each element in `vector`, writing the result to `result`, single-precision.
     ///
-    /// - Parameter type: Specifies the function: e raised to the power of each element, e raised to the power of each element minus one, or 2 raised to the power of each element.
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func exp<U, V>(_ vector: U,
-                                 type: ExponentialType,
                                  result: inout V)
         where
         U : _ContiguousCollection,
@@ -645,34 +637,72 @@ extension vForce {
             
             result.withUnsafeMutableBufferPointer { dest in
                 vector.withUnsafeBufferPointer { src in
-                    
-                    switch type {
-                    case .exp:
-                        vvexpf(dest.baseAddress!,
-                               src.baseAddress!,
-                               &n)
-                    case .expm1:
-                        vvexpm1f(dest.baseAddress!,
-                                 src.baseAddress!,
-                                 &n)
-                    case .exp2:
-                        vvexp2f(dest.baseAddress!,
-                                src.baseAddress!,
-                                &n)
-                    }
+                    vvexpf(dest.baseAddress!,
+                           src.baseAddress!,
+                           &n)
                 }
             }
     }
     
-    /// Calculates an exponential function of each element in `vector`, writing the result to `result`, double-precision.
+    /// Calculates e raised to the power of each element  minus one  in `vector`, writing the result to `result`, single-precision.
     ///
-    /// - Parameter type: Specifies the function: e raised to the power of each element, e raised to the power of each element minus one, or 2 raised to the power of each element.
+    /// - Parameter _ vector: Input values.
+    /// - Parameter result: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func expm1<U, V>(_ vector: U,
+                                   result: inout V)
+        where
+        U : _ContiguousCollection,
+        V : _MutableContiguousCollection,
+        U.Element == Float, V.Element == Float {
+            
+            precondition(vector.count == result.count)
+            
+            var n = Int32(vector.count)
+            
+            result.withUnsafeMutableBufferPointer { dest in
+                vector.withUnsafeBufferPointer { src in
+                    vvexpm1f(dest.baseAddress!,
+                             src.baseAddress!,
+                             &n)
+                }
+            }
+    }
+    
+    /// Calculates 2 raised to the power of each element  minus one  in `vector`, writing the result to `result`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Parameter result: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func exp2<U, V>(_ vector: U,
+                                  result: inout V)
+        where
+        U : _ContiguousCollection,
+        V : _MutableContiguousCollection,
+        U.Element == Float, V.Element == Float {
+            
+            precondition(vector.count == result.count)
+            
+            var n = Int32(vector.count)
+            
+            result.withUnsafeMutableBufferPointer { dest in
+                vector.withUnsafeBufferPointer { src in
+                    vvexp2f(dest.baseAddress!,
+                            src.baseAddress!,
+                            &n)
+                }
+            }
+    }
+    
+    /// Calculates e raised to the power of each element in `vector`, writing the result to `result`, double-precision.
+    ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func exp<U, V>(_ vector: U,
-                                 type: ExponentialType,
                                  result: inout V)
         where
         U : _ContiguousCollection,
@@ -685,41 +715,74 @@ extension vForce {
             
             result.withUnsafeMutableBufferPointer { dest in
                 vector.withUnsafeBufferPointer { src in
-                    
-                    switch type {
-                    case .exp:
-                        vvexp(dest.baseAddress!,
-                              src.baseAddress!,
-                              &n)
-                    case .expm1:
-                        vvexpm1(dest.baseAddress!,
-                                src.baseAddress!,
-                                &n)
-                    case .exp2:
-                        vvexp2(dest.baseAddress!,
-                               src.baseAddress!,
-                               &n)
-                    }
+                    vvexp(dest.baseAddress!,
+                          src.baseAddress!,
+                          &n)
+                }
+            }
+    }
+    
+    /// Calculates e raised to the power of each element  minus one  in `vector`, writing the result to `result`, double-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Parameter result: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func expm1<U, V>(_ vector: U,
+                                   result: inout V)
+        where
+        U : _ContiguousCollection,
+        V : _MutableContiguousCollection,
+        U.Element == Double, V.Element == Double {
+            
+            precondition(vector.count == result.count)
+            
+            var n = Int32(vector.count)
+            
+            result.withUnsafeMutableBufferPointer { dest in
+                vector.withUnsafeBufferPointer { src in
+                    vvexpm1(dest.baseAddress!,
+                            src.baseAddress!,
+                            &n)
+                }
+            }
+    }
+    
+    /// Calculates 2 raised to the power of each element  minus one  in `vector`, writing the result to `result`, double-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Parameter result: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func exp2<U, V>(_ vector: U,
+                                  result: inout V)
+        where
+        U : _ContiguousCollection,
+        V : _MutableContiguousCollection,
+        U.Element == Double, V.Element == Double {
+            
+            precondition(vector.count == result.count)
+            
+            var n = Int32(vector.count)
+            
+            result.withUnsafeMutableBufferPointer { dest in
+                vector.withUnsafeBufferPointer { src in
+                    vvexp2(dest.baseAddress!,
+                           src.baseAddress!,
+                           &n)
                 }
             }
     }
     
     // MARK: Logarithm
-    
-    public enum LogarithmBase {
-        case two
-        case ten
-    }
-    
-    /// Calculates either the base two or base ten logarithm of each element in `vector`, writing the result to `result`, single-precision.
+
+    /// Calculates the base two logarithm of each element in `vector`, writing the result to `result`, single-precision.
     ///
-    /// - Parameter base: Specifies the logarithm base.
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func log<U, V>(_ vector: U,
-                                 base: LogarithmBase,
+    public static func log2<U, V>(_ vector: U,
                                  result: inout V)
         where
         U : _ContiguousCollection,
@@ -732,30 +795,46 @@ extension vForce {
             
             result.withUnsafeMutableBufferPointer { dest in
                 vector.withUnsafeBufferPointer { src in
-                    
-                    switch base {
-                    case .two:
-                        vvlog2f(dest.baseAddress!,
-                                src.baseAddress!,
-                                &n)
-                    case .ten:
-                        vvlog10f(dest.baseAddress!,
-                                 src.baseAddress!,
-                                 &n)
-                    }
+                    vvlog2f(dest.baseAddress!,
+                            src.baseAddress!,
+                            &n)
                 }
             }
     }
     
-    /// Calculates either the base two or base ten logarithm of each element in `vector`, writing the result to `result`, double-precision.
+    /// Calculates the base ten logarithm of each element in `vector`, writing the result to `result`, single-precision.
     ///
-    /// - Parameter base: Specifies the logarithm base.
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func log<U, V>(_ vector: U,
-                                 base: LogarithmBase,
+    public static func log10<U, V>(_ vector: U,
+                                 result: inout V)
+        where
+        U : _ContiguousCollection,
+        V : _MutableContiguousCollection,
+        U.Element == Float, V.Element == Float {
+            
+            precondition(vector.count == result.count)
+            
+            var n = Int32(vector.count)
+            
+            result.withUnsafeMutableBufferPointer { dest in
+                vector.withUnsafeBufferPointer { src in
+                    vvlog10f(dest.baseAddress!,
+                             src.baseAddress!,
+                             &n)
+                }
+            }
+    }
+    
+    /// Calculates the base two logarithm of each element in `vector`, writing the result to `result`, double-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Parameter result: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func log2<U, V>(_ vector: U,
                                  result: inout V)
         where
         U : _ContiguousCollection,
@@ -768,17 +847,35 @@ extension vForce {
             
             result.withUnsafeMutableBufferPointer { dest in
                 vector.withUnsafeBufferPointer { src in
-                    
-                    switch base {
-                    case .two:
-                        vvlog2(dest.baseAddress!,
-                               src.baseAddress!,
-                               &n)
-                    case .ten:
-                        vvlog10(dest.baseAddress!,
-                                src.baseAddress!,
-                                &n)
-                    }
+                    vvlog2(dest.baseAddress!,
+                           src.baseAddress!,
+                           &n)
+                }
+            }
+    }
+    
+    /// Calculates the ten logarithm of each element in `vector`, writing the result to `result`, double-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Parameter result: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func log10<U, V>(_ vector: U,
+                                 result: inout V)
+        where
+        U : _ContiguousCollection,
+        V : _MutableContiguousCollection,
+        U.Element == Double, V.Element == Double {
+            
+            precondition(vector.count == result.count)
+            
+            var n = Int32(vector.count)
+            
+            result.withUnsafeMutableBufferPointer { dest in
+                vector.withUnsafeBufferPointer { src in
+                    vvlog10(dest.baseAddress!,
+                            src.baseAddress!,
+                            &n)
                 }
             }
     }
@@ -793,8 +890,8 @@ extension vForce {
     /// This function calculates `floor(log2(vector))`.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func exponent<U, V>(_ vector: U,
-                                      result: inout V)
+    public static func logb<U, V>(_ vector: U,
+                                  result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -821,8 +918,8 @@ extension vForce {
     /// This function calculates `floor(log2(vector))`.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func exponent<U, V>(_ vector: U,
-                                      result: inout V)
+    public static func logb<U, V>(_ vector: U,
+                                  result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
