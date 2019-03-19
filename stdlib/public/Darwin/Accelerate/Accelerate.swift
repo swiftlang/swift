@@ -10,5 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// An enum that acts as a namespace for Swift overlays to vDSP and vForce based functions.
+/// An enum that acts as a namespace for Swift overlays to vDSP based functions.
 public enum vDSP {}
+
+/// An enum that acts as a namespace for Swift overlays to vForce based functions.
+public enum vForce {}

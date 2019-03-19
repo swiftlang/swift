@@ -88,8 +88,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.ceil(x,
-                  result: &result)
+        vForce.ceil(x,
+                    result: &result)
         
         vvceilf(&legacyResult,
                 x,
@@ -102,8 +102,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.floor(x,
-                   result: &result)
+        vForce.floor(x,
+                     result: &result)
         
         vvfloorf(&legacyResult,
                  x,
@@ -116,9 +116,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.copysign(magnitudes: x,
-                      signs: y,
-                      result: &result)
+        vForce.copysign(magnitudes: x,
+                        signs: y,
+                        result: &result)
         
         vvcopysignf(&legacyResult,
                     x,
@@ -132,9 +132,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.truncatingRemainder(dividends: x,
-                                 divisors: y,
-                                 result: &result)
+        vForce.truncatingRemainder(dividends: x,
+                                   divisors: y,
+                                   result: &result)
         
         vvfmodf(&legacyResult,
                 x,
@@ -149,9 +149,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let scalarNumerator = [Float(20)]
         let scalarDenominator = [Float(6)]
         
-        vDSP.truncatingRemainder(dividends: scalarNumerator,
-                                 divisors: scalarDenominator,
-                                 result: &scalarResult)
+        vForce.truncatingRemainder(dividends: scalarNumerator,
+                                   divisors: scalarDenominator,
+                                   result: &scalarResult)
         
         expectEqual(Int(scalarResult.first!), 2)
     }
@@ -160,9 +160,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.remainder(dividends: x,
-                       divisors: y,
-                       result: &result)
+        vForce.remainder(dividends: x,
+                         divisors: y,
+                         result: &result)
         
         vvremainderf(&legacyResult,
                      x,
@@ -177,9 +177,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let scalarNumerator = [Float(20)]
         let scalarDenominator = [Float(6)]
         
-        vDSP.remainder(dividends: scalarNumerator,
-                       divisors: scalarDenominator,
-                       result: &scalarResult)
+        vForce.remainder(dividends: scalarNumerator,
+                         divisors: scalarDenominator,
+                         result: &scalarResult)
         
         expectEqual(Int(scalarResult.first!), 2)
     }
@@ -188,8 +188,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.trunc(x,
-                   result: &result)
+        vForce.trunc(x,
+                     result: &result)
         
         vvintf(&legacyResult,
                x,
@@ -202,8 +202,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.nearestInteger(x,
-                            result: &result)
+        vForce.nearestInteger(x,
+                              result: &result)
         
         vvnintf(&legacyResult,
                 x,
@@ -216,8 +216,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.reciprocalSquareRoot(x,
-                                  result: &result)
+        vForce.reciprocalSquareRoot(x,
+                                    result: &result)
         
         vvrsqrtf(&legacyResult,
                  x,
@@ -230,8 +230,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.squareRoot(x,
-                        result: &result)
+        vForce.squareRoot(x,
+                          result: &result)
         
         vvsqrtf(&legacyResult,
                 x,
@@ -244,8 +244,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.reciprocal(x,
-                        result: &result)
+        vForce.reciprocal(x,
+                          result: &result)
         
         vvrecf(&legacyResult,
                x,
@@ -258,9 +258,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.exp(x,
-                 type: .exp,
-                 result: &result)
+        vForce.exp(x,
+                   type: .exp,
+                   result: &result)
         
         vvexpf(&legacyResult,
                x,
@@ -273,9 +273,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.exp(x,
-                 type: .expm1,
-                 result: &result)
+        vForce.exp(x,
+                   type: .expm1,
+                   result: &result)
         
         vvexpm1f(&legacyResult,
                  x,
@@ -288,9 +288,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.exp(x,
-                 type: .exp2,
-                 result: &result)
+        vForce.exp(x,
+                   type: .exp2,
+                   result: &result)
         
         vvexp2f(&legacyResult,
                 x,
@@ -303,9 +303,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.log(x,
-                 base: .two,
-                 result: &result)
+        vForce.log(x,
+                   base: .two,
+                   result: &result)
         
         vvlog2f(&legacyResult,
                 x,
@@ -318,9 +318,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.log(x,
-                 base: .ten,
-                 result: &result)
+        vForce.log(x,
+                   base: .ten,
+                   result: &result)
         
         vvlog10f(&legacyResult,
                  x,
@@ -333,8 +333,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.exponent(x,
-                      result: &result)
+        vForce.exponent(x,
+                        result: &result)
         
         vvlogbf(&legacyResult,
                 x,
@@ -347,9 +347,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.pow(bases: x,
-                 exponents: y,
-                 result: &result)
+        vForce.pow(bases: x,
+                   exponents: y,
+                   result: &result)
         
         vvpowf(&legacyResult,
                y,
@@ -364,9 +364,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let scalarBase = [Float(10)]
         let scalarExponent = [Float(2)]
         
-        vDSP.pow(bases: scalarBase,
-                 exponents: scalarExponent,
-                 result: &scalarResult)
+        vForce.pow(bases: scalarBase,
+                   exponents: scalarExponent,
+                   result: &scalarResult)
         
         expectEqual(Int(scalarResult.first!), 100)
     }
@@ -375,8 +375,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.sin(x,
-                 result: &result)
+        vForce.sin(x,
+                   result: &result)
         
         vvsinf(&legacyResult,
                x,
@@ -389,8 +389,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.sin(piTimes: x,
-                 result: &result)
+        vForce.sin(piTimes: x,
+                   result: &result)
         
         vvsinpif(&legacyResult,
                  x,
@@ -403,8 +403,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.cos(x,
-                 result: &result)
+        vForce.cos(x,
+                   result: &result)
         
         vvcosf(&legacyResult,
                x,
@@ -417,8 +417,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.cos(piTimes: x,
-                 result: &result)
+        vForce.cos(piTimes: x,
+                   result: &result)
         
         vvcospif(&legacyResult,
                  x,
@@ -434,9 +434,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         var cosResult = [Float](repeating: .nan, count: result.count)
         var legacyCosResult = [Float](repeating: .nan, count: result.count)
         
-        vDSP.sincos(x,
-                    sinResult: &result,
-                    cosResult: &cosResult)
+        vForce.sincos(x,
+                      sinResult: &result,
+                      cosResult: &cosResult)
         
         vvsincosf(&legacyResult,
                   &legacyCosResult,
@@ -451,8 +451,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.tan(x,
-                 result: &result)
+        vForce.tan(x,
+                   result: &result)
         
         vvtanf(&legacyResult,
                x,
@@ -465,8 +465,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.tan(piTimes: x,
-                 result: &result)
+        vForce.tan(piTimes: x,
+                   result: &result)
         
         vvtanpif(&legacyResult,
                  x,
@@ -479,8 +479,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.asin(z,
-                  result: &result)
+        vForce.asin(z,
+                    result: &result)
         
         vvasinf(&legacyResult,
                 z,
@@ -493,8 +493,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.acos(z,
-                  result: &result)
+        vForce.acos(z,
+                    result: &result)
         
         vvacosf(&legacyResult,
                 z,
@@ -507,8 +507,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.atan(z,
-                  result: &result)
+        vForce.atan(z,
+                    result: &result)
         
         vvatanf(&legacyResult,
                 z,
@@ -521,8 +521,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.sinh(x,
-                  result: &result)
+        vForce.sinh(x,
+                    result: &result)
         
         vvsinhf(&legacyResult,
                 x,
@@ -535,8 +535,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.cosh(x,
-                  result: &result)
+        vForce.cosh(x,
+                    result: &result)
         
         vvcoshf(&legacyResult,
                 x,
@@ -549,8 +549,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.tanh(z,
-                  result: &result)
+        vForce.tanh(z,
+                    result: &result)
         
         vvtanhf(&legacyResult,
                 z,
@@ -563,8 +563,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.asinh(z,
-                   result: &result)
+        vForce.asinh(z,
+                     result: &result)
         
         vvasinhf(&legacyResult,
                  z,
@@ -577,8 +577,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.acosh(x,
-                   result: &result)
+        vForce.acosh(x,
+                     result: &result)
         
         vvacoshf(&legacyResult,
                  x,
@@ -591,8 +591,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vDSP.atanh(z,
-                   result: &result)
+        vForce.atanh(z,
+                     result: &result)
         
         vvatanhf(&legacyResult,
                  z,
@@ -622,8 +622,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.ceil(x,
-                  result: &result)
+        vForce.ceil(x,
+                    result: &result)
         
         vvceil(&legacyResult,
                x,
@@ -636,8 +636,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.floor(x,
-                   result: &result)
+        vForce.floor(x,
+                     result: &result)
         
         vvfloor(&legacyResult,
                 x,
@@ -650,9 +650,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.copysign(magnitudes: x,
-                      signs: y,
-                      result: &result)
+        vForce.copysign(magnitudes: x,
+                        signs: y,
+                        result: &result)
         
         vvcopysign(&legacyResult,
                    x,
@@ -666,9 +666,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.truncatingRemainder(dividends: x,
-                                 divisors: y,
-                                 result: &result)
+        vForce.truncatingRemainder(dividends: x,
+                                   divisors: y,
+                                   result: &result)
         
         vvfmod(&legacyResult,
                x,
@@ -683,9 +683,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let scalarNumerator = [Double(20)]
         let scalarDenominator = [Double(6)]
         
-        vDSP.truncatingRemainder(dividends: scalarNumerator,
-                                 divisors: scalarDenominator,
-                                 result: &scalarResult)
+        vForce.truncatingRemainder(dividends: scalarNumerator,
+                                   divisors: scalarDenominator,
+                                   result: &scalarResult)
         
         expectEqual(Int(scalarResult.first!), 2)
     }
@@ -694,9 +694,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.remainder(dividends: x,
-                       divisors: y,
-                       result: &result)
+        vForce.remainder(dividends: x,
+                         divisors: y,
+                         result: &result)
         
         vvremainder(&legacyResult,
                     x,
@@ -711,9 +711,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let scalarNumerator = [Double(20)]
         let scalarDenominator = [Double(6)]
         
-        vDSP.remainder(dividends: scalarNumerator,
-                       divisors: scalarDenominator,
-                       result: &scalarResult)
+        vForce.remainder(dividends: scalarNumerator,
+                         divisors: scalarDenominator,
+                         result: &scalarResult)
         
         expectEqual(Int(scalarResult.first!), 2)
     }
@@ -722,8 +722,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.trunc(x,
-                   result: &result)
+        vForce.trunc(x,
+                     result: &result)
         
         vvint(&legacyResult,
               x,
@@ -736,8 +736,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.nearestInteger(x,
-                            result: &result)
+        vForce.nearestInteger(x,
+                              result: &result)
         
         vvnint(&legacyResult,
                x,
@@ -750,8 +750,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.reciprocalSquareRoot(x,
-                                  result: &result)
+        vForce.reciprocalSquareRoot(x,
+                                    result: &result)
         
         vvrsqrt(&legacyResult,
                 x,
@@ -764,8 +764,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.squareRoot(x,
-                        result: &result)
+        vForce.squareRoot(x,
+                          result: &result)
         
         vvsqrt(&legacyResult,
                x,
@@ -778,8 +778,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.reciprocal(x,
-                        result: &result)
+        vForce.reciprocal(x,
+                          result: &result)
         
         vvrec(&legacyResult,
               x,
@@ -792,9 +792,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.exp(x,
-                 type: .exp,
-                 result: &result)
+        vForce.exp(x,
+                   type: .exp,
+                   result: &result)
         
         vvexp(&legacyResult,
               x,
@@ -807,9 +807,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.exp(x,
-                 type: .expm1,
-                 result: &result)
+        vForce.exp(x,
+                   type: .expm1,
+                   result: &result)
         
         vvexpm1(&legacyResult,
                 x,
@@ -822,9 +822,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.exp(x,
-                 type: .exp2,
-                 result: &result)
+        vForce.exp(x,
+                   type: .exp2,
+                   result: &result)
         
         vvexp2(&legacyResult,
                x,
@@ -837,9 +837,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.log(x,
-                 base: .two,
-                 result: &result)
+        vForce.log(x,
+                   base: .two,
+                   result: &result)
         
         vvlog2(&legacyResult,
                x,
@@ -852,9 +852,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.log(x,
-                 base: .ten,
-                 result: &result)
+        vForce.log(x,
+                   base: .ten,
+                   result: &result)
         
         vvlog10(&legacyResult,
                 x,
@@ -867,8 +867,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.exponent(x,
-                      result: &result)
+        vForce.exponent(x,
+                        result: &result)
         
         vvlogb(&legacyResult,
                x,
@@ -881,9 +881,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.pow(bases: x,
-                 exponents: y,
-                 result: &result)
+        vForce.pow(bases: x,
+                   exponents: y,
+                   result: &result)
         
         vvpow(&legacyResult,
               y,
@@ -898,9 +898,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let scalarBase = [Double(10)]
         let scalarExponent = [Double(2)]
         
-        vDSP.pow(bases: scalarBase,
-                 exponents: scalarExponent,
-                 result: &scalarResult)
+        vForce.pow(bases: scalarBase,
+                   exponents: scalarExponent,
+                   result: &scalarResult)
         
         expectEqual(Int(scalarResult.first!), 100)
     }
@@ -909,8 +909,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.sin(x,
-                 result: &result)
+        vForce.sin(x,
+                   result: &result)
         
         vvsin(&legacyResult,
               x,
@@ -923,8 +923,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.sin(piTimes: x,
-                 result: &result)
+        vForce.sin(piTimes: x,
+                   result: &result)
         
         vvsinpi(&legacyResult,
                 x,
@@ -937,8 +937,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.cos(x,
-                 result: &result)
+        vForce.cos(x,
+                   result: &result)
         
         vvcos(&legacyResult,
               x,
@@ -951,8 +951,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.cos(piTimes: x,
-                 result: &result)
+        vForce.cos(piTimes: x,
+                   result: &result)
         
         vvcospi(&legacyResult,
                 x,
@@ -968,9 +968,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         var cosResult = [Double](repeating: .nan, count: result.count)
         var legacyCosResult = [Double](repeating: .nan, count: result.count)
         
-        vDSP.sincos(x,
-                    sinResult: &result,
-                    cosResult: &cosResult)
+        vForce.sincos(x,
+                      sinResult: &result,
+                      cosResult: &cosResult)
         
         vvsincos(&legacyResult,
                  &legacyCosResult,
@@ -985,8 +985,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.tan(x,
-                 result: &result)
+        vForce.tan(x,
+                   result: &result)
         
         vvtan(&legacyResult,
               x,
@@ -999,8 +999,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.tan(piTimes: x,
-                 result: &result)
+        vForce.tan(piTimes: x,
+                   result: &result)
         
         vvtanpi(&legacyResult,
                 x,
@@ -1013,8 +1013,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.asin(z,
-                  result: &result)
+        vForce.asin(z,
+                    result: &result)
         
         vvasin(&legacyResult,
                z,
@@ -1027,8 +1027,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.acos(z,
-                  result: &result)
+        vForce.acos(z,
+                    result: &result)
         
         vvacos(&legacyResult,
                z,
@@ -1041,8 +1041,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.atan(z,
-                  result: &result)
+        vForce.atan(z,
+                    result: &result)
         
         vvatan(&legacyResult,
                z,
@@ -1055,8 +1055,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.sinh(x,
-                  result: &result)
+        vForce.sinh(x,
+                    result: &result)
         
         vvsinh(&legacyResult,
                x,
@@ -1069,8 +1069,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.cosh(x,
-                  result: &result)
+        vForce.cosh(x,
+                    result: &result)
         
         vvcosh(&legacyResult,
                x,
@@ -1083,8 +1083,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.tanh(z,
-                  result: &result)
+        vForce.tanh(z,
+                    result: &result)
         
         vvtanh(&legacyResult,
                z,
@@ -1097,8 +1097,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.asinh(z,
-                   result: &result)
+        vForce.asinh(z,
+                     result: &result)
         
         vvasinh(&legacyResult,
                 z,
@@ -1111,8 +1111,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.acosh(x,
-                   result: &result)
+        vForce.acosh(x,
+                     result: &result)
         
         vvacosh(&legacyResult,
                 x,
@@ -1125,8 +1125,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vDSP.atanh(z,
-                   result: &result)
+        vForce.atanh(z,
+                     result: &result)
         
         vvatanh(&legacyResult,
                 z,
