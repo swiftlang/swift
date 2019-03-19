@@ -6,20 +6,20 @@
 func sin(_ x: Float) -> Float {
   return x // dummy implementation
 }
-
 @differentiating(sin) // ok
-func vjpSin(x: Float) -> (value: Float, pullback: (Float) -> Float) {
+func jvpSin(x: @nondiff Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
 @differentiating(sin, wrt: x) // ok
 func vjpSinExplicitWrt(x: Float) -> (value: Float, pullback: (Float) -> Float) {
   return (x, { $0 })
 }
-@differentiating(sin) // ok
-func jvpSin(x: @nondiff Float) -> (value: Float, differential: (Float) -> (Float)) {
+
+// expected-error @+1 {{a derivative already exists for 'sin'}}
+@differentiating(sin)
+func vjpDuplicate(x: Float) -> (value: Float, pullback: (Float) -> Float) {
   return (x, { $0 })
 }
-
 // expected-error @+1 {{'@differentiating' attribute requires function to return a two-element tuple of type '(value: T..., pullback: (U.CotangentVector) -> T.CotangentVector...)' or '(value: T..., differential: (T.TangentVector...) -> U.TangentVector)'}}
 @differentiating(sin)
 func jvpSinResultInvalid(x: @nondiff Float) -> Float {
@@ -44,10 +44,6 @@ func vjpSinResultInvalidSeedType(x: Float) -> (value: Float, pullback: (Double) 
 
 func generic<T : Differentiable>(_ x: T, _ y: T) -> T {
   return x
-}
-@differentiating(generic) // ok
-func vjpGeneric<T : Differentiable>(x: T, y: T) -> (value: T, pullback: (T.CotangentVector) -> (T.CotangentVector, T.CotangentVector)) {
-  return (x, { ($0, $0) })
 }
 @differentiating(generic) // ok
 func jvpGeneric<T : Differentiable>(x: T, y: T) -> (value: T, differential: (T.TangentVector, T.TangentVector) -> T.TangentVector) {
@@ -130,10 +126,6 @@ func vjpFoo<T : AdditiveArithmetic & Differentiable>(_ x: T) -> (value: T, pullb
   return (x, { $0 })
 }
 @differentiating(foo)
-func vjpFoo<T : FloatingPoint & Differentiable>(_ x: T) -> (value: T, pullback: (T.CotangentVector) -> (T.CotangentVector)) {
-  return (x, { $0 })
-}
-@differentiating(foo)
 func vjpFooExtraGenericRequirements<T : FloatingPoint & Differentiable & BinaryInteger>(_ x: T) -> (value: T, pullback: (T) -> (T)) where T == T.CotangentVector {
   return (x, { $0 })
 }
@@ -177,8 +169,10 @@ extension AdditiveArithmetic where Self : Differentiable, Self == Self.Cotangent
 protocol InstanceMethod : Differentiable {
   // expected-note @+1 {{'foo' defined here}}
   func foo(_ x: Self) -> Self
+  func foo2(_ x: Self) -> Self
   // expected-note @+1 {{'bar' defined here}}
   func bar<T : Differentiable>(_ x: T) -> Self
+  func bar2<T : Differentiable>(_ x: T) -> Self
 }
 
 extension InstanceMethod {
@@ -186,17 +180,17 @@ extension InstanceMethod {
   // expected-error @+2 {{function result's 'pullback' type does not match 'foo'}}
   // expected-note @+2 {{'pullback' does not have expected type '(Self.CotangentVector) -> (Self.CotangentVector, Self.CotangentVector)'}}
   @differentiating(foo)
-  func vjpFoo(x: Self) -> (value: Self, pullback: (Self.CotangentVector) -> Self.CotangentVector) {
+  func vjpFoo(x: Self) -> (value: Self, pullback: (CotangentVector) -> CotangentVector) {
     return (x, { $0 })
   }
 
   @differentiating(foo)
-  func vjpFoo(x: Self) -> (value: Self, pullback: (Self.CotangentVector) -> (Self.CotangentVector, Self.CotangentVector)) {
-    return (x, { ($0, $0) })
+  func jvpFoo(x: Self) -> (value: Self, differential: (TangentVector, TangentVector) -> (TangentVector)) {
+    return (x, { $0 + $1 })
   }
 
   @differentiating(foo, wrt: (self, x))
-  func vjpFooWrt(x: Self) -> (value: Self, pullback: (Self.CotangentVector) -> (Self.CotangentVector, Self.CotangentVector)) {
+  func vjpFooWrt(x: Self) -> (value: Self, pullback: (CotangentVector) -> (CotangentVector, CotangentVector)) {
     return (x, { ($0, $0) })
   }
 }
@@ -205,43 +199,38 @@ extension InstanceMethod {
   // expected-error @+2 {{function result's 'pullback' type does not match 'bar'}}
   // expected-note @+2 {{'pullback' does not have expected type '(Self.CotangentVector) -> (Self.CotangentVector, T.CotangentVector)'}}
   @differentiating(bar)
-  func vjpBar<T : Differentiable>(_ x: T) -> (value: Self, pullback: (Self.CotangentVector) -> T.CotangentVector) {
+  func vjpBar<T : Differentiable>(_ x: T) -> (value: Self, pullback: (CotangentVector) -> T.CotangentVector) {
     return (self, { _ in .zero })
   }
 
   @differentiating(bar)
-  func vjpBar<T : Differentiable>(_ x: T) -> (value: Self, pullback: (Self.CotangentVector) -> (Self.CotangentVector, T.CotangentVector)) {
+  func vjpBar<T : Differentiable>(_ x: T) -> (value: Self, pullback: (CotangentVector) -> (CotangentVector, T.CotangentVector)) {
     return (self, { ($0, .zero) })
   }
 
-  @differentiating(bar)
-  func jvpBar<T : Differentiable>(_ x: T) -> (value: Self, differential: (Self.TangentVector, T.TangentVector) -> Self.TangentVector) {
-    return (self, { dself, dx in dself })
-  }
-
   @differentiating(bar, wrt: (self, x))
-  func jvpBarWrt<T : Differentiable>(_ x: T) -> (value: Self, differential: (Self.TangentVector, T.TangentVector) -> Self.TangentVector) {
+  func jvpBarWrt<T : Differentiable>(_ x: T) -> (value: Self, differential: (TangentVector, T.TangentVector) -> TangentVector) {
     return (self, { dself, dx in dself })
   }
 }
 
 extension InstanceMethod where Self == Self.TangentVector, Self == Self.CotangentVector {
-  @differentiating(foo)
+  @differentiating(foo2)
   func vjpFooExtraRequirements(x: Self) -> (value: Self, pullback: (Self) -> (Self, Self)) {
     return (x, { ($0, $0) })
   }
 
-  @differentiating(foo)
+  @differentiating(foo2)
   func jvpFooExtraRequirements(x: Self) -> (value: Self, differential: (Self, Self) -> (Self)) {
     return (x, { $0 + $1 })
   }
 
-  @differentiating(bar)
+  @differentiating(bar2)
   func vjpBarExtraRequirements<T : Differentiable>(x: T) -> (value: Self, pullback: (Self) -> (Self, T.CotangentVector)) {
     return (self, { ($0, .zero) })
   }
 
-  @differentiating(bar)
+  @differentiating(bar2)
   func jvpBarExtraRequirements<T : Differentiable>(_ x: T) -> (value: Self, differential: (Self, T.TangentVector) -> Self) {
     return (self, { dself, dx in dself })
   }
