@@ -172,6 +172,9 @@ Solution ConstraintSystem::finalize() {
   for (auto &e : CheckedConformances)
     solution.Conformances.push_back({e.first, e.second});
 
+  for (auto &arg : DynamicMemberArguments)
+    solution.DynamicMemberArguments.insert(arg);
+
   return solution;
 }
 
@@ -242,6 +245,11 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   // Register any missing members encountered along this path.
   MissingMembers.insert(solution.MissingMembers.begin(),
                         solution.MissingMembers.end());
+
+  // Register any implicitly generated argument used by keypath
+  // based dynamic member lookup.
+  DynamicMemberArguments.append(solution.DynamicMemberArguments.begin(),
+                                solution.DynamicMemberArguments.end());
 }
 
 /// Restore the type variable bindings to what they were before
@@ -425,6 +433,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numMissingMembers = cs.MissingMembers.size();
   numDisabledConstraints = cs.solverState->getNumDisabledConstraints();
   numFavoredConstraints = cs.solverState->getNumFavoredConstraints();
+  numDynamicMemberArguments = cs.DynamicMemberArguments.size();
 
   PreviousScore = cs.CurrentScore;
 
@@ -478,6 +487,10 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any missing members found along the current path.
   truncate(cs.MissingMembers, numMissingMembers);
+
+  // Remove any implicitly generated arguments used by keypath
+  // based dynamic lookup generated along the current path.
+  truncate(cs.DynamicMemberArguments, numDynamicMemberArguments);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;

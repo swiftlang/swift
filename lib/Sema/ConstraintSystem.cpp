@@ -1883,7 +1883,52 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     }
 
     if (kind == OverloadChoiceKind::KeyPathDynamicMemberLookup) {
-      assert(false && "not yet implemented");
+      auto *fnType = refType->castTo<FunctionType>();
+      assert(fnType->getParams().size() == 1 &&
+             "subscript always has one argument");
+      // Parameter type is KeyPath<T, U> where `T` is a root type
+      // and U is a leaf type (aka member type).
+      auto keyPathTy =
+          fnType->getParams()[0].getPlainType()->castTo<BoundGenericType>();
+
+      refType = fnType->getResult();
+
+      auto *keyPathExpr = buildImplicitDynamicKeyPathArgument(
+          locator->getAnchor(), keyPathTy, locator);
+
+      // If argument couldn't be built, let's fail this choice.
+      if (!keyPathExpr) {
+        failedConstraint = Constraint::create(*this, ConstraintKind::Bind,
+                                              boundType, refType, locator);
+        return;
+      }
+
+      auto *keyPathLocator = getConstraintLocator(keyPathExpr);
+      auto *componentLoc = getConstraintLocator(
+          keyPathExpr, LocatorPathElt::getKeyPathComponent(0));
+
+      auto rootTy = keyPathTy->getGenericArgs()[0];
+      // Member would either point to mutable or immutable property, we
+      // don't which at the moment, so let's allow its type to be l-value.
+      auto memberTy = createTypeVariable(componentLoc, TVO_CanBindToLValue);
+      // Attempt to lookup a member with a give name in the root type and
+      // assign result to the leaf type of the keypath.
+      addValueMemberConstraint(LValueType::get(rootTy), choice.getName(),
+                               memberTy, useDC, FunctionRefKind::Unapplied,
+                               /*outerAlternatives=*/{}, componentLoc);
+
+      auto rvalueMemberTy = createTypeVariable(keyPathLocator);
+      // Since member type is going to be bound to "leaf" generic parameter
+      // of the keypath, it has to be an r-value always, so let's add a new
+      // constraint to preserve that.
+      addConstraint(ConstraintKind::Equal, memberTy, rvalueMemberTy,
+                    keyPathLocator);
+
+      // For a new keypath constraint which is going to check whether given
+      // overload is correct.
+      addUnsolvedConstraint(Constraint::create(*this, ConstraintKind::KeyPath,
+                                               keyPathTy, rootTy,
+                                               rvalueMemberTy, keyPathLocator));
     }
     break;
   }
@@ -2555,4 +2600,36 @@ void ConstraintSystem::generateConstraints(
 
     recordChoice(constraints, index, choices[index]);
   }
+}
+
+KeyPathExpr *ConstraintSystem::buildImplicitDynamicKeyPathArgument(
+    Expr *member, BoundGenericType *keyPathTy, ConstraintLocator *locator) {
+  // Only properties are support at the moment.
+  auto *UDE = dyn_cast<UnresolvedDotExpr>(member);
+  if (!UDE)
+    return nullptr;
+
+  auto &ctx = getASTContext();
+  auto dotLoc = UDE->getDotLoc();
+
+  auto *property = new (ctx)
+      UnresolvedDotExpr(new (ctx) KeyPathDotExpr(dotLoc), dotLoc,
+                        UDE->getName(), UDE->getNameLoc(), /*isImplicit=*/true);
+
+  // Now, let's create a KeyPath expression itself.
+  auto *keyPath = new (ctx) KeyPathExpr(/*backslashLoc=*/dotLoc,
+                                        /*parsedRoot=*/nullptr,
+                                        /*parsedPath=*/property,
+                                        /*isImplicit=*/true);
+
+  // Let's form a single unrsolved property component this keypath is
+  // going to refer to.
+  keyPath->resolveComponents(
+      ctx, {KeyPathExpr::Component::forUnresolvedProperty(
+               property->getName(), property->getStartLoc())});
+  setType(keyPath, keyPathTy);
+
+  // Register newly generated argument in the constraint system.
+  DynamicMemberArguments.push_back({locator, keyPath});
+  return keyPath;
 }
