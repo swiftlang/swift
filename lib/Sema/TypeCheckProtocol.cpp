@@ -665,9 +665,11 @@ swift::matchWitness(
   for (auto *reqDiffAttr : reqAttrs.getAttributes<DifferentiableAttr>()) {
     auto witnessDiffAttrs =
         witnessAttrs.getAttributes<DifferentiableAttr, /*AllowInvalid*/ true>();
-    bool reqDiffAttrMatch = llvm::any_of(witnessDiffAttrs,
-        [&](const DifferentiableAttr *witnessDiffAttr) {
-          return witnessDiffAttr->parametersMatch(*reqDiffAttr);
+    bool reqDiffAttrMatch = llvm::any_of(
+        witnessDiffAttrs, [&](const DifferentiableAttr *witnessDiffAttr) {
+          return witnessDiffAttr->getParameterIndices() &&
+                 reqDiffAttr->getParameterIndices() &&
+                 witnessDiffAttr->parametersMatch(*reqDiffAttr);
         });
     if (!reqDiffAttrMatch) {
       if (auto *vdWitness = dyn_cast<VarDecl>(witness))
