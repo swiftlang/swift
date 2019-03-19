@@ -1422,9 +1422,28 @@ static objc_hook_getClass OldGetClassHook;
 static BOOL
 getObjCClassByMangledName(const char * _Nonnull typeName,
                           Class _Nullable * _Nonnull outClass) {
-  auto metadata = swift_getTypeByMangledNameInEnvironment(typeName, strlen(typeName),
-                                             /* no substitutions */
-                                             nullptr, nullptr);
+  // Demangle old-style class and protocol names, which are still used in the
+  // ObjC metadata.
+  StringRef typeStr(typeName);
+  const Metadata *metadata = nullptr;
+  if (typeStr.startswith("_Tt")) {
+    Demangler demangler;
+    auto node = demangler.demangleSymbol(typeName);
+    if (!node)
+      return NO;
+    metadata = swift_getTypeByMangledNode(
+      MetadataState::Complete, demangler, node,
+      /* no substitutions */
+      [&](unsigned depth, unsigned index) {
+        return nullptr;
+      },
+      [&](const Metadata *type, unsigned index) {
+        return nullptr;
+      }).getMetadata();
+  } else {
+    metadata = swift_getTypeByMangledNameInEnvironment(
+      typeStr.data(), typeStr.size(), /* no substitutions */ nullptr, nullptr);
+  }
   if (metadata) {
     auto objcClass =
       reinterpret_cast<Class>(

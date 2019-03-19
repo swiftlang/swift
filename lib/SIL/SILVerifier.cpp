@@ -429,7 +429,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   void operator=(const SILVerifier&) = delete;
 public:
   bool isSILOwnershipEnabled() const {
-    return F.getModule().getOptions().EnableSILOwnership;
+    return F.getModule().getOptions().VerifySILOwnership;
   }
 
   void _require(bool condition, const Twine &complaint,

@@ -314,6 +314,7 @@ function (swift_benchmark_compile_archopts)
 
   set(common_options
       "-c"
+      "-Xfrontend" "-verify-sil-ownership"
       "-target" "${target}"
       "-${BENCH_COMPILE_ARCHOPTS_OPT}" ${PAGE_ALIGNMENT_OPTION})
 
@@ -343,6 +344,7 @@ function (swift_benchmark_compile_archopts)
 
   set(common_options_driver
       "-c"
+      "-Xfrontend" "-verify-sil-ownership"
       "-target" "${target}"
       "-${driver_opt}")
 

@@ -630,7 +630,7 @@ void SILInstruction::verifyOperandOwnership() const {
     return;
 
   // If SILOwnership is not enabled, do not perform verification.
-  if (!getModule().getOptions().EnableSILOwnership)
+  if (!getModule().getOptions().VerifySILOwnership)
     return;
 
   // If the given function has unqualified ownership or we have been asked by

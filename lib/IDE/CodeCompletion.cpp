@@ -2116,9 +2116,8 @@ public:
       if (NeedComma)
         Builder.addComma();
 
-      Builder.addCallParameter(argName, bodyName, paramTy, isVariadic,
-                               /*TopLevel*/ true, isInOut, isIUO,
-                               isAutoclosure);
+      Builder.addCallParameter(argName, bodyName, paramTy, isVariadic, isInOut,
+                               isIUO, isAutoclosure);
 
       modifiedBuilder = true;
       NeedComma = true;
@@ -3235,9 +3234,8 @@ public:
     builder.addWhitespace(" ");
     assert(RHSType && resultType);
     builder.addCallParameter(Identifier(), Identifier(), RHSType,
-                             /*IsVarArg*/ false, /*TopLevel*/ true,
-                             /*IsInOut*/ false, /*isIUO*/ false,
-                             /*isAutoClosure*/ false);
+                             /*IsVarArg*/ false, /*IsInOut*/ false,
+                             /*isIUO*/ false, /*isAutoClosure*/ false);
     addTypeAnnotation(builder, resultType);
   }
 
@@ -3259,9 +3257,9 @@ public:
     builder.addTextChunk(op->getName().str());
     builder.addWhitespace(" ");
     if (RHSType)
-      builder.addCallParameter(Identifier(), Identifier(), RHSType, false, true,
-                               /*IsInOut*/ false, /*isIUO*/ false,
-                               /*isAutoClosure*/ false);
+      builder.addCallParameter(Identifier(), Identifier(), RHSType,
+                               /*IsVarArg*/ false, /*IsInOut*/ false,
+                               /*isIUO*/ false, /*isAutoClosure*/ false);
     if (resultType)
       addTypeAnnotation(builder, resultType);
   }
@@ -3446,21 +3444,21 @@ public:
     addFromProto(LK::ColorLiteral, "", [&](Builder &builder) {
       builder.addTextChunk("#colorLiteral");
       builder.addLeftParen();
-      builder.addCallParameter(context.getIdentifier("red"), floatType, false,
-                               true, /*IsInOut*/ false,
+      builder.addCallParameter(context.getIdentifier("red"), floatType,
+                               /*IsVarArg*/ false, /*IsInOut*/ false,
                                /*isIUO*/ false, /*isAutoClosure*/ false);
       builder.addComma();
-      builder.addCallParameter(context.getIdentifier("green"), floatType, false,
-                               true, /*IsInOut*/ false, /*isIUO*/ false,
-                               /*isAutoClosure*/ false);
+      builder.addCallParameter(context.getIdentifier("green"), floatType,
+                               /*IsVarArg*/ false, /*IsInOut*/ false,
+                               /*isIUO*/ false, /*isAutoClosure*/ false);
       builder.addComma();
-      builder.addCallParameter(context.getIdentifier("blue"), floatType, false,
-                               true, /*IsInOut*/ false, /*isIUO*/ false,
-                               /*isAutoClosure*/ false);
+      builder.addCallParameter(context.getIdentifier("blue"), floatType,
+                               /*IsVarArg*/ false, /*IsInOut*/ false,
+                               /*isIUO*/ false, /*isAutoClosure*/ false);
       builder.addComma();
-      builder.addCallParameter(context.getIdentifier("alpha"), floatType, false,
-                               true, /*IsInOut*/ false, /*isIUO*/ false,
-                               /*isAutoClosure*/ false);
+      builder.addCallParameter(context.getIdentifier("alpha"), floatType,
+                               /*IsVarArg*/ false, /*IsInOut*/ false,
+                               /*isIUO*/ false, /*isAutoClosure*/ false);
       builder.addRightParen();
     });
 
@@ -3469,8 +3467,9 @@ public:
       builder.addTextChunk("#imageLiteral");
       builder.addLeftParen();
       builder.addCallParameter(context.getIdentifier("resourceName"),
-                               stringType, false, true, /*IsInOut*/ false,
-                               /*isIUO*/ false, /*isAutoClosure*/ false);
+                               stringType, /*IsVarArg*/ false,
+                               /*IsInOut*/ false, /*isIUO*/ false,
+                               /*isAutoClosure*/ false);
       builder.addRightParen();
     });
 

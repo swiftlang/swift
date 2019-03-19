@@ -2824,6 +2824,13 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
   auto access = getAccessLevel();
   auto *sourceDC = VD->getDeclContext();
 
+  // Preserve "fast path" behavior for everything inside
+  // protocol extensions and operators, otherwise allow access
+  // check declarations inside inaccessible members via slower
+  // access scope based check, which is helpful for diagnostics.
+  if (!(sourceDC->getSelfProtocolDecl() || VD->isOperator()))
+    return checkAccessUsingAccessScopes(useDC, VD, access);
+
   if (!forConformance) {
     if (auto *proto = sourceDC->getSelfProtocolDecl()) {
       // FIXME: Swift 4.1 allowed accessing protocol extension methods that were
@@ -2878,21 +2885,8 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
 
 bool ValueDecl::isAccessibleFrom(const DeclContext *useDC,
                                  bool forConformance) const {
-  bool result = checkAccess(useDC, this, forConformance,
-                            [&]() { return getFormalAccess(); });
-
-  // For everything outside of protocols and operators, we should get the same
-  // result using either implementation of checkAccess, because useDC must
-  // already have access to this declaration's DeclContext.
-  // FIXME: Arguably, we're doing the wrong thing for operators here too,
-  // because we're finding internal operators within private types. Fortunately
-  // we have a requirement that a member operator take the enclosing type as an
-  // argument, so it won't ever match.
-  assert(getDeclContext()->getSelfProtocolDecl() || isOperator() ||
-         result ==
-             checkAccessUsingAccessScopes(useDC, this, getFormalAccess()));
-
-  return result;
+  return checkAccess(useDC, this, forConformance,
+                     [&]() { return getFormalAccess(); });
 }
 
 bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC,
@@ -4427,6 +4421,14 @@ bool AbstractStorageDecl::hasPrivateAccessor() const {
   return false;
 }
 
+bool AbstractStorageDecl::hasDidSetOrWillSetDynamicReplacement() const {
+  if (auto *func = getDidSetFunc())
+    return func->getAttrs().hasAttribute<DynamicReplacementAttr>();
+  if (auto *func = getWillSetFunc())
+    return func->getAttrs().hasAttribute<DynamicReplacementAttr>();
+  return false;
+}
+
 void AbstractStorageDecl::setAccessors(StorageImplInfo implInfo,
                                        SourceLoc lbraceLoc,
                                        ArrayRef<AccessorDecl *> accessors,
@@ -4874,12 +4876,72 @@ SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
   return SourceRange();
 }
 
-static bool isVarInPattern(const VarDecl *VD, Pattern *P) {
+static bool isVarInPattern(const VarDecl *vd, Pattern *p) {
   bool foundIt = false;
-  P->forEachVariable([&](VarDecl *FoundFD) {
-    foundIt |= FoundFD == VD;
-  });
+  p->forEachVariable([&](VarDecl *foundFD) { foundIt |= foundFD == vd; });
   return foundIt;
+}
+
+static Optional<std::pair<CaseStmt *, Pattern *>>
+findParentPatternCaseStmtAndPattern(const VarDecl *inputVD) {
+  auto getMatchingPattern = [&](CaseStmt *cs) -> Pattern * {
+    for (auto &item : cs->getMutableCaseLabelItems()) {
+      if (isVarInPattern(inputVD, item.getPattern())) {
+        return item.getPattern();
+      }
+    }
+    return nullptr;
+  };
+
+  // First find our canonical var decl. This is the VarDecl corresponding to the
+  // first case label item of the first case block in the fallthrough chain that
+  // our case block is within. Grab the case stmt associated with that var decl
+  // and start traveling down the fallthrough chain looking for the case
+  // statement that the input VD belongs to by using getMatchingPattern().
+  auto *canonicalVD = inputVD->getCanonicalVarDecl();
+  auto *caseStmt =
+      dyn_cast_or_null<CaseStmt>(canonicalVD->getParentPatternStmt());
+  if (!caseStmt)
+    return None;
+
+  if (auto *p = getMatchingPattern(caseStmt))
+    return std::make_pair(caseStmt, p);
+
+  while ((caseStmt = caseStmt->getFallthroughDest().getPtrOrNull())) {
+    if (auto *p = getMatchingPattern(caseStmt))
+      return std::make_pair(caseStmt, p);
+  }
+
+  return None;
+}
+
+VarDecl *VarDecl::getCanonicalVarDecl() const {
+  // Any var decl without a parent var decl is canonical. This means that before
+  // type checking, all var decls are canonical.
+  auto *cur = const_cast<VarDecl *>(this);
+  auto *vd = cur->getParentVarDecl();
+  if (!vd)
+    return cur;
+
+  while (vd) {
+    cur = vd;
+    vd = vd->getParentVarDecl();
+  }
+
+  return cur;
+}
+
+Stmt *VarDecl::getRecursiveParentPatternStmt() const {
+  // If our parent is already a pattern stmt, just return that.
+  if (auto *stmt = getParentPatternStmt())
+    return stmt;
+
+  // Otherwise, see if we have a parent var decl. If we do not, then return
+  // nullptr. Otherwise, return the case stmt that we found.
+  auto result = findParentPatternCaseStmtAndPattern(this);
+  if (!result.hasValue())
+    return nullptr;
+  return result->first;
 }
 
 /// Return the Pattern involved in initializing this VarDecl.  Recall that the
@@ -4903,7 +4965,7 @@ Pattern *VarDecl::getParentPattern() const {
     
     if (auto *CS = dyn_cast<CatchStmt>(stmt))
       return CS->getErrorPattern();
-    
+
     if (auto *cs = dyn_cast<CaseStmt>(stmt)) {
       // In a case statement, search for the pattern that contains it.  This is
       // a bit silly, because you can't have something like "case x, y:" anyway.
@@ -4911,17 +4973,27 @@ Pattern *VarDecl::getParentPattern() const {
         if (isVarInPattern(this, items.getPattern()))
           return items.getPattern();
       }
-    } else if (auto *LCS = dyn_cast<LabeledConditionalStmt>(stmt)) {
+    }
+
+    if (auto *LCS = dyn_cast<LabeledConditionalStmt>(stmt)) {
       for (auto &elt : LCS->getCond())
         if (auto pat = elt.getPatternOrNull())
           if (isVarInPattern(this, pat))
             return pat;
     }
-    
+
     //stmt->dump();
     assert(0 && "Unknown parent pattern statement?");
   }
-  
+
+  // Otherwise, check if we have to walk our case stmt's var decl list to find
+  // the pattern.
+  if (auto caseStmtPatternPair = findParentPatternCaseStmtAndPattern(this)) {
+    return caseStmtPatternPair->second;
+  }
+
+  // Otherwise, this is a case we do not know or understand. Return nullptr to
+  // signal we do not have any information.
   return nullptr;
 }
 

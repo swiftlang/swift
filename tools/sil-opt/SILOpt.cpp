@@ -76,9 +76,10 @@ EnableLibraryEvolution("enable-library-evolution",
                                       "interfaces for all public declarations by "
                                       "default"));
 
-static llvm::cl::opt<bool>
-EnableSILOwnershipOpt("enable-sil-ownership",
-                 llvm::cl::desc("Compile the module with sil-ownership initially enabled for all functions"));
+static llvm::cl::opt<bool> VerifySILOwnershipOpt(
+    "verify-sil-ownership",
+    llvm::cl::desc(
+        "Compile the module with sil ownership verification enabled"));
 
 static llvm::cl::opt<bool>
 EnableSILOpaqueValues("enable-sil-opaque-values",
@@ -337,7 +338,7 @@ int main(int argc, char **argv) {
   SILOpts.AssertConfig = AssertConfId;
   if (OptimizationGroup != OptGroup::Diagnostics)
     SILOpts.OptMode = OptimizationMode::ForSpeed;
-  SILOpts.EnableSILOwnership = EnableSILOwnershipOpt;
+  SILOpts.VerifySILOwnership = VerifySILOwnershipOpt;
 
   SILOpts.VerifyExclusivity = VerifyExclusivity;
   if (EnforceExclusivity.getNumOccurrences() != 0) {

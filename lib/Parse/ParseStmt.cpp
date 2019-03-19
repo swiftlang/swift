@@ -36,6 +36,9 @@ using namespace swift::syntax;
 /// isStartOfStmt - Return true if the current token starts a statement.
 ///
 bool Parser::isStartOfStmt() {
+  // This needs to be kept in sync with `Parser::parseStmt()`. If a new token
+  // kind is accepted here as start of statement, it should also be handled in
+  // `Parser::parseStmt()`.
   switch (Tok.getKind()) {
   default: return false;
   case tok::kw_return:
@@ -565,6 +568,8 @@ static ParserResult<Stmt> recoverFromInvalidCase(Parser &P) {
 }
 
 ParserResult<Stmt> Parser::parseStmt() {
+  AssertParserMadeProgressBeforeLeavingScopeRAII apmp(*this);
+
   SyntaxParsingContext LocalContext(SyntaxContext, SyntaxContextKind::Stmt);
 
   // Note that we're parsing a statement.
@@ -588,7 +593,9 @@ ParserResult<Stmt> Parser::parseStmt() {
   if (isContextualYieldKeyword()) {
     Tok.setKind(tok::kw_yield);
   }
-  
+
+  // This needs to handle everything that `Parser::isStartOfStmt()` accepts as
+  // start of statement.
   switch (Tok.getKind()) {
   case tok::pound_line:
   case tok::pound_sourceLocation:
@@ -601,6 +608,11 @@ ParserResult<Stmt> Parser::parseStmt() {
     LLVM_FALLTHROUGH;
   default:
     diagnose(Tok, tryLoc.isValid() ? diag::expected_expr : diag::expected_stmt);
+    if (Tok.is(tok::at_sign)) {
+      // Recover from erroneously placed attribute.
+      consumeToken(tok::at_sign);
+      consumeIf(tok::identifier);
+    }
     return nullptr;
   case tok::kw_return:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);

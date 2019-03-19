@@ -2525,10 +2525,9 @@ void ConstraintSystem::generateConstraints(
   }
 
   for (auto index : indices(choices)) {
-    const auto &choice = choices[index];
     if (favoredIndex && (*favoredIndex == index))
       continue;
 
-    recordChoice(constraints, index, choice);
+    recordChoice(constraints, index, choices[index]);
   }
 }

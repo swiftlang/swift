@@ -2,7 +2,7 @@
 // swift-module-flags: -module-name ObjCAttrWithoutFoundation -enable-library-evolution -enable-objc-interop
 
 // RUN: %empty-directory(%t)
-// RUN: echo 'import ObjCAttrWithoutFoundation' | %target-swift-frontend -typecheck -enable-parseable-module-interface -module-cache-path %t -I %S -
+// RUN: echo 'import ObjCAttrWithoutFoundation' | %target-swift-frontend -typecheck -module-cache-path %t -I %S -
 
 public class MyClass {
   public init()

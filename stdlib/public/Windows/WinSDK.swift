@@ -71,3 +71,17 @@ public let TOOLBARW_CLASSW: [WCHAR] = Array<WCHAR>("ToolbarWindow32".utf16)
 public let TRACKBAR_CLASSW: [WCHAR] = Array<WCHAR>("msctls_trackbar32".utf16)
 public let UPDOWN_CLASSW: [WCHAR] = Array<WCHAR>("msctls_updown32".utf16)
 
+// Swift Convenience
+public extension FILETIME {
+  var time_t: time_t {
+    let NTTime: Int64 = Int64(self.dwLowDateTime) | (Int64(self.dwHighDateTime) << 32)
+    return (NTTime - 116444736000000000) / 10000000
+  }
+
+  init(from time: time_t) {
+    let UNIXTime: Int64 = ((time * 10000000) + 116444736000000000)
+    self = FILETIME(dwLowDateTime: DWORD(UNIXTime & 0xffffffff),
+                    dwHighDateTime: DWORD((UNIXTime >> 32) & 0xffffffff))
+  }
+}
+

@@ -325,6 +325,8 @@ void collectPossibleCalleesByQualifiedLookup(
     if ((!isa<AbstractFunctionDecl>(VD) && !isa<SubscriptDecl>(VD)) ||
         VD->shouldHideFromEditor())
       continue;
+    if (!isMemberDeclApplied(&DC, baseTy->getMetatypeInstanceType(), VD))
+      continue;
     resolver->resolveDeclSignature(VD);
     if (!VD->hasInterfaceType())
       continue;
