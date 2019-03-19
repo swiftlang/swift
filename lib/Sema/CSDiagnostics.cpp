@@ -1976,7 +1976,8 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   auto path = locator->getPath();
 
   // TODO: Currently this is only intended to diagnose contextual failures.
-  if (!(path.back().getKind() == ConstraintLocator::ApplyArgToParam ||
+  if (path.empty() ||
+      !(path.back().getKind() == ConstraintLocator::ApplyArgToParam ||
         path.back().getKind() == ConstraintLocator::ContextualType))
     return false;
 
