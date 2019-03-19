@@ -28,6 +28,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/RecordLayout.h"
+#include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
 
 #include "GenMeta.h"
@@ -53,7 +54,9 @@ enum class StructTypeInfoKind {
   FixedStructTypeInfo,
   ClangRecordTypeInfo,
   NonFixedStructTypeInfo,
-  ResilientStructTypeInfo
+  ResilientStructTypeInfo,
+  ClangNonTrivialRecordTypeInfo,
+  ClangNonTrivialLoadableRecordTypeInfo,
 };
 
 static StructTypeInfoKind getStructTypeInfoKind(const TypeInfo &type) {
@@ -326,6 +329,146 @@ namespace {
     getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
                                    const ClangFieldInfo &field) const {
       llvm_unreachable("non-fixed field in Clang type?");
+    }
+  };
+
+  // A common base class for loadable and address-only non-trivially copyable
+  // C structs (i.e., they contain ARC fields).
+  template <class Impl, class Base, class FieldInfoType = ClangFieldInfo>
+  class ClangNonTrivialRecordTypeInfoBase :
+     public StructTypeInfoBase<Impl, Base, FieldInfoType> {
+    using super = StructTypeInfoBase<Impl, Base, FieldInfoType>;
+
+    const clang::RecordDecl *ClangDecl;
+  protected:
+    template <class... As>
+    ClangNonTrivialRecordTypeInfoBase(StructTypeInfoKind kind,
+                                      const clang::RecordDecl *clangDecl,
+                                      As &&...args)
+      : super(kind, std::forward<As>(args)...), ClangDecl(clangDecl)
+    {}
+
+    const clang::RecordDecl *getClangDecl() const { return ClangDecl; }
+
+  public:
+    void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
+                            Address srcAddr, SILType T, bool isOutlined) const {
+      clang::CodeGen::callNonTrivialCStructCopyConstructor(
+          IGF.IGM.getClangCGM(),
+          IGF.Builder.GetInsertBlock(), IGF.Builder.GetInsertPoint(),
+          destAddr.getAddress(), destAddr.getAlignment().asCharUnits(),
+          srcAddr.getAddress(), srcAddr.getAlignment().asCharUnits(),
+          clang::QualType(ClangDecl->getTypeForDecl(), 0));
+    }
+
+    void initializeWithTake(IRGenFunction &IGF, Address destAddr,
+                            Address srcAddr, SILType T, bool isOutlined) const {
+      clang::CodeGen::callNonTrivialCStructMoveConstructor(
+          IGF.IGM.getClangCGM(),
+          IGF.Builder.GetInsertBlock(), IGF.Builder.GetInsertPoint(),
+          destAddr.getAddress(), destAddr.getAlignment().asCharUnits(),
+          srcAddr.getAddress(), srcAddr.getAlignment().asCharUnits(),
+          clang::QualType(ClangDecl->getTypeForDecl(), 0));
+    }
+
+    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                        SILType T, bool isOutlined) const {
+      clang::CodeGen::callNonTrivialCStructCopyAssignmentOperator(
+          IGF.IGM.getClangCGM(),
+          IGF.Builder.GetInsertBlock(), IGF.Builder.GetInsertPoint(),
+          dest.getAddress(), dest.getAlignment().asCharUnits(),
+          src.getAddress(), src.getAlignment().asCharUnits(),
+          clang::QualType(ClangDecl->getTypeForDecl(), 0));
+    }
+
+    void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
+                        SILType T, bool isOutlined) const {
+      clang::CodeGen::callNonTrivialCStructMoveAssignmentOperator(
+          IGF.IGM.getClangCGM(),
+          IGF.Builder.GetInsertBlock(), IGF.Builder.GetInsertPoint(),
+          dest.getAddress(), dest.getAlignment().asCharUnits(),
+          src.getAddress(), src.getAlignment().asCharUnits(),
+          clang::QualType(ClangDecl->getTypeForDecl(), 0));
+    }
+
+    void destroy(IRGenFunction &IGF, Address address, SILType T,
+                 bool isOutlined) const {
+      clang::CodeGen::callNonTrivialCStructDestructor(
+          IGF.IGM.getClangCGM(),
+          IGF.Builder.GetInsertBlock(), IGF.Builder.GetInsertPoint(),
+          address.getAddress(), address.getAlignment().asCharUnits(),
+          clang::QualType(ClangDecl->getTypeForDecl(), 0));
+    }
+
+    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
+      return None;
+    }
+    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return None;
+    }
+    MemberAccessStrategy
+    getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
+                                   const ClangFieldInfo &field) const {
+      llvm_unreachable("non-fixed field in Clang type?");
+    }
+  };
+
+  /// A type info implementation for address-only record types imported from
+  /// Clang that are non-trivially copyable.
+  class ClangNonTrivialRecordTypeInfo final :
+    public ClangNonTrivialRecordTypeInfoBase<ClangNonTrivialRecordTypeInfo,
+                                             FixedTypeInfo> {
+  public:
+    ClangNonTrivialRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
+                                  llvm::Type *storageType, Size size,
+                                  SpareBitVector &&spareBits, Alignment align,
+                                  const clang::RecordDecl *clangDecl)
+      : ClangNonTrivialRecordTypeInfoBase(
+          StructTypeInfoKind::ClangNonTrivialRecordTypeInfo, clangDecl,
+          fields, storageType, size, std::move(spareBits), align, IsNotPOD,
+          IsNotBitwiseTakable, IsFixedSize)
+    {}
+
+    void initializeFromParams(IRGenFunction &IGF, Explosion &params,
+                              Address addr, SILType T,
+                              bool isOutlined) const override {
+      // TODO: How do I implement this without all the support functions
+      // provided by LoadableTypeInfo? Manually iterate over the fields and
+      // store into them?
+    }
+  };
+
+  /// A type implementation for loadable record types imported from Clang that
+  /// are non-trivially copyable (i.e., the contain ARC fields).
+  class ClangNonTrivialLoadableRecordTypeInfo final :
+    public ClangNonTrivialRecordTypeInfoBase<
+        ClangNonTrivialLoadableRecordTypeInfo, LoadableTypeInfo> {
+  public:
+    ClangNonTrivialLoadableRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
+                                          unsigned explosionSize,
+                                          llvm::Type *storageType, Size size,
+                                          SpareBitVector &&spareBits,
+                                          Alignment align,
+                                          const clang::RecordDecl *clangDecl)
+      : ClangNonTrivialRecordTypeInfoBase(
+          StructTypeInfoKind::ClangNonTrivialLoadableRecordTypeInfo, clangDecl,
+          fields, explosionSize, storageType, size, std::move(spareBits), align,
+          IsNotPOD, IsFixedSize)
+    {}
+
+    void initializeFromParams(IRGenFunction &IGF, Explosion &params,
+                              Address addr, SILType T,
+                              bool isOutlined) const override {
+      // TODO: Is this the right thing to do here? It means we never call the
+      // non-trivial default constructor function, even when the explosion is
+      // all zero-initialized values. Maybe that's fine?
+      ClangNonTrivialLoadableRecordTypeInfo::initialize(IGF, params, addr,
+                                                        isOutlined);
+    }
+
+    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                          Size offset) const override {
+      lowering.addTypedData(getClangDecl(), offset.asCharUnits());
     }
   };
 
@@ -639,6 +782,18 @@ public:
 
   const TypeInfo *createTypeInfo(llvm::StructType *llvmType) {
     llvmType->setBody(LLVMFields, /*packed*/ true);
+    if (ClangDecl->isNonTrivialToPrimitiveCopy() ||
+        ClangDecl->isNonTrivialToPrimitiveDestroy()) {
+      if (ClangDecl->canPassInRegisters()) {
+        return ClangNonTrivialLoadableRecordTypeInfo::create(
+            FieldInfos, NextExplosionIndex, llvmType, TotalStride,
+            std::move(SpareBits), TotalAlignment, ClangDecl);
+      }
+      return ClangNonTrivialRecordTypeInfo::create(FieldInfos, llvmType,
+                                                   TotalStride,
+                                                   std::move(SpareBits),
+                                                   TotalAlignment, ClangDecl);
+    }
     return ClangRecordTypeInfo::create(FieldInfos, NextExplosionIndex,
                                        llvmType, TotalStride,
                                        std::move(SpareBits), TotalAlignment,
@@ -819,21 +974,26 @@ private:
 
 /// A convenient macro for delegating an operation to all of the
 /// various struct implementations.
-#define FOR_STRUCT_IMPL(IGF, type, op, ...) do {                       \
-  auto &structTI = IGF.getTypeInfo(type);                              \
-  switch (getStructTypeInfoKind(structTI)) {                           \
-  case StructTypeInfoKind::ClangRecordTypeInfo:                        \
-    return structTI.as<ClangRecordTypeInfo>().op(IGF, __VA_ARGS__);    \
-  case StructTypeInfoKind::LoadableStructTypeInfo:                     \
-    return structTI.as<LoadableStructTypeInfo>().op(IGF, __VA_ARGS__); \
-  case StructTypeInfoKind::FixedStructTypeInfo:                        \
-    return structTI.as<FixedStructTypeInfo>().op(IGF, __VA_ARGS__);    \
-  case StructTypeInfoKind::NonFixedStructTypeInfo:                     \
-    return structTI.as<NonFixedStructTypeInfo>().op(IGF, __VA_ARGS__); \
-  case StructTypeInfoKind::ResilientStructTypeInfo:                    \
-    llvm_unreachable("resilient structs are opaque");                  \
-  }                                                                    \
-  llvm_unreachable("bad struct type info kind!");                      \
+#define FOR_STRUCT_IMPL(IGF, type, op, ...) do {                              \
+  auto &structTI = IGF.getTypeInfo(type);                                     \
+  switch (getStructTypeInfoKind(structTI)) {                                  \
+  case StructTypeInfoKind::ClangRecordTypeInfo:                               \
+    return structTI.as<ClangRecordTypeInfo>().op(IGF, __VA_ARGS__);           \
+  case StructTypeInfoKind::ClangNonTrivialRecordTypeInfo:                     \
+    return structTI.as<ClangNonTrivialRecordTypeInfo>().op(IGF, __VA_ARGS__); \
+  case StructTypeInfoKind::ClangNonTrivialLoadableRecordTypeInfo:             \
+    return structTI.as<ClangNonTrivialLoadableRecordTypeInfo>().op(           \
+        IGF, __VA_ARGS__);                                                    \
+  case StructTypeInfoKind::LoadableStructTypeInfo:                            \
+    return structTI.as<LoadableStructTypeInfo>().op(IGF, __VA_ARGS__);        \
+  case StructTypeInfoKind::FixedStructTypeInfo:                               \
+    return structTI.as<FixedStructTypeInfo>().op(IGF, __VA_ARGS__);           \
+  case StructTypeInfoKind::NonFixedStructTypeInfo:                            \
+    return structTI.as<NonFixedStructTypeInfo>().op(IGF, __VA_ARGS__);        \
+  case StructTypeInfoKind::ResilientStructTypeInfo:                           \
+    llvm_unreachable("resilient structs are opaque");                         \
+  }                                                                           \
+  llvm_unreachable("bad struct type info kind!");                             \
 } while (0)
 
 Address irgen::projectPhysicalStructMemberAddress(IRGenFunction &IGF,
