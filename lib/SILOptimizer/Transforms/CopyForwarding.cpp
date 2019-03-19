@@ -1689,12 +1689,26 @@ bool TempRValueOptPass::collectLoads(
     loadInsts.insert(user);
     return true;
   }
+  case SILInstructionKind::OpenExistentialAddrInst: {
+    // We only support open existential addr if the access is immutable.
+    auto *oeai = cast<OpenExistentialAddrInst>(user);
+    if (oeai->getAccessKind() != OpenedExistentialAccess::Immutable) {
+      LLVM_DEBUG(llvm::dbgs() << "  Temp consuming use may write/destroy "
+                 "its source" << *user);
+      return false;
+    }
+    return true;
+  }
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::TupleElementAddrInst: {
     // Transitively look through projections on stack addresses.
     auto proj = cast<SingleValueInstruction>(user);
     for (auto *projUseOper : proj->getUses()) {
-      if (!collectLoads(projUseOper, projUseOper->getUser(), proj, srcObject,
+      auto *user = projUseOper->getUser();
+      if (user->isTypeDependentOperand(*projUseOper))
+        continue;
+
+      if (!collectLoads(projUseOper, user, proj, srcObject,
                         loadInsts))
         return false;
     }
@@ -1813,6 +1827,7 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
     case SILInstructionKind::LoadInst:
     case SILInstructionKind::LoadBorrowInst:
     case SILInstructionKind::ApplyInst:
+    case SILInstructionKind::OpenExistentialAddrInst:
       use->set(copyInst->getSrc());
       break;
 
