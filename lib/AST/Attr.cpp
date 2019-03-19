@@ -733,7 +733,12 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@differentiating");
     Printer << '(';
     auto *attr = cast<DifferentiatingAttr>(this);
+    auto *derivative = dyn_cast_or_null<AbstractFunctionDecl>(D);
     Printer << attr->getOriginal().Name;
+    auto diffParamsString = getDifferentiationParametersClauseString(
+        derivative, attr->getParameterIndices(), attr->getParsedParameters());
+    if (!diffParamsString.empty())
+      Printer << ", " << diffParamsString;
     Printer << ')';
     break;
   }
