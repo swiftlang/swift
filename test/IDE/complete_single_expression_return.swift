@@ -6,6 +6,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprClosureUnresolved | %FileCheck %s -check-prefix=TestSingleExprClosureRetUnresolved
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprClosureCall | %FileCheck %s -check-prefix=TestSingleExprClosure
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprClosureGlobal | %FileCheck %s -check-prefix=TestSingleExprClosureGlobal
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestNonSingleExprClosureGlobal | %FileCheck %s -check-prefix=TestNonSingleExprClosureGlobal
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestNonSingleExprClosureUnresolved | %FileCheck %s -check-prefix=TestNonSingleExprClosureUnresolved
 
 struct TestSingleExprClosureRet {
   func void() -> Void {}
@@ -125,7 +127,7 @@ struct TestSingleExprClosureGlobal {
   func int() -> Int { return 0 }
 
   func test() -> Int {
-    return { () -> Int in
+    return { () in
       #^TestSingleExprClosureGlobal^#
     }()
   }
@@ -134,4 +136,38 @@ struct TestSingleExprClosureGlobal {
 // TestSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/OutNominal/TypeRelation[Identical]: int()[#Int#];
 // TestSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/OutNominal: void()[#Void#];
 // TestSingleExprClosureGlobal: End completions
+}
+
+struct TestNonSingleExprClosureGlobal {
+  func void() -> Void {}
+  func str() -> String { return "" }
+  func int() -> Int { return 0 }
+
+  func test() -> Int {
+    return { () in
+      #^TestNonSingleExprClosureGlobal^#
+      return 42
+    }()
+  }
+// TestNonSingleExprClosureGlobal: Begin completions
+// TestNonSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/OutNominal: str()[#String#];
+// TestNonSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/OutNominal: int()[#Int#];
+// TestNonSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/OutNominal: void()[#Void#];
+// TestNonSingleExprClosureGlobal: End completions
+}
+
+struct TestNonSingleExprClosureUnresolved {
+  enum MyEnum { case myEnum }
+  enum NotMine { case notMine }
+  func mine() -> MyEnum { return .myEnum }
+  func notMine() -> NotMine { return .notMine }
+
+  func test() -> Int {
+    return { () in
+      .#^TestNonSingleExprClosureUnresolved^#
+      return 42
+    }()
+  }
+// TestNonSingleExprClosureUnresolved-NOT: myEnum
+// TestNonSingleExprClosureUnresolved-NOT: notMine
 }

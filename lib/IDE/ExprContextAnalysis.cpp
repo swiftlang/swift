@@ -716,15 +716,7 @@ class ExprContextAnalyzer {
   }
 
   static bool isSingleExpressionBodyForCodeCompletion(BraceStmt *body) {
-    switch (body->getNumElements()) {
-    case 0:
-      // Nothing in the body except the code-completion token.
-      return true;
-    case 1:
-      return body->getElements()[0].is<Expr *>();
-    default:
-      return false;
-    }
+    return body->getNumElements() == 1 && body->getElements()[0].is<Expr *>();
   }
 
 public:
