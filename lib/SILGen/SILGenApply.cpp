@@ -3366,7 +3366,7 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
                                                          SGFContext());
       }
     }
-  }                      
+  }
 
   if (!isStoredPropertyDefaultArg) {
     value = SGF.emitApplyOfDefaultArgGenerator(info.loc,

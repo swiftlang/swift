@@ -1658,7 +1658,9 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
   // If we don't have an expression initializer or silgen can't assign a default
   // initializer, then we can't generate a default value. An example of where
   // silgen can assign a default is var x: Int? where the default is nil.
-  if (!var->getParentPatternBinding()->isDefaultInitializable())
+  // If the variable is lazy, go ahead and give it a default value.
+  if (!var->getAttrs().hasAttribute<LazyAttr>() &&
+      !var->getParentPatternBinding()->isDefaultInitializable())
     return;
 
   // We can add a default value now.
@@ -1670,18 +1672,21 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
 
   defaultInits.push_back(initDC);
 
+  // If the variable has a type T? and no initial value, return a nil literal
+  // default arg. All lazy variables return a nil literal as well. *Note* that
+  // the type will always be a sugared T? because we don't default init an
+  // explicit Optional<T>.
+  if ((isa<OptionalType>(var->getValueInterfaceType().getPointer()) &&
+      !var->getParentInitializer()) ||
+      var->getAttrs().hasAttribute<LazyAttr>()) {
+    arg->setDefaultArgumentKind(DefaultArgumentKind::NilLiteral);
+    return;
+  }
+
   // Set the default value to the variable. When we emit this in silgen
   // we're going to call the variable's initializer expression.
   arg->setStoredProperty(var);
   arg->setDefaultArgumentKind(DefaultArgumentKind::StoredProperty);
-
-  // If the type is T? and has no initial value, then set the default arg kind
-  // to nil literal. This is useful when we need to print the constructor.
-  // Note, this will always be the sugared T? because we don't default init an
-  // explicit Optional<T>.
-  if (isa<OptionalType>(var->getValueInterfaceType().getPointer()) &&
-      !var->getParentInitializer())
-    arg->setDefaultArgumentKind(DefaultArgumentKind::NilLiteral);
 }
 
 /// Create an implicit struct or class constructor.

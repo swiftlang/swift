@@ -38,3 +38,24 @@ struct F<T> {
 // CHECK-NEXT: {{.*}} = apply [[F1_REF]]<Int>({{.*}}, {{.*}}, [[H1]], {{.*}}) : $@convention(method) <τ_0_0> (@in τ_0_0, Int, @thin F<τ_0_0>.Type) -> @out F<τ_0_0>
 
 let i = F(g: 128)
+
+struct J {
+  lazy var k: Bool = false
+  lazy var l: Int = 0
+}
+
+// CHECK: {{.*}} = metatype $@thin Optional<Int>.Type
+// CHECK-NEXT: [[L1_REF:%.*]] = enum $Optional<Int>, #Optional.none!enumelt
+// CHECK-NEXT: function_ref J.init(k:l:)
+// CHECK-NEXT: [[J1_REF:%.*]] = function_ref @$s27stored_property_default_arg1JV1k1lACSbSg_SiSgtcfC : $@convention(method) (Optional<Bool>, Optional<Int>, @thin J.Type) -> J
+// CHECK-NEXT: {{.*}} = apply [[J1_REF]]({{.*}}, [[L1_REF]], {{.*}}) : $@convention(method) (Optional<Bool>, Optional<Int>, @thin J.Type) -> J
+
+let m = J(k: true)
+
+// CHECK: {{.*}} = metatype $@thin Optional<Bool>.Type
+// CHECK-NEXT: [[K1_REF:%.*]] = enum $Optional<Bool>, #Optional.none!enumelt
+// CHECK-NEXT: function_ref J.init(k:l:)
+// CHECK-NEXT: [[J2_REF:%.*]] = function_ref @$s27stored_property_default_arg1JV1k1lACSbSg_SiSgtcfC : $@convention(method) (Optional<Bool>, Optional<Int>, @thin J.Type) -> J
+// CHECK-NEXT: {{.*}} = apply [[J2_REF]]([[K1_REF]], {{.*}}, {{.*}}) : $@convention(method) (Optional<Bool>, Optional<Int>, @thin J.Type) -> J
+
+let n = J(l: 316)
