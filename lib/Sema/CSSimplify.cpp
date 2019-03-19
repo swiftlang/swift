@@ -4160,10 +4160,12 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
     case MemberLookupResult::UR_TypeMemberOnInstance:
       return AllowTypeOrInstanceMember::create(cs, baseTy, memberName, locator);
 
+    case MemberLookupResult::UR_Inaccessible:
+      return AllowInaccessibleMember::create(cs, decl, locator);
+
     case MemberLookupResult::UR_MutatingMemberOnRValue:
     case MemberLookupResult::UR_MutatingGetterOnRValue:
     case MemberLookupResult::UR_LabelMismatch:
-    case MemberLookupResult::UR_Inaccessible:
     case MemberLookupResult::UR_UnavailableInExistential:
       break;
     }
@@ -4187,9 +4189,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
   auto locator = getConstraintLocator(locatorB);
   MemberLookupResult result =
-    performMemberLookup(kind, member, baseTy, functionRefKind, locator,
-                        /*includeInaccessibleMembers*/false);
-  
+      performMemberLookup(kind, member, baseTy, functionRefKind, locator,
+                          /*includeInaccessibleMembers*/ shouldAttemptFixes());
+
   switch (result.OverallResult) {
   case MemberLookupResult::Unsolved:
     // If requested, generate a constraint.
@@ -6195,6 +6197,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowInvalidInitRef:
   case FixKind::AllowClosureParameterDestructuring:
   case FixKind::MoveOutOfOrderArgument:
+  case FixKind::AllowInaccessibleMember:
     llvm_unreachable("handled elsewhere");
   }
 

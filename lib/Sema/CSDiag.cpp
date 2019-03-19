@@ -854,11 +854,17 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
       // visible to us, but the conforming type is. In this case, we need to
       // clamp the formal access for diagnostics purposes to the formal access
       // of the protocol itself.
-      diagnose(nameLoc, diag::candidate_inaccessible, decl->getBaseName(),
-               decl->getFormalAccessScope().accessLevelForDiagnostics());
-      for (auto cand : result.UnviableCandidates)
-        diagnose(cand.getDecl(), diag::decl_declared_here, memberName);
-
+      InaccessibleMemberFailure failure(expr, CS, decl,
+                                        CS.getConstraintLocator(E));
+      auto diagnosed = failure.diagnoseAsError();
+      assert(diagnosed && "failed to produce expected diagnostic");
+      for (auto cand : result.UnviableCandidates) {
+        auto *choice = cand.getDecl();
+        // failure is going to highlight candidate given to it,
+        // we just need to handle the rest here.
+        if (choice != decl)
+          diagnose(choice, diag::decl_declared_here, choice->getFullName());
+      }
       return;
     }
     }
