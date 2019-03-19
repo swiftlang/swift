@@ -2246,3 +2246,57 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
 
   return true;
 }
+
+bool InaccessibleMemberFailure::diagnoseAsError() {
+  auto *anchor = getRawAnchor();
+  // Let's try to avoid over-diagnosing chains of inaccessible
+  // members e.g.:
+  //
+  // struct A {
+  //   struct B {
+  //     struct C {}
+  //   }
+  // }
+  //
+  // _ = A.B.C()
+  //
+  // We'll have a fix for each `B', `C` and `C.init` but it makes
+  // sense to diagnose only `B` and consider the rest hidden.
+  Expr *baseExpr = nullptr;
+  DeclNameLoc nameLoc;
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
+    baseExpr = UDE->getBase();
+    nameLoc = UDE->getNameLoc();
+  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
+    nameLoc = UME->getNameLoc();
+  } else if (auto *SE = dyn_cast<SubscriptExpr>(anchor)) {
+    baseExpr = SE->getBase();
+  } else if (auto *call = dyn_cast<CallExpr>(anchor)) {
+    baseExpr = call->getFn();
+  }
+
+  if (baseExpr) {
+    auto &cs = getConstraintSystem();
+    auto *locator =
+        cs.getConstraintLocator(baseExpr, ConstraintLocator::Member);
+    if (llvm::any_of(cs.getFixes(), [&](const ConstraintFix *fix) {
+          return fix->getLocator() == locator;
+        }))
+      return false;
+  }
+
+  auto loc = nameLoc.isValid() ? nameLoc.getStartLoc() : anchor->getLoc();
+  auto accessLevel = Member->getFormalAccessScope().accessLevelForDiagnostics();
+  if (auto *CD = dyn_cast<ConstructorDecl>(Member)) {
+    emitDiagnostic(loc, diag::init_candidate_inaccessible,
+                   CD->getResultInterfaceType(), accessLevel)
+        .highlight(nameLoc.getSourceRange());
+  } else {
+    emitDiagnostic(loc, diag::candidate_inaccessible, Member->getBaseName(),
+                   accessLevel)
+        .highlight(nameLoc.getSourceRange());
+  }
+
+  emitDiagnostic(Member, diag::decl_declared_here, Member->getFullName());
+  return true;
+}

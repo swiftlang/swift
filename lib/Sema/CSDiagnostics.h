@@ -956,6 +956,29 @@ private:
   }
 };
 
+/// Diagnose an attempt to reference inaccessible member e.g.
+///
+/// ```swift
+/// struct S {
+///   var foo: String
+///
+///   private init(_ v: String) {
+///     self.foo = v
+///   }
+/// }
+/// _ = S("ultimate question")
+/// ```
+class InaccessibleMemberFailure final : public FailureDiagnostic {
+  ValueDecl *Member;
+
+public:
+  InaccessibleMemberFailure(Expr *root, ConstraintSystem &cs, ValueDecl *member,
+                            ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), Member(member) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 
