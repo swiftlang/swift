@@ -1204,7 +1204,6 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
     
     for (auto VD : repeatedDecls) {
       VD->setHasNonPatternBindingInit();
-      VD->setImplicit();
     }
 
     // Parse the optional 'where' guard, with this particular pattern's bound
