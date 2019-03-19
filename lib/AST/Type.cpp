@@ -3950,13 +3950,9 @@ bool UnownedStorageType::isLoadable(ResilienceExpansion resilience) const {
 }
 
 static ReferenceCounting getClassReferenceCounting(ClassDecl *theClass) {
-  while (auto superclass = theClass->getSuperclassDecl()) {
-    theClass = superclass;
-  }
-
-  return theClass->hasClangNode()
-           ? ReferenceCounting::ObjC
-           : ReferenceCounting::Native;
+  return (theClass->checkAncestry(AncestryFlags::ClangImported)
+          ? ReferenceCounting::ObjC
+          : ReferenceCounting::Native);
 }
 
 ReferenceCounting TypeBase::getReferenceCounting() {

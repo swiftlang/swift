@@ -2590,17 +2590,8 @@ public:
                                        ArrayRef<VarDecl *> vars) {
     // Check whether we have an Objective-C-defined class in our
     // inheritance chain.
-    while (classDecl) {
-      // If we found an Objective-C-defined class, continue checking.
-      if (classDecl->hasClangNode())
-        break;
-
-      // If we ran out of superclasses, we're done.
-      if (!classDecl->hasSuperclass())
-        return false;
-
-      classDecl = classDecl->getSuperclassDecl();
-    }
+    if (!classDecl->checkAncestry(AncestryFlags::ClangImported))
+      return false;
 
     // If all of the variables are @objc, we can use @NSManaged.
     for (auto var : vars) {

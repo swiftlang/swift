@@ -2481,7 +2481,8 @@ namespace {
       case ClassMetadataStrategy::Update:
       case ClassMetadataStrategy::FixedOrUpdate:
       case ClassMetadataStrategy::Fixed: {
-        auto type = (Target->checkObjCAncestry() != ObjCClassKind::NonObjC
+        // FIXME: Should this check HasImported instead?
+        auto type = (Target->checkAncestry(AncestryFlags::ObjC)
                     ? IGM.Context.TheUnknownObjectType
                     : IGM.Context.TheNativeObjectType);
         auto wtable = IGM.getAddrOfValueWitnessTable(type);
