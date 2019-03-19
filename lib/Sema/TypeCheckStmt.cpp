@@ -545,6 +545,12 @@ public:
   }
   
   Stmt *visitThrowStmt(ThrowStmt *TS) {
+    // If the throw is in a defer, then it isn't valid.
+    if (isInDefer()) {
+      TC.diagnose(TS->getThrowLoc(), diag::jump_out_of_defer, "throw");
+      return nullptr;
+    }
+
     // Coerce the operand to the exception type.
     auto E = TS->getSubExpr();
 

@@ -355,12 +355,35 @@ func test_defer(_ a : Int) {
 }
 
 class SomeTestClass {
-  var x = 42
-  
-  func method() {
-    defer { x = 97 }  // self. not required here!
-    // expected-warning@-1 {{'defer' statement before end of scope always executes immediately}}{{5-10=do}}
-  }
+	var x = 42
+	
+	func method() {
+	  defer { x = 97 }  // self. not required here!
+	  // expected-warning@-1 {{'defer' statement before end of scope always executes immediately}}{{5-10=do}}
+	}
+}
+
+enum DeferThrowError: Error {
+  case someError
+}
+
+func throwInDefer() {
+  defer { throw DeferThrowError.someError } // expected-error {{'throw' cannot transfer control out of a defer statement}}
+  print("Foo")
+}
+
+func throwingFuncInDefer1() throws {
+  defer { try throwingFunctionCalledInDefer() } // expected-error {{errors cannot be thrown out of a defer body}}
+  print("Bar")
+}
+
+func throwingFuncInDefer2() throws {
+  defer { try throwingFunctionCalledInDefer() } // expected-error {{errors cannot be thrown out of a defer body}}
+  print("Bar")
+}
+
+func throwingFunctionCalledInDefer() throws {
+  throw DeferThrowError.someError
 }
 
 class SomeDerivedClass: SomeTestClass {
