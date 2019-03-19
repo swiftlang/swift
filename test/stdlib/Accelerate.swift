@@ -259,7 +259,6 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         legacyResult = [Float](repeating: -1, count: count)
         
         vForce.exp(x,
-                   type: .exp,
                    result: &result)
         
         vvexpf(&legacyResult,
@@ -273,9 +272,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vForce.exp(x,
-                   type: .expm1,
-                   result: &result)
+        vForce.expm1(x,
+                     result: &result)
         
         vvexpm1f(&legacyResult,
                  x,
@@ -288,8 +286,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vForce.exp(x,
-                   type: .exp2,
+        vForce.exp2(x,
                    result: &result)
         
         vvexp2f(&legacyResult,
@@ -303,9 +300,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vForce.log(x,
-                   base: .two,
-                   result: &result)
+        vForce.log2(x,
+                    result: &result)
         
         vvlog2f(&legacyResult,
                 x,
@@ -318,9 +314,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vForce.log(x,
-                   base: .ten,
-                   result: &result)
+        vForce.log10(x,
+                     result: &result)
         
         vvlog10f(&legacyResult,
                  x,
@@ -333,8 +328,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vForce.exponent(x,
-                        result: &result)
+        vForce.logb(x,
+                    result: &result)
         
         vvlogbf(&legacyResult,
                 x,
@@ -793,7 +788,6 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         legacyResult = [Double](repeating: -1, count: count)
         
         vForce.exp(x,
-                   type: .exp,
                    result: &result)
         
         vvexp(&legacyResult,
@@ -807,9 +801,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vForce.exp(x,
-                   type: .expm1,
-                   result: &result)
+        vForce.expm1(x,
+                     result: &result)
         
         vvexpm1(&legacyResult,
                 x,
@@ -822,9 +815,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vForce.exp(x,
-                   type: .exp2,
-                   result: &result)
+        vForce.exp2(x,
+                    result: &result)
         
         vvexp2(&legacyResult,
                x,
@@ -837,9 +829,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vForce.log(x,
-                   base: .two,
-                   result: &result)
+        vForce.log2(x,
+                    result: &result)
         
         vvlog2(&legacyResult,
                x,
@@ -852,9 +843,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vForce.log(x,
-                   base: .ten,
-                   result: &result)
+        vForce.log10(x,
+                     result: &result)
         
         vvlog10(&legacyResult,
                 x,
@@ -867,8 +857,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vForce.exponent(x,
-                        result: &result)
+        vForce.logb(x,
+                    result: &result)
         
         vvlogb(&legacyResult,
                x,
