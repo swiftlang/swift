@@ -2497,38 +2497,39 @@ static bool linkSpecialization(SILModule &M, SILFunction *F) {
   return false;
 }
 
-/// The list of classes and functions from the stdlib
-/// whose specializations we want to preserve.
-static const char *const KnownPrespecializations[] = {
-    "Array",
-    "_ArrayBuffer",
-    "_ContiguousArrayBuffer",
-    "Range",
-    "RangeIterator",
-    "CountableRange",
-    "CountableRangeIterator",
-    "ClosedRange",
-    "ClosedRangeIterator",
-    "CountableClosedRange",
-    "CountableClosedRangeIterator",
-    "IndexingIterator",
-    "Collection",
-    "ReversedCollection",
-    "MutableCollection",
-    "BidirectionalCollection",
-    "RandomAccessCollection",
-    "ReversedRandomAccessCollection",
-    "RangeReplaceableCollection",
-    "_allocateUninitializedArray",
-    "UTF8",
-    "UTF16",
-    "String",
-    "_StringBuffer",
-};
-
 bool swift::isKnownPrespecialization(StringRef SpecName) {
   // Completely disable for now.
 #if false
+
+  /// The list of classes and functions from the stdlib
+  /// whose specializations we want to preserve.
+  static const char *const KnownPrespecializations[] = {
+      "Array",
+      "_ArrayBuffer",
+      "_ContiguousArrayBuffer",
+      "Range",
+      "RangeIterator",
+      "CountableRange",
+      "CountableRangeIterator",
+      "ClosedRange",
+      "ClosedRangeIterator",
+      "CountableClosedRange",
+      "CountableClosedRangeIterator",
+      "IndexingIterator",
+      "Collection",
+      "ReversedCollection",
+      "MutableCollection",
+      "BidirectionalCollection",
+      "RandomAccessCollection",
+      "ReversedRandomAccessCollection",
+      "RangeReplaceableCollection",
+      "_allocateUninitializedArray",
+      "UTF8",
+      "UTF16",
+      "String",
+      "_StringBuffer",
+  };
+
   // TODO: Once there is an efficient API to check if
   // a given symbol is a specialization of a specific type,
   // use it instead. Doing demangling just for this check
