@@ -1169,14 +1169,6 @@ static bool doesPlatformSupportObjCMetadataUpdateCallback(
 TypeConverter::TypeConverter(IRGenModule &IGM)
   : IGM(IGM),
     FirstType(invalidTypeInfo()) {
-  // FIXME: In LLDB, everything is completely fragile, so that IRGen can query
-  // the size of resilient types. Of course this is not the right long term
-  // solution, because it won't work once the swiftmodule file is not in
-  // sync with the binary module. Once LLDB can calculate type layouts at
-  // runtime (using remote mirrors or some other mechanism), we can remove this.
-  if (IGM.IRGen.Opts.EnableResilienceBypass)
-    LoweringMode = Mode::CompletelyFragile;
-
   const auto &Triple = IGM.Context.LangOpts.Target;
 
   SupportsObjCMetadataUpdateCallback =
