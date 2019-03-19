@@ -355,12 +355,12 @@ func test_defer(_ a : Int) {
 }
 
 class SomeTestClass {
-	var x = 42
-	
-	func method() {
-	  defer { x = 97 }  // self. not required here!
-	  // expected-warning@-1 {{'defer' statement before end of scope always executes immediately}}{{5-10=do}}
-	}
+  var x = 42
+ 
+  func method() {
+    defer { x = 97 }  // self. not required here!
+    // expected-warning@-1 {{'defer' statement before end of scope always executes immediately}}{{5-10=do}}
+  }
 }
 
 enum DeferThrowError: Error {
