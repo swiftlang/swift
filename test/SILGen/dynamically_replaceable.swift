@@ -356,3 +356,9 @@ func getsetX(_ x: Int) -> Int {
 dynamic func funcWithDefaultArg(_ arg : String = String("hello")) {
   print("hello")
 }
+
+// IMPLICIT-LABEL: sil private [ossa] @$s23dynamically_replaceable6$deferL_yyF
+var x = 10
+defer {
+  let y = x
+}
