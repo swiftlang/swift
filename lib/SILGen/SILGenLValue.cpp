@@ -3188,16 +3188,8 @@ LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e,
   LValue lv = visitRec(e->getBase(),
                        getBaseAccessKindForStorage(accessKind),
                        options.forProjectedBaseLValue());
-
-  auto baseTypeData = lv.getTypeData();
-  LValueTypeData typeData = {
-    accessKind,
-    baseTypeData.OrigFormalType.getTupleElementType(index),
-    cast<TupleType>(baseTypeData.SubstFormalType).getElementType(index),
-    cast<TupleType>(baseTypeData.TypeOfRValue).getElementType(index)
-  };
-
-  lv.add<TupleElementComponent>(index, typeData);
+  lv.add<TupleElementComponent>(
+      index, lv.getTypeData().getTupleElementTypeData(accessKind, index));
   return lv;
 }
 

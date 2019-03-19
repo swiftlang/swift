@@ -69,6 +69,13 @@ struct LValueTypeData {
   }
 
   SGFAccessKind getAccessKind() const { return AccessKind; }
+
+  LValueTypeData getTupleElementTypeData(SGFAccessKind accessKind,
+                                         unsigned index) const {
+    return {accessKind, OrigFormalType.getTupleElementType(index),
+            cast<TupleType>(SubstFormalType).getElementType(index),
+            cast<TupleType>(TypeOfRValue).getElementType(index)};
+  }
 };
 
 /// An l-value path component represents a chunk of the access path to
