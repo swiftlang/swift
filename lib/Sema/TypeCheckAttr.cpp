@@ -2005,8 +2005,9 @@ void lookupReplacedDecl(DeclName replacedDeclName,
   if (!typeCtx)
     typeCtx = cast<ExtensionDecl>(declCtxt->getAsDecl())->getExtendedNominal();
 
-  moduleScopeCtxt->lookupQualified({typeCtx}, replacedDeclName,
-                                   NL_QualifiedDefault, results);
+  if (typeCtx)
+    moduleScopeCtxt->lookupQualified({typeCtx}, replacedDeclName,
+                                     NL_QualifiedDefault, results);
 }
 
 /// Remove any argument labels from the interface type of the given value that
@@ -2565,10 +2566,17 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
       D->getAttrs().hasAttribute<InlinableAttr>())
     return;
 
+  if (auto *FD = dyn_cast<FuncDecl>(D)) {
+    // Don't add dynamic to defer bodies.
+    if (FD->isDeferBody())
+      return;
+  }
+
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     // Don't turn stored into computed properties. This could conflict with
     // exclusivity checking.
-    if (VD->hasStorage())
+    // If there is a didSet or willSet function we allow dynamic replacement.
+    if (VD->hasStorage() && !VD->getDidSetFunc() && !VD->getWillSetFunc())
       return;
     // Don't add dynamic to local variables.
     if (VD->getDeclContext()->isLocalContext())

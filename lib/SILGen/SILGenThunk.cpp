@@ -272,7 +272,7 @@ SILGenFunction::emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
       isa<BuiltinUnit>(constant.getDecl()->getDeclContext())) {
     SGM.diagnose(loc.getSourceLoc(), diag::not_implemented,
                  "delayed application of builtin");
-    return SILUndef::get(constantInfo.getSILType(), SGM.M);
+    return SILUndef::get(constantInfo.getSILType(), F);
   }
   
   // If the constant is a thunk we haven't emitted yet, emit it.

@@ -1,6 +1,6 @@
 // -- Test with resilience enabled
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -force-single-frontend-invocation -Xfrontend -enable-resilience -module-name KeyPathMultiModule_b -c -o %t/KeyPathMultiModule_b.o -emit-module-path %t/KeyPathMultiModule_b.swiftmodule -parse-as-library %S/Inputs/KeyPathMultiModule_b.swift
+// RUN: %target-build-swift -force-single-frontend-invocation -enable-library-evolution -module-name KeyPathMultiModule_b -c -o %t/KeyPathMultiModule_b.o -emit-module-path %t/KeyPathMultiModule_b.swiftmodule -parse-as-library %S/Inputs/KeyPathMultiModule_b.swift
 // RUN: %target-build-swift -g %t/KeyPathMultiModule_b.o -I %t %s -o %t/a.out.resilient
 // RUN: %target-codesign %t/a.out.resilient
 // RUN: %target-run %t/a.out.resilient

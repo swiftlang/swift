@@ -464,9 +464,6 @@ def create_argument_parser():
            help='the maximum number of parallel link jobs to use when '
                 'compiling swift tools.')
 
-    option('--enable-sil-ownership', store_true,
-           help='Enable the SIL ownership model')
-
     option('--disable-guaranteed-normal-arguments', store_true,
            help='Disable guaranteed normal arguments')
 

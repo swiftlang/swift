@@ -25,6 +25,69 @@ CHANGELOG
 Swift 5.1
 ---------
 
+* [SE-0068][]:
+
+  `Self` can now be used inside member functions and for function arguments of structs and enums to refer to the containing type.
+
+* [SR-7799][]:
+
+  Enum cases can now be matched against an optional enum without
+  requiring a '?' at the end of the pattern.
+
+  ```swift
+  enum Foo { case zero, one }
+
+  let foo: Foo? = .zero
+
+  switch foo {
+    case .zero: break
+    case .one: break
+    case .none: break
+  }
+  ```
+
+* `weak` and `unowned` variables can now be used inside types that
+   declare `Equatable` or `Hashable` conformance.
+
+* [SR-2688][]:
+
+  An `@autoclosure` closure can now be a typealias.
+
+  ```swift
+  class Foo {
+    typealias FooClosure = () -> String
+    func fooFunction(closure: @autoclosure FooClosure) {}
+  }
+  ```
+
+* [SR-7601][]:
+
+  Functions marked with `@objc` can now return `Self`
+
+  ```swift
+  @objc func returnDynamicSelf() -> Self { return self }
+  ```
+
+* [SR-2176][]:
+
+  Assigning '.none' to an optional enum which also has a 'none' case
+  or comparing such an enum with '.none' will now warn. Such expressions
+  create an ambiguity because the compiler chooses Optional.none
+  over Foo.none.
+
+  ```swift
+  enum Foo { case none }
+
+  // Assigned Optional.none instead of Foo.none
+  let foo: Foo? = .none
+  // Comparing with Optional.none instead of Foo.none
+  let isEqual = foo == .none
+  ```
+
+  The compiler will provide a warning along with a fix-it to
+  replace '.none' with 'Optional.none' or 'Foo.none' to resolve
+  the ambiguity.
+
 * Key path expressions can now include references to tuple elements.
 
 * Single-parameter functions accepting values of type `Any` are no
@@ -7452,12 +7515,16 @@ Swift 1.0
 [SR-1446]: <https://bugs.swift.org/browse/SR-1446>
 [SR-1529]: <https://bugs.swift.org/browse/SR-1529>
 [SR-2131]: <https://bugs.swift.org/browse/SR-2131>
+[SR-2176]: <https://bugs.swift.org/browse/SR-2176>
 [SR-2388]: <https://bugs.swift.org/browse/SR-2388>
 [SR-2394]: <https://bugs.swift.org/browse/SR-2394>
 [SR-2608]: <https://bugs.swift.org/browse/SR-2608>
+[SR-2688]: <https://bugs.swift.org/browse/SR-2688>
 [SR-4248]: <https://bugs.swift.org/browse/SR-4248>
 [SR-5581]: <https://bugs.swift.org/browse/SR-5581>
 [SR-5719]: <https://bugs.swift.org/browse/SR-5719>
 [SR-7139]: <https://bugs.swift.org/browse/SR-7139>
 [SR-7251]: <https://bugs.swift.org/browse/SR-7251>
+[SR-7601]: <https://bugs.swift.org/browse/SR-7601>
+[SR-7799]: <https://bugs.swift.org/browse/SR-7799>
 [SR-8109]: <https://bugs.swift.org/browse/SR-8109>

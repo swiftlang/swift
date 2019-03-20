@@ -1,8 +1,8 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -enable-resilience %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -verify-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -verify-sil-ownership -enable-library-evolution %s | %FileCheck %s
 
-// RUN: %target-swift-frontend -emit-ir -enable-sil-ownership %s
-// RUN: %target-swift-frontend -emit-ir -enable-sil-ownership -enable-resilience %s
+// RUN: %target-swift-frontend -emit-ir %s
+// RUN: %target-swift-frontend -emit-ir -enable-library-evolution %s
 
 public class C : Hashable {
   public static func ==(lhs: C, rhs: C) -> Bool { return lhs === rhs }

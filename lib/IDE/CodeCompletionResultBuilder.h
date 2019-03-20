@@ -315,7 +315,7 @@ public:
   }
 
   void addCallParameter(Identifier Name, Identifier LocalName, Type Ty,
-                        bool IsVarArg, bool Outermost, bool IsInOut, bool IsIUO,
+                        bool IsVarArg, bool IsInOut, bool IsIUO,
                         bool isAutoClosure) {
     CurrentNestingLevel++;
 
@@ -325,7 +325,7 @@ public:
       llvm::SmallString<16> EscapedKeyword;
       addChunkWithText(
           CodeCompletionString::Chunk::ChunkKind::CallParameterName,
-          escapeArgumentLabel(Name.str(), !Outermost, EscapedKeyword));
+          escapeArgumentLabel(Name.str(), false, EscapedKeyword));
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
     } else if (!LocalName.empty()) {
@@ -333,7 +333,7 @@ public:
       llvm::SmallString<16> EscapedKeyword;
       addChunkWithText(
           CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName,
-            escapeArgumentLabel(LocalName.str(), !Outermost, EscapedKeyword));
+            escapeArgumentLabel(LocalName.str(), false, EscapedKeyword));
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
     }
@@ -376,10 +376,10 @@ public:
     CurrentNestingLevel--;
   }
 
-  void addCallParameter(Identifier Name, Type Ty, bool IsVarArg, bool Outermost,
-                        bool IsInOut, bool IsIUO, bool isAutoClosure) {
-    addCallParameter(Name, Identifier(), Ty, IsVarArg, Outermost, IsInOut,
-                     IsIUO, isAutoClosure);
+  void addCallParameter(Identifier Name, Type Ty, bool IsVarArg, bool IsInOut,
+                        bool IsIUO, bool isAutoClosure) {
+    addCallParameter(Name, Identifier(), Ty, IsVarArg, IsInOut, IsIUO,
+                     isAutoClosure);
   }
 
   void addGenericParameter(StringRef Name) {

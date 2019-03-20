@@ -26,16 +26,18 @@
 #include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
-  class AnyPattern;
-  class ASTContext;
-  class ASTWalker;
-  class Decl;
-  class Expr;
-  class FuncDecl;
-  class Pattern;
-  class PatternBindingDecl;
-  class VarDecl;
-  
+
+class AnyPattern;
+class ASTContext;
+class ASTWalker;
+class Decl;
+class Expr;
+class FuncDecl;
+class Pattern;
+class PatternBindingDecl;
+class VarDecl;
+class CaseStmt;
+
 enum class StmtKind {
 #define STMT(ID, PARENT) ID,
 #define LAST_STMT(ID) Last_Stmt = ID,
@@ -920,6 +922,45 @@ public:
   }
 };
 
+/// FallthroughStmt - The keyword "fallthrough".
+class FallthroughStmt : public Stmt {
+  SourceLoc Loc;
+  CaseStmt *FallthroughSource;
+  CaseStmt *FallthroughDest;
+
+public:
+  FallthroughStmt(SourceLoc Loc, Optional<bool> implicit = None)
+      : Stmt(StmtKind::Fallthrough, getDefaultImplicitFlag(implicit, Loc)),
+        Loc(Loc), FallthroughSource(nullptr), FallthroughDest(nullptr) {}
+
+  SourceLoc getLoc() const { return Loc; }
+
+  SourceRange getSourceRange() const { return Loc; }
+
+  /// Get the CaseStmt block from which the fallthrough transfers control.
+  /// Set during Sema. (May stay null if fallthrough is invalid.)
+  CaseStmt *getFallthroughSource() const { return FallthroughSource; }
+  void setFallthroughSource(CaseStmt *C) {
+    assert(!FallthroughSource && "fallthrough source already set?!");
+    FallthroughSource = C;
+  }
+
+  /// Get the CaseStmt block to which the fallthrough transfers control.
+  /// Set during Sema.
+  CaseStmt *getFallthroughDest() const {
+    assert(FallthroughDest && "fallthrough dest is not set until Sema");
+    return FallthroughDest;
+  }
+  void setFallthroughDest(CaseStmt *C) {
+    assert(!FallthroughDest && "fallthrough dest already set?!");
+    FallthroughDest = C;
+  }
+
+  static bool classof(const Stmt *S) {
+    return S->getKind() == StmtKind::Fallthrough;
+  }
+};
+
 /// A 'case' or 'default' block of a switch statement.  Only valid as the
 /// substatement of a SwitchStmt.  A case block begins either with one or more
 /// CaseLabelItems or a single 'default' label.
@@ -933,8 +974,10 @@ public:
 ///   default:
 /// \endcode
 ///
-class CaseStmt final : public Stmt,
-    private llvm::TrailingObjects<CaseStmt, CaseLabelItem> {
+class CaseStmt final
+    : public Stmt,
+      private llvm::TrailingObjects<CaseStmt, FallthroughStmt *,
+                                    CaseLabelItem> {
   friend TrailingObjects;
 
   SourceLoc UnknownAttrLoc;
@@ -943,23 +986,46 @@ class CaseStmt final : public Stmt,
 
   llvm::PointerIntPair<Stmt *, 1, bool> BodyAndHasBoundDecls;
 
+  /// Set to true if we have a fallthrough.
+  ///
+  /// TODO: Once we have CaseBodyVarDecls, use the bit in BodyAndHasBoundDecls
+  /// for this instead. This is separate now for staging reasons.
+  bool hasFallthrough;
+
   CaseStmt(SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
            bool HasBoundDecls, SourceLoc UnknownAttrLoc, SourceLoc ColonLoc,
-           Stmt *Body, Optional<bool> Implicit);
+           Stmt *Body, Optional<bool> Implicit,
+           NullablePtr<FallthroughStmt> fallthroughStmt);
 
 public:
-  static CaseStmt *create(ASTContext &C, SourceLoc CaseLoc,
-                          ArrayRef<CaseLabelItem> CaseLabelItems,
-                          bool HasBoundDecls, SourceLoc UnknownAttrLoc,
-                          SourceLoc ColonLoc, Stmt *Body,
-                          Optional<bool> Implicit = None);
+  static CaseStmt *
+  create(ASTContext &C, SourceLoc CaseLoc,
+         ArrayRef<CaseLabelItem> CaseLabelItems, bool HasBoundDecls,
+         SourceLoc UnknownAttrLoc, SourceLoc ColonLoc, Stmt *Body,
+         Optional<bool> Implicit = None,
+         NullablePtr<FallthroughStmt> fallthroughStmt = nullptr);
 
   ArrayRef<CaseLabelItem> getCaseLabelItems() const {
     return {getTrailingObjects<CaseLabelItem>(), Bits.CaseStmt.NumPatterns};
   }
+
   MutableArrayRef<CaseLabelItem> getMutableCaseLabelItems() {
     return {getTrailingObjects<CaseLabelItem>(), Bits.CaseStmt.NumPatterns};
   }
+
+  unsigned getNumCaseLabelItems() const { return Bits.CaseStmt.NumPatterns; }
+
+  NullablePtr<CaseStmt> getFallthroughDest() const {
+    return const_cast<CaseStmt &>(*this).getFallthroughDest();
+  }
+
+  NullablePtr<CaseStmt> getFallthroughDest() {
+    if (!hasFallthrough)
+      return nullptr;
+    return (*getTrailingObjects<FallthroughStmt *>())->getFallthroughDest();
+  }
+
+  bool hasFallthroughDest() const { return hasFallthrough; }
 
   Stmt *getBody() const { return BodyAndHasBoundDecls.getPointer(); }
   void setBody(Stmt *body) { BodyAndHasBoundDecls.setPointer(body); }
@@ -991,6 +1057,14 @@ public:
   }
 
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Case; }
+
+  size_t numTrailingObjects(OverloadToken<CaseLabelItem>) const {
+    return getNumCaseLabelItems();
+  }
+
+  size_t numTrailingObjects(OverloadToken<FallthroughStmt *>) const {
+    return hasFallthrough ? 1 : 0;
+  }
 };
 
 /// Switch statement.
@@ -1132,48 +1206,6 @@ public:
 
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::Continue;
-  }
-};
-
-/// FallthroughStmt - The keyword "fallthrough".
-class FallthroughStmt : public Stmt {
-  SourceLoc Loc;
-  CaseStmt *FallthroughSource;
-  CaseStmt *FallthroughDest;
-  
-public:
-  FallthroughStmt(SourceLoc Loc, Optional<bool> implicit = None)
-    : Stmt(StmtKind::Fallthrough, getDefaultImplicitFlag(implicit, Loc)),
-      Loc(Loc), FallthroughSource(nullptr), FallthroughDest(nullptr)
-  {}
-  
-  SourceLoc getLoc() const { return Loc; }
-  
-  SourceRange getSourceRange() const { return Loc; }
-
-  /// Get the CaseStmt block from which the fallthrough transfers control.
-  /// Set during Sema. (May stay null if fallthrough is invalid.)
-  CaseStmt *getFallthroughSource() const {
-    return FallthroughSource;
-  }
-  void setFallthroughSource(CaseStmt *C) {
-    assert(!FallthroughSource && "fallthrough source already set?!");
-    FallthroughSource = C;
-  }
-
-  /// Get the CaseStmt block to which the fallthrough transfers control.
-  /// Set during Sema.
-  CaseStmt *getFallthroughDest() const {
-    assert(FallthroughDest && "fallthrough dest is not set until Sema");
-    return FallthroughDest;
-  }
-  void setFallthroughDest(CaseStmt *C) {
-    assert(!FallthroughDest && "fallthrough dest already set?!");
-    FallthroughDest = C;
-  }
-  
-  static bool classof(const Stmt *S) {
-    return S->getKind() == StmtKind::Fallthrough;
   }
 };
 

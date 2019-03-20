@@ -86,7 +86,8 @@ static bool hasSingletonMetatype(CanType instanceType) {
   return HasSingletonMetatype().visit(instanceType);
 }
 
-CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
+CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
+                                              ResilienceExpansion expansion) {
   auto decl = capture.getDecl();
   if (auto *var = dyn_cast<VarDecl>(decl)) {
     assert(var->hasStorage() &&
@@ -97,9 +98,7 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
     // by its address (like a var) instead.
     if (var->isImmutable() &&
         (!SILModuleConventions(M).useLoweredAddresses() ||
-         // FIXME: Expansion
-         !getTypeLowering(var->getType(),
-                          ResilienceExpansion::Minimal).isAddressOnly()))
+         !getTypeLowering(var->getType(), expansion).isAddressOnly()))
       return CaptureKind::Constant;
 
     // In-out parameters are captured by address.

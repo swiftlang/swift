@@ -1,0 +1,111 @@
+// RUN: %target-sil-opt -access-enforcement-dom %s -enable-sil-verify-all | %FileCheck %s
+//
+// Test AccessEnforcementDom in the presence of loops.
+// For loops with accessors, see also access_dom_call.sil.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+struct X {
+  @_hasStorage var i: Int64 { get set }
+  init(i: Int64)
+  init()
+}
+
+var globalX: X
+
+sil_global hidden @globalX : $X
+
+// Insert one preheader check for the outer access only.
+// CHECK-LABEL: sil @testDomLoopRDMD : $@convention(thin) () -> () {
+// CHECK: [[A:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GA:%.*]] : $*X
+// CHECK: end_access [[A]]
+// CHECK: bb3:
+// CHECK: begin_access [read] [static] [no_nested_conflict] [[GA]] : $*X
+// CHECK: begin_access [modify] [dynamic] [no_nested_conflict] [[GA]] : $*X
+// CHECK-LABEL: } // end sil function 'testDomLoopRDMD'
+sil @testDomLoopRDMD : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  br bb1
+  
+bb1:
+  br bb2
+
+bb2:
+  br bb3
+  
+bb3:
+  %4 = begin_access [read] [dynamic] [no_nested_conflict] %0 : $*X
+  %6 = begin_access [modify] [dynamic] [no_nested_conflict] %0 : $*X
+  end_access %6 : $*X
+  end_access %4 : $*X
+  %cond = integer_literal $Builtin.Int1, 1
+  cond_br %cond, bb2, bb4
+
+bb4:
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// No, do cannot optimize a nested loop access.
+// CHECK-LABEL: sil @testDomLoopRSMD : $@convention(thin) () -> () {
+// CHECK-NOT: begin_access
+// CHECK: bb3:
+// CHECK: begin_access [read] [static] [no_nested_conflict] [[GA:%.*]] : $*X
+// CHECK: begin_access [modify] [dynamic] [no_nested_conflict] [[GA]] : $*X
+// CHECK-LABEL: } // end sil function 'testDomLoopRSMD'
+sil @testDomLoopRSMD : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  br bb1
+  
+bb1:
+  br bb2
+
+bb2:
+  br bb3
+  
+bb3:
+  %4 = begin_access [read] [static] [no_nested_conflict] %0 : $*X
+  %6 = begin_access [modify] [dynamic] [no_nested_conflict] %0 : $*X
+  end_access %6 : $*X
+  end_access %4 : $*X
+  %cond = integer_literal $Builtin.Int1, 1
+  cond_br %cond, bb2, bb4
+
+bb4:
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// Yes, insert a preheader check for unidentifiable access (address argument).
+// CHECK-LABEL: sil @testDomLoopUnidentified : $@convention(thin) (@inout Int64) -> () {
+// CHECK: [[A:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GA:%.*]] : $*Int64
+// CHECK: end_access [[A]]
+// CHECK: bb3:
+// CHECK: begin_access [modify] [static] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDomLoopUnidentified'
+sil @testDomLoopUnidentified : $@convention(thin) (@inout Int64) -> () {
+bb0(%0 : $*Int64):
+  br bb1
+  
+bb1:
+  br bb2
+
+bb2:
+  br bb3
+  
+bb3:
+  %6 = begin_access [modify] [dynamic] [no_nested_conflict] %0 : $*Int64
+  end_access %6 : $*Int64
+  %cond = integer_literal $Builtin.Int1, 1
+  cond_br %cond, bb2, bb4
+
+bb4:
+  %10 = tuple ()
+  return %10 : $()
+}

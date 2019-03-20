@@ -241,7 +241,11 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
                    [&](SGFContext C) -> ManagedValue {
                      if (openedArchetype)
                        return SGF.manageOpaqueValue(state, loc, C);
-                     return input;
+                     if (input.isPlusOne(SGF))
+                       return input;
+                     if (C.isGuaranteedPlusZeroOk())
+                       return input;
+                     return input.copyUnmanaged(SGF, loc);
                    });
   
   return input;
@@ -3078,7 +3082,7 @@ CanSILFunctionType SILGenFunction::buildThunkType(
 
   // Add the function type as the parameter.
   auto contextConvention =
-      SILType::getPrimitiveObjectType(sourceType).isTrivial(this->getModule())
+      getTypeLowering(sourceType).isTrivial()
           ? ParameterConvention::Direct_Unowned
           : ParameterConvention::Direct_Guaranteed;
   SmallVector<SILParameterInfo, 4> params;

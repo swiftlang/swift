@@ -150,6 +150,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_INIT_2 | %FileCheck %s -check-prefix=PROTOCOL_EXT_INIT_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_INIT_3 | %FileCheck %s -check-prefix=PROTOCOL_EXT_INIT_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_INIT_4 | %FileCheck %s -check-prefix=PROTOCOL_EXT_INIT_4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_INIT_5 | %FileCheck %s -check-prefix=PROTOCOL_EXT_INIT_5
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P4_DOT_1 | %FileCheck %s -check-prefix=PROTOCOL_EXT_P4_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P4_DOT_2 | %FileCheck %s -check-prefix=PROTOCOL_EXT_P4_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P4_T_DOT_1 | %FileCheck %s -check-prefix=PROTOCOL_EXT_P4_T_DOT_1
@@ -189,6 +190,10 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOLTYPE_DOT_1 | %FileCheck %s -check-prefix=PROTOCOLTYPE_DOT_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOLTYPE_DOT_2 | %FileCheck %s -check-prefix=PROTOCOLTYPE_DOT_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOLTYPE_DOT_3 | %FileCheck %s -check-prefix=PROTOCOLTYPE_DOT_3
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_IN_MEMBERDECLINIT_1 | %FileCheck %s -check-prefix=FOO_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_IN_MEMBERDECLINIT_2 | %FileCheck %s -check-prefix=FOO_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_IN_MEMBERDECLINIT_3 | %FileCheck %s -check-prefix=FOO_OBJECT_DOT
 
 // Test code completion of expressions that produce a value.
 
@@ -1811,11 +1816,15 @@ func testProtExtInit2<S: P4 where S.T : P1>() {
   S(#^PROTOCOL_EXT_INIT_2^#
   S.#^PROTOCOL_EXT_INIT_3^#
   S#^PROTOCOL_EXT_INIT_4^#
+
+  var sTy: S.Type = S.self
+  sTy.init(#^PROTOCOL_EXT_INIT_5^#
 }
 
 // PROTOCOL_EXT_INIT_2: Decl[Constructor]/CurrNominal: ['(']{#x: Int#}[')'][#P4#]{{; name=.+$}}
 // PROTOCOL_EXT_INIT_3: Decl[Constructor]/CurrNominal: init({#x: Int#})[#P4#]{{; name=.+$}}
 // PROTOCOL_EXT_INIT_4: Decl[Constructor]/CurrNominal: ({#x: Int#})[#P4#]{{; name=.+$}}
+// PROTOCOL_EXT_INIT_5: Pattern/CurrModule:            ['(']{#x: Int#}[')'][#S#]{{; name=.+$}}
 
 extension P4 where Self.T == OnlyMe {
   final func test1() {
@@ -2070,14 +2079,10 @@ protocol ExistentialProto {
 
 func testExistential() {
   let _ = ExistentialProto.#^PROTOCOLTYPE_DOT_1^#
-// PROTOCOLTYPE_DOT_1: Begin completions, 5 items
+// PROTOCOLTYPE_DOT_1: Begin completions, 3 items
 // PROTOCOLTYPE_DOT_1-DAG: Keyword[self]/CurrNominal:          self[#ExistentialProto.Protocol#]; name=self
 // PROTOCOLTYPE_DOT_1-DAG: Keyword/CurrNominal:                Protocol[#ExistentialProto.Protocol#]; name=Protocol
 // PROTOCOLTYPE_DOT_1-DAG: Keyword/CurrNominal:                Type[#ExistentialProto.Type#]; name=Type
-// FIXME(SR-75, rdar://problem/21289579): These 2 are invalid: {
-// PROTOCOLTYPE_DOT_1-DAG: Decl[StaticMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: staticMethod()[#Void#]; name=staticMethod()
-// PROTOCOLTYPE_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: instanceMethod({#(self): ExistentialProto#})[#() -> Void#]; name=instanceMethod(self: ExistentialProto)
-// }
 // PROTOCOLTYPE_DOT_1: End completions
 
   let _ = ExistentialProto.Type.#^PROTOCOLTYPE_DOT_2^#
@@ -2117,5 +2122,24 @@ class TestChain {
 // COMPLEX_CHAIN_1-DAG: Decl[InstanceVar]/CurrNominal:      prop1[#Int#]
 // COMPLEX_CHAIN_1-DAG: Decl[InstanceVar]/CurrNominal:      prop2[#Int#]
 // COMPLEX_CHAIN_1: End completions
+  }
+}
+
+// rdar://problem/48453760
+struct InitializerTest {
+  let value1: FooStruct = {
+    $0.#^CLOSURE_IN_MEMBERDECLINIT_1^#
+    return $0
+  }(FooStruct())
+
+  let value2: FooStruct = { (b: FooStruct ) -> FooStruct in
+    b.#^CLOSURE_IN_MEMBERDECLINIT_2^#
+    return b
+  }(FooStruct())
+}
+// rdar://problem/40944761
+extension String {
+  static let v = { (obj: FooStruct) in
+    obj.#^CLOSURE_IN_MEMBERDECLINIT_3^#
   }
 }

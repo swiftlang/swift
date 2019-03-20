@@ -453,6 +453,7 @@ struct PrintOptions {
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::Always;
     result.PrintDocumentationComments = true;
+    result.SkipUnderscoredKeywords = true;
     return result;
   }
 
@@ -537,6 +538,7 @@ struct PrintOptions {
   /// Print in the style of quick help declaration.
   static PrintOptions printQuickHelpDeclaration() {
     PrintOptions PO;
+    PO.SkipUnderscoredKeywords = true;
     PO.EnumRawValues = true;
     PO.PrintImplicitAttrs = false;
     PO.PrintFunctionRepresentationAttrs = false;

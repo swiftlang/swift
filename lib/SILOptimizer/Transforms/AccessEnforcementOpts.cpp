@@ -1020,12 +1020,6 @@ static void mergeEndAccesses(BeginAccessInst *parentIns,
 }
 
 static bool canMergeEnd(BeginAccessInst *parentIns, BeginAccessInst *childIns) {
-  // A [read] access cannot be converted to a [modify] without potentially
-  // introducing new conflicts that were previously ignored. Merging read/modify
-  // will require additional data flow information.
-  if (childIns->getAccessKind() != parentIns->getAccessKind())
-    return false;
-
   auto *endP = getSingleEndAccess(parentIns);
   if (!endP)
     return false;
@@ -1067,6 +1061,12 @@ static bool
 canMerge(PostDominanceInfo *postDomTree,
          const llvm::DenseMap<SILBasicBlock *, SCCInfo> &blockToSCCMap,
          BeginAccessInst *parentIns, BeginAccessInst *childIns) {
+  // A [read] access cannot be converted to a [modify] without potentially
+  // introducing new conflicts that were previously ignored. Merging read/modify
+  // will require additional data flow information.
+  if (childIns->getAccessKind() != parentIns->getAccessKind())
+    return false;
+
   if (!canMergeBegin(postDomTree, blockToSCCMap, parentIns, childIns))
     return false;
 

@@ -1131,8 +1131,11 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
   if (VD->getAttrs().hasAttribute<NSManagedAttr>())
     return ObjCReason(ObjCReason::ExplicitlyNSManaged);
   // A member of an @objc protocol is implicitly @objc.
-  if (isMemberOfObjCProtocol)
+  if (isMemberOfObjCProtocol) {
+    if (!VD->isProtocolRequirement())
+      return None;
     return ObjCReason(ObjCReason::MemberOfObjCProtocol);
+  }
 
   // A @nonobjc is not @objc, even if it is an override of an @objc, so check
   // for @nonobjc first.
