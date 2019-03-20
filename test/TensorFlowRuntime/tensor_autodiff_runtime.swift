@@ -121,6 +121,27 @@ TensorADTests.testAllBackends("mean") {
   expectEqual(expected, meanGradAlongAxes(input))
 }
 
+TensorADTests.testAllBackends("expandingShape") {
+  let f1 = { (a: Tensor<Float>) in a.expandingShape(at: 0).squared() }
+  let f2 = { (a: Tensor<Float>) in a.squared().expandingShape(at: 0) }
+  expectEqual([6, 10], pullback(at: [3, 5], in: f1)([[1, 1]]))
+  expectEqual([6, 10], pullback(at: [3, 5], in: f2)([[1, 1]]))
+}
+
+TensorADTests.testAllBackends("squeezingShape") {
+  let f1 = { (a: Tensor<Float>) in a.squeezingShape(at: 0).squared() }
+  let f2 = { (a: Tensor<Float>) in a.squared().squeezingShape(at: 0) }
+  expectEqual([[6, 10]], pullback(at: [[3, 5]], in: f1)([1, 1]))
+  expectEqual([[6, 10]], pullback(at: [[3, 5]], in: f2)([1, 1]))
+}
+
+TensorADTests.testAllBackends("reshapedBackprop") {
+  let f1 = { (a: Tensor<Float>) in a.reshaped(toShape: Tensor<Int32>([2, 1])).squared() }
+  let f2 = { (a: Tensor<Float>) in a.squared().reshaped(toShape: Tensor<Int32>([2, 1])) }
+  expectEqual([[6, 10]], pullback(at: [[3, 5]], in: f1)([[1], [1]]))
+  expectEqual([[6, 10]], pullback(at: [[3, 5]], in: f2)([[1], [1]]))
+}
+
 TensorADTests.testAllBackends("reshaped") {
   let shapeTensor = Tensor<Int32>([2, 2, 2])
   let input = Tensor<Float>(ones: [2, 4])
