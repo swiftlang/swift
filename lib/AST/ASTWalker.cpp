@@ -159,7 +159,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       else
         return true;
       if (entry.getInit() &&
-          (!entry.isInitializerLazy() ||
+          (!entry.isInitializerSubsumed() ||
            Walker.shouldWalkIntoLazyInitializers())) {
 #ifndef NDEBUG
         PrettyStackTraceDecl debugStack("walking into initializer for", PBD);

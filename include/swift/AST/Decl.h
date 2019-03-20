@@ -1896,7 +1896,10 @@ class PatternBindingEntry {
   enum class Flags {
     Checked = 1 << 0,
     Removed = 1 << 1,
-    Lazy    = 1 << 2
+    /// Whether the contents of this initializer were subsumed by
+    /// some other initialization, e.g., a lazy property's initializer
+    /// gets subsumed by the getter body.
+    Subsumed    = 1 << 2
   };
   llvm::PointerIntPair<Pattern *, 3, OptionSet<Flags>> PatternAndFlags;
 
@@ -1941,8 +1944,10 @@ public:
       return nullptr;
     return InitExpr.Node;
   }
-  Expr *getNonLazyInit() const {
-    return isInitializerLazy() ? nullptr : getInit();
+  /// Retrieve the initializer if it should be executed to initialize this
+  /// particular pattern binding.
+  Expr *getExecutableInit() const {
+    return isInitializerSubsumed() ? nullptr : getInit();
   }
   SourceRange getOrigInitRange() const;
   void setInit(Expr *E);
@@ -1986,11 +1991,11 @@ public:
     PatternAndFlags.setInt(PatternAndFlags.getInt() | Flags::Checked);
   }
 
-  bool isInitializerLazy() const {
-    return PatternAndFlags.getInt().contains(Flags::Lazy);
+  bool isInitializerSubsumed() const {
+    return PatternAndFlags.getInt().contains(Flags::Subsumed);
   }
-  void setInitializerLazy() {
-    PatternAndFlags.setInt(PatternAndFlags.getInt() | Flags::Lazy);
+  void setInitializerSubsumed() {
+    PatternAndFlags.setInt(PatternAndFlags.getInt() | Flags::Subsumed);
   }
 
   // Return the first variable initialized by this pattern.
@@ -2090,8 +2095,8 @@ public:
   Expr *getInit(unsigned i) const {
     return getPatternList()[i].getInit();
   }
-  Expr *getNonLazyInit(unsigned i) const {
-    return getPatternList()[i].getNonLazyInit();
+  Expr *getExecutableInit(unsigned i) const {
+    return getPatternList()[i].getExecutableInit();
   }
   
   SourceRange getOrigInitRange(unsigned i) const {
@@ -2132,12 +2137,12 @@ public:
     getMutablePatternList()[i].setInitializerChecked();
   }
 
-  bool isInitializerLazy(unsigned i) const {
-    return getPatternList()[i].isInitializerLazy();
+  bool isInitializerSubsumed(unsigned i) const {
+    return getPatternList()[i].isInitializerSubsumed();
   }
 
-  void setInitializerLazy(unsigned i) {
-    getMutablePatternList()[i].setInitializerLazy();
+  void setInitializerSubsumed(unsigned i) {
+    getMutablePatternList()[i].setInitializerSubsumed();
   }
   
   /// Does this binding declare something that requires storage?

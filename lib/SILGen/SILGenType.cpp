@@ -1024,7 +1024,7 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     // Emit initializers.
     for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i) {
-      if (pd->getNonLazyInit(i)) {
+      if (pd->getExecutableInit(i)) {
         if (pd->isStatic())
           SGM.emitGlobalInitialization(pd, i);
         else
@@ -1136,7 +1136,7 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     // Emit initializers for static variables.
     for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i) {
-      if (pd->getNonLazyInit(i)) {
+      if (pd->getExecutableInit(i)) {
         assert(pd->isStatic() && "stored property in extension?!");
         SGM.emitGlobalInitialization(pd, i);
       }

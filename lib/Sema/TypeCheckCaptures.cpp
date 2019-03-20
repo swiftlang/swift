@@ -706,7 +706,7 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
         // Walk the initializers for all properties declared in the type with
         // an initializer.
         for (auto &elt : PBD->getPatternList()) {
-          if (elt.isInitializerLazy())
+          if (elt.isInitializerSubsumed())
             continue;
 
           if (auto *init = elt.getInit())
