@@ -1738,16 +1738,16 @@ getOpaqueReadWriteAccessStrategy(const AbstractStorageDecl *storage,
            getOpaqueWriteAccessStrategy(storage, dispatch));
 }
 
-static AccessStrategy
-getOpaqueAccessStrategy(const AbstractStorageDecl *storage,
-                        AccessKind accessKind, bool dispatch) {
+AccessStrategy
+AbstractStorageDecl::getOpaqueAccessStrategy(AccessKind accessKind) const {
+  assert(hasAnyAccessors() && "accessor-less storage can't be accessed opaquely");
   switch (accessKind) {
   case AccessKind::Read:
-    return getOpaqueReadAccessStrategy(storage, dispatch);
+    return getOpaqueReadAccessStrategy(this, isPolymorphic(this));
   case AccessKind::Write:
-    return getOpaqueWriteAccessStrategy(storage, dispatch);
+    return getOpaqueWriteAccessStrategy(this, isPolymorphic(this));
   case AccessKind::ReadWrite:
-    return getOpaqueReadWriteAccessStrategy(storage, dispatch);
+    return getOpaqueReadWriteAccessStrategy(this, isPolymorphic(this));
   }
   llvm_unreachable("bad access kind");
 }
@@ -1768,11 +1768,9 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
     if (!getDeclContext()->isLocalContext()) {
       // If the property is defined in a non-final class or a protocol, the
       // accessors are dynamically dispatched, and we cannot do direct access.
-      if (isPolymorphic(this))
-        return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ true);
-
-      if (isNativeDynamic())
-        return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ false);
+      // Likewise if it's dynamically replaced.
+      if (isPolymorphic(this) || isNativeDynamic())
+        return getOpaqueAccessStrategy(accessKind);
 
       // If the storage is resilient from the given module and resilience
       // expansion, we cannot use direct access.
@@ -1794,7 +1792,7 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
         resilient = isResilient();
 
       if (resilient)
-        return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ false);
+        return getOpaqueAccessStrategy(accessKind);
     }
 
     LLVM_FALLTHROUGH;

@@ -4540,6 +4540,10 @@ public:
                                    AccessKind accessKind,
                                    ModuleDecl *module,
                                    ResilienceExpansion expansion) const;
+  
+  /// Get an always-opaque (i.e. through accessors) access strategy for this storage.
+  AccessStrategy getOpaqueAccessStrategy(AccessKind accessKind) const;
+
 
   /// Should this declaration behave as if it must be accessed
   /// resiliently, even when we're building a non-resilient module?
