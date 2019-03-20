@@ -681,12 +681,14 @@ public extension Tensor {
   /// Return a copy of the tensor collapsed into a 1-D `Tensor`, in row-major
   /// order.
   @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func flattened() -> Tensor {
     return reshaped(to: [-1])
   }
 
   /// Returns a rank-lifted `Tensor` with a leading dimension of 1.
   @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func rankLifted() -> Tensor {
     return expandingShape(at: 0)
   }
