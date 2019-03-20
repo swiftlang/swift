@@ -4237,59 +4237,8 @@ namespace {
             break;
           }
 
-          if (foundDecl->choice.isDecl()) {
-            auto property = foundDecl->choice.getDecl();
-              
-            // Key paths can only refer to properties currently.
-            if (!isa<VarDecl>(property)) {
-              cs.TC.diagnose(origComponent.getLoc(),
-                             diag::expr_keypath_not_property,
-                             property->getDescriptiveKind(),
-                             property->getFullName());
-            } else {
-              // Key paths don't work with mutating-get properties.
-              auto varDecl = cast<VarDecl>(property);
-              if (varDecl->isGetterMutating()) {
-                cs.TC.diagnose(origComponent.getLoc(),
-                               diag::expr_keypath_mutating_getter,
-                               property->getFullName());
-              }
-                  
-              // Key paths don't currently support static members.
-              if (varDecl->isStatic()) {
-                cs.TC.diagnose(origComponent.getLoc(),
-                               diag::expr_keypath_static_member,
-                               property->getFullName());
-              }
-            }
-              
-            cs.TC.requestMemberLayout(property);
-              
-            auto dc = property->getInnermostDeclContext();
-              
-            // Compute substitutions to refer to the member.
-            SubstitutionMap subs =
-            solution.computeSubstitutions(dc->getGenericSignatureOfContext(),
-                                          locator);
-              
-            auto resolvedTy = foundDecl->openedType;
-            resolvedTy = simplifyType(resolvedTy);
-              
-            auto ref = ConcreteDeclRef(property, subs);
-              
-            component = KeyPathExpr::Component::forProperty(ref,
-                                                            resolvedTy,
-                                                            origComponent.getLoc());
-          } else {
-            auto fieldIndex = foundDecl->choice.getTupleIndex();
-
-            auto resolvedTy = foundDecl->openedType;
-            resolvedTy = simplifyType(resolvedTy);
-
-            component = KeyPathExpr::Component::forTupleElement(fieldIndex,
-                                                                resolvedTy,
-                                                                origComponent.getLoc());
-          }
+          component = buildKeyPathPropertyComponent(
+              *foundDecl, origComponent.getLoc(), locator);
 
           baseTy = component.getComponentType();
           resolvedComponents.push_back(component);
@@ -4474,6 +4423,58 @@ namespace {
       assert(!baseTy || baseTy->hasUnresolvedType()
              || baseTy->getWithoutSpecifierType()->isEqual(leafTy));
       return E;
+    }
+
+    KeyPathExpr::Component
+    buildKeyPathPropertyComponent(const SelectedOverload &overload,
+                                  SourceLoc componentLoc,
+                                  ConstraintLocator *locator) {
+      if (overload.choice.isDecl()) {
+        auto property = overload.choice.getDecl();
+
+        // Key paths can only refer to properties currently.
+        if (!isa<VarDecl>(property)) {
+          cs.TC.diagnose(componentLoc, diag::expr_keypath_not_property,
+                         property->getDescriptiveKind(),
+                         property->getFullName());
+        } else {
+          // Key paths don't work with mutating-get properties.
+          auto varDecl = cast<VarDecl>(property);
+          if (varDecl->isGetterMutating()) {
+            cs.TC.diagnose(componentLoc, diag::expr_keypath_mutating_getter,
+                           property->getFullName());
+          }
+
+          // Key paths don't currently support static members.
+          if (varDecl->isStatic()) {
+            cs.TC.diagnose(componentLoc, diag::expr_keypath_static_member,
+                           property->getFullName());
+          }
+        }
+
+        cs.TC.requestMemberLayout(property);
+
+        auto dc = property->getInnermostDeclContext();
+
+        // Compute substitutions to refer to the member.
+        SubstitutionMap subs = solution.computeSubstitutions(
+            dc->getGenericSignatureOfContext(), locator);
+
+        auto resolvedTy = overload.openedType;
+        resolvedTy = simplifyType(resolvedTy);
+
+        auto ref = ConcreteDeclRef(property, subs);
+
+        return KeyPathExpr::Component::forProperty(ref, resolvedTy,
+                                                   componentLoc);
+      }
+
+      auto fieldIndex = overload.choice.getTupleIndex();
+      auto resolvedTy = overload.openedType;
+      resolvedTy = simplifyType(resolvedTy);
+
+      return KeyPathExpr::Component::forTupleElement(fieldIndex, resolvedTy,
+                                                     componentLoc);
     }
 
     Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) {
