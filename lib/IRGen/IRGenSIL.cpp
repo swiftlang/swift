@@ -4802,13 +4802,13 @@ visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *i) {
   // This returns two bits, the first of which is "is Objective-C object", the
   // second is "is Objective-C Tagged Pointer".  Each of these bits is computed
   // by checking to see if some other bits are non-zero in the BridgeObject.
-  auto bitsNonZero = [&](const SpareBitVector &bits) -> llvm::Value* {
+  auto bitsNonZero = [&](const llvm::APInt &bits) -> llvm::Value* {
     // If this target doesn't have the specified field, just produce false.
-    if (!bits.any())
+    if (bits == 0)
       return Builder.getInt1(0);
 
     llvm::Value *bitsValue =
-      Builder.CreateAnd(bridgeVal, Builder.getInt(bits.asAPInt()));
+      Builder.CreateAnd(bridgeVal, Builder.getInt(bits));
     return
       Builder.CreateICmpNE(bitsValue, llvm::ConstantInt::get(IGM.SizeTy, 0));
   };
@@ -4852,8 +4852,7 @@ void IRGenSILFunction::visitBridgeObjectToRefInst(
   if (IGM.TargetInfo.hasObjCTaggedPointers() &&
       (!Cl || !isKnownNotTaggedPointer(IGM, Cl))) {
     boBits = Builder.CreatePtrToInt(bo, IGM.SizeTy);
-    APInt maskValue = IGM.TargetInfo.ObjCPointerReservedBits.asAPInt();
-    llvm::Value *mask = Builder.getInt(maskValue);
+    llvm::Value *mask = Builder.getInt(IGM.TargetInfo.ObjCPointerReservedBits);
     llvm::Value *reserved = Builder.CreateAnd(boBits, mask);
     llvm::Value *cond = Builder.CreateICmpEQ(reserved,
                                          llvm::ConstantInt::get(IGM.SizeTy, 0));
@@ -4872,7 +4871,7 @@ void IRGenSILFunction::visitBridgeObjectToRefInst(
   }
   
   // Mask off the spare bits (if they exist).
-  auto &spareBits = IGM.getHeapObjectSpareBits();
+  auto spareBits = IGM.getHeapObjectSpareBits();
   llvm::Value *result;
   if (spareBits.any()) {
     APInt maskValue = ~spareBits.asAPInt();

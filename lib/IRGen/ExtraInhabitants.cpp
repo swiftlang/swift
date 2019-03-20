@@ -29,9 +29,7 @@ static unsigned getNumLowObjCReservedBits(const IRGenModule &IGM) {
     return 0;
 
   // Get the index of the first non-reserved bit.
-  SpareBitVector ObjCMask = IGM.TargetInfo.ObjCPointerReservedBits;
-  ObjCMask.flipAll();
-  return ObjCMask.enumerateSetBits().findNext().getValue();
+  return IGM.TargetInfo.ObjCPointerReservedBits.countTrailingOnes();
 }
 
 /*****************************************************************************/

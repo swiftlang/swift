@@ -6916,26 +6916,20 @@ EnumPayload irgen::interleaveSpareBits(IRGenFunction &IGF,
   return result;
 }
 
-static void setAlignmentBits(SpareBitVector &v, Alignment align) {
-  auto value = align.getValue() >> 1;
-  for (unsigned i = 0; value; ++i, value >>= 1) {
-    v.setBit(i);
-  }
-}
-
-const SpareBitVector &
-IRGenModule::getHeapObjectSpareBits() const {
+SpareBitVector IRGenModule::getHeapObjectSpareBits() const {
   if (!HeapPointerSpareBits) {
     // Start with the spare bit mask for all pointers.
-    HeapPointerSpareBits = TargetInfo.PointerSpareBits;
-
+    auto mask = TargetInfo.PointerSpareBits;
     // Low bits are made available by heap object alignment.
-    setAlignmentBits(*HeapPointerSpareBits, TargetInfo.HeapObjectAlignment);
+    mask |= TargetInfo.HeapObjectAlignment.getMaskValue();
+    // FIXME: byte swap mask on big-endian platforms.
+    HeapPointerSpareBits = SpareBitVector::fromAPInt(mask);
   }
   return *HeapPointerSpareBits;
 }
 
-const SpareBitVector &
-IRGenModule::getFunctionPointerSpareBits() const {
-  return TargetInfo.FunctionPointerSpareBits;
+SpareBitVector IRGenModule::getFunctionPointerSpareBits() const {
+  auto mask = TargetInfo.FunctionPointerSpareBits;
+  // FIXME: byte swap mask on big-endian platforms.
+  return SpareBitVector::fromAPInt(mask);
 }

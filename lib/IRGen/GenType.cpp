@@ -1050,11 +1050,10 @@ TypeConverter::createPrimitiveForAlignedPointer(llvm::PointerType *type,
                                                 Size size,
                                                 Alignment align,
                                                 Alignment pointerAlignment) {
-  SpareBitVector spareBits = IGM.TargetInfo.PointerSpareBits;
-  for (unsigned bit = 0; Alignment(1 << bit) != pointerAlignment; ++bit) {
-    spareBits.setBit(bit);
-  }
-
+  auto mask = IGM.TargetInfo.PointerSpareBits;
+  mask |= pointerAlignment.getMaskValue();
+  // FIXME: byte swap mask on big-endian platforms.
+  SpareBitVector spareBits = SpareBitVector::fromAPInt(mask);
   return new PrimitiveTypeInfo(type, size, std::move(spareBits), align);
 }
 
@@ -1293,9 +1292,10 @@ const LoadableTypeInfo &TypeConverter::getWitnessTablePtrTypeInfo() {
   return *WitnessTablePtrTI;
 }
 
-const SpareBitVector &IRGenModule::getWitnessTablePtrSpareBits() const {
+SpareBitVector IRGenModule::getWitnessTablePtrSpareBits() const {
   // Witness tables are pointers and have pointer spare bits.
-  return TargetInfo.PointerSpareBits;
+  // FIXME: byte swap mask on big-endian platforms.
+  return SpareBitVector::fromAPInt(TargetInfo.PointerSpareBits);
 }
 
 const TypeInfo &IRGenModule::getTypeMetadataPtrTypeInfo() {

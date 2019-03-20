@@ -676,10 +676,9 @@ public:
   
   /// Return the spare bit mask to use for types that comprise heap object
   /// pointers.
-  const SpareBitVector &getHeapObjectSpareBits() const;
-
-  const SpareBitVector &getFunctionPointerSpareBits() const;
-  const SpareBitVector &getWitnessTablePtrSpareBits() const;
+  SpareBitVector getHeapObjectSpareBits() const;
+  SpareBitVector getFunctionPointerSpareBits() const;
+  SpareBitVector getWitnessTablePtrSpareBits() const;
 
   /// Return runtime specific extra inhabitant and spare bits policies.
   unsigned getReferenceStorageExtraInhabitantCount(ReferenceOwnership ownership,

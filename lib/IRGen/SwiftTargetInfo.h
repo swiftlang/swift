@@ -19,7 +19,7 @@
 #define SWIFT_IRGEN_SWIFTTARGETINFO_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/ClusteredBitVector.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Triple.h"
 #include "IRGen.h"
 
@@ -53,24 +53,26 @@ public:
 
   /// The target's object format type.
   llvm::Triple::ObjectFormatType OutputObjectFormat;
-  
-  /// The spare bit mask for pointers. Bits set in this mask are unused by
-  /// pointers of any alignment.
-  SpareBitVector PointerSpareBits;
 
-  /// The spare bit mask for (ordinary C) thin function pointers.
-  SpareBitVector FunctionPointerSpareBits;
-  
+  /// Bits set in this mask are unused by pointers of any alignment. This
+  /// integer is in target byte order and should be converted to little-
+  /// endian byte order before being added to a spare bit mask.
+  llvm::APInt PointerSpareBits;
+
+  /// Bits set in this mask are unused by (ordinary C) thin function pointers.
+  /// This integer is in target byte order and should be converted to little-
+  /// endian byte order before being added to a spare bit mask.
+  llvm::APInt FunctionPointerSpareBits;
+
   /// The reserved bit mask for Objective-C pointers. Pointer values with
   /// bits from this mask set are reserved by the ObjC runtime and cannot be
   /// used for Swift value layout when a reference type may reference ObjC
   /// objects.
-  SpareBitVector ObjCPointerReservedBits;
+  llvm::APInt ObjCPointerReservedBits;
 
   /// These bits, if set, indicate that a Builtin.BridgeObject value is holding
   /// an Objective-C object.
-  SpareBitVector IsObjCPointerBit;
-
+  llvm::APInt IsObjCPointerBit;
 
   /// The alignment of heap objects.  By default, assume pointer alignment.
   Alignment HeapObjectAlignment;
