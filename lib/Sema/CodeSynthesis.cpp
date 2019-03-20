@@ -1450,6 +1450,12 @@ VarDecl *swift::getOrSynthesizePropertyBehaviorBackingProperty(VarDecl *var) {
   Type storageInterfaceType =
       applyPropertyBehaviorType(var->getInterfaceType(), var,
                                 TypeResolution::forInterface(dc));
+  bool isInvalid = false;
+  if (!storageInterfaceType) {
+    storageInterfaceType = ErrorType::get(ctx);
+    isInvalid = true;
+  }
+
   Type storageType = dc->mapTypeIntoContext(storageInterfaceType);
 
   // Create the backing storage property and note it in the cache.
@@ -1463,6 +1469,8 @@ VarDecl *swift::getOrSynthesizePropertyBehaviorBackingProperty(VarDecl *var) {
   backingVar->setInterfaceType(storageInterfaceType);
   backingVar->setType(storageType);
   backingVar->setImplicit();
+  if (isInvalid)
+    backingVar->setInvalid();
   addMemberToContextIfNeeded(backingVar, dc, var);
 
   // Create the pattern binding declaration for the backing property.
@@ -1565,9 +1573,12 @@ static void maybeAddAccessorsToLazyVariable(VarDecl *var, ASTContext &ctx) {
 
 static void maybeAddAccessorsForPropertyBehavior(VarDecl *var,
                                                  ASTContext &ctx) {
-  auto behaviorVar = getPropertyBehaviorUnwrapProperty(var);
-  if (!behaviorVar)
+  auto backingVar = getOrSynthesizePropertyBehaviorBackingProperty(var);
+  if (!backingVar || backingVar->isInvalid())
     return;
+
+  auto behaviorVar = getPropertyBehaviorUnwrapProperty(var);
+  assert(behaviorVar && "Cannot fail when the backing var is valid");
 
   // If there are already accessors, something is invalid; bail out.
   if (!var->getImplInfo().isSimpleStored())

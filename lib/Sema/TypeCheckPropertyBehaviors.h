@@ -16,7 +16,7 @@
 #ifndef SWIFT_SEMA_TYPECHECKPROPERTYBEHAVIORS_H
 #define SWIFT_SEMA_TYPECHECKPROPERTYBEHAVIORS_H
 
-#include <swift/AST/Type.h>
+#include "swift/AST/Type.h"
 #include "TypeCheckType.h"
 
 namespace swift {

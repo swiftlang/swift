@@ -50,6 +50,7 @@ struct TwoParameterWrapper<T, U> { }
 struct MissingValue<T> { }
 // expected-error@-1{{property behavior type 'MissingValue' does not contain a non-static property named 'value'}}
 
+// expected-note@+1{{type 'NotABehavior<T>' must have the attribute '@propertyBehavior' to be used as a property behavior}}{{1-1=@propertyBehavior}}
 struct NotABehavior<T> {
   var value: T
 }
@@ -62,12 +63,12 @@ protocol CannotBeABehavior {
 }
 
 func testBadWrapperTypes() {
-  var wrapped1: Int by NonGenericWrapper
+  var wrapped1: Int by NonGenericWrapper // expected-error{{property behavior type 'NonGenericWrapper' must not provide generic arguments}}
   var wrapped2: Int by TwoParameterWrapper
-  var wrapped3: Int by TwoParameterWrapper<Int, Int>
-  var wrapped4: Int by (Int) // FIXME: error about Int not being a behavior type
-  var wrapped5: Int by Wrapper<Int> // FIXME: diagnose this consistently
-  var wrapped6: Int by NotABehavior // FIXME: diagnose this consistently
+  var wrapped3: Int by TwoParameterWrapper<Int, Int> // expected-error{{property behavior type 'TwoParameterWrapper<Int, Int>' must not provide generic arguments}}
+  var wrapped4: Int by (Int) // expected-error{{use of non-behavior type 'Int' as a property behavior}}
+  var wrapped5: Int by Wrapper<Int> // expected-error{{property behavior type 'Wrapper<Int>' must not provide generic arguments}}
+  var wrapped6: Int by NotABehavior // expected-error{{use of non-behavior type 'NotABehavior' as a property behavior}}
 
   wrapped1 = 0
   wrapped2 = 0

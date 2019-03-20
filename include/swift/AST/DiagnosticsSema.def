@@ -4277,7 +4277,7 @@ ERROR(property_behavior_not_unbound, none,
 ERROR(property_behavior_by_not_behavior, none,
       "use of non-behavior type %0 as a property behavior", (Type))
 NOTE(property_behavior_missing_attribute, none,
-     "type %0 must have the attribute '@propertyBehavior' to be used as"
+     "type %0 must have the attribute '@propertyBehavior' to be used as "
      "a property behavior", (Type))
 ERROR(property_behavior_not_single_parameter, none,
   "property behavior type must have a single generic type parameter", ())
