@@ -3683,9 +3683,17 @@ struct TargetResilientSuperclass {
   TargetRelativeDirectPointer<Runtime, const void, /*nullable*/true> Superclass;
 };
 
+/// A structure that stores a reference to an Objective-C class stub.
+///
+/// This is not the class stub itself; it is part of a class context
+/// descriptor.
 template <typename Runtime>
-struct TargetObjCResilientClassStub {
-  /// A relative pointer to an Objective-C resilient class stub:
+struct TargetObjCResilientClassStubInfo {
+  /// A relative pointer to an Objective-C resilient class stub.
+  ///
+  /// We do not declare a struct type for class stubs since the Swift runtime
+  /// does not need to interpret them. The class stub struct is part of
+  /// the Objective-C ABI, and is laid out as follows:
   /// - isa pointer, always 1
   /// - an update callback, of type 'Class (*)(Class *, objc_class_stub *)'
   ///
@@ -3710,7 +3718,7 @@ class TargetClassDescriptor final
                               TargetMethodDescriptor<Runtime>,
                               TargetOverrideTableHeader<Runtime>,
                               TargetMethodOverrideDescriptor<Runtime>,
-                              TargetObjCResilientClassStub<Runtime>> {
+                              TargetObjCResilientClassStubInfo<Runtime>> {
 private:
   using TrailingGenericContextObjects =
     TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
@@ -3722,7 +3730,7 @@ private:
                                   TargetMethodDescriptor<Runtime>,
                                   TargetOverrideTableHeader<Runtime>,
                                   TargetMethodOverrideDescriptor<Runtime>,
-                                  TargetObjCResilientClassStub<Runtime>>;
+                                  TargetObjCResilientClassStubInfo<Runtime>>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -3738,8 +3746,8 @@ public:
     TargetForeignMetadataInitialization<Runtime>;
   using SingletonMetadataInitialization =
     TargetSingletonMetadataInitialization<Runtime>;
-  using ObjCResilientClassStub =
-    TargetObjCResilientClassStub<Runtime>;
+  using ObjCResilientClassStubInfo =
+    TargetObjCResilientClassStubInfo<Runtime>;
 
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredPointerDifference = typename Runtime::StoredPointerDifference;
@@ -3777,8 +3785,8 @@ public:
     /// positive size of metadata objects of this class (in words).
     uint32_t MetadataPositiveSizeInWords;
 
-    /// Classes with resilient ancestry instead use this flags word to
-    /// indicate the presence of an Objective-C resilient class stub.
+    /// Otherwise, these flags are used to do things like indicating
+    /// the presence of an Objective-C resilient class stub.
     ExtraClassDescriptorFlags ExtraClassFlags;
   };
 
@@ -3855,7 +3863,7 @@ private:
     return getOverrideTable()->NumEntries;
   }
 
-  size_t numTrailingObjects(OverloadToken<ObjCResilientClassStub>) const {
+  size_t numTrailingObjects(OverloadToken<ObjCResilientClassStubInfo>) const {
     return hasObjCResilientClassStub() ? 1 : 0;
   }
 
@@ -3980,7 +3988,7 @@ public:
   }
 
   /// Whether this context descriptor references an Objective-C resilient
-  /// class stub. See the description of TargetObjCResilientClassStub above
+  /// class stub. See the above description of TargetObjCResilientClassStubInfo
   /// for details.
   bool hasObjCResilientClassStub() const {
     if (!hasResilientSuperclass())
@@ -3992,7 +4000,7 @@ public:
     if (!hasObjCResilientClassStub())
       return nullptr;
 
-    return this->template getTrailingObjects<ObjCResilientClassStub>()
+    return this->template getTrailingObjects<ObjCResilientClassStubInfo>()
       ->Stub.get();
   }
 

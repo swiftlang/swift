@@ -1631,6 +1631,7 @@ namespace {
 
       // union {
       //   uint32_t MetadataPositiveSizeInWords;
+      //   ExtraClassContextFlags ExtraClassFlags;
       // };
       if (!MetadataLayout) {
         // FIXME: do something meaningful for foreign classes?
@@ -1639,7 +1640,10 @@ namespace {
         B.addInt32(MetadataLayout->getSize().getOffsetToEnd()
                      / IGM.getPointerSize());
       } else {
-        B.addInt32(0); // currently unused
+        ExtraClassDescriptorFlags flags;
+        if (hasObjCResilientClassStub(IGM, getType()))
+          flags.setObjCResilientClassStub(true);
+        B.addInt32(flags.getOpaqueValue());
       }
 
       // uint32_t NumImmediateMembers;
@@ -2552,7 +2556,8 @@ namespace {
       Type type = Target->mapTypeIntoContext(Target->getSuperclass());
       auto *metadata = tryEmitConstantHeapMetadataRef(
           IGM, type->getCanonicalType(),
-          /*allowUninit*/ false);
+          /*allowUninit*/ false,
+          /*allowStub*/ false);
       assert(metadata != nullptr);
       B.add(metadata);
     }
@@ -3137,6 +3142,26 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
   if (IGM.ObjCInterop) {
     switch (strategy) {
     case ClassMetadataStrategy::Resilient:
+      // Even non-@objc classes can have Objective-C categories attached, so
+      // we always emit a resilient class stub as long as -enable-objc-interop
+      // is set.
+      if (hasObjCResilientClassStub(IGM, classDecl)) {
+        emitObjCResilientClassStub(IGM, classDecl);
+
+        if (classDecl->isObjC()) {
+          auto *stub = IGM.getAddrOfObjCResilientClassStub(
+              classDecl, NotForDefinition,
+              TypeMetadataAddress::AddressPoint);
+          emitObjCClassSymbol(IGM, classDecl, stub);
+
+          // @_objc_non_lazy_realization is only for use by the standard
+          // library, and we cannot support it with Objective-C class
+          // stubs (which there are none of in the standard library).
+          assert(!classDecl->getAttrs().hasAttribute<ObjCNonLazyRealizationAttr>());
+          IGM.addObjCClass(stub, /*eagerInitialization=*/false);
+        }
+      }
+      break;
     case ClassMetadataStrategy::Singleton:
       break;
     
