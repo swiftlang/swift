@@ -800,7 +800,7 @@ static void synthesizePropertyDelegateGetterBody(AccessorDecl *getter,
                                                  ASTContext &ctx) {
   auto var = cast<VarDecl>(getter->getStorage());
   auto backingVar = getOrSynthesizePropertyDelegateBackingProperty(var);
-  auto unwrapVar = getPropertyDelegateUnwrapProperty(var);
+  auto unwrapVar = getAttachedPropertyDelegateInfo(var).unwrapProperty;
 
   if (!backingVar || !unwrapVar)
     return;
@@ -850,7 +850,7 @@ static void synthesizePropertyDelegateSetterBody(AccessorDecl *setter,
                                                  ASTContext &ctx) {
   auto var = cast<VarDecl>(setter->getStorage());
   auto backingVar = getOrSynthesizePropertyDelegateBackingProperty(var);
-  auto unwrapVar = getPropertyDelegateUnwrapProperty(var);
+  auto unwrapVar = getAttachedPropertyDelegateInfo(var).unwrapProperty;
 
   if (!backingVar || !unwrapVar)
     return;
@@ -1577,7 +1577,7 @@ static void maybeAddAccessorsForPropertyDelegate(VarDecl *var,
   if (!backingVar || backingVar->isInvalid())
     return;
 
-  auto unwrapVar = getPropertyDelegateUnwrapProperty(var);
+  auto unwrapVar = getAttachedPropertyDelegateInfo(var).unwrapProperty;
   assert(unwrapVar && "Cannot fail when the backing var is valid");
 
   // If there are already accessors, something is invalid; bail out.

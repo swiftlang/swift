@@ -2070,8 +2070,9 @@ namespace {
         // tuples, nested arrays, and dictionary literals.
         //
         // Otherwise, create a new type variable.
+        // FIXME: This should be in the solver.
         auto ty = Type();
-        if (!var->hasNonPatternBindingInit()) {
+        if (!var->hasNonPatternBindingInit() && !var->hasPropertyDelegate()) {
           if (auto boundExpr = locator.trySimplifyToExpr()) {
             if (!boundExpr->isSemanticallyInOutExpr())
               ty = CS.getType(boundExpr)->getRValueType();

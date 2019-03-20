@@ -20,6 +20,7 @@
 #include "MiscDiagnostics.h"
 #include "TypeChecker.h"
 #include "TypeCheckType.h"
+#include "TypeCheckPropertyDelegates.h"
 #include "TypoCorrection.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -2467,12 +2468,30 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     /// The type of the initializer.
     Type initType;
 
+    /// Whether we applied a property delegate to the initializer expression.
+    bool appliedPropertyDelegate = false;
+
   public:
     explicit BindingListener(Pattern *&pattern, Expr *&initializer)
       : pattern(pattern), initializer(initializer),
-        Locator(nullptr) { }
+        Locator(nullptr) {
+      maybeApplyPropertyDelegate();
+    }
 
-    Type getInitType() const { return initType; }
+    /// Retrieve the type to which the pattern should be coerced.
+    Type getPatternInitType() const {
+      if (!appliedPropertyDelegate || initType->hasError())
+        return initType;
+
+      // We applied a property delegate, so dig the pattern initialization
+      // type out of the type argument of the property delegate type.
+      auto boundGeneric = initType->getAs<BoundGenericType>();
+      assert(boundGeneric && boundGeneric->getGenericArgs().size() == 1 &&
+             boundGeneric->getDecl() ==
+                 getUnboundPropertyDelegateType(pattern->getSingleVar())
+                   ->getDecl());
+      return boundGeneric->getGenericArgs()[0];
+    }
 
     bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
       assert(!expr->isSemanticallyInOutExpr());
@@ -2485,6 +2504,17 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       initType = cs.generateConstraints(pattern, Locator);
       if (!initType)
         return true;
+
+      // If we applied a property delegate to the initializer, perform the
+      // corresponding application to the pattern type.
+      if (appliedPropertyDelegate) {
+        auto var = pattern->getSingleVar();
+        auto dc = var->getInnermostDeclContext();
+        initType = applyPropertyDelegateType(
+            initType, var, TypeResolution::forContextual(dc));
+        if (!initType)
+          return true;
+      }
 
       // Add a conversion constraint between the types.
       cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
@@ -2505,6 +2535,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     }
 
     Expr *appliedSolution(Solution &solution, Expr *expr) override {
+      
       // Convert the initializer to the type of the pattern.
       expr = solution.coerceToType(expr, initType, Locator,
                                    false /* ignoreTopLevelInjection */);
@@ -2516,6 +2547,50 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       initializer = expr;
       return expr;
     }
+
+  private:
+    // If the pattern contains a single variable that has an attached
+    // property delegate, set up the initializer expression to initialize
+    // the backing storage.
+    void maybeApplyPropertyDelegate() {
+      auto singleVar = pattern->getSingleVar();
+      if (!singleVar || !singleVar->hasPropertyDelegate())
+        return;
+
+      // Gather all of the information we'll need to
+      auto info = getAttachedPropertyDelegateInfo(singleVar);
+      if (!info)
+        return;
+
+      auto unboundType = getUnboundPropertyDelegateType(singleVar);
+      if (!unboundType)
+        return;
+
+      // We require the property delegate type to have an initializer
+      // init(initialValue:) to perform initialization.
+      if (!info.initialValueInit) {
+        singleVar->diagnose(diag::property_delegate_init_without_initial_value,
+                            singleVar->getFullName(), Type(unboundType))
+          .highlight(initializer->getSourceRange());
+        auto unboundDecl = unboundType->getDecl();
+        unboundDecl->diagnose(diag::kind_declname_declared_here,
+                              unboundDecl->getDescriptiveKind(),
+                              unboundDecl->getFullName());
+        return;
+      }
+
+      // Form a call to the init(initialValue:) initializer of the property
+      // delegate type.
+      auto &ctx = singleVar->getASTContext();
+      auto typeExpr = TypeExpr::createImplicit(Type(unboundType), ctx);
+      initializer = CallExpr::createImplicit(
+         ctx, typeExpr, {initializer}, {ctx.Id_initialValue});
+
+      // Note that we have applied to property delegate, so we can adjust
+      // the initializer type later.
+      appliedPropertyDelegate = true;
+    }
+
   };
 
   assert(initializer && "type-checking an uninitialized binding?");
@@ -2557,7 +2632,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     // FIXME: initTy should be the same as resultTy; now that typeCheckExpression()
     // returns a Type and not bool, we should be able to simplify the listener
     // implementation here.
-    auto initTy = listener.getInitType();
+    auto initTy = listener.getPatternInitType();
     if (initTy->hasDependentMember())
       return true;
 

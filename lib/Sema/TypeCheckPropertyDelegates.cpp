@@ -39,9 +39,7 @@ void swift::simple_display(
   out << " }";
 }
 
-/// Retrieve the property delegate type information for the behavior attached
-/// to the given property.
-static PropertyDelegateTypeInfo getAttachedPropertyDelegateTypeInfo(
+PropertyDelegateTypeInfo swift::getAttachedPropertyDelegateInfo(
     VarDecl *var) {
   if (!var->hasPropertyDelegate())
     return PropertyDelegateTypeInfo();
@@ -58,8 +56,7 @@ static PropertyDelegateTypeInfo getAttachedPropertyDelegateTypeInfo(
       PropertyDelegateTypeInfo());
 }
 
-/// Retrieve the unbound property delegate type for the given property.
-static UnboundGenericType *getUnboundPropertyDelegateType(VarDecl *var) {
+UnboundGenericType *swift::getUnboundPropertyDelegateType(VarDecl *var) {
   assert(var->hasPropertyDelegate() && "Only call with property delegates");
 
   if (var->getPropertyDelegateTypeLoc().wasValidated()) {
@@ -145,22 +142,22 @@ PropertyDelegateTypeInfoRequest::evaluate(
 
   // Look for a non-static property named "value" in the property delegate
   // type.
-  SmallVector<ValueDecl *, 2> decls;
   ASTContext &ctx = nominal->getASTContext();
-  nominal->getModuleContext()->lookupQualified(nominal, ctx.Id_value,
-                                               NL_QualifiedDefault, decls);
+  auto dc = nominal->getModuleContext();
   SmallVector<VarDecl *, 2> unwrapVars;
-  for (const auto &foundDecl : decls) {
-    auto foundVar = dyn_cast<VarDecl>(foundDecl);
-    if (!foundVar || foundVar->isStatic())
-      continue;
+  {
+    SmallVector<ValueDecl *, 2> decls;
+    dc->lookupQualified(nominal, ctx.Id_value, NL_QualifiedDefault, decls);
+    for (const auto &foundDecl : decls) {
+      auto foundVar = dyn_cast<VarDecl>(foundDecl);
+      if (!foundVar || foundVar->isStatic())
+        continue;
 
-    unwrapVars.push_back(foundVar);
+      unwrapVars.push_back(foundVar);
+    }
   }
 
   // Diagnose missing or ambiguous "value" properties.
-  // FIXME: Cache the result of this. which will also suppress
-  // redundant diagnostics.
   switch (unwrapVars.size()) {
   case 0:
     nominal->diagnose(diag::property_delegate_no_value_property,
@@ -181,13 +178,44 @@ PropertyDelegateTypeInfoRequest::evaluate(
     return PropertyDelegateTypeInfo();
   }
 
+  // Determine whether we have an init(initialValue:), and diagnose
+  // ambiguities.
+  {
+    SmallVector<ConstructorDecl *, 2> initialValueInitializers;
+    DeclName initName(ctx, DeclBaseName::createConstructor(),
+                      {ctx.Id_initialValue});
+    SmallVector<ValueDecl *, 2> decls;
+    dc->lookupQualified(nominal, initName, NL_QualifiedDefault, decls);
+    for (const auto &decl : decls) {
+      auto init = dyn_cast<ConstructorDecl>(decl);
+      if (!init)
+        continue;
+
+      initialValueInitializers.push_back(init);
+    }
+
+    switch (initialValueInitializers.size()) {
+    case 0:
+      break;
+
+    case 1:
+      result.initialValueInit = initialValueInitializers.front();
+      break;
+
+    default:
+      // Diagnose ambiguous init(initialValue:) initializers.
+      nominal->diagnose(diag::property_delegate_ambiguous_initial_value_init,
+                        nominal->getDeclaredType());
+      for (auto init : initialValueInitializers) {
+        init->diagnose(diag::kind_declname_declared_here,
+                      init->getDescriptiveKind(), init->getFullName());
+      }
+      break;
+    }
+  }
+
   return result;
 }
-
-VarDecl *swift::getPropertyDelegateUnwrapProperty(VarDecl *var) {
-  return getAttachedPropertyDelegateTypeInfo(var).unwrapProperty;
-}
-
 
 Type swift::applyPropertyDelegateType(Type type, VarDecl *var,
                                       TypeResolution resolution) {

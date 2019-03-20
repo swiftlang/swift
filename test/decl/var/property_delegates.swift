@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -debugger-support
 
 @propertyDelegate
-struct Wrapper<T> {
+struct Wrapper<T> { // expected-note{{generic struct 'Wrapper' declared here}}
   var value: T
 }
 
@@ -11,12 +11,10 @@ struct Wrapper<T> {
 
 func testParsing() {
   var wrapped1: Int by Wrapper
-  var wrapped2: Int by Wrapper = 5
-  var wrapped3 by Wrapper = 5
+  var wrapped2: Int by Wrapper
 
   _ = wrapped1
   _ = wrapped2
-  _ = wrapped3
 }
 
 func testParseError() {
@@ -89,4 +87,45 @@ func testBadWrapperTypes() {
 // ---------------------------------------------------------------------------
 struct HasDelegate {
   var wrapped1: Int by Wrapper
+}
+
+// ---------------------------------------------------------------------------
+// Initial value initializers
+// ---------------------------------------------------------------------------
+@propertyDelegate
+struct WrapperWithInitialValue<T> {
+  var value: T
+
+  init(initialValue: T) {
+    self.value = initialValue
+  }
+}
+
+func testInitialValueInference(i: Int, s: String) {
+  // Inferring the type of the property itself
+  var x by WrapperWithInitialValue = i
+  x = 3.14159 // expected-error{{cannot assign value of type 'Double' to type 'Int'}}
+
+  // Inferring part of the type of the property itself
+  var y: Dictionary by WrapperWithInitialValue = [s: i]
+  y = 3.14159 // expected-error{{cannot assign value of type 'Double' to type 'Dictionary<String, Int>'}}
+}
+
+func testInitialValueWithoutDelegateSupport(i: Int) {
+  var x by Wrapper = i // expected-error{{cannot directly initialize property 'x' with property delegate 'Wrapper' that lacks an 'init(initialValue:)' initializer}}
+}
+
+
+
+@propertyDelegate
+struct WrapperWithAmbiguousInitialValue<T> { // expected-error{{property delegate type 'WrapperWithAmbiguousInitialValue' has multiple initial-value initializers}}
+  var value: T
+
+  init(initialValue: T?) { // expected-note{{initializer 'init(initialValue:)' declared here}}
+    self.value = initialValue!
+  }
+
+  init(initialValue: T) { // expected-note{{initializer 'init(initialValue:)' declared here}}
+    self.value = initialValue
+  }
 }
