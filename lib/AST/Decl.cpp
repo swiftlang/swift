@@ -1188,12 +1188,13 @@ PatternBindingDecl *
 PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
                            StaticSpellingKind StaticSpelling, SourceLoc VarLoc,
                            Pattern *Pat, SourceLoc EqualLoc, Expr *E,
-                           DeclContext *Parent) {
+                           bool IsPropertyDelegateInit, DeclContext *Parent) {
   DeclContext *BindingInitContext = nullptr;
   if (!Parent->isLocalContext())
     BindingInitContext = new (Ctx) PatternBindingInitializer(Parent);
 
-  auto PBE = PatternBindingEntry(Pat, EqualLoc, E, BindingInitContext);
+  auto PBE = PatternBindingEntry(Pat, EqualLoc, E, IsPropertyDelegateInit,
+                                 BindingInitContext);
   auto *Result = create(Ctx, StaticLoc, StaticSpelling, VarLoc, PBE, Parent);
 
   if (BindingInitContext)
@@ -1206,7 +1207,8 @@ PatternBindingDecl *PatternBindingDecl::createImplicit(
     ASTContext &Ctx, StaticSpellingKind StaticSpelling, Pattern *Pat, Expr *E,
     DeclContext *Parent, SourceLoc VarLoc) {
   auto *Result = create(Ctx, /*StaticLoc*/ SourceLoc(), StaticSpelling, VarLoc,
-                        Pat, /*EqualLoc*/ SourceLoc(), E, Parent);
+                        Pat, /*EqualLoc*/ SourceLoc(), E,
+                        /*IsPropertyDelegateInit*/false, Parent);
   Result->setImplicit();
   return Result;
 }
@@ -1255,7 +1257,9 @@ PatternBindingDecl *PatternBindingDecl::createDeserialized(
                                           NumPatternEntries, Parent);
   for (auto &entry : PBD->getMutablePatternList()) {
     entry = PatternBindingEntry(/*Pattern*/ nullptr, /*EqualLoc*/ SourceLoc(),
-                                /*Init*/ nullptr, /*InitContext*/ nullptr);
+                                /*Init*/ nullptr,
+                                /*IsPropertyDelegateInit*/false,
+                                /*InitContext*/ nullptr);
   }
   return PBD;
 }
@@ -1333,7 +1337,7 @@ void PatternBindingEntry::setInit(Expr *E) {
   } else {
     PatternAndFlags.setInt(F | Flags::Removed);
   }
-  InitExpr.Node = E;
+  InitExpr.NodeAndPropertyDelegateInit.setPointer(E);
   InitContextAndIsText.setInt(false);
 }
 

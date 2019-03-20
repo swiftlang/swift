@@ -4711,7 +4711,9 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
       TypedPattern::createImplicit(Context, new (Context) NamedPattern(storage),
                                    ErrorType::get(Context));
     PatternBindingEntry entry(pattern, /*EqualLoc*/ SourceLoc(),
-                              /*Init*/ nullptr, /*InitContext*/ nullptr);
+                              /*Init*/ nullptr,
+                              /*InitIsPropertyDelegateInit*/ false,
+                              /*InitContext*/ nullptr);
     auto binding = PatternBindingDecl::create(Context, StaticLoc,
                                               StaticSpellingKind::None,
                                               VarLoc, entry, CurDeclContext);
@@ -5218,6 +5220,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     }
 
     // Parse a property delegate.
+    VarDecl *propertyDelegateVar = nullptr;
     if (Tok.isContextualKeyword("by")) {
       SourceLoc byLoc = consumeToken();
       ParserResult<TypeRepr> delegateType =
@@ -5228,6 +5231,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       if (delegateType.isNonNull()) {
         if (auto var = pattern->getSingleVar()) {
           var->addPropertyDelegate(byLoc, delegateType.get());
+          propertyDelegateVar = var;
         } else {
           // FIXME: Support AnyPattern as well, somehow.
           diagnose(byLoc, diag::property_delegate_not_named)
@@ -5247,12 +5251,13 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     // Remember this pattern/init pair for our ultimate PatternBindingDecl. The
     // Initializer will be added later when/if it is parsed.
     PBDEntries.push_back({pattern, /*EqualLoc*/ SourceLoc(), /*Init*/ nullptr,
+      /*InitIsPropertyDelegateInit*/ false,
                           /*InitContext*/ nullptr});
 
     Expr *PatternInit = nullptr;
     
     // Parse an initializer if present.
-    if (Tok.is(tok::equal)) {
+    if (Tok.is(tok::equal) || (propertyDelegateVar && Tok.is(tok::l_paren))) {
       SyntaxParsingContext InitCtx(SyntaxContext, SyntaxKind::InitializerClause);
       // If we're not in a local context, we'll need a context to parse initializers
       // into (should we have one).  This happens for properties and global
@@ -5290,9 +5295,17 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       if (initContext)
         initParser.emplace(*this, initContext);
 
-      
-      SourceLoc EqualLoc = consumeToken(tok::equal);
-      PBDEntries.back().setEqualLoc(EqualLoc);
+      bool isPropertyDelegateInit;
+      SourceLoc EqualLoc;
+      if (Tok.is(tok::equal)) {
+        EqualLoc = consumeToken(tok::equal);
+        PBDEntries.back().setEqualLoc(EqualLoc);
+        isPropertyDelegateInit = false;
+      } else {
+        // Points at the '(' for diagnostics.
+        EqualLoc = Tok.getLoc();
+        isPropertyDelegateInit = true;
+      }
 
       ParserResult<Expr> init = parseExpr(diag::expected_init_value);
       
@@ -5315,6 +5328,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       // Remember this init for the PatternBindingDecl.
       PatternInit = init.getPtrOrNull();
       PBDEntries.back().setInit(PatternInit);
+      PBDEntries.back().setIsPropertyDelegateInit(isPropertyDelegateInit);
 
       // If we set up an initialization context for a property or module-level
       // global, record it.

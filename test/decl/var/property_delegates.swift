@@ -112,10 +112,8 @@ func testInitialValueInference(i: Int, s: String) {
 }
 
 func testInitialValueWithoutDelegateSupport(i: Int) {
-  var x by Wrapper = i // expected-error{{cannot directly initialize property 'x' with property delegate 'Wrapper' that lacks an 'init(initialValue:)' initializer}}
+  var x by Wrapper = i // expected-error{{initializing property 'x' with delegate 'Wrapper' that lacks an 'init(initialValue:)' initializer; use (...) instead}}
 }
-
-
 
 @propertyDelegate
 struct WrapperWithAmbiguousInitialValue<T> { // expected-error{{property delegate type 'WrapperWithAmbiguousInitialValue' has multiple initial-value initializers}}
@@ -128,4 +126,22 @@ struct WrapperWithAmbiguousInitialValue<T> { // expected-error{{property delegat
   init(initialValue: T) { // expected-note{{initializer 'init(initialValue:)' declared here}}
     self.value = initialValue
   }
+}
+
+extension Wrapper {
+  init(name: String, value: T) {
+    self.value = value
+  }
+}
+
+func testDirectDelegateInitialization(s: String, i: Int) {
+  var x by Wrapper(value: i)
+  x = 3.14159 // expected-error{{cannot assign value of type 'Double' to type 'Int'}}
+
+  var y by Wrapper(name: "Hello", value: 3.14159)
+  y = "hello" // expected-error{{cannot assign value of type 'String' to type 'Double'}}
+
+  // FIXME: Diagnostic below should say "specified type 'Wrapper<Int>'.
+  var z: Int by Wrapper(name: "Hello", value: 3.14159)
+  // expected-error@-1{{cannot convert value of type 'Wrapper<Double>' to specified type 'Int'}}
 }

@@ -324,7 +324,7 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
   PatternBindingDecl *metavarBinding = PatternBindingDecl::create(
       Context, /*StaticLoc*/ SourceLoc(), StaticSpellingKind::None,
       /*VarLoc*/ E->getStartLoc(), metavarPat, /*EqualLoc*/ SourceLoc(), E,
-      TLCD);
+      /*IsPropertyDelegateInit*/ false, TLCD);
 
   // Overwrite the body of the existing TopLevelCodeDecl.
   TLCD->setBody(BraceStmt::create(Context,
@@ -399,7 +399,7 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
     PatternBindingDecl *metavarBinding = PatternBindingDecl::create(
         Context, /*StaticLoc*/ SourceLoc(), StaticSpellingKind::None,
         /*VarLoc*/ PBD->getStartLoc(), metavarPat, /*EqualLoc*/ SourceLoc(),
-        patternEntry.getInit(), &SF);
+        patternEntry.getInit(), /*IsPropertyDelegateInit*/ false, &SF);
 
     auto MVBrace = BraceStmt::create(Context, metavarBinding->getStartLoc(),
                                      ASTNode(metavarBinding),

@@ -2455,7 +2455,8 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
 }
 
 bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
-                                   DeclContext *DC) {
+                                   DeclContext *DC,
+                                   bool IsPropertyDelegateInit) {
 
   /// Type checking listener for pattern binding initializers.
   class BindingListener : public ExprTypeCheckListener {
@@ -2465,6 +2466,10 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     /// The locator we're using.
     ConstraintLocator *Locator;
 
+    /// Whether the initializer is a property delegate initializer, specified
+    /// directly on the property delegate (vs. following an '=').
+    bool isPropertyDelegateInit;
+
     /// The type of the initializer.
     Type initType;
 
@@ -2472,9 +2477,10 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     bool appliedPropertyDelegate = false;
 
   public:
-    explicit BindingListener(Pattern *&pattern, Expr *&initializer)
+    explicit BindingListener(Pattern *&pattern, Expr *&initializer,
+                             bool isPropertyDelegateInit)
       : pattern(pattern), initializer(initializer),
-        Locator(nullptr) {
+        Locator(nullptr), isPropertyDelegateInit(isPropertyDelegateInit) {
       maybeApplyPropertyDelegate();
     }
 
@@ -2566,9 +2572,10 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       if (!unboundType)
         return;
 
-      // We require the property delegate type to have an initializer
+      // If this isn't directly initializing the property delegate, we require
+      /// the property delegate type to have an initializer
       // init(initialValue:) to perform initialization.
-      if (!info.initialValueInit) {
+      if (!info.initialValueInit && !isPropertyDelegateInit) {
         singleVar->diagnose(diag::property_delegate_init_without_initial_value,
                             singleVar->getFullName(), Type(unboundType))
           .highlight(initializer->getSourceRange());
@@ -2579,12 +2586,21 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
         return;
       }
 
-      // Form a call to the init(initialValue:) initializer of the property
-      // delegate type.
+      // Form a call to an initializer of the property delegate type.
       auto &ctx = singleVar->getASTContext();
       auto typeExpr = TypeExpr::createImplicit(Type(unboundType), ctx);
-      initializer = CallExpr::createImplicit(
-         ctx, typeExpr, {initializer}, {ctx.Id_initialValue});
+      if (isPropertyDelegateInit) {
+        // Call the property delegate initializer as spelled in the
+        // parenthesized initializer.
+        initializer = CallExpr::create(
+            ctx, typeExpr, initializer, { }, { }, /*hasTrailingClosure=*/false,
+            /*implicit=*/true);
+      } else {
+        // Form a call to the init(initialValue:) initializer of the property
+        // delegate type.
+        initializer = CallExpr::createImplicit(
+            ctx, typeExpr, {initializer}, {ctx.Id_initialValue});
+      }
 
       // Note that we have applied to property delegate, so we can adjust
       // the initializer type later.
@@ -2594,7 +2610,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
   };
 
   assert(initializer && "type-checking an uninitialized binding?");
-  BindingListener listener(pattern, initializer);
+  BindingListener listener(pattern, initializer, IsPropertyDelegateInit);
 
   TypeLoc contextualType;
   auto contextualPurpose = CTP_Unused;
@@ -2687,7 +2703,8 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
       DC = initContext;
   }
 
-  bool hadError = typeCheckBinding(pattern, init, DC);
+  bool hadError = typeCheckBinding(
+      pattern, init, DC, PBD->isPropertyDelegateInit(patternNumber));
   PBD->setPattern(patternNumber, pattern, initContext);
   PBD->setInit(patternNumber, init);
 
@@ -2944,7 +2961,8 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
     // If the pattern didn't get a type, it's because we ran into some
     // unknown types along the way. We'll need to check the initializer.
     auto init = elt.getInitializer();
-    hadError |= typeCheckBinding(pattern, init, dc);
+    hadError |= typeCheckBinding(
+        pattern, init, dc, /*isPropertyDelegateInit=*/false);
     elt.setPattern(pattern);
     elt.setInitializer(init);
     hadAnyFalsable |= pattern->isRefutablePattern();

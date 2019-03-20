@@ -1898,7 +1898,10 @@ class PatternBindingEntry {
     // When the initializer is removed we don't actually clear the pointer
     // because we might need to get initializer's source range. Since the
     // initializer is ASTContext-allocated it is safe.
-    Expr *Node;
+    //
+    // The bit indicates whether the initializer is for an attached property
+    // delegate.
+    llvm::PointerIntPair<Expr *, 1, bool> NodeAndPropertyDelegateInit;
     /// The location of the equal '=' token.
     SourceLoc EqualLoc;
   };
@@ -1918,8 +1921,10 @@ class PatternBindingEntry {
 
 public:
   PatternBindingEntry(Pattern *P, SourceLoc EqualLoc, Expr *E,
+                      bool InitIsPropertyDelegateInit,
                       DeclContext *InitContext)
-    : PatternAndFlags(P, {}), InitExpr({E, EqualLoc}),
+    : PatternAndFlags(P, {}),
+      InitExpr({{E, InitIsPropertyDelegateInit}, EqualLoc}),
       InitContextAndIsText({InitContext, false}) {
   }
 
@@ -1929,13 +1934,19 @@ public:
     if (PatternAndFlags.getInt().contains(Flags::Removed) ||
         InitContextAndIsText.getInt())
       return nullptr;
-    return InitExpr.Node;
+    return InitExpr.NodeAndPropertyDelegateInit.getPointer();
+  }
+  bool isPropertyDelegateInit() const {
+    return InitExpr.NodeAndPropertyDelegateInit.getInt();
   }
   Expr *getNonLazyInit() const {
     return isInitializerLazy() ? nullptr : getInit();
   }
   SourceRange getOrigInitRange() const;
   void setInit(Expr *E);
+  void setIsPropertyDelegateInit(bool isPropertyDelegateInit) {
+    InitExpr.NodeAndPropertyDelegateInit.setInt(isPropertyDelegateInit);
+  }
 
   /// Gets the text of the initializer expression, stripping out inactive
   /// branches of any #ifs inside the expression.
@@ -1966,7 +1977,9 @@ public:
 
   /// Retrieve the initializer as it was written in the source.
   Expr *getInitAsWritten() const {
-    return InitContextAndIsText.getInt() ? nullptr : InitExpr.Node;
+    return InitContextAndIsText.getInt()
+        ? nullptr
+        : InitExpr.NodeAndPropertyDelegateInit.getPointer();
   }
 
   bool isInitializerChecked() const {
@@ -2039,6 +2052,7 @@ public:
                                     StaticSpellingKind StaticSpelling,
                                     SourceLoc VarLoc, Pattern *Pat,
                                     SourceLoc EqualLoc, Expr *E,
+                                    bool IsPropertyDelegateInit,
                                     DeclContext *Parent);
 
   static PatternBindingDecl *createImplicit(ASTContext &Ctx,
@@ -2078,7 +2092,10 @@ public:
   Expr *getNonLazyInit(unsigned i) const {
     return getPatternList()[i].getNonLazyInit();
   }
-  
+  bool isPropertyDelegateInit(unsigned i) const {
+    return getPatternList()[i].isPropertyDelegateInit();
+  }
+
   SourceRange getOrigInitRange(unsigned i) const {
     return getPatternList()[i].getOrigInitRange();
   }
