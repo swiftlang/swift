@@ -102,7 +102,8 @@ add_swift_host_library(swiftBasic STATIC
   # Platform-agnostic fallback TaskQueue implementation
   Default/TaskQueue.inc
 
-  UnicodeExtendedGraphemeClusters.cpp.gyb
+  GYB_SOURCES
+    UnicodeExtendedGraphemeClusters.cpp.gyb
 
   C_COMPILE_FLAGS ${UUID_INCLUDE}
   LLVM_COMPONENT_DEPENDS support)
