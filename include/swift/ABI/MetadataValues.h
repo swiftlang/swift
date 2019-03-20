@@ -1309,6 +1309,28 @@ public:
                                  class_setResilientSuperclassReferenceKind)
 };
 
+/// Extra flags for resilient classes, since we need more than 16 bits of
+/// flags there.
+class ExtraClassDescriptorFlags : public FlagSet<uint32_t> {
+  enum {
+    /// Set if the context descriptor includes a pointer to an Objective-C
+    /// resilient class stub structure. See the description of
+    /// TargetObjCResilientClassStub in Metadata.h for details.
+    ///
+    /// Only meaningful for class descriptors when Objective-C interop is
+    /// enabled.
+    HasObjCResilientClassStub = 0,
+  };
+
+public:
+  explicit ExtraClassDescriptorFlags(uint32_t bits) : FlagSet(bits) {}
+  constexpr ExtraClassDescriptorFlags() {}
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasObjCResilientClassStub,
+                                hasObjCResilientClassStub,
+                                setObjCResilientClassStub)
+};
+
 /// Flags for protocol context descriptors. These values are used as the
 /// kindSpecificFlags of the ContextDescriptorFlags for the protocol.
 class ProtocolContextDescriptorFlags : public FlagSet<uint16_t> {

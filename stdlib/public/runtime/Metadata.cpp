@@ -2641,6 +2641,11 @@ getSuperclassMetadata(ClassMetadata *self, bool allowDependency) {
   return {MetadataDependency(), super};
 }
 
+// Suppress diagnostic about the availability of _objc_realizeClassFromSwift.
+// We test availability with a nullptr check, but the compiler doesn't see that.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunguarded-availability-new"
+
 static SWIFT_CC(swift) MetadataDependency
 _swift_initClassMetadataImpl(ClassMetadata *self,
                              ClassLayoutFlags layoutFlags,
@@ -2667,6 +2672,11 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
     (void)unused;
     setUpObjCRuntimeGetImageNameFromClass();
   }, nullptr);
+
+  // Temporary workaround until _objc_realizeClassFromSwift is in the SDK.
+  static auto _objc_realizeClassFromSwift =
+    (Class (*)(Class _Nullable, const void *_Nullable))
+    dlsym(RTLD_NEXT, "_objc_realizeClassFromSwift");
 #endif
 
   // Copy field offsets, generic arguments and (if necessary) vtable entries
@@ -2681,9 +2691,11 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
   initClassFieldOffsetVector(self, numFields, fieldTypes, fieldOffsets);
 
 #if SWIFT_OBJC_INTEROP
-  if (self->getDescription()->isGeneric())
+  auto *description = self->getDescription();
+  if (description->isGeneric()) {
+    assert(!description->hasObjCResilientClassStub());
     initGenericObjCClass(self, numFields, fieldTypes, fieldOffsets);
-  else {
+  } else {
     initObjCClass(self, numFields, fieldTypes, fieldOffsets);
 
     // Register this class with the runtime. This will also cause the
@@ -2691,12 +2703,24 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
     // globals. Note that the field offset vector is *not* updated;
     // however we should not be using it for anything in a non-generic
     // class.
-    swift_instantiateObjCClass(self);
+    if (auto *stub = description->getObjCResilientClassStub()) {
+      if (_objc_realizeClassFromSwift == nullptr) {
+        fatalError(0, "class %s requires missing Objective-C runtime feature; "
+                  "the deployment target was newer than this OS\n",
+                  self->getDescription()->Name.get());
+      }
+      _objc_realizeClassFromSwift((Class) self, stub);
+    } else
+      swift_instantiateObjCClass(self);
   }
+#else
+  assert(!description->hasObjCResilientClassStub());
 #endif
 
   return MetadataDependency();
 }
+
+#pragma clang diagnostic pop
 
 void swift::swift_initClassMetadata(ClassMetadata *self,
                                     ClassLayoutFlags layoutFlags,
@@ -2737,7 +2761,7 @@ _swift_updateClassMetadataImpl(ClassMetadata *self,
 #ifndef OBJC_REALIZECLASSFROMSWIFT_DEFINED
   // Temporary workaround until _objc_realizeClassFromSwift is in the SDK.
   static auto _objc_realizeClassFromSwift =
-    (Class (*)(Class _Nullable, void* _Nullable))
+    (Class (*)(Class _Nullable, const void *_Nullable))
     dlsym(RTLD_NEXT, "_objc_realizeClassFromSwift");
 #endif
 
