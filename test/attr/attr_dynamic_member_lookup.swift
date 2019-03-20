@@ -397,3 +397,42 @@ class C {
 }
 _ = \C.[dynamicMember: "hi"]
 _ = \C.testLookup
+
+/* KeyPath based dynamic lookup */
+
+struct Point {
+  var x: Int
+  let y: Int
+}
+
+struct Rectangle {
+  var topLeft, bottomRight: Point
+}
+
+@dynamicMemberLookup
+struct Lens<T> {
+  var obj: T
+
+  init(_ obj: T) {
+    self.obj = obj
+  }
+
+  subscript<U>(dynamicMember member: KeyPath<T, U>) -> Lens<U> {
+    get { return Lens<U>(obj[keyPath: member]) }
+  }
+
+  subscript<U>(dynamicMember member: WritableKeyPath<T, U>) -> Lens<U> {
+    get { return Lens<U>(obj[keyPath: member]) }
+    set { obj[keyPath: member] = newValue.obj }
+  }
+}
+
+var topLeft = Point(x: 0, y: 0)
+var bottomRight = Point(x: 10, y: 10)
+
+var lens = Lens(Rectangle(topLeft: topLeft,
+                          bottomRight: bottomRight))
+
+lens.topLeft = Lens(Point(x: 1, y: 2)) // Ok
+lens.bottomRight.x = Lens(11)          // Ok
+lens.bottomRight.y = Lens(12)          // expected-error {{cannot assign through dynamic lookup property: 'lens' is immutable}}
