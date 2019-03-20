@@ -4916,34 +4916,18 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
       if (!storage) {
         return SolutionKind::Error;
       }
-      
-      // See whether key paths can store to this component. (Key paths don't
-      // get any special power from being formed in certain contexts, such
-      // as the ability to assign to `let`s in initialization contexts, so
-      // we pass null for the DC to `isSettable` here.)
-      if (!getASTContext().isSwiftVersionAtLeast(5)) {
-        // As a source-compatibility measure, continue to allow
-        // WritableKeyPaths to be formed in the same conditions we did
-        // in previous releases even if we should not be able to set
-        // the value in this context.
-        if (!storage->isSettable(DC)) {
-          // A non-settable component makes the key path read-only, unless
-          // a reference-writable component shows up later.
-          capability = ReadOnly;
-          continue;
-        }
-      } else if (!storage->isSettable(nullptr)
-                 || !storage->isSetterAccessibleFrom(DC)) {
-        // A non-settable component makes the key path read-only, unless
-        // a reference-writable component shows up later.
+
+      if (isReadOnlyKeyPathComponent(storage)) {
         capability = ReadOnly;
         continue;
       }
+
       // A nonmutating setter indicates a reference-writable base.
       if (!storage->isSetterMutating()) {
         capability = ReferenceWritable;
         continue;
       }
+
       // Otherwise, the key path maintains its current capability.
       break;
     }
@@ -4991,8 +4975,9 @@ done:
   if (keyPathBGT) {
     if (keyPathBGT->getDecl() == getASTContext().getKeyPathDecl())
       kpDecl = getASTContext().getKeyPathDecl();
-    else if (keyPathBGT->getDecl() == getASTContext().getWritableKeyPathDecl()
-             && capability >= Writable)
+    else if (keyPathBGT->getDecl() ==
+                 getASTContext().getWritableKeyPathDecl() &&
+             capability >= Writable)
       kpDecl = getASTContext().getWritableKeyPathDecl();
   }
   
