@@ -944,7 +944,7 @@ static bool requiresIVarInitialization(SILGenModule &SGM, ClassDecl *cd) {
     if (!pbd) continue;
 
     for (auto entry : pbd->getPatternList())
-      if (entry.getNonLazyInit())
+      if (entry.getExecutableInit())
         return true;
   }
 
@@ -1113,7 +1113,7 @@ emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
   auto *var = pbdEntry.getAnchoringVarDecl();
   auto *init = pbdEntry.getInit();
   auto *initDC = pbdEntry.getInitContext();
-  assert(!pbdEntry.isInitializerLazy());
+  assert(!pbdEntry.isInitializerSubsumed());
 
   SILDeclRef constant(var, SILDeclRef::Kind::StoredPropertyInitializer);
   emitOrDelayFunction(*this, constant,
@@ -1279,7 +1279,7 @@ void SILGenModule::emitObjCDestructorThunk(DestructorDecl *destructor) {
 void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
   assert(!TopLevelSGF && "script mode PBDs should be in TopLevelCodeDecls");
   for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i)
-    if (pd->getNonLazyInit(i))
+    if (pd->getExecutableInit(i))
       emitGlobalInitialization(pd, i);
 }
 
