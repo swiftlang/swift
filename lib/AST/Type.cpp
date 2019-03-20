@@ -3110,9 +3110,7 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
 #ifndef NDEBUG
   auto *currentClass = getConcreteTypeForSuperclassTraversing(this)
       ->getClassOrBoundGenericClass();
-  while (currentClass && currentClass != baseClass)
-    currentClass = currentClass->getSuperclassDecl();
-  assert(currentClass == baseClass &&
+  assert(baseClass->isSuperclassOf(currentClass) &&
          "no inheritance relationship between given classes");
 #endif
 

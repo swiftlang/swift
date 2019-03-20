@@ -3631,6 +3631,9 @@ public:
   /// is no superclass.
   ClassDecl *getSuperclassDecl() const;
 
+  /// Check if this class is a superclass or equal to the given class.
+  bool isSuperclassOf(ClassDecl *other) const;
+
   /// Set the superclass of this class.
   void setSuperclass(Type superclass);
 
