@@ -512,3 +512,17 @@ bool DefaultTypeRequest::getPerformLocalLookup(const KnownProtocolKind knownProt
     default: return false;
   }
 }
+
+bool PropertyBehaviorTypeInfoRequest::isCached() const {
+  return true;
+}
+
+void PropertyBehaviorTypeInfoRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference);
+}
+
+void PropertyBehaviorTypeInfoRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
+}

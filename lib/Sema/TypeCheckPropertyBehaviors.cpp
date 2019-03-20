@@ -19,11 +19,46 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 using namespace swift;
 
+void swift::simple_display(
+    llvm::raw_ostream &out, const PropertyBehaviorTypeInfo &propertyBehavior) {
+  out << "{ ";
+  if (propertyBehavior.unwrapProperty)
+    out << propertyBehavior.unwrapProperty->printRef();
+  else
+    out << "null";
+  out << ", ";
+  if (propertyBehavior.initialValueInit)
+    out << propertyBehavior.initialValueInit->printRef();
+  else
+    out << "null";
+  out << " }";
+}
 
-//// Retrieve the unbound property behavior type for the given property.
+/// Retrieve the property behavior type information for the behavior attached
+/// to the given property.
+static PropertyBehaviorTypeInfo getAttachedPropertyBehaviorTypeInfo(
+    VarDecl *var) {
+  if (!var->hasPropertyBehavior())
+    return PropertyBehaviorTypeInfo();
+
+  // Find the attached property behavior type declaration.
+  ASTContext &ctx = var->getASTContext();
+  auto behaviorType = evaluateOrDefault(
+      ctx.evaluator, AttachedPropertyBehaviorDeclRequest(var), nullptr);
+  if (!behaviorType)
+    return PropertyBehaviorTypeInfo();
+
+  return evaluateOrDefault(
+      ctx.evaluator, PropertyBehaviorTypeInfoRequest(behaviorType),
+      PropertyBehaviorTypeInfo());
+}
+
+/// Retrieve the unbound property behavior type for the given property.
 static UnboundGenericType *getUnboundPropertyBehaviorType(VarDecl *var) {
   assert(var->hasPropertyBehavior() && "Only call with property behaviors");
 
@@ -61,14 +96,17 @@ static UnboundGenericType *getUnboundPropertyBehaviorType(VarDecl *var) {
 
   // Make sure that we have a single-parameter generic.
   auto genericDecl = unboundGeneric->getDecl();
-  if (!genericDecl->getGenericSignature() ||
-      genericDecl->getGenericSignature()->getGenericParams().size() != 1) {
-    ctx.Diags.diagnose(var->getPropertyBehaviorByLoc(),
-                       diag::property_behavior_not_single_parameter)
-      .highlight(var->getPropertyBehaviorTypeLoc().getSourceRange());
-    genericDecl->diagnose(diag::kind_declname_declared_here,
-                          genericDecl->getDescriptiveKind(),
-                          genericDecl->getFullName());
+  auto nominalDecl = dyn_cast<NominalTypeDecl>(genericDecl);
+  if (!nominalDecl) {
+    nominalDecl->diagnose(diag::property_behavior_not_single_parameter);
+    var->getPropertyBehaviorTypeLoc().setInvalidType(ctx);
+    return nullptr;
+  }
+
+  // Make sure it's a valid property behavior type.
+  if (!evaluateOrDefault(
+           ctx.evaluator, PropertyBehaviorTypeInfoRequest(nominalDecl),
+           PropertyBehaviorTypeInfo())) {
     var->getPropertyBehaviorTypeLoc().setInvalidType(ctx);
     return nullptr;
   }
@@ -77,18 +115,24 @@ static UnboundGenericType *getUnboundPropertyBehaviorType(VarDecl *var) {
   return unboundGeneric;
 }
 
-VarDecl *swift::getPropertyBehaviorUnwrapProperty(VarDecl *var) {
-  auto unboundGeneric = getUnboundPropertyBehaviorType(var);
-  if (!unboundGeneric)
-    return nullptr;
+llvm::Expected<PropertyBehaviorTypeInfo>
+PropertyBehaviorTypeInfoRequest::evaluate(
+    Evaluator &eval, NominalTypeDecl *nominal) const {
+  PropertyBehaviorTypeInfo result;
 
-  // Look for a non-stsatic property named "value" in the property behavior
+  // Ensure that we have a single-parameter generic type.
+  if (!nominal->getGenericSignature() ||
+      nominal->getGenericSignature()->getGenericParams().size() != 1) {
+    nominal->diagnose(diag::property_behavior_not_single_parameter);
+    return result;
+  }
+
+  // Look for a non-static property named "value" in the property behavior
   // type.
   SmallVector<ValueDecl *, 2> decls;
-  ASTContext &ctx = var->getASTContext();
-  var->getModuleContext()->lookupQualified(unboundGeneric, ctx.Id_value,
-                                           NL_QualifiedDefault,
-                                           ctx.getLazyResolver(), decls);
+  ASTContext &ctx = nominal->getASTContext();
+  nominal->getModuleContext()->lookupQualified(nominal, ctx.Id_value,
+                                               NL_QualifiedDefault, decls);
   SmallVector<VarDecl *, 2> unwrapVars;
   for (const auto &foundDecl : decls) {
     auto foundVar = dyn_cast<VarDecl>(foundDecl);
@@ -103,25 +147,31 @@ VarDecl *swift::getPropertyBehaviorUnwrapProperty(VarDecl *var) {
   // redundant diagnostics.
   switch (unwrapVars.size()) {
   case 0:
-    unboundGeneric->getDecl()
-    ->diagnose(diag::property_behavior_no_value_property,
-               Type(unboundGeneric));
-    return nullptr;
+    nominal->diagnose(diag::property_behavior_no_value_property,
+                      nominal->getDeclaredType());
+    return PropertyBehaviorTypeInfo();
 
   case 1:
-    return unwrapVars.front();
+    result.unwrapProperty = unwrapVars.front();
+    break;
 
   default:
-    unboundGeneric->getDecl()
-    ->diagnose(diag::property_behavior_ambiguous_value_property,
-               Type(unboundGeneric));
+    nominal->diagnose(diag::property_behavior_ambiguous_value_property,
+                      nominal->getDeclaredType());
     for (auto var : unwrapVars) {
       var->diagnose(diag::kind_declname_declared_here,
                     var->getDescriptiveKind(), var->getFullName());
     }
-    return nullptr;
+    return PropertyBehaviorTypeInfo();
   }
+
+  return result;
 }
+
+VarDecl *swift::getPropertyBehaviorUnwrapProperty(VarDecl *var) {
+  return getAttachedPropertyBehaviorTypeInfo(var).unwrapProperty;
+}
+
 
 Type swift::applyPropertyBehaviorType(Type type, VarDecl *var,
                                       TypeResolution resolution) {

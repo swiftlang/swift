@@ -16,9 +16,11 @@
 #ifndef SWIFT_TYPE_CHECK_REQUESTS_H
 #define SWIFT_TYPE_CHECK_REQUESTS_H
 
-#include "swift/AST/Type.h"
+#include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/Evaluator.h"
+#include "swift/AST/PropertyBehaviors.h"
 #include "swift/AST/SimpleRequest.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Hashing.h"
@@ -387,6 +389,31 @@ private:
   TypeChecker &getTypeChecker() const;
   SourceFile *getSourceFile() const;
   Type &getCache() const;
+};
+
+/// Retrieve information about a property behavior type.
+class PropertyBehaviorTypeInfoRequest
+  : public SimpleRequest<PropertyBehaviorTypeInfoRequest,
+                         CacheKind::Cached,
+                         PropertyBehaviorTypeInfo,
+                         NominalTypeDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<PropertyBehaviorTypeInfo>
+      evaluate(Evaluator &eval, NominalTypeDecl *nominal) const;
+
+public:
+  // Caching
+  bool isCached() const;
+
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// The zone number for the type checker.

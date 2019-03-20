@@ -4275,7 +4275,7 @@ WARNING(hashvalue_implementation,none,
 ERROR(property_behavior_not_unbound, none,
   "property behavior must name a generic type without any generic arguments", ())
 ERROR(property_behavior_not_single_parameter, none,
-  "property behavior must refer to a single-parameter generic type", ())
+  "property behavior type must have a single generic type parameter", ())
 ERROR(property_behavior_no_value_property, none,
   "property behavior type %0 does not contain a non-static property "
   "named 'value'", (Type))

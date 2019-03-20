@@ -176,6 +176,20 @@ void TypeDeclsFromWhereClauseRequest::noteCycleStep(
   diags.diagnose(ext, diag::circular_reference_through);
 }
 
+bool AttachedPropertyBehaviorDeclRequest::isCached() const {
+  return std::get<0>(getStorage())->hasPropertyBehavior();
+}
+
+void AttachedPropertyBehaviorDeclRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference);
+}
+
+void AttachedPropertyBehaviorDeclRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
+}
+
 // Define request evaluation functions for each of the name lookup requests.
 static AbstractRequestFunction *nameLookupRequestFunctions[] = {
 #define SWIFT_TYPEID(Name)                                    \

@@ -38,18 +38,28 @@ func testExplicitWrapperType() {
 }
 
 struct NonGenericWrapper { }
-struct TwoParameterWrapper<T, U> { } // expected-note{{generic struct 'TwoParameterWrapper' declared here}}
+// expected-error@-1{{property behavior type must have a single generic type parameter}}
+
+struct TwoParameterWrapper<T, U> { }
+// expected-error@-1{{property behavior type must have a single generic type parameter}}
 
 func testBadWrapperTypes() {
-  let wrapped1: Int by NonGenericWrapper // expected-error{{property behavior must name a generic type without any generic arguments}}
-  let wrapped2: Int by TwoParameterWrapper // expected-error{{property behavior must refer to a single-parameter generic type}}
-  let wrapped3: Int by TwoParameterWrapper<Int, Int> // expected-error{{property behavior must name a generic type without any generic arguments}}
-  let wrapped4: Int by (Int) // expected-error{{property behavior must name a generic type without any generic arguments}}
+  var wrapped1: Int by NonGenericWrapper
+  var wrapped2: Int by TwoParameterWrapper
+  var wrapped3: Int by TwoParameterWrapper<Int, Int>
+  var wrapped4: Int by (Int) // FIXME: error about Int not being a behavior type
+  var wrapped5: Int by Wrapper<Int> // FIXME: diagnose this consistently
 
+  wrapped1 = 0
+  wrapped2 = 0
+  wrapped3 = 0
+  wrapped4 = 0
+  wrapped5 = 0
   _ = wrapped1
   _ = wrapped2
   _ = wrapped3
   _ = wrapped4
+  _ = wrapped5
 }
 
 // ---------------------------------------------------------------------------

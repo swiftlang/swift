@@ -16,6 +16,7 @@
 #ifndef SWIFT_NAME_LOOKUP_REQUESTS_H
 #define SWIFT_NAME_LOOKUP_REQUESTS_H
 
+#include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -25,6 +26,7 @@ namespace swift {
 class ClassDecl;
 class TypeAliasDecl;
 class TypeDecl;
+class VarDecl;
 
 /// Display a nominal type or extension thereof.
 void simple_display(
@@ -234,6 +236,32 @@ private:
 public:
   // Cycle handling
   DirectlyReferencedTypeDecls breakCycle() const { return { }; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+/// Request the property behavior declaration for the given property, if it
+/// has one.
+class AttachedPropertyBehaviorDeclRequest :
+    public SimpleRequest<AttachedPropertyBehaviorDeclRequest,
+                         CacheKind::Cached,
+                         NominalTypeDecl *,
+                         VarDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<NominalTypeDecl *>
+  evaluate(Evaluator &evaluator, VarDecl *property) const;
+
+public:
+  // Caching
+  bool isCached() const;
+
+  // Cycle handling
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 };

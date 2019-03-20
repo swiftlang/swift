@@ -2093,6 +2093,35 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
   return nominalTypes.empty() ? nullptr : nominalTypes.front();
 }
 
+llvm::Expected<NominalTypeDecl *>
+AttachedPropertyBehaviorDeclRequest::evaluate(Evaluator &evaluator,
+                                              VarDecl *property) const {
+  if (!property->hasPropertyBehavior())
+    return nullptr;
+
+  // Find the types referenced by the property behavior reference in the
+  // property.
+  auto &ctx = property->getASTContext();
+  TypeLoc &typeLoc = property->getPropertyBehaviorTypeLoc();
+  DirectlyReferencedTypeDecls decls;
+  if (auto typeRepr = typeLoc.getTypeRepr()) {
+    decls = directReferencesForTypeRepr(
+        evaluator, ctx, typeRepr, property->getInnermostDeclContext());
+  } else if (Type type = typeLoc.getType()) {
+    decls = directReferencesForType(type);
+  }
+
+  // Dig out the nominal type declarations.
+  SmallVector<ModuleDecl *, 2> modulesFound;
+  bool anyObject = false;
+  auto nominals = resolveTypeDeclsToNominal(evaluator, ctx, decls,
+                                            modulesFound, anyObject);
+  if (nominals.size() == 1 && !isa<ProtocolDecl>(nominals.front()))
+    return nominals.front();
+
+  return nullptr;
+}
+
 void swift::getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
     unsigned i,
