@@ -18,20 +18,19 @@
 
 namespace swift {
 class Decl;
-class DocComment;
+class TypeDecl;
 struct RawComment;
 
 class DocComment {
-  const Decl *D;
-  const swift::markup::Document *Doc = nullptr;
-  const swift::markup::CommentParts Parts;
+  swift::markup::Document *Doc = nullptr;
+  swift::markup::CommentParts Parts;
 
+  DocComment(swift::markup::Document *Doc, swift::markup::CommentParts Parts)
+      : Doc(Doc), Parts(Parts) {}
 public:
-  DocComment(const Decl *D, swift::markup::Document *Doc,
-             swift::markup::CommentParts Parts)
-      : D(D), Doc(Doc), Parts(Parts) {}
+  static DocComment *create(swift::markup::MarkupContext &MC, RawComment RC);
 
-  const Decl *getDecl() const { return D; }
+  void addInheritanceNote(swift::markup::MarkupContext &MC, TypeDecl *base);
 
   const swift::markup::Document *getDocument() const { return Doc; }
 
@@ -87,18 +86,23 @@ public:
 };
 
 /// Get a parsed documentation comment for the declaration, if there is one.
-Optional<DocComment *>getSingleDocComment(swift::markup::MarkupContext &Context,
-                                          const Decl *D);
+DocComment *getSingleDocComment(swift::markup::MarkupContext &Context,
+                                const Decl *D);
+
+const Decl *getDocCommentProvidingDecl(const Decl *D);
 
 /// Attempt to get a doc comment from the declaration, or other inherited
 /// sources, like from base classes or protocols.
-Optional<DocComment *> getCascadingDocComment(swift::markup::MarkupContext &MC,
-                                             const Decl *D);
+DocComment *getCascadingDocComment(swift::markup::MarkupContext &MC,
+                                   const Decl *D);
 
 /// Extract comments parts from the given Markup node.
 swift::markup::CommentParts
 extractCommentParts(swift::markup::MarkupContext &MC,
                     swift::markup::MarkupASTNode *Node);
+
+/// Extract brief comment from \p RC, and print it to \p OS .
+void printBriefComment(RawComment RC, llvm::raw_ostream &OS);
 } // namespace swift
 
 #endif // LLVM_SWIFT_AST_COMMENT_H
