@@ -2637,18 +2637,19 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto lookupConformance =
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
 
-  AbstractFunctionDecl *original = nullptr;
-  if (auto *vd = dyn_cast<VarDecl>(D)) {
-    // When used on a storage decl, @differentiable refers to its getter.
-    original = vd->getGetter();
-  } else if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
-    original = afd;
-    if (auto *accessor = dyn_cast<AccessorDecl>(afd)) {
-      // We do not support setters yet because inout is not supported yet.
-      if (accessor->isSetter())
-        original = nullptr;
-    }
+  AbstractFunctionDecl *original = dyn_cast<AbstractFunctionDecl>(D);
+  if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
+    // When used directly on a storage decl (stored/computed property or
+    // subscript), the getter is currently inferred to be `@differentiable`.
+    // TODO(TF-129): Infer setter to also be `@differentiable` after
+    // differentiation supports inout parameters.
+    original = asd->getGetter();
   }
+  // Setters are not yet supported.
+  // TODO(TF-129): Remove this when differentiation supports inout parameters.
+  if (auto *accessor = dyn_cast_or_null<AccessorDecl>(original))
+    if (accessor->isSetter())
+      original = nullptr;
 
   // Global immutable vars, for example, have no getter, and therefore trigger
   // this.
@@ -2796,16 +2797,19 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return;
   }
 
+  // Set the checked differentiation parameter indices in the attribute.
+  attr->setParameterIndices(checkedWrtParamIndices);
+
   auto insertion =
       ctx.DifferentiableAttrs.try_emplace({D, checkedWrtParamIndices}, attr);
-  // Differentiable attributes are uniqued by their parameter indices.
+  // `@differentiable` attributes are uniqued by their parameter indices.
   // Reject duplicate attributes for the same decl and parameter indices pair.
   if (!insertion.second && insertion.first->getSecond() != attr) {
     diagnoseAndRemoveAttr(attr, diag::differentiable_attr_duplicate);
     return;
   }
 
-  // Check that result type conforms to `Differentiable`.
+  // Check that original function's result type conforms to `Differentiable`.
   if (whereClauseGenEnv) {
     auto originalResultInterfaceType = !originalResultTy->hasTypeParameter()
         ? originalResultTy->mapTypeOutOfContext()
@@ -2820,9 +2824,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     attr->setInvalid();
     return;
   }
-
-  // Memorize the checked parameter indices in the attribute.
-  attr->setParameterIndices(checkedWrtParamIndices);
 
   // Checks that the `candidate` function type equals the `required` function
   // type, disregarding parameter labels.
@@ -3149,6 +3150,9 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     return;
   }
 
+  // Set the checked differentiation parameter indices in the attribute.
+  attr->setParameterIndices(checkedWrtParamIndices);
+
   // Gather differentiation parameters.
   SmallVector<Type, 4> wrtParamTypes;
   checkedWrtParamIndices->getSubsetParameterTypes(
@@ -3214,12 +3218,22 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
 
   // Reject different-file retroactive derivatives.
   // TODO(TF-136): Full support for cross-file/cross-module retroactive
-  // differentiability will require SIL differnetiability witnesses and lots of
+  // differentiability will require SIL differentiability witnesses and lots of
   // plumbing.
   if (originalFn->getParentSourceFile() != derivative->getParentSourceFile()) {
     diagnoseAndRemoveAttr(
         attr, diag::differentiating_attr_not_in_same_file_as_original);
     return;
+  }
+
+  // Compute derivative generic requirements that are not satisfied by original
+  // function.
+  SmallVector<Requirement, 8> derivativeRequirements;
+  if (auto derivativeGenSig = derivative->getGenericSignature()) {
+    auto originalGenSig = originalFn->getGenericSignature();
+    for (auto req : derivativeGenSig->getRequirements())
+      if (!originalGenSig->isRequirementSatisfied(req))
+        derivativeRequirements.push_back(req);
   }
 
   // Add the derivative to a `@differentiable` attribute on the original
@@ -3229,28 +3243,38 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   for (auto *cda : originalFn->getAttrs().getAttributes<DifferentiableAttr>())
     if (checkedWrtParamIndices == cda->getParameterIndices())
       da = const_cast<DifferentiableAttr *>(cda);
-  // TODO: Infer the original `@differentiable`'s generic requirements.
   if (!da) {
-    da = DifferentiableAttr::create(ctx, /*implicit*/ true, SourceLoc(),
-                                    SourceRange(), checkedWrtParamIndices, None,
-                                    None, {});
+    da = DifferentiableAttr::create(ctx, /*implicit*/ true, attr->AtLoc,
+                                    attr->getRange(), checkedWrtParamIndices,
+                                    None, None, derivativeRequirements);
+    auto insertion = ctx.DifferentiableAttrs.try_emplace(
+        {originalFn, checkedWrtParamIndices}, da);
+    // `@differentiable` attributes are uniqued by their parameter indices.
+    // Reject duplicate attributes for the same decl and parameter indices pair.
+    if (!insertion.second && insertion.first->getSecond() != da) {
+      diagnoseAndRemoveAttr(da, diag::differentiable_attr_duplicate);
+      return;
+    }
     originalFn->getAttrs().add(da);
   }
+  // Check if the `@differentiable` attribute already has a registered
+  // derivative. If so, emit an error on the `@differentiating` attribute.
+  // Otherwise, register the derivative in the `@differentiable` attribute.
   switch (kind) {
   case AutoDiffAssociatedFunctionKind::JVP:
-    if (auto jvp = da->getJVP()) {
+    if (da->getJVP() || da->getJVPFunction()) {
       diagnoseAndRemoveAttr(
           attr, diag::differentiating_attr_original_already_has_derivative,
-          jvp->Name);
+          originalFn->getFullName());
       return;
     }
     da->setJVPFunction(derivative);
     break;
   case AutoDiffAssociatedFunctionKind::VJP:
-    if (auto vjp = da->getVJP()) {
+    if (da->getVJP() || da->getVJPFunction()) {
       diagnoseAndRemoveAttr(
           attr, diag::differentiating_attr_original_already_has_derivative,
-          vjp->Name);
+          originalFn->getFullName());
       return;
     }
     da->setVJPFunction(derivative);

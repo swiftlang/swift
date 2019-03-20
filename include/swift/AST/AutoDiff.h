@@ -210,7 +210,12 @@ public:
   /// Sets the parameters at indices in the specified range.
   void setParameters(unsigned lowerBound, unsigned upperBound);
 
-  /// Returns the number of parameters.
+  /// Returns the number of set parameters.
+  unsigned count() { return parameters.count(); }
+
+  /// Returns the number of bits in the `parameters` bitvector.
+  // TODO: After `getNumAutoDiffParameterIndices` is fixed to compute exact
+  // parameter count, update doc comment to "Returns the number of parameters".
   unsigned size() { return parameters.size(); }
 };
 

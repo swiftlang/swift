@@ -1,7 +1,22 @@
 // RUN: %target-swift-frontend -typecheck -verify %s
 
-@differentiable(vjp: dfoo) // expected-error {{'@differentiable' attribute cannot be applied to this declaration}}
-let x: Float = 1
+@differentiable // expected-error {{'@differentiable' attribute cannot be applied to this declaration}}
+let global: Float = 1
+
+func testLocalVariables() {
+  // expected-error @+1 {{'_' has no parameters to differentiate with respect to}}
+  @differentiable
+  var getter: Float {
+    return 1
+  }
+
+  // expected-error @+1 {{'_' has no parameters to differentiate with respect to}}
+  @differentiable
+  var getterSetter: Float {
+    get { return 1 }
+    set {}
+  }
+}
 
 @differentiable(vjp: dfoo) // expected-error {{'@differentiable' attribute cannot be applied to this declaration}}
 protocol P {}
@@ -82,6 +97,34 @@ struct DifferentiableInstanceMethod : Differentiable {
   @differentiable // ok
   func noParams() -> Float {
     return 1
+  }
+}
+
+// Test subscript methods.
+struct SubscriptMethod {
+  @differentiable // ok
+  subscript(implicitGetter x: Float) -> Float {
+    return x
+  }
+
+  @differentiable // ok
+  subscript(implicitGetterSetter x: Float) -> Float {
+    get { return x }
+    set {}
+  }
+
+  subscript(explicit x: Float) -> Float {
+    @differentiable // ok
+    get { return x }
+    @differentiable // expected-error {{'@differentiable' attribute cannot be applied to this declaration}}
+    set {}
+  }
+
+  subscript(x: Float, y: Float) -> Float {
+    @differentiable // ok
+    get { return x + y }
+    @differentiable // expected-error {{'@differentiable' attribute cannot be applied to this declaration}}
+    set {}
   }
 }
 
@@ -543,19 +586,28 @@ protocol DiffReq : Differentiable {
   // expected-note @+2 {{protocol requires function 'f2'}}
   @differentiable(wrt: (self, x, y))
   func f2(_ x: Float, _ y: Float) -> Float
+
+  // expected-note @+2 {{protocol requires function 'generic'}}
+  @differentiable(where T : Differentiable)
+  func generic<T>(_ x: T) -> T
 }
 
 // expected-error @+1 {{does not conform to protocol 'DiffReq'}}
 struct ConformingWithErrors : DiffReq {
-  // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: (self, x))'}}
+  // expected-note @+1 {{candidate is missing attribute '@differentiable'}}
   func f1(_ x: Float) -> Float {
     return x
   }
 
-  // expected-note @+2 {{candidate is missing attribute '@differentiable(wrt: (self, x, y))'}}
+  // expected-note @+2 {{candidate is missing attribute '@differentiable'}}
   @differentiable(wrt: (self, x))
   func f2(_ x: Float, _ y: Float) -> Float {
     return x + y
+  }
+
+  // expected-note @+1 {{candidate is missing attribute '@differentiable(where T : Differentiable)'}}
+  func generic<T>(_ x: T) -> T {
+    return x
   }
 }
 
@@ -575,14 +627,14 @@ struct DifferentiableInitStruct : DifferentiableInit {
 
   // FIXME(TF-284): Fix unexpected diagnostic.
   // expected-note @+2 {{candidate is missing attribute '@differentiable'}}
-  // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: x)'}}
+  // expected-note @+1 {{candidate is missing attribute '@differentiable'}}
   init(x: Float, y: Float) {
     self.x = x
     self.y = y
   }
 
   // FIXME(TF-284): Fix unexpected diagnostic.
-  // expected-note @+2 {{candidate is missing attribute '@differentiable(wrt: x)'}}
+  // expected-note @+2 {{candidate is missing attribute '@differentiable'}}
   // expected-note @+1 {{candidate is missing attribute '@differentiable'}}
   init(x: Float, y: Int) {
     self.x = x

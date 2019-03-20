@@ -1278,6 +1278,29 @@ extension PythonObject : MutableCollection {
   }
 }
 
+extension PythonObject : Sequence {
+  public struct Iterator : IteratorProtocol {
+    fileprivate let pythonIterator: PythonObject
+
+    public func next() -> PythonObject? {
+      guard let result = PyIter_Next(self.pythonIterator.borrowedPyObject) else {
+        try! throwPythonErrorIfPresent()
+        return nil
+      }
+      return PythonObject(consuming: result)
+    }
+  }
+
+  public func makeIterator() -> Iterator {
+    guard let result = PyObject_GetIter(borrowedPyObject) else {
+      try! throwPythonErrorIfPresent()
+      // Unreachable. A Python `TypeError` must have been thrown.
+      preconditionFailure()
+    }
+    return Iterator(pythonIterator: PythonObject(consuming: result))
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // `ExpressibleByLiteral` conformances
 //===----------------------------------------------------------------------===//

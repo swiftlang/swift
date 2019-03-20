@@ -77,6 +77,14 @@ PythonRuntimeTestSuite.testWithLeakChecking("PythonDict") {
   expectEqual("d", dict["b"])
 }
 
+PythonRuntimeTestSuite.testWithLeakChecking("Iterator") {
+  var sum = PythonObject(0)
+  for v in Python.iter([1, 2, 3]) {
+    sum += v
+  }
+  expectEqual(6, sum)
+}
+
 PythonRuntimeTestSuite.testWithLeakChecking("Range") {
   let slice = PythonObject(5..<10)
   expectEqual(Python.slice(5, 10), slice)

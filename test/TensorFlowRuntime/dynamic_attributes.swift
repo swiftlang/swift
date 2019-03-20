@@ -7,7 +7,11 @@
 // REQUIRES: tensorflow
 
 import TensorFlow
+#if TPU
+import TensorFlowUnittestTPU
+#else
 import TensorFlowUnittest
+#endif
 import StdlibUnittest
 
 var DynamicAttributeTests = TestSuite("DynamicAttribute")
