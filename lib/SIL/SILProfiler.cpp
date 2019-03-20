@@ -145,7 +145,7 @@ static void walkPatternForProfiling(PatternBindingDecl *PBD,
                                     ASTWalker &Walker) {
   if (PBD && !PBD->isStatic())
     for (auto E : PBD->getPatternList())
-      if (auto init = E.getNonLazyInit())
+      if (auto init = E.getExecutableInit())
         init->walk(Walker);
 }
 

@@ -5336,7 +5336,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
 
       // If the attributes include @lazy, flag that on each initializer.
       if (Attributes.hasAttribute<LazyAttr>()) {
-        PBDEntries.back().setInitializerLazy();
+        PBDEntries.back().setInitializerSubsumed();
       }
 
       if (init.hasCodeCompletion()) {

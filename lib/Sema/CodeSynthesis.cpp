@@ -1327,7 +1327,7 @@ static void synthesizeLazyGetterBody(AbstractFunctionDecl *fn, void *context) {
   auto *InitValue = VD->getParentInitializer();
   auto PBD = VD->getParentPatternBinding();
   unsigned entryIndex = PBD->getPatternEntryIndexForVarDecl(VD);
-  assert(PBD->isInitializerLazy(entryIndex));
+  assert(PBD->isInitializerSubsumed(entryIndex));
   bool wasInitializerChecked = PBD->isInitializerChecked(entryIndex);
   PBD->setInitializerChecked(entryIndex);
 
