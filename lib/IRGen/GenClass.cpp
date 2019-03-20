@@ -1207,7 +1207,9 @@ namespace {
       else {
         auto type = getSelfType(getClass()).getASTType();
         llvm::Constant *metadata =
-          tryEmitConstantHeapMetadataRef(IGM, type, /*allowUninit*/ true);
+          tryEmitConstantHeapMetadataRef(IGM, type,
+                                         /*allowUninit*/ true,
+                                         /*allowStub*/ true);
         assert(metadata &&
                "extended objc class doesn't have constant metadata?");
         fields.add(metadata);
@@ -2046,6 +2048,48 @@ static llvm::Function *emitObjCMetadataUpdateFunction(IRGenModule &IGM,
                               IGM.ObjCClassPtrTy));
 
   return f;
+}
+
+/// We emit Objective-C class stubs for non-generic classes with resilient
+/// ancestry. This lets us attach categories to the class even though it
+/// does not have statically-emitted metadata.
+bool irgen::hasObjCResilientClassStub(IRGenModule &IGM, ClassDecl *D) {
+  assert(IGM.getClassMetadataStrategy(D) == ClassMetadataStrategy::Resilient);
+  return (!D->isGenericContext() &&
+          IGM.ObjCInterop &&
+          IGM.Context.LangOpts.EnableObjCResilientClassStubs);
+}
+
+void irgen::emitObjCResilientClassStub(IRGenModule &IGM, ClassDecl *D) {
+  assert(hasObjCResilientClassStub(IGM, D));
+
+  llvm::Constant *fields[] = {
+    llvm::ConstantInt::get(IGM.SizeTy, 0), // reserved
+    llvm::ConstantInt::get(IGM.SizeTy, 1), // isa
+    IGM.getAddrOfObjCMetadataUpdateFunction(D, NotForDefinition)
+  };
+  auto init = llvm::ConstantStruct::get(IGM.ObjCFullResilientClassStubTy,
+                                        makeArrayRef(fields));
+
+  // Define the full stub. This is a private symbol.
+  auto fullObjCStub = cast<llvm::GlobalVariable>(
+      IGM.getAddrOfObjCResilientClassStub(D, ForDefinition,
+                                          TypeMetadataAddress::FullMetadata));
+  fullObjCStub->setInitializer(init);
+
+  // Emit the metadata update function referenced above.
+  emitObjCMetadataUpdateFunction(IGM, D);
+
+  // Apply the offset.
+  auto *objcStub = llvm::ConstantExpr::getBitCast(fullObjCStub, IGM.Int8PtrTy);
+  objcStub = llvm::ConstantExpr::getInBoundsGetElementPtr(
+      IGM.Int8Ty, objcStub, IGM.getSize(IGM.getPointerSize()));
+  objcStub = llvm::ConstantExpr::getPointerCast(objcStub,
+      IGM.ObjCResilientClassStubTy->getPointerTo());
+
+  auto entity = LinkEntity::forObjCResilientClassStub(
+      D, TypeMetadataAddress::AddressPoint);
+  IGM.defineAlias(entity, objcStub);
 }
 
 /// Emit the private data (RO-data) associated with a class.

@@ -1315,7 +1315,7 @@ class ExtraClassDescriptorFlags : public FlagSet<uint32_t> {
   enum {
     /// Set if the context descriptor includes a pointer to an Objective-C
     /// resilient class stub structure. See the description of
-    /// TargetObjCResilientClassStub in Metadata.h for details.
+    /// TargetObjCResilientClassStubInfo in Metadata.h for details.
     ///
     /// Only meaningful for class descriptors when Objective-C interop is
     /// enabled.
