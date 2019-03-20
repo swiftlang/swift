@@ -1,4 +1,4 @@
-//===--- PropertyBehaviors.h - Property Behavior ASTs -----------*- C++ -*-===//
+//===--- PropertyDelegates.h - Property Behavior ASTs -----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines helper types for property behaviors.
+// This file defines helper types for property delegates.
 //
 //===----------------------------------------------------------------------===//
 
@@ -26,32 +26,32 @@ namespace swift {
 class VarDecl;
 class ConstructorDecl;
   
-/// Describes a property behavior type.
-struct PropertyBehaviorTypeInfo {
+/// Describes a property delegate type.
+struct PropertyDelegateTypeInfo {
   /// The property through which we should "unwrap" the behavior type to access
   /// the underlying value.
   VarDecl *unwrapProperty = nullptr;
 
   /// The initializer init(initialValue:) that will be called when the
-  /// initiqlizing the property behavior type from a value of the property type.
+  /// initiqlizing the property delegate type from a value of the property type.
   ConstructorDecl *initialValueInit = nullptr;
 
-  /// Whether this is a valid property behavior.
+  /// Whether this is a valid property delegate.
   bool isValid() const {
     return unwrapProperty != nullptr;
   }
 
   explicit operator bool() const { return isValid(); }
 
-  friend bool operator==(const PropertyBehaviorTypeInfo &lhs,
-                         const PropertyBehaviorTypeInfo &rhs) {
+  friend bool operator==(const PropertyDelegateTypeInfo &lhs,
+                         const PropertyDelegateTypeInfo &rhs) {
     return lhs.unwrapProperty == rhs.unwrapProperty &&
         lhs.initialValueInit == rhs.initialValueInit;
   }
 };
 
 void simple_display(
-    llvm::raw_ostream &out, const PropertyBehaviorTypeInfo &propertyBehavior);
+    llvm::raw_ostream &out, const PropertyDelegateTypeInfo &propertyDelegate);
 
 } // end namespace swift
 

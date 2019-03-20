@@ -240,10 +240,10 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
-/// Request the property behavior declaration for the given property, if it
+/// Request the property delegate declaration for the given property, if it
 /// has one.
-class AttachedPropertyBehaviorDeclRequest :
-    public SimpleRequest<AttachedPropertyBehaviorDeclRequest,
+class AttachedPropertyDelegateDeclRequest :
+    public SimpleRequest<AttachedPropertyDelegateDeclRequest,
                          CacheKind::Cached,
                          NominalTypeDecl *,
                          VarDecl *> {

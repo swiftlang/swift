@@ -4282,7 +4282,7 @@ static bool shouldValidateMemberDuringFinalization(NominalTypeDecl *nominal,
        !cast<VarDecl>(VD)->isStatic() &&
        (cast<VarDecl>(VD)->hasStorage() ||
         VD->getAttrs().hasAttribute<LazyAttr>() ||
-        cast<VarDecl>(VD)->hasPropertyBehavior())))
+        cast<VarDecl>(VD)->hasPropertyDelegate())))
     return true;
 
   // For classes, we need to validate properties and functions,
@@ -4379,10 +4379,10 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
       completeLazyVarImplementation(prop);
     }
 
-    // Ensure that we create the backing variable for a property behavior.
-    if (prop->hasPropertyBehavior()) {
+    // Ensure that we create the backing variable for a property delegate.
+    if (prop->hasPropertyDelegate()) {
       finalizeAbstractStorageDecl(TC, prop);
-      (void)getOrSynthesizePropertyBehaviorBackingProperty(prop);
+      (void)getOrSynthesizePropertyDelegateBackingProperty(prop);
     }
   }
 

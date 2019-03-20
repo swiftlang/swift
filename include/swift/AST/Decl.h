@@ -381,8 +381,8 @@ protected:
     /// FIXME: Remove this once LLDB has proper support for resilience.
     IsREPLVar : 1,
 
-    /// Whether this property has an associated property behavior.
-    HasPropertyBehavior : 1
+    /// Whether this property has an associated property delegate.
+    HasPropertyDelegate : 1
   );
 
   SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1 + NumDefaultArgumentKindBits,
@@ -4603,7 +4603,7 @@ protected:
     Bits.VarDecl.IsCaptureList = IsCaptureList;
     Bits.VarDecl.IsDebuggerVar = false;
     Bits.VarDecl.IsREPLVar = false;
-    Bits.VarDecl.HasPropertyBehavior = false;
+    Bits.VarDecl.HasPropertyDelegate = false;
     Bits.VarDecl.HasNonPatternBindingInit = false;
   }
 
@@ -4876,27 +4876,27 @@ public:
     Bits.VarDecl.IsREPLVar = IsREPLVar;
   }
 
-  /// Whether this variable has a property behavior attached.
-  bool hasPropertyBehavior() const {
-    return Bits.VarDecl.HasPropertyBehavior;
+  /// Whether this variable has a property delegate attached.
+  bool hasPropertyDelegate() const {
+    return Bits.VarDecl.HasPropertyDelegate;
   }
 
-  /// For a property behavior, retrieve the source location for the
+  /// For a property delegate, retrieve the source location for the
   /// 'by' keyword.
-  SourceLoc getPropertyBehaviorByLoc() const;
+  SourceLoc getPropertyDelegateByLoc() const;
 
-  /// For a property behavior, retrieve the behavior type location
+  /// For a property delegate, retrieve the behavior type location
   /// information.
-  TypeLoc &getPropertyBehaviorTypeLoc();
+  TypeLoc &getPropertyDelegateTypeLoc();
 
-  /// Add a property behavior to this variable.
-  void addPropertyBehavior(SourceLoc byLoc, TypeLoc typeLoc);
+  /// Add a property delegate to this variable.
+  void addPropertyDelegate(SourceLoc byLoc, TypeLoc typeLoc);
 
-  /// Retrieve the backing variable for the property behavior.
-  VarDecl *getPropertyBehaviorBackingVar() const;
+  /// Retrieve the backing variable for the property delegate.
+  VarDecl *getPropertyDelegateBackingVar() const;
 
-  /// Set the backing variable for the property behavior.
-  void setPropertyBehaviorBackingVar(VarDecl *backingVar);
+  /// Set the backing variable for the property delegate.
+  void setPropertyDelegateBackingVar(VarDecl *backingVar);
 
   /// Return the Objective-C runtime name for this property.
   Identifier getObjCPropertyName() const;

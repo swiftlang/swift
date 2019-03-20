@@ -20,7 +20,7 @@
 #include "TypeChecker.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
-#include "TypeCheckPropertyBehaviors.h"
+#include "TypeCheckPropertyDelegates.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Expr.h"
@@ -735,7 +735,7 @@ static bool isSynthesizedComputedProperty(AbstractStorageDecl *storage) {
   return (storage->getAttrs().hasAttribute<LazyAttr>() ||
           storage->getAttrs().hasAttribute<NSManagedAttr>() ||
           (isa<VarDecl>(storage) &&
-           cast<VarDecl>(storage)->hasPropertyBehavior()));
+           cast<VarDecl>(storage)->hasPropertyDelegate()));
 }
 
 /// Synthesize the body of a trivial getter.  For a non-member vardecl or one
@@ -794,13 +794,13 @@ static void synthesizeReadCoroutineGetterBody(AccessorDecl *getter,
   synthesizeTrivialGetterBody(getter, TargetImpl::Implementation, ctx);
 }
 
-/// Synthesize the body of a getter for a property behavior, which
-/// delegates to the behavior's unwrap property.
-static void synthesizePropertyBehaviorGetterBody(AccessorDecl *getter,
+/// Synthesize the body of a getter for a property delegate, which
+/// delegates to the delegate's unwrap property.
+static void synthesizePropertyDelegateGetterBody(AccessorDecl *getter,
                                                  ASTContext &ctx) {
   auto var = cast<VarDecl>(getter->getStorage());
-  auto backingVar = getOrSynthesizePropertyBehaviorBackingProperty(var);
-  auto unwrapVar = getPropertyBehaviorUnwrapProperty(var);
+  auto backingVar = getOrSynthesizePropertyDelegateBackingProperty(var);
+  auto unwrapVar = getPropertyDelegateUnwrapProperty(var);
 
   if (!backingVar || !unwrapVar)
     return;
@@ -844,13 +844,13 @@ static void synthesizeTrivialSetterBody(AccessorDecl *setter,
                                          storage, ctx);
 }
 
-/// Synthesize the body of a setter for a property behavior, which
-/// delegates to the behavior's unwrap property.
-static void synthesizePropertyBehaviorSetterBody(AccessorDecl *setter,
+/// Synthesize the body of a setter for a property delegate, which
+/// delegates to the delegate's unwrap property.
+static void synthesizePropertyDelegateSetterBody(AccessorDecl *setter,
                                                  ASTContext &ctx) {
   auto var = cast<VarDecl>(setter->getStorage());
-  auto backingVar = getOrSynthesizePropertyBehaviorBackingProperty(var);
-  auto unwrapVar = getPropertyBehaviorUnwrapProperty(var);
+  auto backingVar = getOrSynthesizePropertyDelegateBackingProperty(var);
+  auto unwrapVar = getPropertyDelegateUnwrapProperty(var);
 
   if (!backingVar || !unwrapVar)
     return;
@@ -1433,8 +1433,8 @@ void swift::completeLazyVarImplementation(VarDecl *VD) {
   Storage->overwriteSetterAccess(AccessLevel::Private);
 }
 
-VarDecl *swift::getOrSynthesizePropertyBehaviorBackingProperty(VarDecl *var) {
-  VarDecl *backingVar = var->getPropertyBehaviorBackingVar();
+VarDecl *swift::getOrSynthesizePropertyDelegateBackingProperty(VarDecl *var) {
+  VarDecl *backingVar = var->getPropertyDelegateBackingVar();
   if (backingVar) return backingVar;
 
   ASTContext &ctx = var->getASTContext();
@@ -1448,7 +1448,7 @@ VarDecl *swift::getOrSynthesizePropertyBehaviorBackingProperty(VarDecl *var) {
   // Determine the type of the storage.
   auto dc = var->getDeclContext();
   Type storageInterfaceType =
-      applyPropertyBehaviorType(var->getInterfaceType(), var,
+      applyPropertyDelegateType(var->getInterfaceType(), var,
                                 TypeResolution::forInterface(dc));
   bool isInvalid = false;
   if (!storageInterfaceType) {
@@ -1462,9 +1462,9 @@ VarDecl *swift::getOrSynthesizePropertyBehaviorBackingProperty(VarDecl *var) {
   backingVar = new (ctx) VarDecl(/*IsStatic=*/var->isStatic(),
                                  VarDecl::Specifier::Var,
                                  /*IsCaptureList=*/false,
-                                 var->getPropertyBehaviorByLoc(),
+                                 var->getPropertyDelegateByLoc(),
                                  name, dc);
-  var->setPropertyBehaviorBackingVar(backingVar);
+  var->setPropertyDelegateBackingVar(backingVar);
 
   backingVar->setInterfaceType(storageInterfaceType);
   backingVar->setType(storageType);
@@ -1480,7 +1480,7 @@ VarDecl *swift::getOrSynthesizePropertyBehaviorBackingProperty(VarDecl *var) {
   pbdPattern = TypedPattern::createImplicit(ctx, pbdPattern, storageType);
   auto pbd = PatternBindingDecl::createImplicit(
       ctx, backingVar->getCorrectStaticSpelling(), pbdPattern,
-      /*init*/nullptr, dc, var->getPropertyBehaviorByLoc());
+      /*init*/nullptr, dc, var->getPropertyDelegateByLoc());
   addMemberToContextIfNeeded(pbd, dc, var);
 
   // Mark the backing property as 'final'. There's no sensible way to override.
@@ -1571,14 +1571,14 @@ static void maybeAddAccessorsToLazyVariable(VarDecl *var, ASTContext &ctx) {
   addExpectedOpaqueAccessorsToStorage(var, ctx);
 }
 
-static void maybeAddAccessorsForPropertyBehavior(VarDecl *var,
+static void maybeAddAccessorsForPropertyDelegate(VarDecl *var,
                                                  ASTContext &ctx) {
-  auto backingVar = getOrSynthesizePropertyBehaviorBackingProperty(var);
+  auto backingVar = getOrSynthesizePropertyDelegateBackingProperty(var);
   if (!backingVar || backingVar->isInvalid())
     return;
 
-  auto behaviorVar = getPropertyBehaviorUnwrapProperty(var);
-  assert(behaviorVar && "Cannot fail when the backing var is valid");
+  auto unwrapVar = getPropertyDelegateUnwrapProperty(var);
+  assert(unwrapVar && "Cannot fail when the backing var is valid");
 
   // If there are already accessors, something is invalid; bail out.
   if (!var->getImplInfo().isSimpleStored())
@@ -1588,11 +1588,11 @@ static void maybeAddAccessorsForPropertyBehavior(VarDecl *var,
     addGetterToStorage(var, ctx);
   }
 
-  if (!var->getSetter() && behaviorVar->isSettable(nullptr)) {
+  if (!var->getSetter() && unwrapVar->isSettable(nullptr)) {
     addSetterToStorage(var, ctx);
   }
 
-  if (behaviorVar->isSettable(nullptr))
+  if (unwrapVar->isSettable(nullptr))
     var->overwriteImplInfo(StorageImplInfo::getMutableComputed());
   else
     var->overwriteImplInfo(StorageImplInfo::getImmutableComputed());
@@ -1615,10 +1615,10 @@ void swift::maybeAddAccessorsToStorage(AbstractStorageDecl *storage) {
     return;
   }
 
-  // Property behaviors require backing storage.
+  // Property delegates require backing storage.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (var->hasPropertyBehavior()) {
-      maybeAddAccessorsForPropertyBehavior(var, ctx);
+    if (var->hasPropertyDelegate()) {
+      maybeAddAccessorsForPropertyDelegate(var, ctx);
       return;
     }
   }
@@ -1702,10 +1702,10 @@ static void synthesizeGetterBody(AccessorDecl *getter,
                                  ASTContext &ctx) {
   auto storage = getter->getStorage();
 
-  // Synthesize the getter for a property behavior.
+  // Synthesize the getter for a property delegate.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (var->hasPropertyBehavior()) {
-      synthesizePropertyBehaviorGetterBody(getter, ctx);
+    if (var->hasPropertyDelegate()) {
+      synthesizePropertyDelegateGetterBody(getter, ctx);
       return;
     }
   }
@@ -1742,10 +1742,10 @@ static void synthesizeSetterBody(AccessorDecl *setter,
                                  ASTContext &ctx) {
   auto storage = setter->getStorage();
 
-  // Synthesize the setter for a property behavior.
+  // Synthesize the setter for a property delegate.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (var->hasPropertyBehavior()) {
-      synthesizePropertyBehaviorSetterBody(setter, ctx);
+    if (var->hasPropertyDelegate()) {
+      synthesizePropertyDelegateSetterBody(setter, ctx);
       return;
     }
   }

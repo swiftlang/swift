@@ -110,15 +110,15 @@ using AssociativityCacheType =
   MACRO(NSValue)
 
 namespace {
-  /// Information about a property behavior that has been attached to
+  /// Information about a property delegate that has been attached to
   /// a particular property.
-  struct AttachedPropertyBehaviorInfo {
+  struct AttachedPropertyDelegateInfo {
     SourceLoc byLoc;
-    TypeLoc behaviorTypeLoc;
+    TypeLoc delegateTypeLoc;
     VarDecl *backingVar = nullptr;
 
-    AttachedPropertyBehaviorInfo(SourceLoc byLoc, TypeLoc behaviorTypeLoc)
-      : byLoc(byLoc), behaviorTypeLoc(behaviorTypeLoc) { }
+    AttachedPropertyDelegateInfo(SourceLoc byLoc, TypeLoc delegateTypeLoc)
+      : byLoc(byLoc), delegateTypeLoc(delegateTypeLoc) { }
   };
 }
 
@@ -311,10 +311,10 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   llvm::DenseMap<SourceFile *, std::array<Type, NumKnownProtocols>>
       DefaultTypeRequestCaches;
 
-  /// Information about the property behaviors that have been attached to
+  /// Information about the property delegate that have been attached to
   /// properties.
-  llvm::DenseMap<const VarDecl *, AttachedPropertyBehaviorInfo*>
-    AttachedPropertyBehaviors;
+  llvm::DenseMap<const VarDecl *, AttachedPropertyDelegateInfo*>
+    AttachedPropertyDelegates;
 
   /// Structure that captures data that is segregated into different
   /// arenas.
@@ -5077,37 +5077,37 @@ Type &ASTContext::getDefaultTypeRequestCache(SourceFile *SF,
   return getImpl().DefaultTypeRequestCaches[SF][size_t(kind)];
 }
 
-void VarDecl::addPropertyBehavior(SourceLoc byLoc, TypeLoc typeLoc) {
-  assert(!hasPropertyBehavior());
-  Bits.VarDecl.HasPropertyBehavior = true;
+void VarDecl::addPropertyDelegate(SourceLoc byLoc, TypeLoc typeLoc) {
+  assert(!hasPropertyDelegate());
+  Bits.VarDecl.HasPropertyDelegate = true;
 
   ASTContext &ctx = getASTContext();
-  void *mem = ctx.Allocate(sizeof(AttachedPropertyBehaviorInfo),
-                           alignof(AttachedPropertyBehaviorInfo));
-  ctx.getImpl().AttachedPropertyBehaviors[this] =
-      new (mem) AttachedPropertyBehaviorInfo(byLoc, typeLoc);
+  void *mem = ctx.Allocate(sizeof(AttachedPropertyDelegateInfo),
+                           alignof(AttachedPropertyDelegateInfo));
+  ctx.getImpl().AttachedPropertyDelegates[this] =
+      new (mem) AttachedPropertyDelegateInfo(byLoc, typeLoc);
 }
 
-SourceLoc VarDecl::getPropertyBehaviorByLoc() const {
-  assert(hasPropertyBehavior());
-  return getASTContext().getImpl().AttachedPropertyBehaviors[this]->byLoc;
+SourceLoc VarDecl::getPropertyDelegateByLoc() const {
+  assert(hasPropertyDelegate());
+  return getASTContext().getImpl().AttachedPropertyDelegates[this]->byLoc;
 }
 
-TypeLoc &VarDecl::getPropertyBehaviorTypeLoc() {
-  assert(hasPropertyBehavior());
+TypeLoc &VarDecl::getPropertyDelegateTypeLoc() {
+  assert(hasPropertyDelegate());
   ASTContext &ctx = getASTContext();
-  return ctx.getImpl().AttachedPropertyBehaviors[this]->behaviorTypeLoc;
+  return ctx.getImpl().AttachedPropertyDelegates[this]->delegateTypeLoc;
 }
 
-VarDecl *VarDecl::getPropertyBehaviorBackingVar() const {
-  assert(hasPropertyBehavior());
+VarDecl *VarDecl::getPropertyDelegateBackingVar() const {
+  assert(hasPropertyDelegate());
   ASTContext &ctx = getASTContext();
-  return ctx.getImpl().AttachedPropertyBehaviors[this]->backingVar;
+  return ctx.getImpl().AttachedPropertyDelegates[this]->backingVar;
 }
 
-void VarDecl::setPropertyBehaviorBackingVar(VarDecl *backingVar) {
-  assert(hasPropertyBehavior());
+void VarDecl::setPropertyDelegateBackingVar(VarDecl *backingVar) {
+  assert(hasPropertyDelegate());
   ASTContext &ctx = getASTContext();
-  assert(!ctx.getImpl().AttachedPropertyBehaviors[this]->backingVar);
-  ctx.getImpl().AttachedPropertyBehaviors[this]->backingVar = backingVar;
+  assert(!ctx.getImpl().AttachedPropertyDelegates[this]->backingVar);
+  ctx.getImpl().AttachedPropertyDelegates[this]->backingVar = backingVar;
 }

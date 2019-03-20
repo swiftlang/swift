@@ -176,16 +176,16 @@ void TypeDeclsFromWhereClauseRequest::noteCycleStep(
   diags.diagnose(ext, diag::circular_reference_through);
 }
 
-bool AttachedPropertyBehaviorDeclRequest::isCached() const {
-  return std::get<0>(getStorage())->hasPropertyBehavior();
+bool AttachedPropertyDelegateDeclRequest::isCached() const {
+  return std::get<0>(getStorage())->hasPropertyDelegate();
 }
 
-void AttachedPropertyBehaviorDeclRequest::diagnoseCycle(
+void AttachedPropertyDelegateDeclRequest::diagnoseCycle(
     DiagnosticEngine &diags) const {
   std::get<0>(getStorage())->diagnose(diag::circular_reference);
 }
 
-void AttachedPropertyBehaviorDeclRequest::noteCycleStep(
+void AttachedPropertyDelegateDeclRequest::noteCycleStep(
     DiagnosticEngine &diags) const {
   std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
 }

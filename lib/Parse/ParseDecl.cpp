@@ -5217,20 +5217,20 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       pattern = patternRes.get();
     }
 
-    // Parse a property behavior.
+    // Parse a property delegate.
     if (Tok.isContextualKeyword("by")) {
       SourceLoc byLoc = consumeToken();
-      ParserResult<TypeRepr> behaviorType =
-          parseType(diag::expected_behavior_type_after_by);
-      if (behaviorType.hasCodeCompletion())
+      ParserResult<TypeRepr> delegateType =
+          parseType(diag::expected_property_delegate_type_after_by);
+      if (delegateType.hasCodeCompletion())
         return makeResult(makeParserCodeCompletionStatus());
 
-      if (behaviorType.isNonNull()) {
+      if (delegateType.isNonNull()) {
         if (auto var = pattern->getSingleVar()) {
-          var->addPropertyBehavior(byLoc, behaviorType.get());
+          var->addPropertyDelegate(byLoc, delegateType.get());
         } else {
           // FIXME: Support AnyPattern as well, somehow.
-          diagnose(byLoc, diag::property_behavior_not_named)
+          diagnose(byLoc, diag::property_delegate_not_named)
             .highlight(pattern->getSourceRange());
         }
       }

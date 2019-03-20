@@ -1,4 +1,4 @@
-//===--- TypeCheckPropertyBehavior.cpp - Property Behaviors ---------------===//
+//===--- TypeCheckPropertyDelegate.cpp - Property Behaviors ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements semantic analysis for property behaviors.
+// This file implements semantic analysis for property delegates.
 //
 //===----------------------------------------------------------------------===//
-#include "TypeCheckPropertyBehaviors.h"
+#include "TypeCheckPropertyDelegates.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
@@ -25,125 +25,125 @@
 using namespace swift;
 
 void swift::simple_display(
-    llvm::raw_ostream &out, const PropertyBehaviorTypeInfo &propertyBehavior) {
+    llvm::raw_ostream &out, const PropertyDelegateTypeInfo &propertyDelegate) {
   out << "{ ";
-  if (propertyBehavior.unwrapProperty)
-    out << propertyBehavior.unwrapProperty->printRef();
+  if (propertyDelegate.unwrapProperty)
+    out << propertyDelegate.unwrapProperty->printRef();
   else
     out << "null";
   out << ", ";
-  if (propertyBehavior.initialValueInit)
-    out << propertyBehavior.initialValueInit->printRef();
+  if (propertyDelegate.initialValueInit)
+    out << propertyDelegate.initialValueInit->printRef();
   else
     out << "null";
   out << " }";
 }
 
-/// Retrieve the property behavior type information for the behavior attached
+/// Retrieve the property delegate type information for the behavior attached
 /// to the given property.
-static PropertyBehaviorTypeInfo getAttachedPropertyBehaviorTypeInfo(
+static PropertyDelegateTypeInfo getAttachedPropertyDelegateTypeInfo(
     VarDecl *var) {
-  if (!var->hasPropertyBehavior())
-    return PropertyBehaviorTypeInfo();
+  if (!var->hasPropertyDelegate())
+    return PropertyDelegateTypeInfo();
 
-  // Find the attached property behavior type declaration.
+  // Find the attached property delegate type declaration.
   ASTContext &ctx = var->getASTContext();
   auto behaviorType = evaluateOrDefault(
-      ctx.evaluator, AttachedPropertyBehaviorDeclRequest(var), nullptr);
+      ctx.evaluator, AttachedPropertyDelegateDeclRequest(var), nullptr);
   if (!behaviorType)
-    return PropertyBehaviorTypeInfo();
+    return PropertyDelegateTypeInfo();
 
   return evaluateOrDefault(
-      ctx.evaluator, PropertyBehaviorTypeInfoRequest(behaviorType),
-      PropertyBehaviorTypeInfo());
+      ctx.evaluator, PropertyDelegateTypeInfoRequest(behaviorType),
+      PropertyDelegateTypeInfo());
 }
 
-/// Retrieve the unbound property behavior type for the given property.
-static UnboundGenericType *getUnboundPropertyBehaviorType(VarDecl *var) {
-  assert(var->hasPropertyBehavior() && "Only call with property behaviors");
+/// Retrieve the unbound property delegate type for the given property.
+static UnboundGenericType *getUnboundPropertyDelegateType(VarDecl *var) {
+  assert(var->hasPropertyDelegate() && "Only call with property delegates");
 
-  if (var->getPropertyBehaviorTypeLoc().wasValidated()) {
-    if (var->getPropertyBehaviorTypeLoc().isError())
+  if (var->getPropertyDelegateTypeLoc().wasValidated()) {
+    if (var->getPropertyDelegateTypeLoc().isError())
       return nullptr;
 
-    return var->getPropertyBehaviorTypeLoc().getType()
+    return var->getPropertyDelegateTypeLoc().getType()
         ->castTo<UnboundGenericType>();
   }
 
-  // We haven't resolved the property behavior type yet; do so now.
-  SourceLoc byLoc = var->getPropertyBehaviorByLoc();
+  // We haven't resolved the property delegate type yet; do so now.
+  SourceLoc byLoc = var->getPropertyDelegateByLoc();
   TypeResolution resolution =
       TypeResolution::forContextual(var->getInnermostDeclContext());
   TypeResolutionOptions options(TypeResolverContext::ProtocolWhereClause);
   options |= TypeResolutionFlags::AllowUnboundGenerics;
   Type unboundBehaviorType = resolution.resolveType(
-      var->getPropertyBehaviorTypeLoc().getTypeRepr(), options);
+      var->getPropertyDelegateTypeLoc().getTypeRepr(), options);
 
   ASTContext &ctx = var->getASTContext();
   if (!unboundBehaviorType || unboundBehaviorType->hasError()) {
-    var->getPropertyBehaviorTypeLoc().setInvalidType(ctx);
+    var->getPropertyDelegateTypeLoc().setInvalidType(ctx);
     return nullptr;
   }
 
-  // We expect a nominal type with the @propertyBehavior attribute.
+  // We expect a nominal type with the @propertyDelegate attribute.
   auto nominalDecl = unboundBehaviorType->getAnyNominal();
   if (!nominalDecl ||
-      !nominalDecl->getAttrs().hasAttribute<PropertyBehaviorAttr>()) {
-    ctx.Diags.diagnose(byLoc, diag::property_behavior_by_not_behavior,
+      !nominalDecl->getAttrs().hasAttribute<PropertyDelegateAttr>()) {
+    ctx.Diags.diagnose(byLoc, diag::property_delegate_by_not_delegate,
                        unboundBehaviorType)
-      .highlight(var->getPropertyBehaviorTypeLoc().getSourceRange());
+      .highlight(var->getPropertyDelegateTypeLoc().getSourceRange());
     if (nominalDecl && !isa<ProtocolDecl>(nominalDecl)) {
-      nominalDecl->diagnose(diag::property_behavior_missing_attribute,
+      nominalDecl->diagnose(diag::property_delegate_missing_attribute,
                             nominalDecl->getDeclaredInterfaceType())
         .fixItInsert(
             nominalDecl->getAttributeInsertionLoc(/*forModifier=*/false),
-           "@propertyBehavior");
+           "@propertyDelegate");
     }
 
-    var->getPropertyBehaviorTypeLoc().setInvalidType(ctx);
+    var->getPropertyDelegateTypeLoc().setInvalidType(ctx);
     return nullptr;
   }
 
   // We expect an unbound generic type here.
   auto unboundGeneric = unboundBehaviorType->getAs<UnboundGenericType>();
   if (!unboundGeneric || unboundGeneric->getDecl() != nominalDecl) {
-    ctx.Diags.diagnose(byLoc, diag::property_behavior_not_unbound,
+    ctx.Diags.diagnose(byLoc, diag::property_delegate_not_unbound,
                        unboundBehaviorType)
-      .highlight(var->getPropertyBehaviorTypeLoc().getSourceRange());
-    var->getPropertyBehaviorTypeLoc().setInvalidType(ctx);
+      .highlight(var->getPropertyDelegateTypeLoc().getSourceRange());
+    var->getPropertyDelegateTypeLoc().setInvalidType(ctx);
     return nullptr;
   }
 
-  // Make sure it's a valid property behavior type.
+  // Make sure it's a valid property delegate type.
   if (!evaluateOrDefault(
-           ctx.evaluator, PropertyBehaviorTypeInfoRequest(nominalDecl),
-           PropertyBehaviorTypeInfo())) {
-    var->getPropertyBehaviorTypeLoc().setInvalidType(ctx);
+           ctx.evaluator, PropertyDelegateTypeInfoRequest(nominalDecl),
+           PropertyDelegateTypeInfo())) {
+    var->getPropertyDelegateTypeLoc().setInvalidType(ctx);
     return nullptr;
   }
 
-  var->getPropertyBehaviorTypeLoc().setType(unboundBehaviorType);
+  var->getPropertyDelegateTypeLoc().setType(unboundBehaviorType);
   return unboundGeneric;
 }
 
-llvm::Expected<PropertyBehaviorTypeInfo>
-PropertyBehaviorTypeInfoRequest::evaluate(
+llvm::Expected<PropertyDelegateTypeInfo>
+PropertyDelegateTypeInfoRequest::evaluate(
     Evaluator &eval, NominalTypeDecl *nominal) const {
-  PropertyBehaviorTypeInfo result;
+  PropertyDelegateTypeInfo result;
 
-  // We must have the @propertyBehavior attribute to continue.
-  if (!nominal->getAttrs().hasAttribute<PropertyBehaviorAttr>()) {
+  // We must have the @propertyDelegate attribute to continue.
+  if (!nominal->getAttrs().hasAttribute<PropertyDelegateAttr>()) {
     return result;
   }
 
   // Ensure that we have a single-parameter generic type.
   if (!nominal->getGenericSignature() ||
       nominal->getGenericSignature()->getGenericParams().size() != 1) {
-    nominal->diagnose(diag::property_behavior_not_single_parameter);
+    nominal->diagnose(diag::property_delegate_not_single_parameter);
     return result;
   }
 
-  // Look for a non-static property named "value" in the property behavior
+  // Look for a non-static property named "value" in the property delegate
   // type.
   SmallVector<ValueDecl *, 2> decls;
   ASTContext &ctx = nominal->getASTContext();
@@ -163,41 +163,41 @@ PropertyBehaviorTypeInfoRequest::evaluate(
   // redundant diagnostics.
   switch (unwrapVars.size()) {
   case 0:
-    nominal->diagnose(diag::property_behavior_no_value_property,
+    nominal->diagnose(diag::property_delegate_no_value_property,
                       nominal->getDeclaredType());
-    return PropertyBehaviorTypeInfo();
+    return PropertyDelegateTypeInfo();
 
   case 1:
     result.unwrapProperty = unwrapVars.front();
     break;
 
   default:
-    nominal->diagnose(diag::property_behavior_ambiguous_value_property,
+    nominal->diagnose(diag::property_delegate_ambiguous_value_property,
                       nominal->getDeclaredType());
     for (auto var : unwrapVars) {
       var->diagnose(diag::kind_declname_declared_here,
                     var->getDescriptiveKind(), var->getFullName());
     }
-    return PropertyBehaviorTypeInfo();
+    return PropertyDelegateTypeInfo();
   }
 
   return result;
 }
 
-VarDecl *swift::getPropertyBehaviorUnwrapProperty(VarDecl *var) {
-  return getAttachedPropertyBehaviorTypeInfo(var).unwrapProperty;
+VarDecl *swift::getPropertyDelegateUnwrapProperty(VarDecl *var) {
+  return getAttachedPropertyDelegateTypeInfo(var).unwrapProperty;
 }
 
 
-Type swift::applyPropertyBehaviorType(Type type, VarDecl *var,
+Type swift::applyPropertyDelegateType(Type type, VarDecl *var,
                                       TypeResolution resolution) {
-  auto unboundGeneric = getUnboundPropertyBehaviorType(var);
+  auto unboundGeneric = getUnboundPropertyDelegateType(var);
   if (!unboundGeneric)
     return Type();
 
   TypeChecker &tc =
       *static_cast<TypeChecker *>(var->getASTContext().getLazyResolver());
-  SourceLoc byLoc = var->getPropertyBehaviorByLoc();
+  SourceLoc byLoc = var->getPropertyDelegateByLoc();
   return tc.applyUnboundGenericArguments(unboundGeneric,
                                          unboundGeneric->getDecl(),
                                          byLoc, resolution, { type });

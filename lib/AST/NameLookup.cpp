@@ -2094,15 +2094,15 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
 }
 
 llvm::Expected<NominalTypeDecl *>
-AttachedPropertyBehaviorDeclRequest::evaluate(Evaluator &evaluator,
+AttachedPropertyDelegateDeclRequest::evaluate(Evaluator &evaluator,
                                               VarDecl *property) const {
-  if (!property->hasPropertyBehavior())
+  if (!property->hasPropertyDelegate())
     return nullptr;
 
-  // Find the types referenced by the property behavior reference in the
+  // Find the types referenced by the property delegate reference in the
   // property.
   auto &ctx = property->getASTContext();
-  TypeLoc &typeLoc = property->getPropertyBehaviorTypeLoc();
+  TypeLoc &typeLoc = property->getPropertyDelegateTypeLoc();
   DirectlyReferencedTypeDecls decls;
   if (auto typeRepr = typeLoc.getTypeRepr()) {
     decls = directReferencesForTypeRepr(

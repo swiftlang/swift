@@ -4270,22 +4270,22 @@ WARNING(hashvalue_implementation,none,
         (Type))
 
 //------------------------------------------------------------------------------
-// MARK: property behavior diagnostics
+// MARK: property delegate diagnostics
 //------------------------------------------------------------------------------
-ERROR(property_behavior_not_unbound, none,
-      "property behavior type %0 must not provide generic arguments", (Type))
-ERROR(property_behavior_by_not_behavior, none,
-      "use of non-behavior type %0 as a property behavior", (Type))
-NOTE(property_behavior_missing_attribute, none,
-     "type %0 must have the attribute '@propertyBehavior' to be used as "
-     "a property behavior", (Type))
-ERROR(property_behavior_not_single_parameter, none,
-  "property behavior type must have a single generic type parameter", ())
-ERROR(property_behavior_no_value_property, none,
-  "property behavior type %0 does not contain a non-static property "
+ERROR(property_delegate_not_unbound, none,
+      "property delegate type %0 must not provide generic arguments", (Type))
+ERROR(property_delegate_by_not_delegate, none,
+      "use of non-property delegate type %0 as a property delegate", (Type))
+NOTE(property_delegate_missing_attribute, none,
+     "type %0 must have the attribute '@propertyDelegate' to be used as "
+     "a property delegate", (Type))
+ERROR(property_delegate_not_single_parameter, none,
+  "property delegate type must have a single generic type parameter", ())
+ERROR(property_delegate_no_value_property, none,
+  "property delegate type %0 does not contain a non-static property "
   "named 'value'", (Type))
-ERROR(property_behavior_ambiguous_value_property, none,
-  "property behavior type %0 has multiple non-static properties "
+ERROR(property_delegate_ambiguous_value_property, none,
+  "property delegate type %0 has multiple non-static properties "
   "named 'value'", (Type))
 
 #ifndef DIAG_NO_UNDEF

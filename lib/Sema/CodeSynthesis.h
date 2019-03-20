@@ -58,8 +58,8 @@ void triggerAccessorSynthesis(TypeChecker &TC, AbstractStorageDecl *storage);
 void completeLazyVarImplementation(VarDecl *lazyVar);
 
 /// Retrieve or synthesize the backing property for the given property
-/// behavior.
-VarDecl *getOrSynthesizePropertyBehaviorBackingProperty(VarDecl *var);
+/// delegate.
+VarDecl *getOrSynthesizePropertyDelegateBackingProperty(VarDecl *var);
 
 /// Describes the kind of implicit constructor that will be
 /// generated.

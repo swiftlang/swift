@@ -1,0 +1,92 @@
+// RUN: %target-typecheck-verify-swift -debugger-support
+
+@propertyDelegate
+struct Wrapper<T> {
+  var value: T
+}
+
+// ---------------------------------------------------------------------------
+// Parsing
+// ---------------------------------------------------------------------------
+
+func testParsing() {
+  var wrapped1: Int by Wrapper
+  var wrapped2: Int by Wrapper = 5
+  var wrapped3 by Wrapper = 5
+
+  _ = wrapped1
+  _ = wrapped2
+  _ = wrapped3
+}
+
+func testParseError() {
+  let (a, b): (Int, Int) by Wrapper // expected-error{{property delegate can only by written on a single-variable pattern}}
+  let (c, d): (Int, Int) by // expected-error{{expected property delegate type after 'by'}}
+
+  _ = a
+  _ = b
+  _ = c
+  _ = d
+}
+
+// ---------------------------------------------------------------------------
+// Type formation
+// ---------------------------------------------------------------------------
+func testExplicitWrapperType() {
+  var wrapped1: Int by Wrapper
+
+  wrapped1 = "Hello" // expected-error{{cannot assign value of type 'String' to type 'Int'}}
+}
+
+@propertyDelegate
+struct NonGenericWrapper { }
+// expected-error@-1{{property delegate type must have a single generic type parameter}}
+
+@propertyDelegate
+struct TwoParameterWrapper<T, U> { }
+// expected-error@-1{{property delegate type must have a single generic type parameter}}
+
+@propertyDelegate
+struct MissingValue<T> { }
+// expected-error@-1{{property delegate type 'MissingValue' does not contain a non-static property named 'value'}}
+
+// expected-note@+1{{type 'NotADelegate<T>' must have the attribute '@propertyDelegate' to be used as a property delegate}}{{1-1=@propertyDelegate}}
+struct NotADelegate<T> {
+  var value: T
+}
+
+// expected-error@+1{{'@propertyDelegate' attribute cannot be applied to this declaration}}
+@propertyDelegate
+protocol CannotBeADelegate {
+  associatedtype Value
+  var value: Value { get set }
+}
+
+func testBadWrapperTypes() {
+  var wrapped1: Int by NonGenericWrapper // expected-error{{property delegate type 'NonGenericWrapper' must not provide generic arguments}}
+  var wrapped2: Int by TwoParameterWrapper
+  var wrapped3: Int by TwoParameterWrapper<Int, Int> // expected-error{{property delegate type 'TwoParameterWrapper<Int, Int>' must not provide generic arguments}}
+  var wrapped4: Int by (Int) // expected-error{{use of non-property delegate type 'Int' as a property delegate}}
+  var wrapped5: Int by Wrapper<Int> // expected-error{{property delegate type 'Wrapper<Int>' must not provide generic arguments}}
+  var wrapped6: Int by NotADelegate // expected-error{{use of non-property delegate type 'NotADelegate' as a property delegate}}
+
+  wrapped1 = 0
+  wrapped2 = 0
+  wrapped3 = 0
+  wrapped4 = 0
+  wrapped5 = 0
+  wrapped6 = 0
+  _ = wrapped1
+  _ = wrapped2
+  _ = wrapped3
+  _ = wrapped4
+  _ = wrapped5
+  _ = wrapped6
+}
+
+// ---------------------------------------------------------------------------
+// Property delegates as members
+// ---------------------------------------------------------------------------
+struct HasDelegate {
+  var wrapped1: Int by Wrapper
+}

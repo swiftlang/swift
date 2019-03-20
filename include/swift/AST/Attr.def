@@ -390,7 +390,7 @@ DECL_ATTR(_private, PrivateImport,
 SIMPLE_DECL_ATTR(_alwaysEmitIntoClient, AlwaysEmitIntoClient,
   OnVar | OnSubscript | OnAbstractFunction | UserInaccessible,
   83)
-SIMPLE_DECL_ATTR(propertyBehavior, PropertyBehavior,
+SIMPLE_DECL_ATTR(propertyDelegate, PropertyDelegate,
   OnStruct | OnClass | OnEnum,
   84)
 

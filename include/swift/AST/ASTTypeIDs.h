@@ -21,7 +21,7 @@
 namespace swift {
 
 class NominalTypeDecl;
-struct PropertyBehaviorTypeInfo;
+struct PropertyDelegateTypeInfo;
 class VarDecl;
 
 #define SWIFT_AST_TYPEID_ZONE 1

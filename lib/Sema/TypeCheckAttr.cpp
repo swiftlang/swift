@@ -122,7 +122,7 @@ public:
   IGNORED_ATTR(WeakLinked)
   IGNORED_ATTR(DynamicReplacement)
   IGNORED_ATTR(PrivateImport)
-  IGNORED_ATTR(PropertyBehavior)
+  IGNORED_ATTR(PropertyDelegate)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -835,7 +835,7 @@ public:
 
   void visitNonOverrideAttr(NonOverrideAttr *attr);
 
-  void visitPropertyBehaviorAttr(PropertyBehaviorAttr *attr);
+  void visitPropertyDelegateAttr(PropertyDelegateAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2403,12 +2403,12 @@ void AttributeChecker::visitNonOverrideAttr(NonOverrideAttr *attr) {
   }
 }
 
-void AttributeChecker::visitPropertyBehaviorAttr(PropertyBehaviorAttr *attr) {
+void AttributeChecker::visitPropertyDelegateAttr(PropertyDelegateAttr *attr) {
   if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
     ASTContext &ctx = nominal->getASTContext();
     (void)evaluateOrDefault(
-        ctx.evaluator, PropertyBehaviorTypeInfoRequest(nominal),
-        PropertyBehaviorTypeInfo());
+        ctx.evaluator, PropertyDelegateTypeInfoRequest(nominal),
+        PropertyDelegateTypeInfo());
   }
 }
 
@@ -2428,7 +2428,7 @@ void TypeChecker::checkTypeModifyingDeclAttributes(VarDecl *var) {
   if (auto *attr = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
     checkReferenceOwnershipAttr(var, attr);
 
-  if (var->hasPropertyBehavior()) {
+  if (var->hasPropertyDelegate()) {
 
   }
 }

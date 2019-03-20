@@ -18,7 +18,7 @@
 
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/Evaluator.h"
-#include "swift/AST/PropertyBehaviors.h"
+#include "swift/AST/PropertyDelegates.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeResolutionStage.h"
@@ -391,11 +391,11 @@ private:
   Type &getCache() const;
 };
 
-/// Retrieve information about a property behavior type.
-class PropertyBehaviorTypeInfoRequest
-  : public SimpleRequest<PropertyBehaviorTypeInfoRequest,
+/// Retrieve information about a property delegate type.
+class PropertyDelegateTypeInfoRequest
+  : public SimpleRequest<PropertyDelegateTypeInfoRequest,
                          CacheKind::Cached,
-                         PropertyBehaviorTypeInfo,
+                         PropertyDelegateTypeInfo,
                          NominalTypeDecl *> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -404,7 +404,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<PropertyBehaviorTypeInfo>
+  llvm::Expected<PropertyDelegateTypeInfo>
       evaluate(Evaluator &eval, NominalTypeDecl *nominal) const;
 
 public:
