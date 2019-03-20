@@ -383,6 +383,21 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
     }
 
     if (auto classDecl = ED->getSelfClassDecl()) {
+      auto *mod = value->getModuleContext();
+      auto &ctx = mod->getASTContext();
+
+      if (!ctx.LangOpts.EnableObjCResilientClassStubs) {
+        if (classDecl->checkAncestry().contains(
+              AncestryFlags::ResilientOther) ||
+            classDecl->hasResilientMetadata(mod,
+                                            ResilienceExpansion::Maximal)) {
+          if (diagnose) {
+            value->diagnose(diag::objc_in_resilient_extension);
+          }
+          return true;
+        }
+      }
+
       if (classDecl->isGenericContext()) {
         if (!classDecl->usesObjCGenericsModel()) {
           if (diagnose) {
@@ -1016,6 +1031,20 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
         .fixItRemove(attr->getRangeWithAt());
     }
 
+    // If the class has resilient ancestry, @objc just controls the runtime
+    // name unless -enable-resilient-objc-class-stubs is enabled.
+    if (ancestry.contains(AncestryFlags::ResilientOther) &&
+        !ctx.LangOpts.EnableObjCResilientClassStubs) {
+      if (attr->hasName()) {
+        const_cast<ClassDecl *>(CD)->getAttrs().add(
+          new (ctx) ObjCRuntimeNameAttr(*attr));
+        return None;
+      }
+
+      ctx.Diags.diagnose(attr->getLocation(), diag::objc_for_resilient_class)
+        .fixItRemove(attr->getRangeWithAt());
+    }
+
     // Only allow ObjC-rooted classes to be @objc.
     // (Leave a hole for test cases.)
     if (ancestry.contains(AncestryFlags::ObjC) &&
@@ -1032,8 +1061,16 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
     return ObjCReason(ObjCReason::ExplicitlyObjC);
   }
 
-  if (ancestry.contains(AncestryFlags::ObjC) &&
-      !ancestry.contains(AncestryFlags::Generic)) {
+  if (ancestry.contains(AncestryFlags::ObjC)) {
+    if (ancestry.contains(AncestryFlags::Generic)) {
+      return None;
+    }
+
+    if (ancestry.contains(AncestryFlags::ResilientOther) &&
+        !ctx.LangOpts.EnableObjCResilientClassStubs) {
+      return None;
+    }
+
     return ObjCReason(ObjCReason::ImplicitlyObjC);
   }
 
