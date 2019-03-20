@@ -2021,9 +2021,9 @@ namespace {
 } // end anonymous namespace
 
 static llvm::Function *emitObjCMetadataUpdateFunction(IRGenModule &IGM,
-                                                      ClassDecl *cls) {
+                                                      ClassDecl *D) {
   llvm::Function *f =
-    IGM.getAddrOfObjCMetadataUpdateFunction(cls, ForDefinition);
+    IGM.getAddrOfObjCMetadataUpdateFunction(D, ForDefinition);
   f->setAttributes(IGM.constructInitialAttributes());
 
   IRGenFunction IGF(IGM, f);
@@ -2037,7 +2037,7 @@ static llvm::Function *emitObjCMetadataUpdateFunction(IRGenModule &IGM,
 
   // Just directly call our metadata accessor. This should actually
   // return the same metadata; the Objective-C runtime enforces this.
-  auto type = cls->getDeclaredType()->getCanonicalType();
+  auto type = D->getDeclaredType()->getCanonicalType();
   auto *metadata = IGF.emitTypeMetadataRef(type,
                                            MetadataState::Complete)
     .getMetadata();

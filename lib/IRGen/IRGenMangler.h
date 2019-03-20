@@ -107,6 +107,14 @@ public:
     return mangleNominalTypeSymbol(Decl, "MU");
   }
 
+  std::string mangleObjCResilientClassStub(const ClassDecl *Decl) {
+    return mangleNominalTypeSymbol(Decl, "Ms");
+  }
+
+  std::string mangleFullObjCResilientClassStub(const ClassDecl *Decl) {
+    return mangleNominalTypeSymbol(Decl, "Mt");
+  }
+
   std::string mangleClassMetadataBaseOffset(const ClassDecl *Decl) {
     return mangleNominalTypeSymbol(Decl, "Mo");
   }
