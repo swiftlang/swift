@@ -122,6 +122,7 @@ public:
   IGNORED_ATTR(WeakLinked)
   IGNORED_ATTR(DynamicReplacement)
   IGNORED_ATTR(PrivateImport)
+  IGNORED_ATTR(PropertyBehavior)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -833,6 +834,8 @@ public:
   void visitFrozenAttr(FrozenAttr *attr);
 
   void visitNonOverrideAttr(NonOverrideAttr *attr);
+
+  void visitPropertyBehaviorAttr(PropertyBehaviorAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2397,6 +2400,15 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
 void AttributeChecker::visitNonOverrideAttr(NonOverrideAttr *attr) {
   if (auto overrideAttr = D->getAttrs().getAttribute<OverrideAttr>()) {
     diagnoseAndRemoveAttr(overrideAttr, diag::nonoverride_and_override_attr);
+  }
+}
+
+void AttributeChecker::visitPropertyBehaviorAttr(PropertyBehaviorAttr *attr) {
+  if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
+    ASTContext &ctx = nominal->getASTContext();
+    (void)evaluateOrDefault(
+        ctx.evaluator, PropertyBehaviorTypeInfoRequest(nominal),
+        PropertyBehaviorTypeInfo());
   }
 }
 

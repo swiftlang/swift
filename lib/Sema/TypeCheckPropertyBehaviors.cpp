@@ -85,20 +85,31 @@ static UnboundGenericType *getUnboundPropertyBehaviorType(VarDecl *var) {
     return nullptr;
   }
 
-  // We expect an unbound generic type here.
-  auto unboundGeneric = unboundBehaviorType->getAs<UnboundGenericType>();
-  if (!unboundGeneric) {
-    ctx.Diags.diagnose(byLoc, diag::property_behavior_not_unbound)
+  // We expect a nominal type with the @propertyBehavior attribute.
+  auto nominalDecl = unboundBehaviorType->getAnyNominal();
+  if (!nominalDecl ||
+      !nominalDecl->getAttrs().hasAttribute<PropertyBehaviorAttr>()) {
+    ctx.Diags.diagnose(byLoc, diag::property_behavior_by_not_behavior,
+                       unboundBehaviorType)
       .highlight(var->getPropertyBehaviorTypeLoc().getSourceRange());
+    if (nominalDecl && !isa<ProtocolDecl>(nominalDecl)) {
+      nominalDecl->diagnose(diag::property_behavior_missing_attribute,
+                            nominalDecl->getDeclaredInterfaceType())
+        .fixItInsert(
+            nominalDecl->getAttributeInsertionLoc(/*forModifier=*/false),
+           "@propertyBehavior");
+    }
+
     var->getPropertyBehaviorTypeLoc().setInvalidType(ctx);
     return nullptr;
   }
 
-  // Make sure that we have a single-parameter generic.
-  auto genericDecl = unboundGeneric->getDecl();
-  auto nominalDecl = dyn_cast<NominalTypeDecl>(genericDecl);
-  if (!nominalDecl) {
-    nominalDecl->diagnose(diag::property_behavior_not_single_parameter);
+  // We expect an unbound generic type here.
+  auto unboundGeneric = unboundBehaviorType->getAs<UnboundGenericType>();
+  if (!unboundGeneric || unboundGeneric->getDecl() != nominalDecl) {
+    ctx.Diags.diagnose(byLoc, diag::property_behavior_not_unbound,
+                       unboundBehaviorType)
+      .highlight(var->getPropertyBehaviorTypeLoc().getSourceRange());
     var->getPropertyBehaviorTypeLoc().setInvalidType(ctx);
     return nullptr;
   }
@@ -119,6 +130,11 @@ llvm::Expected<PropertyBehaviorTypeInfo>
 PropertyBehaviorTypeInfoRequest::evaluate(
     Evaluator &eval, NominalTypeDecl *nominal) const {
   PropertyBehaviorTypeInfo result;
+
+  // We must have the @propertyBehavior attribute to continue.
+  if (!nominal->getAttrs().hasAttribute<PropertyBehaviorAttr>()) {
+    return result;
+  }
 
   // Ensure that we have a single-parameter generic type.
   if (!nominal->getGenericSignature() ||

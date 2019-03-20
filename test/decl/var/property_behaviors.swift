@@ -1,5 +1,6 @@
 // RUN: %target-typecheck-verify-swift -debugger-support
 
+@propertyBehavior
 struct Wrapper<T> {
   var value: T
 }
@@ -37,11 +38,28 @@ func testExplicitWrapperType() {
   wrapped1 = "Hello" // expected-error{{cannot assign value of type 'String' to type 'Int'}}
 }
 
+@propertyBehavior
 struct NonGenericWrapper { }
 // expected-error@-1{{property behavior type must have a single generic type parameter}}
 
+@propertyBehavior
 struct TwoParameterWrapper<T, U> { }
 // expected-error@-1{{property behavior type must have a single generic type parameter}}
+
+@propertyBehavior
+struct MissingValue<T> { }
+// expected-error@-1{{property behavior type 'MissingValue' does not contain a non-static property named 'value'}}
+
+struct NotABehavior<T> {
+  var value: T
+}
+
+// expected-error@+1{{'@propertyBehavior' attribute cannot be applied to this declaration}}
+@propertyBehavior
+protocol CannotBeABehavior {
+  associatedtype Value
+  var value: Value { get set }
+}
 
 func testBadWrapperTypes() {
   var wrapped1: Int by NonGenericWrapper
@@ -49,17 +67,20 @@ func testBadWrapperTypes() {
   var wrapped3: Int by TwoParameterWrapper<Int, Int>
   var wrapped4: Int by (Int) // FIXME: error about Int not being a behavior type
   var wrapped5: Int by Wrapper<Int> // FIXME: diagnose this consistently
+  var wrapped6: Int by NotABehavior // FIXME: diagnose this consistently
 
   wrapped1 = 0
   wrapped2 = 0
   wrapped3 = 0
   wrapped4 = 0
   wrapped5 = 0
+  wrapped6 = 0
   _ = wrapped1
   _ = wrapped2
   _ = wrapped3
   _ = wrapped4
   _ = wrapped5
+  _ = wrapped6
 }
 
 // ---------------------------------------------------------------------------
