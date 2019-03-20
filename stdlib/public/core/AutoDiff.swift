@@ -145,11 +145,12 @@ public func differentiableFunction<T : Differentiable, R : Differentiable>(
   from vjp: @escaping (T)
            -> (value: R, pullback: (R.CotangentVector) -> T.CotangentVector)
 ) -> @differentiable (T) -> R {
-  @differentiable(vjp: _vjp)
   func original(_ x: T) -> R {
     return vjp(x).value
   }
-  func _vjp(_ x: T) -> (R, (R.CotangentVector) -> T.CotangentVector) {
+  @differentiating(original)
+  func derivative(_ x: T)
+    -> (value: R, pullback: (R.CotangentVector) -> T.CotangentVector) {
     return vjp(x)
   }
   return original
@@ -163,12 +164,14 @@ public func differentiableFunction<T, U, R>(
              -> (T.CotangentVector, U.CotangentVector))
 ) -> @differentiable (T, U) -> R
   where T : Differentiable, U : Differentiable, R : Differentiable {
-  @differentiable(vjp: _vjp)
   func original(_ x: T, _ y: U) -> R {
     return vjp(x, y).value
   }
-  func _vjp(_ x: T, _ y: U)
-    -> (R, (R.CotangentVector) -> (T.CotangentVector, U.CotangentVector)) {
+  @differentiating(original)
+  func derivative(_ x: T, _ y: U)
+    -> (value: R,
+        pullback: (R.CotangentVector)
+                    -> (T.CotangentVector, U.CotangentVector)) {
     return vjp(x, y)
   }
   return original
