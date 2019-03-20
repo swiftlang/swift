@@ -401,8 +401,8 @@ DECL_ATTR(differentiable, Differentiable,
   AllowMultipleAttributes,
   83)
 DECL_ATTR(differentiating, Differentiating,
-  OnFunc | LongAttribute | AllowMultipleAttributes,
-  84)
+  OnFunc | LongAttribute | AllowMultipleAttributes |
+  NotSerialized, 84)
 SIMPLE_DECL_ATTR(compilerEvaluable, CompilerEvaluable,
                  OnAccessor | OnFunc | OnConstructor | OnSubscript,
                  /* Not serialized */ 85)

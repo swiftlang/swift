@@ -1279,6 +1279,18 @@ void DifferentiableAttr::setRequirements(ASTContext &context,
   Requirements = context.AllocateCopy(requirements);
 }
 
+void DifferentiableAttr::setJVPFunction(FuncDecl *decl) {
+  JVPFunction = decl;
+  if (decl && !JVP)
+    JVP = {decl->getFullName(), DeclNameLoc(decl->getNameLoc())};
+}
+
+void DifferentiableAttr::setVJPFunction(FuncDecl *decl) {
+  VJPFunction = decl;
+  if (decl && !VJP)
+    VJP = {decl->getFullName(), DeclNameLoc(decl->getNameLoc())};
+}
+
 void DifferentiableAttr::print(llvm::raw_ostream &OS, const Decl *D,
                                ModuleDecl *prettyPrintInModule) const {
   StreamPrinter P(OS);
