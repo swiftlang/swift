@@ -5,10 +5,10 @@ add_swift_target_library(swiftUIKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_
   DesignatedInitializers.mm
   UIKit.swift
 
+  "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
+
   GYB_SOURCES
     UIKit_FoundationExtensions.swift.gyb
-
-  "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
 
   SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} -swift-version 4.2
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
