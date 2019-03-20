@@ -3634,6 +3634,22 @@ AncestryOptions ClassDecl::checkAncestry() const {
   return result;
 }
 
+bool ClassDecl::isSuperclassOf(ClassDecl *other) const {
+  llvm::SmallPtrSet<const ClassDecl *, 8> visited;
+
+  do {
+    if (!visited.insert(other).second)
+      break;
+
+    if (this == other)
+      return true;
+
+    other = other->getSuperclassDecl();
+  } while (other != nullptr);
+
+  return false;
+}
+
 ClassDecl::MetaclassKind ClassDecl::getMetaclassKind() const {
   assert(getASTContext().LangOpts.EnableObjCInterop &&
          "querying metaclass kind without objc interop");
@@ -3727,8 +3743,6 @@ ClassDecl::findImplementingMethod(const AbstractFunctionDecl *Method) const {
       }
     }
     // Check the superclass
-    if (!C->hasSuperclass())
-      break;
     C = C->getSuperclassDecl();
   }
   return nullptr;
