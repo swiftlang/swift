@@ -7,6 +7,8 @@ struct MyStruct {
     get { return "get \(i)" }
     set { print("set \(i)") }
   }
+  
+  static var prop: Int = 0
 }
 
 print(MyStruct.self[0])
@@ -37,3 +39,11 @@ class NSThingy {
     return nil
   }
 }
+let kp = \MyStruct.Type.prop
+print(kp)
+print(MyStruct.self[keyPath: kp])
+print(MyStruct[keyPath: kp])
+
+let dynKP = \Dyn.Type.foo
+print(dynKP)
+print(Dyn.self[keyPath: dynKP])

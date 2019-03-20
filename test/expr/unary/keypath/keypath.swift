@@ -515,9 +515,9 @@ class X {
 
 func testStaticKeyPathComponent() {
   _ = \X.a // expected-error{{}}
-  _ = \X.Type.a // expected-error{{cannot refer to static member}}
+  _ = \X.Type.a
   _ = \X.b // expected-error{{}}
-  _ = \X.Type.b // expected-error{{cannot refer to static member}}
+  _ = \X.Type.b
 }
 
 class Bass: Hashable {

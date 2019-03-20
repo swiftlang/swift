@@ -2449,7 +2449,8 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
   
   // Upcast a class instance to the property's declared type if necessary.
   if (auto propertyClass = storage->getDeclContext()->getSelfClassDecl()) {
-    if (baseType->getClassOrBoundGenericClass() != propertyClass) {
+    if (baseType->getClassOrBoundGenericClass() != propertyClass &&
+        !baseType->is<MetatypeType>()) {
       baseType = baseType->getSuperclassForDecl(propertyClass)
         ->getCanonicalType();
       paramSubstValue = subSGF.B.createUpcast(loc, paramSubstValue,
@@ -3306,10 +3307,16 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
              .isForeign));
     };
   
-  auto strategy = storage->getAccessStrategy(AccessSemantics::Ordinary,
-                                             storage->supportsMutation()
-                                               ? AccessKind::ReadWrite
-                                               : AccessKind::Read,
+  auto accessKind = storage->supportsMutation()
+                  ? AccessKind::ReadWrite
+                  : AccessKind::Read;
+  
+  // Keypaths always access static properties through accessors; instance
+  // properties can be accessed directly.
+  auto strategy = storage->isStatic()
+                ? storage->getOpaqueAccessStrategy(accessKind)
+                : storage->getAccessStrategy(AccessSemantics::Ordinary,
+                                             accessKind,
                                              M.getSwiftModule(),
                                              expansion);
 

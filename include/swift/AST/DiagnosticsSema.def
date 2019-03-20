@@ -484,9 +484,6 @@ ERROR(expr_keypath_not_property,none,
 ERROR(expr_keypath_mutating_getter,none,
       "key path cannot refer to %0, which has a mutating getter",
       (DeclName))
-ERROR(expr_keypath_static_member,none,
-      "key path cannot refer to static member %0",
-      (DeclName))
 ERROR(expr_keypath_empty,none,
       "empty key path does not refer to a property", ())
 ERROR(expr_unsupported_objc_key_path_component,none,

@@ -1324,6 +1324,11 @@ SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
   // computed.
   if (decl->isResilient(M.getSwiftModule(), expansion))
     return false;
+  
+  // If the declaration is static (or class), we need to access it through
+  // its accessors.
+  if (decl->isStatic())
+    return false;
 
   auto strategy = decl->getAccessStrategy(AccessSemantics::Ordinary,
                                           decl->supportsMutation()
