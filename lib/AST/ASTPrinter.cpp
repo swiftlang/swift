@@ -19,6 +19,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -248,24 +249,6 @@ std::string ASTPrinter::sanitizeUtf8(StringRef Text) {
     Data += Step;
   }
   return Builder.str();
-}
-
-ValueDecl* ASTPrinter::findConformancesWithDocComment(ValueDecl *VD) {
-  assert(VD->getRawComment().isEmpty());
-  std::queue<ValueDecl*> AllConformances;
-  AllConformances.push(VD);
-  while (!AllConformances.empty()) {
-    auto *VD = AllConformances.front();
-    AllConformances.pop();
-    if (VD->getRawComment().isEmpty()) {
-      for (auto *Req : VD->getSatisfiedProtocolRequirements()) {
-        AllConformances.push(Req);
-      }
-    } else {
-      return VD;
-    }
-  }
-  return nullptr;
 }
 
 void ASTPrinter::anchor() {}
@@ -569,20 +552,14 @@ class PrintAST : public ASTVisitor<PrintAST> {
   }
 
   void printSwiftDocumentationComment(const Decl *D) {
-    auto RC = D->getRawComment();
-    if (RC.isEmpty() && !Options.ElevateDocCommentFromConformance)
+    if (Options.CascadeDocComment)
+      D = getDocCommentProvidingDecl(D);
+    if (!D)
       return;
-
-    if (RC.isEmpty()) {
-      if (auto *VD = dyn_cast<ValueDecl>(D)) {
-        if (auto *Req = ASTPrinter::findConformancesWithDocComment(
-            const_cast<ValueDecl*>(VD))) {
-          printRawComment(Req->getRawComment());
-        }
-      }
-    } else {
-      printRawComment(RC);
-    }
+    auto RC = D->getRawComment();
+    if (RC.isEmpty())
+      return;
+    printRawComment(RC);
   }
 
   void printDocumentationComment(const Decl *D) {

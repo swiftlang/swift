@@ -258,7 +258,7 @@ struct CommentToXMLConverter {
     OS << "</Tags>";
   }
 
-  void visitDocComment(const DocComment *DC);
+  void visitDocComment(const Decl *D, const DocComment *DC);
   void visitCommentParts(const swift::markup::CommentParts &Parts);
 };
 } // unnamed namespace
@@ -297,8 +297,7 @@ void CommentToXMLConverter::visitCommentParts(const swift::markup::CommentParts 
   }
 }
 
-void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
-  const Decl *D = DC->getDecl();
+void CommentToXMLConverter::visitDocComment(const Decl *D, const DocComment *DC) {
 
   StringRef RootEndTag;
   if (isa<AbstractFunctionDecl>(D)) {
@@ -460,11 +459,11 @@ bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
 
   swift::markup::MarkupContext MC;
   auto DC = getCascadingDocComment(MC, D);
-  if (!DC.hasValue())
+  if (!DC)
     return false;
 
   CommentToXMLConverter Converter(OS);
-  Converter.visitDocComment(DC.getValue());
+  Converter.visitDocComment(D, DC);
 
   OS.flush();
   return true;
@@ -473,10 +472,10 @@ bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
 bool ide::getLocalizationKey(const Decl *D, raw_ostream &OS) {
   swift::markup::MarkupContext MC;
   auto DC = getCascadingDocComment(MC, D);
-  if (!DC.hasValue())
+  if (!DC)
     return false;
 
-  if (const auto LKF = DC.getValue()->getLocalizationKeyField()) {
+  if (const auto LKF = DC->getLocalizationKeyField()) {
     printInlinesUnder(LKF.getValue(), OS);
     return true;
   }
