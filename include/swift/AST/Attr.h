@@ -1497,9 +1497,9 @@ public:
   void setRequirements(ASTContext &context, ArrayRef<Requirement> requirements);
 
   FuncDecl *getJVPFunction() const { return JVPFunction; }
-  void setJVPFunction(FuncDecl *decl) { JVPFunction = decl; }
+  void setJVPFunction(FuncDecl *decl);
   FuncDecl *getVJPFunction() const { return VJPFunction; }
-  void setVJPFunction(FuncDecl *decl) { VJPFunction = decl; }
+  void setVJPFunction(FuncDecl *decl);
 
   bool parametersMatch(const DifferentiableAttr &other) const {
     assert(ParameterIndices && other.ParameterIndices);
