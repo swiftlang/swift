@@ -276,6 +276,15 @@ class alignas(1 << TypeAlignInBits) TypeBase {
     return false;
   }
 
+  /// Returns true if the given type is an artificial type.
+  ///
+  /// Only intended for use in compile-time optimizations.
+  // Specializations of this are at the end of the file.
+  template <typename T>
+  static constexpr bool isArtificialType() {
+    return false;
+  }
+
 protected:
   enum { NumAFTExtInfoBits = 6 };
   enum { NumSILExtInfoBits = 6 };
@@ -469,7 +478,7 @@ public:
   template <typename T>
   T *getAs() {
     static_assert(!isSugaredType<T>(), "getAs desugars types");
-    auto Ty = getDesugaredType();
+    auto Ty = isArtificialType<T>() ? this : getDesugaredType();
     SWIFT_ASSUME(Ty != nullptr);
     return dyn_cast<T>(Ty);
   }
@@ -477,13 +486,17 @@ public:
   template <typename T>
   bool is() {
     static_assert(!isSugaredType<T>(), "isa desugars types");
-    return isa<T>(getDesugaredType());
+    auto Ty = isArtificialType<T>() ? this : getDesugaredType();
+    SWIFT_ASSUME(Ty != nullptr);
+    return isa<T>(Ty);
   }
   
   template <typename T>
   T *castTo() {
     static_assert(!isSugaredType<T>(), "castTo desugars types");
-    return cast<T>(getDesugaredType());
+    auto Ty = isArtificialType<T>() ? this : getDesugaredType();
+    SWIFT_ASSUME(Ty != nullptr);
+    return cast<T>(Ty);
   }
 
   /// getRecursiveProperties - Returns the properties defined on the
@@ -5426,6 +5439,11 @@ AnyFunctionType::Param computeSelfParam(AbstractFunctionDecl *AFD,
 #define SUGARED_TYPE(id, parent) \
 template <> \
 constexpr bool TypeBase::isSugaredType<id##Type>() { \
+  return true; \
+}
+#define ARTIFICIAL_TYPE(id, parent) \
+template <> \
+constexpr bool TypeBase::isArtificialType<id##Type>() { \
   return true; \
 }
 #include "swift/AST/TypeNodes.def"
