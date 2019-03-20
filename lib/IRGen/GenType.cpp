@@ -2175,32 +2175,27 @@ SpareBitVector IRGenModule::getSpareBitsForType(llvm::Type *scalarTy, Size size)
   if (it != SpareBitsForTypes.end())
     return it->second;
 
-  assert(DataLayout.getTypeAllocSizeInBits(scalarTy) <= size.getValueInBits() &&
+  assert(!isa<llvm::StructType>(scalarTy));
+
+  unsigned allocBits = size.getValueInBits();
+  assert(allocBits >= DataLayout.getTypeAllocSizeInBits(scalarTy) &&
          "using a size that's smaller than LLVM's alloc size?");
-  
-  {
-    // FIXME: Currently we only implement spare bits for primitive integer
-    // types.
-    assert(!isa<llvm::StructType>(scalarTy));
 
-    auto *intTy = dyn_cast<llvm::IntegerType>(scalarTy);
-    if (!intTy)
-      goto no_spare_bits;
+  // Allocate a new cache entry.
+  SpareBitVector &result = SpareBitsForTypes[scalarTy];
 
-    // Round Integer-Of-Unusual-Size types up to their allocation size.
-    unsigned allocBits = size.getValueInBits();
-    assert(allocBits >= intTy->getBitWidth());
-        
-    // FIXME: Endianness.
-    SpareBitVector &result = SpareBitsForTypes[scalarTy];
-    result.appendClearBits(intTy->getBitWidth());
-    result.extendWithSetBits(allocBits);
+  // FIXME: Currently we only implement spare bits for primitive integer
+  // types.
+  if (auto *intTy = dyn_cast<llvm::IntegerType>(scalarTy)) {
+    // Pad integers with spare bits up to their allocation size.
+    auto v = llvm::APInt::getBitsSetFrom(allocBits, intTy->getBitWidth());
+    // FIXME: byte swap v on big-endian platforms.
+    result = SpareBitVector::fromAPInt(v);
     return result;
   }
-  
-no_spare_bits:
-  SpareBitVector &result = SpareBitsForTypes[scalarTy];
-  result.appendClearBits(size.getValueInBits());
+
+  // No spare bits.
+  result = SpareBitVector::getConstant(allocBits, false);
   return result;
 }
 
