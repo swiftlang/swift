@@ -876,6 +876,20 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         continue;
       }
 
+      // Dynamic member lookup through a keypath is better than one using string
+      // because it carries more type information.
+      if (choice1.getKind() == OverloadChoiceKind::KeyPathDynamicMemberLookup &&
+          choice2.getKind() == OverloadChoiceKind::DynamicMemberLookup) {
+        score1 += weight;
+        continue;
+      }
+
+      if (choice1.getKind() == OverloadChoiceKind::DynamicMemberLookup &&
+          choice2.getKind() == OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+        score2 += weight;
+        continue;
+      }
+
       continue;
     }
 
