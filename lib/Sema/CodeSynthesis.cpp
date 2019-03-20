@@ -1474,14 +1474,27 @@ VarDecl *swift::getOrSynthesizePropertyDelegateBackingProperty(VarDecl *var) {
   addMemberToContextIfNeeded(backingVar, dc, var);
 
   // Create the pattern binding declaration for the backing property.
-  // FIXME: If the original property had an initializer, we'll have an
-  // initializer.
   Pattern *pbdPattern = new (ctx) NamedPattern(backingVar, /*implicit=*/true);
   pbdPattern = TypedPattern::createImplicit(ctx, pbdPattern, storageType);
   auto pbd = PatternBindingDecl::createImplicit(
       ctx, backingVar->getCorrectStaticSpelling(), pbdPattern,
       /*init*/nullptr, dc, var->getPropertyDelegateByLoc());
   addMemberToContextIfNeeded(pbd, dc, var);
+
+  // Take the initializer from the original property.
+  if (auto parentPBD = var->getParentPatternBinding()) {
+    unsigned patternNumber = parentPBD->getPatternEntryIndexForVarDecl(var);
+    if (parentPBD->getInit(patternNumber) &&
+        !parentPBD->isInitializerChecked(patternNumber)) {
+      auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
+      tc.typeCheckPatternBinding(parentPBD, patternNumber);
+    }
+
+    if (Expr *init = parentPBD->getInit(patternNumber)) {
+      pbd->setInit(0, init);
+      pbd->setInitializerChecked(0);
+    }
+  }
 
   // Mark the backing property as 'final'. There's no sensible way to override.
   if (dc->getSelfClassDecl())
@@ -1496,6 +1509,12 @@ VarDecl *swift::getOrSynthesizePropertyDelegateBackingProperty(VarDecl *var) {
 
 static bool wouldBeCircularSynthesis(AbstractStorageDecl *storage,
                                      AccessorKind kind) {
+  // All property delegate accessors are non-circular.
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    if (var->hasPropertyDelegate())
+      return false;
+  }
+
   switch (kind) {
   case AccessorKind::Get:
     return storage->getReadImpl() == ReadImplKind::Get;

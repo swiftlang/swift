@@ -2712,6 +2712,15 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
     PBD->setInvalid();
 
   PBD->setInitializerChecked(patternNumber);
+
+  // If this was an initializer for a property with a property delegate,
+  // the initializer expression initializes the backing storage. That
+  // initializer subsumes this one.
+  if (auto singleVar = pattern->getSingleVar()) {
+    if (singleVar->hasPropertyDelegate())
+      PBD->setInitializerSubsumed(patternNumber);
+  }
+
   return hadError;
 }
 
