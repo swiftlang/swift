@@ -7,27 +7,24 @@
 
 // BCANALYZER-NOT: UnknownCode
 
+// CHECK: @differentiable(wrt: x, jvp: jvpAddWrtX)
+// CHECK-NEXT: @differentiable(vjp: vjpAdd)
 func add(x: Float, y: Float) -> Float {
   return x + y
 }
-// CHECK: @differentiating(add, wrt: x)
-// CHECK-NEXT: func jvpAddWrtX(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float))
 @differentiating(add, wrt: x)
-func jvpAddWrtX(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float)) {
+func jvpAddWrtX(x: Float, y: Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x + y, { $0 })
 }
-// CHECK: @differentiating(add)
-// CHECK-NEXT: func vjpAddWrtXY(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float, Float))
 @differentiating(add)
-func vjpAddWrtXY(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float, Float)) {
+func vjpAdd(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float, Float)) {
   return (x + y, { ($0, $0) })
 }
 
+// CHECK: @differentiable(vjp: vjpGeneric where T : Differentiable)
 func generic<T : Numeric>(x: T) -> T {
   return x
 }
-// CHECK: @differentiating(generic)
-// CHECK-NEXT: func vjpGeneric<T>(x: T) -> (value: T, pullback: (T.CotangentVector) -> T.CotangentVector)
 @differentiating(generic)
 func vjpGeneric<T>(x: T) -> (value: T, pullback: (T.CotangentVector) -> T.CotangentVector)
   where T : Numeric, T : Differentiable
@@ -36,21 +33,21 @@ func vjpGeneric<T>(x: T) -> (value: T, pullback: (T.CotangentVector) -> T.Cotang
 }
 
 protocol InstanceMethod : Differentiable {
+  // CHECK: @differentiable(vjp: vjpFoo)
   func foo(_ x: Self) -> Self
+  // CHECK: @differentiable(jvp: jvpBarWrt where T == T.TangentVector)
   func bar<T : Differentiable>(_ x: T) -> Self
 }
 extension InstanceMethod {
-  // CHECK: @differentiating(foo)
-  // CHECK-NEXT: func vjpFoo(x: Self) -> (value: Self, pullback: (Self.CotangentVector) -> (Self.CotangentVector, Self.CotangentVector))
   @differentiating(foo)
   func vjpFoo(x: Self) -> (value: Self, pullback: (Self.CotangentVector) -> (Self.CotangentVector, Self.CotangentVector)) {
     return (x, { ($0, $0) })
   }
 
-  // CHECK: @differentiating(bar)
-  // CHECK-NEXT: func jvpBarWrt<T>(_ x: T) -> (value: Self, differential: (Self.TangentVector, T.TangentVector) -> Self.TangentVector) where T : Differentiable
   @differentiating(bar, wrt: (self, x))
-  func jvpBarWrt<T : Differentiable>(_ x: T) -> (value: Self, differential: (Self.TangentVector, T.TangentVector) -> Self.TangentVector) {
+  func jvpBarWrt<T : Differentiable>(_ x: T) -> (value: Self, differential: (Self.TangentVector, T) -> Self.TangentVector)
+    where T == T.TangentVector
+  {
     return (self, { dself, dx in dself })
   }
 }

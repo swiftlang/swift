@@ -1281,13 +1281,13 @@ void DifferentiableAttr::setRequirements(ASTContext &context,
 
 void DifferentiableAttr::setJVPFunction(FuncDecl *decl) {
   JVPFunction = decl;
-  if (decl)
+  if (decl && !JVP)
     JVP = {decl->getFullName(), DeclNameLoc(decl->getNameLoc())};
 }
 
 void DifferentiableAttr::setVJPFunction(FuncDecl *decl) {
   VJPFunction = decl;
-  if (decl)
+  if (decl && !VJP)
     VJP = {decl->getFullName(), DeclNameLoc(decl->getNameLoc())};
 }
 
