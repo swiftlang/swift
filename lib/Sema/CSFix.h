@@ -132,6 +132,10 @@ enum class FixKind : uint8_t {
 
   /// If there is out-of-order argument, let's fix that by re-ordering.
   MoveOutOfOrderArgument,
+
+  /// If there is a matching inaccessible member - allow it as if there
+  /// no access control.
+  AllowInaccessibleMember,
 };
 
 class ConstraintFix {
@@ -711,6 +715,26 @@ public:
                                         unsigned prevArgIdx,
                                         ArrayRef<ParamBinding> bindings,
                                         ConstraintLocator *locator);
+};
+
+class AllowInaccessibleMember final : public ConstraintFix {
+  ValueDecl *Member;
+
+  AllowInaccessibleMember(ConstraintSystem &cs, ValueDecl *member,
+                          ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowInaccessibleMember, locator),
+        Member(member) {}
+
+public:
+  std::string getName() const override {
+    return "allow inaccessible member reference";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowInaccessibleMember *create(ConstraintSystem &cs,
+                                         ValueDecl *member,
+                                         ConstraintLocator *locator);
 };
 
 } // end namespace constraints

@@ -424,6 +424,17 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     });
   }
 
+  // If there are no shims in the resource dir, add a search path in the SDK.
+  SmallString<128> shimsPath(searchPathOpts.RuntimeResourcePath);
+  llvm::sys::path::append(shimsPath, "shims");
+  if (!llvm::sys::fs::exists(shimsPath)) {
+    shimsPath = searchPathOpts.SDKPath;
+    llvm::sys::path::append(shimsPath, "usr", "lib", "swift", "shims");
+    invocationArgStrs.insert(invocationArgStrs.end(), {
+      "-isystem", shimsPath.str()
+    });
+  }
+
   // Construct the invocation arguments for the current target.
   // Add target-independent options first.
   invocationArgStrs.insert(invocationArgStrs.end(), {
@@ -716,6 +727,8 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
     invocationArgStrs.push_back(importerOpts.IndexStorePath);
   }
 
+  invocationArgStrs.push_back("-fansi-escape-codes");
+
   for (auto extraArg : importerOpts.ExtraArgs) {
     invocationArgStrs.push_back(extraArg);
   }
@@ -876,7 +889,6 @@ ClangImporter::create(ASTContext &ctx,
   // Clang expects this to be like an actual command line. So we need to pass in
   // "clang" for argv[0]
   invocationArgStrs.push_back("clang");
-
   switch (importerOpts.Mode) {
   case ClangImporterOptions::Modes::Normal:
     getNormalInvocationArguments(invocationArgStrs, ctx, importerOpts);

@@ -791,15 +791,19 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
   // Otherwise, we have at least one (and potentially many) viable candidates
   // sort them out.  If all of the candidates have the same problem (commonly
   // because there is exactly one candidate!) diagnose this.
-  bool sameProblem = true;
-  auto firstProblem = result.UnviableCandidates[0].second;
+  auto firstProblem = result.UnviableReasons[0];
+  bool sameProblem = llvm::all_of(
+      result.UnviableReasons,
+      [&firstProblem](const MemberLookupResult::UnviableReason &problem) {
+        return problem == firstProblem;
+      });
+
   ValueDecl *member = nullptr;
   for (auto cand : result.UnviableCandidates) {
     if (member == nullptr)
-      member = cand.first.getDecl();
-    sameProblem &= cand.second == firstProblem;
+      member = cand.getDecl();
   }
-  
+
   auto instanceTy = baseObjTy;
   if (auto *MTT = instanceTy->getAs<AnyMetatypeType>())
     instanceTy = MTT->getInstanceType();
@@ -842,7 +846,7 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
     }
         
     case MemberLookupResult::UR_Inaccessible: {
-      auto decl = result.UnviableCandidates[0].first.getDecl();
+      auto decl = result.UnviableCandidates[0].getDecl();
       // FIXME: What if the unviable candidates have different levels of access?
       //
       // If we found an inaccessible member of a protocol extension, it might
@@ -850,11 +854,17 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
       // visible to us, but the conforming type is. In this case, we need to
       // clamp the formal access for diagnostics purposes to the formal access
       // of the protocol itself.
-      diagnose(nameLoc, diag::candidate_inaccessible, decl->getBaseName(),
-               decl->getFormalAccessScope().accessLevelForDiagnostics());
-      for (auto cand : result.UnviableCandidates)
-        diagnose(cand.first.getDecl(), diag::decl_declared_here, memberName);
-        
+      InaccessibleMemberFailure failure(expr, CS, decl,
+                                        CS.getConstraintLocator(E));
+      auto diagnosed = failure.diagnoseAsError();
+      assert(diagnosed && "failed to produce expected diagnostic");
+      for (auto cand : result.UnviableCandidates) {
+        auto *choice = cand.getDecl();
+        // failure is going to highlight candidate given to it,
+        // we just need to handle the rest here.
+        if (choice != decl)
+          diagnose(choice, diag::decl_declared_here, choice->getFullName());
+      }
       return;
     }
     }
@@ -4206,7 +4216,7 @@ bool FailureDiagnosis::diagnoseMethodAttributeFailures(
 
   SmallVector<OverloadChoice, 2> choices;
   for (auto &unviable : results.UnviableCandidates)
-    choices.push_back(OverloadChoice(baseType, unviable.first.getDecl(),
+    choices.push_back(OverloadChoice(baseType, unviable.getDecl(),
                                      UDE->getFunctionRefKind()));
 
   CalleeCandidateInfo unviableCandidates(baseType, choices, hasTrailingClosure,

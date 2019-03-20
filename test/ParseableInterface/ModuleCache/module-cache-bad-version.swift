@@ -16,7 +16,7 @@
 //
 // Try to build TestModule into a .swiftmodule explicitly using LeafModule via LeafModule.swiftinterface, but fail because version mismatch in LeafModule.swiftinterface.
 //
-// RUN: not %target-swift-frontend -I %t -module-cache-path %t/modulecache -enable-parseable-module-interface -emit-module  -o %t/TestModule.swiftmodule -module-name TestModule %s >%t/err.txt 2>&1
+// RUN: not %target-swift-frontend -I %t -module-cache-path %t/modulecache -emit-module  -o %t/TestModule.swiftmodule -module-name TestModule %s >%t/err.txt 2>&1
 // RUN: test ! -f %t/TestModule.swiftmodule
 // RUN: test ! -f %t/modulecache/LeafModule-*.swiftmodule
 // RUN: %FileCheck %s -check-prefix=CHECK-ERR <%t/err.txt

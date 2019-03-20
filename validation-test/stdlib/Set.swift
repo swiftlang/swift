@@ -4613,4 +4613,102 @@ SetTestSuite.test("IndexValidation.RemoveAt.AfterGrow") {
   s.remove(at: i)
 }
 
+#if _runtime(_ObjC)
+SetTestSuite.test("ForcedNonverbatimBridge.Trap.String")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type")
+  .code {
+
+  let s1: NSSet = [
+    "Gordon" as NSString,
+    "William" as NSString,
+    "Katherine" as NSString,
+    "Lynn" as NSString,
+    "Brian" as NSString,
+    1756 as NSNumber]
+
+  expectCrashLater()
+  _ = s1 as! Set<String>
+}
+#endif
+
+#if _runtime(_ObjC)
+SetTestSuite.test("ForcedNonverbatimBridge.Trap.Int")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type")
+  .code {
+
+  let s1: NSSet = [
+    4 as NSNumber,
+    8 as NSNumber,
+    15 as NSNumber,
+    16 as NSNumber,
+    23 as NSNumber,
+    42 as NSNumber,
+    "John" as NSString]
+
+  expectCrashLater()
+  _ = s1 as! Set<Int>
+}
+#endif
+
+#if _runtime(_ObjC)
+SetTestSuite.test("ForcedVerbatimBridge.Trap.NSString")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type")
+  .code {
+
+  let s1: NSSet = [
+    "Gordon" as NSString,
+    "William" as NSString,
+    "Katherine" as NSString,
+    "Lynn" as NSString,
+    "Brian" as NSString,
+    1756 as NSNumber]
+
+  // With the ObjC runtime, the verbatim downcast is O(1); it performs no
+  // runtime checks.
+  let s2 = s1 as! Set<NSString>
+  // Element access goes through the bridged path and performs forced downcasts.
+  // This is where the odd numeric value is caught.
+  expectCrashLater()
+  for string in s2 {
+    _ = string
+  }
+}
+#endif
+
+#if _runtime(_ObjC)
+SetTestSuite.test("ForcedVerbatimBridge.Trap.NSNumber")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type")
+  .code {
+  let s1: NSSet = [
+    4 as NSNumber,
+    8 as NSNumber,
+    15 as NSNumber,
+    16 as NSNumber,
+    23 as NSNumber,
+    42 as NSNumber,
+    "John" as NSString]
+  // With the ObjC runtime, the verbatim downcast is O(1); it performs no
+  // runtime checks.
+  let s2 = s1 as! Set<NSNumber>
+  // Element access goes through the bridged path and performs forced downcasts.
+  // This is where the odd numeric value is caught.
+  expectCrashLater()
+  for string in s2 {
+    _ = string
+  }
+}
+#endif
+
 runAllTests()

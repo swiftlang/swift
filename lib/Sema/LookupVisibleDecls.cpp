@@ -174,6 +174,24 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
   return true;
 }
 
+/// Collect visble members from \p Parent into \p FoundDecls .
+static void collectVisibleMemberDecls(const DeclContext *CurrDC, LookupState LS,
+                                      Type BaseType,
+                                      IterableDeclContext *Parent,
+                                      SmallVectorImpl<ValueDecl *> &FoundDecls,
+                                      LazyResolver *TypeResolver) {
+  for (auto Member : Parent->getMembers()) {
+    auto *VD = dyn_cast<ValueDecl>(Member);
+    if (!VD)
+      continue;
+    if (!isDeclVisibleInLookupMode(VD, LS, CurrDC, TypeResolver))
+      continue;
+    if (!isMemberDeclApplied(CurrDC, BaseType, VD))
+      continue;
+    FoundDecls.push_back(VD);
+  }
+}
+
 /// Lookup members in extensions of \p LookupType, using \p BaseType as the
 /// underlying type when checking any constraints on the extensions.
 static void doGlobalExtensionLookup(Type BaseType,
@@ -187,15 +205,12 @@ static void doGlobalExtensionLookup(Type BaseType,
 
   // Look in each extension of this type.
   for (auto extension : nominal->getExtensions()) {
-    if (!isExtensionApplied(*const_cast<DeclContext*>(CurrDC), BaseType,
+    if (!isExtensionApplied(const_cast<DeclContext *>(CurrDC), BaseType,
                             extension))
       continue;
 
-    for (auto Member : extension->getMembers()) {
-      if (auto VD = dyn_cast<ValueDecl>(Member))
-        if (isDeclVisibleInLookupMode(VD, LS, CurrDC, TypeResolver))
-          FoundDecls.push_back(VD);
-    }
+    collectVisibleMemberDecls(CurrDC, LS, BaseType, extension, FoundDecls,
+                              TypeResolver);
   }
 
   // Handle shadowing.
@@ -217,12 +232,8 @@ static void lookupTypeMembers(Type BaseType, Type LookupType,
   assert(D && "should have a nominal type");
 
   SmallVector<ValueDecl*, 2> FoundDecls;
+  collectVisibleMemberDecls(CurrDC, LS, BaseType, D, FoundDecls, TypeResolver);
 
-  for (Decl *Member : D->getMembers()) {
-    if (auto *VD = dyn_cast<ValueDecl>(Member))
-      if (isDeclVisibleInLookupMode(VD, LS, CurrDC, TypeResolver))
-        FoundDecls.push_back(VD);
-  }
   doGlobalExtensionLookup(BaseType, LookupType, FoundDecls, CurrDC, LS, Reason,
                           TypeResolver);
 
@@ -783,7 +794,10 @@ public:
                       OtherSignature, OtherSignatureType,
                       /*wouldConflictInSwift5*/nullptr,
                       /*skipProtocolExtensionCheck*/true)) {
-        if (VD->getFormalAccess() > OtherVD->getFormalAccess()) {
+        if (VD->getFormalAccess() > OtherVD->getFormalAccess() ||
+            //Prefer available one.
+            (!AvailableAttr::isUnavailable(VD) &&
+             AvailableAttr::isUnavailable(OtherVD))) {
           PossiblyConflicting.erase(I);
           PossiblyConflicting.insert(VD);
 

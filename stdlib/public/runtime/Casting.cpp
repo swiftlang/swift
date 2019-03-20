@@ -3023,14 +3023,17 @@ _bridgeNonVerbatimFromObjectiveC(
         const_cast<void*>(swift_dynamicCastUnknownClass(sourceValue,
                                                         objectiveCType));
       
-    if (sourceValueAsObjectiveCType) {
-      // The type matches.  _forceBridgeFromObjectiveC returns `Self`, so
-      // we can just return it directly.
-      bridgeWitness->forceBridgeFromObjectiveC(
-        static_cast<HeapObject*>(sourceValueAsObjectiveCType),
-        destValue, nativeType, nativeType, bridgeWitness);
-      return;
+    if (!sourceValueAsObjectiveCType) {
+      swift::swift_dynamicCastFailure(_swift_getClass(sourceValue),
+                                      objectiveCType);
     }
+
+    // The type matches.  _forceBridgeFromObjectiveC returns `Self`, so
+    // we can just return it directly.
+    bridgeWitness->forceBridgeFromObjectiveC(
+      static_cast<HeapObject*>(sourceValueAsObjectiveCType),
+      destValue, nativeType, nativeType, bridgeWitness);
+    return;
   }
   
   // Fail.

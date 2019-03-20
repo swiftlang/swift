@@ -1,6 +1,6 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/type_layout_dumper_other.swiftmodule -module-name=type_layout_dumper_other %S/Inputs/type_layout_dumper_other.swift
+// RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/type_layout_dumper_other.swiftmodule -module-name=type_layout_dumper_other %S/Inputs/type_layout_dumper_other.swift
 
 // RUN: %target-swift-frontend -dump-type-info -type-info-dump-filter=fragile -I %t %s | %FileCheck %s
 

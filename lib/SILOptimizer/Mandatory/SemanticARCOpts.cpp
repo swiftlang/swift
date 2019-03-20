@@ -378,7 +378,7 @@ struct SemanticARCOpts : SILFunctionTransform {
     SILFunction &f = *getFunction();
 
     // Make sure we are running with ownership verification enabled.
-    assert(f.getModule().getOptions().EnableSILOwnership &&
+    assert(f.getModule().getOptions().VerifySILOwnership &&
            "Can not perform semantic arc optimization unless ownership "
            "verification is enabled");
 

@@ -551,6 +551,18 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     };
 
     if (!isConfused) {
+      if (Name == Context.Id_Self) {
+        if (DeclContext *typeContext = DC->getInnermostTypeContext()){
+          Type SelfType = typeContext->getSelfInterfaceType();
+
+          if (typeContext->getSelfClassDecl())
+            SelfType = DynamicSelfType::get(SelfType, Context);
+          SelfType = DC->mapTypeIntoContext(SelfType);
+          return new (Context) TypeExpr(TypeLoc(new (Context)
+                                                FixedTypeRepr(SelfType, Loc)));
+        }
+      }
+
       TypoCorrectionResults corrections(*this, Name, nameLoc);
       performTypoCorrection(DC, UDRE->getRefKind(), Type(),
                             lookupOptions, corrections);
@@ -3909,7 +3921,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   auto toConstrainedArchetype = false;
   if (toArchetypeType) {
     auto archetype = toType->castTo<ArchetypeType>();
-    toConstrainedArchetype = archetype && !archetype->getConformsTo().empty();
+    toConstrainedArchetype = !archetype->getConformsTo().empty();
   }
 
   if (fromFunctionType &&

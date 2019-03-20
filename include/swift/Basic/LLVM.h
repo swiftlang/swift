@@ -43,6 +43,7 @@ namespace llvm {
   template<typename T> class TinyPtrVector;
   template<typename T> class Optional;
   template <typename PT1, typename PT2> class PointerUnion;
+  template <typename PT1, typename PT2, typename PT3> class PointerUnion3;
   class SmallBitVector;
 
   // Other common classes.
@@ -62,22 +63,23 @@ namespace swift {
   using llvm::cast_or_null;
 
   // Containers.
-  using llvm::None;
-  using llvm::Optional;
-  using llvm::SmallPtrSetImpl;
-  using llvm::SmallPtrSet;
-  using llvm::SmallString;
-  using llvm::StringRef;
-  using llvm::StringLiteral;
-  using llvm::Twine;
-  using llvm::SmallVectorImpl;
-  using llvm::SmallVector;
   using llvm::ArrayRef;
   using llvm::MutableArrayRef;
-  using llvm::TinyPtrVector;
+  using llvm::None;
+  using llvm::Optional;
   using llvm::PointerUnion;
-  using llvm::SmallSetVector;
+  using llvm::PointerUnion3;
   using llvm::SmallBitVector;
+  using llvm::SmallPtrSet;
+  using llvm::SmallPtrSetImpl;
+  using llvm::SmallSetVector;
+  using llvm::SmallString;
+  using llvm::SmallVector;
+  using llvm::SmallVectorImpl;
+  using llvm::StringLiteral;
+  using llvm::StringRef;
+  using llvm::TinyPtrVector;
+  using llvm::Twine;
 
   // Other common classes.
   using llvm::APFloat;
