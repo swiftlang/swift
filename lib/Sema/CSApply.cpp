@@ -323,26 +323,17 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
 /// Form a type checked expression for the index of a @dynamicMemberLookup
 /// subscript index parameter.
 /// The index expression will have a tuple type of `(dynamicMember: T)`.
-static Expr *buildDynamicMemberLookupIndexExpr(StringRef name, Type ty,
-                                               SourceLoc loc, DeclContext *dc,
+static Expr *buildDynamicMemberLookupIndexExpr(StringRef name, SourceLoc loc,
+                                               DeclContext *dc,
                                                ConstraintSystem &cs) {
   auto &ctx = cs.TC.Context;
-  
   // Build and type check the string literal index value to the specific
   // string type expected by the subscript.
   Expr *nameExpr = new (ctx) StringLiteralExpr(name, loc, /*implicit*/true);
   (void)cs.TC.typeCheckExpression(nameExpr, dc);
   cs.cacheExprTypes(nameExpr);
-
-  // Build a tuple so that the argument has a label.
-  Expr *tuple = TupleExpr::create(ctx, loc, nameExpr, ctx.Id_dynamicMember,
-                                  loc, loc, /*hasTrailingClosure*/false,
-                                  /*implicit*/true);
-  cs.setType(tuple, ty);
-  tuple->setType(ty);
-  return tuple;
+  return nameExpr;
 }
-
 
 namespace {
 
@@ -1380,7 +1371,8 @@ namespace {
 
       // Use the correct locator kind based on the subscript kind.
       auto locatorKind = ConstraintLocator::SubscriptMember;
-      if (choice.getKind() == OverloadChoiceKind::DynamicMemberLookup)
+      if (choice.getKind() == OverloadChoiceKind::DynamicMemberLookup ||
+          choice.getKind() == OverloadChoiceKind::KeyPathDynamicMemberLookup)
         locatorKind = ConstraintLocator::Member;
       
       // If we opened up an existential when performing the subscript, open
@@ -1395,7 +1387,8 @@ namespace {
  
       // Figure out the index and result types.
       Type resultTy;
-      if (choice.getKind() != OverloadChoiceKind::DynamicMemberLookup) {
+      if (choice.getKind() != OverloadChoiceKind::DynamicMemberLookup &&
+          choice.getKind() != OverloadChoiceKind::KeyPathDynamicMemberLookup) {
         auto subscriptTy = simplifyType(selected.openedType);
         auto *subscriptFnTy = subscriptTy->castTo<FunctionType>();
         resultTy = subscriptFnTy->getResult();
@@ -1415,7 +1408,7 @@ namespace {
         // the subscript.
         resultTy = simplifyType(selected.openedType);
       }
-      
+
       auto getType = [&](const Expr *E) -> Type {
         return cs.getType(E);
       };
@@ -1520,6 +1513,20 @@ namespace {
       }
 
       return ctorRef;
+    }
+
+    Expr *buildKeyPathDynamicMemberIndexExpr(ConstraintLocator *memberLoc) {
+      auto arg = solution.DynamicMemberArguments.find(memberLoc);
+      assert(arg != solution.DynamicMemberArguments.end() &&
+             "cannot find argument for keypath dynamic member lookup");
+
+      auto *keyPath = arg->getSecond();
+      keyPath->forEachChildExpr([&](Expr *childExpr) -> Expr * {
+        simplifyExprType(childExpr);
+        return childExpr;
+      });
+
+      return visitKeyPathExpr(keyPath);
     }
 
     /// Bridge the given value (which is an error type) to NSError.
@@ -2592,7 +2599,8 @@ namespace {
                             AccessSemantics::Ordinary);
       }
 
-      switch (selected.choice.getKind()) {
+      auto choiceKind = selected.choice.getKind();
+      switch (choiceKind) {
       case OverloadChoiceKind::DeclViaBridge: {
         base = cs.coerceToRValue(base);
 
@@ -2663,14 +2671,16 @@ namespace {
 
       case OverloadChoiceKind::KeyPathApplication:
         llvm_unreachable("should only happen in a subscript");
-          
-      case OverloadChoiceKind::DynamicMemberLookup: {
-        // Application of a DynamicMemberLookup result turns a member access of
-        // x.foo into x[dynamicMember: "foo"].
+
+      case OverloadChoiceKind::DynamicMemberLookup:
+      case OverloadChoiceKind::KeyPathDynamicMemberLookup: {
+        // Application of a DynamicMemberLookup result turns
+        // a member access of `x.foo` into x[dynamicMember: "foo"], or
+        // x[dynamicMember: KeyPath<T, U>]
         auto &ctx = cs.getASTContext();
         auto loc = nameLoc.getStartLoc();
-        
-        // Figure out the expected type of the string.  We know the
+
+        // Figure out the expected type of the lookup parameter. We know the
         // openedFullType will be "xType -> indexType -> resultType".  Dig out
         // its index type.
         auto declTy = solution.simplifyType(selected.openedFullType);
@@ -2678,15 +2688,28 @@ namespace {
         auto refFnType = subscriptTy->castTo<FunctionType>();
         assert(refFnType->getParams().size() == 1 &&
                "subscript always has one arg");
-        auto stringType = refFnType->getParams()[0].getPlainType();
-        auto tupleTy = TupleType::get(TupleTypeElt(stringType,
-                                                   ctx.Id_dynamicMember), ctx);
+        auto paramTy = refFnType->getParams()[0].getPlainType();
 
-        // Build and type check the string literal index value to the specific
-        // string type expected by the subscript.
-        auto fieldName = selected.choice.getName().getBaseIdentifier().str();
-        auto index =
-          buildDynamicMemberLookupIndexExpr(fieldName, tupleTy, loc, dc, cs);
+        Expr *argExpr = nullptr;
+        if (choiceKind == OverloadChoiceKind::DynamicMemberLookup) {
+          // Build and type check the string literal index value to the specific
+          // string type expected by the subscript.
+          auto fieldName = selected.choice.getName().getBaseIdentifier().str();
+          argExpr = buildDynamicMemberLookupIndexExpr(fieldName, loc, dc, cs);
+        } else {
+          argExpr = buildKeyPathDynamicMemberIndexExpr(memberLocator);
+        }
+
+        assert(argExpr);
+
+        // Build a tuple so that the argument has a label.
+        auto tupleTy =
+            TupleType::get(TupleTypeElt(paramTy, ctx.Id_dynamicMember), ctx);
+        Expr *index = TupleExpr::create(ctx, loc, argExpr, ctx.Id_dynamicMember,
+                                        loc, loc, /*hasTrailingClosure*/ false,
+                                        /*implicit*/ true);
+        index->setType(tupleTy);
+        cs.cacheType(index);
 
         // Build and return a subscript that uses this string as the index.
         return buildSubscript(base, index, ctx.Id_dynamicMember,
@@ -2694,10 +2717,6 @@ namespace {
                               cs.getConstraintLocator(expr),
                               /*isImplicit*/false,
                               AccessSemantics::Ordinary, selected);
-      }
-
-      case OverloadChoiceKind::KeyPathDynamicMemberLookup: {
-        break;
       }
       }
 
@@ -4109,6 +4128,10 @@ namespace {
       KeyPathSubscriptComponents;
   public:
     Expr *visitKeyPathExpr(KeyPathExpr *E) {
+      return visitKeyPathExpr(E, cs.getConstraintLocator(E));
+    }
+
+    Expr *visitKeyPathExpr(KeyPathExpr *E, ConstraintLocator *baseLocator) {
       if (E->isObjC()) {
         cs.setType(E, cs.getType(E->getObjCStringLiteralExpr()));
         return E;
@@ -4181,9 +4204,9 @@ namespace {
         auto kind = origComponent.getKind();
         Optional<SelectedOverload> foundDecl;
 
-        auto locator =
-          cs.getConstraintLocator(E,
-                        ConstraintLocator::PathElement::getKeyPathComponent(i));
+        auto locator = cs.getConstraintLocator(
+            baseLocator,
+            ConstraintLocator::PathElement::getKeyPathComponent(i));
         if (kind == KeyPathExpr::Component::Kind::UnresolvedSubscript) {
           locator =
             cs.getConstraintLocator(locator,
@@ -4199,9 +4222,7 @@ namespace {
             // If this was a @dynamicMemberLookup property, then we actually
             // form a subscript reference, so switch the kind.
             if (foundDecl->choice.getKind() ==
-                    OverloadChoiceKind::DynamicMemberLookup ||
-                foundDecl->choice.getKind() ==
-                    OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+                OverloadChoiceKind::DynamicMemberLookup) {
               kind = KeyPathExpr::Component::Kind::UnresolvedSubscript;
             }
           }
