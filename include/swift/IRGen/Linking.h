@@ -96,7 +96,7 @@ class LinkEntity {
     // This field appears in the ValueWitness kind.
     ValueWitnessShift = 8, ValueWitnessMask = 0xFF00,
 
-    // This field appears in the TypeMetadata kind.
+    // This field appears in the TypeMetadata and ObjCResilientClassStub kinds.
     MetadataAddressShift = 8, MetadataAddressMask = 0x0300,
 
     // This field appears in associated type access functions.
@@ -163,6 +163,12 @@ class LinkEntity {
     /// metadata for classes where getClassMetadataStrategy() is equal to
     /// ClassMetadataStrategy::Update or ::FixedOrUpdate.
     ObjCMetadataUpdateFunction,
+
+    /// A stub that we emit to allow Clang-generated code to statically refer
+    /// to Swift classes with resiliently-sized metadata, since the metadata
+    /// is not statically-emitted. Used when getClassMetadataStrategy() is
+    /// equal to ClassMetadataStrategy::Resilient.
+    ObjCResilientClassStub,
 
     /// A class metadata base offset global variable.  This stores the offset
     /// of the immediate members of a class (generic parameters, field offsets,
@@ -613,13 +619,19 @@ public:
     return entity;
   }
 
+  static LinkEntity forObjCResilientClassStub(ClassDecl *decl,
+                                              TypeMetadataAddress addr) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::ObjCResilientClassStub, decl);
+    entity.Data |= LINKENTITY_SET_FIELD(MetadataAddress, unsigned(addr));
+    return entity;
+  }
+
   static LinkEntity forTypeMetadata(CanType concreteType,
                                     TypeMetadataAddress addr) {
     LinkEntity entity;
-    entity.Pointer = concreteType.getPointer();
-    entity.SecondaryPointer = nullptr;
-    entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::TypeMetadata))
-                | LINKENTITY_SET_FIELD(MetadataAddress, unsigned(addr));
+    entity.setForType(Kind::TypeMetadata, concreteType);
+    entity.Data |= LINKENTITY_SET_FIELD(MetadataAddress, unsigned(addr));
     return entity;
   }
 
@@ -1021,7 +1033,8 @@ public:
     return ValueWitness(LINKENTITY_GET_FIELD(Data, ValueWitness));
   }
   TypeMetadataAddress getMetadataAddress() const {
-    assert(getKind() == Kind::TypeMetadata);
+    assert(getKind() == Kind::TypeMetadata ||
+           getKind() == Kind::ObjCResilientClassStub);
     return (TypeMetadataAddress)LINKENTITY_GET_FIELD(Data, MetadataAddress);
   }
   bool isForeignTypeMetadataCandidate() const {
