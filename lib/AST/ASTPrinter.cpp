@@ -99,6 +99,7 @@ PrintOptions PrintOptions::printParseableInterfaceFile() {
   result.TypeDefinitions = true;
   result.PrintIfConfig = false;
   result.FullyQualifiedTypes = true;
+  result.UseExportedModuleNames = true;
   result.AllowNullTypes = false;
   result.SkipImports = true;
   result.OmitNameOfInaccessibleProperties = true;
@@ -3342,8 +3343,14 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
   template <typename T>
   void printModuleContext(T *Ty) {
-    ModuleDecl *Mod = Ty->getDecl()->getModuleContext();
-    Printer.printModuleRef(Mod, Mod->getName());
+    FileUnit *File = cast<FileUnit>(Ty->getDecl()->getModuleScopeContext());
+    ModuleDecl *Mod = File->getParentModule();
+
+    Identifier Name = Mod->getName();
+    if (Options.UseExportedModuleNames)
+      Name = Mod->getASTContext().getIdentifier(File->getExportedModuleName());
+
+    Printer.printModuleRef(Mod, Name);
     Printer << ".";
   }
 
