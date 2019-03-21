@@ -2796,16 +2796,16 @@ for host in "${ALL_HOSTS[@]}"; do
                 ICU_LIBDIR_STATIC="$(build_directory ${host} swift)/lib/swift_static/${SWIFT_HOST_VARIANT}"
                 ICU_LIBDIR_STATIC_ARCH="$(build_directory ${host} swift)/lib/swift_static/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
                 # Add in the ICU renaming config into uconfig.h
-                sed -e "/^#define __UCONFIG_H__/ r ${LIBICU_BUILD_DIR}/uconfig.h.prepend" -i ${ICU_TMPINSTALL}/include/unicode/uconfig.h
+                call sed -e "/^#define __UCONFIG_H__/ r ${LIBICU_BUILD_DIR}/uconfig.h.prepend" -i ${ICU_TMPINSTALL}/include/unicode/uconfig.h
 
                 if [ $(true_false "${BUILD_SWIFT_STATIC_STDLIB}") == "TRUE" ]; then
                     # Copy the static libs into the swift_static directory
-                    mkdir -p "${ICU_LIBDIR_STATIC_ARCH}"
+                    call mkdir -p "${ICU_LIBDIR_STATIC_ARCH}"
                     for l in uc i18n data
                     do
                         lib="${ICU_LIBDIR}/libicu${l}swift.a"
-                        cp "${lib}" "${ICU_LIBDIR_STATIC}"
-                        cp "${lib}" "${ICU_LIBDIR_STATIC_ARCH}"
+                        call cp "${lib}" "${ICU_LIBDIR_STATIC}"
+                        call cp "${lib}" "${ICU_LIBDIR_STATIC_ARCH}"
                     done
                 fi
 
@@ -3677,31 +3677,31 @@ for host in "${ALL_HOSTS[@]}"; do
                 ICU_INSTALL_DIR="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})"
                 ICU_LIBDIR="$(build_directory ${host} swift)/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
                 LIBICU_DEST_DIR="${ICU_INSTALL_DIR}lib/swift/${SWIFT_HOST_VARIANT}"
-                mkdir -p ${LIBICU_DEST_DIR}
+                call mkdir -p ${LIBICU_DEST_DIR}
 
                 for l in uc i18n data
                 do
                     lib=${ICU_LIBDIR}/libicu${l}swift
                     echo "${lib} => ${LIBICU_DEST_DIR}"
-                    cp -d ${lib}.so ${lib}.so.* ${LIBICU_DEST_DIR}
+                    call cp -d ${lib}.so ${lib}.so.* ${LIBICU_DEST_DIR}
                 done
 
                 if [ $(true_false "${BUILD_SWIFT_STATIC_STDLIB}") == "TRUE" ]; then
                     LIBICU_DEST_DIR_STATIC="${ICU_INSTALL_DIR}lib/swift_static/${SWIFT_HOST_VARIANT}"
-                    mkdir -p ${LIBICU_DEST_DIR_STATIC}
+                    call mkdir -p ${LIBICU_DEST_DIR_STATIC}
                     for l in uc i18n data
                     do
                         lib=${ICU_LIBDIR}/libicu${l}swift
                         echo "${lib} => ${LIBICU_DEST_DIR_STATIC}"
-                        cp -d ${lib}.a ${LIBICU_DEST_DIR_STATIC}
+                        call cp -d ${lib}.a ${LIBICU_DEST_DIR_STATIC}
                     done
                 fi
 
                 ICU_TMP_INSTALL_DIR="${ICU_BUILD_DIR}/tmp_install"
-                mkdir -p  "${ICU_INSTALL_DIR}include"
-                cp -a "${ICU_TMP_INSTALL_DIR}/include/unicode" "${ICU_INSTALL_DIR}include"
-                mkdir -p "${ICU_INSTALL_DIR}share/icuswift"
-                cp -a "${ICU_TMP_INSTALL_DIR}/share/icuswift" "${ICU_INSTALL_DIR}share"
+                call mkdir -p  "${ICU_INSTALL_DIR}include"
+                call cp -a "${ICU_TMP_INSTALL_DIR}/include/unicode" "${ICU_INSTALL_DIR}include"
+                call mkdir -p "${ICU_INSTALL_DIR}share/icuswift"
+                call cp -a "${ICU_TMP_INSTALL_DIR}/share/icuswift" "${ICU_INSTALL_DIR}share"
                 continue
                 ;;
             playgroundsupport)
