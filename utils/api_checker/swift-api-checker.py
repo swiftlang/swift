@@ -30,7 +30,7 @@ def escapeCmdArg(arg):
         return arg
 
 
-def check_call(cmd, cwd=None, env=os.environ, verbose=True, output=None):
+def check_call(cmd, cwd=None, env=os.environ, verbose=False, output=None):
     if verbose:
         print(' '.join([escapeCmdArg(arg) for arg in cmd]))
     return subprocess.check_call(cmd, cwd=cwd, env=env,
@@ -56,24 +56,29 @@ def prepare_module_list(platform, file):
         file.write(extra.read())
 
 
+def get_api_digester_path(tool_path):
+    if tool_path:
+        return tool_path
+    return check_output(['xcrun', '--find', 'swift-api-digester'])
+
+
 class DumpConfig:
-    def __init__(self, platform):
+    def __init__(self, tool_path, platform):
         target_map = {
             'iphoneos': 'arm64-apple-ios10.0',
             'macosx': 'x86_64-apple-macosx10.11',
             'appletvos': 'arm64-apple-tvos10.0',
             'watchos': 'armv7k-apple-watchos3.0',
         }
+        self.tool_path = get_api_digester_path(tool_path)
         self.platform = platform
         self.target = target_map[platform]
         self.sdk = get_sdk_path(platform)
         self.frameworks = [
             self.sdk + '/System/Library/Frameworks/',
             os.path.realpath(self.sdk + '/../../Library/Frameworks/')]
-        self.tool_path = check_output(['xcrun', '--find',
-                                       'swift-api-digester'])
 
-    def run(self, output, module, swift_ver, abi):
+    def run(self, output, module, swift_ver, abi, verbose):
         cmd = [self.tool_path, '-o', output, '-sdk', self.sdk, '-target',
                self.target, '-dump-sdk', '-module-cache-path',
                '/tmp/ModuleCache', '-swift-version',
@@ -82,14 +87,32 @@ class DumpConfig:
             cmd.extend(['-iframework', path])
         if abi:
             cmd.extend(['-abi'])
+        if verbose:
+            cmd.extend(['-v'])
         if module:
             cmd.extend(['-module', module])
-            check_call(cmd)
+            check_call(cmd, verbose=verbose)
         else:
             with tempfile.NamedTemporaryFile() as tmp:
                 prepare_module_list(self.platform, tmp)
                 cmd.extend(['-module-list-file', tmp.name])
-                check_call(cmd)
+                check_call(cmd, verbose=verbose)
+
+
+class DiagnoseConfig:
+    def __init__(self, tool_path):
+        self.tool_path = get_api_digester_path(tool_path)
+
+    def run(self, abi, before, after, output, verbose):
+        cmd = [self.tool_path, '-diagnose-sdk', '-input-paths', before,
+               '-input-paths', after]
+        if output:
+            cmd.extend(['-o', output])
+        if abi:
+            cmd.extend(['-abi'])
+        if verbose:
+            cmd.extend(['-v'])
+        check_call(cmd, verbose=verbose)
 
 
 def main():
@@ -100,6 +123,12 @@ A convenient wrapper for swift-api-digester.
 ''')
 
     basic_group = parser.add_argument_group('Basic')
+
+    basic_group.add_argument('--tool-path', default=None, help='''
+        the path to a swift-api-digester; if not specified, the script will
+        use the one from the toolchain
+        ''')
+
     basic_group.add_argument('--action', default='', help='''
         the action to perform for swift-api-digester
         ''')
@@ -124,18 +153,39 @@ A convenient wrapper for swift-api-digester.
                              action='store_true',
                              help='Whether we are jsonizing for abi')
 
-    args = parser.parse_args(sys.argv[1:])
-    if not args.target:
-        fatal_error("Need to specify --target")
-    if not args.output:
-        fatal_error("Need to specify --output")
+    basic_group.add_argument('--v',
+                             action='store_true',
+                             help='Process verbosely')
 
+    basic_group.add_argument('--dump-before',
+                             action=None,
+                             help='''
+        Path to the json file generated before change'
+        ''')
+
+    basic_group.add_argument('--dump-after',
+                             action=None,
+                             help='''
+        Path to the json file generated after change
+        ''')
+
+    args = parser.parse_args(sys.argv[1:])
     if args.action == 'dump':
-        runner = DumpConfig(platform=args.target)
+        if not args.target:
+            fatal_error("Need to specify --target")
+        if not args.output:
+            fatal_error("Need to specify --output")
+        runner = DumpConfig(tool_path=args.tool_path, platform=args.target)
         runner.run(output=args.output, module=args.module,
-                   swift_ver=args.swift_version, abi=args.abi)
+                   swift_ver=args.swift_version, abi=args.abi, verbose=args.v)
     elif args.action == 'diagnose':
-        fatal_error('Not implemented')
+        if not args.dump_before:
+            fatal_error("Need to specify --dump-before")
+        if not args.dump_after:
+            fatal_error("Need to specify --dump-after")
+        runner = DiagnoseConfig(tool_path=args.tool_path)
+        runner.run(abi=args.abi, before=args.dump_before,
+                   after=args.dump_after, output=args.output, verbose=args.v)
     else:
         fatal_error('Cannot recognize action: ' + args.action)
 
