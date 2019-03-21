@@ -1017,22 +1017,9 @@ extension ContiguousArray {
       _ buffer: inout UnsafeMutableBufferPointer<Element>,
       _ initializedCount: inout Int) throws -> Void
   ) rethrows {
-    var firstElementAddress: UnsafeMutablePointer<Element>
-    (self, firstElementAddress) =
-      ContiguousArray._allocateUninitialized(unsafeUninitializedCapacity)
-
-    var initializedCount = 0
-    defer {
-      // Update self.count even if initializer throws an error.
-      _precondition(
-        initializedCount <= unsafeUninitializedCapacity,
-        "Initialized count set to greater than specified capacity."
-      )
-      self._buffer.count = initializedCount
-    }
-    var buffer = UnsafeMutableBufferPointer<Element>(
-      start: firstElementAddress, count: unsafeUninitializedCapacity)
-    try initializer(&buffer, &initializedCount)
+    self = try ContiguousArray(Array(
+      _unsafeUninitializedCapacity: unsafeUninitializedCapacity,
+      initializingWith: initializer))
   }
 
   /// Calls a closure with a pointer to the array's contiguous storage.

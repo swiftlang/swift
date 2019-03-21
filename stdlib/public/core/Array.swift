@@ -1366,17 +1366,35 @@ extension Array {
 }
 
 extension Array {
-  @available(swift, deprecated: 5.1, renamed: "init(unsafeUninitializedCapacity:initializingWith:)")
+  /// Implementation for Array(unsafeUninitializedCapacity:initializingWith:)
+  /// and ContiguousArray(unsafeUninitializedCapacity:initializingWith:)
   @inlinable
-  public init(
+  internal init(
     _unsafeUninitializedCapacity: Int,
     initializingWith initializer: (
       _ buffer: inout UnsafeMutableBufferPointer<Element>,
       _ initializedCount: inout Int) throws -> Void
   ) rethrows {
-    try self.init(
-      unsafeUninitializedCapacity: _unsafeUninitializedCapacity,
-      initializingWith: initializer)
+    var firstElementAddress: UnsafeMutablePointer<Element>
+    (self, firstElementAddress) =
+      Array._allocateUninitialized(_unsafeUninitializedCapacity)
+
+    var initializedCount = 0
+    var buffer = UnsafeMutableBufferPointer<Element>(
+      start: firstElementAddress, count: _unsafeUninitializedCapacity)
+    defer {
+      // Update self.count even if initializer throws an error.
+      _precondition(
+        initializedCount <= _unsafeUninitializedCapacity,
+        "Initialized count set to greater than specified capacity."
+      )
+      _precondition(
+        buffer.baseAddress == firstElementAddress,
+        "Can't reassign buffer in Array(unsafeUninitializedCapacity:initializingWith:)"
+      )
+      self._buffer.count = initializedCount
+    }
+    try initializer(&buffer, &initializedCount)
   }
 
   /// Creates an array with the specified capacity, then calls the given
@@ -1404,29 +1422,16 @@ extension Array {
   ///       - initializedCount: The count of initialized elements in the array,
   ///         which begins as zero. Set `initializedCount` to the number of
   ///         elements you initialize.
-  @inlinable
+  @_alwaysEmitIntoClient @inlinable
   public init(
     unsafeUninitializedCapacity: Int,
     initializingWith initializer: (
       _ buffer: inout UnsafeMutableBufferPointer<Element>,
       _ initializedCount: inout Int) throws -> Void
   ) rethrows {
-    var firstElementAddress: UnsafeMutablePointer<Element>
-    (self, firstElementAddress) =
-      Array._allocateUninitialized(unsafeUninitializedCapacity)
-    
-    var initializedCount = 0
-    defer {
-      // Update self.count even if initializer throws an error.
-      _precondition(
-        initializedCount <= unsafeUninitializedCapacity,
-        "Initialized count set to greater than specified capacity."
-      )
-      self._buffer.count = initializedCount
-    }
-    var buffer = UnsafeMutableBufferPointer<Element>(
-      start: firstElementAddress, count: unsafeUninitializedCapacity)
-    try initializer(&buffer, &initializedCount)
+    self = try Array(
+      _unsafeUninitializedCapacity: unsafeUninitializedCapacity,
+      initializingWith: initializer)
   }
 
   /// Calls a closure with a pointer to the array's contiguous storage.
