@@ -158,3 +158,31 @@ func testMemberwiseInits() {
   // expected-error@+1{{type '(Wrapper<Bool>, Double) -> MemberwiseInits<Double>'}}
   let _: Int = MemberwiseInits<Double>.init
 }
+
+// ---------------------------------------------------------------------------
+// Default initializers
+// ---------------------------------------------------------------------------
+struct DefaultInitializerStruct {
+  var x by Wrapper(value: true)
+  var y: Int by WrapperWithInitialValue = 10
+}
+
+struct NoDefaultInitializerStruct { // expected-note{{'init(x:)' declared here}}
+  var x: Bool by Wrapper
+}
+
+class DefaultInitializerClass {
+  var x by Wrapper(value: true)
+  var y: Int by WrapperWithInitialValue = 10
+}
+
+class NoDefaultInitializerClass { // expected-error{{class 'NoDefaultInitializerClass' has no initializers}}
+  // FIXME: Reference 'x' instead of '$x' here
+  var x: Bool by Wrapper  // expected-note{{stored property '$x' without initial value prevents synthesized initializers}}
+}
+
+func testDefaultInitializers() {
+  _ = DefaultInitializerStruct()
+  _ = DefaultInitializerClass()
+  _ = NoDefaultInitializerStruct() // expected-error{{missing argument for parameter 'x' in call}}
+}
