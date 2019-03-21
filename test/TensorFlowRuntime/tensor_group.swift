@@ -17,6 +17,8 @@ extension TensorDataType : Equatable {
   }
 }
 
+struct Empty : TensorGroup {}
+
 struct Simple : TensorGroup {
   var w, b: Tensor<Float>
 }
@@ -39,6 +41,10 @@ struct Nested : TensorGroup {
 struct Generic<T: TensorGroup, U: TensorGroup> : TensorGroup {
   var t: T
   var u: U
+}
+
+TensorGroupTests.test("Empty") {
+  expectEqual([], Empty._typeList)
 }
 
 TensorGroupTests.test("Simple") {

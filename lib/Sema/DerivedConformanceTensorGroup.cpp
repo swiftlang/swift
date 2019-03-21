@@ -87,7 +87,7 @@ deriveBodyTensorGroup_typeList(AbstractFunctionDecl *funcDecl) {
   auto *tensorGroupProto = C.getProtocol(KnownProtocolKind::TensorGroup);
   auto *typeListReq = getProtocolRequirement(tensorGroupProto, C.Id_typeList);
 
-  // Concatenate all member `_typeList` arrays..
+  // Concatenate all member `_typeList` arrays.
   Type arrayType = BoundGenericType::get(
     C.getArrayDecl(), Type(), 
     {C.getTensorDataTypeDecl()->getDeclaredInterfaceType()});
@@ -164,8 +164,7 @@ static ValueDecl *deriveTensorGroup_typeList(DerivedConformance &derived) {
 
 // Synthesize body for `init(_owning:)`.
 static void 
-deriveBodyTensorGroup_init(
-    AbstractFunctionDecl *funcDecl) {
+deriveBodyTensorGroup_init(AbstractFunctionDecl *funcDecl) {
   auto *parentDC = funcDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
