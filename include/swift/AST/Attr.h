@@ -1410,27 +1410,26 @@ struct DeclNameWithLoc {
 ///
 /// Examples:
 ///   @differentiable(jvp: jvpFoo where T : FloatingPoint)
-///   @differentiable(wrt: (self, .0, .1), jvp: jvpFoo)
+///   @differentiable(wrt: (self, x, y), jvp: jvpFoo)
 class DifferentiableAttr final
     : public DeclAttribute,
       private llvm::TrailingObjects<DifferentiableAttr,
                                     ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
-  /// The number of parameters specified in 'wrt:'.
+  /// The number of parsed parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
   /// The JVP function.
   Optional<DeclNameWithLoc> JVP;
   /// The VJP function.
   Optional<DeclNameWithLoc> VJP;
-  /// The JVP function (optional), to be resolved by the type checker if
+  /// The JVP function (optional), resolved by the type checker if JVP name is
   /// specified.
   FuncDecl *JVPFunction = nullptr;
-  /// The VJP function (optional), to be resolved by the type checker if
+  /// The VJP function (optional), resolved by the type checker if VJP name is
   /// specified.
   FuncDecl *VJPFunction = nullptr;
-  /// The differentiation parameters' indices, to be resolved by the type
-  /// checker.
+  /// The differentiation parameters' indices, resolved by the type checker.
   AutoDiffParameterIndices *ParameterIndices = nullptr;
   /// The trailing where clause, if it exists.
   TrailingWhereClause *WhereClause = nullptr;
@@ -1489,7 +1488,7 @@ public:
   }
   size_t numTrailingObjects(OverloadToken<ParsedAutoDiffParameter>) const {
     return NumParsedParameters;
- }
+  }
 
   TrailingWhereClause *getWhereClause() const { return WhereClause; }
 
@@ -1498,14 +1497,18 @@ public:
   void setRequirements(ASTContext &context, ArrayRef<Requirement> requirements);
 
   FuncDecl *getJVPFunction() const { return JVPFunction; }
-  void setJVPFunction(FuncDecl *decl) { JVPFunction = decl; }
+  void setJVPFunction(FuncDecl *decl);
   FuncDecl *getVJPFunction() const { return VJPFunction; }
-  void setVJPFunction(FuncDecl *decl) { VJPFunction = decl; }
+  void setVJPFunction(FuncDecl *decl);
 
   bool parametersMatch(const DifferentiableAttr &other) const {
     assert(ParameterIndices && other.ParameterIndices);
     return ParameterIndices->parameters == other.ParameterIndices->parameters;
   }
+
+  // Print the attribute to the given stream.
+  void print(llvm::raw_ostream &OS, const Decl *D,
+             ModuleDecl *prettyPrintInModule) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Differentiable;
@@ -1516,28 +1519,65 @@ public:
 /// Attribute that registers a function as a derivative of another function.
 ///
 /// Examples:
-///   @differentiating(sin(_:_:))
-///   @differentiating(+)
-class DifferentiatingAttr final : public DeclAttribute {
-private:
+///   @differentiating(sin(_:))
+///   @differentiating(+, wrt: (lhs, rhs))
+class DifferentiatingAttr final
+    : public DeclAttribute,
+      private llvm::TrailingObjects<DifferentiableAttr,
+                                    ParsedAutoDiffParameter> {
   /// The original function name.
   DeclNameWithLoc Original;
   /// The original function, resolved by the type checker.
   FuncDecl *OriginalFunction = nullptr;
+  /// The number of parsed parameters specified in 'wrt:'.
+  unsigned NumParsedParameters = 0;
+  /// The differentiation parameters' indices, resolved by the type checker.
+  AutoDiffParameterIndices *ParameterIndices = nullptr;
 
   explicit DifferentiatingAttr(ASTContext &context, bool implicit,
                                SourceLoc atLoc, SourceRange baseRange,
-                               DeclNameWithLoc original);
+                               DeclNameWithLoc original,
+                               ArrayRef<ParsedAutoDiffParameter> params);
+
+  explicit DifferentiatingAttr(ASTContext &context, bool implicit,
+                               SourceLoc atLoc, SourceRange baseRange,
+                               DeclNameWithLoc original,
+                               AutoDiffParameterIndices *indices);
 
 public:
   static DifferentiatingAttr *create(ASTContext &context, bool implicit,
                                      SourceLoc atLoc, SourceRange baseRange,
-                                     DeclNameWithLoc original);
+                                     DeclNameWithLoc original,
+                                     ArrayRef<ParsedAutoDiffParameter> params);
+
+  static DifferentiatingAttr *create(ASTContext &context, bool implicit,
+                                     SourceLoc atLoc, SourceRange baseRange,
+                                     DeclNameWithLoc original,
+                                     AutoDiffParameterIndices *indices);
 
   DeclNameWithLoc getOriginal() const { return Original; }
 
   FuncDecl *getOriginalFunction() const { return OriginalFunction; }
   void setOriginalFunction(FuncDecl *decl) { OriginalFunction = decl; }
+
+  /// The parsed differentiation parameters, i.e. the list of parameters
+  /// specified in 'wrt:'.
+  ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
+    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
+  }
+  MutableArrayRef<ParsedAutoDiffParameter> getParsedParameters() {
+    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
+  }
+  size_t numTrailingObjects(OverloadToken<ParsedAutoDiffParameter>) const {
+    return NumParsedParameters;
+  }
+
+  AutoDiffParameterIndices *getParameterIndices() const {
+    return ParameterIndices;
+  }
+  void setParameterIndices(AutoDiffParameterIndices *pi) {
+    ParameterIndices = pi;
+  }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Differentiating;

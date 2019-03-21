@@ -9,7 +9,11 @@
 
 import TensorFlow
 import StdlibUnittest
+#if TPU
+import TensorFlowUnittestTPU
+#else
 import TensorFlowUnittest
+#endif
 
 var TensorADTests = TestSuite("TensorAD")
 
@@ -17,8 +21,8 @@ TensorADTests.testAllBackends("TestSimpleGrad") {
   func square(_ x: Tensor<Float>) -> Tensor<Float> {
     return x * x
   }
-  expectTrue(gradient(at: [0.1, 0.2, 0.3], in: square) == [0.2, 0.4, 0.6])
-  expectTrue(gradient(at: [[10], [20]], in: square) == [[20], [40]])
+  expectEqual([0.2, 0.4, 0.6], gradient(at: [0.1, 0.2, 0.3], in: square))
+  expectEqual([[20], [40]], gradient(at: [[10], [20]], in: square))
 }
 
 TensorADTests.testAllBackends("TestGenericGrad") {
@@ -45,59 +49,64 @@ TensorADTests.testAllBackends("TestScalarized") {
 
 TensorADTests.testAllBackends("+") {
   let f = { (a: Tensor<Float>, b: Tensor<Float>) in a + b }
-  expectTrue((Tensor(1), Tensor(1)) == gradient(at: Tensor(0), Tensor(0), in: f))
-  expectTrue(([1], [1]) == pullback(at: [1], [10], in: f)([1]))
+  expectEqual((Tensor(1), Tensor(1)), gradient(at: Tensor(0), Tensor(0), in: f))
+  expectEqual(([1], [1]), pullback(at: [1], [10], in: f)([1]))
 }
 
 TensorADTests.testAllBackends("-") {
   let f = { (a: Tensor<Float>, b: Tensor<Float>) in a - b }
-  expectTrue((Tensor(1), Tensor(-1)) == gradient(at: Tensor(0), Tensor(0), in: f))
-  expectTrue(([1], [-1]) == pullback(at: [1], [10], in: f)([1]))
+  expectEqual((Tensor(1), Tensor(-1)), gradient(at: Tensor(0), Tensor(0), in: f))
+  expectEqual(([1], [-1]), pullback(at: [1], [10], in: f)([1]))
 }
 
 TensorADTests.testAllBackends("*") {
   let f = { (a: Tensor<Float>, b: Tensor<Float>) in a * b }
-  expectTrue(([0], [0]) == gradient(at: [0], [0], in: f))
-  expectTrue(([10], [1]) == gradient(at: [1], [10], in: f))
+  expectEqual(([0], [0]), gradient(at: [0], [0], in: f))
+  expectEqual(([10], [1]), gradient(at: [1], [10], in: f))
 }
 
 TensorADTests.testAllBackends("/") {
   let f = { (a: Tensor<Float>, b: Tensor<Float>) in a / b }
-  expectTrue(([0.1], [-0.01]) == gradient(at: [1], [10], in: f))
+  expectEqual(([0.1], [-0.01]), gradient(at: [1], [10], in: f))
 }
 
 TensorADTests.testAllBackends("matmul") {
   let f = { (a: Tensor<Float>, b: Tensor<Float>) in matmul(a, b) }
   let v = Tensor<Float>(ones: [1, 1])
-  expectTrue(([[0]], [[0]]) == pullback(at: [[0]], [[0]], in: f)(v))
-  expectTrue(([[10]], [[1]]) == pullback(at: [[1]], [[10]], in: f)(v))
+  expectEqual(([[0]], [[0]]), pullback(at: [[0]], [[0]], in: f)(v))
+  expectEqual(([[10]], [[1]]), pullback(at: [[1]], [[10]], in: f)(v))
 }
 
 TensorADTests.testAllBackends("•") {
   let f = { (a: Tensor<Float>, b: Tensor<Float>) in a • b }
   let v = Tensor<Float>(ones: [1, 1])
-  expectTrue(([[0]], [[0]]) == pullback(at: [[0]], [[0]], in: f)(v))
-  expectTrue(([[10]], [[1]]) == pullback(at: [[1]], [[10]], in: f)(v))
+  expectEqual(([[0]], [[0]]), pullback(at: [[0]], [[0]], in: f)(v))
+  expectEqual(([[10]], [[1]]), pullback(at: [[1]], [[10]], in: f)(v))
 }
 
 TensorADTests.testAllBackends("negate") {
   let f = { (a: Tensor<Float>) in -a }
-  expectTrue([-1] == gradient(at: [0], in: f))
-  expectTrue([-1] == gradient(at: [10], in: f))
+  expectEqual([-1], gradient(at: [0], in: f))
+  expectEqual([-1], gradient(at: [10], in: f))
+}
+
+TensorADTests.testAllBackends("Abs") {
+  let f = { (a: Tensor<Float>) in abs(a) }
+  expectEqual([1, -1, 0], gradient(at: [3.0, -3.0, 0], in: f))
 }
 
 TensorADTests.testAllBackends("sum") {
-  let input = Tensor<Float>(shape: [2, 2], repeating: 42)
+  let input = Tensor<Float>(repeating: 42, shape: [2, 2])
   let sumPullbackScalar = pullback(at: input) { (a: Tensor<Float>) in a.sum() }
   let sumPullbackAlongAxes = pullback(at: input) { (a: Tensor<Float>) in a.sum(alongAxes: 0, 1) }
 
   let expected = Tensor<Float>(ones: [2, 2])
-  expectTrue(sumPullbackScalar(Tensor(1)) == expected)
-  // expectTrue(sumPullbackSqueezingAxes(Tensor(1)) == expected)
-  expectTrue(sumPullbackAlongAxes(Tensor(1))  == expected)
-  expectTrue(sumPullbackScalar(Tensor(3)) == expected * 3)
-  // expectTrue(sumPullbackSqueezingAxes(Tensor(3)) == expected * 3)
-  expectTrue(sumPullbackAlongAxes(Tensor(3)) == expected * 3)
+  expectEqual(expected, sumPullbackScalar(Tensor(1)))
+  // expectEqual(expected, sumPullbackSqueezingAxes(Tensor(1)))
+  expectEqual(expected, sumPullbackAlongAxes(Tensor(1)))
+  expectEqual(expected * 3, sumPullbackScalar(Tensor(3)))
+  // expectEqual(expected * 3, sumPullbackSqueezingAxes(Tensor(3)))
+  expectEqual(expected * 3, sumPullbackAlongAxes(Tensor(3)))
 }
 
 TensorADTests.testAllBackends("mean") {
@@ -106,10 +115,31 @@ TensorADTests.testAllBackends("mean") {
   let meanGradAlongAxes = gradient { (a: Tensor<Float>) in a.mean(alongAxes: 0, 1) }
 
   let input = Tensor<Float>(ones: [2, 2])
-  let expected = Tensor<Float>(shape: [2, 2], repeating: 0.25)
-  expectTrue(meanGradScalar(input) == expected)
-  // expectTrue(meanGradSqueezingAxes(input) == expected)
-  expectTrue(meanGradAlongAxes(input) == expected)
+  let expected = Tensor<Float>(repeating: 0.25, shape: [2, 2])
+  expectEqual(expected, meanGradScalar(input))
+  // expectEqual(expected, meanGradSqueezingAxes(input))
+  expectEqual(expected, meanGradAlongAxes(input))
+}
+
+TensorADTests.testAllBackends("expandingShape") {
+  let f1 = { (a: Tensor<Float>) in a.expandingShape(at: 0).squared() }
+  let f2 = { (a: Tensor<Float>) in a.squared().expandingShape(at: 0) }
+  expectEqual([6, 10], pullback(at: [3, 5], in: f1)([[1, 1]]))
+  expectEqual([6, 10], pullback(at: [3, 5], in: f2)([[1, 1]]))
+}
+
+TensorADTests.testAllBackends("squeezingShape") {
+  let f1 = { (a: Tensor<Float>) in a.squeezingShape(at: 0).squared() }
+  let f2 = { (a: Tensor<Float>) in a.squared().squeezingShape(at: 0) }
+  expectEqual([[6, 10]], pullback(at: [[3, 5]], in: f1)([1, 1]))
+  expectEqual([[6, 10]], pullback(at: [[3, 5]], in: f2)([1, 1]))
+}
+
+TensorADTests.testAllBackends("reshapedBackprop") {
+  let f1 = { (a: Tensor<Float>) in a.reshaped(toShape: Tensor<Int32>([2, 1])).squared() }
+  let f2 = { (a: Tensor<Float>) in a.squared().reshaped(toShape: Tensor<Int32>([2, 1])) }
+  expectEqual([[6, 10]], pullback(at: [[3, 5]], in: f1)([[1], [1]]))
+  expectEqual([[6, 10]], pullback(at: [[3, 5]], in: f2)([[1], [1]]))
 }
 
 TensorADTests.testAllBackends("reshaped") {
@@ -117,7 +147,7 @@ TensorADTests.testAllBackends("reshaped") {
   let input = Tensor<Float>(ones: [2, 4])
   let reshapedPullback = pullback(at: input) { (a: Tensor<Float>) in a.reshaped(toShape: shapeTensor) }
   let reshaped = Tensor<Float>(ones: [2, 2, 2])
-  expectTrue(reshapedPullback(reshaped) == input)
+  expectEqual(input, reshapedPullback(reshaped))
 }
 
 TensorADTests.testAllBackends("transposed") {
@@ -127,25 +157,25 @@ TensorADTests.testAllBackends("transposed") {
   let transposedPermutationsPullback = pullback(at: input) { (a: Tensor<Float>) in a.transposed(withPermutations: [1, 0]) }
   let transposedVariadicsPullback = pullback(at: input) { (a: Tensor<Float>) in a.transposed(withPermutations: 1, 0) }
 
-  expectTrue(transposedPullback(transposed) == input)
-  expectTrue(transposedPermutationsPullback(transposed) == input)
-  expectTrue(transposedVariadicsPullback(transposed) == input)
+  expectEqual(input, transposedPullback(transposed))
+  expectEqual(input, transposedPermutationsPullback(transposed))
+  expectEqual(input, transposedVariadicsPullback(transposed))
 }
 
 TensorADTests.testAllBackends("relu") {
   let f = { (a: Tensor<Float>) in relu(a) }
-  expectTrue([1, 0, 0] == gradient(at: [5, -5, 0], in: f))
+  expectEqual([1, 0, 0], gradient(at: [5, -5, 0], in: f))
 }
 
 TensorADTests.testAllBackends("softmax") {
   let pb = pullback(at: Tensor(ones: [2, 2])) { (a: Tensor<Float>) in softmax(a) }
-  expectTrue([[0, 0], [0, 0]] == pb([[1, 1], [1, 1]]))
-  expectTrue([[-0.25, 0.25], [0.75, -0.75]] == pb([[1, 2], [4, 1]]))
+  expectEqual([[0, 0], [0, 0]], pb([[1, 1], [1, 1]]))
+  expectEqual([[-0.25, 0.25], [0.75, -0.75]], pb([[1, 2], [4, 1]]))
 }
 
 TensorADTests.testAllBackends("log_softmax") {
   let pb = pullback(at: Tensor(ones: [3, 3])) { (a: Tensor<Float>) in logSoftmax(a) }
-  expectTrue(Tensor(shape: [3, 3], repeating: 5.9604645e-08) == pb(Tensor(ones: [3, 3])))
+  expectEqual(Tensor(repeating: 5.9604645e-08, shape: [3, 3]), pb(Tensor(ones: [3, 3])))
 }
 
 TensorADTests.testAllBackends("SR-9345: OwnedCheckpoints") {

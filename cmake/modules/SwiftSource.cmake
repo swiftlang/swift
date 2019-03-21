@@ -237,7 +237,11 @@ function(_compile_swift_files
     # SWIFT_ENABLE_TENSORFLOW
     # FIXME: `-enable-resilience` is currently disabled for the TensorFlow
     # module because it causes compilation to crash during IRGen.
-    if(NOT "${SWIFTFILE_MODULE_NAME}" STREQUAL "TensorFlow")
+    # Also, disable it for DifferentiationUnittest because resilience changes
+    # the AD code # that gets generated (leading to additional leaks)
+    # (see: TF-328)
+    if(NOT "${SWIFTFILE_MODULE_NAME}" STREQUAL "TensorFlow" AND
+       NOT "${SWIFTFILE_MODULE_NAME}" STREQUAL "DifferentiationUnittest")
       list(APPEND swift_flags "-Xfrontend" "-enable-resilience")
     endif()
   endif()

@@ -2590,24 +2590,6 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
         break;
       }
 
-      // SWIFT_ENABLE_TENSORFLOW
-      case decls_block::Differentiating_DECL_ATTR: {
-        bool isImplicit;
-        uint64_t origNameId;
-        DeclID origDeclId;
-
-        serialization::decls_block::DifferentiatingDeclAttrLayout::readRecord(
-            scratch, isImplicit, origNameId, origDeclId);
-
-        DeclNameWithLoc origName = {getIdentifier(origNameId), DeclNameLoc()};
-        FuncDecl *origDecl = cast<FuncDecl>(getDecl(origDeclId));
-        auto diffAttr = DifferentiatingAttr::create(
-            ctx, isImplicit, SourceLoc(), SourceRange(), origName);
-        diffAttr->setOriginalFunction(origDecl);
-        Attr = diffAttr;
-        break;
-      }
-
       case decls_block::DynamicReplacement_DECL_ATTR: {
         bool isImplicit;
         uint64_t numArgs;

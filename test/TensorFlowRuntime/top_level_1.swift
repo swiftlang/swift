@@ -8,7 +8,11 @@
 // specifics, so we can keep it simple and just test CPU.
 
 import TensorFlow
+#if TPU
+import TensorFlowUnittestTPU
+#else
 import TensorFlowUnittest
+#endif
 import StdlibUnittest
 
 var TopLevelTests = TestSuite("TopLevel")

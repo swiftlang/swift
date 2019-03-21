@@ -10,7 +10,11 @@
 
 import TensorFlow
 import StdlibUnittest
+#if TPU
+import TensorFlowUnittestTPU
+#else
 import TensorFlowUnittest
+#endif
 
 var ModelADTests = TestSuite("ModelAD")
 

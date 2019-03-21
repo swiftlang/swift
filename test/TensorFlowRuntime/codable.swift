@@ -5,7 +5,11 @@
 
 import TensorFlow
 import Foundation
+#if TPU
+import TensorFlowUnittestTPU
+#else
 import TensorFlowUnittest
+#endif
 import StdlibUnittest
 
 var CodableTests = TestSuite("TensorFlowCodable")
@@ -29,17 +33,7 @@ private func _testRoundTrip<T>(
   do {
     let decoder = JSONDecoder()
     let decoded = try decoder.decode(T.self, from: payload)
-
-    // NOTE: `expectEqual` cannot be called with `Tensor` arguments because it
-    // is not @inlinable and defined in another module. Calling it with
-    // `Tensor` arguments results in a crash:
-    // !!! Compiler bug -- Tensor op builtin __tfop_Equal,$in,$in,T cannot be lowered to LLVM IR !!!
-    // This bug is a challenge for graph program extraction and will surface
-    // in cross-module code (when an inlinable `Tensor` op is called from an
-    // opaque, non-inlinable context).
-    // expectEqual(decoded, value, "\(T.self) did not round-trip to an equal value.")
-
-    expectTrue(decoded == value, "\(T.self) did not round-trip to an equal value.")
+    expectEqual(value, decoded, "\(T.self) did not round-trip to an equal value.")
   } catch {
     expectUnreachable("Failed to decode \(T.self) from JSON: \(error)")
   }

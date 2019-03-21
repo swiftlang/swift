@@ -3247,10 +3247,10 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
       outputOrigTypeNotDiff, outputSubstTypeNotDiff, expectedTLNotDiff);
 
   // TODO: Use parameter indices specified in the function type.
-  AutoDiffParameterIndicesBuilder parameterIndicesBuilder(
-      inputSubstType, /*setAllParams*/ true);
+  auto autodiffBuilder = AutoDiffParameterIndicesBuilder::inferParameters(
+      inputSubstType, SGF.getModule().getSwiftModule());
   auto *parameterIndices =
-      parameterIndicesBuilder.build(inputSubstType->getASTContext());
+      autodiffBuilder.build(inputSubstType->getASTContext());
 
   auto getAssocFnTy =
       [&](CanAnyFunctionType fnTy, AutoDiffAssociatedFunctionKind kind)

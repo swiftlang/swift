@@ -6,17 +6,48 @@
 import Python
 import StdlibUnittest
 
+/// The gc module is an interface to the Python garbage collector.
+let gc = Python.import("gc")
+/// The tracemalloc module is a debug tool to trace memory blocks allocated by
+/// Python. It is optionally imported because it is available only in Python 3.
+let tracemalloc = try? Python.attemptImport("tracemalloc")
+
+extension TestSuite {
+  /// Check that running `body` does not cause Python memory leaks.
+  func testWithLeakChecking(_ name: String, body: @escaping () -> Void) {
+    test(name) {
+      if let tracemalloc = tracemalloc {
+        tracemalloc.start()
+      }
+      // Note: Convert to integer to prevent the integer from messing up
+      // tracemalloc's count.
+      let referencedObjectCount = Int(Python.len(gc.get_objects()))!
+      body()
+      expectEqual(referencedObjectCount, Int(Python.len(gc.get_objects()))!,
+                  "Python memory leak.")
+      if let tracemalloc = tracemalloc {
+        expectEqual(0, Int(tracemalloc.get_traced_memory().tuple2.0)!)
+        tracemalloc.stop()
+      }
+    }
+  }
+}
+
 var PythonRuntimeTestSuite = TestSuite("PythonRuntime")
 PythonLibrary.useVersion(2, 7)
 
-PythonRuntimeTestSuite.test("CheckVersion") {
+PythonRuntimeTestSuite.testWithLeakChecking("CheckVersion") {
   expectEqual("2.7.", String(Python.version)!.prefix(4))
   let versionInfo = Python.versionInfo
   expectEqual(2, versionInfo.major)
   expectEqual(7, versionInfo.minor)
 }
 
-PythonRuntimeTestSuite.test("PythonList") {
+// Python.repr() in lists produces some static values that stay referenced for
+// the lifetime of the program. Call here to allow leak checking to work on the
+// following test.
+_ = Python.repr([1])
+PythonRuntimeTestSuite.testWithLeakChecking("PythonList") {
   let list: PythonObject = [0, 1, 2]
   expectEqual("[0, 1, 2]", list.description)
   expectEqual(3, Python.len(list))
@@ -34,7 +65,7 @@ PythonRuntimeTestSuite.test("PythonList") {
   expectEqual(2, polymorphicList[2])
 }
 
-PythonRuntimeTestSuite.test("PythonDict") {
+PythonRuntimeTestSuite.testWithLeakChecking("PythonDict") {
   let dict: PythonObject = ["a": 1, 1: 0.5]
   expectEqual(2, Python.len(dict))
   expectEqual(1, dict["a"])
@@ -46,7 +77,15 @@ PythonRuntimeTestSuite.test("PythonDict") {
   expectEqual("d", dict["b"])
 }
 
-PythonRuntimeTestSuite.test("Range") {
+PythonRuntimeTestSuite.testWithLeakChecking("Iterator") {
+  var sum = PythonObject(0)
+  for v in Python.iter([1, 2, 3]) {
+    sum += v
+  }
+  expectEqual(6, sum)
+}
+
+PythonRuntimeTestSuite.testWithLeakChecking("Range") {
   let slice = PythonObject(5..<10)
   expectEqual(Python.slice(5, 10), slice)
   expectEqual(5, slice.start)
@@ -60,7 +99,7 @@ PythonRuntimeTestSuite.test("Range") {
   expectNil(Range<Int>(PythonObject(5...)))
 }
 
-PythonRuntimeTestSuite.test("PartialRangeFrom") {
+PythonRuntimeTestSuite.testWithLeakChecking("PartialRangeFrom") {
   let slice = PythonObject(5...)
   expectEqual(Python.slice(5, Python.None), slice)
   expectEqual(5, slice.start)
@@ -72,7 +111,7 @@ PythonRuntimeTestSuite.test("PartialRangeFrom") {
   expectNil(PartialRangeFrom<Int>(PythonObject(..<5)))
 }
 
-PythonRuntimeTestSuite.test("PartialRangeUpTo") {
+PythonRuntimeTestSuite.testWithLeakChecking("PartialRangeUpTo") {
   let slice = PythonObject(..<5)
   expectEqual(Python.slice(5), slice)
   expectEqual(5, slice.stop)
@@ -84,7 +123,7 @@ PythonRuntimeTestSuite.test("PartialRangeUpTo") {
   expectNil(PartialRangeUpTo<Int>(PythonObject(5...)))
 }
 
-PythonRuntimeTestSuite.test("Strideable") {
+PythonRuntimeTestSuite.testWithLeakChecking("Strideable") {
   let strideTo = stride(from: PythonObject(0), to: 100, by: 2)
   expectEqual(0, strideTo.min()!)
   expectEqual(98, strideTo.max()!)
@@ -98,7 +137,7 @@ PythonRuntimeTestSuite.test("Strideable") {
   expectEqual([92, 94, 96, 98, 100], Array(strideThrough.suffix(5)))
 }
 
-PythonRuntimeTestSuite.test("BinaryOps") {
+PythonRuntimeTestSuite.testWithLeakChecking("BinaryOps") {
   expectEqual(42, PythonObject(42))
   expectEqual(42, PythonObject(2) + PythonObject(40))
   expectEqual(2, PythonObject(2) * PythonObject(3) + PythonObject(-4))
@@ -122,7 +161,7 @@ PythonRuntimeTestSuite.test("BinaryOps") {
   expectEqual(2.5, x)
 }
 
-PythonRuntimeTestSuite.test("Comparable") {
+PythonRuntimeTestSuite.testWithLeakChecking("Comparable") {
   let array: [PythonObject] = [-1, 10, 1, 0, 0]
   expectEqual([-1, 0, 0, 1, 10], array.sorted())
   let list: PythonObject = [-1, 10, 1, 0, 0]
@@ -135,7 +174,7 @@ PythonRuntimeTestSuite.test("Comparable") {
   expectEqual([0, 10, "a", "b", "b"], list2.sorted())
 }
 
-PythonRuntimeTestSuite.test("Hashable") {
+PythonRuntimeTestSuite.testWithLeakChecking("Hashable") {
   func compareHashValues(_ x: PythonConvertible) {
     let a = x.pythonObject
     let b = x.pythonObject
@@ -148,13 +187,13 @@ PythonRuntimeTestSuite.test("Hashable") {
   compareHashValues(PythonObject(tupleOf: 1, 2, 3))
 }
 
-PythonRuntimeTestSuite.test("RangeIteration") {
+PythonRuntimeTestSuite.testWithLeakChecking("RangeIteration") {
   for (index, val) in Python.range(5).enumerated() {
     expectEqual(PythonObject(index), val)
   }
 }
 
-PythonRuntimeTestSuite.test("Errors") {
+PythonRuntimeTestSuite.testWithLeakChecking("Errors") {
   expectThrows(PythonError.exception("division by zero", traceback: nil), {
     try PythonObject(1).__truediv__.throwing.dynamicallyCall(withArguments: 0)
     // `expectThrows` does not fail if no error is thrown.
@@ -162,7 +201,7 @@ PythonRuntimeTestSuite.test("Errors") {
   })
 }
 
-PythonRuntimeTestSuite.test("Tuple") {
+PythonRuntimeTestSuite.testWithLeakChecking("Tuple") {
   let element1: PythonObject = 0
   let element2: PythonObject = "abc"
   let element3: PythonObject = [0, 0]
@@ -188,7 +227,7 @@ PythonRuntimeTestSuite.test("Tuple") {
   expectEqual(element2, quadruple[1])
 }
 
-PythonRuntimeTestSuite.test("MethodCalling") {
+PythonRuntimeTestSuite.testWithLeakChecking("MethodCalling") {
   let list: PythonObject = [1, 2]
   list.append(3)
   expectEqual([1, 2, 3], list)
@@ -206,7 +245,7 @@ PythonRuntimeTestSuite.test("MethodCalling") {
               greeting.format("Hey", first: "Jane", last: "Doe"))
 }
 
-PythonRuntimeTestSuite.test("ConvertibleFromPython") {
+PythonRuntimeTestSuite.testWithLeakChecking("ConvertibleFromPython") {
   // Ensure that we cover the -1 case as this is used by Python
   // to signal conversion errors.
   let minusOne: PythonObject = -1
@@ -246,7 +285,7 @@ PythonRuntimeTestSuite.test("ConvertibleFromPython") {
   expectNil(Double(string))
 }
 
-PythonRuntimeTestSuite.test("PythonConvertible") {
+PythonRuntimeTestSuite.testWithLeakChecking("PythonConvertible") {
   let minusOne: PythonObject = -1
   let five: PythonObject = 5
 
@@ -267,18 +306,59 @@ PythonRuntimeTestSuite.test("PythonConvertible") {
   expectEqual(five, Double(5).pythonObject)
 }
 
-PythonRuntimeTestSuite.test("SR-9230") {
+PythonRuntimeTestSuite.testWithLeakChecking("Optional") {
+  let five: PythonObject = 5
+  expectEqual(five, (5 as Int?).pythonObject)
+  expectEqual(Python.None, (nil as Int?).pythonObject)
+
+  let xx: [Int?] = [1, 2, nil, 3, nil, 4]
+  let pyxx: PythonObject = [1, 2, Python.None, 3, Python.None, 4]
+  expectEqual(pyxx, xx.pythonObject)
+  expectEqual(xx, [Int?](pyxx))
+}
+
+PythonRuntimeTestSuite.testWithLeakChecking("SR-9230") {
   expectEqual(2, Python.len(Python.dict(a: "a", b: "b")))
 }
 
 // TF-78: isType() consumed refcount for type objects like `PyBool_Type`.
-PythonRuntimeTestSuite.test("PythonRefCount") {
+PythonRuntimeTestSuite.testWithLeakChecking("PythonRefCount") {
   let b: PythonObject = true
   for _ in 0...20 {
     // This triggers isType(), which used to crash after repeated invocation
     // because of reduced refcount for `PyBool_Type`.
     _ = Bool.init(b)
   }
+}
+
+PythonRuntimeTestSuite.test("ReferenceCounting") {
+  // Note: gc.get_objects() only counts objects that can be part of a cycle.
+  // (Like arrays and general python-objects).
+  let referencedObjectCount = Python.len(gc.get_objects())
+  let v = Python.list([1000, 2000, 3000])
+  expectEqual(1, Python.len(gc.get_objects()) - referencedObjectCount)
+}
+
+PythonRuntimeTestSuite.test("TraceMallocReferenceCounting") {
+  guard let tracemalloc = tracemalloc else { return }
+  tracemalloc.start()
+  expectEqual(0, Int(tracemalloc.get_traced_memory().tuple2.0)!)
+  do {
+    let v: PythonObject = [1, 2, 3, 4]
+    expectNotEqual(0, Int(tracemalloc.get_traced_memory().tuple2.0)!)
+  }
+  expectEqual(0, Int(tracemalloc.get_traced_memory().tuple2.0)!)
+  do {
+    let v: PythonObject = 20000
+    expectNotEqual(0, Int(tracemalloc.get_traced_memory().tuple2.0)!)
+  }
+  expectEqual(0, Int(tracemalloc.get_traced_memory().tuple2.0)!)
+  do {
+    let v: PythonObject = "Some String"
+    expectNotEqual(0, Int(tracemalloc.get_traced_memory().tuple2.0)!)
+  }
+  expectEqual(0, Int(tracemalloc.get_traced_memory().tuple2.0)!)
+  tracemalloc.stop()
 }
 
 runAllTests()

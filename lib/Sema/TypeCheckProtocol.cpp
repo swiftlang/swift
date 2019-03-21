@@ -665,9 +665,11 @@ swift::matchWitness(
   for (auto *reqDiffAttr : reqAttrs.getAttributes<DifferentiableAttr>()) {
     auto witnessDiffAttrs =
         witnessAttrs.getAttributes<DifferentiableAttr, /*AllowInvalid*/ true>();
-    bool reqDiffAttrMatch = llvm::any_of(witnessDiffAttrs,
-        [&](const DifferentiableAttr *witnessDiffAttr) {
-          return witnessDiffAttr->parametersMatch(*reqDiffAttr);
+    bool reqDiffAttrMatch = llvm::any_of(
+        witnessDiffAttrs, [&](const DifferentiableAttr *witnessDiffAttr) {
+          return witnessDiffAttr->getParameterIndices() &&
+                 reqDiffAttr->getParameterIndices() &&
+                 witnessDiffAttr->parametersMatch(*reqDiffAttr);
         });
     if (!reqDiffAttrMatch) {
       if (auto *vdWitness = dyn_cast<VarDecl>(witness))
@@ -2248,7 +2250,8 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
       assert(da);
       std::string diffAttrReq;
       llvm::raw_string_ostream stream(diffAttrReq);
-      da->print(stream, req);
+      da->print(stream, req,
+                /*prettyPrintInModule*/ match.Witness->getModuleContext());
       diags.diagnose(match.Witness,
           diag::protocol_witness_missing_specific_differentiable_attr,
           StringRef(stream.str()).trim());
