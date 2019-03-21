@@ -5532,7 +5532,7 @@ Expr *ExprRewriter::coerceCallArguments(
       sliceType = tc.getArraySliceType(arg->getLoc(), paramBaseType);
       toSugarFields.push_back(
           TupleTypeElt(sliceType, param.getLabel(), param.getParameterFlags()));
-      sources.push_back(TupleShuffleExpr::Variadic);
+      sources.push_back(ArgumentShuffleExpr::Variadic);
 
       // Convert the arguments.
       for (auto argIdx : parameterBindings[paramIdx]) {
@@ -5582,9 +5582,9 @@ Expr *ExprRewriter::coerceCallArguments(
 
       if (defArg) {
         callerDefaultArgs.push_back(defArg);
-        sources.push_back(TupleShuffleExpr::CallerDefaultInitialize);
+        sources.push_back(ArgumentShuffleExpr::CallerDefaultInitialize);
       } else {
-        sources.push_back(TupleShuffleExpr::DefaultInitialize);
+        sources.push_back(ArgumentShuffleExpr::DefaultInitialize);
       }
       continue;
     }
@@ -5722,7 +5722,7 @@ Expr *ExprRewriter::coerceCallArguments(
                                                  /*canonicalVararg=*/false);
 
   // If we came from a scalar, create a scalar-to-tuple conversion.
-  TupleShuffleExpr::TypeImpact typeImpact;
+  ArgumentShuffleExpr::TypeImpact typeImpact;
   if (argTuple == nullptr) {
     // Deal with a difference in only scalar ownership.
     if (auto paramParenTy = dyn_cast<ParenType>(paramType.getPointer())) {
@@ -5735,20 +5735,20 @@ Expr *ExprRewriter::coerceCallArguments(
       return cs.cacheType(argParen);
     }
 
-    typeImpact = TupleShuffleExpr::ScalarToTuple;
+    typeImpact = ArgumentShuffleExpr::ScalarToTuple;
     assert(isa<TupleType>(paramType.getPointer()));
   } else if (isa<TupleType>(paramType.getPointer())) {
-    typeImpact = TupleShuffleExpr::TupleToTuple;
+    typeImpact = ArgumentShuffleExpr::TupleToTuple;
   } else {
-    typeImpact = TupleShuffleExpr::TupleToScalar;
+    typeImpact = ArgumentShuffleExpr::TupleToScalar;
     assert(isa<ParenType>(paramType.getPointer()));
   }
 
-  // Create the tuple shuffle.
-  return cs.cacheType(TupleShuffleExpr::create(tc.Context, arg, sources,
-                                               typeImpact, callee, variadicArgs,
-                                               sliceType, callerDefaultArgs,
-                                               paramType));
+  // Create the argument shuffle.
+  return cs.cacheType(ArgumentShuffleExpr::create(tc.Context, arg, sources,
+                                                  typeImpact, callee, variadicArgs,
+                                                  sliceType, callerDefaultArgs,
+                                                  paramType));
 }
 
 static ClosureExpr *getClosureLiteralExpr(Expr *expr) {
@@ -7016,7 +7016,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
           return nullptr;
         }
 
-        if (auto shuffle = dyn_cast<TupleShuffleExpr>(arg))
+        if (auto shuffle = dyn_cast<ArgumentShuffleExpr>(arg))
           arg = shuffle->getSubExpr();
 
         if (auto tuple = dyn_cast<TupleExpr>(arg))
@@ -7219,8 +7219,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
     // Extract all arguments.
     auto *CEA = arg;
-    if (auto *TSE = dyn_cast<TupleShuffleExpr>(CEA))
-      CEA = TSE->getSubExpr();
+    if (auto *ASE = dyn_cast<ArgumentShuffleExpr>(CEA))
+      CEA = ASE->getSubExpr();
     // The argument is either a ParenExpr or TupleExpr.
     ArrayRef<Expr *> arguments;
 

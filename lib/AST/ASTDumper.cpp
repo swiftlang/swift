@@ -2171,6 +2171,42 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  void visitArgumentShuffleExpr(ArgumentShuffleExpr *E) {
+    printCommon(E, "tuple_shuffle_expr");
+    switch (E->getTypeImpact()) {
+    case ArgumentShuffleExpr::ScalarToTuple:
+      OS << " scalar_to_tuple";
+      break;
+    case ArgumentShuffleExpr::TupleToTuple:
+      OS << " tuple_to_tuple";
+      break;
+    case ArgumentShuffleExpr::TupleToScalar:
+      OS << " tuple_to_scalar";
+      break;
+    }
+    OS << " elements=[";
+    for (unsigned i = 0, e = E->getElementMapping().size(); i != e; ++i) {
+      if (i) OS << ", ";
+      OS << E->getElementMapping()[i];
+    }
+    OS << "]";
+    OS << " variadic_sources=[";
+    interleave(E->getVariadicArgs(),
+               [&](unsigned source) {
+                 OS << source;
+               },
+               [&] { OS << ", "; });
+    OS << "]";
+
+    if (auto defaultArgsOwner = E->getDefaultArgsOwner()) {
+      OS << " default_args_owner=";
+      defaultArgsOwner.dump(OS);
+    }
+
+    OS << "\n";
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
   void visitUnresolvedTypeConversionExpr(UnresolvedTypeConversionExpr *E) {
     printCommon(E, "unresolvedtype_conversion_expr") << '\n';
     printRec(E->getSubExpr());

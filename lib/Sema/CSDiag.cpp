@@ -3538,7 +3538,7 @@ public:
              "unexpected argument expression type");
       insertLoc = ArgExpr->getLoc();
 
-      // Can't be TupleShuffleExpr because this argExpr is not yet resolved.
+      // Can't be ArgumentShuffleExpr because this argExpr is not yet resolved.
     }
 
     assert(insertLoc.isValid() && "missing argument after trailing closure?");
