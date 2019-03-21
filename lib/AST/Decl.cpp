@@ -2313,7 +2313,7 @@ CanType ValueDecl::getOverloadSignatureType() const {
       defaultSignatureType = mapSignatureFunctionType(
           getASTContext(), getInterfaceType(),
           /*topLevelFunction=*/true,
-          /*isMethod=*/true,
+          /*isMethod=*/false,
           /*isInitializer=*/false,
           1)->getCanonicalType();
     }
