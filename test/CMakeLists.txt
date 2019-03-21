@@ -229,13 +229,15 @@ foreach(SDK ${SWIFT_SDKS})
               ${PYTHON_EXECUTABLE} "${SWIFT_SOURCE_DIR}/utils/android/adb_push_built_products.py"
               --ndk "${SWIFT_ANDROID_NDK_PATH}"
               --destination "${SWIFT_ANDROID_DEPLOY_DEVICE_PATH}"
+              --destination-arch "${ARCH}"
               # Build products like libswiftCore.so.
               "${SWIFTLIB_DIR}/android"
               # These two directories may contain the same libraries,
               # but upload both to device just in case. Duplicates will be
               # overwritten, and uploading doesn't take very long anyway.
               "${SWIFT_ANDROID_${ARCH}_ICU_UC}"
-              "${SWIFT_ANDROID_${ARCH}_ICU_I18N}")
+              "${SWIFT_ANDROID_${ARCH}_ICU_I18N}"
+              "${SWIFT_ANDROID_${ARCH}_ICU_DATA}")
     endif()
     add_custom_target("upload-stdlib${VARIANT_SUFFIX}"
         ${command_upload_stdlib}
