@@ -1040,10 +1040,9 @@ namespace {
       unsigned bits = cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits();
       assert(bits < 32 && "freakishly huge no-payload enum");
 
-      size_t shifted = static_cast<size_t>(static_cast<size_t>(1) << bits);
-      size_t rawCount = shifted - ElementsWithNoPayload.size();
-      return std::min(rawCount,
-                      size_t(ValueWitnessFlags::MaxNumExtraInhabitants));
+      unsigned shifted = 1U << bits;
+      unsigned rawCount = shifted - ElementsWithNoPayload.size();
+      return std::min(rawCount, ValueWitnessFlags::MaxNumExtraInhabitants);
     }
 
     APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
