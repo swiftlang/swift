@@ -1515,18 +1515,44 @@ namespace {
       return ctorRef;
     }
 
-    Expr *buildKeyPathDynamicMemberIndexExpr(ConstraintLocator *memberLoc) {
-      auto arg = solution.DynamicMemberArguments.find(memberLoc);
-      assert(arg != solution.DynamicMemberArguments.end() &&
-             "cannot find argument for keypath dynamic member lookup");
+    /// Build an implicit argument for keypath based dynamic lookup,
+    /// which consists of KeyPath expression and a single component.
+    ///
+    /// \param keyPathTy The type of the keypath argument.
+    /// \param dotLoc The location of the '.' preceding member name.
+    /// \param memberLoc The locator to be associated with new argument.
+    Expr *buildKeyPathDynamicMemberIndexExpr(BoundGenericType *keyPathTy,
+                                             SourceLoc dotLoc,
+                                             ConstraintLocator *memberLoc) {
+      auto &ctx = cs.getASTContext();
+      // Only properties are supported at the moment.
+      auto *UDE = dyn_cast<UnresolvedDotExpr>(memberLoc->getAnchor());
+      if (!UDE)
+        return nullptr;
 
-      auto *keyPath = arg->getSecond();
-      keyPath->forEachChildExpr([&](Expr *childExpr) -> Expr * {
-        simplifyExprType(childExpr);
-        return childExpr;
-      });
+      simplifyExprType(UDE);
+      UDE->setType(cs.getType(UDE));
 
-      return visitKeyPathExpr(keyPath);
+      // Let's re-use existinng expression but switch its base
+      // to keypath special dot expression.
+      UDE->setBase(new (ctx) KeyPathDotExpr(dotLoc));
+
+      // Now, let's create a KeyPath expression itself.
+      auto *keyPath = new (ctx) KeyPathExpr(/*backslashLoc=*/dotLoc,
+                                            /*parsedRoot=*/nullptr,
+                                            /*parsedPath=*/UDE,
+                                            /*isImplicit=*/true);
+
+      auto *propertyLoc = cs.getConstraintLocator(
+          memberLoc,
+          LocatorPathElt::getKeyPathDynamicMember(keyPathTy->getAnyNominal()));
+      auto overload = solution.getOverloadChoice(propertyLoc);
+      keyPath->resolveComponents(
+          ctx, {buildKeyPathPropertyComponent(overload, UDE->getLoc(),
+                                              propertyLoc)});
+      keyPath->setType(keyPathTy);
+      cs.cacheType(keyPath);
+      return keyPath;
     }
 
     /// Bridge the given value (which is an error type) to NSError.
@@ -2697,7 +2723,8 @@ namespace {
           auto fieldName = selected.choice.getName().getBaseIdentifier().str();
           argExpr = buildDynamicMemberLookupIndexExpr(fieldName, loc, dc, cs);
         } else {
-          argExpr = buildKeyPathDynamicMemberIndexExpr(memberLocator);
+          argExpr = buildKeyPathDynamicMemberIndexExpr(
+              paramTy->castTo<BoundGenericType>(), dotLoc, memberLocator);
         }
 
         assert(argExpr);
@@ -4128,10 +4155,6 @@ namespace {
       KeyPathSubscriptComponents;
   public:
     Expr *visitKeyPathExpr(KeyPathExpr *E) {
-      return visitKeyPathExpr(E, cs.getConstraintLocator(E));
-    }
-
-    Expr *visitKeyPathExpr(KeyPathExpr *E, ConstraintLocator *baseLocator) {
       if (E->isObjC()) {
         cs.setType(E, cs.getType(E->getObjCStringLiteralExpr()));
         return E;
@@ -4205,8 +4228,7 @@ namespace {
         Optional<SelectedOverload> foundDecl;
 
         auto locator = cs.getConstraintLocator(
-            baseLocator,
-            ConstraintLocator::PathElement::getKeyPathComponent(i));
+            E, ConstraintLocator::PathElement::getKeyPathComponent(i));
         if (kind == KeyPathExpr::Component::Kind::UnresolvedSubscript) {
           locator =
             cs.getConstraintLocator(locator,

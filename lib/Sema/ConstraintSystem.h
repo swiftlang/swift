@@ -613,11 +613,6 @@ public:
   llvm::SmallVector<std::pair<ConstraintLocator *, ProtocolConformanceRef>, 8>
       Conformances;
 
-  /// The set of implicitly generated arguments used by keypath based
-  /// dynamic lookup.
-  llvm::SmallDenseMap<ConstraintLocator *, KeyPathExpr *>
-      DynamicMemberArguments;
-
   /// Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
   Type simplifyType(Type type) const;
@@ -1080,11 +1075,6 @@ private:
 
   SmallVector<std::pair<ConstraintLocator *, ProtocolConformanceRef>, 8>
       CheckedConformances;
-
-  /// A cache that stores implicitly generated arguments for keypath based
-  /// dynamic lookup.
-  SmallVector<std::pair<ConstraintLocator *, KeyPathExpr *>, 4>
-      DynamicMemberArguments;
 
 public:
   /// The locators of \c Defaultable constraints whose defaults were used.
@@ -1552,8 +1542,6 @@ public:
     unsigned numDisabledConstraints;
 
     unsigned numFavoredConstraints;
-
-    unsigned numDynamicMemberArguments;
 
     /// The previous score.
     Score PreviousScore;
@@ -2761,16 +2749,6 @@ public:
                                          bool includeInaccessibleMembers);
 
 private:
-  /// Build an implicit argument for keypath based dynamic lookup,
-  /// which consists of KeyPath expression and a single component.
-  ///
-  /// \param member The member being dynamically lookuped up.
-  /// \param keyPathTy The type of the keypath argument.
-  /// \param locator The locator to be associated with new argument.
-  KeyPathExpr *buildImplicitDynamicKeyPathArgument(Expr *member,
-                                                   BoundGenericType *keyPathTy,
-                                                   ConstraintLocator *locator);
-
   /// Attempt to simplify the given construction constraint.
   ///
   /// \param valueType The type being constructed.
