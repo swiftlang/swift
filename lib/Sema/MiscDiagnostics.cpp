@@ -2450,6 +2450,20 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     auto *var = elt.first;
     unsigned access = elt.second;
 
+    if (auto *CS = dyn_cast_or_null<CaseStmt>(var->getRecursiveParentPatternStmt())) {
+      // Only diagnose VarDecls from the first CaseLabelItem in CaseStmts, as
+      // the remaining items must match it anyway.
+      auto CaseItems = CS->getCaseLabelItems();
+      if (!CaseItems.empty()) {
+        bool InFirstCaseLabelItem = false;
+        CaseItems.front().getPattern()->forEachVariable([&](VarDecl *D) {
+          InFirstCaseLabelItem |= var == D;
+        });
+        if (!InFirstCaseLabelItem)
+          continue;
+      }
+    }
+
     // If this is a 'let' value, any stores to it are actually initializations,
     // not mutations.
     auto isWrittenLet = false;

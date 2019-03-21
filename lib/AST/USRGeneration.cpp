@@ -167,6 +167,9 @@ static bool shouldUseObjCUSR(const Decl *D) {
 llvm::Expected<std::string>
 swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
                                       const ValueDecl *D) const {
+  if (auto *VD = dyn_cast<VarDecl>(D))
+    D = VD->getCanonicalVarDecl();
+
   if (!D->hasName() && !isa<ParamDecl>(D) && !isa<AccessorDecl>(D))
     return std::string(); // Ignore.
   if (D->getModuleContext()->isBuiltinModule())
