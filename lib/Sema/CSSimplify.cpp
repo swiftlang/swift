@@ -3826,6 +3826,28 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       }
     }
 
+    // Check whether this is overload choice found via keypath
+    // based dynamic member lookup. Since it's unknown upfront
+    // what kind of declaration lookup is going to find, let's
+    // double check here that given keypath is appropriate for it.
+    if (memberLocator) {
+      auto path = memberLocator->getPath();
+      if (!path.empty() && path.back().isKeyPathDynamicMember()) {
+        auto *keyPath = path.back().getKeyPath();
+        if (auto *storage = dyn_cast<AbstractStorageDecl>(decl)) {
+          // If this is an attempt to access read-only member via
+          // writable key path, let's fail this choice early.
+          if (isReadOnlyKeyPathComponent(storage) &&
+              keyPath == getASTContext().getWritableKeyPathDecl()) {
+            result.addUnviable(
+                candidate,
+                MemberLookupResult::UR_WritableKeyPathOnReadOnlyMember);
+            return;
+          }
+        }
+      }
+    }
+
     // Otherwise, we're good, add the candidate to the list.
     result.addViable(candidate);
   };
@@ -4193,6 +4215,11 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
     case MemberLookupResult::UR_MutatingGetterOnRValue:
     case MemberLookupResult::UR_LabelMismatch:
     case MemberLookupResult::UR_UnavailableInExistential:
+    // TODO(diagnostics): Add a new fix that is suggests to
+    // add `subscript(dynamicMember: KeyPath<T, U>)`
+    // overload here, that would help if such subscript has
+    // not been provided.
+    case MemberLookupResult::UR_WritableKeyPathOnReadOnlyMember:
       break;
     }
   }

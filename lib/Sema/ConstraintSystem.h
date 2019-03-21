@@ -872,6 +872,12 @@ struct MemberLookupResult {
     
     /// The member is inaccessible (e.g. a private member in another file).
     UR_Inaccessible,
+
+    /// This is a `WritableKeyPath` being used to look up read-only member,
+    /// used in situations involving dynamic member lookup via keypath,
+    /// because it's not known upfront what access capability would the
+    /// member have.
+    UR_WritableKeyPathOnReadOnlyMember,
   };
 
   /// This is a list of considered (but rejected) candidates, along with a

@@ -1988,29 +1988,6 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       }
     }
 
-    // Check whether this is overload choice found via keypath
-    // based dynamic member lookup. Since it's unknown upfront
-    // what kind of declaration lookup is going to find, let's
-    // double check here that given keypath is appropriate for it.
-    auto path = locator->getPath();
-    if (!path.empty() && path.back().isKeyPathDynamicMember()) {
-      auto *keyPath = path.back().getKeyPath();
-      if (auto *storage = dyn_cast<AbstractStorageDecl>(decl)) {
-        // If this is an attempt to access read-only member via
-        // writable key path, let's fail this choice early.
-        //
-        // TODO(diagnostics): Add a new fix that is suggests to
-        // add `subscript(dynamicMember: WritableKeyPath<T, U>)`
-        // overload here, instead of failing.
-        if (isReadOnlyKeyPathComponent(storage) &&
-            keyPath == getASTContext().getWritableKeyPathDecl()) {
-          failedConstraint = Constraint::create(*this, ConstraintKind::Bind,
-                                                boundType, refType, locator);
-          return;
-        }
-      }
-    }
-
     // Check whether applying this overload would result in invalid
     // partial function application e.g. partial application of
     // mutating method or initializer.
