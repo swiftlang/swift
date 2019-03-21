@@ -1838,15 +1838,27 @@ public:
   explicit RelatedIdScanner(SourceFile &SrcFile, unsigned BufferID,
                             ValueDecl *D,
       llvm::SmallVectorImpl<std::pair<unsigned, unsigned>> &Ranges)
-    : Dcl(D), Ranges(Ranges),
-      SourceMgr(SrcFile.getASTContext().SourceMgr),
+    : Ranges(Ranges), SourceMgr(SrcFile.getASTContext().SourceMgr),
       BufferID(BufferID) {
+    if (auto *V = dyn_cast<VarDecl>(D)) {
+      // Always use the canonical var decl for comparison. This is so we
+      // pick up all occurrences of x in case statements like the below:
+      //   case .first(let x), .second(let x)
+      //     fallthrough
+      //   case .third(let x)
+      //     print(x)
+      Dcl = V->getCanonicalVarDecl();
+    } else {
+      Dcl = D;
+    }
   }
 
 private:
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
     if (Cancelled)
       return false;
+    if (auto *V = dyn_cast<VarDecl>(D))
+        D = V->getCanonicalVarDecl();
     if (D == Dcl)
       return passId(Range);
     return true;
@@ -1856,8 +1868,12 @@ private:
                           ReferenceMetaData Data) override {
     if (Cancelled)
       return false;
-    if (CtorTyRef)
+
+    if (auto *V = dyn_cast<VarDecl>(D))
+      D = V->getCanonicalVarDecl();
+    else if (CtorTyRef)
       D = CtorTyRef;
+
     if (D == Dcl)
       return passId(Range);
     return true;
@@ -1933,7 +1949,13 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
           return;
 
         RelatedIdScanner Scanner(SrcFile, BufferID, VD, Ranges);
-        if (DeclContext *LocalDC = VD->getDeclContext()->getLocalContext()) {
+
+        if (auto *Case = getCaseStmtOfCanonicalVar(VD)) {
+          Scanner.walk(Case);
+          while ((Case = Case->getFallthroughDest().getPtrOrNull())) {
+            Scanner.walk(Case);
+          }
+        } else if (DeclContext *LocalDC = VD->getDeclContext()->getLocalContext()) {
           Scanner.walk(LocalDC);
         } else {
           Scanner.walk(SrcFile);
@@ -1955,6 +1977,16 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
     void failed(StringRef Error) override {
       LOG_WARN_FUNC("related idents failed: " << Error);
       Receiver({});
+    }
+
+    static CaseStmt *getCaseStmtOfCanonicalVar(Decl *D) {
+      assert(D);
+      if (auto *VD = dyn_cast<VarDecl>(D)) {
+        if (auto *Canonical = VD->getCanonicalVarDecl()) {
+          return dyn_cast_or_null<CaseStmt>(Canonical->getRecursiveParentPatternStmt());
+        }
+      }
+      return nullptr;
     }
   };
 
