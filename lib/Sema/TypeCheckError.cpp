@@ -892,6 +892,9 @@ public:
 
     /// The pattern of a catch.
     CatchGuard,
+
+    /// A defer body
+    DeferBody
   };
 
 private:
@@ -917,6 +920,7 @@ private:
 
   Kind TheKind;
   bool DiagnoseErrorOnTry = false;
+  bool isInDefer = false;
   DeclContext *RethrowsDC = nullptr;
   InterpolatedStringLiteralExpr *InterpolatedString = nullptr;
 
@@ -957,6 +961,12 @@ public:
 
     return Context(getKindForFunctionBody(
         D->getInterfaceType(), D->hasImplicitSelfDecl() ? 2 : 1));
+  }
+
+  static Context forDeferBody() {
+    Context result(Kind::DeferBody);
+    result.isInDefer = true;
+    return result;
   }
 
   static Context forInitializer(Initializer *init) {
@@ -1029,13 +1039,20 @@ public:
   }
 
   static void diagnoseThrowInIllegalContext(TypeChecker &TC, ASTNode node,
-                                            StringRef description) {
+                                            StringRef description,
+                                            bool throwInDefer = false) {
     if (auto *e = node.dyn_cast<Expr*>())
       if (isa<ApplyExpr>(e)) {
         TC.diagnose(e->getLoc(), diag::throwing_call_in_illegal_context,
                     description);
         return;
       }
+
+    if (throwInDefer) {
+      // Return because this would've already been diagnosed in TypeCheckStmt.
+      return;
+    }
+
     TC.diagnose(node.getStartLoc(), diag::throw_in_illegal_context,
                 description);
   }
@@ -1196,6 +1213,9 @@ public:
     case Kind::CatchGuard:
       diagnoseThrowInIllegalContext(TC, E, "a catch guard expression");
       return;
+    case Kind::DeferBody:
+      diagnoseThrowInIllegalContext(TC, E, "a defer body", isInDefer);
+      return;
     }
     llvm_unreachable("bad context kind");
   }
@@ -1223,6 +1243,7 @@ public:
     case Kind::DefaultArgument:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
+    case Kind::DeferBody:
       assert(!DiagnoseErrorOnTry);
       // Diagnosed at the call sites.
       return;
@@ -1670,7 +1691,10 @@ void TypeChecker::checkFunctionErrorHandling(AbstractFunctionDecl *fn) {
   PrettyStackTraceDecl debugStack("checking error handling for", fn);
 #endif
 
-  CheckErrorCoverage checker(*this, Context::forFunction(fn));
+  auto isDeferBody = isa<FuncDecl>(fn) && cast<FuncDecl>(fn)->isDeferBody();
+  auto context =
+      isDeferBody ? Context::forDeferBody() : Context::forFunction(fn);
+  CheckErrorCoverage checker(*this, context);
 
   // If this is a debugger function, suppress 'try' marking at the top level.
   if (fn->getAttrs().hasAttribute<LLDBDebuggerFunctionAttr>())
