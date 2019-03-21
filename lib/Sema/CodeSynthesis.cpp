@@ -1899,15 +1899,17 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       auto var = dyn_cast<VarDecl>(member);
       if (!var)
         continue;
-      
+
       // Implicit, computed, and static properties are not initialized.
-      // The exception is lazy properties, which due to batch mode we may or
+      // The exception is lazy properties and properties that have an
+      // attached delegate, which due to batch mode we may or
       // may not have yet finalized, so they may currently be "stored" or
       // "computed" in the current AST state.
       if (var->isImplicit() || var->isStatic())
         continue;
 
-      if (!var->hasStorage() && !var->getAttrs().hasAttribute<LazyAttr>())
+      if (!var->hasStorage() && !var->getAttrs().hasAttribute<LazyAttr>() &&
+          !var->hasPropertyDelegate())
         continue;
 
       // Initialized 'let' properties have storage, but don't get an argument
@@ -1921,13 +1923,26 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       tc.validateDecl(var);
       auto varInterfaceType = var->getValueInterfaceType();
 
-      // If var is a lazy property, its value is provided for the underlying
-      // storage.  We thus take an optional of the properties type.  We only
-      // need to do this because the implicit constructor is added before all
-      // the properties are type checked. Perhaps init() synth should be moved
-      // later.
-      if (var->getAttrs().hasAttribute<LazyAttr>())
+      if (var->getAttrs().hasAttribute<LazyAttr>()) {
+        // If var is a lazy property, its value is provided for the underlying
+        // storage.  We thus take an optional of the property's type.  We only
+        // need to do this because the implicit initializer is added before all
+        // the properties are type checked.  Perhaps init() synth should be
+        // moved later.
         varInterfaceType = OptionalType::get(varInterfaceType);
+      } else if (var->hasPropertyDelegate()) {
+        // For a property that has a delegate, the presence of an
+        // init(initialValue:) in the delegate type implies that the
+        // property can be initialized from the original property type.
+        // When there is no init(initialValue:), the underlying storage
+        // type will need to be initialized.
+        auto delegateTypeInfo = getAttachedPropertyDelegateInfo(var);
+        if (!delegateTypeInfo.initialValueInit) {
+          if (auto backingVar =
+                  getOrSynthesizePropertyDelegateBackingProperty(var))
+            varInterfaceType = backingVar->getValueInterfaceType();
+        }
+      }
 
       // Create the parameter.
       auto *arg = new (ctx)

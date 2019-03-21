@@ -145,3 +145,16 @@ func testDirectDelegateInitialization(s: String, i: Int) {
   var z: Int by Wrapper(name: "Hello", value: 3.14159)
   // expected-error@-1{{cannot convert value of type 'Wrapper<Double>' to specified type 'Int'}}
 }
+
+// ---------------------------------------------------------------------------
+// Memberwise initializers
+// ---------------------------------------------------------------------------
+struct MemberwiseInits<T> {
+  var x: Bool by Wrapper
+  var y: T by WrapperWithInitialValue
+}
+
+func testMemberwiseInits() {
+  // expected-error@+1{{type '(Wrapper<Bool>, Double) -> MemberwiseInits<Double>'}}
+  let _: Int = MemberwiseInits<Double>.init
+}
