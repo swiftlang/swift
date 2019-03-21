@@ -1906,8 +1906,6 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
   BraceStmt *BS = FD->getBody();
   assert(BS && "Should have a body");
 
-  // FIXME: FIXME_NOW: DETERMINE: What is the appropriate place for this code to
-  //        live?
   if (FD->hasSingleExpressionBody()) {
     auto resultTypeLoc = FD->getBodyResultTypeLoc();
     auto E = FD->getSingleExpressionBody();
@@ -1919,9 +1917,19 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
       // Fall through to type-checking the body as if we were not a single 
       // expression function.
     } else {
+      // The function doesn't return void.  First check whether the 
+      // single-expression has the appropriate type to return from the
+      // function.  If it does, we're done.  Otherwise, type-check the 
+      // expression without specifying the convertType.  If it type-checks, 
+      // check whether the expression's type is uninhabited.  If it is, delete
+      // the return and we're done.  If it isn't, assume the user intended to 
+      // use implicit return and show the diagnostics from failing to type-check
+      // the with the convertType specified to be the function's return type.
+      //
+      // Note that if we had implicit conversion from uninhabited types (i.e.
+      // if uninhabited types were bottom types) to arbitrary types, the
+      // problem solved here would disappear.
       auto resultType = Optional<AnyFunctionRef>(FD)->getBodyResultType();
-      // FIXME: FIXME_NOW: DETERMINE: Is this the appropriate mechanism to use
-      //        to divine the type of E?
       preCheckExpression(E, FD);
       if (E != FD->getSingleExpressionBody())
         FD->setSingleExpressionBody(E);
@@ -1979,12 +1987,10 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
         //
         // (2) When we don't assume the intent was to implicitly return the 
         // single expression, the constraint system has a solution, but the
-        // expression's type in that solution is not some uninhabited type
-        // distinct from the return type of the function.  For example,
+        // expression's type in that solution is some inhabited type, distinct
+        // from the return type of the function.  For example,
         //
-        //   func foo() -> Int {
-        //       "hi"
-        //   }
+        //   func foo() -> Int { "hi" }
         // 
         // In either case, we should assume that the intent was to implicitly
         // return the single expression and diagnose accordingly, per the first
