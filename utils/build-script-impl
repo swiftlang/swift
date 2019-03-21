@@ -2173,6 +2173,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLLVM_TOOL_SWIFT_BUILD:BOOL=NO
                     -DLLVM_INCLUDE_DOCS:BOOL=TRUE
                     -DLLVM_ENABLE_LTO:STRING="${LLVM_ENABLE_LTO}"
+                    -DCOMPILER_RT_INTERCEPT_LIBDISPATCH=ON
                     "${llvm_cmake_options[@]}"
                 )
 
