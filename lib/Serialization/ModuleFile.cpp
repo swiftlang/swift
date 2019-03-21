@@ -25,7 +25,6 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangImporter.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Serialization/BCReadingExtras.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/ADT/StringExtras.h"
@@ -1842,15 +1841,8 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
   }
 
   if (nominal->getParent()->isModuleScopeContext()) {
-    auto parentModule = nominal->getParentModule();
-    StringRef moduleName = parentModule->getName().str();
-
-    // If the originating module is a private module whose interface is
-    // re-exported via public module, check the name of the public module.
-    if (auto clangModuleUnit =
-            dyn_cast<ClangModuleUnit>(parentModule->getFiles().front())) {
-      moduleName = clangModuleUnit->getExportedModuleName();
-    }
+    auto parentFile = cast<FileUnit>(nominal->getParent());
+    StringRef moduleName = parentFile->getExportedModuleName();
 
     for (auto item : *iter) {
       if (item.first != moduleName)
