@@ -1010,7 +1010,7 @@ extension ContiguousArray {
   ///       - initializedCount: The count of initialized elements in the array,
   ///         which begins as zero. Set `initializedCount` to the number of
   ///         elements you initialize.
-  @inlinable
+  @_alwaysEmitIntoClient @inlinable
   public init(
     unsafeUninitializedCapacity: Int,
     initializingWith initializer: (
