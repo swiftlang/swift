@@ -4055,13 +4055,14 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     // }
     if (fromExistential) {
       if (auto NTD = toType->getAnyNominal()) {
-
-        auto protocolDecl =
-            dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal());
-        if (protocolDecl &&
-            !conformsToProtocol(toType, protocolDecl, dc,
-                                ConformanceCheckFlags::InExpression)) {
-          return failed();
+        if (!isa<ProtocolDecl>(NTD)) {
+          auto protocolDecl =
+              dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal());
+          if (protocolDecl &&
+              !conformsToProtocol(toType, protocolDecl, dc,
+                                  ConformanceCheckFlags::InExpression)) {
+            return failed();
+          }
         }
       }
     }

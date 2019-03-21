@@ -153,9 +153,9 @@ func objc_protocol_casts(_ op1: ObjCProto1, opn: NonObjCProto) {
   _ = ObjCClass() as! ObjCProto1 & NonObjCProto
 
   _ = op1 as! ObjCProto1 & ObjCProto2
-  _ = op1 as! ObjCProto2 // expected-warning {{cast from 'ObjCProto1' to unrelated type 'ObjCProto2' always fails}}
+  _ = op1 as! ObjCProto2
   _ = op1 as! ObjCProto1 & NonObjCProto
-  _ = opn as! ObjCProto1 // expected-warning {{cast from 'NonObjCProto' to unrelated type 'ObjCProto1' always fails}}
+  _ = opn as! ObjCProto1
 
   _ = NonObjCClass() as! ObjCProto1
 }
