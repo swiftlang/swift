@@ -392,17 +392,19 @@ func testGenerics<S, T, P: GenericProtocol>(
 //===----------------------------------------------------------------------===//
 
 @dynamicMemberLookup
-class C {
+class KP {
   subscript(dynamicMember member: String) -> Int { return 7 }
 }
-_ = \C.[dynamicMember: "hi"]
-_ = \C.testLookup
+_ = \KP.[dynamicMember: "hi"]
+_ = \KP.testLookup
 
 /* KeyPath based dynamic lookup */
 
 struct Point {
   var x: Int
   let y: Int
+
+  private let z: Int = 0 // expected-note 7 {{declared here}}
 }
 
 struct Rectangle {
@@ -433,6 +435,99 @@ var bottomRight = Point(x: 10, y: 10)
 var lens = Lens(Rectangle(topLeft: topLeft,
                           bottomRight: bottomRight))
 
+_ = lens.topLeft
+_ = lens.topLeft.x
+_ = lens.topLeft.y
+_ = lens.topLeft.z // expected-error {{'z' is inaccessible due to 'private' protection level}}
+
+_ = lens.bottomRight
+_ = lens.bottomRight.x
+_ = lens.bottomRight.y
+_ = lens.bottomRight.z // expected-error {{'z' is inaccessible due to 'private' protection level}}
+
 lens.topLeft = Lens(Point(x: 1, y: 2)) // Ok
 lens.bottomRight.x = Lens(11)          // Ok
 lens.bottomRight.y = Lens(12)          // expected-error {{cannot assign through dynamic lookup property: 'lens' is immutable}}
+lens.bottomRight.z = Lens(13)          // expected-error {{'z' is inaccessible due to 'private' protection level}}
+
+func acceptKeyPathDynamicLookup(_: Lens<Int>) {}
+
+acceptKeyPathDynamicLookup(lens.topLeft.x)
+acceptKeyPathDynamicLookup(lens.topLeft.y)
+acceptKeyPathDynamicLookup(lens.topLeft.z) // expected-error {{'z' is inaccessible due to 'private' protection level}}
+
+@dynamicMemberLookup
+class A<T> {
+  var value: T
+
+  init(_ v: T) {
+    self.value = v
+  }
+
+  subscript<U>(dynamicMember member: KeyPath<T, U>) -> U {
+    get { return value[keyPath: member] }
+  }
+}
+
+// Let's make sure that keypath dynamic member lookup
+// works with inheritance
+
+class B<T> : A<T> {}
+
+func bar(_ b: B<Point>) {
+  let _: Int = b.x
+  let _ = b.y
+  let _: Float = b.y // expected-error {{cannot convert value of type 'Int' to specified type 'Float'}}
+  let _ = b.z // expected-error {{'z' is inaccessible due to 'private' protection level}}
+}
+
+// Existentials and IUOs
+
+@dynamicMemberLookup
+protocol KeyPathLookup {
+  associatedtype T
+
+  var value: T { get }
+
+  subscript(dynamicMember member: KeyPath<T, Int>) -> Int! { get }
+}
+
+extension KeyPathLookup {
+  subscript(dynamicMember member: KeyPath<T, Int>) -> Int! {
+    get { return value[keyPath: member] }
+  }
+}
+
+class C<T> : KeyPathLookup {
+  var value: T
+  init(_ v: T) {
+    self.value = v
+  }
+}
+
+func baz(_ c: C<Point>) {
+  let _: Int = c.x
+  let _ = c.y
+  let _: Float = c.y // expected-error {{cannot convert value of type 'Int?' to specified type 'Float'}}
+  let _ = c.z // expected-error {{'z' is inaccessible due to 'private' protection level}}
+}
+
+@dynamicMemberLookup
+class D<T> {
+  var value: T
+
+  init(_ v: T) {
+    self.value = v
+  }
+
+  subscript<U: Numeric>(dynamicMember member: KeyPath<T, U>) -> (U) -> U {
+    get { return { offset in self.value[keyPath: member] + offset } }
+  }
+}
+
+func faz(_ d: D<Point>) {
+  let _: Int = d.x(42)
+  let _ = d.y(1 + 0)
+  let _: Float = d.y(1 + 0) // expected-error {{cannot convert value of type 'Int' to specified type 'Float'}}
+  let _ = d.z(1 + 0)        // expected-error {{'z' is inaccessible due to 'private' protection level}}
+}

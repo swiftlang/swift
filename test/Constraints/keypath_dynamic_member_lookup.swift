@@ -53,3 +53,44 @@ _ = lens.topLeft.y
 
 lens.topLeft = Lens(Point(x: 1, y: 2)) // Ok
 lens.bottomRight.y = Lens(12)          // Ok
+
+@dynamicMemberLookup
+class A<T> {
+  var value: T
+
+  init(_ v: T) {
+    self.value = v
+  }
+
+  subscript<U>(dynamicMember member: KeyPath<T, U>) -> U {
+    get { return value[keyPath: member] }
+  }
+}
+
+// Let's make sure that keypath dynamic member lookup
+// works with inheritance
+
+class B<T> : A<T> {}
+
+func bar(_ b: B<Point>) {
+  let _: Int = b.x
+  let _ = b.y
+}
+
+struct Point3D {
+  var x, y, z: Int
+}
+
+// Make sure that explicitly declared members take precedence
+class C<T> : A<T> {
+  var x: Float = 42
+}
+
+func baz(_ c: C<Point3D>) {
+  // CHECK: ref_element_addr {{.*}} : $C<Point3D>, #C.x
+  let _ = c.x
+  // CHECK: [[Y:%.*]] = keypath $KeyPath<Point3D, Int>, (root $Point3D; stored_property #Point3D.z : $Int)
+  // CHECK: [[KEYPATH:%.*]] = function_ref @$s29keypath_dynamic_member_lookup1AC0B6Memberqd__s7KeyPathCyxqd__G_tcluig
+  // CHECK-NEXT: apply [[KEYPATH]]<Point3D, Int>({{.*}}, [[Y]], {{.*}})
+  let _ = c.z
+}

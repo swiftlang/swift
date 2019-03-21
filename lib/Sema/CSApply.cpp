@@ -1257,7 +1257,9 @@ namespace {
       if (selected->choice.isDecl()) {
         auto locatorKind = ConstraintLocator::SubscriptMember;
         if (selected->choice.getKind() ==
-            OverloadChoiceKind::DynamicMemberLookup)
+                OverloadChoiceKind::DynamicMemberLookup ||
+            selected->choice.getKind() ==
+                OverloadChoiceKind::KeyPathDynamicMemberLookup)
           locatorKind = ConstraintLocator::Member;
 
         newSubscript =
