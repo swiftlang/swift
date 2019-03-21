@@ -42,23 +42,19 @@ public extension SIMD where Scalar : FixedWidthInteger {
 component = ['x','y','z','w']
 scalar_types = ['Float','Double','Int32','UInt32']
 ctype = { 'Float':'float', 'Double':'double', 'Int32':'int', 'UInt32':'uint'}
-llvm_type = { 'Float':'FPIEEE32', 'Double':'FPIEEE64', 'Int32':'Int32', 'UInt32':'Int32' }
 floating_types = ['Float','Double']
-cardinal = { 2:'two', 3:'three', 4:'four'}
 }%
 
 %for scalar in scalar_types:
 % for count in [2, 3, 4]:
 %  vectype = ctype[scalar] + str(count)
-%  llvm_vectype = "Vec" + str(count) + "x" + llvm_type[scalar]
 %  vecsize = (8 if scalar == 'Double' else 4) * (4 if count == 3 else count)
 %  vecalign = (16 if vecsize > 16 else vecsize)
-%  extractelement = "extractelement_" + llvm_vectype + "_Int32"
-%  insertelement = "insertelement_" + llvm_vectype + "_" + llvm_type[scalar] + "_Int32"
 %  is_floating = scalar in floating_types
 %  is_signed = scalar[0] != 'U'
 %  wrap = "" if is_floating else "&"
 
+@available(swift, deprecated: 5.1, message: "Use SIMD${count}<${scalar}>")
 public typealias ${vectype} = SIMD${count}<${scalar}>
 
 %  if is_signed:

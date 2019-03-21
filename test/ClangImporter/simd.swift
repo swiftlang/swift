@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name main -typecheck -verify %s
 
 import c_simd
-import simd
 
 let f4: float4 = makes_float4()
 let i3: int3 = makes_int3()

@@ -510,36 +510,32 @@ namespace {
     }
 
     ImportResult VisitVectorType(const clang::VectorType *type) {
-      auto *SIMD = Impl.tryLoadSIMDModule();
-      if (!SIMD)
-        return Type();
-      
-      // Map the element type and count to a Swift name, such as
-      // float x 3 => Float3.
-      SmallString<16> name;
-      {
-        llvm::raw_svector_ostream names(name);
-        
-        if (auto builtinTy
-              = dyn_cast<clang::BuiltinType>(type->getElementType())){
-          switch (builtinTy->getKind()) {
-#define MAP_SIMD_TYPE(TYPE_NAME, __, BUILTIN_KIND)   \
-          case clang::BuiltinType::BUILTIN_KIND: \
-            names << #TYPE_NAME;                 \
-            break;
-#include "swift/ClangImporter/SIMDMappedTypes.def"
-          default:
-            // A vector type we don't know how to map.
-            return Type();
+      // Get the element type and count.
+      Type element = Impl.importTypeIgnoreIUO(type->getElementType(),
+                                              ImportTypeKind::Abstract,
+                                              false,
+                                              Bridgeability::Full,
+                                              OptionalTypeKind::OTK_None);
+      unsigned count = type->getNumElements();
+      // Import vector-of-one as the element type.
+      if (count == 1) { return element; }
+      // element type needs to conform to SIMDScalar to be imported.
+      auto nominal = element->getAnyNominal();
+      auto simdscalar = Impl.SwiftContext.getProtocol(KnownProtocolKind::SIMDScalar);
+      SmallVector<ProtocolConformance *, 2> conformances;
+      if (simdscalar && nominal->lookupConformance(nominal->getParentModule(),
+                                                   simdscalar, conformances)) {
+        SmallString<8> name("SIMD");
+        name.append(std::to_string(count));
+        if (auto vector = Impl.getNamedSwiftType(Impl.getStdlibModule(), name)) {
+          if (auto unbound = vector->getAs<UnboundGenericType>()) {
+            ArrayRef<Type> arg(element);
+            return BoundGenericType::get(cast<NominalTypeDecl>(unbound->getDecl()),
+                                         Type(), arg);
           }
-        } else {
-          return Type();
         }
-        
-        names << type->getNumElements();
       }
-      
-      return Impl.getNamedSwiftType(SIMD, name);
+      return Type();
     }
 
     ImportResult VisitFunctionProtoType(const clang::FunctionProtoType *type) {
@@ -2323,11 +2319,6 @@ static ModuleDecl *tryLoadModule(ASTContext &C,
 
 ModuleDecl *ClangImporter::Implementation::tryLoadFoundationModule() {
   return tryLoadModule(SwiftContext, SwiftContext.Id_Foundation,
-                       ImportForwardDeclarations, checkedModules);
-}
-
-ModuleDecl *ClangImporter::Implementation::tryLoadSIMDModule() {
-  return tryLoadModule(SwiftContext, SwiftContext.Id_simd,
                        ImportForwardDeclarations, checkedModules);
 }
 
