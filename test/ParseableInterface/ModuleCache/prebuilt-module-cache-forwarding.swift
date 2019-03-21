@@ -3,7 +3,8 @@
 // RUN: %empty-directory(%t/prebuilt-cache)
 
 // First, prebuild a module and put it in the prebuilt cache.
-// RUN: sed -e 's/FromInterface/FromPrebuilt/g' %S/Inputs/prebuilt-module-cache/Lib.swiftinterface > %t/Lib.swiftinterface
+// RUN: sed -e 's/FromInterface/FromPrebuilt/g' %S/Inputs/prebuilt-module-cache/Lib.swiftinterface | tr -d '\r' > %t/Lib.swiftinterface.tmp
+// RUN: mv %t/Lib.swiftinterface.tmp %t/Lib.swiftinterface
 // RUN: %target-swift-frontend -build-module-from-parseable-interface -module-cache-path %t/MCP -serialize-parseable-module-interface-dependency-hashes -o %t/prebuilt-cache/Lib.swiftmodule %t/Lib.swiftinterface
 
 // Next, use the module and check if the forwarding module is in place.
