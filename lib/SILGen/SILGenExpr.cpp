@@ -2672,6 +2672,10 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   auto genericSig = genericEnv
     ? genericEnv->getGenericSignature()->getCanonicalSignature()
     : nullptr;
+  if (genericSig && genericSig->areAllParamsConcrete()) {
+    genericSig = nullptr;
+    genericEnv = nullptr;
+  }
 
   // Build the signature of the thunk as expected by the keypath runtime.
   CanType loweredBaseTy, loweredPropTy;
@@ -2800,6 +2804,11 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   auto genericSig = genericEnv
     ? genericEnv->getGenericSignature()->getCanonicalSignature()
     : nullptr;
+
+  if (genericSig && genericSig->areAllParamsConcrete()) {
+    genericSig = nullptr;
+    genericEnv = nullptr;
+  }
 
   // Build the signature of the thunk as expected by the keypath runtime.
   CanType loweredBaseTy, loweredPropTy;
@@ -2956,6 +2965,11 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
   auto genericSig = genericEnv
     ? genericEnv->getGenericSignature()->getCanonicalSignature()
     : nullptr;
+
+  if (genericSig && genericSig->areAllParamsConcrete()) {
+    genericSig = nullptr;
+    genericEnv = nullptr;
+  }
 
   auto &C = SGM.getASTContext();
   auto unsafeRawPointerTy = C.getUnsafeRawPointerDecl()->getDeclaredType()
