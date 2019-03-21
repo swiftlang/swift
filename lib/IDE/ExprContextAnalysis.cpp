@@ -439,12 +439,12 @@ bool collectPossibleCalleesForSubscript(
 }
 
 /// Get index of \p CCExpr in \p Args. \p Args is usually a \c TupleExpr,
-/// \c ParenExpr, or a \c TupleShuffleExpr.
+/// \c ParenExpr, or a \c ArgumentShuffleExpr.
 /// \returns \c true if success, \c false if \p CCExpr is not a part of \p Args.
 bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
                        unsigned &Position, bool &HasName) {
-  if (auto TSE = dyn_cast<TupleShuffleExpr>(Args))
-    Args = TSE->getSubExpr();
+  if (auto ASE = dyn_cast<ArgumentShuffleExpr>(Args))
+    Args = ASE->getSubExpr();
 
   if (isa<ParenExpr>(Args)) {
     HasName = false;
@@ -469,28 +469,28 @@ bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
 }
 
 /// Translate argument index in \p Args to parameter index.
-/// Does nothing unless \p Args is \c TupleShuffleExpr.
+/// Does nothing unless \p Args is \c ArgumentShuffleExpr.
 bool translateArgIndexToParamIndex(Expr *Args, unsigned &Position,
                                    bool &HasName) {
-  auto TSE = dyn_cast<TupleShuffleExpr>(Args);
-  if (!TSE)
+  auto ASE = dyn_cast<ArgumentShuffleExpr>(Args);
+  if (!ASE)
     return true;
 
-  auto mapping = TSE->getElementMapping();
+  auto mapping = ASE->getElementMapping();
   for (unsigned destIdx = 0, e = mapping.size(); destIdx != e; ++destIdx) {
     auto srcIdx = mapping[destIdx];
     if (srcIdx == (signed)Position) {
       Position = destIdx;
       return true;
     }
-    if (srcIdx == TupleShuffleExpr::Variadic &&
-        llvm::is_contained(TSE->getVariadicArgs(), Position)) {
+    if (srcIdx == ArgumentShuffleExpr::Variadic &&
+        llvm::is_contained(ASE->getVariadicArgs(), Position)) {
       // The arg is a part of variadic args.
       Position = destIdx;
       HasName = false;
-      if (auto Args = dyn_cast<TupleExpr>(TSE->getSubExpr())) {
+      if (auto Args = dyn_cast<TupleExpr>(ASE->getSubExpr())) {
         // Check if the first variadiac argument has the label.
-        auto firstVarArgIdx = TSE->getVariadicArgs().front();
+        auto firstVarArgIdx = ASE->getVariadicArgs().front();
         HasName = Args->getElementNameLoc(firstVarArgIdx).isValid();
       }
       return true;
@@ -749,7 +749,7 @@ public:
           auto ParentE = Parent.getAsExpr();
           return !ParentE ||
                  (!isa<CallExpr>(ParentE) && !isa<SubscriptExpr>(ParentE) &&
-                  !isa<BinaryExpr>(ParentE) && !isa<TupleShuffleExpr>(ParentE));
+                  !isa<BinaryExpr>(ParentE) && !isa<ArgumentShuffleExpr>(ParentE));
         }
         case ExprKind::Closure: {
           // Note: we cannot use hasSingleExpressionBody, because we explicitly

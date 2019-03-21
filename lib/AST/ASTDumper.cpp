@@ -2119,14 +2119,25 @@ public:
   }
   void visitTupleShuffleExpr(TupleShuffleExpr *E) {
     printCommon(E, "tuple_shuffle_expr");
+    OS << " elements=[";
+    for (unsigned i = 0, e = E->getElementMapping().size(); i != e; ++i) {
+      if (i) OS << ", ";
+      OS << E->getElementMapping()[i];
+    }
+    OS << "]\n";
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+  void visitArgumentShuffleExpr(ArgumentShuffleExpr *E) {
+    printCommon(E, "tuple_shuffle_expr");
     switch (E->getTypeImpact()) {
-    case TupleShuffleExpr::ScalarToTuple:
+    case ArgumentShuffleExpr::ScalarToTuple:
       OS << " scalar_to_tuple";
       break;
-    case TupleShuffleExpr::TupleToTuple:
+    case ArgumentShuffleExpr::TupleToTuple:
       OS << " tuple_to_tuple";
       break;
-    case TupleShuffleExpr::TupleToScalar:
+    case ArgumentShuffleExpr::TupleToScalar:
       OS << " tuple_to_scalar";
       break;
     }
