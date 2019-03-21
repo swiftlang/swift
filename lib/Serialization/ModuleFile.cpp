@@ -1847,11 +1847,9 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
 
     // If the originating module is a private module whose interface is
     // re-exported via public module, check the name of the public module.
-    std::string exportedModuleName;
     if (auto clangModuleUnit =
             dyn_cast<ClangModuleUnit>(parentModule->getFiles().front())) {
-      exportedModuleName = clangModuleUnit->getExportedModuleName();
-      moduleName = exportedModuleName;
+      moduleName = clangModuleUnit->getExportedModuleName();
     }
 
     for (auto item : *iter) {
