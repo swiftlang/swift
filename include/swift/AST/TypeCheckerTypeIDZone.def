@@ -83,7 +83,7 @@ SWIFT_REQUEST(TypeChecker, HasDynamicMemberLookupAttributeRequest,
               bool(CanType), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
               GenericSignature (ModuleDecl *, GenericSignatureImpl *,
-                                 GenericParamList *,
+                                 GenericParamSource,
                                  SmallVector<Requirement, 2>,
                                  SmallVector<TypeLoc, 2>, bool),
               Cached, NoLocationInfo)

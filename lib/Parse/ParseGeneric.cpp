@@ -392,8 +392,9 @@ ParserStatus Parser::parseGenericWhereClause(
 }
 
 
-/// Parse a free-standing where clause attached to a declaration, adding it to
-/// a generic parameter list that may (or may not) already exist.
+/// Parse a free-standing where clause attached to a declaration,
+/// adding it to a generic parameter list, if any, or to the given
+/// generic context representing the declaration.
 ParserStatus Parser::
 parseFreestandingGenericWhereClause(GenericContext *genCtx,
                                     GenericParamList *&genericParams,
