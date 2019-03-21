@@ -5108,23 +5108,10 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     return expr;
   }
 
-  // computeTupleShuffle() produces an array of unsigned (since it can only
-  // contain tuple element indices). However TupleShuffleExpr is also used
-  // for call argument lists which can contain special things like default
-  // arguments and variadics; those are presented by negative integers.
-  //
-  // FIXME: Design and implement a new AST where argument lists are
-  // separate from rvalue tuple conversions.
-  ArrayRef<unsigned> sourcesRef = sources;
-  ArrayRef<int> sourcesCast((const int *) sourcesRef.data(),
-                            sourcesRef.size());
-
   // Create the tuple shuffle.
   return
     cs.cacheType(TupleShuffleExpr::create(tc.Context,
-                                          expr, sourcesCast,
-                                          TupleShuffleExpr::TupleToTuple,
-                                          ConcreteDeclRef(), {}, Type(), {},
+                                          expr, sources,
                                           toSugarType));
 }
 

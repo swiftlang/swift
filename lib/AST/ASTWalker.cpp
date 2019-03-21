@@ -646,13 +646,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       return nullptr;
     }
 
-    for (auto &defaultArg : E->getCallerDefaultArgs()) {
-      if (Expr *newDefaultArg = doIt(defaultArg))
-        defaultArg = newDefaultArg;
-      else
-        return nullptr;
-    }
-
     return E;
   }
 
