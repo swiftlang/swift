@@ -586,6 +586,11 @@ public:
   SILInstruction *getUser() { return Owner; }
   const SILInstruction *getUser() const { return Owner; }
 
+  /// Return true if this operand is a type dependent operand.
+  ///
+  /// Implemented in SILInstruction.h
+  bool isTypeDependent() const;
+
   /// Return which operand this is in the operand list of the using instruction.
   unsigned getOperandNumber() const;
 
