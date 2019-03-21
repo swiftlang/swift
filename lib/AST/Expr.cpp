@@ -1335,20 +1335,11 @@ CaptureListExpr *CaptureListExpr::create(ASTContext &ctx,
 
 TupleShuffleExpr *TupleShuffleExpr::create(ASTContext &ctx,
                                            Expr *subExpr,
-                                           ArrayRef<int> elementMapping,
-                                           TypeImpact typeImpact,
-                                           ConcreteDeclRef defaultArgsOwner,
-                                           ArrayRef<unsigned> VariadicArgs,
-                                           Type VarargsArrayTy,
-                                           ArrayRef<Expr *> CallerDefaultArgs,
+                                           ArrayRef<unsigned> elementMapping,
                                            Type ty) {
-  auto size = totalSizeToAlloc<Expr*, int, unsigned>(CallerDefaultArgs.size(),
-                                                     elementMapping.size(),
-                                                     VariadicArgs.size());
+  auto size = totalSizeToAlloc<unsigned>(elementMapping.size());
   auto mem = ctx.Allocate(size, alignof(TupleShuffleExpr));
-  return ::new(mem) TupleShuffleExpr(subExpr, elementMapping, typeImpact,
-                                     defaultArgsOwner, VariadicArgs,
-                                     VarargsArrayTy, CallerDefaultArgs, ty);
+  return ::new(mem) TupleShuffleExpr(subExpr, elementMapping, ty);
 }
 
 ArgumentShuffleExpr *ArgumentShuffleExpr::create(ASTContext &ctx,
