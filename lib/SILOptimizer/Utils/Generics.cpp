@@ -23,6 +23,7 @@
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/GenericCloner.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Strings.h"
 
 using namespace swift;
@@ -2499,91 +2500,24 @@ static bool linkSpecialization(SILModule &M, SILFunction *F) {
   return false;
 }
 
+#define PRESPEC_SYMBOL(s) MANGLE_AS_STRING(s),
+static const char *PrespecSymbols[] = {
+#include "OnonePrespecializations.def"
+  nullptr
+};
+#undef PRESPEC_SYMBOL
+
+llvm::DenseSet<StringRef> PrespecSet;
+
 bool swift::isKnownPrespecialization(StringRef SpecName) {
-  // Completely disable for now.
-#if false
-
-  /// The list of classes and functions from the stdlib
-  /// whose specializations we want to preserve.
-  static const char *const KnownPrespecializations[] = {
-      "Array",
-      "_ArrayBuffer",
-      "_ContiguousArrayBuffer",
-      "Range",
-      "RangeIterator",
-      "CountableRange",
-      "CountableRangeIterator",
-      "ClosedRange",
-      "ClosedRangeIterator",
-      "CountableClosedRange",
-      "CountableClosedRangeIterator",
-      "IndexingIterator",
-      "Collection",
-      "ReversedCollection",
-      "MutableCollection",
-      "BidirectionalCollection",
-      "RandomAccessCollection",
-      "ReversedRandomAccessCollection",
-      "RangeReplaceableCollection",
-      "_allocateUninitializedArray",
-      "UTF8",
-      "UTF16",
-      "String",
-      "_StringBuffer",
-  };
-
-  // TODO: Once there is an efficient API to check if
-  // a given symbol is a specialization of a specific type,
-  // use it instead. Doing demangling just for this check
-  // is just wasteful.
-  auto DemangledNameString =
-     swift::Demangle::demangleSymbolAsString(SpecName);
-
-  StringRef DemangledName = DemangledNameString;
-
-  LLVM_DEBUG(llvm::dbgs() << "Check if known: " << DemangledName << "\n");
-
-  auto pos = DemangledName.find("generic ", 0);
-  auto oldpos = pos;
-  if (pos == StringRef::npos)
-    return false;
-
-  // Create "of Swift"
-  llvm::SmallString<64> OfString;
-  llvm::raw_svector_ostream buffer(OfString);
-  buffer << "of ";
-  buffer << STDLIB_NAME <<'.';
-
-  StringRef OfStr = buffer.str();
-  LLVM_DEBUG(llvm::dbgs() << "Check substring: " << OfStr << "\n");
-
-  pos = DemangledName.find(OfStr, oldpos);
-
-  if (pos == StringRef::npos) {
-    // Create "of (extension in Swift).Swift"
-    llvm::SmallString<64> OfString;
-    llvm::raw_svector_ostream buffer(OfString);
-    buffer << "of (extension in " << STDLIB_NAME << "):";
-    buffer << STDLIB_NAME << '.';
-    OfStr = buffer.str();
-    pos = DemangledName.find(OfStr, oldpos);
-    LLVM_DEBUG(llvm::dbgs() << "Check substring: " << OfStr << "\n");
-    if (pos == StringRef::npos)
-      return false;
-  }
-
-  pos += OfStr.size();
-
-  for (auto NameStr : KnownPrespecializations) {
-    StringRef Name = NameStr;
-    auto pos1 = DemangledName.find(Name, pos);
-    if (pos1 == pos && !isalpha(DemangledName[pos1+Name.size()])) {
-      return true;
+  if (PrespecSet.empty()) {
+    const char **Pos = &PrespecSymbols[0];
+    while (const char *Sym = *Pos++) {
+      PrespecSet.insert(Sym);
     }
+    assert(!PrespecSet.empty());
   }
-
-#endif
-  return false;
+  return PrespecSet.count(SpecName) != 0;
 }
 
 /// Try to look up an existing specialization in the specialization cache.
