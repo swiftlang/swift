@@ -748,11 +748,11 @@ def create_argument_parser():
 
     # FIXME: Convert to store_true action
     option('-y', store('test_optimize_none_implicit_dynamic', const=True),
-           help='run the test suite in optimize none with implicit dynamic mode'
-                ' too (implies --test)')
+           help='run the test suite in optimize none with implicit dynamic'
+                ' mode too (implies --test)')
     option('--test-optimize-none-implicit-dynamic', toggle_true,
-           help='run the test suite in optimize none with implicit dynamic mode'
-                ' too (implies --test)')
+           help='run the test suite in optimize none with implicit dynamic'
+                'mode too (implies --test)')
 
     option('--long-test', toggle_true,
            help='run the long test suite')

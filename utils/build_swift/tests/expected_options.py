@@ -452,6 +452,8 @@ EXPECTED_OPTIONS = [
     EnableOption('--stress-test'),
     EnableOption('--test'),
     EnableOption('--test-optimize-for-size'),
+    EnableOption('--test-optimize-none-implicit-dynamic'),
+    EnableOption('--test-optimized'),
     EnableOption('--test-optimized'),
     EnableOption('--tvos'),
     EnableOption('--validation-test'),
