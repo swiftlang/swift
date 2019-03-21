@@ -313,6 +313,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     PrettyStackTraceDecl debugStack("walking into body of", AFD);
 #endif
 
+    if (AFD->hasSingleExpressionBody()) {
+      if (auto body = AFD->getSingleExpressionBody()) {
+        if ((body = doIt(body)))
+          AFD->setSingleExpressionBody(body);
+        else
+          return true;
+      }
+    }
+
     bool WalkGenerics = AFD->getGenericParams() &&
         Walker.shouldWalkIntoGenericParams() &&
         // accessor generics are visited from the storage decl
@@ -339,15 +348,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }
     }
 
-    // FIXME: FIXME_NOW: DETERMINE: Is this or something like it needed?  Right
-    //        now it's causing assertion failures during AST verification.
-    //     
-    //     if (AFD->hasSingleExpressionBody()) {
-    //       if (Expr *body = doIt(AFD->getSingleExpressionBody()))
-    //         AFD->setSingleExpressionBody(body);
-    //       else
-    //         return true;
-    //     }
     if (AFD->getBody(/*canSynthesize=*/false)) {
       AbstractFunctionDecl::BodyKind PreservedKind = AFD->getBodyKind();
       if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(AFD->getBody())))
