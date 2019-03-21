@@ -947,21 +947,20 @@ public:
     return S;
   }
 
-  void checkCaseLabelItem(CaseStmt *caseBlock, CaseLabelItem &labelItem,
-                          bool &limitExhaustivityChecks, Type subjectType) {
-    SWIFT_DEFER {
-      // Check the guard expression, if present.
-      if (auto *guard = labelItem.getGuardExpr()) {
-        limitExhaustivityChecks |= TC.typeCheckCondition(guard, DC);
-        labelItem.setGuardExpr(guard);
-      }
-    };
-
+  void checkCaseLabelItemPattern(CaseStmt *caseBlock, CaseLabelItem &labelItem,
+                                 bool &limitExhaustivityChecks,
+                                 Type subjectType,
+                                 SmallVectorImpl<VarDecl *> **prevCaseDecls,
+                                 SmallVectorImpl<VarDecl *> **nextCaseDecls) {
     Pattern *pattern = labelItem.getPattern();
     auto *newPattern = TC.resolvePattern(pattern, DC,
                                          /*isStmtCondition*/ false);
-    if (!newPattern)
+    if (!newPattern) {
+      pattern->collectVariables(**nextCaseDecls);
+      std::swap(*prevCaseDecls, *nextCaseDecls);
       return;
+    }
+
     pattern = newPattern;
     // Coerce the pattern to the subject's type.
     TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
@@ -976,44 +975,108 @@ public:
     }
     labelItem.setPattern(pattern);
 
-    // For each variable in the pattern, make sure its type is identical to what
-    // it was in the first label item's pattern.
-    auto *firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
-    SmallVector<VarDecl *, 4> vars;
-    firstPattern->collectVariables(vars);
+    // If we do not have decls from the previous case that we need to match,
+    // just return. This only happens with the first case label item.
+    if (!*prevCaseDecls) {
+      pattern->collectVariables(**nextCaseDecls);
+      std::swap(*prevCaseDecls, *nextCaseDecls);
+      return;
+    }
+
+    // Otherwise for each variable in the pattern, make sure its type is
+    // identical to the initial case decl and stash the previous case decl as
+    // the parent of the decl.
     pattern->forEachVariable([&](VarDecl *vd) {
       if (!vd->hasName())
         return;
-      for (auto *expected : vars) {
-        if (expected->hasName() && expected->getName() == vd->getName()) {
-          if (vd->hasType() && expected->hasType() && !expected->isInvalid() &&
-              !vd->getType()->isEqual(expected->getType())) {
-            TC.diagnose(vd->getLoc(), diag::type_mismatch_multiple_pattern_list,
-                        vd->getType(), expected->getType());
-            vd->markInvalid();
-            expected->markInvalid();
-          }
-          if (expected->isLet() != vd->isLet()) {
-            auto diag = TC.diagnose(
-                vd->getLoc(), diag::mutability_mismatch_multiple_pattern_list,
-                vd->isLet(), expected->isLet());
 
-            VarPattern *foundVP = nullptr;
-            vd->getParentPattern()->forEachNode([&](Pattern *P) {
-              if (auto *VP = dyn_cast<VarPattern>(P))
-                if (VP->getSingleVar() == vd)
-                  foundVP = VP;
-            });
-            if (foundVP)
-              diag.fixItReplace(foundVP->getLoc(),
-                                expected->isLet() ? "let" : "var");
-            vd->markInvalid();
-            expected->markInvalid();
-          }
+      // We know that prev var decls matches the initial var decl. So if we can
+      // match prevVarDecls, we can also match initial var decl... So for each
+      // decl in prevVarDecls...
+      for (auto *expected : **prevCaseDecls) {
+        // If we do not match the name of vd, continue.
+        if (!expected->hasName() || expected->getName() != vd->getName())
+          continue;
+
+        // Ok, we found a match! Before we leave, mark expected as the parent of
+        // vd and add vd to the next case decl list for the next iteration.
+        SWIFT_DEFER {
+          vd->setParentVarDecl(expected);
+          (*nextCaseDecls)->push_back(vd);
+        };
+
+        // Then we check for errors.
+        //
+        // NOTE: We emit the diagnostics against the initial case label item var
+        // decl associated with expected to ensure that we always emit
+        // diagnostics against a single reference var decl. If we used expected
+        // instead, we would emit confusing diagnostics since a correct var decl
+        // after an incorrect var decl will be marked as incorrect. For instance
+        // given the following case statement.
+        //
+        //   case .a(let x), .b(var x), .c(let x):
+        //
+        // if we use expected, we will emit errors saying that .b(var x) needs
+        // to be a let and .c(let x) needs to be a var. Thus if one
+        // automatically applied both fix-its, one would still get an error
+        // producing program:
+        //
+        //   case .a(let x), .b(let x), .c(var x):
+        //
+        // More complex case label item lists could cause even longer fixup
+        // sequences. Thus, we emit errors against the VarDecl associated with
+        // expected in the initial case label item list.
+        //
+        // Luckily, it is easy for us to compute this since we only change the
+        // parent field of the initial case label item's VarDecls /after/ we
+        // finish updating the parent pointers of the VarDecls associated with
+        // all other CaseLabelItems. So that initial group of VarDecls are
+        // guaranteed to still have a parent pointer pointing at our
+        // CaseStmt. Since we have setup the parent pointer VarDecl linked list
+        // for all other CaseLabelItem var decls that we have already processed,
+        // we can use our VarDecl linked list to find that initial case label
+        // item VarDecl.
+        auto *initialCaseVarDecl = expected;
+        while (auto *prev = initialCaseVarDecl->getParentVarDecl()) {
+          initialCaseVarDecl = prev;
+        }
+        assert(isa<CaseStmt>(initialCaseVarDecl->getParentPatternStmt()));
+
+        if (vd->hasType() && initialCaseVarDecl->hasType() &&
+            !initialCaseVarDecl->isInvalid() &&
+            !vd->getType()->isEqual(initialCaseVarDecl->getType())) {
+          TC.diagnose(vd->getLoc(), diag::type_mismatch_multiple_pattern_list,
+                      vd->getType(), initialCaseVarDecl->getType());
+          vd->markInvalid();
+          initialCaseVarDecl->markInvalid();
+        }
+
+        if (initialCaseVarDecl->isLet() == vd->isLet()) {
           return;
         }
+
+        auto diag = TC.diagnose(vd->getLoc(),
+                                diag::mutability_mismatch_multiple_pattern_list,
+                                vd->isLet(), initialCaseVarDecl->isLet());
+
+        VarPattern *foundVP = nullptr;
+        vd->getParentPattern()->forEachNode([&](Pattern *P) {
+          if (auto *VP = dyn_cast<VarPattern>(P))
+            if (VP->getSingleVar() == vd)
+              foundVP = VP;
+        });
+        if (foundVP)
+          diag.fixItReplace(foundVP->getLoc(),
+                            initialCaseVarDecl->isLet() ? "let" : "var");
+        vd->markInvalid();
+        initialCaseVarDecl->markInvalid();
       }
     });
+
+    // Clear our previous case decl list and the swap in the new decls for the
+    // next iteration.
+    (*prevCaseDecls)->clear();
+    std::swap(*prevCaseDecls, *nextCaseDecls);
   }
 
   void checkUnknownAttrRestrictions(CaseStmt *caseBlock,
@@ -1052,33 +1115,43 @@ public:
     SmallVector<VarDecl *, 4> vars;
     firstPattern->collectVariables(vars);
 
-    for (auto &labelItem : previousBlock->getCaseLabelItems()) {
-      const Pattern *pattern = labelItem.getPattern();
-      SmallVector<VarDecl *, 4> PreviousVars;
-      pattern->collectVariables(PreviousVars);
-      for (auto expected : vars) {
-        bool matched = false;
-        if (!expected->hasName())
+    // We know that the typechecker will guarantee that all of the case label
+    // items in the fallthrough match. So if we match the last case label item,
+    // transitively we will match all of the other case label items.
+    auto &labelItem = previousBlock->getCaseLabelItems().back();
+    const Pattern *pattern = labelItem.getPattern();
+    SmallVector<VarDecl *, 4> previousVars;
+    pattern->collectVariables(previousVars);
+    for (auto *expected : vars) {
+      bool matched = false;
+      if (!expected->hasName())
+        continue;
+
+      for (auto *previous : previousVars) {
+        if (!previous->hasName() ||
+            expected->getName() != previous->getName()) {
           continue;
-        for (auto previous : PreviousVars) {
-          if (previous->hasName() &&
-              expected->getName() == previous->getName()) {
-            if (!previous->getType()->isEqual(expected->getType())) {
-              TC.diagnose(previous->getLoc(),
-                          diag::type_mismatch_fallthrough_pattern_list,
-                          previous->getType(), expected->getType());
-              previous->markInvalid();
-              expected->markInvalid();
-            }
-            matched = true;
-            break;
-          }
         }
-        if (!matched) {
-          TC.diagnose(PreviousFallthrough->getLoc(),
-                      diag::fallthrough_into_case_with_var_binding,
-                      expected->getName());
+
+        if (!previous->getType()->isEqual(expected->getType())) {
+          TC.diagnose(previous->getLoc(),
+                      diag::type_mismatch_fallthrough_pattern_list,
+                      previous->getType(), expected->getType());
+          previous->markInvalid();
+          expected->markInvalid();
         }
+
+        // Ok, we found our match. Make the previous fallthrough statement var
+        // decl our parent var decl.
+        expected->setParentVarDecl(previous);
+        matched = true;
+        break;
+      }
+
+      if (!matched) {
+        TC.diagnose(PreviousFallthrough->getLoc(),
+                    diag::fallthrough_into_case_with_var_binding,
+                    expected->getName());
       }
     }
   }
@@ -1105,6 +1178,9 @@ public:
       TC.typeCheckDecl(node.get<Decl *>());
     }
 
+    SmallVector<VarDecl *, 8> scratchMemory1;
+    SmallVector<VarDecl *, 8> scratchMemory2;
+
     auto cases = switchStmt->getCases();
     CaseStmt *previousBlock = nullptr;
     for (auto i = cases.begin(), e = cases.end(); i != e; ++i) {
@@ -1114,11 +1190,49 @@ public:
       FallthroughSource = caseBlock;
       FallthroughDest = std::next(i) == e ? nullptr : *std::next(i);
 
-      for (auto &labelItem : caseBlock->getMutableCaseLabelItems()) {
+      scratchMemory1.clear();
+      scratchMemory2.clear();
+
+      SmallVectorImpl<VarDecl *> *prevCaseDecls = nullptr;
+      SmallVectorImpl<VarDecl *> *nextCaseDecls = &scratchMemory1;
+
+      auto caseLabelItemArray = caseBlock->getMutableCaseLabelItems();
+      {
+        // Peel off the first iteration so we handle the first case label
+        // especially since we use it to begin the validation chain.
+        auto &labelItem = caseLabelItemArray.front();
+
+        // Resolve the pattern in our case label if it has not been resolved and
+        // check that our var decls follow invariants.
+        checkCaseLabelItemPattern(caseBlock, labelItem, limitExhaustivityChecks,
+                                  subjectType, &prevCaseDecls, &nextCaseDecls);
+
+        // After this is complete, prevCaseDecls will be pointing at
+        // scratchMemory1 which contains the initial case block's var decls and
+        // nextCaseDecls will be a nullptr. Set nextCaseDecls to point at
+        // scratchMemory2 for the next iterations.
+        assert(prevCaseDecls == &scratchMemory1);
+        assert(nextCaseDecls == nullptr);
+        nextCaseDecls = &scratchMemory2;
+
+        // Check the guard expression, if present.
+        if (auto *guard = labelItem.getGuardExpr()) {
+          limitExhaustivityChecks |= TC.typeCheckCondition(guard, DC);
+          labelItem.setGuardExpr(guard);
+        }
+      }
+
+      // Then check the rest.
+      for (auto &labelItem : caseLabelItemArray.drop_front()) {
         // Resolve the pattern in our case label if it has not been resolved
         // and check that our var decls follow invariants.
-        checkCaseLabelItem(caseBlock, labelItem, limitExhaustivityChecks,
-                           subjectType);
+        checkCaseLabelItemPattern(caseBlock, labelItem, limitExhaustivityChecks,
+                                  subjectType, &prevCaseDecls, &nextCaseDecls);
+        // Check the guard expression, if present.
+        if (auto *guard = labelItem.getGuardExpr()) {
+          limitExhaustivityChecks |= TC.typeCheckCondition(guard, DC);
+          labelItem.setGuardExpr(guard);
+        }
       }
 
       // Check restrictions on '@unknown'.
@@ -1131,7 +1245,7 @@ public:
       if (PreviousFallthrough && previousBlock) {
         checkFallthroughPatternBindingsAndTypes(caseBlock, previousBlock);
       }
-      
+
       // Type-check the body statements.
       PreviousFallthrough = nullptr;
       Stmt *body = caseBlock->getBody();
