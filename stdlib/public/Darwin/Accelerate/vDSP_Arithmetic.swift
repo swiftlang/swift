@@ -167,10 +167,10 @@ extension vDSP {
             precondition(vectorA.count == n && vectorB.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorB.withUnsafeBufferPointer { a in
-                    vectorA.withUnsafeBufferPointer { b in
-                        vDSP_vsub(a.baseAddress!, 1,
-                                  b.baseAddress!, 1,
+                vectorB.withUnsafeBufferPointer { b in
+                    vectorA.withUnsafeBufferPointer { a in
+                        vDSP_vsub(b.baseAddress!, 1,
+                                  a.baseAddress!, 1,
                                   r.baseAddress!, 1,
                                   vDSP_Length(n))
                     }
@@ -199,10 +199,10 @@ extension vDSP {
             precondition(vectorA.count == n && vectorB.count == n)
             
             result.withUnsafeMutableBufferPointer { r in
-                vectorB.withUnsafeBufferPointer { a in
-                    vectorA.withUnsafeBufferPointer { b in
-                        vDSP_vsubD(a.baseAddress!, 1,
-                                   b.baseAddress!, 1,
+                vectorB.withUnsafeBufferPointer { b in
+                    vectorA.withUnsafeBufferPointer { a in
+                        vDSP_vsubD(b.baseAddress!, 1,
+                                   a.baseAddress!, 1,
                                    r.baseAddress!, 1,
                                    vDSP_Length(n))
                     }
