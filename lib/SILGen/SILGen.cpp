@@ -1380,14 +1380,10 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
     auto setter = decl->getSetter();
     if (setter == nullptr)
       return true;
-    
-    auto setterLinkage = SILDeclRef(setter, SILDeclRef::Kind::Func)
-      .getLinkage(NotForDefinition);
-    
-    if (setterLinkage == SILLinkage::PublicExternal
-        || setterLinkage == SILLinkage::Public)
+
+    if (setter->getFormalAccessScope(nullptr, true).isPublic())
       return true;
-    
+
     return false;
   }
   case ResilienceStrategy::Resilient: {
