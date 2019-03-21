@@ -553,6 +553,32 @@ ${Suite}.test("${ArrayType}/init(unsafeUninitializedCapacity:...:)/throwing") {
   expectEqual(0, InstanceCountedClass.instanceCounter)
 }
 
+${Suite}.test("${ArrayType}/init(unsafeUninitializedCapacity:...:)/noCopy") {
+  var storageAddress: UnsafeMutablePointer<Int>?
+  var array = ${ArrayType}<Int>(unsafeUninitializedCapacity: 20) { buffer, _ in
+    storageAddress = buffer.baseAddress
+  }
+  array.withUnsafeMutableBufferPointer { buffer in
+    expectEqual(storageAddress, buffer.baseAddress)
+  }
+}
+
+${Suite}.test("${ArrayType}/init(unsafeUninitializedCapacity:...:)/validCount") {
+  expectCrashLater()
+  let array = ${ArrayType}<Int>(unsafeUninitializedCapacity: 10) { buffer, c in
+    for i in 0..<10 { buffer[i] = i }
+    c = 20
+  }
+}
+
+${Suite}.test("${ArrayType}/init(unsafeUninitializedCapacity:...:)/reassignBuffer") {
+  expectCrashLater()
+  let otherBuffer = UnsafeMutableBufferPointer<Int>.allocate(capacity: 1)
+  let array = ${ArrayType}<Int>(unsafeUninitializedCapacity: 10) { buffer, _ in
+    buffer = otherBuffer
+  }
+}
+
 %end
 
 //===---
