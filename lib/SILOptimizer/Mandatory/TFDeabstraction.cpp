@@ -1463,14 +1463,27 @@ bool isArrayAllocUninit(SILValue op, SILValue &numElements) {
   if (!callee)
     return false;
 
-  auto calleeName = callee->getReferencedFunction()->getName();
-  // FIXME: Gross hack because this is specialized by perf optimizer.  Remove
-  // when deabstraction does arrays.
-  if (!calleeName.contains("_allocateUninitializedArray"))
-    return false;
+  auto calleeFn = callee->getReferencedFunction();
+  auto calleeName = calleeFn->getName();
 
-  numElements = getValueInsideStructInst(apply->getOperand(1));
-  return true;
+  // FIXME: Gross hack because this is specialized by perf optimizer.  Remove
+  // when deabstraction does arrays. (same as below.)
+  if (calleeName.contains("_allocateUninitializedArray")) {
+    numElements = getValueInsideStructInst(apply->getOperand(1));
+    return true;
+  }
+  if (calleeFn->hasSemanticsAttr("array.uninitialized")) {
+    if (calleeName.contains("_allocateUninitialized")) {
+      numElements = getValueInsideStructInst(apply->getOperand(1));
+      return true;
+    }
+    if (calleeName.contains("_adoptStorage")) {
+      numElements = getValueInsideStructInst(apply->getOperand(2));
+      return true;
+    }
+  }
+
+  return false;
 }
 
 namespace {
