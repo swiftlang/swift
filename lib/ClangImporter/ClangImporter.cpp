@@ -3120,7 +3120,7 @@ clang::ASTContext &ClangModuleUnit::getClangASTContext() const {
   return owner.getClangASTContext();
 }
 
-std::string ClangModuleUnit::getExportedModuleName() const {
+StringRef ClangModuleUnit::getExportedModuleName() const {
   if (clangModule && !clangModule->ExportAsModule.empty())
     return clangModule->ExportAsModule;
 

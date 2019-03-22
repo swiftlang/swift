@@ -185,6 +185,12 @@ struct PrintOptions {
   /// type might be ambiguous.
   bool FullyQualifiedTypesIfAmbiguous = false;
 
+  /// If true, printed module names will use the "exported" name, which may be
+  /// different from the regular name.
+  ///
+  /// \see FileUnit::getExportedModuleName
+  bool UseExportedModuleNames = false;
+
   /// Print Swift.Array and Swift.Optional with sugared syntax
   /// ([] and ?), even if there are no sugar type nodes.
   bool SynthesizeSugarOnTypes = false;
