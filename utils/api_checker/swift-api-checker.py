@@ -175,7 +175,8 @@ A convenient wrapper for swift-api-digester.
             fatal_error("Need to specify --output")
         runner = DumpConfig(tool_path=args.tool_path, platform=args.target)
         runner.run(output=args.output, module=args.module,
-                   swift_ver=args.swift_version, opts=args.opts, verbose=args.v)
+                   swift_ver=args.swift_version, opts=args.opts,
+                   verbose=args.v)
     elif args.action == 'diagnose':
         if not args.dump_before:
             fatal_error("Need to specify --dump-before")
