@@ -120,6 +120,11 @@ deriveBodyTensorGroup_typeList(AbstractFunctionDecl *funcDecl) {
     }
   }
 
+  if (typeListExpr == nullptr) {
+    // Create an empty array.
+    typeListExpr = ArrayExpr::create(C, SourceLoc(), {}, {}, SourceLoc());
+  }
+
   // Return the resulting data types array.
   auto *returnStmt = new (C) ReturnStmt(SourceLoc(), typeListExpr);
   auto *body = BraceStmt::create(C, SourceLoc(), {returnStmt}, SourceLoc(),
