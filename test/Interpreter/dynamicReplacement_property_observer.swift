@@ -7,6 +7,8 @@
 
 // REQUIRES: executable_test
 
+// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
+
 @_private(sourceFile: "dynamic_replacement_property_observer_orig.swift") import TestDidWillSet
 
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
