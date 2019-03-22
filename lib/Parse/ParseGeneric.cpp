@@ -297,8 +297,8 @@ ParserStatus Parser::parseGenericWhereClause(
           getLayoutConstraint(Context.getIdentifier(Tok.getText()), Context)
               ->isKnownLayout()) {
         // Parse a layout constraint.
-        auto LayoutName = Context.getIdentifier(Tok.getText());
-        auto LayoutLoc = consumeToken();
+        Identifier LayoutName;
+        auto LayoutLoc = consumeIdentifier(&LayoutName);
         auto LayoutInfo = parseLayoutConstraint(LayoutName);
         if (!LayoutInfo->isKnownLayout()) {
           // There was a bug in the layout constraint.
