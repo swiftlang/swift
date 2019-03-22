@@ -2570,6 +2570,9 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
     // Don't add dynamic to defer bodies.
     if (FD->isDeferBody())
       return;
+    // Don't add dynamic to functions with a cdecl.
+    if (FD->getAttrs().hasAttribute<CDeclAttr>())
+      return;
   }
 
   if (auto *VD = dyn_cast<VarDecl>(D)) {
