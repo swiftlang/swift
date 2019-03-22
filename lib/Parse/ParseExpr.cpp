@@ -1545,7 +1545,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
         // call pattern.
         peekToken().isNot(tok::period, tok::period_prefix, tok::l_paren)) {
       Identifier name;
-      SourceLoc loc = consumeIdentifier(&name);
+      SourceLoc loc = consumeIdentifier(&name, /*allowDollarIdentifier=*/true);
       auto specifier = (InVarOrLetPattern != IVOLP_InVar)
                      ? VarDecl::Specifier::Let
                      : VarDecl::Specifier::Var;
@@ -2132,7 +2132,8 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
   SourceLoc baseNameLoc;
   if (Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_self)) {
     Identifier baseNameId;
-    baseNameLoc = consumeIdentifier(&baseNameId);
+    baseNameLoc = consumeIdentifier(
+        &baseNameId, /*allowDollarIdentifier=*/true);
     baseName = baseNameId;
   } else if (allowOperators && Tok.isAnyOperator()) {
     baseName = Context.getIdentifier(Tok.getText());
