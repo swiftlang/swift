@@ -2059,6 +2059,7 @@ static void emitDynamicallyReplaceableThunk(IRGenModule &IGM,
     forwardedArgs.push_back(&arg);
   auto *Res =
       B.CreateCall(FunctionPointer(typeFnPtr, signature), forwardedArgs);
+  Res->setTailCall();
   if (implFn->getReturnType()->isVoidTy())
     B.CreateRetVoid();
   else
