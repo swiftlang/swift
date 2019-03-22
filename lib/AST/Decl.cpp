@@ -492,8 +492,8 @@ void AbstractFunctionDecl::setSingleExpressionBody(Expr *NewBody) {
       // which was originally spelled init?(...) { nil }.  
       //
       // We can no longer write the single-expression which is being set on us 
-      // into anything because a FailStmt does not have such a child.  As a result
-      // we need to demand that the NewBody is null.
+      // into anything because a FailStmt does not have such a child.  As a
+      // result we need to demand that the NewBody is null.
       assert(NewBody == nullptr);
       return;
     }
