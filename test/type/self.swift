@@ -151,3 +151,27 @@ enum E {
     return .e
   }
 }
+
+class A1 {
+  required init() {}
+  func copy() -> Self {
+    let copy = Self.init()
+    return copy
+  }
+
+  var copied: Self { // expected-error {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'A1'?}}
+    let copy = Self.init()
+    return copy
+  }
+}
+
+class B1: A1 {
+  override func copy() -> Self {
+    let copy = super.copy() as! Self // supported
+    return copy
+  }
+  override var copied: Self { // expected-error {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'B1'?}}
+    let copy = super.copied as! Self // unsupported
+    return copy
+  }
+}
