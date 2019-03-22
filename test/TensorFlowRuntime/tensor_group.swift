@@ -43,6 +43,16 @@ struct Generic<T: TensorGroup, U: TensorGroup> : TensorGroup {
   var u: U
 }
 
+struct NestedGeneric<T: TensorGroup> {
+  struct Nested<U: TensorGroup> {
+    struct UltraNested<V: TensorGroup> : TensorGroup {
+      var a: Generic<T, U>
+      var b: Generic<U, V>
+      var c: Generic<T, V>
+    }
+  }
+}
+
 TensorGroupTests.test("Empty") {
   expectEqual([], Empty._typeList)
 }
@@ -73,6 +83,17 @@ TensorGroupTests.test("Generic") {
   expectEqual(
     [float, float, string, float, int], 
     Generic<Simple, Mixed>._typeList)
+}
+
+TensorGroupTests.test("NestedGeneric") {
+  let float = Float.tensorFlowDataType
+  let int = Int32.tensorFlowDataType
+  let string = String.tensorFlowDataType
+  expectEqual(
+    [float, float, string, float, int, 
+     string, float, int, float, 
+     float, float, float],
+    NestedGeneric<Simple>.Nested<Mixed>.UltraNested<Tensor<Float>>._typeList)
 }
 
 runAllTests()
