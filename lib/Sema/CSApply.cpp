@@ -4282,75 +4282,16 @@ namespace {
             component = origComponent;
             break;
           }
-          
-          auto subscript = cast<SubscriptDecl>(foundDecl->choice.getDecl());
-          if (subscript->isGetterMutating()) {
-            cs.TC.diagnose(origComponent.getLoc(),
-                           diag::expr_keypath_mutating_getter,
-                           subscript->getFullName());
-          }
 
-          cs.TC.requestMemberLayout(subscript);
+          ArrayRef<Identifier> subscriptLabels;
+          if (foundDecl->choice.getKind() !=
+              OverloadChoiceKind::DynamicMemberLookup)
+            subscriptLabels = origComponent.getSubscriptLabels();
 
-          auto dc = subscript->getInnermostDeclContext();
+          component = buildKeyPathSubscriptComponent(
+              *foundDecl, origComponent.getLoc(), origComponent.getIndexExpr(),
+              subscriptLabels, locator);
 
-          auto indexType = AnyFunctionType::composeInput(
-            cs.TC.Context,
-            subscript->getInterfaceType()
-              ->castTo<AnyFunctionType>()
-              ->getParams(),
-            /*canonicalVararg=*/false);
-
-          SubstitutionMap subs;
-          if (auto sig = dc->getGenericSignatureOfContext()) {
-            // Compute substitutions to refer to the member.
-            subs = solution.computeSubstitutions(sig, locator);
-            indexType = indexType.subst(subs);
-          }
-
-          // If this is a @dynamicMemberLookup reference to resolve a property
-          // through the subscript(dynamicMember:) member, restore the
-          // openedType and origComponent to its full reference as if the user
-          // wrote out the subscript manually.
-          if (foundDecl->choice.getKind() ==
-              OverloadChoiceKind::DynamicMemberLookup) {
-            foundDecl->openedType = foundDecl->openedFullType
-                ->castTo<AnyFunctionType>()->getResult();
-
-            auto &ctx = cs.TC.Context;
-            auto loc = origComponent.getLoc();
-            auto fieldName =
-                foundDecl->choice.getName().getBaseIdentifier().str();
-
-            Expr *nameExpr = new (ctx) StringLiteralExpr(fieldName, loc,
-                                                         /*implicit*/true);
-            (void)cs.TC.typeCheckExpression(nameExpr, dc);
-            cs.cacheExprTypes(nameExpr);
-
-            origComponent = KeyPathExpr::Component::
-              forUnresolvedSubscript(ctx, loc,
-                                     {nameExpr}, {ctx.Id_dynamicMember}, {loc},
-                                     loc, /*trailingClosure*/nullptr);
-            cs.setType(origComponent.getIndexExpr(), indexType);
-          }
-
-          auto subscriptType =
-              simplifyType(foundDecl->openedType)->castTo<AnyFunctionType>();
-          auto resolvedTy = subscriptType->getResult();
-          auto ref = ConcreteDeclRef(subscript, subs);
-
-          // Coerce the indices to the type the subscript expects.
-          auto indexExpr = coerceCallArguments(
-              origComponent.getIndexExpr(), subscriptType,
-              /*applyExpr*/ nullptr, origComponent.getSubscriptLabels(),
-              /* hasTrailingClosure */ false, locator);
-
-          component = KeyPathExpr::Component
-            ::forSubscriptWithPrebuiltIndexExpr(ref, indexExpr,
-                                            origComponent.getSubscriptLabels(),
-                                            resolvedTy,
-                                            origComponent.getLoc(),
-                                            {});
           // Save a reference to the component so we can do a post-pass to check
           // the Hashable conformance of the indexes.
           KeyPathSubscriptComponents.push_back({E, resolvedComponents.size()});
@@ -4499,6 +4440,65 @@ namespace {
 
       return KeyPathExpr::Component::forTupleElement(fieldIndex, resolvedTy,
                                                      componentLoc);
+    }
+
+    KeyPathExpr::Component buildKeyPathSubscriptComponent(
+        SelectedOverload &overload, SourceLoc componentLoc, Expr *indexExpr,
+        ArrayRef<Identifier> labels, ConstraintLocator *locator) {
+      auto subscript = cast<SubscriptDecl>(overload.choice.getDecl());
+      if (subscript->isGetterMutating()) {
+        cs.TC.diagnose(componentLoc, diag::expr_keypath_mutating_getter,
+                       subscript->getFullName());
+      }
+
+      cs.TC.requestMemberLayout(subscript);
+
+      auto dc = subscript->getInnermostDeclContext();
+
+      auto indexType = AnyFunctionType::composeInput(
+          cs.TC.Context,
+          subscript->getInterfaceType()->castTo<AnyFunctionType>()->getParams(),
+          /*canonicalVararg=*/false);
+
+      SubstitutionMap subs;
+      if (auto sig = dc->getGenericSignatureOfContext()) {
+        // Compute substitutions to refer to the member.
+        subs = solution.computeSubstitutions(sig, locator);
+        indexType = indexType.subst(subs);
+      }
+
+      // If this is a @dynamicMemberLookup reference to resolve a property
+      // through the subscript(dynamicMember:) member, restore the
+      // openedType and origComponent to its full reference as if the user
+      // wrote out the subscript manually.
+      if (overload.choice.getKind() ==
+          OverloadChoiceKind::DynamicMemberLookup) {
+        overload.openedType =
+            overload.openedFullType->castTo<AnyFunctionType>()->getResult();
+
+        auto &ctx = cs.TC.Context;
+        auto fieldName = overload.choice.getName().getBaseIdentifier().str();
+
+        labels = ctx.Id_dynamicMember;
+        indexExpr = new (ctx) StringLiteralExpr(fieldName, componentLoc,
+                                                /*implicit*/ true);
+        (void)cs.TC.typeCheckExpression(indexExpr, dc);
+        cs.cacheExprTypes(indexExpr);
+      }
+
+      auto subscriptType =
+          simplifyType(overload.openedType)->castTo<AnyFunctionType>();
+      auto resolvedTy = subscriptType->getResult();
+      auto ref = ConcreteDeclRef(subscript, subs);
+
+      // Coerce the indices to the type the subscript expects.
+      auto *newIndexExpr =
+          coerceCallArguments(indexExpr, subscriptType,
+                              /*applyExpr*/ nullptr, labels,
+                              /*hasTrailingClosure*/ false, locator);
+
+      return KeyPathExpr::Component::forSubscriptWithPrebuiltIndexExpr(
+          ref, newIndexExpr, labels, resolvedTy, componentLoc, {});
     }
 
     Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) {
