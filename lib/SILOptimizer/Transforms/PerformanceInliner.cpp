@@ -112,6 +112,9 @@ class SILPerformanceInliner {
     /// The benefit of a onFastPath builtin.
     FastPathBuiltinBenefit = RemovedCallBenefit + 40,
 
+    /// The benefit of inlining a function with a semantic call site.
+    SemanticCallBenefit = RemovedCallBenefit + 50,
+
     /// The benefit of being able to devirtualize a call.
     DevirtualizedCallBenefit = RemovedCallBenefit + 300,
 
@@ -359,6 +362,16 @@ bool SILPerformanceInliner::isProfitableToInline(
       CalleeCost += (int)instructionInlineCost(I);
 
       if (FullApplySite FAI = FullApplySite::isa(&I)) {
+        // Functions with semantic calls need to be inlined into their callers
+        // for optimization based on those semantics to kick in within the
+        // caller scope. This may mean the call can be hoisted out of a loop for
+        // example. Do this only after the caller is fully specialized,
+        // otherwise it could actually prevent inlining of callers.
+        SILFunction *Callee = FAI.getReferencedFunctionOrNull();
+        if (!IsGeneric && Callee && isOptimizableSemanticFunction(Callee)) {
+          BlockW.updateBenefit(Benefit, SemanticCallBenefit);
+        }
+
         // Check if the callee is passed as an argument. If so, increase the
         // threshold, because inlining will (probably) eliminate the closure.
         SILInstruction *def = constTracker.getDefInCaller(FAI.getCallee());
@@ -372,9 +385,9 @@ bool SILPerformanceInliner::isProfitableToInline(
         if (!def)
           continue;
 
+        // Ignore anything else that is not a generic call or if inlining of
+        // generics is forbidden.
         auto Subs = FAI.getSubstitutionMap();
-
-        // Bail if it is not a generic call or inlining of generics is forbidden.
         if (!EnableSILInliningOfGenerics || !Subs.hasAnySubstitutableParams())
           continue;
 
