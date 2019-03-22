@@ -153,6 +153,7 @@ func buildWorkload() {
   blackHole(utf16Words)
 }
 
+
 // A partial set of Unicode alphanumeric characters. (ASCII letters with at most
 // one diacritic (of a limited selection), plus ASCII digits.)
 let someAlphanumerics: Set<Character> = {

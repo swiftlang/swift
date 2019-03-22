@@ -225,7 +225,7 @@ internal func _fastIsSingleByteGrapheme(
     
     let secondByte = utf8[_unchecked: i &+ 1]
     
-    guard byte < 0xCC else {
+    guard secondByte < 0xCC else {
       return false
     }
     
