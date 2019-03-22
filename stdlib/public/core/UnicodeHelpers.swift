@@ -244,6 +244,10 @@ internal func _fastIsSingleByteGrapheme(
     let count = utf8.count
     _internalInvariant(i < count)
 
+    guard i != 0 else {
+      return true
+    }
+    
     let byte = utf8[_unchecked: i &- 1]
     guard _isASCII(byte) else {
       return false
@@ -251,7 +255,7 @@ internal func _fastIsSingleByteGrapheme(
 
     let secondByte = utf8[_unchecked: i]
 
-    guard byte < 0xCC else {
+    guard secondByte < 0xCC else {
       return false
     }
 
