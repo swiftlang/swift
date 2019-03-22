@@ -166,19 +166,10 @@ deriveBodyTensorArrayProtocol_unpackTensorHandles(
         new (C) UnresolvedDotExpr(addressDRE, SourceLoc(),
                                   advancedName, DeclNameLoc(), 
                                   /*Implicit*/ true);
-    
-    // Get member type's property, e.g. `Member._tensorHandleCount(into:)`.
-    ValueDecl *memberCountDecl = countReq;
-    // If conformance reference is concrete, then use concrete witness
-    // declaration for the operator.
-    if (confRef->isConcrete())
-      memberCountDecl = confRef->getConcrete()->getWitnessDecl(
-          countReq, C.getLazyResolver());
-    assert(memberCountDecl && "Member property declaration must exist");
 
     // Obtain `Member._tensorHandleCount`.
     auto *memberCountMRE = new (C) MemberRefExpr(
-        memberDRE, SourceLoc(), memberCountDecl, DeclNameLoc(), 
+        memberDRE, SourceLoc(), countReq, DeclNameLoc(), 
         /*Implicit*/ true);
     
     // Cast the tensor handle count to Int.
@@ -269,10 +260,101 @@ static ValueDecl
       deriveBodyTensorArrayProtocol_unpackTensorHandles);
 }
 
+/// Derive the body for the '_tensorHandleCount' getter.
+static void
+deriveBodyTensorArrayProtocol_tensorHandleCount(
+    AbstractFunctionDecl *funcDecl) {
+  auto *nominal = funcDecl->getDeclContext()->getSelfNominalTypeDecl();
+  auto &C = nominal->getASTContext();
+
+  // Get references to `self`.
+  auto *selfDecl = funcDecl->getImplicitSelfDecl();
+  auto *selfDRE = new (C) 
+    DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit*/ true);
+
+  // Get protocol requirement.
+  auto *tensorArrayProto = C.getProtocol(
+    KnownProtocolKind::TensorArrayProtocol);
+  auto *countReq = getProtocolRequirement(
+    tensorArrayProto, C.Id_tensorHandleCount);
+
+  // Concatenate all member `_tensorHandleCount`s.
+  Type intType = C.getInt32Decl()->getDeclaredType();
+  TypeExpr *intTE = TypeExpr::createImplicit(intType, C);
+  auto plusOpLookup = C.getInt32Decl()->lookupDirect(C.getIdentifier("+"));
+  assert(plusOpLookup.size() == 1 && "Ambiguous 'Int32.+' operator.");
+  ValueDecl *plusOpDecl = plusOpLookup.front();
+  auto plusOpDRE = new (C) 
+      DeclRefExpr(plusOpDecl, DeclNameLoc(), /*Implicit*/ true);
+  auto plusOpExpr = new (C) DotSyntaxCallExpr(plusOpDRE, SourceLoc(), intTE);
+  Expr *tensorHandleCountExpr = new (C) 
+      IntegerLiteralExpr("0", SourceLoc(), /*implicit*/ true);
+  for (auto member : nominal->getStoredProperties()) {
+    auto *memberDRE = new (C) MemberRefExpr(
+      selfDRE, SourceLoc(), member, DeclNameLoc(), /*Implicit*/ true);
+    auto *memberTensorHandleCountExpr = new (C) 
+      MemberRefExpr(memberDRE, SourceLoc(), countReq, 
+                    DeclNameLoc(), /*Implicit*/ true);
+    // Create expression `lhsArg + rhsArg`.
+    auto *plusOpArgs = 
+        TupleExpr::create(C, SourceLoc(), 
+                          {tensorHandleCountExpr, memberTensorHandleCountExpr}, 
+                          {}, {}, SourceLoc(), /*HasTrailingClosure*/ false,
+                          /*Implicit*/ true);
+    tensorHandleCountExpr = new (C) BinaryExpr(plusOpExpr, plusOpArgs, 
+                                               /*Implicit*/ true);
+  }
+
+  // Return the resulting data types array.
+  auto *returnStmt = new (C) ReturnStmt(SourceLoc(), tensorHandleCountExpr);
+  auto *body = BraceStmt::create(C, SourceLoc(), {returnStmt}, SourceLoc(),
+                                 /*Implicit*/ true);
+  funcDecl->setBody(BraceStmt::create(C, SourceLoc(), {body}, SourceLoc(),
+                                      /*Implicit*/ true));
+}
+
+/// Derive a '_tensorHandleCount' implementation.
+static ValueDecl *deriveTensorArrayProtocol_tensorHandleCount(
+    DerivedConformance &derived) {
+  auto nominal = derived.Nominal;
+  auto &TC = derived.TC;
+  ASTContext &C = TC.Context;
+
+  auto parentDC = derived.getConformanceContext();
+  Type intType = C.getInt32Decl()->getDeclaredType();
+  auto returnType = parentDC->mapTypeIntoContext(intType);
+
+  // Create `_tensorHandleCount` property declaration.
+  VarDecl *tensorHandleCountDecl;
+  PatternBindingDecl *patDecl;
+  std::tie(tensorHandleCountDecl, patDecl) = derived.declareDerivedProperty(
+    C.Id_tensorHandleCount, returnType, returnType, /*isStatic*/ false,
+    /*isFinal*/ false);
+
+  // Add `@inlinable` to the `_tensorHandleCount` declaration.
+  if (nominal->getEffectiveAccess() > AccessLevel::Internal)
+    tensorHandleCountDecl->getAttrs().add(
+      new (C) InlinableAttr(/*implicit*/ true));
+
+  // Create `_tensorHandleCount` getter.
+  auto *getterDecl = derived.declareDerivedPropertyGetter(
+    TC, tensorHandleCountDecl, returnType);
+  getterDecl->setBodySynthesizer(
+    deriveBodyTensorArrayProtocol_tensorHandleCount);
+  tensorHandleCountDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
+                                      SourceLoc(), {getterDecl}, SourceLoc());
+  derived.addMembersToConformanceContext(
+    {getterDecl, tensorHandleCountDecl, patDecl});
+
+  return tensorHandleCountDecl;
+}
+
 ValueDecl *DerivedConformance::deriveTensorArrayProtocol(
     ValueDecl *requirement) {
   if (requirement->getBaseName() == TC.Context.Id_unpackTensorHandles)
     return deriveTensorArrayProtocol_unpackTensorHandles(*this);
+  if (requirement->getBaseName() == TC.Context.Id_tensorHandleCount)
+    return deriveTensorArrayProtocol_tensorHandleCount(*this);
   TC.diagnose(requirement->getLoc(), 
               diag::broken_tensor_array_protocol_requirement);
   return nullptr;

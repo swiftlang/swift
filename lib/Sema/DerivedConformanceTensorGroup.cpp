@@ -97,9 +97,9 @@ deriveBodyTensorGroup_typeList(AbstractFunctionDecl *funcDecl) {
   ValueDecl *plusOpDecl = plusOpLookup.front();
   auto plusOpDRE = new (C) 
       DeclRefExpr(plusOpDecl, DeclNameLoc(), /*Implicit*/ true);
-  auto plusOpExpr = 
-        new (C) DotSyntaxCallExpr(plusOpDRE, SourceLoc(), arrayTypeExpr);
-  Expr *typeListExpr = nullptr;
+  auto plusOpExpr = new (C)
+      DotSyntaxCallExpr(plusOpDRE, SourceLoc(), arrayTypeExpr);
+  Expr *typeListExpr = ArrayExpr::create(C, SourceLoc(), {}, {}, SourceLoc());
   for (auto member : nominal->getStoredProperties()) {
     auto memberType =
         parentDC->mapTypeIntoContext(member->getValueInterfaceType());
@@ -107,22 +107,13 @@ deriveBodyTensorGroup_typeList(AbstractFunctionDecl *funcDecl) {
     auto *memberTypeListExpr = new (C) 
         MemberRefExpr(memberTypeExpr, SourceLoc(), typeListReq,
                       DeclNameLoc(), /*Implicit*/ true);
-    if (typeListExpr == nullptr)  {
-      typeListExpr = memberTypeListExpr;
-    } else {
-      // Create expression `lhsArg + rhsArg`.
+    // Create expression `lhsArg + rhsArg`.
     auto *plusOpArgs =
         TupleExpr::create(C, SourceLoc(), {typeListExpr, memberTypeListExpr}, 
                           {}, {}, SourceLoc(), /*HasTrailingClosure*/ false,
                           /*Implicit*/ true);
     typeListExpr = new (C) BinaryExpr(plusOpExpr, plusOpArgs, 
                                       /*Implicit*/ true);
-    }
-  }
-
-  if (typeListExpr == nullptr) {
-    // Create an empty array.
-    typeListExpr = ArrayExpr::create(C, SourceLoc(), {}, {}, SourceLoc());
   }
 
   // Return the resulting data types array.
@@ -161,7 +152,7 @@ static ValueDecl *deriveTensorGroup_typeList(DerivedConformance &derived) {
       TC, typeListDecl, returnType);
   getterDecl->setBodySynthesizer(deriveBodyTensorGroup_typeList);
   typeListDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
-                                SourceLoc(), {getterDecl}, SourceLoc());
+                             SourceLoc(), {getterDecl}, SourceLoc());
   derived.addMembersToConformanceContext({getterDecl, typeListDecl, patDecl});
 
   return typeListDecl;
