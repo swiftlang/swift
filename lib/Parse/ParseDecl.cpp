@@ -1242,9 +1242,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       return false;
     }
     
-    Identifier name = Context.getIdentifier(Tok.getText());
-    
-    consumeToken(tok::identifier);
+    Identifier name;
+    consumeIdentifier(&name);
     
     auto range = SourceRange(Loc, Tok.getRange().getStart());
 
@@ -4242,8 +4241,7 @@ static ParameterList *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
         EndLoc = StartLoc;
     } else {
       // We have a name.
-      Name = P.Context.getIdentifier(P.Tok.getText());
-      NameLoc = P.consumeToken();
+      NameLoc = P.consumeIdentifier(&Name);
 
       auto DiagID =
          Kind == AccessorKind::Set ? diag::expected_rparen_set_name :
@@ -6713,15 +6711,17 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
         SyntaxParsingContext GroupCtxt(SyntaxContext,
                                        SyntaxKind::IdentifierList);
 
-        identifiers.push_back(Context.getIdentifier(Tok.getText()));
-        identifierLocs.push_back(consumeToken(tok::identifier));
+        Identifier name;
+        identifierLocs.push_back(consumeIdentifier(&name));
+        identifiers.push_back(name);
 
         while (Tok.is(tok::comma)) {
           auto comma = consumeToken();
 
           if (Tok.is(tok::identifier)) {
-            identifiers.push_back(Context.getIdentifier(Tok.getText()));
-            identifierLocs.push_back(consumeToken(tok::identifier));
+            Identifier name;
+            identifierLocs.push_back(consumeIdentifier(&name));
+            identifiers.push_back(name);
           } else {
             if (Tok.isNot(tok::eof)) {
               auto otherTokLoc = consumeToken();
@@ -7009,8 +7009,9 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
           diagnose(Tok, diag::expected_precedencegroup_relation, attrName);
           return abortBody();
         }
-        auto name = Context.getIdentifier(Tok.getText());
-        relations.push_back({consumeToken(), name, nullptr});
+        Identifier name;
+        SourceLoc nameLoc = consumeIdentifier(&name);
+        relations.push_back({nameLoc, name, nullptr});
 
         if (skipUnspacedCodeCompleteToken())
           return abortBody(/*hasCodeCompletion*/true);
