@@ -28,10 +28,6 @@ class VarDecl;
 /// Retrieve the unbound property delegate type for the given property.
 UnboundGenericType *getUnboundPropertyDelegateType(VarDecl *var);
 
-/// For a property that has an attached property delegate, return information
-/// about the delegate.
-PropertyDelegateTypeInfo getAttachedPropertyDelegateInfo(VarDecl *var);
-
 /// Given the type of the given variable (which must have a property
 /// behavior), form the stored property type that results from applying
 /// the behavior.

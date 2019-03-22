@@ -39,23 +39,6 @@ void swift::simple_display(
   out << " }";
 }
 
-PropertyDelegateTypeInfo swift::getAttachedPropertyDelegateInfo(
-    VarDecl *var) {
-  if (!var->hasPropertyDelegate())
-    return PropertyDelegateTypeInfo();
-
-  // Find the attached property delegate type declaration.
-  ASTContext &ctx = var->getASTContext();
-  auto behaviorType = evaluateOrDefault(
-      ctx.evaluator, AttachedPropertyDelegateDeclRequest(var), nullptr);
-  if (!behaviorType)
-    return PropertyDelegateTypeInfo();
-
-  return evaluateOrDefault(
-      ctx.evaluator, PropertyDelegateTypeInfoRequest(behaviorType),
-      PropertyDelegateTypeInfo());
-}
-
 UnboundGenericType *swift::getUnboundPropertyDelegateType(VarDecl *var) {
   assert(var->hasPropertyDelegate() && "Only call with property delegates");
 

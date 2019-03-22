@@ -14,6 +14,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
@@ -525,4 +526,21 @@ void PropertyDelegateTypeInfoRequest::diagnoseCycle(
 void PropertyDelegateTypeInfoRequest::noteCycleStep(
     DiagnosticEngine &diags) const {
   std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
+}
+
+PropertyDelegateTypeInfo swift::getAttachedPropertyDelegateInfo(
+    VarDecl *var) {
+  if (!var->hasPropertyDelegate())
+    return PropertyDelegateTypeInfo();
+
+  // Find the attached property delegate type declaration.
+  ASTContext &ctx = var->getASTContext();
+  auto behaviorType = evaluateOrDefault(
+      ctx.evaluator, AttachedPropertyDelegateDeclRequest(var), nullptr);
+  if (!behaviorType)
+    return PropertyDelegateTypeInfo();
+
+  return evaluateOrDefault(
+      ctx.evaluator, PropertyDelegateTypeInfoRequest(behaviorType),
+      PropertyDelegateTypeInfo());
 }

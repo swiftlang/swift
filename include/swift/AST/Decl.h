@@ -356,7 +356,7 @@ protected:
     ValidKeyPathComponent : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+4+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+4+1+1+1+1+1+1,
     /// Whether this property is a type property (currently unfortunately
     /// called 'static').
     IsStatic : 1,
@@ -382,7 +382,10 @@ protected:
     IsREPLVar : 1,
 
     /// Whether this property has an associated property delegate.
-    HasPropertyDelegate : 1
+    HasPropertyDelegate : 1,
+
+    /// Whether this is the backing storage for a property delegate.
+    IsPropertyDelegateBackingProperty : 1
   );
 
   SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1 + NumDefaultArgumentKindBits,
@@ -4626,6 +4629,7 @@ protected:
     Bits.VarDecl.IsDebuggerVar = false;
     Bits.VarDecl.IsREPLVar = false;
     Bits.VarDecl.HasPropertyDelegate = false;
+    Bits.VarDecl.IsPropertyDelegateBackingProperty = false;
     Bits.VarDecl.HasNonPatternBindingInit = false;
   }
 
@@ -4919,6 +4923,14 @@ public:
 
   /// Set the backing variable for the property delegate.
   void setPropertyDelegateBackingVar(VarDecl *backingVar);
+
+  /// Retrieve the property that delegates to this backing property,
+  /// or \c nullptr if this is not a backing property.
+  VarDecl *getOriginalDelegatedProperty() const;
+
+  /// Set the property that delegates to this property as it's backing
+  /// property.
+  void setOriginalDelegatedProperty(VarDecl *originalProperty);
 
   /// Return the Objective-C runtime name for this property.
   Identifier getObjCPropertyName() const;

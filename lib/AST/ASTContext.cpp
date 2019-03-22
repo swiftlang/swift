@@ -316,6 +316,10 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   llvm::DenseMap<const VarDecl *, AttachedPropertyDelegateInfo*>
     AttachedPropertyDelegates;
 
+  /// A mapping from the backing storage of a property that has a delegate
+  /// to the original property with the delegate.
+  llvm::DenseMap<const VarDecl *, VarDecl *> OriginalDelegatedProperties;
+
   /// Structure that captures data that is segregated into different
   /// arenas.
   struct Arena {
@@ -5110,4 +5114,20 @@ void VarDecl::setPropertyDelegateBackingVar(VarDecl *backingVar) {
   ASTContext &ctx = getASTContext();
   assert(!ctx.getImpl().AttachedPropertyDelegates[this]->backingVar);
   ctx.getImpl().AttachedPropertyDelegates[this]->backingVar = backingVar;
+}
+
+VarDecl *VarDecl::getOriginalDelegatedProperty() const {
+  if (!Bits.VarDecl.IsPropertyDelegateBackingProperty)
+    return nullptr;
+
+  ASTContext &ctx = getASTContext();
+  assert(ctx.getImpl().OriginalDelegatedProperties.count(this) > 0);
+  return ctx.getImpl().OriginalDelegatedProperties[this];
+}
+
+void VarDecl::setOriginalDelegatedProperty(VarDecl *originalProperty) {
+  Bits.VarDecl.IsPropertyDelegateBackingProperty = true;
+  ASTContext &ctx = getASTContext();
+  assert(ctx.getImpl().OriginalDelegatedProperties.count(this) == 0);
+  ctx.getImpl().OriginalDelegatedProperties[this] = originalProperty;
 }

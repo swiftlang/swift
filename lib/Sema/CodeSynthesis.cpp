@@ -29,6 +29,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "llvm/ADT/SmallString.h"
@@ -1465,6 +1466,7 @@ VarDecl *swift::getOrSynthesizePropertyDelegateBackingProperty(VarDecl *var) {
                                  var->getPropertyDelegateByLoc(),
                                  name, dc);
   var->setPropertyDelegateBackingVar(backingVar);
+  backingVar->setOriginalDelegatedProperty(var);
 
   backingVar->setInterfaceType(storageInterfaceType);
   backingVar->setType(storageType);

@@ -416,6 +416,10 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
+/// For a property that has an attached property delegate, return information
+/// about the delegate.
+PropertyDelegateTypeInfo getAttachedPropertyDelegateInfo(VarDecl *var);
+
 /// The zone number for the type checker.
 #define SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE 10
 

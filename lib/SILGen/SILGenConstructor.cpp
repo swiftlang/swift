@@ -20,6 +20,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
@@ -166,6 +167,30 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
 
       assert(elti != eltEnd && "number of args does not match number of fields");
       (void)eltEnd;
+
+      // If the field is the backing property for a property delegate,
+      // we may need to initialize through init(initialValue:).
+      if (auto originalProperty = field->getOriginalDelegatedProperty()) {
+        auto delegateInfo = getAttachedPropertyDelegateInfo(originalProperty);
+        if (auto initialValueInit = delegateInfo.initialValueInit) {
+          ConcreteDeclRef concreteInitialValueInit(
+              initialValueInit,
+              field->getType()->getMemberSubstitutionMap(
+                SGF.getModule().getSwiftModule(), initialValueInit));
+          FullExpr scope(SGF.Cleanups, CleanupLocation::get(Loc));
+          RValue result =
+              SGF.emitApplyAllocatingInitializer(
+                Loc, concreteInitialValueInit, std::move(*elti), Type(),
+                SGFContext(init.get()));
+          if (!result.isInContext()) {
+            std::move(result).ensurePlusOne(SGF, Loc)
+              .forwardInto(SGF, Loc, init.get());
+          }
+          ++elti;
+          continue;
+        }
+      }
+
       std::move(*elti).forwardInto(SGF, Loc, init.get());
       ++elti;
     }
