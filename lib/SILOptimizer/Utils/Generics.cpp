@@ -390,6 +390,8 @@ static bool shouldNotSpecialize(SILFunction *Callee, SILFunction *Caller,
 bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
                                         SubstitutionMap ParamSubs,
                                         OptRemark::Emitter *ORE) {
+  assert(ParamSubs.hasAnySubstitutableParams());
+
   if (shouldNotSpecialize(Callee, Apply ? Apply.getFunction() : nullptr))
     return false;
 
