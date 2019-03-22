@@ -189,6 +189,10 @@ def _apply_default_arguments(args):
     if args.test_optimize_for_size:
         args.test = True
 
+    # --test-optimize-none-implicit-dynamic implies --test.
+    if args.test_optimize_none_implicit_dynamic:
+        args.test = True
+
     # If none of tests specified skip swift stdlib test on all platforms
     if not args.test and not args.validation_test and not args.long_test:
         args.test_linux = False
@@ -742,6 +746,14 @@ def create_argument_parser():
            help='run the test suite in optimize for size mode too '
                 '(implies --test)')
 
+    # FIXME: Convert to store_true action
+    option('-y', store('test_optimize_none_implicit_dynamic', const=True),
+           help='run the test suite in optimize none with implicit dynamic'
+                ' mode too (implies --test)')
+    option('--test-optimize-none-implicit-dynamic', toggle_true,
+           help='run the test suite in optimize none with implicit dynamic'
+                'mode too (implies --test)')
+
     option('--long-test', toggle_true,
            help='run the long test suite')
 
@@ -956,6 +968,7 @@ def create_argument_parser():
     option('--common-cmake-options', unsupported)
     option('--only-execute', unsupported)
     option('--skip-test-optimize-for-size', unsupported)
+    option('--skip-test-optimize-none-implicit-dynamic', unsupported)
     option('--skip-test-optimized', unsupported)
 
     # -------------------------------------------------------------------------
