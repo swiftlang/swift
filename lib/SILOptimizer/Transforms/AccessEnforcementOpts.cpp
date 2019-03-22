@@ -327,10 +327,10 @@ private:
 void AccessConflictAndMergeAnalysis::recordInScopeConflicts(
     RegionState &state, const AccessedStorage &currStorage,
     SILAccessKind currKind) {
-  // It is tempting to combine loop with the loop in removeConflicts, which also
-  // checks isDistinctFrom for each element. However, since SetVector does not
-  // support 'llvm::erase_if', it is actually more efficient to do the removal
-  // in a separate 'remove_if' loop.
+  // It is tempting to combine this loop with the loop in removeConflicts, which
+  // also checks isDistinctFrom for each element. However, since SetVector does
+  // not support 'llvm::erase_if', it is actually more efficient to do the
+  // removal in a separate 'remove_if' loop.
   llvm::for_each(state.inScopeConflictFreeAccesses, [&](BeginAccessInst *bai) {
     auto &accessInfo = result.getAccessInfo(bai);
     if (accessKindMayConflict(currKind, bai->getAccessKind())

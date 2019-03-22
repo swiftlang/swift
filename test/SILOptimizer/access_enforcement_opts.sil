@@ -1681,7 +1681,7 @@ bb0:
 
 // public func testNestedWriteBailout() {
 // Same as testNestedReadBailout but with modify
-// We will create two scopes - nested conflict
+// We will create two scopes - the nested conflict must be preserved.
 //
 // CHECK-LABEL: sil @testNestedWriteBailout : $@convention(thin) () -> () {
 // CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
