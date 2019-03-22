@@ -1946,6 +1946,7 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
                              /*skipClosures*/false);
         if (E != FD->getSingleExpressionBody())
           FD->setSingleExpressionBody(E);
+        setAutoClosureDiscriminators(FD, BS);
         FD->setBody(BS);
         return false;
       } else {
@@ -1970,6 +1971,7 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
                                   /*discardedExpr=*/false, 
                                   /*skipClosures*/false);
             BS->setElement(0, E);
+            setAutoClosureDiscriminators(FD, BS);
             FD->setBody(BS);
             return false;
           }
@@ -2002,6 +2004,7 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
                                /*skipClosures*/false);
           if (E != FD->getSingleExpressionBody())
             FD->setSingleExpressionBody(E);
+          setAutoClosureDiscriminators(FD, BS);
           FD->setBody(BS);
         }
         return HadSalvageError;

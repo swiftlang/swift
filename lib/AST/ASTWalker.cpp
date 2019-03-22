@@ -313,15 +313,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     PrettyStackTraceDecl debugStack("walking into body of", AFD);
 #endif
 
-    if (AFD->hasSingleExpressionBody()) {
-      if (auto body = AFD->getSingleExpressionBody()) {
-        if ((body = doIt(body)))
-          AFD->setSingleExpressionBody(body);
-        else
-          return true;
-      }
-    }
-
     bool WalkGenerics = AFD->getGenericParams() &&
         Walker.shouldWalkIntoGenericParams() &&
         // accessor generics are visited from the storage decl
