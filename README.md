@@ -71,6 +71,8 @@ several hours. Naturally, incremental builds are much faster.
 macOS, Ubuntu Linux LTS, and the latest Ubuntu Linux release are the current
 supported host development operating systems.
 
+Please make sure you use Python 2.x. Python 3.x is not supported currently.
+
 #### macOS
 
 To build for macOS, you need [Xcode 10.2 beta](https://developer.apple.com/xcode/downloads/).
