@@ -729,9 +729,9 @@ func testInsideFunctionCall0() {
 func testInsideFunctionCall1() {
   var a = FooStruct()
   a.instanceFunc0(#^INSIDE_FUNCTION_CALL_1^#
-// There should be no results here because the function call
-// unambiguously resolves to overload that takes 0 arguments.
-// INSIDE_FUNCTION_CALL_1-NOT: Begin completions
+// INSIDE_FUNCTION_CALL_1: Begin completions, 1 items
+// INSIDE_FUNCTION_CALL_1: Pattern/CurrModule: ['('][')'][#Void#]; name=
+// INSIDE_FUNCTION_CALL_1: End completions
 }
 
 func testInsideFunctionCall2() {
@@ -782,8 +782,9 @@ func testInsideFunctionCall7() {
 
 func testInsideFunctionCall8(_ x: inout FooStruct) {
   x.instanceFunc0(#^INSIDE_FUNCTION_CALL_8^#)
-// Since we already have '()', there is no pattern to complete.
-// INSIDE_FUNCTION_CALL_8-NOT: Pattern/{{.*}}:
+// INSIDE_FUNCTION_CALL_8: Begin completions
+// INSIDE_FUNCTION_CALL_8: Pattern/CurrModule: ['('][')'][#Void#]; name=
+// INSIDE_FUNCTION_CALL_8: End completions
 }
 func testInsideFunctionCall9(_ x: inout FooStruct) {
   x.instanceFunc1(#^INSIDE_FUNCTION_CALL_9^#)
