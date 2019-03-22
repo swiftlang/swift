@@ -1733,3 +1733,21 @@ class CImplicitIdentityExpr { func gimme() -> CImplicitIdentityExpr { self } }
 
 class CImplicitDotSelfExpr { func gimme() -> CImplicitDotSelfExpr { self.self } }
 
+
+
+// Autoclosure Discriminators
+
+
+
+func embedAutoclosure_standard() -> Int {
+    _helpEmbedAutoclosure_standard(42)
+}
+func _helpEmbedAutoclosure_standard<T>(_ value: @autoclosure () -> T) -> T {
+    value()
+}
+
+func embedAutoclosure_never() -> Int {
+  fatalError("unsupported")
+}
+
+
