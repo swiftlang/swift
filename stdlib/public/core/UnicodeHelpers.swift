@@ -207,7 +207,7 @@ internal func _mayNotBeNFCStarter(_ byte:UInt8) -> Bool {
 internal func _fastIsSingleByteGrapheme(
   in guts: _StringGuts, startingAt i: Int
   ) -> Bool {
-  guard _fastPath(guts.isFastUTF8) else {
+  guard guts.isFastUTF8 else {
     return false
   }
   return guts.withFastUTF8 { utf8 in
@@ -215,21 +215,21 @@ internal func _fastIsSingleByteGrapheme(
     _internalInvariant(i < count)
     
     let byte = utf8[_unchecked: i]
-    guard _fastPath(_isASCII(byte)) else {
+    guard _isASCII(byte) else {
       return false
     }
     
-    guard _fastPath(i != count &- 1) else {
+    guard i != count &- 1 else {
       return true
     }
     
     let secondByte = utf8[_unchecked: i &+ 1]
     
-    guard !_mayNotBeNFCStarter(secondByte) else {
+    guard byte < 0xCC else {
       return false
     }
     
-    return _fastPath(!(byte == _CR && secondByte == _LF))
+    return !(byte == _CR && secondByte == _LF)
   }
 }
 
@@ -237,7 +237,7 @@ internal func _fastIsSingleByteGrapheme(
 internal func _fastIsSingleByteGrapheme(
   in guts: _StringGuts, endingAt i: Int
   ) -> Bool {
-  guard _fastPath(guts.isFastUTF8) else {
+  guard guts.isFastUTF8 else {
     return false
   }
   return guts.withFastUTF8 { utf8 in
@@ -245,17 +245,17 @@ internal func _fastIsSingleByteGrapheme(
     _internalInvariant(i < count)
 
     let byte = utf8[_unchecked: i &- 1]
-    guard _fastPath(_isASCII(byte)) else {
+    guard _isASCII(byte) else {
       return false
     }
 
     let secondByte = utf8[_unchecked: i]
 
-    guard !_mayNotBeNFCStarter(secondByte) else {
+    guard byte < 0xCC else {
       return false
     }
 
-    return _fastPath(!(byte == _CR && secondByte == _LF))
+    return !(byte == _CR && secondByte == _LF)
   }
 }
 
@@ -279,7 +279,7 @@ extension _StringGuts {
   @inlinable
   @inline(__always) // fast-path: fold common fastUTF8 check
   internal func scalarAlign(_ idx: Index) -> Index {
-    if _fastPath(isASCII) {
+    if isASCII {
       _internalInvariant(idx.transcodedOffset == 0)
       return idx
     }
