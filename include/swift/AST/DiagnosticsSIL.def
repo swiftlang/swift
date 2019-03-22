@@ -251,8 +251,13 @@ ERROR(circular_transparent,none,
       "inlining 'transparent' functions forms circular loop", ())
 NOTE(note_while_inlining,none,
      "while inlining here", ())
+
+// Pre-specializations
 ERROR(cannot_prespecialize,none,
       "Cannot pre-specialize %0", (StringRef))
+ERROR(missing_prespecialization,none,
+      "Pre-specialized function %0 missing in SwiftOnoneSupport module",
+      (StringRef))
 
 // Arithmetic diagnostics.
 ERROR(integer_conversion_overflow,none,
