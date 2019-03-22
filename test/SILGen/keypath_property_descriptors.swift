@@ -154,3 +154,17 @@ public struct FixedLayout {
   // RESILIENT-LABEL: sil_property #FixedLayout.c (stored_property
   public var c: Int
 }
+
+public class Foo {}
+extension Array where Element == Foo {
+  public class Bar {
+    // NONRESILIENT-LABEL: sil_property #Array.Bar.dontCrash<τ_0_0 where τ_0_0 == Foo> (settable_property $Int
+    public private(set) var dontCrash : Int {
+      get {
+        return 10
+      }
+      set {
+      }
+    }
+  }
+}
