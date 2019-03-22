@@ -7,7 +7,7 @@
 // RUN: %target-swift-frontend -emit-module %S/Inputs/autolinking_indirect.swift -emit-module-path %t/autolinking_indirect.swiftmodule -module-link-name autolinking_indirect -I %t -swift-version 4
 
 // RUN: %target-swift-frontend -emit-module %S/Inputs/autolinking_module_inferred.swift -emit-module-path %t/autolinking_module_inferred.swiftmodule -module-link-name autolinking_module_inferred -I %t -swift-version 4
-// RUN: %target-swift-frontend -emit-ir %s -I %t -swift-version 4 -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -I %t -swift-version 4 -enable-objc-interop | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-os
 
 // Linux uses a different autolinking mechanism, based on
 // swift-autolink-extract. This file tests the Darwin mechanism.
@@ -20,12 +20,24 @@ import autolinking_module_inferred
 
 bfunc()
 
-// CHECK: !llvm.linker.options = !{[[MODULE:![0-9]+]], [[PUBLIC:![0-9]+]], [[SWIFTONONESUPPORT:![0-9]+]], [[SWIFTCORE:![0-9]+]], [[PRIVATE:![0-9]+]], [[OTHER:![0-9]+]], [[INDIRECT:![0-9]+]], [[OTHER2:![0-9]+]], [[OBJC:![0-9]+]]}
+// CHECK: !llvm.linker.options = !{
+// CHECK-SAME: [[MODULE:![0-9]+]],
+// CHECK-SAME: [[PUBLIC:![0-9]+]],
+// CHECK-SAME: [[SWIFTONONESUPPORT:![0-9]+]],
+// CHECK-SAME: [[SWIFTCORE:![0-9]+]],
+// CHECK-windows-msvc-SAME: [[STDIO:![0-9]+]],
+// CHECK-SAME: [[PRIVATE:![0-9]+]],
+// CHECK-SAME: [[OTHER:![0-9]+]],
+// CHECK-SAME: [[INDIRECT:![0-9]+]],
+// CHECK-SAME: [[OTHER2:![0-9]+]],
+// CHECK-SAME: [[OBJC:![0-9]+]]
+// CHECK-SAME: }
 
-// CHECK-DAG: [[SWIFTCORE]] = !{!{{"-lswiftCore"|"/DEFAULTLIB:swiftCore.lib"}}}
-// CHECK-DAG: [[SWIFTONONESUPPORT]] = !{!{{"-lswiftSwiftOnoneSupport"|"/DEFAULTLIB:swiftSwiftOnoneSupport.lib"}}}
 // CHECK-DAG: [[MODULE]] = !{!{{"-lautolinking_module_inferred"|"/DEFAULTLIB:autolinking_module_inferred.lib"}}}
 // CHECK-DAG: [[PUBLIC]] = !{!{{"-lautolinking_public"|"/DEFAULTLIB:autolinking_public.lib"}}}
+// CHECK-DAG: [[SWIFTONONESUPPORT]] = !{!{{"-lswiftSwiftOnoneSupport"|"/DEFAULTLIB:swiftSwiftOnoneSupport.lib"}}}
+// CHECK-DAG: [[SWIFTCORE]] = !{!{{"-lswiftCore"|"/DEFAULTLIB:swiftCore.lib"}}}
+// CHECK-windows-msvc-DAG: [[STDIO]] = !{!"/DEFAULTLIB:legacy_stdio_definitions.lib"}
 // CHECK-DAG: [[OTHER]] = !{!{{"-lautolinking_other"|"/DEFAULTLIB:autolinking_other.lib"}}}
 // CHECK-DAG: [[OTHER2]] = !{!{{"-lautolinking_other2"|"/DEFAULTLIB:autolinking_other2.lib"}}}
 // CHECK-DAG: [[OBJC]] = !{!{{"-lobjc"|"/DEFAULTLIB:objc.lib"}}}
