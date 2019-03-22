@@ -78,15 +78,14 @@ class DumpConfig:
             self.sdk + '/System/Library/Frameworks/',
             os.path.realpath(self.sdk + '/../../Library/Frameworks/')]
 
-    def run(self, output, module, swift_ver, abi, verbose):
+    def run(self, output, module, swift_ver, opts, verbose):
         cmd = [self.tool_path, '-o', output, '-sdk', self.sdk, '-target',
                self.target, '-dump-sdk', '-module-cache-path',
                '/tmp/ModuleCache', '-swift-version',
                swift_ver, '-abort-on-module-fail']
         for path in self.frameworks:
             cmd.extend(['-iframework', path])
-        if abi:
-            cmd.extend(['-abi'])
+        cmd.extend(['-' + o for o in opts])
         if verbose:
             cmd.extend(['-v'])
         if module:
@@ -103,13 +102,12 @@ class DiagnoseConfig:
     def __init__(self, tool_path):
         self.tool_path = get_api_digester_path(tool_path)
 
-    def run(self, abi, before, after, output, verbose):
+    def run(self, opts, before, after, output, verbose):
         cmd = [self.tool_path, '-diagnose-sdk', '-input-paths', before,
                '-input-paths', after]
         if output:
             cmd.extend(['-o', output])
-        if abi:
-            cmd.extend(['-abi'])
+        cmd.extend(['-' + o for o in opts])
         if verbose:
             cmd.extend(['-v'])
         check_call(cmd, verbose=verbose)
@@ -149,9 +147,9 @@ A convenient wrapper for swift-api-digester.
         name of the module/framework to generate baseline, e.g. Foundation
         ''')
 
-    basic_group.add_argument('--abi',
-                             action='store_true',
-                             help='Whether we are jsonizing for abi')
+    basic_group.add_argument('--opts', nargs='+', default=[], help='''
+        additional flags to pass to swift-api-digester
+        ''')
 
     basic_group.add_argument('--v',
                              action='store_true',
@@ -177,14 +175,15 @@ A convenient wrapper for swift-api-digester.
             fatal_error("Need to specify --output")
         runner = DumpConfig(tool_path=args.tool_path, platform=args.target)
         runner.run(output=args.output, module=args.module,
-                   swift_ver=args.swift_version, abi=args.abi, verbose=args.v)
+                   swift_ver=args.swift_version, opts=args.opts,
+                   verbose=args.v)
     elif args.action == 'diagnose':
         if not args.dump_before:
             fatal_error("Need to specify --dump-before")
         if not args.dump_after:
             fatal_error("Need to specify --dump-after")
         runner = DiagnoseConfig(tool_path=args.tool_path)
-        runner.run(abi=args.abi, before=args.dump_before,
+        runner.run(opts=args.opts, before=args.dump_before,
                    after=args.dump_after, output=args.output, verbose=args.v)
     else:
         fatal_error('Cannot recognize action: ' + args.action)
