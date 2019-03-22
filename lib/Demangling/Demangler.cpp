@@ -355,7 +355,7 @@ void Node::addChild(NodePointer Child, NodeFactory &Factory) {
   }
 }
 
-void Node::removeChildAt(unsigned Pos, swift::Demangle::NodeFactory &factory) {
+void Node::removeChildAt(unsigned Pos) {
   switch (NodePayloadKind) {
     case PayloadKind::OneChild:
       assert(Pos == 0);
@@ -1255,7 +1255,7 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
       auto Label = getChildIf(Param, Node::Kind::TupleElementName);
 
       if (Label.first) {
-        Param->removeChildAt(Label.second, *this);
+        Param->removeChildAt(Label.second);
         return createNodeWithAllocatedText(Node::Kind::Identifier,
                                            Label.first->getText());
       }
