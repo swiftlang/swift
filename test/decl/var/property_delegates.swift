@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -debugger-support
+// RUN: %target-typecheck-verify-swift
 
 @propertyDelegate
 struct Wrapper<T> { // expected-note{{generic struct 'Wrapper' declared here}}
@@ -185,4 +185,17 @@ func testDefaultInitializers() {
   _ = DefaultInitializerStruct()
   _ = DefaultInitializerClass()
   _ = NoDefaultInitializerStruct() // expected-error{{missing argument for parameter 'x' in call}}
+}
+
+// ---------------------------------------------------------------------------
+// Referencing the backing store
+// ---------------------------------------------------------------------------
+extension MemberwiseInits {
+  func getXStorage() -> Wrapper<Bool> {
+    return $x
+  }
+
+  func getYStorage() -> WrapperWithInitialValue<T> {
+    return self.$y
+  }
 }

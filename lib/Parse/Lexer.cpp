@@ -945,16 +945,7 @@ void Lexer::lexDollarIdent() {
     return formToken(tok::identifier, tokStart);
   }
 
-  // We reserve $nonNumeric for persistent bindings in the debugger and implicit
-  // variables, like storage for lazy properties.
   if (!isAllDigits) {
-    if (!LangOpts.EnableDollarIdentifiers && !InSILBody &&
-        LexMode != LexerMode::SwiftInterface)
-      diagnose(tokStart, diag::expected_dollar_numeric);
-
-    // Even if we diagnose, we go ahead and form an identifier token,
-    // in part to ensure that the basic behavior of the lexer is
-    // independent of language mode.
     return formToken(tok::identifier, tokStart);
   } else {
     return formToken(tok::dollarident, tokStart);

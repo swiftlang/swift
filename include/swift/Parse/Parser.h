@@ -519,10 +519,15 @@ public:
     return consumeToken();
   }
 
-  SourceLoc consumeIdentifier(Identifier *Result = nullptr) {
+  SourceLoc consumeIdentifier(Identifier *Result = nullptr,
+                              bool allowDollarIdentifier = false) {
     assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self));
     if (Result)
       *Result = Context.getIdentifier(Tok.getText());
+
+    if (Tok.getText()[0] == '$' && !allowDollarIdentifier)
+      diagnoseDollarIdentifier(Tok);
+
     return consumeToken();
   }
 
@@ -532,8 +537,25 @@ public:
     if (!Tok.is(tok::kw__)) {
       Tok.setKind(tok::identifier);
       Result = Context.getIdentifier(Tok.getText());
+
+      if (Tok.getText()[0] == '$')
+        diagnoseDollarIdentifier(Tok);
     }
     return consumeToken();
+  }
+
+  /// When we have a token that is an identifier starting with '$',
+  /// diagnose it if not permitted in this mode.
+  void diagnoseDollarIdentifier(const Token &tok) {
+    assert(tok.getText()[0] == '$');
+
+    if (tok.getText().size() == 1 ||
+        Context.LangOpts.EnableDollarIdentifiers ||
+        isInSILMode() || L->isSwiftInterface())
+      return;
+
+    diagnose(tok.getLoc(), diag::dollar_identifier_decl,
+             Context.getIdentifier(tok.getText()));
   }
 
   /// Retrieve the location just past the end of the previous
