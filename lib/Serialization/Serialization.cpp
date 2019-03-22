@@ -180,7 +180,7 @@ namespace {
     int32_t getNameDataForBase(const NominalTypeDecl *nominal,
                                StringRef *dataToWrite = nullptr) {
       if (nominal->getDeclContext()->isModuleScopeContext())
-        return -Serializer.addModuleRef(nominal->getParentModule());
+        return -Serializer.addContainingModuleRef(nominal->getDeclContext());
 
       auto &mangledName = MangledNameCache[nominal];
       if (mangledName.empty())
@@ -731,7 +731,12 @@ IdentifierID Serializer::addFilename(StringRef filename) {
   return addUniquedString(filename).second;
 }
 
-IdentifierID Serializer::addModuleRef(const ModuleDecl *M) {
+IdentifierID Serializer::addContainingModuleRef(const DeclContext *DC) {
+  assert(!isa<ModuleDecl>(DC) &&
+         "References should be to things within modules");
+  const FileUnit *file = cast<FileUnit>(DC->getModuleScopeContext());
+  const ModuleDecl *M = file->getParentModule();
+
   if (M == this->M)
     return CURRENT_MODULE_ID;
   if (M == this->M->getASTContext().TheBuiltinModule)
@@ -743,18 +748,10 @@ IdentifierID Serializer::addModuleRef(const ModuleDecl *M) {
   if (M == clangImporter->getImportedHeaderModule())
     return OBJC_HEADER_MODULE_ID;
 
-  // If we're referring to a member of a private module that will be
-  // re-exported via a public module, record the public module's name.
-  if (auto clangModuleUnit =
-        dyn_cast<ClangModuleUnit>(M->getFiles().front())) {
-    auto exportedModuleName =
-        M->getASTContext().getIdentifier(
-                                 clangModuleUnit->getExportedModuleName());
-    return addDeclBaseNameRef(exportedModuleName);
-  }
-
-  assert(!M->getName().empty());
-  return addDeclBaseNameRef(M->getName());
+  auto exportedModuleName = file->getExportedModuleName();
+  assert(!exportedModuleName.empty());
+  auto exportedModuleID = M->getASTContext().getIdentifier(exportedModuleName);
+  return addDeclBaseNameRef(exportedModuleID);
 }
 
 SILLayoutID Serializer::addSILLayoutRef(SILLayout *layout) {
@@ -1650,7 +1647,7 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
         abbrCode,
         addDeclRef(normal->getProtocol()),
         addDeclRef(normal->getType()->getAnyNominal()),
-        addModuleRef(normal->getDeclContext()->getParentModule()));
+        addContainingModuleRef(normal->getDeclContext()));
     }
     break;
   }
@@ -1885,14 +1882,13 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   case DeclContextKind::EnumElementDecl:
     llvm_unreachable("cannot cross-reference this context");
 
-  case DeclContextKind::FileUnit:
-    DC = cast<FileUnit>(DC)->getParentModule();
-    LLVM_FALLTHROUGH;
-
   case DeclContextKind::Module:
+    llvm_unreachable("should only cross-reference something within a file");
+
+  case DeclContextKind::FileUnit:
     abbrCode = DeclTypeAbbrCodes[XRefLayout::Code];
     XRefLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                           addModuleRef(cast<ModuleDecl>(DC)), pathLen);
+                           addContainingModuleRef(DC), pathLen);
     break;
 
   case DeclContextKind::GenericTypeDecl: {
@@ -1929,7 +1925,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
       genericSig = ext->getGenericSignature()->getCanonicalSignature();
     }
     XRefExtensionPathPieceLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, addModuleRef(DC->getParentModule()),
+        Out, ScratchRecord, abbrCode, addContainingModuleRef(DC),
         addGenericSignatureRef(genericSig));
     break;
   }
@@ -2022,7 +2018,7 @@ void Serializer::writeCrossReference(const Decl *D) {
   unsigned abbrCode;
 
   if (auto op = dyn_cast<OperatorDecl>(D)) {
-    writeCrossReference(op->getModuleContext(), 1);
+    writeCrossReference(op->getDeclContext(), 1);
 
     abbrCode = DeclTypeAbbrCodes[XRefOperatorOrAccessorPathPieceLayout::Code];
     auto nameID = addDeclBaseNameRef(op->getName());
@@ -2034,7 +2030,7 @@ void Serializer::writeCrossReference(const Decl *D) {
   }
 
   if (auto prec = dyn_cast<PrecedenceGroupDecl>(D)) {
-    writeCrossReference(prec->getModuleContext(), 1);
+    writeCrossReference(prec->getDeclContext(), 1);
 
     abbrCode = DeclTypeAbbrCodes[XRefOperatorOrAccessorPathPieceLayout::Code];
     auto nameID = addDeclBaseNameRef(prec->getName());
