@@ -2590,6 +2590,20 @@ bool swift::isKnownPrespecialization(StringRef SpecName) {
   return PrespecSet.count(SpecName) != 0;
 }
 
+void swift::checkCompletenessOfPrespecializations(SILModule &M) {
+  const char **Pos = &PrespecSymbols[0];
+  while (const char *Sym = *Pos++) {
+    StringRef FunctionName(Sym);
+    SILFunction *F = M.lookUpFunction(FunctionName);
+    if (!F || F->getLinkage() != SILLinkage::Public) {
+      M.getASTContext().Diags.diagnose(SourceLoc(),
+                                       diag::missing_prespecialization,
+                                       FunctionName);
+    }
+  }
+
+}
+
 /// Try to look up an existing specialization in the specialization cache.
 /// If it is found, it tries to link this specialization.
 ///
