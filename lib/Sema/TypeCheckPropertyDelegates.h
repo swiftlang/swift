@@ -26,7 +26,8 @@ class UnboundGenericType;
 class VarDecl;
 
 /// Retrieve the unbound property delegate type for the given property.
-UnboundGenericType *getUnboundPropertyDelegateType(VarDecl *var);
+UnboundGenericType *getUnboundPropertyDelegateType(VarDecl *var,
+                                                   TypeResolution resolution);
 
 /// Given the type of the given variable (which must have a property
 /// behavior), form the stored property type that results from applying

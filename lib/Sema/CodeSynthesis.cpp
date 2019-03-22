@@ -1457,7 +1457,15 @@ VarDecl *swift::getOrSynthesizePropertyDelegateBackingProperty(VarDecl *var) {
     isInvalid = true;
   }
 
-  Type storageType = dc->mapTypeIntoContext(storageInterfaceType);
+  Type storageType;
+  if (!isInvalid) {
+    storageType = applyPropertyDelegateType(var->getType(), var,
+                                            TypeResolution::forContextual(dc));
+  }
+  if (!storageType) {
+    storageType = ErrorType::get(ctx);
+    isInvalid = true;
+  }
 
   // Create the backing storage property and note it in the cache.
   backingVar = new (ctx) VarDecl(/*IsStatic=*/var->isStatic(),

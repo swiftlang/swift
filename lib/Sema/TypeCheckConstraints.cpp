@@ -2493,10 +2493,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       // We applied a property delegate, so dig the pattern initialization
       // type out of the type argument of the property delegate type.
       auto boundGeneric = initType->getAs<BoundGenericType>();
-      assert(boundGeneric && boundGeneric->getGenericArgs().size() == 1 &&
-             boundGeneric->getDecl() ==
-                 getUnboundPropertyDelegateType(pattern->getSingleVar())
-                   ->getDecl());
+      assert(boundGeneric && boundGeneric->getGenericArgs().size() == 1);
       return boundGeneric->getGenericArgs()[0];
     }
 
@@ -2569,12 +2566,14 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       if (!info)
         return;
 
-      auto unboundType = getUnboundPropertyDelegateType(singleVar);
+      TypeResolution resolution =
+          TypeResolution::forContextual(singleVar->getInnermostDeclContext());
+      auto unboundType = getUnboundPropertyDelegateType(singleVar, resolution);
       if (!unboundType)
         return;
 
       // If this isn't directly initializing the property delegate, we require
-      /// the property delegate type to have an initializer
+      // the property delegate type to have an initializer
       // init(initialValue:) to perform initialization.
       if (!info.initialValueInit && !isPropertyDelegateInit) {
         singleVar->diagnose(diag::property_delegate_init_without_initial_value,

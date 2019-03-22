@@ -199,3 +199,23 @@ extension MemberwiseInits {
     return self.$y
   }
 }
+
+// ---------------------------------------------------------------------------
+// Nested delegates
+// ---------------------------------------------------------------------------
+struct HasNestedDelegate<T> {
+  @propertyDelegate
+  struct NestedDelegate<U> {
+    var value: U
+    init(initialValue: U) {
+      self.value = initialValue
+    }
+  }
+
+  var y: [T] by NestedDelegate = []
+}
+
+struct UsesNestedDelegate<V> {
+  var y: [V] by HasNestedDelegate<V>.NestedDelegate
+}
+

@@ -39,21 +39,28 @@ void swift::simple_display(
   out << " }";
 }
 
-UnboundGenericType *swift::getUnboundPropertyDelegateType(VarDecl *var) {
+UnboundGenericType *swift::getUnboundPropertyDelegateType(
+    VarDecl *var, TypeResolution resolution) {
   assert(var->hasPropertyDelegate() && "Only call with property delegates");
 
   if (var->getPropertyDelegateTypeLoc().wasValidated()) {
     if (var->getPropertyDelegateTypeLoc().isError())
       return nullptr;
 
-    return var->getPropertyDelegateTypeLoc().getType()
-        ->castTo<UnboundGenericType>();
+    Type storedType = var->getPropertyDelegateTypeLoc().getType();
+    switch (resolution.getStage()) {
+    case TypeResolutionStage::Contextual:
+      return var->getInnermostDeclContext()->mapTypeIntoContext(storedType)
+          ->getAs<UnboundGenericType>();
+
+    case TypeResolutionStage::Interface:
+    case TypeResolutionStage::Structural:
+      return storedType->castTo<UnboundGenericType>();
+    }
   }
 
   // We haven't resolved the property delegate type yet; do so now.
   SourceLoc byLoc = var->getPropertyDelegateByLoc();
-  TypeResolution resolution =
-      TypeResolution::forContextual(var->getInnermostDeclContext());
   TypeResolutionOptions options(TypeResolverContext::ProtocolWhereClause);
   options |= TypeResolutionFlags::AllowUnboundGenerics;
   Type unboundBehaviorType = resolution.resolveType(
@@ -102,7 +109,16 @@ UnboundGenericType *swift::getUnboundPropertyDelegateType(VarDecl *var) {
     return nullptr;
   }
 
-  var->getPropertyDelegateTypeLoc().setType(unboundBehaviorType);
+  switch (resolution.getStage()) {
+  case TypeResolutionStage::Contextual:
+  case TypeResolutionStage::Structural:
+    // Don't cache these results.
+    break;
+
+  case TypeResolutionStage::Interface:
+    var->getPropertyDelegateTypeLoc().setType(unboundBehaviorType);
+    break;
+  }
   return unboundGeneric;
 }
 
@@ -117,8 +133,8 @@ PropertyDelegateTypeInfoRequest::evaluate(
   }
 
   // Ensure that we have a single-parameter generic type.
-  if (!nominal->getGenericSignature() ||
-      nominal->getGenericSignature()->getGenericParams().size() != 1) {
+  if (!nominal->getGenericParams() ||
+      nominal->getGenericParams()->size() != 1) {
     nominal->diagnose(diag::property_delegate_not_single_parameter);
     return result;
   }
@@ -126,11 +142,11 @@ PropertyDelegateTypeInfoRequest::evaluate(
   // Look for a non-static property named "value" in the property delegate
   // type.
   ASTContext &ctx = nominal->getASTContext();
-  auto dc = nominal->getModuleContext();
+  ctx.getLazyResolver()->resolveDeclSignature(nominal);
   SmallVector<VarDecl *, 2> unwrapVars;
   {
     SmallVector<ValueDecl *, 2> decls;
-    dc->lookupQualified(nominal, ctx.Id_value, NL_QualifiedDefault, decls);
+    nominal->lookupQualified(nominal, ctx.Id_value, NL_QualifiedDefault, decls);
     for (const auto &foundDecl : decls) {
       auto foundVar = dyn_cast<VarDecl>(foundDecl);
       if (!foundVar || foundVar->isStatic())
@@ -168,7 +184,7 @@ PropertyDelegateTypeInfoRequest::evaluate(
     DeclName initName(ctx, DeclBaseName::createConstructor(),
                       {ctx.Id_initialValue});
     SmallVector<ValueDecl *, 2> decls;
-    dc->lookupQualified(nominal, initName, NL_QualifiedDefault, decls);
+    nominal->lookupQualified(nominal, initName, NL_QualifiedDefault, decls);
     for (const auto &decl : decls) {
       auto init = dyn_cast<ConstructorDecl>(decl);
       if (!init)
@@ -202,7 +218,7 @@ PropertyDelegateTypeInfoRequest::evaluate(
 
 Type swift::applyPropertyDelegateType(Type type, VarDecl *var,
                                       TypeResolution resolution) {
-  auto unboundGeneric = getUnboundPropertyDelegateType(var);
+  auto unboundGeneric = getUnboundPropertyDelegateType(var, resolution);
   if (!unboundGeneric)
     return Type();
 
