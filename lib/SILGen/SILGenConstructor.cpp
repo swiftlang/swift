@@ -98,6 +98,37 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
   return RValue(SGF, loc, type, mvArg);
 }
 
+/// If the field has a property delegate for which we will need to call the
+/// delegate type's init(initialValue:), do so.
+///
+/// Otherwise, returns the given argument.
+static RValue maybeEmitPropertyDelegateInitFromValue(SILGenFunction &SGF,
+                                                     SILLocation loc,
+                                                     VarDecl *field,
+                                                     RValue &&arg,
+                                                     Initialization *init) {
+  auto originalProperty = field->getOriginalDelegatedProperty();
+  if (!originalProperty)
+    return std::move(arg);
+
+  auto delegateInfo = getAttachedPropertyDelegateInfo(originalProperty);
+  auto initialValueInit = delegateInfo.initialValueInit;
+  if (!initialValueInit)
+    return std::move(arg);
+
+  ConcreteDeclRef concreteInitialValueInit(
+     initialValueInit,
+     field->getType()->getMemberSubstitutionMap(
+       SGF.getModule().getSwiftModule(), initialValueInit));
+  RValue result = SGF.emitApplyAllocatingInitializer(
+      loc, concreteInitialValueInit, std::move(arg), Type(),
+      init ? SGFContext(init) : SGFContext());
+  if (result.isInContext())
+    return result;
+
+  return std::move(result).ensurePlusOne(SGF, loc);
+}
+
 static void emitImplicitValueConstructor(SILGenFunction &SGF,
                                          ConstructorDecl *ctor) {
   RegularLocation Loc(ctor);
@@ -168,30 +199,11 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
       assert(elti != eltEnd && "number of args does not match number of fields");
       (void)eltEnd;
 
-      // If the field is the backing property for a property delegate,
-      // we may need to initialize through init(initialValue:).
-      if (auto originalProperty = field->getOriginalDelegatedProperty()) {
-        auto delegateInfo = getAttachedPropertyDelegateInfo(originalProperty);
-        if (auto initialValueInit = delegateInfo.initialValueInit) {
-          ConcreteDeclRef concreteInitialValueInit(
-              initialValueInit,
-              field->getType()->getMemberSubstitutionMap(
-                SGF.getModule().getSwiftModule(), initialValueInit));
-          FullExpr scope(SGF.Cleanups, CleanupLocation::get(Loc));
-          RValue result =
-              SGF.emitApplyAllocatingInitializer(
-                Loc, concreteInitialValueInit, std::move(*elti), Type(),
-                SGFContext(init.get()));
-          if (!result.isInContext()) {
-            std::move(result).ensurePlusOne(SGF, Loc)
-              .forwardInto(SGF, Loc, init.get());
-          }
-          ++elti;
-          continue;
-        }
-      }
-
-      std::move(*elti).forwardInto(SGF, Loc, init.get());
+      FullExpr scope(SGF.Cleanups, CleanupLocation::get(Loc));
+      auto v = maybeEmitPropertyDelegateInitFromValue(
+          SGF, Loc, field, std::move(*elti), init.get());
+      if (!v.isInContext())
+        std::move(v).forwardInto(SGF, Loc, init.get());
       ++elti;
     }
     SGF.B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(Loc),
@@ -217,7 +229,10 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
     } else {
       assert(elti != eltEnd && "number of args does not match number of fields");
       (void)eltEnd;
-      v = std::move(*elti).forwardAsSingleStorageValue(SGF, fieldTy, Loc);
+      FullExpr scope(SGF.Cleanups, CleanupLocation::get(Loc));
+      v = maybeEmitPropertyDelegateInitFromValue(
+          SGF, Loc, field, std::move(*elti), nullptr)
+            .forwardAsSingleStorageValue(SGF, fieldTy, Loc);
       ++elti;
     }
 
