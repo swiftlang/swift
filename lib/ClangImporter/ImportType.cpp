@@ -510,28 +510,32 @@ namespace {
     }
 
     ImportResult VisitVectorType(const clang::VectorType *type) {
-      // Get the element type and count.
-      Type element = Impl.importTypeIgnoreIUO(type->getElementType(),
-                                              ImportTypeKind::Abstract,
-                                              false,
-                                              Bridgeability::Full,
-                                              OptionalTypeKind::OTK_None);
+      // Get the imported element type and count.
+      Type element = Impl.importTypeIgnoreIUO(
+        type->getElementType(), ImportTypeKind::Abstract,
+        false /* No NSUIntegerAsInt */, Bridgeability::None,
+        OptionalTypeKind::OTK_None);
       unsigned count = type->getNumElements();
       // Import vector-of-one as the element type.
       if (count == 1) { return element; }
-      // element type needs to conform to SIMDScalar to be imported.
+      // Imported element type needs to conform to SIMDScalar.
       auto nominal = element->getAnyNominal();
       auto simdscalar = Impl.SwiftContext.getProtocol(KnownProtocolKind::SIMDScalar);
       SmallVector<ProtocolConformance *, 2> conformances;
       if (simdscalar && nominal->lookupConformance(nominal->getParentModule(),
                                                    simdscalar, conformances)) {
+        // Element type conforms to SIMDScalar. Get the SIMDn generic type
+        // if it exists.
         SmallString<8> name("SIMD");
         name.append(std::to_string(count));
         if (auto vector = Impl.getNamedSwiftType(Impl.getStdlibModule(), name)) {
           if (auto unbound = vector->getAs<UnboundGenericType>()) {
-            ArrayRef<Type> arg(element);
-            return BoundGenericType::get(cast<NominalTypeDecl>(unbound->getDecl()),
-                                         Type(), arg);
+            // All checks passed: the imported element type is SIMDScalar,
+            // and a generic SIMDn type exists with n == count. Construct the
+            // bound generic type and return that.
+            return BoundGenericType::get(
+              cast<NominalTypeDecl>(unbound->getDecl()), Type(), { element }
+            );
           }
         }
       }
