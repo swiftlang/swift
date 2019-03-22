@@ -1065,7 +1065,8 @@ static Type diagnoseUnknownType(TypeResolution resolution,
           methodDecl->getDeclContext() == dc->getParentForLookup();
 
         if (((!insideClass || !declaringMethod) &&
-             !options.is(TypeResolverContext::GenericRequirement)) ||
+             !options.is(TypeResolverContext::GenericRequirement) &&
+             !options.is(TypeResolverContext::PatternBindingDecl)) ||
             options.is(TypeResolverContext::ExplicitCastExpr)) {
           Type SelfType = nominal->getSelfInterfaceType();
           if (insideClass)
