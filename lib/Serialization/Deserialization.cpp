@@ -1149,7 +1149,7 @@ static bool isReExportedToModule(const ValueDecl *value,
       = dyn_cast<ClangModuleUnit>(valueDC->getModuleScopeContext());
   if (!fromClangModule)
     return false;
-  std::string exportedName = fromClangModule->getExportedModuleName();
+  StringRef exportedName = fromClangModule->getExportedModuleName();
 
   auto toClangModule
       = dyn_cast<ClangModuleUnit>(expectedModule->getFiles().front());
