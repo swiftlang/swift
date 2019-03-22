@@ -78,7 +78,8 @@ Please make sure you use Python 2.x. Python 3.x is not supported currently.
 To build for macOS, you need [Xcode 10.2 beta](https://developer.apple.com/xcode/downloads/).
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document or the host information on <https://ci.swift.org> for the
-current required version.
+current required version. Be sure to switch to the version of Xcode mentioned above by
+executing `sudo xcode-select -s $PATH_TO_XCODE_APP` before starting the build.
 
 You will also need [CMake](https://cmake.org) and [Ninja](https://ninja-build.org),
 which can be installed via a package manager:
