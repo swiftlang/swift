@@ -176,8 +176,8 @@ public:
   Expr *get() const { return FoundExpr; }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-    if (TargetRange == E->getSourceRange() && !isa<ImplicitConversionExpr>(E) &&
-        !isa<AutoClosureExpr>(E) && !isa<ConstructorRefCallExpr>(E)) {
+    if (TargetRange == E->getSourceRange() && !E->isImplicit() &&
+        !isa<ConstructorRefCallExpr>(E)) {
       assert(!FoundExpr && "non-nullptr for found expr");
       FoundExpr = E;
       return {false, nullptr};
