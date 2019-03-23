@@ -99,6 +99,11 @@ Swift 5.1
   foo(0) // prints "Any" in Swift < 5.1, "T" in Swift 5.1
   ```
 
+* [SE-0245][]:
+
+  `Array` and `ContiguousArray` now have `init(unsafeUninitializedCapacity:initializingWith:)`,
+  which provides access to the array's uninitialized storage.
+
 **Add new entries to the top of this section, not here!**
 
 Swift 5.0
@@ -7506,6 +7511,7 @@ Swift 1.0
 [SE-0228]: <https://github.com/apple/swift-evolution/blob/master/proposals/0228-fix-expressiblebystringinterpolation.md>
 [SE-0230]: <https://github.com/apple/swift-evolution/blob/master/proposals/0230-flatten-optional-try.md>
 [SE-0235]: <https://github.com/apple/swift-evolution/blob/master/proposals/0235-add-result.md>
+[SE-0245]: <https://github.com/apple/swift-evolution/blob/master/proposals/0245-array-uninitialized-initializer.md>
 
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
 [SR-419]: <https://bugs.swift.org/browse/SR-419>
