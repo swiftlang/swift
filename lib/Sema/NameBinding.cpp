@@ -250,7 +250,7 @@ void NameBinder::addImport(
     }
   }
 
-  if (SF.getParentModule()->isResilient() &&
+  if (SF.getParentModule()->isResilient() && topLevelModule &&
       !topLevelModule->isResilient() &&
       !topLevelModule->isNonSwiftModule() &&
       !ID->getAttrs().hasAttribute<ImplementationOnlyAttr>()) {

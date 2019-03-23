@@ -19,9 +19,10 @@ using namespace swift;
 using namespace namelookup;
 
 namespace {
-  using ModuleLookupCache = llvm::SmallDenseMap<ModuleDecl::ImportedModule,
-                                                TinyPtrVector<ValueDecl *>,
-                                                32>;
+  using ModuleLookupCacheKey = std::pair<ModuleDecl::ImportedModule,
+                                         const DeclContext * /*lookupScope*/>;
+  using ModuleLookupCache = llvm::SmallDenseMap<ModuleLookupCacheKey,
+                                                TinyPtrVector<ValueDecl *>, 32>;
 
   class SortCanType {
   public:
@@ -155,12 +156,15 @@ static void lookupInModule(ModuleDecl *module, ModuleDecl::AccessPathTy accessPa
     return !import.second;
   }));
 
-  ModuleLookupCache::iterator iter;
-  bool isNew;
-  std::tie(iter, isNew) = cache.insert({{accessPath, module}, {}});
-  if (!isNew) {
-    decls.append(iter->second.begin(), iter->second.end());
-    return;
+  ModuleDecl::ImportedModule import{accessPath, module};
+  ModuleLookupCacheKey cacheKey{import, moduleScopeContext};
+
+  {
+    auto iter = cache.find(cacheKey);
+    if (iter != cache.end()) {
+      decls.append(iter->second.begin(), iter->second.end());
+      return;
+    }
   }
 
   size_t initialCount = decls.size();
@@ -174,7 +178,10 @@ static void lookupInModule(ModuleDecl *module, ModuleDecl::AccessPathTy accessPa
     });
     localDecls.erase(newEndIter, localDecls.end());
 
-    // This only applies to immediate imports of the top-level module.
+    // Special treatment based on the use site only applies to immediate 
+    // imports of the top-level module.
+    // FIXME: It ought to apply to anything re-exported by those immediate
+    // imports as well.
     if (moduleScopeContext && moduleScopeContext->getParentModule() != module)
       moduleScopeContext = nullptr;
   }
@@ -189,8 +196,8 @@ static void lookupInModule(ModuleDecl *module, ModuleDecl::AccessPathTy accessPa
     SmallVector<ModuleDecl::ImportedModule, 8> reexports;
     module->getImportedModulesForLookup(reexports);
     assert(std::none_of(reexports.begin(), reexports.end(),
-                        [](ModuleDecl::ImportedModule import) -> bool {
-      return !import.second;
+                        [module](ModuleDecl::ImportedModule import) -> bool {
+      return !import.second || import.second == module;
     }));
     reexports.append(extraImports.begin(), extraImports.end());
 
@@ -241,7 +248,7 @@ static void lookupInModule(ModuleDecl *module, ModuleDecl::AccessPathTy accessPa
                              }),
               decls.end());
 
-  auto &cachedValues = cache[{accessPath, module}];
+  auto &cachedValues = cache[cacheKey];
   cachedValues.insert(cachedValues.end(),
                       decls.begin() + initialCount,
                       decls.end());
