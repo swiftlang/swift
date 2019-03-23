@@ -274,3 +274,33 @@ func testPrivateDelegateInstance(p: HasPrivateDelegateInstance<Int>) {
   var mutableP = p
   mutableP.$w = p.$w // expected-error{{cannot assign to property: '$w' is immutable}}
 }
+
+// ---------------------------------------------------------------------------
+// Access control for the memberwise initializer
+// ---------------------------------------------------------------------------
+struct NotPrivateMemberwiseInits<T> {
+  var x: Bool by Wrapper
+  var y: T by private WrapperWithInitialValue
+
+  static func construct(x: Wrapper<Bool>, y: T)
+      -> NotPrivateMemberwiseInits<T> {
+    return NotPrivateMemberwiseInits<T>(x: x, y: y)
+  }
+}
+
+struct PrivateMemberwiseInits<T> { // expected-note{{'init(x:y:)' declared here}}
+  var x: Bool by private Wrapper
+  var y: T by WrapperWithInitialValue
+
+  static func construct(x: Wrapper<Bool>, y: T)
+      -> PrivateMemberwiseInits<T> {
+    return PrivateMemberwiseInits<T>(x: x, y: y)
+  }
+}
+
+func testMemberInitAccess<T>(x: Wrapper<Bool>, y: T) {
+  _ = NotPrivateMemberwiseInits<T>(x: x, y: y)
+
+  // expected-error@+1{{'PrivateMemberwiseInits<T>' initializer is inaccessible due to 'private' protection level}}
+  _ = PrivateMemberwiseInits<T>(x: x, y: y)
+}

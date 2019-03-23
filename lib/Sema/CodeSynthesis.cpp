@@ -1974,8 +1974,10 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
         auto delegateTypeInfo = getAttachedPropertyDelegateInfo(var);
         if (!delegateTypeInfo.initialValueInit) {
           if (auto backingVar =
-                  getOrSynthesizePropertyDelegateBackingProperty(var))
+                  getOrSynthesizePropertyDelegateBackingProperty(var)) {
             varInterfaceType = backingVar->getValueInterfaceType();
+            accessLevel = std::min(accessLevel, backingVar->getFormalAccess());
+          }
         }
       }
 
