@@ -47,3 +47,11 @@ print(MyStruct[keyPath: kp])
 let dynKP = \Dyn.Type.foo
 print(dynKP)
 print(Dyn.self[keyPath: dynKP])
+class Base {
+  static subscript(_ i: Int) -> String { return "Base" }
+}
+class DerivedGood: Base {
+  override static subscript(_ i: Int) -> String { return "DerivedGood" }
+}
+
+print(DerivedGood[0])
