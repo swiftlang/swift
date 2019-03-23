@@ -195,6 +195,11 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_IN_MEMBERDECLINIT_2 | %FileCheck %s -check-prefix=FOO_OBJECT_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_IN_MEMBERDECLINIT_3 | %FileCheck %s -check-prefix=FOO_OBJECT_DOT
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_ARRAY_LITERAL_1 | %FileCheck %s -check-prefix=SIMPLE_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_ARRAY_LITERAL_2 | %FileCheck %s -check-prefix=SIMPLE_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_DICTIONARY_LITERAL_1 | %FileCheck %s -check-prefix=SIMPLE_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_DICTIONARY_LITERAL_2 | %FileCheck %s -check-prefix=SIMPLE_OBJECT_DOT
+
 // Test code completion of expressions that produce a value.
 
 struct FooStruct {
@@ -2142,4 +2147,26 @@ extension String {
   static let v = { (obj: FooStruct) in
     obj.#^CLOSURE_IN_MEMBERDECLINIT_3^#
   }
+}
+
+struct SimpleStruct {
+  func foo() -> SimpleStruct {}
+}
+// SIMPLE_OBJECT_DOT: Begin completions
+// SIMPLE_OBJECT_DOT-DAG: Keyword[self]/CurrNominal:          self[#SimpleStruct#]; name=self
+// SIMPLE_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Identical\])?}}: foo()[#SimpleStruct#]; name=foo()
+// SIMPLE_OBJECT_DOT: End completions
+func testInCollectionLiteral(value: SimpleStruct) {
+  let _ = [
+    value.#^IN_ARRAY_LITERAL_1^#
+  ]
+  let _ = [
+    value.#^IN_ARRAY_LITERAL_2^#,
+  ]
+  let _: [String: String] = [
+    value.#^IN_DICTIONARY_LITERAL_1^#
+  ]
+  let _: [String: String] = [
+    value.#^IN_DICTIONARY_LITERAL_2^# : "test"
+  ]
 }
