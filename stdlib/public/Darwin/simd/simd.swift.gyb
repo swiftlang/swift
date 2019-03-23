@@ -18,6 +18,7 @@ import Darwin
 
 public extension SIMD {
   @available(swift, deprecated:5, renamed: "init(repeating:)")
+  @_transparent
   init(_ scalar: Scalar) { self.init(repeating: scalar) }
 }
 
@@ -35,6 +36,7 @@ internal extension SIMD4 {
 
 public extension SIMD where Scalar : FixedWidthInteger {
   @available(swift, deprecated:5, message: "use 0 &- rhs")
+  @_transparent
   static prefix func -(rhs: Self) -> Self { return 0 &- rhs }
 }
 
