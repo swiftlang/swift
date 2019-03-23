@@ -18,10 +18,9 @@ if not os.path.exists(os.path.join(swift_src_root, '.git')):
 returncode = subprocess.call(
     ['git', '-C', swift_src_root, 'grep', r'\bDEBUG[(]'])
 if returncode == 0:  # We found some DEBUG in there.
-    print('\n'
-          '*** The DEBUG'
-          '(...) macro is being renamed to LLVM_DEBUG(...);\n'
-          '*** please use that instead.')
+    print("""
+*** The {DEBUG}(...) macro is being renamed to LLVM_DEBUG(...);
+*** please use that instead.""".format(DEBUG='DEBUG'))
     sys.exit(1)
 
 # If you see a failure in this test, that means you introduced a use of the
