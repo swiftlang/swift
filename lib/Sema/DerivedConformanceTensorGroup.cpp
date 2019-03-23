@@ -65,18 +65,6 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, DeclName name) {
   return lookup.front();
 }
 
-// Return the static method with the specified name.
-static ValueDecl *getStaticMethod(ProtocolDecl *proto, DeclName name) {
-  auto lookup = proto->lookupDirect(name);
-  lookup.erase(std::remove_if(lookup.begin(), lookup.end(),
-                              [](ValueDecl *v) {
-                                return !v->isStatic();
-                              }),
-               lookup.end());
-  assert(lookup.size() == 1 && "Ambiguous static method");
-  return lookup.front();
-}
-
 /// Derive the body for the '_typeList' getter.
 static void
 deriveBodyTensorGroup_typeList(AbstractFunctionDecl *funcDecl) {
@@ -203,11 +191,13 @@ deriveBodyTensorGroup_init(AbstractFunctionDecl *funcDecl) {
 
   // Get the necessary protocol requirements.  
   auto *tensorGroupProto = C.getProtocol(KnownProtocolKind::TensorGroup);
+  auto *tensorArrayProto = C.getProtocol(
+      KnownProtocolKind::TensorArrayProtocol);
   auto initName = DeclName(
       C, DeclBaseName::createConstructor(), {C.getIdentifier("_owning")});
   auto *initReq = getProtocolRequirement(tensorGroupProto, initName);
-  auto *tensorHandleCountReq = getStaticMethod(
-      tensorGroupProto, C.Id_tensorHandleCount);
+  auto *tensorHandleCountReq = getProtocolRequirement(
+      tensorArrayProto, C.Id_tensorHandleCount);
 
   Type intType = C.getIntDecl()->getDeclaredType();
   TypeExpr *intTE = TypeExpr::createImplicit(intType, C);
@@ -286,7 +276,7 @@ deriveBodyTensorGroup_init(AbstractFunctionDecl *funcDecl) {
     
     // Obtain `MemberType._tensorHandleCount`.
     auto *memberCountMRE = new (C) MemberRefExpr(
-        memberTypeExpr, SourceLoc(), tensorHandleCountReq, DeclNameLoc(), 
+        memberDRE, SourceLoc(), tensorHandleCountReq, DeclNameLoc(),
         /*Implicit*/ true);
     
     // Cast the tensor handle count to Int.

@@ -194,10 +194,9 @@ TensorArrayProtocolTests.test("NestedGenericUnpackTensorHandles") {
   let genericSM = Generic<Simple, Mixed>(t: simple, u: mixed)
   let genericMF = Generic<Mixed, Tensor<Float>>(t: mixed, u: w)
   let genericSF = Generic<Simple, Tensor<Float>>(t: simple, u: w)
-  let nested = NestedGeneric<Simple>.Nested<Mixed>.UltraNested<Tensor<Float>>(
-    a: genericSM, b: genericMF, c: genericSF)
+  let generic = NestedGeneric.Nested.UltraNested(a: genericSM, b: genericMF, c: genericSF)
   let buffer = UnsafeMutablePointer<CTensorHandle>.allocate(capacity: 12)
-  nested._unpackTensorHandles(into: buffer)
+  generic._unpackTensorHandles(into: buffer)
   let expectedBuffer = UnsafeMutableBufferPointer<CTensorHandle>.allocate(capacity: 12)
   expectedBuffer.baseAddress?.initialize(to: w.handle._cTensorHandle)
   expectedBuffer.baseAddress?.advanced(by: 1).initialize(to: b.handle._cTensorHandle)
