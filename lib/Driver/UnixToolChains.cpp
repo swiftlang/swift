@@ -41,7 +41,9 @@ static void addLinkSanitizerLibArgsForLinux(const ArgList &Args,
                                             ArgStringList &Arguments,
                                             StringRef Sanitizer,
                                             const ToolChain &TC) {
+  Arguments.push_back("--whole-archive");
   TC.addLinkRuntimeLib(Args, Arguments, TC.sanitizerRuntimeLibName(Sanitizer));
+  Arguments.push_back("--no-whole-archive");
 
   // Code taken from
   // https://github.com/apple/swift-clang/blob/ab3cbe7/lib/Driver/Tools.cpp#L3264-L3276
