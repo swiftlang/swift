@@ -30,7 +30,7 @@ struct UseWrapper<T: DefaultInit> {
 
   // CHECK: pattern_binding_decl implicit
   // CHECK-NEXT: pattern_typed implicit type='Wrapper<T>'
-  // CHECK-NEXT: pattern_named implicit '$wrapped'
+  // CHECK-NEXT: pattern_named implicit type='Wrapper<T>' '$wrapped'
   // CHECK: constructor_ref_call_expr
   // CHECK-NEXT: declref_expr{{.*}}Wrapper.init(initialValue:)
   init() { }

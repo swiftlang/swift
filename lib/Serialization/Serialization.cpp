@@ -3231,6 +3231,23 @@ void Serializer::writeDecl(const Decl *D) {
     SmallVector<TypeID, 2> accessorsAndDependencies;
     for (auto accessor : accessors.Decls)
       accessorsAndDependencies.push_back(addDeclRef(accessor));
+    uint8_t rawPropertyDelegateAccessLevel =
+        getRawStableAccessLevel(swift::AccessLevel::Internal);
+    if (var->hasPropertyDelegate()) {
+      accessorsAndDependencies.push_back(
+          addTypeRef(var->getPropertyDelegateTypeLoc().getType()));
+      accessorsAndDependencies.push_back(
+          addDeclRef(var->getPropertyDelegateBackingVar()));
+      rawPropertyDelegateAccessLevel =
+          getRawStableAccessLevel(var->getPropertyDelegateFormalAccess());
+    }
+
+    bool isDelegatedPropertyBackingVar = false;
+    if (auto original = var->getOriginalDelegatedProperty()) {
+      isDelegatedPropertyBackingVar = true;
+      accessorsAndDependencies.push_back(addDeclRef(original));
+    }
+
     for (Type dependency : collectDependenciesFromType(ty->getCanonicalType()))
       accessorsAndDependencies.push_back(addTypeRef(dependency));
 
@@ -3253,6 +3270,9 @@ void Serializer::writeDecl(const Decl *D) {
                           addTypeRef(ty),
                           addDeclRef(var->getOverriddenDecl()),
                           rawAccessLevel, rawSetterAccessLevel,
+                          var->hasPropertyDelegate(),
+                          isDelegatedPropertyBackingVar,
+                          rawPropertyDelegateAccessLevel,
                           accessorsAndDependencies);
     break;
   }

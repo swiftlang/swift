@@ -1485,6 +1485,7 @@ VarDecl *swift::getOrSynthesizePropertyDelegateBackingProperty(VarDecl *var) {
 
   // Create the pattern binding declaration for the backing property.
   Pattern *pbdPattern = new (ctx) NamedPattern(backingVar, /*implicit=*/true);
+  pbdPattern->setType(storageType);
   pbdPattern = TypedPattern::createImplicit(ctx, pbdPattern, storageType);
   auto pbd = PatternBindingDecl::createImplicit(
       ctx, backingVar->getCorrectStaticSpelling(), pbdPattern,

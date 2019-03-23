@@ -5122,6 +5122,12 @@ TypeLoc &VarDecl::getPropertyDelegateTypeLoc() {
   return ctx.getImpl().AttachedPropertyDelegates[this]->delegateTypeLoc;
 }
 
+const TypeLoc &VarDecl::getPropertyDelegateTypeLoc() const {
+  assert(hasPropertyDelegate());
+  ASTContext &ctx = getASTContext();
+  return ctx.getImpl().AttachedPropertyDelegates[this]->delegateTypeLoc;
+}
+
 VarDecl *VarDecl::getPropertyDelegateBackingVar() const {
   assert(hasPropertyDelegate());
   ASTContext &ctx = getASTContext();

@@ -2643,6 +2643,9 @@ public:
     TypeID interfaceTypeID;
     ModuleFile::AccessorRecord accessors;
     DeclID overriddenID;
+    bool isPropertyDelegate;
+    bool isDelegatedPropertyBackingVar;
+    uint8_t rawPropertyDelegateAccessLevel;
     ArrayRef<uint64_t> accessorAndDependencyIDs;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID,
@@ -2655,6 +2658,9 @@ public:
                                        interfaceTypeID,
                                        overriddenID,
                                        rawAccessLevel, rawSetterAccessLevel,
+                                       isPropertyDelegate,
+                                       isDelegatedPropertyBackingVar,
+                                       rawPropertyDelegateAccessLevel,
                                        accessorAndDependencyIDs);
 
     Identifier name = MF.getIdentifier(nameID);
@@ -2669,7 +2675,21 @@ public:
     for (DeclID accessorID : accessorAndDependencyIDs.slice(0, numAccessors)) {
       accessors.IDs.push_back(accessorID);
     }
-    accessorAndDependencyIDs = accessorAndDependencyIDs.slice(numAccessors);
+    unsigned firstDependencyIdx = numAccessors;
+    TypeID delegateTypeID;
+    DeclID delegateBackingVarID;
+    if (isPropertyDelegate) {
+      delegateTypeID = accessorAndDependencyIDs[firstDependencyIdx++];
+      delegateBackingVarID = accessorAndDependencyIDs[firstDependencyIdx++];
+    }
+
+    DeclID delegateOriginalVarID;
+    if (isDelegatedPropertyBackingVar) {
+      delegateOriginalVarID = accessorAndDependencyIDs[firstDependencyIdx++];
+    }
+
+    accessorAndDependencyIDs =
+        accessorAndDependencyIDs.slice(firstDependencyIdx);
 
     for (TypeID dependencyID : accessorAndDependencyIDs) {
       auto dependency = MF.getTypeChecked(dependencyID);
@@ -2754,6 +2774,42 @@ public:
     // Add the @_hasStorage attribute if this var has storage.
     if (var->hasStorage())
       AddAttribute(new (ctx) HasStorageAttr(/*isImplicit:*/true));
+
+    if (isPropertyDelegate) {
+      Expected<Type> delegateType = MF.getTypeChecked(delegateTypeID);
+      if (!delegateType) {
+        DeclDeserializationError::Flags flags;
+        return llvm::make_error<TypeError>(
+            name, takeErrorInfo(delegateType.takeError()), flags);
+      }
+
+      auto delegateAccessLevel =
+          getActualAccessLevel(rawPropertyDelegateAccessLevel);
+      if (!delegateAccessLevel) {
+        MF.error();
+        return nullptr;
+      }
+
+      var->addPropertyDelegate(SourceLoc(), *delegateAccessLevel,
+                               SourceLoc(),
+                               TypeLoc::withoutLoc(delegateType.get()));
+
+      Expected<Decl *> backingDecl = MF.getDeclChecked(delegateBackingVarID);
+      if (!backingDecl)
+        return backingDecl;
+
+      VarDecl *backingVar = cast<VarDecl>(backingDecl.get());
+      var->setPropertyDelegateBackingVar(backingVar);
+    }
+
+    if (isDelegatedPropertyBackingVar) {
+      Expected<Decl *> originalDecl = MF.getDeclChecked(delegateOriginalVarID);
+      if (!originalDecl)
+        return originalDecl;
+
+      VarDecl *originalVal = cast<VarDecl>(originalDecl.get());
+      var->setOriginalDelegatedProperty(originalVal);
+    }
 
     return var;
   }

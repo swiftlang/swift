@@ -4915,6 +4915,10 @@ public:
   /// information.
   TypeLoc &getPropertyDelegateTypeLoc();
 
+  /// For a property delegate, retrieve the behavior type location
+  /// information.
+  const TypeLoc &getPropertyDelegateTypeLoc() const;
+
   /// Retrieve the formal access level for the attached property delegate.
   AccessLevel getPropertyDelegateFormalAccess() const;
 
