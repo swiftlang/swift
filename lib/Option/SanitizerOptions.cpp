@@ -188,3 +188,13 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
 
   return sanitizerSet;
 }
+
+std::string swift::getSanitizerList(const OptionSet<SanitizerKind> &Set) {
+  std::string list;
+  if (Set & SanitizerKind::Address) list += "address,";
+  if (Set & SanitizerKind::Thread) list += "thread,";
+  if (Set & SanitizerKind::Fuzzer) list += "fuzzer,";
+  if (Set & SanitizerKind::Undefined) list += "undefined,";
+  if (!list.empty()) list.pop_back(); // Remove last comma
+  return list;
+}
