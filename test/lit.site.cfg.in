@@ -91,6 +91,9 @@ if "@SWIFT_BUILD_SYNTAXPARSERLIB@" == "TRUE":
 if "@SWIFT_ENABLE_SOURCEKIT_TESTS@" == "TRUE":
     config.available_features.add('sourcekit')
 
+if "@SWIFT_HAVE_LIBXML2@" == "TRUE":
+    config.available_features.add('libxml2')
+
 if "@SWIFT_ENABLE_LLD_LINKER@" == "TRUE":
     config.android_linker_name = "lld"
 else:
