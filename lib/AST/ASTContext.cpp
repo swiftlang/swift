@@ -114,11 +114,17 @@ namespace {
   /// a particular property.
   struct AttachedPropertyDelegateInfo {
     SourceLoc byLoc;
+    AccessLevel access;
+    SourceLoc accessLoc;
     TypeLoc delegateTypeLoc;
     VarDecl *backingVar = nullptr;
 
-    AttachedPropertyDelegateInfo(SourceLoc byLoc, TypeLoc delegateTypeLoc)
-      : byLoc(byLoc), delegateTypeLoc(delegateTypeLoc) { }
+    AttachedPropertyDelegateInfo(SourceLoc byLoc,
+                                 AccessLevel access,
+                                 SourceLoc accessLoc,
+                                 TypeLoc delegateTypeLoc)
+      : byLoc(byLoc), access(access), accessLoc(accessLoc),
+        delegateTypeLoc(delegateTypeLoc) { }
   };
 }
 
@@ -5081,7 +5087,10 @@ Type &ASTContext::getDefaultTypeRequestCache(SourceFile *SF,
   return getImpl().DefaultTypeRequestCaches[SF][size_t(kind)];
 }
 
-void VarDecl::addPropertyDelegate(SourceLoc byLoc, TypeLoc typeLoc) {
+void VarDecl::addPropertyDelegate(SourceLoc byLoc,
+                                  AccessLevel access,
+                                  SourceLoc accessLoc,
+                                  TypeLoc typeLoc) {
   assert(!hasPropertyDelegate());
   Bits.VarDecl.HasPropertyDelegate = true;
 
@@ -5089,12 +5098,22 @@ void VarDecl::addPropertyDelegate(SourceLoc byLoc, TypeLoc typeLoc) {
   void *mem = ctx.Allocate(sizeof(AttachedPropertyDelegateInfo),
                            alignof(AttachedPropertyDelegateInfo));
   ctx.getImpl().AttachedPropertyDelegates[this] =
-      new (mem) AttachedPropertyDelegateInfo(byLoc, typeLoc);
+      new (mem) AttachedPropertyDelegateInfo(byLoc, access, accessLoc, typeLoc);
 }
 
 SourceLoc VarDecl::getPropertyDelegateByLoc() const {
   assert(hasPropertyDelegate());
   return getASTContext().getImpl().AttachedPropertyDelegates[this]->byLoc;
+}
+
+AccessLevel VarDecl::getPropertyDelegateFormalAccess() const {
+  assert(hasPropertyDelegate());
+  return getASTContext().getImpl().AttachedPropertyDelegates[this]->access;
+}
+
+SourceLoc VarDecl::getPropertyDelegateAccessLoc() const {
+  assert(hasPropertyDelegate());
+  return getASTContext().getImpl().AttachedPropertyDelegates[this]->accessLoc;
 }
 
 TypeLoc &VarDecl::getPropertyDelegateTypeLoc() {

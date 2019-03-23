@@ -4915,8 +4915,18 @@ public:
   /// information.
   TypeLoc &getPropertyDelegateTypeLoc();
 
+  /// Retrieve the formal access level for the attached property delegate.
+  AccessLevel getPropertyDelegateFormalAccess() const;
+
+  /// Retrieve the source location for access specifier of the property
+  /// delegate.
+  SourceLoc getPropertyDelegateAccessLoc() const;
+
   /// Add a property delegate to this variable.
-  void addPropertyDelegate(SourceLoc byLoc, TypeLoc typeLoc);
+  void addPropertyDelegate(SourceLoc byLoc,
+                           AccessLevel access,
+                           SourceLoc accessLoc,
+                           TypeLoc typeLoc);
 
   /// Retrieve the backing variable for the property delegate.
   VarDecl *getPropertyDelegateBackingVar() const;

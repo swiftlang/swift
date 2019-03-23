@@ -248,3 +248,26 @@ public struct HasUsableFromInlineDelegate<T> {
   var y: [T] by InternalDelegate = []
   // expected-error@-1{{property delegate type referenced from a '@usableFromInline' property must be '@usableFromInline' or public}}
 }
+
+// ---------------------------------------------------------------------------
+// Access control for the delegate instance
+// ---------------------------------------------------------------------------
+struct HasPrivateDelegateInstance<T> {
+  var x: [T] by fileprivate WrapperWithInitialValue = []
+  var y: [T] by private WrapperWithInitialValue = [] // expected-note{{'$y' declared here}}
+  var z: [T] by public WrapperWithInitialValue = [] // expected-error{{specified property delegate access 'public' cannot be greater than that of the original property ('internal')}}
+  private(set) var w: [T] by WrapperWithInitialValue = []
+
+  func getStorage(which: Bool) -> WrapperWithInitialValue<[T]> {
+    return which ? $x : $y
+  }
+}
+
+func testPrivateDelegateInstance(p: HasPrivateDelegateInstance<Int>) {
+  _ = p.$x
+  _ = p.$y // expected-error{{'$y' is inaccessible due to 'private' protection level}}
+  _ = p.$w
+
+  var mutableP = p
+  mutableP.$w = p.$w // expected-error{{cannot assign to property: '$w' is immutable}}
+}

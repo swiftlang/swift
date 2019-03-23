@@ -5221,6 +5221,35 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     VarDecl *propertyDelegateVar = nullptr;
     if (Tok.isContextualKeyword("by")) {
       SourceLoc byLoc = consumeToken();
+
+      // Parse the optional access specifier.
+      AccessLevel access = AccessLevel::Internal;
+      SourceLoc accessLoc;
+      switch (Tok.getKind()) {
+      case tok::kw_private:
+        access = AccessLevel::Private;
+        accessLoc = consumeToken(tok::kw_private);
+        break;
+
+      case tok::kw_fileprivate:
+        access = AccessLevel::FilePrivate;
+        accessLoc = consumeToken(tok::kw_fileprivate);
+        break;
+
+      case tok::kw_internal:
+        access = AccessLevel::Internal;
+        accessLoc = consumeToken(tok::kw_internal);
+        break;
+
+      case tok::kw_public:
+        access = AccessLevel::Public;
+        accessLoc = consumeToken(tok::kw_public);
+        break;
+
+      default:
+        break;
+      }
+
       ParserResult<TypeRepr> delegateType =
           parseType(diag::expected_property_delegate_type_after_by);
       if (delegateType.hasCodeCompletion())
@@ -5228,7 +5257,8 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
 
       if (delegateType.isNonNull()) {
         if (auto var = pattern->getSingleVar()) {
-          var->addPropertyDelegate(byLoc, delegateType.get());
+          var->addPropertyDelegate(byLoc, access, accessLoc,
+                                   delegateType.get());
           propertyDelegateVar = var;
         } else {
           // FIXME: Support AnyPattern as well, somehow.

@@ -4306,6 +4306,13 @@ ERROR(property_delegate_type_not_usable_from_inline,none,
       "%select{%select{variable|constant}0|property}1 "
       "must be '@usableFromInline' or public",
       (bool, bool))
+ERROR(property_delegate_access_greater_than_original,none,
+      "specified property delegate access "
+      "'%select{private|fileprivate|internal|public|%error}0' "
+      "cannot be greater than that of "
+      "the original property "
+      "('%select{private|fileprivate|internal|public|open}1')",
+      (AccessLevel, AccessLevel))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

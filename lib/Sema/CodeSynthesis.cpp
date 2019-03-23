@@ -1510,9 +1510,34 @@ VarDecl *swift::getOrSynthesizePropertyDelegateBackingProperty(VarDecl *var) {
   if (dc->getSelfClassDecl())
     makeFinal(ctx, backingVar);
 
-  // FIXME: Extra syntax could escalate the access level.
-  backingVar->overwriteAccess(AccessLevel::Private);
-  backingVar->overwriteSetterAccess(AccessLevel::Private);
+  // Determine the access level for the backing property, which may be
+  // less than that of the original property.
+  AccessLevel varAccess =
+      var->getFormalAccessScope().requiredAccessForDiagnostics();
+  AccessLevel access =
+      std::min(var->getPropertyDelegateFormalAccess(), varAccess);
+
+  // If the access was reduced from what was explicitly specified for the
+  // delegate, complain.
+  if (access < var->getPropertyDelegateFormalAccess()) {
+    SourceLoc accessLoc = var->getPropertyDelegateAccessLoc();
+    if (accessLoc.isValid()) {
+      ctx.Diags.diagnose(accessLoc,
+                         diag::property_delegate_access_greater_than_original,
+                         var->getPropertyDelegateFormalAccess(),
+                         varAccess)
+      .fixItReplace(accessLoc, getAccessLevelSpelling(access));
+    }
+  }
+
+  backingVar->overwriteAccess(access);
+
+  // Determine setter access.
+  AccessLevel setterAccess =
+    std::min(var->getPropertyDelegateFormalAccess(),
+             var->getSetterFormalAccess());
+
+  backingVar->overwriteSetterAccess(setterAccess);
 
   return backingVar;
 }
