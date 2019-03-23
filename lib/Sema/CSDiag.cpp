@@ -2316,6 +2316,25 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
     return false;
   }
 
+  // If we're trying to convert something of type "() -> T" to T, then we
+  // probably meant to call the value.
+  if (auto srcFT = exprType->getAs<AnyFunctionType>()) {
+    if (srcFT->getParams().empty() &&
+        !isUnresolvedOrTypeVarType(srcFT->getResult()) &&
+        CS.TC.isConvertibleTo(srcFT->getResult(), contextualType, CS.DC)) {
+
+      auto locator = CS.getConstraintLocator(expr);
+      auto extendedLocator =
+          CS.getConstraintLocator(locator, ConstraintLocator::ContextualType);
+      ContextualFailure failure = ContextualFailure(
+          nullptr, CS, srcFT, contextualType, extendedLocator);
+      auto diagnosed = failure.diagnoseAsError();
+      assert(diagnosed && "Failed to produce contextual failure diagnostic");
+      (void)diagnosed;
+      return true;
+    }
+  }
+
   // If this is a conversion from T to () in a call argument context, it is
   // almost certainly an extra argument being passed in.
   if (CTP == CTP_CallArgument && contextualType->isVoid()) {

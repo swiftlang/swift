@@ -1357,7 +1357,11 @@ bool ContextualFailure::diagnoseMissingFunctionCall() const {
   //
   // Let's offer another fix-it to remove the '=' to turn the stored
   // property into a computed property. If the variable is immutable, then
-  // replace the 'let' with a 'var'
+  // replace the 'let' with a 'var'.
+
+  if (getAnchor() && !isa<ClosureExpr>(getAnchor())) {
+    return true;
+  }
 
   // First, check if the variable is declared top level or not. If it is
   // not, then it means we're inside a decl like a class or an extension.

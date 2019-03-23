@@ -1994,10 +1994,9 @@ repairFailures(ConstraintSystem &cs, Type lhs, Type rhs,
       auto *fix = ContextualMismatch::create(cs, lhs, rhs,
                                              cs.getConstraintLocator(locator));
       conversionsOrFixes.push_back(fix);
-      break;
     }
 
-    return;
+    break;
   }
 
   default:
