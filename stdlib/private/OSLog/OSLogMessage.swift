@@ -25,6 +25,7 @@ public enum IntFormat {
   case decimal
   case hex
   case octal
+  case binary
 }
 
 /// Privacy qualifiers for indicating the privacy level of the logged data
@@ -232,6 +233,8 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
       formatSpecifier += "x"
     case .octal:
       formatSpecifier += "o"
+    case .binary:
+      formatSpecifier += "b"
     default:
       formatSpecifier += isSigned ? "d" : "u"
     }

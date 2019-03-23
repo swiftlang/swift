@@ -37,6 +37,9 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
       level: .fault,
       "Invalid address: 0x\(addr, format: .hex, privacy: .public)")
 
+    let flag = 0b1011
+    h.log(level: .debug, "Flag: \(flag, format: .binary)")
+
     // Test logging with multiple arguments.
     let filePermissions = 0o777
     let pid = 122225
