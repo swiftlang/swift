@@ -172,6 +172,12 @@ foreach(SDK ${SWIFT_SDKS})
     set(validation_test_bin_dir
         "${CMAKE_CURRENT_BINARY_DIR}/../validation-test${VARIANT_SUFFIX}")
 
+    if(LibXml2_FOUND)
+      set(SWIFT_HAVE_LIBXML2 TRUE)
+    else()
+      set(SWIFT_HAVE_LIBXML2 FALSE)
+    endif()
+
     swift_configure_lit_site_cfg(
         "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
         "${test_bin_dir}/lit.site.cfg"
