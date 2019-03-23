@@ -4918,8 +4918,7 @@ public:
   /// Retrieve the formal access level for the attached property delegate.
   AccessLevel getPropertyDelegateFormalAccess() const;
 
-  /// Retrieve the source location for access specifier of the property
-  /// delegate.
+  /// Retrieve the source location for access specifier of the property.
   SourceLoc getPropertyDelegateAccessLoc() const;
 
   /// Add a property delegate to this variable.

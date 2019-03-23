@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "CodeSynthesis.h"
 #include "TypeChecker.h"
 #include "TypeCheckAccess.h"
 #include "swift/AST/AccessScopeChecker.h"
@@ -514,7 +515,11 @@ public:
 
     // Check the property delegate type.
     if (anyVar->hasPropertyDelegate()) {
-      checkTypeAccess(anyVar->getPropertyDelegateTypeLoc(), anyVar,
+      auto backingVar = getOrSynthesizePropertyDelegateBackingProperty(anyVar);
+      if (!backingVar)
+        return;
+
+      checkTypeAccess(anyVar->getPropertyDelegateTypeLoc(), backingVar,
                       /*mayBeInferred=*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
@@ -1123,10 +1128,12 @@ public:
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {
-        auto diag = TC.diagnose(
-            anyVar->getPropertyDelegateByLoc(),
-            diag::property_delegate_type_not_usable_from_inline,
-            anyVar->isLet(), isTypeContext);
+        auto diagID = diag::property_delegate_type_not_usable_from_inline;
+        if (fixedLayoutStructContext)
+          diagID = diag::pattern_type_not_usable_from_inline_fixed_layout;
+
+        auto diag = TC.diagnose(anyVar->getPropertyDelegateByLoc(),
+                                diagID, anyVar->isLet(), isTypeContext);
         highlightOffendingType(TC, diag, complainRepr);
       });
     }

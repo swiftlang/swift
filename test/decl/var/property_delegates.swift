@@ -233,6 +233,9 @@ struct HasPrivateDelegate<T> {
 
   var y: [T] by PrivateDelegate = []
   // expected-error@-1{{property must be declared private because its property delegate type uses a private type}}
+
+  // Okay to reference private entities from a private delegate instance
+  var z: [T] by private PrivateDelegate
 }
 
 public struct HasUsableFromInlineDelegate<T> {
