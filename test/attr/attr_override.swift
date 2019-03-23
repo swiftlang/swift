@@ -40,7 +40,7 @@ class A {
   var v9: Int { return 5 } // expected-note{{attempt to override property here}}
   var v10: Int { return 5 } // expected-note{{attempt to override property here}}
 
-  subscript (i: Int) -> String { // expected-note{{potential overridden subscript 'subscript(_:)' here}}
+  subscript (i: Int) -> String { // expected-note{{potential overridden subscript 'subscript(_:)' here}} expected-note{{potential overridden subscript 'subscript(_:)' here}}
     get {
       return "hello"
     }
@@ -49,7 +49,7 @@ class A {
     }
   }
 
-  subscript (d: Double) -> String { // expected-note{{overridden declaration is here}} expected-note{{potential overridden subscript 'subscript(_:)' here}}
+  subscript (d: Double) -> String { // expected-note{{overridden declaration is here}} expected-note{{potential overridden subscript 'subscript(_:)' here}} expected-note{{potential overridden subscript 'subscript(_:)' here}}
     get {
       return "hello"
     }
@@ -57,16 +57,34 @@ class A {
     set {
     }
   }
+  
+  class subscript (i: String) -> String { // expected-note{{overridden declaration is here}} expected-note{{potential overridden subscript 'subscript(_:)' here}}
+    get {
+      return "hello"
+    }
+    
+    set {
+    }
+  }
+  
+  class subscript (a: [Int]) -> String { // expected-note{{potential overridden subscript 'subscript(_:)' here}}
+    get {
+      return "hello"
+    }
+    
+    set {
+    }
+  }
 
-  subscript (i: Int8) -> A { // expected-note{{potential overridden subscript 'subscript(_:)' here}}
+  subscript (i: Int8) -> A { // expected-note{{potential overridden subscript 'subscript(_:)' here}} expected-note{{potential overridden subscript 'subscript(_:)' here}}
     get { return self }
   }
 
-  subscript (i: Int16) -> A { // expected-note{{attempt to override subscript here}} expected-note{{potential overridden subscript 'subscript(_:)' here}}
+  subscript (i: Int16) -> A { // expected-note{{attempt to override subscript here}} expected-note{{potential overridden subscript 'subscript(_:)' here}} expected-note{{potential overridden subscript 'subscript(_:)' here}}
     get { return self }
     set { }
   }
-
+  
   func overriddenInExtension() {} // expected-note {{overr}}
 }
 
@@ -120,6 +138,51 @@ class B : A {
       return "hello"
     }
 
+    set {
+    }
+  }
+  
+  override class subscript (i: Int) -> String { // expected-error{{subscript does not override any subscript from its superclass}}
+    get {
+      return "hello"
+    }
+    
+    set {
+    }
+  }
+  
+  static subscript (i: String) -> String { // expected-error{{overriding declaration requires an 'override' keyword}} {{10-10=override }}
+    get {
+      return "hello"
+    }
+    
+    set {
+    }
+  }
+  
+  static subscript (i: Double) -> String {
+    get {
+      return "hello"
+    }
+    
+    set {
+    }
+  }
+  
+  override class subscript (a: [Int]) -> String {
+    get {
+      return "hello"
+    }
+    
+    set {
+    }
+  }
+  
+  override subscript (a: [Int]) -> String { // expected-error{{subscript does not override any subscript from its superclass}}
+    get {
+      return "hello"
+    }
+    
     set {
     }
   }

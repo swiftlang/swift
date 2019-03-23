@@ -234,30 +234,21 @@ static bool areOverrideCompatibleSimple(ValueDecl *decl,
   if (parentDecl->isInvalid())
     return false;
 
-  if (auto func = dyn_cast<FuncDecl>(decl)) {
-    // Specific checking for methods.
-    auto parentFunc = cast<FuncDecl>(parentDecl);
-    if (func->isStatic() != parentFunc->isStatic())
-      return false;
-    if (func->isGeneric() != parentFunc->isGeneric())
-      return false;
-  } else if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
-    auto parentCtor = cast<ConstructorDecl>(parentDecl);
-    if (ctor->isGeneric() != parentCtor->isGeneric())
-      return false;
+  // If their staticness is different, they aren't compatible.
+  if (decl->isStatic() != parentDecl->isStatic())
+    return false;
 
-    // Factory initializers cannot be overridden.
-    if (parentCtor->isFactoryInit())
-      return false;
-  } else if (auto var = dyn_cast<VarDecl>(decl)) {
-    auto parentVar = cast<VarDecl>(parentDecl);
-    if (var->isStatic() != parentVar->isStatic())
-      return false;
-  } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
-    auto parentSubscript = cast<SubscriptDecl>(parentDecl);
-    if (subscript->isGeneric() != parentSubscript->isGeneric())
+  // If their genericity is different, they aren't compatible.
+  if (auto genDecl = decl->getAsGenericContext()) {
+    auto genParentDecl = parentDecl->getAsGenericContext();
+    if (genDecl->isGeneric() != genParentDecl->isGeneric())
       return false;
   }
+
+  // Factory initializers cannot be overridden.
+  if (auto parentCtor = dyn_cast<ConstructorDecl>(parentDecl))
+    if (parentCtor->isFactoryInit())
+      return false;
 
   return true;
 }

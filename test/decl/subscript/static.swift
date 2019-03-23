@@ -24,3 +24,13 @@ class Dyn {
 
 print(Dyn.foo)
 print(Dyn.bar)
+
+class Base {
+  static subscript(_ i: Int) -> String { return "Base" }
+}
+class DerivedGood: Base {
+  override static subscript(_ i: Int) -> String { return "DerivedGood" }
+}
+
+print(DerivedGood[0])
+
