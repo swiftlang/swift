@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 5
 
 @propertyDelegate
 struct Wrapper<T> { // expected-note{{generic struct 'Wrapper' declared here}}
@@ -219,3 +219,32 @@ struct UsesNestedDelegate<V> {
   var y: [V] by HasNestedDelegate<V>.NestedDelegate
 }
 
+// ---------------------------------------------------------------------------
+// Access control
+// ---------------------------------------------------------------------------
+struct HasPrivateDelegate<T> {
+  @propertyDelegate
+  private struct PrivateDelegate<U> { // expected-note{{type declared here}}
+    var value: U
+    init(initialValue: U) {
+      self.value = initialValue
+    }
+  }
+
+  var y: [T] by PrivateDelegate = []
+  // expected-error@-1{{property must be declared private because its property delegate type uses a private type}}
+}
+
+public struct HasUsableFromInlineDelegate<T> {
+  @propertyDelegate
+  struct InternalDelegate<U> { // expected-note{{type declared here}}
+    var value: U
+    init(initialValue: U) {
+      self.value = initialValue
+    }
+  }
+
+  @usableFromInline
+  var y: [T] by InternalDelegate = []
+  // expected-error@-1{{property delegate type referenced from a '@usableFromInline' property must be '@usableFromInline' or public}}
+}
