@@ -43,16 +43,6 @@ struct Generic<T: TensorGroup & Equatable, U: TensorGroup & Equatable> : TensorG
   var u: U
 }
 
-struct NestedGeneric<T: TensorGroup & Equatable> {
-  struct Nested<U: TensorGroup & Equatable> {
-    struct UltraNested<V: TensorGroup & Equatable> : TensorGroup, Equatable {
-      var a: Generic<T, U>
-      var b: Generic<U, V>
-      var c: Generic<T, V>
-    }
-  }
-}
-
 TensorGroupTests.test("EmptyTypeList") {
   expectEqual([], Empty._typeList)
 }
@@ -171,55 +161,70 @@ TensorGroupTests.test("GenericInit") {
 }
 
 TensorGroupTests.test("NestedGenericTypeList") {
-  let float = Float.tensorFlowDataType
-  let int = Int32.tensorFlowDataType
-  expectEqual(
-    [float, float, float, int, 
-     float, int, float, 
-     float, float, float],
-    NestedGeneric<Simple>.Nested<Mixed>.UltraNested<Tensor<Float>>._typeList)
+  struct NestedGeneric {
+    func function() {
+      struct UltraNested<T: TensorGroup & Equatable, V: TensorGroup & Equatable> : TensorGroup, Equatable {
+        var a: Generic<T, V>
+        var b: Generic<V, T>
+      }
+      let float = Float.tensorFlowDataType
+      let int = Int32.tensorFlowDataType
+      expectEqual(
+        [float, float, float, int,
+        float, int, float, float],
+        UltraNested<Simple, Mixed>._typeList)
+    }
+  }
+
+  NestedGeneric().function()
 }
 
 TensorGroupTests.test("NestedGenericInit") {
-  let w = Tensor<Float>(0.1)
-  let b = Tensor<Float>(0.1)
-  let simple = Simple(w: w, b: b)
-  let float = Tensor<Float>(0.1)
-  let int = Tensor<Int32>(1)
-  let mixed = Mixed(float: float, int: int)
-  let genericSM = Generic<Simple, Mixed>(t: simple, u: mixed)
-  let genericMF = Generic<Mixed, Tensor<Float>>(t: mixed, u: w)
-  let genericSF = Generic<Simple, Tensor<Float>>(t: simple, u: w)
-  let generic = NestedGeneric.Nested.UltraNested(a: genericSM, b: genericMF, c: genericSF)
+  struct NestedGeneric {
+    func function() {
+      struct UltraNested<T: TensorGroup & Equatable, V: TensorGroup & Equatable> : TensorGroup, Equatable {
+        var a: Generic<T, V>
+        var b: Generic<V, T>
+      }
 
-  let status = TF_NewStatus()
-  let wHandle1 = TFE_TensorHandleCopySharingTensor(w.handle._cTensorHandle, status)!
-  let wHandle2 = TFE_TensorHandleCopySharingTensor(w.handle._cTensorHandle, status)!
-  let wHandle3 = TFE_TensorHandleCopySharingTensor(w.handle._cTensorHandle, status)!
-  let wHandle4 = TFE_TensorHandleCopySharingTensor(w.handle._cTensorHandle, status)!
-  let bHandle1 = TFE_TensorHandleCopySharingTensor(b.handle._cTensorHandle, status)!
-  let bHandle2 = TFE_TensorHandleCopySharingTensor(b.handle._cTensorHandle, status)!
-  let floatHandle1 = TFE_TensorHandleCopySharingTensor(float.handle._cTensorHandle, status)!
-  let floatHandle2 = TFE_TensorHandleCopySharingTensor(float.handle._cTensorHandle, status)!
-  let intHandle1 = TFE_TensorHandleCopySharingTensor(int.handle._cTensorHandle, status)!
-  let intHandle2 = TFE_TensorHandleCopySharingTensor(int.handle._cTensorHandle, status)!
-  TF_DeleteStatus(status)
+      let w = Tensor<Float>(0.1)
+      let b = Tensor<Float>(0.1)
+      let simple = Simple(w: w, b: b)
+      let float = Tensor<Float>(0.1)
+      let int = Tensor<Int32>(1)
+      let mixed = Mixed(float: float, int: int)
+      let genericSM = Generic<Simple, Mixed>(t: simple, u: mixed)
+      let genericMS = Generic<Mixed, Simple>(t: mixed, u: simple)
+      let generic = UltraNested(a: genericSM, b: genericMS)
 
-  let buffer = UnsafeMutableBufferPointer<CTensorHandle>.allocate(capacity: 10)
-  buffer.baseAddress?.initialize(to: wHandle1)
-  buffer.baseAddress?.advanced(by: 1).initialize(to: bHandle1)
-  buffer.baseAddress?.advanced(by: 2).initialize(to: floatHandle1)
-  buffer.baseAddress?.advanced(by: 3).initialize(to: intHandle1)
-  buffer.baseAddress?.advanced(by: 4).initialize(to: floatHandle2)
-  buffer.baseAddress?.advanced(by: 5).initialize(to: intHandle2)
-  buffer.baseAddress?.advanced(by: 6).initialize(to: wHandle2)
-  buffer.baseAddress?.advanced(by: 7).initialize(to: wHandle3)
-  buffer.baseAddress?.advanced(by: 8).initialize(to: bHandle2)
-  buffer.baseAddress?.advanced(by: 9).initialize(to: wHandle4)
-  let expectedGeneric = NestedGeneric<Simple>.Nested<Mixed>.UltraNested<Tensor<Float>>(
-    _owning: UnsafePointer(buffer.baseAddress))
+      let status = TF_NewStatus()
+      let wHandle1 = TFE_TensorHandleCopySharingTensor(w.handle._cTensorHandle, status)!
+      let wHandle2 = TFE_TensorHandleCopySharingTensor(w.handle._cTensorHandle, status)!
+      let bHandle1 = TFE_TensorHandleCopySharingTensor(b.handle._cTensorHandle, status)!
+      let bHandle2 = TFE_TensorHandleCopySharingTensor(b.handle._cTensorHandle, status)!
+      let floatHandle1 = TFE_TensorHandleCopySharingTensor(float.handle._cTensorHandle, status)!
+      let floatHandle2 = TFE_TensorHandleCopySharingTensor(float.handle._cTensorHandle, status)!
+      let intHandle1 = TFE_TensorHandleCopySharingTensor(int.handle._cTensorHandle, status)!
+      let intHandle2 = TFE_TensorHandleCopySharingTensor(int.handle._cTensorHandle, status)!
+      TF_DeleteStatus(status)
 
-  expectEqual(expectedGeneric, generic)
+      let buffer = UnsafeMutableBufferPointer<CTensorHandle>.allocate(capacity: 8)
+      buffer.baseAddress?.initialize(to: wHandle1)
+      buffer.baseAddress?.advanced(by: 1).initialize(to: bHandle1)
+      buffer.baseAddress?.advanced(by: 2).initialize(to: floatHandle1)
+      buffer.baseAddress?.advanced(by: 3).initialize(to: intHandle1)
+      buffer.baseAddress?.advanced(by: 4).initialize(to: floatHandle2)
+      buffer.baseAddress?.advanced(by: 5).initialize(to: intHandle2)
+      buffer.baseAddress?.advanced(by: 6).initialize(to: wHandle2)
+      buffer.baseAddress?.advanced(by: 7).initialize(to: bHandle2)
+      let expectedGeneric = UltraNested<Simple, Mixed>(
+        _owning: UnsafePointer(buffer.baseAddress))
+
+      expectEqual(expectedGeneric, generic)
+    }
+  }
+
+  NestedGeneric().function()
 }
 
 runAllTests()
