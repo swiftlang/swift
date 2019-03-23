@@ -3667,6 +3667,8 @@ ERROR(objc_invalid_on_var,none,
 ERROR(objc_invalid_on_subscript,none,
       "subscript cannot be %" OBJC_ATTR_SELECT "0 because its type "
       "cannot be represented in Objective-C", (unsigned))
+ERROR(objc_invalid_on_static_subscript,none,
+      "%0 cannot be %" OBJC_ATTR_SELECT "1", (DescriptiveDeclKind, unsigned))
 ERROR(objc_invalid_with_generic_params,none,
       "method cannot be %" OBJC_ATTR_SELECT "0 because it has generic "
       "parameters", (unsigned))

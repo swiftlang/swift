@@ -32,3 +32,8 @@ class BadDerived: BadBase {
   override static subscript(_ i: Int) -> String { return "DerivedGood" } // expected-error{{cannot override static subscript}}
 }
 
+class NSThingy {
+  @objc class subscript(_ i: Int) -> AnyObject? { // expected-error{{class subscript cannot be marked @objc}}
+    return nil
+  }
+}
