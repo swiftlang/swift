@@ -47,11 +47,11 @@ print(MyStruct[keyPath: kp])
 let dynKP = \Dyn.Type.foo
 print(dynKP)
 print(Dyn.self[keyPath: dynKP])
-class Base {
-  static subscript(_ i: Int) -> String { return "Base" }
+
+class BadBase {
+  static subscript(_ i: Int) -> String { return "Base" } // expected-note{{overridden declaration is here}}
 }
-class DerivedGood: Base {
-  override static subscript(_ i: Int) -> String { return "DerivedGood" }
+class BadDerived: BadBase {
+  override static subscript(_ i: Int) -> String { return "DerivedGood" } // expected-error{{cannot override static subscript}}
 }
 
-print(DerivedGood[0])
