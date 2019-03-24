@@ -158,6 +158,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         PBD->setPattern(idx, Pat, entry.getInitContext());
       else
         return true;
+
+      // Visit property delegate.
+      if (auto singleVar = PBD->getSingleVar()) {
+        if (singleVar->hasPropertyDelegate() &&
+            doIt(singleVar->getPropertyDelegateTypeLoc()))
+          return true;
+      }
+
       if (entry.getInit() &&
           (!entry.isInitializerSubsumed() ||
            Walker.shouldWalkIntoLazyInitializers())) {
