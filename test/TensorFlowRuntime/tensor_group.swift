@@ -62,8 +62,8 @@ TensorGroupTests.test("SimpleInit") {
   let bHandle = TFE_TensorHandleCopySharingTensor(b.handle._cTensorHandle, status)!
   TF_DeleteStatus(status)
 
-  let buffer = UnsafeMutableBufferPointer<CTensorHandle>.initialize(
-    from: [wHandle, bHandle])
+  let buffer = UnsafeMutableBufferPointer<CTensorHandle>.allocate(capacity: 2)
+  buffer.initialize(from: [wHandle, bHandle])
   let expectedSimple = Simple(_owning: UnsafePointer(buffer.baseAddress))
 
   expectEqual(expectedSimple, simple)
@@ -85,8 +85,8 @@ TensorGroupTests.test("MixedInit") {
   let intHandle = TFE_TensorHandleCopySharingTensor(int.handle._cTensorHandle, status)!
   TF_DeleteStatus(status)
 
-  let buffer = UnsafeMutableBufferPointer<CTensorHandle>.initialize(
-    from: [floatHandle, intHandle])
+  let buffer = UnsafeMutableBufferPointer<CTensorHandle>.allocate(capacity: 2)
+  buffer.initialize(from: [floatHandle, intHandle])
   let expectedMixed = Mixed(_owning: UnsafePointer(buffer.baseAddress))
 
   expectEqual(expectedMixed, mixed)
@@ -114,8 +114,8 @@ TensorGroupTests.test("NestedInit") {
   let intHandle = TFE_TensorHandleCopySharingTensor(int.handle._cTensorHandle, status)!
   TF_DeleteStatus(status)
 
-  let buffer = UnsafeMutableBufferPointer<CTensorHandle>.initialize(
-    from: [wHandle, bHandle, floatHandle, intHandle])
+  let buffer = UnsafeMutableBufferPointer<CTensorHandle>.allocate(capacity: 4)
+  buffer.initialize(from: [wHandle, bHandle, floatHandle, intHandle])
   let expectedNested = Nested(_owning: UnsafePointer(buffer.baseAddress))
 
   expectEqual(expectedNested, nested)
@@ -143,8 +143,8 @@ TensorGroupTests.test("GenericInit") {
   let intHandle = TFE_TensorHandleCopySharingTensor(int.handle._cTensorHandle, status)!
   TF_DeleteStatus(status)
 
-  let buffer = UnsafeMutableBufferPointer<CTensorHandle>.initialize(
-    from: [wHandle, bHandle, floatHandle,  intHandle])
+  let buffer = UnsafeMutableBufferPointer<CTensorHandle>.allocate(capacity: 4)
+  buffer.initialize(from: [wHandle, bHandle, floatHandle, intHandle])
   let expectedGeneric = Generic<Simple, Mixed>(_owning: UnsafePointer(buffer.baseAddress))
 
   expectEqual(expectedGeneric, generic)
@@ -196,9 +196,9 @@ TensorGroupTests.test("NestedGenericInit") {
       let intHandle2 = TFE_TensorHandleCopySharingTensor(int.handle._cTensorHandle, status)!
       TF_DeleteStatus(status)
 
-      let buffer = UnsafeMutableBufferPointer<CTensorHandle>.initialize(
-        from: [wHandle1, bHandle1, floatHandle1,  intHandle1,
-               floatHandle2, intHandle2, wHandle2, bHandle2])
+      let buffer = UnsafeMutableBufferPointer<CTensorHandle>.allocate(capacity: 8)
+      buffer.initialize(from: [wHandle1, bHandle1, floatHandle1,  intHandle1,
+                               floatHandle2, intHandle2, wHandle2, bHandle2])
       let expectedGeneric = UltraNested<Simple, Mixed>(
         _owning: UnsafePointer(buffer.baseAddress))
 

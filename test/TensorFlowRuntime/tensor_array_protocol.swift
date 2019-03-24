@@ -54,8 +54,8 @@ TensorArrayProtocolTests.test("SimpleUnpackTensorHandles") {
   let simple = Simple(w: w, b: b)
   let buffer = UnsafeMutablePointer<CTensorHandle>.allocate(capacity: 2)
   simple._unpackTensorHandles(into: buffer)
-  let expectedBuffer = UnsafeMutableBufferPointer<CTensorHandle>.initialize(
-    from: [w.handle._cTensorHandle, b.handle._cTensorHandle])
+  let expectedBuffer = UnsafeMutableBufferPointer<CTensorHandle>.allocate(capacity: 2)
+  expectedBuffer.initialize(from: [w.handle._cTensorHandle, b.handle._cTensorHandle])
   expectEqual(expectedBuffer[0], buffer[0])
   expectEqual(expectedBuffer[1], buffer[1])
 }
@@ -75,7 +75,8 @@ TensorArrayProtocolTests.test("MixedUnpackTensorHandles") {
   let mixed = Mixed(string: string, float: float, int: int)
   let buffer = UnsafeMutablePointer<CTensorHandle>.allocate(capacity: 3)
   mixed._unpackTensorHandles(into: buffer)
-  let expectedBuffer = UnsafeMutableBufferPointer<CTensorHandle>.initialize(
+  let expectedBuffer = UnsafeMutableBufferPointer<CTensorHandle>.allocate(capacity: 3)
+  expectedBuffer.initialize(
     from: [string.handle._cTensorHandle, float.handle._cTensorHandle, 
            int.handle._cTensorHandle])
   expectEqual(expectedBuffer[0], buffer[0])
@@ -106,7 +107,8 @@ TensorArrayProtocolTests.test("NestedUnpackTensorHandles") {
   let nested = Nested(simple: simple, mixed: mixed)
   let buffer = UnsafeMutablePointer<CTensorHandle>.allocate(capacity: 5)
   nested._unpackTensorHandles(into: buffer)
-  let expectedBuffer = UnsafeMutableBufferPointer<CTensorHandle>.initialize(
+  let expectedBuffer = UnsafeMutableBufferPointer<CTensorHandle>.allocate(capacity: 5)
+  expectedBuffer.initialize(
     from: [w.handle._cTensorHandle, b.handle._cTensorHandle, 
            string.handle._cTensorHandle, float.handle._cTensorHandle, 
            int.handle._cTensorHandle])
@@ -140,7 +142,8 @@ TensorArrayProtocolTests.test("GenericUnpackTensorHandles") {
   let generic = Generic<Simple, Mixed>(t: simple, u: mixed)
   let buffer = UnsafeMutablePointer<CTensorHandle>.allocate(capacity: 5)
   generic._unpackTensorHandles(into: buffer)
-  let expectedBuffer = UnsafeMutableBufferPointer<CTensorHandle>.initialize(
+  let expectedBuffer = UnsafeMutableBufferPointer<CTensorHandle>.allocate(capacity: 5)
+  expectedBuffer.initialize(
     from: [w.handle._cTensorHandle, b.handle._cTensorHandle, 
            string.handle._cTensorHandle, float.handle._cTensorHandle, 
            int.handle._cTensorHandle])
@@ -194,7 +197,8 @@ TensorArrayProtocolTests.test("NestedGenericUnpackTensorHandles") {
       let nested = UltraNested<Simple, Mixed>(a: genericSM, b: genericMS)
       let buffer = UnsafeMutablePointer<CTensorHandle>.allocate(capacity: 10)
       nested._unpackTensorHandles(into: buffer)
-      let expectedBuffer = UnsafeMutableBufferPointer<CTensorHandle>.initialize(
+      let expectedBuffer = UnsafeMutableBufferPointer<CTensorHandle>.allocate(capacity: 10)
+      expectedBuffer.initialize(
         from: [w.handle._cTensorHandle, b.handle._cTensorHandle, 
                string.handle._cTensorHandle, float.handle._cTensorHandle, 
                int.handle._cTensorHandle, string.handle._cTensorHandle, 
