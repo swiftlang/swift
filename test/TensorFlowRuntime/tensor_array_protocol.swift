@@ -195,11 +195,11 @@ TensorArrayProtocolTests.test("NestedGenericUnpackTensorHandles") {
       let buffer = UnsafeMutablePointer<CTensorHandle>.allocate(capacity: 10)
       nested._unpackTensorHandles(into: buffer)
       let expectedBuffer = UnsafeMutableBufferPointer<CTensorHandle>.initialize(
-    from: [w.handle._cTensorHandle, b.handle._cTensorHandle, 
-           string.handle._cTensorHandle, float.handle._cTensorHandle, 
-           int.handle._cTensorHandle, string.handle._cTensorHandle, 
-           float.handle._cTensorHandle, int.handle._cTensorHandle, 
-           w.handle._cTensorHandle, b.handle._cTensorHandle])
+        from: [w.handle._cTensorHandle, b.handle._cTensorHandle, 
+              string.handle._cTensorHandle, float.handle._cTensorHandle, 
+              int.handle._cTensorHandle, string.handle._cTensorHandle, 
+              float.handle._cTensorHandle, int.handle._cTensorHandle, 
+              w.handle._cTensorHandle, b.handle._cTensorHandle])
       expectEqual(expectedBuffer[0], buffer[0])
       expectEqual(expectedBuffer[1], buffer[1])
       expectEqual(expectedBuffer[2], buffer[2])
