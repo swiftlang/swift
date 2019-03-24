@@ -571,7 +571,7 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
   @inlinable
   func _vjpMean() -> (Tensor, (Tensor) -> Tensor) {
     return (mean(), { [shape = shapeTensor, count = scalarCountTensor] in
-      $0.broadcast(toShape: shape) / Tensor(count)
+      ($0 / Tensor(count)).broadcast(toShape: shape)
     })
   }
 
