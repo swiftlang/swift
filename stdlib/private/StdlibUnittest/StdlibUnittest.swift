@@ -107,7 +107,7 @@ fileprivate struct AtomicBool {
     
     private var _value = _stdlib_AtomicInt
     
-    public init(_ b: Bool) { self._value = _stdlib_AtomicInt(b ? 1 : 0) }
+    init(_ b: Bool) { self._value = _stdlib_AtomicInt(b ? 1 : 0) }
     
     func store(_ b: Bool) { _value.store(b ? 1 : 0) }
     
