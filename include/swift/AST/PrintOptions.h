@@ -250,7 +250,10 @@ struct PrintOptions {
 
   /// Whether to skip placeholder members.
   bool SkipMissingMemberPlaceholders = true;
-  
+
+  /// Whether to skip property delegates attached to properties.
+  bool SkipPropertyDelegates = false;
+
   /// Whether to print a long attribute like '\@available' on a separate line
   /// from the declaration or other attributes.
   bool PrintLongAttrsOnSeparateLines = false;

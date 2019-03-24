@@ -181,6 +181,8 @@ PrintOptions PrintOptions::printParseableInterfaceFile() {
   // the default to 'public' and mark the 'internal' things.
   result.PrintAccess = true;
 
+  result.SkipPropertyDelegates = true;
+
   result.ExcludeAttrList = {DAK_ImplicitlyUnwrappedOptional, DAK_AccessControl,
                             DAK_SetterAccess, DAK_Lazy};
 
@@ -745,6 +747,11 @@ class PrintAST : public ASTVisitor<PrintAST> {
   void printTypedPattern(const TypedPattern *TP);
   void printBraceStmt(const BraceStmt *stmt, bool newlineIfEmpty = true);
   void printAccessorDecl(const AccessorDecl *decl);
+
+  /// Print the property delegate reference ("by ...") for the given
+  /// variable, if there is one.
+  /// \returns true if the property delegate was printed, false otherwise.
+  bool maybePrintPropertyDelegate(const VarDecl *decl);
 
 public:
   void printPattern(const Pattern *pattern);
@@ -1860,6 +1867,25 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   indent();
 }
 
+bool PrintAST::maybePrintPropertyDelegate(const VarDecl *decl) {
+  if (!decl->hasPropertyDelegate() || Options.SkipPropertyDelegates)
+    return false;
+
+  auto backingVar = decl->getPropertyDelegateBackingVar();
+  if (backingVar && !isPublicOrUsableFromInline(backingVar))
+    return false;
+
+  if (!backingVar &&
+      decl->getPropertyDelegateFormalAccess() < AccessLevel::Public)
+    return false;
+
+  Printer << " by ";
+  printAccess(backingVar ? backingVar->getFormalAccess()
+                         : decl->getPropertyDelegateFormalAccess());
+  printTypeLoc(decl->getPropertyDelegateTypeLoc());
+  return true;
+}
+
 void PrintAST::printMembersOfDecl(Decl *D, bool needComma,
                                   bool openBracket,
                                   bool closeBracket) {
@@ -2147,6 +2173,12 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
       printPatternType(entry.getPattern());
     }
 
+    // Determine whether we have a property delegate that will be printed.
+    bool isPropertyDelegate = false;
+    if (auto var = decl->getSingleVar()) {
+      isPropertyDelegate = maybePrintPropertyDelegate(var);
+    }
+
     if (Options.VarInitializers) {
       auto vd = entry.getAnchoringVarDecl();
       if (entry.hasInitStringRepresentation() &&
@@ -2159,8 +2191,13 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
     // If we're just printing a single pattern and it has accessors,
     // print the accessors here. It is an error to add accessors to a
     // pattern binding with multiple entries.
-    if (auto var = decl->getSingleVar()) {
-      printAccessors(var);
+    //
+    // Properties that have publicly-accessible delegates don't have their
+    // accessors printed.
+    if (!isPropertyDelegate) {
+      if (auto var = decl->getSingleVar()) {
+        printAccessors(var);
+      }
     }
   }
 }
@@ -2471,7 +2508,8 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
       printTypeLoc(tyLoc);
   }
 
-  printAccessors(decl);
+  if (!maybePrintPropertyDelegate(decl))
+    printAccessors(decl);
 }
 
 void PrintAST::visitParamDecl(ParamDecl *decl) {
