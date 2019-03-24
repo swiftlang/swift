@@ -70,6 +70,15 @@ class A<T> {
     // expected-warning@-1 {{conditional cast from 'Self' to 'Self' always succeeds}}
     // expected-warning@-2 {{conditional downcast from 'Self?' to 'A<T>' is equivalent to an implicit conversion to an optional 'A<T>'}}
   }
+  func copy() -> Self {
+    let copy = Self.init(a: 11)
+    return copy
+  }
+
+  var copied: Self { // expected-error {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'A'?}}
+    let copy = Self.init(a: 11)
+    return copy
+  }
 }
 
 class B: A<Int> {
@@ -87,6 +96,14 @@ class B: A<Int> {
   }
   override class func y() {
     print("override \(Self.self).\(#function)")
+  }
+  override func copy() -> Self {
+    let copy = super.copy() as! Self // supported
+    return copy
+  }
+  override var copied: Self { // expected-error {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'B'?}}
+    let copy = super.copied as! Self // unsupported
+    return copy
   }
 }
 
@@ -121,6 +138,15 @@ struct S2 {
       // expected-warning@-1 {{conditional cast from 'S2.S3<T>' to 'S2.S3<T>' always succeeds}}
     }
   }
+  func copy() -> Self {
+    let copy = Self.init()
+    return copy
+  }
+
+  var copied: Self {
+    let copy = Self.init()
+    return copy
+  }
 }
 
 extension S2 {
@@ -149,29 +175,5 @@ enum E {
   func h(h: Self) -> Self {
     Self.f()
     return .e
-  }
-}
-
-class A1 {
-  required init() {}
-  func copy() -> Self {
-    let copy = Self.init()
-    return copy
-  }
-
-  var copied: Self { // expected-error {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'A1'?}}
-    let copy = Self.init()
-    return copy
-  }
-}
-
-class B1: A1 {
-  override func copy() -> Self {
-    let copy = super.copy() as! Self // supported
-    return copy
-  }
-  override var copied: Self { // expected-error {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'B1'?}}
-    let copy = super.copied as! Self // unsupported
-    return copy
   }
 }
