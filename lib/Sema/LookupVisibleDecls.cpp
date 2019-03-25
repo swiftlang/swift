@@ -388,10 +388,16 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
   NominalTypeDecl *CurrNominal = BaseTy->getAnyNominal();
   if (!CurrNominal)
     return;
+  ModuleDecl *Module = FromContext->getParentModule();
 
   for (auto Conformance : CurrNominal->getAllConformances()) {
     auto Proto = Conformance->getProtocol();
     if (!Proto->isAccessibleFrom(FromContext))
+      continue;
+
+    // Skip unsatisfied conditional conformances.
+    if (Conformance->getConditionalRequirementsIfAvailable() &&
+        !Module->conformsToProtocol(BaseTy, Proto))
       continue;
 
     DeclVisibilityKind ReasonForThisProtocol;
