@@ -328,3 +328,32 @@ func testMemberInitAccess<T>(x: Wrapper<Bool>, y: T) {
   // expected-error@+1{{'PrivateMemberwiseInits<T>' initializer is inaccessible due to 'private' protection level}}
   _ = PrivateMemberwiseInits<T>(x: x, y: y)
 }
+
+// ---------------------------------------------------------------------------
+// Miscellaneous restrictions
+// ---------------------------------------------------------------------------
+enum SomeEnum {
+  case foo
+
+  var bar: Int by Wrapper(value: 17) // expected-error{{property 'bar' declared inside an enum cannot have a delegate}}
+  // expected-error@-1{{cannot convert value of type '(value: Int)' to specified type 'Int'}}
+  
+  static var x by Wrapper(value: 17) // okay
+}
+
+protocol SomeProtocol {
+  var bar: Int by Wrapper(value: 17) // expected-error{{property 'bar' declared inside a protocol cannot have a delegate}}
+  // expected-error@-1{{initial value is not allowed here}}
+  
+  static var x: Int by Wrapper(value: 17) // expected-error{{property 'x' declared inside a protocol cannot have a delegate}}
+  // expected-error@-1{{static stored properties not supported in generic types}}
+  // expected-error@-2{{static stored properties not supported in generic types}}
+  // expected-error@-3{{initial value is not allowed here}}
+}
+
+extension HasDelegate {
+  var inExt: Int by Wrapper(value: 17) // expected-error{{property 'inExt' declared inside an extension cannot have a delegate}}
+  // expected-error@-1{{cannot convert value of type '(value: Int)' to specified type 'Int'}}
+
+  static var x by Wrapper(value: 17) // okay
+}

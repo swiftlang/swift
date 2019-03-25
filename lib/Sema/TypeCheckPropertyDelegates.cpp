@@ -59,6 +59,31 @@ UnboundGenericType *swift::getUnboundPropertyDelegateType(
     }
   }
 
+  // A property with a delegate cannot be declared in a protocol, enum, or
+  // an extension.
+  ASTContext &ctx = var->getASTContext();
+  auto dc = var->getDeclContext();
+  if (isa<ProtocolDecl>(dc) ||
+      (isa<ExtensionDecl>(dc) && var->isInstanceMember()) ||
+      (isa<EnumDecl>(dc) && var->isInstanceMember())) {
+    int whichKind;
+    if (isa<ProtocolDecl>(dc))
+      whichKind = 0;
+    else if (isa<ExtensionDecl>(dc))
+      whichKind = 1;
+    else
+      whichKind = 2;
+    var->diagnose(diag::property_with_delegate_in_bad_context,
+                  var->getFullName(), whichKind)
+      .highlight(SourceRange(var->getPropertyDelegateByLoc(),
+                             var->getPropertyDelegateTypeLoc()
+                               .getSourceRange().End));
+
+    var->getPropertyDelegateTypeLoc().setInvalidType(ctx);
+    var->setInvalid();
+    return nullptr;
+  }
+
   // We haven't resolved the property delegate type yet; do so now.
   SourceLoc byLoc = var->getPropertyDelegateByLoc();
   TypeResolutionOptions options(TypeResolverContext::ProtocolWhereClause);
@@ -66,7 +91,6 @@ UnboundGenericType *swift::getUnboundPropertyDelegateType(
   Type unboundBehaviorType = resolution.resolveType(
       var->getPropertyDelegateTypeLoc().getTypeRepr(), options);
 
-  ASTContext &ctx = var->getASTContext();
   if (!unboundBehaviorType || unboundBehaviorType->hasError()) {
     var->getPropertyDelegateTypeLoc().setInvalidType(ctx);
     return nullptr;

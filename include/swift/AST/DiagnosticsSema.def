@@ -4313,6 +4313,10 @@ ERROR(property_delegate_access_greater_than_original,none,
       "the original property "
       "('%select{private|fileprivate|internal|public|open}1')",
       (AccessLevel, AccessLevel))
+ERROR(property_with_delegate_in_bad_context,none,
+      "%select{|non-static |non-static }1property %0 declared inside "
+      "%select{a protocol|an extension|an enum}1 cannot have a delegate",
+      (DeclName, int))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
