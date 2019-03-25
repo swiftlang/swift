@@ -506,7 +506,7 @@ internal protocol _AnyDerivativeBox {
 
   // `AdditiveArithmetic` requirements.
   static var _zero: _AnyDerivativeBox { get }
-  static var _cotangentZero: _AnyDerivativeBox { get }
+  static var _dualSpaceZero: _AnyDerivativeBox { get }
   func _adding(_ x: _AnyDerivativeBox) -> _AnyDerivativeBox
   func _subtracting(_ x: _AnyDerivativeBox) -> _AnyDerivativeBox
 
@@ -537,10 +537,9 @@ extension _AnyDerivativeBox {
 @inline(never)
 @usableFromInline
 internal func _derivativeTypeMismatch(
-  _ x: Any, _ y: Any, file: StaticString = #file, line: UInt = #line
+  _ x: Any.Type, _ y: Any.Type, file: StaticString = #file, line: UInt = #line
 ) -> Never {
-  fatalError("Derivative type mismatch: \(type(of: x)) and \(type(of: y))",
-             file: file, line: line)
+  fatalError("Derivative type mismatch: \(x) and \(y)", file: file, line: line)
 }
 
 internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
@@ -588,7 +587,7 @@ internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
     return _ConcreteDerivativeBox(T.zero)
   }
 
-  static var _cotangentZero: _AnyDerivativeBox {
+  static var _dualSpaceZero: _AnyDerivativeBox {
     return _ConcreteDerivativeBox<T.CotangentVector>(T.CotangentVector.zero)
   }
 
@@ -602,26 +601,22 @@ internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
       return self
     }
     guard let xBase = x._unboxed(to: T.self) else {
-      _derivativeTypeMismatch(self, x)
+      _derivativeTypeMismatch(T.self, type(of: x._typeErasedBase))
     }
     return _ConcreteDerivativeBox(_base + xBase)
   }
 
   func _subtracting(_ x: _AnyDerivativeBox) -> _AnyDerivativeBox {
-    // 0 - 0 = 0
-    if _isOpaqueZero() && x._isOpaqueZero() {
+    // y - 0 = y
+    if x._isOpaqueZero() {
       return self
     }
     // 0 - x = -x
     if _isOpaqueZero() {
       return type(of: x)._zero._subtracting(x)
     }
-    // y - 0 = y
-    if x._isOpaqueZero() {
-      return self
-    }
     guard let xBase = x._unboxed(to: T.self) else {
-      _derivativeTypeMismatch(self, x)
+      _derivativeTypeMismatch(T.self, type(of: x._typeErasedBase))
     }
     return _ConcreteDerivativeBox(_base - xBase)
   }
@@ -629,9 +624,6 @@ internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
   // `Differentiable` requirements.
 
   var _allDifferentiableVariables: _AnyDerivativeBox {
-    if _isOpaqueZero() {
-      return self
-    }
     return _ConcreteDerivativeBox(_base.allDifferentiableVariables)
   }
 
@@ -644,23 +636,21 @@ internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
     }
     guard let directionBase =
       direction._unboxed(to: T.TangentVector.self) else {
-      _derivativeTypeMismatch(self, direction)
+      _derivativeTypeMismatch(T.self, type(of: direction._typeErasedBase))
     }
-    return _ConcreteDerivativeBox<T>(
-      _base.moved(along: directionBase))
+    return _ConcreteDerivativeBox<T>(_base.moved(along: directionBase))
   }
 
   func _tangentVector(from cotangent: _AnyDerivativeBox) -> _AnyDerivativeBox {
     if _isOpaqueZero() {
-      return type(of: cotangent)._cotangentZero
-        ._tangentVector(from: cotangent)
+      return type(of: cotangent)._dualSpaceZero._tangentVector(from: cotangent)
     }
     if cotangent._isOpaqueZero() {
       return cotangent
     }
     guard let cotangentBase =
       cotangent._unboxed(to: T.CotangentVector.self) else {
-      _derivativeTypeMismatch(self, cotangent)
+      _derivativeTypeMismatch(T.self, type(of: cotangent._typeErasedBase))
     }
     return _ConcreteDerivativeBox<T.TangentVector>(
       _base.tangentVector(from: cotangentBase))
@@ -675,8 +665,8 @@ internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
 public struct AnyDerivative : Differentiable & AdditiveArithmetic {
   internal var _box: _AnyDerivativeBox
 
-  internal init(box: _AnyDerivativeBox) {
-    self._box = box
+  internal init(_box: _AnyDerivativeBox) {
+    self._box = _box
   }
 
   /// The underlying base value.
@@ -716,27 +706,29 @@ public struct AnyDerivative : Differentiable & AdditiveArithmetic {
 
   public static var zero: AnyDerivative {
     return AnyDerivative(
-      box: _ConcreteDerivativeBox<OpaqueZero>(OpaqueZero.zero))
+      _box: _ConcreteDerivativeBox<OpaqueZero>(OpaqueZero.zero))
   }
-  public static func + (lhs: AnyDerivative, rhs: AnyDerivative)
-      -> AnyDerivative {
-    return AnyDerivative(box: lhs._box._adding(rhs._box))
+  public static func + (
+    lhs: AnyDerivative, rhs: AnyDerivative
+  ) -> AnyDerivative {
+    return AnyDerivative(_box: lhs._box._adding(rhs._box))
   }
-  public static func - (lhs: AnyDerivative, rhs: AnyDerivative)
-      -> AnyDerivative {
-    return AnyDerivative(box: lhs._box._subtracting(rhs._box))
+  public static func - (
+    lhs: AnyDerivative, rhs: AnyDerivative
+  ) -> AnyDerivative {
+    return AnyDerivative(_box: lhs._box._subtracting(rhs._box))
   }
 
   // `Differentiable` requirements.
   public var allDifferentiableVariables: AllDifferentiableVariables {
-    get { return AnyDerivative(box: _box._allDifferentiableVariables) }
+    get { return AnyDerivative(_box: _box._allDifferentiableVariables) }
     // set { _box._allDifferentiableVariables = newValue._box }
   }
   public func moved(along direction: TangentVector) -> AnyDerivative {
-    return AnyDerivative(box: _box._moved(along: direction._box))
+    return AnyDerivative(_box: _box._moved(along: direction._box))
   }
   public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
-    return AnyDerivative(box: _box._tangentVector(from: cotangent._box))
+    return AnyDerivative(_box: _box._tangentVector(from: cotangent._box))
   }
 }
 
