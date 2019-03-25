@@ -3637,12 +3637,13 @@ public:
           return false;
       }
 
-      // In optional context, ignore '.init(<some>)', 'init(nilLiteral:)',
-      // '.some(<some>)' and '.none'. They are useless in most cases.
       if (T->getOptionalObjectType() &&
-          VD->getModuleContext()->isStdlibModule() &&
-          (isa<EnumElementDecl>(VD) || isa<ConstructorDecl>(VD))) {
-        return false;
+          VD->getModuleContext()->isStdlibModule()) {
+        // In optional context, ignore '.init(<some>)', 'init(nilLiteral:)',
+        if (isa<ConstructorDecl>(VD))
+          return false;
+        // TODO: Ignore '.some(<Wrapped>)' and '.none' too *in expression
+        // context*. They are useful in pattern context though.
       }
 
       // Enum element decls can always be referenced by implicit member
