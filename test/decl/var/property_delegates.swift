@@ -196,13 +196,13 @@ struct NoDefaultInitializerStruct { // expected-note{{'init(x:)' declared here}}
 }
 
 class DefaultInitializerClass {
-  var x by Wrapper(value: true)
-  var y: Int by WrapperWithInitialValue = 10
+  final var x by Wrapper(value: true)
+  final var y: Int by WrapperWithInitialValue = 10
 }
 
 class NoDefaultInitializerClass { // expected-error{{class 'NoDefaultInitializerClass' has no initializers}}
   // FIXME: Reference 'x' instead of '$x' here
-  var x: Bool by Wrapper  // expected-note{{stored property '$x' without initial value prevents synthesized initializers}}
+  final var x: Bool by Wrapper  // expected-note{{stored property '$x' without initial value prevents synthesized initializers}}
 }
 
 func testDefaultInitializers() {
@@ -356,4 +356,21 @@ extension HasDelegate {
   // expected-error@-1{{cannot convert value of type '(value: Int)' to specified type 'Int'}}
 
   static var x by Wrapper(value: 17) // okay
+}
+
+class ClassWithDelegates {
+  final var x by Wrapper(value: 17)
+  var y by Wrapper(value: 17) // expected-error{{property 'y' with a delegate must be 'final'}}{{3-3=final}}
+}
+
+final class FinalClassWithDelegates {
+  var x by Wrapper(value: 17)
+}
+
+class Superclass {
+  var x: Int = 0
+}
+
+class SubclassWithDelegate: Superclass {
+  final override var x by Wrapper(value: 17) // expected-error{{property 'x' with a delegate cannot override another property}}
 }

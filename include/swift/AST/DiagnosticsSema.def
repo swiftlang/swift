@@ -4317,6 +4317,11 @@ ERROR(property_with_delegate_in_bad_context,none,
       "%select{|non-static |non-static }1property %0 declared inside "
       "%select{a protocol|an extension|an enum}1 cannot have a delegate",
       (DeclName, int))
+ERROR(non_final_property_with_delegate,none,
+      "property %0 with a delegate must be 'final'", (DeclName))
+ERROR(property_with_delegate_overrides,none,
+      "property %0 with a delegate cannot override another property",
+      (DeclName))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

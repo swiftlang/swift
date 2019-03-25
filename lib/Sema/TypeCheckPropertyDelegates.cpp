@@ -84,6 +84,28 @@ UnboundGenericType *swift::getUnboundPropertyDelegateType(
     return nullptr;
   }
 
+  // Properties with delegates must be 'final' (or within a final class).
+  if (auto classDecl = dyn_cast<ClassDecl>(dc)) {
+    if (!var->isFinal() && !classDecl->isFinal()) {
+      var->diagnose(diag::non_final_property_with_delegate, var->getFullName())
+        .highlight(SourceRange(var->getPropertyDelegateByLoc(),
+                               var->getPropertyDelegateTypeLoc()
+                                 .getSourceRange().End))
+        .fixItInsert(var->getAttributeInsertionLoc(/*forModifier=*/true),
+                     "final");
+      var->getAttrs().add(new (ctx) FinalAttr(/*isImplicit=*/true));
+    }
+
+    if (auto overrideAttr = var->getAttrs().getAttribute<OverrideAttr>()) {
+      var->diagnose(diag::property_with_delegate_overrides, var->getFullName())
+        .highlight(SourceRange(var->getPropertyDelegateByLoc(),
+                               var->getPropertyDelegateTypeLoc()
+                                 .getSourceRange().End))
+        .fixItRemove(overrideAttr->getLocation());
+      overrideAttr->setInvalid();
+    }
+  }
+
   // We haven't resolved the property delegate type yet; do so now.
   SourceLoc byLoc = var->getPropertyDelegateByLoc();
   TypeResolutionOptions options(TypeResolverContext::ProtocolWhereClause);
