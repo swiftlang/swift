@@ -42,10 +42,10 @@ AnyDerivativeTests.test("Zero") {
   expectEqual(zero, zero + zero)
   expectEqual(zero, zero - zero)
   expectEqual(zero, zero.moved(along: zero))
-  expectEqual(zero, zero.tangentVector(from: zero))
   expectEqual(zero, zero.allDifferentiableVariables)
 
   var tan = AnyDerivative(Vector.TangentVector(x: 1, y: 1))
+  expectEqual(zero, tan.tangentVector(from: zero))
   expectEqual(AnyDerivative(Vector.TangentVector.zero), zero)
   expectEqual(AnyDerivative(Vector.TangentVector.zero), tan - tan)
   expectEqual(AnyDerivative.zero, tan - tan)
@@ -57,6 +57,21 @@ AnyDerivativeTests.test("Zero") {
   expectEqual(tan, zero.moved(along: tan))
   expectEqual(zero, tan.tangentVector(from: zero))
   expectEqual(tan, zero.tangentVector(from: tan))
+}
+
+AnyDerivativeTests.test("Casting") {
+  let tan = AnyDerivative(Vector.TangentVector(x: 1, y: 1))
+  expectEqual(Vector.TangentVector(x: 1, y: 1), tan.base as? Vector.TangentVector)
+
+  let genericTan = AnyDerivative(Generic<Float>.TangentVector(x: 1))
+  expectEqual(Generic<Float>.TangentVector(x: 1),
+              genericTan.base as? Generic<Float>.TangentVector)
+  expectEqual(nil, genericTan.base as? Generic<Double>.TangentVector)
+
+  let zero = AnyDerivative.zero
+  expectEqual(nil, zero.base as? Float)
+  expectEqual(nil, zero.base as? Vector.TangentVector)
+  expectEqual(nil, zero.base as? Generic<Float>.TangentVector)
 }
 
 runAllTests()

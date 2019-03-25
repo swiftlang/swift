@@ -499,216 +499,218 @@ public func gradient<T, U, V, R>(
 // Type-erased `AnyDerivative`
 //===----------------------------------------------------------------------===//
 
-@usableFromInline
-internal protocol AnyDerivativeBase {
+internal protocol _AnyDerivativeBox {
   // `Equatable` requirements (implied by `AdditiveArithmetic`).
-  func isEqual(_ other: AnyDerivativeBase) -> Bool
-  func isNotEqual(_ other: AnyDerivativeBase) -> Bool
+  func _isEqual(to other: _AnyDerivativeBox) -> Bool
+  func _isNotEqual(to other: _AnyDerivativeBox) -> Bool
 
   // `AdditiveArithmetic` requirements.
-  static var zero: AnyDerivativeBase { get }
-  func plus(_ x: AnyDerivativeBase) -> AnyDerivativeBase
-  mutating func plusEqual(_ x: AnyDerivativeBase)
-  func minus(_ x: AnyDerivativeBase) -> AnyDerivativeBase
-  mutating func minusEqual(_ x: AnyDerivativeBase)
+  static var _zero: _AnyDerivativeBox { get }
+  static var _cotangentZero: _AnyDerivativeBox { get }
+  func _adding(_ x: _AnyDerivativeBox) -> _AnyDerivativeBox
+  func _subtracting(_ x: _AnyDerivativeBox) -> _AnyDerivativeBox
 
   // `Differentiable` requirements.
-  var allDifferentiableVariables: AnyDerivativeBase { get }
-  func moved(along direction: AnyDerivativeBase) -> AnyDerivativeBase
-  func tangentVector(from cotangent: AnyDerivativeBase) -> AnyDerivativeBase
+  var _allDifferentiableVariables: _AnyDerivativeBox { get }
+  func _moved(along direction: _AnyDerivativeBox) -> _AnyDerivativeBox
+  func _tangentVector(from cotangent: _AnyDerivativeBox) -> _AnyDerivativeBox
+
+  /// The underlying base value.
+  var _base: Any { get }
+
+  /// Returns the underlying value unboxed to the given type, if possible.
+  func _unboxed<U>(to type: U.Type) -> U?
+    where U : Differentiable, U.TangentVector == U,
+          U.AllDifferentiableVariables == U,
+          // NOTE: The requirement below should be defined on `Differentiable`.
+          // But it causes a crash due to generic signature minimization bug.
+          U.CotangentVector == U.CotangentVector.AllDifferentiableVariables
+
+  /// Returns true if the underlying value has type `AnyDerivative.OpaqueZero`.
+  func _isOpaqueZero() -> Bool
 }
 
-@usableFromInline
-internal struct AnyDerivativeBox<T : Differentiable> : AnyDerivativeBase
-  where T.TangentVector == T, T.AllDifferentiableVariables == T,
+internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
+  where T : Differentiable, T.TangentVector == T,
+        T.AllDifferentiableVariables == T,
         // NOTE: The requirement below should be defined on `Differentiable`.
         // But it causes a crash due to generic signature minimization bug.
         T.CotangentVector == T.CotangentVector.AllDifferentiableVariables
 {
-  /// The underlying value.
-  var concrete: T
+  /// The underlying base value.
+  var _baseDerivative: T
 
-  public init(_ concrete: T) {
-    self.concrete = concrete
+  public init(_ base: T) {
+    self._baseDerivative = base
+  }
+
+  /// The underlying base value, type-erased to `Any`.
+  var _base: Any {
+    return _baseDerivative
+  }
+
+  func _unboxed<U>(to type: U.Type) -> U?
+    where U : Differentiable, U.TangentVector == U,
+          U.AllDifferentiableVariables == U,
+          // NOTE: The requirement below should be defined on `Differentiable`.
+          // But it causes a crash due to generic signature minimization bug.
+          U.CotangentVector == U.CotangentVector.AllDifferentiableVariables
+  {
+    return (self as _AnyDerivativeBox as? _ConcreteDerivativeBox<U>)?
+      ._baseDerivative
+  }
+
+  func _isOpaqueZero() -> Bool {
+    return T.self == AnyDerivative._OpaqueZero.self
   }
 
   // `Equatable` requirements (implied by `AdditiveArithmetic`).
 
-  @usableFromInline
-  func isEqual(_ other: AnyDerivativeBase) -> Bool {
+  func _isEqual(to other: _AnyDerivativeBox) -> Bool {
     // 0 == 0 => true
-    if T.self == AnyDerivative.Zero.self, other is AnyDerivativeBox<AnyDerivative.Zero> {
+    if _isOpaqueZero() && other._isOpaqueZero() {
       return true
     }
-    if T.self == AnyDerivative.Zero.self {
-      return type(of: other).zero.isEqual(other)
+    if _isOpaqueZero() {
+      return type(of: other)._zero._isEqual(to: other)
     }
-    if other is AnyDerivativeBox<AnyDerivative.Zero> {
-      return AnyDerivativeBox<T>(T.zero).isEqual(self)
+    if other._isOpaqueZero() {
+      return _ConcreteDerivativeBox<T>(T.zero)._isEqual(to: self)
     }
-    guard let other = other as? AnyDerivativeBox<T> else {
+    guard let otherBase = other._unboxed(to: T.self) else {
       fatalError()
     }
-    return concrete == other.concrete
+    return _baseDerivative == otherBase
   }
 
-  @usableFromInline
-  func isNotEqual(_ other: AnyDerivativeBase) -> Bool {
+  func _isNotEqual(to other: _AnyDerivativeBox) -> Bool {
     // 0 != 0 => false
-    if T.self == AnyDerivative.Zero.self,
-       other is AnyDerivativeBox<AnyDerivative.Zero> {
+    if _isOpaqueZero() && other._isOpaqueZero() {
       return false
     }
-    if T.self == AnyDerivative.Zero.self {
-      return type(of: other).zero.isNotEqual(other)
+    if _isOpaqueZero() {
+      return type(of: other)._zero._isNotEqual(to: other)
     }
-    if other is AnyDerivativeBox<AnyDerivative.Zero> {
-      return AnyDerivativeBox<T>(T.zero).isNotEqual(self)
+    if other._isOpaqueZero() {
+      return _ConcreteDerivativeBox<T>(T.zero)._isNotEqual(to: self)
     }
-    guard let other = other as? AnyDerivativeBox<T> else {
+    guard let otherBase = other._unboxed(to: T.self) else {
       fatalError()
     }
-    return concrete != other.concrete
+    return _baseDerivative != otherBase
   }
 
   // `AdditiveArithmetic` requirements.
 
-  @usableFromInline
-  static var zero: AnyDerivativeBase {
-    return AnyDerivativeBox(T.zero)
+  static var _zero: _AnyDerivativeBox {
+    return _ConcreteDerivativeBox(T.zero)
   }
 
-  @usableFromInline
-  func plus(_ x: AnyDerivativeBase) -> AnyDerivativeBase {
+  static var _cotangentZero: _AnyDerivativeBox {
+    return _ConcreteDerivativeBox<T.CotangentVector>(T.CotangentVector.zero)
+  }
+
+  func _adding(_ x: _AnyDerivativeBox) -> _AnyDerivativeBox {
     // 0 + x = x
-    if T.self == AnyDerivative.Zero.self {
+    if _isOpaqueZero() {
       return x
     }
     // y + 0 = y
-    if x is AnyDerivativeBox<AnyDerivative.Zero> {
+    if x._isOpaqueZero() {
       return self
     }
-    guard let x = x as? AnyDerivativeBox<T> else {
+    guard let xBase = x._unboxed(to: T.self) else {
       fatalError()
     }
-    return AnyDerivativeBox(concrete + x.concrete)
+    return _ConcreteDerivativeBox(_baseDerivative + xBase)
   }
 
-  @usableFromInline
-  mutating func plusEqual(_ x: AnyDerivativeBase) {
-    if T.self == AnyDerivative.Zero.self {
-      // FIXME: How to mutate `AnyDerivativeBox<AnyDerivative.Zero>`?
-      // That would require changing `T` generic parameter.
-      return
-    }
-    if x is AnyDerivativeBox<AnyDerivative.Zero> {
-      return
-    }
-    guard let x = x as? AnyDerivativeBox<T> else {
-      fatalError()
-    }
-    concrete += x.concrete
-  }
-
-  @usableFromInline
-  func minus(_ x: AnyDerivativeBase) -> AnyDerivativeBase {
+  func _subtracting(_ x: _AnyDerivativeBox) -> _AnyDerivativeBox {
     // 0 - 0 = 0
-    if T.self == AnyDerivative.Zero.self, x is AnyDerivativeBox<AnyDerivative.Zero> {
+    if _isOpaqueZero() && x._isOpaqueZero() {
       return self
     }
-    // 0 - x = x - x - x = -x
-    if T.self == AnyDerivative.Zero.self {
-      // TODO: Find a more efficient calculation.
-      return x.minus(x).minus(x)
+    // 0 - x = -x
+    if _isOpaqueZero() {
+      return type(of: x)._zero._subtracting(x)
     }
     // y - 0 = y
-    if x is AnyDerivativeBox<AnyDerivative.Zero> {
+    if x._isOpaqueZero() {
       return self
     }
-    guard let x = x as? AnyDerivativeBox<T> else {
+    guard let xBase = x._unboxed(to: T.self) else {
       fatalError()
     }
-    return AnyDerivativeBox(concrete - x.concrete)
-  }
-
-  @usableFromInline
-  mutating func minusEqual(_ x: AnyDerivativeBase) {
-    if T.self == AnyDerivative.Zero.self {
-      // FIXME: How to mutate `AnyDerivativeBox<AnyDerivative.Zero>`?
-      // That would require changing `T` generic parameter.
-      return
-    }
-    if x is AnyDerivativeBox<AnyDerivative.Zero> {
-      return
-    }
-    guard let x = x as? AnyDerivativeBox<T> else {
-      fatalError()
-    }
-    concrete -= x.concrete
+    return _ConcreteDerivativeBox(_baseDerivative - xBase)
   }
 
   // `Differentiable` requirements.
 
-  @usableFromInline
-  var allDifferentiableVariables: AnyDerivativeBase {
-    if T.self == AnyDerivative.Zero.self {
+  var _allDifferentiableVariables: _AnyDerivativeBox {
+    if _isOpaqueZero() {
       return self
     }
-    return AnyDerivativeBox(concrete.allDifferentiableVariables)
+    return _ConcreteDerivativeBox(_baseDerivative.allDifferentiableVariables)
   }
 
-  @usableFromInline
-  func moved(along direction: AnyDerivativeBase) -> AnyDerivativeBase {
-    if T.self == AnyDerivative.Zero.self {
+  func _moved(along direction: _AnyDerivativeBox) -> _AnyDerivativeBox {
+    if _isOpaqueZero() {
       return direction
     }
-    if direction is AnyDerivativeBox<AnyDerivative.Zero> {
+    if direction._isOpaqueZero() {
       return self
     }
-    guard let direction = direction as? AnyDerivativeBox<T.TangentVector> else {
+    guard let directionBase =
+      direction._unboxed(to: T.TangentVector.self) else {
       fatalError()
     }
-    return AnyDerivativeBox(concrete.moved(along: direction.concrete))
+    return _ConcreteDerivativeBox<T>(
+      _baseDerivative.moved(along: directionBase))
   }
 
-  @usableFromInline
-  func tangentVector(from cotangent: AnyDerivativeBase) -> AnyDerivativeBase {
-    if T.self == AnyDerivative.Zero.self {
+  func _tangentVector(from cotangent: _AnyDerivativeBox) -> _AnyDerivativeBox {
+    if _isOpaqueZero() {
+      return type(of: cotangent)._cotangentZero
+        ._tangentVector(from: cotangent)
+    }
+    if cotangent._isOpaqueZero() {
       return cotangent
     }
-    if cotangent is AnyDerivativeBox<AnyDerivative.Zero> {
-      return cotangent
-    }
-    guard let cotangent = cotangent as? AnyDerivativeBox<T.CotangentVector> else {
+    guard let cotangentBase =
+      cotangent._unboxed(to: T.CotangentVector.self) else {
       fatalError()
     }
-    return AnyDerivativeBox(concrete.tangentVector(from: cotangent.concrete))
+    return _ConcreteDerivativeBox<T.TangentVector>(
+      _baseDerivative.tangentVector(from: cotangentBase))
   }
 }
 
-/// A type-erased derivative.
+/// A type-erased derivative value.
 ///
-/// This type forwards its operations to an arbitrary underlying base
-/// derivative conforming to `Differentiable` and `AdditiveArithmetic`, hiding
-/// the specifics of the underlying derivative.
-@_fixed_layout
+/// The `AnyDerivative` type forwards its operations to an arbitrary underlying
+/// base derivative value conforming to `Differentiable` and
+/// `AdditiveArithmetic`, hiding the specifics of the underlying value.
 public struct AnyDerivative : Differentiable & AdditiveArithmetic {
-  @usableFromInline
-  internal var base: AnyDerivativeBase
+  internal var _box: _AnyDerivativeBox
 
-  @usableFromInline
-  internal init(base: AnyDerivativeBase) {
-    self.base = base
+  internal init(box: _AnyDerivativeBox) {
+    self._box = box
+  }
+
+  /// The underlying base value.
+  public var base: Any {
+    return _box._base
   }
 
   /// Creates a type-erased derivative from the given derivative.
-  public init<T : Differentiable>(_ base: T)
-    where T.TangentVector == T, T.AllDifferentiableVariables == T,
+  public init<T>(_ base: T)
+    where T : Differentiable, T.TangentVector == T,
+          T.AllDifferentiableVariables == T,
           // NOTE: The requirement below should be defined on `Differentiable`.
           // But it causes a crash due to generic signature minimization bug.
           T.CotangentVector == T.CotangentVector.AllDifferentiableVariables
   {
-    self.base = AnyDerivativeBox<T>(base)
+    self._box = _ConcreteDerivativeBox<T>(base)
   }
 
   public typealias TangentVector = AnyDerivative
@@ -717,44 +719,42 @@ public struct AnyDerivative : Differentiable & AdditiveArithmetic {
 
   // `Equatable` requirements (implied by `AdditiveArithmetic`).
   public static func == (lhs: AnyDerivative, rhs: AnyDerivative) -> Bool {
-    return lhs.base.isEqual(rhs.base)
+    return lhs._box._isEqual(to: rhs._box)
   }
   public static func != (lhs: AnyDerivative, rhs: AnyDerivative) -> Bool {
-    return lhs.base.isNotEqual(rhs.base)
+    return lhs._box._isNotEqual(to: rhs._box)
   }
 
   // `AdditiveArithmetic` requirements.
-  /// Internal struct representing the untyped value zero.
+
+  /// Internal struct representing an opaque zero value.
   @_fixed_layout
   @usableFromInline
-  internal struct Zero : Differentiable & AdditiveArithmetic {}
+  internal struct _OpaqueZero : Differentiable & AdditiveArithmetic {}
 
   public static var zero: AnyDerivative {
-    return AnyDerivative(base: AnyDerivativeBox<Zero>(Zero.zero))
+    return AnyDerivative(
+      box: _ConcreteDerivativeBox<_OpaqueZero>(_OpaqueZero.zero))
   }
-  public static func +(lhs: AnyDerivative, rhs: AnyDerivative) -> AnyDerivative {
-    return AnyDerivative(base: lhs.base.plus(rhs.base))
+  public static func + (lhs: AnyDerivative, rhs: AnyDerivative)
+      -> AnyDerivative {
+    return AnyDerivative(box: lhs._box._adding(rhs._box))
   }
-  public static func +=(lhs: inout AnyDerivative, rhs: AnyDerivative) {
-    lhs.base.plusEqual(rhs.base)
-  }
-  public static func -(lhs: AnyDerivative, rhs: AnyDerivative) -> AnyDerivative {
-    return AnyDerivative(base: lhs.base.minus(rhs.base))
-  }
-  public static func -=(lhs: inout AnyDerivative, rhs: AnyDerivative) {
-    lhs.base.minusEqual(rhs.base)
+  public static func - (lhs: AnyDerivative, rhs: AnyDerivative)
+      -> AnyDerivative {
+    return AnyDerivative(box: lhs._box._subtracting(rhs._box))
   }
 
   // `Differentiable` requirements.
   public var allDifferentiableVariables: AllDifferentiableVariables {
-    get { return AnyDerivative(base: base.allDifferentiableVariables) }
-    // set { base.allDifferentiableVariables = newValue.base }
+    get { return AnyDerivative(box: _box._allDifferentiableVariables) }
+    // set { _box._allDifferentiableVariables = newValue._box }
   }
   public func moved(along direction: TangentVector) -> AnyDerivative {
-    return AnyDerivative(base: base.moved(along: direction.base))
+    return AnyDerivative(box: _box._moved(along: direction._box))
   }
   public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
-    return AnyDerivative(base: base.tangentVector(from: cotangent.base))
+    return AnyDerivative(box: _box._tangentVector(from: cotangent._box))
   }
 }
 
