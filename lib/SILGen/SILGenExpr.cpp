@@ -2030,150 +2030,30 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
   return result;
 }
 
-namespace {
-
-/// A helper function with context that tries to emit member refs of nominal
-/// types avoiding the conservative lvalue logic.
-class NominalTypeMemberRefRValueEmitter {
-  using SelfTy = NominalTypeMemberRefRValueEmitter;
-
-  /// The member ref expression we are emitting.
-  MemberRefExpr *Expr;
-
-  /// The passed in SGFContext.
-  SGFContext Context;
-
-  /// The typedecl of the base expression of the member ref expression.
-  NominalTypeDecl *Base;
-
-  /// The field of the member.
-  VarDecl *Field;
-
-public:
-
-  NominalTypeMemberRefRValueEmitter(MemberRefExpr *Expr, SGFContext Context,
-                                    NominalTypeDecl *Base)
-    : Expr(Expr), Context(Context), Base(Base),
-      Field(cast<VarDecl>(Expr->getMember().getDecl())) {}
-
-  /// Emit the RValue.
-  Optional<RValue> emit(SILGenFunction &SGF) {
-    // If we don't have a class or a struct, bail.
-    if (!isa<ClassDecl>(Base) && !isa<StructDecl>(Base))
-      return None;
-
-    // Check that we have a stored access strategy. If we don't bail.
-    AccessStrategy strategy =
-      Field->getAccessStrategy(Expr->getAccessSemantics(), AccessKind::Read,
-                               SGF.SGM.M.getSwiftModule(),
-                               SGF.F.getResilienceExpansion());
-    if (strategy.getKind() != AccessStrategy::Storage)
-      return None;
-
-    FormalEvaluationScope scope(SGF);
-    if (isa<StructDecl>(Base))
-      return emitStructDecl(SGF);
-    assert(isa<ClassDecl>(Base) && "Expected class");
-    return emitClassDecl(SGF);
-  }
-
-  NominalTypeMemberRefRValueEmitter(const SelfTy &) = delete;
-  NominalTypeMemberRefRValueEmitter(SelfTy &&) = delete;
-  ~NominalTypeMemberRefRValueEmitter() = default;
-
-private:
-  RValue emitStructDecl(SILGenFunction &SGF) {
-    ManagedValue base =
-      SGF.emitRValueAsSingleValue(Expr->getBase(),
-                                  SGFContext::AllowImmediatePlusZero);
-    CanType baseFormalType =
-      Expr->getBase()->getType()->getCanonicalType();
-    assert(baseFormalType->isMaterializable());
-    
-    RValue result =
-      SGF.emitRValueForStorageLoad(Expr, base, baseFormalType,
-                                   Expr->isSuper(),
-                                   Field, {},
-                                   Expr->getMember().getSubstitutions(),
-                                   Expr->getAccessSemantics(),
-                                   Expr->getType(), Context);
-    return result;
-  }
-
-  Optional<RValue> emitClassDecl(SILGenFunction &SGF) {
-    // If guaranteed plus zero is not ok, we bail.
-    if (!Context.isGuaranteedPlusZeroOk())
-      return None;
-
-    // If the field is not a let, bail. We need to use the lvalue logic.
-    if (!Field->isLet())
-      return None;
-    
-    // If we are emitting a delegating init super and we have begun the
-    // super.init call, since self has been exclusively borrowed, we need to be
-    // conservative and use the lvalue machinery. This ensures that we properly
-    // create FormalEvaluationScopes around the access to self.
-    //
-    // TODO: This currently turns off this optimization for /all/ classes that
-    // are accessed as a direct argument to a super.init call. In the future, we
-    // should be able to be less conservative here by pattern matching if
-    // something /can not/ be self.
-    if (SGF.SelfInitDelegationState == SILGenFunction::DidExclusiveBorrowSelf)
-      return None;
-
-    // Ok, now we know that we are able to emit our base at guaranteed plus zero
-    // emit base.
-    ManagedValue base =
-      SGF.emitRValueAsSingleValue(Expr->getBase(), Context);
-
-    CanType baseFormalType =
-      Expr->getBase()->getType()->getCanonicalType();
-    assert(baseFormalType->isMaterializable());
-    
-    // And then emit our property using whether or not base is at +0 to
-    // discriminate whether or not the base was guaranteed.
-    RValue result =
-        SGF.emitRValueForStorageLoad(Expr, base, baseFormalType,
-                                     Expr->isSuper(),
-                                     Field, {},
-                                     Expr->getMember().getSubstitutions(),
-                                     Expr->getAccessSemantics(),
-                                     Expr->getType(), Context,
-                                     base.isPlusZeroRValueOrTrivial());
-    return std::move(result);
-  }
-};
-
-} // end anonymous namespace
-
-RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
-  assert(!E->getType()->is<LValueType>() &&
+RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *e,
+                                         SGFContext resultCtx) {
+  assert(!e->getType()->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
 
-  if (isa<TypeDecl>(E->getMember().getDecl())) {
+  if (isa<TypeDecl>(e->getMember().getDecl())) {
     // Emit the metatype for the associated type.
-    visit(E->getBase());
-    SILValue MT =
-      SGF.B.createMetatype(E, SGF.getLoweredLoadableType(E->getType()));
-    return RValue(SGF, E, ManagedValue::forUnmanaged(MT));
+    visit(e->getBase());
+    SILValue mt =
+        SGF.B.createMetatype(e, SGF.getLoweredLoadableType(e->getType()));
+    return RValue(SGF, e, ManagedValue::forUnmanaged(mt));
   }
-
-  // If we have a nominal type decl as our base, try to emit the base rvalue's
-  // member using special logic that will let us avoid extra retains
-  // and releases.
-  if (auto *N = E->getBase()->getType()->getNominalOrBoundGenericNominal())
-    if (auto RV = NominalTypeMemberRefRValueEmitter(E, C, N).emit(SGF))
-      return RValue(std::move(RV.getValue()));
 
   // Everything else should use the l-value logic.
 
   // Any writebacks for this access are tightly scoped.
   FormalEvaluationScope scope(SGF);
 
-  LValue lv = SGF.emitLValue(E, SGFAccessKind::OwnedObjectRead);
-  // We can't load at +0 without further analysis, since the formal access into
-  // the lvalue will end immediately.
-  return SGF.emitLoadOfLValue(E, std::move(lv), C.withFollowingSideEffects());
+  LValue lv = SGF.emitLValue(e, SGFAccessKind::OwnedObjectRead);
+
+  // Otherwise, we can't load at +0 without further analysis, since the formal
+  // access into the lvalue will end immediately.
+  return SGF.emitLoadOfLValue(e, std::move(lv),
+                              resultCtx.withFollowingSideEffects());
 }
 
 RValue RValueEmitter::visitDynamicMemberRefExpr(DynamicMemberRefExpr *E,
