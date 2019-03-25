@@ -147,6 +147,30 @@ func testDirectDelegateInitialization(s: String, i: Int) {
 }
 
 // ---------------------------------------------------------------------------
+// @autoclosure initializers
+// ---------------------------------------------------------------------------
+@propertyDelegate
+struct WrapperAcceptingAutoclosure<T> {
+  private let fn: () -> T
+
+  var value: T {
+    return fn()
+  }
+
+  init(initialValue fn: @autoclosure @escaping () -> T) {
+    self.fn = fn
+  }
+}
+
+func seventeen() -> Int { return 17 }
+
+struct UseWrapperAcceptingAutoclosure {
+  var foo by WrapperAcceptingAutoclosure = seventeen()
+}
+
+
+
+// ---------------------------------------------------------------------------
 // Memberwise initializers
 // ---------------------------------------------------------------------------
 struct MemberwiseInits<T> {

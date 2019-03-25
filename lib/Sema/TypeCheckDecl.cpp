@@ -2405,7 +2405,12 @@ public:
 
         // If we entered an initializer context, contextualize any
         // auto-closures we might have created.
-        if (!DC->isLocalContext()) {
+        // Note that we don't contextualize the initializer for a property
+        // with a delegate, because the initializer will have been subsumed
+        // by the backing storage property.
+        if (!DC->isLocalContext() &&
+            !(PBD->getSingleVar() &&
+              PBD->getSingleVar()->hasPropertyDelegate())) {
           auto *initContext = cast_or_null<PatternBindingInitializer>(
               entry.getInitContext());
           if (initContext) {
