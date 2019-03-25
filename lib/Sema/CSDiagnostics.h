@@ -671,10 +671,6 @@ public:
   static bool trySequenceSubsequenceFixIts(InFlightDiagnostic &diag,
                                            ConstraintSystem &CS, Type fromType,
                                            Type toType, Expr *expr);
-  /// Try to add a fix-it to convert a stored property into a computed
-  /// property
-  static void tryComputedPropertyFixIts(TypeChecker &TC, Expr *expr,
-                                        DeclContext *dc);
 
 private:
   Type resolve(Type rawType) {
@@ -685,6 +681,10 @@ private:
     }
     return type;
   }
+
+  /// Try to add a fix-it to convert a stored property into a computed
+  /// property
+  void tryComputedPropertyFixIts(Expr *expr) const;
 };
 
 /// Diagnose situations when @autoclosure argument is passed to @autoclosure

@@ -1350,9 +1350,7 @@ bool ContextualFailure::diagnoseMissingFunctionCall() const {
       .highlight(anchor->getSourceRange())
       .fixItInsertAfter(anchor->getEndLoc(), "()");
 
-  if (isa<ClosureExpr>(getAnchor())) {
-    tryComputedPropertyFixIts(TC, anchor, getDC());
-  }
+  tryComputedPropertyFixIts(anchor);
 
   return true;
 }
@@ -1384,8 +1382,10 @@ bool ContextualFailure::trySequenceSubsequenceFixIts(InFlightDiagnostic &diag,
   return false;
 }
 
-void ContextualFailure::tryComputedPropertyFixIts(TypeChecker &TC, Expr *expr,
-                                                  DeclContext *dc) {
+void ContextualFailure::tryComputedPropertyFixIts(Expr *expr) const {
+  if (!isa<ClosureExpr>(expr))
+    return;
+
   // It is possible that we're looking at a stored property being
   // initialized with a closure. Something like:
   //
@@ -1397,7 +1397,7 @@ void ContextualFailure::tryComputedPropertyFixIts(TypeChecker &TC, Expr *expr,
 
   PatternBindingDecl *PBD = nullptr;
 
-  if (auto TLCD = dyn_cast<TopLevelCodeDecl>(dc)) {
+  if (auto TLCD = dyn_cast<TopLevelCodeDecl>(getDC())) {
     if (TLCD->getBody()->isImplicit()) {
       if (auto decl = TLCD->getBody()->getElement(0).dyn_cast<Decl *>()) {
         if (auto binding = dyn_cast<PatternBindingDecl>(decl)) {
@@ -1405,7 +1405,7 @@ void ContextualFailure::tryComputedPropertyFixIts(TypeChecker &TC, Expr *expr,
         }
       }
     }
-  } else if (auto PBI = dyn_cast<PatternBindingInitializer>(dc)) {
+  } else if (auto PBI = dyn_cast<PatternBindingInitializer>(getDC())) {
     PBD = PBI->getBinding();
   }
 
@@ -1416,9 +1416,9 @@ void ContextualFailure::tryComputedPropertyFixIts(TypeChecker &TC, Expr *expr,
       if (!VD->isStatic() &&
           !VD->getAttrs().getAttribute<DynamicReplacementAttr>() &&
           entry.getInit() && isa<ClosureExpr>(entry.getInit())) {
-        auto diag =
-            TC.diagnose(expr->getLoc(), diag::extension_stored_property_fixit,
-                        VD->getName());
+        auto diag = emitDiagnostic(expr->getLoc(),
+                                   diag::extension_stored_property_fixit,
+                                   VD->getName());
         diag.fixItRemove(entry.getEqualLoc());
 
         if (VD->isLet()) {
