@@ -88,6 +88,7 @@ public func returnOptionalEscape() -> (() ->())?
 // NOPEEPHOLE:  switch_enum [[V1]] : $Optional<{{.*}}>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
 // NOPEEPHOLE: [[SOME_BB]]([[V2:%.*]]: $@callee_guaranteed () -> ()):
+// NOPEEPHOLE-NEXT:  fix_lifetime [[NONE_2]]
 // NOPEEPHOLE-NEXT:  release_value [[NONE_2]]
 // NOPEEPHOLE-NEXT:  [[SOME:%.*]] = enum $Optional<{{.*}}>, #Optional.some!enumelt.1, [[V2]]
 // NOPEEPHOLE-NEXT:  [[CVT:%.*]] = convert_escape_to_noescape [[V2]]
@@ -109,7 +110,9 @@ public func returnOptionalEscape() -> (() ->())?
 // NOPEEPHOLE-NEXT:  apply [[F]]([[BLOCK_PHI]])
 // NOPEEPHOLE-NEXT:  release_value [[BLOCK_PHI]]
 // NOPEEPHOLE-NEXT:  tuple
+// NOPEEPHOLE-NEXT:  fix_lifetime [[SOME]]
 // NOPEEPHOLE-NEXT:  release_value [[SOME]]
+// NOPEEPHOLE-NEXT:  fix_lifetime [[SWIFT_CLOSURE_PHI]]
 // NOPEEPHOLE-NEXT:  release_value [[SWIFT_CLOSURE_PHI]]
 // NOPEEPHOLE-NEXT: return
 // NOPEEPHOLE: } // end sil function '$s1A19bridgeNoescapeBlockyyF'

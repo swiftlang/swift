@@ -43,6 +43,7 @@ func test0() {
 // MANDATORY-NEXT: [[T0:%.*]] = function_ref @$s10reabstract6takeFn{{[_0-9a-zA-Z]*}}F
 // MANDATORY-NEXT: apply [[T0]]<Int>([[T4]])
 // MANDATORY-NEXT: dealloc_stack [[T4]] : $@noescape @callee_guaranteed (@in_guaranteed Int) -> @out Optional<Int>
+// MANDATORY-NEXT: fix_lifetime [[T2]]
 // MANDATORY-NEXT: strong_release [[T2]]
 // MANDATORY-NEXT: tuple ()
 // MANDATORY-NEXT: return

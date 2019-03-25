@@ -16,12 +16,14 @@ func nonthrower() -> Int { return 0 }
 // CHECK:       try_apply [[RETHROWER]]([[CVT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> (Int, @error Error)) -> (Int, @error Error), normal [[NORMAL:bb1]], error [[ERROR:bb2]]
 // CHECK:     [[NORMAL]]([[RESULT_T0:%.*]] : $Int):
 // FIXME - SR-6979: We should be able to eliminate this strong_release.
+// CHECK-NEXT:  fix_lifetime [[T0]]
 // CHECK-NEXT:  strong_release [[T0]]
 // CHECK-NEXT:  strong_release [[T0]]
 // CHECK-NEXT:  [[T1:%.*]] = tuple ()
 // CHECK-NEXT:  return [[T1]]
 // CHECK:     [[ERROR]]([[RESULT_T0:%.*]] : $Error):
 // FIXME - SR-6979: We should be able to eliminate this strong_release.
+// CHECK-NEXT:  fix_lifetime [[T0]]
 // CHECK-NEXT:  strong_release [[T0]]
 // CHECK-NEXT:  strong_release [[T0]]
 // CHECK-NEXT:  throw [[RESULT_T0]]
@@ -48,10 +50,12 @@ func test0() throws {
 // CHECK:       [[RETHROWER:%.*]] = function_ref @$s8rethrows9rethroweryS2iyKXEKF : $@convention(thin) (@noescape @callee_guaranteed () -> (Int, @error Error)) -> (Int, @error Error)
 // CHECK:       try_apply [[RETHROWER]]([[CVT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> (Int, @error Error)) -> (Int, @error Error), normal [[NORMAL:bb1]], error [[ERROR:bb2]]
 // CHECK:     [[NORMAL]]([[RESULT:%.*]] : $Int):
+// CHECK-NEXT:  fix_lifetime [[T0]]
 // CHECK-NEXT:  strong_release [[T0]]
 // CHECK-NEXT:  strong_release [[T0]]
 // CHECK-NEXT:  return [[RESULT]]
 // CHECK:     [[ERROR]]([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:  fix_lifetime [[T0]]
 // CHECK-NEXT:  strong_release [[T0]]
 // CHECK-NEXT:  strong_release [[T0]]
 // CHECK-NEXT:  throw [[ERROR]]
@@ -67,11 +71,13 @@ func test1() throws {
 // CHECK:       [[RETHROWER:%.*]] = function_ref @$s8rethrows9rethroweryS2iyKXEKF : $@convention(thin) (@noescape @callee_guaranteed () -> (Int, @error Error)) -> (Int, @error Error)
 // CHECK:       try_apply [[RETHROWER]]([[T2]]) : $@convention(thin) (@noescape @callee_guaranteed () -> (Int, @error Error)) -> (Int, @error Error), normal [[NORMAL:bb1]], error [[ERROR:bb2]]
 // CHECK:     [[NORMAL]]([[T0:%.*]] : $Int):
+// CHECK-NEXT:  fix_lifetime [[T1]]
 // CHECK-NEXT:  strong_release [[T1]]
 // CHECK-NEXT:  strong_release [[T1]]
 // CHECK-NEXT:  [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT:  return [[RESULT]]
 // CHECK:     [[ERROR]]([[T0:%.*]] : $Error):
+// CHECK-NEXT:  fix_lifetime [[T1]]
 // CHECK-NEXT:  strong_release [[T1]]
 // CHECK-NEXT:  unreachable
 func test2() {

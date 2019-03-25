@@ -143,7 +143,9 @@ class C: NSObject {
 // Make sure even if we have a loop, we do not release the value after calling super.deinit
 // CHECK-LABEL: sil hidden @$s27closure_lifetime_fixup_objc9CWithLoopCfD : $@convention(method) (@owned CWithLoop) -> () {
 // CHECK:        [[METH:%.*]] = objc_super_method
+// CHECK-NEXT:   fix_lifetime
 // CHECK-NEXT:   release_value
+// CHECK-NEXT:   fix_lifetime
 // CHECK-NEXT:   release_value
 // CHECK-NEXT:   upcast {{%.*}} : $CWithLoop to $NSObject
 // CHECK-NEXT:   apply [[METH]]({{%.*}}) : $@convention(objc_method) (NSObject) -> ()

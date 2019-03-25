@@ -147,6 +147,7 @@ static void extendLifetimeToEndOfFunction(SILFunction &Fn,
       auto *SafeClosureDestructionPt =
           getDeinitSafeClosureDestructionPoint(Term);
       SILBuilderWithScope B(SafeClosureDestructionPt);
+      B.createFixLifetime(loc, InnerCVI);
       B.createDestroyValue(loc, InnerCVI);
     }
     return;
@@ -193,15 +194,18 @@ static void extendLifetimeToEndOfFunction(SILFunction &Fn,
     // Before the copy value, insert an extra destroy_value to handle
     // loops. Since we used our enum value this is safe.
     SILBuilderWithScope B(CVI);
-    B.createDestroyValue(loc,
-                         Updater.GetValueInMiddleOfBlock(CVI->getParent()));
+    SILValue v = Updater.GetValueInMiddleOfBlock(CVI->getParent());
+    B.createFixLifetime(loc, v);
+    B.createDestroyValue(loc, v);
   }
 
   for (auto *Exit : ExitingBlocks) {
     auto *Term = Exit->getTerminator();
     auto *SafeClosureDestructionPt = getDeinitSafeClosureDestructionPoint(Term);
     SILBuilderWithScope B(SafeClosureDestructionPt);
-    B.createDestroyValue(loc, Updater.GetValueAtEndOfBlock(Exit));
+    SILValue v = Updater.GetValueAtEndOfBlock(Exit);
+    B.createFixLifetime(loc, v);
+    B.createDestroyValue(loc, v);
   }
 }
 
@@ -433,12 +437,14 @@ static bool tryExtendLifetimeToLastUse(
     if (auto *Apply = dyn_cast<ApplyInst>(SingleApplyUser.getInstruction())) {
       auto InsertPt = std::next(SILBasicBlock::iterator(Apply));
       SILBuilderWithScope B3(InsertPt);
+      B3.createFixLifetime(loc, ClosureCopy);
       B3.createDestroyValue(loc, ClosureCopy);
 
     } else if (auto *Try =
                    dyn_cast<TryApplyInst>(SingleApplyUser.getInstruction())) {
       for (auto *SuccBB : Try->getSuccessorBlocks()) {
         SILBuilderWithScope B3(SuccBB->begin());
+        B3.createFixLifetime(loc, ClosureCopy);
         B3.createDestroyValue(loc, ClosureCopy);
       }
     } else {
@@ -525,6 +531,7 @@ static bool trySwitchEnumPeephole(ConvertEscapeToNoEscapeInst *Cvt) {
   auto copy =
       B.createCopyValue(loc, SwitchEnum1->getOperand());
   B.setInsertionPoint(onlyDestroy);
+  B.createFixLifetime(loc, copy);
   B.createDestroyValue(loc, copy);
   return true;
 }
@@ -732,8 +739,9 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *CB,
   // handle loops correctly.
   {
     SILBuilderWithScope B(InitialValue);
-    B.createDestroyValue(generatedLoc, Updater.GetValueInMiddleOfBlock(
-                                           InitialValue->getParent()));
+    SILValue v = Updater.GetValueInMiddleOfBlock(InitialValue->getParent());
+    B.createFixLifetime(generatedLoc, v);
+    B.createDestroyValue(generatedLoc, v);
   }
 
   // And insert an is_escaping_closure, cond_fail, destroy_value at each of the
@@ -758,7 +766,9 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *CB,
       auto *SafeClosureDestructionPt =
           getDeinitSafeClosureDestructionPoint(Term);
       SILBuilderWithScope B(SafeClosureDestructionPt);
-      B.createDestroyValue(generatedLoc, Updater.GetValueInMiddleOfBlock(Exit));
+      SILValue v = Updater.GetValueInMiddleOfBlock(Exit);
+      B.createFixLifetime(generatedLoc, v);
+      B.createDestroyValue(generatedLoc, v);
     }
   }
 
