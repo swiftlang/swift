@@ -419,16 +419,19 @@ namespace {
     /// @}
 
     bool parseSILDottedPath(ValueDecl *&Decl,
-                            SmallVectorImpl<ValueDecl *> &values);
-    bool parseSILDottedPath(ValueDecl *&Decl) {
+                            SmallVectorImpl<ValueDecl *> &values,
+                            Optional<bool> isStatic = None);
+    bool parseSILDottedPath(ValueDecl *&Decl, Optional<bool> isStatic = None) {
       SmallVector<ValueDecl *, 4> values;
       return parseSILDottedPath(Decl, values);
     }
     bool parseSILDottedPathWithoutPound(ValueDecl *&Decl,
-                                        SmallVectorImpl<ValueDecl *> &values);
-    bool parseSILDottedPathWithoutPound(ValueDecl *&Decl) {
+                                        SmallVectorImpl<ValueDecl *> &values,
+                                        Optional<bool> isStatic = None);
+    bool parseSILDottedPathWithoutPound(ValueDecl *&Decl,
+                                        Optional<bool> isStatic = None) {
       SmallVector<ValueDecl *, 4> values;
-      return parseSILDottedPathWithoutPound(Decl, values);
+      return parseSILDottedPathWithoutPound(Decl, values, isStatic);
     }
     /// At the time of calling this function, we may not have the type of the
     /// Decl yet. So we return a SILDeclRef on the first lookup result and also
@@ -1308,14 +1311,16 @@ bool SILParser::parseSILType(SILType &Result,
 }
 
 bool SILParser::parseSILDottedPath(ValueDecl *&Decl,
-                                   SmallVectorImpl<ValueDecl *> &values) {
+                                   SmallVectorImpl<ValueDecl *> &values,
+                                   Optional<bool> isStatic) {
   if (P.parseToken(tok::pound, diag::expected_sil_constant))
     return true;
-  return parseSILDottedPathWithoutPound(Decl, values);
+  return parseSILDottedPathWithoutPound(Decl, values, isStatic);
 }
 
 bool SILParser::parseSILDottedPathWithoutPound(ValueDecl *&Decl,
-                                   SmallVectorImpl<ValueDecl *> &values) {
+                                   SmallVectorImpl<ValueDecl *> &values,
+                                   Optional<bool> isStatic) {
   // Handle sil-dotted-path.
   Identifier Id;
   SmallVector<DeclBaseName, 4> FullName;
@@ -1368,7 +1373,21 @@ bool SILParser::parseSILDottedPathWithoutPound(ValueDecl *&Decl,
                         I == FullName.size() - 1/*ExpectMultipleResults*/);
     }
   }
-  Decl = VD;
+  if (VD && isStatic.hasValue()) {
+    std::remove_if(values.begin(), values.end(), [=](ValueDecl *aVD) {
+      return aVD->isStatic() != *isStatic;
+    });
+    if (values.empty()) {
+      P.diagnose(Locs.back(), diag::sil_named_member_decl_not_found,
+                 FullName.back(), VD->getDeclContext()->getSelfTypeInContext());
+      Decl = nullptr;
+      return true;
+    }
+    else
+      Decl = values.front();
+  }
+  else
+    Decl = VD;
   return false;
 }
 
@@ -5583,14 +5602,26 @@ bool SILParserTUState::parseSILGlobal(Parser &P) {
 }
 
 /// decl-sil-property: [[only in SIL mode]]
-///   'sil_property' sil-decl-ref '(' sil-key-path-pattern-component ')'
+///   'sil_property' ( 'instance' | 'type' ) sil-decl-ref '(' sil-key-path-pattern-component ')'
 
 bool SILParserTUState::parseSILProperty(Parser &P) {
+  struct Staticness {
+    bool isStatic = false;
+    Staticness() {}
+    Staticness(StringRef value) : isStatic(value == "type") { }
+  };
+
   Lexer::SILBodyRAII Tmp(*P.L);
 
   auto loc = P.consumeToken(tok::kw_sil_property);
   auto InstLoc = RegularLocation(loc);
   SILParser SP(P);
+
+  Staticness staticness;
+  if (SP.parseSILIdentifierSwitch(staticness, {"instance", "type"},
+                                  diag::expected_tok_in_sil_instr,
+                                  "'instance' or 'type'"))
+    return true;
   
   IsSerialized_t Serialized = IsNotSerialized;
   if (parseDeclSILOptional(nullptr, &Serialized, nullptr, nullptr, nullptr,
@@ -5599,8 +5630,9 @@ bool SILParserTUState::parseSILProperty(Parser &P) {
     return true;
   
   ValueDecl *VD;
-  
-  if (SP.parseSILDottedPath(VD))
+  SmallVector<ValueDecl *, 2> decls;
+
+  if (SP.parseSILDottedPath(VD, decls, staticness.isStatic))
     return true;
   
   GenericParamList *generics;

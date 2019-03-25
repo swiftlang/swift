@@ -101,7 +101,7 @@ public class C {
   @_hasStorage @_hasInitialValue public var field: Int64 { get set }
 }
 
-sil_property #C.field ()
+sil_property instance #C.field ()
 
 sil hidden [transparent] @CFieldModify : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Int64 {
 bb0(%0 : $C):

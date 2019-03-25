@@ -230,12 +230,12 @@ sil [serialized] @get_external_subscript : $@convention(thin) <T, U: Hashable> (
 sil [serialized] @equals_external_subscript : $@convention(thin) <U: Hashable, T> (UnsafeRawPointer, UnsafeRawPointer) -> Bool
 sil [serialized] @hash_external_subscript : $@convention(thin) <U: Hashable, T> (UnsafeRawPointer) -> Int
 
-// CHECK-LABEL: sil_property [serialized] #External.ro<τ_0_0> (stored_property #External.ro : $τ_0_0)
-sil_property [serialized] #External.ro <T> (stored_property #External.ro : $T)
+// CHECK-LABEL: sil_property instance [serialized] #External.ro<τ_0_0> (stored_property #External.ro : $τ_0_0)
+sil_property instance [serialized] #External.ro <T> (stored_property #External.ro : $T)
 
-// CHECK-LABEL: sil_property [serialized] #External.subscript<τ_0_0><τ_1_0 where τ_1_0 : Hashable> (gettable_property $τ_0_0,
+// CHECK-LABEL: sil_property instance [serialized] #External.subscript<τ_0_0><τ_1_0 where τ_1_0 : Hashable> (gettable_property $τ_0_0,
 // CHECK-SAME:   id @id_a : $@convention(thin) () -> (),
 // CHECK-SAME:   getter @get_external_subscript : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 : Hashable> (@in_guaranteed External<τ_0_0>, UnsafeRawPointer) -> @out τ_0_0)
-sil_property [serialized] #External.subscript <T><U: Hashable> (gettable_property $T,
+sil_property instance [serialized] #External.subscript <T><U: Hashable> (gettable_property $T,
   id @id_a : $@convention(thin) () -> (),
   getter @get_external_subscript : $@convention(thin) <T, U: Hashable> (@in_guaranteed External<T>, UnsafeRawPointer) -> @out T)

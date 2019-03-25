@@ -2640,6 +2640,12 @@ void SILProperty::print(SILPrintContext &Ctx) const {
   
   auto &OS = Ctx.OS();
   OS << "sil_property ";
+
+  if (getDecl()->isStatic())
+    OS << "type ";
+  else
+    OS << "instance ";
+
   if (isSerialized())
     OS << "[serialized] ";
   
