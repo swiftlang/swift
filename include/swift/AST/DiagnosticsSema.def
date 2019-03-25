@@ -1522,6 +1522,8 @@ ERROR(extension_specialization,none,
       "type %0 with constraints specified by a 'where' clause", (Identifier))
 ERROR(extension_stored_property,none,
       "extensions must not contain stored properties", ())
+NOTE(extension_stored_property_fixit,none,
+     "Remove '=' to make %0 a computed property", (Identifier))
 ERROR(extension_nongeneric_trailing_where,none,
       "trailing 'where' clause for extension of non-generic type %0",
       (DeclName))

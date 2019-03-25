@@ -1989,6 +1989,17 @@ repairFailures(ConstraintSystem &cs, Type lhs, Type rhs,
     break;
   }
 
+  case ConstraintLocator::ContextualType: {
+    if (lhs->is<FunctionType>() && !rhs->is<AnyFunctionType>() &&
+        isa<ClosureExpr>(anchor)) {
+      auto *fix = ContextualMismatch::create(cs, lhs, rhs,
+                                             cs.getConstraintLocator(locator));
+      conversionsOrFixes.push_back(fix);
+    }
+
+    break;
+  }
+
   default:
     return;
   }
