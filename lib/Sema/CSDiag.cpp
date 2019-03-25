@@ -2323,11 +2323,10 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
         !isUnresolvedOrTypeVarType(srcFT->getResult()) &&
         CS.TC.isConvertibleTo(srcFT->getResult(), contextualType, CS.DC)) {
 
-      auto locator = CS.getConstraintLocator(expr);
-      auto extendedLocator =
-          CS.getConstraintLocator(locator, ConstraintLocator::ContextualType);
-      ContextualFailure failure = ContextualFailure(
-          nullptr, CS, srcFT, contextualType, extendedLocator);
+      auto locator =
+          CS.getConstraintLocator(expr, ConstraintLocator::ContextualType);
+      ContextualFailure failure =
+          ContextualFailure(nullptr, CS, srcFT, contextualType, locator);
       auto diagnosed = failure.diagnoseAsError();
       assert(diagnosed && "Failed to produce contextual failure diagnostic");
       (void)diagnosed;

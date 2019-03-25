@@ -1350,52 +1350,8 @@ bool ContextualFailure::diagnoseMissingFunctionCall() const {
       .highlight(anchor->getSourceRange())
       .fixItInsertAfter(anchor->getEndLoc(), "()");
 
-  // It is possible that we're looking at a stored property being
-  // initialized with a closure. Something like:
-  //
-  // var foo: Int = { return 0 }
-  //
-  // Let's offer another fix-it to remove the '=' to turn the stored
-  // property into a computed property. If the variable is immutable, then
-  // replace the 'let' with a 'var'.
-
-  if (getAnchor() && !isa<ClosureExpr>(getAnchor())) {
-    return true;
-  }
-
-  // First, check if the variable is declared top level or not. If it is
-  // not, then it means we're inside a decl like a class or an extension.
-  PatternBindingDecl *PBD = nullptr;
-
-  if (auto TLCD = dyn_cast<TopLevelCodeDecl>(getDC())) {
-    if (TLCD->getBody()->isImplicit()) {
-      if (auto decl = TLCD->getBody()->getElement(0).dyn_cast<Decl *>()) {
-        if (auto binding = dyn_cast<PatternBindingDecl>(decl)) {
-          PBD = binding;
-        }
-      }
-    }
-  } else if (auto PBI = dyn_cast<PatternBindingInitializer>(getDC())) {
-    PBD = PBI->getBinding();
-  }
-
-  if (PBD) {
-    if (auto VD = PBD->getSingleVar()) {
-      auto entry = PBD->getPatternEntryForVarDecl(VD);
-
-      if (!VD->isStatic() &&
-          !VD->getAttrs().getAttribute<DynamicReplacementAttr>() &&
-          entry.getInit() && isa<ClosureExpr>(entry.getInit())) {
-        auto diag =
-            TC.diagnose(anchor->getLoc(), diag::extension_stored_property_fixit,
-                        VD->getName());
-        diag.fixItRemove(entry.getEqualLoc());
-
-        if (VD->isLet()) {
-          diag.fixItReplace(PBD->getStartLoc(), getTokenText(tok::kw_var));
-        }
-      }
-    }
+  if (isa<ClosureExpr>(getAnchor())) {
+    tryComputedPropertyFixIts(TC, anchor, getDC());
   }
 
   return true;
@@ -1426,6 +1382,51 @@ bool ContextualFailure::trySequenceSubsequenceFixIts(InFlightDiagnostic &diag,
   }
 
   return false;
+}
+
+void ContextualFailure::tryComputedPropertyFixIts(TypeChecker &TC, Expr *expr,
+                                                  DeclContext *dc) {
+  // It is possible that we're looking at a stored property being
+  // initialized with a closure. Something like:
+  //
+  // var foo: Int = { return 0 }
+  //
+  // Let's offer another fix-it to remove the '=' to turn the stored
+  // property into a computed property. If the variable is immutable, then
+  // replace the 'let' with a 'var'.
+
+  PatternBindingDecl *PBD = nullptr;
+
+  if (auto TLCD = dyn_cast<TopLevelCodeDecl>(dc)) {
+    if (TLCD->getBody()->isImplicit()) {
+      if (auto decl = TLCD->getBody()->getElement(0).dyn_cast<Decl *>()) {
+        if (auto binding = dyn_cast<PatternBindingDecl>(decl)) {
+          PBD = binding;
+        }
+      }
+    }
+  } else if (auto PBI = dyn_cast<PatternBindingInitializer>(dc)) {
+    PBD = PBI->getBinding();
+  }
+
+  if (PBD) {
+    if (auto VD = PBD->getSingleVar()) {
+      auto entry = PBD->getPatternEntryForVarDecl(VD);
+
+      if (!VD->isStatic() &&
+          !VD->getAttrs().getAttribute<DynamicReplacementAttr>() &&
+          entry.getInit() && isa<ClosureExpr>(entry.getInit())) {
+        auto diag =
+            TC.diagnose(expr->getLoc(), diag::extension_stored_property_fixit,
+                        VD->getName());
+        diag.fixItRemove(entry.getEqualLoc());
+
+        if (VD->isLet()) {
+          diag.fixItReplace(PBD->getStartLoc(), getTokenText(tok::kw_var));
+        }
+      }
+    }
+  }
 }
 
 bool AutoClosureForwardingFailure::diagnoseAsError() {
