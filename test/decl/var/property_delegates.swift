@@ -374,3 +374,11 @@ class Superclass {
 class SubclassWithDelegate: Superclass {
   final override var x by Wrapper(value: 17) // expected-error{{property 'x' with a delegate cannot override another property}}
 }
+
+class C { }
+
+struct BadCombinations {
+  lazy var x: C by WrapperWithInitialValue = C() // expected-error{{property 'x' with a delegate cannot also be lazy}}
+  weak var y: C? by Wrapper // expected-error{{property 'y' with a delegate cannot also be weak}}
+  unowned var z: C by Wrapper // expected-error{{property 'z' with a delegate cannot also be unowned}}
+}

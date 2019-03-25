@@ -106,6 +106,30 @@ UnboundGenericType *swift::getUnboundPropertyDelegateType(
     }
   }
 
+  // Check for conflicting attributes.
+  if (var->getAttrs().hasAttribute<LazyAttr>() ||
+      var->getAttrs().hasAttribute<NSCopyingAttr>() ||
+      var->getAttrs().hasAttribute<NSManagedAttr>() ||
+      (var->getAttrs().hasAttribute<ReferenceOwnershipAttr>() &&
+       var->getAttrs().getAttribute<ReferenceOwnershipAttr>()->get() !=
+           ReferenceOwnership::Strong)) {
+    int whichKind;
+    if (var->getAttrs().hasAttribute<LazyAttr>())
+      whichKind = 0;
+    else if (var->getAttrs().hasAttribute<NSCopyingAttr>())
+      whichKind = 1;
+    else if (var->getAttrs().hasAttribute<NSManagedAttr>())
+      whichKind = 2;
+    else {
+      auto attr = var->getAttrs().getAttribute<ReferenceOwnershipAttr>();
+      whichKind = 2 + static_cast<unsigned>(attr->get());
+    }
+    var->diagnose(diag::property_with_delegate_conflict_attribute,
+                  var->getFullName(), whichKind);
+    var->getPropertyDelegateTypeLoc().setInvalidType(ctx);
+    return nullptr;
+  }
+
   // We haven't resolved the property delegate type yet; do so now.
   SourceLoc byLoc = var->getPropertyDelegateByLoc();
   TypeResolutionOptions options(TypeResolverContext::ProtocolWhereClause);
