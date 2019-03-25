@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -verify-sil-ownership -predictable-memaccess-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -predictable-memaccess-opts %s | %FileCheck %s
 
 sil_stage raw
 

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
-// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-full-demangle %s -verify-sil-ownership
+// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-full-demangle %s
 
 // REQUIRES: objc_interop
 

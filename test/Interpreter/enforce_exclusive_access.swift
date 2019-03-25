@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -verify-sil-ownership -swift-version 4 %s -o %t/a.out -enforce-exclusivity=checked -Onone
+// RUN: %target-build-swift  -swift-version 4 %s -o %t/a.out -enforce-exclusivity=checked -Onone
 //
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out

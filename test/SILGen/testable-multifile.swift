@@ -8,8 +8,8 @@
 // RUN: %target-swift-emit-silgen -I %t -primary-file %s %S/testable-multifile-other.swift -module-name main | %FileCheck %s
 
 // Just make sure we don't crash later on.
-// RUN: %target-swift-emit-ir -verify-sil-ownership -I %t -primary-file %s %S/testable-multifile-other.swift -module-name main -o /dev/null
-// RUN: %target-swift-emit-ir -verify-sil-ownership -I %t -O -primary-file %s %S/testable-multifile-other.swift -module-name main -o /dev/null
+// RUN: %target-swift-emit-ir -I %t -primary-file %s %S/testable-multifile-other.swift -module-name main -o /dev/null
+// RUN: %target-swift-emit-ir -I %t -O -primary-file %s %S/testable-multifile-other.swift -module-name main -o /dev/null
 
 @testable import TestableMultifileHelper
 
