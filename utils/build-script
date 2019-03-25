@@ -137,15 +137,10 @@ class HostSpecificConfiguration(object):
             # For platforms which normally require a connected device to
             # test, the default behavior is to run tests that only require
             # the host (i.e., they do not attempt to execute).
-            if deployment_platform.is_darwin and \
-               deployment_platform.is_embedded and \
-               not deployment_platform.is_simulator:
-                if deployment_platform not in \
-                        invocation.platforms_to_skip_test_host:
-                    test_host_only = True
-                    test = True
-                else:
-                    test = False
+            if deployment_platform.uses_host_tests and \
+                    deployment_platform not in \
+                    invocation.platforms_to_skip_test_host:
+                test_host_only = True
 
             name = deployment_target.name
 
@@ -181,7 +176,7 @@ class HostSpecificConfiguration(object):
                         "check-swift-benchmark-{}-external".format(name))
             if test:
                 if test_host_only:
-                    suffix = "-non-executable"
+                    suffix = "-only_non_executable"
                 else:
                     suffix = ""
                 subset_suffix = ""
@@ -407,11 +402,13 @@ class BuildScriptInvocation(object):
         if not args.test_watchos_simulator:
             self.platforms_to_skip_test.add(
                 StdlibDeploymentTarget.AppleWatchSimulator)
-
-        if not args.test_android_host:
+        if not args.test_android:
             self.platforms_to_skip_test.add(StdlibDeploymentTarget.Android)
 
         self.platforms_to_skip_test_host = set()
+        if not args.test_android_host:
+            self.platforms_to_skip_test_host.add(
+                StdlibDeploymentTarget.Android)
         if not args.test_ios_host:
             self.platforms_to_skip_test_host.add(StdlibDeploymentTarget.iOS)
         if not args.test_tvos_host:
@@ -709,6 +706,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-test-watchos-host"]
         if not args.test_watchos_simulator:
             impl_args += ["--skip-test-watchos-simulator"]
+        if not args.test_android:
+            impl_args += ["--skip-test-android"]
         if not args.test_android_host:
             impl_args += ["--skip-test-android-host"]
         if args.build_runtime_with_host_compiler:

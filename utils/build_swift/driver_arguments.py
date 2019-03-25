@@ -202,6 +202,7 @@ def _apply_default_arguments(args):
         args.test_ios = False
         args.test_tvos = False
         args.test_watchos = False
+        args.test_android = False
         args.test_indexstoredb = False
         args.test_sourcekitlsp = False
 
@@ -237,6 +238,10 @@ def _apply_default_arguments(args):
         args.test_watchos_simulator = False
 
     if not args.build_android:
+        args.test_android = False
+        args.test_android_host = False
+
+    if not args.test_android:
         args.test_android_host = False
 
     if not args.host_test:
@@ -899,6 +904,9 @@ def create_argument_parser():
            help='skip testing watchOS device targets on the host machine (the '
                 'watch itself)')
 
+    option('--skip-test-android',
+           toggle_false('test_android'),
+           help='skip testing all Android targets.')
     option('--skip-test-android-host',
            toggle_false('test_android_host'),
            help='skip testing Android device targets on the host machine (the '
