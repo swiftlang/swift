@@ -5561,12 +5561,14 @@ public:
 
 class OperatorDecl;
 
-/// Note: These align with '%select's in diagnostics.
 enum class SelfAccessKind : uint8_t {
-  NonMutating = 0,
-  Mutating    = 1,
-  __Consuming = 2,
+  NonMutating,
+  Mutating,
+  __Consuming,
 };
+
+/// Diagnostic printing of \c SelfAccessKind.
+llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SelfAccessKind SAK);
   
 /// FuncDecl - 'func' declaration.
 class FuncDecl : public AbstractFunctionDecl {

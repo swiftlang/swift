@@ -279,11 +279,11 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
     if (contextTy->hasReferenceSemantics()) {
       if (attrModifier != SelfAccessKind::__Consuming)
         diagnoseAndRemoveAttr(attr, diag::mutating_invalid_classes,
-                              unsigned(attrModifier));
+                              attrModifier);
     }
   } else {
     diagnoseAndRemoveAttr(attr, diag::mutating_invalid_global_scope,
-                          unsigned(attrModifier));
+                          attrModifier);
   }
 
   // Verify we don't have more than one of mutating, nonmutating,
@@ -294,24 +294,21 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
     if (auto *NMA = FD->getAttrs().getAttribute<NonMutatingAttr>()) {
       if (attrModifier != SelfAccessKind::NonMutating) {
         diagnoseAndRemoveAttr(NMA, diag::functions_mutating_and_not,
-                              unsigned(SelfAccessKind::NonMutating),
-                              unsigned(attrModifier));
+                              SelfAccessKind::NonMutating, attrModifier);
       }
     }
 
     if (auto *MUA = FD->getAttrs().getAttribute<MutatingAttr>()) {
       if (attrModifier != SelfAccessKind::Mutating) {
         diagnoseAndRemoveAttr(MUA, diag::functions_mutating_and_not,
-                                unsigned(SelfAccessKind::Mutating),
-                                unsigned(attrModifier));
+                                SelfAccessKind::Mutating, attrModifier);
       }
     }
 
     if (auto *CSA = FD->getAttrs().getAttribute<ConsumingAttr>()) {
       if (attrModifier != SelfAccessKind::__Consuming) {
         diagnoseAndRemoveAttr(CSA, diag::functions_mutating_and_not,
-                              unsigned(SelfAccessKind::__Consuming),
-                              unsigned(attrModifier));
+                              SelfAccessKind::__Consuming, attrModifier);
       }
     }
   }

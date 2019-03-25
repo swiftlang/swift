@@ -1975,7 +1975,10 @@ static bool computeIsSetterMutating(TypeChecker &TC,
       if ((result || storage->isGetterMutating()) != modifyResult) {
         TC.diagnose(modifyAccessor,
                     diag::modify_mutatingness_differs_from_setter,
-                    modifyResult);
+                    modifyResult ? SelfAccessKind::Mutating
+                                 : SelfAccessKind::NonMutating,
+                    modifyResult ? SelfAccessKind::NonMutating
+                                 : SelfAccessKind::Mutating);
         TC.diagnose(storage->getSetter(), diag::previous_accessor, "setter", 0);
         modifyAccessor->setInvalid();
       }

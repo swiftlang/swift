@@ -2193,19 +2193,19 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     // FIXME: Could emit a Fix-It here.
     diags.diagnose(match.Witness,
                    diag::protocol_witness_mutation_modifier_conflict,
-                   unsigned(SelfAccessKind::Mutating));
+                   SelfAccessKind::Mutating);
     break;
   case MatchKind::NonMutatingConflict:
     // FIXME: Could emit a Fix-It here.
     diags.diagnose(match.Witness,
                    diag::protocol_witness_mutation_modifier_conflict,
-                   unsigned(SelfAccessKind::NonMutating));
+                   SelfAccessKind::NonMutating);
     break;
   case MatchKind::ConsumingConflict:
     // FIXME: Could emit a Fix-It here.
     diags.diagnose(match.Witness,
                    diag::protocol_witness_mutation_modifier_conflict,
-                   unsigned(SelfAccessKind::__Consuming));
+                   SelfAccessKind::__Consuming);
     break;
   case MatchKind::RethrowsConflict:
     // FIXME: Could emit a Fix-It here.

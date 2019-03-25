@@ -324,6 +324,16 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
   return OS << "'" << keywordOf(RO) << "'";
 }
 
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
+                                     SelfAccessKind SAK) {
+  switch (SAK) {
+  case SelfAccessKind::NonMutating: return OS << "'nonmutating'";
+  case SelfAccessKind::Mutating: return OS << "'mutating'";
+  case SelfAccessKind::__Consuming: return OS << "'__consuming'";
+  }
+  llvm_unreachable("Unknown SelfAccessKind");
+}
+
 DeclContext *Decl::getInnermostDeclContext() const {
   if (auto func = dyn_cast<AbstractFunctionDecl>(this))
     return const_cast<AbstractFunctionDecl*>(func);
