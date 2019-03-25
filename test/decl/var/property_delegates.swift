@@ -382,3 +382,9 @@ struct BadCombinations {
   weak var y: C? by Wrapper // expected-error{{property 'y' with a delegate cannot also be weak}}
   unowned var z: C by Wrapper // expected-error{{property 'z' with a delegate cannot also be unowned}}
 }
+
+struct DelegateWithAccessors {
+  var x: Int by Wrapper { // expected-error{{property 'x' with a delegate cannot declare accessors}}
+    return 0
+  }
+}

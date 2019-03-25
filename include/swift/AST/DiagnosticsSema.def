@@ -4326,6 +4326,9 @@ ERROR(property_with_delegate_conflict_attribute,none,
       "property %0 with a delegate cannot also be "
       "%select{lazy|@NSCopying|@NSManaged|weak|unowned|unmanaged}1",
       (DeclName, int))
+ERROR(property_with_delegate_accessors,none,
+      "property %0 with a delegate cannot declare accessors",
+      (DeclName))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

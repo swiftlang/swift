@@ -1601,10 +1601,12 @@ void swift::triggerAccessorSynthesis(TypeChecker &TC,
     if (!accessor)
       return;
 
-    accessor->setBodySynthesizer(&synthesizeAccessorBody);
+    if (!accessor->hasBody()) {
+      accessor->setBodySynthesizer(&synthesizeAccessorBody);
 
-    TC.Context.addSynthesizedDecl(accessor);
-    TC.DeclsToFinalize.insert(accessor);
+      TC.Context.addSynthesizedDecl(accessor);
+      TC.DeclsToFinalize.insert(accessor);
+    }
   });
 }
 
