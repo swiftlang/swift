@@ -241,7 +241,7 @@ class C4 {
     var _: SomeEnum1??? = .#^UNRESOLVED_OPT_3^#
   }
 }
-// UNRESOLVED_3: Begin completions
+// UNRESOLVED_3: Begin completions, 2 items
 // UNRESOLVED_3-DAG: Decl[EnumElement]/ExprSpecific:     North[#SomeEnum1#]; name=North
 // UNRESOLVED_3-DAG: Decl[EnumElement]/ExprSpecific:     South[#SomeEnum1#]; name=South
 // UNRESOLVED_3-NOT: SomeOptions1
@@ -249,21 +249,21 @@ class C4 {
 // UNRESOLVED_3-NOT: none
 // UNRESOLVED_3-NOT: some(
 
-// UNRESOLVED_3_OPT: Begin completions
+// UNRESOLVED_3_OPT: Begin completions, 5 items
 // UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     North[#SomeEnum1#];
 // UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     South[#SomeEnum1#];
 // UNRESOLVED_3_OPT-DAG: Keyword[nil]/ExprSpecific/Erase[1]: nil[#SomeEnum1?#]; name=nil
-// UNRESOLVED_3_OPT-NOT: none
-// UNRESOLVED_3_OPT-NOT: some
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     none[#Optional<SomeEnum1>#]; name=none
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     some({#SomeEnum1#})[#Optional<SomeEnum1>#];
 // UNRESOLVED_3_OPT-NOT: init({#(some):
 // UNRESOLVED_3_OPT-NOT: init({#nilLiteral:
 
-// UNRESOLVED_3_OPTOPTOPT: Begin completions
+// UNRESOLVED_3_OPTOPTOPT: Begin completions, 5 items
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     North[#SomeEnum1#];
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     South[#SomeEnum1#];
 // UNRESOLVED_3_OPTOPTOPT-DAG: Keyword[nil]/ExprSpecific/Erase[1]: nil[#SomeEnum1???#]; name=nil
-// UNRESOLVED_3_OPTOPTOPT-NOT: none
-// UNRESOLVED_3_OPTOPTOPT-NOT: some
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     none[#Optional<SomeEnum1??>#]; name=none
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     some({#SomeEnum1??#})[#Optional<SomeEnum1??>#];
 // UNRESOLVED_3_OPTOPTOPT-NOT: init({#(some):
 // UNRESOLVED_3_OPTOPTOPT-NOT: init({#nilLiteral:
 
@@ -276,16 +276,17 @@ extension Optional where Wrapped == Somewhere {
 }
 func testOptionalWithCustomExtension() {
   var _: Somewhere? = .#^UNRESOLVED_OPT_4^#
-// UNRESOLVED_OPT_4: Begin completions
+// UNRESOLVED_OPT_4: Begin completions, 7 items
 // UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific:     earth[#Somewhere#];
 // UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific:     mars[#Somewhere#];
 // UNRESOLVED_OPT_4-DAG: Keyword[nil]/ExprSpecific/Erase[1]: nil[#Somewhere?#]; name=nil
+// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific:     none[#Optional<Somewhere>#]; name=none
+// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific:     some({#Somewhere#})[#Optional<Somewhere>#];
 // UNRESOLVED_OPT_4-DAG: Decl[Constructor]/CurrNominal:      init({#str: String#})[#Optional<Somewhere>#]; name=init(str: String)
 // UNRESOLVED_OPT_4-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: nowhere[#Optional<Somewhere>#]; name=nowhere
-// UNRESOLVED_OPT_4-NOT: none
-// UNRESOLVED_OPT_4-NOT: some
 // UNRESOLVED_OPT_4-NOT: init({#(some):
 // UNRESOLVED_OPT_4-NOT: init({#nilLiteral:
+// UNRESOLVED_OPT_4: End completions
 }
 
 
