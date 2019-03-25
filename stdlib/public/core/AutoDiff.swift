@@ -515,8 +515,8 @@ internal protocol _AnyDerivativeBox {
   func _moved(along direction: _AnyDerivativeBox) -> _AnyDerivativeBox
   func _tangentVector(from cotangent: _AnyDerivativeBox) -> _AnyDerivativeBox
 
-  /// The underlying base value.
-  var _base: Any { get }
+  /// The underlying base value, type-erased to `Any`.
+  var _typeErasedBase: Any { get }
 
   /// Returns the underlying value unboxed to the given type, if possible.
   func _unboxed<U>(to type: U.Type) -> U?
@@ -525,9 +525,22 @@ internal protocol _AnyDerivativeBox {
           // NOTE: The requirement below should be defined on `Differentiable`.
           // But it causes a crash due to generic signature minimization bug.
           U.CotangentVector == U.CotangentVector.AllDifferentiableVariables
+}
 
+extension _AnyDerivativeBox {
   /// Returns true if the underlying value has type `AnyDerivative.OpaqueZero`.
-  func _isOpaqueZero() -> Bool
+  func _isOpaqueZero() -> Bool {
+    return _unboxed(to: AnyDerivative.OpaqueZero.self) != nil
+  }
+}
+
+@inline(never)
+@usableFromInline
+internal func _derivativeTypeMismatch(
+  _ x: Any, _ y: Any, file: StaticString = #file, line: UInt = #line
+) -> Never {
+  fatalError("Derivative type mismatch: \(type(of: x)) and \(type(of: y))",
+             file: file, line: line)
 }
 
 internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
@@ -538,15 +551,15 @@ internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
         T.CotangentVector == T.CotangentVector.AllDifferentiableVariables
 {
   /// The underlying base value.
-  var _baseDerivative: T
+  var _base: T
 
-  public init(_ base: T) {
-    self._baseDerivative = base
+  init(_ base: T) {
+    self._base = base
   }
 
   /// The underlying base value, type-erased to `Any`.
-  var _base: Any {
-    return _baseDerivative
+  var _typeErasedBase: Any {
+    return _base
   }
 
   func _unboxed<U>(to type: U.Type) -> U?
@@ -556,48 +569,17 @@ internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
           // But it causes a crash due to generic signature minimization bug.
           U.CotangentVector == U.CotangentVector.AllDifferentiableVariables
   {
-    return (self as _AnyDerivativeBox as? _ConcreteDerivativeBox<U>)?
-      ._baseDerivative
-  }
-
-  func _isOpaqueZero() -> Bool {
-    return T.self == AnyDerivative._OpaqueZero.self
+    return (self as? _ConcreteDerivativeBox<U>)?._base
   }
 
   // `Equatable` requirements (implied by `AdditiveArithmetic`).
 
   func _isEqual(to other: _AnyDerivativeBox) -> Bool {
-    // 0 == 0 => true
-    if _isOpaqueZero() && other._isOpaqueZero() {
-      return true
-    }
-    if _isOpaqueZero() {
-      return type(of: other)._zero._isEqual(to: other)
-    }
-    if other._isOpaqueZero() {
-      return _ConcreteDerivativeBox<T>(T.zero)._isEqual(to: self)
-    }
-    guard let otherBase = other._unboxed(to: T.self) else {
-      fatalError()
-    }
-    return _baseDerivative == otherBase
+    return _base == other._unboxed(to: T.self)
   }
 
   func _isNotEqual(to other: _AnyDerivativeBox) -> Bool {
-    // 0 != 0 => false
-    if _isOpaqueZero() && other._isOpaqueZero() {
-      return false
-    }
-    if _isOpaqueZero() {
-      return type(of: other)._zero._isNotEqual(to: other)
-    }
-    if other._isOpaqueZero() {
-      return _ConcreteDerivativeBox<T>(T.zero)._isNotEqual(to: self)
-    }
-    guard let otherBase = other._unboxed(to: T.self) else {
-      fatalError()
-    }
-    return _baseDerivative != otherBase
+    return _base != other._unboxed(to: T.self)
   }
 
   // `AdditiveArithmetic` requirements.
@@ -620,9 +602,9 @@ internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
       return self
     }
     guard let xBase = x._unboxed(to: T.self) else {
-      fatalError()
+      _derivativeTypeMismatch(self, x)
     }
-    return _ConcreteDerivativeBox(_baseDerivative + xBase)
+    return _ConcreteDerivativeBox(_base + xBase)
   }
 
   func _subtracting(_ x: _AnyDerivativeBox) -> _AnyDerivativeBox {
@@ -639,9 +621,9 @@ internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
       return self
     }
     guard let xBase = x._unboxed(to: T.self) else {
-      fatalError()
+      _derivativeTypeMismatch(self, x)
     }
-    return _ConcreteDerivativeBox(_baseDerivative - xBase)
+    return _ConcreteDerivativeBox(_base - xBase)
   }
 
   // `Differentiable` requirements.
@@ -650,7 +632,7 @@ internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
     if _isOpaqueZero() {
       return self
     }
-    return _ConcreteDerivativeBox(_baseDerivative.allDifferentiableVariables)
+    return _ConcreteDerivativeBox(_base.allDifferentiableVariables)
   }
 
   func _moved(along direction: _AnyDerivativeBox) -> _AnyDerivativeBox {
@@ -662,10 +644,10 @@ internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
     }
     guard let directionBase =
       direction._unboxed(to: T.TangentVector.self) else {
-      fatalError()
+      _derivativeTypeMismatch(self, direction)
     }
     return _ConcreteDerivativeBox<T>(
-      _baseDerivative.moved(along: directionBase))
+      _base.moved(along: directionBase))
   }
 
   func _tangentVector(from cotangent: _AnyDerivativeBox) -> _AnyDerivativeBox {
@@ -678,10 +660,10 @@ internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
     }
     guard let cotangentBase =
       cotangent._unboxed(to: T.CotangentVector.self) else {
-      fatalError()
+      _derivativeTypeMismatch(self, cotangent)
     }
     return _ConcreteDerivativeBox<T.TangentVector>(
-      _baseDerivative.tangentVector(from: cotangentBase))
+      _base.tangentVector(from: cotangentBase))
   }
 }
 
@@ -699,7 +681,7 @@ public struct AnyDerivative : Differentiable & AdditiveArithmetic {
 
   /// The underlying base value.
   public var base: Any {
-    return _box._base
+    return _box._typeErasedBase
   }
 
   /// Creates a type-erased derivative from the given derivative.
@@ -730,11 +712,11 @@ public struct AnyDerivative : Differentiable & AdditiveArithmetic {
   /// Internal struct representing an opaque zero value.
   @_fixed_layout
   @usableFromInline
-  internal struct _OpaqueZero : Differentiable & AdditiveArithmetic {}
+  internal struct OpaqueZero : Differentiable & AdditiveArithmetic {}
 
   public static var zero: AnyDerivative {
     return AnyDerivative(
-      box: _ConcreteDerivativeBox<_OpaqueZero>(_OpaqueZero.zero))
+      box: _ConcreteDerivativeBox<OpaqueZero>(OpaqueZero.zero))
   }
   public static func + (lhs: AnyDerivative, rhs: AnyDerivative)
       -> AnyDerivative {

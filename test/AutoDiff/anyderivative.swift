@@ -46,9 +46,9 @@ AnyDerivativeTests.test("Zero") {
 
   var tan = AnyDerivative(Vector.TangentVector(x: 1, y: 1))
   expectEqual(zero, tan.tangentVector(from: zero))
-  expectEqual(AnyDerivative(Vector.TangentVector.zero), zero)
   expectEqual(AnyDerivative(Vector.TangentVector.zero), tan - tan)
-  expectEqual(AnyDerivative.zero, tan - tan)
+  expectNotEqual(AnyDerivative(Vector.TangentVector.zero), zero)
+  expectNotEqual(AnyDerivative.zero, tan - tan)
   tan += zero
   tan -= zero
   expectEqual(tan, tan + zero)
