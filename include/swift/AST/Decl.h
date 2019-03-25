@@ -4715,7 +4715,7 @@ public:
   /// Set \p v to be the pattern produced VarDecl that is the parent of this
   /// var decl.
   void setParentVarDecl(VarDecl *v) {
-    assert(v);
+    assert(v && v != this);
     Parent = v;
   }
 
