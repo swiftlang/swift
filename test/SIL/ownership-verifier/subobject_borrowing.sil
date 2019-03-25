@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -verify-sil-ownership -sil-ownership-verifier-enable-testing -enable-sil-verify-all=0 -o /dev/null 2>&1  %s | %FileCheck %s
-// RUN: %target-sil-opt -verify-sil-ownership -sil-ownership-verifier-enable-testing -enable-sil-verify-all=0 -o /dev/null 2>&1  %s | %FileCheck -check-prefix=NEGATIVE-TEST %s
+// RUN: %target-sil-opt -sil-ownership-verifier-enable-testing -enable-sil-verify-all=0 -o /dev/null 2>&1  %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-ownership-verifier-enable-testing -enable-sil-verify-all=0 -o /dev/null 2>&1  %s | %FileCheck -check-prefix=NEGATIVE-TEST %s
 // REQUIRES: asserts
 
 sil_stage canonical

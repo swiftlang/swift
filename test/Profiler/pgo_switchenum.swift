@@ -1,6 +1,6 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -Xfrontend -verify-sil-ownership -profile-generate -Xfrontend -disable-incremental-llvm-codegen -module-name pgo_switchenum -o %t/main
+// RUN: %target-build-swift %s  -profile-generate -Xfrontend -disable-incremental-llvm-codegen -module-name pgo_switchenum -o %t/main
 
 // This unusual use of 'sh' allows the path of the profraw file to be
 // substituted by %target-run.

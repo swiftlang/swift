@@ -4,8 +4,8 @@
 // RUN: %target-swift-emit-silgen -I %t -primary-file %s %S/private_import_other.swift -module-name main -swift-version 5 | %FileCheck %s
 // RUN: %target-swift-emit-silgen -I %t %s %S/private_import_other.swift -module-name main -swift-version 5 | %FileCheck %s
 // RUN: %target-swift-emit-silgen -I %t %S/private_import_other.swift %s -module-name main -swift-version 5 | %FileCheck %s
-// RUN: %target-swift-emit-ir -verify-sil-ownership -I %t -primary-file %s %S/private_import_other.swift -module-name main -o /dev/null
-// RUN: %target-swift-emit-ir -verify-sil-ownership -I %t -O -primary-file %s %S/private_import_other.swift -module-name main -o /dev/null
+// RUN: %target-swift-emit-ir -I %t -primary-file %s %S/private_import_other.swift -module-name main -o /dev/null
+// RUN: %target-swift-emit-ir -I %t -O -primary-file %s %S/private_import_other.swift -module-name main -o /dev/null
 
 
 @_private(sourceFile: "private_import_module.swift") import Mod

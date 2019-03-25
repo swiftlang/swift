@@ -236,7 +236,6 @@ function(_compile_swift_files
   endif()
 
   if(SWIFTFILE_IS_STDLIB)
-    list(APPEND swift_flags "-Xfrontend" "-verify-sil-ownership")
     list(APPEND swift_flags "-Xfrontend" "-enable-mandatory-semantic-arc-opts")
   endif()
 

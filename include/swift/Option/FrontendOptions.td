@@ -299,8 +299,8 @@ def emit_pch : Flag<["-"], "emit-pch">,
 def pch_disable_validation : Flag<["-"], "pch-disable-validation">,
   HelpText<"Disable validating the persistent PCH">;
 
-def verify_sil_ownership : Flag<["-"], "verify-sil-ownership">,
-  HelpText<"Verify ownership invariants during SIL Verification ">;
+def disable_sil_ownership_verifier : Flag<["-"], "disable-sil-ownership-verifier">,
+  HelpText<"Do not verify ownership invariants during SIL Verification ">;
 
 def enable_mandatory_semantic_arc_opts : Flag<["-"], "enable-mandatory-semantic-arc-opts">,
   HelpText<"Enable the mandatory semantic arc optimizer">;

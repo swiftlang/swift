@@ -1,7 +1,7 @@
 
-// RUN: %target-swift-emit-sil -verify-sil-ownership -parse-stdlib %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -verify-sil-ownership -parse-stdlib %s | %FileCheck %s -check-prefix=SILGEN
-// RUN: %target-swift-emit-ir -verify-sil-ownership -parse-stdlib %s
+// RUN: %target-swift-emit-sil -parse-stdlib %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-stdlib %s | %FileCheck %s -check-prefix=SILGEN
+// RUN: %target-swift-emit-ir -parse-stdlib %s
 
 // This test includes some calls to transparent stdlib functions.
 // We pattern match for the absence of access markers in the inlined code.
