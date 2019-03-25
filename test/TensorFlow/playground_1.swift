@@ -17,11 +17,8 @@ let x = 12345678  // a distinctive number to filecheck for.
 // CHECK: [[INT:%.*]] = integer_literal $Builtin.Int64, 12345678
 // CHECK: [[INT2:%.*]] = struct $Int ([[INT]] : $Builtin.Int64)
 // CHECK: store [[INT2]] to [[INTP:%.*]] : $*Int
-// CHECK: [[INT:%.*]] = load [[INTP]] : $*Int
-// CHECK: [[INTP:%.*]] = alloc_stack $Int
-// CHECK: store [[INT]] to [[INTP]] : $*Int
 // CHECK: [[LOGFN:%.*]] = function_ref @{{.*}}__builtin_log_with_id{{.*}}
-// CHECK: apply [[LOGFN]]<Int>([[INTP]],
+// CHECK: apply [[LOGFN]]([[INT2]],
 
 
 let a = Tensor<Float>([1,2,3])
