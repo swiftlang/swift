@@ -43,6 +43,29 @@ SerializedModuleLoaderBase::~SerializedModuleLoaderBase() = default;
 
 SerializedModuleLoader::~SerializedModuleLoader() = default;
 
+std::error_code SerializedModuleLoaderBase::openModuleDocFile(
+  AccessPathElem ModuleID, StringRef ModuleDocPath,
+  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) {
+
+  if (!ModuleDocBuffer)
+    return std::error_code();
+
+  llvm::vfs::FileSystem &FS = *Ctx.SourceMgr.getFileSystem();
+
+  // Try to open the module documentation file.  If it does not exist, ignore
+  // the error.  However, pass though all other errors.
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleDocOrErr =
+    FS.getBufferForFile(ModuleDocPath);
+  if (ModuleDocOrErr) {
+    *ModuleDocBuffer = std::move(*ModuleDocOrErr);
+  } else if (ModuleDocOrErr.getError() !=
+               std::errc::no_such_file_or_directory) {
+    return ModuleDocOrErr.getError();
+  }
+
+  return std::error_code();
+}
+
 std::error_code SerializedModuleLoaderBase::openModuleFiles(
     AccessPathElem ModuleID, StringRef ModulePath, StringRef ModuleDocPath,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
@@ -74,18 +97,12 @@ std::error_code SerializedModuleLoaderBase::openModuleFiles(
   if (!ModuleOrErr)
     return ModuleOrErr.getError();
 
-  // Try to open the module documentation file.  If it does not exist, ignore
-  // the error.  However, pass though all other errors.
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleDocOrErr =
-      FS.getBufferForFile(ModuleDocPath);
-  if (!ModuleDocOrErr &&
-      ModuleDocOrErr.getError() != std::errc::no_such_file_or_directory) {
-    return ModuleDocOrErr.getError();
-  }
+  auto ModuleDocErr =
+    openModuleDocFile(ModuleID, ModuleDocPath, ModuleDocBuffer);
+  if (ModuleDocErr)
+    return ModuleDocErr;
 
   *ModuleBuffer = std::move(ModuleOrErr.get());
-  if (ModuleDocOrErr)
-    *ModuleDocBuffer = std::move(ModuleDocOrErr.get());
 
   return std::error_code();
 }
