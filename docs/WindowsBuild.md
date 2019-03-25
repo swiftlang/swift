@@ -125,7 +125,7 @@ cmake -G Ninja^
  -DLLVM_ENABLE_ASSERTIONS=ON^
  -DLLVM_ENABLE_PDB=YES^
  -DLLVM_ENABLE_PROJECTS=clang^
- -DLLVM_TARGETS_TO_BUILD=X86^
+ -DLLVM_TARGETS_TO_BUILD="AArch64;ARM;X86"^
  S:/llvm
 popd
 cmake --build "S:\b\llvm"
@@ -208,7 +208,7 @@ cmake -G Ninja^
   -DLLDB_PATH_TO_LLVM_BUILD="S:\b\llvm"^
   -DLLDB_PATH_TO_SWIFT_BUILD="S:\b\swift"^
   -DLLVM_ENABLE_ASSERTIONS=ON^
-  -DPYTHON_HOME=%ProgramFiles(x86)%\Microsoft Visual Studio\Shared\Python37_64^
+  -DPYTHON_HOME="%ProgramFiles(x86)%\Microsoft Visual Studio\Shared\Python37_64"^
   S:\lldb
 popd
 cmake --build S:\b\lldb
