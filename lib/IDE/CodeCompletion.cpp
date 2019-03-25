@@ -1190,8 +1190,6 @@ void CodeCompletionString::getName(raw_ostream &OS) const {
       }
     }
   }
-  assert((TextSize > 0) &&
-         "code completion string should have non-empty name!");
 }
 
 void CodeCompletionContext::sortCompletionResults(
@@ -2255,14 +2253,8 @@ public:
       else
         Builder.addAnnotatedLeftParen();
 
-      bool anyParam = addCallArgumentPatterns(Builder, AFT->getParams(),
-                                              declParams, includeDefaultArgs);
-
-      if (HaveLParen && !anyParam) {
-        // Empty result, don't add it.
-        Builder.cancel();
-        return;
-      }
+      addCallArgumentPatterns(Builder, AFT->getParams(), declParams,
+                              includeDefaultArgs);
 
       // The rparen matches the lparen here so that we insert both or neither.
       if (!HaveLParen)
@@ -2508,14 +2500,8 @@ public:
       else
         Builder.addAnnotatedLeftParen();
 
-      bool anyParam = addCallArgumentPatterns(
-          Builder, ConstructorType, CD->getParameters(), includeDefaultArgs);
-
-      if (HaveLParen && !anyParam) {
-        // Empty result, don't add it.
-        Builder.cancel();
-        return;
-      }
+      addCallArgumentPatterns(Builder, ConstructorType, CD->getParameters(),
+                              includeDefaultArgs);
 
       // The rparen matches the lparen here so that we insert both or neither.
       if (!HaveLParen)
