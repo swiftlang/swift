@@ -1621,7 +1621,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
 
   // If the overriding declaration does not have the 'override' modifier on
   // it, complain.
-  if (!override->getAttrs().hasAttribute<OverrideAttr>() &&
+  if (!override->getAttrs().hasAttribute<OverrideAttr>(/*AllowInvalid=*/true) &&
       overrideRequiresKeyword(base) != OverrideRequiresKeyword::Never &&
       !override->isImplicit() &&
       override->getDeclContext()->getParentSourceFile()) {
