@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -verify-sil-ownership -inline -verify %s | %FileCheck %s
-// RUN: %target-sil-opt -verify-sil-ownership -mandatory-inlining -verify %s | %FileCheck %s
+// RUN: %target-sil-opt -inline -verify %s | %FileCheck %s
+// RUN: %target-sil-opt -mandatory-inlining -verify %s | %FileCheck %s
 
 import Builtin
 import Swift

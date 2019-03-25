@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-emit-silgen -module-name partial_apply_protocol -verify-sil-ownership -primary-file %s | %FileCheck %s
-// RUN: %target-swift-emit-ir -module-name partial_apply_protocol -verify-sil-ownership -primary-file %s
+// RUN: %target-swift-emit-silgen -module-name partial_apply_protocol -primary-file %s | %FileCheck %s
+// RUN: %target-swift-emit-ir -module-name partial_apply_protocol -primary-file %s
 
 protocol Clonable {
   func clone() -> Self

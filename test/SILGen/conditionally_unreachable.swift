@@ -1,8 +1,8 @@
-// RUN: %target-swift-emit-silgen -verify-sil-ownership -parse-stdlib -primary-file %s | %FileCheck %s -check-prefix=RAW
-// RUN: %target-swift-emit-sil -verify-sil-ownership -assert-config Debug -parse-stdlib -primary-file %s | %FileCheck -check-prefix=DEBUG %s
-// RUN: %target-swift-emit-sil -verify-sil-ownership -O -assert-config Debug -parse-stdlib -primary-file %s | %FileCheck -check-prefix=DEBUG %s
-// RUN: %target-swift-emit-sil -verify-sil-ownership -assert-config Release -parse-stdlib -primary-file %s | %FileCheck -check-prefix=RELEASE %s
-// RUN: %target-swift-emit-sil -verify-sil-ownership -O -assert-config Release -parse-stdlib -primary-file %s | %FileCheck -check-prefix=RELEASE %s
+// RUN: %target-swift-emit-silgen -parse-stdlib -primary-file %s | %FileCheck %s -check-prefix=RAW
+// RUN: %target-swift-emit-sil -assert-config Debug -parse-stdlib -primary-file %s | %FileCheck -check-prefix=DEBUG %s
+// RUN: %target-swift-emit-sil -O -assert-config Debug -parse-stdlib -primary-file %s | %FileCheck -check-prefix=DEBUG %s
+// RUN: %target-swift-emit-sil -assert-config Release -parse-stdlib -primary-file %s | %FileCheck -check-prefix=RELEASE %s
+// RUN: %target-swift-emit-sil -O -assert-config Release -parse-stdlib -primary-file %s | %FileCheck -check-prefix=RELEASE %s
 
 import Swift
 
