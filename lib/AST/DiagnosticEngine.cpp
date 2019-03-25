@@ -475,6 +475,18 @@ static void formatDiagnosticArgument(StringRef Modifier,
     Out << Arg.getAsPatternKind();
     break;
 
+  case DiagnosticArgumentKind::SelfAccessKind:
+    if (Modifier == "select") {
+      formatSelectionArgument(ModifierArguments, Args,
+                              unsigned(Arg.getAsSelfAccessKind()),
+                              FormatOpts, Out);
+    } else {
+      assert(Modifier.empty() &&
+             "Improper modifier for SelfAccessKind argument");
+      Out << Arg.getAsSelfAccessKind();
+    }
+    break;
+
   case DiagnosticArgumentKind::ReferenceOwnership:
     if (Modifier == "select") {
       formatSelectionArgument(ModifierArguments, Args,
