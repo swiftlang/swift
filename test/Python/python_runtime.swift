@@ -199,6 +199,11 @@ PythonRuntimeTestSuite.testWithLeakChecking("Errors") {
     // `expectThrows` does not fail if no error is thrown.
     fatalError("No error was thrown.")
   })
+
+  expectCrash(executing: {
+    let a = Python.object()
+    a.foo = "bar"
+  })
 }
 
 PythonRuntimeTestSuite.testWithLeakChecking("Tuple") {
