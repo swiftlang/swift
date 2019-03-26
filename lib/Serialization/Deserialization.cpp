@@ -238,6 +238,8 @@ getActualDefaultArgKind(uint8_t raw) {
     return swift::DefaultArgumentKind::EmptyArray;
   case serialization::DefaultArgumentKind::EmptyDictionary:
     return swift::DefaultArgumentKind::EmptyDictionary;
+  case serialization::DefaultArgumentKind::StoredProperty:
+    return swift::DefaultArgumentKind::StoredProperty;
   }
   return None;
 }

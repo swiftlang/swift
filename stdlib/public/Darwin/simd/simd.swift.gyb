@@ -86,14 +86,14 @@ public func max(_ x: ${vectype}, _ y: ${vectype}) -> ${vectype} {
 /// corresponding element of the input vector and the scalar.
 @_transparent
 public func min(_ vector: ${vectype}, _ scalar: ${scalar}) -> ${vectype} {
-  return min(vector, ${vectype}(scalar))
+  return min(vector, ${vectype}(repeating: scalar))
 }
 
 /// Vector-scalar maximum.  Each component of the result is the maximum of the
 /// corresponding element of the input vector and the scalar.
 @_transparent
 public func max(_ vector: ${vectype}, _ scalar: ${scalar}) -> ${vectype} {
-  return max(vector, ${vectype}(scalar))
+  return max(vector, ${vectype}(repeating: scalar))
 }
 
 /// Each component of the result is the corresponding element of `x` clamped to
@@ -370,7 +370,7 @@ extension ${mattype} {
 
   /// Initialize matrix to have `scalar` on main diagonal, zeros elsewhere.
   public init(_ scalar: ${type}) {
-    self.init(diagonal: ${diagtype}(scalar))
+    self.init(diagonal: ${diagtype}(repeating: scalar))
   }
 
   /// Initialize matrix to have specified `diagonal`, and zeros elsewhere.
