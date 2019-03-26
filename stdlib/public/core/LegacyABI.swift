@@ -13,6 +13,14 @@
 // This file contains non-API (or underscored) declarations that are needed to
 // be kept around for ABI compatibility
 
+// This is an old intrinsic known by the compiler, but exists solely for ABI
+// compatibility at this point.
+@available(swift, obsoleted: 5.0)
+@usableFromInline
+internal func _getBool(_ v: Builtin.Int1) -> Bool {
+  return Bool(v)
+}
+
 extension Unicode.UTF16 {
   @available(*, unavailable, renamed: "Unicode.UTF16.isASCII")
   @inlinable
