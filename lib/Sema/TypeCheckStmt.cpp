@@ -2012,17 +2012,8 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
         // In either case, we should assume that the intent was to implicitly
         // return the single expression and diagnose accordingly, per the first
         // call to solve.
-        auto HadSalvageError = cs.salvage(viable, E);
-        if (!HadSalvageError) {
-          auto &solution = viable[0];
-          E = cs.applySolution(solution, E, resultType, /*discardedExpr=*/false, 
-                               /*skipClosures*/false);
-          if (E != FD->getSingleExpressionBody())
-            FD->setSingleExpressionBody(E);
-          setAutoClosureDiscriminators(FD, BS);
-          FD->setBody(BS);
-        }
-        return HadSalvageError;
+        cs.salvage(viable, E);
+        return true;
       }
     }
   }
