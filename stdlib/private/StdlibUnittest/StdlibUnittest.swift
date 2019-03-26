@@ -105,7 +105,7 @@ public struct SourceLocStack {
 
 fileprivate struct AtomicBool {
     
-    private var _value = _stdlib_AtomicInt
+    private var _value: _stdlib_AtomicInt
     
     init(_ b: Bool) { self._value = _stdlib_AtomicInt(b ? 1 : 0) }
     
