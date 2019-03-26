@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend %s -typecheck -verify
 
-import Foundation
-
 // MARK: - Helpers
 
 
@@ -48,10 +46,6 @@ struct StructWithProperty {
 @dynamicMemberLookup
 struct DynamicStruct {
     subscript(dynamicMember input: String) -> String { return input } 
-}
-
-class DynamicSubscriptClass {
-  @objc subscript (i : Int) -> String { "howdy" }
 }
 
 struct MyOwnArray<Element> : ExpressibleByArrayLiteral {
@@ -413,10 +407,6 @@ func ff_implicitDynamicMember(_ s: DynamicStruct) -> String {
     s.foo
 }
 
-func ff_implicitDynamicSubscript(_ c: DynamicSubscriptClass) -> String {
-    c[13]
-}
-
 func ff_implicitParenExpr() -> Int {
     (3 + 5)
 }
@@ -544,14 +534,6 @@ func ff_conditional(_ condition: Bool) -> Int {
 var __ff_implicitAssignExpr: Int = 0
 func ff_implicitAssignExpr(newValue: Int) -> Void {
     __ff_implicitAssignExpr = newValue
-}
-
-func ff_implicitObjcSelectorExpr() -> Selector {
-    #selector(NSArray.object(at:))
-}
-
-func ff_implicitKeyPathExpr() -> String {
-    #keyPath(NSArray.count)
 }
 
 func ff_implicitMemberAccessInit() -> Initable {
@@ -1732,6 +1714,10 @@ class CSuperExpr_Derived : CSuperExpr_Base { override init() { super.init() } }
 class CImplicitIdentityExpr { func gimme() -> CImplicitIdentityExpr { self } }
 
 class CImplicitDotSelfExpr { func gimme() -> CImplicitDotSelfExpr { self.self } }
+
+func badIs<T>(_ value: Any, anInstanceOf type: T.Type) -> Bool {
+    value is type // expected-error {{use of undeclared type 'type'}}
+}
 
 
 
