@@ -1637,10 +1637,6 @@ static void maybeAddAccessorsForPropertyDelegate(VarDecl *var,
   auto unwrapVar = getAttachedPropertyDelegateInfo(var).unwrapProperty;
   assert(unwrapVar && "Cannot fail when the backing var is valid");
 
-  // If there are already accessors, something is invalid; bail out.
-  if (!var->getImplInfo().isSimpleStored())
-    return;
-
   if (!var->getGetter()) {
     addGetterToStorage(var, ctx);
   }
@@ -1867,7 +1863,8 @@ void synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
 
 static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
                     SmallVectorImpl<DefaultArgumentInitializer *> &defaultInits,
-                                         unsigned paramSize, ASTContext &ctx) {
+                                         unsigned paramSize, ASTContext &ctx,
+                                         VarDecl *backingVar) {
   // First and foremost, if this is a constant don't bother.
   if (var->isLet())
     return;
@@ -1881,8 +1878,15 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
   // initializer, then we can't generate a default value. An example of where
   // silgen can assign a default is var x: Int? where the default is nil.
   // If the variable is lazy, go ahead and give it a default value.
+  //
+  // With property delegates, we look at whether the backing storage property
+  // is default-initializable.
   if (!var->getAttrs().hasAttribute<LazyAttr>() &&
-      !var->getParentPatternBinding()->isDefaultInitializable())
+      !(var->hasPropertyDelegate() &&
+        backingVar && backingVar->hasStorage() &&
+        backingVar->getParentPatternBinding()->isDefaultInitializable()) &&
+      !(var->hasStorage() &&
+        var->getParentPatternBinding()->isDefaultInitializable()))
     return;
 
   // We can add a default value now.
@@ -1907,7 +1911,7 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
 
   // Set the default value to the variable. When we emit this in silgen
   // we're going to call the variable's initializer expression.
-  arg->setStoredProperty(var);
+  arg->setStoredProperty(backingVar ? backingVar : var);
   arg->setDefaultArgumentKind(DefaultArgumentKind::StoredProperty);
 }
 
@@ -1961,6 +1965,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       tc.validateDecl(var);
       auto varInterfaceType = var->getValueInterfaceType();
 
+      VarDecl *delegateBackingVar = nullptr;
       if (var->getAttrs().hasAttribute<LazyAttr>()) {
         // If var is a lazy property, its value is provided for the underlying
         // storage.  We thus take an optional of the property's type.  We only
@@ -1975,12 +1980,12 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
         // When there is no init(initialValue:), the underlying storage
         // type will need to be initialized.
         auto delegateTypeInfo = getAttachedPropertyDelegateInfo(var);
-        if (!delegateTypeInfo.initialValueInit) {
-          if (auto backingVar =
-                  getOrSynthesizePropertyDelegateBackingProperty(var)) {
-            varInterfaceType = backingVar->getValueInterfaceType();
-            accessLevel = std::min(accessLevel, backingVar->getFormalAccess());
-          }
+        delegateBackingVar =
+                getOrSynthesizePropertyDelegateBackingProperty(var);
+        if (!delegateTypeInfo.initialValueInit && delegateBackingVar) {
+          varInterfaceType = delegateBackingVar->getValueInterfaceType();
+          accessLevel =
+              std::min(accessLevel, delegateBackingVar->getFormalAccess());
         }
       }
 
@@ -1991,7 +1996,8 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       arg->setInterfaceType(varInterfaceType);
       arg->setImplicit();
       
-      maybeAddMemberwiseDefaultArg(arg, var, defaultInits, params.size(), ctx);
+      maybeAddMemberwiseDefaultArg(arg, var, defaultInits, params.size(), ctx,
+                                   delegateBackingVar);
       
       params.push_back(arg);
     }

@@ -130,13 +130,6 @@ UnboundGenericType *swift::getUnboundPropertyDelegateType(
     return nullptr;
   }
 
-  if (!var->getImplInfo().isSimpleStored() &&
-      !var->hasStorage()) {
-    var->diagnose(diag::property_with_delegate_accessors, var->getFullName());
-    var->getPropertyDelegateTypeLoc().setInvalidType(ctx);
-    return nullptr;
-  }
-
   // We haven't resolved the property delegate type yet; do so now.
   SourceLoc byLoc = var->getPropertyDelegateByLoc();
   TypeResolutionOptions options(TypeResolverContext::ProtocolWhereClause);

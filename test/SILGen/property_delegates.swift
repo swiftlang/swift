@@ -57,3 +57,33 @@ struct HasNested<T> {
     return HasNested<T>(y: y)
   }
 }
+
+struct DelegateWithAccessors {
+  var x: Int by Wrapper {
+    // CHECK-LABEL: sil hidden [ossa] @$s18property_delegates21DelegateWithAccessorsV1xSivg
+    // CHECK-NOT: return
+    // CHECK: integer_literal $Builtin.IntLiteral, 42
+    return 42
+
+    // Synthesized setter
+    // CHECK-LABEL: sil hidden [ossa] @$s18property_delegates21DelegateWithAccessorsV1xSivs : $@convention(method) (Int, @inout DelegateWithAccessors) -> ()
+    // CHECK-NOT: return
+    // CHECK: struct_element_addr {{%.*}} : $*DelegateWithAccessors, #DelegateWithAccessors.$x
+  }
+  
+  var y: Int by WrapperWithInitialValue {
+    // Synthesized getter
+    // CHECK-LABEL: sil hidden [ossa] @$s18property_delegates21DelegateWithAccessorsV1ySivg : $@convention(method) (DelegateWithAccessors) -> Int
+    // CHECK-NOT: return
+    // CHECK: struct_extract %0 : $DelegateWithAccessors, #DelegateWithAccessors.$y
+
+    // CHECK-LABEL: sil hidden [ossa] @$s18property_delegates21DelegateWithAccessorsV1ySivs : $@convention(method) (Int, @inout DelegateWithAccessors) -> ()
+    // CHECK-NOT: struct_extract
+    // CHECK: return
+    set { }
+  }
+
+  mutating func test() {
+    x = y
+  }
+}

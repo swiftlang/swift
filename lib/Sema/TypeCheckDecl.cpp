@@ -1929,6 +1929,21 @@ static bool computeIsGetterMutating(TypeChecker &TC,
            !storage->isStatic();
   }
 
+  // If we have an attached property delegate, the getter is mutating if
+  // the "value" property of the delegate type is mutating and we're in
+  // a context that has value semantics.
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    if (var->hasPropertyDelegate()) {
+      auto info = getAttachedPropertyDelegateInfo(var);
+      if (info.unwrapProperty) {
+        TC.validateDecl(info.unwrapProperty);
+        return info.unwrapProperty->isGetterMutating() &&
+            var->isInstanceMember() &&
+            doesContextHaveValueSemantics(var->getDeclContext());
+      }
+    }
+  }
+
   switch (storage->getReadImpl()) {
   case ReadImplKind::Stored:
     return false;
@@ -1949,6 +1964,21 @@ static bool computeIsGetterMutating(TypeChecker &TC,
 
 static bool computeIsSetterMutating(TypeChecker &TC,
                                     AbstractStorageDecl *storage) {
+  // If we have an attached property delegate, the setter is mutating if
+  // the "value" property of the delegate type is mutating and we're in
+  // a context that has value semantics.
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    if (var->hasPropertyDelegate()) {
+      auto info = getAttachedPropertyDelegateInfo(var);
+      if (info.unwrapProperty) {
+        TC.validateDecl(info.unwrapProperty);
+        return info.unwrapProperty->isSetterMutating() &&
+            var->isInstanceMember() &&
+            doesContextHaveValueSemantics(var->getDeclContext());
+      }
+    }
+  }
+
   auto impl = storage->getImplInfo();
   switch (impl.getWriteImpl()) {
   case WriteImplKind::Immutable:
@@ -5162,6 +5192,13 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       }
 
       if (auto var = dyn_cast<VarDecl>(member)) {
+        // If this variable has a property delegate, go validate it to ensure
+        // that we create the backing storage property.
+        if (var->hasPropertyDelegate()) {
+          validateDecl(var);
+          maybeAddAccessorsToStorage(var);
+        }
+
         if (var->hasStorage() && !var->isStatic() && !var->isInvalid()) {
           // Initialized 'let' properties have storage, but don't get an argument
           // to the memberwise initializer since they already have an initial

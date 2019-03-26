@@ -383,8 +383,19 @@ struct BadCombinations {
   unowned var z: C by Wrapper // expected-error{{property 'z' with a delegate cannot also be unowned}}
 }
 
-struct DelegateWithAccessors {
-  var x: Int by Wrapper { // expected-error{{property 'x' with a delegate cannot declare accessors}}
-    return 0
+struct DelegateWithAccessors { // expected-note{{'init(x:y:)' declared here}}
+  var x: Int by Wrapper {
+    return $x.value * 2
   }
+
+  var y: Int by WrapperWithInitialValue {
+    set {
+      $y.value = newValue / 2
+    }
+  }
+}
+
+func testDelegateWithAccessors() {
+  _ = DelegateWithAccessors() // expected-error{{missing argument for parameter 'x' in call}}
+  _ = DelegateWithAccessors(x: Wrapper<Int>(value: 17), y: 42)
 }

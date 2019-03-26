@@ -4968,6 +4968,13 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
     }
   }
 
+  // Whether we have a property delegate attached to the given variable,
+  // which affects which accessors can be provided / omitted.
+  bool hasPropertyDelegate = false;
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    hasPropertyDelegate = var->hasPropertyDelegate();
+  }
+
   // The observing accessors have very specific restrictions.
   // Prefer to ignore them.
   if (WillSet || DidSet) {
@@ -5016,7 +5023,8 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
     readImpl = ReadImplKind::Read;
   } else if (Address) {
     readImpl = ReadImplKind::Address;
-
+  } else if (hasPropertyDelegate) {
+    readImpl = ReadImplKind::Get;
   // If there's a writing accessor of any sort, there must also be a
   // reading accessor.
   } else if (auto mutator = findFirstMutator()) {
@@ -5073,7 +5081,10 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
   } else if (readImpl == ReadImplKind::Stored) {
     writeImpl = WriteImplKind::Stored;
     readWriteImpl = ReadWriteImplKind::Stored;
-
+  // Otherwise, declare the setter if it has a property delegate.
+  } else if (hasPropertyDelegate) {
+    writeImpl = WriteImplKind::Set;
+    readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
   // Otherwise, it's immutable.
   } else {
     writeImpl = WriteImplKind::Immutable;
