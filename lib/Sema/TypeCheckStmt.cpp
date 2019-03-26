@@ -492,8 +492,15 @@ public:
       }
     }
 
+    ContextualTypePurpose ctp = CTP_ReturnStmt;
+    if (auto func = dyn_cast_or_null<FuncDecl>(TheFunc->getAbstractFunctionDecl())) {
+      if (func->hasSingleExpressionBody()) {
+        ctp = CTP_ReturnSingleExpr;
+      }
+    }
+
     auto exprTy = TC.typeCheckExpression(E, DC, TypeLoc::withoutLoc(ResultTy),
-                                         CTP_ReturnStmt,
+                                         ctp,
                                          options);
     
     RS->setResult(E);
@@ -1931,90 +1938,6 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
       BS->setElement(0, E);
       // Fall through to type-checking the body as if we were not a single 
       // expression function.
-    } else {
-      // The function doesn't return void.  First check whether the 
-      // single-expression has the appropriate type to return from the
-      // function.  If it does, we're done.  Otherwise, type-check the 
-      // expression without specifying the convertType.  If it type-checks, 
-      // check whether the expression's type is uninhabited.  If it is, delete
-      // the return and we're done.  If it isn't, assume the user intended to 
-      // use implicit return and show the diagnostics from failing to type-check
-      // the with the convertType specified to be the function's return type.
-      //
-      // Note that if we had implicit conversion from uninhabited types (i.e.
-      // if uninhabited types were bottom types) to arbitrary types, the
-      // problem solved here would disappear.
-      auto resultType = Optional<AnyFunctionRef>(FD)->getBodyResultType();
-      preCheckExpression(E, FD);
-      if (E != FD->getSingleExpressionBody())
-        FD->setSingleExpressionBody(E);
-
-      constraints::ConstraintSystem cs(*this, FD, 
-                                       constraints::ConstraintSystemFlags::SuppressDiagnostics);
-      cs.setContextualType(E, TypeLoc::withoutLoc(resultType), CTP_ReturnStmt);
-
-      SmallVector<constraints::Solution, 4> viable;
-      if(!cs.solve(E, resultType, /*listener=*/nullptr, viable,
-                    FreeTypeVariableBinding::Disallow)) {
-        auto &solution = viable[0];
-        E = cs.applySolution(solution, E, resultType, /*discardedExpr=*/false, 
-                             /*skipClosures*/false);
-        if (E != FD->getSingleExpressionBody())
-          FD->setSingleExpressionBody(E);
-        setAutoClosureDiscriminators(FD, BS);
-        FD->setBody(BS);
-        return false;
-      } else {
-        // There is exactly one scenario we have to look for, where the single
-        // expression is uninhabited and different from the return type of the
-        // function.
-        // 
-        // Try solving the constraint system again without a return type.
-        constraints::ConstraintSystem ucs(*this, FD, 
-                                          constraints::ConstraintSystemFlags::SuppressDiagnostics);
-        SmallVector<constraints::Solution, 4> uviable;
-        if (!ucs.solve(E, /*convertType*/Type(), /*listener=*/nullptr, uviable,
-                       FreeTypeVariableBinding::Disallow)) {
-          auto &solution = uviable[0];
-          auto &solutionCS = solution.getConstraintSystem();
-          Type exprType = solution.simplifyType(solutionCS.getType(E));
-          if (!exprType.isNull() && exprType->isUninhabited() &&
-              exprType->getCanonicalType() != resultType->getCanonicalType()) {
-            // The expression is an uninhabited type distinct from the 
-            // function's.  Remove the return we inserted.
-            E = ucs.applySolution(solution, E, /*convertType*/Type(), 
-                                  /*discardedExpr=*/false, 
-                                  /*skipClosures*/false);
-            BS->setElement(0, E);
-            setAutoClosureDiscriminators(FD, BS);
-            FD->setBody(BS);
-            return false;
-          }
-        }
-        // There are two ways to reach this point.
-        // (1) The system doesn't have a (unique) solution when we don't treat
-        // the single expression as being implicitly returned.  For example:
-        //
-        // enum Nevah {}
-        // enum Nevah2 {}
-        // func nevah() -> Nevah { fatalError() }
-        // func nevah() -> Nevah2 { fatalError() }
-        // 
-        // func die() -> Never { nevah() }
-        //
-        // (2) When we don't assume the intent was to implicitly return the 
-        // single expression, the constraint system has a solution, but the
-        // expression's type in that solution is some inhabited type, distinct
-        // from the return type of the function.  For example,
-        //
-        //   func foo() -> Int { "hi" }
-        // 
-        // In either case, we should assume that the intent was to implicitly
-        // return the single expression and diagnose accordingly, per the first
-        // call to solve.
-        cs.salvage(viable, E);
-        return true;
-      }
     }
   }
 

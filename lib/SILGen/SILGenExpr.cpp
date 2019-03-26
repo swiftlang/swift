@@ -416,6 +416,7 @@ namespace {
              SGFContext C);
     RValue visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C);
     RValue visitBridgeFromObjCExpr(BridgeFromObjCExpr *E, SGFContext C);
+    RValue visitUninhabitedUpcastExpr(UninhabitedUpcastExpr *E, SGFContext C);
     RValue visitConditionalBridgeFromObjCExpr(ConditionalBridgeFromObjCExpr *E,
                                               SGFContext C);
     RValue visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E, SGFContext C);
@@ -1414,6 +1415,15 @@ RValueEmitter::visitBridgeFromObjCExpr(BridgeFromObjCExpr *E, SGFContext C) {
   auto result = SGF.emitBridgedToNativeValue(E, mv, origType, resultType,
                                              loweredResultTy, C);
   return RValue(SGF, E, result);
+}
+
+RValue 
+RValueEmitter::visitUninhabitedUpcastExpr(UninhabitedUpcastExpr *E, 
+                                          SGFContext C) {
+  // Emit code which force casts the expr of uninhabited type to the right type.
+  // TODO: Emit something more appropriate.
+  return emitUnconditionalCheckedCast(SGF, E, E->getSubExpr(), E->getType(),
+                                      CheckedCastKind::ValueCast, C);
 }
 
 RValue

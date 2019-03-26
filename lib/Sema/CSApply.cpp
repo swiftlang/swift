@@ -390,6 +390,9 @@ namespace {
     Expr *coerceSuperclass(Expr *expr, Type toType,
                            ConstraintLocatorBuilder locator);
 
+    Expr *coerceUninhabited(Expr *expr, Type toType,
+                            ConstraintLocatorBuilder locator);
+
     /// Coerce the given value to existential type.
     ///
     /// The following conversions are supported:
@@ -5268,6 +5271,13 @@ Expr *ExprRewriter::coerceSuperclass(Expr *expr, Type toType,
     new (tc.Context) DerivedToBaseExpr(expr, toType));
 }
 
+Expr *ExprRewriter::coerceUninhabited(Expr *expr, Type toType,
+                                      ConstraintLocatorBuilder locator) {
+  auto &tc = cs.getTypeChecker();
+  return cs.cacheType(
+    new (tc.Context) UninhabitedUpcastExpr(expr, toType));
+}
+
 /// Collect the conformances for all the protocols of an existential type.
 /// If the source type is also existential, we don't want to check conformance
 /// because most protocols do not conform to themselves -- however we still
@@ -6348,6 +6358,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     case ConversionRestrictionKind::Superclass:
     case ConversionRestrictionKind::ExistentialMetatypeToMetatype:
       return coerceSuperclass(expr, toType, locator);
+    case ConversionRestrictionKind::UninhabitedUpcast:
+      return coerceUninhabited(expr, toType, locator);
 
     case ConversionRestrictionKind::Existential:
     case ConversionRestrictionKind::MetatypeToExistentialMetatype:
