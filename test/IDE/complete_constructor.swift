@@ -50,6 +50,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AVAILABLE_1 | %FileCheck %s -check-prefix=AVAILABLE_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AVAILABLE_2 | %FileCheck %s -check-prefix=AVAILABLE_2
 
+// REQUIRES: rdar49240981
+
 func freeFunc() {}
 
 //===---
