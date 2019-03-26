@@ -133,7 +133,7 @@ var _seenExpectCrash = AtomicBool(false)
 
 /// Run `body` and expect a failure to happen.
 ///
-/// The check passes if `body` triggers one or more failures.
+/// The check passes iff `body` triggers one or more failures.
 public func expectFailure(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
