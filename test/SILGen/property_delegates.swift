@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-silgen -verify-sil-ownership | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-silgen | %FileCheck %s
 // FIXME: switch to %target-swift-emit-silgen once we have syntax tree support
 
 @propertyDelegate
