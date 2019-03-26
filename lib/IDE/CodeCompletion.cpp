@@ -929,6 +929,18 @@ calculateMaxTypeRelationForDecl(
     bool IsImplicitlyCurriedInstanceMethod = false) {
   auto Result = CodeCompletionResult::ExpectedTypeRelation::Unrelated;
   for (auto Type : typeContext.possibleTypes) {
+    // Do not use Void type context for a single-expression body, since the
+    // implicit return does not constrain the expression.
+    //
+    //     { ... -> ()  in x } // x can be anything
+    //
+    // This behaves differently from explicit return, and from non-Void:
+    //
+    //     { ... -> Int in x }        // x must be Int
+    //     { ... -> ()  in return x } // x must be Void
+    if (typeContext.isSingleExpressionBody && Type->isVoid())
+      continue;
+
     Result = std::max(Result, calculateTypeRelationForDecl(
                                   D, Type, IsImplicitlyCurriedInstanceMethod));
 
@@ -1650,7 +1662,15 @@ public:
         expectedTypeContext.possibleTypes.push_back(T);
   }
 
-  bool hasExpectedTypes() const { return !expectedTypeContext.empty(); }
+  CodeCompletionContext::TypeContextKind typeContextKind() const {
+    if (expectedTypeContext.empty()) {
+      return CodeCompletionContext::TypeContextKind::None;
+    } else if (expectedTypeContext.isSingleExpressionBody) {
+      return CodeCompletionContext::TypeContextKind::SingleExpressionBody;
+    } else {
+      return CodeCompletionContext::TypeContextKind::Required;
+    }
+  }
 
   bool needDot() const {
     return NeedLeadingDot;
@@ -3548,9 +3568,7 @@ public:
       builder.addSimpleNamedParameter("values");
       builder.addRightParen();
       for (auto T : expectedTypeContext.possibleTypes) {
-        if (!T)
-          continue;
-        if (T->is<TupleType>()) {
+        if (T && T->is<TupleType>() && !T->isVoid()) {
           addTypeAnnotation(builder, T);
           builder.setExpectedTypeRelation(CodeCompletionResult::Identical);
           break;
@@ -5394,7 +5412,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     Lookup.RequestedCachedResults.clear();
   }
 
-  CompletionContext.HasExpectedTypeRelation = Lookup.hasExpectedTypes();
+  CompletionContext.typeContextKind = Lookup.typeContextKind();
 
   deliverCompletionResults();
 }
