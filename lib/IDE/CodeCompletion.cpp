@@ -1371,7 +1371,7 @@ public:
   void completeInPrecedenceGroup(SyntaxKind SK) override;
   void completeNominalMemberBeginning(
       SmallVectorImpl<StringRef> &Keywords, SourceLoc introducerLoc) override;
-  void completeAccessorBeginning() override;
+  void completeAccessorBeginning(CodeCompletionExpr *E) override;
 
   void completePoundAvailablePlatform() override;
   void completeImportDecl(std::vector<std::pair<Identifier, SourceLoc>> &Path) override;
@@ -4637,9 +4637,11 @@ void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeAccessorBeginning() {
+void CodeCompletionCallbacksImpl::completeAccessorBeginning(
+    CodeCompletionExpr *E) {
   Kind = CompletionKind::AccessorBeginning;
   CurDeclContext = P.CurDeclContext;
+  CodeCompleteTokenExpr = E;
 }
 
 static bool isDynamicLookup(Type T) {
@@ -5222,8 +5224,12 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::AccessorBeginning: {
-    if (isa<AccessorDecl>(ParsedDecl))
+    if (isa<AccessorDecl>(ParsedDecl)) {
+      ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
+      Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
+                              ContextInfo.isSingleExpressionBody());
       DoPostfixExprBeginning();
+    }
     break;
   }
 
