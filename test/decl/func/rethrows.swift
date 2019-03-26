@@ -49,6 +49,28 @@ func testArrayAndTupleRethrowing() {
   rethrowArray2(arg: throwsFunc, nothrowsFunc)
   // expected-error@-1 {{call can throw, but it is not marked with 'try' and the error}}
   // expected-note@-2 {{call is to 'rethrows' function}}
+
+  let optArray: [() throws -> Void]? = nil
+
+  try! rethrowArray3(arg: [throwsFunc]) // OK
+  rethrowArray3(arg: nil) // OK
+  rethrowArray3(arg: [nothrowsFunc, throwsFunc])
+  // expected-error@-1 {{call can throw, but it is not marked with 'try' and the error is not handled}}
+  // expected-note@-2 {{call is to 'rethrows' function}}
+  rethrowArray3(arg: optArray) // Opaque
+  // expected-error@-1 {{call can throw, but it is not marked with 'try' and the error is not handled}}
+  // expected-note@-2 {{call is to 'rethrows' function, but argument function can throw}}
+
+  let tuple: (() throws -> Void, Bool)? = nil
+
+  try! rethrowTuple1(arg: (throwsFunc, true)) // OK
+  rethrowTuple1(arg: nil) // OK
+  rethrowTuple1(arg: (throwsFunc, true)) // OK
+  // expected-error@-1 {{call can throw, but it is not marked with 'try' and the error is not handled}}
+  // expected-note@-2 {{call is to 'rethrows' function, but argument function can throw}}
+  rethrowTuple1(arg: tuple) // Opaque
+  // expected-error@-1 {{call can throw, but it is not marked with 'try' and the error is not handled}}
+  // expected-note@-2 {{call is to 'rethrows' function, but argument function can throw}}
 }
 
 /** Protocol conformance checking ********************************************/

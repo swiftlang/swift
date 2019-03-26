@@ -691,6 +691,7 @@ private:
   /// Classify an argument being passed to a rethrows function.
   Classification classifyRethrowsArgument(Expr *arg, Type paramType) {
     arg = arg->getValueProvidingExpr();
+    paramType = paramType->lookThroughAllOptionalTypes();
 
     // If this argument is `nil` literal or `.none`,
     // it doesn't cause the call to throw.
