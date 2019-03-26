@@ -945,8 +945,8 @@ StringTests.test("stringGutsReserve")
     case 4: (base, startedNative) = ("x" as NSMutableString as String, true)
 #endif
     case 5: (base, startedNative) = (shared, true)
-    case 6: (base, startedNative) = ("xá" as NSString as String, false)
-    case 7: (base, startedNative) = ("xá" as NSMutableString as String, false)
+    case 6: (base, startedNative) = ("xá" as NSString as String, true)
+    case 7: (base, startedNative) = ("xá" as NSMutableString as String, true)
     default:
       fatalError("case unhandled!")
     }
