@@ -168,8 +168,6 @@ struct UseWrapperAcceptingAutoclosure {
   var foo by WrapperAcceptingAutoclosure = seventeen()
 }
 
-
-
 // ---------------------------------------------------------------------------
 // Memberwise initializers
 // ---------------------------------------------------------------------------
@@ -181,6 +179,26 @@ struct MemberwiseInits<T> {
 func testMemberwiseInits() {
   // expected-error@+1{{type '(Wrapper<Bool>, Double) -> MemberwiseInits<Double>'}}
   let _: Int = MemberwiseInits<Double>.init
+
+  _ = MemberwiseInits(x: Wrapper(value: true), y: 17)
+}
+
+struct DefaultedMemberwiseInits {
+  var x: Bool by Wrapper(value: true)
+  var y: Int by WrapperWithInitialValue = 17
+}
+
+func testDefaultedMemberwiseInits() {
+  // FIXME: We would like defaults for these, but it is not implemented yet.
+  _ = DefaultedMemberwiseInits()
+  _ = DefaultedMemberwiseInits(x: Wrapper(value: false), y: 42)
+
+  _ = DefaultedMemberwiseInits(y: 42)
+  // expected-error@-1{{cannot invoke initializer for type 'DefaultedMemberwiseInits' with an argument list of type '(y: Int)'}}
+  // expected-note@-2{{overloads for 'DefaultedMemberwiseInits' exist with these partially matching parameter lists: (), (x: Wrapper<Bool>, y: Int)}}
+  _ = DefaultedMemberwiseInits(x: Wrapper(value: false))
+  // expected-error@-1{{cannot invoke initializer for type 'DefaultedMemberwiseInits' with an argument list of type '(x: Wrapper<Bool>)'}}
+  // expected-note@-2{{overloads for 'DefaultedMemberwiseInits' exist with these partially matching parameter lists: (), (x: Wrapper<Bool>, y: Int)}}
 }
 
 // ---------------------------------------------------------------------------

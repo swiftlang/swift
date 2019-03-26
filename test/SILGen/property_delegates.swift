@@ -58,6 +58,20 @@ struct HasNested<T> {
   }
 }
 
+// FIXME: For now, we are only checking that we don't crash.
+struct HasDefaultInit {
+  var x by Wrapper(value: true)
+  var y by WrapperWithInitialValue = 25
+
+  static func defaultInit() -> HasDefaultInit {
+    return HasDefaultInit()
+  }
+
+  static func memberwiseInit(x: Bool, y: Int) -> HasDefaultInit {
+    return HasDefaultInit(x: Wrapper(value: x), y: y)
+  }
+}
+
 struct DelegateWithAccessors {
   var x: Int by Wrapper {
     // CHECK-LABEL: sil hidden [ossa] @$s18property_delegates21DelegateWithAccessorsV1xSivg

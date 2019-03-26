@@ -1863,8 +1863,7 @@ void synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
 
 static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
                     SmallVectorImpl<DefaultArgumentInitializer *> &defaultInits,
-                                         unsigned paramSize, ASTContext &ctx,
-                                         VarDecl *backingVar) {
+                                         unsigned paramSize, ASTContext &ctx) {
   // First and foremost, if this is a constant don't bother.
   if (var->isLet())
     return;
@@ -1874,19 +1873,16 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
   if (!var->getParentPattern()->getSingleVar())
     return;
 
+  // If this property has a delegate, don't give it a default argument.
+  if (var->hasPropertyDelegate())
+    return;
+
   // If we don't have an expression initializer or silgen can't assign a default
   // initializer, then we can't generate a default value. An example of where
   // silgen can assign a default is var x: Int? where the default is nil.
   // If the variable is lazy, go ahead and give it a default value.
-  //
-  // With property delegates, we look at whether the backing storage property
-  // is default-initializable.
   if (!var->getAttrs().hasAttribute<LazyAttr>() &&
-      !(var->hasPropertyDelegate() &&
-        backingVar && backingVar->hasStorage() &&
-        backingVar->getParentPatternBinding()->isDefaultInitializable()) &&
-      !(var->hasStorage() &&
-        var->getParentPatternBinding()->isDefaultInitializable()))
+      !var->getParentPatternBinding()->isDefaultInitializable())
     return;
 
   // We can add a default value now.
@@ -1911,7 +1907,7 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
 
   // Set the default value to the variable. When we emit this in silgen
   // we're going to call the variable's initializer expression.
-  arg->setStoredProperty(backingVar ? backingVar : var);
+  arg->setStoredProperty(var);
   arg->setDefaultArgumentKind(DefaultArgumentKind::StoredProperty);
 }
 
@@ -1965,7 +1961,6 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       tc.validateDecl(var);
       auto varInterfaceType = var->getValueInterfaceType();
 
-      VarDecl *delegateBackingVar = nullptr;
       if (var->getAttrs().hasAttribute<LazyAttr>()) {
         // If var is a lazy property, its value is provided for the underlying
         // storage.  We thus take an optional of the property's type.  We only
@@ -1980,12 +1975,12 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
         // When there is no init(initialValue:), the underlying storage
         // type will need to be initialized.
         auto delegateTypeInfo = getAttachedPropertyDelegateInfo(var);
-        delegateBackingVar =
-                getOrSynthesizePropertyDelegateBackingProperty(var);
-        if (!delegateTypeInfo.initialValueInit && delegateBackingVar) {
-          varInterfaceType = delegateBackingVar->getValueInterfaceType();
-          accessLevel =
-              std::min(accessLevel, delegateBackingVar->getFormalAccess());
+        if (!delegateTypeInfo.initialValueInit) {
+          if (auto backingVar =
+                  getOrSynthesizePropertyDelegateBackingProperty(var)) {
+            varInterfaceType = backingVar->getValueInterfaceType();
+            accessLevel = std::min(accessLevel, backingVar->getFormalAccess());
+          }
         }
       }
 
@@ -1996,8 +1991,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       arg->setInterfaceType(varInterfaceType);
       arg->setImplicit();
       
-      maybeAddMemberwiseDefaultArg(arg, var, defaultInits, params.size(), ctx,
-                                   delegateBackingVar);
+      maybeAddMemberwiseDefaultArg(arg, var, defaultInits, params.size(), ctx);
       
       params.push_back(arg);
     }
