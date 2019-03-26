@@ -289,12 +289,7 @@ public struct ThrowingPythonObject {
   public func dynamicallyCall(
     withArguments args: [PythonConvertible] = []
   ) throws -> PythonObject {
-    // Make sure there are no state errors.
-    if PyErr_Occurred() != nil {
-      // FIXME: This should be an assert, but the failure mode in Playgrounds
-      // is just awful.
-      fatalError("Python error state must be clear")
-    }
+    try throwPythonErrorIfPresent()
 
     // Positional arguments are passed as a tuple of objects.
     let argTuple = pyTuple(args.map { $0.pythonObject })
@@ -324,12 +319,7 @@ public struct ThrowingPythonObject {
     withKeywordArguments args:
       KeyValuePairs<String, PythonConvertible> = [:]
   ) throws -> PythonObject {
-    // Make sure there are no state errors.
-    if PyErr_Occurred() != nil {
-      // FIXME: This should be an assert, but the failure mode in Playgrounds
-      // is just awful.
-      fatalError("Python error state must be clear")
-    }
+    try throwPythonErrorIfPresent()
 
     // An array containing positional arguments.
     var positionalArgs: [PythonObject] = []

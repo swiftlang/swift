@@ -98,7 +98,7 @@ let PyObject_GetAttrString: @convention(c) (
   PythonLibrary.loadSymbol(name: "PyObject_GetAttrString")
 
 let PyObject_SetAttrString: @convention(c) (
-  PyObjectPointer, PyCCharPointer, PyObjectPointer) -> Int =
+  PyObjectPointer, PyCCharPointer, PyObjectPointer) -> Int32 =
   PythonLibrary.loadSymbol(name: "PyObject_SetAttrString")
 
 let PySlice_New: @convention(c) (
