@@ -22,6 +22,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -1348,6 +1349,9 @@ bool ContextualFailure::diagnoseMissingFunctionCall() const {
                  srcFT->getResult())
       .highlight(anchor->getSourceRange())
       .fixItInsertAfter(anchor->getEndLoc(), "()");
+
+  tryComputedPropertyFixIts(anchor);
+
   return true;
 }
 
@@ -1364,19 +1368,6 @@ bool ContextualFailure::trySequenceSubsequenceFixIts(InFlightDiagnostic &diag,
   if (!String || !Substring)
     return false;
 
-  /// FIXME: Remove this flag when void subscripts are implemented.
-  /// Make this unconditional and remove the if statement.
-  if (CS.TC.getLangOpts().FixStringToSubstringConversions) {
-    // String -> Substring conversion
-    // Add '[]' void subscript call to turn the whole String into a Substring
-    if (fromType->isEqual(String)) {
-      if (toType->isEqual(Substring)) {
-        diag.fixItInsertAfter(expr->getEndLoc(), "[]");
-        return true;
-      }
-    }
-  }
-
   // Substring -> String conversion
   // Wrap in String.init
   if (fromType->isEqual(Substring)) {
@@ -1389,6 +1380,53 @@ bool ContextualFailure::trySequenceSubsequenceFixIts(InFlightDiagnostic &diag,
   }
 
   return false;
+}
+
+void ContextualFailure::tryComputedPropertyFixIts(Expr *expr) const {
+  if (!isa<ClosureExpr>(expr))
+    return;
+
+  // It is possible that we're looking at a stored property being
+  // initialized with a closure. Something like:
+  //
+  // var foo: Int = { return 0 }
+  //
+  // Let's offer another fix-it to remove the '=' to turn the stored
+  // property into a computed property. If the variable is immutable, then
+  // replace the 'let' with a 'var'.
+
+  PatternBindingDecl *PBD = nullptr;
+
+  if (auto TLCD = dyn_cast<TopLevelCodeDecl>(getDC())) {
+    if (TLCD->getBody()->isImplicit()) {
+      if (auto decl = TLCD->getBody()->getElement(0).dyn_cast<Decl *>()) {
+        if (auto binding = dyn_cast<PatternBindingDecl>(decl)) {
+          PBD = binding;
+        }
+      }
+    }
+  } else if (auto PBI = dyn_cast<PatternBindingInitializer>(getDC())) {
+    PBD = PBI->getBinding();
+  }
+
+  if (PBD) {
+    if (auto VD = PBD->getSingleVar()) {
+      auto entry = PBD->getPatternEntryForVarDecl(VD);
+
+      if (!VD->isStatic() &&
+          !VD->getAttrs().getAttribute<DynamicReplacementAttr>() &&
+          entry.getInit() && isa<ClosureExpr>(entry.getInit())) {
+        auto diag = emitDiagnostic(expr->getLoc(),
+                                   diag::extension_stored_property_fixit,
+                                   VD->getName());
+        diag.fixItRemove(entry.getEqualLoc());
+
+        if (VD->isLet()) {
+          diag.fixItReplace(PBD->getStartLoc(), getTokenText(tok::kw_var));
+        }
+      }
+    }
+  }
 }
 
 bool AutoClosureForwardingFailure::diagnoseAsError() {
@@ -1989,7 +2027,8 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   auto path = locator->getPath();
 
   // TODO: Currently this is only intended to diagnose contextual failures.
-  if (!(path.back().getKind() == ConstraintLocator::ApplyArgToParam ||
+  if (path.empty() ||
+      !(path.back().getKind() == ConstraintLocator::ApplyArgToParam ||
         path.back().getKind() == ConstraintLocator::ContextualType))
     return false;
 
@@ -2257,5 +2296,59 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
                              first, second));
   }
 
+  return true;
+}
+
+bool InaccessibleMemberFailure::diagnoseAsError() {
+  auto *anchor = getRawAnchor();
+  // Let's try to avoid over-diagnosing chains of inaccessible
+  // members e.g.:
+  //
+  // struct A {
+  //   struct B {
+  //     struct C {}
+  //   }
+  // }
+  //
+  // _ = A.B.C()
+  //
+  // We'll have a fix for each `B', `C` and `C.init` but it makes
+  // sense to diagnose only `B` and consider the rest hidden.
+  Expr *baseExpr = nullptr;
+  DeclNameLoc nameLoc;
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
+    baseExpr = UDE->getBase();
+    nameLoc = UDE->getNameLoc();
+  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
+    nameLoc = UME->getNameLoc();
+  } else if (auto *SE = dyn_cast<SubscriptExpr>(anchor)) {
+    baseExpr = SE->getBase();
+  } else if (auto *call = dyn_cast<CallExpr>(anchor)) {
+    baseExpr = call->getFn();
+  }
+
+  if (baseExpr) {
+    auto &cs = getConstraintSystem();
+    auto *locator =
+        cs.getConstraintLocator(baseExpr, ConstraintLocator::Member);
+    if (llvm::any_of(cs.getFixes(), [&](const ConstraintFix *fix) {
+          return fix->getLocator() == locator;
+        }))
+      return false;
+  }
+
+  auto loc = nameLoc.isValid() ? nameLoc.getStartLoc() : anchor->getLoc();
+  auto accessLevel = Member->getFormalAccessScope().accessLevelForDiagnostics();
+  if (auto *CD = dyn_cast<ConstructorDecl>(Member)) {
+    emitDiagnostic(loc, diag::init_candidate_inaccessible,
+                   CD->getResultInterfaceType(), accessLevel)
+        .highlight(nameLoc.getSourceRange());
+  } else {
+    emitDiagnostic(loc, diag::candidate_inaccessible, Member->getBaseName(),
+                   accessLevel)
+        .highlight(nameLoc.getSourceRange());
+  }
+
+  emitDiagnostic(Member, diag::decl_declared_here, Member->getFullName());
   return true;
 }

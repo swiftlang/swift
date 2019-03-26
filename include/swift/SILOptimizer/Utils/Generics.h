@@ -319,6 +319,12 @@ public:
 /// prespecialization for -Onone support.
 bool isKnownPrespecialization(StringRef SpecName);
 
+/// Checks if all OnoneSupport pre-specializations are included in the module
+/// as public functions.
+///
+/// Issues errors for all missing functions.
+void checkCompletenessOfPrespecializations(SILModule &M);
+
 /// Create a new apply based on an old one, but with a different
 /// function being applied.
 ApplySite replaceWithSpecializedFunction(ApplySite AI, SILFunction *NewF,

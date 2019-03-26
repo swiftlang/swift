@@ -31,6 +31,7 @@ bb0(%0 : $Int):
   %5 = function_ref @closureWithArgument : $@convention(thin) (@inout_aliasable Int) -> ()
   %6 = partial_apply %5(%3) : $@convention(thin) (@inout_aliasable Int) -> ()
   %8 = apply %4(%6) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  destroy_value %2 : ${ var Int }
   %9 = tuple ()
   return %9 : $()
 }

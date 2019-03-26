@@ -2521,44 +2521,6 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
   }
 }
 
-namespace {
-  class FallthroughFinder : public ASTWalker {
-    bool &Result;
-  public:
-    FallthroughFinder(bool &Result) : Result(Result) {}
-
-    // We walk through statements.  If we find a fallthrough, then we got what
-    // we came for.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      if (isa<FallthroughStmt>(S))
-        Result = true;
-      
-      return { true, S };
-    }
-
-    // Expressions, patterns and decls cannot contain fallthrough statements, so
-    // there is no reason to walk into them.
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      return { false, E };
-    }
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-      return { false, P };
-    }
-
-    bool walkToDeclPre(Decl *D) override { return false; }
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
-    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
-  };
-} // end anonymous namespace
-
-
-static bool containsFallthrough(Stmt *S) {
-  bool Result = false;
-  S->walk(FallthroughFinder(Result));
-  return Result;
-}
-
-
 /// Context info used to emit FallthroughStmts.
 /// Since fallthrough-able case blocks must not bind variables, they are always
 /// emitted in the outermost scope of the switch.
@@ -2770,8 +2732,8 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
                               const_cast<Expr*>(labelItem.getGuardExpr()),
                               hasFallthrough);
     }
-    
-    hasFallthrough = containsFallthrough(caseBlock->getBody());
+
+    hasFallthrough = caseBlock->hasFallthroughDest();
   }
 
   // Emit alloc_stacks for address-only variables appearing in

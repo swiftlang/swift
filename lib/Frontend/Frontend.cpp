@@ -29,6 +29,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
@@ -286,16 +287,14 @@ bool CompilerInstance::setUpModuleLoaders() {
   if (hasSourceImport()) {
     bool immediate = FrontendOptions::isActionImmediate(
         Invocation.getFrontendOptions().RequestedAction);
-    bool enableResilience = Invocation.getFrontendOptions().EnableResilience;
+    bool enableLibraryEvolution =
+      Invocation.getFrontendOptions().EnableLibraryEvolution;
     Context->addModuleLoader(SourceLoader::create(*Context,
                                                   !immediate,
-                                                  enableResilience,
+                                                  enableLibraryEvolution,
                                                   getDependencyTracker()));
   }
-  auto MLM = ModuleLoadingMode::OnlySerialized;
-  if (Invocation.getFrontendOptions().EnableParseableModuleInterface) {
-    MLM = ModuleLoadingMode::PreferSerialized;
-  }
+  auto MLM = ModuleLoadingMode::PreferSerialized;
   if (auto forceModuleLoadingMode =
       llvm::sys::Process::GetEnv("SWIFT_FORCE_MODULE_LOADING")) {
     if (*forceModuleLoadingMode == "prefer-parseable")
@@ -531,7 +530,7 @@ ModuleDecl *CompilerInstance::getMainModule() {
     if (Invocation.getFrontendOptions().EnableImplicitDynamic)
       MainModule->setImplicitDynamicEnabled();
 
-    if (Invocation.getFrontendOptions().EnableResilience)
+    if (Invocation.getFrontendOptions().EnableLibraryEvolution)
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
   }
   return MainModule;
@@ -1111,6 +1110,11 @@ static void performSILOptimizations(CompilerInvocation &Invocation,
     runSILOptimizationPassesWithFileSpecification(*SM, CustomPipelinePath);
   } else {
     runSILOptimizationPasses(*SM);
+  }
+  if (Invocation.getFrontendOptions().CheckOnoneSupportCompleteness &&
+      // TODO: handle non-ObjC based stdlib builds, e.g. on linux.
+      Invocation.getLangOptions().EnableObjCInterop) {
+    checkCompletenessOfPrespecializations(*SM);
   }
 }
 

@@ -30,7 +30,7 @@
 using namespace swift;
 using namespace Lowering;
 
-static bool isTrivialShuffle(TupleShuffleExpr *shuffle) {
+static bool isTrivialShuffle(ArgumentShuffleExpr *shuffle) {
   // Each element must be mapped to the corresponding element of the input.
   auto mapping = shuffle->getElementMapping();
   for (auto index : indices(mapping)) {
@@ -56,7 +56,7 @@ static ArrayRef<Expr*> decomposeArguments(SILGenFunction &SGF,
   // The use of owned parameters can trip up CSApply enough to introduce
   // a trivial tuple shuffle here.
   arg = arg->getSemanticsProvidingExpr();
-  if (auto shuffle = dyn_cast<TupleShuffleExpr>(arg)) {
+  if (auto shuffle = dyn_cast<ArgumentShuffleExpr>(arg)) {
     if (isTrivialShuffle(shuffle))
       arg = shuffle->getSubExpr();
   }

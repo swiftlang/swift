@@ -176,8 +176,8 @@ public:
   Expr *get() const { return FoundExpr; }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-    if (TargetRange == E->getSourceRange() && !isa<ImplicitConversionExpr>(E) &&
-        !isa<AutoClosureExpr>(E) && !isa<ConstructorRefCallExpr>(E)) {
+    if (TargetRange == E->getSourceRange() && !E->isImplicit() &&
+        !isa<ConstructorRefCallExpr>(E)) {
       assert(!FoundExpr && "non-nullptr for found expr");
       FoundExpr = E;
       return {false, nullptr};
@@ -325,6 +325,8 @@ void collectPossibleCalleesByQualifiedLookup(
     if ((!isa<AbstractFunctionDecl>(VD) && !isa<SubscriptDecl>(VD)) ||
         VD->shouldHideFromEditor())
       continue;
+    if (!isMemberDeclApplied(&DC, baseTy->getMetatypeInstanceType(), VD))
+      continue;
     resolver->resolveDeclSignature(VD);
     if (!VD->hasInterfaceType())
       continue;
@@ -437,12 +439,12 @@ bool collectPossibleCalleesForSubscript(
 }
 
 /// Get index of \p CCExpr in \p Args. \p Args is usually a \c TupleExpr,
-/// \c ParenExpr, or a \c TupleShuffleExpr.
+/// \c ParenExpr, or a \c ArgumentShuffleExpr.
 /// \returns \c true if success, \c false if \p CCExpr is not a part of \p Args.
 bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
                        unsigned &Position, bool &HasName) {
-  if (auto TSE = dyn_cast<TupleShuffleExpr>(Args))
-    Args = TSE->getSubExpr();
+  if (auto ASE = dyn_cast<ArgumentShuffleExpr>(Args))
+    Args = ASE->getSubExpr();
 
   if (isa<ParenExpr>(Args)) {
     HasName = false;
@@ -467,28 +469,28 @@ bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
 }
 
 /// Translate argument index in \p Args to parameter index.
-/// Does nothing unless \p Args is \c TupleShuffleExpr.
+/// Does nothing unless \p Args is \c ArgumentShuffleExpr.
 bool translateArgIndexToParamIndex(Expr *Args, unsigned &Position,
                                    bool &HasName) {
-  auto TSE = dyn_cast<TupleShuffleExpr>(Args);
-  if (!TSE)
+  auto ASE = dyn_cast<ArgumentShuffleExpr>(Args);
+  if (!ASE)
     return true;
 
-  auto mapping = TSE->getElementMapping();
+  auto mapping = ASE->getElementMapping();
   for (unsigned destIdx = 0, e = mapping.size(); destIdx != e; ++destIdx) {
     auto srcIdx = mapping[destIdx];
     if (srcIdx == (signed)Position) {
       Position = destIdx;
       return true;
     }
-    if (srcIdx == TupleShuffleExpr::Variadic &&
-        llvm::is_contained(TSE->getVariadicArgs(), Position)) {
+    if (srcIdx == ArgumentShuffleExpr::Variadic &&
+        llvm::is_contained(ASE->getVariadicArgs(), Position)) {
       // The arg is a part of variadic args.
       Position = destIdx;
       HasName = false;
-      if (auto Args = dyn_cast<TupleExpr>(TSE->getSubExpr())) {
+      if (auto Args = dyn_cast<TupleExpr>(ASE->getSubExpr())) {
         // Check if the first variadiac argument has the label.
-        auto firstVarArgIdx = TSE->getVariadicArgs().front();
+        auto firstVarArgIdx = ASE->getVariadicArgs().front();
         HasName = Args->getElementNameLoc(firstVarArgIdx).isValid();
       }
       return true;
@@ -510,6 +512,7 @@ class ExprContextAnalyzer {
   SmallVectorImpl<Type> &PossibleTypes;
   SmallVectorImpl<StringRef> &PossibleNames;
   SmallVectorImpl<FunctionTypeAndDecl> &PossibleCallees;
+  bool &singleExpressionBody;
 
   void recordPossibleType(Type ty) {
     if (!ty || ty->is<ErrorType>())
@@ -616,6 +619,13 @@ class ExprContextAnalyzer {
       }
       break;
     }
+    case ExprKind::Closure: {
+      auto *CE = cast<ClosureExpr>(Parent);
+      assert(isSingleExpressionBodyForCodeCompletion(CE->getBody()));
+      singleExpressionBody = true;
+      recordPossibleType(getReturnTypeFromContext(CE));
+      break;
+    }
     default:
       llvm_unreachable("Unhandled expression kind.");
     }
@@ -705,14 +715,20 @@ class ExprContextAnalyzer {
     }
   }
 
+  static bool isSingleExpressionBodyForCodeCompletion(BraceStmt *body) {
+    return body->getNumElements() == 1 && body->getElements()[0].is<Expr *>();
+  }
+
 public:
   ExprContextAnalyzer(DeclContext *DC, Expr *ParsedExpr,
                       SmallVectorImpl<Type> &PossibleTypes,
                       SmallVectorImpl<StringRef> &PossibleNames,
-                      SmallVectorImpl<FunctionTypeAndDecl> &PossibleCallees)
+                      SmallVectorImpl<FunctionTypeAndDecl> &PossibleCallees,
+                      bool &singleExpressionBody)
       : DC(DC), ParsedExpr(ParsedExpr), SM(DC->getASTContext().SourceMgr),
         Context(DC->getASTContext()), PossibleTypes(PossibleTypes),
-        PossibleNames(PossibleNames), PossibleCallees(PossibleCallees) {}
+        PossibleNames(PossibleNames), PossibleCallees(PossibleCallees),
+        singleExpressionBody(singleExpressionBody) {}
 
   void Analyze() {
     // We cannot analyze without target.
@@ -733,7 +749,16 @@ public:
           auto ParentE = Parent.getAsExpr();
           return !ParentE ||
                  (!isa<CallExpr>(ParentE) && !isa<SubscriptExpr>(ParentE) &&
-                  !isa<BinaryExpr>(ParentE) && !isa<TupleShuffleExpr>(ParentE));
+                  !isa<BinaryExpr>(ParentE) && !isa<ArgumentShuffleExpr>(ParentE));
+        }
+        case ExprKind::Closure: {
+          // Note: we cannot use hasSingleExpressionBody, because we explicitly
+          // do not use the single-expression-body when there is code-completion
+          // in the expression in order to avoid a base expression affecting
+          // the type. However, now that we've typechecked, we will take the
+          // context type into account.
+          return isSingleExpressionBodyForCodeCompletion(
+              cast<ClosureExpr>(E)->getBody());
         }
         default:
           return false;
@@ -793,6 +818,6 @@ public:
 
 ExprContextInfo::ExprContextInfo(DeclContext *DC, Expr *TargetExpr) {
   ExprContextAnalyzer Analyzer(DC, TargetExpr, PossibleTypes, PossibleNames,
-                               PossibleCallees);
+                               PossibleCallees, singleExpressionBody);
   Analyzer.Analyze();
 }

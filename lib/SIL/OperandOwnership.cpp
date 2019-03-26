@@ -719,6 +719,10 @@ OperandOwnershipKindClassifier::visitFullApply(FullApplySite apply) {
     return Map::allLive();
   }
 
+  // If we have a type dependent operand, return an empty map.
+  if (apply.getInstruction()->isTypeDependentOperand(op))
+    return Map();
+
   unsigned argIndex = apply.getCalleeArgIndex(op);
   auto conv = apply.getSubstCalleeConv();
   SILParameterInfo paramInfo = conv.getParamInfoForSILArg(argIndex);

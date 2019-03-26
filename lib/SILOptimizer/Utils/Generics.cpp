@@ -16,13 +16,17 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/TypeMatcher.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/GenericCloner.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Strings.h"
 
 using namespace swift;
@@ -390,6 +394,8 @@ static bool shouldNotSpecialize(SILFunction *Callee, SILFunction *Caller,
 bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
                                         SubstitutionMap ParamSubs,
                                         OptRemark::Emitter *ORE) {
+  assert(ParamSubs.hasAnySubstitutableParams());
+
   if (shouldNotSpecialize(Callee, Apply ? Apply.getFunction() : nullptr))
     return false;
 
@@ -2285,6 +2291,69 @@ SILArgument *ReabstractionThunkGenerator::convertReabstractionThunkArguments(
   return ReturnValueAddr;
 }
 
+/// Create a pre-specialization of the library function with
+/// \p UnspecializedName, using the substitutions from \p Apply.
+static bool createPrespecialized(StringRef UnspecializedName,
+                                 ApplySite Apply,
+                                 SILOptFunctionBuilder &FuncBuilder) {
+  SILModule &M = FuncBuilder.getModule();
+  SILFunction *UnspecFunc = M.lookUpFunction(UnspecializedName);
+  if (UnspecFunc) {
+    if (!UnspecFunc->isDefinition())
+      M.loadFunction(UnspecFunc);
+  } else {
+    UnspecFunc = M.getSILLoader()->lookupSILFunction(UnspecializedName,
+                                                     /*declarationOnly*/ false);
+  }
+
+  if (!UnspecFunc || !UnspecFunc->isDefinition())
+    return false;
+
+  ReabstractionInfo ReInfo(ApplySite(), UnspecFunc, Apply.getSubstitutionMap(),
+                           IsNotSerialized, /*ConvertIndirectToDirect=*/true,
+                           nullptr);
+
+  if (!ReInfo.canBeSpecialized())
+    return false;
+
+  GenericFuncSpecializer FuncSpecializer(FuncBuilder,
+                                         UnspecFunc, Apply.getSubstitutionMap(),
+                                         ReInfo);
+  SILFunction *SpecializedF = FuncSpecializer.lookupSpecialization();
+  if (!SpecializedF)
+    SpecializedF = FuncSpecializer.tryCreateSpecialization();
+  if (!SpecializedF)
+    return false;
+
+  SpecializedF->setLinkage(SILLinkage::Public);
+  SpecializedF->setSerialized(IsNotSerialized);
+  return true;
+}
+
+/// Create pre-specializations of the library function X if \p ProxyFunc has
+/// @_semantics("prespecialize.X") attributes.
+static bool createPrespecializations(ApplySite Apply, SILFunction *ProxyFunc,
+                                     SILOptFunctionBuilder &FuncBuilder) {
+  if (Apply.getSubstitutionMap().hasArchetypes())
+    return false;
+
+  SILModule &M = FuncBuilder.getModule();
+
+  bool prespecializeFound = false;
+  for (const std::string &semAttrStr : ProxyFunc->getSemanticsAttrs()) {
+    StringRef semAttr(semAttrStr);
+    if (semAttr.consume_front("prespecialize.")) {
+      prespecializeFound = true;
+      if (!createPrespecialized(semAttr, Apply, FuncBuilder)) {
+        M.getASTContext().Diags.diagnose(Apply.getLoc().getSourceLoc(),
+                                         diag::cannot_prespecialize,
+                                         semAttr);
+      }
+    }
+  }
+  return prespecializeFound;
+}
+
 void swift::trySpecializeApplyOfGeneric(
     SILOptFunctionBuilder &FuncBuilder,
     ApplySite Apply, DeadInstructionSet &DeadApplies,
@@ -2329,8 +2398,12 @@ void swift::trySpecializeApplyOfGeneric(
   // as we do not SIL serialize their bodies.
   // It is important to set this flag here, because it affects the
   // mangling of the specialization's name.
-  if (Apply.getModule().isOptimizedOnoneSupportModule())
+  if (Apply.getModule().isOptimizedOnoneSupportModule()) {
+    if (createPrespecializations(Apply, RefF, FuncBuilder)) {
+      return;
+    }
     Serialized = IsNotSerialized;
+  }
 
   ReabstractionInfo ReInfo(Apply, RefF, Apply.getSubstitutionMap(),
                            Serialized, /*ConvertIndirectToDirect=*/true,
@@ -2497,87 +2570,38 @@ static bool linkSpecialization(SILModule &M, SILFunction *F) {
   return false;
 }
 
-/// The list of classes and functions from the stdlib
-/// whose specializations we want to preserve.
-static const char *const KnownPrespecializations[] = {
-    "Array",
-    "_ArrayBuffer",
-    "_ContiguousArrayBuffer",
-    "Range",
-    "RangeIterator",
-    "CountableRange",
-    "CountableRangeIterator",
-    "ClosedRange",
-    "ClosedRangeIterator",
-    "CountableClosedRange",
-    "CountableClosedRangeIterator",
-    "IndexingIterator",
-    "Collection",
-    "ReversedCollection",
-    "MutableCollection",
-    "BidirectionalCollection",
-    "RandomAccessCollection",
-    "ReversedRandomAccessCollection",
-    "RangeReplaceableCollection",
-    "_allocateUninitializedArray",
-    "UTF8",
-    "UTF16",
-    "String",
-    "_StringBuffer",
+#define PRESPEC_SYMBOL(s) MANGLE_AS_STRING(s),
+static const char *PrespecSymbols[] = {
+#include "OnonePrespecializations.def"
+  nullptr
 };
+#undef PRESPEC_SYMBOL
+
+llvm::DenseSet<StringRef> PrespecSet;
 
 bool swift::isKnownPrespecialization(StringRef SpecName) {
-  // TODO: Once there is an efficient API to check if
-  // a given symbol is a specialization of a specific type,
-  // use it instead. Doing demangling just for this check
-  // is just wasteful.
-  auto DemangledNameString =
-     swift::Demangle::demangleSymbolAsString(SpecName);
-
-  StringRef DemangledName = DemangledNameString;
-
-  LLVM_DEBUG(llvm::dbgs() << "Check if known: " << DemangledName << "\n");
-
-  auto pos = DemangledName.find("generic ", 0);
-  auto oldpos = pos;
-  if (pos == StringRef::npos)
-    return false;
-
-  // Create "of Swift"
-  llvm::SmallString<64> OfString;
-  llvm::raw_svector_ostream buffer(OfString);
-  buffer << "of ";
-  buffer << STDLIB_NAME <<'.';
-
-  StringRef OfStr = buffer.str();
-  LLVM_DEBUG(llvm::dbgs() << "Check substring: " << OfStr << "\n");
-
-  pos = DemangledName.find(OfStr, oldpos);
-
-  if (pos == StringRef::npos) {
-    // Create "of (extension in Swift).Swift"
-    llvm::SmallString<64> OfString;
-    llvm::raw_svector_ostream buffer(OfString);
-    buffer << "of (extension in " << STDLIB_NAME << "):";
-    buffer << STDLIB_NAME << '.';
-    OfStr = buffer.str();
-    pos = DemangledName.find(OfStr, oldpos);
-    LLVM_DEBUG(llvm::dbgs() << "Check substring: " << OfStr << "\n");
-    if (pos == StringRef::npos)
-      return false;
+  if (PrespecSet.empty()) {
+    const char **Pos = &PrespecSymbols[0];
+    while (const char *Sym = *Pos++) {
+      PrespecSet.insert(Sym);
+    }
+    assert(!PrespecSet.empty());
   }
+  return PrespecSet.count(SpecName) != 0;
+}
 
-  pos += OfStr.size();
-
-  for (auto NameStr : KnownPrespecializations) {
-    StringRef Name = NameStr;
-    auto pos1 = DemangledName.find(Name, pos);
-    if (pos1 == pos && !isalpha(DemangledName[pos1+Name.size()])) {
-      return true;
+void swift::checkCompletenessOfPrespecializations(SILModule &M) {
+  const char **Pos = &PrespecSymbols[0];
+  while (const char *Sym = *Pos++) {
+    StringRef FunctionName(Sym);
+    SILFunction *F = M.lookUpFunction(FunctionName);
+    if (!F || F->getLinkage() != SILLinkage::Public) {
+      M.getASTContext().Diags.diagnose(SourceLoc(),
+                                       diag::missing_prespecialization,
+                                       FunctionName);
     }
   }
 
-  return false;
 }
 
 /// Try to look up an existing specialization in the specialization cache.

@@ -2411,12 +2411,6 @@ static void emitFieldOffsetGlobals(IRGenModule &IGM,
 static ClassFlags getClassFlags(ClassDecl *classDecl) {
   auto flags = ClassFlags();
 
-#if !SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
-  // FIXME: Remove this after enabling stable ABI.
-  // This bit is NOT conditioned on UseDarwinPreStableABIBit.
-  flags |= ClassFlags::IsSwiftPreStableABI;
-#endif
-
   // Set a flag if the class uses Swift refcounting.
   auto type = classDecl->getDeclaredType()->getCanonicalType();
   if (type->getReferenceCounting() == ReferenceCounting::Native) {
@@ -4115,6 +4109,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Hashable:
   case KnownProtocolKind::CaseIterable:
   case KnownProtocolKind::Comparable:
+  case KnownProtocolKind::SIMDScalar:
   case KnownProtocolKind::ObjectiveCBridgeable:
   case KnownProtocolKind::DestructorSafeContainer:
   case KnownProtocolKind::SwiftNewtypeWrapper:

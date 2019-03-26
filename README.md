@@ -71,6 +71,8 @@ several hours. Naturally, incremental builds are much faster.
 macOS, Ubuntu Linux LTS, and the latest Ubuntu Linux release are the current
 supported host development operating systems.
 
+Please make sure you use Python 2.x. Python 3.x is not supported currently.
+
 #### macOS
 
 To build for macOS, you need [Xcode 10.2 beta](https://developer.apple.com/xcode/downloads/).
@@ -295,7 +297,7 @@ To read the compiler documentation, start by installing the
 [Sphinx](http://sphinx-doc.org) documentation generator tool by running the
 command:
 
-    easy_install -U Sphinx
+    easy_install -U "Sphinx < 2.0"
 
 Once complete, you can build the Swift documentation by changing directory into
 [docs](https://github.com/apple/swift/tree/master/docs) and typing `make`. This

@@ -873,11 +873,12 @@ struct MemberLookupResult {
     /// The member is inaccessible (e.g. a private member in another file).
     UR_Inaccessible,
   };
-  
-  /// This is a list of considered (but rejected) candidates, along with a
-  /// reason for their rejection.
-  SmallVector<std::pair<OverloadChoice, UnviableReason>, 4> UnviableCandidates;
 
+  /// This is a list of considered (but rejected) candidates, along with a
+  /// reason for their rejection. Split into separate collections to make
+  /// it easier to use in conjunction with viable candidates.
+  SmallVector<OverloadChoice, 4> UnviableCandidates;
+  SmallVector<UnviableReason, 4> UnviableReasons;
 
   /// Mark this as being an already-diagnosed error and return itself.
   MemberLookupResult &markErrorAlreadyDiagnosed() {
@@ -890,14 +891,13 @@ struct MemberLookupResult {
   }
   
   void addUnviable(OverloadChoice candidate, UnviableReason reason) {
-    UnviableCandidates.push_back({candidate, reason});
+    UnviableCandidates.push_back(candidate);
+    UnviableReasons.push_back(reason);
   }
-  
-  OverloadChoice *getFavoredChoice() {
-    if (FavoredChoice == ~0U) return nullptr;
-    return &ViableCandidates[FavoredChoice];
+
+  Optional<unsigned> getFavoredIndex() const {
+    return (FavoredChoice == ~0U) ? Optional<unsigned>() : FavoredChoice;
   }
-  
 };
 
 /// Stores the required methods for @dynamicCallable types.
@@ -2417,7 +2417,7 @@ public:
   /// sets.
   void addOverloadSet(Type boundType, ArrayRef<OverloadChoice> choices,
                       DeclContext *useDC, ConstraintLocator *locator,
-                      OverloadChoice *favored = nullptr);
+                      Optional<unsigned> favoredIndex = None);
 
   void addOverloadSet(ArrayRef<Constraint *> choices,
                       ConstraintLocator *locator);
@@ -2458,10 +2458,35 @@ public:
   Type generateConstraints(Pattern *P, ConstraintLocatorBuilder locator);
 
   /// Generate constraints for a given set of overload choices.
-  void generateConstraints(SmallVectorImpl<Constraint *> &constraints,
-                           Type type, ArrayRef<OverloadChoice> choices,
-                           DeclContext *useDC, ConstraintLocator *locator,
-                           OverloadChoice *favoredChoice = nullptr);
+  ///
+  /// \param constraints The container of generated constraint choices.
+  ///
+  /// \param type The type each choice should be bound to.
+  ///
+  /// \param choices The set of choices to convert into bind overload
+  /// constraints so solver could attempt each one.
+  ///
+  /// \param useDC The declaration context where each choice is used.
+  ///
+  /// \param locator The locator to use when generating constraints.
+  ///
+  /// \param favoredIndex If there is a "favored" or preferred choice
+  /// this is its index in the set of choices.
+  ///
+  /// \param requiresFix Determines whether choices require a fix to
+  /// be included in the result. If the fix couldn't be provided by
+  /// `getFix` for any given choice, such choice would be filtered out.
+  ///
+  /// \param getFix Optional callback to determine a fix for a given
+  /// choice (first argument is a position of current choice,
+  /// second - the choice in question).
+  void generateConstraints(
+      SmallVectorImpl<Constraint *> &constraints, Type type,
+      ArrayRef<OverloadChoice> choices, DeclContext *useDC,
+      ConstraintLocator *locator, Optional<unsigned> favoredIndex = None,
+      bool requiresFix = false,
+      llvm::function_ref<ConstraintFix *(unsigned, const OverloadChoice &)>
+          getFix = [](unsigned, const OverloadChoice &) { return nullptr; });
 
   /// Propagate constraints in an effort to enforce local
   /// consistency to reduce the time to solve the system.
@@ -3654,6 +3679,10 @@ public:
   bool attempt(ConstraintSystem &cs) const;
 
   bool isDisabled() const { return Choice->isDisabled(); }
+
+  bool hasFix() const {
+    return bool(Choice->getFix());
+  }
 
   bool isUnavailable() const {
     if (auto *decl = getDecl(Choice))

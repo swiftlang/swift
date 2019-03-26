@@ -965,8 +965,8 @@ public:
 #if SWIFT_OBJC_INTEROP
     // Look for a Swift-defined @objc protocol with the Swift 3 mangling that
     // is used for Objective-C entities.
-    std::string objcMangledName = "_Tt" + mangleNodeOld(node, &demangler) + "_";
-    if (auto protocol = objc_getProtocol(objcMangledName.c_str()))
+    const char *objcMangledName = mangleNodeAsObjcCString(node, demangler);
+    if (auto protocol = objc_getProtocol(objcMangledName))
       return ProtocolDescriptorRef::forObjC(protocol);
 #endif
 
@@ -1422,9 +1422,28 @@ static objc_hook_getClass OldGetClassHook;
 static BOOL
 getObjCClassByMangledName(const char * _Nonnull typeName,
                           Class _Nullable * _Nonnull outClass) {
-  auto metadata = swift_getTypeByMangledNameInEnvironment(typeName, strlen(typeName),
-                                             /* no substitutions */
-                                             nullptr, nullptr);
+  // Demangle old-style class and protocol names, which are still used in the
+  // ObjC metadata.
+  StringRef typeStr(typeName);
+  const Metadata *metadata = nullptr;
+  if (typeStr.startswith("_Tt")) {
+    Demangler demangler;
+    auto node = demangler.demangleSymbol(typeName);
+    if (!node)
+      return NO;
+    metadata = swift_getTypeByMangledNode(
+      MetadataState::Complete, demangler, node,
+      /* no substitutions */
+      [&](unsigned depth, unsigned index) {
+        return nullptr;
+      },
+      [&](const Metadata *type, unsigned index) {
+        return nullptr;
+      }).getMetadata();
+  } else {
+    metadata = swift_getTypeByMangledNameInEnvironment(
+      typeStr.data(), typeStr.size(), /* no substitutions */ nullptr, nullptr);
+  }
   if (metadata) {
     auto objcClass =
       reinterpret_cast<Class>(

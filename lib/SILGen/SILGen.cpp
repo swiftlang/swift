@@ -956,9 +956,8 @@ bool SILGenModule::hasNonTrivialIVars(ClassDecl *cd) {
     auto *vd = dyn_cast<VarDecl>(member);
     if (!vd || !vd->hasStorage()) continue;
 
-    // FIXME: Expansion
     auto &ti = Types.getTypeLowering(vd->getType(),
-                                     ResilienceExpansion::Minimal);
+                                     ResilienceExpansion::Maximal);
     if (!ti.isTrivial())
       return true;
   }
@@ -1082,6 +1081,7 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg,
   case DefaultArgumentKind::NilLiteral:
   case DefaultArgumentKind::EmptyArray:
   case DefaultArgumentKind::EmptyDictionary:
+  case DefaultArgumentKind::StoredProperty:
     return;
   }
 
@@ -1292,7 +1292,9 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
       auto impl = vd->getImplInfo();
       switch (kind) {
       case AccessorKind::Get:
-        return impl.getReadImpl() != ReadImplKind::Get;
+        return impl.getReadImpl() != ReadImplKind::Get &&
+               !(impl.getReadImpl() == ReadImplKind::Stored &&
+                 impl.getWriteImpl() == WriteImplKind::StoredWithObservers);
       case AccessorKind::Read:
         return impl.getReadImpl() != ReadImplKind::Read;
       case AccessorKind::Set:
@@ -1379,14 +1381,10 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
     auto setter = decl->getSetter();
     if (setter == nullptr)
       return true;
-    
-    auto setterLinkage = SILDeclRef(setter, SILDeclRef::Kind::Func)
-      .getLinkage(NotForDefinition);
-    
-    if (setterLinkage == SILLinkage::PublicExternal
-        || setterLinkage == SILLinkage::Public)
+
+    if (setter->getFormalAccessScope(nullptr, true).isPublic())
       return true;
-    
+
     return false;
   }
   case ResilienceStrategy::Resilient: {

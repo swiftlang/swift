@@ -407,6 +407,35 @@ void ClangImporter::clearTypeResolver() {
 
 #pragma mark Module loading
 
+/// Finds the glibc.modulemap file relative to the provided resource dir.
+///
+/// Note that the module map used for Glibc depends on the target we're
+/// compiling for, and is not included in the resource directory with the other
+/// implicit module maps. It's at {freebsd|linux}/{arch}/glibc.modulemap.
+static Optional<StringRef>
+getGlibcModuleMapPath(StringRef resourceDir, llvm::Triple triple,
+                      SmallVectorImpl<char> &scratch) {
+  if (resourceDir.empty())
+    return None;
+
+  scratch.append(resourceDir.begin(), resourceDir.end());
+  llvm::sys::path::append(
+      scratch,
+      swift::getPlatformNameForTriple(triple),
+      swift::getMajorArchitectureName(triple),
+      "glibc.modulemap");
+
+  // Only specify the module map if that file actually exists.
+  // It may not--for example in the case that
+  // `swiftc -target x86_64-unknown-linux-gnu -emit-ir` is invoked using
+  // a Swift compiler not built for Linux targets.
+  if (llvm::sys::fs::exists(scratch)) {
+    return StringRef(scratch.data(), scratch.size());
+  } else {
+    return None;
+  }
+}
+
 static void
 getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
                              ASTContext &ctx,
@@ -421,6 +450,17 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
           .endswith(file_types::getExtension(file_types::TY_PCH))) {
     invocationArgStrs.insert(invocationArgStrs.end(), {
         "-include-pch", importerOpts.BridgingHeader
+    });
+  }
+
+  // If there are no shims in the resource dir, add a search path in the SDK.
+  SmallString<128> shimsPath(searchPathOpts.RuntimeResourcePath);
+  llvm::sys::path::append(shimsPath, "shims");
+  if (!llvm::sys::fs::exists(shimsPath)) {
+    shimsPath = searchPathOpts.SDKPath;
+    llvm::sys::path::append(shimsPath, "usr", "lib", "swift", "shims");
+    invocationArgStrs.insert(invocationArgStrs.end(), {
+      "-isystem", shimsPath.str()
     });
   }
 
@@ -560,28 +600,10 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       }
     }
 
-    // The module map used for Glibc depends on the target we're compiling for,
-    // and is not included in the resource directory with the other implicit
-    // module maps. It's at {freebsd|linux}/{arch}/glibc.modulemap.
     SmallString<128> GlibcModuleMapPath;
-    GlibcModuleMapPath = searchPathOpts.RuntimeResourcePath;
-
-    // Running without a resource directory is not a supported configuration.
-    assert(!GlibcModuleMapPath.empty());
-
-    llvm::sys::path::append(
-      GlibcModuleMapPath,
-      swift::getPlatformNameForTriple(triple),
-      swift::getMajorArchitectureName(triple),
-      "glibc.modulemap");
-
-    // Only specify the module map if that file actually exists.
-    // It may not--for example in the case that
-    // `swiftc -target x86_64-unknown-linux-gnu -emit-ir` is invoked using
-    // a Swift compiler not built for Linux targets.
-    if (llvm::sys::fs::exists(GlibcModuleMapPath)) {
-      invocationArgStrs.push_back(
-        (Twine("-fmodule-map-file=") + GlibcModuleMapPath).str());
+    if (auto path = getGlibcModuleMapPath(searchPathOpts.RuntimeResourcePath,
+                                          triple, GlibcModuleMapPath)) {
+      invocationArgStrs.push_back((Twine("-fmodule-map-file=") + *path).str());
     } else {
       // FIXME: Emit a warning of some kind.
     }
@@ -759,7 +781,6 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
                          *clangDiags,
                          CI.getLangOpts(),
                          clangSrcMgr,
-                         CI.getPCMCache(),
                          headerSearchInfo,
                          (clang::ModuleLoader &)CI,
                          /*IILookup=*/nullptr,
@@ -772,7 +793,7 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   // Note: Reusing the PCHContainerReader or ModuleFileExtensions could be
   // dangerous.
   std::unique_ptr<clang::ASTReader> Reader(new clang::ASTReader(
-      PP, &ctx, CI.getPCHContainerReader(),
+      PP, CI.getModuleCache(), &ctx, CI.getPCHContainerReader(),
       CI.getFrontendOpts().ModuleFileExtensions,
       CI.getHeaderSearchOpts().Sysroot,
       /*DisableValidation*/ false,
@@ -1384,7 +1405,8 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
   invocation->getPreprocessorOpts().resetNonModularOptions();
 
   clang::CompilerInstance rewriteInstance(
-    Impl.Instance->getPCHContainerOperations());
+    Impl.Instance->getPCHContainerOperations(),
+    &Impl.Instance->getModuleCache());
   rewriteInstance.setInvocation(invocation);
   rewriteInstance.createDiagnostics(new clang::IgnoringDiagConsumer);
 
@@ -1440,9 +1462,11 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   invocation->getFrontendOpts().ProgramAction = clang::frontend::GeneratePCH;
   invocation->getPreprocessorOpts().resetNonModularOptions();
   invocation->getLangOpts()->NeededByPCHOrCompilationUsesPCH = true;
+  invocation->getLangOpts()->CacheGeneratedPCH = true;
 
   clang::CompilerInstance emitInstance(
-    Impl.Instance->getPCHContainerOperations());
+    Impl.Instance->getPCHContainerOperations(),
+    &Impl.Instance->getModuleCache());
   emitInstance.setInvocation(std::move(invocation));
   emitInstance.createDiagnostics(&Impl.Instance->getDiagnosticClient(),
                                  /*ShouldOwnClient=*/false);
@@ -3133,7 +3157,7 @@ clang::ASTContext &ClangModuleUnit::getClangASTContext() const {
   return owner.getClangASTContext();
 }
 
-std::string ClangModuleUnit::getExportedModuleName() const {
+StringRef ClangModuleUnit::getExportedModuleName() const {
   if (clangModule && !clangModule->ExportAsModule.empty())
     return clangModule->ExportAsModule;
 

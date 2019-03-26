@@ -133,21 +133,6 @@ public struct AnyHashable {
 
   /// Creates a type-erased hashable value that wraps the given instance.
   ///
-  /// The following example creates two type-erased hashable values: `x` wraps
-  /// an `Int` with the value 42, while `y` wraps a `UInt8` with the same
-  /// numeric value. Because the underlying types of `x` and `y` are
-  /// different, the two variables do not compare as equal despite having
-  /// equal underlying values.
-  ///
-  ///     let x = AnyHashable(Int(42))
-  ///     let y = AnyHashable(UInt8(42))
-  ///
-  ///     print(x == y)
-  ///     // Prints "false" because `Int` and `UInt8` are different types
-  ///
-  ///     print(x == AnyHashable(Int(42)))
-  ///     // Prints "true"
-  ///
   /// - Parameter base: A hashable value to wrap.
   public init<H : Hashable>(_ base: H) {
     if let custom =
@@ -209,21 +194,6 @@ extension AnyHashable : Equatable {
   /// Two instances of `AnyHashable` compare as equal if and only if the
   /// underlying types have the same conformance to the `Equatable` protocol
   /// and the underlying values compare as equal.
-  ///
-  /// The following example creates two type-erased hashable values: `x` wraps
-  /// an `Int` with the value 42, while `y` wraps a `UInt8` with the same
-  /// numeric value. Because the underlying types of `x` and `y` are
-  /// different, the two variables do not compare as equal despite having
-  /// equal underlying values.
-  ///
-  ///     let x = AnyHashable(Int(42))
-  ///     let y = AnyHashable(UInt8(42))
-  ///
-  ///     print(x == y)
-  ///     // Prints "false" because `Int` and `UInt8` are different types
-  ///
-  ///     print(x == AnyHashable(Int(42)))
-  ///     // Prints "true"
   ///
   /// - Parameters:
   ///   - lhs: A type-erased hashable value.

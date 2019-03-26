@@ -173,30 +173,40 @@ class DiscoveredModule {
   /// The kind of module that's been discovered.
   const Kind kind;
 
-  DiscoveredModule(StringRef path, Kind kind): kind(kind), path(path) {}
+  DiscoveredModule(StringRef path, Kind kind,
+    std::unique_ptr<llvm::MemoryBuffer> moduleBuffer)
+    : kind(kind), moduleBuffer(std::move(moduleBuffer)), path(path) {}
+
 public:
+  /// The contents of the .swiftmodule, if we've read it while validating
+  /// dependencies.
+  std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
+
   /// The path to the discovered serialized .swiftmodule on disk.
   const std::string path;
 
   /// Creates a \c Normal discovered module.
-  static DiscoveredModule normal(StringRef path) {
-    return { path, Kind::Normal };
+  static DiscoveredModule normal(StringRef path,
+      std::unique_ptr<llvm::MemoryBuffer> moduleBuffer) {
+    return { path, Kind::Normal, std::move(moduleBuffer) };
   }
 
   /// Creates a \c Prebuilt discovered module.
-  static DiscoveredModule prebuilt(StringRef path) {
-    return { path, Kind::Prebuilt };
+  static DiscoveredModule prebuilt(
+      StringRef path, std::unique_ptr<llvm::MemoryBuffer> moduleBuffer) {
+    return { path, Kind::Prebuilt, std::move(moduleBuffer) };
   }
 
   /// Creates a \c Forwarded discovered module, whose dependencies have been
   /// externally validated by a \c ForwardingModule.
-  static DiscoveredModule forwarded(StringRef path) {
-    return { path, Kind::Forwarded };
+  static DiscoveredModule forwarded(
+      StringRef path, std::unique_ptr<llvm::MemoryBuffer> moduleBuffer) {
+    return { path, Kind::Forwarded, std::move(moduleBuffer) };
   }
 
   bool isNormal() const { return kind == Kind::Normal; }
   bool isPrebuilt() const { return kind == Kind::Prebuilt; }
-  bool isForwarding() const { return kind == Kind::Forwarded; }
+  bool isForwarded() const { return kind == Kind::Forwarded; }
 };
 
 } // end anonymous namespace
@@ -258,7 +268,6 @@ class swift::ParseableInterfaceBuilder {
   void configureSubInvocationInputsAndOutputs(StringRef OutPath) {
     auto &SubFEOpts = subInvocation.getFrontendOptions();
     SubFEOpts.RequestedAction = FrontendOptions::ActionType::EmitModuleOnly;
-    SubFEOpts.EnableParseableModuleInterface = true;
     SubFEOpts.InputsAndOutputs.addPrimaryInputFile(interfacePath);
     SupplementaryOutputPaths SOPs;
     SOPs.ModuleOutputPath = OutPath.str();
@@ -454,7 +463,8 @@ public:
     return subInvocation;
   }
 
-  bool buildSwiftModule(StringRef OutPath, bool ShouldSerializeDeps) {
+  bool buildSwiftModule(StringRef OutPath, bool ShouldSerializeDeps,
+                        std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer) {
     bool SubError = false;
     bool RunSuccess = llvm::CrashRecoveryContext().RunSafelyOnThread([&] {
       // Note that we don't assume cachePath is the same as the Clang
@@ -560,7 +570,10 @@ public:
       if (ShouldSerializeDeps)
         SerializationOpts.Dependencies = Deps;
       SILMod->setSerializeSILAction([&]() {
-        serialize(Mod, SerializationOpts, SILMod.get());
+        // We don't want to serialize module docs in the cache -- they
+        // will be serialized beside the interface file.
+        serializeToBuffers(Mod, SerializationOpts, ModuleBuffer,
+                           /*ModuleDocBuffer*/nullptr, SILMod.get());
       });
 
       LLVM_DEBUG(llvm::dbgs() << "Running SIL processing passes\n");
@@ -713,30 +726,28 @@ class ParseableInterfaceModuleLoaderImpl {
     if (validationInfo.status != serialization::Status::Valid)
       return false;
 
-    assert(validationInfo.name == moduleName &&
-           "we built a module at this path with a different name?");
-
     return dependenciesAreUpToDate(allDeps);
   }
 
   // Check that the output .swiftmodule file is at least as new as all the
   // dependencies it read when it was built last time.
-  bool swiftModuleIsUpToDate(StringRef modulePath,
-                             SmallVectorImpl<FileDependency> &AllDeps) {
+  bool swiftModuleIsUpToDate(
+    StringRef modulePath, SmallVectorImpl<FileDependency> &AllDeps,
+    std::unique_ptr<llvm::MemoryBuffer> &moduleBuffer) {
     auto OutBuf = fs.getBufferForFile(modulePath);
     if (!OutBuf)
       return false;
-    return serializedASTBufferIsUpToDate(*OutBuf.get(), AllDeps);
+    moduleBuffer = std::move(*OutBuf);
+    return serializedASTBufferIsUpToDate(*moduleBuffer, AllDeps);
   }
 
   // Check that a "forwarding" .swiftmodule file is at least as new as all the
   // dependencies it read when it was built last time. Requires that the
   // forwarding module has been loaded from disk.
-  bool forwardingModuleIsUpToDate(const ForwardingModule &fwd,
-                                  SmallVectorImpl<FileDependency> &deps) {
+  bool forwardingModuleIsUpToDate(
+    const ForwardingModule &fwd, SmallVectorImpl<FileDependency> &deps,
+    std::unique_ptr<llvm::MemoryBuffer> &moduleBuffer) {
     // First, make sure the underlying module path exists and is valid.
-    // FIXME: We should preserve this buffer, rather than opening it again
-    //        when loading the module.
     auto modBuf = fs.getBufferForFile(fwd.underlyingModulePath);
     if (!modBuf || !serializedASTLooksValid(*modBuf.get()))
       return false;
@@ -747,7 +758,11 @@ class ParseableInterfaceModuleLoaderImpl {
         FileDependency::modTimeBased(
           dep.path, dep.size, dep.lastModificationTime));
     }
-    return dependenciesAreUpToDate(deps);
+    if (!dependenciesAreUpToDate(deps))
+      return false;
+
+    moduleBuffer = std::move(*modBuf);
+    return true;
   }
 
   Optional<StringRef>
@@ -813,22 +828,25 @@ class ParseableInterfaceModuleLoaderImpl {
     // First, check the cached module path. Whatever's in this cache represents
     // the most up-to-date knowledge we have about the module.
     if (auto cachedBufOrError = fs.getBufferForFile(cachedOutputPath)) {
-      auto &buf = *cachedBufOrError.get();
+      auto buf = std::move(*cachedBufOrError);
 
       // Check to see if the module is a serialized AST. If it's not, then we're
       // probably dealing with a Forwarding Module, which is a YAML file.
       bool isForwardingModule =
-        !serialization::isSerializedAST(buf.getBuffer());
+        !serialization::isSerializedAST(buf->getBuffer());
 
       // If it's a forwarding module, load the YAML file from disk and check
       // if it's up-to-date.
       if (isForwardingModule) {
-        auto modOrErr = ForwardingModule::load(buf);
-        if (modOrErr && forwardingModuleIsUpToDate(*modOrErr, deps))
-          return DiscoveredModule::forwarded(modOrErr->underlyingModulePath);
+        if (auto forwardingModule = ForwardingModule::load(*buf)) {
+          std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
+          if (forwardingModuleIsUpToDate(*forwardingModule, deps, moduleBuffer))
+            return DiscoveredModule::forwarded(
+              forwardingModule->underlyingModulePath, std::move(moduleBuffer));
+        }
       // Otherwise, check if the AST buffer itself is up to date.
-      } else if (serializedASTBufferIsUpToDate(buf, deps)) {
-        return DiscoveredModule::normal(cachedOutputPath);
+      } else if (serializedASTBufferIsUpToDate(*buf, deps)) {
+        return DiscoveredModule::normal(cachedOutputPath, std::move(buf));
       }
     }
 
@@ -839,9 +857,10 @@ class ParseableInterfaceModuleLoaderImpl {
     // from the SDK.
     if (!prebuiltCacheDir.empty()) {
       llvm::SmallString<256> scratch;
+      std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
       auto path = computePrebuiltModulePath(scratch);
-      if (path && swiftModuleIsUpToDate(*path, deps))
-        return DiscoveredModule::prebuilt(*path);
+      if (path && swiftModuleIsUpToDate(*path, deps, moduleBuffer))
+        return DiscoveredModule::prebuilt(*path, std::move(moduleBuffer));
     }
 
     // Finally, if there's a module adjacent to the .swiftinterface that we can
@@ -903,10 +922,12 @@ class ParseableInterfaceModuleLoaderImpl {
       });
   }
 
-  /// Looks up the best module to load for a given interface. See the main
-  /// comment in \c ParseableInterfaceModuleLoader.h for an explanation of
-  /// the module loading strategy.
-  llvm::ErrorOr<std::string> findOrBuildLoadableModule() {
+  /// Looks up the best module to load for a given interface, and returns a
+  /// buffer of the module's contents.  See the main comment in
+  /// \c ParseableInterfaceModuleLoader.h for an explanation of the module
+  /// loading strategy.
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
+  findOrBuildLoadableModule() {
 
     // Set up a builder if we need to build the module. It'll also set up
     // the subinvocation we'll need to use to compute the cache paths.
@@ -931,24 +952,27 @@ class ParseableInterfaceModuleLoaderImpl {
         moduleOrErr.getError() != std::errc::no_such_file_or_directory)
       return moduleOrErr.getError();
 
-    // We discovered a module! Return the module's path so we know what to load.
+    // We discovered a module! Return that module's buffer so we can load it.
     if (moduleOrErr) {
-      auto &module = *moduleOrErr;
+      auto module = std::move(moduleOrErr.get());
+
       // If it's prebuilt, use this time to generate a forwarding module.
       if (module.isPrebuilt())
         if (writeForwardingModule(module, cachedOutputPath, allDeps))
           return std::make_error_code(std::errc::not_supported);
 
-      // FIXME: return and load module buffer directly
-      return module.path;
+      return std::move(module.moduleBuffer);
     }
 
+    std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
     // We didn't discover a module corresponding to this interface. Build one.
-    if (builder.buildSwiftModule(cachedOutputPath, /*shouldSerializeDeps*/true))
+    if (builder.buildSwiftModule(cachedOutputPath, /*shouldSerializeDeps*/true,
+                                 &moduleBuffer))
       return std::make_error_code(std::errc::invalid_argument);
 
-    // FIXME: return and load module buffer directly
-    return cachedOutputPath.str();
+    assert(moduleBuffer &&
+           "failed to write module buffer but returned success?");
+    return std::move(moduleBuffer);
   }
 };
 
@@ -988,26 +1012,24 @@ std::error_code ParseableInterfaceModuleLoader::findModuleFilesInDirectory(
 
   // Ask the impl to find us a module that we can load or give us an error
   // telling us that we couldn't load it.
-  auto PathOrErr = Impl.findOrBuildLoadableModule();
-  if (!PathOrErr)
-    return PathOrErr.getError();
-  std::string FinalPath = std::move(*PathOrErr);
+  auto ModuleBufferOrErr = Impl.findOrBuildLoadableModule();
+  if (!ModuleBufferOrErr)
+    return ModuleBufferOrErr.getError();
 
-  // Finish off by delegating back up to the SerializedModuleLoaderBase
-  // routine that can load the recently-manufactured serialized module.
-  LLVM_DEBUG(llvm::dbgs() << "Loading " << FinalPath
-             << " via normal module loader\n");
+  if (ModuleBuffer) {
+    *ModuleBuffer = std::move(*ModuleBufferOrErr);
+  }
+
+  // Delegate back to the serialized module loader to load the module doc.
   llvm::SmallString<256> DocPath{DirPath};
   path::append(DocPath, ModuleDocFilename);
-  auto ErrorCode = SerializedModuleLoaderBase::openModuleFiles(
-    ModuleID, FinalPath, DocPath, ModuleBuffer, ModuleDocBuffer);
-  LLVM_DEBUG(llvm::dbgs() << "Loaded " << FinalPath
-             << " via normal module loader");
-  if (ErrorCode) {
-    LLVM_DEBUG(llvm::dbgs() << " with error: " << ErrorCode.message());
-  }
-  LLVM_DEBUG(llvm::dbgs() << "\n");
-  return ErrorCode;
+  auto DocLoadErr =
+    SerializedModuleLoaderBase::openModuleDocFile(ModuleID, DocPath,
+                                                  ModuleDocBuffer);
+  if (DocLoadErr)
+    return DocLoadErr;
+
+  return std::error_code();
 }
 
 
@@ -1022,5 +1044,6 @@ bool ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
   //        make them relocatable (SDK-relative) if we want to ship the built
   //        swiftmodules to another machine. Just track them as absolute paths
   //        for now, so we can test the dependency tracking locally.
-  return builder.buildSwiftModule(OutPath, /*shouldSerializeDeps*/true);
+  return builder.buildSwiftModule(OutPath, /*shouldSerializeDeps*/true,
+                                  /*ModuleBuffer*/nullptr);
 }

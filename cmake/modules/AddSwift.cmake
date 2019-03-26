@@ -721,6 +721,7 @@ function(_add_swift_library_single target name)
         FILE_DEPENDS
         FRAMEWORK_DEPENDS
         FRAMEWORK_DEPENDS_WEAK
+        GYB_SOURCES
         INCORPORATE_OBJECT_LIBRARIES
         INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY
         INTERFACE_LINK_LIBRARIES
@@ -810,10 +811,14 @@ function(_add_swift_library_single target name)
         "Either SHARED, STATIC, or OBJECT_LIBRARY must be specified")
   endif()
 
-  handle_gyb_sources(
-      gyb_dependency_targets
-      SWIFTLIB_SINGLE_SOURCES
-      "${SWIFTLIB_SINGLE_ARCHITECTURE}")
+  if(SWIFTLIB_SINGLE_GYB_SOURCES)
+    handle_gyb_sources(
+        gyb_dependency_targets
+        SWIFTLIB_SINGLE_GYB_SOURCES
+        "${SWIFTLIB_SINGLE_ARCHITECTURE}")
+    set(SWIFTLIB_SINGLE_SOURCES ${SWIFTLIB_SINGLE_SOURCES}
+      ${SWIFTLIB_SINGLE_GYB_SOURCES})
+  endif()
 
   # Remove the "swift" prefix from the name to determine the module name.
   if(SWIFTLIB_IS_STDLIB_CORE)
@@ -1620,6 +1625,7 @@ function(add_swift_target_library name)
         FRAMEWORK_DEPENDS_IOS_TVOS
         FRAMEWORK_DEPENDS_OSX
         FRAMEWORK_DEPENDS_WEAK
+        GYB_SOURCES
         INCORPORATE_OBJECT_LIBRARIES
         INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY
         INTERFACE_LINK_LIBRARIES
@@ -1914,6 +1920,7 @@ function(add_swift_target_library name)
         DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
         DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
         DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
+        GYB_SOURCES ${SWIFTLIB_GYB_SOURCES}
       )
 
       if(NOT SWIFTLIB_OBJECT_LIBRARY)
@@ -2104,15 +2111,12 @@ endfunction()
 #
 #   [ARCHITECTURE architecture]
 #     Architecture to build for.
-#
-#   [LINK_FAT_LIBRARIES lipo_target1 ...]
-#     Fat libraries to link with.
 function(_add_swift_executable_single name)
   # Parse the arguments we were given.
   cmake_parse_arguments(SWIFTEXE_SINGLE
     "EXCLUDE_FROM_ALL"
     "SDK;ARCHITECTURE"
-    "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_LIBRARIES;LINK_FAT_LIBRARIES;COMPILE_FLAGS"
+    "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_LIBRARIES;COMPILE_FLAGS"
     ${ARGN})
 
   set(SWIFTEXE_SINGLE_SOURCES ${SWIFTEXE_SINGLE_UNPARSED_ARGUMENTS})
@@ -2160,27 +2164,11 @@ function(_add_swift_executable_single name)
         "-Xlinker" "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
   endif()
 
-  # Find the names of dependency library targets.
-  #
-  # We don't add the ${ARCH} to the target suffix because we want to link
-  # against fat libraries.  This only works for the Darwin targets as MachO is
-  # the only format with the fat libraries.
-  if(${SWIFTEXE_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
-    _list_add_string_suffix(
-        "${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES}"
-        "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}"
-        SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS)
-    _list_add_string_suffix(
-        "${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES}"
-        "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
-        SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES)
-  else()
-    _list_add_string_suffix(
-        "${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES}"
-        "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
-        SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS)
-    set(SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS})
-  endif()
+  _list_add_string_suffix(
+      "${SWIFTEXE_SINGLE_LINK_LIBRARIES}"
+      "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
+      SWIFTEXE_SINGLE_LINK_LIBRARIES_TARGETS)
+  set(SWIFTEXE_SINGLE_LINK_LIBRARIES ${SWIFTEXE_SINGLE_LINK_LIBRARIES_TARGETS})
 
   handle_swift_sources(
       dependency_target
@@ -2191,7 +2179,6 @@ function(_add_swift_executable_single name)
       SWIFTEXE_SINGLE_SOURCES SWIFTEXE_SINGLE_EXTERNAL_SOURCES ${name}
       DEPENDS
         ${SWIFTEXE_SINGLE_DEPENDS}
-        ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS}
       MODULE_NAME ${name}
       SDK ${SWIFTEXE_SINGLE_SDK}
       ARCHITECTURE ${SWIFTEXE_SINGLE_ARCHITECTURE}
@@ -2209,8 +2196,7 @@ function(_add_swift_executable_single name)
       DEPENDS
         ${dependency_target}
         ${LLVM_COMMON_DEPENDS}
-        ${SWIFTEXE_SINGLE_DEPENDS}
-        ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS})
+        ${SWIFTEXE_SINGLE_DEPENDS})
   llvm_update_compile_flags("${name}")
 
   # Convert variables to space-separated strings.
@@ -2230,11 +2216,10 @@ function(_add_swift_executable_single name)
       BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
       LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
-  target_link_libraries("${name}" PRIVATE ${SWIFTEXE_SINGLE_LINK_LIBRARIES} ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES})
+  target_link_libraries("${name}" PRIVATE ${SWIFTEXE_SINGLE_LINK_LIBRARIES})
   swift_common_llvm_config("${name}" ${SWIFTEXE_SINGLE_LLVM_COMPONENT_DEPENDS})
 
-  set_target_properties(${name}
-      PROPERTIES FOLDER "Swift executables")
+  set_target_properties(${name} PROPERTIES FOLDER "Swift executables")
 endfunction()
 
 macro(add_swift_tool_subdirectory name)

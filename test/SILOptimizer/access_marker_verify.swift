@@ -904,11 +904,9 @@ internal struct CanCastStruct<Base : Hashable> : CanCast {
 // CHECK: checked_cast_addr_br take_always CanCast in [[TEMP_BASE]] : $*CanCast to CanCastStruct<T> in [[TEMP_SUB_ADR]] : $*CanCastStruct<T>
 // CHECK-NOT: begin_access
 // CHECK: [[TEMP_DATA:%.*]] = unchecked_take_enum_data_addr [[TEMP_SUB]] : $*Optional<CanCastStruct<T>>, #Optional.some!enumelt.1
-// CHECK: [[ACCESS:%.*]] = begin_access [read] [unsafe] [[TEMP_DATA]] : $*CanCastStruct<T>
-// CHECK: [[BASE_ADR:%.*]] = struct_element_addr [[ACCESS]] : $*CanCastStruct<T>, #CanCastStruct.base
 // CHECK-NOT: begin_access
+// CHECK: [[BASE_ADR:%.*]] = struct_element_addr [[TEMP_DATA]] : $*CanCastStruct<T>, #CanCastStruct.base
 // CHECK: copy_addr [[BASE_ADR]] to [initialization] [[OUT_ENUM]] : $*T
-// CHECK: end_access [[ACCESS]] : $*CanCastStruct<T>
 // CHECK-NOT: begin_access
 // CHECK: inject_enum_addr %0 : $*Optional<T>, #Optional.some!enumelt.1
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify13CanCastStructV5unboxqd__SgySHRd__lF'

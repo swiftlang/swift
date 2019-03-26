@@ -240,7 +240,7 @@ public:
                            AbstractionPattern origFormalType,
                            SILType expectedType = SILType()) &&;
 
-  /// Whether this argument source is a TupleShuffleExpr.
+  /// Whether this argument source is an ArgumentShuffleExpr.
   bool isShuffle() const;
 
   bool isObviouslyEqual(const ArgumentSource &other) const;

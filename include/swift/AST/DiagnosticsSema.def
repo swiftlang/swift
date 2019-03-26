@@ -1108,24 +1108,20 @@ ERROR(attribute_requires_operator_identifier,none,
 ERROR(attribute_requires_single_argument,none,
       "'%0' requires a function with one argument", (StringRef))
 
-ERROR(mutating_invalid_global_scope,none,
-      "'%select{nonmutating|mutating|__consuming}0' is only valid on methods",
-      (unsigned))
-ERROR(mutating_invalid_classes,none,
-      "'%select{nonmutating|mutating|__consuming}0' isn't valid on methods in "
-      "classes or class-bound protocols", (bool))
+ERROR(mutating_invalid_global_scope,none, "%0 is only valid on methods",
+      (SelfAccessKind))
+ERROR(mutating_invalid_classes,none, "%0 isn't valid on methods in "
+      "classes or class-bound protocols", (SelfAccessKind))
 
 ERROR(functions_mutating_and_not,none,
-      "method must not be declared both "
-      "%select{nonmutating|mutating|__consuming}0 and "
-      "%select{nonmutating|mutating|__consuming}1",
-      (unsigned, unsigned))
+      "method must not be declared both %0 and %1",
+      (SelfAccessKind, SelfAccessKind))
 ERROR(static_functions_not_mutating,none,
       "static functions must not be declared mutating", ())
 
 ERROR(modify_mutatingness_differs_from_setter,none,
-      "'modify' accessor cannot be %select{nonmutating|mutating}0 "
-      "when the setter is %select{mutating|nonmutating}0", (bool))
+      "'modify' accessor cannot be %0 when the setter is %1",
+      (SelfAccessKind, SelfAccessKind))
 
 ERROR(transparent_in_protocols_not_supported,none,
       "'@_transparent' attribute is not supported on declarations within protocols", ())
@@ -1305,7 +1301,7 @@ ERROR(indirect_case_without_payload,none,
 ERROR(indirect_case_in_indirect_enum,none,
       "enum case in 'indirect' enum cannot also be 'indirect'", ())
 WARNING(enum_frozen_nonresilient,none,
-        "%0 has no effect without -enable-resilience", (DeclAttribute))
+        "%0 has no effect without -enable-library-evolution", (DeclAttribute))
 WARNING(enum_frozen_nonpublic,none,
         "%0 has no effect on non-public enums", (DeclAttribute))
 
@@ -1522,6 +1518,8 @@ ERROR(extension_specialization,none,
       "type %0 with constraints specified by a 'where' clause", (Identifier))
 ERROR(extension_stored_property,none,
       "extensions must not contain stored properties", ())
+NOTE(extension_stored_property_fixit,none,
+     "Remove '=' to make %0 a computed property", (Identifier))
 ERROR(extension_nongeneric_trailing_where,none,
       "trailing 'where' clause for extension of non-generic type %0",
       (DeclName))
@@ -1871,8 +1869,8 @@ NOTE(protocol_witness_prefix_postfix_conflict,none,
      "candidate is %select{|prefix, |postfix, }1not "
      "%select{prefix|postfix}0 as required", (bool, unsigned))
 NOTE(protocol_witness_mutation_modifier_conflict,none,
-     "candidate is marked '%select{nonmutating|mutating|__consuming}0' but "
-     "protocol does not allow it", (unsigned))
+     "candidate is marked %0 but protocol does not allow it",
+     (SelfAccessKind))
 NOTE(protocol_witness_settable_conflict,none,
      "candidate is not settable, but protocol requires it", ())
 NOTE(protocol_witness_rethrows_conflict,none,

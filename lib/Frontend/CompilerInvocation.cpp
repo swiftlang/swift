@@ -201,12 +201,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                           const FrontendOptions &FrontendOpts) {
   using namespace options;
 
-  /// FIXME: Remove this flag when void subscripts are implemented.
-  /// This is used to guard preemptive testing for the fix-it.
-  if (Args.hasArg(OPT_fix_string_substring_conversion)) {
-    Opts.FixStringToSubstringConversions = true;
-  }
-
   if (auto A = Args.getLastArg(OPT_swift_version)) {
     auto vers = version::Version::parseVersionString(
       A->getValue(), SourceLoc(), &Diags);
@@ -447,15 +441,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                    Target.isOSDarwin());
   Opts.EnableSILOpaqueValues |= Args.hasArg(OPT_enable_sil_opaque_values);
 
-#if SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
   Opts.UseDarwinPreStableABIBit =
     (Target.isMacOSX() && Target.isMacOSXVersionLT(10, 14, 4)) ||
     (Target.isiOS() && Target.isOSVersionLT(12, 2)) ||
     (Target.isTvOS() && Target.isOSVersionLT(12, 2)) ||
     (Target.isWatchOS() && Target.isOSVersionLT(5, 2));
-#else
-  Opts.UseDarwinPreStableABIBit = true;
-#endif
 
   Opts.DisableConstraintSolverPerformanceHacks |=
       Args.hasArg(OPT_disable_constraint_solver_performance_hacks);
@@ -777,7 +767,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EmitProfileCoverageMapping |= Args.hasArg(OPT_profile_coverage_mapping);
   Opts.DisableSILPartialApply |=
     Args.hasArg(OPT_disable_sil_partial_apply);
-  Opts.EnableSILOwnership |= Args.hasArg(OPT_enable_sil_ownership);
+  Opts.VerifySILOwnership &= !Args.hasArg(OPT_disable_sil_ownership_verifier);
   Opts.EnableMandatorySemanticARCOpts |=
       Args.hasArg(OPT_enable_mandatory_semantic_arc_opts);
   Opts.EnableLargeLoadableTypes |= Args.hasArg(OPT_enable_large_loadable_types);

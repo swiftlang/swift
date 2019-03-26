@@ -230,7 +230,22 @@ public:
     // Cut off parsing by acting as if we reached the end-of-file.
     Tok.setKind(tok::eof);
   }
-  
+
+  /// Use this to assert that the parser has advanced the lexing location, e.g.
+  /// before a specific parser function has returned.
+  class AssertParserMadeProgressBeforeLeavingScopeRAII {
+    Parser &P;
+    SourceLoc InitialLoc;
+  public:
+    AssertParserMadeProgressBeforeLeavingScopeRAII(Parser &parser) : P(parser) {
+      InitialLoc = P.Tok.getLoc();
+    }
+    ~AssertParserMadeProgressBeforeLeavingScopeRAII() {
+      assert(InitialLoc != P.Tok.getLoc() &&
+        "parser did not make progress, this can result in infinite loop");
+    }
+  };
+
   /// A RAII object for temporarily changing CurDeclContext.
   class ContextChange {
   protected:

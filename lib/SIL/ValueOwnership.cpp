@@ -223,7 +223,7 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
     // If we have mismatched SILOwnership and sil ownership is not enabled,
     // just return Any for staging purposes. If SILOwnership is enabled, then
     // we must assert!
-    if (!i->getModule().getOptions().EnableSILOwnership) {
+    if (!i->getModule().getOptions().VerifySILOwnership) {
       return ValueOwnershipKind::Any;
     }
     llvm_unreachable("Forwarding inst with mismatching ownership kinds?!");

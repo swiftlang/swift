@@ -250,10 +250,6 @@ option(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT
     "Whether to enable CrashReporter integration"
     FALSE)
 
-option(SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
-    "Enable the Swift stable ABI's class marker bit for new deployment targets"
-    TRUE)
-
 set(SWIFT_DARWIN_XCRUN_TOOLCHAIN "XcodeDefault" CACHE STRING
     "The name of the toolchain to pass to 'xcrun'")
 
@@ -330,10 +326,6 @@ option(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
 option(SWIFT_STDLIB_USE_NONATOMIC_RC
     "Build the standard libraries and overlays with nonatomic reference count operations enabled"
     FALSE)
-
-option(SWIFT_STDLIB_ENABLE_SIL_OWNERSHIP
-  "Build the standard libraries and overlays with sil ownership enabled."
-  FALSE)
 
 option(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS
   "Enable runtime function counters and expose the API."
@@ -891,12 +883,11 @@ find_package(PythonInterp REQUIRED)
 # Find optional dependencies.
 #
 
-# Find libxml.
-# FIXME: unify with CLANG_HAVE_LIBXML, which is set in LLVM anyway.
-find_package(LibXml2)
-option(SWIFT_HAVE_LIBXML
-    "Whether to build with libxml"
-    ${LIBXML2_FOUND})
+if(LLVM_ENABLE_LIBXML2)
+  find_package(Libxml2 REQUIRED)
+else()
+  find_package(LibXml2)
+endif()
 
 # You need libedit linked in order to check if you have el_wgets.
 cmake_push_check_state()

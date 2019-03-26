@@ -12,6 +12,8 @@ __attribute__((objc_root_class))
 
 @protocol SomeProto
 @end
+
+typedef long long SomeTypedef;
 #endif
 
 @protocol ZProto

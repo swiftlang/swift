@@ -21,7 +21,9 @@ if(NOT SWIFT_SOURCEKIT_USE_INPROC_LIBRARY AND SWIFT_BUILD_STDLIB AND SWIFT_BUILD
     SourceKitdRequest.swift
     SourceKitdResponse.swift
     SourceKitdUID.swift
-    UIDs.swift.gyb
+
+    GYB_SOURCES
+      UIDs.swift.gyb
 
     DEPENDS ${DEPENDS_LIST}
     SWIFT_MODULE_DEPENDS_OSX Darwin Foundation

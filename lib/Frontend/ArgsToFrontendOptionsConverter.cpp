@@ -71,7 +71,11 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.EnableTesting |= Args.hasArg(OPT_enable_testing);
   Opts.EnablePrivateImports |= Args.hasArg(OPT_enable_private_imports);
-  Opts.EnableResilience |= Args.hasArg(OPT_enable_resilience);
+  Opts.EnableLibraryEvolution |= Args.hasArg(OPT_enable_library_evolution);
+
+  // FIXME: Remove this flag
+  Opts.EnableLibraryEvolution |= Args.hasArg(OPT_enable_resilience);
+
   Opts.EnableImplicitDynamic |= Args.hasArg(OPT_enable_implicit_dynamic);
 
   Opts.TrackSystemDeps |= Args.hasArg(OPT_track_system_dependencies);
@@ -91,6 +95,8 @@ bool ArgsToFrontendOptionsConverter::convert(
                              Opts.SolverExpressionTimeThreshold);
   setUnsignedIntegerArgument(OPT_switch_checking_invocation_threshold_EQ, 10,
                              Opts.SwitchCheckingInvocationThreshold);
+
+  Opts.CheckOnoneSupportCompleteness = Args.hasArg(OPT_check_onone_completeness);
 
   Opts.DebuggerTestingTransform = Args.hasArg(OPT_debugger_testing_transform);
 
@@ -163,8 +169,6 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
   Opts.ImportUnderlyingModule |= Args.hasArg(OPT_import_underlying_module);
-  Opts.EnableParseableModuleInterface |=
-      Args.hasArg(OPT_enable_parseable_module_interface);
   Opts.EnableSerializationNestedTypeLookupTable &=
       !Args.hasArg(OPT_disable_serialization_nested_type_lookup_table);
 

@@ -2332,7 +2332,9 @@ enum class MetatypeRepresentation : char {
   /// which permit dynamic behavior.
   Thick,
   /// An Objective-C metatype refers to an Objective-C class object.
-  ObjC
+  ObjC,
+
+  Last_MetatypeRepresentation = ObjC
 };
 
 /// AnyMetatypeType - A common parent class of MetatypeType and
