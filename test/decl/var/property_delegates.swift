@@ -401,6 +401,10 @@ struct BadCombinations {
   unowned var z: C by Wrapper // expected-error{{property 'z' with a delegate cannot also be unowned}}
 }
 
+// ---------------------------------------------------------------------------
+// Explicitly-specified accessors
+// ---------------------------------------------------------------------------
+
 struct DelegateWithAccessors { // expected-note{{'init(x:y:)' declared here}}
   var x: Int by Wrapper {
     return $x.value * 2
@@ -416,4 +420,74 @@ struct DelegateWithAccessors { // expected-note{{'init(x:y:)' declared here}}
 func testDelegateWithAccessors() {
   _ = DelegateWithAccessors() // expected-error{{missing argument for parameter 'x' in call}}
   _ = DelegateWithAccessors(x: Wrapper<Int>(value: 17), y: 42)
+}
+
+// ---------------------------------------------------------------------------
+// Mutating/nonmutating
+// ---------------------------------------------------------------------------
+@propertyDelegate
+struct DelegateWithNonMutatingSetter<Value> {
+  class Box {
+    var value: Value
+    init(value: Value) {
+      self.value = value
+    }
+  }
+
+  var box: Box
+
+  init(initialValue: Value) {
+    self.box = Box(value: initialValue)
+  }
+
+  var value: Value {
+    get { return box.value }
+    nonmutating set { box.value = newValue }
+  }
+}
+
+@propertyDelegate
+struct DelegateWithMutatingGetter<Value> {
+  var readCount = 0
+  var writeCount = 0
+  var stored: Value
+  
+  init(initialValue: Value) {
+    self.stored = initialValue
+  }
+
+  var value: Value {
+    mutating get {
+      readCount += 1
+      return stored
+    }
+    set {
+      writeCount += 1
+      stored = newValue
+    }
+  }
+}
+
+struct UseMutatingnessDelegates {
+  var x by DelegateWithNonMutatingSetter = true
+  var y by DelegateWithMutatingGetter = 17
+}
+
+func testMutatingness() {
+  var mutable = UseMutatingnessDelegates()
+
+  _ = mutable.x
+  mutable.x = false
+
+  _ = mutable.y
+  mutable.y = 42
+
+  let nonmutable = UseMutatingnessDelegates() // expected-note 2{{change 'let' to 'var' to make it mutable}}
+
+  // Okay due to nonmutating setter
+  _ = nonmutable.x
+  nonmutable.x = false
+
+  _ = nonmutable.y // expected-error{{cannot use mutating getter on immutable value: 'nonmutable' is a 'let' constant}}
+  nonmutable.y = 42 // expected-error{{cannot use mutating getter on immutable value: 'nonmutable' is a 'let' constant}}
 }

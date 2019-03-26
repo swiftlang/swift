@@ -1935,7 +1935,8 @@ static bool computeIsGetterMutating(TypeChecker &TC,
   if (auto var = dyn_cast<VarDecl>(storage)) {
     if (var->hasPropertyDelegate()) {
       auto info = getAttachedPropertyDelegateInfo(var);
-      if (info.unwrapProperty) {
+      if (info.unwrapProperty &&
+          (!storage->getGetter() || storage->getGetter()->isImplicit())) {
         TC.validateDecl(info.unwrapProperty);
         return info.unwrapProperty->isGetterMutating() &&
             var->isInstanceMember() &&
@@ -1970,7 +1971,8 @@ static bool computeIsSetterMutating(TypeChecker &TC,
   if (auto var = dyn_cast<VarDecl>(storage)) {
     if (var->hasPropertyDelegate()) {
       auto info = getAttachedPropertyDelegateInfo(var);
-      if (info.unwrapProperty) {
+      if (info.unwrapProperty &&
+          (!storage->getSetter() || storage->getSetter()->isImplicit())) {
         TC.validateDecl(info.unwrapProperty);
         return info.unwrapProperty->isSetterMutating() &&
             var->isInstanceMember() &&
