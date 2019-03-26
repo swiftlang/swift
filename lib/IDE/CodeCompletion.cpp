@@ -2069,6 +2069,7 @@ public:
     for (auto param : *func->getParameters()) {
       switch (param->getDefaultArgumentKind()) {
       case DefaultArgumentKind::Normal:
+      case DefaultArgumentKind::StoredProperty:
       case DefaultArgumentKind::Inherited: // FIXME: include this?
         return true;
       default:
@@ -2096,6 +2097,7 @@ public:
         return false;
 
       case DefaultArgumentKind::Normal:
+      case DefaultArgumentKind::StoredProperty:
       case DefaultArgumentKind::Inherited:
       case DefaultArgumentKind::NilLiteral:
       case DefaultArgumentKind::EmptyArray:

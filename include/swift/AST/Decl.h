@@ -4910,7 +4910,7 @@ class ParamDecl : public VarDecl {
   SourceLoc SpecifierLoc;
 
   struct StoredDefaultArgument {
-    Expr *DefaultArg = nullptr;
+    PointerUnion<Expr *, VarDecl *> DefaultArg;
     Initializer *InitContext = nullptr;
     StringRef StringRepresentation;
   };
@@ -4967,11 +4967,19 @@ public:
   
   Expr *getDefaultValue() const {
     if (auto stored = DefaultValueAndFlags.getPointer())
-      return stored->DefaultArg;
+      return stored->DefaultArg.dyn_cast<Expr *>();
+    return nullptr;
+  }
+
+  VarDecl *getStoredProperty() const {
+    if (auto stored = DefaultValueAndFlags.getPointer())
+      return stored->DefaultArg.dyn_cast<VarDecl *>();
     return nullptr;
   }
 
   void setDefaultValue(Expr *E);
+
+  void setStoredProperty(VarDecl *var);
 
   Initializer *getDefaultArgumentInitContext() const {
     if (auto stored = DefaultValueAndFlags.getPointer())
