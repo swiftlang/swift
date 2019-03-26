@@ -150,6 +150,9 @@ enum class ConstraintKind : char {
   /// The first type is a type that's a candidate to be the underlying type of
   /// the second opaque archetype.
   OpaqueUnderlyingType,
+  /// The first type is being implicitly returned from a function, the second is
+  /// the function's result type.
+  SingleExpressionFunctionReturnConversion,
 };
 
 /// Classification of the different kinds of constraints.
@@ -181,6 +184,8 @@ enum class ConversionRestrictionKind {
   DeepEquality,
   /// Subclass-to-superclass conversion.
   Superclass,
+  /// Uninhabited-to-any conversion.
+  UninhabitedUpcast,
   /// Class metatype to AnyObject conversion.
   ClassMetatypeToAnyObject,
   /// Existential metatype to AnyObject conversion.
@@ -489,6 +494,7 @@ public:
     case ConstraintKind::BindOverload:
     case ConstraintKind::OptionalObject:
     case ConstraintKind::OpaqueUnderlyingType:
+    case ConstraintKind::SingleExpressionFunctionReturnConversion:
       return ConstraintClassification::Relational;
 
     case ConstraintKind::ValueMember:

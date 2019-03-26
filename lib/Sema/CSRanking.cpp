@@ -77,6 +77,9 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
     case SK_KeyPathSubscript:
       log << "key path subscript";
       break;
+    case SK_UninhabitedUpcast:
+      log << "uninhabited upcast conversion";
+      break;
     case SK_ValueToPointerConversion:
       log << "value-to-pointer conversion";
       break;

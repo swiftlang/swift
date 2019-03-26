@@ -2102,6 +2102,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
       }
     };
     break;
+  case CTP_ReturnSingleExpr:
   case CTP_ReturnStmt:
     // Special case the "conversion to void" case.
     if (contextualType->isVoid()) {

@@ -4677,6 +4677,16 @@ public:
   }
 };
 
+class UninhabitedUpcastExpr : public ImplicitConversionExpr {
+public:
+  UninhabitedUpcastExpr(Expr *subExpr, Type ty)
+    : ImplicitConversionExpr(ExprKind::UninhabitedUpcast, subExpr, ty) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UninhabitedUpcast;
+  }
+};
+
 /// Produces the Objective-C selector of the referenced method.
 ///
 /// \code

@@ -351,6 +351,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   PASS_THROUGH_REFERENCE(BridgeFromObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(ConditionalBridgeFromObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(UnderlyingToOpaque, getSubExpr);
+  PASS_THROUGH_REFERENCE(UninhabitedUpcast, getSubExpr);
   NO_REFERENCE(Coerce);
   NO_REFERENCE(ForcedCheckedCast);
   NO_REFERENCE(ConditionalCheckedCast);
@@ -669,6 +670,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::BridgeFromObjC:
   case ExprKind::BridgeToObjC:
   case ExprKind::UnderlyingToOpaque:
+  case ExprKind::UninhabitedUpcast:
     // Implicit conversion nodes have no syntax of their own; defer to the
     // subexpression.
     return cast<ImplicitConversionExpr>(this)->getSubExpr()
