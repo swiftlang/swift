@@ -13,11 +13,43 @@ func f3(_ f: UndeclaredFunctionType) rethrows { f() } // expected-error {{use of
 func f4(_ f: (() throws -> Void)?...) rethrows {} // expected-error {{'rethrows' function must take a throwing function argument}}
 func f5(_ f: ((() throws -> Void)?, Bool)) rethrows {} // expected-error {{'rethrows' function must take a throwing function argument}}
 
+/** Rethrowing from arrays, tuples and variadic parameters *******************/
+
 typealias VoidToVoidThrows = () throws -> Void
 
-func f6(_ f: () throws -> Void...) rethrows {} // Ok
-func f7(_ f: [VoidToVoidThrows]) rethrows {} // Ok
-func f8(_ f: [() throws -> Void]?) rethrows {} // Ok
+func rethrowArray1(arg: [VoidToVoidThrows]) rethrows {
+  try arg[0]()
+  arg.first?() // expected-error {{call can throw, but it is not marked with 'try' and the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
+}
+func rethrowArray2(arg: () throws -> Void...) rethrows {
+  try arg[0]()
+}
+func rethrowArray3(arg: [VoidToVoidThrows]?) rethrows {
+  try arg?[0]()
+}
+func rethrowTuple1(arg: (() throws -> Void, Bool)?) rethrows {}
+
+func throwsFunc() throws {}
+func nothrowsFunc() {}
+func testArrayAndTupleRethrowing() {
+
+  let array: [() throws -> Void] = [nothrowsFunc]
+
+  try! rethrowArray1(arg: [throwsFunc]) // OK
+  rethrowArray1(arg: [nothrowsFunc]) // OK
+  rethrowArray1(arg: [nothrowsFunc, throwsFunc])
+  // expected-error@-1 {{call can throw, but it is not marked with 'try' and the error is not handled}}
+  // expected-note@-2 {{call is to 'rethrows' function}}
+  rethrowArray1(arg: array) // Opaque
+  // expected-error@-1 {{call can throw, but it is not marked with 'try' and the error is not handled}}
+  // expected-note@-2 {{call is to 'rethrows' function, but argument function can throw}}
+
+  try! rethrowArray2(arg: throwsFunc, nothrowsFunc) // OK
+  rethrowArray2(arg: nothrowsFunc) // OK
+  rethrowArray2(arg: throwsFunc, nothrowsFunc)
+  // expected-error@-1 {{call can throw, but it is not marked with 'try' and the error}}
+  // expected-note@-2 {{call is to 'rethrows' function}}
+}
 
 /** Protocol conformance checking ********************************************/
 

@@ -172,6 +172,16 @@ public:
     // Closures.
     } else if (auto closure = dyn_cast<AbstractClosureExpr>(fn)) {
       return AbstractFunction(closure);
+
+    // Array.subscript.
+    } else if (auto subscript = dyn_cast<SubscriptExpr>(fn)) {
+      auto result = decomposeFunction(
+                        subscript->getBase()->getValueProvidingExpr());
+      if (auto param = result.getParameter()) {
+        if (subscript->getDecl().getDecl() ==
+            param->getASTContext().getArrayIntSubscriptDecl())
+          return result;
+      }
     }
 
     // Everything else is opaque.
@@ -514,7 +524,10 @@ private:
 
   Classification classifyThrowingParameterBody(ParamDecl *param,
                                                PotentialReason reason) {
-    assert(param->getType()->lookThroughAllOptionalTypes()->castTo<AnyFunctionType>()->throws());
+    assert(classifyArgumentByType(param->getType()
+                                    ->lookThroughAllOptionalTypes(),
+                                  reason).getResult()
+           == ThrowingKind::Throws);
 
     // If we're currently doing rethrows-checking on the body of the
     // function which declares the parameter, it's rethrowing-only.
@@ -711,6 +724,15 @@ private:
       // has a single-element-tuple argument type, but the argument is just
       // a ClosureExpr and not a TupleExpr/TupleShuffleExpr.
       paramType = paramTupleType->getElementType(0);
+    } else if (auto elementTy = paramType->getArrayElementType()) {
+      if (auto arrayExpr = dyn_cast<ArrayExpr>(arg))
+        return classifyArrayRethrowsArgument(arrayExpr, elementTy);
+      // Otherwise, we're passing an opaque array expression, and we
+      // should treat it as contributing to 'rethrows' if the element
+      // type included a throwing function type.
+      return classifyArgumentByType(
+                              elementTy,
+                              PotentialReason::forRethrowsArgument(arg));
     }
 
     // Otherwise, if the original parameter type was not a throwing
@@ -740,6 +762,18 @@ private:
 
     // Otherwise, classify the function implementation.
     return classifyThrowingFunctionBody(fn, reason);
+  }
+
+  /// Classify an argument to a 'rethrows' function that's an array literal.
+  Classification classifyArrayRethrowsArgument(ArrayExpr *array,
+                                               Type arrayEltType) {
+    Classification result;
+    for (const auto &expr : array->getElements()) {
+      result.merge(classifyRethrowsArgument(expr, arrayEltType));
+      if (result.getResult() == ThrowingKind::Throws)
+        break;
+    }
+    return result;
   }
 
   /// Classify an argument to a 'rethrows' function that's a tuple literal.
@@ -809,13 +843,12 @@ private:
                  srcIndex == TupleShuffleExpr::CallerDefaultInitialize) {
         // Nothing interesting from the source expression.
       } else if (srcIndex == TupleShuffleExpr::Variadic) {
-        // Variadic arguments never contribute to 'rethrows'.
-        // Assign the rest of the source elements parameter types that will
-        // cause the recursive walker to ignore them.
+        // For variadic fields, use the corresponding elements from the
+        // source tuple, which will have equivalent but non-variadic types.
+        auto srcTupleType = shuffle->getSubExpr()->getType()->castTo<TupleType>();
         for (unsigned srcIndex : shuffle->getVariadicArgs()) {
           assert(srcIndex >= 0 && "default-initialized variadic argument?");
-          origSrcElts[srcIndex] =
-            origParamTupleType->getASTContext().TheRawPointerType;
+          origSrcElts[srcIndex] = srcTupleType->getElement(destIndex);
         }
       } else {
         llvm_unreachable("bad source-element mapping!");
@@ -849,6 +882,8 @@ private:
         result.merge(classifyArgumentByType(eltType, reason));
       }
       return result;
+    } else if (auto elementTy = paramType->getArrayElementType()) {
+      return classifyArgumentByType(elementTy, reason);
     }
 
     // No other types include throwing functions for now.
