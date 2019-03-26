@@ -113,6 +113,8 @@ out with ``lit.py -h``. We document some of the more useful ones below:
 * ``--param swift_test_mode=<MODE>`` drives the various suffix variations
   mentioned above. Again, it's best to get the invocation from the existing
   build system targets and modify it rather than constructing it yourself.
+* ``--param use_os_stdlib`` will run all tests with the standard libraries
+  coming from the OS.
 
 ##### Remote testing options
 
