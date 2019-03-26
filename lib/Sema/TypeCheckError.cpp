@@ -703,6 +703,9 @@ private:
       }
     }
 
+    if (auto inject = dyn_cast<InjectIntoOptionalExpr>(arg))
+      arg = inject->getSubExpr()->getValueProvidingExpr();
+
     // If the parameter was structurally a tuple, try to look through the
     // various tuple operations.
     if (auto paramTupleType = dyn_cast<TupleType>(paramType.getPointer())) {
