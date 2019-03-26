@@ -1535,17 +1535,15 @@ namespace {
                                              SourceLoc dotLoc,
                                              ConstraintLocator *memberLoc) {
       auto &ctx = cs.getASTContext();
+      auto *anchor = memberLoc->getAnchor();
 
       KeyPathExpr::Component component;
-      auto *componentExpr = memberLoc->getAnchor();
 
-      simplifyExprType(componentExpr);
-      componentExpr->setType(cs.getType(componentExpr));
-
-      // Now, let's create a KeyPath expression itself.
+      // Let's create a KeyPath expression and fill in "parsed path"
+      // after component is built.
       auto *keyPath = new (ctx) KeyPathExpr(/*backslashLoc=*/dotLoc,
                                             /*parsedRoot=*/nullptr,
-                                            /*parsedPath=*/componentExpr,
+                                            /*parsedPath=*/anchor,
                                             /*isImplicit=*/true);
 
       auto *componentLoc = cs.getConstraintLocator(
@@ -1553,14 +1551,36 @@ namespace {
           LocatorPathElt::getKeyPathDynamicMember(keyPathTy->getAnyNominal()));
       auto overload = solution.getOverloadChoice(componentLoc);
 
-      // Let's re-use existing expression, but switch its base
-      // to keypath special "dot" expression.
-      if (auto *UDE = dyn_cast<UnresolvedDotExpr>(componentExpr)) {
-        UDE->setBase(new (ctx) KeyPathDotExpr(dotLoc));
+      // We can't reuse existing expression because type-check
+      // based diagnostics could hold the reference to original AST.
+      Expr *componentExpr = nullptr;
+      auto *dotExpr = new (ctx) KeyPathDotExpr(dotLoc);
+      if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
+        componentExpr = new (ctx) UnresolvedDotExpr(
+            dotExpr, dotLoc, UDE->getName(), UDE->getNameLoc(),
+            /*Implicit=*/true);
+
         component = buildKeyPathPropertyComponent(overload, UDE->getLoc(),
                                                   componentLoc);
-      } else if (auto *SE = dyn_cast<SubscriptExpr>(componentExpr)) {
-        SE->setBase(new (ctx) KeyPathDotExpr(dotLoc));
+      } else if (auto *SE = dyn_cast<SubscriptExpr>(anchor)) {
+        SmallVector<Expr *, 4> arguments;
+        if (auto *TE = dyn_cast<TupleExpr>(SE->getIndex())) {
+          auto args = TE->getElements();
+          arguments.append(args.begin(), args.end());
+        } else {
+          arguments.push_back(SE->getIndex()->getSemanticsProvidingExpr());
+        }
+
+        Expr *trailingClosure = nullptr;
+        if (SE->hasTrailingClosure())
+          trailingClosure = arguments.pop_back_val();
+
+        componentExpr = SubscriptExpr::create(
+            ctx, dotExpr, SE->getStartLoc(), arguments, SE->getArgumentLabels(),
+            SE->getArgumentLabelLocs(), SE->getEndLoc(), trailingClosure,
+            SE->hasDecl() ? SE->getDecl() : ConcreteDeclRef(),
+            /*implicit=*/true, SE->getAccessSemantics());
+
         component = buildKeyPathSubscriptComponent(
             overload, SE->getLoc(), SE->getIndex(), SE->getArgumentLabels(),
             componentLoc);
@@ -1571,6 +1591,11 @@ namespace {
         return nullptr;
       }
 
+      assert(componentExpr);
+      componentExpr->setType(simplifyType(cs.getType(anchor)));
+      cs.cacheType(componentExpr);
+
+      keyPath->setParsedPath(componentExpr);
       keyPath->resolveComponents(ctx, {component});
       keyPath->setType(keyPathTy);
       cs.cacheType(keyPath);
@@ -2760,7 +2785,8 @@ namespace {
             paramTy->castTo<BoundGenericType>(), dotLoc, memberLocator);
       }
 
-      assert(argExpr);
+      if (!argExpr)
+        return nullptr;
 
       // Build a tuple so that the argument has a label.
       auto tupleTy =

@@ -579,3 +579,11 @@ func keypath_with_subscripts(_ arr: SubscriptLens<[Int]>,
   }
   dict["ultimate question"] = 42
 }
+
+func keypath_with_incorrect_return_type(_ arr: Lens<Array<Int>>) {
+  for idx in 0..<arr.count {
+    // expected-error@-1 {{binary operator '..<' cannot be applied to operands of type 'Int' and 'Lens<Int>'}}
+    // expected-note@-2  {{expected an argument list of type '(Self, Self)'}}
+    let _ = arr[idx]
+  }
+}
