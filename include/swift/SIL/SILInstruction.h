@@ -4186,9 +4186,17 @@ class ConvertEscapeToNoEscapeInst final
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
          bool lifetimeGuaranteed);
 public:
+  /// Return true if we have extended the lifetime of the argument of the
+  /// convert_escape_to_no_escape to be over all uses of the trivial type.
   bool isLifetimeGuaranteed() const {
     return lifetimeGuaranteed;
   }
+
+  /// Mark that we have extended the lifetime of the argument of the
+  /// convert_escape_to_no_escape to be over all uses of the trivial type.
+  ///
+  /// NOTE: This is a one way operation.
+  void setLifetimeGuaranteed() { lifetimeGuaranteed = true; }
 };
 
 /// ThinFunctionToPointerInst - Convert a thin function pointer to a
