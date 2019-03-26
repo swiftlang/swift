@@ -210,9 +210,9 @@ private func _getCocoaStringPointer(
   return .none
 }
 
-@usableFromInline
 @_effects(releasenone) // @opaque
-internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
+internal func _bridgeOwnedCocoaString(
+  _ cocoaString: __owned _CocoaString) -> _StringGuts {
   switch _KnownCocoaString(cocoaString) {
   case .storage:
     return _unsafeUncheckedDowncast(
@@ -259,10 +259,16 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
   }
 }
 
+@usableFromInline
+@_effects(releasenone) // @opaque
+internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
+  return _bridgeOwnedCocoaString(cocoaString)
+}
+
 extension String {
   public // SPI(Foundation)
   init(_cocoaString: AnyObject) {
-    self._guts = _bridgeCocoaString(_cocoaString)
+    self._guts = _bridgeOwnedCocoaString(_cocoaString)
   }
 }
 
