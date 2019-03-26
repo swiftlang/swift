@@ -132,8 +132,11 @@ bool constraints::areConservativelyCompatibleArgumentLabels(
     hasCurriedSelf = false;
   } else if (baseType->is<AnyMetatypeType>() && decl->isInstanceMember()) {
     hasCurriedSelf = false;
-  } else if (isa<EnumElementDecl>(decl)) {
-    hasCurriedSelf = false;
+  } else if (auto *EED = dyn_cast<EnumElementDecl>(decl)) {
+    // enum elements have either `(Self.Type) -> (Arg...) -> Self`, or
+    // `(Self.Type) -> Self`, in the former case self type has to be
+    // stripped off.
+    hasCurriedSelf = bool(EED->getParameterList());
   } else {
     hasCurriedSelf = true;
   }
