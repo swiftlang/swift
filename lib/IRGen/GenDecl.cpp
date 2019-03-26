@@ -1462,6 +1462,9 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
     return RESULT(External, Hidden, Default);
 
   case SILLinkage::Private: {
+    if (info.forcePublicDecls() && !isDefinition)
+      return getIRLinkage(info, SILLinkage::PublicExternal, isDefinition,
+                          isWeakImported);
     auto linkage = info.needLinkerToMergeDuplicateSymbols()
                        ? llvm::GlobalValue::LinkOnceODRLinkage
                        : llvm::GlobalValue::InternalLinkage;
