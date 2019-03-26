@@ -810,6 +810,14 @@ public:
     return nullptr;
   }
 
+  /// Returns the name to use when referencing entities in this file.
+  ///
+  /// Usually this is the module name itself, but certain Clang features allow
+  /// substituting another name instead.
+  virtual StringRef getExportedModuleName() const {
+    return getParentModule()->getName().str();
+  }
+
   /// Traverse the decls within this file.
   ///
   /// \returns true if traversal was aborted, false if it completed
