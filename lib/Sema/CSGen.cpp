@@ -3274,6 +3274,38 @@ namespace {
             expr = sanitizeArgumentList(expr);
         }
 
+        // If this expression represents keypath based dynamic member
+        // lookup, let's convert it back to the original form of
+        // member or subscript reference.
+        if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
+          if (auto *TE = dyn_cast<TupleExpr>(SE->getIndex())) {
+            auto isImplicitKeyPathExpr = [](Expr *argExpr) -> bool {
+              if (auto *KP = dyn_cast<KeyPathExpr>(argExpr))
+                return KP->isImplicit();
+              return false;
+            };
+
+            if (TE->isImplicit() && TE->getNumElements() == 1 &&
+                TE->getElementName(0) == TC.Context.Id_dynamicMember &&
+                isImplicitKeyPathExpr(TE->getElement(0))) {
+              auto *keyPathExpr = cast<KeyPathExpr>(TE->getElement(0));
+              auto *componentExpr = keyPathExpr->getParsedPath();
+
+              if (auto *UDE = dyn_cast<UnresolvedDotExpr>(componentExpr)) {
+                UDE->setBase(SE->getBase());
+                return {true, UDE};
+              }
+
+              if (auto *subscript = dyn_cast<SubscriptExpr>(componentExpr)) {
+                subscript->setBase(SE->getBase());
+                return {true, subscript};
+              }
+
+              llvm_unreachable("unknown keypath component type");
+            }
+          }
+        }
+
         // Now, we're ready to walk into sub expressions.
         return {true, expr};
       }
