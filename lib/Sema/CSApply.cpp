@@ -4905,6 +4905,7 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
   case DefaultArgumentKind::None:
     llvm_unreachable("No default argument here?");
 
+  case DefaultArgumentKind::StoredProperty:
   case DefaultArgumentKind::Normal:
     return {nullptr, param->getDefaultArgumentKind()};
 
