@@ -539,7 +539,7 @@ extension _AnyDerivativeBox {
 internal func _derivativeTypeMismatch(
   _ x: Any.Type, _ y: Any.Type, file: StaticString = #file, line: UInt = #line
 ) -> Never {
-  fatalError("""
+  preconditionFailure("""
     Derivative type mismatch: \
     \(String(reflecting: x)) and \(String(reflecting: y))
     """, file: file, line: line)
