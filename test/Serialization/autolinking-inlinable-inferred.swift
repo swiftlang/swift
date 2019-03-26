@@ -11,10 +11,7 @@
 
 // Linux uses a different autolinking mechanism, based on
 // swift-autolink-extract. This file tests the Darwin mechanism.
-// UNSUPPORTED: OS=linux-gnu
-// UNSUPPORTED: OS=linux-gnueabihf
-// UNSUPPORTED: OS=freebsd
-// UNSUPPORTED: OS=linux-androideabi
+/// UNSUPPORTED: autolink-extract
 
 import autolinking_module_inferred
 
