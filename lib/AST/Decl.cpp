@@ -530,8 +530,10 @@ bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
   }
 
   if (auto ImportD = dyn_cast<ImportDecl>(D)) {
-    if (ImportD->getModule()->isSwiftShimsModule())
-      return true;
+    if (auto *Mod = ImportD->getModule()) {
+      if (Mod->isSwiftShimsModule())
+        return true;
+    }
   }
 
   auto VD = dyn_cast<ValueDecl>(D);
