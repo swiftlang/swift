@@ -299,8 +299,10 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
       if (context.OI.SelectedSanitizers & SanitizerKind::Address)
         addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "asan", *this);
 
-      if (context.OI.SelectedSanitizers & SanitizerKind::Thread)
+      if (context.OI.SelectedSanitizers & SanitizerKind::Thread) {
         addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "tsan", *this);
+        Arguments.push_back("-ldispatch");
+      }
 
       if (context.OI.SelectedSanitizers & SanitizerKind::Undefined)
         addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "ubsan", *this);
