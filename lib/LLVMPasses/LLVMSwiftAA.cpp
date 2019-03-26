@@ -41,7 +41,8 @@ ModRefInfo SwiftAAResult::getModRefInfo(const llvm::CallBase *Call,
     return ModRefInfo::NoModRef;
 
   // Otherwise, delegate to the rest of the AA ModRefInfo machinery.
-  return AAResultBase::getModRefInfo(Call, Loc);
+  AAQueryInfo AAQI;
+  return AAResultBase::getModRefInfo(Call, Loc, AAQI);
 }
 
 //===----------------------------------------------------------------------===//
