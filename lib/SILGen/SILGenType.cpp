@@ -288,6 +288,7 @@ static void emitTypeMemberGlobalVariable(SILGenModule &SGM,
   }
 
   SGM.addGlobalVariable(var);
+  SGM.tryEmitPropertyDescriptor(var);
 }
 
 namespace {

@@ -3367,6 +3367,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     } else {
       componentTy =
         GenericEnvironment::mapTypeIntoContext(genericEnv, baseTy)
+          ->getMetatypeInstanceType()
           ->getTypeOfMember(SwiftModule, var)
           ->getReferenceStorageReferent()
           ->mapTypeOutOfContext()

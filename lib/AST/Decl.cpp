@@ -5260,6 +5260,14 @@ Type DeclContext::getSelfInterfaceType() const {
   return getDeclaredInterfaceType();
 }
 
+Type DeclContext::getSelfInterfaceType(bool isStatic) const {
+  auto ty = getSelfInterfaceType();
+  if (isStatic && ty)
+    return MetatypeType::get(ty);
+  else
+    return ty;
+}
+
 /// Return the full source range of this parameter.
 SourceRange ParamDecl::getSourceRange() const {
   SourceLoc APINameLoc = getArgumentNameLoc();

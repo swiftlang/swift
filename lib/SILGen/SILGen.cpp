@@ -1418,11 +1418,7 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
 
   Type baseTy;
   if (decl->getDeclContext()->isTypeContext()) {
-    // TODO: Static properties should eventually be referenceable as
-    // keypaths from T.Type -> Element, viz `baseTy = MetatypeType::get(baseTy)`
-    assert(!decl->isStatic());
-    
-    baseTy = decl->getDeclContext()->getSelfInterfaceType()
+    baseTy = decl->getDeclContext()->getSelfInterfaceType(decl->isStatic())
                  ->getCanonicalType(decl->getInnermostDeclContext()
                                         ->getGenericSignatureOfContext());
   } else {

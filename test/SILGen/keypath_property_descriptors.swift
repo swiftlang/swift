@@ -47,10 +47,18 @@ public struct A {
   // PRIVATEIMPORTS-LABEL: sil_property instance #A.f ()
   private var f: Int = 0
 
-  // TODO: static vars should get descriptors
+  // static vars
+  
+  // NONRESILIENT-LABEL: sil_property type #A.a ()
+  // RESILIENT-LABEL: sil_property type #A.a (settable_property
   public static var a: Int = 0
+  
+  // CHECK-LABEL: sil_property type #A.b ()
   @inlinable
   public static var b: Int { return 0 }
+  
+  // NONRESILIENT-LABEL: sil_property type #A.c ()
+  // RESILIENT-LABEL: sil_property type #A.c (settable_property
   @usableFromInline
   internal static var c: Int = 0
 

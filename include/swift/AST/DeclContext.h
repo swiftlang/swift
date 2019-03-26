@@ -341,6 +341,12 @@ public:
   /// - Everything else falls back on getDeclaredInterfaceType().
   Type getSelfInterfaceType() const;
 
+  /// Get the type of `self` in this context.
+  ///
+  /// - Protocol types return the `Self` interface type.
+  /// - Everything else falls back on getDeclaredInterfaceType().
+  Type getSelfInterfaceType(bool isStatic) const;
+
   /// Visit the generic parameter list of every outer context, innermost first.
   void forEachGenericContext(
     llvm::function_ref<void (GenericParamList *)> fn) const;

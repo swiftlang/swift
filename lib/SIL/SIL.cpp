@@ -204,9 +204,9 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
   // The storage needs a descriptor if it sits at a module's ABI boundary,
   // meaning it has public linkage.
   
-  // TODO: Global and static properties ought to eventually be referenceable
-  // as key paths from () or T.Type too.
-  if (!getDeclContext()->isTypeContext() || isStatic())
+  // TODO: Global properties ought to eventually be referenceable
+  // as key paths from () too.
+  if (!getDeclContext()->isTypeContext())
     return false;
   
   // Protocol requirements do not need property descriptors.

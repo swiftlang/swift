@@ -4909,9 +4909,10 @@ void SILProperty::verify(const SILModule &M) const {
   auto *decl = getDecl();
   auto *dc = decl->getInnermostDeclContext();
   
-  // TODO: base type for global/static descriptors
+  // TODO: base type for global descriptors
   auto sig = dc->getGenericSignatureOfContext();
-  auto baseTy = dc->getInnermostTypeContext()->getSelfInterfaceType()
+  auto baseTy = dc->getInnermostTypeContext()
+                  ->getSelfInterfaceType(decl->isStatic())
                   ->getCanonicalType(sig);
   auto leafTy = decl->getValueInterfaceType()->getCanonicalType(sig);
   SubstitutionMap subs;
