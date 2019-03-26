@@ -1910,15 +1910,90 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       auto memberTy = createTypeVariable(keyPathLoc, TVO_CanBindToLValue);
       // Attempt to lookup a member with a give name in the root type and
       // assign result to the leaf type of the keypath.
-      addValueMemberConstraint(LValueType::get(rootTy), choice.getName(),
-                               memberTy, useDC, FunctionRefKind::Unapplied,
+      bool isSubscriptRef = isa<SubscriptExpr>(locator->getAnchor());
+      DeclName memberName =
+          isSubscriptRef ? DeclBaseName::createSubscript() : choice.getName();
+
+      addValueMemberConstraint(LValueType::get(rootTy), memberName, memberTy,
+                               useDC,
+                               isSubscriptRef ? FunctionRefKind::DoubleApply
+                                              : FunctionRefKind::Unapplied,
                                /*outerAlternatives=*/{}, keyPathLoc);
 
-      // Since member type is going to be bound to "leaf" generic parameter
-      // of the keypath, it has to be an r-value always, so let's add a new
-      // constraint to represent that conversion instead of loading member
-      // type into "leaf" directly.
-      addConstraint(ConstraintKind::Equal, memberTy, leafTy, keyPathLoc);
+      // In case of subscript things are more compicated comparing to "dot"
+      // syntax, because we have to get "applicable function" constraint
+      // associated with index expression and re-bind it to match "member type"
+      // looked up by dynamically.
+      if (isSubscriptRef) {
+        // Make sure that regular subscript declarations (if any) are
+        // preferred over key path dynamic member lookup.
+        increaseScore(SK_KeyPathSubscript);
+
+        auto dynamicResultTy = boundType->castTo<TypeVariableType>();
+        llvm::SetVector<Constraint *> constraints;
+        CG.gatherConstraints(dynamicResultTy, constraints,
+                             ConstraintGraph::GatheringKind::EquivalenceClass,
+                             [](Constraint *constraint) {
+                               return constraint->getKind() ==
+                                      ConstraintKind::ApplicableFunction;
+                             });
+
+        assert(constraints.size() == 1);
+        auto *applicableFn = constraints.front();
+        retireConstraint(applicableFn);
+
+        // Original subscript expression e.g. `<base>[0]` generated following
+        // constraint `($T_A0, [$T_A1], ...) -> $T_R applicable fn $T_S` where
+        // `$T_S` is supposed to be bound to each subscript choice e.g.
+        // `(Int) -> Int`.
+        //
+        // Here is what we need to do to make this work as-if expression was
+        // `<base>[dynamicMember: \.[0]]`:
+        // - Right-hand side function type would have to get a new result type
+        //   since it would have to point to result type of `\.[0]`, arguments
+        //   though should stay the same.
+        // - Left-hand side `$T_S` is going to point to a new "member type"
+        //   we are looking up based on the root type of the key path.
+        // - Original result type `$T_R` is going to represent result of
+        //   the `[dynamicMember: \.[0]]` invocation.
+
+        // Result of the `WritableKeyPath` is going to be l-value type,
+        // let's adjust l-valueness of the result type to accommodate that.
+        //
+        // This is required because we are binding result of the subscript
+        // to its "member type" which becomes dynamic result type. We could
+        // form additional `applicable fn` constraint here and bind it to a
+        // function type, but it would create inconsistency with how properties
+        // are handled, which means more special handling in CSApply.
+        if (keyPathDecl == getASTContext().getWritableKeyPathDecl())
+          dynamicResultTy->getImpl().setCanBindToLValue(getSavedBindings(),
+                                                        /*enabled=*/true);
+
+        auto fnType = applicableFn->getFirstType()->castTo<FunctionType>();
+
+        auto subscriptResultTy = createTypeVariable(
+            getConstraintLocator(locator->getAnchor(),
+                                 ConstraintLocator::FunctionResult),
+            TVO_CanBindToLValue);
+
+        auto adjustedFnTy =
+            FunctionType::get(fnType->getParams(), subscriptResultTy);
+
+        addConstraint(ConstraintKind::ApplicableFunction, adjustedFnTy,
+                      memberTy, applicableFn->getLocator());
+
+        addConstraint(ConstraintKind::Bind, dynamicResultTy,
+                      fnType->getResult(), keyPathLoc);
+
+        addConstraint(ConstraintKind::Equal, subscriptResultTy, leafTy,
+                      keyPathLoc);
+      } else {
+        // Since member type is going to be bound to "leaf" generic parameter
+        // of the keypath, it has to be an r-value always, so let's add a new
+        // constraint to represent that conversion instead of loading member
+        // type into "leaf" directly.
+        addConstraint(ConstraintKind::Equal, memberTy, leafTy, keyPathLoc);
+      }
     }
     break;
   }

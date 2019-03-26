@@ -381,14 +381,18 @@ public:
     rep->getImpl().ParentOrFixed = type.getPointer();
   }
 
-  void setCannotBindToLValue(constraints::SavedTypeVariableBindings *record) {
-    auto rep = getRepresentative(record);
-    if (rep->getImpl().canBindToLValue()) {
-      if (record)
-        rep->getImpl().recordBinding(*record);
-      rep->getImpl().getTypeVariable()->Bits.TypeVariableType.Options
-        &= ~TVO_CanBindToLValue;
-    }
+  void setCanBindToLValue(constraints::SavedTypeVariableBindings *record,
+                          bool enabled) {
+    auto &impl = getRepresentative(record)->getImpl();
+    if (record)
+      impl.recordBinding(*record);
+
+    if (enabled)
+      impl.getTypeVariable()->Bits.TypeVariableType.Options |=
+          TVO_CanBindToLValue;
+    else
+      impl.getTypeVariable()->Bits.TypeVariableType.Options &=
+          ~TVO_CanBindToLValue;
   }
 
   /// Print the type variable to the given output stream.

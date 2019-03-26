@@ -531,3 +531,51 @@ func faz(_ d: D<Point>) {
   let _: Float = d.y(1 + 0) // expected-error {{cannot convert value of type 'Int' to specified type 'Float'}}
   let _ = d.z(1 + 0)        // expected-error {{'z' is inaccessible due to 'private' protection level}}
 }
+
+@dynamicMemberLookup
+struct SubscriptLens<T> {
+  var value: T
+
+  var counter: Int = 0
+
+  subscript(foo: String) -> Int {
+    get { return 42 }
+  }
+
+  subscript(offset: Int) -> Int {
+    get { return counter }
+    set { counter = counter + newValue }
+  }
+
+  subscript<U>(dynamicMember member: KeyPath<T, U>) -> U! {
+    get { return value[keyPath: member] }
+  }
+
+  subscript<U>(dynamicMember member: WritableKeyPath<T, U>) -> U {
+    get { return value[keyPath: member] }
+    set { value[keyPath: member] = newValue }
+  }
+}
+
+func keypath_with_subscripts(_ arr: SubscriptLens<[Int]>,
+                             _ dict: inout SubscriptLens<[String: Int]>) {
+  _ = arr[0..<3]
+  for idx in 0..<arr.count {
+    let _ = arr[idx]
+    print(arr[idx])
+  }
+
+  _ = arr["hello"]  // Ok
+  _ = dict["hello"] // Ok
+
+  _ = arr["hello"] = 42 // expected-error {{cannot assign through subscript: subscript is get-only}}
+  _ = dict["hello"] = 0 // Ok
+
+  _ = arr[0] = 42 // expected-error {{cannot assign through subscript: 'arr' is a 'let' constant}}
+  _ = dict[0] = 1 // Ok
+
+  if let index = dict.value.firstIndex(where: { $0.value == 42 }) {
+    let _ = dict[index]
+  }
+  dict["ultimate question"] = 42
+}

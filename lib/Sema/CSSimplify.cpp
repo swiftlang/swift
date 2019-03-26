@@ -1871,7 +1871,8 @@ ConstraintSystem::matchTypesBindTypeVar(
     // lvalues either.
     type.visit([&](Type t) {
       if (auto *tvt = dyn_cast<TypeVariableType>(t.getPointer()))
-        typeVar->getImpl().setCannotBindToLValue(getSavedBindings());
+        typeVar->getImpl().setCanBindToLValue(getSavedBindings(),
+                                              /*enabled=*/false);
     });
   }
 
@@ -3878,6 +3879,27 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
                                              ->getOptionalObjectType());
       return OverloadChoice::getDeclViaUnwrappedOptional(ovlBaseTy, cand,
                                                          functionRefKind);
+    }
+
+    // While looking for subscript choices it's possible to find
+    // `subscript(dynamicMember: {Writable}KeyPath)` on types
+    // marked as `@dynamicMemberLookup`, let's mark this candidate
+    // as representing "dynamic lookup" unless it's a direct call
+    // to such subscript (in that case label is expected to match).
+    if (auto *subscript = dyn_cast<SubscriptDecl>(cand)) {
+      if (hasDynamicMemberLookupAttribute(instanceTy,
+                                          DynamicMemberLookupCache) &&
+          isValidKeyPathDynamicMemberLookup(subscript, TC)) {
+        auto info =
+            getArgumentLabels(*this, ConstraintLocatorBuilder(memberLocator));
+
+        if (!(info && info->Labels.size() == 1 &&
+              info->Labels[0] == getASTContext().Id_dynamicMember)) {
+          return OverloadChoice::getDynamicMemberLookup(
+              baseTy, subscript, TC.Context.getIdentifier("subscript"),
+              /*isKeyPathBased=*/true);
+        }
+      }
     }
 
     return OverloadChoice(baseTy, cand, functionRefKind);

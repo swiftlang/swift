@@ -94,3 +94,46 @@ func baz(_ c: C<Point3D>) {
   // CHECK-NEXT: apply [[KEYPATH]]<Point3D, Int>({{.*}}, [[Y]], {{.*}})
   let _ = c.z
 }
+
+@dynamicMemberLookup
+struct SubscriptLens<T> {
+  var value: T
+
+  subscript(foo: String) -> Int {
+    get { return 42 }
+  }
+
+  subscript<U>(dynamicMember member: KeyPath<T, U>) -> U {
+    get { return value[keyPath: member] }
+  }
+
+  subscript<U>(dynamicMember member: WritableKeyPath<T, U>) -> U {
+    get { return value[keyPath: member] }
+    set { value[keyPath: member] = newValue }
+  }
+}
+
+func keypath_with_subscripts(_ arr: SubscriptLens<[Int]>,
+                             _ dict: inout SubscriptLens<[String: Int]>) {
+  // CHECK: keypath $WritableKeyPath<Array<Int>, ArraySlice<Int>>, (root $Array<Int>; settable_property $ArraySlice<Int>,  id @$sSays10ArraySliceVyxGSnySiGcig : {{.*}})
+  _ = arr[0..<3]
+  // CHECK: keypath $KeyPath<Array<Int>, Int>, (root $Array<Int>; gettable_property $Int,  id @$sSa5countSivg : {{.*}})
+  for idx in 0..<arr.count {
+    // CHECK: keypath $WritableKeyPath<Array<Int>, Int>, (root $Array<Int>; settable_property $Int,  id @$sSayxSicig : {{.*}})
+    let _ = arr[idx]
+    // CHECK: keypath $WritableKeyPath<Array<Int>, Int>, (root $Array<Int>; settable_property $Int,  id @$sSayxSicig : {{.*}})
+    print(arr[idx])
+  }
+
+  // CHECK: function_ref @$s29keypath_dynamic_member_lookup13SubscriptLensVySiSScig
+  _ = arr["hello"]
+  // CHECK: function_ref @$s29keypath_dynamic_member_lookup13SubscriptLensVySiSScig
+  _ = dict["hello"]
+
+  if let index = dict.value.firstIndex(where: { $0.value == 42 }) {
+    // CHECK: keypath $KeyPath<Dictionary<String, Int>, (key: String, value: Int)>, (root $Dictionary<String, Int>; gettable_property $(key: String, value: Int),  id @$sSDyx3key_q_5valuetSD5IndexVyxq__Gcig : {{.*}})
+    let _ = dict[index]
+  }
+  // CHECK: keypath $WritableKeyPath<Dictionary<String, Int>, Optional<Int>>, (root $Dictionary<String, Int>; settable_property $Optional<Int>,  id @$sSDyq_Sgxcig : {{.*}})
+  dict["ultimate question"] = 42
+}

@@ -1344,13 +1344,22 @@ ConstraintSystem::filterDisjunction(
   case 1: {
     // Only a single constraint remains. Retire the disjunction and make
     // the remaining constraint active.
+    auto choice = disjunction->getNestedConstraints()[choiceIdx];
+
+    // This can only happen when subscript syntax is used to lookup
+    // something which doesn't exist in type marked with
+    // `@dynamicMemberLookup`. Early simplification of the key path
+    // dynamic member lookup choice is impossible because it requires
+    // constraints associated with subscript index expression to be present.
+    if (!solverState && choice->getOverloadChoice().getKind() ==
+                            OverloadChoiceKind::KeyPathDynamicMemberLookup)
+      return SolutionKind::Unsolved;
 
     // Retire the disjunction. It's been solved.
     retireConstraint(disjunction);
 
     // Note the choice we made and simplify it. This introduces the
     // new constraint into the system.
-    auto choice = disjunction->getNestedConstraints()[choiceIdx];
     if (disjunction->shouldRememberChoice()) {
       recordDisjunctionChoice(disjunction->getLocator(), choiceIdx);
     }
