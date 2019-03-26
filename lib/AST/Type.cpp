@@ -611,6 +611,13 @@ Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK) {
   return Type();
 }
 
+Type TypeBase::getArrayElementType() {
+  if (auto boundStruct = getAs<BoundGenericStructType>())
+    if (getASTContext().getArrayDecl() == boundStruct->getDecl())
+      return boundStruct->getGenericArgs().front();
+  return Type();
+}
+
 Type TypeBase::lookThroughAllOptionalTypes() {
   Type type(this);
   while (auto objType = type->getOptionalObjectType())

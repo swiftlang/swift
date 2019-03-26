@@ -87,6 +87,7 @@ namespace swift {
   class InheritedProtocolConformance;
   class SelfProtocolConformance;
   class SpecializedProtocolConformance;
+  class SubscriptDecl;
   enum class ProtocolConformanceState;
   class Pattern;
   enum PointerTypeKind : unsigned;
@@ -522,6 +523,9 @@ public:
 
   /// Retrieve the declaration of Swift._hashValue<H>(for: H) -> Int.
   FuncDecl *getHashValueForDecl() const;
+
+  /// Retrieve the declaration for Array.subscript(index: Int) -> Element
+  SubscriptDecl *getArrayIntSubscriptDecl() const;
 
   /// Retrieve the declaration of Array.append(element:)
   FuncDecl *getArrayAppendElementDecl() const;

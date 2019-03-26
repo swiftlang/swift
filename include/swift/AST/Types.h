@@ -687,6 +687,9 @@ public:
     return getAnyPointerElementType(Ignore);
   }
   
+  /// Returns the `Element` type if this is a bound `Array`, otherwise null.
+  Type getArrayElementType();
+
   /// Determine whether the given type is "specialized", meaning that
   /// it involves generic types for which generic arguments have been provided.
   /// For example, the types Vector<Int> and Vector<Int>.Element are both

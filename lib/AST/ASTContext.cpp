@@ -204,6 +204,9 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// func _hashValue<H: Hashable>(for: H) -> Int
   FuncDecl *HashValueForDecl = nullptr;
 
+  // subscript(index: Int) -> Element
+  SubscriptDecl *ArrayIntSubscriptDecl = nullptr;
+
   /// func append(Element) -> void
   FuncDecl *ArrayAppendElementDecl = nullptr;
 
@@ -1072,6 +1075,31 @@ FuncDecl *ASTContext::getHashValueForDecl() const {
       continue;
     getImpl().HashValueForDecl = fd;
     return fd;
+  }
+  return nullptr;
+}
+
+SubscriptDecl *ASTContext::getArrayIntSubscriptDecl() const {
+  if (getImpl().ArrayIntSubscriptDecl)
+    return getImpl().ArrayIntSubscriptDecl;
+
+  auto subscripts =
+      getArrayDecl()->lookupDirect(DeclBaseName::createSubscript());
+
+  for (auto candidate: subscripts) {
+    auto subscript = dyn_cast<SubscriptDecl>(candidate);
+    if (!subscript->getModuleContext()->isStdlibModule())
+      continue;
+
+    auto indices = subscript->getIndices();
+    if (indices->size() != 1)
+      continue;
+
+    if (indices->get(0)->getInterfaceType()
+          ->isEqual(getIntDecl()->getDeclaredInterfaceType())) {
+      getImpl().ArrayIntSubscriptDecl = subscript;
+      return subscript;
+    }
   }
   return nullptr;
 }
