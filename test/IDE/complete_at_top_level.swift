@@ -298,7 +298,7 @@ _ = {
 }()
 // TOP_LEVEL_CLOSURE_1: Begin completions
 // TOP_LEVEL_CLOSURE_1-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{; name=.+$}}
-// TOP_LEVEL_CLOSURE_1-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Identical]: fooFunc1()[#Void#]{{; name=.+$}}
+// TOP_LEVEL_CLOSURE_1-DAG: Decl[FreeFunction]/CurrModule: fooFunc1()[#Void#]{{; name=.+$}}
 // TOP_LEVEL_CLOSURE_1-DAG: Decl[GlobalVar]/Local: fooObject[#FooStruct#]{{; name=.+$}}
 // TOP_LEVEL_CLOSURE_1: End completions
 

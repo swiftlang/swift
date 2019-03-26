@@ -205,7 +205,7 @@ void SwiftLangSupport::codeComplete(llvm::MemoryBuffer *UnresolvedInputFile,
   SwiftCodeCompletionConsumer SwiftConsumer([&](
       MutableArrayRef<CodeCompletionResult *> Results,
       SwiftCompletionInfo &info) {
-    bool hasExpectedType = info.completionContext->HasExpectedTypeRelation;
+    bool hasRequiredType = info.completionContext->typeContextKind == TypeContextKind::Required;
     CodeCompletionContext::sortCompletionResults(Results);
     // FIXME: this adhoc filtering should be configurable like it is in the
     // codeCompleteOpen path.
@@ -217,7 +217,7 @@ void SwiftLangSupport::codeComplete(llvm::MemoryBuffer *UnresolvedInputFile,
           break;
         case CodeCompletionLiteralKind::ImageLiteral:
         case CodeCompletionLiteralKind::ColorLiteral:
-          if (hasExpectedType &&
+          if (hasRequiredType &&
               Result->getExpectedTypeRelation() <
                   CodeCompletionResult::Convertible)
             continue;
@@ -708,9 +708,9 @@ CompletionKind CodeCompletion::SessionCache::getCompletionKind() {
   llvm::sys::ScopedLock L(mtx);
   return completionKind;
 }
-bool CodeCompletion::SessionCache::getCompletionHasExpectedTypes() {
+TypeContextKind CodeCompletion::SessionCache::getCompletionTypeContextKind() {
   llvm::sys::ScopedLock L(mtx);
-  return completionHasExpectedTypes;
+  return typeContextKind;
 }
 bool CodeCompletion::SessionCache::getCompletionMayUseImplicitMemberExpr() {
   llvm::sys::ScopedLock L(mtx);
@@ -1016,7 +1016,7 @@ static void transformAndForwardResults(
 
   CodeCompletion::CodeCompletionOrganizer organizer(
       options, session->getCompletionKind(),
-      session->getCompletionHasExpectedTypes());
+      session->getCompletionTypeContextKind());
 
   auto &rules = session->getFilterRules();
 
@@ -1160,7 +1160,7 @@ void SwiftLangSupport::codeCompleteOpen(
   }
 
   CompletionKind completionKind = CompletionKind::None;
-  bool hasExpectedTypes = false;
+  TypeContextKind typeContextKind = TypeContextKind::None;
   bool mayUseImplicitMemberExpr = false;
 
   SwiftCodeCompletionConsumer swiftConsumer(
@@ -1168,7 +1168,7 @@ void SwiftLangSupport::codeCompleteOpen(
           SwiftCompletionInfo &info) {
         auto &completionCtx = *info.completionContext;
         completionKind = completionCtx.CodeCompletionKind;
-        hasExpectedTypes = completionCtx.HasExpectedTypeRelation;
+        typeContextKind = completionCtx.typeContextKind;
         mayUseImplicitMemberExpr = completionCtx.MayUseImplicitMemberExpr;
         completions =
             extendCompletions(results, sink, info, nameToPopularity, CCOpts);
@@ -1209,7 +1209,7 @@ void SwiftLangSupport::codeCompleteOpen(
   std::vector<std::string> argsCopy(extendedArgs.begin(), extendedArgs.end());
   SessionCacheRef session{new SessionCache(
       std::move(sink), std::move(bufferCopy), std::move(argsCopy),
-      completionKind, hasExpectedTypes, mayUseImplicitMemberExpr,
+      completionKind, typeContextKind, mayUseImplicitMemberExpr,
       std::move(filterRules))};
   session->setSortedCompletions(std::move(completions));
 
