@@ -2690,8 +2690,8 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
 
   initClassFieldOffsetVector(self, numFields, fieldTypes, fieldOffsets);
 
-#if SWIFT_OBJC_INTEROP
   auto *description = self->getDescription();
+#if SWIFT_OBJC_INTEROP
   if (description->isGeneric()) {
     assert(!description->hasObjCResilientClassStub());
     initGenericObjCClass(self, numFields, fieldTypes, fieldOffsets);
