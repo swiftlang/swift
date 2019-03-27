@@ -6350,7 +6350,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
     }
 
     // type
-    ElementTy = parseType(diag::expected_type_subscript);
+    ElementTy = parseDeclResultType(diag::expected_type_subscript);
     Status |= ElementTy;
     SignatureHasCodeCompletion |= ElementTy.hasCodeCompletion();
     if (SignatureHasCodeCompletion && !CodeCompletion) {

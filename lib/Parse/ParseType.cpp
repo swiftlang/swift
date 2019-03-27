@@ -506,6 +506,16 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
                                                specifierLoc));
 }
 
+ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
+  if (Tok.is(tok::code_complete)) {
+    if (CodeCompletion)
+      CodeCompletion->completeTypeDeclResultBeginning();
+    consumeToken(tok::code_complete);
+    return makeParserCodeCompletionStatus();
+  }
+  return parseType(MessageID);
+}
+
 ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
                                            SourceLoc &LAngleLoc,
                                            SourceLoc &RAngleLoc) {
