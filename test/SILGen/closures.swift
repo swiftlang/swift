@@ -20,6 +20,7 @@ func return_local_generic_function_without_captures<A, R>() -> (A) -> R {
 
 func return_local_generic_function_with_captures<A, R>(_ a: A) -> (A) -> R {
   func f(_: A) -> R {
+    _ = 0
     _ = a
   }
 
