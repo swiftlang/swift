@@ -138,9 +138,9 @@ extension NSString {
 // CHECK-NEXT: - (T _Nullable)extract2 SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: @end
 extension PettableContainer {
-  @objc func duplicate() -> PettableContainer { fatalError() }
-  @objc func duplicate2() -> PettableContainer<T> { fatalError() }
-  @objc func duplicate3() -> PettableContainer<PettableOverextendedMetaphor> { fatalError() }
-  @objc func extract() -> T { fatalError() }
-  @objc func extract2() -> T? { fatalError() }
+  @objc func duplicate() -> PettableContainer { _ = 0; fatalError() }
+  @objc func duplicate2() -> PettableContainer<T> { _ = 0; fatalError() }
+  @objc func duplicate3() -> PettableContainer<PettableOverextendedMetaphor> { _ = 0; fatalError() }
+  @objc func extract() -> T { _ = 0; fatalError() }
+  @objc func extract2() -> T? { _ = 0; fatalError() }
 }

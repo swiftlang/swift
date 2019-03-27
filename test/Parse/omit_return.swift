@@ -942,7 +942,7 @@ var fvs_explicit: String {
 var fvs_explicitClosure: () -> Void {
     get { return { print("howdy") } }
     set {
-        return { print("howdy") } // expected-error {{unexpected non-void return value in void function}}
+        return { print("howdy") } // expected-error {{function produces expected type '()'; did you mean to call it with '()'?}}
     }
 }
 

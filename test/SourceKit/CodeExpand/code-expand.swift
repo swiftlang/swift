@@ -53,7 +53,9 @@ func f() {
 func f1() {
   bar(<#T##d: () -> ()##() -> ()#>)
 }
-// CHECK-NOT: bar { () -> () in
+// CHECK:   bar({
+// CHECK-NEXT:	<#code#>
+// CHECK-NEXT:	})
 
 func f1() {
   bar(<#T##d: () -> ()##() -> ()#>, <#T##d: () -> ()##() -> ()#>)
