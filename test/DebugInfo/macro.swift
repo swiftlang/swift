@@ -1,4 +1,3 @@
-// REQUIRES: objc-interop
 // RUN: %target-swift-frontend -emit-ir %s -g -I %S/Inputs -o - \
 // RUN:    -parse-as-library | %FileCheck %s
 
