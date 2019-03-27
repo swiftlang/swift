@@ -80,10 +80,10 @@ SILType SILType::getSILTokenType(const ASTContext &C) {
   return getPrimitiveObjectType(C.TheSILTokenType);
 }
 
-bool SILType::isTrivial(SILModule &M) const {
-  return M.Types.getTypeLowering(*this,
-                                 ResilienceExpansion::Minimal)
-    .isTrivial();
+bool SILType::isTrivial(const SILFunction &F) const {
+  // FIXME: Should just call F.getTypeLowering()
+  return F.getModule().Types.getTypeLowering(*this,
+                                      ResilienceExpansion::Minimal).isTrivial();
 }
 
 bool SILType::isReferenceCounted(SILModule &M) const {
@@ -181,9 +181,9 @@ bool SILType::isLoadableOrOpaque(SILModule &M) const {
   return isLoadable(M) || !SILModuleConventions(M).useLoweredAddresses();
 }
 
-bool SILType::isLoadableOrOpaque(SILFunction *inFunction) const {
-  SILModule &M = inFunction->getModule();
-  return isLoadable(inFunction) ||
+bool SILType::isLoadableOrOpaque(const SILFunction &F) const {
+  SILModule &M = F.getModule();
+  return isLoadable(F) ||
          !SILModuleConventions(M).useLoweredAddresses();
 }
 
@@ -195,9 +195,10 @@ bool SILType::isAddressOnly(SILModule &M) const {
     .isAddressOnly();
 }
 
-bool SILType::isAddressOnly(SILFunction *inFunction) const {
-  return inFunction->getModule().Types.getTypeLowering(*this,
-                        inFunction->getResilienceExpansion()).isAddressOnly();
+bool SILType::isAddressOnly(const SILFunction &F) const {
+  // FIXME: Should just call F.getTypeLowering()
+  return F.getModule().Types.getTypeLowering(*this,
+                                   F.getResilienceExpansion()).isAddressOnly();
 }
 
 SILType SILType::substGenericArgs(SILModule &M,
@@ -415,10 +416,12 @@ SILBoxType::getFieldLoweredType(SILModule &M, unsigned index) const {
 }
 
 ValueOwnershipKind
-SILResultInfo::getOwnershipKind(SILModule &M,
-                                CanGenericSignature signature) const {
-  GenericContextScope GCS(M.Types, signature);
-  bool IsTrivial = getSILStorageType().isTrivial(M);
+SILResultInfo::getOwnershipKind(SILFunction &F) const {
+  auto &M = F.getModule();
+  auto sig = F.getLoweredFunctionType()->getGenericSignature();
+  GenericContextScope GCS(M.Types, sig);
+
+  bool IsTrivial = getSILStorageType().isTrivial(F);
   switch (getConvention()) {
   case ResultConvention::Indirect:
     return SILModuleConventions(M).isSILIndirect(*this)
@@ -443,15 +446,21 @@ SILModuleConventions::SILModuleConventions(const SILModule &M)
 
 bool SILModuleConventions::isReturnedIndirectlyInSIL(SILType type,
                                                      SILModule &M) {
-  if (SILModuleConventions(M).loweredAddresses)
-    return type.isAddressOnly(M);
+  if (SILModuleConventions(M).loweredAddresses) {
+    return M.Types.getTypeLowering(type,
+                                   ResilienceExpansion::Minimal)
+      .isAddressOnly();
+  }
 
   return false;
 }
 
 bool SILModuleConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
-  if (SILModuleConventions(M).loweredAddresses)
-    return type.isAddressOnly(M);
+  if (SILModuleConventions(M).loweredAddresses) {
+    return M.Types.getTypeLowering(type,
+                                   ResilienceExpansion::Minimal)
+      .isAddressOnly();
+  }
 
   return false;
 }

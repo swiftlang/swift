@@ -23,6 +23,27 @@ class C2<Param> {
 	func f(t : Param) -> Param {return t}
 }
 
+enum X {
+  case first(Int, String)
+  case second(Int, String)
+  case third(Int, String)
+  case fourth(Int, String)
+}
+
+switch X.first(2, "") {
+  case .first(let x, let y):
+    print(y)
+    fallthrough
+  case .second(let x, _):
+    print(x)
+  case .third(let x, let y):
+    fallthrough
+  case .fourth(let x, let y):
+    print(y)
+    print(x)
+    break
+}
+
 // RUN: %sourcekitd-test -req=related-idents -pos=6:17 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK1 %s
 // CHECK1: START RANGES
 // CHECK1-NEXT: 1:7 - 2
@@ -53,3 +74,37 @@ class C2<Param> {
 // CHECK5-NEXT: 23:13 - 5
 // CHECK5-NEXT: 23:23 - 5
 // CHECK5-NEXT: END RANGES
+
+// RUN: %sourcekitd-test -req=related-idents -pos=34:19 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK6 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=37:20 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK6 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=38:11 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK6 %s
+// CHECK6:      START RANGES
+// CHECK6-NEXT: 34:19 - 1
+// CHECK6-NEXT: 37:20 - 1
+// CHECK6-NEXT: 38:11 - 1
+// CHECK6-NEXT: END RANGES
+
+// RUN: %sourcekitd-test -req=related-idents -pos=34:26 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK7 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=35:11 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK7 %s
+// CHECK7:      START RANGES
+// CHECK7-NEXT: 34:26 - 1
+// CHECK7-NEXT: 35:11 - 1
+// CHECK7-NEXT: END RANGES
+
+// RUN: %sourcekitd-test -req=related-idents -pos=39:26 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK8 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=41:27 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK8 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=42:11 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK8 %s
+// CHECK8:      START RANGES
+// CHECK8-NEXT: 39:26 - 1
+// CHECK8-NEXT: 41:27 - 1
+// CHECK8-NEXT: 42:11 - 1
+// CHECK8-NEXT: END RANGES
+
+// RUN: %sourcekitd-test -req=related-idents -pos=39:19 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK9 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=41:20 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK9 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=43:11 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK9 %s
+// CHECK9:      START RANGES
+// CHECK9-NEXT: 39:19 - 1
+// CHECK9-NEXT: 41:20 - 1
+// CHECK9-NEXT: 43:11 - 1
+// CHECK9-NEXT: END RANGES

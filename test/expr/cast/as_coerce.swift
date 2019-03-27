@@ -103,3 +103,32 @@ f(1 as String) // expected-error{{cannot convert value of type 'Int' to type 'St
 // <rdar://problem/19650402> Swift compiler segfaults while running the annotation tests
 let s : AnyObject = C3()
 s as C3 // expected-error{{'AnyObject' is not convertible to 'C3'; did you mean to use 'as!' to force downcast?}} {{3-5=as!}}
+
+// SR-6022
+func sr6022() -> Any { return 0 }
+func sr6022_1() { return; }
+protocol SR6022_P {}
+
+_ = sr6022 as! SR6022_P // expected-warning {{cast from '() -> Any' to unrelated type 'SR6022_P' always fails}} // expected-note {{did you mean to call 'sr6022' with '()'?}}{{11-11=()}}
+_ = sr6022 as? SR6022_P // expected-warning {{cast from '() -> Any' to unrelated type 'SR6022_P' always fails}} // expected-note {{did you mean to call 'sr6022' with '()'}}{{11-11=()}}
+_ = sr6022_1 as! SR6022_P // expected-warning {{cast from '() -> ()' to unrelated type 'SR6022_P' always fails}}
+_ = sr6022_1 as? SR6022_P // expected-warning {{cast from '() -> ()' to unrelated type 'SR6022_P' always fails}}
+
+func testSR6022_P<T: SR6022_P>(_: T.Type) {
+  _ = sr6022 as! T // expected-warning {{cast from '() -> Any' to unrelated type 'T' always fails}} // expected-note {{did you mean to call 'sr6022' with '()'?}}{{13-13=()}}
+  _ = sr6022 as? T // expected-warning {{cast from '() -> Any' to unrelated type 'T' always fails}} // expected-note {{did you mean to call 'sr6022' with '()'?}}{{13-13=()}}
+  _ = sr6022_1 as! T // expected-warning {{cast from '() -> ()' to unrelated type 'T' always fails}}
+  _ = sr6022_1 as? T // expected-warning {{cast from '() -> ()' to unrelated type 'T' always fails}}
+}
+
+func testSR6022_P_1<U>(_: U.Type) {
+  _ = sr6022 as! U // Okay
+  _ = sr6022 as? U // Okay
+  _ = sr6022_1 as! U // Okay
+  _ = sr6022_1 as? U // Okay
+}
+
+_ = sr6022 as! AnyObject // expected-warning {{forced cast from '() -> Any' to 'AnyObject' always succeeds; did you mean to use 'as'?}}
+_ = sr6022 as? AnyObject // expected-warning {{conditional cast from '() -> Any' to 'AnyObject' always succeeds}}
+_ = sr6022_1 as! Any // expected-warning {{forced cast from '() -> ()' to 'Any' always succeeds; did you mean to use 'as'?}}
+_ = sr6022_1 as? Any // expected-warning {{conditional cast from '() -> ()' to 'Any' always succeeds}}

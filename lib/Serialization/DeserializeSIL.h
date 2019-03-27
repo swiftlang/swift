@@ -65,7 +65,9 @@ namespace swift {
     /// Data structures used to perform name lookup for local values.
     llvm::DenseMap<uint32_t, ValueBase*> LocalValues;
     llvm::DenseMap<uint32_t, ValueBase*> ForwardLocalValues;
-    serialization::ValueID LastValueID = 0;
+
+    /// The first two local values are reserved for SILUndef.
+    serialization::ValueID LastValueID = 1;
 
     /// Data structures used to perform lookup of basic blocks.
     llvm::DenseMap<unsigned, SILBasicBlock*> BlocksByID;

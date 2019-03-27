@@ -818,7 +818,7 @@ const void *RequirementSource::getOpaqueStorage1() const {
     return storage.type;
 
   case StorageKind::AssociatedTypeDecl:
-    return storage.dependentMember;
+    return storage.assocType;
   }
 
   llvm_unreachable("Unhandled StorageKind in switch.");
@@ -918,16 +918,11 @@ bool RequirementSource::isSelfDerivedSource(GenericSignatureBuilder &builder,
 /// the nested type. This limited operation makes sure that it does not
 /// create any new potential archetypes along the way, so it should only be
 /// used in cases where we're reconstructing something that we know exists.
-static Type replaceSelfWithType(llvm::DenseMap<Type, Type> &cache,
-                                Type selfType, Type depTy) {
+static Type replaceSelfWithType(Type selfType, Type depTy) {
   if (auto depMemTy = depTy->getAs<DependentMemberType>()) {
-    Type baseType = replaceSelfWithType(cache, selfType, depMemTy->getBase());
+    Type baseType = replaceSelfWithType(selfType, depMemTy->getBase());
     assert(depMemTy->getAssocType() && "Missing associated type");
-    auto &known = cache[baseType];
-    if (!known) {
-      known = DependentMemberType::get(baseType, depMemTy->getAssocType());
-    }
-    return known;
+    return DependentMemberType::get(baseType, depMemTy->getAssocType());
   }
 
   assert(depTy->is<GenericTypeParamType>() && "missing Self?");
@@ -1371,8 +1366,8 @@ RequirementSource::visitPotentialArchetypesAlongPath(
 
     if (visitor(parentType, this)) return nullptr;
 
-    return replaceSelfWithType(ReplacedSelfCache,
-                               parentType, getDependentMember());
+    return replaceSelfWithType(parentType,
+                               getAssociatedType()->getDeclaredInterfaceType());
   }
 
   case RequirementSource::NestedTypeNameMatch:
@@ -1407,8 +1402,7 @@ RequirementSource::visitPotentialArchetypesAlongPath(
 
     if (visitor(parentType, this)) return nullptr;
 
-    return replaceSelfWithType(ReplacedSelfCache,
-                               parentType, getStoredType());
+    return replaceSelfWithType(parentType, getStoredType());
   }
   }
   llvm_unreachable("unhandled kind");
@@ -1442,7 +1436,7 @@ ProtocolDecl *RequirementSource::getProtocolDecl() const {
     return getProtocolConformance().getRequirement();
 
   case StorageKind::AssociatedTypeDecl:
-    return storage.dependentMember->getAssocType()->getProtocol();
+    return storage.assocType->getProtocol();
   }
 
   llvm_unreachable("Unhandled StorageKind in switch.");
@@ -1613,9 +1607,8 @@ void RequirementSource::print(llvm::raw_ostream &out,
   }
 
   case StorageKind::AssociatedTypeDecl:
-    auto assocType = storage.dependentMember->getAssocType();
-    out << " (" << assocType->getProtocol()->getName()
-        << "::" << assocType->getName() << ")";
+    out << " (" << storage.assocType->getProtocol()->getName()
+        << "::" << storage.assocType->getName() << ")";
     break;
   }
 
@@ -2940,7 +2933,7 @@ Type GenericSignatureBuilder::PotentialArchetype::getDependentType(
     if (parentType->hasError())
       return parentType;
 
-    return getResolvedDependentMemberType(parentType);
+    return DependentMemberType::get(parentType, getResolvedType());
   }
   
   assert(isGenericParam() && "Not a generic parameter?");

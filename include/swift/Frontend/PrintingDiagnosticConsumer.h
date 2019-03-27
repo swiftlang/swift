@@ -22,6 +22,7 @@
 #include "swift/AST/DiagnosticConsumer.h"
 
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/Process.h"
 
 namespace swift {
 
@@ -42,6 +43,7 @@ public:
 
   void forceColors() {
     ForceColors = true;
+    llvm::sys::Process::UseANSIEscapeCodes(true);
   }
 
   bool didErrorOccur() {

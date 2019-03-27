@@ -1,7 +1,6 @@
-
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -enable-sil-ownership %S/../Inputs/resilient_struct.swift
-// RUN: %target-swift-emit-silgen -I %t -enable-sil-ownership -enable-resilience %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-emit-silgen -I %t -enable-library-evolution %s | %FileCheck %s
 
 import resilient_struct
 

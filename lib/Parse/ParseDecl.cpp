@@ -2802,6 +2802,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
                               StaticSpelling, tryLoc);
     StaticLoc = SourceLoc(); // we handled static if present.
     MayNeedOverrideCompletion = true;
+    if (DeclResult.hasCodeCompletion() && isCodeCompletionFirstPass())
+      break;
     std::for_each(Entries.begin(), Entries.end(), Handler);
     if (auto *D = DeclResult.getPtrOrNull())
       markWasHandled(D);
@@ -2824,6 +2826,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
     llvm::SmallVector<Decl *, 4> Entries;
     DeclParsingContext.setCreateSyntax(SyntaxKind::EnumCaseDecl);
     DeclResult = parseDeclEnumCase(Flags, Attributes, Entries);
+    if (DeclResult.hasCodeCompletion() && isCodeCompletionFirstPass())
+      break;
     std::for_each(Entries.begin(), Entries.end(), Handler);
     if (auto *D = DeclResult.getPtrOrNull())
       markWasHandled(D);
@@ -2873,6 +2877,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
     }
     llvm::SmallVector<Decl *, 4> Entries;
     DeclResult = parseDeclSubscript(Flags, Attributes, Entries);
+    if (DeclResult.hasCodeCompletion() && isCodeCompletionFirstPass())
+      break;
     std::for_each(Entries.begin(), Entries.end(), Handler);
     MayNeedOverrideCompletion = true;
     if (auto *D = DeclResult.getPtrOrNull())
@@ -2995,7 +3001,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
   }
 
   if (DeclResult.hasCodeCompletion() && isCodeCompletionFirstPass() &&
-      !CurDeclContext->isModuleScopeContext()) {
+      !CurDeclContext->isModuleScopeContext() &&
+      !isa<TopLevelCodeDecl>(CurDeclContext)) {
     // Only consume non-toplevel decls.
     consumeDecl(BeginParserPosition, Flags, /*IsTopLevel=*/false);
 
