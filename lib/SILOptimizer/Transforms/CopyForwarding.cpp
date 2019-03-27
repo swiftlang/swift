@@ -843,11 +843,13 @@ bool CopyForwarding::doesCopyDominateDestUsers(
 // To find all SSA users of storedValue, we first find the RC root, then search
 // past any instructions that may propagate the reference.
 bool CopyForwarding::markStoredValueUsers(SILValue storedValue) {
-  if (storedValue->getType().isTrivial(*storedValue->getModule()))
+  auto *F = storedValue->getFunction();
+
+  if (storedValue->getType().isTrivial(*F))
     return true;
 
   // Find the RC root, peeking past things like struct_extract.
-  RCIdentityFunctionInfo *RCI = RCIAnalysis->get(storedValue->getFunction());
+  RCIdentityFunctionInfo *RCI = RCIAnalysis->get(F);
   SILValue root = RCI->getRCIdentityRoot(storedValue);
 
   SmallVector<SILInstruction *, 8> users;
@@ -868,7 +870,7 @@ bool CopyForwarding::markStoredValueUsers(SILValue storedValue) {
     }
     // A single-valued use is nontransitive if its result is trivial.
     if (auto *SVI = dyn_cast<SingleValueInstruction>(user)) {
-      if (SVI->getType().isTrivial(user->getModule())) {
+      if (SVI->getType().isTrivial(*F)) {
         StoredValueUserInsts.insert(user);
         continue;
       }
@@ -1687,12 +1689,26 @@ bool TempRValueOptPass::collectLoads(
     loadInsts.insert(user);
     return true;
   }
+  case SILInstructionKind::OpenExistentialAddrInst: {
+    // We only support open existential addr if the access is immutable.
+    auto *oeai = cast<OpenExistentialAddrInst>(user);
+    if (oeai->getAccessKind() != OpenedExistentialAccess::Immutable) {
+      LLVM_DEBUG(llvm::dbgs() << "  Temp consuming use may write/destroy "
+                 "its source" << *user);
+      return false;
+    }
+    return true;
+  }
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::TupleElementAddrInst: {
     // Transitively look through projections on stack addresses.
     auto proj = cast<SingleValueInstruction>(user);
     for (auto *projUseOper : proj->getUses()) {
-      if (!collectLoads(projUseOper, projUseOper->getUser(), proj, srcObject,
+      auto *user = projUseOper->getUser();
+      if (user->isTypeDependentOperand(*projUseOper))
+        continue;
+
+      if (!collectLoads(projUseOper, user, proj, srcObject,
                         loadInsts))
         return false;
     }
@@ -1811,6 +1827,7 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
     case SILInstructionKind::LoadInst:
     case SILInstructionKind::LoadBorrowInst:
     case SILInstructionKind::ApplyInst:
+    case SILInstructionKind::OpenExistentialAddrInst:
       use->set(copyInst->getSrc());
       break;
 

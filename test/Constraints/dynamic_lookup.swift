@@ -217,8 +217,8 @@ let uopt : AnyObject! = nil
 uopt.wibble!()
 
 // Should not be able to see private or internal @objc methods.
-uopt.privateFoo!() // expected-error{{value of type 'AnyObject?' has no member 'privateFoo'}}
-uopt.internalFoo!() // expected-error{{value of type 'AnyObject?' has no member 'internalFoo'}}
+uopt.privateFoo!() // expected-error{{'privateFoo' is inaccessible due to 'private' protection level}}
+uopt.internalFoo!() // expected-error{{'internalFoo' is inaccessible due to 'internal' protection level}}
 
 let anyValue: Any = X()
 _ = anyValue.bar() // expected-error {{value of type 'Any' has no member 'bar'}}

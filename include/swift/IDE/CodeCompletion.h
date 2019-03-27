@@ -492,6 +492,7 @@ enum class CompletionKind {
   TypeSimpleBeginning,
   TypeIdentifierWithDot,
   TypeIdentifierWithoutDot,
+  CaseStmtKeyword,
   CaseStmtBeginning,
   CaseStmtDotPrefix,
   NominalMemberBeginning,
