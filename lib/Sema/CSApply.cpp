@@ -1573,7 +1573,7 @@ namespace {
 
         Expr *trailingClosure = nullptr;
         if (SE->hasTrailingClosure())
-          trailingClosure = arguments.pop_back_val();
+          trailingClosure = arguments.back();
 
         componentExpr = SubscriptExpr::create(
             ctx, dotExpr, SE->getStartLoc(), arguments, SE->getArgumentLabels(),

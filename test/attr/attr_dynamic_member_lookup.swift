@@ -587,3 +587,20 @@ func keypath_with_incorrect_return_type(_ arr: Lens<Array<Int>>) {
     let _ = arr[idx]
   }
 }
+
+struct WithTrailingClosure {
+  subscript(fn: () -> Int) -> Int {
+    get { return fn() }
+    nonmutating set { _ = fn() + newValue }
+  }
+
+  subscript(offset: Int, _ fn: () -> Int) -> Int {
+    get { return offset + fn() }
+  }
+}
+
+func keypath_with_trailing_closure_subscript(_ ty: inout SubscriptLens<WithTrailingClosure>) {
+  _ = ty[0] { 42 } // expected-error {{subscript index of type '() -> Int' in a key path must be Hashable}}
+  _ = ty[] { 42 }  // expected-error {{subscript index of type '() -> Int' in a key path must be Hashable}}
+  _ = ty[] { 42 } = 0 // expected-error {{subscript index of type '() -> Int' in a key path must be Hashable}}
+}
