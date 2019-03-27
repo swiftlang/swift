@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -enable-sil-ownership -sil-verify-all -emit-sil -o - -I %S/Inputs/usr/include | %FileCheck %s
+// RUN: %target-swift-frontend %s -sil-verify-all -emit-sil -o - -I %S/Inputs/usr/include | %FileCheck %s
 // REQUIRES: objc_interop
 
 import Foundation

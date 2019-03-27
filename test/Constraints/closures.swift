@@ -416,11 +416,11 @@ func r20789423() {
   
 }
 
-// Make sure that behavior related to allowing trailing closures to match functions
-// with Any as a final parameter is the same after the changes made by SR-2505, namely:
-// that we continue to select function that does _not_ have Any as a final parameter in
-// presence of other possibilities.
-
+// In the example below, SR-2505 started preferring C_SR_2505.test(_:) over
+// test(it:). Prior to Swift 5.1, we emulated the old behavior. However,
+// that behavior is inconsistent with the typical approach of preferring
+// overloads from the concrete type over one from a protocol, so we removed
+// the hack.
 protocol SR_2505_Initable { init() }
 struct SR_2505_II : SR_2505_Initable {}
 
@@ -442,10 +442,9 @@ class C_SR_2505 : P_SR_2505 {
   }
 
   func call(_ c: C_SR_2505) -> Bool {
-    // Note: no diagnostic about capturing 'self', because this is a
-    // non-escaping closure -- that's how we know we have selected
-    // test(it:) and not test(_)
-    return c.test { o in test(o) }
+    // Note: the diagnostic about capturing 'self', indicates that we have
+    // selected test(_) rather than test(it:)
+    return c.test { o in test(o) } // expected-error{{call to method 'test' in closure requires explicit 'self.' to make capture semantics explicit}}
   }
 }
 

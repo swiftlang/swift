@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -swift-version 4.2 -verify -dump-ast -enable-resilience %s | %FileCheck --check-prefix=RESILIENCE-ON %s
-// RUN: %target-swift-frontend -typecheck -swift-version 4.2 -verify -dump-ast -enable-resilience -enable-testing %s | %FileCheck --check-prefix=RESILIENCE-ON %s
+// RUN: %target-swift-frontend -typecheck -swift-version 4.2 -verify -dump-ast -enable-library-evolution %s | %FileCheck --check-prefix=RESILIENCE-ON %s
+// RUN: %target-swift-frontend -typecheck -swift-version 4.2 -verify -dump-ast -enable-library-evolution -enable-testing %s | %FileCheck --check-prefix=RESILIENCE-ON %s
 // RUN: not %target-swift-frontend -typecheck -swift-version 4.2 -dump-ast %s | %FileCheck --check-prefix=RESILIENCE-OFF %s
 // RUN: not %target-swift-frontend -typecheck -swift-version 4.2 -dump-ast %s -enable-testing | %FileCheck --check-prefix=RESILIENCE-OFF %s
 
@@ -21,7 +21,7 @@
 }
 
 //
-// Public types are resilient when -enable-resilience is on
+// Public types are resilient when -enable-library-evolution is on
 //
 
 // RESILIENCE-ON: struct_decl{{.*}}"Size" interface type='Size.Type' access=public resilient

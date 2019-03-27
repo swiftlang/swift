@@ -175,11 +175,15 @@ public:
     constexpr RecursiveProperties(IsTrivial_t isTrivial,
                                   IsFixedABI_t isFixedABI,
                                   IsAddressOnly_t isAddressOnly,
-                                  IsResilient_t isResilient = IsNotResilient)
+                                  IsResilient_t isResilient)
       : Flags((isTrivial ? 0U : NonTrivialFlag) | 
-              (isAddressOnly ? AddressOnlyFlag : 0U) |
               (isFixedABI ? 0U : NonFixedABIFlag) |
+              (isAddressOnly ? AddressOnlyFlag : 0U) |
               (isResilient ? ResilientFlag : 0U)) {}
+
+    static constexpr RecursiveProperties forTrivial() {
+      return {IsTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient};
+    }
 
     static constexpr RecursiveProperties forReference() {
       return {IsNotTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient };
@@ -190,7 +194,7 @@ public:
     }
 
     static constexpr RecursiveProperties forResilient() {
-      return {IsNotTrivial, IsNotFixedABI, IsAddressOnly, IsResilient};
+      return {IsTrivial, IsFixedABI, IsNotAddressOnly, IsResilient};
     }
 
     void addSubobject(RecursiveProperties other) {
@@ -683,7 +687,9 @@ class TypeConverter {
   llvm::DenseMap<AnyFunctionRef, CaptureInfo> LoweredCaptures;
 
   /// Cache of loadable SILType to number of (estimated) fields
-  llvm::DenseMap<SILType, unsigned> TypeFields;
+  ///
+  /// Second element is a ResilienceExpansion.
+  llvm::DenseMap<std::pair<SILType, unsigned>, unsigned> TypeFields;
 
   CanAnyFunctionType makeConstantInterfaceType(SILDeclRef constant);
   
@@ -695,11 +701,8 @@ class TypeConverter {
   const TypeLowering &
   getTypeLoweringForLoweredType(TypeKey key,
                                 ResilienceExpansion forExpansion);
-  const TypeLowering &
-  getTypeLoweringForUncachedLoweredType(TypeKey key,
-                                        ResilienceExpansion forExpansion);
 
-  const TypeLowering &
+  const TypeLowering *
   getTypeLoweringForExpansion(TypeKey key,
                               ResilienceExpansion forExpansion,
                               const TypeLowering *lowering);
@@ -714,7 +717,8 @@ public:
   TypeConverter &operator=(TypeConverter const &) = delete;
 
   /// Return the CaptureKind to use when capturing a decl.
-  CaptureKind getDeclCaptureKind(CapturedValue capture);
+  CaptureKind getDeclCaptureKind(CapturedValue capture,
+                                 ResilienceExpansion expansion);
 
   /// Return a most-general-possible abstraction pattern.
   AbstractionPattern getMostGeneralAbstraction() {
@@ -739,7 +743,7 @@ public:
   static ProtocolDispatchStrategy getProtocolDispatchStrategy(ProtocolDecl *P);
 
   /// Count the total number of fields inside the given SIL Type
-  unsigned countNumberOfFields(SILType Ty);
+  unsigned countNumberOfFields(SILType Ty, ResilienceExpansion expansion);
 
   /// True if a protocol uses witness tables for dynamic dispatch.
   static bool protocolRequiresWitnessTable(ProtocolDecl *P) {

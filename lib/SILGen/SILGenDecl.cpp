@@ -374,7 +374,7 @@ public:
 
     auto boxType = SGF.SGM.Types
       .getContextBoxTypeForCapture(decl,
-                     SGF.getLoweredType(decl->getType()).getASTType(),
+                     SGF.SGM.Types.getLoweredRValueType(decl->getType()),
                      SGF.F.getGenericEnvironment(),
                      /*mutable*/ true);
 

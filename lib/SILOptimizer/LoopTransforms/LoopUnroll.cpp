@@ -325,7 +325,7 @@ void LoopCloner::collectLoopLiveOutValues(
 static void
 updateSSA(SILModule &M, SILLoop *Loop,
           DenseMap<SILValue, SmallVector<SILValue, 8>> &LoopLiveOutValues) {
-  SILSSAUpdater SSAUp(M);
+  SILSSAUpdater SSAUp;
   for (auto &MapEntry : LoopLiveOutValues) {
     // Collect out of loop uses of this value.
     auto OrigValue = MapEntry.first;

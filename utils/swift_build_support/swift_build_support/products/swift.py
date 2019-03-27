@@ -30,9 +30,6 @@ class Swift(product.Product):
         # Add benchmark specific flags.
         self.cmake_options.extend(self._benchmark_flags)
 
-        # Add any sil ownership flags.
-        self.cmake_options.extend(self._sil_ownership_flags)
-
         # Generate the compile db.
         self.cmake_options.extend(self._compile_db_flags)
 
@@ -105,12 +102,6 @@ updated without updating swift.py?")
             "-DSWIFT_BENCHMARK_NUM_ONONE_ITERATIONS={}".format(onone_iters),
             "-DSWIFT_BENCHMARK_NUM_O_ITERATIONS={}".format(o_iters)
         ]
-
-    @property
-    def _sil_ownership_flags(self):
-        if not self.args.enable_sil_ownership:
-            return ["-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=FALSE"]
-        return ["-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=TRUE"]
 
     @property
     def _compile_db_flags(self):

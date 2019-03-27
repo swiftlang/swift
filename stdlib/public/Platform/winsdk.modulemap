@@ -96,6 +96,11 @@ module WinSDK [system] [extern_c] {
     }
   }
 
+  module CommCtrl {
+    header "CommCtrl.h"
+    export *
+  }
+
   // FIXME(compnerd) this is a hack for the HWND typedef for DbgHelp
   module __DirectX {
     header "directmanipulation.h"

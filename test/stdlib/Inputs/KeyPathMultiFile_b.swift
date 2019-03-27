@@ -11,9 +11,9 @@ struct A {
 }
 
 func A_x_keypath() -> WritableKeyPath<A, Int> {
-  return \A.x
+  return \A.x as! WritableKeyPath<A, Int>
 }
 
 func A_subscript_0_keypath() -> WritableKeyPath<A, Int> {
-  return \A.[0]
+  return \A.[0] as! WritableKeyPath<A, Int>
 }

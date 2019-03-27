@@ -343,7 +343,6 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
   // the location of the original closure. This is needed to balance the
   // implicit release of all captured arguments that occurs when the partial
   // apply is destroyed.
-  SILModule &M = NewF->getModule();
   auto ClosureCalleeConv = CSDesc.getClosureCallee()->getConventions();
   unsigned ClosureArgIdx =
       ClosureCalleeConv.getNumSILArguments() - CSDesc.getNumArguments();
@@ -351,7 +350,7 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
     SILType ArgTy = Arg->getType();
 
     // If our argument is of trivial type, continue...
-    if (ArgTy.isTrivial(M)) {
+    if (ArgTy.isTrivial(*NewF)) {
       NewArgs.push_back(Arg);
       ++ClosureArgIdx;
       continue;
@@ -646,7 +645,7 @@ ClosureSpecCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
              || ParamConv == ParameterConvention::Indirect_Inout
              || ParamConv == ParameterConvention::Indirect_InoutAliasable);
     } else {
-      ParamConv = ClosedOverFunConv.getSILType(PInfo).isTrivial(M)
+      ParamConv = ClosedOverFunConv.getSILType(PInfo).isTrivial(*ClosureUser)
                       ? ParameterConvention::Direct_Unowned
                       : ParameterConvention::Direct_Owned;
     }

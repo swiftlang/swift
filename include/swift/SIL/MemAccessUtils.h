@@ -160,6 +160,11 @@ protected:
                                64 - NumAccessedStorageBits,
                                seenNestedConflict : 1,
                                beginAccessIndex : 63 - NumAccessedStorageBits);
+
+    // Define data flow bits for use in the AccessEnforcementDom pass. Each
+    // begin_access in the function is mapped to one instance of this subclass.
+    SWIFT_INLINE_BITFIELD(DomAccessedStorage, AccessedStorage, 1 + 1,
+                          isInner : 1, containsRead : 1);
   } Bits;
 
 private:
@@ -190,6 +195,10 @@ public:
 
   Kind getKind() const { return static_cast<Kind>(Bits.AccessedStorage.Kind); }
 
+  // Clear any bits reserved for subclass data. Useful for up-casting back to
+  // the base class.
+  void resetSubclassData() { initKind(getKind()); }
+
   SILValue getValue() const {
     assert(getKind() != Argument && getKind() != Global && getKind() != Class);
     return value;
@@ -215,6 +224,10 @@ public:
     return objProj;
   }
 
+  /// Return true if the given storage objects have identical storage locations.
+  ///
+  /// This compares only the AccessedStorage base class bits, ignoring the
+  /// subclass bits. It is used for hash lookup equality.
   bool hasIdenticalBase(const AccessedStorage &other) const {
     if (getKind() != other.getKind())
       return false;
@@ -233,7 +246,6 @@ public:
     case Class:
       return objProj == other.objProj;
     }
-    llvm_unreachable("unhandled kind");
   }
 
   /// Return true if the storage is guaranteed local.
@@ -311,31 +323,6 @@ private:
   bool operator!=(const AccessedStorage &) const = delete;
 };
 
-/// Return true if the given storage objects have identical storage locations.
-///
-/// This compares only the AccessedStorage base class bits, ignoring the
-/// subclass bits.
-inline bool accessingIdenticalLocations(AccessedStorage LHS,
-                                        AccessedStorage RHS) {
-  if (LHS.getKind() != RHS.getKind())
-    return false;
-
-  switch (LHS.getKind()) {
-  case swift::AccessedStorage::Box:
-  case swift::AccessedStorage::Stack:
-  case swift::AccessedStorage::Nested:
-  case swift::AccessedStorage::Yield:
-  case swift::AccessedStorage::Unidentified:
-    return LHS.getValue() == RHS.getValue();
-  case swift::AccessedStorage::Argument:
-    return LHS.getParamIndex() == RHS.getParamIndex();
-  case swift::AccessedStorage::Global:
-    return LHS.getGlobal() == RHS.getGlobal();
-  case swift::AccessedStorage::Class:
-    return LHS.getObjectProjection() == RHS.getObjectProjection();
-  }
-}
-
 template <class ImplTy, class ResultTy = void, typename... ArgTys>
 class AccessedStorageVisitor {
   ImplTy &asImpl() { return static_cast<ImplTy &>(*this); }
@@ -396,7 +383,7 @@ template <> struct DenseMapInfo<swift::AccessedStorage> {
   }
 
   static bool isEqual(swift::AccessedStorage LHS, swift::AccessedStorage RHS) {
-    return swift::accessingIdenticalLocations(LHS, RHS);
+    return LHS.hasIdenticalBase(RHS);
   }
 };
 

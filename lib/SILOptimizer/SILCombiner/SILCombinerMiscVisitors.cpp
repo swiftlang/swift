@@ -761,7 +761,7 @@ SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
   // Destroy value of an enum with a trivial payload or no-payload is a no-op.
   if (auto *EI = dyn_cast<EnumInst>(Operand)) {
     if (!EI->hasOperand() ||
-        EI->getOperand()->getType().isTrivial(EI->getModule()))
+        EI->getOperand()->getType().isTrivial(*EI->getFunction()))
       return eraseInstFromFunction(*RVI);
 
     // retain_value of an enum_inst where we know that it has a payload can be
@@ -783,7 +783,7 @@ SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
                                        RVI->getAtomicity());
 
   // ReleaseValueInst of a trivial type is a no-op.
-  if (OperandTy.isTrivial(RVI->getModule()))
+  if (OperandTy.isTrivial(*RVI->getFunction()))
     return eraseInstFromFunction(*RVI);
 
   // Do nothing for non-trivial non-reference types.
@@ -798,7 +798,7 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
   // RAUW.
   if (auto *EI = dyn_cast<EnumInst>(Operand)) {
     if (!EI->hasOperand() ||
-        EI->getOperand()->getType().isTrivial(RVI->getModule())) {
+        EI->getOperand()->getType().isTrivial(*RVI->getFunction())) {
       return eraseInstFromFunction(*RVI);
     }
 
@@ -822,7 +822,7 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
   }
 
   // RetainValueInst of a trivial type is a no-op + use propagation.
-  if (OperandTy.isTrivial(RVI->getModule())) {
+  if (OperandTy.isTrivial(*RVI->getFunction())) {
     return eraseInstFromFunction(*RVI);
   }
 
