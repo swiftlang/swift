@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -module-name protocol_overrides -emit-module -enable-sil-ownership -enable-resilience -emit-module-path=%t/protocol_overrides.swiftmodule %S/../SILGen/Inputs/protocol_overrides.swift
+// RUN: %target-swift-frontend -module-name protocol_overrides -emit-module -enable-library-evolution -emit-module-path=%t/protocol_overrides.swiftmodule %S/../SILGen/Inputs/protocol_overrides.swift
 // RUN: %target-swift-frontend -module-name keypath_witness_overrides -emit-ir %s -I %t | %FileCheck %s
 
 import protocol_overrides

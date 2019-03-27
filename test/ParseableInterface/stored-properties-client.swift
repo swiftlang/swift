@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -typecheck %S/stored-properties.swift -module-name StoredProperties -emit-parseable-module-interface-path %t/StoredProperties.swiftinterface
-// RUN: %target-swift-frontend -emit-ir %s -I %t -enable-parseable-module-interface | %FileCheck %s -check-prefix CHECK -check-prefix COMMON
+// RUN: %target-swift-frontend -emit-ir %s -I %t | %FileCheck %s -check-prefix CHECK -check-prefix COMMON
 
-// RUN: %target-swift-frontend -typecheck %S/stored-properties.swift -enable-resilience -module-name StoredProperties -emit-parseable-module-interface-path %t/StoredProperties.swiftinterface
-// RUN: %target-swift-frontend -emit-ir %s -I %t -enable-parseable-module-interface | %FileCheck %s -check-prefix RESILIENT -check-prefix COMMON
+// RUN: %target-swift-frontend -typecheck %S/stored-properties.swift -enable-library-evolution -module-name StoredProperties -emit-parseable-module-interface-path %t/StoredProperties.swiftinterface
+// RUN: %target-swift-frontend -emit-ir %s -I %t | %FileCheck %s -check-prefix RESILIENT -check-prefix COMMON
 
 // REQUIRES: rdar_46486517
 

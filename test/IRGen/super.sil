@@ -1,14 +1,14 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -enable-resilience -I %t -o %t %S/../Inputs/resilient_struct.swift
-// RUN: %target-swift-frontend -emit-module -enable-resilience -I %t -o %t %S/../Inputs/resilient_class.swift
+// RUN: %target-swift-frontend -emit-module -enable-library-evolution -I %t -o %t %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -emit-module -enable-library-evolution -I %t -o %t %S/../Inputs/resilient_class.swift
 
-// Note: we build fixed_layout_class without -enable-resilience, since with
-// -enable-resilience even @_fixed_layout classes have resilient metadata, and
+// Note: we build fixed_layout_class without -enable-library-evolution, since with
+// -enable-library-evolution even @_fixed_layout classes have resilient metadata, and
 // we want to test the fragile access pattern here.
 
 // RUN: %target-swift-frontend -emit-module -I %t -o %t %S/../Inputs/fixed_layout_class.swift
 
-// RUN: %target-swift-frontend -enable-resilience -parse-sil -parse-as-library -emit-ir -I %t %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-library-evolution -parse-sil -parse-as-library -emit-ir -I %t %s | %FileCheck %s
 
 // CHECK: %swift.type = type { [[INT:i32|i64]] }
 

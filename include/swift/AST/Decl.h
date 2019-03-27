@@ -213,6 +213,15 @@ struct OverloadSignature {
   /// Whether this is a function.
   unsigned IsFunction : 1;
 
+  /// Whether this is a enum element.
+  unsigned IsEnumElement : 1;
+
+  /// Whether this is a nominal type.
+  unsigned IsNominal : 1;
+
+  /// Whether this is a type alias.
+  unsigned IsTypeAlias : 1;
+
   /// Whether this signature is part of a protocol extension.
   unsigned InProtocolExtension : 1;
 
@@ -4552,6 +4561,8 @@ public:
   /// True if any of the accessors to the storage is private or fileprivate.
   bool hasPrivateAccessor() const;
 
+  bool hasDidSetOrWillSetDynamicReplacement() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractStorageDecl &&
@@ -4577,7 +4588,7 @@ public:
   };
 
 protected:
-  llvm::PointerUnion<PatternBindingDecl*, Stmt*> ParentPattern;
+  PointerUnion3<PatternBindingDecl *, Stmt *, VarDecl *> Parent;
 
   VarDecl(DeclKind Kind, bool IsStatic, Specifier Sp, bool IsCaptureList,
           SourceLoc NameLoc, Identifier Name, DeclContext *DC)
@@ -4648,12 +4659,15 @@ public:
   /// Return the parent pattern binding that may provide an initializer for this
   /// VarDecl.  This returns null if there is none associated with the VarDecl.
   PatternBindingDecl *getParentPatternBinding() const {
-    return ParentPattern.dyn_cast<PatternBindingDecl *>();
+    if (!Parent)
+      return nullptr;
+    return Parent.dyn_cast<PatternBindingDecl *>();
   }
   void setParentPatternBinding(PatternBindingDecl *PBD) {
-    ParentPattern = PBD;
+    assert(PBD);
+    Parent = PBD;
   }
-  
+
   /// Return the Pattern involved in initializing this VarDecl.  However, recall
   /// that the Pattern may be involved in initializing more than just this one
   /// vardecl.  For example, if this is a VarDecl for "x", the pattern may be
@@ -4664,15 +4678,52 @@ public:
   /// returns null.
   ///
   Pattern *getParentPattern() const;
-  
+
   /// Return the statement that owns the pattern associated with this VarDecl,
   /// if one exists.
+  ///
+  /// NOTE: After parsing and before type checking, all VarDecls from
+  /// CaseLabelItem's Patterns return their CaseStmt. After type checking, we
+  /// will have constructed the CaseLabelItem VarDecl linked list implying this
+  /// will return nullptr. After type checking, if one wishes to find a parent
+  /// pattern of a VarDecl of a CaseStmt, \see getRecursiveParentPatternStmt
+  /// instead.
   Stmt *getParentPatternStmt() const {
-    return ParentPattern.dyn_cast<Stmt*>();
+    if (!Parent)
+      return nullptr;
+    return Parent.dyn_cast<Stmt *>();
   }
-  void setParentPatternStmt(Stmt *S) {
-    ParentPattern = S;
+
+  void setParentPatternStmt(Stmt *s) {
+    assert(s);
+    Parent = s;
   }
+
+  /// Look for the parent pattern stmt of this var decl, recursively
+  /// looking through var decl pointers and then through any
+  /// fallthroughts.
+  Stmt *getRecursiveParentPatternStmt() const;
+
+  /// Returns the var decl that this var decl is an implicit reference to if
+  /// such a var decl exists.
+  VarDecl *getParentVarDecl() const {
+    if (!Parent)
+      return nullptr;
+    return Parent.dyn_cast<VarDecl *>();
+  }
+
+  /// Set \p v to be the pattern produced VarDecl that is the parent of this
+  /// var decl.
+  void setParentVarDecl(VarDecl *v) {
+    assert(v && v != this);
+    Parent = v;
+  }
+
+  /// If this is a VarDecl that does not belong to a CaseLabelItem's pattern,
+  /// return this. Otherwise, this VarDecl must belong to a CaseStmt's
+  /// CaseLabelItem. In that case, return the first case label item of the first
+  /// case stmt in a sequence of case stmts that fallthrough into each other.
+  VarDecl *getCanonicalVarDecl() const;
 
   /// True if the global stored property requires lazy initialization.
   bool isLazilyInitializedGlobal() const;
@@ -4855,7 +4906,7 @@ class ParamDecl : public VarDecl {
   SourceLoc SpecifierLoc;
 
   struct StoredDefaultArgument {
-    Expr *DefaultArg = nullptr;
+    PointerUnion<Expr *, VarDecl *> DefaultArg;
     Initializer *InitContext = nullptr;
     StringRef StringRepresentation;
   };
@@ -4912,11 +4963,19 @@ public:
   
   Expr *getDefaultValue() const {
     if (auto stored = DefaultValueAndFlags.getPointer())
-      return stored->DefaultArg;
+      return stored->DefaultArg.dyn_cast<Expr *>();
+    return nullptr;
+  }
+
+  VarDecl *getStoredProperty() const {
+    if (auto stored = DefaultValueAndFlags.getPointer())
+      return stored->DefaultArg.dyn_cast<VarDecl *>();
     return nullptr;
   }
 
   void setDefaultValue(Expr *E);
+
+  void setStoredProperty(VarDecl *var);
 
   Initializer *getDefaultArgumentInitContext() const {
     if (auto stored = DefaultValueAndFlags.getPointer())
@@ -5510,12 +5569,14 @@ public:
 
 class OperatorDecl;
 
-/// Note: These align with '%select's in diagnostics.
 enum class SelfAccessKind : uint8_t {
-  NonMutating = 0,
-  Mutating    = 1,
-  __Consuming = 2,
+  NonMutating,
+  Mutating,
+  __Consuming,
 };
+
+/// Diagnostic printing of \c SelfAccessKind.
+llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SelfAccessKind SAK);
   
 /// FuncDecl - 'func' declaration.
 class FuncDecl : public AbstractFunctionDecl {

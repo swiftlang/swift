@@ -565,6 +565,15 @@ private:
   Type getUnwrappedType() const {
     return resolveType(UnwrappedType, /*reconstituteSugar=*/true);
   }
+
+  /// Suggest a default value via `?? <default value>`
+  void offerDefaultValueUnwrapFixIt(DeclContext *DC, Expr *expr) const;
+  /// Suggest a force optional unwrap via `!`
+  void offerForceUnwrapFixIt(Expr *expr) const;
+
+  /// Determine whether given expression is an argument used in the
+  /// operator invocation, and if so return corresponding parameter.
+  Optional<AnyFunctionType::Param> getOperatorParameterFor(Expr *expr) const;
 };
 
 /// Diagnose errors associated with rvalues in positions
@@ -672,6 +681,10 @@ private:
     }
     return type;
   }
+
+  /// Try to add a fix-it to convert a stored property into a computed
+  /// property
+  void tryComputedPropertyFixIts(Expr *expr) const;
 };
 
 /// Diagnose situations when @autoclosure argument is passed to @autoclosure
@@ -945,6 +958,29 @@ private:
     const auto &param = ContextualType->getParams().front();
     return resolveType(param.getPlainType());
   }
+};
+
+/// Diagnose an attempt to reference inaccessible member e.g.
+///
+/// ```swift
+/// struct S {
+///   var foo: String
+///
+///   private init(_ v: String) {
+///     self.foo = v
+///   }
+/// }
+/// _ = S("ultimate question")
+/// ```
+class InaccessibleMemberFailure final : public FailureDiagnostic {
+  ValueDecl *Member;
+
+public:
+  InaccessibleMemberFailure(Expr *root, ConstraintSystem &cs, ValueDecl *member,
+                            ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), Member(member) {}
+
+  bool diagnoseAsError() override;
 };
 
 } // end namespace constraints

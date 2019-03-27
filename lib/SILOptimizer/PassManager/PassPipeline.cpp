@@ -639,24 +639,23 @@ SILPassPipelinePlan
 SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   SILPassPipelinePlan P(Options);
 
-  // First specialize user-code.
-  P.startPipeline("Prespecialization");
-  P.addUsePrespecialized();
+  // First serialize the SIL if we are asked to.
+  P.startPipeline("Serialization");
+  P.addSerializeSILPass();
 
+  // And then strip ownership...
+  if (!Options.StripOwnershipDuringDiagnosticsPipeline)
+    P.addOwnershipModelEliminator();
+
+  // Finally perform some small transforms.
   P.startPipeline("Rest of Onone");
+  P.addUsePrespecialized();
 
   // Has only an effect if the -assume-single-thread option is specified.
   P.addAssumeSingleThreaded();
 
   // Has only an effect if the -gsil option is specified.
   P.addSILDebugInfoGenerator();
-
-  // Finally serialize the SIL if we are asked to.
-  P.addSerializeSILPass();
-
-  // And then strip ownership before we IRGen.
-  if (!Options.StripOwnershipDuringDiagnosticsPipeline)
-    P.addOwnershipModelEliminator();
 
   return P;
 }

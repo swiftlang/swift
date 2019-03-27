@@ -145,9 +145,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       if (isa<TypeExpr>(Base))
         checkUseOfMetaTypeName(Base);
 
-      if (auto *TSE = dyn_cast<TupleShuffleExpr>(E)) {
-        if (CallArgs.count(TSE))
-          CallArgs.insert(TSE->getSubExpr());
+      if (auto *ASE = dyn_cast<ArgumentShuffleExpr>(E)) {
+        if (CallArgs.count(ASE))
+          CallArgs.insert(ASE->getSubExpr());
       }
 
       if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
@@ -331,8 +331,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
                                         <void(unsigned, Expr*)> fn) {
       // The argument could be shuffled if it includes default arguments,
       // label differences, or other exciting things like that.
-      if (auto *TSE = dyn_cast<TupleShuffleExpr>(arg))
-        arg = TSE->getSubExpr();
+      if (auto *ASE = dyn_cast<ArgumentShuffleExpr>(arg))
+        arg = ASE->getSubExpr();
 
       // The argument is either a ParenExpr or TupleExpr.
       if (auto *TE = dyn_cast<TupleExpr>(arg)) {
@@ -2450,6 +2450,20 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     auto *var = elt.first;
     unsigned access = elt.second;
 
+    if (auto *CS = dyn_cast_or_null<CaseStmt>(var->getRecursiveParentPatternStmt())) {
+      // Only diagnose VarDecls from the first CaseLabelItem in CaseStmts, as
+      // the remaining items must match it anyway.
+      auto CaseItems = CS->getCaseLabelItems();
+      if (!CaseItems.empty()) {
+        bool InFirstCaseLabelItem = false;
+        CaseItems.front().getPattern()->forEachVariable([&](VarDecl *D) {
+          InFirstCaseLabelItem |= var == D;
+        });
+        if (!InFirstCaseLabelItem)
+          continue;
+      }
+    }
+
     // If this is a 'let' value, any stores to it are actually initializations,
     // not mutations.
     auto isWrittenLet = false;
@@ -2623,7 +2637,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       }
       else {
         bool suggestLet = true;
-        if (auto *stmt = var->getParentPatternStmt()) {
+        if (auto *stmt = var->getRecursiveParentPatternStmt()) {
           // Don't try to suggest 'var' -> 'let' conversion
           // in case of 'for' loop because it's an implicitly
           // immutable context.
@@ -2927,8 +2941,8 @@ void swift::fixItEncloseTrailingClosure(TypeChecker &TC,
                                         const CallExpr *call,
                                         Identifier closureLabel) {
   auto argsExpr = call->getArg();
-  if (auto TSE = dyn_cast<TupleShuffleExpr>(argsExpr))
-    argsExpr = TSE->getSubExpr();
+  if (auto ASE = dyn_cast<ArgumentShuffleExpr>(argsExpr))
+    argsExpr = ASE->getSubExpr();
 
   SmallString<32> replacement;
   SourceLoc lastLoc;
@@ -2983,8 +2997,8 @@ static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
       // Ignore invalid argument type. Some diagnostics are already emitted.
       if (!argsTy || argsTy->hasError()) return;
 
-      if (auto TSE = dyn_cast<TupleShuffleExpr>(argsExpr))
-        argsExpr = TSE->getSubExpr();
+      if (auto ASE = dyn_cast<ArgumentShuffleExpr>(argsExpr))
+        argsExpr = ASE->getSubExpr();
 
       SourceLoc closureLoc;
       if (auto PE = dyn_cast<ParenExpr>(argsExpr))

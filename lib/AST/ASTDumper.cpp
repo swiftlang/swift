@@ -305,6 +305,7 @@ static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
     case DefaultArgumentKind::EmptyArray: return "[]";
     case DefaultArgumentKind::EmptyDictionary: return "[:]";
     case DefaultArgumentKind::Normal: return "normal";
+    case DefaultArgumentKind::StoredProperty: return "stored property";
   }
 
   llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
@@ -1619,6 +1620,24 @@ public:
     printCommon(S, "case_stmt");
     if (S->hasUnknownAttr())
       OS << " @unknown";
+
+    if (auto caseBodyVars = S->getCaseBodyVariables()) {
+      OS << '\n';
+      OS.indent(Indent + 2);
+      PrintWithColorRAII(OS, ParenthesisColor) << '(';
+      PrintWithColorRAII(OS, StmtColor) << "case_body_variables";
+      OS << '\n';
+      for (auto *vd : *caseBodyVars) {
+        OS.indent(2);
+        // TODO: Printing a var decl does an Indent ... dump(vd) ... '\n'. We
+        // should see if we can factor this dumping so that the caller of
+        // printRec(VarDecl) has more control over the printing.
+        printRec(vd);
+      }
+      OS.indent(Indent + 2);
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
     for (const auto &LabelItem : S->getCaseLabelItems()) {
       OS << '\n';
       OS.indent(Indent + 2);
@@ -1829,6 +1848,8 @@ public:
   }
   void visitFloatLiteralExpr(FloatLiteralExpr *E) {
     printCommon(E, "float_literal_expr");
+    if (E->isNegative())
+      PrintWithColorRAII(OS, LiteralValueColor) << " negative";
     PrintWithColorRAII(OS, LiteralValueColor)
       << " value=" << E->getDigitsText();
     PrintWithColorRAII(OS, LiteralValueColor) << " builtin_initializer=";
@@ -2119,14 +2140,25 @@ public:
   }
   void visitTupleShuffleExpr(TupleShuffleExpr *E) {
     printCommon(E, "tuple_shuffle_expr");
+    OS << " elements=[";
+    for (unsigned i = 0, e = E->getElementMapping().size(); i != e; ++i) {
+      if (i) OS << ", ";
+      OS << E->getElementMapping()[i];
+    }
+    OS << "]\n";
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+  void visitArgumentShuffleExpr(ArgumentShuffleExpr *E) {
+    printCommon(E, "argument_shuffle_expr");
     switch (E->getTypeImpact()) {
-    case TupleShuffleExpr::ScalarToTuple:
+    case ArgumentShuffleExpr::ScalarToTuple:
       OS << " scalar_to_tuple";
       break;
-    case TupleShuffleExpr::TupleToTuple:
+    case ArgumentShuffleExpr::TupleToTuple:
       OS << " tuple_to_tuple";
       break;
-    case TupleShuffleExpr::TupleToScalar:
+    case ArgumentShuffleExpr::TupleToScalar:
       OS << " tuple_to_scalar";
       break;
     }

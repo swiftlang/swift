@@ -2057,6 +2057,7 @@ static void emitDynamicallyReplaceableThunk(IRGenModule &IGM,
     forwardedArgs.push_back(&arg);
   auto *Res =
       B.CreateCall(FunctionPointer(typeFnPtr, signature), forwardedArgs);
+  Res->setTailCall();
   if (implFn->getReturnType()->isVoidTy())
     B.CreateRetVoid();
   else
@@ -2858,7 +2859,7 @@ llvm::Constant *IRGenModule::emitFieldDescriptors() {
     sectionName = "swift5_fieldmd";
     break;
   case llvm::Triple::COFF:
-    sectionName = ".swift5_fieldmd";
+    sectionName = ".sw5flmd$B";
     break;
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("Don't know how to emit field records table for "
