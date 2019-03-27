@@ -34,7 +34,8 @@ private func _isNSString(_ str:AnyObject) -> UInt8 {
 
 @_effects(releasenone)
 private func _unsafeAddressOfCocoaStringClass(
-  _ str: _CocoaString) -> UInt {
+  _ str: _CocoaString
+) -> UInt {
   return _swift_stdlib_unsafeAddressOfClass(str)
 }
 

@@ -73,47 +73,49 @@ extension String : _ObjectiveCBridgeable {
   public static func _unconditionallyBridgeFromObjectiveC(
     _ source: NSString?
   ) -> String {
-    if let source = source {
-      #if !(arch(i386) || arch(arm))
-      if let result = _bridgeTaggedCocoaString(source) {
-        return result
-      }
-      #endif
-      
-      let sourceClass:AnyClass = _getClass(source)
-      
-      if _isRebridgedSwiftStringClass(sourceClass) {
-        return _rebridgeSwiftString(source, sourceClass)
-      }
-      
-      let len = _length(source)
-
-      //We *may* not be able to form a SmallString from this, but above 15 we
-      //definitely can't. It's worth trying because eager bridging is almost
-      //always good if we don't have to allocate for it.
-      if len <= 15 && sourceClass == nscfClass,
-        let result = _bridgeShortCFString(source, len) {
-        return result
-      }
-      
-      if sourceClass == nscfConstantClass {
-        return _bridgeConstantCocoaString(source, len)
-      }
-      
-      let immutableCopy = _copyString(source)
-      
-      //mutable->immutable might make it start being a tagged pointer
-      #if !(arch(i386) || arch(arm))
-      if let result = _bridgeTaggedCocoaString(immutableCopy) {
-        return result
-      }
-      #endif
-      
-      return _bridgeUnknownCocoaString(immutableCopy, len)
+    guard let source = source else {
+      // `nil` has historically been used as a stand-in for an empty
+      // string; map it to an empty string.
+      return String()
     }
-    // `nil` has historically been used as a stand-in for an empty
-    // string; map it to an empty string.
-    return String()
+    
+    #if !(arch(i386) || arch(arm))
+    if let result = _bridgeTaggedCocoaString(source) {
+      return result
+    }
+    #endif
+    
+    let sourceClass:AnyClass = _getClass(source)
+    
+    if let result = _rebridgeSwiftString(source, sourceClass) {
+      return result
+    }
+    
+    let len = _length(source)
+    
+    //The Swift side of the bridge may decide it's not profitable to eagerly
+    //bridge this NSString, but it's worth attempting
+    //Only try regular CF-based NSStrings for now due to things like
+    //NSLocalizedString assoc objects and NSAttributedString content proxies
+    if sourceClass == nscfClass,
+       let result = _bridgeCocoaStringEagerly(source, len) {
+      return result
+    }
+    
+    if sourceClass == nscfConstantClass {
+      return _bridgeCocoaStringLazily(source, len)
+    }
+    
+    let immutableCopy = _copyString(source)
+    
+    //mutable->immutable might make it start being a tagged pointer
+    #if !(arch(i386) || arch(arm))
+    if let result = _bridgeTaggedCocoaString(immutableCopy) {
+      return result
+    }
+    #endif
+    
+    return _bridgeCocoaStringLazily(immutableCopy, len)
   }
 }
 
