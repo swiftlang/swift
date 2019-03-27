@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -enable-objc-interop -disable-objc-attr-requires-foundation-module -enable-sil-ownership
+// RUN: %target-swift-emit-silgen %s -enable-objc-interop -disable-objc-attr-requires-foundation-module
 
 @objc protocol Unrelated {}
 

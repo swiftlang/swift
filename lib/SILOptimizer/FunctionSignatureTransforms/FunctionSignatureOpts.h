@@ -127,7 +127,7 @@ struct ArgumentDescriptor {
   getTransformedOwnershipKind(SILType SubTy) {
     if (IsEntirelyDead)
       return None;
-    if (SubTy.isTrivial(Arg->getModule()))
+    if (SubTy.isTrivial(*Arg->getFunction()))
       return Optional<ValueOwnershipKind>(ValueOwnershipKind::Any);
     if (OwnedToGuaranteed)
       return Optional<ValueOwnershipKind>(ValueOwnershipKind::Guaranteed);

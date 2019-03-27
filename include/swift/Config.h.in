@@ -12,6 +12,4 @@
 
 #cmakedefine HAVE_PROC_PID_RUSAGE 1
 
-#cmakedefine01 SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
-
 #endif // SWIFT_CONFIG_H

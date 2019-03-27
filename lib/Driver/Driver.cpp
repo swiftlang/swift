@@ -1946,7 +1946,8 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
 
     if (MergeModuleAction) {
       if (OI.DebugInfoLevel == IRGenDebugInfoLevel::Normal) {
-        if (TC.getTriple().getObjectFormat() == llvm::Triple::ELF) {
+        if (TC.getTriple().getObjectFormat() == llvm::Triple::ELF ||
+            TC.getTriple().getObjectFormat() == llvm::Triple::COFF) {
           auto *ModuleWrapAction =
               C.createAction<ModuleWrapJobAction>(MergeModuleAction);
           LinkAction->addInput(ModuleWrapAction);

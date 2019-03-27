@@ -90,6 +90,9 @@
 // RUN: %FileCheck %s -check-prefix=KW_EXPR < %t.expr6
 // RUN: %FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr6
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SWITCH_TOP | %FileCheck %s -check-prefix=KW_CASE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SWITCH_IN_CASE | %FileCheck %s -check-prefix=KW_CASE
+
 // KW_RETURN: Keyword[return]/None: return{{; name=.+$}}
 // KW_NO_RETURN-NOT: Keyword[return]
 
@@ -400,4 +403,17 @@ func inExpr5() {
 }
 func inExpr6() -> Int {
   return #^EXPR_6^#
+}
+
+func inSwitch(val: Int) {
+  switch val {
+  #^SWITCH_TOP^#
+  case 1:
+    foo()
+  #^SWITCH_IN_CASE^#
+  }
+// Begin completions
+// KW_CASE-DAG: Keyword[case]/None:                 case; name=case
+// KW_CASE-DAG: Keyword[default]/None:              default; name=default
+// End completions
 }

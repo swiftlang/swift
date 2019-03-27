@@ -14,10 +14,10 @@ bb0(%0 : @guaranteed $@callee_guaranteed () -> ()):
 }
 
 // Check that the convert_function [without_actually_escaping] attribute is parsed and printed.
-// CHECK-LABEL: sil hidden [ossa] @f2_testWithoutActuallyEscapingBlock : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> () {
+// CHECK-LABEL: sil hidden [ossa] @f2_testWithoutActuallyEscapingBlock : $@convention(thin) (@owned @convention(block) @noescape () -> ()) -> () {
 // CHECK: convert_function %0 : $@convention(block) @noescape () -> () to [without_actually_escaping] $@convention(block) () -> ()
-sil hidden [ossa] @f2_testWithoutActuallyEscapingBlock : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> () {
-bb0(%0 : @guaranteed $@convention(block) @noescape () -> ()):
+sil hidden [ossa] @f2_testWithoutActuallyEscapingBlock : $@convention(thin) (@owned @convention(block) @noescape () -> ()) -> () {
+bb0(%0 : @owned $@convention(block) @noescape () -> ()):
   %cvt = convert_function %0 : $@convention(block) @noescape () -> () to [without_actually_escaping] $@convention(block) () -> ()
   %f = function_ref @closure1 : $@convention(thin) (@guaranteed @convention(block) () -> ()) -> ()
   %call = apply %f(%cvt) : $@convention(thin) (@guaranteed @convention(block) () -> ()) -> ()
