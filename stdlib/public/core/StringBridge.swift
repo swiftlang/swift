@@ -222,18 +222,61 @@ extension String {
   }
 }
 
+private let BAD:UInt8 = 0xFF
+private let charToSixBitLookup:[UInt8] = [
+  /* 0 - 31 */    BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD,
+  //                                                                                              '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
+  /* 32 - 63  */  15,  BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, 46,  7,   60,  29,  30,  40,  31,  28,  43,  44,  48,  42,  49,  BAD, BAD, BAD, BAD, BAD, BAD,
+  //                   'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
+  /* 64 - 95 */   BAD, 50,  47,  27,  33,  53,  51,  58,  61,  13,  59,  52,  39,  19,  34,  41,  45,  BAD, 24,  20,  23,  38,  55,  54,  63,  62,  BAD, BAD, BAD, BAD, BAD, 56,
+  /* 96 - 127 */  BAD, 8,   32,  14,  10,  0,   17,  26,  21,  1,   22,  18,  2,   6,   11,  3,   9,   BAD, 5,   12,  4,   16,  35,  36,  25,  37,  57,  BAD, BAD, BAD, BAD, BAD,
+  /*   */         BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD,
+  /*   */         BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD,
+  /*   */         BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD,
+  /*   */         BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD
+];
+
 extension String {
   @_effects(releasenone)
   public // SPI(Foundation)
   func _bridgeToObjectiveCImpl() -> AnyObject {
     if _guts.isSmall {
       return _guts.asSmall.withUTF8 { bufPtr in
-        // TODO(String bridging): worth isASCII check for different encoding?
-        return _swift_stdlib_CFStringCreateWithBytes(
-            nil, bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
-            bufPtr.count,
-            kCFStringEncodingUTF8, 0)
-        as AnyObject
+        if _guts.isASCII {
+          return charToSixBitLookup.withUnsafeBufferPointer { lookupTable in
+            
+            //NOTE: This makes assumptions about how tagged NSStrings work
+            //If those assumptions become invalid, this will be less efficient
+            //but not incorrect. Make sure not to rely on the valid lengths or
+            //allowed characters in a tagged NSString for correctness.
+            
+            let canTag:Bool
+            switch bufPtr.count {
+            case 0...7: //TAGGED_STRING_UNPACKED_MAXLEN
+              canTag = true
+            case 8...9: //TAGGED_STRING_SIXBIT_MAXLEN
+              canTag = bufPtr.allSatisfy { lookupTable[_unchecked: Int($0)] <= 63 }
+            case 9...11: //TAGGED_STRING_FIVEBIT_MAXLEN
+              canTag = bufPtr.allSatisfy { lookupTable[_unchecked: Int($0)] <= 31 }
+            default:
+ 	      canTag = false
+	    }
+            
+            if canTag {
+              return _swift_stdlib_CFStringCreateWithBytes(
+                nil, bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
+                bufPtr.count,
+                kCFStringEncodingASCII, 0)
+                as AnyObject
+            }
+            
+            return __StringStorage.create(initializingFrom: bufPtr,
+                                          isASCII: true)
+          }
+        } else {
+          return __StringStorage.create(initializingFrom: bufPtr,
+                                        isASCII: false)
+        }
       }
     }
     if _guts._object.isImmortal {
