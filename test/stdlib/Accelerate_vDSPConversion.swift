@@ -274,8 +274,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         
         expectTrue(real.elementsEqual(realResult))
         expectTrue(imag.elementsEqual(imagResult))
-    }
-
+    }    
 }
 
 runAllTests()
