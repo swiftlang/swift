@@ -54,7 +54,7 @@ import Accelerate
 public struct Quadrature {
     
     private var integrateOptions = quadrature_integrate_options()
-
+    
     /// Initializes and returns a quadrature instance.
     ///
     /// - Parameter integrator: An enumeration specifying the integration algorithm and relevant properties.
@@ -63,7 +63,7 @@ public struct Quadrature {
     public init(integrator: Integrator,
                 absoluteTolerance: Double = 1.0e-8,
                 relativeTolerance: Double = 1.0e-2){
-
+        
         integrateOptions.abs_tolerance = absoluteTolerance
         integrateOptions.rel_tolerance = relativeTolerance
         
@@ -105,7 +105,7 @@ public struct Quadrature {
     /// - Parameter interval: The lower and upper bounds of the integration interval.
     /// - Parameter integrand: The function to integrate. The input value is `x` that's within the interval over which the integrand is being integrated, and the output value is the corresponding value `y = integrand(x)` at those points.
     public func integrate(over interval: ClosedRange<Double>,
-                                integrand: (_ input: UnsafeBufferPointer<Double>, _ result: UnsafeMutableBufferPointer<Double>) -> ()) ->
+                          integrand: (_ input: UnsafeBufferPointer<Double>, _ result: UnsafeMutableBufferPointer<Double>) -> ()) ->
         Result<(integralResult: Double, estimatedAbsoluteError: Double), Error>{
             
             var status = QUADRATURE_SUCCESS
@@ -154,7 +154,7 @@ public struct Quadrature {
                 return .failure(Error(quadratureStatus: status))
             }
     }
- 
+    
     /// Performs the integration over the supplied function.
     ///
     /// - Parameter interval: The lower and upper bounds of the integration interval.
@@ -175,10 +175,10 @@ public struct Quadrature {
                     
                     callback = quadrature_integrate_function(
                         fun: { (arg: UnsafeMutableRawPointer?,
-                                n: Int,
-                                x: UnsafePointer<Double>,
-                                y: UnsafeMutablePointer<Double>
-                                ) in
+                            n: Int,
+                            x: UnsafePointer<Double>,
+                            y: UnsafeMutablePointer<Double>
+                            ) in
                             
                             guard let integrand = arg?.load(as: ((Double) -> Double).self) else {
                                 return
