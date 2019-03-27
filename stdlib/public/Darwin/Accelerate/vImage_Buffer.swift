@@ -32,8 +32,7 @@ extension vImage_Buffer {
     /// Initializes a vImage buffer of a specified size without memory allocation,
     /// reporting the preferred alignment.
     ///
-    /// - Parameter width: The width of the image.
-    /// - Parameter height: The height of the image.
+    /// - Parameter size: The size of the image.
     /// - Parameter bitsPerPixel: The number of bits in a pixel of image data.
     /// - Parameter alignment: The preferred alignment is written to this parameter.
     ///
@@ -65,8 +64,7 @@ extension vImage_Buffer {
     
     /// Initializes a vImage buffer of a specified size, reporting any errors.
     ///
-    /// - Parameter width: The width of the image.
-    /// - Parameter height: The height of the image.
+    /// - Parameter size: The size of the image.
     /// - Parameter bitsPerPixel: The number of bits in a pixel of image data.
     /// - Parameter error: Overwritten with the error code if the operation failed.
     /// - Parameter options: The options to use when performing this operation.
@@ -99,8 +97,7 @@ extension vImage_Buffer {
     
     /// Initializes a vImage buffer of a specified size.
     ///
-    /// - Parameter width: The width of the image.
-    /// - Parameter height: The height of the image.
+    /// - Parameter size: The size of the image.
     /// - Parameter bitsPerPixel: The number of bits in a pixel of image data.
     /// - Parameter options: The options to use when performing this operation.
     ///
