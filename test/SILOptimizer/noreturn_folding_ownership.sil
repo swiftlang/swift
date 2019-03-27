@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -module-name Swift -enable-sil-ownership -enable-sil-verify-all -noreturn-folding < %s | %FileCheck %s
+// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -noreturn-folding < %s | %FileCheck %s
 
 import Builtin
 

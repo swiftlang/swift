@@ -1005,7 +1005,11 @@ handleSemanticRequest(RequestDict Req,
 
   if (ReqUID == RequestCollectExpressionType) {
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-    return Lang.collectExpressionTypes(*SourceFile, Args,
+
+    SmallVector<const char *, 8> ExpectedProtocols;
+    if (Req.getStringArray(KeyExpectedTypes, ExpectedProtocols, true))
+      return Rec(createErrorRequestInvalid("invalid 'key.interested_protocols'"));
+    return Lang.collectExpressionTypes(*SourceFile, Args, ExpectedProtocols,
       [Rec](const ExpressionTypesInFile &Info) {
         reportExpressionTypeInfo(Info, Rec);
       });

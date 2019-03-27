@@ -82,7 +82,7 @@ class ResilienceTest(object):
                                         lib_file)
             compiler_flags = ['-emit-library', '-emit-module',
                               '-swift-version', '4',
-                              '-Xfrontend', '-enable-resilience',
+                              '-enable-library-evolution',
                               '-D', config,
                               self.lib_src,
                               '-o', output_dylib]

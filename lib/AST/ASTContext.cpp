@@ -301,15 +301,22 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// Structure that captures data that is segregated into different
   /// arenas.
   struct Arena {
+    static_assert(alignof(TypeBase) >= 8, "TypeBase not 8-byte aligned?");
+    static_assert(alignof(TypeBase) > static_cast<unsigned>(
+               MetatypeRepresentation::Last_MetatypeRepresentation) + 1,
+               "Use std::pair for MetatypeTypes and ExistentialMetatypeTypes.");
+
     llvm::DenseMap<Type, ErrorType *> ErrorTypesWithOriginal;
     llvm::FoldingSet<TypeAliasType> TypeAliasTypes;
     llvm::FoldingSet<TupleType> TupleTypes;
-    llvm::DenseMap<std::pair<Type,char>, MetatypeType*> MetatypeTypes;
-    llvm::DenseMap<std::pair<Type,char>,
+    llvm::DenseMap<llvm::PointerIntPair<TypeBase*, 3, unsigned>,
+                   MetatypeType*> MetatypeTypes;
+    llvm::DenseMap<llvm::PointerIntPair<TypeBase*, 3, unsigned>,
                    ExistentialMetatypeType*> ExistentialMetatypeTypes;
     llvm::DenseMap<Type, ArraySliceType*> ArraySliceTypes;
     llvm::DenseMap<std::pair<Type, Type>, DictionaryType *> DictionaryTypes;
     llvm::DenseMap<Type, OptionalType*> OptionalTypes;
+    llvm::DenseMap<Type, ParenType*> SimpleParenTypes; // Most are simple
     llvm::DenseMap<std::pair<Type, unsigned>, ParenType*> ParenTypes;
     llvm::DenseMap<uintptr_t, ReferenceStorageType*> ReferenceStorageTypes;
     llvm::DenseMap<Type, LValueType*> LValueTypes;
@@ -317,12 +324,12 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
     llvm::DenseMap<std::pair<Type, void*>, DependentMemberType *>
       DependentMemberTypes;
     llvm::DenseMap<Type, DynamicSelfType *> DynamicSelfTypes;
-    llvm::FoldingSet<EnumType> EnumTypes;
-    llvm::FoldingSet<StructType> StructTypes;
-    llvm::FoldingSet<ClassType> ClassTypes;
+    llvm::DenseMap<std::pair<EnumDecl*, Type>, EnumType*> EnumTypes;
+    llvm::DenseMap<std::pair<StructDecl*, Type>, StructType*> StructTypes;
+    llvm::DenseMap<std::pair<ClassDecl*, Type>, ClassType*> ClassTypes;
+    llvm::DenseMap<std::pair<ProtocolDecl*, Type>, ProtocolType*> ProtocolTypes;
     llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
     llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
-    llvm::FoldingSet<ProtocolType> ProtocolTypes;
     llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
     llvm::FoldingSet<LayoutConstraintInfo> LayoutConstraints;
 
@@ -2088,16 +2095,18 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     llvm::capacity_in_bytes(ArraySliceTypes) +
     llvm::capacity_in_bytes(DictionaryTypes) +
     llvm::capacity_in_bytes(OptionalTypes) +
+    llvm::capacity_in_bytes(SimpleParenTypes) +
     llvm::capacity_in_bytes(ParenTypes) +
     llvm::capacity_in_bytes(ReferenceStorageTypes) +
     llvm::capacity_in_bytes(LValueTypes) +
     llvm::capacity_in_bytes(InOutTypes) +
     llvm::capacity_in_bytes(DependentMemberTypes) +
+    llvm::capacity_in_bytes(EnumTypes) +
+    llvm::capacity_in_bytes(StructTypes) +
+    llvm::capacity_in_bytes(ClassTypes) +
+    llvm::capacity_in_bytes(ProtocolTypes) +
     llvm::capacity_in_bytes(DynamicSelfTypes);
     // FunctionTypes ?
-    // EnumTypes ?
-    // StructTypes ?
-    // ClassTypes ?
     // UnboundGenericTypes ?
     // BoundGenericTypes ?
     // NormalConformances ?
@@ -3044,8 +3053,10 @@ ParenType *ParenType::get(const ASTContext &C, Type underlying,
   
   auto properties = underlying->getRecursiveProperties();
   auto arena = getArena(properties);
-  ParenType *&Result =
-      C.getImpl().getArena(arena).ParenTypes[{underlying, fl.toRaw()}];
+  auto flags = fl.toRaw();
+  ParenType *&Result = flags == 0
+      ? C.getImpl().getArena(arena).SimpleParenTypes[underlying]
+      : C.getImpl().getArena(arena).ParenTypes[{underlying, flags}];
   if (Result == nullptr) {
     Result = new (C, arena) ParenType(underlying,
                                       properties, fl);
@@ -3362,26 +3373,15 @@ EnumType::EnumType(EnumDecl *TheDecl, Type Parent, const ASTContext &C,
   : NominalType(TypeKind::Enum, &C, TheDecl, Parent, properties) { }
 
 EnumType *EnumType::get(EnumDecl *D, Type Parent, const ASTContext &C) {
-  llvm::FoldingSetNodeID id;
-  EnumType::Profile(id, D, Parent);
-
   RecursiveTypeProperties properties;
   if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
-  void *insertPos = nullptr;
-  if (auto enumTy
-        = C.getImpl().getArena(arena).EnumTypes.FindNodeOrInsertPos(id, insertPos))
-    return enumTy;
-
-  auto enumTy = new (C, arena) EnumType(D, Parent, C, properties);
-  C.getImpl().getArena(arena).EnumTypes.InsertNode(enumTy, insertPos);
-  return enumTy;
-}
-
-void EnumType::Profile(llvm::FoldingSetNodeID &ID, EnumDecl *D, Type Parent) {
-  ID.AddPointer(D);
-  ID.AddPointer(Parent.getPointer());
+  auto *&known = C.getImpl().getArena(arena).EnumTypes[{D, Parent}];
+  if (!known) {
+    known = new (C, arena) EnumType(D, Parent, C, properties);
+  }
+  return known;
 }
 
 StructType::StructType(StructDecl *TheDecl, Type Parent, const ASTContext &C,
@@ -3389,26 +3389,15 @@ StructType::StructType(StructDecl *TheDecl, Type Parent, const ASTContext &C,
   : NominalType(TypeKind::Struct, &C, TheDecl, Parent, properties) { }
 
 StructType *StructType::get(StructDecl *D, Type Parent, const ASTContext &C) {
-  llvm::FoldingSetNodeID id;
-  StructType::Profile(id, D, Parent);
-
   RecursiveTypeProperties properties;
   if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
-  void *insertPos = nullptr;
-  if (auto structTy
-        = C.getImpl().getArena(arena).StructTypes.FindNodeOrInsertPos(id, insertPos))
-    return structTy;
-
-  auto structTy = new (C, arena) StructType(D, Parent, C, properties);
-  C.getImpl().getArena(arena).StructTypes.InsertNode(structTy, insertPos);
-  return structTy;
-}
-
-void StructType::Profile(llvm::FoldingSetNodeID &ID, StructDecl *D, Type Parent) {
-  ID.AddPointer(D);
-  ID.AddPointer(Parent.getPointer());
+  auto *&known = C.getImpl().getArena(arena).StructTypes[{D, Parent}];
+  if (!known) {
+    known = new (C, arena) StructType(D, Parent, C, properties);
+  }
+  return known;
 }
 
 ClassType::ClassType(ClassDecl *TheDecl, Type Parent, const ASTContext &C,
@@ -3416,26 +3405,15 @@ ClassType::ClassType(ClassDecl *TheDecl, Type Parent, const ASTContext &C,
   : NominalType(TypeKind::Class, &C, TheDecl, Parent, properties) { }
 
 ClassType *ClassType::get(ClassDecl *D, Type Parent, const ASTContext &C) {
-  llvm::FoldingSetNodeID id;
-  ClassType::Profile(id, D, Parent);
-
   RecursiveTypeProperties properties;
   if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
-  void *insertPos = nullptr;
-  if (auto classTy
-        = C.getImpl().getArena(arena).ClassTypes.FindNodeOrInsertPos(id, insertPos))
-    return classTy;
-
-  auto classTy = new (C, arena) ClassType(D, Parent, C, properties);
-  C.getImpl().getArena(arena).ClassTypes.InsertNode(classTy, insertPos);
-  return classTy;
-}
-
-void ClassType::Profile(llvm::FoldingSetNodeID &ID, ClassDecl *D, Type Parent) {
-  ID.AddPointer(D);
-  ID.AddPointer(Parent.getPointer());
+  auto *&known = C.getImpl().getArena(arena).ClassTypes[{D, Parent}];
+  if (!known) {
+    known = new (C, arena) ClassType(D, Parent, C, properties);
+  }
+  return known;
 }
 
 ProtocolCompositionType *
@@ -3524,13 +3502,16 @@ MetatypeType *MetatypeType::get(Type T, Optional<MetatypeRepresentation> Repr,
   auto properties = T->getRecursiveProperties();
   auto arena = getArena(properties);
 
-  char reprKey;
+  unsigned reprKey;
   if (Repr.hasValue())
-    reprKey = static_cast<char>(*Repr) + 1;
+    reprKey = static_cast<unsigned>(*Repr) + 1;
   else
     reprKey = 0;
 
-  MetatypeType *&Entry = Ctx.getImpl().getArena(arena).MetatypeTypes[{T, reprKey}];
+  auto pair = llvm::PointerIntPair<TypeBase*, 3, unsigned>(T.getPointer(),
+                                                           reprKey);
+
+  MetatypeType *&Entry = Ctx.getImpl().getArena(arena).MetatypeTypes[pair];
   if (Entry) return Entry;
 
   return Entry = new (Ctx, arena) MetatypeType(
@@ -3549,13 +3530,16 @@ ExistentialMetatypeType::get(Type T, Optional<MetatypeRepresentation> repr,
   auto properties = T->getRecursiveProperties();
   auto arena = getArena(properties);
 
-  char reprKey;
+  unsigned reprKey;
   if (repr.hasValue())
-    reprKey = static_cast<char>(*repr) + 1;
+    reprKey = static_cast<unsigned>(*repr) + 1;
   else
     reprKey = 0;
 
-  auto &entry = ctx.getImpl().getArena(arena).ExistentialMetatypeTypes[{T, reprKey}];
+  auto pair = llvm::PointerIntPair<TypeBase*, 3, unsigned>(T.getPointer(),
+                                                           reprKey);
+
+  auto &entry = ctx.getImpl().getArena(arena).ExistentialMetatypeTypes[pair];
   if (entry) return entry;
 
   return entry = new (ctx, arena) ExistentialMetatypeType(
@@ -4171,34 +4155,21 @@ OptionalType *OptionalType::get(Type base) {
 
 ProtocolType *ProtocolType::get(ProtocolDecl *D, Type Parent,
                                 const ASTContext &C) {
-  llvm::FoldingSetNodeID id;
-  ProtocolType::Profile(id, D, Parent);
-
   RecursiveTypeProperties properties;
   if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
-  void *insertPos = nullptr;
-  if (auto protoTy
-        = C.getImpl().getArena(arena).ProtocolTypes.FindNodeOrInsertPos(id, insertPos))
-    return protoTy;
-
-  auto protoTy = new (C, arena) ProtocolType(D, Parent, C, properties);
-  C.getImpl().getArena(arena).ProtocolTypes.InsertNode(protoTy, insertPos);
-
-  return protoTy;
+  auto *&known = C.getImpl().getArena(arena).ProtocolTypes[{D, Parent}];
+  if (!known) {
+    known = new (C, arena) ProtocolType(D, Parent, C, properties);
+  }
+  return known;
 }
 
 ProtocolType::ProtocolType(ProtocolDecl *TheDecl, Type Parent,
                            const ASTContext &Ctx,
                            RecursiveTypeProperties properties)
   : NominalType(TypeKind::Protocol, &Ctx, TheDecl, Parent, properties) { }
-
-void ProtocolType::Profile(llvm::FoldingSetNodeID &ID, ProtocolDecl *D,
-                           Type Parent) {
-  ID.AddPointer(D);
-  ID.AddPointer(Parent.getPointer());
-}
 
 LValueType *LValueType::get(Type objectTy) {
   assert(!objectTy->hasError() &&

@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.4.3)
 include("../../../../cmake/modules/StandaloneOverlay.cmake")
 
 add_swift_target_library(swiftAccelerate ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
-  BNNS.swift.gyb
   Accelerate.swift
   vImage_Error.swift
   vImage_Options.swift
@@ -10,6 +9,9 @@ add_swift_target_library(swiftAccelerate ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES
   vImage_CVImageFormat.swift
   vImage_CGImageFormat.swift
   vImage_Converter.swift
+
+  GYB_SOURCES
+    BNNS.swift.gyb
 
   SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"

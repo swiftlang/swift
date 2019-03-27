@@ -705,16 +705,19 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
   SyntaxContext->setCreateSyntax(SyntaxKind::CompositionType);
   assert(Tok.isContextualPunctuator("&"));
   do {
-    consumeToken(); // consume '&'
-
-    if (SyntaxContext->isEnabled() && Status.isSuccess()) {
-      ParsedCompositionTypeElementSyntaxBuilder Builder(*SyntaxContext);
-      auto Ampersand = SyntaxContext->popToken();
-      auto Type = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
-      Builder
-        .useAmpersand(Ampersand)
-        .useType(Type);
-      SyntaxContext->addSyntax(Builder.build());
+    if (SyntaxContext->isEnabled()) {
+      auto Type = SyntaxContext->popIf<ParsedTypeSyntax>();
+      consumeToken(); // consume '&'
+      if (Type) {
+        ParsedCompositionTypeElementSyntaxBuilder Builder(*SyntaxContext);
+        auto Ampersand = SyntaxContext->popToken();
+        Builder
+          .useAmpersand(Ampersand)
+          .useType(Type.getValue());
+        SyntaxContext->addSyntax(Builder.build());
+      }
+    } else {
+      consumeToken(); // consume '&'
     }
 
     // Parse next type.
@@ -726,11 +729,12 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
     addType(ty.getPtrOrNull());
   } while (Tok.isContextualPunctuator("&"));
 
-  if (SyntaxContext->isEnabled() && Status.isSuccess()) {
-    auto LastNode = ParsedSyntaxRecorder::makeCompositionTypeElement(
-        SyntaxContext->popIf<ParsedTypeSyntax>().getValue(), None,
-        *SyntaxContext);
-    SyntaxContext->addSyntax(LastNode);
+  if (SyntaxContext->isEnabled()) {
+    if (auto synType = SyntaxContext->popIf<ParsedTypeSyntax>()) {
+      auto LastNode = ParsedSyntaxRecorder::makeCompositionTypeElement(
+          synType.getValue(), None, *SyntaxContext);
+      SyntaxContext->addSyntax(LastNode);
+    }
   }
   SyntaxContext->collectNodesInPlace(SyntaxKind::CompositionTypeElementList);
   
