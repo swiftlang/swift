@@ -977,7 +977,11 @@ visitDynamicCallableAttr(DynamicCallableAttr *attr) {
 
 static bool hasSingleNonVariadicParam(SubscriptDecl *decl) {
   auto *indices = decl->getIndices();
-  return indices->size() == 1 && !indices->get(0)->isVariadic();
+  if (decl->isInvalid() || indices->size() != 1)
+    return false;
+
+  auto *index = indices->get(0);
+  return !index->isVariadic() && index->hasValidSignature();
 }
 
 /// Returns true if the given subscript method is an valid implementation of
@@ -1020,9 +1024,6 @@ bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
     return false;
 
   const auto *param = decl->getIndices()->get(0);
-  if (param->isVariadic())
-    return false;
-
   if (auto NTD = param->getType()->getAnyNominal()) {
     return NTD == TC.Context.getKeyPathDecl() ||
            NTD == TC.Context.getWritableKeyPathDecl();
