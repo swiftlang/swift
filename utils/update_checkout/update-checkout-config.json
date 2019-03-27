@@ -5,7 +5,7 @@
         "llvm": {
             "remote": { "id": "apple/swift-llvm" } },
         "clang": {
-            "remote": { "id": "apple/swift-clang" } },
+            "remote": { "id": "dan-zheng/swift-clang" } },
         "swift": {
             "remote": { "id": "apple/swift" } },
         "lldb": {
@@ -53,7 +53,7 @@
             "aliases": ["master", "stable"],
             "repos": {
                 "llvm": "stable",
-                "clang": "stable",
+                "clang": "callable",
                 "swift": "master",
                 "lldb": "stable",
                 "cmark": "master",
