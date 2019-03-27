@@ -494,7 +494,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
       if (!RunningVal) {
         // Loading without a previous store is only acceptable if the type is
         // Void (= empty tuple) or a tuple of Voids.
-        RunningVal = SILUndef::get(ASI->getElementType(), ASI->getModule());
+        RunningVal = SILUndef::get(ASI->getElementType(), *ASI->getFunction());
       }
       replaceLoad(cast<LoadInst>(Inst), RunningVal, ASI);
       NumInstRemoved++;
@@ -595,7 +595,7 @@ StackAllocationPromoter::getLiveOutValue(BlockSet &PhiBlocks,
     LLVM_DEBUG(llvm::dbgs() << "*** Walking up the iDOM.\n");
   }
   LLVM_DEBUG(llvm::dbgs() << "*** Could not find a Def. Using Undef.\n");
-  return SILUndef::get(ASI->getElementType(), ASI->getModule());
+  return SILUndef::get(ASI->getElementType(), *ASI->getFunction());
 }
 
 SILValue
@@ -611,7 +611,7 @@ StackAllocationPromoter::getLiveInValue(BlockSet &PhiBlocks,
   }
 
   if (BB->pred_empty() || !DT->getNode(BB))
-    return SILUndef::get(ASI->getElementType(), ASI->getModule());
+    return SILUndef::get(ASI->getElementType(), *ASI->getFunction());
 
   // No phi for this value in this block means that the value flowing
   // out of the immediate dominator reaches here.

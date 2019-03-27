@@ -102,7 +102,7 @@ bool ArrayAllocation::isInitializationWithKnownCount() {
       (ArrayValue = Uninitialized.getArrayValue()))
     return true;
 
-  ArraySemanticsCall Init(Alloc, "array.init");
+  ArraySemanticsCall Init(Alloc, "array.init", /*matchPartialName*/true);
   if (Init &&
       (ArrayCount = Init.getInitializationCount()) &&
       (ArrayValue = Init.getArrayValue()))

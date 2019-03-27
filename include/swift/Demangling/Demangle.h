@@ -221,7 +221,7 @@ public:
   // Only to be used by the demangler parsers.
   void addChild(NodePointer Child, NodeFactory &Factory);
   // Only to be used by the demangler parsers.
-  void removeChildAt(unsigned Pos, NodeFactory &factory);
+  void removeChildAt(unsigned Pos);
 
   // Reverses the order of children.
   void reverseChildren(size_t StartingAt = 0);
@@ -484,17 +484,8 @@ enum class OperatorKind {
   Infix,
 };
 
-/// Mangle an identifier using Swift's mangling rules.
-void mangleIdentifier(const char *data, size_t length,
-                      OperatorKind operatorKind, std::string &out,
-                      bool usePunycode = true);
-
 /// Remangle a demangled parse tree.
-///
-/// If \p BorrowFrom is specified, the initial bump pointer memory is
-/// borrowed from the free memory of BorrowFrom.
-std::string mangleNode(NodePointer root,
-                       NodeFactory *BorrowFrom = nullptr);
+std::string mangleNode(NodePointer root);
 
 using SymbolicResolver =
   llvm::function_ref<Demangle::NodePointer (SymbolicReferenceKind,
@@ -502,18 +493,33 @@ using SymbolicResolver =
 
 /// Remangle a demangled parse tree, using a callback to resolve
 /// symbolic references.
+std::string mangleNode(NodePointer root, SymbolicResolver resolver);
+
+/// Remangle a demangled parse tree, using a callback to resolve
+/// symbolic references.
 ///
-/// If \p BorrowFrom is specified, the initial bump pointer memory is
-/// borrowed from the free memory of BorrowFrom.
-std::string mangleNode(NodePointer root, SymbolicResolver resolver,
-                       NodeFactory *BorrowFrom = nullptr);
+/// The returned string is owned by \p Factory. This means \p Factory must stay
+/// alive as long as the returned string is used.
+llvm::StringRef mangleNode(NodePointer root, SymbolicResolver resolver,
+                           NodeFactory &Factory);
 
 /// Remangle in the old mangling scheme.
 ///
 /// This is only used for objc-runtime names.
-/// If \p BorrowFrom is specified, the initial bump pointer memory is
-/// borrowed from the free memory of BorrowFrom.
-std::string mangleNodeOld(NodePointer root, NodeFactory *BorrowFrom = nullptr);
+std::string mangleNodeOld(NodePointer root);
+
+/// Remangle in the old mangling scheme.
+///
+/// This is only used for objc-runtime names.
+/// The returned string is owned by \p Factory. This means \p Factory must stay
+/// alive as long as the returned string is used.
+llvm::StringRef mangleNodeOld(NodePointer node, NodeFactory &Factory);
+
+/// Remangle in the old mangling scheme and embed the name in "_Tt<name>_".
+///
+/// The returned string is null terminated and owned by \p Factory. This means
+/// \p Factory must stay alive as long as the returned string is used.
+const char *mangleNodeAsObjcCString(NodePointer node, NodeFactory &Factory);
 
 /// Transform the node structure to a string.
 ///

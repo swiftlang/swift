@@ -363,7 +363,7 @@ bool SILPerformanceInliner::isProfitableToInline(
         auto Subs = FAI.getSubstitutionMap();
 
         // Bail if it is not a generic call or inlining of generics is forbidden.
-        if (!EnableSILInliningOfGenerics || Subs.empty())
+        if (!EnableSILInliningOfGenerics || !Subs.hasAnySubstitutableParams())
           continue;
 
         if (!isa<FunctionRefInst>(def) && !isa<ClassMethodInst>(def) &&

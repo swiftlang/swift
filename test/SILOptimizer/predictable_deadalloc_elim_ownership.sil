@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-sil-ownership %s -predictable-deadalloc-elim | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -predictable-deadalloc-elim | %FileCheck %s
 
 sil_stage canonical
 

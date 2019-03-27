@@ -201,7 +201,7 @@ bool PartialApplyCombiner::allocateTemporaries() {
         return false;
 
       // If the temporary is non-trivial, we need to release it later.
-      if (!Arg->getType().isTrivial(PAI->getModule()))
+      if (!Arg->getType().isTrivial(*PAI->getFunction()))
         needsReleases = true;
       ArgsToHandle.push_back(std::make_pair(Arg, i));
     }
@@ -256,7 +256,7 @@ void PartialApplyCombiner::releaseTemporaries() {
   // its really needed.
   for (auto Op : Tmps) {
     auto TmpType = Op->getType().getObjectType();
-    if (TmpType.isTrivial(PAI->getModule()))
+    if (TmpType.isTrivial(*PAI->getFunction()))
       continue;
     for (auto *EndPoint : PAFrontier) {
       Builder.setInsertionPoint(EndPoint);

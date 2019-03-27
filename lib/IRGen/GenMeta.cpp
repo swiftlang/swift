@@ -205,18 +205,21 @@ static void emitMetadataCompletionFunction(IRGenModule &IGM,
   IGF.Builder.CreateRet(returnValue);
 }
 
-static bool needsForeignMetadataCompletionFunction(StructDecl *decl) {
+static bool needsForeignMetadataCompletionFunction(IRGenModule &IGM,
+                                                   StructDecl *decl) {
   // Currently, foreign structs never need a completion function.
   return false;
 }
 
-static bool needsForeignMetadataCompletionFunction(EnumDecl *decl) {
+static bool needsForeignMetadataCompletionFunction(IRGenModule &IGM,
+                                                   EnumDecl *decl) {
   // Currently, foreign enums never need a completion function.
   return false;
 }
 
-static bool needsForeignMetadataCompletionFunction(ClassDecl *decl) {
-  return decl->hasSuperclass();
+static bool needsForeignMetadataCompletionFunction(IRGenModule &IGM,
+                                                   ClassDecl *decl) {
+  return IGM.getOptions().LazyInitializeClassMetadata || decl->hasSuperclass();
 }
 
 /*****************************************************************************/
@@ -1171,7 +1174,7 @@ namespace {
     }
 
     bool needsForeignMetadataCompletionFunction() {
-      return ::needsForeignMetadataCompletionFunction(Type);
+      return ::needsForeignMetadataCompletionFunction(IGM, Type);
     }
 
     /// Add an SingletonMetadataInitialization structure to the descriptor.
@@ -2407,12 +2410,6 @@ static void emitFieldOffsetGlobals(IRGenModule &IGM,
 
 static ClassFlags getClassFlags(ClassDecl *classDecl) {
   auto flags = ClassFlags();
-
-#if !SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
-  // FIXME: Remove this after enabling stable ABI.
-  // This bit is NOT conditioned on UseDarwinPreStableABIBit.
-  flags |= ClassFlags::IsSwiftPreStableABI;
-#endif
 
   // Set a flag if the class uses Swift refcounting.
   auto type = classDecl->getDeclaredType()->getCanonicalType();
@@ -3804,7 +3801,7 @@ namespace {
     }
 
     bool needsMetadataCompletionFunction() {
-      return needsForeignMetadataCompletionFunction(Target);
+      return needsForeignMetadataCompletionFunction(IGM, Target);
     }
 
     void createMetadataCompletionFunction() {
@@ -3837,10 +3834,19 @@ namespace {
   public:
     ForeignClassMetadataBuilder(IRGenModule &IGM, ClassDecl *target,
                                 ConstantStructBuilder &B)
-      : ForeignMetadataBuilderBase(IGM, target, B) {}
+        : ForeignMetadataBuilderBase(IGM, target, B) {
+      if (IGM.getOptions().LazyInitializeClassMetadata)
+        CanBeConstant = false;
+    }
 
     void emitInitializeMetadata(IRGenFunction &IGF, llvm::Value *metadata,
                                 MetadataDependencyCollector *collector) {
+      if (!Target->hasSuperclass()) {
+        assert(IGM.getOptions().LazyInitializeClassMetadata &&
+               "should have superclass if not lazy initializing class metadata");
+        return;
+      }
+
       // Emit a reference to the superclass.
       auto superclass = IGF.emitAbstractTypeMetadataRef(
                                    Target->getSuperclass()->getCanonicalType());
@@ -3858,6 +3864,24 @@ namespace {
     // Visitor methods.
 
     void addValueWitnessTable() {
+      // The runtime will fill in the default VWT during allocation for the
+      // foreign class metadata.
+      //
+      // As of Swift 5.1, the runtime will fill in a default VWT during
+      // allocation of foreign class metadata.  We rely on this for correctness
+      // on COFF, where we can't necessarily reference the stanard VWT from the
+      // metadata candidate, but it is a good optimization everywhere.
+      //
+      // The default VWT uses ObjC-compatible reference counting if ObjC interop
+      // is enabled and Swift-compatible reference counting otherwise.  That is
+      // currently always good enough for foreign classes, so we can
+      // unconditionally rely on the default VWT.
+      //
+      // FIXME: take advantage of this on other targets when targeting a
+      // sufficiently recent runtime.
+      if (IGM.getOptions().LazyInitializeClassMetadata)
+        return B.addNullPointer(IGM.WitnessTablePtrTy);
+
       // Without Objective-C interop, foreign classes must still use
       // Swift native reference counting.
       auto type = (IGM.ObjCInterop
@@ -4085,6 +4109,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Hashable:
   case KnownProtocolKind::CaseIterable:
   case KnownProtocolKind::Comparable:
+  case KnownProtocolKind::SIMDScalar:
   case KnownProtocolKind::ObjectiveCBridgeable:
   case KnownProtocolKind::DestructorSafeContainer:
   case KnownProtocolKind::SwiftNewtypeWrapper:
