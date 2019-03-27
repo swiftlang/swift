@@ -210,12 +210,12 @@ public:
 
   Optional<std::string>
   createTypeDecl(Node *node, bool &typeAlias) {
-    return Demangle::mangleNode(node, &Dem);
+    return Demangle::mangleNode(node);
   }
 
   BuiltProtocolDecl
   createProtocolDecl(Node *node) {
-    return std::make_pair(Demangle::mangleNode(node, &Dem), false);
+    return std::make_pair(Demangle::mangleNode(node), false);
   }
 
   BuiltProtocolDecl
@@ -274,13 +274,13 @@ public:
 
   const BoundGenericTypeRef *
   createBoundGenericType(const Optional<std::string> &mangledName,
-                         const std::vector<const TypeRef *> &args,
+                         ArrayRef<const TypeRef *> args,
                          const TypeRef *parent) {
     return BoundGenericTypeRef::create(*this, *mangledName, args, parent);
   }
 
   const TupleTypeRef *
-  createTupleType(const std::vector<const TypeRef *> &elements,
+  createTupleType(ArrayRef<const TypeRef *> elements,
                   std::string &&labels, bool isVariadic) {
     // FIXME: Add uniqueness checks in TupleTypeRef::Profile and
     // unittests/Reflection/TypeRef.cpp if using labels for identity.
@@ -288,7 +288,7 @@ public:
   }
 
   const FunctionTypeRef *createFunctionType(
-      const std::vector<remote::FunctionParam<const TypeRef *>> &params,
+      ArrayRef<remote::FunctionParam<const TypeRef *>> params,
       const TypeRef *result, FunctionTypeFlags flags) {
     return FunctionTypeRef::create(*this, params, result, flags);
   }
@@ -406,7 +406,7 @@ public:
 
   const ObjCClassTypeRef *
   createBoundGenericObjCClassType(const std::string &name,
-                                  std::vector<const TypeRef *> &args) {
+                                  ArrayRef<const TypeRef *> args) {
     // Remote reflection just ignores generic arguments for Objective-C
     // lightweight generic types, since they don't affect layout.
     return createObjCClassType(name);

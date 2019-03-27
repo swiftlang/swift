@@ -10,7 +10,8 @@ import Builtin
 // CHECK: unchecked_ownership_conversion {{%.*}} : $Builtin.NativeObject, @guaranteed to @owned
 sil [serialized] [ossa] @test_unchecked_ownership_conversion : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
-  unchecked_ownership_conversion %0 : $Builtin.NativeObject, @guaranteed to @owned
+  %1 = unchecked_ownership_conversion %0 : $Builtin.NativeObject, @guaranteed to @owned
+  destroy_value %1 : $Builtin.NativeObject
   return undef : $()
 }
 

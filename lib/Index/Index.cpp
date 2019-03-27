@@ -516,6 +516,12 @@ private:
   }
 
   bool shouldIndex(ValueDecl *D, bool IsRef) const {
+    if (D->isImplicit() && isa<VarDecl>(D) && IsRef) {
+      // Bypass the implicit VarDecls introduced in CaseStmt bodies by using the
+      // canonical VarDecl for these checks instead.
+      D = cast<VarDecl>(D)->getCanonicalVarDecl();
+    }
+
     if (D->isImplicit() && !isa<ConstructorDecl>(D))
       return false;
 
@@ -1151,6 +1157,11 @@ bool IndexSwiftASTWalker::reportImplicitConformance(ValueDecl *witness, ValueDec
 bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
                                           bool IsRef, IndexSymbol &Info) {
   assert(D);
+  if (auto *VD = dyn_cast<VarDecl>(D)) {
+    // Always base the symbol information on the canonical VarDecl
+    D = VD->getCanonicalVarDecl();
+  }
+
   Info.decl = D;
   Info.symInfo = getSymbolInfoForDecl(D);
   if (Info.symInfo.Kind == SymbolKind::Unknown)
