@@ -1010,6 +1010,7 @@ ClangImporter::create(ASTContext &ctx,
 
   // Set up the file manager.
   {
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS;
     if (!ctx.SearchPathOpts.VFSOverlayFiles.empty()) {
       // If the clang instance has overlays it means the user has provided
       // -ivfsoverlay options and swift -vfsoverlay options.  We're going to
@@ -1017,9 +1018,9 @@ ClangImporter::create(ASTContext &ctx,
       if (!instance.getHeaderSearchOpts().VFSOverlayFiles.empty()) {
         ctx.Diags.diagnose(SourceLoc(), diag::clang_vfs_overlay_is_ignored);
       }
-      instance.setVirtualFileSystem(ctx.SourceMgr.getFileSystem());
+      VFS = ctx.SourceMgr.getFileSystem();
     }
-    instance.createFileManager();
+    instance.createFileManager(std::move(VFS));
   }
 
   // Don't stop emitting messages if we ever can't load a module.
