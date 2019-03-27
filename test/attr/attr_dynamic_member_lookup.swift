@@ -601,6 +601,9 @@ struct WithTrailingClosure {
 
 func keypath_with_trailing_closure_subscript(_ ty: inout SubscriptLens<WithTrailingClosure>) {
   _ = ty[0] { 42 } // expected-error {{subscript index of type '() -> Int' in a key path must be Hashable}}
+  _ = ty[0] { 42 } = 0 // FIXME(diagnostics): Once keypath related diagnostics are using fixes, "ambiguous" error would disappear
+  // expected-error@-1 {{subscript index of type '() -> Int' in a key path must be Hashable}}
+  // expected-error@-2 {{type of expression is ambiguous without more context}}
   _ = ty[] { 42 }  // expected-error {{subscript index of type '() -> Int' in a key path must be Hashable}}
   _ = ty[] { 42 } = 0 // expected-error {{subscript index of type '() -> Int' in a key path must be Hashable}}
 }

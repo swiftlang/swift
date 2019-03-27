@@ -3537,6 +3537,10 @@ static bool hasDynamicMemberLookupAttribute(Type type,
   return result;
 }
 
+static bool isKeyPathDynamicMemberLookup(ConstraintLocator *locator) {
+  auto path = locator ? locator->getPath() : None;
+  return !path.empty() && path.back().isKeyPathDynamicMember();
+}
 
 /// Given a ValueMember, UnresolvedValueMember, or TypeMember constraint,
 /// perform a lookup into the specified base type to find a candidate list.
@@ -3568,10 +3572,15 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   // Okay, start building up the result list.
   MemberLookupResult result;
   result.OverallResult = MemberLookupResult::HasResults;
-  
+
   // If we're looking for a subscript, consider key path operations.
+  //
+  // TODO: This logic needs to be refactored to make sure that implicit
+  // keypath result is only introduced when it makes sense e.g. if there
+  // is a single argument with `keypath:` label or `\.` syntax is used.
   if (memberName.isSimpleName() &&
-      memberName.getBaseName().getKind() == DeclBaseName::Kind::Subscript) {
+      memberName.getBaseName().getKind() == DeclBaseName::Kind::Subscript &&
+      !isKeyPathDynamicMemberLookup(memberLocator)) {
     result.ViableCandidates.push_back(
         OverloadChoice(baseTy, OverloadChoiceKind::KeyPathApplication));
   }
@@ -3831,20 +3840,18 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // based dynamic member lookup. Since it's unknown upfront
     // what kind of declaration lookup is going to find, let's
     // double check here that given keypath is appropriate for it.
-    if (memberLocator) {
+    if (isKeyPathDynamicMemberLookup(memberLocator)) {
       auto path = memberLocator->getPath();
-      if (!path.empty() && path.back().isKeyPathDynamicMember()) {
-        auto *keyPath = path.back().getKeyPath();
-        if (auto *storage = dyn_cast<AbstractStorageDecl>(decl)) {
-          // If this is an attempt to access read-only member via
-          // writable key path, let's fail this choice early.
-          if (isReadOnlyKeyPathComponent(storage) &&
-              keyPath == getASTContext().getWritableKeyPathDecl()) {
-            result.addUnviable(
-                candidate,
-                MemberLookupResult::UR_WritableKeyPathOnReadOnlyMember);
-            return;
-          }
+      auto *keyPath = path.back().getKeyPath();
+      if (auto *storage = dyn_cast<AbstractStorageDecl>(decl)) {
+        // If this is an attempt to access read-only member via
+        // writable key path, let's fail this choice early.
+        if (isReadOnlyKeyPathComponent(storage) &&
+            keyPath == getASTContext().getWritableKeyPathDecl()) {
+          result.addUnviable(
+              candidate,
+              MemberLookupResult::UR_WritableKeyPathOnReadOnlyMember);
+          return;
         }
       }
     }
