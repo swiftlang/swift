@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %s -typecheck -verify
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 class DynamicSubscriptClass {
@@ -16,5 +18,11 @@ func ff_implicitObjcSelectorExpr() -> Selector {
 
 func ff_implicitKeyPathExpr() -> String {
     #keyPath(NSArray.count)
+}
+
+class SomeClass {}
+
+func ff_implicitClassMetatypeToAnyObjectExpr() -> AnyObject {
+    SomeClass.self
 }
 
