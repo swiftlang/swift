@@ -1641,11 +1641,13 @@ static void maybeAddAccessorsForPropertyDelegate(VarDecl *var,
     addGetterToStorage(var, ctx);
   }
 
-  if (!var->getSetter() && unwrapVar->isSettable(nullptr)) {
+  bool delegateSetterIsUsable = unwrapVar->isSettable(nullptr) &&
+    unwrapVar->isSetterAccessibleFrom(var->getInnermostDeclContext());
+  if (!var->getSetter() && delegateSetterIsUsable) {
     addSetterToStorage(var, ctx);
   }
 
-  if (unwrapVar->isSettable(nullptr))
+  if (var->getSetter())
     var->overwriteImplInfo(StorageImplInfo::getMutableComputed());
   else
     var->overwriteImplInfo(StorageImplInfo::getImmutableComputed());

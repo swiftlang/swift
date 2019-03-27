@@ -294,6 +294,35 @@ public struct HasUsableFromInlineDelegate<T> {
   // expected-error@-1{{property delegate type referenced from a '@usableFromInline' property must be '@usableFromInline' or public}}
 }
 
+@propertyDelegate
+class Box<Value> {
+  private(set) var value: Value
+
+  init(initialValue: Value) {
+    self.value = initialValue
+  }
+}
+
+struct UseBox {
+  var x by Box = 17
+  var y: Int by Box {
+    set { }
+  }
+}
+
+func testBox(ub: UseBox) {
+  _ = ub.x
+  ub.x = 5 // expected-error{{cannot assign to property: 'x' is a get-only property}}
+
+  _ = ub.y
+  ub.y = 20 // expected-error{{cannot assign to property: 'ub' is a 'let' constant}}
+
+  var mutableUB = ub
+  _ = mutableUB.y
+  mutableUB.y = 20
+  mutableUB = ub
+}
+
 // ---------------------------------------------------------------------------
 // Access control for the delegate instance
 // ---------------------------------------------------------------------------
