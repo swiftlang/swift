@@ -219,5 +219,6 @@ func writebackNesting(x: inout Int,
   // -- set 'b'
   // CHECK: function_ref @$sSi19keypath_applicationE1bSivs
 
+  _ = 0
   x.b[keyPath: y].u[keyPath: z].tt = w
 }

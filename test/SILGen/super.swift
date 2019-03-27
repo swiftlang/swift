@@ -126,6 +126,7 @@ public class ChildToResilientParent : ResilientOutsideParent {
     // CHECK:   [[FUNC:%.*]] = super_method [[METASELF]] : $@thick ChildToResilientParent.Type, #ResilientOutsideParent.classMethod!1 : (ResilientOutsideParent.Type) -> () -> ()
     // CHECK:   apply [[FUNC]]([[UPCAST_CAST_METASELF]])
     // CHECK: unreachable
+    _ = 0
     super.classMethod()
   }
   // CHECK: } // end sil function '$s5super22ChildToResilientParentC11returnsSelfACXDyFZ'
@@ -164,6 +165,7 @@ public class ChildToFixedParent : OutsideParent {
     // CHECK:   [[FUNC:%.*]] = super_method [[SELF]] : $@thick ChildToFixedParent.Type, #OutsideParent.classMethod!1 : (OutsideParent.Type) -> () -> ()
     // CHECK:   apply [[FUNC]]([[SECOND_CAST]])
     // CHECK:   unreachable
+    _ = 0
     super.classMethod()
   }
   // CHECK: } // end sil function '$s5super18ChildToFixedParentC11returnsSelfACXDyFZ'
