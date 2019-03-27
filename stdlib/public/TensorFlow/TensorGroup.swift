@@ -44,6 +44,14 @@ public protocol TensorGroup : TensorArrayProtocol {
   /// The types of the tensor stored properties in this type.
   static var _typeList: [TensorDataType] { get }
 
+  /// An array of `nil`s with the same number of elements as `_outputTypeList`.
+  /// The `nil` represents unknown shape.
+  // TODO: This is a protocol requirement so that conformances can provide
+  // custom const-evaluable implementations. When the const-evaluator is
+  // powerful enough to evaluate the default implementation, remove this
+  // requirement.
+  static var _unknownShapeList: [TensorShape?] { get }
+
   /// Initializes a value of this type, taking ownership of the
   /// `_tensorHandleCount` tensors starting at address `tensorHandles`.
   init(_owning tensorHandles: UnsafePointer<CTensorHandle>?)
