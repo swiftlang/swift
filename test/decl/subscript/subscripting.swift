@@ -412,7 +412,7 @@ class Foo {
     }
     
     subscript(key: String) -> String { // expected-error {{invalid redeclaration of 'subscript(_:)'}}
-        get { a } // expected-error {{use of unresolved identifier 'a'}}
+        get { _ = 0; a } // expected-error {{use of unresolved identifier 'a'}}
         set { b } // expected-error {{use of unresolved identifier 'b'}}
     }
 }
