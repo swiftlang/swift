@@ -1305,8 +1305,10 @@ ConstraintSystem::filterDisjunction(
   for (unsigned constraintIdx : indices(disjunction->getNestedConstraints())) {
     auto constraint = disjunction->getNestedConstraints()[constraintIdx];
 
-    // Skip already-disabled constraints.
-    if (constraint->isDisabled())
+    // Skip already-disabled constraints. Let's treat disabled
+    // choices which have a fix as "enabled" ones here, so we can
+    // potentially infer some type information from them.
+    if (constraint->isDisabled() && !constraint->getFix())
       continue;
 
     if (pred(constraint)) {
@@ -1650,64 +1652,67 @@ bool ConstraintSystem::haveTypeInformationForAllArguments(
 }
 
 Constraint *ConstraintSystem::getUnboundBindOverloadDisjunction(
-                                                  TypeVariableType *tyvar) {
+    TypeVariableType *tyvar, unsigned *numOptionalUnwraps) {
+  if (numOptionalUnwraps)
+    *numOptionalUnwraps = 0;
+
   auto *rep = getRepresentative(tyvar);
   assert(!getFixedType(rep));
 
-  llvm::SetVector<Constraint *> disjunctions;
-  getConstraintGraph().gatherConstraints(
-      rep, disjunctions, ConstraintGraph::GatheringKind::EquivalenceClass,
-      [this, rep](Constraint *match) {
-        if (match->getKind() != ConstraintKind::Disjunction ||
-            match->getNestedConstraints().front()->getKind() !=
-                   ConstraintKind::BindOverload)
-          return false;
+  SmallPtrSet<TypeVariableType *, 4> visitedVars;
+  while (visitedVars.insert(rep).second) {
+    // Look for a disjunction that binds this type variable to an overload set.
+    TypeVariableType *optionalObjectTypeVar = nullptr;
+    llvm::SetVector<Constraint *> disjunctions;
+    getConstraintGraph().gatherConstraints(
+        rep, disjunctions, ConstraintGraph::GatheringKind::EquivalenceClass,
+        [this, rep, &optionalObjectTypeVar](Constraint *match) {
+          // If we have an "optional object of" constraint where the right-hand
+          // side is this type variable, we may need to follow that type
+          // variable to find the disjunction.
+          if (match->getKind() == ConstraintKind::OptionalObject) {
+            auto rhsTypeVar = match->getSecondType()->getAs<TypeVariableType>();
+            if (rhsTypeVar && getRepresentative(rhsTypeVar) == rep) {
+              optionalObjectTypeVar =
+                  match->getFirstType()->getAs<TypeVariableType>();
+            }
+            return false;
+          }
 
-        auto lhsTypeVar =
-            match->getNestedConstraints().front()->getFirstType()
-              ->getAs<TypeVariableType>();
-        if (!lhsTypeVar)
-          return false;
+          // We only care about disjunctions of overload bindings.
+          if (match->getKind() != ConstraintKind::Disjunction ||
+              match->getNestedConstraints().front()->getKind() !=
+                     ConstraintKind::BindOverload)
+            return false;
 
-        return getRepresentative(lhsTypeVar) == rep;
-      });
+          auto lhsTypeVar =
+              match->getNestedConstraints().front()->getFirstType()
+                ->getAs<TypeVariableType>();
+          if (!lhsTypeVar)
+            return false;
 
-  if (disjunctions.empty())
+          return getRepresentative(lhsTypeVar) == rep;
+        });
+
+    // If we found a disjunction, return it.
+    if (!disjunctions.empty())
+      return disjunctions[0];
+
+    // If we found an "optional object of" constraint, follow it.
+    if (optionalObjectTypeVar && !getFixedType(optionalObjectTypeVar)) {
+      if (numOptionalUnwraps)
+        ++*numOptionalUnwraps;
+
+      tyvar = optionalObjectTypeVar;
+      rep = getRepresentative(tyvar);
+      continue;
+    }
+
+    // There is nowhere else to look.
     return nullptr;
-
-  return disjunctions[0];
-}
-
-/// solely resolved by an overload set.
-SmallVector<OverloadChoice, 2> ConstraintSystem::getUnboundBindOverloads(
-                                                     TypeVariableType *tyvar) {
-  // Always work on the representation.
-  tyvar = getRepresentative(tyvar);
-
-  SmallVector<OverloadChoice, 2> choices;
-
-  auto disjunction = getUnboundBindOverloadDisjunction(tyvar);
-  if (!disjunction) return choices;
-
-  for (auto constraint : disjunction->getNestedConstraints()) {
-    // We must have bind-overload constraints.
-    if (constraint->getKind() != ConstraintKind::BindOverload) {
-      choices.clear();
-      return choices;
-    }
-
-    // We must be binding the type variable (or a type variable equivalent to
-    // it).
-    auto boundTypeVar = constraint->getFirstType()->getAs<TypeVariableType>();
-    if (!boundTypeVar || getRepresentative(boundTypeVar) != tyvar) {
-      choices.clear();
-      return choices;
-    }
-
-    choices.push_back(constraint->getOverloadChoice());
   }
 
-  return choices;
+  return nullptr;
 }
 
 // Find a disjunction associated with an ApplicableFunction constraint
@@ -1941,7 +1946,7 @@ static Constraint *tryOptimizeGenericDisjunction(
       return type->isAny();
     });
 
-    // If function declaration references `Any` or `Any?` type
+    // If function declaration references `Any` or an optional type,
     // let's not attempt it, because it's unclear
     // without solving which overload is going to be better.
     return !hasAnyOrOptional;

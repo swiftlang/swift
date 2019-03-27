@@ -22,7 +22,7 @@
 
 // Then we do it one more time with resilience enabled.
 
-// RUN: %target-swift-frontend -emit-module -DSUB -o %t -enable-testing -enable-resilience %s -module-name testability_client -I %t
+// RUN: %target-swift-frontend -emit-module -DSUB -o %t -enable-testing -enable-library-evolution %s -module-name testability_client -I %t
 // RUN: %target-swift-frontend -emit-sil -DMAIN %s -module-name main -I %t > /dev/null
 // RUN: %target-swift-frontend -emit-sil -DMAIN -DTESTABLE %s -module-name main -I %t > /dev/null
 // RUN: %target-swift-frontend -emit-sil -DMAIN -DDEBUG -disable-access-control %s -module-name main -I %t > /dev/null

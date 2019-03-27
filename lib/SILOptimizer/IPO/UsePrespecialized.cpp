@@ -90,7 +90,7 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     if (Subs.hasArchetypes())
       continue;
 
-    ReabstractionInfo ReInfo(AI, ReferencedF, Subs);
+    ReabstractionInfo ReInfo(AI, ReferencedF, Subs, IsNotSerialized);
 
     if (!ReInfo.canBeSpecialized())
       continue;

@@ -30,7 +30,6 @@ set(SWIFTLIB_ESSENTIAL
   ASCII.swift
   Assert.swift
   AssertCommon.swift
-  AtomicInt.swift.gyb
   BidirectionalCollection.swift
   Bitset.swift
   Bool.swift
@@ -38,10 +37,8 @@ set(SWIFTLIB_ESSENTIAL
   BridgeStorage.swift
   BridgingBuffer.swift
   Builtin.swift
-  BuiltinMath.swift.gyb
   Character.swift
   CocoaArray.swift
-  Codable.swift.gyb
   Collection.swift
   CollectionAlgorithms.swift
   Comparable.swift
@@ -65,12 +62,9 @@ set(SWIFTLIB_ESSENTIAL
   Equatable.swift
   ErrorType.swift
   Filter.swift
-  FixedArray.swift.gyb
   FlatMap.swift
   Flatten.swift
   FloatingPoint.swift
-  FloatingPointParsing.swift.gyb
-  FloatingPointTypes.swift.gyb
   Hashable.swift
   # WORKAROUND: This file name is not sorted alphabetically in the list because
   # if we do so, the compiler crashes.
@@ -84,7 +78,6 @@ set(SWIFTLIB_ESSENTIAL
   InputStream.swift
   IntegerParsing.swift
   Integers.swift
-  IntegerTypes.swift.gyb
   Join.swift
   KeyPath.swift
   KeyValuePairs.swift
@@ -95,7 +88,6 @@ set(SWIFTLIB_ESSENTIAL
   Map.swift
   MemoryLayout.swift
   UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
-  Mirrors.swift.gyb
   Misc.swift
   MutableCollection.swift
   NativeDictionary.swift
@@ -118,7 +110,6 @@ set(SWIFTLIB_ESSENTIAL
   REPL.swift
   Result.swift
   Reverse.swift
-  Runtime.swift.gyb
   RuntimeFunctionCounters.swift
   SipHash.swift
   Sequence.swift
@@ -170,7 +161,6 @@ set(SWIFTLIB_ESSENTIAL
   SwiftNativeNSArray.swift
   ThreadLocalStorage.swift
   UIntBuffer.swift
-  UnavailableStringAPIs.swift.gyb
   UnicodeEncoding.swift
   UnicodeHelpers.swift
   UnicodeParser.swift
@@ -179,8 +169,6 @@ set(SWIFTLIB_ESSENTIAL
   Unmanaged.swift
   UnmanagedOpaqueString.swift
   UnmanagedString.swift
-  UnsafeBufferPointer.swift.gyb
-  UnsafeRawBufferPointer.swift.gyb
   UnsafePointer.swift
   UnsafeRawPointer.swift
   UTFEncoding.swift
@@ -191,7 +179,21 @@ set(SWIFTLIB_ESSENTIAL
   StringGraphemeBreaking.swift # ORDER DEPENDENCY: Must follow UTF16.swift
   ValidUTF8Buffer.swift
   WriteBackMutableSlice.swift
-  MigrationSupport.swift
+  MigrationSupport.swift)
+
+set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
+  AtomicInt.swift.gyb
+  BuiltinMath.swift.gyb
+  Codable.swift.gyb
+  FixedArray.swift.gyb
+  FloatingPointParsing.swift.gyb
+  FloatingPointTypes.swift.gyb
+  IntegerTypes.swift.gyb
+  Mirrors.swift.gyb
+  Runtime.swift.gyb
+  UnavailableStringAPIs.swift.gyb
+  UnsafeBufferPointer.swift.gyb
+  UnsafeRawBufferPointer.swift.gyb
   )
 
 # The complete list of sources in the core standard library.  Includes
@@ -203,17 +205,20 @@ set(SWIFTLIB_SOURCES
   CollectionDifference.swift
   CollectionOfOne.swift
   Diffing.swift
-  ExistentialCollection.swift.gyb
   Mirror.swift
   PlaygroundDisplay.swift
   CommandLine.swift
   SliceBuffer.swift
   SIMDVector.swift
-  SIMDVectorTypes.swift.gyb
-  Tuple.swift.gyb
   UnfoldSequence.swift
   VarArgs.swift
-  Zip.swift
+  Zip.swift)
+
+set(SWIFTLIB_GYB_SOURCES
+    ${SWIFTLIB_ESSENTIAL_GYB_SOURCES}
+    ExistentialCollection.swift.gyb
+    SIMDVectorTypes.swift.gyb
+    Tuple.swift.gyb
   )
 set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)
 set(swift_core_link_flags "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")
@@ -283,13 +288,17 @@ endif()
 
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
   add_swift_target_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
-      ${SWIFTLIB_ESSENTIAL})
+      ${SWIFTLIB_ESSENTIAL}
+      GYB_SOURCES
+        ${SWIFTLIB_ESSENTIAL_GYB_SOURCES})
   target_link_libraries(swift_stdlib_essential ${RUNTIME_DEPENDENCY})
 endif()
 
 add_swift_target_library(swiftCore
                   ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
                     ${SWIFTLIB_SOURCES}
+                  GYB_SOURCES
+                    ${SWIFTLIB_GYB_SOURCES}
                   # The copy_shim_headers target dependency is required to let the
                   # build system know that there's a rule to produce the shims
                   # directory, but is not sufficient to cause the object file to be rebuilt

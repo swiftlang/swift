@@ -888,12 +888,6 @@ public:
   /// into the ASTContext.
   ModuleDecl *tryLoadFoundationModule();
 
-  /// Returns the "SIMD" module, if it can be loaded.
-  ///
-  /// After this has been called, the SIMD module will or won't be loaded
-  /// into the ASTContext.
-  ModuleDecl *tryLoadSIMDModule();
-
   /// Retrieves the Swift wrapper for the given Clang module, creating
   /// it if necessary.
   ClangModuleUnit *getWrapperForModule(const clang::Module *underlying);
