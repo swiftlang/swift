@@ -646,6 +646,16 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       return nullptr;
     }
 
+    return E;
+  }
+
+  Expr *visitArgumentShuffleExpr(ArgumentShuffleExpr *E) {
+    if (Expr *E2 = doIt(E->getSubExpr())) {
+      E->setSubExpr(E2);
+    } else {
+      return nullptr;
+    }
+
     for (auto &defaultArg : E->getCallerDefaultArgs()) {
       if (Expr *newDefaultArg = doIt(defaultArg))
         defaultArg = newDefaultArg;

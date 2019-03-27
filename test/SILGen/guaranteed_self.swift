@@ -451,20 +451,21 @@ class LetFieldClass {
   // CHECK-LABEL: sil hidden [ossa] @$s15guaranteed_self13LetFieldClassC10letkMethod{{[_0-9a-zA-Z]*}}F : $@convention(method) (@guaranteed LetFieldClass) -> () {
   // CHECK: bb0([[CLS:%.*]] : @guaranteed $LetFieldClass):
   // CHECK: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
-  // CHECK-NEXT: [[KRAKEN:%.*]] = load_borrow [[KRAKEN_ADDR]]
+  // CHECK-NEXT: [[KRAKEN:%.*]] = load [copy] [[KRAKEN_ADDR]]
   // CHECK-NEXT: [[KRAKEN_METH:%.*]] = class_method [[KRAKEN]]
   // CHECK-NEXT: apply [[KRAKEN_METH]]([[KRAKEN]])
   // CHECK: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
   // CHECK-NEXT: [[KRAKEN:%.*]] = load [copy] [[KRAKEN_ADDR]]
-  // CHECK:      [[BORROWED_KRAKEN:%.*]] = begin_borrow [[KRAKEN]]
+  // CHECK:      [[REBORROWED_KRAKEN:%.*]] = begin_borrow [[KRAKEN]]
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @$s15guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@guaranteed Kraken) -> ()
-  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[BORROWED_KRAKEN]])
-  // CHECK-NEXT: end_borrow [[BORROWED_KRAKEN]]
+  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[REBORROWED_KRAKEN]])
+  // CHECK-NEXT: end_borrow [[REBORROWED_KRAKEN]]
+  // CHECK-NEXT: destroy_value [[KRAKEN]]
   // CHECK-NEXT: [[KRAKEN_BOX:%.*]] = alloc_box ${ var Kraken }
   // CHECK-NEXT: [[PB:%.*]] = project_box [[KRAKEN_BOX]]
   // CHECK-NEXT: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
-  // CHECK-NEXT: [[KRAKEN2:%.*]] = load [copy] [[KRAKEN_ADDR]]
-  // CHECK-NEXT: store [[KRAKEN2]] to [init] [[PB]]
+  // CHECK-NEXT: [[KRAKEN:%.*]] = load [copy] [[KRAKEN_ADDR]]
+  // CHECK-NEXT: store [[KRAKEN]] to [init] [[PB]]
   // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*Kraken
   // CHECK-NEXT: [[KRAKEN_COPY:%.*]] = load [copy] [[READ]]
   // CHECK-NEXT: end_access [[READ]] : $*Kraken
@@ -472,15 +473,23 @@ class LetFieldClass {
   // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN_COPY]])
   // CHECK-NEXT: destroy_value [[KRAKEN_COPY]]
   // CHECK-NEXT: destroy_value [[KRAKEN_BOX]]
-  // CHECK-NEXT: destroy_value [[KRAKEN]]
   // CHECK-NEXT: tuple
   // CHECK-NEXT: return
+  // CHECK: } // end sil function
   func letkMethod() {
-    letk.enrage()
-    let ll = letk
-    destroyShip(ll)
-    var lv = letk
-    destroyShip(lv)
+    do {
+      letk.enrage()
+    }
+
+    do {
+      let ll = letk
+      destroyShip(ll)
+    }
+
+    do {
+      var lv = letk
+      destroyShip(lv)
+    }
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s15guaranteed_self13LetFieldClassC10varkMethod{{[_0-9a-zA-Z]*}}F : $@convention(method) (@guaranteed LetFieldClass) -> () {
@@ -534,6 +543,8 @@ class ClassIntTreeNode {
   // CHECK-NOT: destroy_value
   // CHECK: copy_value
   // CHECK-NOT: copy_value
+  // CHECK: destroy_value
+  // CHECK: destroy_value
   // CHECK-NOT: destroy_value
   // CHECK: return
   func find(_ v : Int) -> ClassIntTreeNode {

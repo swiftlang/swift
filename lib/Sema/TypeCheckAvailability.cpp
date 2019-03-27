@@ -1738,7 +1738,7 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     return labelStr.empty() ? Identifier() : ctx.getIdentifier(labelStr);
   });
 
-  if (auto args = dyn_cast<TupleShuffleExpr>(argExpr)) {
+  if (auto args = dyn_cast<ArgumentShuffleExpr>(argExpr)) {
     argExpr = args->getSubExpr();
 
     // Coerce the `argumentLabelIDs` to the user supplied arguments.
@@ -1758,12 +1758,12 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     auto I = argumentLabelIDs.begin();
     for (auto shuffleIdx : elementMap) {
       switch (shuffleIdx) {
-      case TupleShuffleExpr::DefaultInitialize:
-      case TupleShuffleExpr::CallerDefaultInitialize:
+      case ArgumentShuffleExpr::DefaultInitialize:
+      case ArgumentShuffleExpr::CallerDefaultInitialize:
         // Defaulted: remove param label of it.
         I = argumentLabelIDs.erase(I);
         break;
-      case TupleShuffleExpr::Variadic: {
+      case ArgumentShuffleExpr::Variadic: {
         auto variadicArgsNum = args->getVariadicArgs().size();
         if (variadicArgsNum == 0) {
           // No arguments: Remove param label of it.

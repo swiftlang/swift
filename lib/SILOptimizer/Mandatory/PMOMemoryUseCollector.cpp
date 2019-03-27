@@ -95,7 +95,7 @@ static void scalarizeLoadBorrow(LoadBorrowInst *lbi,
   SmallVector<SILValue, 4> elementTmps;
 
   for (unsigned i : indices(elementAddrs)) {
-    if (elementAddrs[i]->getType().isTrivial(lbi->getModule())) {
+    if (elementAddrs[i]->getType().isTrivial(*lbi->getFunction())) {
       elementTmps.push_back(b.createLoad(lbi->getLoc(), elementAddrs[i],
                                          LoadOwnershipQualifier::Trivial));
       continue;
@@ -297,7 +297,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
           // initializations, unless they have trivial type (which we classify
           // as InitOrAssign).
           case StoreOwnershipQualifier::Unqualified:
-            if (PointeeType.isTrivial(User->getModule()))
+            if (PointeeType.isTrivial(*User->getFunction()))
               return PMOUseKind::InitOrAssign;
             return PMOUseKind::Initialization;
 
@@ -333,7 +333,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       auto Kind = ([&]() -> PMOUseKind {
         if (UI->getOperandNumber() == CopyAddrInst::Src)
           return PMOUseKind::Load;
-        if (PointeeType.isTrivial(CAI->getModule()))
+        if (PointeeType.isTrivial(*CAI->getFunction()))
           return PMOUseKind::InitOrAssign;
         if (CAI->isInitializationOfDest())
           return PMOUseKind::Initialization;

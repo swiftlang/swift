@@ -158,6 +158,10 @@ public:
   /// module appears to not be a public module.
   Optional<bool> SerializeOptionsForDebugging;
 
+  /// When true, check if all required SwiftOnoneSupport symbols are present in
+  /// the module.
+  bool CheckOnoneSupportCompleteness = false;
+
   /// If set, inserts instrumentation useful for testing the debugger.
   bool DebuggerTestingTransform = false;
 
@@ -214,14 +218,11 @@ public:
   /// Enables the "fully resilient" resilience strategy.
   ///
   /// \see ResilienceStrategy::Resilient
-  bool EnableResilience = false;
+  bool EnableLibraryEvolution = false;
 
   /// Indicates that the frontend should emit "verbose" SIL
   /// (if asked to emit SIL).
   bool EmitVerboseSIL = false;
-
-  /// If set, find and import parseable modules from .swiftinterface files.
-  bool EnableParseableModuleInterface = false;
 
   /// If set, this module is part of a mixed Objective-C/Swift framework, and
   /// the Objective-C half should implicitly be visible to the Swift sources.
@@ -266,6 +267,10 @@ public:
   /// Indicates whether the dependency tracker should track system
   /// dependencies as well.
   bool TrackSystemDeps = false;
+
+  /// Should we serialize the hashes of dependencies (vs. the modification
+  /// times) when compiling a parseable module interface?
+  bool SerializeParseableModuleInterfaceDependencyHashes = false;
 
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {

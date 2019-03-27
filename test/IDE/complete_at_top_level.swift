@@ -263,6 +263,7 @@ func resyncParser7() {}
 var topLevelVar2 = FooStruct#^TOP_LEVEL_VAR_INIT_2^#
 // TOP_LEVEL_VAR_INIT_2: Begin completions
 // TOP_LEVEL_VAR_INIT_2-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(self): FooStruct#})[#(Int) -> Void#]{{; name=.+$}}
+// TOP_LEVEL_VAR_INIT_2-NEXT: Decl[Constructor]/CurrNominal: ()[#FooStruct#]{{; name=.+$}}
 // TOP_LEVEL_VAR_INIT_2-NEXT: Decl[Constructor]/CurrNominal: ({#instanceVar: Int#})[#FooStruct#]{{; name=.+$}}
 // TOP_LEVEL_VAR_INIT_2-NEXT: Decl[Constructor]/CurrNominal: ()[#FooStruct#]{{; name=.+$}}
 // TOP_LEVEL_VAR_INIT_2-NEXT: Keyword[self]/CurrNominal: .self[#FooStruct.Type#]; name=self
@@ -298,7 +299,7 @@ _ = {
 }()
 // TOP_LEVEL_CLOSURE_1: Begin completions
 // TOP_LEVEL_CLOSURE_1-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{; name=.+$}}
-// TOP_LEVEL_CLOSURE_1-DAG: Decl[FreeFunction]/CurrModule: fooFunc1()[#Void#]{{; name=.+$}}
+// TOP_LEVEL_CLOSURE_1-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Identical]: fooFunc1()[#Void#]{{; name=.+$}}
 // TOP_LEVEL_CLOSURE_1-DAG: Decl[GlobalVar]/Local: fooObject[#FooStruct#]{{; name=.+$}}
 // TOP_LEVEL_CLOSURE_1: End completions
 

@@ -185,6 +185,12 @@ struct PrintOptions {
   /// type might be ambiguous.
   bool FullyQualifiedTypesIfAmbiguous = false;
 
+  /// If true, printed module names will use the "exported" name, which may be
+  /// different from the regular name.
+  ///
+  /// \see FileUnit::getExportedModuleName
+  bool UseExportedModuleNames = false;
+
   /// Print Swift.Array and Swift.Optional with sugared syntax
   /// ([] and ?), even if there are no sugar type nodes.
   bool SynthesizeSugarOnTypes = false;
@@ -453,6 +459,7 @@ struct PrintOptions {
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::Always;
     result.PrintDocumentationComments = true;
+    result.SkipUnderscoredKeywords = true;
     return result;
   }
 
@@ -537,6 +544,7 @@ struct PrintOptions {
   /// Print in the style of quick help declaration.
   static PrintOptions printQuickHelpDeclaration() {
     PrintOptions PO;
+    PO.SkipUnderscoredKeywords = true;
     PO.EnumRawValues = true;
     PO.PrintImplicitAttrs = false;
     PO.PrintFunctionRepresentationAttrs = false;

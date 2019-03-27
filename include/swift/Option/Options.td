@@ -305,6 +305,10 @@ def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Specifies the Clang module cache path">;
 
+def enable_library_evolution : Flag<["-"], "enable-library-evolution">,
+  Flags<[FrontendOption, ParseableInterfaceOption]>,
+  HelpText<"Build the module to allow binary-compatible library evolution">;
+
 def module_name : Separate<["-"], "module-name">,
   Flags<[FrontendOption, ParseableInterfaceOption]>,
   HelpText<"Name of the module to build">;
@@ -342,11 +346,6 @@ def emit_parseable_module_interface_path :
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
          ArgumentIsPath]>,
   MetaVarName<"<path>">, HelpText<"Output parseable interface file to <path>">;
-def enable_parseable_module_interface :
-  Flag<["-"], "enable-parseable-module-interface">,
-  Flags<[FrontendOption, HelpHidden, NoInteractiveOption,
-         DoesNotAffectIncrementalBuild]>,
-  HelpText<"Accept parseable .swiftinterface form of modules">;
 
 def emit_objc_header : Flag<["-"], "emit-objc-header">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
@@ -856,7 +855,8 @@ def index_ignore_system_modules : Flag<["-"], "index-ignore-system-modules">,
   HelpText<"Avoid indexing system modules">;
 
 def enforce_exclusivity_EQ : Joined<["-"], "enforce-exclusivity=">,
-  Flags<[FrontendOption]>, MetaVarName<"<enforcement>">,
+  Flags<[FrontendOption, ParseableInterfaceOption]>,
+  MetaVarName<"<enforcement>">,
   HelpText<"Enforce law of exclusivity">;
 
 def working_directory : Separate<["-"], "working-directory">,

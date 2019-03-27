@@ -265,8 +265,11 @@ void SILDeserializer::setLocalValue(ValueBase *Value, ValueID Id) {
 
 SILValue SILDeserializer::getLocalValue(ValueID Id,
                                         SILType Type) {
+  // The first two IDs are special undefined values.
   if (Id == 0)
-    return SILUndef::get(Type, &SILMod);
+    return SILUndef::get(Type, SILMod, ValueOwnershipKind::Any);
+  else if (Id == 1)
+    return SILUndef::get(Type, SILMod, ValueOwnershipKind::Owned);
 
   // Check to see if this is already defined.
   ValueBase *Entry = LocalValues.lookup(Id);
@@ -680,7 +683,9 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   BasicBlockID = 0;
   BlocksByID.clear();
   UndefinedBlocks.clear();
-  LastValueID = 0;
+
+  // The first two IDs are reserved for SILUndef.
+  LastValueID = 1;
   LocalValues.clear();
   ForwardLocalValues.clear();
 

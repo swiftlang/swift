@@ -25,14 +25,14 @@ class SourceLoader : public ModuleLoader {
 private:
   ASTContext &Ctx;
   bool SkipBodies;
-  bool EnableResilience;
+  bool EnableLibraryEvolution;
 
   explicit SourceLoader(ASTContext &ctx,
                         bool skipBodies,
                         bool enableResilience,
                         DependencyTracker *tracker)
     : ModuleLoader(tracker), Ctx(ctx),
-      SkipBodies(skipBodies), EnableResilience(enableResilience) {}
+      SkipBodies(skipBodies), EnableLibraryEvolution(enableResilience) {}
 
 public:
   static std::unique_ptr<SourceLoader>

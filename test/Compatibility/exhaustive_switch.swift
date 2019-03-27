@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-resilience
+// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-library-evolution
 
 func foo(a: Int?, b: Int?) -> Int {
   switch (a, b) {
