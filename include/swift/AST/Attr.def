@@ -309,7 +309,7 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(indirect, Indirect, DeclModifier |
   OnEnum | OnEnumElement,
   60)
 SIMPLE_DECL_ATTR(warn_unqualified_access, WarnUnqualifiedAccess,
-  OnFunc | OnAccessor | OnCall | /*OnVar |*/
+  OnFunc | OnAccessor | /*OnVar |*/
   LongAttribute,
   61)
 SIMPLE_DECL_ATTR(_show_in_interface, ShowInInterface,

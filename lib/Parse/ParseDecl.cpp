@@ -5930,7 +5930,7 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       return Status;
     }
 
-    if (Tok.is(tok::identifier)) {
+    if (Tok.is(tok::identifier) || Tok.is(tok::kw_call)) {
       Status |= parseIdentifierDeclName(*this, Name, NameLoc, "enum 'case'",
                                         tok::l_paren, tok::kw_case, tok::colon,
                                         tok::r_brace);

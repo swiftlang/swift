@@ -6,6 +6,21 @@ struct SimpleCallable {
   }
 }
 
+// Test source compatibility with existing usages of "call" as an identifier.
+
+struct CallFuncMember {
+  func call() {}
+}
+struct CallVarMember {
+  var call: Int
+}
+enum CallCase {
+  case call(call: Int)
+}
+protocol CallRequirement {
+  func call()
+}
+
 struct NoRedefinitionErrors {
   call(_ x: Int) -> Int {
     return x

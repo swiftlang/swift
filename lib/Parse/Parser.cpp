@@ -864,7 +864,7 @@ bool Parser::parseSpecificIdentifier(StringRef expected, SourceLoc &loc,
 /// its name in Result.  Otherwise, emit an error and return true.
 bool Parser::parseAnyIdentifier(Identifier &Result, SourceLoc &Loc,
                                 const Diagnostic &D) {
-  if (Tok.is(tok::identifier) || Tok.isAnyOperator()) {
+  if (Tok.is(tok::identifier) || Tok.isAnyOperator() || Tok.is(tok::kw_call)) {
     Result = Context.getIdentifier(Tok.getText());
     Loc = Tok.getLoc();
     consumeToken();
