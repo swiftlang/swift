@@ -2315,16 +2315,21 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
       exprType->isEqual(contextualType)) {
     return false;
   }
-  
+
   // If we're trying to convert something of type "() -> T" to T, then we
   // probably meant to call the value.
   if (auto srcFT = exprType->getAs<AnyFunctionType>()) {
     if (srcFT->getParams().empty() &&
         !isUnresolvedOrTypeVarType(srcFT->getResult()) &&
         CS.TC.isConvertibleTo(srcFT->getResult(), contextualType, CS.DC)) {
-      diagnose(expr->getLoc(), diag::missing_nullary_call, srcFT->getResult())
-        .highlight(expr->getSourceRange())
-        .fixItInsertAfter(expr->getEndLoc(), "()");
+
+      auto locator =
+          CS.getConstraintLocator(expr, ConstraintLocator::ContextualType);
+      ContextualFailure failure =
+          ContextualFailure(nullptr, CS, srcFT, contextualType, locator);
+      auto diagnosed = failure.diagnoseAsError();
+      assert(diagnosed && "Failed to produce contextual failure diagnostic");
+      (void)diagnosed;
       return true;
     }
   }

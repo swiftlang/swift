@@ -681,6 +681,10 @@ private:
     }
     return type;
   }
+
+  /// Try to add a fix-it to convert a stored property into a computed
+  /// property
+  void tryComputedPropertyFixIts(Expr *expr) const;
 };
 
 /// Diagnose situations when @autoclosure argument is passed to @autoclosure
