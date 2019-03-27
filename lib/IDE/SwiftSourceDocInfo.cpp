@@ -79,11 +79,19 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
   if (!D->hasName())
     return false;
 
-  if (Loc == LocToResolve) {
-    CursorInfo.setValueRef(D, CtorTyRef, ExtTyRef, IsRef, Ty, ContainerType);
-    return true;
+  if (Loc != LocToResolve)
+    return false;
+
+  if (auto *VD = dyn_cast<VarDecl>(D)) {
+    // Handle references to the implicitly generated vars in case statements
+    // matching multiple patterns
+    if (VD->isImplicit()) {
+      if (auto * Parent = VD->getParentVarDecl())
+        D = Parent;
+    }
   }
-  return false;
+  CursorInfo.setValueRef(D, CtorTyRef, ExtTyRef, IsRef, Ty, ContainerType);
+  return true;
 }
 
 bool CursorInfoResolver::tryResolve(ModuleEntity Mod, SourceLoc Loc) {

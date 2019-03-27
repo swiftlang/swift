@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -enable-sil-ownership -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

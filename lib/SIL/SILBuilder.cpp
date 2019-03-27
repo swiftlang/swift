@@ -124,7 +124,7 @@ SILBuilder::createClassifyBridgeObject(SILLocation Loc, SILValue value) {
 SingleValueInstruction *
 SILBuilder::createUncheckedBitCast(SILLocation Loc, SILValue Op, SILType Ty) {
   assert(isLoadableOrOpaque(Ty));
-  if (Ty.isTrivial(getModule()))
+  if (Ty.isTrivial(getFunction()))
     return insert(UncheckedTrivialBitCastInst::create(
         getSILDebugLocation(Loc), Op, Ty, getFunction(), C.OpenedArchetypes));
 
@@ -299,7 +299,7 @@ static bool couldReduceStrongRefcount(SILInstruction *Inst) {
   // to safely ignore one of those.
   if (auto AI = dyn_cast<AssignInst>(Inst)) {
     auto StoredType = AI->getOperand(0)->getType();
-    if (StoredType.isTrivial(Inst->getModule()) ||
+    if (StoredType.isTrivial(*Inst->getFunction()) ||
         StoredType.is<ReferenceStorageType>())
       return false;
   }
@@ -310,7 +310,7 @@ static bool couldReduceStrongRefcount(SILInstruction *Inst) {
       return false;
 
     SILType StoredType = CAI->getOperand(0)->getType().getObjectType();
-    if (StoredType.isTrivial(Inst->getModule()) ||
+    if (StoredType.isTrivial(*Inst->getFunction()) ||
         StoredType.is<ReferenceStorageType>())
       return false;
   }

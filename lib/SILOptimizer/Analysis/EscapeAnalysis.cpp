@@ -1183,9 +1183,9 @@ bool EscapeAnalysis::buildConnectionGraphForDestructor(
   // It should be a locally allocated object.
   if (!pointsToLocalObject(V))
     return false;
-  SILModule &M = I->getFunction()->getModule();
+
   // Determine the exact type of the value.
-  auto Ty = getExactDynamicTypeOfUnderlyingObject(V, M, nullptr);
+  auto Ty = getExactDynamicTypeOfUnderlyingObject(V, nullptr);
   if (!Ty) {
     // The object is local, but we cannot determine its type.
     return false;
@@ -1202,7 +1202,7 @@ bool EscapeAnalysis::buildConnectionGraphForDestructor(
   auto Destructor = Class->getDestructor();
   SILDeclRef DeallocRef(Destructor, SILDeclRef::Kind::Deallocator);
   // Find a SILFunction for destructor.
-  SILFunction *Dealloc = M.lookUpFunction(DeallocRef);
+  SILFunction *Dealloc = M->lookUpFunction(DeallocRef);
   if (!Dealloc)
     return false;
   CalleeList Callees(Dealloc);

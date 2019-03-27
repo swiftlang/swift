@@ -430,7 +430,9 @@ StepResult DisjunctionStep::resume(bool prevFailed) {
 bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   auto &ctx = CS.getASTContext();
 
-  if (choice.isDisabled()) {
+  bool attemptFixes = CS.shouldAttemptFixes();
+  // Enable "fixed" overload choices in "diagnostic" mode.
+  if (!(attemptFixes && choice.hasFix()) && choice.isDisabled()) {
     if (isDebugMode()) {
       auto &log = getDebugLogger();
       log << "(skipping ";
@@ -442,7 +444,7 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   }
 
   // Skip unavailable overloads unless solver is in the "diagnostic" mode.
-  if (!CS.shouldAttemptFixes() && choice.isUnavailable())
+  if (!attemptFixes && choice.isUnavailable())
     return true;
 
   if (ctx.LangOpts.DisableConstraintSolverPerformanceHacks)

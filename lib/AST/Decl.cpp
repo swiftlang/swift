@@ -324,6 +324,16 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
   return OS << "'" << keywordOf(RO) << "'";
 }
 
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
+                                     SelfAccessKind SAK) {
+  switch (SAK) {
+  case SelfAccessKind::NonMutating: return OS << "'nonmutating'";
+  case SelfAccessKind::Mutating: return OS << "'mutating'";
+  case SelfAccessKind::__Consuming: return OS << "'__consuming'";
+  }
+  llvm_unreachable("Unknown SelfAccessKind");
+}
+
 DeclContext *Decl::getInnermostDeclContext() const {
   if (auto func = dyn_cast<AbstractFunctionDecl>(this))
     return const_cast<AbstractFunctionDecl*>(func);
@@ -520,8 +530,10 @@ bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
   }
 
   if (auto ImportD = dyn_cast<ImportDecl>(D)) {
-    if (ImportD->getModule()->isSwiftShimsModule())
-      return true;
+    if (auto *Mod = ImportD->getModule()) {
+      if (Mod->isSwiftShimsModule())
+        return true;
+    }
   }
 
   auto VD = dyn_cast<ValueDecl>(D);
@@ -2090,6 +2102,32 @@ bool swift::conflicting(ASTContext &ctx,
   if (!conflicting(sig1, sig2, skipProtocolExtensionCheck))
     return false;
 
+  // Functions and enum elements do not conflict with each other if their types
+  // are different.
+  if (((sig1.IsFunction && sig2.IsEnumElement) ||
+       (sig1.IsEnumElement && sig2.IsFunction)) &&
+      sig1Type != sig2Type) {
+    return false;
+  }
+
+  // Nominal types and enum elements always conflict with each other.
+  if ((sig1.IsNominal && sig2.IsEnumElement) ||
+      (sig1.IsEnumElement && sig2.IsNominal)) {
+    return true;
+  }
+
+  // Typealiases and enum elements always conflict with each other.
+  if ((sig1.IsTypeAlias && sig2.IsEnumElement) ||
+      (sig1.IsEnumElement && sig2.IsTypeAlias)) {
+    return true;
+  }
+
+  // Enum elements always conflict with each other. At this point, they
+  // have the same base name but different types.
+  if (sig1.IsEnumElement && sig2.IsEnumElement) {
+    return true;
+  }
+
   // Functions always conflict with non-functions with the same signature.
   // In practice, this only applies for zero argument functions.
   if (sig1.IsFunction != sig2.IsFunction)
@@ -2248,6 +2286,9 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   signature.IsInstanceMember = isInstanceMember();
   signature.IsVariable = isa<VarDecl>(this);
   signature.IsFunction = isa<AbstractFunctionDecl>(this);
+  signature.IsEnumElement = isa<EnumElementDecl>(this);
+  signature.IsNominal = isa<NominalTypeDecl>(this);
+  signature.IsTypeAlias = isa<TypeAliasDecl>(this);
 
   // Unary operators also include prefix/postfix.
   if (auto func = dyn_cast<FuncDecl>(this)) {
@@ -2291,6 +2332,13 @@ CanType ValueDecl::getOverloadSignatureType() const {
     // and struct decl.
     return defaultSignatureType->addCurriedSelfType(getDeclContext())
                                ->getCanonicalType();
+  }
+
+  if (isa<EnumElementDecl>(this)) {
+    auto mappedType = mapSignatureFunctionType(
+        getASTContext(), getInterfaceType(), /*topLevelFunction=*/false,
+        /*isMethod=*/false, /*isInitializer=*/false, /*curryLevels=*/0);
+    return mappedType->getCanonicalType();
   }
 
   // Note: If you add more cases to this function, you should update the
@@ -2824,6 +2872,13 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
   auto access = getAccessLevel();
   auto *sourceDC = VD->getDeclContext();
 
+  // Preserve "fast path" behavior for everything inside
+  // protocol extensions and operators, otherwise allow access
+  // check declarations inside inaccessible members via slower
+  // access scope based check, which is helpful for diagnostics.
+  if (!(sourceDC->getSelfProtocolDecl() || VD->isOperator()))
+    return checkAccessUsingAccessScopes(useDC, VD, access);
+
   if (!forConformance) {
     if (auto *proto = sourceDC->getSelfProtocolDecl()) {
       // FIXME: Swift 4.1 allowed accessing protocol extension methods that were
@@ -2878,21 +2933,8 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
 
 bool ValueDecl::isAccessibleFrom(const DeclContext *useDC,
                                  bool forConformance) const {
-  bool result = checkAccess(useDC, this, forConformance,
-                            [&]() { return getFormalAccess(); });
-
-  // For everything outside of protocols and operators, we should get the same
-  // result using either implementation of checkAccess, because useDC must
-  // already have access to this declaration's DeclContext.
-  // FIXME: Arguably, we're doing the wrong thing for operators here too,
-  // because we're finding internal operators within private types. Fortunately
-  // we have a requirement that a member operator take the enclosing type as an
-  // argument, so it won't ever match.
-  assert(getDeclContext()->getSelfProtocolDecl() || isOperator() ||
-         result ==
-             checkAccessUsingAccessScopes(useDC, this, getFormalAccess()));
-
-  return result;
+  return checkAccess(useDC, this, forConformance,
+                     [&]() { return getFormalAccess(); });
 }
 
 bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC,
@@ -4427,6 +4469,14 @@ bool AbstractStorageDecl::hasPrivateAccessor() const {
   return false;
 }
 
+bool AbstractStorageDecl::hasDidSetOrWillSetDynamicReplacement() const {
+  if (auto *func = getDidSetFunc())
+    return func->getAttrs().hasAttribute<DynamicReplacementAttr>();
+  if (auto *func = getWillSetFunc())
+    return func->getAttrs().hasAttribute<DynamicReplacementAttr>();
+  return false;
+}
+
 void AbstractStorageDecl::setAccessors(StorageImplInfo implInfo,
                                        SourceLoc lbraceLoc,
                                        ArrayRef<AccessorDecl *> accessors,
@@ -4874,12 +4924,90 @@ SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
   return SourceRange();
 }
 
-static bool isVarInPattern(const VarDecl *VD, Pattern *P) {
+static bool isVarInPattern(const VarDecl *vd, Pattern *p) {
   bool foundIt = false;
-  P->forEachVariable([&](VarDecl *FoundFD) {
-    foundIt |= FoundFD == VD;
-  });
+  p->forEachVariable([&](VarDecl *foundFD) { foundIt |= foundFD == vd; });
   return foundIt;
+}
+
+static Optional<std::pair<CaseStmt *, Pattern *>>
+findParentPatternCaseStmtAndPattern(const VarDecl *inputVD) {
+  auto getMatchingPattern = [&](CaseStmt *cs) -> Pattern * {
+    // Check if inputVD is in our case body var decls if we have any. If we do,
+    // treat its pattern as our first case label item pattern.
+    for (auto *vd : cs->getCaseBodyVariablesOrEmptyArray()) {
+      if (vd == inputVD) {
+        return cs->getMutableCaseLabelItems().front().getPattern();
+      }
+    }
+
+    // Then check the rest of our case label items.
+    for (auto &item : cs->getMutableCaseLabelItems()) {
+      if (isVarInPattern(inputVD, item.getPattern())) {
+        return item.getPattern();
+      }
+    }
+
+    // Otherwise return false if we do not find anything.
+    return nullptr;
+  };
+
+  // First find our canonical var decl. This is the VarDecl corresponding to the
+  // first case label item of the first case block in the fallthrough chain that
+  // our case block is within. Grab the case stmt associated with that var decl
+  // and start traveling down the fallthrough chain looking for the case
+  // statement that the input VD belongs to by using getMatchingPattern().
+  auto *canonicalVD = inputVD->getCanonicalVarDecl();
+  auto *caseStmt =
+      dyn_cast_or_null<CaseStmt>(canonicalVD->getParentPatternStmt());
+  if (!caseStmt)
+    return None;
+
+  if (auto *p = getMatchingPattern(caseStmt))
+    return std::make_pair(caseStmt, p);
+
+  while ((caseStmt = caseStmt->getFallthroughDest().getPtrOrNull())) {
+    if (auto *p = getMatchingPattern(caseStmt))
+      return std::make_pair(caseStmt, p);
+  }
+
+  return None;
+}
+
+VarDecl *VarDecl::getCanonicalVarDecl() const {
+  // Any var decl without a parent var decl is canonical. This means that before
+  // type checking, all var decls are canonical.
+  auto *cur = const_cast<VarDecl *>(this);
+  auto *vd = cur->getParentVarDecl();
+  if (!vd)
+    return cur;
+
+#ifndef NDEBUG
+  // Make sure that we don't get into an infinite loop.
+  SmallPtrSet<VarDecl *, 8> visitedDecls;
+  visitedDecls.insert(vd);
+  visitedDecls.insert(cur);
+#endif
+  while (vd) {
+    cur = vd;
+    vd = vd->getParentVarDecl();
+    assert((!vd || visitedDecls.insert(vd).second) && "Infinite loop ?!");
+  }
+
+  return cur;
+}
+
+Stmt *VarDecl::getRecursiveParentPatternStmt() const {
+  // If our parent is already a pattern stmt, just return that.
+  if (auto *stmt = getParentPatternStmt())
+    return stmt;
+
+  // Otherwise, see if we have a parent var decl. If we do not, then return
+  // nullptr. Otherwise, return the case stmt that we found.
+  auto result = findParentPatternCaseStmtAndPattern(this);
+  if (!result.hasValue())
+    return nullptr;
+  return result->first;
 }
 
 /// Return the Pattern involved in initializing this VarDecl.  Recall that the
@@ -4903,7 +5031,7 @@ Pattern *VarDecl::getParentPattern() const {
     
     if (auto *CS = dyn_cast<CatchStmt>(stmt))
       return CS->getErrorPattern();
-    
+
     if (auto *cs = dyn_cast<CaseStmt>(stmt)) {
       // In a case statement, search for the pattern that contains it.  This is
       // a bit silly, because you can't have something like "case x, y:" anyway.
@@ -4911,17 +5039,27 @@ Pattern *VarDecl::getParentPattern() const {
         if (isVarInPattern(this, items.getPattern()))
           return items.getPattern();
       }
-    } else if (auto *LCS = dyn_cast<LabeledConditionalStmt>(stmt)) {
+    }
+
+    if (auto *LCS = dyn_cast<LabeledConditionalStmt>(stmt)) {
       for (auto &elt : LCS->getCond())
         if (auto pat = elt.getPatternOrNull())
           if (isVarInPattern(this, pat))
             return pat;
     }
-    
+
     //stmt->dump();
     assert(0 && "Unknown parent pattern statement?");
   }
-  
+
+  // Otherwise, check if we have to walk our case stmt's var decl list to find
+  // the pattern.
+  if (auto caseStmtPatternPair = findParentPatternCaseStmtAndPattern(this)) {
+    return caseStmtPatternPair->second;
+  }
+
+  // Otherwise, this is a case we do not know or understand. Return nullptr to
+  // signal we do not have any information.
   return nullptr;
 }
 
@@ -5173,6 +5311,17 @@ void ParamDecl::setDefaultValue(Expr *E) {
   DefaultValueAndFlags.getPointer()->DefaultArg = E;
 }
 
+void ParamDecl::setStoredProperty(VarDecl *var) {
+  if (!DefaultValueAndFlags.getPointer()) {
+    if (!var) return;
+
+    DefaultValueAndFlags.setPointer(
+      getASTContext().Allocate<StoredDefaultArgument>());
+  }
+
+  DefaultValueAndFlags.getPointer()->DefaultArg = var;
+}
+
 void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
   assert(DefaultValueAndFlags.getPointer());
   DefaultValueAndFlags.getPointer()->InitContext = initContext;
@@ -5201,6 +5350,17 @@ ParamDecl::getDefaultValueStringRepresentation(
     return extractInlinableText(getASTContext().SourceMgr, getDefaultValue(),
                                 scratch);
   }
+  case DefaultArgumentKind::StoredProperty: {
+    assert(DefaultValueAndFlags.getPointer() &&
+           "default value not provided yet");
+    auto existing = DefaultValueAndFlags.getPointer()->StringRepresentation;
+    if (!existing.empty())
+      return existing;
+    auto var = getStoredProperty();
+    return extractInlinableText(getASTContext().SourceMgr,
+                                var->getParentInitializer(),
+                                scratch);
+  }
   case DefaultArgumentKind::Inherited:
     // FIXME: This needs /some/ kind of textual representation, but this isn't
     // a great one.
@@ -5219,7 +5379,8 @@ ParamDecl::getDefaultValueStringRepresentation(
 
 void
 ParamDecl::setDefaultValueStringRepresentation(StringRef stringRepresentation) {
-  assert(getDefaultArgumentKind() == DefaultArgumentKind::Normal);
+  assert(getDefaultArgumentKind() == DefaultArgumentKind::Normal ||
+         getDefaultArgumentKind() == DefaultArgumentKind::StoredProperty);
   assert(!stringRepresentation.empty());
 
   if (!DefaultValueAndFlags.getPointer()) {
@@ -5238,7 +5399,7 @@ void DefaultArgumentInitializer::changeFunction(
   }
 
   auto param = paramList->get(getIndex());
-  if (param->getDefaultValue())
+  if (param->getDefaultValue() || param->getStoredProperty())
     param->setDefaultArgumentInitContext(this);
 }
 

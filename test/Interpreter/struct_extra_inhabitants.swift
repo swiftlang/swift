@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 
 // -- build resilient library
-// RUN: %target-build-swift -force-single-frontend-invocation -Xfrontend -enable-resilience -module-name ExtraInhabitantResilientTypes -emit-module-path %t/ExtraInhabitantResilientTypes.swiftmodule -parse-as-library -c -o %t/ExtraInhabitantResilientTypes.o %S/Inputs/struct_extra_inhabitants_ExtraInhabitantResilientTypes.swift
+// RUN: %target-build-swift -force-single-frontend-invocation -enable-library-evolution -module-name ExtraInhabitantResilientTypes -emit-module-path %t/ExtraInhabitantResilientTypes.swiftmodule -parse-as-library -c -o %t/ExtraInhabitantResilientTypes.o %S/Inputs/struct_extra_inhabitants_ExtraInhabitantResilientTypes.swift
 
 // -- run tests
 // RUN: %target-build-swift -parse-stdlib -Xfrontend -verify-type-layout -Xfrontend PairWithPointerFirst -Xfrontend -verify-type-layout -Xfrontend PairWithPointerSecond -Xfrontend -verify-type-layout -Xfrontend PairWithPointerSecondAndPhantomParam_Int -Xfrontend -verify-type-layout -Xfrontend GenericPairWithPointerFirst_Int -Xfrontend -verify-type-layout -Xfrontend GenericPairWithPointerFirst_AnyObject -Xfrontend -verify-type-layout -Xfrontend GenericPairWithPointerSecond_Int -Xfrontend -verify-type-layout -Xfrontend GenericPairWithPointerSecond_AnyObject -Xfrontend -verify-type-layout -Xfrontend StringAlike32 -Xfrontend -verify-type-layout -Xfrontend StringAlike64 -I %t -o %t/a.out.tests %s %t/ExtraInhabitantResilientTypes.o

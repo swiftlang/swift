@@ -2,6 +2,6 @@
 // swift-module-flags: -module-name DreadPirateRoberts
 
 // RUN: %empty-directory(%t)
-// RUN: echo 'import WrongName' | not %target-swift-frontend -typecheck -enable-parseable-module-interface -module-cache-path %t -I %S - 2>&1 | %FileCheck %s
+// RUN: echo 'import WrongName' | not %target-swift-frontend -typecheck -module-cache-path %t -I %S - 2>&1 | %FileCheck %s
 
 // CHECK: :1:8: error: cannot load module 'DreadPirateRoberts' as 'WrongName'

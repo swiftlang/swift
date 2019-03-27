@@ -161,6 +161,9 @@ public struct _Stderr : TextOutputStream {
 #if os(Windows)
 public struct _FDOutputStream : TextOutputStream {
   public var handle: HANDLE
+  public var isClosed: Bool {
+    return handle == INVALID_HANDLE_VALUE
+  }
 
   public init(handle: HANDLE) {
     self.handle = handle

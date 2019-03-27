@@ -279,11 +279,11 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
     if (contextTy->hasReferenceSemantics()) {
       if (attrModifier != SelfAccessKind::__Consuming)
         diagnoseAndRemoveAttr(attr, diag::mutating_invalid_classes,
-                              unsigned(attrModifier));
+                              attrModifier);
     }
   } else {
     diagnoseAndRemoveAttr(attr, diag::mutating_invalid_global_scope,
-                          unsigned(attrModifier));
+                          attrModifier);
   }
 
   // Verify we don't have more than one of mutating, nonmutating,
@@ -294,24 +294,21 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
     if (auto *NMA = FD->getAttrs().getAttribute<NonMutatingAttr>()) {
       if (attrModifier != SelfAccessKind::NonMutating) {
         diagnoseAndRemoveAttr(NMA, diag::functions_mutating_and_not,
-                              unsigned(SelfAccessKind::NonMutating),
-                              unsigned(attrModifier));
+                              SelfAccessKind::NonMutating, attrModifier);
       }
     }
 
     if (auto *MUA = FD->getAttrs().getAttribute<MutatingAttr>()) {
       if (attrModifier != SelfAccessKind::Mutating) {
         diagnoseAndRemoveAttr(MUA, diag::functions_mutating_and_not,
-                                unsigned(SelfAccessKind::Mutating),
-                                unsigned(attrModifier));
+                                SelfAccessKind::Mutating, attrModifier);
       }
     }
 
     if (auto *CSA = FD->getAttrs().getAttribute<ConsumingAttr>()) {
       if (attrModifier != SelfAccessKind::__Consuming) {
         diagnoseAndRemoveAttr(CSA, diag::functions_mutating_and_not,
-                              unsigned(SelfAccessKind::__Consuming),
-                              unsigned(attrModifier));
+                              SelfAccessKind::__Consuming, attrModifier);
       }
     }
   }
@@ -2005,8 +2002,9 @@ void lookupReplacedDecl(DeclName replacedDeclName,
   if (!typeCtx)
     typeCtx = cast<ExtensionDecl>(declCtxt->getAsDecl())->getExtendedNominal();
 
-  moduleScopeCtxt->lookupQualified({typeCtx}, replacedDeclName,
-                                   NL_QualifiedDefault, results);
+  if (typeCtx)
+    moduleScopeCtxt->lookupQualified({typeCtx}, replacedDeclName,
+                                     NL_QualifiedDefault, results);
 }
 
 /// Remove any argument labels from the interface type of the given value that
@@ -2565,10 +2563,20 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
       D->getAttrs().hasAttribute<InlinableAttr>())
     return;
 
+  if (auto *FD = dyn_cast<FuncDecl>(D)) {
+    // Don't add dynamic to defer bodies.
+    if (FD->isDeferBody())
+      return;
+    // Don't add dynamic to functions with a cdecl.
+    if (FD->getAttrs().hasAttribute<CDeclAttr>())
+      return;
+  }
+
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     // Don't turn stored into computed properties. This could conflict with
     // exclusivity checking.
-    if (VD->hasStorage())
+    // If there is a didSet or willSet function we allow dynamic replacement.
+    if (VD->hasStorage() && !VD->getDidSetFunc() && !VD->getWillSetFunc())
       return;
     // Don't add dynamic to local variables.
     if (VD->getDeclContext()->isLocalContext())

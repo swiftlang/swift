@@ -844,7 +844,7 @@ func inoutTests(_ arr: inout Int) {
 
 // <rdar://problem/20802757> Compiler crash in default argument & inout expr
 var g20802757 = 2
-func r20802757(_ z: inout Int = &g20802757) { // expected-error {{use of extraneous '&'}}
+func r20802757(_ z: inout Int = &g20802757) { // expected-error {{cannot provide default value to inout parameter 'z'}}
   print(z)
 }
 

@@ -355,7 +355,7 @@ void Node::addChild(NodePointer Child, NodeFactory &Factory) {
   }
 }
 
-void Node::removeChildAt(unsigned Pos, swift::Demangle::NodeFactory &factory) {
+void Node::removeChildAt(unsigned Pos) {
   switch (NodePayloadKind) {
     case PayloadKind::OneChild:
       assert(Pos == 0);
@@ -465,11 +465,20 @@ void CharVector::append(StringRef Rhs, NodeFactory &Factory) {
 }
 
 void CharVector::append(int Number, NodeFactory &Factory) {
-  const int MaxIntPrintSize = 8;
+  const int MaxIntPrintSize = 11;
   if (NumElems + MaxIntPrintSize > Capacity)
     Factory.Reallocate(Elems, Capacity, /*Growth*/ MaxIntPrintSize);
   int Length = snprintf(Elems + NumElems, MaxIntPrintSize, "%d", Number);
   assert(Length > 0 && Length < MaxIntPrintSize);
+  NumElems += Length;
+}
+
+void CharVector::append(unsigned long long Number, NodeFactory &Factory) {
+  const int MaxPrintSize = 21;
+  if (NumElems + MaxPrintSize > Capacity)
+    Factory.Reallocate(Elems, Capacity, /*Growth*/ MaxPrintSize);
+  int Length = snprintf(Elems + NumElems, MaxPrintSize, "%llu", Number);
+  assert(Length > 0 && Length < MaxPrintSize);
   NumElems += Length;
 }
 
@@ -1246,7 +1255,7 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
       auto Label = getChildIf(Param, Node::Kind::TupleElementName);
 
       if (Label.first) {
-        Param->removeChildAt(Label.second, *this);
+        Param->removeChildAt(Label.second);
         return createNodeWithAllocatedText(Node::Kind::Identifier,
                                            Label.first->getText());
       }
