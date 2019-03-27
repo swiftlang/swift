@@ -31,8 +31,8 @@
 
 // CHECK: {{(bin/)?}}ld{{"? }}
 // CHECK-NO-RUNTIME-NOT: libclang_rt
-// CHECK-MACOS-SAME: {{[^ ]+/lib/swift/clang/lib/darwin/libclang_rt.osx.a}}
-// CHECK-IOS-SAME: {{[^ ]+/lib/swift/clang/lib/darwin/libclang_rt.ios.a}}
-// CHECK-TVOS-SAME: {{[^ ]+/lib/swift/clang/lib/darwin/libclang_rt.tvos.a}}
-// CHECK-WATCHOS-SAME: {{[^ ]+/lib/swift/clang/lib/darwin/libclang_rt.watchos.a}}
+// CHECK-MACOS-SAME: {{[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)clang(/|\\\\)lib(/|\\\\)darwin(/|\\\\)libclang_rt.osx.a}}
+// CHECK-IOS-SAME: {{[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)clang(/|\\\\)lib(/|\\\\)darwin(/|\\\\)libclang_rt.ios.a}}
+// CHECK-TVOS-SAME: {{[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)clang(/|\\\\)lib(/|\\\\)darwin(/|\\\\)libclang_rt.tvos.a}}
+// CHECK-WATCHOS-SAME: {{[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)clang(/|\\\\)lib(/|\\\\)darwin(/|\\\\)libclang_rt.watchos.a}}
 // CHECK-SAME: -o {{[^ ]+}}

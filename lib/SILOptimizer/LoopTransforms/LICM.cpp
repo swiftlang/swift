@@ -554,10 +554,6 @@ static bool analyzeBeginAccess(BeginAccessInst *BI,
                                WriteSet &MayWrites,
                                AccessedStorageAnalysis *ASA,
                                DominanceInfo *DT) {
-  if (BI->getEnforcement() != SILAccessEnforcement::Dynamic) {
-    return false;
-  }
-
   const AccessedStorage &storage =
       findAccessedStorageNonNested(BI->getSource());
   if (!storage) {
@@ -654,9 +650,7 @@ void LoopTreeOptimization::analyzeCurrentLoop(
       case SILInstructionKind::BeginAccessInst: {
         auto *BI = dyn_cast<BeginAccessInst>(&Inst);
         assert(BI && "Expected a Begin Access");
-        if (BI->getEnforcement() == SILAccessEnforcement::Dynamic) {
-          BeginAccesses.push_back(BI);
-        }
+        BeginAccesses.push_back(BI);
         checkSideEffects(Inst, MayWrites);
         break;
       }

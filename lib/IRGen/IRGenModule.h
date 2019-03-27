@@ -747,8 +747,11 @@ public:
   getConformanceInfo(const ProtocolDecl *protocol,
                      const ProtocolConformance *conformance);
 
-  SILType getLoweredType(AbstractionPattern orig, Type subst);
-  SILType getLoweredType(Type subst);
+  SILType getLoweredType(AbstractionPattern orig, Type subst) const;
+  SILType getLoweredType(Type subst) const;
+  const Lowering::TypeLowering &getTypeLowering(SILType type) const;
+  bool isTypeABIAccessible(SILType type) const;
+
   const TypeInfo &getTypeInfoForUnlowered(AbstractionPattern orig,
                                           CanType subst);
   const TypeInfo &getTypeInfoForUnlowered(AbstractionPattern orig,

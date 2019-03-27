@@ -344,8 +344,8 @@ public:
       return dyn_cast<DeclRefExpr>(
           inout->getSubExpr()->getSemanticsProvidingExpr());
 
-      // Drill through tuple shuffles, ignoring non-default-argument inouts.
-    } else if (auto shuffle = dyn_cast<TupleShuffleExpr>(E)) {
+      // Drill through argument shuffles, ignoring non-default-argument inouts.
+    } else if (auto shuffle = dyn_cast<ArgumentShuffleExpr>(E)) {
       return digForInoutDeclRef(shuffle->getSubExpr());
 
       // Try to find a unique inout argument in a tuple.

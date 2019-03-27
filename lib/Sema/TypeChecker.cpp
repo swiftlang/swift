@@ -645,6 +645,17 @@ void swift::typeCheckCompletionDecl(Decl *D) {
     TC.validateDecl(cast<ValueDecl>(D));
 }
 
+void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
+                                    unsigned bindingIndex) {
+  assert(!PBD->isInitializerChecked(bindingIndex) &&
+         PBD->getInit(bindingIndex));
+
+  auto &Ctx = PBD->getASTContext();
+  DiagnosticSuppression suppression(Ctx.Diags);
+  TypeChecker &TC = createTypeChecker(Ctx);
+  TC.typeCheckPatternBinding(PBD, bindingIndex);
+}
+
 static Optional<Type> getTypeOfCompletionContextExpr(
                         TypeChecker &TC,
                         DeclContext *DC,

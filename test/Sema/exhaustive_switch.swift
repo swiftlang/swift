@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-resilience
-// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-resilience -enable-nonfrozen-enum-exhaustivity-diagnostics
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution
+// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-library-evolution -enable-nonfrozen-enum-exhaustivity-diagnostics
 
 func foo(a: Int?, b: Int?) -> Int {
   switch (a, b) {
