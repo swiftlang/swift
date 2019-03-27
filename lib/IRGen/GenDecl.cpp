@@ -2966,7 +2966,7 @@ IRGenModule::getAddrOfMetaclassObject(ClassDecl *decl,
 llvm::Function *
 IRGenModule::getAddrOfObjCMetadataUpdateFunction(ClassDecl *classDecl,
                                                  ForDefinition_t forDefinition) {
-  IRGen.noteUseOfTypeMetadata(classDecl);
+  assert(ObjCInterop);
 
   LinkEntity entity = LinkEntity::forObjCMetadataUpdateFunction(classDecl);
   llvm::Function *&entry = GlobalFuncs[entity];
@@ -2976,12 +2976,23 @@ IRGenModule::getAddrOfObjCMetadataUpdateFunction(ClassDecl *classDecl,
   }
 
   // Class _Nullable callback(Class _Nonnull cls, void * _Nullable arg);
-  llvm::Type *params[] = { ObjCClassPtrTy, Int8PtrTy };
-  auto fnType = llvm::FunctionType::get(ObjCClassPtrTy, params, false);
-  Signature signature(fnType, llvm::AttributeList(), DefaultCC);
+  Signature signature(ObjCUpdateCallbackTy, llvm::AttributeList(), DefaultCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
   return entry;
+}
+
+/// Fetch the declaration of an Objective-C resilient class stub.
+llvm::Constant *
+IRGenModule::getAddrOfObjCResilientClassStub(ClassDecl *classDecl,
+                                             ForDefinition_t forDefinition,
+                                             TypeMetadataAddress addr) {
+  assert(ObjCInterop);
+  assert(getClassMetadataStrategy(classDecl) ==
+         ClassMetadataStrategy::Resilient);
+
+  LinkEntity entity = LinkEntity::forObjCResilientClassStub(classDecl, addr);
+  return getAddrOfLLVMVariable(entity, forDefinition, DebugTypeInfo());
 }
 
 /// Fetch the type metadata access function for a non-generic type.

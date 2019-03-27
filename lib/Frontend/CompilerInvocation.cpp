@@ -450,6 +450,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableConstraintSolverPerformanceHacks |=
       Args.hasArg(OPT_disable_constraint_solver_performance_hacks);
 
+  Opts.EnableObjCResilientClassStubs =
+      Args.hasArg(OPT_enable_objc_resilient_class_stubs);
+
   // Must be processed after any other language options that could affect
   // platform conditions.
   bool UnsupportedOS, UnsupportedArch;

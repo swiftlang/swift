@@ -3592,9 +3592,11 @@ ERROR(invalid_nonobjc_extension,none,
 ERROR(objc_in_extension_context,none,
       "members of constrained extensions cannot be declared @objc", ())
 ERROR(objc_in_generic_extension,none,
-      "members of extensions of "
-      "%select{classes from generic context|generic classes}0 "
-      "cannot be declared @objc", (bool))
+      "extensions of %select{classes from generic context|generic classes}0 "
+      "cannot contain '@objc' members", (bool))
+ERROR(objc_in_resilient_extension,none,
+      "extensions of classes built with library evolution support "
+      "cannot contain '@objc' members", ())
 ERROR(objc_operator, none,
       "operator methods cannot be declared @objc", ())
 ERROR(objc_operator_proto, none,
@@ -3615,6 +3617,10 @@ NOTE(objc_inference_swift3_addnonobjc,none,
 ERROR(objc_for_generic_class,none,
       "generic subclasses of '@objc' classes cannot have an explicit '@objc' "
       "because they are not directly visible from Objective-C", ())
+ERROR(objc_for_resilient_class,none,
+      "classes built with library evolution support cannot have explicit "
+      "'@objc' subclasses because they are not directly "
+      "visible from Objective-C", ())
 ERROR(objc_getter_for_nonobjc_property,none,
       "'@objc' getter for non-'@objc' property", ())
 ERROR(objc_getter_for_nonobjc_subscript,none,
