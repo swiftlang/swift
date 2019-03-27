@@ -49,12 +49,16 @@ public:
   /// True iff are multiple llvm modules.
   bool HasMultipleIGMs;
 
+  /// When this is true, the linkage for forward-declared private symbols will
+  /// be promoted to public external. Used by the LLDB expression evaluator.
+  bool ForcePublicDecls;
+
   bool IsWholeModule;
 
   explicit UniversalLinkageInfo(IRGenModule &IGM);
 
   UniversalLinkageInfo(const llvm::Triple &triple, bool hasMultipleIGMs,
-                       bool isWholeModule);
+                       bool forcePublicDecls, bool isWholeModule);
 
   /// In case of multiple llvm modules (in multi-threaded compilation) all
   /// private decls must be visible from other files.
@@ -66,6 +70,12 @@ public:
   /// IRGen into different object files and the linker would complain about
   /// duplicate symbols.
   bool needLinkerToMergeDuplicateSymbols() const { return HasMultipleIGMs; }
+
+  /// This  is used  by  the  LLDB expression  evaluator  since an  expression's
+  /// llvm::Module  may   need  to  access   private  symbols  defined   in  the
+  /// expression's  context.  This  flag  ensures  that  private  accessors  are
+  /// forward-declared as public external in the expression's module.
+  bool forcePublicDecls() const { return ForcePublicDecls; }
 };
 
 /// Selector for type metadata symbol kinds.
