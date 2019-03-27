@@ -4040,6 +4040,33 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     if (toType->isAnyObject() || fromType->isAnyObject())
       return CheckedCastKind::ValueCast;
 
+    // A cast from an existential type to a concrete type does not succeed. For
+    // example:
+    //
+    // struct S {}
+    // enum FooError: Error { case bar }
+    //
+    // func foo() {
+    //   do {
+    //     throw FooError.bar
+    //   } catch is X { /* Will always fail */
+    //     print("Caught bar error")
+    //   }
+    // }
+    if (fromExistential) {
+      if (auto NTD = toType->getAnyNominal()) {
+        if (!isa<ProtocolDecl>(NTD)) {
+          auto protocolDecl =
+              dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal());
+          if (protocolDecl &&
+              !conformsToProtocol(toType, protocolDecl, dc,
+                                  ConformanceCheckFlags::InExpression)) {
+            return failed();
+          }
+        }
+      }
+    }
+
     bool toRequiresClass;
     if (toType->isExistentialType())
       toRequiresClass = toType->getExistentialLayout().requiresClass();
