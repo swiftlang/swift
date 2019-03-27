@@ -178,6 +178,12 @@ foreach(SDK ${SWIFT_SDKS})
       set(SWIFT_HAVE_LIBXML2 FALSE)
     endif()
 
+    if(${SDK} IN_LIST SWIFT_APPLE_PLATFORMS OR SWIFT_NEED_EXPLICIT_LIBDISPATCH)
+      set(SWIFT_HAVE_LIBDISPATCH TRUE)
+    else()
+      set(SWIFT_HAVE_LIBDISPATCH FALSE)
+    endif()
+
     swift_configure_lit_site_cfg(
         "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
         "${test_bin_dir}/lit.site.cfg"
