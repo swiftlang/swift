@@ -5249,13 +5249,7 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   // Load tuples with lvalue elements.
   if (auto tupleType = fromType->getAs<TupleType>()) {
     if (tupleType->hasLValueType()) {
-      auto toTuple = tupleType->getRValueType()->castTo<TupleType>();
-      SmallVector<unsigned, 4> sources;
-      bool failed = computeTupleShuffle(tupleType, toTuple, sources);
-      assert(!failed && "Couldn't convert tuple to tuple?");
-      (void)failed;
-
-      coerceTupleToTuple(expr, tupleType, toTuple, locator, sources);
+      expr = cs.coerceToRValue(expr);
     }
   }
 
@@ -6482,6 +6476,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     auto toTuple = toType->getAs<TupleType>();
     if (!toTuple)
       break;
+
+    if (fromTuple->hasLValueType() && !toTuple->hasLValueType())
+      return coerceToType(cs.coerceToRValue(expr), toType, locator);
+
     SmallVector<unsigned, 4> sources;
     if (!computeTupleShuffle(fromTuple, toTuple, sources)) {
       return coerceTupleToTuple(expr, fromTuple, toTuple,
