@@ -174,6 +174,7 @@ public:
   /// Force lazy initialization of class metadata
   /// Used on Windows to avoid cross-module references.
   unsigned LazyInitializeClassMetadata : 1;
+  unsigned LazyInitializeProtocolConformances : 1;
 
   /// Normally if the -read-legacy-type-info flag is not specified, we look for
   /// a file named "legacy-<arch>.yaml" in SearchPathOpts.RuntimeLibraryPath.
@@ -234,7 +235,7 @@ public:
         ValueNames(false), EnableReflectionMetadata(true),
         EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
         EnableResilienceBypass(false), LazyInitializeClassMetadata(false),
-        DisableLegacyTypeInfo(false),
+        LazyInitializeProtocolConformances(false), DisableLegacyTypeInfo(false),
         UseIncrementalLLVMCodeGen(true), UseSwiftCall(false),
         GenerateProfile(false), EnableDynamicReplacementChaining(false),
         DisableRoundTripDebugTypes(false),

@@ -722,14 +722,10 @@ static SILFunction *eagerSpecialize(SILOptFunctionBuilder &FuncBuilder,
              dbgs() << "  Specialize Attr:";
              SA.print(dbgs()); dbgs() << "\n");
 
-  IsSerialized_t Serialized = IsNotSerialized;
-  if (GenericFunc->isSerialized())
-    Serialized = IsSerializable;
-
   GenericFuncSpecializer
       FuncSpecializer(FuncBuilder, GenericFunc,
                       ReInfo.getClonerParamSubstitutionMap(),
-                      Serialized, ReInfo);
+                      ReInfo);
 
   SILFunction *NewFunc = FuncSpecializer.trySpecialization();
   if (!NewFunc)

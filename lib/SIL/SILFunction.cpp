@@ -263,6 +263,12 @@ const TypeLowering &SILFunction::getTypeLowering(SILType type) const {
                                            ResilienceExpansion::Minimal);
 }
 
+bool SILFunction::isTypeABIAccessible(SILType type) const {
+  // FIXME: Expansion
+  return getModule().isTypeABIAccessible(type,
+                                         ResilienceExpansion::Minimal);
+}
+
 SILBasicBlock *SILFunction::createBasicBlock() {
   return new (getModule()) SILBasicBlock(this, nullptr, false);
 }

@@ -551,20 +551,20 @@ bool calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl);
 // can be derived e.g.:
 // - from a constructor or
 // - from a successful outcome of a checked_cast_br [exact] instruction.
-SILValue getInstanceWithExactDynamicType(SILValue S, SILModule &M,
+SILValue getInstanceWithExactDynamicType(SILValue S,
                                          ClassHierarchyAnalysis *CHA);
 
 /// Try to determine the exact dynamic type of an object.
 /// returns the exact dynamic type of the object, or an empty type if the exact
 /// type could not be determined.
-SILType getExactDynamicType(SILValue S, SILModule &M,
+SILType getExactDynamicType(SILValue S,
                             ClassHierarchyAnalysis *CHA,
                             bool ForUnderlyingObject = false);
 
 /// Try to statically determine the exact dynamic type of the underlying object.
 /// returns the exact dynamic type of the underlying object, or an empty SILType
 /// if the exact type could not be determined.
-SILType getExactDynamicTypeOfUnderlyingObject(SILValue S, SILModule &M,
+SILType getExactDynamicTypeOfUnderlyingObject(SILValue S,
                                               ClassHierarchyAnalysis *CHA);
 
 /// Utility class for cloning init values into the static initializer of a

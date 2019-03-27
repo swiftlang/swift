@@ -9,7 +9,7 @@
 // RUN: %target-swift-ide-test -skip-deinit=false -print-module -print-access -module-to-print=accessibility_print -I %t -source-filename=%s -swift-version 5 | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-5 %s
 
 // Enabling resilience means opting into the new behavior.
-// RUN: %target-swift-frontend -emit-module-path %t/accessibility_print.swiftmodule -module-name accessibility_print %s -swift-version 4 -enable-resilience
+// RUN: %target-swift-frontend -emit-module-path %t/accessibility_print.swiftmodule -module-name accessibility_print %s -swift-version 4 -enable-library-evolution
 // RUN: %target-swift-ide-test -skip-deinit=false -print-module -print-access -module-to-print=accessibility_print -I %t -source-filename=%s -swift-version 4 | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-5 %s
 
 internal struct InternalStruct {}

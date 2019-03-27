@@ -20,8 +20,7 @@ var closure5 : (Double) -> Int = {
 
 var closure6 = $0  // expected-error {{anonymous closure argument not contained in a closure}}
 
-var closure7 : Int =
-   { 4 }  // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}} {{9-9=()}}
+var closure7 : Int = { 4 }  // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}} {{27-27=()}} // expected-note {{Remove '=' to make 'closure7' a computed property}}{{20-22=}}
 
 var capturedVariable = 1
 var closure8 = { [capturedVariable] in
