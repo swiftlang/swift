@@ -1860,8 +1860,8 @@ static const Expr *lookThroughExprsToImmediateDeallocation(const Expr *E) {
   while (true) {
     E = E->getValueProvidingExpr();
 
-    // We don't currently deal with tuple shuffles.
-    if (isa<TupleShuffleExpr>(E))
+    // We don't currently deal with tuple destructuring.
+    if (isa<DestructureTupleExpr>(E))
       return E;
 
     // If we have a TupleElementExpr with a child TupleExpr, dig into that
