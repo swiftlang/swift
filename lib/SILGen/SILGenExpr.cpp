@@ -449,7 +449,7 @@ namespace {
     RValue visitKeyPathApplicationExpr(KeyPathApplicationExpr *E, SGFContext C);
     RValue visitDynamicSubscriptExpr(DynamicSubscriptExpr *E,
                                      SGFContext C);
-    RValue visitTupleShuffleExpr(TupleShuffleExpr *E, SGFContext C);
+    RValue visitDestructureTupleExpr(DestructureTupleExpr *E, SGFContext C);
     RValue visitArgumentShuffleExpr(ArgumentShuffleExpr *E, SGFContext C);
     RValue visitDynamicTypeExpr(DynamicTypeExpr *E, SGFContext C);
     RValue visitCaptureListExpr(CaptureListExpr *E, SGFContext C);
@@ -2151,81 +2151,34 @@ RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
                    subs, {}, calleeTypeInfo, ApplyOptions::None, C);
 }
 
-static void emitTupleShuffleExprInto(RValueEmitter &emitter,
-                                     TupleShuffleExpr *E,
-                                     Initialization *outerTupleInit) {
-  CanTupleType outerTuple = cast<TupleType>(E->getType()->getCanonicalType());
-  auto outerFields = outerTuple->getElements();
-  (void) outerFields;
-
-  // Decompose the initialization.
-  SmallVector<InitializationPtr, 4> outerInitsBuffer;
-  auto outerInits =
-    outerTupleInit->splitIntoTupleElements(emitter.SGF, RegularLocation(E),
-                                           outerTuple, outerInitsBuffer);
-  assert(outerInits.size() == outerFields.size() &&
-         "initialization size does not match tuple size?!");
-
-  // Map outer initializations into a tuple of inner initializations:
-  //   - fill out the initialization elements with null
-  TupleInitialization innerTupleInit;
-
-  CanTupleType innerTuple =
-    cast<TupleType>(E->getSubExpr()->getType()->getCanonicalType());
-  innerTupleInit.SubInitializations.resize(innerTuple->getNumElements());
-
-  // Map all the outer initializations to their appropriate targets.
-  for (unsigned outerIndex = 0; outerIndex != outerInits.size(); outerIndex++) {
-    auto innerMapping = E->getElementMapping()[outerIndex];
-    innerTupleInit.SubInitializations[innerMapping] =
-      std::move(outerInits[outerIndex]);
-  }
-
-#ifndef NDEBUG
-  for (auto &innerInit : innerTupleInit.SubInitializations) {
-    assert(innerInit != nullptr && "didn't map all inner elements");
-  }
-#endif
-
-  // Emit the sub-expression into the tuple initialization we just built.
-  emitter.SGF.emitExprInto(E->getSubExpr(), &innerTupleInit);
-
-  outerTupleInit->finishInitialization(emitter.SGF);
-}
-
-RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
-                                            SGFContext C) {
-  // If we're emitting into an initialization, we can try shuffling the
-  // elements of the initialization.
-  if (Initialization *I = C.getEmitInto()) {
-    if (I->canSplitIntoTupleElements()) {
-      emitTupleShuffleExprInto(*this, E, I);
-      return RValue::forInContext();
-    }
-  }
-
+RValue RValueEmitter::visitDestructureTupleExpr(DestructureTupleExpr *E,
+                                                SGFContext C) {
   // Emit the sub-expression tuple and destructure it into elements.
   SmallVector<RValue, 4> elements;
   visit(E->getSubExpr()).extractElements(elements);
 
-  // Prepare a new tuple to hold the shuffled result.
-  RValue result(E->getType()->getCanonicalType());
+  // Bind each element of the input tuple to its corresponding
+  // opaque value.
+  for (unsigned i = 0, e = E->getDestructuredElements().size();
+       i != e; ++i) {
+    auto *opaqueElt = E->getDestructuredElements()[i];
+    assert(!SGF.OpaqueValues.count(opaqueElt));
 
-  auto outerFields = E->getType()->castTo<TupleType>()->getElements();
-  auto shuffleIndexIterator = E->getElementMapping().begin();
-  auto shuffleIndexEnd = E->getElementMapping().end();
-  (void)shuffleIndexEnd;
-  for (auto &field : outerFields) {
-    (void) field;
-    assert(shuffleIndexIterator != shuffleIndexEnd &&
-           "ran out of shuffle indexes before running out of fields?!");
-    int shuffleIndex = *shuffleIndexIterator++;
-    
-    // Map from a different tuple element.
-    result.addElement(
-        std::move(elements[shuffleIndex]).ensurePlusOne(SGF, E));
+    auto opaqueMV = std::move(elements[i]).getAsSingleValue(SGF, E);
+    SGF.OpaqueValues[opaqueElt] = opaqueMV;
   }
-  
+
+  // Emit the result expression written in terms of the above
+  // opaque values.
+  auto result = visit(E->getResultExpr(), C);
+
+  // Clean up.
+  for (unsigned i = 0, e = E->getDestructuredElements().size();
+       i != e; ++i) {
+    auto *opaqueElt = E->getDestructuredElements()[i];
+    SGF.OpaqueValues.erase(opaqueElt);
+  }
+
   return result;
 }
 
