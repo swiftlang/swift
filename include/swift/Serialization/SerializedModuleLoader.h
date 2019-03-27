@@ -63,6 +63,11 @@ protected:
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer);
 
+  std::error_code
+  openModuleDocFile(AccessPathElem ModuleID,
+                    StringRef ModuleDocPath,
+                    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer);
+
   /// If the module loader subclass knows that all options have been tried for
   /// loading an architecture-specific file out of a swiftmodule bundle, try
   /// to list the architectures that \e are present.

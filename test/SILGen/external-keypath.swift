@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-resilience -emit-module -o %t/ExternalKeyPaths.swiftmodule -module-name ExternalKeyPaths %S/Inputs/ExternalKeyPaths.swift
+// RUN: %target-swift-frontend -enable-library-evolution -emit-module -o %t/ExternalKeyPaths.swiftmodule -module-name ExternalKeyPaths %S/Inputs/ExternalKeyPaths.swift
 // RUN: %target-swift-emit-silgen -swift-version 5 -I %t %s | %FileCheck %s
 
 import ExternalKeyPaths

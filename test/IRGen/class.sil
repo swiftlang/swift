@@ -41,7 +41,7 @@ sil_vtable C {}
 // CHECK-INDIRECT-SAME:   %swift.type* null,
 // CHECK-SAME:   [[OPAQUE]]* @_objc_empty_cache,
 // CHECK-SAME:   [[OPAQUE]]* null,
-// CHECK-SAME:   i64 add (i64 ptrtoint ({{.*}}* @_DATA__TtC5class1C to i64), i64 1)
+// CHECK-SAME:   i64 add (i64 ptrtoint ({{.*}}* @_DATA__TtC5class1C to i64), i64 [[IS_SWIFT_BIT:1|2]])
 // CHECK-SAME: }>
 
 // Destroying destructor
