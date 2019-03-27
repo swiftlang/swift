@@ -814,7 +814,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
     }
 
     ParserResult<TypeRepr> ResultType =
-      parseType(diag::expected_type_function_result);
+        parseDeclResultType(diag::expected_type_function_result);
     if (ResultType.hasCodeCompletion())
       return ResultType;
     retType = ResultType.getPtrOrNull();
@@ -857,7 +857,7 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
     if (result.isNull())  // Recover by creating AnyPattern.
       result = makeParserErrorResult(new (Context) AnyPattern(colonLoc));
     
-    ParserResult<TypeRepr> Ty = parseType();
+    ParserResult<TypeRepr> Ty = parseDeclResultType(diag::expected_type);
     if (Ty.hasCodeCompletion())
       return makeParserCodeCompletionResult<Pattern>();
     if (!Ty.isNull()) {

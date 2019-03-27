@@ -1346,6 +1346,7 @@ public:
   void completeExprSuperDot(SuperRefExpr *SRE) override;
   void completeExprKeyPath(KeyPathExpr *KPE, SourceLoc DotLoc) override;
 
+  void completeTypeDeclResultBeginning() override;
   void completeTypeSimpleBeginning() override;
   void completeTypeIdentifierWithDot(IdentTypeRepr *ITR) override;
   void completeTypeIdentifierWithoutDot(IdentTypeRepr *ITR) override;
@@ -4446,6 +4447,11 @@ void CodeCompletionCallbacksImpl::completePoundAvailablePlatform() {
   CurDeclContext = P.CurDeclContext;
 }
 
+void CodeCompletionCallbacksImpl::completeTypeDeclResultBeginning() {
+  Kind = CompletionKind::TypeDeclResultBeginning;
+  CurDeclContext = P.CurDeclContext;
+}
+
 void CodeCompletionCallbacksImpl::completeTypeSimpleBeginning() {
   Kind = CompletionKind::TypeSimpleBeginning;
   CurDeclContext = P.CurDeclContext;
@@ -4720,10 +4726,13 @@ static void addExprKeywords(CodeCompletionResultSink &Sink) {
   addKeyword(Sink, "#dsohandle", CodeCompletionKeywordKind::pound_dsohandle, "UnsafeMutableRawPointer");
 }
 
+static void addOpaqueTypeKeyword(CodeCompletionResultSink &Sink) {
+  addKeyword(Sink, "some", CodeCompletionKeywordKind::None, "some");
+}
+
 static void addAnyTypeKeyword(CodeCompletionResultSink &Sink) {
   addKeyword(Sink, "Any", CodeCompletionKeywordKind::None, "Any");
 }
-
 
 void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
                                               bool MaybeFuncBody) {
@@ -4793,6 +4802,13 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::TypeIdentifierWithoutDot:
     break;
 
+  case CompletionKind::TypeDeclResultBeginning:
+    if (!isa<ProtocolDecl>(CurDeclContext))
+      if (CurDeclContext->isTypeContext() ||
+          (ParsedDecl && isa<FuncDecl>(ParsedDecl)))
+        addOpaqueTypeKeyword(Sink);
+
+    LLVM_FALLTHROUGH;
   case CompletionKind::TypeSimpleBeginning:
     addAnyTypeKeyword(Sink);
     break;
@@ -5162,6 +5178,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
 
+  case CompletionKind::TypeDeclResultBeginning:
   case CompletionKind::TypeSimpleBeginning: {
     Lookup.getTypeCompletionsInDeclContext(
         P.Context.SourceMgr.getCodeCompletionLoc());
