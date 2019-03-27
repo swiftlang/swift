@@ -4,6 +4,8 @@ include("../../../../cmake/modules/StandaloneOverlay.cmake")
 add_swift_target_library(swiftCoreLocation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   CLError.swift
 
+  "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
+
   GYB_SOURCES
     NSValue.swift.gyb
 
