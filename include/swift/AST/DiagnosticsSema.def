@@ -4326,6 +4326,11 @@ ERROR(property_with_delegate_conflict_attribute,none,
       "property %0 with a delegate cannot also be "
       "%select{lazy|@NSCopying|@NSManaged|weak|unowned|unmanaged}1",
       (DeclName, int))
+ERROR(property_delegate_type_requirement_not_accessible,none,
+      "%select{private|fileprivate|internal|public|open}0 %1 %2 cannot have "
+      "more restrictive access than its enclosing property delegate type %3 "
+      "(which is %select{private|fileprivate|internal|public|open}4)",
+      (AccessLevel, DescriptiveDeclKind, DeclName, Type, AccessLevel))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

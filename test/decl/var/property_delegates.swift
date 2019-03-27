@@ -430,6 +430,20 @@ struct BadCombinations {
   unowned var z: C by Wrapper // expected-error{{property 'z' with a delegate cannot also be unowned}}
 }
 
+@propertyDelegate
+struct NonVisibleValueDelegate<Value> {
+  private var value: Value // expected-error{{private property 'value' cannot have more restrictive access than its enclosing property delegate type 'NonVisibleValueDelegate' (which is internal)}}
+}
+
+@propertyDelegate
+struct NonVisibleInitDelegate<Value> {
+  var value: Value
+
+  private init(initialValue: Value) { // expected-error{{private initializer 'init(initialValue:)' cannot have more restrictive access than its enclosing property delegate type 'NonVisibleInitDelegate' (which is internal)}}
+    self.value = initialValue
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Explicitly-specified accessors
 // ---------------------------------------------------------------------------

@@ -219,7 +219,8 @@ PropertyDelegateTypeInfoRequest::evaluate(
     nominal->lookupQualified(nominal, ctx.Id_value, NL_QualifiedDefault, decls);
     for (const auto &foundDecl : decls) {
       auto foundVar = dyn_cast<VarDecl>(foundDecl);
-      if (!foundVar || foundVar->isStatic())
+      if (!foundVar || foundVar->isStatic() ||
+          foundVar->getDeclContext() != nominal)
         continue;
 
       unwrapVars.push_back(foundVar);
@@ -247,6 +248,16 @@ PropertyDelegateTypeInfoRequest::evaluate(
     return PropertyDelegateTypeInfo();
   }
 
+  // The 'value' property must be as accessible as the nominal type.
+  if (result.unwrapProperty->getFormalAccess() < nominal->getFormalAccess()) {
+    auto var = result.unwrapProperty;
+    var->diagnose(diag::property_delegate_type_requirement_not_accessible,
+                  var->getFormalAccess(), var->getDescriptiveKind(),
+                  var->getFullName(), nominal->getDeclaredType(),
+                  nominal->getFormalAccess());
+    return PropertyDelegateTypeInfo();
+  }
+
   // Determine whether we have an init(initialValue:), and diagnose
   // ambiguities.
   {
@@ -257,7 +268,7 @@ PropertyDelegateTypeInfoRequest::evaluate(
     nominal->lookupQualified(nominal, initName, NL_QualifiedDefault, decls);
     for (const auto &decl : decls) {
       auto init = dyn_cast<ConstructorDecl>(decl);
-      if (!init)
+      if (!init || init->getDeclContext() != nominal)
         continue;
 
       initialValueInitializers.push_back(init);
@@ -267,9 +278,19 @@ PropertyDelegateTypeInfoRequest::evaluate(
     case 0:
       break;
 
-    case 1:
-      result.initialValueInit = initialValueInitializers.front();
+    case 1: {
+      // 'init(initialValue:)' must be as accessible as the nominal type.
+      auto init = initialValueInitializers.front();
+      if (init->getFormalAccess() < nominal->getFormalAccess()) {
+        init->diagnose(diag::property_delegate_type_requirement_not_accessible,
+                       init->getFormalAccess(), init->getDescriptiveKind(),
+                       init->getFullName(), nominal->getDeclaredType(),
+                       nominal->getFormalAccess());
+      } else {
+        result.initialValueInit = init;
+      }
       break;
+    }
 
     default:
       // Diagnose ambiguous init(initialValue:) initializers.
