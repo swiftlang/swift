@@ -24,21 +24,6 @@
 #include "swift/AST/Types.h"
 using namespace swift;
 
-void swift::simple_display(
-    llvm::raw_ostream &out, const PropertyDelegateTypeInfo &propertyDelegate) {
-  out << "{ ";
-  if (propertyDelegate.unwrapProperty)
-    out << propertyDelegate.unwrapProperty->printRef();
-  else
-    out << "null";
-  out << ", ";
-  if (propertyDelegate.initialValueInit)
-    out << propertyDelegate.initialValueInit->printRef();
-  else
-    out << "null";
-  out << " }";
-}
-
 UnboundGenericType *swift::getUnboundPropertyDelegateType(
     VarDecl *var, TypeResolution resolution) {
   assert(var->hasPropertyDelegate() && "Only call with property delegates");

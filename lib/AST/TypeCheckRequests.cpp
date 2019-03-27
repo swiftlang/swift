@@ -544,3 +544,18 @@ PropertyDelegateTypeInfo swift::getAttachedPropertyDelegateInfo(
       ctx.evaluator, PropertyDelegateTypeInfoRequest(behaviorType),
       PropertyDelegateTypeInfo());
 }
+
+void swift::simple_display(
+    llvm::raw_ostream &out, const PropertyDelegateTypeInfo &propertyDelegate) {
+  out << "{ ";
+  if (propertyDelegate.unwrapProperty)
+    out << propertyDelegate.unwrapProperty->printRef();
+  else
+    out << "null";
+  out << ", ";
+  if (propertyDelegate.initialValueInit)
+    out << propertyDelegate.initialValueInit->printRef();
+  else
+    out << "null";
+  out << " }";
+}
