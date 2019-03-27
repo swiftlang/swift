@@ -76,8 +76,6 @@ struct SomeProtoConformer : SomeProto {
     func foo() -> String { "howdy" }
 }
 
-class SomeClass {}
-
 class Base {}
 class Derived : Base {}
 
@@ -469,10 +467,6 @@ func ff_implicitTemporarilyEscapableExpr(_ cl: () -> Void) -> () -> Void {
 
 func ff_implicitOpenExistentialExpr(_ f: SomeProto) -> String {
     f.foo()
-}
-
-func ff_implicitClassMetatypeToAnyObjectExpr() -> AnyObject {
-    SomeClass.self
 }
 
 func ff_implicitInjectIntoOptionalExpr(_ int: Int) -> Int? {
