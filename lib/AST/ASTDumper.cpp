@@ -2150,7 +2150,7 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitArgumentShuffleExpr(ArgumentShuffleExpr *E) {
-    printCommon(E, "tuple_shuffle_expr");
+    printCommon(E, "argument_shuffle_expr");
     switch (E->getTypeImpact()) {
     case ArgumentShuffleExpr::ScalarToTuple:
       OS << " scalar_to_tuple";
