@@ -1,3 +1,6 @@
+include(SwiftWindowsSupport)
+swift_swap_compiler_if_needed("SyntaxParserUnitTests")
+
 add_swift_unittest(SwiftSyntaxParserTests
   SyntaxParserTests.cpp
 )
