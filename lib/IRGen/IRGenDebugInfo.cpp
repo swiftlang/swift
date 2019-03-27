@@ -241,11 +241,15 @@ private:
       return L;
 
     if (auto *ClangDecl = D->getClangDecl()) {
-      auto ClangSrcLoc = ClangDecl->getBeginLoc();
+      clang::SourceLocation ClangSrcLoc = ClangDecl->getBeginLoc();
       clang::SourceManager &ClangSM =
           CI.getClangASTContext().getSourceManager();
-      L.Line = ClangSM.getPresumedLineNumber(ClangSrcLoc);
-      L.Filename = ClangSM.getBufferName(ClangSrcLoc);
+      clang::PresumedLoc PresumedLoc = ClangSM.getPresumedLoc(ClangSrcLoc);
+      if (!PresumedLoc.isValid())
+        return L;
+      L.Line = PresumedLoc.getLine();
+      L.Column = PresumedLoc.getColumn();
+      L.Filename = PresumedLoc.getFilename();
       return L;
     }
     return getSwiftDebugLoc(DI, D, End);

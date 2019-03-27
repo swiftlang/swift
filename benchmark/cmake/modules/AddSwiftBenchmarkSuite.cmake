@@ -77,6 +77,11 @@ macro(configure_sdks_darwin)
   set(appletvos_ver "9.1")
   set(watchos_ver "2.0")
 
+  set(macosx_vendor "apple")
+  set(iphoneos_vendor "apple")
+  set(appletvos_vendor "apple")
+  set(watchos_vendor "apple")
+
   set(macosx_triple_platform "macosx")
   set(iphoneos_triple_platform "ios")
   set(appletvos_triple_platform "tvos")

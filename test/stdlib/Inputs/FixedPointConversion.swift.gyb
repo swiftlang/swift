@@ -1,7 +1,10 @@
 // FIXME(integers): add tests that perform the same checks in generic code
 
 %{
-import gyb
+from SwiftIntTypes import all_integer_types, int_max, int_min
+from SwiftFloatingPointTypes import all_floating_point_types, getFtoIBounds
+
+from decimal import Decimal
 }%
 
 import StdlibUnittest
@@ -34,15 +37,7 @@ func getTooLargeMessage() -> String {
   return ""
 }
 
-%{
-
-int_to_int_conversion_template = gyb.parse_template("int_to_int_conversion",
-"""
-%{
-from SwiftIntTypes import all_integer_types, int_max, int_min
-from SwiftFloatingPointTypes import all_floating_point_types
-
-}%
+% word_bits = int(target_ptrsize)
 % for self_ty in all_integer_types(word_bits):
 %   selfBits = self_ty.bits
 %   selfSigned = self_ty.is_signed
@@ -50,6 +45,7 @@ from SwiftFloatingPointTypes import all_floating_point_types
 %   selfMax = self_ty.max
 %   Self = self_ty.stdlib_name
 
+%   # Test conversion behaviors for all integer types
 %   for other_ty in all_integer_types(word_bits):
 %     otherBits = other_ty.bits
 %     otherSigned = other_ty.is_signed
@@ -60,9 +56,10 @@ from SwiftFloatingPointTypes import all_floating_point_types
 %     for testValue in [selfMin, selfMax, selfMin - 1, selfMax + 1, otherMin, otherMax]:
 
 %       if testValue < otherMin or testValue > otherMax:
-%          # Can't construct `other` value, do nothing and continue.
-
+%         # Can't construct `other` value, do nothing and continue.
+%         pass
 %       elif testValue >= selfMin and testValue <= selfMax:
+%         # Test value can be represented by Self, test conversion succeeds
 
 /// Always-safe conversion from ${Other}(${testValue}) to ${Self}.
 FixedPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}") {
@@ -75,18 +72,19 @@ FixedPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}") 
 FixedPointConversionFailure.test("${Other}To${Self}FailableConversion/dest=${testValue}") {
   // Test that nothing interesting happens and we end up with a non-nil, identical result.
   let input = get${Other}(${testValue})
-  var result = ${Self}(exactly: input)
+  let result = ${Self}(exactly: input)
   expectEqual(${testValue}, result)
 }
 
 %       else:
+%         # Test value is out of range of Self, test conversion fails
 
 /// Always-failing conversion from ${Other}(${testValue}) to ${Self}.
 FixedPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}") {
   // Test that we check if we fail and crash when an integer would be truncated in conversion.
   let input = get${Other}(${testValue})
   expectCrashLater()
-  var result = ${Self}(input)
+  let result = ${Self}(input)
   _blackHole(result)
 }
 
@@ -96,60 +94,78 @@ FixedPointConversionFailure.test("${Other}To${Self}Conversion/dest=${testValue}"
   let input = get${Other}(${testValue})
   expectNil(${Self}(exactly: input))
 }
-%       end
 
+%       end
 %     end # for testValue in ...
 %   end # for in all_integer_types (Other)
 
+%   # Test conversion behaviors for all floating-point types
 %   for other_type in all_floating_point_types():
 %     Other = "Float" + str(other_type.bits)
 %     otherMin = -int_max(bits=other_type.explicit_significand_bits, signed=False)
 %     otherMax = int_max(bits=other_type.explicit_significand_bits, signed=False)
+%     (selfFtoIMin, selfFtoIMax) = getFtoIBounds(other_type.bits, selfBits, selfSigned)
 
 %     if Other == 'Float80':
 #if !os(Windows) && (arch(i386) || arch(x86_64))
 %     end
 
-%     for testValue in [repr(value) for value in [selfMin, selfMax, selfMin - 0.1, selfMax + 0.1, otherMin, otherMax, 0.0, -0.0, 0.1, -0.1]]:
+%     testValues = [
+%       Decimal(selfMin),
+%       Decimal(selfMax),
+%       Decimal(selfFtoIMin) - Decimal('0.1'),
+%       Decimal(selfFtoIMax) + Decimal('0.1'),
+%       Decimal(otherMin),
+%       Decimal(otherMax),
+%       Decimal('0.0'),
+%       Decimal('-0.0'),
+%       Decimal('0.1'),
+%       Decimal('-0.1')
+%     ]
+%     for testValue in testValues:
+%       testValueStr = str(testValue)
 
 %       if testValue < otherMin or testValue > otherMax:
 %         # Can't construct `other` value to test from, do nothing and continue.
+%         pass
+%       elif testValue >= selfFtoIMin and testValue <= selfFtoIMax and (testValue % 1).is_zero():
+%         # Test value can be represented exactly by Self, test two-way conversion
 
-%       elif testValue >= selfMin and testValue <= selfMax and testValue % 1 == 0 and testValue != -0.0:
-
-FloatingPointConversionTruncations.test("${Other}To${Self}Conversion/dest=${testValue}") {
-  let input = get${Other}(${testValue})
+FloatingPointConversionTruncations.test("${Other}To${Self}Conversion/dest=${testValueStr}") {
+  let input = get${Other}(${testValueStr})
   let result = ${Self}(input)
-  var resultConvertedBack = ${Other}(result)
-  expectEqual(${testValue}, resultConvertedBack)
+  let resultConvertedBack = ${Other}(result)
+  expectEqual(${testValueStr}, resultConvertedBack)
 }
 
-FloatingPointConversionFailures.test("${Other}To${Self}FailableConversion/dest=${testValue}") {
-  let input = get${Other}(${testValue})
-  expectNil(${Self}(exactly: input))
+FloatingPointConversionFailures.test("${Other}To${Self}FailableConversion/dest=${testValueStr}") {
+  let input = get${Other}(${testValueStr})
+  expectNotNil(${Self}(exactly: input))
 }
 
 %       else:
-
-%         if testValue > selfMax:
-FloatingPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}")
+%         if testValue > selfFtoIMax:
+%           # Test value exceeds maximum value of Self, test for too large message
+FloatingPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValueStr}")
 .crashOutputMatches(getTooLargeMessage()).code {
   expectCrashLater()
-%         elif testValue < selfMin:
-FloatingPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}")
+%         elif testValue < selfFtoIMin:
+%           # Test value doesn't reach minimum value of Self, test for too small message
+FloatingPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValueStr}")
 .crashOutputMatches(getTooSmallMessage()).code {
   expectCrashLater()
 %         else:
-FloatingPointConversionTruncations.test("${Other}To${Self}Conversion/dest=${testValue}") {
+%           # Test value can be represented inexactly by Self, test for truncation
+FloatingPointConversionTruncations.test("${Other}To${Self}Conversion/dest=${testValueStr}") {
 %         end
-  let input = get${Other}(${testValue})
-  var result = ${Self}(input)
-  var resultConvertedBack = ${Other}(result)
+  let input = get${Other}(${testValueStr})
+  let result = ${Self}(input)
+  let resultConvertedBack = ${Other}(result)
   expectNotEqual(input, resultConvertedBack)
 }
 
-FloatingPointConversionFailures.test("${Other}To${Self}Conversion/dest=${testValue}") {
-  let input = get${Other}(${testValue})
+FloatingPointConversionFailures.test("${Other}To${Self}Conversion/dest=${testValueStr}") {
+  let input = get${Other}(${testValueStr})
   expectNil(${Self}(exactly: input))
 }
 %       end
@@ -207,27 +223,5 @@ FloatingPointConversionFailures.test("${Self}/${Other}/NaN") {
 
 %   end # for in all_floating_point_types (Other)
 % end # for in all_integer_types (Self)
-
-""")
-
-}%
-
-#if arch(i386) || arch(arm)
-
-  ${gyb.execute_template(
-      int_to_int_conversion_template,
-      word_bits=32)}
-
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-
-  ${gyb.execute_template(
-      int_to_int_conversion_template,
-      word_bits=64)}
-
-#else
-
-_UnimplementedError()
-
-#endif
 
 runAllTests()

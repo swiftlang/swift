@@ -4,6 +4,7 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 // REQUIRES: CPU=arm64 || CPU=x86_64
+// REQUIRES: rdar49026133
 
 //
 // Tests for small strings

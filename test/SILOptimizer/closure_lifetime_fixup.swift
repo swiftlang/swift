@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %S/../Inputs/resilient_struct.swift -enable-resilience -emit-module -emit-module-path %t/resilient_struct.swiftmodule
-// RUN: %target-swift-frontend %S/../Inputs/resilient_enum.swift -I %t -enable-resilience -emit-module -emit-module-path %t/resilient_enum.swiftmodule
-// RUN: %target-swift-frontend %s -sil-verify-all -enable-sil-ownership -emit-sil -I %t -o - | %FileCheck %s --check-prefix=CHECK --check-prefix=%target-os
+// RUN: %target-swift-frontend %S/../Inputs/resilient_struct.swift -enable-library-evolution -emit-module -emit-module-path %t/resilient_struct.swiftmodule
+// RUN: %target-swift-frontend %S/../Inputs/resilient_enum.swift -I %t -enable-library-evolution -emit-module -emit-module-path %t/resilient_enum.swiftmodule
+// RUN: %target-swift-frontend %s -sil-verify-all -emit-sil -I %t -o - | %FileCheck %s --check-prefix=CHECK --check-prefix=%target-os
 
 import resilient_struct
 import resilient_enum

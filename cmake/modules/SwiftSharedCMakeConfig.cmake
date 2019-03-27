@@ -63,8 +63,8 @@ macro(swift_common_standalone_build_config_llvm product)
   endif()
 
   if(CMAKE_CROSSCOMPILING)
-    set(LLVM_NATIVE_BUILD "${LLVM_BINARY_DIR}/NATIVE")
-    if(NOT EXISTS "${LLVM_NATIVE_BUILD}")
+    set(LLVM_NATIVE_BUILD_DIR "${LLVM_BINARY_DIR}/NATIVE")
+    if(NOT EXISTS "${LLVM_NATIVE_BUILD_DIR}")
       message(FATAL_ERROR
         "Attempting to cross-compile swift standalone but no native LLVM build
         found.  Please cross-compile LLVM as well.")
