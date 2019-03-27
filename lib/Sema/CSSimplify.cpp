@@ -5228,107 +5228,6 @@ retry_after_fail:
   return fnType;
 }
 
-/// Returns the `call` declarations (if they exist) implemented or inherited
-/// by a type.
-/// This function may be slow for deep class hierarchies and multiple protocol
-/// conformances, but it is invoked only after other constraint simplification
-/// rules fail.
-static llvm::DenseSet<CallDecl *>
-getCallDeclarations(Type type, ConstraintSystem &CS,
-                    const ConstraintLocatorBuilder &locator) {
-  auto canType = type->getCanonicalType();
-  auto it = CS.CallDeclCache.find(canType);
-  if (it != CS.CallDeclCache.end()) return it->second;
-
-  // Calculate `call` declarations for composite types with multiple components
-  // (protocol composition types and archetypes).
-  auto calculateForComponentTypes =
-      [&](ArrayRef<Type> componentTypes) -> llvm::DenseSet<CallDecl *> {
-    llvm::DenseSet<CallDecl *> callDecls;
-    for (auto componentType : componentTypes) {
-      auto *nominal = componentType->getAnyNominal();
-      callDecls.insert(nominal->getCallDeclarations().begin(),
-                       nominal->getCallDeclarations().end());
-    }
-    return callDecls;
-  };
-
-  // Calculate `call` declarations.
-  auto calculate = [&]() -> llvm::DenseSet<CallDecl *> {
-    // If this is an archetype type, check if any types it conforms to
-    // (superclass or protocols) have`call` declarations.
-    if (auto archetype = dyn_cast<ArchetypeType>(canType)) {
-      SmallVector<Type, 2> componentTypes;
-      for (auto protocolDecl : archetype->getConformsTo())
-        componentTypes.push_back(protocolDecl->getDeclaredType());
-      if (auto superclass = archetype->getSuperclass())
-        componentTypes.push_back(superclass);
-      return calculateForComponentTypes(componentTypes);
-    }
-
-    // If this is a protocol composition, check if any of its members have
-    // `call` declarations.
-    if (auto protocolComp = dyn_cast<ProtocolCompositionType>(canType))
-      return calculateForComponentTypes(protocolComp->getMembers());
-
-    // Otherwise, this must be a nominal type.
-    // Structural types cannot define `call` declarations.
-    auto nominal = canType->getAnyNominal();
-    if (!nominal) return llvm::DenseSet<CallDecl *>();
-
-    // If this type conforms to protocols, look up all of their `call`
-    // declaration requirements.
-    // FIXME: Fix this to handle overridden requirements, e.g. using
-    // `OverriddenDeclsRequest`. Mimic logic from or unify logic with
-    // `lookupQualified`.
-    llvm::DenseSet<CallDecl *> callDecls;
-    for (auto p : nominal->getAllProtocols()) {
-      if (p->getCallDeclarations().empty())
-        continue;
-      /*
-      for (auto *callDecl : p->getCallDeclarations())
-        if (callDecl->isProtocolRequirement())
-          callDecls.insert(callDecl);
-      */
-      callDecls.insert(p->getCallDeclarations().begin(),
-                       p->getCallDeclarations().end());
-    }
-    // Hack: if any are found, return them directly. See FIXME above.
-    if (!callDecls.empty())
-      return callDecls;
-
-    // Walk superclasses, if present.
-    llvm::SmallPtrSet<const NominalTypeDecl*, 8> visitedDecls;
-    while (1) {
-      // If we found a circular parent class chain, reject this.
-      if (!visitedDecls.insert(nominal).second)
-        return llvm::DenseSet<CallDecl *>();
-
-      // If this type has the attribute on it, then look up the methods.
-      if (!nominal->getCallDeclarations().empty()) {
-        callDecls.insert(nominal->getCallDeclarations().begin(),
-                         nominal->getCallDeclarations().end());
-      }
-
-      // If this type is a class with a superclass, check superclasses.
-      if (auto *cd = dyn_cast<ClassDecl>(nominal)) {
-        if (auto superClass = cd->getSuperclassDecl()) {
-          nominal = superClass;
-          continue;
-        }
-      }
-
-      return callDecls;
-    }
-  };
-
-  auto result = calculate();
-  // Cache the result if the type does not contain type variables.
-  if (!type->hasTypeVariable())
-    CS.CallDeclCache[canType] = result;
-  return result;
-}
-
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyApplicableFnConstraint(
                                            Type type1,
@@ -5490,18 +5389,27 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     return simplified;
   }
 
-  // TODO: WIP!
-  // Handle `call` declaration application.
+  // Handle applications of types with `call` members.
   if (auto nominal = desugar2->getAnyNominal()) {
-    auto callDecls = getCallDeclarations(desugar2, *this, locator);
+    auto &ctx = getASTContext();
+    // Get all `call` members of the nominal type.
+    SmallVector<CallDecl *, 4> callDecls;
+    auto candidates = TC.lookupMember(DC, nominal->getDeclaredTypeInContext(),
+                                      DeclName(ctx.getIdentifier("call")));
+    for (auto entry : candidates) {
+      auto callDecl = dyn_cast<CallDecl>(entry.getValueDecl());
+      if (!callDecl)
+        continue;
+      callDecls.push_back(callDecl);
+    }
 
-    // Handle `call` method calls.
+    // Handle `call` member calls.
     if (!callDecls.empty()) {
-      // Create a type variable for the `call` method.
+      // Create a type variable for the `call` member.
       auto loc = getConstraintLocator(locator);
       auto tv = createTypeVariable(loc, TVO_CanBindToLValue);
 
-      // Record the `call` method overload set.
+      // Record the `call` member overload set.
       SmallVector<OverloadChoice, 4> choices;
       for (auto candidate : callDecls) {
         TC.validateDecl(candidate);
@@ -5525,7 +5433,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
                       tvParam, locatorBuilder);
         tvParams.push_back(AnyFunctionType::Param(tvParam));
       }
-      // Create target function type and applicable function constraint.
+      // Create target function type and an applicable function constraint.
       AnyFunctionType *funcType =
           FunctionType::get(tvParams, func1->getResult());
       addConstraint(ConstraintKind::ApplicableFunction,

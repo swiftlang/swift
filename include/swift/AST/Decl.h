@@ -3298,21 +3298,6 @@ public:
                              ToStoredPropertyOrMissingMemberPlaceholder());
   }
 
-private:
-  /// Predicate used to filter CallDeclRange.
-  struct ToCallDecl {
-    ToCallDecl() {}
-    Optional<CallDecl *> operator()(Decl *decl) const;
-  };
-
-public:
-  /// A range for iterating the call declarations of a nominal type.
-  using CallDeclRange = OptionalTransformRange<DeclRange,
-                                               ToCallDecl>;
-
-  /// Return a collection of the call declarations of this nominal type.
-  CallDeclRange getCallDeclarations() const;
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_NominalTypeDecl &&
@@ -6836,13 +6821,6 @@ NominalTypeDecl::ToStoredPropertyOrMissingMemberPlaceholder
       return missing;
   }
 
-  return None;
-}
-
-inline Optional<CallDecl *>
-NominalTypeDecl::ToCallDecl::operator()(Decl *decl) const {
-  if (auto callDecl = dyn_cast<CallDecl>(decl))
-    return callDecl;
   return None;
 }
 

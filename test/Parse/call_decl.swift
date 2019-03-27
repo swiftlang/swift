@@ -88,3 +88,4 @@ func call(_ fn: () -> Void) {}
 
 // expression
 call() {}
+call {}

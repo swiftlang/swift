@@ -3216,10 +3216,6 @@ auto NominalTypeDecl::getStoredProperties(bool skipInaccessible) const
                              ToStoredProperty(skipInaccessible));
 }
 
-auto NominalTypeDecl::getCallDeclarations() const -> CallDeclRange {
-  return CallDeclRange(getMembers(), ToCallDecl());
-}
-
 bool NominalTypeDecl::isOptionalDecl() const {
   return this == getASTContext().getOptionalDecl();
 }

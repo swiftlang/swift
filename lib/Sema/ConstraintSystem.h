@@ -1080,9 +1080,6 @@ public:
   /// The locators of \c Defaultable constraints whose defaults were used.
   SmallVector<ConstraintLocator *, 8> DefaultedConstraints;
 
-  /// A cache that stores the `call` declarations of a type.
-  llvm::DenseMap<CanType, llvm::DenseSet<CallDecl *>> CallDeclCache;
-
   /// A cache that stores the @dynamicCallable required methods implemented by
   /// types.
   llvm::DenseMap<CanType, DynamicCallableMethods> DynamicCallableCache;

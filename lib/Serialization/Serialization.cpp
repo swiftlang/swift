@@ -3410,9 +3410,6 @@ void Serializer::writeDecl(const Decl *D) {
     break;
   }
 
-  // TODO: Revisit serialization.
-  // Create `CallLayout`? Not all fields from `FuncLayout` are necessary:
-  // `call` declarations cannot be static.
   case DeclKind::Call: {
     auto fn = cast<CallDecl>(D);
     verifyAttrSerializable(fn);

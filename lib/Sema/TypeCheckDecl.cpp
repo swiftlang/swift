@@ -3843,7 +3843,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   }
 
   case DeclKind::Func:
-  case DeclKind::Accessor: {
+  case DeclKind::Accessor:
+  case DeclKind::Call: {
     auto *FD = cast<FuncDecl>(D);
     assert(!FD->hasInterfaceType());
 
@@ -4152,30 +4153,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // Perform accessor-related validation.
     validateAbstractStorageDecl(*this, SD);
-
-    break;
-  }
-
-  case DeclKind::Call: {
-    auto *CD = cast<CallDecl>(D);
-    DeclValidationRAII IBV(CD);
-    validateGenericFuncSignature(CD);
-    CD->setSignatureIsValidated();
-    checkDeclAttributesEarly(CD);
-    validateAttributes(*this, CD);
-
-    auto *TyR = CD->getBodyResultTypeLoc().getTypeRepr();
-    if (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
-      auto &C = CD->getASTContext();
-      CD->getAttrs().add(
-          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
-    }
-
-    // Member subscripts need some special validation logic.
-    if (CD->getDeclContext()->isTypeContext()) {
-      // If this is a class member, mark it final if the class is final.
-      inferFinalAndDiagnoseIfNeeded(*this, CD, StaticSpellingKind::None);
-    }
 
     break;
   }

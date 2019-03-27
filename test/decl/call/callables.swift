@@ -12,7 +12,7 @@ let foo = SimpleCallable()
 _ = foo(1)
 _ = foo(foo(1))
 
-// Test direct `call` method references.
+// Test direct `call` member references.
 
 _ = foo.call(1)
 _ = [1, 2, 3].map(foo.call)
@@ -46,11 +46,93 @@ struct MultipleArgsCallable {
 }
 
 let bar = MultipleArgsCallable()
-
 _ = bar(x: 1, y: 1)
 _ = bar.call(x: 1, y: 1)
 _ = bar(x: bar.call(x: 1, y: 1)[0], y: 1)
 _ = bar.call(x: bar(x: 1, y: 1)[0], y: 1)
+
+struct Extended {}
+extension Extended {
+  @discardableResult
+  call() -> Extended {
+    return self
+  }
+}
+var extended = Extended()
+extended()().call()()
+
+struct OptionalCallable {
+  call() -> OptionalCallable? {
+    return self
+  }
+}
+var optional = OptionalCallable()
+_ = optional()?.call()?()
+
+struct VariadicCallable {
+  call(_ args: Int...) -> [Int] {
+    return args
+  }
+}
+var variadic = VariadicCallable()
+_ = variadic()
+_ = variadic(1, 2, 3)
+
+struct Mutating {
+  var x: Int
+  mutating call() {
+    x += 1
+  }
+}
+func testMutating(_ x: Mutating, _ y: inout Mutating) {
+  _ = x() // expected-error {{cannot use mutating member on immutable value: 'x' is a 'let' constant}}
+  _ = x.call() // expected-error {{cannot use mutating member on immutable value: 'x' is a 'let' constant}}
+  _ = y()
+  _ = y.call()
+}
+
+struct Throwing {
+  call() throws -> Throwing {
+    return self
+  }
+}
+var throwing = Throwing()
+_ = try throwing()
+
+enum BinaryOperation {
+  case add, subtract, multiply, divide
+}
+extension BinaryOperation {
+  call(_ lhs: Float, _ rhs: Float) -> Float {
+    switch self {
+    case .add: return lhs + rhs
+    case .subtract: return lhs - rhs
+    case .multiply: return lhs * rhs
+    case .divide: return lhs / rhs
+    }
+  }
+}
+_ = BinaryOperation.add(1, 2)
+
+class BaseClass {
+  call() -> Self {
+    return self
+  }
+}
+class SubClass : BaseClass {
+  override call() -> Self {
+    return self
+  }
+}
+
+func testIUO(a: SimpleCallable!, b: MultipleArgsCallable!, c: Extended!,
+             d: OptionalCallable!, e: Throwing!) {
+  _ = a(1)
+  _ = b(x: 1, y: 1)
+  _ = c()
+  _ = d()?.call()?()
+  _ = try? e()
+}
 
 // Errors.
 

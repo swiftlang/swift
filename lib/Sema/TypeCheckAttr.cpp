@@ -949,7 +949,7 @@ static bool hasValidDynamicCallableMethod(TypeChecker &TC,
   });
 
   // If there are no valid candidates, return false.
-  if (candidates.size() == 0) return false;
+  if (candidates.empty()) return false;
   return true;
 }
 

@@ -7134,6 +7134,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     };
 
   // The function is always an rvalue.
+  // Save the original potentially lvalue function for rewriting `call` member
+  // applications.
+  auto *originalFn = fn;
   fn = cs.coerceToRValue(fn);
 
   // Resolve applications of decls with special semantics.
@@ -7320,24 +7323,36 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     return finishApply(apply, openedType, locator);
   }
 
-  // Handle `call` method applications.
+  // Handle `call` member applications.
   auto &ctx = cs.getASTContext();
 
   TupleExpr *arg = dyn_cast<TupleExpr>(apply->getArg());
   if (auto parenExpr = dyn_cast<ParenExpr>(apply->getArg()))
     arg = TupleExpr::createImplicit(ctx, parenExpr->getSubExpr(), {});
 
-  // Get resolved `call` method and verify it.
+  // Get resolved `call` member and verify it.
   auto loc = locator.withPathElement(ConstraintLocator::ApplyFunction);
   auto selected = solution.getOverloadChoice(cs.getConstraintLocator(loc));
   auto choice = selected.choice;
   if (auto *method = dyn_cast<CallDecl>(selected.choice.getDecl())) {
+    auto methodType = selected.openedFullType->castTo<AnyFunctionType>();
     bool isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
     auto callDeclLocator = cs.getConstraintLocator(
         locator.withPathElement(ConstraintLocator::ApplyFunction)
         .withPathElement(ConstraintLocator::CallMember));
-    // Create direct reference to `call` method.
-    Expr *declRef = buildMemberRef(fn, selected.openedFullType,
+    assert(methodType->getNumParams() == 1);
+    auto selfParam = methodType->getParams().front();
+    // Diagnose `mutating` method call on immutable value.
+    if (!cs.getType(originalFn)->hasLValueType() && selfParam.isInOut()) {
+      AssignmentFailure failure(
+          originalFn, cs, originalFn->getLoc(),
+          diag::cannot_pass_rvalue_mutating_subelement,
+          diag::cannot_pass_rvalue_mutating);
+      failure.diagnose();
+      return nullptr;
+    }
+    // Create direct reference to `call` member.
+    Expr *declRef = buildMemberRef(originalFn, selected.openedFullType,
                                    /*dotLoc=*/SourceLoc(), choice,
                                    DeclNameLoc(fn->getEndLoc()),
                                    selected.openedType, locator,
@@ -7347,7 +7362,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     if (!declRef)
       return nullptr;
     declRef->setImplicit(apply->isImplicit());
-    apply->setFn(declRef) ;
+    apply->setFn(declRef);
     Expr *result = apply;
     cs.TC.typeCheckExpression(result, cs.DC);
     cs.cacheExprTypes(result);
