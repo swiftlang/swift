@@ -299,8 +299,8 @@ def emit_pch : Flag<["-"], "emit-pch">,
 def pch_disable_validation : Flag<["-"], "pch-disable-validation">,
   HelpText<"Disable validating the persistent PCH">;
 
-def verify_sil_ownership : Flag<["-"], "verify-sil-ownership">,
-  HelpText<"Verify ownership invariants during SIL Verification ">;
+def disable_sil_ownership_verifier : Flag<["-"], "disable-sil-ownership-verifier">,
+  HelpText<"Do not verify ownership invariants during SIL Verification ">;
 
 def enable_mandatory_semantic_arc_opts : Flag<["-"], "enable-mandatory-semantic-arc-opts">,
   HelpText<"Enable the mandatory semantic arc optimizer">;
@@ -416,6 +416,9 @@ def import_module : Separate<["-"], "import-module">,
 def print_stats : Flag<["-"], "print-stats">,
   HelpText<"Print various statistics">;
 
+def check_onone_completeness : Flag<["-"], "check-onone-completeness">,
+  HelpText<"Print errors if the compile OnoneSupport module is missing symbols">;
+
 def debugger_testing_transform : Flag<["-"], "debugger-testing-transform">,
   HelpText<"Instrument the code with calls to an intrinsic that record the expected values of "
            "local variables so they can be compared against the results from the debugger.">;
@@ -520,6 +523,9 @@ def prebuilt_module_cache_path_EQ :
 def enable_resilience_bypass : Flag<["-"], "enable-resilience-bypass">,
    HelpText<"Completely bypass resilience when accessing types in resilient frameworks">;
 
+def force_public_linkage : Flag<["-"], "force-public-linkage">,
+   HelpText<"Force public linkage for private symbols. Used by LLDB.">;
+
 def dump_api_path : Separate<["-"], "dump-api-path">,
   HelpText<"The path to output swift interface files for the compiled source files">;
 
@@ -551,5 +557,9 @@ def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">
 def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
   Flags<[FrontendOption]>,
   HelpText<"One of 'all', 'resilient' or 'fragile'">;
+
+def enable_objc_resilient_class_stubs : Flag<["-"], "enable-resilient-objc-class-stubs">,
+  HelpText<"Emit Objective-C resilient class stubs for classes with "
+           "resiliently-sized metadata">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

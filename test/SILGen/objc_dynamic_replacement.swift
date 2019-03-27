@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -I %t -module-name SomeModule -emit-module -emit-module-path=%t/SomeModule.swiftmodule %S/Inputs/objc_dynamic_replacement.swift -enable-private-imports -swift-version 5 -enable-implicit-dynamic
-// RUN: %target-swift-emit-silgen -I %t -verify-sil-ownership %s -swift-version 5 | %FileCheck %s
+// RUN: %target-swift-emit-silgen -I %t %s -swift-version 5 | %FileCheck %s
 
 // REQUIRES: objc_interop
 

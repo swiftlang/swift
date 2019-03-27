@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -verify-sil-ownership %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -verify-sil-ownership -enable-library-evolution %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-library-evolution %s | %FileCheck %s
 
 // RUN: %target-swift-frontend -emit-ir %s
 // RUN: %target-swift-frontend -emit-ir -enable-library-evolution %s

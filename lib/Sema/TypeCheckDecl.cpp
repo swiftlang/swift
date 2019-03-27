@@ -1975,7 +1975,10 @@ static bool computeIsSetterMutating(TypeChecker &TC,
       if ((result || storage->isGetterMutating()) != modifyResult) {
         TC.diagnose(modifyAccessor,
                     diag::modify_mutatingness_differs_from_setter,
-                    modifyResult);
+                    modifyResult ? SelfAccessKind::Mutating
+                                 : SelfAccessKind::NonMutating,
+                    modifyResult ? SelfAccessKind::NonMutating
+                                 : SelfAccessKind::Mutating);
         TC.diagnose(storage->getSetter(), diag::previous_accessor, "setter", 0);
         modifyAccessor->setInvalid();
       }
@@ -2590,17 +2593,8 @@ public:
                                        ArrayRef<VarDecl *> vars) {
     // Check whether we have an Objective-C-defined class in our
     // inheritance chain.
-    while (classDecl) {
-      // If we found an Objective-C-defined class, continue checking.
-      if (classDecl->hasClangNode())
-        break;
-
-      // If we ran out of superclasses, we're done.
-      if (!classDecl->hasSuperclass())
-        return false;
-
-      classDecl = classDecl->getSuperclassDecl();
-    }
+    if (!classDecl->checkAncestry(AncestryFlags::ClangImported))
+      return false;
 
     // If all of the variables are @objc, we can use @NSManaged.
     for (auto var : vars) {

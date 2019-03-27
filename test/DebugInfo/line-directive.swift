@@ -8,7 +8,10 @@ func f() {
   markUsed("Test")
 #sourceLocation(file: "abc.swift", line: 142)
   markUsed("abc again")
-#sourceLocation(file: "/absolute/path/def.swift", line:  142)
+  // NOTE: we use `//absolute/path` here as this is an absolute path on the
+  // alternate root.  However, it is also a path which is a UNC path on Windows.
+  // This allows the path to be absolute across both environments.
+#sourceLocation(file: "//absolute/path/def.swift", line:  142)
   markUsed("jump directly to def")
 }
 
@@ -19,7 +22,7 @@ func f() {
 // CHECK: .loc	[[ABC]] 42
 // CHECK: .loc	[[MAIN]] 8
 // CHECK: .loc	[[ABC]] 142
-// CHECK: .file	[[DEF:.*]] "/absolute/path/def.swift"
+// CHECK: .file	[[DEF:.*]] "//absolute/path{{/|\\\\}}def.swift"
 // CHECK: .loc	[[DEF]] 142
 // CHECK: .asciz "{{.*}}test/DebugInfo"
 
@@ -32,6 +35,6 @@ func f() {
 // VFS: .loc  [[ABC]] 42
 // VFS: .loc  [[MAIN]] 8
 // VFS: .loc  [[ABC]] 142
-// VFS: .file  [[DEF:.*]] "/absolute/path/def.swift"
+// VFS: .file  [[DEF:.*]] "//absolute/path{{/|\\\\}}def.swift"
 // VFS: .loc  [[DEF]] 142
 // VFS: .asciz "{{.*}}test/DebugInfo"

@@ -25,6 +25,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Module.h"
@@ -2676,12 +2677,12 @@ struct ArgSpecialDest {
 
 using ArgSpecialDestArray = MutableArrayRef<ArgSpecialDest>;
 
-class TupleShuffleArgEmitter;
+class ArgumentShuffleEmitter;
 
 class ArgEmitter {
-  // TODO: Refactor out the parts of ArgEmitter needed by TupleShuffleArgEmitter
+  // TODO: Refactor out the parts of ArgEmitter needed by ArgumentShuffleEmitter
   // into its own "context struct".
-  friend class TupleShuffleArgEmitter;
+  friend class ArgumentShuffleEmitter;
 
   SILGenFunction &SGF;
   SILFunctionTypeRepresentation Rep;
@@ -2731,7 +2732,7 @@ public:
     auto origParamType = AbstractionPattern::getTuple(origParamTypes);
 
     if (arg.isShuffle()) {
-      auto *shuffle = cast<TupleShuffleExpr>(std::move(arg).asKnownExpr());
+      auto *shuffle = cast<ArgumentShuffleExpr>(std::move(arg).asKnownExpr());
       emitShuffle(shuffle, origParamType);
       maybeEmitForeignErrorArgument();
       return;
@@ -2940,7 +2941,7 @@ private:
     emitExpanded({ e, SGF.emitRValue(e) }, origParamType);
   }
 
-  void emitShuffle(TupleShuffleExpr *shuffle, AbstractionPattern origType);
+  void emitShuffle(ArgumentShuffleExpr *shuffle, AbstractionPattern origType);
 
   void emitIndirect(ArgumentSource &&arg,
                     SILType loweredSubstArgType,
@@ -3340,12 +3341,41 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
                                           const DefaultArgumentStorage &info,
                                           SmallVectorImpl<ManagedValue> &args,
                                           size_t &argIndex) {
-  auto value = SGF.emitApplyOfDefaultArgGenerator(info.loc,
-                                                  info.defaultArgsOwner,
-                                                  info.destIndex,
-                                                  info.resultType,
-                                                  info.origResultType);
-  
+  RValue value;  
+  bool isStoredPropertyDefaultArg = false;
+
+  // Check if this is a synthesized memberwise constructor for stored property
+  // default values
+  if (auto ctor = dyn_cast<ConstructorDecl>(info.defaultArgsOwner.getDecl())) {
+    if (ctor->isMemberwiseInitializer() && ctor->isImplicit()) {
+      auto param = ctor->getParameters()->get(info.destIndex);
+      
+      if (auto var = param->getStoredProperty()) {
+        // This is a stored property default arg. Do not emit a call to the
+        // default arg generator, but rather the variable initializer expression
+        isStoredPropertyDefaultArg = true;
+
+        auto pbd = var->getParentPatternBinding();
+        auto entry = pbd->getPatternEntryForVarDecl(var);
+        auto subs = info.defaultArgsOwner.getSubstitutions();
+
+        value = SGF.emitApplyOfStoredPropertyInitializer(info.loc,
+                                                         entry, subs,
+                                                         info.resultType,
+                                                         info.origResultType,
+                                                         SGFContext());
+      }
+    }
+  }
+
+  if (!isStoredPropertyDefaultArg) {
+    value = SGF.emitApplyOfDefaultArgGenerator(info.loc,
+                                               info.defaultArgsOwner,
+                                               info.destIndex,
+                                               info.resultType,
+                                               info.origResultType);
+  }
+
   SmallVector<ManagedValue, 4> loweredArgs;
   SmallVector<DelayedArgument, 4> delayedArgs;
   Optional<ForeignErrorConvention> errorConvention = None;
@@ -3466,7 +3496,7 @@ struct ElementExtent {
   }
 };
 
-class TupleShuffleArgEmitter {
+class ArgumentShuffleEmitter {
   Expr *inner;
   Expr *outer;
   ArrayRef<TupleTypeElt> innerElts;
@@ -3500,7 +3530,7 @@ class TupleShuffleArgEmitter {
   SmallVector<DelayedArgument, 2> innerDelayedArgs;
 
 public:
-  TupleShuffleArgEmitter(TupleShuffleExpr *e, ArrayRef<TupleTypeElt> innerElts,
+  ArgumentShuffleEmitter(ArgumentShuffleExpr *e, ArrayRef<TupleTypeElt> innerElts,
                          AbstractionPattern origParamType)
       : inner(e->getSubExpr()), outer(e), innerElts(innerElts),
         defaultArgsOwner(e->getDefaultArgsOwner()),
@@ -3528,10 +3558,10 @@ public:
       canVarargsArrayType = varargsArrayType->getCanonicalType();
   }
 
-  TupleShuffleArgEmitter(const TupleShuffleArgEmitter &) = delete;
-  TupleShuffleArgEmitter &operator=(const TupleShuffleArgEmitter &) = delete;
-  TupleShuffleArgEmitter(TupleShuffleArgEmitter &&) = delete;
-  TupleShuffleArgEmitter &operator=(TupleShuffleArgEmitter &&) = delete;
+  ArgumentShuffleEmitter(const ArgumentShuffleEmitter &) = delete;
+  ArgumentShuffleEmitter &operator=(const ArgumentShuffleEmitter &) = delete;
+  ArgumentShuffleEmitter(ArgumentShuffleEmitter &&) = delete;
+  ArgumentShuffleEmitter &operator=(ArgumentShuffleEmitter &&) = delete;
 
   void emit(ArgEmitter &parent);
 
@@ -3548,7 +3578,7 @@ private:
 
   VarargExpansionExpr *getVarargExpansion(unsigned innerIndex) {
     Expr *expr = inner->getSemanticsProvidingExpr();
-    if (cast<TupleShuffleExpr>(outer)->isSourceScalar()) {
+    if (cast<ArgumentShuffleExpr>(outer)->isSourceScalar()) {
       assert(innerIndex == 0);
     } else {
       auto tuple = dyn_cast<TupleExpr>(expr);
@@ -3561,7 +3591,7 @@ private:
 
 } // end anonymous namespace
 
-void TupleShuffleArgEmitter::constructInnerTupleTypeInfo(ArgEmitter &parent) {
+void ArgumentShuffleEmitter::constructInnerTupleTypeInfo(ArgEmitter &parent) {
   unsigned nextParamIndex = 0;
   for (unsigned outerIndex : indices(outerElements)) {
     CanType substEltType =
@@ -3596,7 +3626,7 @@ void TupleShuffleArgEmitter::constructInnerTupleTypeInfo(ArgEmitter &parent) {
 #endif
       innerExtents[innerIndex].Params = eltParams;
       origInnerElts[innerIndex] = origEltType;
-    } else if (innerIndex == TupleShuffleExpr::Variadic) {
+    } else if (innerIndex == ArgumentShuffleExpr::Variadic) {
       auto &varargsField = outerElements[outerIndex];
       assert(varargsField.isVararg());
       assert(!varargsInfo.hasValue() && "already had varargs entry?");
@@ -3669,7 +3699,7 @@ void TupleShuffleArgEmitter::constructInnerTupleTypeInfo(ArgEmitter &parent) {
   }
 }
 
-void TupleShuffleArgEmitter::flattenPatternFromInnerExtendIntoInnerParams(
+void ArgumentShuffleEmitter::flattenPatternFromInnerExtendIntoInnerParams(
     ArgEmitter &parent) {
   for (auto &extent : innerExtents) {
     assert(extent.Used && "didn't use all the inner tuple elements!");
@@ -3700,7 +3730,7 @@ void TupleShuffleArgEmitter::flattenPatternFromInnerExtendIntoInnerParams(
   }
 }
 
-void TupleShuffleArgEmitter::splitInnerArgumentsCorrectly(ArgEmitter &parent) {
+void ArgumentShuffleEmitter::splitInnerArgumentsCorrectly(ArgEmitter &parent) {
   ArrayRef<ManagedValue> nextArgs = innerArgs;
   MutableArrayRef<DelayedArgument> nextDelayedArgs = innerDelayedArgs;
   for (auto &extent : innerExtents) {
@@ -3725,7 +3755,7 @@ void TupleShuffleArgEmitter::splitInnerArgumentsCorrectly(ArgEmitter &parent) {
   assert(nextDelayedArgs.empty() && "didn't claim all inout args");
 }
 
-void TupleShuffleArgEmitter::emitDefaultArgsAndFinalize(ArgEmitter &parent) {
+void ArgumentShuffleEmitter::emitDefaultArgsAndFinalize(ArgEmitter &parent) {
   unsigned nextCallerDefaultArg = 0;
   for (unsigned outerIndex = 0, e = outerElements.size();
          outerIndex != e; ++outerIndex) {
@@ -3750,7 +3780,7 @@ void TupleShuffleArgEmitter::emitDefaultArgsAndFinalize(ArgEmitter &parent) {
 
     // If this is default initialization, prepare to emit the default argument
     // generator later.
-    if (innerIndex == TupleShuffleExpr::DefaultInitialize) {
+    if (innerIndex == ArgumentShuffleExpr::DefaultInitialize) {
       // Otherwise, emit the default initializer, then map that as a
       // default argument.
       CanType eltType = outerElements[outerIndex].getType()->getCanonicalType();
@@ -3769,7 +3799,7 @@ void TupleShuffleArgEmitter::emitDefaultArgsAndFinalize(ArgEmitter &parent) {
 
     // If this is caller default initialization, generate the
     // appropriate value.
-    if (innerIndex == TupleShuffleExpr::CallerDefaultInitialize) {
+    if (innerIndex == ArgumentShuffleExpr::CallerDefaultInitialize) {
       auto arg = callerDefaultArgs[nextCallerDefaultArg++];
       parent.emit(ArgumentSource(arg),
                   getOutputOrigElementType(outerIndex));
@@ -3777,7 +3807,7 @@ void TupleShuffleArgEmitter::emitDefaultArgsAndFinalize(ArgEmitter &parent) {
     }
 
     // If we're supposed to create a varargs array with the rest, do so.
-    if (innerIndex == TupleShuffleExpr::Variadic) {
+    if (innerIndex == ArgumentShuffleExpr::Variadic) {
       auto &varargsField = outerElements[outerIndex];
       assert(varargsField.isVararg() &&
              "Cannot initialize nonvariadic element");
@@ -3807,7 +3837,7 @@ void TupleShuffleArgEmitter::emitDefaultArgsAndFinalize(ArgEmitter &parent) {
   }
 }
 
-void TupleShuffleArgEmitter::emit(ArgEmitter &parent) {
+void ArgumentShuffleEmitter::emit(ArgEmitter &parent) {
   // We could support dest addrs here, but it can't actually happen
   // with the current limitations on default arguments in tuples.
   assert(!parent.SpecialDests && "shuffle nested within varargs expansion?");
@@ -3848,7 +3878,7 @@ void TupleShuffleArgEmitter::emit(ArgEmitter &parent) {
   emitDefaultArgsAndFinalize(parent);
 }
 
-void ArgEmitter::emitShuffle(TupleShuffleExpr *E,
+void ArgEmitter::emitShuffle(ArgumentShuffleExpr *E,
                              AbstractionPattern origParamType) {
   ArrayRef<TupleTypeElt> srcElts;
   TupleTypeElt singletonSrcElt;
@@ -3864,7 +3894,7 @@ void ArgEmitter::emitShuffle(TupleShuffleExpr *E,
     srcElts = cast<TupleType>(srcEltTy)->getElements();
   }
 
-  TupleShuffleArgEmitter(E, srcElts, origParamType).emit(*this);
+  ArgumentShuffleEmitter(E, srcElts, origParamType).emit(*this);
 }
 
 namespace {

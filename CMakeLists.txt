@@ -883,12 +883,11 @@ find_package(PythonInterp REQUIRED)
 # Find optional dependencies.
 #
 
-# Find libxml.
-# FIXME: unify with CLANG_HAVE_LIBXML, which is set in LLVM anyway.
-find_package(LibXml2)
-option(SWIFT_HAVE_LIBXML
-    "Whether to build with libxml"
-    ${LIBXML2_FOUND})
+if(LLVM_ENABLE_LIBXML2)
+  find_package(Libxml2 REQUIRED)
+else()
+  find_package(LibXml2)
+endif()
 
 # You need libedit linked in order to check if you have el_wgets.
 cmake_push_check_state()

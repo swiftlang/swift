@@ -69,7 +69,9 @@ func testImplicitConstructors1() {
 }
 func testImplicitConstructors1P() {
   ImplicitConstructors1(#^IMPLICIT_CONSTRUCTORS_1P^#
-// IMPLICIT_CONSTRUCTORS_1P-NOT: Begin completions
+// IMPLICIT_CONSTRUCTORS_1P: Begin completions, 1 items
+// IMPLICIT_CONSTRUCTORS_1P: Decl[Constructor]/CurrNominal: ['('][')'][#ImplicitConstructors1#]; name=
+// IMPLICIT_CONSTRUCTORS_1P: End completions
 }
 
 struct ImplicitConstructors2 {
@@ -78,7 +80,8 @@ struct ImplicitConstructors2 {
 
 func testImplicitConstructors2() {
   ImplicitConstructors2#^IMPLICIT_CONSTRUCTORS_2^#
-// IMPLICIT_CONSTRUCTORS_2: Begin completions, 4 items
+// IMPLICIT_CONSTRUCTORS_2: Begin completions, 5 items
+// IMPLICIT_CONSTRUCTORS_2-DAG: Decl[Constructor]/CurrNominal: ()[#ImplicitConstructors2#]{{; name=.+$}}
 // IMPLICIT_CONSTRUCTORS_2-DAG: Decl[Constructor]/CurrNominal: ({#instanceVar: Int#})[#ImplicitConstructors2#]{{; name=.+$}}
 // IMPLICIT_CONSTRUCTORS_2-DAG: Decl[Constructor]/CurrNominal: ()[#ImplicitConstructors2#]{{; name=.+$}}
 // IMPLICIT_CONSTRUCTORS_2-DAG: Keyword[self]/CurrNominal:     .self[#ImplicitConstructors2.Type#]; name=self
@@ -87,9 +90,11 @@ func testImplicitConstructors2() {
 }
 func testImplicitConstructors2P() {
   ImplicitConstructors2(#^IMPLICIT_CONSTRUCTORS_2P^#
-// IMPLICIT_CONSTRUCTORS_2P: Begin completions
-// IMPLICIT_CONSTRUCTORS_2P-NEXT: Decl[Constructor]/CurrNominal: ['(']{#instanceVar: Int#}[')'][#ImplicitConstructors2#]{{; name=.+$}}
-// IMPLICIT_CONSTRUCTORS_2P-NEXT: End completions
+// IMPLICIT_CONSTRUCTORS_2P: Begin completions, 3 items
+// IMPLICIT_CONSTRUCTORS_2P-DAG: Decl[Constructor]/CurrNominal: ['('][')'][#ImplicitConstructors2#]; name=
+// IMPLICIT_CONSTRUCTORS_2P-DAG: Decl[Constructor]/CurrNominal: ['(']{#instanceVar: Int#}[')'][#ImplicitConstructors2#]{{; name=.+$}}
+// IMPLICIT_CONSTRUCTORS_2P-DAG: Decl[Constructor]/CurrNominal: ['('][')'][#ImplicitConstructors2#]; name=
+// IMPLICIT_CONSTRUCTORS_2P: End completions
 }
 
 struct ExplicitConstructors1 {
@@ -111,6 +116,7 @@ func testExplicitConstructors1() {
 func testExplicitConstructors1P() {
   ExplicitConstructors1(#^EXPLICIT_CONSTRUCTORS_1P^#
 // EXPLICIT_CONSTRUCTORS_1P: Begin completions
+// EXPLICIT_CONSTRUCTORS_1P-NEXT: Decl[Constructor]/CurrNominal: ['('][')'][#ExplicitConstructors1#]; name=
 // EXPLICIT_CONSTRUCTORS_1P-NEXT: Decl[Constructor]/CurrNominal: ['(']{#a: Int#}[')'][#ExplicitConstructors1#]{{; name=.+$}}
 // EXPLICIT_CONSTRUCTORS_1P-NEXT: Decl[Constructor]/CurrNominal: ['(']{#a: Int#}, {#b: Float#}[')'][#ExplicitConstructors1#]{{; name=.+$}}
 // EXPLICIT_CONSTRUCTORS_1P-NEXT: End completions
@@ -276,14 +282,18 @@ struct ExplicitConstructorsDerived3 {
 
 func testHaveRParen1() {
   ImplicitConstructors1(#^HAVE_RPAREN_1^#)
-// HAVE_RPAREN_1-NOT: Decl[Constructor]
+// HAVE_RPAREN_1: Begin completions, 1 items
+// HAVE_RPAREN_1: Decl[Constructor]/CurrNominal: ['('][')'][#ImplicitConstructors1#]; name=
+// HAVE_RPAREN_1: End completions
 }
 
 func testHaveRParen2() {
   ImplicitConstructors2(#^HAVE_RPAREN_2^#)
-// HAVE_RPAREN_2-NOT: Decl[Constructor]
-// HAVE_RPAREN_2:     Decl[Constructor]/CurrNominal: ['(']{#instanceVar: Int#}[')'][#ImplicitConstructors2#]{{; name=.+$}}
-// HAVE_RPAREN_2-NOT: Decl[Constructor]
+// HAVE_RPAREN_2: Begin completions, 3 items
+// HAVE_RPAREN_2-DAG: Decl[Constructor]/CurrNominal: ['('][')'][#ImplicitConstructors2#]; name=
+// HAVE_RPAREN_2-DAG: Decl[Constructor]/CurrNominal: ['(']{#instanceVar: Int#}[')'][#ImplicitConstructors2#]{{; name=.+$}}
+// HAVE_RPAREN_2-DAG: Decl[Constructor]/CurrNominal: ['('][')'][#ImplicitConstructors2#]; name=
+// HAVE_RPAREN_2: End completions
 }
 
 func testHaveComma1() {

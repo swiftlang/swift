@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -verify-sil-ownership -enable-sil-verify-all=0 -module-name Swift -o /dev/null %s 2>&1
+// RUN: %target-sil-opt -enable-sil-verify-all=0 -module-name Swift -o /dev/null %s 2>&1
 // REQUIRES: asserts
 
 // Make sure that we properly handle unreachable code the likes of which come

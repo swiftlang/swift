@@ -132,8 +132,11 @@ bool constraints::areConservativelyCompatibleArgumentLabels(
     hasCurriedSelf = false;
   } else if (baseType->is<AnyMetatypeType>() && decl->isInstanceMember()) {
     hasCurriedSelf = false;
-  } else if (isa<EnumElementDecl>(decl)) {
-    hasCurriedSelf = false;
+  } else if (auto *EED = dyn_cast<EnumElementDecl>(decl)) {
+    // enum elements have either `(Self.Type) -> (Arg...) -> Self`, or
+    // `(Self.Type) -> Self`, in the former case self type has to be
+    // stripped off.
+    hasCurriedSelf = bool(EED->getParameterList());
   } else {
     hasCurriedSelf = true;
   }
@@ -1986,6 +1989,17 @@ repairFailures(ConstraintSystem &cs, Type lhs, Type rhs,
     auto *fix = ContextualMismatch::create(cs, lhs, rhs,
                                            cs.getConstraintLocator(locator));
     conversionsOrFixes.push_back(fix);
+    break;
+  }
+
+  case ConstraintLocator::ContextualType: {
+    if (lhs->is<FunctionType>() && !rhs->is<AnyFunctionType>() &&
+        isa<ClosureExpr>(anchor)) {
+      auto *fix = ContextualMismatch::create(cs, lhs, rhs,
+                                             cs.getConstraintLocator(locator));
+      conversionsOrFixes.push_back(fix);
+    }
+
     break;
   }
 

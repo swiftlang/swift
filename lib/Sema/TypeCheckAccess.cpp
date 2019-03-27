@@ -205,12 +205,11 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
 
   } else {
     // The type violates the rules of access control (with or without taking the
-    // TypeRepr into account).
+    // TypeRepr into account).
 
     if (typeRepr && mayBeInferred &&
         !TC.getLangOpts().isSwiftVersionAtLeast(5) &&
-        useDC->getParentModule()->getResilienceStrategy() !=
-          ResilienceStrategy::Resilient) {
+        !useDC->getParentModule()->isResilient()) {
       // Swift 4.2 and earlier didn't check the Type when a TypeRepr was
       // present. However, this is a major hole when generic parameters are
       // inferred:

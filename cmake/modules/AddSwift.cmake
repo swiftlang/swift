@@ -721,6 +721,7 @@ function(_add_swift_library_single target name)
         FILE_DEPENDS
         FRAMEWORK_DEPENDS
         FRAMEWORK_DEPENDS_WEAK
+        GYB_SOURCES
         INCORPORATE_OBJECT_LIBRARIES
         INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY
         INTERFACE_LINK_LIBRARIES
@@ -810,10 +811,14 @@ function(_add_swift_library_single target name)
         "Either SHARED, STATIC, or OBJECT_LIBRARY must be specified")
   endif()
 
-  handle_gyb_sources(
-      gyb_dependency_targets
-      SWIFTLIB_SINGLE_SOURCES
-      "${SWIFTLIB_SINGLE_ARCHITECTURE}")
+  if(SWIFTLIB_SINGLE_GYB_SOURCES)
+    handle_gyb_sources(
+        gyb_dependency_targets
+        SWIFTLIB_SINGLE_GYB_SOURCES
+        "${SWIFTLIB_SINGLE_ARCHITECTURE}")
+    set(SWIFTLIB_SINGLE_SOURCES ${SWIFTLIB_SINGLE_SOURCES}
+      ${SWIFTLIB_SINGLE_GYB_SOURCES})
+  endif()
 
   # Remove the "swift" prefix from the name to determine the module name.
   if(SWIFTLIB_IS_STDLIB_CORE)
@@ -1620,6 +1625,7 @@ function(add_swift_target_library name)
         FRAMEWORK_DEPENDS_IOS_TVOS
         FRAMEWORK_DEPENDS_OSX
         FRAMEWORK_DEPENDS_WEAK
+        GYB_SOURCES
         INCORPORATE_OBJECT_LIBRARIES
         INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY
         INTERFACE_LINK_LIBRARIES
@@ -1875,9 +1881,12 @@ function(add_swift_target_library name)
       endforeach()
 
       # Add PrivateFrameworks, rdar://28466433
+      set(swiftlib_c_compile_flags_all ${SWIFTLIB_C_COMPILE_FLAGS})
       if(sdk IN_LIST SWIFT_APPLE_PLATFORMS AND SWIFTLIB_IS_SDK_OVERLAY)
         set(swiftlib_swift_compile_private_frameworks_flag "-Fsystem" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/System/Library/PrivateFrameworks/")
       endif()
+
+      list(APPEND swiftlib_c_compile_flags_all "-DSWIFT_TARGET_LIBRARY_NAME=${name}")
 
       # Add this library variant.
       _add_swift_library_single(
@@ -1896,7 +1905,7 @@ function(add_swift_target_library name)
         FRAMEWORK_DEPENDS_WEAK ${SWIFTLIB_FRAMEWORK_DEPENDS_WEAK}
         LLVM_COMPONENT_DEPENDS ${SWIFTLIB_LLVM_COMPONENT_DEPENDS}
         FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS} ${swiftlib_module_dependency_targets}
-        C_COMPILE_FLAGS ${SWIFTLIB_C_COMPILE_FLAGS}
+        C_COMPILE_FLAGS ${swiftlib_c_compile_flags_all}
         SWIFT_COMPILE_FLAGS ${swiftlib_swift_compile_flags_all} ${swiftlib_swift_compile_flags_arch} ${swiftlib_swift_compile_private_frameworks_flag}
         LINK_FLAGS ${swiftlib_link_flags_all}
         PRIVATE_LINK_LIBRARIES ${swiftlib_private_link_libraries_targets}
@@ -1914,6 +1923,7 @@ function(add_swift_target_library name)
         DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
         DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
         DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
+        GYB_SOURCES ${SWIFTLIB_GYB_SOURCES}
       )
 
       if(NOT SWIFTLIB_OBJECT_LIBRARY)

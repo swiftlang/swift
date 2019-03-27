@@ -221,7 +221,7 @@ public:
   // Only to be used by the demangler parsers.
   void addChild(NodePointer Child, NodeFactory &Factory);
   // Only to be used by the demangler parsers.
-  void removeChildAt(unsigned Pos, NodeFactory &factory);
+  void removeChildAt(unsigned Pos);
 
   // Reverses the order of children.
   void reverseChildren(size_t StartingAt = 0);

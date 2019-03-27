@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -verify-sil-ownership -module-name protocol_with_superclass %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name protocol_with_superclass %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-ir %s
 
 // Protocols with superclass-constrained Self, written using a 'where' clause.

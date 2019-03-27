@@ -124,3 +124,34 @@ func rdar34583132() {
     }
   }
 }
+
+func rdar_49159472() {
+  struct A {}
+  struct B {}
+  struct C {}
+
+  enum E {
+  case foo(a: A, b: B?)
+
+    var foo: C? {
+      return nil
+    }
+  }
+
+  class Test {
+    var e: E
+
+    init(_ e: E) {
+      self.e = e
+    }
+
+    func bar() {
+      e = .foo(a: A(), b: nil)   // Ok
+      e = E.foo(a: A(), b: nil)  // Ok
+      baz(e: .foo(a: A(), b: nil))  // Ok
+      baz(e: E.foo(a: A(), b: nil)) // Ok
+    }
+
+    func baz(e: E) {}
+  }
+}

@@ -2140,6 +2140,16 @@ void Remangler::mangleObjCMetadataUpdateFunction(Node *node) {
   Buffer << "MU";
 }
 
+void Remangler::mangleObjCResilientClassStub(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Ms";
+}
+
+void Remangler::mangleFullObjCResilientClassStub(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Mt";
+}
+
 void Remangler::mangleThrowsAnnotation(Node *node) {
   Buffer << 'K';
 }

@@ -357,6 +357,11 @@ dynamic func funcWithDefaultArg(_ arg : String = String("hello")) {
   print("hello")
 }
 
+// IMPLICIT-LABEL: sil hidden [thunk] [ossa] @barfoo
+@_cdecl("barfoo")
+func foobar() {
+}
+
 // IMPLICIT-LABEL: sil private [ossa] @$s23dynamically_replaceable6$deferL_yyF
 var x = 10
 defer {

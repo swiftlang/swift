@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -verify-sil-ownership -enable-sil-verify-all=0 -module-name ObjectiveC -o /dev/null 2>&1  %s
+// RUN: %target-sil-opt -enable-sil-verify-all=0 -module-name ObjectiveC -o /dev/null 2>&1  %s
 // REQUIRES: asserts
 // REQUIRES: objc_interop
 

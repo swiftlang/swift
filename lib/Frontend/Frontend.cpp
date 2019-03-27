@@ -29,6 +29,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
@@ -1109,6 +1110,11 @@ static void performSILOptimizations(CompilerInvocation &Invocation,
     runSILOptimizationPassesWithFileSpecification(*SM, CustomPipelinePath);
   } else {
     runSILOptimizationPasses(*SM);
+  }
+  if (Invocation.getFrontendOptions().CheckOnoneSupportCompleteness &&
+      // TODO: handle non-ObjC based stdlib builds, e.g. on linux.
+      Invocation.getLangOptions().EnableObjCInterop) {
+    checkCompletenessOfPrespecializations(*SM);
   }
 }
 

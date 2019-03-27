@@ -51,6 +51,7 @@
 #include "llvm/Support/OnDiskHashTable.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/SmallVectorMemoryBuffer.h"
 
 #include <vector>
 
@@ -180,7 +181,7 @@ namespace {
     int32_t getNameDataForBase(const NominalTypeDecl *nominal,
                                StringRef *dataToWrite = nullptr) {
       if (nominal->getDeclContext()->isModuleScopeContext())
-        return -Serializer.addModuleRef(nominal->getParentModule());
+        return -Serializer.addContainingModuleRef(nominal->getDeclContext());
 
       auto &mangledName = MangledNameCache[nominal];
       if (mangledName.empty())
@@ -731,7 +732,12 @@ IdentifierID Serializer::addFilename(StringRef filename) {
   return addUniquedString(filename).second;
 }
 
-IdentifierID Serializer::addModuleRef(const ModuleDecl *M) {
+IdentifierID Serializer::addContainingModuleRef(const DeclContext *DC) {
+  assert(!isa<ModuleDecl>(DC) &&
+         "References should be to things within modules");
+  const FileUnit *file = cast<FileUnit>(DC->getModuleScopeContext());
+  const ModuleDecl *M = file->getParentModule();
+
   if (M == this->M)
     return CURRENT_MODULE_ID;
   if (M == this->M->getASTContext().TheBuiltinModule)
@@ -743,18 +749,10 @@ IdentifierID Serializer::addModuleRef(const ModuleDecl *M) {
   if (M == clangImporter->getImportedHeaderModule())
     return OBJC_HEADER_MODULE_ID;
 
-  // If we're referring to a member of a private module that will be
-  // re-exported via a public module, record the public module's name.
-  if (auto clangModuleUnit =
-        dyn_cast<ClangModuleUnit>(M->getFiles().front())) {
-    auto exportedModuleName =
-        M->getASTContext().getIdentifier(
-                                 clangModuleUnit->getExportedModuleName());
-    return addDeclBaseNameRef(exportedModuleName);
-  }
-
-  assert(!M->getName().empty());
-  return addDeclBaseNameRef(M->getName());
+  auto exportedModuleName = file->getExportedModuleName();
+  assert(!exportedModuleName.empty());
+  auto exportedModuleID = M->getASTContext().getIdentifier(exportedModuleName);
+  return addDeclBaseNameRef(exportedModuleID);
 }
 
 SILLayoutID Serializer::addSILLayoutRef(SILLayout *layout) {
@@ -1146,6 +1144,7 @@ static uint8_t getRawStableDefaultArgumentKind(swift::DefaultArgumentKind kind) 
   CASE(NilLiteral)
   CASE(EmptyArray)
   CASE(EmptyDictionary)
+  CASE(StoredProperty)
 #undef CASE
   }
 
@@ -1650,7 +1649,7 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
         abbrCode,
         addDeclRef(normal->getProtocol()),
         addDeclRef(normal->getType()->getAnyNominal()),
-        addModuleRef(normal->getDeclContext()->getParentModule()));
+        addContainingModuleRef(normal->getDeclContext()));
     }
     break;
   }
@@ -1886,14 +1885,13 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   case DeclContextKind::EnumElementDecl:
     llvm_unreachable("cannot cross-reference this context");
 
-  case DeclContextKind::FileUnit:
-    DC = cast<FileUnit>(DC)->getParentModule();
-    LLVM_FALLTHROUGH;
-
   case DeclContextKind::Module:
+    llvm_unreachable("should only cross-reference something within a file");
+
+  case DeclContextKind::FileUnit:
     abbrCode = DeclTypeAbbrCodes[XRefLayout::Code];
     XRefLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                           addModuleRef(cast<ModuleDecl>(DC)), pathLen);
+                           addContainingModuleRef(DC), pathLen);
     break;
 
   case DeclContextKind::GenericTypeDecl: {
@@ -1930,7 +1928,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
       genericSig = ext->getGenericSignature()->getCanonicalSignature();
     }
     XRefExtensionPathPieceLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, addModuleRef(DC->getParentModule()),
+        Out, ScratchRecord, abbrCode, addContainingModuleRef(DC),
         addGenericSignatureRef(genericSig));
     break;
   }
@@ -2023,7 +2021,7 @@ void Serializer::writeCrossReference(const Decl *D) {
   unsigned abbrCode;
 
   if (auto op = dyn_cast<OperatorDecl>(D)) {
-    writeCrossReference(op->getModuleContext(), 1);
+    writeCrossReference(op->getDeclContext(), 1);
 
     abbrCode = DeclTypeAbbrCodes[XRefOperatorOrAccessorPathPieceLayout::Code];
     auto nameID = addDeclBaseNameRef(op->getName());
@@ -2035,7 +2033,7 @@ void Serializer::writeCrossReference(const Decl *D) {
   }
 
   if (auto prec = dyn_cast<PrecedenceGroupDecl>(D)) {
-    writeCrossReference(prec->getModuleContext(), 1);
+    writeCrossReference(prec->getDeclContext(), 1);
 
     abbrCode = DeclTypeAbbrCodes[XRefOperatorOrAccessorPathPieceLayout::Code];
     auto nameID = addDeclBaseNameRef(prec->getName());
@@ -3267,11 +3265,13 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(param->getDeclContext());
     Type interfaceType = param->getInterfaceType();
 
-    // Only save the text for normal default arguments, not any of the special
-    // ones.
+    // Only save the text for normal and stored property default arguments, not
+    // any of the special ones.
     StringRef defaultArgumentText;
     SmallString<128> scratch;
-    if (param->getDefaultArgumentKind() == swift::DefaultArgumentKind::Normal)
+    swift::DefaultArgumentKind argKind = param->getDefaultArgumentKind();
+    if (argKind == swift::DefaultArgumentKind::Normal ||
+        argKind == swift::DefaultArgumentKind::StoredProperty)
       defaultArgumentText =
         param->getDefaultValueStringRepresentation(scratch);
 
@@ -3284,7 +3284,7 @@ void Serializer::writeDecl(const Decl *D) {
         addTypeRef(interfaceType),
         param->isVariadic(),
         param->isAutoClosure(),
-        getRawStableDefaultArgumentKind(param->getDefaultArgumentKind()),
+        getRawStableDefaultArgumentKind(argKind),
         defaultArgumentText);
 
     if (interfaceType->hasError()) {
@@ -4868,6 +4868,48 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
   }
 
   S.writeToStream(os);
+}
+
+void swift::serializeToBuffers(
+  ModuleOrSourceFile DC, const SerializationOptions &options,
+  std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
+  std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
+  const SILModule *M) {
+
+  assert(options.OutputPath && options.OutputPath[0] != '\0');
+  {
+    SharedTimer timer("Serialization, swiftmodule, to buffer");
+    llvm::SmallString<1024> buf;
+    llvm::raw_svector_ostream stream(buf);
+    Serializer::writeToStream(stream, DC, M, options);
+    bool hadError = withOutputFile(getContext(DC).Diags,
+                                   options.OutputPath,
+                                   [&](raw_ostream &out) {
+      out << stream.str();
+      return false;
+    });
+    if (hadError)
+      return;
+    if (moduleBuffer)
+      *moduleBuffer = llvm::make_unique<llvm::SmallVectorMemoryBuffer>(
+                        std::move(buf), options.OutputPath);
+  }
+
+  if (options.DocOutputPath && options.DocOutputPath[0] != '\0') {
+    SharedTimer timer("Serialization, swiftdoc, to buffer");
+    llvm::SmallString<1024> buf;
+    llvm::raw_svector_ostream stream(buf);
+    writeDocToStream(stream, DC, options.GroupInfoPath);
+    (void)withOutputFile(getContext(DC).Diags,
+                         options.DocOutputPath,
+                         [&](raw_ostream &out) {
+      out << stream.str();
+      return false;
+    });
+    if (moduleDocBuffer)
+      *moduleDocBuffer = llvm::make_unique<llvm::SmallVectorMemoryBuffer>(
+                           std::move(buf), options.DocOutputPath);
+  }
 }
 
 void swift::serialize(ModuleOrSourceFile DC,

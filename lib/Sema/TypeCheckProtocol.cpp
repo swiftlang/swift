@@ -2196,19 +2196,19 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     // FIXME: Could emit a Fix-It here.
     diags.diagnose(match.Witness,
                    diag::protocol_witness_mutation_modifier_conflict,
-                   unsigned(SelfAccessKind::Mutating));
+                   SelfAccessKind::Mutating);
     break;
   case MatchKind::NonMutatingConflict:
     // FIXME: Could emit a Fix-It here.
     diags.diagnose(match.Witness,
                    diag::protocol_witness_mutation_modifier_conflict,
-                   unsigned(SelfAccessKind::NonMutating));
+                   SelfAccessKind::NonMutating);
     break;
   case MatchKind::ConsumingConflict:
     // FIXME: Could emit a Fix-It here.
     diags.diagnose(match.Witness,
                    diag::protocol_witness_mutation_modifier_conflict,
-                   unsigned(SelfAccessKind::__Consuming));
+                   SelfAccessKind::__Consuming);
     break;
   case MatchKind::RethrowsConflict:
     // FIXME: Could emit a Fix-It here.
@@ -2521,8 +2521,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
       AccessScope requiredAccessScope = getRequiredAccessScope();
 
       if (!TC.Context.isSwiftVersionAtLeast(5) &&
-          DC->getParentModule()->getResilienceStrategy() !=
-              ResilienceStrategy::Resilient) {
+          !DC->getParentModule()->isResilient()) {
         // HACK: In pre-Swift-5, these typealiases were synthesized with the
         // same access level as the conforming type, which might be more
         // visible than the associated type witness. Preserve that behavior
@@ -4862,19 +4861,6 @@ diagnoseUnstableName(TypeChecker &tc, ProtocolConformance *conformance,
   }
 }
 
-/// Determine whether a particular class has generic ancestry.
-static bool hasGenericAncestry(ClassDecl *classDecl) {
-  SmallPtrSet<ClassDecl *, 4> visited;
-  while (classDecl && visited.insert(classDecl).second) {
-    if (classDecl->isGenericContext())
-      return true;
-
-    classDecl = classDecl->getSuperclassDecl();
-  }
-
-  return false;
-}
-
 /// Infer the attribute tostatic-initialize the Objective-C metadata for the
 /// given class, if needed.
 static void inferStaticInitializeObjCMetadata(TypeChecker &tc,
@@ -4885,7 +4871,7 @@ static void inferStaticInitializeObjCMetadata(TypeChecker &tc,
 
   // If we know that the Objective-C metadata will be statically registered,
   // there's nothing to do.
-  if (!hasGenericAncestry(classDecl)) {
+  if (!classDecl->checkAncestry(AncestryFlags::Generic)) {
     return;
   }
 

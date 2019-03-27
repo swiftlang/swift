@@ -279,11 +279,11 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
     if (contextTy->hasReferenceSemantics()) {
       if (attrModifier != SelfAccessKind::__Consuming)
         diagnoseAndRemoveAttr(attr, diag::mutating_invalid_classes,
-                              unsigned(attrModifier));
+                              attrModifier);
     }
   } else {
     diagnoseAndRemoveAttr(attr, diag::mutating_invalid_global_scope,
-                          unsigned(attrModifier));
+                          attrModifier);
   }
 
   // Verify we don't have more than one of mutating, nonmutating,
@@ -294,24 +294,21 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
     if (auto *NMA = FD->getAttrs().getAttribute<NonMutatingAttr>()) {
       if (attrModifier != SelfAccessKind::NonMutating) {
         diagnoseAndRemoveAttr(NMA, diag::functions_mutating_and_not,
-                              unsigned(SelfAccessKind::NonMutating),
-                              unsigned(attrModifier));
+                              SelfAccessKind::NonMutating, attrModifier);
       }
     }
 
     if (auto *MUA = FD->getAttrs().getAttribute<MutatingAttr>()) {
       if (attrModifier != SelfAccessKind::Mutating) {
         diagnoseAndRemoveAttr(MUA, diag::functions_mutating_and_not,
-                                unsigned(SelfAccessKind::Mutating),
-                                unsigned(attrModifier));
+                                SelfAccessKind::Mutating, attrModifier);
       }
     }
 
     if (auto *CSA = FD->getAttrs().getAttribute<ConsumingAttr>()) {
       if (attrModifier != SelfAccessKind::__Consuming) {
         diagnoseAndRemoveAttr(CSA, diag::functions_mutating_and_not,
-                              unsigned(SelfAccessKind::__Consuming),
-                              unsigned(attrModifier));
+                              SelfAccessKind::__Consuming, attrModifier);
       }
     }
   }
@@ -2384,12 +2381,9 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
   auto *ED = cast<EnumDecl>(D);
 
-  switch (ED->getModuleContext()->getResilienceStrategy()) {
-  case ResilienceStrategy::Default:
+  if (!ED->getModuleContext()->isResilient()) {
     diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonresilient, attr);
     return;
-  case ResilienceStrategy::Resilient:
-    break;
   }
 
   if (ED->getFormalAccess() < AccessLevel::Public &&
@@ -2570,6 +2564,9 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
   if (auto *FD = dyn_cast<FuncDecl>(D)) {
     // Don't add dynamic to defer bodies.
     if (FD->isDeferBody())
+      return;
+    // Don't add dynamic to functions with a cdecl.
+    if (FD->getAttrs().hasAttribute<CDeclAttr>())
       return;
   }
 

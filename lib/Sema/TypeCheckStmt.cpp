@@ -545,6 +545,12 @@ public:
   }
   
   Stmt *visitThrowStmt(ThrowStmt *TS) {
+    // If the throw is in a defer, then it isn't valid.
+    if (isInDefer()) {
+      TC.diagnose(TS->getThrowLoc(), diag::jump_out_of_defer, "throw");
+      return nullptr;
+    }
+
     // Coerce the operand to the exception type.
     auto E = TS->getSubExpr();
 
@@ -1115,13 +1121,12 @@ public:
     SmallVector<VarDecl *, 4> vars;
     firstPattern->collectVariables(vars);
 
-    // We know that the typechecker will guarantee that all of the case label
-    // items in the fallthrough match. So if we match the last case label item,
-    // transitively we will match all of the other case label items.
-    auto &labelItem = previousBlock->getCaseLabelItems().back();
-    const Pattern *pattern = labelItem.getPattern();
-    SmallVector<VarDecl *, 4> previousVars;
-    pattern->collectVariables(previousVars);
+    // We know that the typechecker has already guaranteed that all of
+    // the case label items in the fallthrough have the same var
+    // decls. So if we match against the case body var decls,
+    // transitively we will match all of the other case label items in
+    // the fallthrough destination as well.
+    auto previousVars = previousBlock->getCaseBodyVariablesOrEmptyArray();
     for (auto *expected : vars) {
       bool matched = false;
       if (!expected->hasName())
@@ -1222,6 +1227,21 @@ public:
         }
       }
 
+      // Setup the types of our case body var decls.
+      for (auto *expected : caseBlock->getCaseBodyVariablesOrEmptyArray()) {
+        assert(expected->hasName());
+        for (auto *prev : *prevCaseDecls) {
+          if (!prev->hasName() || expected->getName() != prev->getName()) {
+            continue;
+          }
+          if (prev->hasType())
+            expected->setType(prev->getType());
+          if (prev->hasInterfaceType())
+            expected->setInterfaceType(prev->getInterfaceType());
+          break;
+        }
+      }
+
       // Then check the rest.
       for (auto &labelItem : caseLabelItemArray.drop_front()) {
         // Resolve the pattern in our case label if it has not been resolved
@@ -1232,6 +1252,32 @@ public:
         if (auto *guard = labelItem.getGuardExpr()) {
           limitExhaustivityChecks |= TC.typeCheckCondition(guard, DC);
           labelItem.setGuardExpr(guard);
+        }
+      }
+
+      // Our last CaseLabelItem's VarDecls are now in
+      // prevCaseDecls. Wire them up as parents of our case body var
+      // decls.
+      //
+      // NOTE: We know that the two lists of var decls must be in sync. Remember
+      // that we constructed our case body VarDecls from the first
+      // CaseLabelItems var decls. Just now we proved that all other
+      // CaseLabelItems have matching var decls of the first meaning
+      // transitively that our last case label item must have matching var decls
+      // for our case stmts CaseBodyVarDecls.
+      //
+      // NOTE: We do not check that we matched everything here. That is because
+      // the check has already been done by comparing the 1st CaseLabelItem var
+      // decls. If we insert a check here, we will emit the same error multiple
+      // times.
+      for (auto *expected : caseBlock->getCaseBodyVariablesOrEmptyArray()) {
+        assert(expected->hasName());
+        for (auto *prev : *prevCaseDecls) {
+          if (!prev->hasName() || expected->getName() != prev->getName()) {
+            continue;
+          }
+          expected->setParentVarDecl(prev);
+          break;
         }
       }
 

@@ -3327,8 +3327,11 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
 
   // Create it in our current function.
   auto thunkValue = B.createFunctionRefFor(loc, thunk);
+
+  // Create a copy for the noescape value, so we can mark_dependence upon the
+  // original value.
   SILValue noEscapeValue =
-      noEscapingFunctionValue.ensurePlusOne(*this, loc).forward(*this);
+      noEscapingFunctionValue.copy(*this, loc).forward(*this);
   SingleValueInstruction *thunkedFn = B.createPartialApply(
       loc, thunkValue,
       SILType::getPrimitiveObjectType(substFnTy),
@@ -3336,8 +3339,8 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
       noEscapeValue,
       SILType::getPrimitiveObjectType(escapingFnTy));
   // We need to ensure the 'lifetime' of the trivial values context captures. As
-  // long as we rerpresent these captures by the same value the following works.
-  thunkedFn = B.createMarkDependence(loc, thunkedFn, noEscapeValue);
+  // long as we represent these captures by the same value the following works.
+  thunkedFn = B.createMarkDependence(loc, thunkedFn, noEscapingFunctionValue.getValue());
 
   return emitManagedRValueWithCleanup(thunkedFn);
 }

@@ -195,6 +195,11 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_IN_MEMBERDECLINIT_2 | %FileCheck %s -check-prefix=FOO_OBJECT_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_IN_MEMBERDECLINIT_3 | %FileCheck %s -check-prefix=FOO_OBJECT_DOT
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_ARRAY_LITERAL_1 | %FileCheck %s -check-prefix=SIMPLE_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_ARRAY_LITERAL_2 | %FileCheck %s -check-prefix=SIMPLE_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_DICTIONARY_LITERAL_1 | %FileCheck %s -check-prefix=SIMPLE_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_DICTIONARY_LITERAL_2 | %FileCheck %s -check-prefix=SIMPLE_OBJECT_DOT
+
 // Test code completion of expressions that produce a value.
 
 struct FooStruct {
@@ -331,36 +336,36 @@ var fooObject: FooStruct
 // FOO_OBJECT_DOT-NEXT: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    lazyInstanceVar[#Int#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc0()[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc2({#(a): Int#}, {#b: &Double#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc3({#(a): Int#}, {#(Float, Double)#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc4({#(a): Int?#}, {#b: Int!#}, {#c: &Int?#}, {#d: &Int!#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Identical\])?}}: instanceFunc0()[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Identical\])?}}: instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Identical\])?}}: instanceFunc2({#(a): Int#}, {#b: &Double#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Identical\])?}}: instanceFunc3({#(a): Int#}, {#(Float, Double)#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Identical\])?}}: instanceFunc4({#(a): Int?#}, {#b: Int!#}, {#c: &Int?#}, {#d: &Int!#})[#Void#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc5()[#Int?#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc6()[#Int!#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc7({#a: Int#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc8({#(a): (Int, Int)#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc9({#a: Int#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc10({#arg: Int#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc10({#arg: Int#}, {#optArg: Int#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Identical\])?}}: instanceFunc7({#a: Int#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Identical\])?}}: instanceFunc8({#(a): (Int, Int)#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Identical\])?}}: instanceFunc9({#a: Int#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Identical\])?}}: instanceFunc10({#arg: Int#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Identical\])?}}: instanceFunc10({#arg: Int#}, {#optArg: Int#})[#Void#]{{; name=.+$}}
 //
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: varargInstanceFunc0({#(v): Int...#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: varargInstanceFunc1({#(a): Float#}, {#v: Int...#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: varargInstanceFunc2({#(a): Float#}, {#b: Double#}, {#v: Int...#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Identical\])?}}: varargInstanceFunc0({#(v): Int...#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Identical\])?}}: varargInstanceFunc1({#(a): Float#}, {#v: Int...#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Identical\])?}}: varargInstanceFunc2({#(a): Float#}, {#b: Double#}, {#v: Int...#})[#Void#]{{; name=.+$}}
 //
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc1()[#Int#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc1()[#Double#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc2({#(x): Int#})[#Int#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc2({#(x): Double#})[#Int#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: builderFunc1({#(a): Int#})[#FooStruct#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: selectorVoidFunc1({#(a): Int#}, {#b: Float#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: selectorVoidFunc2({#(a): Int#}, {#b: Float#}, {#c: Double#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: selectorVoidFunc3({#(a): Int#}, {#b: (Float, Double)#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Identical\])?}}: selectorVoidFunc1({#(a): Int#}, {#b: Float#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Identical\])?}}: selectorVoidFunc2({#(a): Int#}, {#b: Float#}, {#c: Double#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Identical\])?}}: selectorVoidFunc3({#(a): Int#}, {#b: (Float, Double)#})[#Void#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: selectorStringFunc1({#(a): Int#}, {#b: Float#})[#String#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: selectorStringFunc2({#(a): Int#}, {#b: Float#}, {#c: Double#})[#String#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: selectorStringFunc3({#(a): Int#}, {#b: (Float, Double)#})[#String#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    extProp[#Int#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: extFunc0()[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Identical\])?}}: extFunc0()[#Void#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: End completions
 
 // FOO_OBJECT_NO_DOT: Begin completions
@@ -441,6 +446,7 @@ var fooObject: FooStruct
 // FOO_STRUCT_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   overloadedStaticFunc1()[#Double#]{{; name=.+$}}
 // FOO_STRUCT_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   overloadedStaticFunc2({#(x): Int#})[#Int#]{{; name=.+$}}
 // FOO_STRUCT_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   overloadedStaticFunc2({#(x): Double#})[#Int#]{{; name=.+$}}
+// FOO_STRUCT_DOT-NEXT: Decl[Constructor]/CurrNominal:    init()[#FooStruct#]; name=init(){{$}}
 // FOO_STRUCT_DOT-NEXT: Decl[Constructor]/CurrNominal:    init({#lazyInstanceVar: Int?#}, {#instanceVar: Int#})[#FooStruct#]; name=init(lazyInstanceVar: Int?, instanceVar: Int){{$}}
 // FOO_STRUCT_DOT-NEXT: Decl[Constructor]/CurrNominal:    init()[#FooStruct#]; name=init(){{$}}
 // FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: extFunc0({#(self): &FooStruct#})[#() -> Void#]{{; name=.+$}}
@@ -489,6 +495,7 @@ var fooObject: FooStruct
 // FOO_STRUCT_NO_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   .overloadedStaticFunc1()[#Double#]{{; name=.+$}}
 // FOO_STRUCT_NO_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   .overloadedStaticFunc2({#(x): Int#})[#Int#]{{; name=.+$}}
 // FOO_STRUCT_NO_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   .overloadedStaticFunc2({#(x): Double#})[#Int#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-NEXT: Decl[Constructor]/CurrNominal:    ()[#FooStruct#]{{; name=.+$}}
 // FOO_STRUCT_NO_DOT-NEXT: Decl[Constructor]/CurrNominal:    ({#lazyInstanceVar: Int?#}, {#instanceVar: Int#})[#FooStruct#]{{; name=.+$}}
 // FOO_STRUCT_NO_DOT-NEXT: Decl[Constructor]/CurrNominal:    ()[#FooStruct#]{{; name=.+$}}
 // FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .extFunc0({#(self): &FooStruct#})[#() -> Void#]{{; name=.+$}}
@@ -729,9 +736,9 @@ func testInsideFunctionCall0() {
 func testInsideFunctionCall1() {
   var a = FooStruct()
   a.instanceFunc0(#^INSIDE_FUNCTION_CALL_1^#
-// There should be no results here because the function call
-// unambiguously resolves to overload that takes 0 arguments.
-// INSIDE_FUNCTION_CALL_1-NOT: Begin completions
+// INSIDE_FUNCTION_CALL_1: Begin completions, 1 items
+// INSIDE_FUNCTION_CALL_1: Pattern/CurrModule: ['('][')'][#Void#]; name=
+// INSIDE_FUNCTION_CALL_1: End completions
 }
 
 func testInsideFunctionCall2() {
@@ -760,7 +767,7 @@ func testInsideFunctionCall4() {
 func testInsideFunctionCall5() {
   FooStruct().instanceFunc2(42, #^INSIDE_FUNCTION_CALL_5^#
 // INSIDE_FUNCTION_CALL_5: Begin completions
-// INSIDE_FUNCTION_CALL_5-DAG: Keyword/ExprSpecific:               b: [#Argument name#]; name=b: 
+// INSIDE_FUNCTION_CALL_5-DAG: Keyword/ExprSpecific:               b: [#Argument name#]; name=b:
 // INSIDE_FUNCTION_CALL_5: End completions
 }
 
@@ -782,8 +789,9 @@ func testInsideFunctionCall7() {
 
 func testInsideFunctionCall8(_ x: inout FooStruct) {
   x.instanceFunc0(#^INSIDE_FUNCTION_CALL_8^#)
-// Since we already have '()', there is no pattern to complete.
-// INSIDE_FUNCTION_CALL_8-NOT: Pattern/{{.*}}:
+// INSIDE_FUNCTION_CALL_8: Begin completions
+// INSIDE_FUNCTION_CALL_8: Pattern/CurrModule: ['('][')'][#Void#]; name=
+// INSIDE_FUNCTION_CALL_8: End completions
 }
 func testInsideFunctionCall9(_ x: inout FooStruct) {
   x.instanceFunc1(#^INSIDE_FUNCTION_CALL_9^#)
@@ -2142,4 +2150,26 @@ extension String {
   static let v = { (obj: FooStruct) in
     obj.#^CLOSURE_IN_MEMBERDECLINIT_3^#
   }
+}
+
+struct SimpleStruct {
+  func foo() -> SimpleStruct {}
+}
+// SIMPLE_OBJECT_DOT: Begin completions
+// SIMPLE_OBJECT_DOT-DAG: Keyword[self]/CurrNominal:          self[#SimpleStruct#]; name=self
+// SIMPLE_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Identical\])?}}: foo()[#SimpleStruct#]; name=foo()
+// SIMPLE_OBJECT_DOT: End completions
+func testInCollectionLiteral(value: SimpleStruct) {
+  let _ = [
+    value.#^IN_ARRAY_LITERAL_1^#
+  ]
+  let _ = [
+    value.#^IN_ARRAY_LITERAL_2^#,
+  ]
+  let _: [String: String] = [
+    value.#^IN_DICTIONARY_LITERAL_1^#
+  ]
+  let _: [String: String] = [
+    value.#^IN_DICTIONARY_LITERAL_2^# : "test"
+  ]
 }

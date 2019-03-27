@@ -9,6 +9,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// REQUIRES: rdar49161053
 
 import Swift
 import Foundation

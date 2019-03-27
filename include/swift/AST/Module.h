@@ -324,6 +324,10 @@ public:
     Bits.ModuleDecl.RawResilienceStrategy = unsigned(strategy);
   }
 
+  bool isResilient() const {
+    return getResilienceStrategy() != ResilienceStrategy::Default;
+  }
+
   /// Look up a (possibly overloaded) value set at top-level scope
   /// (but with the specified access path, which may come from an import decl)
   /// within the current module.
@@ -808,6 +812,14 @@ public:
   /// Returns the associated clang module if one exists.
   virtual const clang::Module *getUnderlyingClangModule() const {
     return nullptr;
+  }
+
+  /// Returns the name to use when referencing entities in this file.
+  ///
+  /// Usually this is the module name itself, but certain Clang features allow
+  /// substituting another name instead.
+  virtual StringRef getExportedModuleName() const {
+    return getParentModule()->getName().str();
   }
 
   /// Traverse the decls within this file.
