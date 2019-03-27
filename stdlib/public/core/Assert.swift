@@ -45,7 +45,7 @@ public func assert(
 ) {
   // Only assert in debug mode.
   if _isDebugAssertConfiguration() {
-    if !_branchHint(condition(), expected: true) {
+    if !_fastPath(condition()) {
       _assertionFailure("Assertion failed", message(), file: file, line: line,
         flags: _fatalErrorFlags())
     }
@@ -87,7 +87,7 @@ public func precondition(
 ) {
   // Only check in debug and release mode. In release mode just trap.
   if _isDebugAssertConfiguration() {
-    if !_branchHint(condition(), expected: true) {
+    if !_fastPath(condition()) {
       _assertionFailure("Precondition failed", message(), file: file, line: line,
         flags: _fatalErrorFlags())
     }
@@ -206,7 +206,7 @@ internal func _precondition(
 ) {
   // Only check in debug and release mode. In release mode just trap.
   if _isDebugAssertConfiguration() {
-    if !_branchHint(condition(), expected: true) {
+    if !_fastPath(condition()) {
       _fatalErrorMessage("Fatal error", message, file: file, line: line,
         flags: _fatalErrorFlags())
     }
@@ -235,7 +235,7 @@ public func _overflowChecked<T>(
 ) -> T {
   let (result, error) = args
   if _isDebugAssertConfiguration() {
-    if _branchHint(error, expected: false) {
+    if _slowPath(error) {
       _fatalErrorMessage("Fatal error", "Overflow/underflow", 
         file: file, line: line, flags: _fatalErrorFlags())
     }
@@ -260,7 +260,7 @@ internal func _debugPrecondition(
 ) {
   // Only check in debug mode.
   if _slowPath(_isDebugAssertConfiguration()) {
-    if !_branchHint(condition(), expected: true) {
+    if !_fastPath(condition()) {
       _fatalErrorMessage("Fatal error", message, file: file, line: line,
         flags: _fatalErrorFlags())
     }
@@ -290,7 +290,7 @@ internal func _internalInvariant(
   file: StaticString = #file, line: UInt = #line
 ) {
 #if INTERNAL_CHECKS_ENABLED
-  if !_branchHint(condition(), expected: true) {
+  if !_fastPath(condition()) {
     _fatalErrorMessage("Fatal error", message, file: file, line: line,
       flags: _fatalErrorFlags())
   }

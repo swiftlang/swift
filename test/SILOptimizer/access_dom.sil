@@ -460,7 +460,7 @@ bb4:
 // CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: end_access [[BEGIN]] : $*X
 // CHECK: bb3:
-// CHECK: [[BEGIN2:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK: [[BEGIN2:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN2]] : $*X
 // CHECK-NEXT: end_access [[BEGIN2]] : $*X
 // CHECK: [[BEGIN3:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBAL]] : $*X
@@ -523,13 +523,24 @@ bb0:
 }
 
 // public func testOptOnNestedDomRead() {
-// Checks that we bail when the dominated begin comes before the dominating begin
+//
+// Bail on a nested access. The dominator-based algorithm does not
+// remove nested access scopes because those could generally be
+// conflicts. This one just happens to be a read-read, so it isn't a real
+// conflict.
+//
+// FIXME: simple nested dynamic reads to identical storage could very
+// easily be removed via separate logic, but it does not fit with the
+// dominator-based algorithm. For example, during the analysis phase, we
+// could simply mark the "fully nested" read scopes, then convert them to
+// [static] right after the analysis, removing them from the result
+// map. I didn't do this because I don't know if it happens in practice.
 //
 // CHECK-LABEL: sil @testOptOnNestedDomRead : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
 // CHECK: [[BEGIN:%.*]] = begin_access [read] [dynamic] [[GLOBAL]] : $*X
-// CHECK: [[BEGIN2:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK: [[BEGIN2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-LABEL: } // end sil function 'testOptOnNestedDomRead'
 sil @testOptOnNestedDomRead : $@convention(thin) () -> () {
 bb0:

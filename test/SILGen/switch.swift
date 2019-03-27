@@ -304,11 +304,13 @@ func test_isa_1(p: P) {
   case is X:
   // CHECK: [[IS_X]]:
   // CHECK-NEXT: load [trivial] [[TMPBUF]]
+  // CHECK-NEXT: // function_ref
+  // CHECK-NEXT: [[FUNC:%.*]] = function_ref @$s6switch1ayyF
+  // CHECK-NEXT: apply [[FUNC]]()
   // CHECK-NEXT: dealloc_stack [[TMPBUF]]
   // CHECK-NEXT: destroy_addr [[PTMPBUF]]
   // CHECK-NEXT: dealloc_stack [[PTMPBUF]]
     a()
-    // CHECK:   function_ref @$s6switch1ayyF
     // CHECK:   br [[CONT:bb[0-9]+]]
 
   // CHECK: [[IS_NOT_X]]:
@@ -423,9 +425,9 @@ func test_isa_class_1(x: B) {
 
   // CHECK: [[YES_CASE1]]:
   case is D1 where runced():
+  // CHECK:   function_ref @$s6switch1ayyF
   // CHECK:   destroy_value [[CAST_D1_COPY]]
   // CHECK:   end_borrow [[CAST_D1]]
-  // CHECK:   function_ref @$s6switch1ayyF
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
 
@@ -443,8 +445,8 @@ func test_isa_class_1(x: B) {
   case is D2:
   // CHECK: [[IS_D2]]([[CAST_D2:%.*]] : @guaranteed $D2):
   // CHECK:   [[CAST_D2_COPY:%.*]] = copy_value [[CAST_D2]]
-  // CHECK:   destroy_value [[CAST_D2_COPY]]
   // CHECK:   function_ref @$s6switch1byyF
+  // CHECK:   destroy_value [[CAST_D2_COPY]]
   // CHECK:   br [[CONT]]
     b()
 
@@ -458,8 +460,8 @@ func test_isa_class_1(x: B) {
   // CHECK:   cond_br {{%.*}}, [[CASE3:bb[0-9]+]], [[NO_CASE3:bb[0-9]+]]
 
   // CHECK: [[CASE3]]:
-  // CHECK:   destroy_value [[CAST_E_COPY]]
   // CHECK:   function_ref @$s6switch1cyyF
+  // CHECK:   destroy_value [[CAST_E_COPY]]
   // CHECK:   br [[CONT]]
     c()
 
@@ -478,9 +480,10 @@ func test_isa_class_1(x: B) {
   case is C:
   // CHECK: [[IS_C]]([[CAST_C:%.*]] : @guaranteed $C):
   // CHECK:   [[CAST_C_COPY:%.*]] = copy_value [[CAST_C]]
+  // CHECK:   function_ref @$s6switch1dyyF
+  // CHECK-NEXT: apply
   // CHECK:   destroy_value [[CAST_C_COPY]]
   // CHECK:   end_borrow [[CAST_C]]
-  // CHECK:   function_ref @$s6switch1dyyF
   // CHECK:   br [[CONT]]
     d()
 
@@ -799,8 +802,9 @@ func test_union_addr_only_1(u: MaybeAddressOnlyPair) {
   // CHECK: [[IS_LEFT]]:
   // CHECK:   [[P:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt.1
   case .Left(_):
+  // CHECK:   [[FUNC:%.*]] = function_ref @$s6switch1byyF
+  // CHECK-NEXT: apply [[FUNC]](
   // CHECK:   destroy_addr [[P]]
-  // CHECK:   function_ref @$s6switch1byyF
   // CHECK:   br [[CONT]]
     b()
 
@@ -808,16 +812,18 @@ func test_union_addr_only_1(u: MaybeAddressOnlyPair) {
   // CHECK:   [[STR_ADDR:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Right!enumelt.1
   // CHECK:   [[STR:%.*]] = load [take] [[STR_ADDR]]
   case .Right(_):
+  // CHECK:   [[FUNC:%.*]] = function_ref @$s6switch1cyyF
+  // CHECK:   apply [[FUNC]](
   // CHECK:   destroy_value [[STR]] : $String
-  // CHECK:   function_ref @$s6switch1cyyF
   // CHECK:   br [[CONT]]
     c()
 
   // CHECK: [[IS_BOTH]]:
   // CHECK:   [[P_STR_TUPLE:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Both!enumelt.1
   case .Both(_):
+  // CHECK:   [[FUNC:%.*]] = function_ref @$s6switch1dyyF
+  // CHECK-NEXT: apply [[FUNC]](
   // CHECK:   destroy_addr [[P_STR_TUPLE]]
-  // CHECK:   function_ref @$s6switch1dyyF
   // CHECK:   br [[CONT]]
     d()
   }
@@ -1283,5 +1289,17 @@ indirect enum SR6664_Base<Element> {
       // Body doesn't matter.
       break
     }
+  }
+}
+
+// Make sure that we properly create switch_enum success arguments if we have an
+// associated type that is a void type.
+func testVoidType() {
+  let x: Optional<()> = ()
+  switch x {
+  case .some(let x):
+    break
+  case .none:
+    break
   }
 }

@@ -431,16 +431,17 @@ func test_let() {
   case bars():
   // CHECK: [[YES_CASE3]]:
   // CHECK:   destroy_value [[VAL_COPY_3]]
+  // CHECK:   [[FUNC:%.*]] = function_ref @$s10switch_var1cyyF
+  // CHECK-NEXT: apply [[FUNC]](
   // CHECK:   destroy_value [[VAL]]
-  // CHECK:   function_ref @$s10switch_var1cyyF
   // CHECK:   br [[CONT]]
     c()
-  // CHECK: [[NO_CASE3]]:
-  // CHECK:   destroy_value [[VAL_COPY_3]]
 
   case _:
-    // CHECK:   destroy_value [[VAL]]
+    // CHECK: [[NO_CASE3]]:
+    // CHECK:   destroy_value [[VAL_COPY_3]]
     // CHECK:   function_ref @$s10switch_var1dyyF
+    // CHECK:   destroy_value [[VAL]]
     // CHECK:   br [[CONT]]
     d()
   }
@@ -504,18 +505,17 @@ func test_mixed_let_var() {
   case bars():
   // CHECK: [[CASE3]]:
   // CHECK:   destroy_value [[VAL_COPY]]
-  // CHECK:   destroy_value [[VAL]]
   // CHECK:   [[FUNC:%.*]] = function_ref @$s10switch_var1cyyF : $@convention(thin) () -> ()
   // CHECK:   apply [[FUNC]]()
+  // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT]]
     c()
 
   // CHECK: [[NOCASE3]]:
   // CHECK:   destroy_value [[VAL_COPY]]
-
-  // CHECK:   destroy_value [[VAL]]
   // CHECK:   [[D_FUNC:%.*]] = function_ref @$s10switch_var1dyyF : $@convention(thin) () -> ()
   // CHECK:   apply [[D_FUNC]]()
+  // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT]]
   case _:
     d()
