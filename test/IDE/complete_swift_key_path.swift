@@ -21,7 +21,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EMPTY_2 | %FileCheck %s -check-prefix=INVALID
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_BASEONLY | %FileCheck %s -check-prefix=PERSONTYPE-DOT
-// FIXME: RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_EXPLICIT | %FileCheck %s -check-prefix=INVALID
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_EXPLICIT | %FileCheck %s -check-prefix=PERSONTYPE-DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_GENERIC_RESULT | %FileCheck %s -check-prefix=PERSONTYPE-DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_GENERIC_RESULT_OPTIONAL | %FileCheck %s -check-prefix=PERSONTYPE-DOT
 
 class Person {
     var name: String
@@ -131,9 +133,19 @@ let _ = \.#^EMPTY_1^#
 let _ = \.friends.#^EMPTY_2^#
 // INVALID-NOT: Begin completions
 
-let _: PartialKeyPath<Person> = \.#^CONTEXT_BASEONLY^#
-// Same as TYPE_DOT.
-
-let _: KeyPath<Person, String> = \.#^CONTEXT_EXPLICIT^#
-// FIXME: Currently, it's suggest nothing. Since we know the base type is
-// 'Person', we should suggest at least '.name'.
+func recvPartialKP(_ kp: PartialKeyPath<Person>) {
+  recvPartialKP(\.#^CONTEXT_BASEONLY^#)
+  // Same as TYPE_DOT.
+}
+func recvExplicitKP(_ kp: KeyPath<Person, String>) {
+  recvExplicitKP(\.#^CONTEXT_EXPLICIT^#)
+  // Same as TYPE_DOT.
+}
+func recvExplicitKPWithGenericResult<Result>(_ kp: KeyPath<Person, Result>) {
+  recvExplicitKPWithGenericResult(\.#^CONTEXT_GENERIC_RESULT^#)
+  // Same as TYPE_DOT.
+}
+func recvExplicitKPWithGenericResultOpt<Result>(_ kp: KeyPath<Person, Result>?) {
+  recvExplicitKPWithGenericResult(\.#^CONTEXT_GENERIC_RESULT_OPTIONAL^#
+  // Same as TYPE_DOT.
+}

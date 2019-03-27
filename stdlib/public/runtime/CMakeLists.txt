@@ -31,6 +31,7 @@ set(swift_runtime_objc_sources
 set(swift_runtime_sources
     AnyHashableSupport.cpp
     Array.cpp
+    BackDeployment.cpp
     Casting.cpp
     CompatibilityOverride.cpp
     CygwinPort.cpp

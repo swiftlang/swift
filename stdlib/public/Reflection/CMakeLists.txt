@@ -3,6 +3,7 @@ set(swiftReflection_SOURCES
   TypeLowering.cpp
   TypeRef.cpp
   TypeRefBuilder.cpp
+  "${SWIFT_SOURCE_DIR}/stdlib/public/runtime/LLVMSupport.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/Context.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/OldDemangler.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/Demangler.cpp"
@@ -21,7 +22,7 @@ endif(LLVM_ENABLE_ASSERTIONS)
 if(SWIFT_BUILD_STDLIB)
   add_swift_target_library(swiftReflection STATIC TARGET_LIBRARY
     ${swiftReflection_SOURCES}
-    C_COMPILE_FLAGS ${SWIFT_RUNTIME_CXX_FLAGS}
+    C_COMPILE_FLAGS ${SWIFT_RUNTIME_CXX_FLAGS} -DswiftCore_EXPORTS
     LINK_FLAGS ${SWIFT_RUNTIME_LINK_FLAGS}
     INSTALL_IN_COMPONENT dev)
 endif()

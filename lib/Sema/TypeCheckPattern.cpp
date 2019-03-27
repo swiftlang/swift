@@ -863,6 +863,14 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL,
         param->setSpecifier(VarDecl::Specifier::Owned);
       }
     }
+
+    if (param->isInOut() && param->isDefaultArgument()) {
+      diagnose(param->getDefaultValue()->getLoc(),
+               swift::diag::cannot_provide_default_value_inout,
+               param->getName());
+      param->markInvalid();
+      hadError = true;
+    }
   }
   
   return hadError;

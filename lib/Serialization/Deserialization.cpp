@@ -238,6 +238,8 @@ getActualDefaultArgKind(uint8_t raw) {
     return swift::DefaultArgumentKind::EmptyArray;
   case serialization::DefaultArgumentKind::EmptyDictionary:
     return swift::DefaultArgumentKind::EmptyDictionary;
+  case serialization::DefaultArgumentKind::StoredProperty:
+    return swift::DefaultArgumentKind::StoredProperty;
   }
   return None;
 }
@@ -1149,7 +1151,7 @@ static bool isReExportedToModule(const ValueDecl *value,
       = dyn_cast<ClangModuleUnit>(valueDC->getModuleScopeContext());
   if (!fromClangModule)
     return false;
-  std::string exportedName = fromClangModule->getExportedModuleName();
+  StringRef exportedName = fromClangModule->getExportedModuleName();
 
   auto toClangModule
       = dyn_cast<ClangModuleUnit>(expectedModule->getFiles().front());
@@ -4329,28 +4331,35 @@ public:
                                                  underlyingTypeID,
                                                  substitutedTypeID,
                                                  substitutionsID);
-    auto aliasOrError = MF.getDeclChecked(typealiasID);
-    if (!aliasOrError)
-      return aliasOrError.takeError();
-    auto alias = dyn_cast<TypeAliasDecl>(aliasOrError.get());
 
-    bool formSugaredType = true;
-
+    TypeAliasDecl *alias = nullptr;
     Type underlyingType;
     if (ctx.LangOpts.EnableDeserializationRecovery) {
       auto underlyingTypeOrError = MF.getTypeChecked(underlyingTypeID);
-      if (!underlyingTypeOrError)
+      if (!underlyingTypeOrError) {
+        // If we can't deserialize the underlying type, we can't be sure the
+        // actual typealias hasn't changed.
         return underlyingTypeOrError.takeError();
+      }
 
       underlyingType = underlyingTypeOrError.get();
+
+      if (auto aliasOrError = MF.getDeclChecked(typealiasID)) {
+        alias = dyn_cast<TypeAliasDecl>(aliasOrError.get());
+      } else {
+        // We're going to recover by falling back to the underlying type, so
+        // just ignore the error.
+        llvm::consumeError(aliasOrError.takeError());
+      }
 
       if (!alias ||
           !alias->getDeclaredInterfaceType()->isEqual(underlyingType)) {
         // Fall back to the canonical type.
-        formSugaredType = false;
+        return underlyingType;
       }
 
     } else {
+      alias = dyn_cast<TypeAliasDecl>(MF.getDecl(typealiasID));
       underlyingType = MF.getType(underlyingTypeID);
     }
 
@@ -4376,9 +4385,6 @@ public:
       assert(underlyingType);
       return underlyingType;
     }
-
-    if (!formSugaredType)
-      return underlyingType;
 
     auto parentType = parentTypeOrError.get();
     return TypeAliasType::get(alias, parentType, subMap, substitutedType);

@@ -431,7 +431,7 @@ void OpaqueStorageAllocation::convertIndirectFunctionArgs() {
 
       LoadInst *loadArg = argBuilder.createLoad(
           RegularLocation(const_cast<ValueDecl *>(arg->getDecl())),
-          SILUndef::get(addrType, pass.F->getModule()),
+          SILUndef::get(addrType, *pass.F),
           LoadOwnershipQualifier::Unqualified);
 
       arg->replaceAllUsesWith(loadArg);
