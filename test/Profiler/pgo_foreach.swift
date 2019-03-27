@@ -19,6 +19,8 @@
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
 
+// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
+
 // SIL-LABEL: // pgo_foreach.guessForEach1
 // SIL-LABEL: sil @$s11pgo_foreach13guessForEach11xs5Int32VAE_tF : $@convention(thin) (Int32) -> Int32 !function_entry_count(42) {
 // IR-LABEL: define swiftcc i32 @$s9pgo_foreach10guessWhiles5Int32VAD1x_tF

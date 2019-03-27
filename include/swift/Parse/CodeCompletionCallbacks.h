@@ -123,7 +123,7 @@ public:
   virtual void completeDotExpr(Expr *E, SourceLoc DotLoc) {};
 
   /// Complete the beginning of a statement or expression.
-  virtual void completeStmtOrExpr() {};
+  virtual void completeStmtOrExpr(CodeCompletionExpr *E) {};
 
   /// Complete the beginning of expr-postfix -- no tokens provided
   /// by user.
@@ -164,6 +164,9 @@ public:
 
   /// Complete a given type-identifier when there is no trailing dot.
   virtual void completeTypeIdentifierWithoutDot(IdentTypeRepr *ITR) {};
+
+  /// Complete the beginning of a case statement at the top of switch stmt.
+  virtual void completeCaseStmtKeyword() {};
 
   /// Complete at the beginning of a case stmt pattern.
   virtual void completeCaseStmtBeginning() {};

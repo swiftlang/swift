@@ -14,6 +14,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_OPT_1 | %FileCheck %s -check-prefix=UNRESOLVED_3_OPT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_OPT_2 | %FileCheck %s -check-prefix=UNRESOLVED_3_OPT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_OPT_3 | %FileCheck %s -check-prefix=UNRESOLVED_3_OPTOPTOPT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_OPT_4 | %FileCheck %s -check-prefix=UNRESOLVED_OPT_4
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_12 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_13 | %FileCheck %s -check-prefix=UNRESOLVED_3
@@ -28,6 +29,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_20 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_21 | %FileCheck %s -check-prefix=UNRESOLVED_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_22 | %FileCheck %s -check-prefix=UNRESOLVED_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_22_noreturn | %FileCheck %s -check-prefix=UNRESOLVED_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_23 | %FileCheck %s -check-prefix=UNRESOLVED_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_24 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_25 | %FileCheck %s -check-prefix=UNRESOLVED_3
@@ -240,7 +242,7 @@ class C4 {
     var _: SomeEnum1??? = .#^UNRESOLVED_OPT_3^#
   }
 }
-// UNRESOLVED_3: Begin completions
+// UNRESOLVED_3: Begin completions, 2 items
 // UNRESOLVED_3-DAG: Decl[EnumElement]/ExprSpecific:     North[#SomeEnum1#]; name=North
 // UNRESOLVED_3-DAG: Decl[EnumElement]/ExprSpecific:     South[#SomeEnum1#]; name=South
 // UNRESOLVED_3-NOT: SomeOptions1
@@ -248,21 +250,46 @@ class C4 {
 // UNRESOLVED_3-NOT: none
 // UNRESOLVED_3-NOT: some(
 
-// UNRESOLVED_3_OPT: Begin completions
+// UNRESOLVED_3_OPT: Begin completions, 5 items
 // UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     North[#SomeEnum1#];
 // UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     South[#SomeEnum1#];
+// UNRESOLVED_3_OPT-DAG: Keyword[nil]/ExprSpecific/Erase[1]: nil[#SomeEnum1?#]; name=nil
 // UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     none[#Optional<SomeEnum1>#]; name=none
 // UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     some({#SomeEnum1#})[#Optional<SomeEnum1>#];
-// UNRESOLVED_3_OPT-DAG: Decl[Constructor]/CurrNominal:      init({#(some): SomeEnum1#})[#Optional<SomeEnum1>#];
-// UNRESOLVED_3_OPT-DAG: Decl[Constructor]/CurrNominal:      init({#nilLiteral: ()#})[#Optional<SomeEnum1>#];
+// UNRESOLVED_3_OPT-NOT: init({#(some):
+// UNRESOLVED_3_OPT-NOT: init({#nilLiteral:
 
-// UNRESOLVED_3_OPTOPTOPT: Begin completions
+// UNRESOLVED_3_OPTOPTOPT: Begin completions, 5 items
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     North[#SomeEnum1#];
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     South[#SomeEnum1#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Keyword[nil]/ExprSpecific/Erase[1]: nil[#SomeEnum1???#]; name=nil
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     none[#Optional<SomeEnum1??>#]; name=none
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     some({#SomeEnum1??#})[#Optional<SomeEnum1??>#];
-// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[Constructor]/CurrNominal:      init({#(some): SomeEnum1??#})[#Optional<SomeEnum1??>#];
-// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[Constructor]/CurrNominal:      init({#nilLiteral: ()#})[#Optional<SomeEnum1??>#];
+// UNRESOLVED_3_OPTOPTOPT-NOT: init({#(some):
+// UNRESOLVED_3_OPTOPTOPT-NOT: init({#nilLiteral:
+
+enum Somewhere {
+  case earth, mars
+}
+extension Optional where Wrapped == Somewhere {
+  init(str: String) { fatalError() }
+  static var nowhere: Self { return nil }
+}
+func testOptionalWithCustomExtension() {
+  var _: Somewhere? = .#^UNRESOLVED_OPT_4^#
+// UNRESOLVED_OPT_4: Begin completions, 7 items
+// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific:     earth[#Somewhere#];
+// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific:     mars[#Somewhere#];
+// UNRESOLVED_OPT_4-DAG: Keyword[nil]/ExprSpecific/Erase[1]: nil[#Somewhere?#]; name=nil
+// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific:     none[#Optional<Somewhere>#]; name=none
+// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific:     some({#Somewhere#})[#Optional<Somewhere>#];
+// UNRESOLVED_OPT_4-DAG: Decl[Constructor]/CurrNominal:      init({#str: String#})[#Optional<Somewhere>#]; name=init(str: String)
+// UNRESOLVED_OPT_4-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: nowhere[#Optional<Somewhere>#]; name=nowhere
+// UNRESOLVED_OPT_4-NOT: init({#(some):
+// UNRESOLVED_OPT_4-NOT: init({#nilLiteral:
+// UNRESOLVED_OPT_4: End completions
+}
+
 
 class C5 {
   func f1() {
@@ -301,6 +328,10 @@ var OpIns1 : SomeOptions1 = .#^UNRESOLVED_21^#
 
 var c1 = {() -> SomeOptions1 in
   return .#^UNRESOLVED_22^#
+}
+
+var c1_noreturn = {() -> SomeOptions1 in
+  .#^UNRESOLVED_22_noreturn^#
 }
 
 class C6 {
@@ -493,11 +524,7 @@ func testSubType() {
 func testMemberTypealias() {
   var _: MyProtocol = .#^SUBTYPE_2^#
 }
-// SUBTYPE_2: Begin completions, 2 items
-// SUBTYPE_1-NOT: Concrete1(failable:
-// SUBTYPE_2-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: Concrete1()[#BaseClass#];
-// SUBTYPE_2-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: Concrete2()[#AnotherTy#];
-// SUBTYPE_2: End completions
+// SUBTYPE_2-NOT: Begin completions
 
 enum Generic<T> {
   case contains(content: T)

@@ -838,7 +838,7 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   auto Loc = dynamicCast.getLocation();
   auto *SuccessBB = dynamicCast.getSuccessBlock();
   auto Op = dynamicCast.getSource();
-  auto &Mod = dynamicCast.getModule();
+  auto *F = dynamicCast.getFunction();
 
   // Check if we can statically predict the outcome of the cast.
   auto Feasibility =
@@ -886,7 +886,7 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
         CastedValue =
             emitSuccessfulScalarUnconditionalCast(Builder, Loc, dynamicCast);
       } else {
-        CastedValue = SILUndef::get(LoweredTargetType, Mod);
+        CastedValue = SILUndef::get(LoweredTargetType, *F);
       }
       if (!CastedValue)
         CastedValue =
@@ -918,7 +918,7 @@ SILInstruction *CastOptimizer::simplifyCheckedCastValueBranchInst(
   auto *SuccessBB = dynamicCast.getSuccessBlock();
   auto *FailureBB = dynamicCast.getFailureBlock();
   auto Op = dynamicCast.getSource();
-  auto &Mod = dynamicCast.getModule();
+  auto *F = dynamicCast.getFunction();
 
   // Check if we can statically predict the outcome of the cast.
   auto Feasibility = dynamicCast.classifyFeasibility(false /*allow wmo opts*/);
@@ -965,7 +965,7 @@ SILInstruction *CastOptimizer::simplifyCheckedCastValueBranchInst(
         CastedValue =
             emitSuccessfulScalarUnconditionalCast(Builder, Loc, dynamicCast);
       } else {
-        CastedValue = SILUndef::get(LoweredTargetType, Mod);
+        CastedValue = SILUndef::get(LoweredTargetType, *F);
       }
     }
     if (!CastedValue)
@@ -1444,7 +1444,7 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
             Builder.getModule())) {
       auto undef = SILValue(
           SILUndef::get(dynamicCast.getLoweredTargetType().getObjectType(),
-                        Builder.getModule()));
+                        Builder.getFunction()));
       Builder.emitStoreValueOperation(Loc, undef, dynamicCast.getDest(),
                                       StoreOwnershipQualifier::Init);
     }

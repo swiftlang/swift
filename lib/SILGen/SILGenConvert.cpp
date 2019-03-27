@@ -644,7 +644,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     if (auto storedNSErrorConformance =
           SGM.getConformanceToBridgedStoredNSError(loc, concreteFormalType)) {
       auto nsErrorVar = SGM.getNSErrorRequirement(loc);
-      if (!nsErrorVar) return emitUndef(loc, existentialTL.getLoweredType());
+      if (!nsErrorVar) return emitUndef(existentialTL.getLoweredType());
 
       SubstitutionMap nsErrorVarSubstitutions;
 
@@ -686,7 +686,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       // NSError from the value.
       auto getEmbeddedNSErrorFn = SGM.getGetErrorEmbeddedNSError(loc);
       if (!getEmbeddedNSErrorFn)
-        return emitUndef(loc, existentialTL.getLoweredType());
+        return emitUndef(existentialTL.getLoweredType());
 
       auto getEmbeddedNSErrorSubstitutions =
         SubstitutionMap::getProtocolSubstitutions(ctx.getErrorDecl(),
