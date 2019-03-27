@@ -20,6 +20,59 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     //
     //===----------------------------------------------------------------------===//
     
+    Accelerate_vImageTests.test("vImage/CVConverters") {
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        
+        let cgFormat = vImage_CGImageFormat(bitsPerComponent: 8,
+                                            bitsPerPixel: 32,
+                                            colorSpace: colorSpace,
+                                            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.first.rawValue),
+                                            renderingIntent: .defaultIntent)
+        
+        let cvFormat = vImageCVImageFormat.make(format: .format32ABGR,
+                                                matrix: kvImage_ARGBToYpCbCrMatrix_ITU_R_601_4.pointee,
+                                                chromaSiting: .center,
+                                                colorSpace: colorSpace,
+                                                alphaIsOpaqueHint: false)!
+        
+        let coreVideoToCoreGraphics = vImageConverter.make(sourceFormat: cvFormat,
+                                                           destinationFormat: cgFormat,
+                                                           flags: .printDiagnosticsToConsole)
+        
+        let coreGraphicsToCoreVideo = vImageConverter.make(sourceFormat: cgFormat,
+                                                           destinationFormat: cvFormat,
+                                                           flags: .printDiagnosticsToConsole)
+        
+        let pixels: [UInt8] = (0 ..< width * height * 4).map { _ in
+            return UInt8.random(in: 0 ..< 255)
+        }
+        
+        let image = makeRGBA8888Image(from: pixels,
+                                      width: width,
+                                      height: height)!
+        
+        let sourceCGBuffer = vImage_Buffer(cgImage: image)!
+        var intermediateCVBuffer = vImage_Buffer(size: size, bitsPerPixel: 32)!
+        var destinationCGBuffer = vImage_Buffer(size: size, bitsPerPixel: 32)!
+        
+        coreGraphicsToCoreVideo?.convert(source: sourceCGBuffer,
+                                         destination: &intermediateCVBuffer)
+        
+        coreVideoToCoreGraphics?.convert(source: intermediateCVBuffer,
+                                         destination: &destinationCGBuffer)
+        
+        let destinationPixels: [UInt8] = arrayFromBuffer(buffer: destinationCGBuffer,
+                                                         count: pixels.count)
+        
+        expectEqual(destinationPixels, pixels)
+        
+        expectEqual(coreVideoToCoreGraphics?.destinationBuffers(colorSpace: colorSpace),
+                    coreGraphicsToCoreVideo?.sourceBuffers(colorSpace: colorSpace))
+        
+        expectEqual(coreVideoToCoreGraphics?.sourceBuffers(colorSpace: colorSpace),
+                    coreGraphicsToCoreVideo?.destinationBuffers(colorSpace: colorSpace))
+    }
+    
     Accelerate_vImageTests.test("vImage/BufferOrder") {
         let sourceFormat = vImage_CGImageFormat(bitsPerComponent: 8,
                                                 bitsPerPixel: 32,

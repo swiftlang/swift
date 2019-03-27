@@ -127,7 +127,11 @@ extension vImageConverter {
             return nil
         }
     }
-    
+
+    //===----------------------------------------------------------------------===//
+    //
+    //  MARK: CG -> CV
+    //
     //===----------------------------------------------------------------------===//
     
     /// Creates a vImage converter to convert from one vImage Core Graphics image format to another,
@@ -182,6 +186,124 @@ extension vImageConverter {
                     vImage_Flags(options.rawValue),
                     nil)
             }
+        }
+        
+        return unmanagedConverter?.takeRetainedValue()
+    }
+    
+    //===----------------------------------------------------------------------===//
+    //
+    //  MARK: CG -> CV
+    //
+    //===----------------------------------------------------------------------===//
+    
+    /// Creates a vImage converter that converts a Core Graphics-formatted image to a Core Video-formatted image,
+    /// reporting any errors.
+    ///
+    /// - Parameter sourceFormat: A `vImage_CGImageFormat` structure describing the image format of the source image
+    /// - Parameter destinationFormat: A `vImageCVImageFormat` structure describing the image format of the destination image
+    /// - Parameter error: Overwritten with the error code if the operation failed.
+    /// - Parameter options: The options to use when performing this operation.
+    ///
+    /// - Returns: a vImage converter to convert a Core Graphics-formatted image to a Core Video-formatted image.
+    public static func make(sourceFormat: vImage_CGImageFormat,
+                            destinationFormat: vImageCVImageFormat,
+                            error: inout Int,
+                            flags options: vImage.Options = .noFlags) -> vImageConverter? {
+        
+        var unmanagedConverter: Unmanaged<vImageConverter>?
+        
+        withUnsafePointer(to: sourceFormat) { src in
+            unmanagedConverter = vImageConverter_CreateForCGToCVImageFormat(
+                src,
+                destinationFormat,
+                nil,
+                vImage_Flags(options.rawValue),
+                &error)
+        }
+        
+        return unmanagedConverter?.takeRetainedValue()
+    }
+    
+    /// Creates a vImage converter that converts a Core Graphics-formatted image to a Core Video-formatted image.
+    ///
+    /// - Parameter sourceFormat: A `vImage_CGImageFormat` structure describing the image format of the source image
+    /// - Parameter destinationFormat: A `vImageCVImageFormat` structure describing the image format of the destination image
+    /// - Parameter options: The options to use when performing this operation.
+    ///
+    /// - Returns: a vImage converter to convert a Core Graphics-formatted image to a Core Video-formatted image.
+    public static func make(sourceFormat: vImage_CGImageFormat,
+                            destinationFormat: vImageCVImageFormat,
+                            flags options: vImage.Options = .noFlags) -> vImageConverter? {
+        
+        var unmanagedConverter: Unmanaged<vImageConverter>?
+        
+        withUnsafePointer(to: sourceFormat) { src in
+            unmanagedConverter = vImageConverter_CreateForCGToCVImageFormat(
+                src,
+                destinationFormat,
+                nil,
+                vImage_Flags(options.rawValue),
+                nil)
+        }
+        
+        return unmanagedConverter?.takeRetainedValue()
+    }
+    
+    //===----------------------------------------------------------------------===//
+    //
+    //  MARK: CV -> CG
+    //
+    //===----------------------------------------------------------------------===//
+    
+    /// Creates a vImage converter that converts a Core Video-formatted image to a Core Graphics-formatted image,
+    /// reporting any errors.
+    ///
+    /// - Parameter sourceFormat: A `vImageCVImageFormat` structure describing the image format of the source image
+    /// - Parameter destinationFormat: A `vImage_CGImageFormat` structure describing the image format of the destination image
+    /// - Parameter error: Overwritten with the error code if the operation failed.
+    /// - Parameter options: The options to use when performing this operation.
+    ///
+    /// - Returns: a vImage converter to convert a Core Video-formatted image to a Core Graphics-formatted image.
+    public static func make(sourceFormat: vImageCVImageFormat,
+                            destinationFormat: vImage_CGImageFormat,
+                            error: inout Int,
+                            flags options: vImage.Options = .noFlags) -> vImageConverter? {
+        
+        var unmanagedConverter: Unmanaged<vImageConverter>?
+        
+        withUnsafePointer(to: destinationFormat) { dest in
+            unmanagedConverter = vImageConverter_CreateForCVToCGImageFormat(
+                sourceFormat,
+                dest,
+                nil,
+                vImage_Flags(options.rawValue),
+                &error)
+        }
+        
+        return unmanagedConverter?.takeRetainedValue()
+    }
+    
+    /// Creates a vImage converter that converts a Core Video-formatted image to a Core Graphics-formatted image.
+    ///
+    /// - Parameter sourceFormat: A `vImageCVImageFormat` structure describing the image format of the source image
+    /// - Parameter destinationFormat: A `vImage_CGImageFormat` structure describing the image format of the destination image
+    /// - Parameter options: The options to use when performing this operation.
+    ///
+    /// - Returns: a vImage converter to convert a Core Video-formatted image to a Core Graphics-formatted image.
+    public static func make(sourceFormat: vImageCVImageFormat,
+                            destinationFormat: vImage_CGImageFormat,
+                            flags options: vImage.Options = .noFlags) -> vImageConverter? {
+        
+        var unmanagedConverter: Unmanaged<vImageConverter>?
+        
+        withUnsafePointer(to: destinationFormat) { dest in
+            unmanagedConverter = vImageConverter_CreateForCVToCGImageFormat(
+                sourceFormat,
+                dest,
+                nil,
+                vImage_Flags(options.rawValue),
+                nil)
         }
         
         return unmanagedConverter?.takeRetainedValue()
