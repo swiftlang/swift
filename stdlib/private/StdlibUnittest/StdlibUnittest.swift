@@ -128,8 +128,8 @@ func _printStackTrace(_ stackTrace: SourceLocStack?) {
   }
 }
 
-var _anyExpectFailed = AtomicBool(false)
-var _seenExpectCrash = AtomicBool(false)
+fileprivate var _anyExpectFailed = AtomicBool(false)
+fileprivate var _seenExpectCrash = AtomicBool(false)
 
 /// Run `body` and expect a failure to happen.
 ///
