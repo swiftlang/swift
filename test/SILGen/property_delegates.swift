@@ -80,14 +80,14 @@ struct DelegateWithAccessors {
     return 42
 
     // Synthesized setter
-    // CHECK-LABEL: sil hidden [ossa] @$s18property_delegates21DelegateWithAccessorsV1xSivs : $@convention(method) (Int, @inout DelegateWithAccessors) -> ()
+    // CHECK-LABEL: sil hidden [transparent] [ossa] @$s18property_delegates21DelegateWithAccessorsV1xSivs : $@convention(method) (Int, @inout DelegateWithAccessors) -> ()
     // CHECK-NOT: return
     // CHECK: struct_element_addr {{%.*}} : $*DelegateWithAccessors, #DelegateWithAccessors.$x
   }
   
   var y: Int by WrapperWithInitialValue {
     // Synthesized getter
-    // CHECK-LABEL: sil hidden [ossa] @$s18property_delegates21DelegateWithAccessorsV1ySivg : $@convention(method) (DelegateWithAccessors) -> Int
+    // CHECK-LABEL: sil hidden [transparent] [ossa] @$s18property_delegates21DelegateWithAccessorsV1ySivg : $@convention(method) (DelegateWithAccessors) -> Int
     // CHECK-NOT: return
     // CHECK: struct_extract %0 : $DelegateWithAccessors, #DelegateWithAccessors.$y
 

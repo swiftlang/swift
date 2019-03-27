@@ -314,6 +314,19 @@ static void maybeMarkTransparent(AccessorDecl *accessor, ASTContext &ctx) {
       accessor->getAccessorKind() == AccessorKind::Set)
     return;
 
+  // Getters/setters for a property with a delegate are not @_transparent if
+  // the backing variable has more-restrictive access than the original
+  // property.
+  if (auto var = dyn_cast<VarDecl>(accessor->getStorage())) {
+    if (var->hasPropertyDelegate()) {
+      if (auto backingVar =
+              getOrSynthesizePropertyDelegateBackingProperty(var)) {
+        if (backingVar->getFormalAccess() < var->getFormalAccess())
+          return;
+      }
+    }
+  }
+
   // Accessors for protocol storage requirements are never @_transparent
   // since they do not have bodies.
   //
@@ -524,7 +537,9 @@ namespace {
     /// an override of it.
     Implementation,
     /// We're referencing the superclass's implementation of the storage.
-    Super
+    Super,
+    /// We're referencing the backing property for a property with a delegate
+    Delegate,
   };
 } // end anonymous namespace
 
@@ -533,6 +548,17 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
                                    AbstractStorageDecl *storage,
                                    TargetImpl target,
                                    ASTContext &ctx) {
+  // Local function to "finish" the expression, creating a member reference
+  // to the "unwrapping" variable if there is one.
+  VarDecl *unwrapVar = nullptr;
+  auto finish = [&](Expr *result) -> Expr * {
+    if (!unwrapVar)
+      return result;
+
+    return new (ctx) MemberRefExpr(
+        result, SourceLoc(), unwrapVar, DeclNameLoc(), /*Implicit=*/true);
+  };
+
   AccessSemantics semantics;
   SelfAccessorKind selfAccessKind;
   switch (target) {
@@ -566,12 +592,22 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
       selfAccessKind = SelfAccessorKind::Peer;
     }
     break;
+
+  case TargetImpl::Delegate: {
+    auto var = cast<VarDecl>(accessor->getStorage());
+    storage = getOrSynthesizePropertyDelegateBackingProperty(var);
+    unwrapVar = getAttachedPropertyDelegateInfo(var).unwrapProperty;
+    semantics = AccessSemantics::DirectToStorage;
+    selfAccessKind = SelfAccessorKind::Peer;
+    break;
+  }
   }
 
   VarDecl *selfDecl = accessor->getImplicitSelfDecl();
   if (!selfDecl) {
     assert(target != TargetImpl::Super);
-    return new (ctx) DeclRefExpr(storage, DeclNameLoc(), IsImplicit, semantics);
+    return finish(
+        new (ctx) DeclRefExpr(storage, DeclNameLoc(), IsImplicit, semantics));
   }
 
   Expr *selfDRE =
@@ -579,12 +615,12 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
 
   if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
     Expr *indices = buildSubscriptIndexReference(ctx, accessor);
-    return SubscriptExpr::create(ctx, selfDRE, indices, storage,
-                                 IsImplicit, semantics);
+    return finish(SubscriptExpr::create(ctx, selfDRE, indices, storage,
+                                        IsImplicit, semantics));
   }
 
-  return new (ctx) MemberRefExpr(selfDRE, SourceLoc(), storage,
-                                 DeclNameLoc(), IsImplicit, semantics);
+  return finish(new (ctx) MemberRefExpr(selfDRE, SourceLoc(), storage,
+                                        DeclNameLoc(), IsImplicit, semantics));
 }
 
 /// Load the value of VD.  If VD is an @override of another value, we call the
@@ -747,7 +783,8 @@ static void synthesizeTrivialGetterBody(AccessorDecl *getter,
                                         TargetImpl target,
                                         ASTContext &ctx) {
   auto storage = getter->getStorage();
-  assert(!isSynthesizedComputedProperty(storage));
+  assert(!isSynthesizedComputedProperty(storage) ||
+         target == TargetImpl::Delegate);
 
   SourceLoc loc = storage->getLoc();
 
@@ -799,20 +836,7 @@ static void synthesizeReadCoroutineGetterBody(AccessorDecl *getter,
 /// delegates to the delegate's unwrap property.
 static void synthesizePropertyDelegateGetterBody(AccessorDecl *getter,
                                                  ASTContext &ctx) {
-  auto var = cast<VarDecl>(getter->getStorage());
-  auto backingVar = getOrSynthesizePropertyDelegateBackingProperty(var);
-  auto unwrapVar = getAttachedPropertyDelegateInfo(var).unwrapProperty;
-
-  if (!backingVar || !unwrapVar)
-    return;
-
-  auto backingValue = createPropertyLoadOrCallSuperclassGetter(
-      getter, backingVar, TargetImpl::Storage, ctx);
-  auto unwrapRef = new (ctx) MemberRefExpr(
-      backingValue, SourceLoc(), unwrapVar, DeclNameLoc(), /*Implicit=*/true);
-  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), unwrapRef);
-  getter->setBody(
-      BraceStmt::create(ctx, SourceLoc(), { returnStmt }, SourceLoc()));
+  synthesizeTrivialGetterBody(getter, TargetImpl::Delegate, ctx);
 }
 
 /// Synthesize the body of a setter which just stores to the given storage
@@ -849,25 +873,8 @@ static void synthesizeTrivialSetterBody(AccessorDecl *setter,
 /// delegates to the delegate's unwrap property.
 static void synthesizePropertyDelegateSetterBody(AccessorDecl *setter,
                                                  ASTContext &ctx) {
-  auto var = cast<VarDecl>(setter->getStorage());
-  auto backingVar = getOrSynthesizePropertyDelegateBackingProperty(var);
-  auto unwrapVar = getAttachedPropertyDelegateInfo(var).unwrapProperty;
-
-  if (!backingVar || !unwrapVar)
-    return;
-
-  VarDecl *newValueParamDecl = getFirstParamDecl(setter);
-  auto *newValueDRE =
-    new (ctx) DeclRefExpr(newValueParamDecl, DeclNameLoc(), IsImplicit);
-
-  auto backingValue =
-      buildStorageReference(setter, backingVar, TargetImpl::Storage, ctx);
-  auto unwrapRef = new (ctx) MemberRefExpr(
-      backingValue, SourceLoc(), unwrapVar, DeclNameLoc(), /*Implicit=*/true);
-  auto assign =
-      new (ctx) AssignExpr(unwrapRef, SourceLoc(), newValueDRE, IsImplicit);
-  setter->setBody(
-      BraceStmt::create(ctx, SourceLoc(), { assign }, SourceLoc()));
+  synthesizeTrivialSetterBodyWithStorage(setter, TargetImpl::Delegate,
+                                         setter->getStorage(), ctx);
 }
 
 static void synthesizeCoroutineAccessorBody(AccessorDecl *accessor,
