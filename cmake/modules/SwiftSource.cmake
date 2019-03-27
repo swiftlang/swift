@@ -226,9 +226,9 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-sil-verify-all")
   endif()
 
-  # The standard library and overlays are always built with resilience.
+  # The standard library and overlays are always built resiliently.
   if(SWIFTFILE_IS_STDLIB)
-    list(APPEND swift_flags "-Xfrontend" "-enable-resilience")
+    list(APPEND swift_flags "-enable-library-evolution")
   endif()
 
   if(SWIFT_STDLIB_USE_NONATOMIC_RC)
@@ -236,7 +236,6 @@ function(_compile_swift_files
   endif()
 
   if(SWIFTFILE_IS_STDLIB)
-    list(APPEND swift_flags "-Xfrontend" "-enable-sil-ownership")
     list(APPEND swift_flags "-Xfrontend" "-enable-mandatory-semantic-arc-opts")
   endif()
 
@@ -262,7 +261,7 @@ function(_compile_swift_files
   if (SWIFTFILE_IS_STDLIB)
     list(APPEND swift_flags "-swift-version" "5")
   endif()
-  
+
   # Force swift 4 compatibility mode for overlays.
   if (SWIFTFILE_IS_SDK_OVERLAY)
     list(APPEND swift_flags "-swift-version" "4")
@@ -344,16 +343,11 @@ function(_compile_swift_files
     list(APPEND module_outputs "${interface_file}")
   endif()
 
-  set(optional_arg)
-  if(sdk IN_LIST SWIFT_APPLE_PLATFORMS)
-    # Allow installation of stdlib without building all variants on Darwin.
-    set(optional_arg "OPTIONAL")
-  endif()
-
   if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
     swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
       DIRECTORY "${specific_module_dir}"
-      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
+      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
+      OPTIONAL)
   else()
     swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
       FILES ${module_outputs}
@@ -439,7 +433,7 @@ function(_compile_swift_files
   set(file_path "${CMAKE_CURRENT_BINARY_DIR}/${file_name}.txt")
   string(REPLACE ";" "'\n'" source_files_quoted "${source_files}")
   file(WRITE "${file_path}" "'${source_files_quoted}'")
-  
+
   # If this platform/architecture combo supports backward deployment to old
   # Objective-C runtimes, we need to copy a YAML file with legacy type layout
   # information to the build directory so that the compiler can find it.

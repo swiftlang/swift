@@ -721,13 +721,16 @@ namespace {
 
     ManagedValue project(SILGenFunction &SGF, SILLocation loc,
                          ManagedValue base) && override {
-      assert(base.getType().isObject() &&
-             "base for ref element component must be an object");
       assert(base.getType().hasReferenceSemantics() &&
              "base for ref element component must be a reference type");
+
       // Borrow the ref element addr using formal access. If we need the ref
       // element addr, we will load it in this expression.
-      base = base.formalAccessBorrow(SGF, loc);
+      if (base.getType().isAddress()) {
+        base = SGF.B.createFormalAccessLoadBorrow(loc, base);
+      } else {
+        base = base.formalAccessBorrow(SGF, loc);
+      }
       SILValue result =
         SGF.B.createRefElementAddr(loc, base.getUnmanagedValue(),
                                    Field, SubstFieldType);
@@ -1701,7 +1704,7 @@ makeBaseConsumableMaterializedRValue(SILGenFunction &SGF,
   }
 
   bool isBorrowed = base.isPlusZeroRValueOrTrivial()
-    && !base.getType().isTrivial(SGF.SGM.M);
+    && !base.getType().isTrivial(SGF.F);
   if (!base.getType().isAddress() || isBorrowed) {
     auto tmp = SGF.emitTemporaryAllocation(loc, base.getType());
     if (isBorrowed)
@@ -1903,11 +1906,19 @@ namespace {
 RValue
 TranslationPathComponent::get(SILGenFunction &SGF, SILLocation loc,
                               ManagedValue base, SGFContext c) && {
-  // Load the original value.
-  RValue baseVal(SGF, loc, getSubstFormalType(),
-           SGF.emitLoad(loc, base.getValue(),
-                        SGF.getTypeLowering(base.getType()),
-                        SGFContext(), IsNotTake));
+  // Inline constructor.
+  RValue baseVal = [&]() -> RValue {
+    // If our base is an object, just put it into an RValue and return.
+    if (base.getType().isObject()) {
+      return RValue(SGF, loc, getSubstFormalType(), base);
+    }
+
+    // Otherwise, load the value and put it into an RValue.
+    return RValue(SGF, loc, getSubstFormalType(),
+                  SGF.emitLoad(loc, base.getValue(),
+                               SGF.getTypeLowering(base.getType()),
+                               SGFContext(), IsNotTake));
+  }();
 
   // Map the base value to its substituted representation.
   return std::move(*this).translate(SGF, loc, std::move(baseVal), c);
@@ -1916,6 +1927,8 @@ TranslationPathComponent::get(SILGenFunction &SGF, SILLocation loc,
 void TranslationPathComponent::set(SILGenFunction &SGF, SILLocation loc,
                                    ArgumentSource &&valueSource,
                                    ManagedValue base) && {
+  assert(base.getType().isAddress() &&
+         "Only support setting bases that have addresses");
   RValue value = std::move(valueSource).getAsRValue(SGF);
 
   // Map the value to the original pattern.
@@ -2229,6 +2242,7 @@ static ManagedValue visitRecNonInOutBase(SILGenLValue &SGL, Expr *e,
   }
 
   // Ok, at this point we know that re-abstraction is not required.
+
   SGFContext ctx;
 
   if (auto *dre = dyn_cast<DeclRefExpr>(e)) {
@@ -4136,8 +4150,6 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc, RValue &&src,
 void SILGenFunction::emitAssignToLValue(SILLocation loc,
                                         ArgumentSource &&src,
                                         LValue &&dest) {
-  assert(dest.getAccessKind() == SGFAccessKind::Write);
-
   // Enter a FormalEvaluationScope so that formal access to independent LValue
   // components do not overlap. Furthermore, use an ArgumentScope to force
   // cleanup of materialized LValues immediately, before evaluating the next

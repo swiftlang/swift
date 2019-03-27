@@ -11,10 +11,10 @@ target_link_libraries(swift-ide-test
                         swiftIDE)
 
 # If libxml2 is available, make it available for swift-ide-test.
-if(SWIFT_HAVE_LIBXML)
+if(LibXml2_FOUND)
   include_directories(SYSTEM ${LIBXML2_INCLUDE_DIR})
   target_link_libraries(swift-ide-test PRIVATE ${LIBXML2_LIBRARIES})
-  add_definitions(-DSWIFT_HAVE_LIBXML="1")
+  target_compile_definitions(swift-ide-test PRIVATE SWIFT_HAVE_LIBXML=1)
 endif()
 
 # Create a symlink for swift-api-dump.py in the bin directory

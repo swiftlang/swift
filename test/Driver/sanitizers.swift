@@ -39,6 +39,10 @@
 // RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=undefined -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck -check-prefix=UBSAN_LINUX %s
 // RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=undefined -target x86_64-unknown-windows-msvc %s 2>&1 | %FileCheck -check-prefix=UBSAN_WINDOWS %s
 
+/*
+ * Multiple Sanitizers At Once
+ */
+// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address,undefined,fuzzer -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck -check-prefix=MULTIPLE_SAN_LINUX %s
 
 /*
  * Bad Argument Tests
@@ -65,7 +69,7 @@
 // ASAN_tvOS: lib{{/|\\\\}}swift{{/|\\\\}}clang{{/|\\\\}}lib{{/|\\\\}}darwin{{/|\\\\}}libclang_rt.asan_tvos_dynamic.dylib
 // ASAN_watchOS_SIM: lib{{/|\\\\}}swift{{/|\\\\}}clang{{/|\\\\}}lib{{/|\\\\}}darwin{{/|\\\\}}libclang_rt.asan_watchossim_dynamic.dylib
 // ASAN_watchOS: lib{{/|\\\\}}swift{{/|\\\\}}clang{{/|\\\\}}lib{{/|\\\\}}darwin{{/|\\\\}}libclang_rt.asan_watchos_dynamic.dylib
-// ASAN_LINUX: lib{{/|\\\\}}swift{{/|\\\\}}clang{{/|\\\\}}lib{{/|\\\\}}linux{{/|\\\\}}libclang_rt.asan-x86_64.a
+// ASAN_LINUX: -fsanitize=address
 // ASAN_WINDOWS: lib{{/|\\\\}}swift{{/|\\\\}}clang{{/|\\\\}}lib{{/|\\\\}}windows{{/|\\\\}}clang_rt.asan-x86_64.lib
 
 // ASAN: -rpath @executable_path
@@ -82,7 +86,7 @@
 // TSAN_watchOS_SIM: unsupported option '-sanitize=thread' for target 'i386-apple-watchos2.0'
 // TSAN_watchOS: unsupported option '-sanitize=thread' for target 'armv7k-apple-watchos2.0'
 // FUZZER_NONEXISTENT: unsupported option '-sanitize=fuzzer' for target 'x86_64-apple-macosx10.9'
-// TSAN_LINUX: lib{{/|\\\\}}swift{{/|\\\\}}clang{{/|\\\\}}lib{{/|\\\\}}linux{{/|\\\\}}libclang_rt.tsan-x86_64.a
+// TSAN_LINUX: -fsanitize=thread
 // TSAN_WINDOWS: unsupported option '-sanitize=thread' for target 'x86_64-unknown-windows-msvc'
 
 // TSAN: -rpath @executable_path
@@ -97,10 +101,12 @@
 // UBSAN_tvOS: lib{{/|\\\\}}swift{{/|\\\\}}clang{{/|\\\\}}lib{{/|\\\\}}darwin{{/|\\\\}}libclang_rt.ubsan_tvos_dynamic.dylib
 // UBSAN_watchOS_SIM: lib{{/|\\\\}}swift{{/|\\\\}}clang{{/|\\\\}}lib{{/|\\\\}}darwin{{/|\\\\}}libclang_rt.ubsan_watchossim_dynamic.dylib
 // UBSAN_watchOS: lib{{/|\\\\}}swift{{/|\\\\}}clang{{/|\\\\}}lib{{/|\\\\}}darwin{{/|\\\\}}libclang_rt.ubsan_watchos_dynamic.dylib
-// UBSAN_LINUX: lib{{/|\\\\}}swift{{/|\\\\}}clang{{/|\\\\}}lib{{/|\\\\}}linux{{/|\\\\}}libclang_rt.ubsan-x86_64.a
+// UBSAN_LINUX: -fsanitize=undefined
 // UBSAN_WINDOWS: lib{{/|\\\\}}swift{{/|\\\\}}clang{{/|\\\\}}lib{{/|\\\\}}windows{{/|\\\\}}clang_rt.ubsan-x86_64.lib
 
 // UBSAN: -rpath @executable_path
+
+// MULTIPLE_SAN_LINUX: -fsanitize=address,fuzzer,undefined
 
 // BADARG: unsupported argument 'unknown' to option '-sanitize='
 // INCOMPATIBLESANITIZERS: argument '-sanitize=address' is not allowed with '-sanitize=thread'

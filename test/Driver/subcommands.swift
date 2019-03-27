@@ -1,3 +1,4 @@
+// REQUIRES: shell
 // Check that 'swift' and 'swift repl' invoke the REPL.
 
 // RUN: rm -rf %t.dir

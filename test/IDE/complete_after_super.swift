@@ -262,7 +262,9 @@ class SuperDerivedA : SuperBaseA {
   }
   init (b: Float) {
     super.init(#^CONSTRUCTOR_SUPER_INIT_PAREN_1^#
-// CONSTRUCTOR_SUPER_INIT_PAREN_1-NOT: Pattern/
+// CONSTRUCTOR_SUPER_INIT_PAREN_1: Begin completions, 1 items
+// CONSTRUCTOR_SUPER_INIT_PAREN_1: Pattern/CurrModule: ['('][')'][#SuperBaseA#]; name=
+// CONSTRUCTOR_SUPER_INIT_PAREN_1: End completions
   }
 
   deinit {

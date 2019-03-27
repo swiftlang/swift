@@ -337,8 +337,13 @@ getFieldAt(const Metadata *base, unsigned index) {
 
   SubstGenericParametersFromMetadata substitutions(base);
   auto typeInfo = swift_getTypeByMangledName(MetadataState::Complete,
-                                             typeName, substitutions,
-                                             substitutions);
+   typeName,
+   [&substitutions](unsigned depth, unsigned index) {
+     return substitutions.getMetadata(depth, index);
+   },
+   [&substitutions](const Metadata *type, unsigned index) {
+     return substitutions.getWitnessTable(type, index);
+   });
 
   // If demangling the type failed, pretend it's an empty type instead with
   // a log message.

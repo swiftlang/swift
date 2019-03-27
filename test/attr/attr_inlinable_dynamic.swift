@@ -1,8 +1,8 @@
 // RUN: %target-swift-frontend -typecheck %s -swift-version 5 -enable-objc-interop -disable-objc-attr-requires-foundation-module -verify
 // RUN: %target-swift-frontend -typecheck %s -swift-version 5 -enable-objc-interop -disable-objc-attr-requires-foundation-module -enable-testing -verify
 
-// RUN: %target-swift-frontend -typecheck %s -swift-version 5 -enable-objc-interop -disable-objc-attr-requires-foundation-module -enable-resilience -verify
-// RUN: %target-swift-frontend -typecheck %s -swift-version 5 -enable-objc-interop -disable-objc-attr-requires-foundation-module -enable-testing -enable-resilience -verify
+// RUN: %target-swift-frontend -typecheck %s -swift-version 5 -enable-objc-interop -disable-objc-attr-requires-foundation-module -enable-library-evolution -verify
+// RUN: %target-swift-frontend -typecheck %s -swift-version 5 -enable-objc-interop -disable-objc-attr-requires-foundation-module -enable-testing -enable-library-evolution -verify
 
 @objc internal enum InternalEnum: UInt8 {
   case dummy
