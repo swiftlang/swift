@@ -47,6 +47,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_IN_INIT_3 | %FileCheck %s -check-prefix=CLOSURE_IN_INIT_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_IN_INIT_4 | %FileCheck %s -check-prefix=CLOSURE_IN_INIT_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AVAILABLE_1 | %FileCheck %s -check-prefix=AVAILABLE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AVAILABLE_2 | %FileCheck %s -check-prefix=AVAILABLE_2
+
 func freeFunc() {}
 
 //===---
@@ -66,7 +69,9 @@ func testImplicitConstructors1() {
 }
 func testImplicitConstructors1P() {
   ImplicitConstructors1(#^IMPLICIT_CONSTRUCTORS_1P^#
-// IMPLICIT_CONSTRUCTORS_1P-NOT: Begin completions
+// IMPLICIT_CONSTRUCTORS_1P: Begin completions, 1 items
+// IMPLICIT_CONSTRUCTORS_1P: Decl[Constructor]/CurrNominal: ['('][')'][#ImplicitConstructors1#]; name=
+// IMPLICIT_CONSTRUCTORS_1P: End completions
 }
 
 struct ImplicitConstructors2 {
@@ -86,6 +91,7 @@ func testImplicitConstructors2P() {
   ImplicitConstructors2(#^IMPLICIT_CONSTRUCTORS_2P^#
 // IMPLICIT_CONSTRUCTORS_2P: Begin completions
 // IMPLICIT_CONSTRUCTORS_2P-NEXT: Decl[Constructor]/CurrNominal: ['(']{#instanceVar: Int#}[')'][#ImplicitConstructors2#]{{; name=.+$}}
+// IMPLICIT_CONSTRUCTORS_2P-NEXT: Decl[Constructor]/CurrNominal: ['('][')'][#ImplicitConstructors2#]; name=
 // IMPLICIT_CONSTRUCTORS_2P-NEXT: End completions
 }
 
@@ -108,6 +114,7 @@ func testExplicitConstructors1() {
 func testExplicitConstructors1P() {
   ExplicitConstructors1(#^EXPLICIT_CONSTRUCTORS_1P^#
 // EXPLICIT_CONSTRUCTORS_1P: Begin completions
+// EXPLICIT_CONSTRUCTORS_1P-NEXT: Decl[Constructor]/CurrNominal: ['('][')'][#ExplicitConstructors1#]; name=
 // EXPLICIT_CONSTRUCTORS_1P-NEXT: Decl[Constructor]/CurrNominal: ['(']{#a: Int#}[')'][#ExplicitConstructors1#]{{; name=.+$}}
 // EXPLICIT_CONSTRUCTORS_1P-NEXT: Decl[Constructor]/CurrNominal: ['(']{#a: Int#}, {#b: Float#}[')'][#ExplicitConstructors1#]{{; name=.+$}}
 // EXPLICIT_CONSTRUCTORS_1P-NEXT: End completions
@@ -273,13 +280,16 @@ struct ExplicitConstructorsDerived3 {
 
 func testHaveRParen1() {
   ImplicitConstructors1(#^HAVE_RPAREN_1^#)
-// HAVE_RPAREN_1-NOT: Decl[Constructor]
+// HAVE_RPAREN_1: Begin completions, 1 items
+// HAVE_RPAREN_1: Decl[Constructor]/CurrNominal: ['('][')'][#ImplicitConstructors1#]; name=
+// HAVE_RPAREN_1: End completions
 }
 
 func testHaveRParen2() {
   ImplicitConstructors2(#^HAVE_RPAREN_2^#)
 // HAVE_RPAREN_2-NOT: Decl[Constructor]
 // HAVE_RPAREN_2:     Decl[Constructor]/CurrNominal: ['(']{#instanceVar: Int#}[')'][#ImplicitConstructors2#]{{; name=.+$}}
+// HAVE_RPAREN_2:     Decl[Constructor]/CurrNominal: ['('][')'][#ImplicitConstructors2#]; name=
 // HAVE_RPAREN_2-NOT: Decl[Constructor]
 }
 
@@ -331,4 +341,34 @@ struct ClosureInInit1 {
   var prop3: S = {
     S(#^CLOSURE_IN_INIT_4^#
   }()
+}
+
+public class AvailableTest {
+
+  @available(swift, obsoleted: 4)
+  init(opt: Int) { }
+
+  @available(swift, introduced: 4)
+  init?(opt: Int) { }
+
+  init(normal1: Int) { }
+  init(normal2: Int) { }
+
+
+}
+func testAvailable() {
+  let _ = AvailableTest(#^AVAILABLE_1^#
+// AVAILABLE_1: Begin completions, 3 items
+// AVAILABLE_1-DAG: Decl[Constructor]/CurrNominal:      ['(']{#opt: Int#}[')'][#AvailableTest?#]; name=opt: Int
+// AVAILABLE_1-DAG: Decl[Constructor]/CurrNominal:      ['(']{#normal1: Int#}[')'][#AvailableTest#]; name=normal1: Int
+// AVAILABLE_1-DAG: Decl[Constructor]/CurrNominal:      ['(']{#normal2: Int#}[')'][#AvailableTest#]; name=normal2: Int
+// AVAILABLE_1: End completions
+
+  let _ = AvailableTest.init(#^AVAILABLE_2^#
+// AVAILABLE_2: Begin completions, 3 items
+// AVAILABLE_2-DAG: Pattern/CurrModule:                 ['(']{#opt: Int#}[')'][#AvailableTest?#]; name=opt: Int
+// AVAILABLE_2-DAG: Pattern/CurrModule:                 ['(']{#normal1: Int#}[')'][#AvailableTest#]; name=normal1: Int
+// AVAILABLE_2-DAG: Pattern/CurrModule:                 ['(']{#normal2: Int#}[')'][#AvailableTest#]; name=normal2: Int
+// AVAILABLE_2: End completions
+
 }

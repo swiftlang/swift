@@ -1185,8 +1185,6 @@ void CodeCompletionString::getName(raw_ostream &OS) const {
       }
     }
   }
-  assert((TextSize > 0) &&
-         "code completion string should have non-empty name!");
 }
 
 void CodeCompletionContext::sortCompletionResults(
@@ -1348,6 +1346,7 @@ public:
   void completeTypeIdentifierWithDot(IdentTypeRepr *ITR) override;
   void completeTypeIdentifierWithoutDot(IdentTypeRepr *ITR) override;
 
+  void completeCaseStmtKeyword() override;
   void completeCaseStmtBeginning() override;
   void completeCaseStmtDotPrefix() override;
   void completeDeclAttrKeyword(Decl *D, bool Sil, bool Param) override;
@@ -1823,6 +1822,32 @@ public:
     llvm_unreachable("unhandled kind");
   }
 
+  void addValueBaseName(CodeCompletionResultBuilder &Builder,
+                        DeclBaseName Name) {
+    auto NameStr = Name.userFacingName();
+    bool shouldEscapeKeywords;
+    if (Name.isSpecial()) {
+      // Special names (i.e. 'init') are always displayed as its user facing
+      // name.
+      shouldEscapeKeywords = false;
+    } else if (ExprType) {
+      // After dot. User can write any keyword after '.' except for `init` and
+      // `self`. E.g. 'func `init`()' must be called by 'expr.`init`()'.
+      shouldEscapeKeywords = NameStr == "self" || NameStr == "init";
+    } else {
+      // As primary expresson. We have to escape almost every keywords except
+      // for 'self' and 'Self'.
+      shouldEscapeKeywords = NameStr != "self" && NameStr != "Self";
+    }
+
+    if (!shouldEscapeKeywords) {
+      Builder.addTextChunk(NameStr);
+    } else {
+      SmallString<16> buffer;
+      Builder.addTextChunk(Builder.escapeKeyword(NameStr, true, buffer));
+    }
+  }
+
   void addLeadingDot(CodeCompletionResultBuilder &Builder) {
     if (NeedOptionalUnwrap) {
       Builder.setNumBytesToErase(NumBytesToEraseForOptionalUnwrap);
@@ -1995,7 +2020,7 @@ public:
         VD->shouldHideFromEditor())
       return;
 
-    StringRef Name = VD->getName().get();
+    Identifier Name = VD->getName();
     assert(!Name.empty() && "name should not be empty");
 
     CommandWordsPairs Pairs;
@@ -2005,7 +2030,7 @@ public:
         getSemanticContext(VD, Reason), ExpectedTypes);
     Builder.setAssociatedDecl(VD);
     addLeadingDot(Builder);
-    Builder.addTextChunk(Name);
+    addValueBaseName(Builder, Name);
     setClangDeclKeywords(VD, Pairs, Builder);
 
     if (!VD->hasValidSignature())
@@ -2013,7 +2038,7 @@ public:
 
     // Add a type annotation.
     Type VarType = getTypeOfMember(VD);
-    if (VD->getName() != Ctx.Id_self && VD->isInOut()) {
+    if (Name != Ctx.Id_self && VD->isInOut()) {
       // It is useful to show inout for function parameters.
       // But for 'self' it is just noise.
       VarType = InOutType::get(VarType);
@@ -2222,14 +2247,8 @@ public:
       else
         Builder.addAnnotatedLeftParen();
 
-      bool anyParam = addCallArgumentPatterns(Builder, AFT->getParams(),
-                                              declParams, includeDefaultArgs);
-
-      if (HaveLParen && !anyParam) {
-        // Empty result, don't add it.
-        Builder.cancel();
-        return;
-      }
+      addCallArgumentPatterns(Builder, AFT->getParams(), declParams,
+                              includeDefaultArgs);
 
       // The rparen matches the lparen here so that we insert both or neither.
       if (!HaveLParen)
@@ -2319,7 +2338,7 @@ public:
       return;
     foundFunction(FD);
 
-    StringRef Name = FD->getName().get();
+    Identifier Name = FD->getName();
     assert(!Name.empty() && "name should not be empty");
 
     Type FunctionType = getTypeOfMember(FD);
@@ -2350,7 +2369,7 @@ public:
       setClangDeclKeywords(FD, Pairs, Builder);
       Builder.setAssociatedDecl(FD);
       addLeadingDot(Builder);
-      Builder.addTextChunk(Name);
+      addValueBaseName(Builder, Name);
       if (IsDynamicLookup)
         Builder.addDynamicLookupMethodCallTail();
       else if (FD->getAttrs().hasAttribute<OptionalAttr>())
@@ -2475,14 +2494,8 @@ public:
       else
         Builder.addAnnotatedLeftParen();
 
-      bool anyParam = addCallArgumentPatterns(
-          Builder, ConstructorType, CD->getParameters(), includeDefaultArgs);
-
-      if (HaveLParen && !anyParam) {
-        // Empty result, don't add it.
-        Builder.cancel();
-        return;
-      }
+      addCallArgumentPatterns(Builder, ConstructorType, CD->getParameters(),
+                              includeDefaultArgs);
 
       // The rparen matches the lparen here so that we insert both or neither.
       if (!HaveLParen)
@@ -2680,8 +2693,7 @@ public:
     Builder.setAssociatedDecl(EED);
     setClangDeclKeywords(EED, Pairs, Builder);
     addLeadingDot(Builder);
-
-    Builder.addTextChunk(EED->getName().str());
+    addValueBaseName(Builder, EED->getName());
 
     // Enum element is of function type; (Self.type) -> Self or
     // (Self.Type) -> (Args...) -> Self.
@@ -2705,7 +2717,8 @@ public:
   void addKeyword(StringRef Name, Type TypeAnnotation = Type(),
                   SemanticContextKind SK = SemanticContextKind::None,
                   CodeCompletionKeywordKind KeyKind
-                    = CodeCompletionKeywordKind::None) {
+                    = CodeCompletionKeywordKind::None,
+                  unsigned NumBytesToErase = 0) {
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Keyword, SK, ExpectedTypes);
@@ -2714,6 +2727,8 @@ public:
     Builder.setKeywordKind(KeyKind);
     if (TypeAnnotation)
       addTypeAnnotation(Builder, TypeAnnotation);
+    if (NumBytesToErase > 0)
+      Builder.setNumBytesToErase(NumBytesToErase);
   }
 
   void addKeyword(StringRef Name, StringRef TypeAnnotation,
@@ -2759,7 +2774,7 @@ public:
 
     // Base name
     addLeadingDot(Builder);
-    Builder.addTextChunk(AFD->getBaseName().userFacingName());
+    addValueBaseName(Builder, AFD->getBaseName());
 
     // Add the argument labels.
     auto ArgLabels = AFD->getFullName().getArgumentNames();
@@ -3600,6 +3615,15 @@ public:
           return false;
       }
 
+      if (T->getOptionalObjectType() &&
+          VD->getModuleContext()->isStdlibModule()) {
+        // In optional context, ignore '.init(<some>)', 'init(nilLiteral:)',
+        if (isa<ConstructorDecl>(VD))
+          return false;
+        // TODO: Ignore '.some(<Wrapped>)' and '.none' too *in expression
+        // context*. They are useful in pattern context though.
+      }
+
       // Enum element decls can always be referenced by implicit member
       // expression.
       if (isa<EnumElementDecl>(VD))
@@ -3670,6 +3694,14 @@ public:
         // If this is optional type, perform completion for the object type.
         // i.e. 'let _: Enum??? = .enumMember' is legal.
         getUnresolvedMemberCompletions(objT->lookThroughAllOptionalTypes());
+
+        // Add 'nil' keyword with erasing '.' instruction.
+        unsigned bytesToErase = 0;
+        auto &SM = CurrDeclContext->getASTContext().SourceMgr;
+        if (DotLoc.isValid())
+          bytesToErase = SM.getByteDistance(DotLoc, SM.getCodeCompletionLoc());
+        addKeyword("nil", T, SemanticContextKind::ExpressionSpecific,
+                   CodeCompletionKeywordKind::kw_nil, bytesToErase);
       }
       getUnresolvedMemberCompletions(T);
     }
@@ -4417,6 +4449,11 @@ void CodeCompletionCallbacksImpl::completeTypeIdentifierWithoutDot(
   CurDeclContext = P.CurDeclContext;
 }
 
+void CodeCompletionCallbacksImpl::completeCaseStmtKeyword() {
+  Kind = CompletionKind::CaseStmtKeyword;
+  CurDeclContext = P.CurDeclContext;
+}
+
 void CodeCompletionCallbacksImpl::completeCaseStmtBeginning() {
   assert(!InEnumElementRawValue);
 
@@ -4598,6 +4635,11 @@ static void addStmtKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody) 
 #include "swift/Syntax/TokenKinds.def"
 }
 
+static void addCaseStmtKeywords(CodeCompletionResultSink &Sink) {
+  addKeyword(Sink, "case", CodeCompletionKeywordKind::kw_case);
+  addKeyword(Sink, "default", CodeCompletionKeywordKind::kw_default);
+}
+
 static void addLetVarKeywords(CodeCompletionResultSink &Sink) {
   addKeyword(Sink, "let", CodeCompletionKeywordKind::kw_let);
   addKeyword(Sink, "var", CodeCompletionKeywordKind::kw_var);
@@ -4685,6 +4727,10 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     addLetVarKeywords(Sink);
     addExprKeywords(Sink);
     addAnyTypeKeyword(Sink);
+    break;
+
+  case CompletionKind::CaseStmtKeyword:
+    addCaseStmtKeywords(Sink);
     break;
 
   case CompletionKind::PostfixExpr:
@@ -4954,19 +5000,30 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     bool OnRoot = !KPE->getComponents().front().isValid();
     Lookup.setIsSwiftKeyPathExpr(OnRoot);
 
-    auto ParsedType = BGT->getGenericArgs()[1];
-    auto Components = KPE->getComponents();
-    if (Components.back().getKind() ==
-        KeyPathExpr::Component::Kind::OptionalWrap) {
+    Type baseType = BGT->getGenericArgs()[OnRoot ? 0 : 1];
+    if (OnRoot && baseType->is<UnresolvedType>()) {
+      // Infer the root type of the keypath from the context type.
+      ExprContextInfo ContextInfo(CurDeclContext, ParsedExpr);
+      for (auto T : ContextInfo.getPossibleTypes()) {
+        if (auto unwrapped = T->getOptionalObjectType())
+          T = unwrapped;
+        if (!T->getAnyNominal() || !T->getAnyNominal()->getKeyPathTypeKind() ||
+            T->hasUnresolvedType() || !T->is<BoundGenericType>())
+          continue;
+        // Use the first KeyPath context type found.
+        baseType = T->castTo<BoundGenericType>()->getGenericArgs()[0];
+        break;
+      }
+    }
+    if (!OnRoot && KPE->getComponents().back().getKind() ==
+                       KeyPathExpr::Component::Kind::OptionalWrap) {
       // KeyPath expr with '?' (e.g. '\Ty.[0].prop?.another').
       // Althogh expected type is optional, we should unwrap it because it's
       // unwrapped.
-      ParsedType = ParsedType->getOptionalObjectType();
+      baseType = baseType->getOptionalObjectType();
     }
 
-    // The second generic type argument of KeyPath<Root, Value> should be
-    // the value we pull code completion results from.
-    Lookup.getValueExprCompletions(ParsedType);
+    Lookup.getValueExprCompletions(baseType);
     break;
   }
 
@@ -5189,11 +5246,12 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       }
     }
     break;
-  case CompletionKind::AfterIfStmtElse:
-    // Handled earlier by keyword completions.
-    break;
   case CompletionKind::PrecedenceGroup:
     Lookup.getPrecedenceGroupCompletions(SyntxKind);
+    break;
+  case CompletionKind::AfterIfStmtElse:
+  case CompletionKind::CaseStmtKeyword:
+    // Handled earlier by keyword completions.
     break;
   }
 

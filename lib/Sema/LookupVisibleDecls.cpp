@@ -388,10 +388,16 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
   NominalTypeDecl *CurrNominal = BaseTy->getAnyNominal();
   if (!CurrNominal)
     return;
+  ModuleDecl *Module = FromContext->getParentModule();
 
   for (auto Conformance : CurrNominal->getAllConformances()) {
     auto Proto = Conformance->getProtocol();
     if (!Proto->isAccessibleFrom(FromContext))
+      continue;
+
+    // Skip unsatisfied conditional conformances.
+    if (Conformance->getConditionalRequirementsIfAvailable() &&
+        !Module->conformsToProtocol(BaseTy, Proto))
       continue;
 
     DeclVisibilityKind ReasonForThisProtocol;
@@ -794,7 +800,10 @@ public:
                       OtherSignature, OtherSignatureType,
                       /*wouldConflictInSwift5*/nullptr,
                       /*skipProtocolExtensionCheck*/true)) {
-        if (VD->getFormalAccess() > OtherVD->getFormalAccess()) {
+        if (VD->getFormalAccess() > OtherVD->getFormalAccess() ||
+            //Prefer available one.
+            (!AvailableAttr::isUnavailable(VD) &&
+             AvailableAttr::isUnavailable(OtherVD))) {
           PossiblyConflicting.erase(I);
           PossiblyConflicting.insert(VD);
 

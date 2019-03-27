@@ -195,6 +195,11 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_IN_MEMBERDECLINIT_2 | %FileCheck %s -check-prefix=FOO_OBJECT_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_IN_MEMBERDECLINIT_3 | %FileCheck %s -check-prefix=FOO_OBJECT_DOT
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_ARRAY_LITERAL_1 | %FileCheck %s -check-prefix=SIMPLE_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_ARRAY_LITERAL_2 | %FileCheck %s -check-prefix=SIMPLE_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_DICTIONARY_LITERAL_1 | %FileCheck %s -check-prefix=SIMPLE_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_DICTIONARY_LITERAL_2 | %FileCheck %s -check-prefix=SIMPLE_OBJECT_DOT
+
 // Test code completion of expressions that produce a value.
 
 struct FooStruct {
@@ -729,9 +734,9 @@ func testInsideFunctionCall0() {
 func testInsideFunctionCall1() {
   var a = FooStruct()
   a.instanceFunc0(#^INSIDE_FUNCTION_CALL_1^#
-// There should be no results here because the function call
-// unambiguously resolves to overload that takes 0 arguments.
-// INSIDE_FUNCTION_CALL_1-NOT: Begin completions
+// INSIDE_FUNCTION_CALL_1: Begin completions, 1 items
+// INSIDE_FUNCTION_CALL_1: Pattern/CurrModule: ['('][')'][#Void#]; name=
+// INSIDE_FUNCTION_CALL_1: End completions
 }
 
 func testInsideFunctionCall2() {
@@ -782,8 +787,9 @@ func testInsideFunctionCall7() {
 
 func testInsideFunctionCall8(_ x: inout FooStruct) {
   x.instanceFunc0(#^INSIDE_FUNCTION_CALL_8^#)
-// Since we already have '()', there is no pattern to complete.
-// INSIDE_FUNCTION_CALL_8-NOT: Pattern/{{.*}}:
+// INSIDE_FUNCTION_CALL_8: Begin completions
+// INSIDE_FUNCTION_CALL_8: Pattern/CurrModule: ['('][')'][#Void#]; name=
+// INSIDE_FUNCTION_CALL_8: End completions
 }
 func testInsideFunctionCall9(_ x: inout FooStruct) {
   x.instanceFunc1(#^INSIDE_FUNCTION_CALL_9^#)
@@ -2142,4 +2148,26 @@ extension String {
   static let v = { (obj: FooStruct) in
     obj.#^CLOSURE_IN_MEMBERDECLINIT_3^#
   }
+}
+
+struct SimpleStruct {
+  func foo() -> SimpleStruct {}
+}
+// SIMPLE_OBJECT_DOT: Begin completions
+// SIMPLE_OBJECT_DOT-DAG: Keyword[self]/CurrNominal:          self[#SimpleStruct#]; name=self
+// SIMPLE_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Identical\])?}}: foo()[#SimpleStruct#]; name=foo()
+// SIMPLE_OBJECT_DOT: End completions
+func testInCollectionLiteral(value: SimpleStruct) {
+  let _ = [
+    value.#^IN_ARRAY_LITERAL_1^#
+  ]
+  let _ = [
+    value.#^IN_ARRAY_LITERAL_2^#,
+  ]
+  let _: [String: String] = [
+    value.#^IN_DICTIONARY_LITERAL_1^#
+  ]
+  let _: [String: String] = [
+    value.#^IN_DICTIONARY_LITERAL_2^# : "test"
+  ]
 }
