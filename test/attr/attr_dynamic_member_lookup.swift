@@ -456,6 +456,14 @@ acceptKeyPathDynamicLookup(lens.topLeft.x)
 acceptKeyPathDynamicLookup(lens.topLeft.y)
 acceptKeyPathDynamicLookup(lens.topLeft.z) // expected-error {{'z' is inaccessible due to 'private' protection level}}
 
+var tupleLens = Lens<(String, Int)>(("ultimate question", 42))
+_ = tupleLens.0.count
+_ = tupleLens.1
+
+var namedTupleLens = Lens<(question: String, answer: Int)>((question: "ultimate question", answer: 42))
+_ = namedTupleLens.question.count
+_ = namedTupleLens.answer
+
 @dynamicMemberLookup
 class A<T> {
   var value: T
@@ -606,4 +614,12 @@ func keypath_with_trailing_closure_subscript(_ ty: inout SubscriptLens<WithTrail
   // expected-error@-2 {{type of expression is ambiguous without more context}}
   _ = ty[] { 42 }  // expected-error {{subscript index of type '() -> Int' in a key path must be Hashable}}
   _ = ty[] { 42 } = 0 // expected-error {{subscript index of type '() -> Int' in a key path must be Hashable}}
+}
+
+func keypath_to_subscript_to_property(_ lens: inout Lens<Array<Rectangle>>) {
+  _ = lens[0].topLeft.x
+  _ = lens[0].topLeft.y
+  _ = lens[0].topLeft.x = Lens(0)
+  _ = lens[0].topLeft.y = Lens(1) // FIXME(diagnostics): Diagnostic should point to 'y' instead of 'lens'
+  // expected-error@-1 {{cannot assign through dynamic lookup property: 'lens' is immutable}}
 }
