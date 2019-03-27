@@ -1328,6 +1328,16 @@
         },
         {
           "kind": "Conformance",
+          "name": "MirrorPath",
+          "printedName": "MirrorPath"
+        },
+        {
+          "kind": "Conformance",
+          "name": "CVarArg",
+          "printedName": "CVarArg"
+        },
+        {
+          "kind": "Conformance",
           "name": "Encodable",
           "printedName": "Encodable"
         },
@@ -1360,11 +1370,6 @@
           "kind": "Conformance",
           "name": "_CustomPlaygroundQuickLookable",
           "printedName": "_CustomPlaygroundQuickLookable"
-        },
-        {
-          "kind": "Conformance",
-          "name": "MirrorPath",
-          "printedName": "MirrorPath"
         },
         {
           "kind": "Conformance",
@@ -1463,11 +1468,6 @@
               ]
             }
           ]
-        },
-        {
-          "kind": "Conformance",
-          "name": "CVarArg",
-          "printedName": "CVarArg"
         }
       ]
     }

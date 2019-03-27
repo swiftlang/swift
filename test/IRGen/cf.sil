@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/cf.sil
-// RUN: %target-swift-frontend -enable-objc-interop -sdk %S/Inputs %t/cf.sil -emit-ir -import-cf-types | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize %t/cf.sil -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -enable-objc-interop -sdk %S/Inputs %t/cf.sil -emit-ir -import-cf-types | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize %t/cf.sil -DINT=i%target-ptrsize -check-prefix CHECK-%target-import-type -check-prefix CHECK-%target-import-type-%target-ptrsize
 
 // REQUIRES: CPU=i386 || CPU=x86_64
 
@@ -9,7 +9,14 @@
 // CHECK: [[MUTABLE_REFRIGERATOR:%TSo24CCMutableRefrigeratorRefa]] = type
 // CHECK: [[OBJC:%objc_object]] = type
 
-// CHECK: @"$sSo17CCRefrigeratorRefaN" = linkonce_odr hidden constant <{ {{.*}} }> <{ i8** @"$sBOWV", [[INT]] 515, {{.*}}"$sSo17CCRefrigeratorRefaMn", [[TYPE]]* null, i8* null }>
+// CHECK: @"$sSo17CCRefrigeratorRefaN" = linkonce_odr hidden
+// CHECK-DIRECT-SAME: constant
+// CHECK-INDIRECT-SAME: global
+// CHECK-SAME: <{ {{.*}} }> <{
+// -- value witness table
+// CHECK-DIRECT-SAME: i8** @"$sBOWV",
+// CHECK-INDIRECT-SAME: i8** null,
+// CHECK-SAME: [[INT]] 515, {{.*}}"$sSo17CCRefrigeratorRefaMn", [[TYPE]]* null, i8* null }>
 
 // CHECK: [[MUTABLE_REFRIGERATOR_NAME:@.*]] = private constant [52 x i8] c"CCMutableRefrigerator\00NCCMutableRefrigeratorRef\00St\00\00"
 
@@ -21,7 +28,10 @@
 // CHECK-64-SAME: @"$sSo24CCMutableRefrigeratorRefaMr"
 
 // CHECK-64: @"$sSo24CCMutableRefrigeratorRefaN" = linkonce_odr hidden global <{ {{.*}} }> <{
-// CHECK-64-SAME: i8** @"$sBOWV", i64 515, {{.*}}"$sSo24CCMutableRefrigeratorRefaMn", %swift.type* null, i8* null }>
+// -- value witness table
+// CHECK-DIRECT-64-SAME: i8** @"$sBOWV",
+// CHECK-INDIRECT-64-SAME: i8** null,
+// CHECK-64-SAME: i64 515, {{.*}}"$sSo24CCMutableRefrigeratorRefaMn", %swift.type* null, i8* null }>
 
 sil_stage canonical
 

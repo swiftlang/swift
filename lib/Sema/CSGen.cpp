@@ -19,6 +19,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -3607,39 +3608,68 @@ void ConstraintSystem::optimizeConstraints(Expr *e) {
   e->walk(optimizer);
 }
 
-bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
-                               const ExtensionDecl *ED) {
-  if (!ED->isConstrainedExtension() ||
-      // We'll crash if we leak type variables from one constraint
-      // system into the new one created below.
-      BaseTy->hasTypeVariable() ||
-      // We can't do anything if the base type has unbound generic
-      // parameters either.
-      BaseTy->hasUnboundGenericType())
-    return true;
+static bool areGenericRequirementsSatisfied(
+    const DeclContext *DC, const GenericSignature *sig,
+    const SubstitutionMap &Substitutions, bool isExtension) {
 
-  TypeChecker *TC = &createTypeChecker(DC.getASTContext());
-  TC->validateExtension(const_cast<ExtensionDecl *>(ED));
-
+  TypeChecker &TC = createTypeChecker(DC->getASTContext());
   ConstraintSystemOptions Options;
-  ConstraintSystem CS(*TC, &DC, Options);
+  ConstraintSystem CS(TC, const_cast<DeclContext *>(DC), Options);
   auto Loc = CS.getConstraintLocator(nullptr);
 
-  // Prepare type substitution map.
-  SubstitutionMap Substitutions = BaseTy->getContextSubstitutionMap(
-    DC.getParentModule(), ED);
-
   // For every requirement, add a constraint.
-  for (auto Req : ED->getGenericRequirements()) {
+  for (auto Req : sig->getRequirements()) {
     if (auto resolved = Req.subst(Substitutions)) {
       CS.addConstraint(*resolved, Loc);
-    } else {
+    } else if (isExtension) {
       return false;
     }
+    // Unresolved requirements are requirements of the function itself. This
+    // does not prevent it from being applied. E.g. func foo<T: Sequence>(x: T).
   }
 
-  // Having a solution implies the extension's requirements have been fulfilled.
+  // Having a solution implies the requirements have been fulfilled.
   return CS.solveSingle().hasValue();
+}
+
+bool swift::isExtensionApplied(const DeclContext *DC, Type BaseTy,
+                               const ExtensionDecl *ED) {
+  // We can't do anything if the base type has unbound generic parameters.
+  // We can't leak type variables into another constraint system.
+  if (BaseTy->hasTypeVariable() || BaseTy->hasUnboundGenericType())
+    return true;
+
+  if (!ED->isConstrainedExtension())
+    return true;
+
+  TypeChecker *TC = &createTypeChecker(DC->getASTContext());
+  TC->validateExtension(const_cast<ExtensionDecl *>(ED));
+
+  GenericSignature *genericSig = ED->getGenericSignature();
+  SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
+      DC->getParentModule(), ED->getExtendedNominal());
+  return areGenericRequirementsSatisfied(DC, genericSig, substMap,
+                                         /*isExtension=*/true);
+}
+
+bool swift::isMemberDeclApplied(const DeclContext *DC, Type BaseTy,
+                                const ValueDecl *VD) {
+  // We can't leak type variables into another constraint system.
+  // We can't do anything if the base type has unbound generic parameters.
+  if (BaseTy->hasTypeVariable() || BaseTy->hasUnboundGenericType())
+    return true;
+
+  const GenericContext *genericDecl = VD->getAsGenericContext();
+  if (!genericDecl)
+    return true;
+  const GenericSignature *genericSig = genericDecl->getGenericSignature();
+  if (!genericSig)
+    return true;
+
+  SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
+      DC->getParentModule(), VD->getDeclContext());
+  return areGenericRequirementsSatisfied(DC, genericSig, substMap,
+                                         /*isExtension=*/false);
 }
 
 static bool canSatisfy(Type type1, Type type2, bool openArchetypes,
@@ -3719,7 +3749,7 @@ swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
 
   // Keep track of all the unviable members.
   for (auto Can : LookupResult.UnviableCandidates)
-    Result.Impl.AllDecls.push_back(Can.first.getDecl());
+    Result.Impl.AllDecls.push_back(Can.getDecl());
 
   // Keep track of the start of viable choices.
   Result.Impl.ViableStartIdx = Result.Impl.AllDecls.size();

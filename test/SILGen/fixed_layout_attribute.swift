@@ -1,8 +1,8 @@
 // RUN: %target-swift-emit-silgen -parse-as-library %s | %FileCheck %s --check-prefix=FRAGILE --check-prefix=CHECK
-// RUN: %target-swift-emit-silgen -enable-resilience -parse-as-library %s | %FileCheck %s --check-prefix=RESILIENT --check-prefix=CHECK
+// RUN: %target-swift-emit-silgen -enable-library-evolution -parse-as-library %s | %FileCheck %s --check-prefix=RESILIENT --check-prefix=CHECK
 
 // RUN: %target-swift-emit-silgen -parse-as-library -enable-testing %s
-// RUN: %target-swift-emit-silgen -parse-as-library -enable-testing -enable-resilience %s
+// RUN: %target-swift-emit-silgen -parse-as-library -enable-testing -enable-library-evolution %s
 
 public let global = 0
 

@@ -42,5 +42,8 @@ llvm::SanitizerCoverageOptions parseSanitizerCoverageArgValue(
         const llvm::Triple &Triple,
         DiagnosticEngine &Diag,
         OptionSet<SanitizerKind> sanitizers);
+
+/// Returns the active sanitizers as a comma-separated list.
+std::string getSanitizerList(const OptionSet<SanitizerKind> &Set);
 }
 #endif // SWIFT_OPTIONS_SANITIZER_OPTIONS_H

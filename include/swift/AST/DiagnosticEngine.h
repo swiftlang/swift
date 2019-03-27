@@ -30,6 +30,7 @@ namespace swift {
   class ValueDecl;
   
   enum class PatternKind : uint8_t;
+  enum class SelfAccessKind : uint8_t;
   enum class ReferenceOwnership : uint8_t;
   enum class StaticSpellingKind : uint8_t;
   enum class DescriptiveDeclKind : uint8_t;
@@ -77,6 +78,7 @@ namespace swift {
     Type,
     TypeRepr,
     PatternKind,
+    SelfAccessKind,
     ReferenceOwnership,
     StaticSpellingKind,
     DescriptiveDeclKind,
@@ -105,6 +107,7 @@ namespace swift {
       Type TypeVal;
       TypeRepr *TyR;
       PatternKind PatternKindVal;
+      SelfAccessKind SelfAccessKindVal;
       ReferenceOwnership ReferenceOwnershipVal;
       StaticSpellingKind StaticSpellingKindVal;
       DescriptiveDeclKind DescriptiveDeclKindVal;
@@ -168,6 +171,10 @@ namespace swift {
     DiagnosticArgument(ReferenceOwnership RO)
         : Kind(DiagnosticArgumentKind::ReferenceOwnership),
           ReferenceOwnershipVal(RO) {}
+
+    DiagnosticArgument(SelfAccessKind SAK)
+        : Kind(DiagnosticArgumentKind::SelfAccessKind),
+          SelfAccessKindVal(SAK) {}
 
     DiagnosticArgument(StaticSpellingKind SSK)
         : Kind(DiagnosticArgumentKind::StaticSpellingKind),
@@ -247,6 +254,11 @@ namespace swift {
     ReferenceOwnership getAsReferenceOwnership() const {
       assert(Kind == DiagnosticArgumentKind::ReferenceOwnership);
       return ReferenceOwnershipVal;
+    }
+
+    SelfAccessKind getAsSelfAccessKind() const {
+      assert(Kind == DiagnosticArgumentKind::SelfAccessKind);
+      return SelfAccessKindVal;
     }
 
     StaticSpellingKind getAsStaticSpellingKind() const {

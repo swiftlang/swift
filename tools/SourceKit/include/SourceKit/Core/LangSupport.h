@@ -128,6 +128,7 @@ struct ExpressionType {
   unsigned ExprOffset;
   unsigned ExprLength;
   unsigned TypeOffset;
+  std::vector<unsigned> ProtocolOffsets;
 };
 
 struct ExpressionTypesInFile {
@@ -722,6 +723,7 @@ public:
 
   virtual void collectExpressionTypes(StringRef FileName,
                                       ArrayRef<const char *> Args,
+                                      ArrayRef<const char *> ExpectedProtocols,
                                       std::function<void(const ExpressionTypesInFile&)> Receiver) = 0;
 
   virtual void getDocInfo(llvm::MemoryBuffer *InputBuf,

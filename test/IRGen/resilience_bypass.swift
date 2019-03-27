@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/first.swiftmodule -module-name=first %S/Inputs/resilience_bypass/first.swift
+// RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/first.swiftmodule -module-name=first %S/Inputs/resilience_bypass/first.swift
 // RUN: %target-swift-frontend -emit-module -emit-module-path=%t/second.swiftmodule -module-name=second %S/Inputs/resilience_bypass/second.swift -I %t
 // RUN: %target-swift-frontend -emit-ir -enable-resilience-bypass %s -I %t | %FileCheck %s -DINT=i%target-ptrsize
 

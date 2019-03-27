@@ -67,10 +67,19 @@ func testFloatConvertUnderflow() {
   let d4: Double = 5E-324  // expected-warning {{'5E-324' underflows and loses precision during conversion to 'Double'}}
   _blackHole(d4)
 
+  let e4: Float80 = 0x1p-16445
+  _blackHole(e4)
+
   // FIXME: if a number is so tiny that it underflows even Float80,
   // nothing is reported
   let e1: Float80 = 0x1p-16446
   _blackHole(e1)
+
+  // Test the case where conversion results in subnormality in the destination.
+  let e2: Double = 0x1p-1074
+  _blackHole(e2)
+  let e3: Double = 0x11p-1074 // expected-warning {{'0x11p-1074' underflows and loses precision during conversion to 'Double'}}
+  _blackHole(e3)
 
   // All warnings are disabled during explict conversions
   _blackHole(Float(1E-400))

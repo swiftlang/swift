@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -verify -enable-sil-ownership
+// RUN: %target-swift-frontend %s -emit-ir -verify
 
 // Verify we don't crash on this.
 // rdar://15595118

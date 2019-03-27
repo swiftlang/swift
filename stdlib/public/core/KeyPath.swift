@@ -26,12 +26,14 @@ internal func _abstract(
 
 // MARK: Type-erased abstract base classes
 
-/// A type-erased key path, from any root type to any resulting value
-/// type. NOTE: older runtimes had Swift.AnyKeyPath as the ObjC name.
-/// The two must coexist, so it was renamed. The old name must not be
-/// used in the new runtime. _TtCs11_AnyKeyPath is the mangled name for
-/// Swift._AnyKeyPath.
+// NOTE: older runtimes had Swift.AnyKeyPath as the ObjC name.
+// The two must coexist, so it was renamed. The old name must not be
+// used in the new runtime. _TtCs11_AnyKeyPath is the mangled name for
+// Swift._AnyKeyPath.
 @_objcRuntimeName(_TtCs11_AnyKeyPath)
+
+/// A type-erased key path, from any root type to any resulting value
+/// type.
 public class AnyKeyPath: Hashable, _AppendKeyPath {
   /// The root type for this key path.
   @inlinable
@@ -1771,6 +1773,9 @@ func _getAtKeyPath<Root, Value>(
   return keyPath._projectReadOnly(from: root)
 }
 
+// The release that ends the access scope is guaranteed to happen
+// immediately at the end_apply call because the continuation is a
+// runtime call with a manual release (access scopes cannot be extended).
 @_silgen_name("_swift_modifyAtWritableKeyPath_impl")
 public // runtime entrypoint
 func _modifyAtWritableKeyPath_impl<Root, Value>(
@@ -1780,6 +1785,9 @@ func _modifyAtWritableKeyPath_impl<Root, Value>(
   return keyPath._projectMutableAddress(from: &root)
 }
 
+// The release that ends the access scope is guaranteed to happen
+// immediately at the end_apply call because the continuation is a
+// runtime call with a manual release (access scopes cannot be extended).
 @_silgen_name("_swift_modifyAtReferenceWritableKeyPath_impl")
 public // runtime entrypoint
 func _modifyAtReferenceWritableKeyPath_impl<Root, Value>(
@@ -1800,6 +1808,8 @@ func _setAtWritableKeyPath<Root, Value>(
   let (addr, owner) = keyPath._projectMutableAddress(from: &root)
   addr.pointee = value
   _fixLifetime(owner)
+  // FIXME: this needs a deallocation barrier to ensure that the
+  // release isn't extended, along with the access scope.
 }
 
 @_silgen_name("swift_setAtReferenceWritableKeyPath")
@@ -1813,6 +1823,8 @@ func _setAtReferenceWritableKeyPath<Root, Value>(
   let (addr, owner) = keyPath._projectMutableAddress(from: root)
   addr.pointee = value
   _fixLifetime(owner)
+  // FIXME: this needs a deallocation barrier to ensure that the
+  // release isn't extended, along with the access scope.
 }
 
 // MARK: Appending type system
