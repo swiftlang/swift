@@ -2556,15 +2556,11 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
     
     baseType = opened->getCanonicalType();
     auto openedOpaqueValue = subSGF.emitOpenExistential(loc, paramSubstValue,
-                                                        opened, subSGF.getLoweredType(baseType),
+                                                        subSGF.getLoweredType(baseType),
                                                         AccessKind::Read);
     // Maybe we could peephole this if we know the property load can borrow the
     // base value…
-    if (!openedOpaqueValue.IsConsumable) {
-      paramSubstValue = openedOpaqueValue.Value.copyUnmanaged(subSGF, loc);
-    } else {
-      paramSubstValue = openedOpaqueValue.Value;
-    }
+    paramSubstValue = openedOpaqueValue.ensurePlusOne(subSGF, loc);
   }
   
   // Upcast a class instance to the property's declared type if necessary.
@@ -4950,14 +4946,14 @@ void SILGenFunction::emitOpenExistentialExprImpl(
       SGFContext::AllowGuaranteedPlusZero);
 
   Type opaqueValueType = E->getOpaqueValue()->getType()->getRValueType();
-  auto state = emitOpenExistential(
-      E, existentialValue, E->getOpenedArchetype(),
+  auto payload = emitOpenExistential(
+      E, existentialValue,
       getLoweredType(opaqueValueType),
       AccessKind::Read);
 
   // Register the opaque value for the projected existential.
   SILGenFunction::OpaqueValueRAII opaqueValueRAII(
-                                    *this, E->getOpaqueValue(), state);
+                                    *this, E->getOpaqueValue(), payload);
 
   emitSubExpr(E->getSubExpr());
 }
@@ -4987,13 +4983,9 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
   auto visitSubExpr = [&](ManagedValue escapingClosure,
                           bool isClosureConsumable) -> RValue {
     // Bind the opaque value to the escaping function.
-    SILGenFunction::OpaqueValueState opaqueValue{
-        escapingClosure,
-        /*consumable*/ isClosureConsumable,
-        /*hasBeenConsumed*/ false,
-    };
+    assert(isClosureConsumable == escapingClosure.hasCleanup());
     SILGenFunction::OpaqueValueRAII pushOpaqueValue(SGF, E->getOpaqueValue(),
-                                                    opaqueValue);
+                                                    escapingClosure);
 
     // Emit the guarded expression.
     return visit(E->getSubExpr(), C);
@@ -5027,8 +5019,8 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
 
 RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {
   assert(SGF.OpaqueValues.count(E) && "Didn't bind OpaqueValueExpr");
-  auto &entry = SGF.OpaqueValues[E];
-  return RValue(SGF, E, SGF.manageOpaqueValue(entry, E, C));
+  auto value = SGF.OpaqueValues[E];
+  return RValue(SGF, E, SGF.manageOpaqueValue(value, E, C));
 }
 
 ProtocolDecl *SILGenFunction::getPointerProtocol() {
