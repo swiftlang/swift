@@ -1075,6 +1075,9 @@ public:
 
   llvm::Constant *tryGetConstantTable(IRGenModule &IGM,
                                       CanType conformingType) const override {
+    if (IGM.getOptions().LazyInitializeProtocolConformances &&
+        RootConformance->getDeclContext()->getParentModule() != IGM.getSwiftModule())
+      return nullptr;
     return IGM.getAddrOfWitnessTable(RootConformance);
   }
 };

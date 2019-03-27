@@ -32,7 +32,7 @@
 // TAG_DECLS_AND_TYPEDEFS: {{^}}  init(x: Int32, y: Double){{$}}
 // TAG_DECLS_AND_TYPEDEFS: {{^}}}{{$}}
 
-// TAG_DECLS_AND_TYPEDEFS:      /*!
+// TAG_DECLS_AND_TYPEDEFS:      /**
 // TAG_DECLS_AND_TYPEDEFS-NEXT:   @keyword Foo2
 // TAG_DECLS_AND_TYPEDEFS-NEXT: */
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}struct FooStruct2 {{{$}}

@@ -483,8 +483,9 @@ _ = EmptyOverload(foo: #^EMPTY_OVERLOAD_2^#)
 public func fopen() -> TestBoundGeneric1! { fatalError() }
 func other() {
   _ = fopen(#^CALLARG_IUO^#)
-// CALLARG_IUO-NOT: Begin completions
-// CALLARG_IUO-NOT: End completions
+// CALLARG_IUO: Begin completions, 1 items
+// CALLARG_IUO: Pattern/CurrModule: ['('][')'][#TestBoundGeneric1!#]; name=
+// CALLARG_IUO: End completions
 }
 
 class Foo { let x: Int }
