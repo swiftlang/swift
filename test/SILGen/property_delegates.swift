@@ -101,3 +101,28 @@ struct DelegateWithAccessors {
     x = y
   }
 }
+
+func consumeOldValue(_: Int) { }
+func consumeNewValue(_: Int) { }
+
+struct DelegateWithDidSetWillSet {
+  // CHECK-LABEL: sil hidden [ossa] @$s18property_delegates022DelegateWithDidSetW
+  // CHECK: function_ref @$s18property_delegates022DelegateWithDidSetWillF0V1xSivw
+  // CHECK: struct_element_addr {{%.*}} : $*DelegateWithDidSetWillSet, #DelegateWithDidSetWillSet.$x
+  // CHECK-NEXT: struct_element_addr {{%.*}} : $*Wrapper<Int>, #Wrapper.value
+  // CHECK-NEXT: assign %0 to {{%.*}} : $*Int
+  // CHECK: function_ref @$s18property_delegates022DelegateWithDidSetWillF0V1xSivW
+  var x: Int by Wrapper {
+    didSet {
+      consumeNewValue(oldValue)
+    }
+
+    willSet {
+      consumeOldValue(newValue)
+    }
+  }
+
+  mutating func test(x: Int) {
+    self.x = x
+  }
+}

@@ -1807,6 +1807,12 @@ static void synthesizeSetterBody(AccessorDecl *setter,
   // Synthesize the setter for a property delegate.
   if (auto var = dyn_cast<VarDecl>(storage)) {
     if (var->hasPropertyDelegate()) {
+      if (var->getAccessor(AccessorKind::WillSet) ||
+          var->getAccessor(AccessorKind::DidSet)) {
+        synthesizeObservedSetterBody(setter, TargetImpl::Delegate, ctx);
+        return;
+      }
+
       synthesizePropertyDelegateSetterBody(setter, ctx);
       return;
     }
