@@ -34,6 +34,18 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestNonSingleExprSubscriptUnresolved | %FileCheck %s -check-prefix=TestNonSingleExprSubscriptUnresolved
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprSubscriptGlobal | %FileCheck %s -check-prefix=TestSingleExprSubscriptGlobal
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingeExprInitInvalid | %FileCheck %s -check-prefix=TestSingeExprInitInvalid
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingeExprInitNone | %FileCheck %s -check-prefix=TestSingeExprInitNone
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingeExprInitNilRet | %FileCheck %s -check-prefix=TestSingeExprInitNilRet
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingeExprInitNil | %FileCheck %s -check-prefix=TestSingeExprInitNil
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestNonSingeExprInitNil1 | %FileCheck %s -check-prefix=TestNonSingeExprInitNil
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestNonSingeExprInitNil2 | %FileCheck %s -check-prefix=TestNonSingeExprInitNil
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingeExprDeinitInvalid | %FileCheck %s -check-prefix=TestSingeExprDeinitInvalid
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testAccessorUnresolvedTopLevel | %FileCheck %s -check-prefix=TopLevelEnum
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testAccessorUnresolvedTopLevelGet | %FileCheck %s -check-prefix=TopLevelEnum
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testClosureUnresolvedTopLevelInit | %FileCheck %s -check-prefix=TopLevelEnum
+
 // MARK: Single-expression closures
 
 struct TestSingleExprClosureRet {
@@ -548,3 +560,88 @@ struct TestSingleExprSubscriptGlobal {
 // TestSingleExprSubscriptGlobal-DAG: Decl[InstanceMethod]/CurrNominal: void()[#Void#];
 // TestSingleExprSubscriptGlobal: End completions
 }
+
+// MARK: Single-expression initializers
+
+enum TestSingeExprInitInvalid {
+  case foo
+  init() {
+    .#^TestSingeExprInitInvalid^#
+  }
+// TestSingeExprInitInvalid-NOT: foo
+}
+
+enum TestSingeExprInitNone {
+  case foo
+  init?() {
+    .#^TestSingeExprInitNone^#
+  }
+// TestSingeExprInitNone-NOT: foo
+// Note: only `nil` is allowed here, not `.none`.
+// TestSingeExprInitNone-NOT: none
+}
+
+enum TestSingeExprInitNilRet {
+  case foo
+  init?() {
+    return #^TestSingeExprInitNilRet^#
+  }
+// TestSingeExprInitNilRet: Literal[Nil]/None/TypeRelation[Identical]: nil[#TestSingeExprInitNil{{(Ret)?}}?#];
+}
+
+enum TestSingeExprInitNil {
+  case foo
+  init?() {
+    #^TestSingeExprInitNil^#
+  }
+// FIXME: For consistency, this should be same as TestSingeExprInitNilRet.
+// TestSingeExprInitNil: Literal[Nil]/None: nil;
+}
+
+enum TestNonSingeExprInitNil1 {
+  case foo
+  init?() {
+    #^TestNonSingeExprInitNil1^#
+    return nil
+  }
+// No type relation.
+// TestNonSingeExprInitNil: Literal[Nil]/None: nil;
+}
+
+enum TestNonSingeExprInitNil2 {
+  case foo
+  init?() {
+    #^TestNonSingeExprInitNil2^#
+    self = .foo
+  }
+}
+
+enum TestSingeExprDeinitInvalid {
+  case foo
+  deinit {
+    .#^TestSingeExprDeinitInvalid^#
+  }
+// TestSingeExprDeinitInvalid-NOT: foo
+}
+
+// MARK: Top-level code
+
+enum TopLevelEnum {
+  case foo
+}
+
+// TopLevelEnum: Decl[EnumElement]/ExprSpecific:     foo[#TopLevelEnum#];
+
+var testAccessorUnresolvedTopLevel: TopLevelEnum {
+  .#^testAccessorUnresolvedTopLevel^#
+}
+
+var testAccessorUnresolvedTopLevelGet: TopLevelEnum {
+  get {
+    .#^testAccessorUnresolvedTopLevelGet^#
+  }
+}
+
+var testClosureUnresolvedTopLevelInit: TopLevelEnum = {
+  .#^testClosureUnresolvedTopLevelInit^#
+}()
