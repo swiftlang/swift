@@ -188,7 +188,7 @@ extension DatasetIterator : IteratorProtocol {
 /// A 2-tuple-like struct that conforms to TensorGroup that represents a tuple 
 /// of 2 types conforming to TensorGroup.
 @_fixed_layout
-public struct Zip2Tensor<T : TensorGroup, U : TensorGroup> : TensorGroup {
+public struct Zip2TensorGroup<T : TensorGroup, U : TensorGroup> : TensorGroup {
   public var first: T
   public var second: U
 
@@ -202,10 +202,10 @@ public struct Zip2Tensor<T : TensorGroup, U : TensorGroup> : TensorGroup {
 @inlinable @inline(__always)
 public func zip<T : TensorGroup, U : TensorGroup>(
   _ dataset1: Dataset<T>, _ dataset2: Dataset<U>
-) -> Dataset<Zip2Tensor<T, U>> {
+) -> Dataset<Zip2TensorGroup<T, U>> {
   let handle: VariantHandle = #tfop(
-     "ZipDataset", Zip2Tensor(dataset1._handle, dataset2._handle),
-     output_types$dtype: Zip2Tensor<T, U>._typeList,
-     output_shapes: Zip2Tensor<T, U>._unknownShapeList)
+     "ZipDataset", Zip2TensorGroup(dataset1._handle, dataset2._handle),
+     output_types$dtype: Zip2TensorGroup<T, U>._typeList,
+     output_shapes: Zip2TensorGroup<T, U>._unknownShapeList)
   return Dataset(_handle: handle)
 }
