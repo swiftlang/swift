@@ -106,7 +106,7 @@
 
 // UBSAN: -rpath @executable_path
 
-// MULTIPLE_SAN_LINUX: -fsanitize=address,fuzzer,undefined
+// MULTIPLE_SAN_LINUX: -fsanitize=address,undefined,fuzzer
 
 // BADARG: unsupported argument 'unknown' to option '-sanitize='
 // INCOMPATIBLESANITIZERS: argument '-sanitize=address' is not allowed with '-sanitize=thread'
