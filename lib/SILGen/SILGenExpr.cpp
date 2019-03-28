@@ -3684,6 +3684,8 @@ RValue RValueEmitter::visitArrayExpr(ArrayExpr *E, SGFContext C) {
   RValue arg(SGF, loc, arrayTy,
              emitEndVarargs(SGF, loc, std::move(varargsInfo)));
 
+  arg = scope.popPreservingValue(std::move(arg));
+
   // Add an argument label for init(arrayLiteral: T...) as the above tuple is of
   // the form (T...) with no label.
   assert(argLabels.size() == 1 && !argLabels[0].empty() &&
@@ -3693,8 +3695,8 @@ RValue RValueEmitter::visitArrayExpr(ArrayExpr *E, SGFContext C) {
   arg.rewriteType(newType->getCanonicalType());
 
   // Call the builtin initializer.
-  return scope.popPreservingValue(SGF.emitApplyAllocatingInitializer(
-      loc, init, std::move(arg), E->getType(), C));
+  return SGF.emitApplyAllocatingInitializer(
+      loc, init, std::move(arg), E->getType(), C);
 }
 
 RValue RValueEmitter::visitDictionaryExpr(DictionaryExpr *E, SGFContext C) {
