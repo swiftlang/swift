@@ -462,7 +462,8 @@ namespace {
     RValue visitKeyPathExpr(KeyPathExpr *E, SGFContext C);
     RValue visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E,
                                            SGFContext C);
-    RValue visitCollectionExpr(CollectionExpr *E, SGFContext C);
+    RValue visitArrayExpr(ArrayExpr *E, SGFContext C);
+    RValue visitDictionaryExpr(DictionaryExpr *E, SGFContext C);
     RValue visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E,
                                             SGFContext C);
     RValue visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E, SGFContext C);
@@ -3601,7 +3602,64 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
 }
 
-RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
+RValue RValueEmitter::visitArrayExpr(ArrayExpr *E, SGFContext C) {
+  auto loc = SILLocation(E);
+  ArgumentScope scope(SGF, loc);
+
+  CanType elementType = E->getElementType()->getCanonicalType();
+  CanType arrayTy = ArraySliceType::get(elementType)->getCanonicalType();
+  VarargsInfo varargsInfo =
+      emitBeginVarargs(SGF, loc, elementType, arrayTy,
+                       E->getNumElements(), {});
+
+  // Cleanups for any elements that have been initialized so far.
+  SmallVector<CleanupHandle, 8> cleanups;
+
+  for (unsigned index : range(E->getNumElements())) {
+    auto destAddr = varargsInfo.getBaseAddress();
+    if (index != 0) {
+      SILValue indexValue = SGF.B.createIntegerLiteral(
+          loc, SILType::getBuiltinWordType(SGF.getASTContext()), index);
+      destAddr = SGF.B.createIndexAddr(loc, destAddr, indexValue);
+    }
+    auto &destTL = varargsInfo.getBaseTypeLowering();
+    // Create a dormant cleanup for the value in case we exit before the
+    // full array has been constructed.
+
+    CleanupHandle destCleanup = CleanupHandle::invalid();
+    if (!destTL.isTrivial()) {
+      destCleanup = SGF.enterDestroyCleanup(destAddr);
+      SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dormant);
+      cleanups.push_back(destCleanup);
+    }
+
+    TemporaryInitialization init(destAddr, destCleanup);
+
+    ArgumentSource(E->getElements()[index])
+        .forwardInto(SGF, varargsInfo.getBaseAbstractionPattern(), &init,
+                     destTL);
+  }
+
+  // Kill the per-element cleanups. The array will take ownership of them.
+  for (auto destCleanup : cleanups)
+    SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dead);
+
+  RValue arg(SGF, loc, arrayTy,
+             emitEndVarargs(SGF, loc, std::move(varargsInfo)));
+
+  arg = scope.popPreservingValue(std::move(arg));
+
+  // If we're building an array, we don't have to call the initializer;
+  // we've already built one.
+  if (arrayTy->isEqual(E->getType()))
+    return arg;
+
+  // Call the builtin initializer.
+  return SGF.emitApplyAllocatingInitializer(
+      loc, E->getInitializer(), std::move(arg), E->getType(), C);
+}
+
+RValue RValueEmitter::visitDictionaryExpr(DictionaryExpr *E, SGFContext C) {
   return visit(E->getSemanticExpr(), C);
 }
 
