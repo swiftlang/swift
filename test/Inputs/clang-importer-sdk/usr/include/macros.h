@@ -74,7 +74,7 @@
 #define RSHIFT_NEG     (MINUS_THREE >> 1)
 #define RSHIFT_INVALID (0xFFFF >> MINUS_THREE) // Should skip. Negative shift.
 
-#define XOR_HIGH (UINT64_MAX ^ UINT32_MAX)
+#define XOR_HIGH (__UINT64_MAX__ ^ __UINT32_MAX__)
 
 // Integer Arithmetic.
 
