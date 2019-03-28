@@ -281,9 +281,10 @@ extension _SmallString {
   }
 }
 
-#if _runtime(_ObjC) && !(arch(i386) || arch(arm))
+#if _runtime(_ObjC)
 // Cocoa interop
 extension _SmallString {
+  #if !(arch(i386) || arch(arm))
   // Resiliently create from a tagged cocoa string
   //
   @_effects(readonly) // @opaque
@@ -299,6 +300,7 @@ extension _SmallString {
     }
     self._invariantCheck()
   }
+  #endif
   
   @_effects(readonly)
   @usableFromInline
