@@ -1514,8 +1514,16 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       continue;
     }
 
-    if (dependency.isImplementationOnly() && !treatAsPartialModule)
+    if (dependency.isImplementationOnly() &&
+        !(treatAsPartialModule || ctx.LangOpts.DebuggerSupport)) {
+      // When building normally (and not merging partial modules), we don't
+      // want to bring in the implementation-only module, because that might
+      // change the set of visible declarations. However, when debugging we
+      // want to allow getting at the internals of this module when possible,
+      // and so we'll try to reference the implementation-only module if it's
+      // available.
       continue;
+    }
 
     StringRef modulePathStr = dependency.RawPath;
     StringRef scopePath;
@@ -1544,7 +1552,8 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
 
       // Otherwise, continue trying to load dependencies, so that we can list
       // everything that's missing.
-      missingDependency = true;
+      if (!(dependency.isImplementationOnly() && ctx.LangOpts.DebuggerSupport))
+        missingDependency = true;
       continue;
     }
 
