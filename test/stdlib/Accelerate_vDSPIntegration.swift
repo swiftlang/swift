@@ -44,7 +44,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                    &legacyResult, 1,
                    n)
         
+        let returnedResult = vDSP.integrate(sourcef,
+                                            using: .runningSum)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPIntegrationTests.test("vDSP/SinglePrecisionTrapezoidal") {
@@ -63,7 +67,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                     &legacyResult, 1,
                     n)
         
+        let returnedResult = vDSP.integrate(sourcef,
+                                            using: .simpson)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPIntegrationTests.test("vDSP/SinglePrecisionTrapezoidal") {
@@ -82,7 +90,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                     &legacyResult, 1,
                     n)
         
+        let returnedResult = vDSP.integrate(sourcef,
+                                            using: .trapezoidal)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPIntegrationTests.test("vDSP/DoublePrecisionRunningSum") {
@@ -101,7 +113,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                     &legacyResult, 1,
                     n)
         
+        let returnedResult = vDSP.integrate(sourced,
+                                            using: .runningSum)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPIntegrationTests.test("vDSP/DoublePrecisionSimpson") {
@@ -120,7 +136,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                      &legacyResult, 1,
                      n)
         
+        let returnedResult = vDSP.integrate(sourced,
+                                            using: .simpson)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPIntegrationTests.test("vDSP/DoublePrecisionTrapezoidal") {
@@ -139,7 +159,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                      &legacyResult, 1,
                      n)
         
+        let returnedResult = vDSP.integrate(sourced,
+                                            using: .trapezoidal)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
 }
 

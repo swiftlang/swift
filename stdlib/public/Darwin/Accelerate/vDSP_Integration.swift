@@ -24,7 +24,35 @@ extension vDSP {
     /// - Parameter vector: The vector to integrate.
     /// - Parameter rule: The integration rule.
     /// - Parameter stepSize: The integration step size (weighting factor for running sum).
-    /// - Parameter result: The destinatiuon vector to receive the result.
+    /// - Returns: The integration result.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func integrate<U>(_ vector: U,
+                                    using rule: IntegrationRule,
+                                    stepSize: Float = 1) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                integrate(vector,
+                          using: rule,
+                          result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
+    /// Integrates source vector using specified rule, single-precision.
+    ///
+    /// - Parameter vector: The vector to integrate.
+    /// - Parameter rule: The integration rule.
+    /// - Parameter stepSize: The integration step size (weighting factor for running sum).
+    /// - Parameter result: The destination vector to receive the result.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func integrate<U, V>(_ vector: U,
@@ -67,7 +95,35 @@ extension vDSP {
     /// - Parameter vector: The vector to integrate.
     /// - Parameter rule: The integration rule.
     /// - Parameter stepSize: The integration step size (weighting factor for running sum).
-    /// - Parameter result: The destinatiuon vector to receive the result.
+    /// - Returns: The integration result.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func integrate<U>(_ vector: U,
+                                    using rule: IntegrationRule,
+                                    stepSize: Double = 1) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                integrate(vector,
+                          using: rule,
+                          result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
+    /// Integrates source vector using specified rule, double-precision.
+    ///
+    /// - Parameter vector: The vector to integrate.
+    /// - Parameter rule: The integration rule.
+    /// - Parameter stepSize: The integration step size (weighting factor for running sum).
+    /// - Parameter result: The destination vector to receive the result.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func integrate<U, V>(_ vector: U,
