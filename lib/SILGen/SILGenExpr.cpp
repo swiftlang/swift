@@ -3590,10 +3590,21 @@ RValue RValueEmitter::visitArrayExpr(ArrayExpr *E, SGFContext C) {
   auto loc = SILLocation(E);
   ArgumentScope scope(SGF, loc);
 
-  CanType elementType = E->getElementType()->getCanonicalType();
-  CanType arrayTy = ArraySliceType::get(elementType)->getCanonicalType();
+  // CSApply builds ArrayExprs without an initializer for the trivial case
+  // of emitting varargs.
+  CanType arrayType, elementType;
+  if (E->getInitializer()) {
+    elementType = E->getElementType()->getCanonicalType();
+    arrayType = ArraySliceType::get(elementType)->getCanonicalType();
+  } else {
+    arrayType = E->getType()->getCanonicalType();
+    auto genericType = cast<BoundGenericStructType>(arrayType);
+    assert(genericType->getDecl() == SGF.getASTContext().getArrayDecl());
+    elementType = genericType.getGenericArgs()[0];
+  }
+
   VarargsInfo varargsInfo =
-      emitBeginVarargs(SGF, loc, elementType, arrayTy,
+      emitBeginVarargs(SGF, loc, elementType, arrayType,
                        E->getNumElements());
 
   // Cleanups for any elements that have been initialized so far.
@@ -3628,14 +3639,14 @@ RValue RValueEmitter::visitArrayExpr(ArrayExpr *E, SGFContext C) {
   for (auto destCleanup : cleanups)
     SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dead);
 
-  RValue arg(SGF, loc, arrayTy,
+  RValue arg(SGF, loc, arrayType,
              emitEndVarargs(SGF, loc, std::move(varargsInfo)));
 
   arg = scope.popPreservingValue(std::move(arg));
 
   // If we're building an array, we don't have to call the initializer;
   // we've already built one.
-  if (arrayTy->isEqual(E->getType()))
+  if (arrayType->isEqual(E->getType()))
     return arg;
 
   // Call the builtin initializer.
