@@ -968,8 +968,10 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
         return;
       }
 
-      SF->getImportedModules(extraImports,
-                             ModuleDecl::ImportFilterKind::Private);
+      ModuleDecl::ImportFilter importFilter;
+      importFilter |= ModuleDecl::ImportFilterKind::Private;
+      importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+      SF->getImportedModules(extraImports, importFilter);
     }
   }
 

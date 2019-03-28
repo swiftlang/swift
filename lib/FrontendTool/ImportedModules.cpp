@@ -82,6 +82,7 @@ bool swift::emitImportedModules(ASTContext &Context, ModuleDecl *mainModule,
       ModuleDecl::ImportFilter importFilter;
       importFilter |= ModuleDecl::ImportFilterKind::Public;
       importFilter |= ModuleDecl::ImportFilterKind::Private;
+      importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
 
       SmallVector<ModuleDecl::ImportedModule, 16> imported;
       clangImporter->getImportedHeaderModule()->getImportedModules(

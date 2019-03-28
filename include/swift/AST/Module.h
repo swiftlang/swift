@@ -420,8 +420,12 @@ public:
 
   /// \sa getImportedModules
   enum class ImportFilterKind {
+    /// Include imports declared with `@_exported`.
     Public = 1 << 0,
-    Private = 1 << 1
+    /// Include "regular" imports with no special annotation.
+    Private = 1 << 1,
+    /// Include imports declared with `@_implementationOnly`.
+    ImplementationOnly = 1 << 2
   };
   /// \sa getImportedModules
   using ImportFilter = OptionSet<ImportFilterKind>;
@@ -892,23 +896,29 @@ public:
     /// This source file has access to private declarations in the imported
     /// module.
     PrivateImport = 0x4,
+
+    /// The imported module is an implementation detail of this file and should
+    /// not be required to be present if the main module is ever imported
+    /// elsewhere.
+    ///
+    /// Mutually exclusive with Exported.
+    ImplementationOnly = 0x8
   };
 
   /// \see ImportFlags
   using ImportOptions = OptionSet<ImportFlags>;
-
-  typedef std::pair<ImportOptions, StringRef> ImportOptionsAndFilename;
 
   struct ImportedModuleDesc {
     ModuleDecl::ImportedModule module;
     ImportOptions importOptions;
     StringRef filename;
 
-    ImportedModuleDesc(ModuleDecl::ImportedModule module, ImportOptions options)
-        : module(module), importOptions(options) {}
     ImportedModuleDesc(ModuleDecl::ImportedModule module, ImportOptions options,
-                       StringRef filename)
-        : module(module), importOptions(options), filename(filename) {}
+                       StringRef filename = {})
+        : module(module), importOptions(options), filename(filename) {
+      assert(!(importOptions.contains(ImportFlags::Exported) &&
+               importOptions.contains(ImportFlags::ImplementationOnly)));
+    }
   };
 
 private:

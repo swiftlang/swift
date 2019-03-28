@@ -1092,6 +1092,22 @@ static Optional<swift::LibraryKind> getActualLibraryKind(unsigned rawKind) {
   return None;
 }
 
+static Optional<ModuleDecl::ImportFilterKind>
+getActualImportControl(unsigned rawValue) {
+  // We switch on the raw value rather than the enum in order to handle future
+  // values.
+  switch (rawValue) {
+  case static_cast<unsigned>(serialization::ImportControl::Normal):
+    return ModuleDecl::ImportFilterKind::Private;
+  case static_cast<unsigned>(serialization::ImportControl::Exported):
+    return ModuleDecl::ImportFilterKind::Public;
+  case static_cast<unsigned>(serialization::ImportControl::ImplementationOnly):
+    return ModuleDecl::ImportFilterKind::ImplementationOnly;
+  default:
+    return None;
+  }
+}
+
 static bool areCompatibleArchitectures(const llvm::Triple &moduleTarget,
                                        const llvm::Triple &ctxTarget) {
   if (moduleTarget.getArch() == ctxTarget.getArch())
@@ -1266,10 +1282,18 @@ ModuleFile::ModuleFile(
         unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
         switch (kind) {
         case input_block::IMPORTED_MODULE: {
-          bool exported, scoped;
+          unsigned rawImportControl;
+          bool scoped;
           input_block::ImportedModuleLayout::readRecord(scratch,
-                                                        exported, scoped);
-          Dependencies.push_back({blobData, exported, scoped});
+                                                        rawImportControl,
+                                                        scoped);
+          auto importKind = getActualImportControl(rawImportControl);
+          if (!importKind) {
+            // We don't know how to import this dependency.
+            error();
+            return;
+          }
+          Dependencies.push_back({blobData, importKind.getValue(), scoped});
           break;
         }
         case input_block::LINK_LIBRARY: {
@@ -1489,6 +1513,9 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       continue;
     }
 
+    if (dependency.isImplementationOnly())
+      continue;
+
     StringRef modulePathStr = dependency.RawPath;
     StringRef scopePath;
     if (dependency.isScoped()) {
@@ -1698,6 +1725,16 @@ void ModuleFile::getImportedModules(
     if (dep.isExported()) {
       if (!filter.contains(ModuleDecl::ImportFilterKind::Public))
         continue;
+
+    } else if (dep.isImplementationOnly()) {
+      if (!filter.contains(ModuleDecl::ImportFilterKind::ImplementationOnly))
+        continue;
+      if (!dep.isLoaded()) {
+        // Pretend we didn't have this import if we weren't originally asked to
+        // load it.
+        continue;
+      }
+
     } else {
       if (!filter.contains(ModuleDecl::ImportFilterKind::Private))
         continue;

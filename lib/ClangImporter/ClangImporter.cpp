@@ -3203,6 +3203,11 @@ ModuleDecl *ClangModuleUnit::getAdapterModule() const {
 void ClangModuleUnit::getImportedModules(
     SmallVectorImpl<ModuleDecl::ImportedModule> &imports,
     ModuleDecl::ImportFilter filter) const {
+  // Bail out if we /only/ want ImplementationOnly imports; Clang modules never
+  // have any of these.
+  if (filter.containsOnly(ModuleDecl::ImportFilterKind::ImplementationOnly))
+    return;
+
   if (filter.contains(ModuleDecl::ImportFilterKind::Private))
     if (auto stdlib = owner.getStdlibModule())
       imports.push_back({ModuleDecl::AccessPathTy(), stdlib});

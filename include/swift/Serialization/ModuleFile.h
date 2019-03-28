@@ -135,27 +135,48 @@ public:
     const StringRef RawPath;
 
   private:
-    unsigned IsExported : 1;
+    using ImportFilterKind = ModuleDecl::ImportFilterKind;
+    const unsigned RawImportControl : 2;
     const unsigned IsHeader : 1;
     const unsigned IsScoped : 1;
 
-    Dependency(StringRef path, bool isHeader, bool exported, bool isScoped)
-      : RawPath(path), IsExported(exported), IsHeader(isHeader),
-        IsScoped(isScoped) {}
+    static unsigned rawControlFromKind(ImportFilterKind importKind) {
+      return llvm::countTrailingZeros(static_cast<unsigned>(importKind));
+    }
+    ImportFilterKind getImportControl() const {
+      return static_cast<ImportFilterKind>(1 << RawImportControl);
+    }
+
+    Dependency(StringRef path, bool isHeader, ImportFilterKind importControl,
+               bool isScoped)
+      : RawPath(path), RawImportControl(rawControlFromKind(importControl)),
+        IsHeader(isHeader), IsScoped(isScoped) {
+      assert(llvm::countPopulation(static_cast<unsigned>(importControl)) == 1 &&
+             "must be a particular filter option, not a bitset");
+      assert(getImportControl() == importControl && "not enough bits");
+    }
 
   public:
-    Dependency(StringRef path, bool exported, bool isScoped)
-      : Dependency(path, false, exported, isScoped) {}
+    Dependency(StringRef path, ImportFilterKind importControl, bool isScoped)
+      : Dependency(path, false, importControl, isScoped) {}
 
     static Dependency forHeader(StringRef headerPath, bool exported) {
-      return Dependency(headerPath, true, exported, false);
+      auto importControl = exported ? ImportFilterKind::Public
+                                    : ImportFilterKind::Private;
+      return Dependency(headerPath, true, importControl, false);
     }
 
     bool isLoaded() const {
       return Import.second != nullptr;
     }
 
-    bool isExported() const { return IsExported; }
+    bool isExported() const {
+      return getImportControl() == ImportFilterKind::Public;
+    }
+    bool isImplementationOnly() const {
+      return getImportControl() == ImportFilterKind::ImplementationOnly;
+    }
+
     bool isHeader() const { return IsHeader; }
     bool isScoped() const { return IsScoped; }
 

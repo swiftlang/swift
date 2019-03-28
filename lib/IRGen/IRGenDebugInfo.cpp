@@ -1744,6 +1744,7 @@ void IRGenDebugInfoImpl::finalize() {
   ModuleDecl::ImportFilter ImportFilter;
   ImportFilter |= ModuleDecl::ImportFilterKind::Public;
   ImportFilter |= ModuleDecl::ImportFilterKind::Private;
+  ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
   SmallVector<ModuleDecl::ImportedModule, 8> ModuleWideImports;
   IGM.getSwiftModule()->getImportedModules(ModuleWideImports, ImportFilter);
   for (auto M : ModuleWideImports)

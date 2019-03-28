@@ -603,6 +603,7 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
   ModuleDecl::ImportFilter importFilter;
   importFilter |= ModuleDecl::ImportFilterKind::Public;
   importFilter |= ModuleDecl::ImportFilterKind::Private;
+  importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
   SmallVector<ModuleDecl::ImportedModule, 8> imports;
   primarySourceFile->getImportedModules(imports, importFilter);
   StringScratchSpace moduleNameScratch;

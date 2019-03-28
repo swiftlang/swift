@@ -487,8 +487,10 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
         loadedModuleFile->getDependencies().begin(),
         loadedModuleFile->getDependencies().end(), std::back_inserter(missing),
         [&duplicates](const ModuleFile::Dependency &dependency) -> bool {
-          if (dependency.isLoaded() || dependency.isHeader())
+          if (dependency.isLoaded() || dependency.isHeader() ||
+              dependency.isImplementationOnly()) {
             return false;
+          }
           return duplicates.insert(dependency.RawPath).second;
         });
 

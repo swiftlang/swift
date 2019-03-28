@@ -123,6 +123,7 @@ public:
     ModuleDecl::ImportFilter ImportFilter;
     ImportFilter |= ModuleDecl::ImportFilterKind::Public;
     ImportFilter |= ModuleDecl::ImportFilterKind::Private;
+    ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
 
     if (auto *SF = SFOrMod.dyn_cast<SourceFile *>()) {
       SF->getImportedModules(Modules, ImportFilter);
