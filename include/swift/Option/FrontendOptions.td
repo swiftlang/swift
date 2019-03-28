@@ -520,6 +520,9 @@ def prebuilt_module_cache_path_EQ :
 def enable_resilience_bypass : Flag<["-"], "enable-resilience-bypass">,
    HelpText<"Completely bypass resilience when accessing types in resilient frameworks">;
 
+def force_public_linkage : Flag<["-"], "force-public-linkage">,
+   HelpText<"Force public linkage for private symbols. Used by LLDB.">;
+
 def dump_api_path : Separate<["-"], "dump-api-path">,
   HelpText<"The path to output swift interface files for the compiled source files">;
 

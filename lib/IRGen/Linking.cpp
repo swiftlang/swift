@@ -19,6 +19,7 @@
 #include "IRGenModule.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Availability.h"
+#include "swift/AST/IRGenOptions.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -68,14 +69,16 @@ bool swift::irgen::useDllStorage(const llvm::Triple &triple) {
 
 UniversalLinkageInfo::UniversalLinkageInfo(IRGenModule &IGM)
     : UniversalLinkageInfo(IGM.Triple, IGM.IRGen.hasMultipleIGMs(),
+                           IGM.IRGen.Opts.ForcePublicLinkage,
                            IGM.getSILModule().isWholeModule()) {}
 
 UniversalLinkageInfo::UniversalLinkageInfo(const llvm::Triple &triple,
                                            bool hasMultipleIGMs,
+                                           bool forcePublicDecls,
                                            bool isWholeModule)
     : IsELFObject(triple.isOSBinFormatELF()),
       UseDLLStorage(useDllStorage(triple)), HasMultipleIGMs(hasMultipleIGMs),
-      IsWholeModule(isWholeModule) {}
+      ForcePublicDecls(forcePublicDecls), IsWholeModule(isWholeModule) {}
 
 /// Mangle this entity into the given buffer.
 void LinkEntity::mangle(SmallVectorImpl<char> &buffer) const {

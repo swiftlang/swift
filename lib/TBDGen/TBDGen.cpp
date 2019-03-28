@@ -590,7 +590,8 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   auto &ctx = M->getASTContext();
   auto isWholeModule = singleFile == nullptr;
   const auto &target = ctx.LangOpts.Target;
-  UniversalLinkageInfo linkInfo(target, opts.HasMultipleIGMs, isWholeModule);
+  UniversalLinkageInfo linkInfo(target, opts.HasMultipleIGMs, false,
+                                isWholeModule);
   auto availCtx = AvailabilityContext::forDeploymentTarget(ctx);
 
   tapi::internal::InterfaceFile file;
