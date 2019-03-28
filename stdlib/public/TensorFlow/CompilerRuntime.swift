@@ -571,6 +571,14 @@ private func configureRuntimeFromEnvironment() {
     _RuntimeConfig.runMetadataOutputPath = path
     debugLog("Setting run metadata output path to \(path) from env.")
   }
+
+  if let value = getenv("SWIFT_TENSORFLOW_CPU_DEVICE_COUNT") {
+    guard let cpuDeviceCount = UInt32(String(cString: value)) else {
+      fatalError("SWIFT_TENSORFLOW_CPU_DEVICE_COUNT must take an int value.")
+    }
+    _RuntimeConfig.cpuDeviceCount = cpuDeviceCount
+    debugLog("Setting number of CPU devices to \(cpuDeviceCount) from env.")
+  }
 }
 
 /// Initialize the TPU system.
