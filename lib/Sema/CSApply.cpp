@@ -2211,7 +2211,6 @@ namespace {
       if (cs.getType(expr) && !cs.getType(expr)->hasTypeVariable())
         return expr;
 
-      auto &ctx = cs.getASTContext();
       auto &tc = cs.getTypeChecker();
 
       // Figure out the type we're converting to.
@@ -2236,30 +2235,14 @@ namespace {
                                         ConformanceCheckFlags::InExpression);
       assert(conformance && "object literal type conforms to protocol");
 
-      Expr *base = TypeExpr::createImplicitHack(expr->getLoc(), conformingType,
-                                                ctx);
-      cs.cacheExprTypes(base);
-        
-      SmallVector<Expr *, 4> args;
-      if (!isa<TupleExpr>(expr->getArg()))
-        return nullptr;
-      auto tupleArg = cast<TupleExpr>(expr->getArg());
-      for (auto elt : tupleArg->getElements()) {
-        cs.setExprTypes(elt);
-        args.push_back(elt);
-      }
       DeclName constrName(tc.getObjectLiteralConstructorName(expr));
 
-      cs.cacheExprTypes(base);
-      cs.setExprTypes(base);
-
-      Expr *semanticExpr = tc.callWitness(base, dc, proto, *conformance,
-                                          constrName, args,
-                                          diag::object_literal_broken_proto);
-      if (semanticExpr)
-        cs.cacheExprTypes(semanticExpr);
-
-      expr->setSemanticExpr(semanticExpr);
+      ConcreteDeclRef witness =
+        conformance->getWitnessByName(conformingType->getRValueType(),
+                                      constrName);
+      if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
+        return nullptr;
+      expr->setInitializer(witness);
       return expr;
     }
 
