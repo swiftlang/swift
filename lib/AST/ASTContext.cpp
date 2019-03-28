@@ -390,6 +390,9 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// For uniquifying `AutoDiffParameterIndices` allocations.
   llvm::FoldingSet<AutoDiffParameterIndices> AutoDiffParameterIndicesSet;
 
+  /// For uniquifying `AutoDiffIndexSubset` allocations.
+  llvm::FoldingSet<AutoDiffIndexSubset> AutoDiffIndexSubsets;
+
   /// For uniquifying `AutoDiffAssociatedFunctionIdentifier` allocations.
   llvm::FoldingSet<AutoDiffAssociatedFunctionIdentifier>
       AutoDiffAssociatedFunctionIdentifiers;
@@ -5243,6 +5246,18 @@ AutoDiffParameterIndices::get(llvm::SmallBitVector indices, ASTContext &C) {
   foldingSet.InsertNode(newNode, insertPos);
 
   return newNode;
+}
+
+AutoDiffIndexSubset *AutoDiffIndexSubset::get(
+    ASTContext &ctx, const SmallBitVector &&rawIndices) {
+  auto &foldingSet = ctx.getImpl().AutoDiffIndexSubsets;
+  llvm::FoldingSetNodeID id;
+  Profile(id, rawIndices);
+  void *insertPos = nullptr;
+  auto *existing = foldingSet.FindNodeOrInsertPos(id, insertPos);
+  if (existing)
+    return existing;
+
 }
 
 AutoDiffAssociatedFunctionIdentifier *

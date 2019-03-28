@@ -355,3 +355,78 @@ CanType VectorSpace::getCanonicalType() const {
 NominalTypeDecl *VectorSpace::getNominal() const {
   return getVector()->getNominalOrBoundGenericNominal();
 }
+
+AutoDiffIndexSubset *
+AutoDiffIndexSubset::get(ASTContext &ctx, unsigned capacity, bool includeAll) {
+  auto *buf = reinterpret_cast<AutoDiffIndexSubset *>(
+      ctx.Allocate(sizeof(AutoDiffIndexSubset), alignof(AutoDiffIndexSubset)));
+  return new (buf) AutoDiffIndexSubset(SmallBitVector(capacity, includeAll));
+}
+
+AutoDiffIndexSubset *
+AutoDiffIndexSubset::get(ASTContext &ctx, const SmallBitVector &rawIndices) {
+  auto *buf = reinterpret_cast<AutoDiffIndexSubset *>(
+      ctx.Allocate(sizeof(AutoDiffIndexSubset), alignof(AutoDiffIndexSubset)));
+  return new (buf) AutoDiffIndexSubset(std::move(rawIndices));
+}
+
+AutoDiffIndexSubset *AutoDiffIndexSubset::get(ASTContext &ctx,
+                                              unsigned capacity,
+                                              IntRange<> range) {
+  auto *subset = get(ctx, capacity);
+  subset->rawIndices.set(range.front(), range.back());
+  return subset;
+}
+
+AutoDiffIndexSubset *AutoDiffIndexSubset::get(ASTContext &ctx,
+                                              unsigned capacity,
+                                              ArrayRef<unsigned> indices) {
+  auto *subset = get(ctx, capacity);
+  for (auto i : indices) {
+    assert(i < capacity && "Index must be smaller than capacity");
+    subset->rawIndices.set(i);
+  }
+  return subset;
+}
+
+bool AutoDiffIndexSubset::equals(const AutoDiffIndexSubset *other) const {
+  return rawIndices == other->rawIndices;
+}
+
+bool AutoDiffIndexSubset::
+isProperSubsetOf(const AutoDiffIndexSubset *other) const {
+  return getSize() == other->getSize() && other->rawIndices.test(rawIndices);
+}
+
+bool AutoDiffIndexSubset::
+isProperSupersetOf(const AutoDiffIndexSubset *other) const {
+  return getSize() == other->getSize() && rawIndices.test(other->rawIndices);
+}
+
+AutoDiffIndexSubset *
+AutoDiffIndexSubset::adding(unsigned index, ASTContext &ctx) const {
+  assert(index < getCapacity());
+
+}
+
+AutoDiffIndexSubset *
+AutoDiffIndexSubset::adding(AutoDiffIndexSubset *other, ASTContext &ctx) const {
+  return get(ctx, rawIndices | other->rawIndices);
+}
+
+void AutoDiffIndexSubset::Profile(llvm::FoldingSetNodeID &id,
+                                  const SmallBitVector &rawIndices) {
+  id.AddInteger(rawIndices.size());
+  for (auto i : rawIndices.set_bits())
+    id.AddInteger(i);
+}
+
+AutoDiffFunctionParameterSubset::
+AutoDiffFunctionParameterSubset(ASTContext &ctx,
+                                AutoDiffIndexSubset *parameterSubset,
+                                Optional<bool> isSelfIncluded) {
+  if (isSelfIncluded.hasValue()) {
+    indexSubset =
+        AutoDiffIndexSubset::get(ctx, parameterSubset->getCapacity() + 1);
+  }
+}

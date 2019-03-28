@@ -20,6 +20,7 @@
 
 #include "ASTContext.h"
 #include "llvm/ADT/SmallBitVector.h"
+#include "swift/Basic/Range.h"
 
 namespace swift {
 
@@ -217,6 +218,95 @@ public:
   // TODO: After `getNumAutoDiffParameterIndices` is fixed to compute exact
   // parameter count, update doc comment to "Returns the number of parameters".
   unsigned size() { return parameters.size(); }
+};
+
+class AutoDiffIndexSubset : public llvm::FoldingSetNode {
+private:
+  using Byte = uint8_t;
+
+  unsigned capacity;
+  unsigned size;
+  unsigned numBytes;
+
+  static unsigned getNumBytesNeeded(unsigned largest) {
+    return (largest + 1) / sizeof(Byte) + 1;
+  }
+
+  unsigned getNumBytes() const {
+    return numBytes;
+  }
+
+  const Byte *getBytesData() const {
+    return reinterpret_cast<const Byte *>(this + 1);
+  }
+
+  ArrayRef<Byte> getBytes() const {
+    return {getBytesData(), getNumBytes()};
+  }
+
+  MutableArrayRef<Byte> getMutableBytes() {
+    return {const_cast<Byte *>(getBytesData()), getNumBytes()};
+  }
+
+  explicit AutoDiffIndexSubset(unsigned capacity, unsigned size,
+                               unsigned numBytes, ArrayRef<uint8_t> bytes);
+
+public:
+  AutoDiffIndexSubset() = delete;
+  AutoDiffIndexSubset(const AutoDiffIndexSubset &) = delete;
+  AutoDiffIndexSubset &operator=(const AutoDiffIndexSubset &) = delete;
+
+  static AutoDiffIndexSubset *get(ASTContext &ctx, unsigned capacity,
+                                  bool includeAll = false);
+  static AutoDiffIndexSubset *get(ASTContext &ctx, unsigned capacity,
+                                  IntRange<> range);
+  static AutoDiffIndexSubset *get(ASTContext &ctx, unsigned capacity,
+                                  ArrayRef<unsigned> indices);
+
+  unsigned getCapacity() const {
+    return capacity;
+  }
+
+  unsigned getSize() const {
+    return size;
+  }
+
+  ArrayRef<unsigned> getIndices() const {
+    return indices;
+  }
+
+  bool contains(unsigned index) const {
+
+  }
+
+  bool equals(const AutoDiffIndexSubset *other) const;
+  bool isProperSubsetOf(const AutoDiffIndexSubset *other) const;
+  bool isProperSupersetOf(const AutoDiffIndexSubset *other) const;
+
+  AutoDiffIndexSubset *adding(unsigned index, ASTContext &ctx) const;
+  AutoDiffIndexSubset *adding(AutoDiffIndexSubset *other,
+                              ASTContext &ctx) const;
+
+  static void Profile(llvm::FoldingSetNodeID &id,
+                      const SmallBitVector &rawIndices) const;
+  void Profile(llvm::FoldingSetNodeID &id) const {
+    Profile(id, rawIndices);
+  }
+};
+
+class AutoDiffFunctionParameterSubset {
+private:
+  AutoDiffIndexSubset *indexSubset;
+  bool isCurried;
+
+public:
+  explicit AutoDiffFunctionParameterSubset(
+      AutoDiffIndexSubset *indexSubset, bool isCurried)
+      : indexSubset(indexSubset), isCurried(isCurried) {}
+
+  explicit AutoDiffFunctionParameterSubset(
+      ASTContext &ctx, AutoDiffIndexSubset *parameterSubset,
+      Optional<bool> isSelfIncluded);
 };
 
 /// SIL-level automatic differentiation indices. Consists of a source index,
