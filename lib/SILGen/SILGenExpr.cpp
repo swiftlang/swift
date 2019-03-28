@@ -3684,6 +3684,11 @@ RValue RValueEmitter::visitArrayExpr(ArrayExpr *E, SGFContext C) {
 
   arg = scope.popPreservingValue(std::move(arg));
 
+  // If we're building an array, we don't have to call the initializer;
+  // we've already built one.
+  if (arrayTy->isEqual(E->getType()))
+    return arg;
+
   // Call the builtin initializer.
   return SGF.emitApplyAllocatingInitializer(
       loc, E->getInitializer(), std::move(arg), E->getType(), C);

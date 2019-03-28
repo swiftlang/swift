@@ -245,10 +245,7 @@ func makeBasic<T : FooProtocol>() -> T { return T() }
 // CHECK: try_apply [[FN]]<T>([[POINTER1]]) : {{.*}} normal bb1, error bb2
 
 // CHECK: bb1([[TMP:%.*]] : $()):
-// CHECK: [[METATYPE:%.*]] = metatype $@thin Array<T>.Type
-// CHECK: [[CTOR:%.*]] = function_ref @$sSa12arrayLiteralSayxGxd_tcfC : $@convention(method) <τ_0_0> (@owned Array<τ_0_0>, @thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
-// CHECK: [[RESULT:%.*]] = apply [[CTOR]]<T>([[ARR]], [[METATYPE]])
-// CHECK: return [[RESULT]]
+// CHECK: return [[ARR]]
 
 // CHECK: bb2([[ERR:%.*]] : @owned $Error):
 // CHECK: [[DEALLOC:%.*]] = function_ref @$ss29_deallocateUninitializedArrayyySayxGnlF
