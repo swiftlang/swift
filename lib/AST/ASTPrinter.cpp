@@ -1712,6 +1712,8 @@ void PrintAST::printMutatingModifiersIfNeeded(const AccessorDecl *accessor) {
 void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   if (isa<VarDecl>(ASD) && !Options.PrintPropertyAccessors)
     return;
+  if (isa<SubscriptDecl>(ASD) && !Options.PrintSubscriptAccessors)
+    return;
 
   auto impl = ASD->getImplInfo();
 
@@ -2532,6 +2534,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     if (!tyLoc.getTypeRepr())
       tyLoc = TypeLoc::withoutLoc(decl->getInterfaceType());
 
+    Printer.printDeclResultTypePre(decl, tyLoc);
     if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
       printTypeLocForImplicitlyUnwrappedOptional(tyLoc);
     else
@@ -2803,6 +2806,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
           ResultTyLoc = TypeLoc::withoutLoc(ResultTy);
       }
       Printer << " -> ";
+
+      Printer.printDeclResultTypePre(decl, ResultTyLoc);
       Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
       if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
         printTypeLocForImplicitlyUnwrappedOptional(ResultTyLoc);
@@ -2930,8 +2935,9 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   });
   Printer << " -> ";
 
-  Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
   TypeLoc elementTy = decl->getElementTypeLoc();
+  Printer.printDeclResultTypePre(decl, elementTy);
+  Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
   if (!elementTy.getTypeRepr())
     elementTy = TypeLoc::withoutLoc(decl->getElementInterfaceType());
   if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
