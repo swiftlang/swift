@@ -39,7 +39,7 @@ func testTrailingClosure() -> String {
 // RUN: %refactor -source-filename %s -pos=10:9 | %FileCheck %s -check-prefix=CHECK-NO-TRAILING-CLOSURE
 // RUN: %refactor -source-filename %s -pos=10:17 | %FileCheck %s -check-prefix=CHECK-TRAILING-CLOSURE
 
-// RUN: %refactor -source-filename %s -pos=12:4 | %FileCheck %s -check-prefix=CHECK-NO-TRAILING-CLOSURE
+// RUN: %refactor -source-filename %s -pos=12:4 | %FileCheck %s -check-prefix=CHECK-TRAILING-CLOSURE
 // RUN: %refactor -source-filename %s -pos=13:5 | %FileCheck %s -check-prefix=CHECK-TRAILING-CLOSURE
 // RUN: %refactor -source-filename %s -pos=14:5 | %FileCheck %s -check-prefix=CHECK-TRAILING-CLOSURE
 

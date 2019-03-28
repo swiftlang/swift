@@ -58,9 +58,13 @@ func test_pow() {
   pow(1.5, 2.5)
 }
 
+#if !((os(Android) || os(Linux)) && arch(arm64))
+// long doubles in AAPCS64 are 128 bits, which is not supported by
+// Swift, so don't test this. SR-9072.
 func test_powl() {
   powl(1.5, 2.5)
 }
+#endif
 
 func test_puts(_ s: String) {
   _ = s.withCString { puts($0) + 32 };
