@@ -3304,7 +3304,16 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
             // storage.
             (!storage->hasAnyAccessors() ||
              !getAccessorDeclRef(getRepresentativeAccessorForKeyPath(storage))
-             .isForeign));
+             .isForeign) &&
+            // For Swift 5.0 compatibility, we must weakly link static
+            // properties' descriptors, and the runtime can't handle a null
+            // descriptor pointer in an external key path component. Omit them
+            // when this happens.
+            // FIXME: We could potentially detect that a static property was
+            // introduced in Swift 5.1 or later and its declaring module will
+            // never be compiled by Swift 5.0.
+            !storage->isStatic()
+            );
     };
   
   auto accessKind = storage->supportsMutation()

@@ -2532,6 +2532,9 @@ private:
       ExternalStorage(externalStorage),
       ExternalSubstitutions(externalSubstitutions)
   {
+    // We can't weak-link these for compatibility with Swift 5.0.
+    assert(!externalStorage || !externalStorage->isStatic() &&
+           "static properties cannot be external components");
   }
   
   /// Constructor for optional components.

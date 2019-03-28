@@ -4574,8 +4574,9 @@ public:
   }
 
   /// True if the storage exports a property descriptor for key paths in
-  /// other modules.
-  bool exportsPropertyDescriptor() const;
+  /// other modules. Set \param forLinking as true if we are deciding whether
+  /// we should try to link against the descriptor, not export it ourselves.
+  bool exportsPropertyDescriptor(bool forLinking = false) const;
 
   /// True if any of the accessors to the storage is private or fileprivate.
   bool hasPrivateAccessor() const;

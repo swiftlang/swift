@@ -3,6 +3,12 @@
 from keypaths_gyb import testCases
 }%
 
+#if BEFORE
+public let isBeforeLibrary = true
+#else
+public let isBeforeLibrary = false
+#endif
+
 public var globalSink: Int = 0
 
 public enum AnEnum {
@@ -25,17 +31,17 @@ public enum AnEnum {
     }
   }
 
-% for (name, kind, before, after, addsAPI) in testCases:
+% for (name, kind, before, after, addsAPI, typeSuffix) in testCases:
 
 %   if kind == "mutating" or kind == "nonmutating":
 
     #if BEFORE
-      ${before.format(name=name, nonmutating="nonmutating")}
+      ${before.format(name=name, nonmutating="nonmutating", type="AnEnum")}
     #else
-      ${after.format(name=name, nonmutating="nonmutating")}
+      ${after.format(name=name, nonmutating="nonmutating", type="AnEnum")}
     #endif
 
-    public static var keyPath_${name}: PartialKeyPath<AnEnum> { return \AnEnum.${name} }
+    public static var keyPath_${name}: PartialKeyPath<AnEnum${typeSuffix}> { return \AnEnum${typeSuffix}.${name} }
       
 %   elif kind == "stored":
 
@@ -51,17 +57,17 @@ public struct AStruct {
 
   public var sink: Int = 0
 
-% for (name, kind, before, after, addsAPI) in testCases:
+% for (name, kind, before, after, addsAPI, typeSuffix) in testCases:
 
 %   if kind == "mutating" or kind == "nonmutating" or kind == "stored":
 
     #if BEFORE
-      ${before.format(name=name, nonmutating="nonmutating")}
+      ${before.format(name=name, nonmutating="nonmutating", type="AStruct")}
     #else
-      ${after.format(name=name, nonmutating="nonmutating")}
+      ${after.format(name=name, nonmutating="nonmutating", type="AStruct")}
     #endif
 
-    public static var keyPath_${name}: PartialKeyPath<AStruct> { return \AStruct.${name} }
+    public static var keyPath_${name}: PartialKeyPath<AStruct${typeSuffix}> { return \AStruct${typeSuffix}.${name} }
 
 %   else:
       %{ raise ValueError("improper test case kind") }%
@@ -75,17 +81,17 @@ public class AClass {
 
   public var sink: Int = 0
 
-% for (name, kind, before, after, addsAPI) in testCases:
+% for (name, kind, before, after, addsAPI, typeSuffix) in testCases:
 
 %   if kind == "nonmutating" or kind == "stored":
 
     #if BEFORE
-      ${before.format(name=name, nonmutating="")}
+      ${before.format(name=name, nonmutating="", type="AClass")}
     #else
-      ${after.format(name=name, nonmutating="")}
+      ${after.format(name=name, nonmutating="", type="AClass")}
     #endif
 
-    public static var keyPath_${name}: PartialKeyPath<AClass> { return \AClass.${name} }
+    public static var keyPath_${name}: PartialKeyPath<AClass${typeSuffix}> { return \AClass${typeSuffix}.${name} }
 
 %   elif kind == "mutating":
 
@@ -101,17 +107,17 @@ public final class AFinalClass {
 
   public var sink: Int = 0
 
-% for (name, kind, before, after, addsAPI) in testCases:
+% for (name, kind, before, after, addsAPI, typeSuffix) in testCases:
 
 %   if kind == "nonmutating" or kind == "stored":
 
     #if BEFORE
-      ${before.format(name=name, nonmutating="")}
+      ${before.format(name=name, nonmutating="", type="AFinalClass")}
     #else
-      ${after.format(name=name, nonmutating="")}
+      ${after.format(name=name, nonmutating="", type="AFinalClass")}
     #endif
 
-    public static var keyPath_${name}: PartialKeyPath<AFinalClass> { return \AFinalClass.${name} }
+    public static var keyPath_${name}: PartialKeyPath<AFinalClass${typeSuffix}> { return \AFinalClass${typeSuffix}.${name} }
 
 %   elif kind == "mutating":
 

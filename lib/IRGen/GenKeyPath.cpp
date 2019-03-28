@@ -898,6 +898,11 @@ emitKeyPathComponent(IRGenModule &IGM,
     auto externalDecl = component.getExternalDecl();
     if (externalDecl &&
         externalDecl->getModuleContext() != IGM.getSwiftModule()) {
+      // The key path runtime can't handle weak-linked external descriptors, so
+      // we can't include them for static decls.
+      assert(!externalDecl->isStatic() &&
+             "static properties can't have external descriptors");
+
       SmallVector<llvm::Constant *, 4> externalSubArgs;
       auto componentSig = externalDecl->getInnermostDeclContext()
         ->getGenericSignatureOfContext();

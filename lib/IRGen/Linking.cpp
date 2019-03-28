@@ -934,6 +934,16 @@ bool LinkEntity::isWeakImported(ModuleDecl *module,
     return false;
   }
 
+  case Kind::PropertyDescriptor:
+    // Swift 5.0 did not emit property descriptors for static properties, so
+    // they must be weakly imported.
+    // FIXME: We could link normally if we know the property was introduced in
+    // or after Swift 5.1 and the descriptor will always be available.
+    if (getDecl()->isStatic() && getDecl()->getModuleContext() != module) {
+      return true;
+    }
+    LLVM_FALLTHROUGH;
+    
   case Kind::DispatchThunk:
   case Kind::DispatchThunkInitializer:
   case Kind::DispatchThunkAllocator:
@@ -949,7 +959,6 @@ bool LinkEntity::isWeakImported(ModuleDecl *module,
   case Kind::SwiftMetaclassStub:
   case Kind::ObjCMetadataUpdateFunction:
   case Kind::ClassMetadataBaseOffset:
-  case Kind::PropertyDescriptor:
   case Kind::NominalTypeDescriptor:
   case Kind::ModuleDescriptor:
   case Kind::ProtocolDescriptor:

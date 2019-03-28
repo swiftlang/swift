@@ -19,7 +19,7 @@ from keypaths_gyb import testCases
 
 var tests = TestSuite("key path resilience")
 
-% for (name, kind, before, after, addsAPI) in testCases:
+% for (name, kind, before, after, addsAPI, typeSuffix) in testCases:
 
 %  if addsAPI:
 #if BEFORE
@@ -29,7 +29,7 @@ var tests = TestSuite("key path resilience")
 
 tests.test("AnEnum.${name}") {
   let fromModule = AnEnum.keyPath_${name}
-  let formedLocally = \AnEnum.${name}
+  let formedLocally = \AnEnum${typeSuffix}.${name}
 
   expectEqual(fromModule, formedLocally)
 }
@@ -46,7 +46,7 @@ tests.test("AnEnum.${name}") {
 
 % end
 
-% for (name, kind, before, after, addsAPI) in testCases:
+% for (name, kind, before, after, addsAPI, typeSuffix) in testCases:
 
 %  if addsAPI:
 #if BEFORE
@@ -56,7 +56,7 @@ tests.test("AnEnum.${name}") {
 
 tests.test("AStruct.${name}") {
   let fromModule = AStruct.keyPath_${name}
-  let formedLocally = \AStruct.${name}
+  let formedLocally = \AStruct${typeSuffix}.${name}
 
   expectEqual(fromModule, formedLocally)
 }
@@ -71,7 +71,7 @@ tests.test("AStruct.${name}") {
 
 % end
 
-% for (name, kind, before, after, addsAPI) in testCases:
+% for (name, kind, before, after, addsAPI, typeSuffix) in testCases:
 
 %  if addsAPI:
 #if BEFORE
@@ -81,14 +81,14 @@ tests.test("AStruct.${name}") {
 
 tests.test("AClass.${name}") {
   let fromModule = AClass.keyPath_${name}
-  let formedLocally = \AClass.${name}
+  let formedLocally = \AClass${typeSuffix}.${name}
 
   expectEqual(fromModule, formedLocally)
 }
 
 tests.test("AFinalClass.${name}") {
   let fromModule = AFinalClass.keyPath_${name}
-  let formedLocally = \AFinalClass.${name}
+  let formedLocally = \AFinalClass${typeSuffix}.${name}
 
   expectEqual(fromModule, formedLocally)
 }
@@ -104,5 +104,35 @@ tests.test("AFinalClass.${name}") {
 %  end
 
 % end
+
+#if !BEFORE
+// In backwards deployment, static properties will not have property
+// descriptors. As a result, we expect key path equality to show certain flaws,
+// but the key paths should still otherwise be usable.
+
+% for typeName in ("AnEnum", "AStruct", "AClass", "AFinalClass"):
+tests.test("${typeName}.staticBackDeployEquality") {
+  let fromModule = ${typeName}.keyPath_staticBackDeploy
+  let formedLocally = \${typeName}.Type.staticBackDeploy
+  let otherFromModule = ${typeName}.keyPath_staticBackDeployOther
+  let otherFormedLocally = \${typeName}.Type.staticBackDeployOther
+  
+  // Always correct behavior
+  expectNotEqual(fromModule, otherFromModule)
+  expectNotEqual(formedLocally, otherFormedLocally)
+    expectEqual(formedLocally, fromModule)
+    expectEqual(otherFormedLocally, otherFromModule)
+
+  if isBeforeLibrary {
+    // Correct behavior when using a module compiled by Swift 5.1+
+  }
+  else {
+    // Incorrect behavior when using a module compiled by Swift 5.0
+//    expectNotEqual(fromModule, formedLocally)
+//    expectNotEqual(otherFromModule, otherFormedLocally)
+  }
+}
+%end
+#endif
 
 runAllTests()

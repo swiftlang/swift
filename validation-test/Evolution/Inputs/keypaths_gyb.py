@@ -8,6 +8,7 @@
 # - "before" definition
 # - "after" definition
 # - whether the "after" definition adds API
+# - Suffix added to type name (usually "" or ".Type")
 #
 # The definition strings are formatted with the following substitutions:
 # - {name}: property name
@@ -30,6 +31,7 @@ testCases = [
           }}
         """,
         DoesntAddAPI,
+        "",
     ),
     (
         "addsPublicSetter",
@@ -44,6 +46,7 @@ testCases = [
           }}
         """,
         AddsAPI,
+        "",
     ),
     (
         "makesPrivateSetterPublic",
@@ -61,6 +64,7 @@ testCases = [
           }}
         """,
         AddsAPI,
+        "",
     ),
     (
         "dropsPrivateSetter",
@@ -77,6 +81,7 @@ testCases = [
           }}
         """,
         DoesntAddAPI,
+        "",
     ),
     (
         "makesPrivateSetterNonmutating",
@@ -94,6 +99,7 @@ testCases = [
           }}
         """,
         DoesntAddAPI,
+        "",
     ),
     (
         "makesPrivateSetterMutating",
@@ -111,6 +117,7 @@ testCases = [
           }}
         """,
         DoesntAddAPI,
+        "",
     ),
     (
         "addsPrivateNonmutatingSetter",
@@ -125,6 +132,7 @@ testCases = [
           }}
         """,
         DoesntAddAPI,
+        "",
     ),
     (
         "addsPublicNonmutatingSetter",
@@ -139,6 +147,7 @@ testCases = [
         }}
         """,
         AddsAPI,
+        "",
     ),
     (
         "makesPrivateNonmutatingSetterPublic",
@@ -156,6 +165,7 @@ testCases = [
           }}
         """,
         AddsAPI,
+        "",
     ),
     (
         "makesPrivateNonmutatingSetterPublicMutating",
@@ -173,6 +183,7 @@ testCases = [
           }}
         """,
         AddsAPI,
+        "",
     ),
     (
         "makesPrivateMutatingSetterPublicNonmutating",
@@ -190,6 +201,7 @@ testCases = [
           }}
         """,
         AddsAPI,
+        "",
     ),
     (
         "storedToComputed",
@@ -204,6 +216,7 @@ testCases = [
           }}
         """,
         DoesntAddAPI,
+        "",
     ),
     (
         "computedToStored",
@@ -218,6 +231,7 @@ testCases = [
           public var {name}: Int = 0
         """,
         DoesntAddAPI,
+        "",
     ),
     (
         "storedToComputedPrivateSet",
@@ -232,6 +246,7 @@ testCases = [
           }}
         """,
         DoesntAddAPI,
+        "",
     ),
     (
         "storedToComputedDroppingPrivateSet",
@@ -245,6 +260,7 @@ testCases = [
           }}
         """,
         DoesntAddAPI,
+        "",
     ),
     (
         "getOnlyComputedToSettableStored",
@@ -258,6 +274,7 @@ testCases = [
           public var {name}: Int = 0
         """,
         AddsAPI,
+        "",
     ),
     (
         "getOnlyComputedToPrivateSettableStored",
@@ -271,6 +288,7 @@ testCases = [
           public private(set) var {name}: Int = 0
         """,
         DoesntAddAPI,
+        "",
     ),
     (
         "storedMakesPrivateSetPublic",
@@ -282,6 +300,46 @@ testCases = [
           public var {name}: Int = 0
         """,
         AddsAPI,
+        "",
+    ),
+    # In the staticBackDeploy test, the "after" case simulates Swift 5.0, which
+    # did not support static key paths and did not emit property descriptors
+    # for them; the "before" case simulates Swift 5.1, which does support static
+    # key paths and does emit property descriptors for them. A Swift 5.1 client
+    # can form key paths to static properties in a Swift 5.0 library, but
+    # Equatable will return incorrect results.
+    # (I'm not sure why the before and after cases need to be backwards, but
+    # they do.)
+    (
+        "staticBackDeploy",
+        "nonmutating",
+        """
+          public static var {name}: Int {{
+            @_semantics("keypath.no_property_descriptor")
+            get {{ return 0 }}
+          }}
+          
+          // Second property used only in staticBackDeployEquality test
+          public static var {name}Other: Int {{
+            @_semantics("keypath.no_property_descriptor")
+            get {{ return 0 }}
+          }}
+          public static var keyPath_{name}Other: PartialKeyPath<{type}.Type> {{
+            return \.{name}Other
+          }}
+        """,
+        """
+          public static let {name}: Int = 0
+          
+          // Second property used only in staticBackDeployEquality test
+          public static let {name}Other: Int = 0
+          
+          public static var keyPath_{name}Other: PartialKeyPath<{type}.Type> {{
+            return \.{name}Other
+          }}
+        """,
+        AddsAPI,      # Because Swift 5.0 doesn't support static keypaths
+        ".Type",
     ),
     # TODO: Turning computed gets into lets without annotation drops method
     # dispatch thunks and other ABI artifacts currently.

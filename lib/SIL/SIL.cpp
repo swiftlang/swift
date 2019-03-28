@@ -200,7 +200,7 @@ bool SILModule::isTypeABIAccessible(SILType type,
   return isTypeMetadataForLayoutAccessible(*this, type);
 }
 
-bool AbstractStorageDecl::exportsPropertyDescriptor() const {
+bool AbstractStorageDecl::exportsPropertyDescriptor(bool forLinking) const {
   // The storage needs a descriptor if it sits at a module's ABI boundary,
   // meaning it has public linkage.
   
@@ -229,6 +229,14 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
 
   // TODO: If previous versions of an ABI-stable binary needed the descriptor,
   // then we still do.
+
+  // Use @_semantic("keypath.no_property_descriptor") to test interoperation
+  // with older Swift versions which didn't emit property descriptors for some
+  // members. We still allow weak linking against the descriptor.
+  if (!forLinking)
+    for (auto *attr : getGetter()->getAttrs().getAttributes<SemanticsAttr>())
+      if (attr->Value == "keypath.no_property_descriptor")
+        return false;
 
   // Check the linkage of the declaration.
   auto getter = SILDeclRef(getGetter());
