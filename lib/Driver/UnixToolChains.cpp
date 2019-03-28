@@ -278,6 +278,12 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   if (job.getKind() == LinkKind::Executable && context.OI.SelectedSanitizers) {
     Arguments.push_back(context.Args.MakeArgString(
         "-fsanitize=" + getSanitizerList(context.OI.SelectedSanitizers)));
+
+    // The TSan runtime depends on the blocks runtime and libdispatch.
+    if (context.OI.SelectedSanitizers & SanitizerKind::Thread) {
+      Arguments.push_back("-lBlocksRuntime");
+      Arguments.push_back("-ldispatch");
+    }
   }
 
   if (context.Args.hasArg(options::OPT_profile_generate)) {
