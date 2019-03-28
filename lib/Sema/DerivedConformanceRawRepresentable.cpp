@@ -501,6 +501,11 @@ static bool canSynthesizeRawRepresentable(DerivedConformance &derived) {
   // - the enum elements all have the same type
   // - they all match the enum type
   for (auto elt : enumDecl->getAllElements()) {
+    // We cannot synthesize raw representable conformance for an enum with
+    // cases that have a payload.
+    if (elt->hasAssociatedValues())
+      return false;
+
     tc.validateDecl(elt);
     if (elt->isInvalid()) {
       return false;
