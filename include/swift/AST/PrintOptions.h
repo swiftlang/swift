@@ -135,6 +135,9 @@ struct PrintOptions {
   /// Whether to print *any* accessors on properties.
   bool PrintPropertyAccessors = true;
 
+  /// Whether to print *any* accessors on subscript.
+  bool PrintSubscriptAccessors = true;
+
   /// Whether to print the accessors of a property abstractly,
   /// i.e. always as:
   /// ```
