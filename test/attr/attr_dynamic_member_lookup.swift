@@ -402,7 +402,7 @@ _ = \KP.testLookup
 
 struct Point {
   var x: Int
-  let y: Int
+  let y: Int // expected-note 2 {{change 'let' to 'var' to make it mutable}}
 
   private let z: Int = 0 // expected-note 7 {{declared here}}
 }
@@ -447,7 +447,7 @@ _ = lens.bottomRight.z // expected-error {{'z' is inaccessible due to 'private' 
 
 lens.topLeft = Lens(Point(x: 1, y: 2)) // Ok
 lens.bottomRight.x = Lens(11)          // Ok
-lens.bottomRight.y = Lens(12)          // expected-error {{cannot assign through dynamic lookup property: 'lens' is immutable}}
+lens.bottomRight.y = Lens(12)          // expected-error {{cannot assign to property: 'y' is a 'let' constant}}
 lens.bottomRight.z = Lens(13)          // expected-error {{'z' is inaccessible due to 'private' protection level}}
 
 func acceptKeyPathDynamicLookup(_: Lens<Int>) {}
@@ -576,7 +576,7 @@ func keypath_with_subscripts(_ arr: SubscriptLens<[Int]>,
   _ = arr["hello"]  // Ok
   _ = dict["hello"] // Ok
 
-  _ = arr["hello"] = 42 // expected-error {{cannot assign through subscript: subscript is get-only}}
+  _ = arr["hello"] = 42 // expected-error {{cannot assign through subscript: 'arr' is a 'let' constant}}
   _ = dict["hello"] = 0 // Ok
 
   _ = arr[0] = 42 // expected-error {{cannot assign through subscript: 'arr' is a 'let' constant}}
@@ -620,6 +620,6 @@ func keypath_to_subscript_to_property(_ lens: inout Lens<Array<Rectangle>>) {
   _ = lens[0].topLeft.x
   _ = lens[0].topLeft.y
   _ = lens[0].topLeft.x = Lens(0)
-  _ = lens[0].topLeft.y = Lens(1) // FIXME(diagnostics): Diagnostic should point to 'y' instead of 'lens'
-  // expected-error@-1 {{cannot assign through dynamic lookup property: 'lens' is immutable}}
+  _ = lens[0].topLeft.y = Lens(1)
+  // expected-error@-1 {{cannot assign to property: 'y' is a 'let' constant}}
 }
