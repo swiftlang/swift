@@ -3663,6 +3663,9 @@ RValue RValueEmitter::visitArrayExpr(ArrayExpr *E, SGFContext C) {
       emitBeginVarargs(SGF, loc, elementType, arrayTy,
                        E->getNumElements(), {});
 
+  // Cleanups for any elements that have been initialized so far.
+  SmallVector<CleanupHandle, 8> cleanups;
+
   for (unsigned index : range(E->getNumElements())) {
     auto destAddr = varargsInfo.getBaseAddress();
     if (index != 0) {
@@ -3671,13 +3674,26 @@ RValue RValueEmitter::visitArrayExpr(ArrayExpr *E, SGFContext C) {
       destAddr = SGF.B.createIndexAddr(loc, destAddr, indexValue);
     }
     auto &destTL = varargsInfo.getBaseTypeLowering();
-    // Use an invalid cleanup here because we're relying on the cleanup for
-    // the Array constructed inside emitBeginVarargs to destroy these values.
-    TemporaryInitialization init(destAddr, CleanupHandle::invalid());
+    // Create a dormant cleanup for the value in case we exit before the
+    // full array has been constructed.
+
+    CleanupHandle destCleanup = CleanupHandle::invalid();
+    if (!destTL.isTrivial()) {
+      destCleanup = SGF.enterDestroyCleanup(destAddr);
+      SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dormant);
+      cleanups.push_back(destCleanup);
+    }
+
+    TemporaryInitialization init(destAddr, destCleanup);
+
     ArgumentSource(E->getElements()[index])
         .forwardInto(SGF, varargsInfo.getBaseAbstractionPattern(), &init,
                      destTL);
   }
+
+  // Kill the per-element cleanups. The array will take ownership of them.
+  for (auto destCleanup : cleanups)
+    SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dead);
 
   RValue arg(SGF, loc, arrayTy,
              emitEndVarargs(SGF, loc, std::move(varargsInfo)));

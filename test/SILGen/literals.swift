@@ -248,6 +248,7 @@ func makeBasic<T : FooProtocol>() -> T { return T() }
 // CHECK: return [[ARR]]
 
 // CHECK: bb2([[ERR:%.*]] : @owned $Error):
+// CHECK: destroy_addr [[POINTER]] : $*T
 // CHECK: [[DEALLOC:%.*]] = function_ref @$ss29_deallocateUninitializedArrayyySayxGnlF
 // CHECK: [[TMP:%.*]] = apply [[DEALLOC]]<T>([[ARR]])
 // CHECK: throw [[ERR]] : $Error
