@@ -4021,7 +4021,7 @@ public:
 /// Opaque value expressions occur when a particular value within the AST
 /// needs to be re-used without being re-evaluated or for a value that is
 /// a placeholder. OpaqueValueExpr nodes are introduced by some other AST
-/// node (say, a \c DynamicMemberRefExpr) and can only be used within the
+/// node (say, an \c OpenExistentialExpr) and can only be used within the
 /// subexpressions of that AST node.
 class OpaqueValueExpr : public Expr {
   SourceLoc Loc;
@@ -4034,6 +4034,82 @@ public:
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::OpaqueValue; 
+  }
+};
+
+/// An expression referring to a default argument left unspecified at the
+/// call site.
+///
+/// A DefaultArgumentExpr must only appear as a direct child of a
+/// ParenExpr or a TupleExpr that is itself a call argument.
+class DefaultArgumentExpr final : public Expr {
+  /// The owning declaration.
+  ConcreteDeclRef DefaultArgsOwner;
+
+  /// The caller parameter index.
+  unsigned ParamIndex;
+
+  /// The source location of the argument list.
+  SourceLoc Loc;
+
+public:
+  explicit DefaultArgumentExpr(ConcreteDeclRef defaultArgsOwner, unsigned paramIndex,
+                               SourceLoc loc, Type Ty)
+    : Expr(ExprKind::DefaultArgument, /*Implicit=*/true, Ty),
+      DefaultArgsOwner(defaultArgsOwner), ParamIndex(paramIndex), Loc(loc) { }
+
+  SourceRange getSourceRange() const {
+    return Loc;
+  }
+
+  ConcreteDeclRef getDefaultArgsOwner() const {
+    return DefaultArgsOwner;
+  }
+
+  unsigned getParamIndex() const {
+    return ParamIndex;
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::DefaultArgument;
+  }
+};
+
+/// An expression referring to a caller-side default argument left unspecified
+/// at the call site.
+///
+/// A CallerDefaultArgumentExpr must only appear as a direct child of a
+/// ParenExpr or a TupleExpr that is itself a call argument.
+///
+/// FIXME: This only exists to distinguish caller default arguments from arguments
+/// that were specified at the call site. Once we remove SanitizeExpr, we can remove
+/// this hack too.
+class CallerDefaultArgumentExpr final : public Expr {
+  /// The expression that is evaluated to produce the default argument value.
+  Expr *SubExpr;
+
+  /// The source location of the argument list.
+  SourceLoc Loc;
+
+public:
+  explicit CallerDefaultArgumentExpr(Expr *subExpr, SourceLoc loc, Type Ty)
+    : Expr(ExprKind::CallerDefaultArgument, /*Implicit=*/true, Ty),
+      SubExpr(subExpr), Loc(loc) { }
+
+  SourceRange getSourceRange() const {
+    return Loc;
+  }
+
+  Expr *getSubExpr() const {
+    return SubExpr;
+  }
+
+  void setSubExpr(Expr *subExpr) {
+    SubExpr = subExpr;
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::CallerDefaultArgument;
   }
 };
 
@@ -4112,7 +4188,7 @@ public:
            E->getKind() <= ExprKind::Last_ApplyExpr;
   }
 };
-  
+
 /// CallExpr - Application of an argument to a function, which occurs
 /// syntactically through juxtaposition with a TupleExpr whose
 /// leading '(' is unspaced.

@@ -679,6 +679,12 @@ private:
   Classification classifyRethrowsArgument(Expr *arg, Type paramType) {
     arg = arg->getValueProvidingExpr();
 
+    if (isa<DefaultArgumentExpr>(arg) ||
+        isa<CallerDefaultArgumentExpr>(arg)) {
+      return classifyArgumentByType(arg->getType(),
+                                    PotentialReason::forDefaultArgument());
+    }
+
     // If this argument is `nil` literal or `.none`,
     // it doesn't cause the call to throw.
     if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(arg)) {

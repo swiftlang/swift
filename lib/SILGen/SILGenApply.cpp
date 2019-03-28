@@ -2715,6 +2715,26 @@ public:
 
   // origParamType is a parameter type.
   void emitSingleArg(ArgumentSource &&arg, AbstractionPattern origParamType) {
+    // If this is default argument, prepare to emit the default argument
+    // generator later.
+    if (arg.isDefaultArg()) {
+      auto substParamType = arg.getSubstRValueType();
+      auto defArg = std::move(arg).asKnownDefaultArg();
+
+      auto numParams = getFlattenedValueCount(origParamType,
+                                              substParamType,
+                                              ImportAsMemberStatus());
+      DelayedArguments.emplace_back(defArg,
+                                    defArg->getDefaultArgsOwner(),
+                                    defArg->getParamIndex(),
+                                    substParamType, origParamType,
+                                    claimNextParameters(numParams),
+                                    Rep);
+      Args.push_back(ManagedValue());
+
+      maybeEmitForeignErrorArgument();
+      return;
+    }
     emit(std::move(arg), origParamType);
     maybeEmitForeignErrorArgument();
   }

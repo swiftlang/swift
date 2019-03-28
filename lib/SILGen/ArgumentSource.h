@@ -172,6 +172,25 @@ public:
   bool isRValue() const & { return StoredKind == Kind::RValue; }
   bool isLValue() const & { return StoredKind == Kind::LValue; }
 
+  bool isDefaultArg() const {
+    switch (StoredKind) {
+    case Kind::Invalid:
+      llvm_unreachable("argument source is invalid");
+    case Kind::RValue:
+    case Kind::LValue:
+      return false;
+    case Kind::Expr:
+      return isa<DefaultArgumentExpr>(asKnownExpr());
+    }
+    llvm_unreachable("bad kind");
+  }
+
+  /// Return the default argument owner and parameter index, consuming
+  /// the argument source. Will assert if this is not a default argument.
+  DefaultArgumentExpr *asKnownDefaultArg() && {
+    return cast<DefaultArgumentExpr>(std::move(*this).asKnownExpr());
+  }
+
   /// Given that this source is storing an RValue, extract and clear
   /// that value.
   RValue &&asKnownRValue(SILGenFunction &SGF) && {
