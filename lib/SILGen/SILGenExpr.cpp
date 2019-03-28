@@ -1916,19 +1916,10 @@ RValue RValueEmitter::visitCoerceExpr(CoerceExpr *E, SGFContext C) {
 
 VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &SGF, SILLocation loc,
                                        CanType baseTy, CanType arrayTy,
-                                       unsigned numElements,
-                                       ArrayRef<unsigned> expansionIndices) {
+                                       unsigned numElements) {
   // Reabstract the base type against the array element type.
   auto baseAbstraction = AbstractionPattern::getOpaque();
   auto &baseTL = SGF.getTypeLowering(baseAbstraction, baseTy);
-
-  if (!expansionIndices.empty()) {
-    // An assertion is okay here for now because this is only in generated code.
-    assert(numElements == 1 &&
-           "expansion that is not the only variadic argument is unsupported");
-    return VarargsInfo(ManagedValue(), CleanupHandle::invalid(), SILValue(),
-                       baseTL, baseAbstraction, /*expansion peephole*/ true);
-  }
 
   // Allocate the array.
   SILValue numEltsVal = SGF.B.createIntegerLiteral(loc,
@@ -1955,18 +1946,11 @@ VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &SGF, SILLocation loc,
     /*isStrict*/ true,
     /*isInvariant*/ false);
 
-  return VarargsInfo(array, abortCleanup, basePtr, baseTL, baseAbstraction,
-                     /*expansion peephole*/ false);
+  return VarargsInfo(array, abortCleanup, basePtr, baseTL, baseAbstraction);
 }
 
 ManagedValue Lowering::emitEndVarargs(SILGenFunction &SGF, SILLocation loc,
                                       VarargsInfo &&varargs) {
-  if (varargs.isExpansionPeephole()) {
-    auto result = varargs.getArray();
-    assert(result);
-    return result;
-  }
-
   // Kill the abort cleanup.
   SGF.Cleanups.setCleanupState(varargs.getAbortCleanup(), CleanupState::Dead);
 
@@ -3610,7 +3594,7 @@ RValue RValueEmitter::visitArrayExpr(ArrayExpr *E, SGFContext C) {
   CanType arrayTy = ArraySliceType::get(elementType)->getCanonicalType();
   VarargsInfo varargsInfo =
       emitBeginVarargs(SGF, loc, elementType, arrayTy,
-                       E->getNumElements(), {});
+                       E->getNumElements());
 
   // Cleanups for any elements that have been initialized so far.
   SmallVector<CleanupHandle, 8> cleanups;
