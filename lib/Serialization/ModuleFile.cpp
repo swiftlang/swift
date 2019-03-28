@@ -1460,7 +1460,8 @@ ModuleFile::ModuleFile(
 }
 
 Status ModuleFile::associateWithFileContext(FileUnit *file,
-                                            SourceLoc diagLoc) {
+                                            SourceLoc diagLoc,
+                                            bool treatAsPartialModule) {
   PrettyStackTraceModuleFile stackEntry(*this);
 
   assert(getStatus() == Status::Valid && "invalid module file");
@@ -1513,7 +1514,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       continue;
     }
 
-    if (dependency.isImplementationOnly())
+    if (dependency.isImplementationOnly() && !treatAsPartialModule)
       continue;
 
     StringRef modulePathStr = dependency.RawPath;

@@ -659,11 +659,26 @@ public:
   // Out of line to avoid instantiation OnDiskChainedHashTable here.
   ~ModuleFile();
 
-  /// Associates this module file with an AST module.
+  /// Associates this module file with the AST node representing it.
   ///
-  /// Returns any error that occurred during association, including validation
-  /// that the module file is compatible with the module it's being loaded as.
-  Status associateWithFileContext(FileUnit *file, SourceLoc diagLoc);
+  /// Checks that the file is compatible with the AST module it's being loaded
+  /// into, loads any dependencies needed to understand the module, and updates
+  /// the ASTContext and ClangImporter with search paths and other information
+  /// from the module.
+  ///
+  /// \param file The FileUnit that represents this file's place in the AST.
+  /// \param diagLoc A location used for diagnostics that occur during loading.
+  /// This does not include diagnostics about \e this file failing to load,
+  /// but rather other things that might be imported as part of bringing the
+  /// file into the AST.
+  /// \param treatAsPartialModule If true, processes implementation-only
+  /// information instead of assuming the client won't need it and shouldn't
+  /// see it.
+  ///
+  /// \returns any error that occurred during association, such as being
+  /// compiled for a different OS.
+  Status associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
+                                  bool treatAsPartialModule);
 
   /// Checks whether this module can be used.
   Status getStatus() const {

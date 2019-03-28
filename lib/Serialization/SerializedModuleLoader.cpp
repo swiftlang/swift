@@ -366,7 +366,7 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
     ModuleDecl &M, Optional<SourceLoc> diagLoc,
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
-    bool isFramework) {
+    bool isFramework, bool treatAsPartialModule) {
   assert(moduleInputBuffer);
 
   StringRef moduleBufferID = moduleInputBuffer->getBufferIdentifier();
@@ -402,7 +402,8 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
 
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
     loadInfo.status =
-        loadedModuleFile->associateWithFileContext(fileUnit, diagLocOrInvalid);
+        loadedModuleFile->associateWithFileContext(fileUnit, diagLocOrInvalid,
+                                                   treatAsPartialModule);
     if (loadInfo.status == serialization::Status::Valid) {
       Ctx.bumpGeneration();
       LoadedModuleFiles.emplace_back(std::move(loadedModuleFile),
@@ -656,7 +657,8 @@ ModuleDecl *SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
   SWIFT_DEFER { M->setHasResolvedImports(); };
 
   if (!loadAST(*M, moduleID.second, std::move(moduleInputBuffer),
-               std::move(moduleDocInputBuffer), isFramework)) {
+               std::move(moduleDocInputBuffer), isFramework,
+               /*treatAsPartialModule*/false)) {
     M->setFailedToLoad();
   }
 
