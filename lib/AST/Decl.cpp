@@ -2226,12 +2226,7 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
                                      bool isMethod,
                                      bool isInitializer,
                                      unsigned curryLevels) {
-  if (auto errorType = type->getAs<ErrorType>()) {
-    if (auto originalType = errorType->getOriginalType()) {
-      return ErrorType::get(mapSignatureFunctionType(
-        ctx, originalType, topLevelFunction, isMethod, isInitializer,
-        curryLevels));
-    }
+  if (type->hasError()) {
     return type;
   }
 
