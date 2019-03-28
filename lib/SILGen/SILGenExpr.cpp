@@ -3656,13 +3656,11 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
 RValue RValueEmitter::visitArrayExpr(ArrayExpr *E, SGFContext C) {
   auto loc = SILLocation(E);
   ArgumentScope scope(SGF, loc);
-  auto init = E->getInitializer();
-  auto *decl = dyn_cast<AbstractFunctionDecl>(init.getDecl());
-  Type elementType = E->getElementType();
-  ArrayRef<Identifier> argLabels = decl->getFullName().getArgumentNames();
+
+  CanType elementType = E->getElementType()->getCanonicalType();
   CanType arrayTy = ArraySliceType::get(elementType)->getCanonicalType();
   VarargsInfo varargsInfo =
-      emitBeginVarargs(SGF, loc, elementType->getCanonicalType(), arrayTy,
+      emitBeginVarargs(SGF, loc, elementType, arrayTy,
                        E->getNumElements(), {});
 
   for (unsigned index : range(E->getNumElements())) {
@@ -3686,17 +3684,9 @@ RValue RValueEmitter::visitArrayExpr(ArrayExpr *E, SGFContext C) {
 
   arg = scope.popPreservingValue(std::move(arg));
 
-  // Add an argument label for init(arrayLiteral: T...) as the above tuple is of
-  // the form (T...) with no label.
-  assert(argLabels.size() == 1 && !argLabels[0].empty() &&
-         !isa<TupleType>(arg.getType()));
-  Type newType = TupleType::get({TupleTypeElt(arg.getType(), argLabels[0])},
-                                SGF.getASTContext());
-  arg.rewriteType(newType->getCanonicalType());
-
   // Call the builtin initializer.
   return SGF.emitApplyAllocatingInitializer(
-      loc, init, std::move(arg), E->getType(), C);
+      loc, E->getInitializer(), std::move(arg), E->getType(), C);
 }
 
 RValue RValueEmitter::visitDictionaryExpr(DictionaryExpr *E, SGFContext C) {
