@@ -401,7 +401,7 @@ static void deriveBodyAdditiveArithmetic_zero(AbstractFunctionDecl *funcDecl) {
     memberZeroExprs.push_back(createMemberZeroExpr(member));
     memberNames.push_back(member->getName());
   }
-  // Call memberwise initialier with member zero expressions.
+  // Call memberwise initializer with member zero expressions.
   auto *callExpr =
       CallExpr::createImplicit(C, initExpr, memberZeroExprs, memberNames);
   ASTNode returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr, true);

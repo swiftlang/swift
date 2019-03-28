@@ -67,6 +67,14 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
     return canDeriveKeyPathIterable(Nominal);
 
   // SWIFT_ENABLE_TENSORFLOW
+  if (*knownProtocol == KnownProtocolKind::TensorArrayProtocol)
+    return canDeriveTensorArrayProtocol(Nominal, DC);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  if (*knownProtocol == KnownProtocolKind::TensorGroup)
+    return canDeriveTensorGroup(Nominal, DC);
+  
+  // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::AdditiveArithmetic)
     return canDeriveAdditiveArithmetic(Nominal, DC);
 
@@ -219,6 +227,16 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       return getRequirement(KnownProtocolKind::KeyPathIterable);
 
     // SWIFT_ENABLE_TENSORFLOW
+    // TensorArrayProtocol._tensorHandleCount
+    if (name.isSimpleName(ctx.Id_tensorHandleCount))
+      return getRequirement(KnownProtocolKind::TensorArrayProtocol);
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // TensorGroup._typeList
+    if (name.isSimpleName(ctx.Id_typeList))
+      return getRequirement(KnownProtocolKind::TensorGroup);
+
+    // SWIFT_ENABLE_TENSORFLOW
     // Differentiable.allDifferentiableVariables
     if (name.isSimpleName(ctx.Id_allDifferentiableVariables))
       return getRequirement(KnownProtocolKind::__Differentiable);
@@ -265,6 +283,17 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     }
 
     // SWIFT_ENABLE_TENSORFLOW
+    // TensorArrayProtocol._unpackTensorHandles(into:)
+    if (name.isCompoundName() && 
+        name.getBaseName() == ctx.Id_unpackTensorHandles) {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 1 &&
+          argumentNames[0] == ctx.getIdentifier("into")) {
+        return getRequirement(KnownProtocolKind::TensorArrayProtocol);
+      }
+    }
+
+    // SWIFT_ENABLE_TENSORFLOW
     // Differentiable.moved(along:)
     if (name.isCompoundName() &&
         name.getBaseName() == ctx.Id_moved) {
@@ -305,6 +334,12 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       // Decodable.init(from: Decoder)
       if (argumentNames[0] == ctx.Id_from)
         return getRequirement(KnownProtocolKind::Decodable);
+
+      // SWIFT_ENABLE_TENSORFLOW
+      // TensorGroup.init(_owning:)
+      if (argumentNames[0] == ctx.getIdentifier("_owning")) {
+        return getRequirement(KnownProtocolKind::TensorGroup);
+      }
     }
 
     return nullptr;

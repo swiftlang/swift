@@ -337,24 +337,22 @@ public extension Tensor {
 }
 
 public extension Tensor {
-  /// Creates a tensor with the specified shape and a single, repeated value.
+  /// Creates a tensor with the specified shape and a single, repeated scalar value.
   ///
   /// - Parameters:
   ///   - shape: The dimensions of the tensor.
   ///   - repeatedValue: The scalar value to repeat.
-  ///
   @inlinable @inline(__always)
   @available(*, deprecated, renamed: "init(repeating:shape:)")
   init(shape: TensorShape, repeating repeatedValue: Scalar) {
     self.init(repeating: repeatedValue, shape: shape)
   }
 
-  /// Creates a tensor with the specified shape and a single, repeated value.
+  /// Creates a tensor with the specified shape and a single, repeated scalar value.
   ///
   /// - Parameters:
-  ///   - shape: The dimensions of the tensor.
   ///   - repeatedValue: The scalar value to repeat.
-  ///
+  ///   - shape: The dimensions of the tensor.
   @inlinable @inline(__always)
   @differentiable(vjp: _vjpInit(repeating:shape:)
                   where Scalar : TensorFlowFloatingPoint)
@@ -683,12 +681,14 @@ public extension Tensor {
   /// Return a copy of the tensor collapsed into a 1-D `Tensor`, in row-major
   /// order.
   @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func flattened() -> Tensor {
     return reshaped(to: [-1])
   }
 
   /// Returns a rank-lifted `Tensor` with a leading dimension of 1.
   @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func rankLifted() -> Tensor {
     return expandingShape(at: 0)
   }
@@ -707,10 +707,21 @@ public extension Tensor {
   /// Remove the specified dimensions of size 1 from the shape of a tensor. If
   /// no dimensions are specified, then all dimensions of size 1 will be
   /// removed.
-  // FIXME: The gradient for variadic `squeezed` is difficult to express because
-  // ExpandDims only expands one axis at a time.
   @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func squeezingShape(at axes: Int32...) -> Tensor {
+    return squeezingShape(at: axes)
+  }
+
+  /// Remove the specified dimensions of size 1 from the shape of a tensor. If
+  /// no dimensions are specified, then all dimensions of size 1 will be
+  /// removed.
+  @inlinable @inline(__always)
+  @differentiable(
+    wrt: self, vjp: _vjpSqueezingShape(at:)
+    where Scalar : TensorFlowFloatingPoint
+  )
+  func squeezingShape(at axes: [Int32]) -> Tensor {
     return Raw.squeeze(self, squeezeDims: axes)
   }
 

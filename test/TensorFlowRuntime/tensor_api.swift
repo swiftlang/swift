@@ -11,7 +11,11 @@
 // resolved, API tests that incur send/receive should reside here.“
 
 import TensorFlow
+#if TPU
+import TensorFlowUnittestTPU
+#else
 import TensorFlowUnittest
+#endif
 import StdlibUnittest
 
 var TensorNonTPUTests = TestSuite("TensorNonTPU")
@@ -29,18 +33,18 @@ TensorNonTPUTests.testAllBackends("SliceUpdate") {
                           scalars: [true, false, true, false, false, false]),
               t3.array)
   var t4 = Tensor<Bool>([[true, true, true], [false, false, false]])
-  t4[0] = Tensor(shape: [3], repeating: false)
-  expectEqual(ShapedArray(shape:[2, 3], repeating: false), t4.array)
+  t4[0] = Tensor(repeating: false, shape: [3])
+  expectEqual(ShapedArray(repeating: false, shape: [2, 3]), t4.array)
 }
 
 TensorNonTPUTests.testAllBackends("BroadcastTensor") {
   // 1 -> 2 x 3 x 4
   let one = Tensor<Float>(1)
-  var target = Tensor<Float>(shape: [2, 3, 4], repeating: 0.0)
+  var target = Tensor<Float>(repeating: 0.0, shape: [2, 3, 4])
   let broadcasted = one.broadcast(like: target)
-  expectEqual(Tensor(shape: [2, 3, 4], repeating: 1), broadcasted)
-  target .= Tensor(shape: [1, 3, 1], repeating: 1)
-  expectEqual(Tensor(shape: [2, 3, 4], repeating: 1), target)
+  expectEqual(Tensor(repeating: 1, shape: [2, 3, 4]), broadcasted)
+  target .= Tensor(repeating: 1, shape: [1, 3, 1])
+  expectEqual(Tensor(repeating: 1, shape: [2, 3, 4]), target)
 }
 
 runAllTests()

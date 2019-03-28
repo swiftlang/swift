@@ -47,6 +47,9 @@ ATTRIBUTE_NODES = [
                        # SWIFT_ENABLE_TENSORFLOW
                        Child('DifferentiableArguments',
                              kind='DifferentiableAttributeArguments'),
+                       # SWIFT_ENABLE_TENSORFLOW
+                       Child('DifferentiatingArguments',
+                             kind='DifferentiatingAttributeArguments'),
                        Child('NamedAttributeString',
                              kind='NamedAttributeStringArgument'),
                    ], description='''
@@ -168,7 +171,7 @@ ATTRIBUTE_NODES = [
     # SWIFT_ENABLE_TENSORFLOW
     # The argument of '@differentiable(...)'.
     # differentiable-attr-arguments ->
-    #     differentiable-attr-parameters?
+    #     differentiation-params-clause? ','?
     #     differentiable-attr-func-specifier? # primal
     #     differentiable-attr-func-specifier? # adjoint
     #     differentiable-attr-func-specifier? # jvp
@@ -185,8 +188,12 @@ ATTRIBUTE_NODES = [
          differentiation parameter list and associated functions.
          ''',
          children=[
-             Child('DiffParams', kind='DifferentiableAttributeDiffParamsClause',
+             Child('DiffParams', kind='DifferentiationParamsClause',
                    is_optional=True),
+             Child('DiffParamsComma', kind='CommaToken', description='''
+                   The comma following the differentiation parameters clause,
+                   if it exists.
+                   ''', is_optional=True),
              Child('MaybePrimal', kind='DifferentiableAttributeFuncSpecifier',
                    is_optional=True),
              Child('MaybeAdjoint', kind='DifferentiableAttributeFuncSpecifier',
@@ -198,13 +205,10 @@ ATTRIBUTE_NODES = [
              Child('WhereClause', kind='GenericWhereClause', is_optional=True),
          ]),
 
-    # differentiable-attr-parameters-clause ->
-    #     'wrt' ':'
-    #     (differentiable-attr-diff-params | differentiable-attr-diff-param)
-    #     ','?
-    Node('DifferentiableAttributeDiffParamsClause', kind='Syntax',
-         description='The clause containing the differentiation parameters.',
-         traits=['WithTrailingComma'],
+    # differentiation-params-clause ->
+    #     'wrt' ':' (differentiation-param | differentiation-params)
+    Node('DifferentiationParamsClause', kind='Syntax',
+         description='A clause containing differentiation parameters.',
          children=[
              Child('WrtLabel', kind='IdentifierToken',
                    text_choices=['wrt'], description='The "wrt" label.'),
@@ -213,33 +217,28 @@ ATTRIBUTE_NODES = [
                    '''),
              Child('Parameters', kind='Syntax',
                    node_choices=[
-                       Child('Parameter',
-                             kind='DifferentiableAttributeDiffParam'),
-                       Child('ParameterList',
-                             kind='DifferentiableAttributeDiffParams'),
+                       Child('Parameter', kind='DifferentiationParam'),
+                       Child('ParameterList', kind='DifferentiationParams'),
                    ]),
-             Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
 
-    # differentiable-attr-diff-params ->
-    #     '(' differentiable-attr-diff-param-list ')'
-    Node('DifferentiableAttributeDiffParams', kind='Syntax',
+    # differentiation-params -> '(' differentiation-param-list ')'
+    Node('DifferentiationParams', kind='Syntax',
          description='The differentiation parameters.',
          children=[
              Child('LeftParen', kind='LeftParenToken'),
-             Child('DiffParams', kind='DifferentiableAttributeDiffParamList',
+             Child('DiffParams', kind='DifferentiationParamList',
                    description='The parameters for differentiation.'),
              Child('RightParen', kind='RightParenToken'),
          ]),
 
-    # differentiable-attr-diff-param-list ->
-    #     differentiable-attr-diff-param differentiable-attr-diff-param-list?
-    Node('DifferentiableAttributeDiffParamList', kind='SyntaxCollection',
-         element='DifferentiableAttributeDiffParam'),
+    # differentiation-param-list ->
+    #     differentiation-param differentiation-param-list?
+    Node('DifferentiationParamList', kind='SyntaxCollection',
+         element='DifferentiationParam'),
 
-    # differentiable-attr-diff-param ->
-    #     ('self' | identifer) ','?
-    Node('DifferentiableAttributeDiffParam', kind='Syntax',
+    # differentiation-param -> ('self' | identifer) ','?
+    Node('DifferentiationParam', kind='Syntax',
          description='''
          A differentiation parameter: either the "self" identifier or a \
          function parameter name.
@@ -254,9 +253,8 @@ ATTRIBUTE_NODES = [
              Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
 
-    # differentiation-func-specifier ->
-    #     ('jvp' | 'vjp') ':' decl-name ','?
-    # decl-name -> (identifier | operator) decl-name-arguments?
+    # differentiable-attr-func-specifier ->
+    #     ('jvp' | 'vjp') ':' func-decl-name ','?
     Node('DifferentiableAttributeFuncSpecifier', kind='Syntax',
          description='''
          A function specifier, consisting of an identifier, colon, and a \
@@ -267,19 +265,48 @@ ATTRIBUTE_NODES = [
              Child('Label', kind='IdentifierToken',
                    text_choices=['jvp', 'vjp']),
              Child('Colon', kind='ColonToken'),
-             Child('DeclBaseName', kind='Syntax', description='''
+             Child('FunctionDeclName', kind='FunctionDeclName',
+                   description='The referenced function name.'),
+             Child('TrailingComma', kind='CommaToken', is_optional=True),
+         ]),
+
+    # func-decl-name -> (identifier | operator) decl-name-arguments?
+    # NOTE: This is duplicated with `DeclName` above. Change `DeclName`
+    # description and use it if possible.
+    Node('FunctionDeclName', kind='Syntax',
+         description='A function declaration name (e.g. `foo(_:_:)`).',
+         children=[
+             Child('Name', kind='Syntax', description='''
                    The base name of the referenced function.
                    ''',
                    node_choices=[
                        Child('Identifier', kind='IdentifierToken'),
-                       Child('Operator', kind='PrefixOperatorToken'),
+                       Child('PrefixOperator', kind='PrefixOperatorToken'),
+                       Child('SpacedBinaryOperator',
+                             kind='SpacedBinaryOperatorToken'),
                    ]),
-             Child('DeclNameArguments', kind='DeclNameArguments',
+             Child('Arguments', kind='DeclNameArguments',
                    is_optional=True, description='''
                    The argument labels of the referenced function, optionally \
                    specified.
                    '''),
-             Child('TrailingComma', kind='CommaToken', is_optional=True),
+         ]),
+
+    # SWIFT_ENABLE_TENSORFLOW
+    # The argument of '@differentiating(...)'.
+    # differentiating-attr-arguments ->
+    #     func-decl-name ','? differentiable-attr-parameters?
+    Node('DifferentiatingAttributeArguments', kind='Syntax',
+         description='''
+         The arguments for the `@differentiating` attribute: the original
+         function and an optional differentiation parameter list.
+         ''',
+         children=[
+             Child('Original', kind='FunctionDeclName',
+                   description='The referenced original function.'),
+             Child('Comma', kind='CommaToken', is_optional=True),
+             Child('DiffParams', kind='DifferentiationParamsClause',
+                   is_optional=True),
          ]),
 
     # objc-selector-piece -> identifier? ':'?

@@ -361,6 +361,14 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
 }
 
 @inlinable
+func _vjpAbs<T : TensorFlowFloatingPoint>(
+  _ x: Tensor<T>
+) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
+  let sign = Raw.sign(x)
+  return (abs(x), { v in v * sign })
+}
+
+@inlinable
 func _vjpLog<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
@@ -531,8 +539,16 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
     toShape newShape: Tensor<Int32>
   ) -> (Tensor, (Tensor) -> Tensor) {
     let value = reshaped(toShape: newShape)
-    return (value, { v in
-      return v.reshaped(toShape: self.shapeTensor)
+    return (value, { [shape = shapeTensor] v in
+      v.reshaped(toShape: shape)
+    })
+  }
+
+  @inlinable
+  func _vjpSqueezingShape(at axes: [Int32]) -> (Tensor, (Tensor) -> Tensor) {
+    let value = squeezingShape(at: axes)
+    return (value, { [shape = shapeTensor] v in
+      v.reshaped(toShape: shape)
     })
   }
 
@@ -542,7 +558,7 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
   ) -> (Tensor, (Tensor) -> Tensor) {
     let value = expandingShape(at: shapeIndex)
     return (value, { v in
-      return v.squeezingShape(at: shapeIndex)
+      v.squeezingShape(at: shapeIndex)
     })
   }
 }
@@ -555,7 +571,7 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
   @inlinable
   func _vjpMean() -> (Tensor, (Tensor) -> Tensor) {
     return (mean(), { [shape = shapeTensor, count = scalarCountTensor] in
-      $0.broadcast(toShape: shape) / Tensor(count)
+      ($0 / Tensor(count)).broadcast(toShape: shape)
     })
   }
 

@@ -49,7 +49,7 @@ struct SupervisedTrainer<Model : Layer> {
   var model: Model
   var lossFunction: @differentiable (Model.Output, Model.Output) -> Float
   func fit(y: Model.Output) {
-    // expected-warning @+1 {{result does not depend on differentiation arguments and will always have a zero derivative; do you want to add '.withoutDerivative()'?}} {{58-58=.withoutDerivative()}}
+    // expected-warning @+1 {{result does not depend on differentiation arguments and will always have a zero derivative; do you want to add '.withoutDerivative()'?}} {{64-64=.withoutDerivative()}}
     _ = gradient(at: Float(1)) { _ in return lossFunction(y, y) }
   }
 }

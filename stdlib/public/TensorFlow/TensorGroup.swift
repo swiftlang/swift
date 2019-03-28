@@ -40,9 +40,6 @@ public protocol TensorArrayProtocol {
 /// When a `TensorGroup` is returned as a result of a tensor operation, it is
 /// initialized with its tensor fields set to the tensor operation's tensor
 /// results.
-//
-// TODO: Implement `TensorGroup` derived conformances so that users don't have
-// to implement conformances themselves.
 public protocol TensorGroup : TensorArrayProtocol {
   /// The types of the tensor stored properties in this type.
   static var _typeList: [TensorDataType] { get }
@@ -210,6 +207,7 @@ extension Array : TensorArrayProtocol where Element : TensorArrayProtocol {
       ptr = ptr!.advanced(by: Int(elem._tensorHandleCount))
     }
   }
+
   public var _tensorHandleCount: Int32 {
     var count: Int32 = 0
     for elem in self { count += elem._tensorHandleCount }

@@ -7,7 +7,11 @@
 // This test suite contains expected failure tests for GPU execution.
 
 import TensorFlow
+#if TPU
+import TensorFlowUnittestTPU
+#else
 import TensorFlowUnittest
+#endif
 import StdlibUnittest
 
 var GPUNegativeTests = TestSuite("GPUNegative")

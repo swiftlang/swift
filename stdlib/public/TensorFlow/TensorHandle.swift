@@ -241,7 +241,7 @@ extension ResourceHandle : TensorSendableReceivable {
 
   // TODO: Remove this dummy `Scalar` typealias, currently required in order to
   // conform to `TensorSendableReceivable`.
-  typealias Scalar = Float
+  @usableFromInline typealias Scalar = Float
   @inlinable
   static func scalar(_ scalar: Scalar) -> ResourceHandle {
     fatalError("Unsupported")
@@ -294,7 +294,7 @@ extension VariantHandle : TensorSendableReceivable {
 
   // TODO: Remove this dummy `Scalar` typealias, currently required in order to
   // conform to `TensorSendableReceivable`.
-  typealias Scalar = Float
+  @usableFromInline typealias Scalar = Float
   @inlinable
   static func scalar(_ scalar: Scalar) -> VariantHandle {
     fatalError("Unsupported")
