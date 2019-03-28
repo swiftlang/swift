@@ -102,7 +102,7 @@ sil @$useMeta : $@convention(thin) <P> () -> ()
 // CHECK:   [[C:%.*]] = bitcast i8* %0 to %objc_class*
 // CHECK:   [[M:%.*]] = call %swift.type* @swift_getObjCClassMetadata(%objc_class* [[C]])
 // CHECK:   [[M2:%.*]] = bitcast %swift.type* [[M]] to %swift.type**
-// CHECK:   [[P:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[M2]], i64 10
+// CHECK:   [[P:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[M2]]
 // CHECK:   [[P2:%.*]] = load %swift.type*, %swift.type** [[P]]
 // CHECK:   call swiftcc void @"$useMeta"(%swift.type* [[P2]])
 // CHECK:   ret void
