@@ -36,7 +36,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                 x,
                 &n)
         
+        let returnedResult = vForce.ceil(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionFloor") {
@@ -50,7 +53,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                  x,
                  &n)
         
+        let returnedResult = vForce.floor(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionCopySign") {
@@ -66,7 +72,12 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                     y,
                     &n)
         
+        let returnedResult = vForce.copysign(magnitudes: x,
+                                             signs: y)
+        
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionModulus") {
@@ -82,7 +93,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                 y,
                 &n)
         
+        let returnedResult = vForce.truncatingRemainder(dividends: x,
+                                                        divisors: y)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionModulusParameters") {
@@ -110,7 +125,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                      y,
                      &n)
         
+        let returnedResult = vForce.remainder(dividends: x,
+                                              divisors: y)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionRemainderParameters") {
@@ -136,7 +155,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                x,
                &n)
         
+        let returnedResult = vForce.trunc(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionNearestInteger") {
@@ -150,7 +172,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                 x,
                 &n)
         
+        let returnedResult = vForce.nearestInteger(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionReciprocalSquareRoot") {
@@ -164,7 +189,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                  x,
                  &n)
         
+        let returnedResult = vForce.reciprocalSquareRoot(x)
+        
         expectTrue(result.filter{!$0.isNaN}.elementsEqual(legacyResult.filter{!$0.isNaN}))
+        expectTrue(result.filter{!$0.isNaN}.elementsEqual(returnedResult.filter{!$0.isNaN}))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionSquareRoot") {
@@ -178,7 +206,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                 x,
                 &n)
         
+        let returnedResult = vForce.squareRoot(x)
+        
         expectTrue(result.filter{!$0.isNaN}.elementsEqual(legacyResult.filter{!$0.isNaN}))
+        expectTrue(result.filter{!$0.isNaN}.elementsEqual(returnedResult.filter{!$0.isNaN}))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionReciprocal") {
@@ -192,7 +223,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                x,
                &n)
         
+        let returnedResult = vForce.reciprocal(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionExp") {
@@ -206,7 +240,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                x,
                &n)
         
+        let returnedResult = vForce.exp(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionExpm1") {
@@ -220,7 +257,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                  x,
                  &n)
         
+        let returnedResult = vForce.expm1(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionExp2") {
@@ -234,7 +274,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                 x,
                 &n)
         
+        let returnedResult = vForce.exp2(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionLog2") {
@@ -248,7 +291,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                 x,
                 &n)
         
+        let returnedResult = vForce.log2(x)
+        
         expectTrue(result.filter{!$0.isNaN}.elementsEqual(legacyResult.filter{!$0.isNaN}))
+        expectTrue(result.filter{!$0.isNaN}.elementsEqual(returnedResult.filter{!$0.isNaN}))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionLog10") {
@@ -262,7 +308,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                  x,
                  &n)
         
+        let returnedResult = vForce.log10(x)
+        
         expectTrue(result.filter{!$0.isNaN}.elementsEqual(legacyResult.filter{!$0.isNaN}))
+        expectTrue(result.filter{!$0.isNaN}.elementsEqual(returnedResult.filter{!$0.isNaN}))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionUnbiasedExponent") {
@@ -276,7 +325,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                 x,
                 &n)
         
+        let returnedResult = vForce.logb(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionPower") {
@@ -292,7 +344,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                x,
                &n)
         
+        let returnedResult = vForce.pow(bases: x,
+                                        exponents: y)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionPower") {
@@ -318,7 +374,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                x,
                &n)
         
+        let returnedResult = vForce.sin(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionSinPi") {
@@ -332,7 +391,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                  x,
                  &n)
         
+        let returnedResult = vForce.sin(piTimes: x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionCosine") {
@@ -346,7 +408,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                x,
                &n)
         
+        let returnedResult = vForce.cos(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionCosPi") {
@@ -360,7 +425,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                  x,
                  &n)
         
+        let returnedResult = vForce.cos(piTimes: x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionSinCos") {
@@ -394,7 +462,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                x,
                &n)
         
+        let returnedResult = vForce.tan(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionTanPi") {
@@ -408,7 +479,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                  x,
                  &n)
         
+        let returnedResult = vForce.tan(piTimes: x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionArcsin") {
@@ -422,7 +496,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                 z,
                 &n)
         
+        let returnedResult = vForce.asin(z)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionArccos") {
@@ -436,7 +513,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                 z,
                 &n)
         
+        let returnedResult = vForce.acos(z)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionArctan") {
@@ -450,7 +530,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                 z,
                 &n)
         
+        let returnedResult = vForce.atan(z)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionSinh") {
@@ -464,7 +547,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                 x,
                 &n)
         
+        let returnedResult = vForce.sinh(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionCosh") {
@@ -478,7 +564,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                 x,
                 &n)
         
+        let returnedResult = vForce.cosh(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionTanh") {
@@ -492,7 +581,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                 z,
                 &n)
         
+        let returnedResult = vForce.tanh(z)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionAsinh") {
@@ -506,7 +598,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                  z,
                  &n)
         
+        let returnedResult = vForce.asinh(z)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionAcosh") {
@@ -520,7 +615,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                  x,
                  &n)
         
+        let returnedResult = vForce.acosh(x)
         expectTrue(result.filter{!$0.isNaN}.elementsEqual(legacyResult.filter{!$0.isNaN}))
+        expectTrue(result.filter{!$0.isNaN}.elementsEqual(returnedResult.filter{!$0.isNaN}))
     }
     
     Accelerate_vForceTests.test("vForce/SinglePrecisionAtan") {
@@ -534,7 +631,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                  z,
                  &n)
         
+        let returnedResult = vForce.atanh(z)
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
 }
 
@@ -565,7 +664,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                x,
                &n)
         
+        let returnedResult = vForce.ceil(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionFloor") {
@@ -579,7 +681,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                 x,
                 &n)
         
+        let returnedResult = vForce.floor(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionCopySign") {
@@ -595,7 +700,12 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                    y,
                    &n)
         
+        let returnedResult = vForce.copysign(magnitudes: x,
+                                             signs: y)
+            
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionModulus") {
@@ -611,7 +721,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                y,
                &n)
         
+        let returnedResult = vForce.truncatingRemainder(dividends: x,
+                                                        divisors: y)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionModulusParameters") {
@@ -639,7 +753,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                     y,
                     &n)
         
+        let returnedResult = vForce.remainder(dividends: x,
+                                              divisors: y)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionRemainderParameters") {
@@ -665,7 +783,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
               x,
               &n)
         
+        let returnedResult = vForce.trunc(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionNearestInteger") {
@@ -679,7 +800,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                x,
                &n)
         
+        let returnedResult = vForce.nearestInteger(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionReciprocalSquareRoot") {
@@ -693,7 +817,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                 x,
                 &n)
         
+        let returnedResult = vForce.reciprocalSquareRoot(x)
+        
         expectTrue(result.filter{!$0.isNaN}.elementsEqual(legacyResult.filter{!$0.isNaN}))
+        expectTrue(result.filter{!$0.isNaN}.elementsEqual(returnedResult.filter{!$0.isNaN}))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionSquareRoot") {
@@ -707,7 +834,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                x,
                &n)
         
+        let returnedResult = vForce.squareRoot(x)
+        
         expectTrue(result.filter{!$0.isNaN}.elementsEqual(legacyResult.filter{!$0.isNaN}))
+        expectTrue(result.filter{!$0.isNaN}.elementsEqual(returnedResult.filter{!$0.isNaN}))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionReciprocal") {
@@ -721,7 +851,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
               x,
               &n)
         
+        let returnedResult = vForce.reciprocal(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionExp") {
@@ -735,7 +868,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
               x,
               &n)
         
+        let returnedResult = vForce.exp(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionExpm1") {
@@ -749,7 +885,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                 x,
                 &n)
         
+        let returnedResult = vForce.expm1(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionExp2") {
@@ -763,7 +902,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                x,
                &n)
         
+        let returnedResult = vForce.exp2(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionLog2") {
@@ -777,7 +919,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                x,
                &n)
         
+        let returnedResult = vForce.log2(x)
+        
         expectTrue(result.filter{!$0.isNaN}.elementsEqual(legacyResult.filter{!$0.isNaN}))
+        expectTrue(result.filter{!$0.isNaN}.elementsEqual(returnedResult.filter{!$0.isNaN}))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionLog10") {
@@ -791,7 +936,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                 x,
                 &n)
         
+        let returnedResult = vForce.log10(x)
+        
         expectTrue(result.filter{!$0.isNaN}.elementsEqual(legacyResult.filter{!$0.isNaN}))
+        expectTrue(result.filter{!$0.isNaN}.elementsEqual(returnedResult.filter{!$0.isNaN}))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionUnbiasedExponent") {
@@ -805,7 +953,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                x,
                &n)
         
+        let returnedResult = vForce.logb(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionPower") {
@@ -821,7 +972,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
               x,
               &n)
         
+        let returnedResult = vForce.pow(bases: x,
+                                        exponents: y)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionPower") {
@@ -847,7 +1002,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
               x,
               &n)
         
+        let returnedResult = vForce.sin(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionSinPi") {
@@ -861,7 +1019,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                 x,
                 &n)
         
+        let returnedResult = vForce.sin(piTimes: x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionCosine") {
@@ -875,7 +1036,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
               x,
               &n)
         
+        let returnedResult = vForce.cos(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionCosPi") {
@@ -889,7 +1053,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                 x,
                 &n)
         
+        let returnedResult = vForce.cos(piTimes: x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionSinCos") {
@@ -923,7 +1090,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
               x,
               &n)
         
+        let returnedResult = vForce.tan(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionTanPi") {
@@ -937,7 +1107,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                 x,
                 &n)
         
+        let returnedResult = vForce.tan(piTimes: x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionArcsin") {
@@ -951,7 +1124,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                z,
                &n)
         
+        let returnedResult = vForce.asin(z)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionArccos") {
@@ -965,7 +1141,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                z,
                &n)
         
+        let returnedResult = vForce.acos(z)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionArctan") {
@@ -979,7 +1158,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                z,
                &n)
         
+        let returnedResult = vForce.atan(z)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionSinh") {
@@ -993,7 +1175,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                x,
                &n)
         
+        let returnedResult = vForce.sinh(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionCosh") {
@@ -1007,7 +1192,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                x,
                &n)
         
+        let returnedResult = vForce.cosh(x)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionTanh") {
@@ -1021,7 +1209,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                z,
                &n)
         
+        let returnedResult = vForce.tanh(z)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionAsinh") {
@@ -1035,7 +1226,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                 z,
                 &n)
         
+        let returnedResult = vForce.asinh(z)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionAcosh") {
@@ -1049,7 +1243,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                 x,
                 &n)
         
+        let returnedResult = vForce.acosh(x)
         expectTrue(result.filter{!$0.isNaN}.elementsEqual(legacyResult.filter{!$0.isNaN}))
+        expectTrue(result.filter{!$0.isNaN}.elementsEqual(returnedResult.filter{!$0.isNaN}))
     }
     
     Accelerate_vForceTests.test("vForce/DoublePrecisionAtan") {
@@ -1063,7 +1259,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                 z,
                 &n)
         
+        let returnedResult = vForce.atanh(z)
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
 }
 

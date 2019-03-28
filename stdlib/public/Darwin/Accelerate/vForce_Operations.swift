@@ -18,6 +18,29 @@ extension vForce {
     
     // MARK: Ceiling
     
+    /// Returns the ceiling of each element in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func ceil<U>(_ vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                ceil(vector,
+                     result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the ceiling of each element in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
@@ -42,6 +65,29 @@ extension vForce {
                             &n)
                 }
             }
+    }
+    
+    /// Returns the ceiling of each element in `vector`, double-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func ceil<U>(_ vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                ceil(vector,
+                     result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates the ceiling of each element in `vector`, writing the result to `result`, double-precision.
@@ -72,6 +118,29 @@ extension vForce {
     
     // MARK: Floor
     
+    /// Returns the floor of each element in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func floor<U>(_ vector: U) -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                floor(vector,
+                      result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the floor of each element in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
@@ -96,6 +165,29 @@ extension vForce {
                              &n)
                 }
             }
+    }
+    
+    /// Returns the floor of each element in `vector`, double-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func floor<U>(_ vector: U) -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                floor(vector,
+                      result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates the floor of each element in `vector`, writing the result to `result`, double-precision.
@@ -125,6 +217,35 @@ extension vForce {
     }
     
     // MARK: Copy sign
+    
+    /// Returns the sign of each element in `signs` to the corresponding element in `magnitudes`, single-precision.
+    ///
+    /// - Parameter magnitudes: Input magnitudes.
+    /// - Parameter signs: Input signs.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func copysign<U, V>(magnitudes: U,
+                                      signs: V) -> [Float]
+        where
+        U : _ContiguousCollection,
+        V : _MutableContiguousCollection,
+        U.Element == Float, V.Element == Float {
+            
+            precondition(magnitudes.count == signs.count)
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: magnitudes.count) {
+                buffer, initializedCount in
+                
+                copysign(magnitudes: magnitudes,
+                         signs: signs,
+                         result: &buffer)
+                
+                initializedCount = magnitudes.count
+            }
+            
+            return result
+    }
     
     /// Copies the sign of each element in `signs` to the corresponding element in `magnitudes`, writing the result to `result`, single-precision.
     ///
@@ -156,6 +277,35 @@ extension vForce {
                     }
                 }
             }
+    }
+    
+    /// Returns the sign of each element in `signs` to the corresponding element in `magnitudes`, double-precision.
+    ///
+    /// - Parameter magnitudes: Input magnitudes.
+    /// - Parameter signs: Input signs.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func copysign<U, V>(magnitudes: U,
+                                      signs: V) -> [Double]
+        where
+        U : _ContiguousCollection,
+        V : _MutableContiguousCollection,
+        U.Element == Double, V.Element == Double {
+            
+            precondition(magnitudes.count == signs.count)
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: magnitudes.count) {
+                buffer, initializedCount in
+                
+                copysign(magnitudes: magnitudes,
+                         signs: signs,
+                         result: &buffer)
+                
+                initializedCount = magnitudes.count
+            }
+            
+            return result
     }
     
     /// Copies the sign of each element in `signs` to the corresponding element in `magnitudes`, writing the result to `result`, double-precision.
@@ -195,7 +345,41 @@ extension vForce {
     
     // MARK: Modulus
     
-    /// Returns the remainder of the elements in `dividends` divided by the the elements in `divisors` using truncating division.
+    /// Returns the remainder of the elements in `dividends` divided by the the elements in `divisors` using truncating division; single-precision.
+    ///
+    /// - Parameter dividends: Input dividends.
+    /// - Parameter divisors: Input divisors.
+    /// - Returns: Output values.
+    ///
+    /// For each corresponding `a` from `dividends` and `b` from `divisors`, the result `r` satisfies:
+    ///     a = bq + r
+    /// where q is the integer formed by rounding `a/b` towards zero, so `abs(r) < abs(b)` and `r` has the same sign as `a`.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func truncatingRemainder<U, V>(dividends: U,
+                                                 divisors: V) -> [Float]
+        where
+        U : _ContiguousCollection,
+        V : _MutableContiguousCollection,
+        U.Element == Float, V.Element == Float {
+            
+            precondition(dividends.count == divisors.count)
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: dividends.count) {
+                buffer, initializedCount in
+                
+                truncatingRemainder(dividends: dividends,
+                                    divisors: divisors,
+                                    result: &buffer)
+                
+                initializedCount = dividends.count
+            }
+            
+            return result
+    }
+    
+    /// Calculates the remainder of the elements in `dividends` divided by the the elements
+    /// in `divisors` using truncating division; single-precision.
     ///
     /// - Parameter dividends: Input dividends.
     /// - Parameter divisors: Input divisors.
@@ -231,7 +415,41 @@ extension vForce {
             }
     }
     
-    /// Returns the remainder of the elements in `dividends` divided by the the elements in `divisors` using truncating division.
+    /// Returns the remainder of the elements in `dividends` divided by the the elements in `divisors` using truncating division; double-precision.
+    ///
+    /// - Parameter dividends: Input dividends.
+    /// - Parameter divisors: Input divisors.
+    /// - Returns: Output values.
+    ///
+    /// For each corresponding `a` from `dividends` and `b` from `divisors`, the result `r` satisfies:
+    ///     a = bq + r
+    /// where q is the integer formed by rounding `a/b` towards zero, so `abs(r) < abs(b)` and `r` has the same sign as `a`.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func truncatingRemainder<U, V>(dividends: U,
+                                                 divisors: V) -> [Double]
+        where
+        U : _ContiguousCollection,
+        V : _MutableContiguousCollection,
+        U.Element == Double, V.Element == Double {
+            
+            precondition(dividends.count == divisors.count)
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: dividends.count) {
+                buffer, initializedCount in
+                
+                truncatingRemainder(dividends: dividends,
+                                    divisors: divisors,
+                                    result: &buffer)
+                
+                initializedCount = dividends.count
+            }
+            
+            return result
+    }
+    
+    /// Calculates the remainder of the elements in `dividends` divided by the the elements
+    /// in `divisors` using truncating division; single-precision.
     ///
     /// - Parameter dividends: Input dividends.
     /// - Parameter divisors: Input divisors.
@@ -269,6 +487,39 @@ extension vForce {
     
     // MARK: Remainder
     
+    /// Returns the remainder after dividing each element in `dividends` by the corresponding element in `divisors`, single-precision.
+    ///
+    /// - Parameter dividends: Input dividends.
+    /// - Parameter divisors: Input divisors.
+    /// - Returns: Output values.
+    ///
+    /// For each corresponding `a` from `dividends` and `b` from `divisors`, the result `r` satisfies:
+    ///     a = bq + r
+    /// where q is `a/b` rounded to the nearest integer, so `abs(r) <= abs(b/2)`.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func remainder<U, V>(dividends: U,
+                                       divisors: V) -> [Float]
+        where
+        U : _ContiguousCollection,
+        V : _MutableContiguousCollection,
+        U.Element == Float, V.Element == Float {
+            
+            precondition(dividends.count == divisors.count)
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: dividends.count) {
+                buffer, initializedCount in
+                
+                remainder(dividends: dividends,
+                          divisors: divisors,
+                          result: &buffer)
+                
+                initializedCount = dividends.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the remainder after dividing each element in `dividends` by the corresponding element in `divisors`, single-precision.
     ///
     /// - Parameter dividends: Input dividends.
@@ -303,6 +554,39 @@ extension vForce {
                     }
                 }
             }
+    }
+    
+    /// Returns the remainder after dividing each element in `dividends` by the corresponding element in `divisors`, double-precision.
+    ///
+    /// - Parameter dividends: Input dividends.
+    /// - Parameter divisors: Input divisors.
+    /// - Returns: Output values.
+    ///
+    /// For each corresponding `a` from `dividends` and `b` from `divisors`, the result `r` satisfies:
+    ///     a = bq + r
+    /// where q is `a/b` rounded to the nearest integer, so `abs(r) <= abs(b/2)`.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func remainder<U, V>(dividends: U,
+                                       divisors: V) -> [Double]
+        where
+        U : _ContiguousCollection,
+        V : _MutableContiguousCollection,
+        U.Element == Double, V.Element == Double {
+            
+            precondition(dividends.count == divisors.count)
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: dividends.count) {
+                buffer, initializedCount in
+                
+                remainder(dividends: dividends,
+                          divisors: divisors,
+                          result: &buffer)
+                
+                initializedCount = dividends.count
+            }
+            
+            return result
     }
     
     /// Calculates the remainder after dividing each element in `dividends` by the corresponding element in `divisors`, double-precision.
@@ -343,6 +627,29 @@ extension vForce {
     
     // MARK: Integer Truncation
     
+    /// Returns the integer truncation of each element in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func trunc<U>(_ vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                trunc(vector,
+                      result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the integer truncation of each element in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
@@ -367,6 +674,29 @@ extension vForce {
                            &n)
                 }
             }
+    }
+    
+    /// Returns the integer truncation of each element in `vector`, double-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func trunc<U>(_ vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                trunc(vector,
+                      result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates the integer truncation of each element in `vector`, writing the result to `result`, double-precision.
@@ -397,6 +727,29 @@ extension vForce {
     
     // MARK: Nearest Integer
     
+    /// Returns the nearest integer to each element in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func nearestInteger<U>(_ vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                nearestInteger(vector,
+                               result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the nearest integer to each element in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
@@ -421,6 +774,29 @@ extension vForce {
                             &n)
                 }
             }
+    }
+    
+    /// Returns the nearest integer to each element in `vector`, double-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func nearestInteger<U>(_ vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                nearestInteger(vector,
+                               result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates the nearest integer to each element in `vector`, writing the result to `result`, double-precision.
@@ -451,6 +827,29 @@ extension vForce {
     
     // MARK: Reciprocal Square Root
     
+    /// Returns the reciprocal square root of each element in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func reciprocalSquareRoot<U>(_ vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                reciprocalSquareRoot(vector,
+                                     result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the reciprocal square root of each element in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
@@ -475,6 +874,29 @@ extension vForce {
                              &n)
                 }
             }
+    }
+    
+    /// Returns the reciprocal square root of each element in `vector`, double-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func reciprocalSquareRoot<U>(_ vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                reciprocalSquareRoot(vector,
+                                     result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates the reciprocal square root of each element in `vector`, writing the result to `result`, double-precision.
@@ -505,6 +927,29 @@ extension vForce {
     
     // MARK: Square Root
     
+    /// Returns the square root of each element in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func squareRoot<U>(_ vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                squareRoot(vector,
+                           result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the square root of each element in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
@@ -529,6 +974,30 @@ extension vForce {
                             &n)
                 }
             }
+    }
+    
+    /// Returns the square root of each element in `vector`, double-precision.
+    ///
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func squareRoot<U>(_ vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                squareRoot(vector,
+                           result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates the square root of each element in `vector`, writing the result to `result`, double-precision.
@@ -559,6 +1028,29 @@ extension vForce {
     
     // MARK: Reciprocal
     
+    /// Returns the reciprocal of each element in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func reciprocal<U>(_ vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                reciprocal(vector,
+                           result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the reciprocal of each element in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
@@ -583,6 +1075,29 @@ extension vForce {
                            &n)
                 }
             }
+    }
+    
+    /// Returns the reciprocal of each element in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func reciprocal<U>(_ vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                reciprocal(vector,
+                           result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates the reciprocal of each element in `vector`, writing the result to `result`, double-precision.
@@ -618,6 +1133,29 @@ extension vForce {
     
     // MARK: Exponential
     
+    /// Returns e raised to the power of each element in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func exp<U>(_ vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                exp(vector,
+                    result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates e raised to the power of each element in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
@@ -644,7 +1182,30 @@ extension vForce {
             }
     }
     
-    /// Calculates e raised to the power of each element  minus one  in `vector`, writing the result to `result`, single-precision.
+    /// Returns e raised to the power of each element minus one in in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func expm1<U>(_ vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                expm1(vector,
+                      result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
+    /// Calculates e raised to the power of each element minus one in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
@@ -668,6 +1229,29 @@ extension vForce {
                              &n)
                 }
             }
+    }
+    
+    /// Returns 2 raised to the power of each element  minus one  in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func exp2<U>(_ vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                exp2(vector,
+                     result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates 2 raised to the power of each element  minus one  in `vector`, writing the result to `result`, single-precision.
@@ -696,6 +1280,29 @@ extension vForce {
             }
     }
     
+    /// Returns e raised to the power of each element in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func exp<U>(_ vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                exp(vector,
+                    result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates e raised to the power of each element in `vector`, writing the result to `result`, double-precision.
     ///
     /// - Parameter _ vector: Input values.
@@ -722,6 +1329,29 @@ extension vForce {
             }
     }
     
+    /// Returns e raised to the power of each element minus one in in `vector`, double-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func expm1<U>(_ vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                expm1(vector,
+                      result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates e raised to the power of each element  minus one  in `vector`, writing the result to `result`, double-precision.
     ///
     /// - Parameter _ vector: Input values.
@@ -746,6 +1376,29 @@ extension vForce {
                             &n)
                 }
             }
+    }
+    
+    /// Returns 2 raised to the power of each element  minus one  in `vector`, double-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func exp2<U>(_ vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                exp2(vector,
+                     result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates 2 raised to the power of each element  minus one  in `vector`, writing the result to `result`, double-precision.
@@ -775,7 +1428,30 @@ extension vForce {
     }
     
     // MARK: Logarithm
-
+    
+    /// Returns the base two logarithm of each element in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func log2<U>(_ vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                log2(vector,
+                     result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the base two logarithm of each element in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
@@ -783,7 +1459,7 @@ extension vForce {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func log2<U, V>(_ vector: U,
-                                 result: inout V)
+                                  result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -802,6 +1478,29 @@ extension vForce {
             }
     }
     
+    /// Returns the base ten logarithm of each element in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func log10<U>(_ vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                log10(vector,
+                      result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the base ten logarithm of each element in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
@@ -809,7 +1508,7 @@ extension vForce {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func log10<U, V>(_ vector: U,
-                                 result: inout V)
+                                   result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -828,6 +1527,29 @@ extension vForce {
             }
     }
     
+    /// Returns the base two logarithm of each element in `vector`, double-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func log2<U>(_ vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                log2(vector,
+                     result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the base two logarithm of each element in `vector`, writing the result to `result`, double-precision.
     ///
     /// - Parameter _ vector: Input values.
@@ -835,7 +1557,7 @@ extension vForce {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func log2<U, V>(_ vector: U,
-                                 result: inout V)
+                                  result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -854,6 +1576,29 @@ extension vForce {
             }
     }
     
+    /// Returns the base ten logarithm of each element in `vector`, double-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func log10<U>(_ vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                log10(vector,
+                      result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the ten logarithm of each element in `vector`, writing the result to `result`, double-precision.
     ///
     /// - Parameter _ vector: Input values.
@@ -861,7 +1606,7 @@ extension vForce {
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func log10<U, V>(_ vector: U,
-                                 result: inout V)
+                                   result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -881,6 +1626,29 @@ extension vForce {
     }
     
     // MARK: Unbiased Exponent
+    
+    /// Returns the unbiased exponent of each element in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func logb<U>(_ vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                logb(vector,
+                     result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
     
     /// Calculates the unbiased exponent of each element in `vector`, writing the result to `result`, single-precision.
     ///
@@ -908,6 +1676,29 @@ extension vForce {
                             &n)
                 }
             }
+    }
+    
+    /// Returns the unbiased exponent of each element in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func logb<U>(_ vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                logb(vector,
+                     result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates the unbiased exponent of each element in `vector`, writing the result to `result`, double-precision.
@@ -945,6 +1736,35 @@ extension vForce {
     
     // MARK: Power
     
+    /// Returns each element in `bases` rasied to the power of the corresponding element in `exponents`, single-precision.
+    ///
+    /// - Parameter bases: Input base values.
+    /// - Parameter exponents: Input exponents.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func pow<U, V>(bases: U,
+                                 exponents: V) -> [Float]
+        where
+        U : _ContiguousCollection,
+        V : _MutableContiguousCollection,
+        U.Element == Float, V.Element == Float {
+            
+            precondition(bases.count == exponents.count)
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: exponents.count) {
+                buffer, initializedCount in
+                
+                pow(bases: bases,
+                    exponents: exponents,
+                    result: &buffer)
+                
+                initializedCount = exponents.count
+            }
+            
+            return result
+    }
+    
     /// Calculates each element in `bases` rasied to the power of the corresponding element in `exponents`, writing the result to `result`, single-precision.
     ///
     /// - Parameter bases: Input base values.
@@ -975,6 +1795,35 @@ extension vForce {
                     }
                 }
             }
+    }
+    
+    /// Returns each element in `bases` rasied to the power of the corresponding element in `exponents`, double-precision.
+    ///
+    /// - Parameter bases: Input base values.
+    /// - Parameter exponents: Input exponents.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func pow<U, V>(bases: U,
+                                 exponents: V) -> [Double]
+        where
+        U : _ContiguousCollection,
+        V : _MutableContiguousCollection,
+        U.Element == Double, V.Element == Double {
+            
+            precondition(bases.count == exponents.count)
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: exponents.count) {
+                buffer, initializedCount in
+                
+                pow(bases: bases,
+                    exponents: exponents,
+                    result: &buffer)
+                
+                initializedCount = exponents.count
+            }
+            
+            return result
     }
     
     /// Calculates each element in `bases` rasied to the power of the corresponding element in `exponents`, writing the result to `result`, double-precision.
@@ -1020,6 +1869,29 @@ extension vForce {
     
     // MARK: Sine
     
+    /// Returns the sine of each element in in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func sin<U>(_ vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                sin(vector,
+                    result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the sine of each element in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter vector: Input values.
@@ -1044,6 +1916,29 @@ extension vForce {
                            &n)
                 }
             }
+    }
+    
+    /// Returns the sine of each element in in `vector`, double-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func sin<U>(_ vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                sin(vector,
+                    result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates the sine of each element in `vector`, writing the result to `result`, double-precision.
@@ -1072,6 +1967,29 @@ extension vForce {
             }
     }
     
+    /// Returns the sine of pi multiplied of each element in in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func sin<U>(piTimes vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                sin(piTimes: vector,
+                    result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the sine of pi multiplied by each element in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter vector: Input values.
@@ -1096,6 +2014,29 @@ extension vForce {
                              &n)
                 }
             }
+    }
+    
+    /// Returns the sine of pi multiplied of each element in in `vector`, double-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func sin<U>(piTimes vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                sin(piTimes: vector,
+                    result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates the sine of pi multiplied by each element in `vector`, writing the result to `result`, double-precision.
@@ -1126,6 +2067,29 @@ extension vForce {
     
     // MARK: Cosine
     
+    /// Returns the cosine of each element in in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func cos<U>(_ vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                cos(vector,
+                    result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the cosine of each element in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter vector: Input values.
@@ -1150,6 +2114,29 @@ extension vForce {
                            &n)
                 }
             }
+    }
+    
+    /// Returns the cosine of each element in in `vector`, double-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func cos<U>(_ vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                cos(vector,
+                    result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates the cosine of each element in `vector`, writing the result to `result`, double-precision.
@@ -1178,6 +2165,29 @@ extension vForce {
             }
     }
     
+    /// Returns the cosine of pi multiplied of each element in in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func cos<U>(piTimes vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                cos(piTimes: vector,
+                    result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the cosine of pi multiplied by each element in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter vector: Input values.
@@ -1202,6 +2212,29 @@ extension vForce {
                              &n)
                 }
             }
+    }
+    
+    /// Returns the cosine of pi multiplied of each element in in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func cos<U>(piTimes vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                cos(piTimes: vector,
+                    result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates the cosine of pi multiplied by each element in `vector`, writing the result to `result`, double-precision.
@@ -1298,6 +2331,29 @@ extension vForce {
     
     // MARK: Tan
     
+    /// Returns the tangent of each element in in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func tan<U>(_ vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                tan(vector,
+                    result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the tangent of each element in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter vector: Input values.
@@ -1323,6 +2379,30 @@ extension vForce {
                 }
             }
     }
+    
+    /// Returns the tangent of each element in in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func tan<U>(_ vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                tan(vector,
+                    result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     
     /// Calculates the tangent of each element in `vector`, writing the result to `result`, double-precision.
     ///
@@ -1350,6 +2430,29 @@ extension vForce {
             }
     }
     
+    /// Returns the tangent of pi multiplied of each element in in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func tan<U>(piTimes vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                tan(piTimes: vector,
+                    result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the tangent of pi multiplied by each element in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter vector: Input values.
@@ -1374,6 +2477,29 @@ extension vForce {
                              &n)
                 }
             }
+    }
+    
+    /// Returns the tangent of pi multiplied of each element in in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func tan<U>(piTimes vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                tan(piTimes: vector,
+                    result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates the tangent of pi multiplied by each element in `vector`, writing the result to `result`, double-precision.
@@ -1404,6 +2530,29 @@ extension vForce {
     
     // MARK: Arcsine
     
+    /// Returns the arcsine of each element in in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func asin<U>(_ vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                asin(vector,
+                     result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the arcsine of each element in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter vector: Input values.
@@ -1428,6 +2577,29 @@ extension vForce {
                             &n)
                 }
             }
+    }
+    
+    /// Returns the arcsine of each element in in `vector`, double-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func asin<U>(_ vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                asin(vector,
+                     result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates the arcsine of each element in `vector`, writing the result to `result`, double-precision.
@@ -1458,6 +2630,29 @@ extension vForce {
     
     // MARK: Arccosine
     
+    /// Returns the arccosine of each element in in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func acos<U>(_ vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                acos(vector,
+                     result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the arccosine of each element in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter vector: Input values.
@@ -1482,6 +2677,29 @@ extension vForce {
                             &n)
                 }
             }
+    }
+    
+    /// Returns the arccosine of each element in in `vector`, double-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func acos<U>(_ vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                acos(vector,
+                     result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates the arccosine of each element in `vector`, writing the result to `result`, double-precision.
@@ -1512,6 +2730,29 @@ extension vForce {
     
     // MARK: Arctangent
     
+    /// Returns the arctangent of each element in in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func atan<U>(_ vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                atan(vector,
+                     result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the arctangent of each element in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter vector: Input values.
@@ -1536,6 +2777,29 @@ extension vForce {
                             &n)
                 }
             }
+    }
+    
+    /// Returns the arctangent of each element in in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func atan<U>(_ vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                atan(vector,
+                     result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates the arctangent of each element in `vector`, writing the result to `result`, double-precision.
@@ -1571,6 +2835,29 @@ extension vForce {
     
     // MARK: Hyperbolic Sine
     
+    /// Returns the hyperbolic sine of each element in in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func sinh<U>(_ vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                sinh(vector,
+                     result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the hyperbolic sine of each element in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter vector: Input values.
@@ -1595,6 +2882,29 @@ extension vForce {
                             &n)
                 }
             }
+    }
+    
+    /// Returns the hyperbolic sine of each element in in `vector`, double-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func sinh<U>(_ vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                sinh(vector,
+                     result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates the hyperbolic sine of each element in `vector`, writing the result to `result`, double-precision.
@@ -1625,6 +2935,29 @@ extension vForce {
     
     // MARK: Hyperbolic Cosine
     
+    /// Returns the hyperbolic cosine of each element in in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func cosh<U>(_ vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                cosh(vector,
+                     result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the hyperbolic cosine of each element in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter vector: Input values.
@@ -1649,6 +2982,29 @@ extension vForce {
                             &n)
                 }
             }
+    }
+    
+    /// Returns the hyperbolic cosine of each element in in `vector`, double-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func cosh<U>(_ vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                cosh(vector,
+                     result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates the hyperbolic cosine of each element in `vector`, writing the result to `result`, double-precision.
@@ -1679,6 +3035,29 @@ extension vForce {
     
     // MARK: Hyperbolic Tangent
     
+    /// Returns the hyperbolic tangent of each element in in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func tanh<U>(_ vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                tanh(vector,
+                     result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the hyperbolic tangent of each element in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter vector: Input values.
@@ -1703,6 +3082,29 @@ extension vForce {
                             &n)
                 }
             }
+    }
+    
+    /// Returns the hyperbolic tangent of each element in in `vector`, double-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func tanh<U>(_ vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                tanh(vector,
+                     result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates the hyperbolic tangent of each element in `vector`, writing the result to `result`, double-precision.
@@ -1733,6 +3135,29 @@ extension vForce {
     
     // MARK: Inverse Hyperbolic Sine
     
+    /// Returns the inverse hyperbolic sine of each element in in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func asinh<U>(_ vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                asinh(vector,
+                      result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the inverse hyperbolic sine of each element in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter vector: Input values.
@@ -1757,6 +3182,29 @@ extension vForce {
                              &n)
                 }
             }
+    }
+    
+    /// Returns the inverse hyperbolic sine of each element in in `vector`, double-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func asinh<U>(_ vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                asinh(vector,
+                      result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates the inverse hyperbolic sine of each element in `vector`, writing the result to `result`, double-precision.
@@ -1787,6 +3235,29 @@ extension vForce {
     
     // MARK: Inverse Hyperbolic Cosine
     
+    /// Returns the inverse hyperbolic cosine of each element in in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func acosh<U>(_ vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                acosh(vector,
+                      result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the inverse hyperbolic cosine of each element in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter vector: Input values.
@@ -1811,6 +3282,29 @@ extension vForce {
                              &n)
                 }
             }
+    }
+    
+    /// Returns the inverse hyperbolic cosine of each element in in `vector`, double-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func acosh<U>(_ vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                acosh(vector,
+                      result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates the inverse hyperbolic cosine of each element in `vector`, writing the result to `result`, double-precision.
@@ -1841,6 +3335,29 @@ extension vForce {
     
     // MARK: Inverse Hyperbolic Tangent
     
+    /// Returns the inverse hyperbolic tangent of each element in in `vector`, single-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func atanh<U>(_ vector: U)  -> [Float]
+        where
+        U : _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                atanh(vector,
+                      result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the inverse hyperbolic tangent of each element in `vector`, writing the result to `result`, single-precision.
     ///
     /// - Parameter vector: Input values.
@@ -1865,6 +3382,29 @@ extension vForce {
                              &n)
                 }
             }
+    }
+    
+    /// Returns the inverse hyperbolic tangent of each element in in `vector`, double-precision.
+    ///
+    /// - Parameter _ vector: Input values.
+    /// - Returns: Output values.
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func atanh<U>(_ vector: U)  -> [Double]
+        where
+        U : _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                atanh(vector,
+                      result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates the inverse hyperbolic tangent of each element in `vector`, writing the result to `result`, double-precision.
