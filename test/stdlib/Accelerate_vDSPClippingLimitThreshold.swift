@@ -43,7 +43,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                    &legacyResult, 1,
                    n)
         
+        let returnedResult = vDSP.clip(source,
+                                       to: bounds)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPClippingLimitThresholdTests.test("vDSP/SinglePrecisionInvertedClipping") {
@@ -63,7 +67,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                     &legacyResult, 1,
                     n)
         
+        let returnedResult = vDSP.invertedClip(source,
+                                               to: bounds)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPClippingLimitThresholdTests.test("vDSP/SinglePrecisionThreshold") {
@@ -83,7 +91,12 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                   &legacyResult, 1,
                   n)
         
+        let returnedResult = vDSP.threshold(source,
+                                            to: bounds.lowerBound,
+                                            with: .clampToThreshold)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPClippingLimitThresholdTests.test("vDSP/SinglePrecisionThresholdWithConstant") {
@@ -104,7 +117,12 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                     &legacyResult, 1,
                     n)
         
+        let returnedResult = vDSP.threshold(source,
+                                            to: bounds.lowerBound,
+                                            with: .signedConstant(outputConstant))
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPClippingLimitThresholdTests.test("vDSP/SinglePrecisionThresholdWithZeroFill") {
@@ -124,7 +142,12 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                     &legacyResult, 1,
                     n)
         
+        let returnedResult = vDSP.threshold(source,
+                                            to: bounds.lowerBound,
+                                            with: .zeroFill)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPClippingLimitThresholdTests.test("vDSP/SinglePrecisionLimit") {
@@ -145,7 +168,12 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                   &legacyResult, 1,
                   n)
         
+        let returnedResult = vDSP.limit(source,
+                                        limit: bounds.upperBound,
+                                        withOutputConstant: outputConstant)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
 }
 
@@ -183,7 +211,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                     &legacyResult, 1,
                     n)
         
+        let returnedResult = vDSP.clip(source,
+                                       to: bounds)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPClippingLimitThresholdTests.test("vDSP/DoublePrecisionInvertedClipping") {
@@ -203,7 +235,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                      &legacyResult, 1,
                      n)
         
+        let returnedResult = vDSP.invertedClip(source,
+                                               to: bounds)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPClippingLimitThresholdTests.test("vDSP/DoublePrecisionThreshold") {
@@ -223,7 +259,15 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                    &legacyResult, 1,
                    n)
         
+        let returnedResult = vDSP.threshold(source,
+                                            to: bounds.lowerBound,
+                                            with: .clampToThreshold)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
+        
+        expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPClippingLimitThresholdTests.test("vDSP/DoublePrecisionThresholdWithConstant") {
@@ -244,7 +288,12 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                      &legacyResult, 1,
                      n)
         
+        let returnedResult = vDSP.threshold(source,
+                                            to: bounds.lowerBound,
+                                            with: .signedConstant(outputConstant))
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPClippingLimitThresholdTests.test("vDSP/DoublePrecisionThresholdWithZeroFill") {
@@ -264,7 +313,12 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                      &legacyResult, 1,
                      n)
         
+        let returnedResult = vDSP.threshold(source,
+                                            to: bounds.lowerBound,
+                                            with: .zeroFill)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPClippingLimitThresholdTests.test("vDSP/DoublePrecisionLimit") {
@@ -285,7 +339,12 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                    &legacyResult, 1,
                    n)
         
+        let returnedResult = vDSP.limit(source,
+                                        limit: bounds.upperBound,
+                                        withOutputConstant: outputConstant)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
 }
 

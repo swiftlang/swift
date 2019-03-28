@@ -16,6 +16,32 @@ extension vDSP {
     
     // MARK: Clip
     
+    /// Returns the elements of `vector` clipped to the specified range. Single-precision.
+    ///
+    /// - Parameter vector: Source vector.
+    /// - Parameter bounds: Clipping threshold.
+    /// - Returns: The clipped result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func clip<U>(_ vector: U,
+                               to bounds: ClosedRange<Float>) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                clip(vector,
+                     to: bounds,
+                     result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the elements of `vector` clipped to the specified range. Single-precision.
     ///
     /// - Parameter vector: Source vector.
@@ -24,8 +50,8 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func clip<U, V>(_ vector: U,
-                           to bounds: ClosedRange<Float>,
-                           result: inout V)
+                                  to bounds: ClosedRange<Float>,
+                                  result: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -49,6 +75,32 @@ extension vDSP {
             }
     }
     
+    /// Returns the elements of `vector` clipped to the specified range. Double-precision.
+    ///
+    /// - Parameter vector: Source vector.
+    /// - Parameter bounds: Clipping threshold.
+    /// - Returns: The clipped result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func clip<U>(_ vector: U,
+                               to bounds: ClosedRange<Double>) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                clip(vector,
+                     to: bounds,
+                     result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the elements of `vector` clipped to the specified range. Double-precision.
     ///
     /// - Parameter vector: Source vector.
@@ -57,8 +109,8 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func clip<U, V>(_ vector: U,
-                           to bounds: ClosedRange<Double>,
-                           result: inout V)
+                                  to bounds: ClosedRange<Double>,
+                                  result: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -84,6 +136,32 @@ extension vDSP {
     
     // MARK: Inverted Clip
     
+    /// Returns the elements of `vector` inverted-clipped to the specified range. Single-precision.
+    ///
+    /// - Parameter vector: Source vector.
+    /// - Parameter bounds: Clipping threshold.
+    /// - Returns: The clipped result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func invertedClip<U>(_ vector: U,
+                                       to bounds: ClosedRange<Float>) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                invertedClip(vector,
+                             to: bounds,
+                             result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the elements of `vector` inverted-clipped to the specified range. Single-precision.
     ///
     /// - Parameter vector: Source vector.
@@ -92,8 +170,8 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func invertedClip<U, V>(_ vector: U,
-                                   to bounds: ClosedRange<Float>,
-                                   result: inout V)
+                                          to bounds: ClosedRange<Float>,
+                                          result: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -117,6 +195,32 @@ extension vDSP {
             }
     }
     
+    /// Returns the elements of `vector` inverted-clipped to the specified range. Double-precision.
+    ///
+    /// - Parameter vector: Source vector.
+    /// - Parameter bounds: Clipping threshold.
+    /// - Returns: The clipped result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func invertedClip<U>(_ vector: U,
+                                       to bounds: ClosedRange<Double>) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                invertedClip(vector,
+                             to: bounds,
+                             result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the elements of `vector` inverted-clipped to the specified range. Double-precision.
     ///
     /// - Parameter vector: Source vector.
@@ -125,8 +229,8 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func invertedClip<U, V>(_ vector: U,
-                                   to bounds: ClosedRange<Double>,
-                                   result: inout V)
+                                          to bounds: ClosedRange<Double>,
+                                          result: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -161,6 +265,34 @@ extension vDSP {
         case signedConstant(_ x: T)
     }
     
+    /// Returns the elements of `vector` after applying a specified thresholding rule. Single-precision.
+    ///
+    /// - Parameter vector: Source vector.
+    /// - Parameter bounds: Clipping threshold.
+    /// - Returns: The clipped result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func threshold<U>(_ vector: U,
+                                    to lowerBound: Float,
+                                    with rule: ThresholdRule<Float>) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                threshold(vector,
+                          to: lowerBound,
+                          with: rule,
+                          result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with with the corresponding value in `vector` after applying a specified thresholding rule. Single-precision.
     ///
     /// This function supports the following rules:
@@ -176,9 +308,9 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func threshold<U, V>(_ vector: U,
-                                to lowerBound: Float,
-                                with rule: ThresholdRule<Float>,
-                                result: inout V)
+                                       to lowerBound: Float,
+                                       with rule: ThresholdRule<Float>,
+                                       result: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -214,6 +346,34 @@ extension vDSP {
             }
     }
     
+    /// Returns the elements of `vector` after applying a specified thresholding rule. Double-precision.
+    ///
+    /// - Parameter vector: Source vector.
+    /// - Parameter bounds: Clipping threshold.
+    /// - Returns: The clipped result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func threshold<U>(_ vector: U,
+                                    to lowerBound: Double,
+                                    with rule: ThresholdRule<Double>) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                threshold(vector,
+                          to: lowerBound,
+                          with: rule,
+                          result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with with the corresponding value in `vector` after applying a specified thresholding rule. Double-precision.
     ///
     /// This function supports the following rules:
@@ -229,9 +389,9 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func threshold<U, V>(_ vector: U,
-                                to lowerBound: Double,
-                                with rule: ThresholdRule<Double>,
-                                result: inout V)
+                                       to lowerBound: Double,
+                                       with rule: ThresholdRule<Double>,
+                                       result: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -276,13 +436,44 @@ extension vDSP {
     /// - Parameter vector: Source vector.
     /// - Parameter limit: Limit.
     /// - Parameter x: Value written to result.
+    /// - Returns: The clipped result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func limit<U>(_ vector: U,
+                                limit: Float,
+                                withOutputConstant outputConstant: Float) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                vDSP.limit(vector,
+                           limit: limit,
+                           withOutputConstant: outputConstant,
+                           result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
+    /// Vector test limit; single-precision.
+    ///
+    /// Compares values from source vector to `limit`. For inputs greater than or equal to `limit`, `outputConstant` is written to `result`. For inputs less than `limit`, the negated value of `outputConstant` is written to `result`.
+    ///
+    /// - Parameter vector: Source vector.
+    /// - Parameter limit: Limit.
+    /// - Parameter x: Value written to result.
     /// - Parameter result: The clipped result.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func limit<U, V>(_ vector: U,
-                            limit: Float,
-                            withOutputConstant outputConstant: Float,
-                            result: inout V)
+                                   limit: Float,
+                                   withOutputConstant outputConstant: Float,
+                                   result: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -306,7 +497,36 @@ extension vDSP {
             }
     }
     
-    // MARK: Limit (vlim)
+    /// Vector test limit; double-precision.
+    ///
+    /// Compares values from source vector to `limit`. For inputs greater than or equal to `limit`, `outputConstant` is written to `result`. For inputs less than `limit`, the negated value of `outputConstant` is written to `result`.
+    ///
+    /// - Parameter vector: Source vector.
+    /// - Parameter limit: Limit.
+    /// - Parameter x: Value written to result.
+    /// - Returns: The clipped result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func limit<U>(_ vector: U,
+                                limit: Double,
+                                withOutputConstant outputConstant: Double) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                vDSP.limit(vector,
+                           limit: limit,
+                           withOutputConstant: outputConstant,
+                           result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
     
     /// Vector test limit; double-precision.
     ///
@@ -319,9 +539,9 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func limit<U, V>(_ vector: U,
-                            limit: Double,
-                            withOutputConstant outputConstant: Double,
-                            result: inout V)
+                                   limit: Double,
+                                   withOutputConstant outputConstant: Double,
+                                   result: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
