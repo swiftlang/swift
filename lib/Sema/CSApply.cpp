@@ -380,14 +380,10 @@ namespace {
     ///
     /// \param sources The sources of each of the elements to be used in the
     /// resulting tuple, as provided by \c computeTupleShuffle.
-    ///
-    /// \param typeFromPattern Optionally, the caller can specify the pattern
-    /// from where the toType is derived, so that we can deliver better fixit.
     Expr *coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
                              TupleType *toTuple,
                              ConstraintLocatorBuilder locator,
-                             SmallVectorImpl<unsigned> &sources,
-                             Optional<Pattern*> typeFromPattern = None);
+                             ArrayRef<unsigned> sources);
 
     /// Coerce a subclass, class-constrained archetype, class-constrained
     /// existential or to a superclass type.
@@ -4841,56 +4837,6 @@ findCalleeDeclRef(ConstraintSystem &cs, const Solution &solution,
   return solution.resolveLocatorToDecl(locator);
 }
 
-static bool
-shouldApplyAddingLabelFixit(TuplePattern *tuplePattern, TupleType *fromTuple,
-                            TupleType *toTuple,
-                std::vector<std::pair<SourceLoc, std::string>> &locInsertPairs) {
-  std::vector<TuplePattern*> patternParts;
-  std::vector<TupleType*> fromParts;
-  std::vector<TupleType*> toParts;
-  patternParts.push_back(tuplePattern);
-  fromParts.push_back(fromTuple);
-  toParts.push_back(toTuple);
-  while (!patternParts.empty()) {
-    TuplePattern *curPattern = patternParts.back();
-    TupleType *curFrom = fromParts.back();
-    TupleType *curTo = toParts.back();
-    patternParts.pop_back();
-    fromParts.pop_back();
-    toParts.pop_back();
-    unsigned n = curPattern->getElements().size();
-    if (curFrom->getElements().size() != n ||
-        curTo->getElements().size() != n)
-      return false;
-    for (unsigned i = 0; i < n; i++) {
-      Pattern* subPat = curPattern->getElement(i).getPattern();
-      const TupleTypeElt &subFrom = curFrom->getElement(i);
-      const TupleTypeElt &subTo = curTo->getElement(i);
-      if ((subFrom.getType()->getKind() == TypeKind::Tuple) ^
-          (subTo.getType()->getKind() == TypeKind::Tuple))
-        return false;
-      auto addLabelFunc = [&]() {
-        if (subFrom.getName().empty() && !subTo.getName().empty()) {
-          llvm::SmallString<8> Name;
-          Name.append(subTo.getName().str());
-          Name.append(": ");
-          locInsertPairs.push_back({subPat->getStartLoc(), Name.str()});
-        }
-      };
-      if (auto subFromTuple = subFrom.getType()->getAs<TupleType>()) {
-        fromParts.push_back(subFromTuple);
-        toParts.push_back(subTo.getType()->getAs<TupleType>());
-        patternParts.push_back(static_cast<TuplePattern*>(subPat));
-        addLabelFunc();
-      } else if (subFrom.getType()->isEqual(subTo.getType())) {
-        addLabelFunc();
-      } else
-        return false;
-    }
-  }
-  return true;
-}
-
 /// Produce the caller-side default argument for this default argument, or
 /// null if the default argument will be provided by the callee.
 static std::pair<Expr *, DefaultArgumentKind>
@@ -4974,155 +4920,102 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
   return {init, param->getDefaultArgumentKind()};
 }
 
-static Expr *lookThroughIdentityExprs(Expr *expr) {
-  while (true) {
-    if (auto ident = dyn_cast<IdentityExpr>(expr)) {
-      expr = ident->getSubExpr();
-    } else if (auto anyTry = dyn_cast<AnyTryExpr>(expr)) {
-      if (isa<OptionalTryExpr>(anyTry))
-        return expr;
-      expr = anyTry->getSubExpr();
-    } else {
-      return expr;
-    }
+static bool canPeepholeTupleConversion(Expr *expr,
+                                       ArrayRef<unsigned> sources) {
+  if (!isa<TupleExpr>(expr))
+    return false;
+
+  for (unsigned i = 0, e = sources.size(); i != e; ++i) {
+    if (sources[i] != i)
+      return false;
   }
+
+  return true;
 }
 
-/// Rebuild the ParenTypes for the given expression, whose underlying expression
-/// should be set to the given type.  This has to apply to exactly the same
-/// levels of sugar that were stripped off by lookThroughIdentityExprs.
-static Type rebuildIdentityExprs(ConstraintSystem &cs, Expr *expr, Type type) {
-  ASTContext &ctx = cs.getASTContext();
-  if (auto paren = dyn_cast<ParenExpr>(expr)) {
-    type = rebuildIdentityExprs(cs, paren->getSubExpr(), type);
-    cs.setType(paren, ParenType::get(ctx, type->getInOutObjectType(),
-                                     ParameterTypeFlags().withInOut(type->is<InOutType>())));
-    return cs.getType(paren);
-  }
-
-  if (auto ident = dyn_cast<IdentityExpr>(expr)) {
-    type = rebuildIdentityExprs(cs, ident->getSubExpr(), type);
-    cs.setType(ident, type);
-    return cs.getType(ident);
-  }
-
-  if (auto ident = dyn_cast<AnyTryExpr>(expr)) {
-    if (isa<OptionalTryExpr>(ident))
-      return type;
-
-    type = rebuildIdentityExprs(cs, ident->getSubExpr(), type);
-    cs.setType(ident, type);
-    return cs.getType(ident);
-  }
-
-  return type;
-}
-
-Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
+Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
+                                       TupleType *fromTuple,
                                        TupleType *toTuple,
                                        ConstraintLocatorBuilder locator,
-                                       SmallVectorImpl<unsigned> &sources,
-                                       Optional<Pattern*> typeFromPattern){
+                                       ArrayRef<unsigned> sources) {
   auto &tc = cs.getTypeChecker();
 
-  // Capture the tuple expression, if there is one.
-  Expr *innerExpr = lookThroughIdentityExprs(expr);
-  auto *fromTupleExpr = dyn_cast<TupleExpr>(innerExpr);
+  // If the input expression is a tuple expression, we can convert it in-place.
+  if (canPeepholeTupleConversion(expr, sources)) {
+    auto *tupleExpr = cast<TupleExpr>(expr);
 
-  /// Check each of the tuple elements in the destination.
-  bool anythingShuffled = false;
-  SmallVector<TupleTypeElt, 4> toSugarFields;
-  SmallVector<TupleTypeElt, 4> fromTupleExprFields(
-                                 fromTuple->getElements().size());
+    for (unsigned i = 0, e = tupleExpr->getNumElements(); i != e; ++i) {
+      auto *fromElt = tupleExpr->getElement(i);
 
-  for (unsigned i = 0, n = toTuple->getNumElements(); i != n; ++i) {
-    const auto &toElt = toTuple->getElement(i);
-    auto toEltType = toElt.getType();
+      // Actually convert the source element.
+      auto toEltType = toTuple->getElementType(i);
 
-    // If the source and destination index are different, we'll be shuffling.
-    if (sources[i] != i) {
-      anythingShuffled = true;
+      auto *toElt
+        = coerceToType(fromElt, toEltType,
+                      locator.withPathElement(
+                        LocatorPathElt::getTupleElement(i)));
+      if (!toElt)
+        return nullptr;
+
+      tupleExpr->setElement(i, toElt);
     }
 
-    // We're matching one element to another. If the types already
-    // match, there's nothing to do.
-    const auto &fromElt = fromTuple->getElement(sources[i]);
-    auto fromEltType = fromElt.getType();
-    if (fromEltType->isEqual(toEltType)) {
-      // Get the sugared type directly from the tuple expression, if there
-      // is one.
-      if (fromTupleExpr)
-        fromEltType = cs.getType(fromTupleExpr->getElement(sources[i]));
+    tupleExpr->setType(toTuple);
+    cs.cacheType(tupleExpr);
 
-      toSugarFields.push_back(toElt.getWithType(fromEltType));
-      fromTupleExprFields[sources[i]] = fromElt;
-      continue;
-    }
+    return tupleExpr;
+  }
 
-    // We need to convert the source element to the destination type.
-    if (!fromTupleExpr) {
-      // FIXME: Lame! We can't express this in the AST.
-      auto anchorExpr = locator.getBaseLocator()->getAnchor();
-      InFlightDiagnostic diag = tc.diagnose(anchorExpr->getLoc(),
-                                        diag::tuple_conversion_not_expressible,
-                                            fromTuple, toTuple);
-      if (typeFromPattern) {
-        std::vector<std::pair<SourceLoc, std::string>> locInsertPairs;
-        auto *tupleP = dyn_cast<TuplePattern>(typeFromPattern.getValue());
-        if (tupleP && shouldApplyAddingLabelFixit(tupleP, toTuple, fromTuple,
-                                                  locInsertPairs)) {
-          for (auto &Pair : locInsertPairs) {
-            diag.fixItInsert(Pair.first, Pair.second);
-          }
-        }
-      }
-      return nullptr;
-    }
+  // Build a list of OpaqueValueExprs that matches the structure
+  // of expr's type.
+  //
+  // Each OpaqueValueExpr's type is equal to the type of the
+  // corresponding element of fromTuple.
+  SmallVector<OpaqueValueExpr *, 4> destructured;
+  for (unsigned i = 0, e = sources.size(); i != e; ++i) {
+    auto fromEltType = fromTuple->getElementType(i);
+    auto *opaqueElt = new (tc.Context) OpaqueValueExpr(expr->getLoc(),
+                                                       fromEltType);
+    cs.cacheType(opaqueElt);
+    destructured.push_back(opaqueElt);
+  }
+
+  // Convert each OpaqueValueExpr to the correct type.
+  SmallVector<Expr *, 4> converted;
+  SmallVector<Identifier, 4> labels;
+  SmallVector<TupleTypeElt, 4> convertedElts;
+
+  for (unsigned i = 0, e = sources.size(); i != e; ++i) {
+    unsigned source = sources[i];
+    auto *fromElt = destructured[source];
 
     // Actually convert the source element.
-    auto convertedElt
-      = coerceToType(fromTupleExpr->getElement(sources[i]), toEltType,
+    auto toEltType = toTuple->getElementType(i);
+    auto toLabel = toTuple->getElement(i).getName();
+
+    auto *toElt
+      = coerceToType(fromElt, toEltType,
                      locator.withPathElement(
-                       LocatorPathElt::getTupleElement(sources[i])));
-    if (!convertedElt)
+                       LocatorPathElt::getTupleElement(source)));
+    if (!toElt)
       return nullptr;
 
-    fromTupleExpr->setElement(sources[i], convertedElt);
-
-    // Record the sugared field name.
-    toSugarFields.push_back(toElt.getWithType(cs.getType(convertedElt)));
-    fromTupleExprFields[sources[i]] =
-      fromElt.getWithType(cs.getType(convertedElt));
+    converted.push_back(toElt);
+    labels.push_back(toLabel);
+    convertedElts.emplace_back(toEltType, toLabel, ParameterTypeFlags());
   }
 
-  // Compute the updated 'from' tuple type, since we may have
-  // performed some conversions in place.
-  Type fromTupleType = TupleType::get(fromTupleExprFields, tc.Context);
-  if (fromTupleExpr) {
-    cs.setType(fromTupleExpr, fromTupleType);
+  // Create the result tuple, written in terms of the destructured
+  // OpaqueValueExprs.
+  auto *result = TupleExpr::createImplicit(tc.Context, converted, labels);
+  result->setType(TupleType::get(convertedElts, tc.Context));
+  cs.cacheType(result);
 
-    // Update the types of parentheses around the tuple expression.
-    rebuildIdentityExprs(cs, expr, fromTupleType);
-  }
-
-  // Compute the re-sugared tuple type.
-  Type toSugarType = TupleType::get(toSugarFields, tc.Context);
-
-  // If we don't have to shuffle anything, we're done.
-  if (!anythingShuffled && fromTupleExpr) {
-    cs.setType(fromTupleExpr, toSugarType);
-
-    // Update the types of parentheses around the tuple expression.
-    rebuildIdentityExprs(cs, expr, toSugarType);
-
-    return expr;
-  }
-
-  // Create the tuple shuffle.
+  // Create the tuple conversion.
   return
-    cs.cacheType(TupleShuffleExpr::create(tc.Context,
-                                          expr, sources,
-                                          toSugarType));
+    cs.cacheType(DestructureTupleExpr::create(tc.Context,
+                                              destructured, expr, result,
+                                              toTuple));
 }
 
 static Type getMetatypeSuperclass(Type t, TypeChecker &tc) {
@@ -5259,13 +5152,7 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   // Load tuples with lvalue elements.
   if (auto tupleType = fromType->getAs<TupleType>()) {
     if (tupleType->hasLValueType()) {
-      auto toTuple = tupleType->getRValueType()->castTo<TupleType>();
-      SmallVector<unsigned, 4> sources;
-      bool failed = computeTupleShuffle(tupleType, toTuple, sources);
-      assert(!failed && "Couldn't convert tuple to tuple?");
-      (void)failed;
-
-      coerceTupleToTuple(expr, tupleType, toTuple, locator, sources);
+      expr = cs.coerceToRValue(expr);
     }
   }
 
@@ -6492,6 +6379,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     auto toTuple = toType->getAs<TupleType>();
     if (!toTuple)
       break;
+
+    if (fromTuple->hasLValueType() && !toTuple->hasLValueType())
+      return coerceToType(cs.coerceToRValue(expr), toType, locator);
+
     SmallVector<unsigned, 4> sources;
     if (!computeTupleShuffle(fromTuple, toTuple, sources)) {
       return coerceTupleToTuple(expr, fromTuple, toTuple,

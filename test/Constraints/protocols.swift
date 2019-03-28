@@ -339,9 +339,7 @@ func testClonableArchetype<T : Clonable>(_ t: T) {
 func testClonableExistential(_ v: Clonable, _ vv: Clonable.Type) {
   let _: Clonable? = v.maybeClone()
   let _: Clonable?? = v.doubleMaybeClone()
-  // FIXME: Tuple-to-tuple conversions are not implemented
   let _: (Clonable, Clonable) = v.subdivideClone()
-  // expected-error@-1{{cannot express tuple conversion '(Clonable, Clonable)' to '(Clonable, Clonable)'}}
   let _: Clonable.Type = v.metatypeOfClone()
   let _: () -> Clonable = v.goodClonerFn()
 
