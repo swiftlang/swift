@@ -113,6 +113,7 @@
         "CocoaArray.swift",
         "ContiguousArray.swift",
         "ContiguousArrayBuffer.swift",
+        "ContiguousCollection.swift",
         "ContiguouslyStored.swift",
         "FixedArray.swift",
         "SliceBuffer.swift",

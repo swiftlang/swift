@@ -44,6 +44,7 @@ set(SWIFTLIB_ESSENTIAL
   Comparable.swift
   CompilerProtocols.swift
   ContiguousArray.swift
+  ContiguousCollection.swift
   ContiguouslyStored.swift
   ClosedRange.swift
   ContiguousArrayBuffer.swift
