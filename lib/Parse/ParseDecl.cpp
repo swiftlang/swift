@@ -5268,6 +5268,10 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
 
       if (delegateType.isNonNull()) {
         if (auto var = pattern->getSingleVar()) {
+          if (var->getDeclContext()->isLocalContext()) {
+            diagnose(byLoc, diag::property_delegate_local);
+          }
+
           var->addPropertyDelegate(byLoc, access, accessLoc,
                                    delegateType.get());
           propertyDelegateVar = var;

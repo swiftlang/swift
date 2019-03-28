@@ -11,7 +11,9 @@ struct Wrapper<T> { // expected-note{{generic struct 'Wrapper' declared here}}
 
 func testParsing() {
   var wrapped1: Int by Wrapper
+  // expected-error@-1{{property delegates are not yet supported on local properties}}
   var wrapped2: Int by Wrapper
+  // expected-error@-1{{property delegates are not yet supported on local properties}}
 
   _ = wrapped1
   _ = wrapped2
@@ -32,7 +34,7 @@ func testParseError() {
 // ---------------------------------------------------------------------------
 func testExplicitWrapperType() {
   var wrapped1: Int by Wrapper
-
+  // expected-error@-1{{property delegates are not yet supported on local properties}}
   wrapped1 = "Hello" // expected-error{{cannot assign value of type 'String' to type 'Int'}}
 }
 
@@ -62,11 +64,17 @@ protocol CannotBeADelegate {
 
 func testBadWrapperTypes() {
   var wrapped1: Int by NonGenericWrapper // expected-error{{property delegate type 'NonGenericWrapper' must not provide generic arguments}}
+  // expected-error@-1{{property delegates are not yet supported on local properties}}
   var wrapped2: Int by TwoParameterWrapper
+  // expected-error@-1{{property delegates are not yet supported on local properties}}
   var wrapped3: Int by TwoParameterWrapper<Int, Int> // expected-error{{property delegate type 'TwoParameterWrapper<Int, Int>' must not provide generic arguments}}
+  // expected-error@-1{{property delegates are not yet supported on local properties}}
   var wrapped4: Int by (Int) // expected-error{{use of non-property delegate type 'Int' as a property delegate}}
+  // expected-error@-1{{property delegates are not yet supported on local properties}}
   var wrapped5: Int by Wrapper<Int> // expected-error{{property delegate type 'Wrapper<Int>' must not provide generic arguments}}
+  // expected-error@-1{{property delegates are not yet supported on local properties}}
   var wrapped6: Int by NotADelegate // expected-error{{use of non-property delegate type 'NotADelegate' as a property delegate}}
+  // expected-error@-1{{property delegates are not yet supported on local properties}}
 
   wrapped1 = 0
   wrapped2 = 0
@@ -104,15 +112,18 @@ struct WrapperWithInitialValue<T> {
 func testInitialValueInference(i: Int, s: String) {
   // Inferring the type of the property itself
   var x by WrapperWithInitialValue = i
+  // expected-error@-1{{property delegates are not yet supported on local properties}}
   x = 3.14159 // expected-error{{cannot assign value of type 'Double' to type 'Int'}}
 
   // Inferring part of the type of the property itself
   var y: Dictionary by WrapperWithInitialValue = [s: i]
+  // expected-error@-1{{property delegates are not yet supported on local properties}}
   y = 3.14159 // expected-error{{cannot assign value of type 'Double' to type 'Dictionary<String, Int>'}}
 }
 
 func testInitialValueWithoutDelegateSupport(i: Int) {
   var x by Wrapper = i // expected-error{{initializing property 'x' with delegate 'Wrapper' that lacks an 'init(initialValue:)' initializer; use (...) instead}}
+  // expected-error@-1{{property delegates are not yet supported on local properties}}
 }
 
 @propertyDelegate
@@ -136,14 +147,17 @@ extension Wrapper {
 
 func testDirectDelegateInitialization(s: String, i: Int) {
   var x by Wrapper(value: i)
+  // expected-error@-1{{property delegates are not yet supported on local properties}}
   x = 3.14159 // expected-error{{cannot assign value of type 'Double' to type 'Int'}}
 
   var y by Wrapper(name: "Hello", value: 3.14159)
+  // expected-error@-1{{property delegates are not yet supported on local properties}}
   y = "hello" // expected-error{{cannot assign value of type 'String' to type 'Double'}}
 
   // FIXME: Diagnostic below should say "specified type 'Wrapper<Int>'.
   var z: Int by Wrapper(name: "Hello", value: 3.14159)
-  // expected-error@-1{{cannot convert value of type 'Wrapper<Double>' to specified type 'Int'}}
+  // expected-error@-1{{property delegates are not yet supported on local properties}}
+  // expected-error@-2{{cannot convert value of type 'Wrapper<Double>' to specified type 'Int'}}
 }
 
 // ---------------------------------------------------------------------------

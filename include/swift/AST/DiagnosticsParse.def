@@ -1627,6 +1627,8 @@ ERROR(property_delegate_not_named, none,
       "property delegate can only by written on a single-variable pattern", ())
 ERROR(expected_property_delegate_type_after_by,PointsToFirstBadToken,
       "expected property delegate type after 'by'", ())
+ERROR(property_delegate_local,none,
+      "property delegates are not yet supported on local properties", ())
 
 //------------------------------------------------------------------------------
 // MARK: syntax parsing diagnostics
