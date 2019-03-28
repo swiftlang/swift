@@ -46,10 +46,10 @@ func _tensorSeeds(_ seed: Tensor<Int64>) -> (Tensor<Int64>, Tensor<Int64>) {
 /// element tensors.
 @_fixed_layout
 public struct Dataset<Element : TensorGroup> {
-  @usableFromInline let _handle: VariantHandle
+  public let _handle: VariantHandle
 
-  @usableFromInline @inline(__always)
-  internal init(_handle: VariantHandle) {
+  @inlinable @inline(__always)
+  public init(_handle: VariantHandle) {
     self._handle = _handle
   }
 }
@@ -185,14 +185,27 @@ extension DatasetIterator : IteratorProtocol {
   }
 }
 
+/// A 2-tuple-like struct that conforms to TensorGroup that represents a tuple 
+/// of 2 types conforming to TensorGroup.
+@_fixed_layout
+public struct Zip2TensorGroup<T : TensorGroup, U : TensorGroup> : TensorGroup {
+  public var first: T
+  public var second: U
+
+  public init(_ first: T, _ second: U) {
+    self.first = first
+    self.second = second
+  }
+}
+
 // TODO(SR-9156): This does not work in graph mode.
 @inlinable @inline(__always)
 public func zip<T : TensorGroup, U : TensorGroup>(
   _ dataset1: Dataset<T>, _ dataset2: Dataset<U>
-) -> Dataset<TensorPair<T, U>> {
+) -> Dataset<Zip2TensorGroup<T, U>> {
   let handle: VariantHandle = #tfop(
-     "ZipDataset", TensorPair(dataset1._handle, dataset2._handle),
-     output_types$dtype: TensorPair<T, U>._typeList,
-     output_shapes: TensorPair<T, U>._unknownShapeList)
+     "ZipDataset", Zip2TensorGroup(dataset1._handle, dataset2._handle),
+     output_types$dtype: Zip2TensorGroup<T, U>._typeList,
+     output_shapes: Zip2TensorGroup<T, U>._unknownShapeList)
   return Dataset(_handle: handle)
 }

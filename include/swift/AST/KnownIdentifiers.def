@@ -126,6 +126,11 @@ IDENTIFIER(allKeyPaths)
 IDENTIFIER(recursivelyAllKeyPaths)
 IDENTIFIER(allWritableKeyPaths)
 IDENTIFIER(recursivelyAllWritableKeyPaths)
+// TensorArrayProtocol
+IDENTIFIER_(unpackTensorHandles)
+IDENTIFIER_(tensorHandleCount)
+// TensorGroup
+IDENTIFIER_(typeList)
 // AdditiveArithmetic, VectorNumeric
 IDENTIFIER(zero)
 IDENTIFIER(Scalar)

@@ -84,6 +84,12 @@ private class TraceContext {
   /// concrete tensors produced within the trace function.
   ///
   /// For example, if the tracee is:
+  ///
+  /// struct TensorPair<T : TensorGroup, U : TensorGroup> : TensorGroup {
+  ///   public var first: T
+  ///   public var second: U
+  /// }
+  ///
   /// func foo(x: TensorPair) -> Tensor {
   ///   let y = Tensor<Float>(1.0)
   ///   return x.first + x.second + y
