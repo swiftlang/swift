@@ -302,9 +302,6 @@ def pch_disable_validation : Flag<["-"], "pch-disable-validation">,
 def disable_sil_ownership_verifier : Flag<["-"], "disable-sil-ownership-verifier">,
   HelpText<"Do not verify ownership invariants during SIL Verification ">;
 
-def enable_mandatory_semantic_arc_opts : Flag<["-"], "enable-mandatory-semantic-arc-opts">,
-  HelpText<"Enable the mandatory semantic arc optimizer">;
-
 def suppress_static_exclusivity_swap : Flag<["-"], "suppress-static-exclusivity-swap">,
   HelpText<"Suppress static violations of exclusive access with swap()">;
 
