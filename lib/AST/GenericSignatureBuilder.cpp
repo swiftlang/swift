@@ -6014,7 +6014,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
   }
 
   // Sort the constraints, so we get a deterministic ordering of diagnostics.
-  llvm::array_pod_sort(constraints.begin(), constraints.end());
+  std::sort(constraints.begin(), constraints.end());
 
   // Find a representative constraint.
   auto representativeConstraint =
