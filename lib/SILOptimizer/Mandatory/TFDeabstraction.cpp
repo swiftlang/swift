@@ -298,6 +298,11 @@ void TFDeabstraction::inlineCalls() {
   auto &module = fn.getModule();
   module.invalidateSILLoaderCaches();
 
+  if (!inlinedCallees.empty()) {
+    passManager->invalidateAnalysis(
+        &fn, SILAnalysis::InvalidationKind::FunctionBody);
+  }
+
   // Now that we've inlined some functions, clean them up to avoid burning
   // compile time in later passes.  We do this with a simple linear scan,
   // because functions that reference each other have already been flattened
