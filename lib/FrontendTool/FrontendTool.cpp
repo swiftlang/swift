@@ -587,7 +587,8 @@ static bool buildModuleFromParseableInterface(CompilerInvocation &Invocation,
       Instance.getASTContext(), Invocation.getClangModuleCachePath(),
       PrebuiltCachePath, Invocation.getModuleName(), InputPath,
       Invocation.getOutputFilename(),
-      FEOpts.SerializeParseableModuleInterfaceDependencyHashes);
+      FEOpts.SerializeParseableModuleInterfaceDependencyHashes,
+      FEOpts.TrackSystemDeps);
 }
 
 static bool compileLLVMIR(CompilerInvocation &Invocation,
