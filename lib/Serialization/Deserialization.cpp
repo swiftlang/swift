@@ -4163,6 +4163,24 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         break;
       }
 
+      case decls_block::Custom_DECL_ATTR: {
+        bool isImplicit;
+        TypeID typeID;
+        serialization::decls_block::CustomDeclAttrLayout::readRecord(
+          scratch, isImplicit, typeID);
+
+        Expected<Type> deserialized = MF.getTypeChecked(typeID);
+        if (!deserialized) {
+          MF.fatal(deserialized.takeError());
+          break;
+        }
+
+        Attr = CustomAttr::create(ctx, SourceLoc(),
+                                  TypeLoc::withoutLoc(deserialized.get()),
+                                  isImplicit);
+        break;
+      }
+
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
       case decls_block::CLASS##_DECL_ATTR: { \
         bool isImplicit; \

@@ -2453,6 +2453,15 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
         addDeclRef(theAttr->getReplacedFunction()), pieces.size(), pieces);
     return;
   }
+
+    case DAK_Custom: {
+      auto abbrCode = DeclTypeAbbrCodes[CustomDeclAttrLayout::Code];
+      auto theAttr = cast<CustomAttr>(DA);
+      CustomDeclAttrLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, theAttr->isImplicit(),
+        addTypeRef(theAttr->getTypeLoc().getType()));
+      return;
+    }
   }
 }
 

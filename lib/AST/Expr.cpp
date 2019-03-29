@@ -1091,23 +1091,16 @@ computeSingleArgumentType(ASTContext &ctx, Expr *arg, bool implicit,
   arg->setType(TupleType::get(typeElements, ctx));
 }
 
-/// Pack the argument information into a single argument, to match the
-/// representation expected by the AST.
-///
-/// \param argLabels The argument labels, which might be updated by this
-/// function.
-///
-/// \param argLabelLocs The argument label locations, which might be updated by
-/// this function.
-static Expr *
-packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Expr *> args,
-                   ArrayRef<Identifier> &argLabels,
-                   ArrayRef<SourceLoc> &argLabelLocs, SourceLoc rParenLoc,
-                   Expr *trailingClosure, bool implicit,
-                   SmallVectorImpl<Identifier> &argLabelsScratch,
-                   SmallVectorImpl<SourceLoc> &argLabelLocsScratch,
-                   llvm::function_ref<Type(const Expr *)> getType =
-                       [](const Expr *E) -> Type { return E->getType(); }) {
+Expr *
+swift::packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc,
+                          ArrayRef<Expr *> args,
+                          ArrayRef<Identifier> &argLabels,
+                          ArrayRef<SourceLoc> &argLabelLocs,
+                          SourceLoc rParenLoc,
+                          Expr *trailingClosure, bool implicit,
+                          SmallVectorImpl<Identifier> &argLabelsScratch,
+                          SmallVectorImpl<SourceLoc> &argLabelLocsScratch,
+                          llvm::function_ref<Type(const Expr *)> getType) {
   // Clear out our scratch space.
   argLabelsScratch.clear();
   argLabelLocsScratch.clear();

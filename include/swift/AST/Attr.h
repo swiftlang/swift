@@ -32,6 +32,7 @@
 #include "swift/AST/Ownership.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/AST/Requirement.h"
+#include "swift/AST/TrailingCallArguments.h"
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -49,6 +50,7 @@ class FuncDecl;
 class ClassDecl;
 class GenericFunctionType;
 class LazyConformanceLoader;
+class PatternBindingInitializer;
 class TrailingWhereClause;
 
 /// TypeAttributes - These are attributes that may be applied to types.
@@ -1420,6 +1422,54 @@ public:
   }
 };
 
+/// Defines a custom attribute.
+class CustomAttr final : public DeclAttribute,
+                         public TrailingCallArguments<CustomAttr> {
+  TypeLoc type;
+  Expr *arg;
+  PatternBindingInitializer *initContext;
+
+  unsigned hasArgLabelLocs : 1;
+  unsigned numArgLabels : 16;
+
+  CustomAttr(SourceLoc atLoc, SourceRange range, TypeLoc type,
+             PatternBindingInitializer *initContext, Expr *arg,
+             ArrayRef<Identifier> argLabels, ArrayRef<SourceLoc> argLabelLocs,
+             bool implicit);
+
+public:
+  static CustomAttr *create(ASTContext &ctx, SourceLoc atLoc, TypeLoc type,
+                            bool implicit = false) {
+    return create(ctx, atLoc, type, false, nullptr, SourceLoc(), { }, { }, { },
+                  SourceLoc(), implicit);
+  }
+
+  static CustomAttr *create(ASTContext &ctx, SourceLoc atLoc, TypeLoc type,
+                            bool hasInitializer,
+                            PatternBindingInitializer *initContext,
+                            SourceLoc lParenLoc,
+                            ArrayRef<Expr *> args,
+                            ArrayRef<Identifier> argLabels,
+                            ArrayRef<SourceLoc> argLabelLocs,
+                            SourceLoc rParenLoc,
+                            bool implicit = false);
+
+  unsigned getNumArguments() const { return numArgLabels; }
+  bool hasArgumentLabelLocs() const { return hasArgLabelLocs; }
+
+  TypeLoc &getTypeLoc() { return type; }
+  const TypeLoc &getTypeLoc() const { return type; }
+
+  Expr *getArg() const { return arg; }
+  void setArg(Expr *newArg) { arg = newArg; }
+
+  PatternBindingInitializer *getInitContext() const { return initContext; }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Custom;
+  }
+};
+
 /// Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.
@@ -1595,6 +1645,8 @@ public:
 
   SourceLoc getStartLoc(bool forModifiers = false) const;
 };
+
+void simple_display(llvm::raw_ostream &out, const DeclAttribute *attr);
 
 } // end namespace swift
 
