@@ -32,6 +32,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
+#include "clang/Basic/CharInfo.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -1852,7 +1853,7 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
 
   if (TypeAttributes::getAttrKindFromString(Tok.getText()) != TAK_Count)
     diagnose(Tok, diag::type_attribute_applied_to_decl);
-  else {
+  else if (Tok.is(tok::identifier) && clang::isUppercase(Tok.getText()[0])) {
     // Parse a custom attribute.
     auto type = parseType(diag::expected_type);
     if (type.hasCodeCompletion() || type.isNull()) {
@@ -1909,6 +1910,8 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
                                    argLabelLocs, rParenLoc);
     Attributes.add(attr);
     return false;
+  } else {
+    diagnose(Tok, diag::unknown_attribute, Tok.getText());
   }
 
   // Recover by eating @foo(...) when foo is not known.
