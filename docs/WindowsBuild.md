@@ -41,6 +41,8 @@ it provides some of the needed headers and libraries.
 1. Clone `apple/swift-corelibs-foundation` into a folder named `swift-corelibs-foundation`
 1. Clone `apple/swift-corelibs-xctest` into a folder name `swift-corelibs-xctest`
 1. Clone `apple/swift-lldb` into a folder named `lldb`
+1. Clone `apple/swift-llbuild` into a folder named `llbuild`
+1. Clone `apple/swift-package-manager` info a folder named `swift-package-manager`
 1. Clone `curl` into a folder named `curl`
 1. Clone `libxml2` into a folder named `libxml2`
 
@@ -54,19 +56,20 @@ subst S: <path to sources>
 ```
 
 ```cmd
-git config --global core.autocrlf input
 S:
 git clone https://github.com/apple/swift-cmark cmark
 git clone https://github.com/apple/swift-clang clang
 git clone https://github.com/apple/swift-llvm llvm
 git clone https://github.com/apple/swift-compiler-rt compiler-rt
-git clone https://github.com/apple/swift
+git clone -c core.autocrlf=input https://github.com/apple/swift
 git clone https://github.com/apple/swift-corelibs-libdispatch
 git clone https://github.com/apple/swift-corelibs-foundation
 git clone https://github.com/apple/swift-corelibs-xctest
 git clone https://github.com/apple/swift-lldb lldb
-git clone https://github.com/curl/curl.git curl
-git clone https://gitlab.gnome.org/GNOME/libxml2.git libxml2
+git clone https://github.com/apple/swift-llbuild llbuild
+git clone -c core.autocrlf=input https://github.com/apple/swift-package-manager
+git clone https://github.com/curl/curl.git
+git clone https://gitlab.gnome.org/GNOME/libxml2.git
 ```
 
 ### 3. Acquire ICU
@@ -77,7 +80,15 @@ git clone https://gitlab.gnome.org/GNOME/libxml2.git libxml2
 PATH S:\icu\bin64;%PATH%
 ```
 
-### 4. Get ready
+### 4. Fetch SQLite3
+
+```powershell
+(New-Object System.Net.WebClient).DownloadFile("https://www.sqlite.org/2019/sqlite-amalgamation-3270200.zip", "S:\sqlite-amalgamation-3270200.zip")
+Add-Type -A System.IO.Compression.FileSystem
+[IO.Compression.ZipFile]::ExtractToDirectory("S:\sqlite-amalgamation-3270200.zip", "S:\")
+```
+
+### 5. Get ready
 - From within a **developer** command prompt (not PowerShell nor cmd, but the [Visual Studio Developer Command Prompt](https://msdn.microsoft.com/en-us/library/f35ctcxw.aspx)), execute the following command if you have an x64 PC.
 
 ```cmd
@@ -108,7 +119,7 @@ mklink "%VCToolsInstallDir%\include\visualc.apinotes" S:\swift\stdlib\public\Pla
 
 Warning: Creating the above links usually requires administrator privileges. The quick and easy way to do this is to open a second developer prompt by right clicking whatever shortcut you used to open the first one, choosing Run As Administrator, and pasting the above commands into the resulting window. You can then close the privileged prompt; this is the only step which requires elevation.
 
-### 5. Build LLVM/Clang
+### 6. Build LLVM/Clang
 - This must be done from within a developer command prompt. LLVM and Clang are
   large projects, so building might take a few hours. Make sure that the build
   type for LLVM/Clang is compatbile with the build type for Swift. That is,
@@ -137,7 +148,7 @@ cmake --build "S:\b\llvm"
 path S:\b\llvm\bin;%PATH%
 ```
 
-### 6. Build CMark
+### 7. Build CMark
 - This must be done from within a developer command prompt. CMark is a fairly
   small project and should only take a few minutes to build.
 ```cmd
@@ -152,7 +163,7 @@ popd
 cmake --build "S:\b\cmark"
 ```
 
-### 7. Build Swift
+### 8. Build Swift
 - This must be done from within a developer command prompt
 - Note that Visual Studio vends a 32-bit python 2.7 installation in `C:\Python27` and a 64-bit python in `C:\Python27amd64`.  You may use either one based on your installation.
 
@@ -193,7 +204,7 @@ cmake --build "S:\b\swift"
 cmake -G "Visual Studio 2017" -A x64 -T "host=x64"^ ...
 ```
 
-### 8. Build lldb
+### 9. Build lldb
 - This must be done from within a developer command prompt and could take hours
   depending on your system.
 ```cmd
@@ -214,7 +225,7 @@ popd
 cmake --build S:\b\lldb
 ```
 
-### 9. Running tests on Windows
+### 10. Running tests on Windows
 
 Running the testsuite on Windows has additional external dependencies.  You must have a subset of the GNUWin32 programs installed and available in your path.  The following packages are currently required:
 
@@ -228,7 +239,7 @@ path S:\thirdparty\icu4c-63_1-Win64-MSVC2017\bin64;S:\b\swift\bin;S:\b\swift\lib
 ninja -C S:\b\swift check-swift
 ```
 
-### 10. Build swift-corelibs-libdispatch
+### 11. Build swift-corelibs-libdispatch
 
 ```cmd
 mkdir "S:\b\libdispatch"
@@ -250,7 +261,7 @@ cmake --build S:\b\libdispatch
 path S:\b\libdispatch;S:\b\libdispatch\src;%PATH%
 ```
 
-### 11. Build curl
+### 12. Build curl
 
 ```cmd
 pushd "S:\curl"
@@ -260,7 +271,7 @@ nmake /f Makefile.vc mode=static VC=15 MACHINE=x64
 popd
 ```
 
-### 12. Build libxml2
+### 13. Build libxml2
 
 ```cmd
 pushd "S:\libxml2\win32"
@@ -269,7 +280,7 @@ nmake /f Makefile.msvc
 popd
 ```
 
-### 13. Build swift-corelibs-foundation
+### 14. Build swift-corelibs-foundation
 
 ```cmd
 mkdir "S:\b\foundation"
@@ -296,7 +307,7 @@ cmake -G Ninja^
 path S:\b\foundation;%PATH%
 ```
 
-### 14. Build swift-corelibs-xctest
+### 15. Build swift-corelibs-xctest
 
 ```cmd
 mkdir "S:\b\xctest"
@@ -321,13 +332,13 @@ cmake --build S:\b\xctest
 path S:\b\xctest;%PATH%
 ```
 
-### 15. Test XCTest
+### 16. Test XCTest
 
 ```cmd
 ninja -C S:\b\xctest check-xctest
 ```
 
-### 16. Rebuild Foundation
+### 17. Rebuild Foundation
 
 ```cmd
 mkdir "S:\b\foundation"
@@ -350,14 +361,55 @@ cmake -G Ninja^
  cmake --build S:\b\foundation
 ```
 
-### 17. Test Foundation
+### 18. Test Foundation
 
 ```cmd
 cmake --build S:\b\foundation
 ninja -C S:\b\foundation test 
 ```
 
-### 18. Install Swift on Windows
+### 19. Build SQLite3
+
+```cmd
+md S:\b\sqlite
+cd S:\b\sqlite
+cl /MD /Ox /Zi /LD /DSQLITE_API=__declspec(dllexport) S:\sqlite-amalgamation-3270200\sqlite.c
+```
+
+ - Add SQLite3 to your path:
+```cmd
+path S:\b\sqlite;%PATH%
+```
+
+### 20. Build llbuild
+
+```cmd
+md S:\b\llbuild
+cd S:\b\llbuild
+cmake -G Ninja^
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo^
+  -DCMAKE_C_COMPILER=cl^
+  -DCMAKE_CXX_COMPILER=cl^
+  -DLLBUILD_PATH_TO_SQLITE_SOURCE=S:\sqlite-amalgamation-3270200^
+  -DLLBUILD_PATH_TO_SQLITE_BUILD=S:\b\sqlite^
+  S:\swift-llbuild
+ninja
+```
+
+ - Add llbuild to your path:
+```cmd
+path S:\b\llbuild;%PATH%
+```
+
+### 21. Build swift-package-manager
+
+```cmd
+md S:\b\spm
+cd S:\b\spm
+C:\Python27\python.exe S:\swift-package-manager\Utilities\bootstrap --foundation S:\b\foundation --libdispatch-build-dir S:\b\libdispatch --libdispatch-source-dir S:\swift-corelibs-libdispatch --llbuild-build-dir S:\b\llbuild --llbuild-source-dir S:\llbuild --sqlite-build-dir S:\b\sqlite --sqlite-source-dir S:\sqlite-amalgamation-3270200
+```
+
+### 22. Install Swift on Windows
 
 - Run ninja install:
 
@@ -366,7 +418,3 @@ ninja -C S:\b\swift install
 ```
 
 - Add the Swift on Windows binaries path (`C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin`)  to the `PATH` environment variable.
-
-## MSVC
-
-To use `cl` instead, just replace the `-DCMAKE_C_COMPILER` and `-DCMAKE_CXX_COMPILER` parameters to the `cmake` invocations.

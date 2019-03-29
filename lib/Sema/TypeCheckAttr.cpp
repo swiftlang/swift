@@ -2380,12 +2380,9 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
   auto *ED = cast<EnumDecl>(D);
 
-  switch (ED->getModuleContext()->getResilienceStrategy()) {
-  case ResilienceStrategy::Default:
+  if (!ED->getModuleContext()->isResilient()) {
     diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonresilient, attr);
     return;
-  case ResilienceStrategy::Resilient:
-    break;
   }
 
   if (ED->getFormalAccess() < AccessLevel::Public &&
