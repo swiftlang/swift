@@ -2945,11 +2945,7 @@ namespace {
     Expr *visitVarargExpansionExpr(VarargExpansionExpr *expr) {
       simplifyExprType(expr);
 
-      auto elementTy = cs.getType(expr);
-      auto arrayTy =
-        cs.getTypeChecker().getArraySliceType(expr->getLoc(), elementTy);
-      if (!arrayTy) return expr;
-
+      auto arrayTy = cs.getType(expr);
       expr->setSubExpr(coerceToType(expr->getSubExpr(), arrayTy,
                                     cs.getConstraintLocator(expr)));
       return expr;

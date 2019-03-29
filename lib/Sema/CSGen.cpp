@@ -1718,7 +1718,9 @@ namespace {
       for (unsigned i = 0, n = expr->getNumElements(); i != n; ++i) {
         auto *elt = expr->getElement(i);
         auto ty = CS.getType(elt);
-        auto flags = ParameterTypeFlags().withInOut(elt->isSemanticallyInOutExpr());
+        auto flags = ParameterTypeFlags()
+            .withInOut(elt->isSemanticallyInOutExpr())
+            .withVariadic(isa<VarargExpansionExpr>(elt));
         elements.push_back(TupleTypeElt(ty->getInOutObjectType(),
                                         expr->getElementName(i), flags));
       }
@@ -2438,12 +2440,7 @@ namespace {
       CS.addConstraint(ConstraintKind::Conversion,
                        CS.getType(expr->getSubExpr()), array,
                        CS.getConstraintLocator(expr));
-
-      // The apparent type of the expression is the element type, as far as
-      // the type-checker is concerned.  When this becomes a real feature,
-      // we should syntactically restrict these expressions to only appear
-      // in specific positions.
-      return element;
+      return array;
     }
 
     Type visitDynamicTypeExpr(DynamicTypeExpr *expr) {
