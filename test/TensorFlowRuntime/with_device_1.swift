@@ -15,6 +15,12 @@ import StdlibUnittest
 
 var WithDeviceTests = TestSuite("WithDevice")
 
+WithDeviceTests.testAllBackends("ConfigTest") {
+  // Run some tensor code to trigger runtime configuration.
+  _hostOp(Tensor<Float>(0.0) + Tensor<Float>(1.0))
+  expectEqual(3, _RuntimeConfig.cpuDeviceCount)
+}
+
 WithDeviceTests.testAllBackends("Basic") {
   func foo() {
     let x = Tensor<Float>(1.0)
@@ -35,5 +41,4 @@ WithDeviceTests.testAllBackends("Basic") {
   #endif
 }
 
-_RuntimeConfig.cpuDeviceCount = 3
 runAllTests()
