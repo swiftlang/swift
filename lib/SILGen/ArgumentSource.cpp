@@ -27,19 +27,6 @@ RValue &ArgumentSource::peekRValue() & {
   return Storage.get<RValueStorage>(StoredKind).Value;
 }
 
-bool ArgumentSource::isShuffle() const {
-  switch (StoredKind) {
-  case Kind::Invalid:
-    llvm_unreachable("argument source is invalid");
-  case Kind::RValue:
-  case Kind::LValue:
-    return false;
-  case Kind::Expr:
-    return isa<ArgumentShuffleExpr>(asKnownExpr());
-  }
-  llvm_unreachable("bad kind");
-}
-
 RValue ArgumentSource::getAsRValue(SILGenFunction &SGF, SGFContext C) && {
   switch (StoredKind) {
   case Kind::Invalid:
@@ -263,10 +250,11 @@ void ArgumentSource::dump(raw_ostream &out, unsigned indent) const {
 
 PreparedArguments::PreparedArguments(
     ArrayRef<AnyFunctionType::Param> params,
-    Expr *arg) : PreparedArguments(params, /*scalar*/ isa<ArgumentShuffleExpr>(arg)) {
-  if (isa<ArgumentShuffleExpr>(arg))
+    Expr *arg) : PreparedArguments(params) {
+  if (isa<ArgumentShuffleExpr>(arg)) {
+    IsScalar = true;
     addArbitrary(arg);
-  else if (auto *PE = dyn_cast<ParenExpr>(arg))
+  } else if (auto *PE = dyn_cast<ParenExpr>(arg))
     addArbitrary(PE->getSubExpr());
   else if (auto *TE = dyn_cast<TupleExpr>(arg)) {
     for (auto *elt : TE->getElements())
@@ -277,17 +265,13 @@ PreparedArguments::PreparedArguments(
   }
 }
 
-void PreparedArguments::emplaceEmptyArgumentList(SILGenFunction &SGF) {
-  emplace({}, /*scalar*/ false);
-  assert(isValid());
-}
-
 PreparedArguments
 PreparedArguments::copy(SILGenFunction &SGF, SILLocation loc) const {
   if (isNull()) return PreparedArguments();
 
   assert(isValid());
-  PreparedArguments result(getParams(), isScalar());
+  PreparedArguments result(getParams());
+  result.IsScalar = isScalar();
   for (auto &elt : Arguments) {
     assert(elt.isRValue());
     result.add(elt.getKnownRValueLocation(),
@@ -335,7 +319,8 @@ PreparedArguments PreparedArguments::copyForDiagnostics() const {
     return PreparedArguments();
 
   assert(isValid());
-  PreparedArguments result(getParams(), isScalar());
+  PreparedArguments result(getParams());
+  result.IsScalar = isScalar();
   for (auto &arg : Arguments) {
     result.Arguments.push_back(arg.copyForDiagnostics());
   }

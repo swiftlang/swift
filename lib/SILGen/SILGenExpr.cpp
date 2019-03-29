@@ -1868,8 +1868,7 @@ static RValue emitBoolLiteral(SILGenFunction &SGF, SILLocation loc,
   RValue builtinArg(SGF, ManagedValue::forUnmanaged(builtinBool),
                     builtinArgType);
 
-  PreparedArguments builtinArgs(AnyFunctionType::Param(builtinArgType),
-                                /*scalar*/ false);
+  PreparedArguments builtinArgs((AnyFunctionType::Param(builtinArgType)));
   builtinArgs.add(loc, std::move(builtinArg));
 
   auto result =
@@ -2415,7 +2414,7 @@ loadIndexValuesForKeyPathComponent(SILGenFunction &SGF, SILLocation loc,
     indexParams.emplace_back(SGF.F.mapTypeIntoContext(elt.first));
   }
   
-  PreparedArguments indexValues(indexParams, /*scalar*/ false);
+  PreparedArguments indexValues(indexParams);
   if (indexes.empty()) {
     assert(indexValues.isValid());
     return indexValues;
@@ -3649,8 +3648,7 @@ RValue RValueEmitter::visitArrayExpr(ArrayExpr *E, SGFContext C) {
     return array;
 
   // Call the builtin initializer.
-  PreparedArguments args(AnyFunctionType::Param(E->getType()),
-                         /*scalar*/ false);
+  PreparedArguments args(AnyFunctionType::Param(E->getType()));
   args.add(E, std::move(array));
 
   return SGF.emitApplyAllocatingInitializer(

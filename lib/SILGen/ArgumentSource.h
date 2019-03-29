@@ -240,9 +240,6 @@ public:
                            AbstractionPattern origFormalType,
                            SILType expectedType = SILType()) &&;
 
-  /// Whether this argument source is an ArgumentShuffleExpr.
-  bool isShuffle() const;
-
   bool isObviouslyEqual(const ArgumentSource &other) const;
 
   ArgumentSource copyForDiagnostics() const;
@@ -268,9 +265,9 @@ class PreparedArguments {
   unsigned IsNull : 1;
 public:
   PreparedArguments() : IsScalar(false), IsNull(true) {}
-  PreparedArguments(ArrayRef<AnyFunctionType::Param> params, bool isScalar)
-      : IsNull(true) {
-    emplace(params, isScalar);
+  explicit PreparedArguments(ArrayRef<AnyFunctionType::Param> params)
+      : IsScalar(false), IsNull(true) {
+    emplace(params);
   }
 
   // Decompse an argument list expression.
@@ -323,15 +320,12 @@ public:
   }
 
   /// Emplace a (probably incomplete) argument list.
-  void emplace(ArrayRef<AnyFunctionType::Param> params, bool isScalar) {
+  void emplace(ArrayRef<AnyFunctionType::Param> params) {
     assert(isNull());
     Params.append(params.begin(), params.end());
-    IsScalar = isScalar;
+    IsScalar = false;
     IsNull = false;
   }
-
-  /// Emplace an empty argument list.
-  void emplaceEmptyArgumentList(SILGenFunction &SGF);
 
   /// Add an emitted r-value argument to this argument list.
   void add(SILLocation loc, RValue &&arg) {

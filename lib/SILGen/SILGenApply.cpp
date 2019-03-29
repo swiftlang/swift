@@ -1668,7 +1668,7 @@ static PreparedArguments emitStringLiteral(SILGenFunction &SGF, Expr *E,
                                    unicode::extractFirstUnicodeScalar(Str));
 
     AnyFunctionType::Param param(Int32Ty.getASTType());
-    PreparedArguments args({param}, /*scalar*/ false);
+    PreparedArguments args({param});
     args.add(E, RValue(SGF, E, Int32Ty.getASTType(),
                        ManagedValue::forUnmanaged(UnicodeScalarValue)));
     return args;
@@ -1717,7 +1717,7 @@ static PreparedArguments emitStringLiteral(SILGenFunction &SGF, Expr *E,
     llvm_unreachable("these cannot be formed here");
   }
 
-  PreparedArguments args(TypeElts, /*scalar*/ false);
+  PreparedArguments args(TypeElts);
   for (unsigned i = 0, e = Elts.size(); i != e; ++i) {
     args.add(E, RValue(SGF, Elts[i], CanType(TypeElts[i].getPlainType())));
   }
@@ -2720,51 +2720,6 @@ public:
   }
 
   // origFormalType is a function type.
-  //
-  // FIXME: This is all a bunch of hacks that can be removed once "scalar"
-  // PreparedArguments goes away.
-  void emitTopLevel(ArgumentSource &&arg, AbstractionPattern origFormalType) {
-    SmallVector<AbstractionPattern, 8> origParamTypes;
-    for (unsigned i = 0, e = origFormalType.getNumFunctionParams(); i < e; ++i) {
-      origParamTypes.push_back(origFormalType.getFunctionParamType(i));
-    }
-
-    auto origParamType = AbstractionPattern::getTuple(origParamTypes);
-
-    if (arg.isShuffle()) {
-      auto *shuffle = cast<ArgumentShuffleExpr>(std::move(arg).asKnownExpr());
-      emitShuffle(shuffle, origParamType);
-      maybeEmitForeignErrorArgument();
-      return;
-    }
-
-    if (arg.isLValue()) {
-      assert(origParamTypes.size() == 1);
-      emitSingleArg(std::move(arg), origParamTypes[0]);
-      return;
-    }
-
-    if (arg.isExpr()) {
-      if (origParamTypes.size() == 1) {
-        auto *e = std::move(arg).asKnownExpr();
-
-        origParamType = origParamTypes[0];
-        if (auto *paren = dyn_cast<ParenExpr>(e))
-          e = paren->getSubExpr();
-        else if (auto *tuple = dyn_cast<TupleExpr>(e)) {
-          assert(tuple->getNumElements() == 1);
-          e = tuple->getElement(0);
-        }
-
-        emitSingleArg(e, origParamType);
-        return;
-      }
-    }
-
-    emitSingleArg(std::move(arg), origParamType);
-  }
-
-  // origFormalType is a function type.
   void emitPreparedArgs(PreparedArguments &&args,
                         AbstractionPattern origFormalType) {
     assert(args.isValid());
@@ -2772,7 +2727,18 @@ public:
 
     if (args.isScalar()) {
       assert(argSources.size() == 1);
-      emitTopLevel(std::move(argSources[0]), origFormalType);
+      auto arg = std::move(argSources[0]);
+      auto *shuffle = cast<ArgumentShuffleExpr>(std::move(arg).asKnownExpr());
+      
+      SmallVector<AbstractionPattern, 8> origParamTypes;
+      for (unsigned i = 0, e = origFormalType.getNumFunctionParams(); i < e; ++i) {
+        origParamTypes.push_back(origFormalType.getFunctionParamType(i));
+      }
+
+      auto origParamType = AbstractionPattern::getTuple(origParamTypes);
+
+      emitShuffle(shuffle, origParamType);
+      maybeEmitForeignErrorArgument();
     } else {
       maybeEmitForeignErrorArgument();
       for (auto i : indices(argSources)) {
@@ -4138,7 +4104,7 @@ public:
                     ArgumentSource &&selfArg,
                     AnyFunctionType::Param selfParam,
                     CanType methodType) {
-    PreparedArguments preparedSelf({selfParam}, /*scalar*/ false);
+    PreparedArguments preparedSelf({selfParam});
     preparedSelf.addArbitrary(std::move(selfArg));
 
     addCallSite(loc, std::move(preparedSelf), methodType,
@@ -5527,7 +5493,7 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
     builtinInit = stringLiteral->getBuiltinInitializer();
     init = stringLiteral->getInitializer();
   } else if (auto nilLiteral = dyn_cast<NilLiteralExpr>(literal)) {
-    builtinLiteralArgs.emplace({}, /*scalar*/ false);
+    builtinLiteralArgs.emplace({});
     builtinInit = nilLiteral->getInitializer();
   } else if (auto booleanLiteral = dyn_cast<BooleanLiteralExpr>(literal)) {
     auto i1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
@@ -5535,7 +5501,7 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
                                                 booleanLiteral->getValue());
     ManagedValue boolManaged = ManagedValue::forUnmanaged(boolValue);
     CanType ty = boolManaged.getType().getASTType()->getCanonicalType();
-    builtinLiteralArgs.emplace(AnyFunctionType::Param(ty), /*scalar*/ false);
+    builtinLiteralArgs.emplace(AnyFunctionType::Param(ty));
     builtinLiteralArgs.add(literal, RValue(*this, {boolManaged}, ty));
     builtinInit = booleanLiteral->getBuiltinInitializer();
     init = booleanLiteral->getInitializer();
@@ -5546,7 +5512,7 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
             SILType::getBuiltinIntegerLiteralType(getASTContext()),
             integerLiteral->getRawValue()));
     CanType ty = integerManaged.getType().getASTType();
-    builtinLiteralArgs.emplace(AnyFunctionType::Param(ty), /*scalar*/ false);
+    builtinLiteralArgs.emplace(AnyFunctionType::Param(ty));
     builtinLiteralArgs.add(literal, RValue(*this, {integerManaged}, ty));
     builtinInit = integerLiteral->getBuiltinInitializer();
     init = integerLiteral->getInitializer();
@@ -5558,7 +5524,7 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
         floatLiteral->getValue()));
 
     CanType ty = floatManaged.getType().getASTType();
-    builtinLiteralArgs.emplace(AnyFunctionType::Param(ty), /*scalar*/ false);
+    builtinLiteralArgs.emplace(AnyFunctionType::Param(ty));
     builtinLiteralArgs.add(literal, RValue(*this, {floatManaged}, ty));
     builtinInit = floatLiteral->getBuiltinInitializer();
     init = floatLiteral->getInitializer();
@@ -5604,7 +5570,7 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
       auto ty = silTy.getASTType();
       SILValue integer = B.createIntegerLiteral(literal, silTy, Value);
       ManagedValue integerManaged = ManagedValue::forUnmanaged(integer);
-      builtinLiteralArgs.emplace(AnyFunctionType::Param(ty), /*scalar*/ false);
+      builtinLiteralArgs.emplace(AnyFunctionType::Param(ty));
       builtinLiteralArgs.add(literal, RValue(*this, {integerManaged}, ty));
       builtinInit = magicLiteral->getBuiltinInitializer();
       init = magicLiteral->getInitializer();
@@ -5627,7 +5593,7 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
 
   // Otherwise, perform the second initialization step.
   auto ty = builtinLiteral.getType();
-  PreparedArguments args(AnyFunctionType::Param(ty), /*scalar*/ false);
+  PreparedArguments args((AnyFunctionType::Param(ty)));
   args.add(literal, std::move(builtinLiteral));
 
   RValue result = emitApplyAllocatingInitializer(literal, init,
@@ -6074,7 +6040,7 @@ SILGenFunction::prepareSubscriptIndices(SubscriptDecl *subscript,
   // Finally, prepare the evaluated index expression. We might be calling
   // the getter and setter, and it is important to only evaluate the
   // index expression once.
-  PreparedArguments result(substParams, /*isScalar=*/false);
+  PreparedArguments result(substParams);
 
   ArrayRef<ManagedValue> remainingArgs = argValues;
   for (auto substParam : substParams) {
@@ -6121,7 +6087,7 @@ RValue SILGenFunction::emitGetAccessor(SILLocation loc, SILDeclRef get,
   }
   // Index or () if none.
   if (subscriptIndices.isNull())
-    subscriptIndices.emplaceEmptyArgumentList(*this);
+    subscriptIndices.emplace({});
 
   emission.addCallSite(loc, std::move(subscriptIndices),
                        accessType.getResult(),
@@ -6157,7 +6123,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
   }
 
   // (value)  or (value, indices...)
-  PreparedArguments values(accessType->getParams(), /*scalar*/ false);
+  PreparedArguments values(accessType->getParams());
   values.addArbitrary(std::move(setValue));
 
   if (!subscriptIndices.isNull()) {
@@ -6202,7 +6168,7 @@ ManagedValue SILGenFunction::emitAddressorAccessor(
   }
   // Index or () if none.
   if (subscriptIndices.isNull())
-    subscriptIndices.emplaceEmptyArgumentList(*this);
+    subscriptIndices.emplace({});
 
   emission.addCallSite(loc, std::move(subscriptIndices),
                        accessType.getResult(),
@@ -6267,7 +6233,7 @@ SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
   }
   // Index or () if none.
   if (subscriptIndices.isNull())
-    subscriptIndices.emplaceEmptyArgumentList(*this);
+    subscriptIndices.emplace({});
 
   emission.addCallSite(loc, std::move(subscriptIndices),
                        accessType.getResult(),
