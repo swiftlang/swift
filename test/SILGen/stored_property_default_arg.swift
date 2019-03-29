@@ -17,8 +17,8 @@ func checkConcreteType() {
 // CHECK-NEXT: {{.*}} = apply [[A1_REF]]({{.*}}, [[C1]], {{.*}}) : $@convention(method) (Int, Bool, @thin A.Type) -> A
   let d = A(b: 1)
 
-// CHECK: function_ref variable initialization expression of A.b
-// CHECK-NEXT: [[B1_REF:%.*]] = function_ref @$s27stored_property_default_arg1AV1bSivpfi : $@convention(thin) () -> Int
+// CHECK: function_ref default argument 0 of A.init(b:c:)
+// CHECK-NEXT: [[B1_REF:%.*]] = function_ref @$s27stored_property_default_arg1AV1b1cACSi_SbtcfcfA_ : $@convention(thin) () -> Int
 // CHECK-NEXT: [[B1:%.*]] = apply [[B1_REF]]() : $@convention(thin) () -> Int
 // CHECK-NEXT: function_ref A.init(b:c:)
 // CHECK-NEXT: [[A2_REF:%.*]] = function_ref @$s27stored_property_default_arg1AV1b1cACSi_SbtcfC : $@convention(method) (Int, Bool, @thin A.Type) -> A

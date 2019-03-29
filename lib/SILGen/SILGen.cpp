@@ -1068,11 +1068,10 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg,
     llvm_unreachable("No default argument here?");
 
   case DefaultArgumentKind::Normal:
+  case DefaultArgumentKind::StoredProperty:
     break;
 
   case DefaultArgumentKind::Inherited:
-    return;
-
   case DefaultArgumentKind::Column:
   case DefaultArgumentKind::File:
   case DefaultArgumentKind::Line:
@@ -1081,7 +1080,6 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg,
   case DefaultArgumentKind::NilLiteral:
   case DefaultArgumentKind::EmptyArray:
   case DefaultArgumentKind::EmptyDictionary:
-  case DefaultArgumentKind::StoredProperty:
     return;
   }
 
@@ -1161,7 +1159,12 @@ void SILGenModule::emitDefaultArgGenerators(SILDeclRef::Loc decl,
                                             ParameterList *paramList) {
   unsigned index = 0;
   for (auto param : *paramList) {
-    if (auto defaultArg = param->getDefaultValue())
+    auto defaultArg = param->getDefaultValue();
+
+    if (auto var = param->getStoredProperty())
+      defaultArg = var->getParentInitializer();
+
+    if (defaultArg)
       emitDefaultArgGenerator(SILDeclRef::getDefaultArgGenerator(decl, index),
                               defaultArg, param->getDefaultArgumentKind(),
                               param->getDefaultArgumentInitContext());
