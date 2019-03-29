@@ -94,7 +94,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                    vDSP_Length(legacyResult.count),
                    vDSP_Length(coefficients.count - 1))
         
+        let returnedResult = vDSP.evaluatePolynomial(usingCoefficients: coefficients,
+                                                     withVariables: variables)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests.test("vDSP/PolynomialEvaluationDoublePrecision") {
@@ -114,8 +118,13 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                     vDSP_Length(legacyResult.count),
                     vDSP_Length(coefficients.count - 1))
         
+        let returnedResult = vDSP.evaluatePolynomial(usingCoefficients: coefficients,
+                                                     withVariables: variables)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
 }
 
 runAllTests()
+

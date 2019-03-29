@@ -18,6 +18,39 @@ extension vDSP {
     ///
     /// - Parameter coefficients: Coefficients.
     /// - Parameter variables: Independent variables.
+    /// - Returns: The polynomial evaluation result.
+    ///
+    /// For example, given the coefficients `[10, 20, 30]`, and independent variables `[2, 5]`,
+    /// the result is calculated as:
+    ///
+    /// `result[0] = (10 * 2²) + (20 * 2¹) + (30 * 2⁰) // 110`
+    ///
+    /// `result[1] = (10 * 5²) + (20 * 5¹) + (30 * 5⁰) // 380`
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func evaluatePolynomial<U>(usingCoefficients coefficients: [Float],
+                                             withVariables variables: U) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: variables.count) {
+                buffer, initializedCount in
+                
+                evaluatePolynomial(usingCoefficients: coefficients,
+                                   withVariables: variables,
+                                   result: &buffer)
+                
+                initializedCount = variables.count
+            }
+            
+            return result
+    }
+    
+    /// Evaluates a polynomial using specified coefficients and independent variables. Single-precision.
+    ///
+    /// - Parameter coefficients: Coefficients.
+    /// - Parameter variables: Independent variables.
     /// - Parameter result: Destination vector.
     ///
     /// For example, given the coefficients `[10, 20, 30]`, and independent variables `[2, 5]`,
@@ -29,8 +62,8 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func evaluatePolynomial<U, V>(usingCoefficients coefficients: [Float],
-                                         withVariables variables: U,
-                                         result: inout V)
+                                                withVariables variables: U,
+                                                result: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -56,6 +89,39 @@ extension vDSP {
     ///
     /// - Parameter coefficients: Coefficients.
     /// - Parameter variables: Independent variables.
+    /// - Returns: The polynomial evaluation result.
+    ///
+    /// For example, given the coefficients `[10, 20, 30]`, and independent variables `[2, 5]`,
+    /// the result is calculated as:
+    ///
+    /// `result[0] = (10 * 2²) + (20 * 2¹) + (30 * 2⁰) // 110`
+    ///
+    /// `result[1] = (10 * 5²) + (20 * 5¹) + (30 * 5⁰) // 380`
+    @inline(__always)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    public static func evaluatePolynomial<U>(usingCoefficients coefficients: [Double],
+                                             withVariables variables: U) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: variables.count) {
+                buffer, initializedCount in
+                
+                evaluatePolynomial(usingCoefficients: coefficients,
+                                   withVariables: variables,
+                                   result: &buffer)
+                
+                initializedCount = variables.count
+            }
+            
+            return result
+    }
+    
+    /// Evaluates a polynomial using specified coefficients and independent variables. Double-precision.
+    ///
+    /// - Parameter coefficients: Coefficients.
+    /// - Parameter variables: Independent variables.
     /// - Parameter result: Destination vector.
     ///
     /// For example, given the coefficients `[10, 20, 30]`, and independent variables `[2, 5]`,
@@ -67,8 +133,8 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func evaluatePolynomial<U, V>(usingCoefficients coefficients: [Double],
-                                         withVariables variables: U,
-                                         result: inout V)
+                                                withVariables variables: U,
+                                                result: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
