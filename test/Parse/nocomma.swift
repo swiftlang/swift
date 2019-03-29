@@ -2451,3 +2451,27 @@ class IVMC11 : IB {
 }
 
 
+
+/// Contextual Keywords
+
+/// Helpers
+
+func ff_contextualArgument_for(a: Int, b: Int, c: Int, for: Int, d: Int) {}
+func ff_contextualArgument_protocol(a: Int, b: Int, c: Int, protocol: Int, d: Int) {}
+
+ff_contextualArgument_for(
+    a: 1
+    b: 1
+    c: 1
+    for: 1
+    d: 1
+)
+
+ff_contextualArgument_protocol(
+    a: 1
+    b: 1
+    c: 1
+    protocol: 1
+    d: 1
+)
+

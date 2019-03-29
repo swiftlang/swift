@@ -25,11 +25,11 @@ func runAction() {} // expected-note {{'runAction' declared here}}
 
 // rdar://16601779
 func foo() {
-  runAction(SKAction.sequence() // expected-error {{use of unresolved identifier 'SKAction'; did you mean 'runAction'?}} {{13-21=runAction}} expected-note {{to match this opening '('}}
+  runAction(SKAction.sequence() // expected-error {{use of unresolved identifier 'SKAction'; did you mean 'runAction'?}} {{13-21=runAction}}
     
     skview!
     // expected-error @-1 {{use of unresolved identifier 'skview'}}
-} //  expected-error {{expected ')' in expression list}}
+} // expected-error {{expected expression in list of expressions}}
 
 super.init() // expected-error {{'super' cannot be used outside of class members}}
 
