@@ -1638,9 +1638,9 @@ public:
 
 } // end anonymous namespace
 
-static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
-                                SGFContext C,
-                                StringLiteralExpr::Encoding encoding) {
+static PreparedArguments emitStringLiteral(SILGenFunction &SGF, Expr *E,
+                                           StringRef Str, SGFContext C,
+                                        StringLiteralExpr::Encoding encoding) {
   uint64_t Length;
   bool isASCII = true;
   for (unsigned char c : Str) {
@@ -1666,8 +1666,12 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
     SILValue UnicodeScalarValue =
         SGF.B.createIntegerLiteral(E, Int32Ty,
                                    unicode::extractFirstUnicodeScalar(Str));
-    return RValue(SGF, E, Int32Ty.getASTType(),
-                  ManagedValue::forUnmanaged(UnicodeScalarValue));
+
+    AnyFunctionType::Param param(Int32Ty.getASTType());
+    PreparedArguments args({param}, /*scalar*/ false);
+    args.add(E, RValue(SGF, E, Int32Ty.getASTType(),
+                       ManagedValue::forUnmanaged(UnicodeScalarValue)));
+    return args;
   }
   }
 
@@ -1682,20 +1686,21 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
   auto Int1Ty = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
   auto *isASCIIInst = SGF.B.createIntegerLiteral(E, Int1Ty, isASCII);
 
+
   ManagedValue EltsArray[] = {
     ManagedValue::forUnmanaged(string),
     ManagedValue::forUnmanaged(lengthInst),
     ManagedValue::forUnmanaged(isASCIIInst)
   };
 
-  TupleTypeElt TypeEltsArray[] = {
-    EltsArray[0].getType().getASTType(),
-    EltsArray[1].getType().getASTType(),
-    EltsArray[2].getType().getASTType()
+  AnyFunctionType::Param TypeEltsArray[] = {
+    AnyFunctionType::Param(EltsArray[0].getType().getASTType()),
+    AnyFunctionType::Param(EltsArray[1].getType().getASTType()),
+    AnyFunctionType::Param(EltsArray[2].getType().getASTType())
   };
 
   ArrayRef<ManagedValue> Elts;
-  ArrayRef<TupleTypeElt> TypeElts;
+  ArrayRef<AnyFunctionType::Param> TypeElts;
   switch (instEncoding) {
   case StringLiteralInst::Encoding::UTF16:
     Elts = llvm::makeArrayRef(EltsArray).slice(0, 2);
@@ -1712,9 +1717,11 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
     llvm_unreachable("these cannot be formed here");
   }
 
-  CanType ty =
-    TupleType::get(TypeElts, SGF.getASTContext())->getCanonicalType();
-  return RValue(SGF, Elts, ty);
+  PreparedArguments args(TypeElts, /*scalar*/ false);
+  for (unsigned i = 0, e = Elts.size(); i != e; ++i) {
+    args.add(E, RValue(SGF, Elts[i], CanType(TypeElts[i].getPlainType())));
+  }
+  return args;
 }
 
 /// Emit a raw apply operation, performing no additional lowering of
@@ -5410,7 +5417,7 @@ getMagicFunctionString(SILGenFunction &SGF) {
 /// Emit an application of the given allocating initializer.
 RValue SILGenFunction::emitApplyAllocatingInitializer(SILLocation loc,
                                                       ConcreteDeclRef init,
-                                                      RValue &&args,
+                                                      PreparedArguments &&args,
                                                       Type overriddenSelfType,
                                                       SGFContext C) {
   ConstructorDecl *ctor = cast<ConstructorDecl>(init.getDecl());
@@ -5487,12 +5494,7 @@ RValue SILGenFunction::emitApplyAllocatingInitializer(SILLocation loc,
                         methodType);
 
   // Arguments.
-
-  // FIXME: Rework this so that scalar=false.
-  PreparedArguments preparedArgs(methodType->getParams(), /*scalar*/ true);
-  preparedArgs.addArbitrary(ArgumentSource(loc, std::move(args)));
-
-  emission.addCallSite(loc, std::move(preparedArgs), resultType, /*throws*/ false);
+  emission.addCallSite(loc, std::move(args), resultType, /*throws*/ false);
 
   // For an inheritable initializer, determine whether we'll need to adjust the
   // result type.
@@ -5522,7 +5524,7 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
   ConcreteDeclRef builtinInit;
   ConcreteDeclRef init;
   // Emit the raw, builtin literal arguments.
-  RValue builtinLiteralArgs;
+  PreparedArguments builtinLiteralArgs;
   if (auto stringLiteral = dyn_cast<StringLiteralExpr>(literal)) {
     builtinLiteralArgs = emitStringLiteral(*this, literal,
                                            stringLiteral->getValue(), C,
@@ -5530,7 +5532,7 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
     builtinInit = stringLiteral->getBuiltinInitializer();
     init = stringLiteral->getInitializer();
   } else if (auto nilLiteral = dyn_cast<NilLiteralExpr>(literal)) {
-    builtinLiteralArgs = emitEmptyTupleRValue(literal, C);
+    builtinLiteralArgs.emplace({}, /*scalar*/ false);
     builtinInit = nilLiteral->getInitializer();
   } else if (auto booleanLiteral = dyn_cast<BooleanLiteralExpr>(literal)) {
     auto i1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
@@ -5538,7 +5540,8 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
                                                 booleanLiteral->getValue());
     ManagedValue boolManaged = ManagedValue::forUnmanaged(boolValue);
     CanType ty = boolManaged.getType().getASTType()->getCanonicalType();
-    builtinLiteralArgs = RValue(*this, {boolManaged}, ty);
+    builtinLiteralArgs.emplace(AnyFunctionType::Param(ty), /*scalar*/ false);
+    builtinLiteralArgs.add(literal, RValue(*this, {boolManaged}, ty));
     builtinInit = booleanLiteral->getBuiltinInitializer();
     init = booleanLiteral->getInitializer();
   } else if (auto integerLiteral = dyn_cast<IntegerLiteralExpr>(literal)) {
@@ -5548,7 +5551,8 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
             SILType::getBuiltinIntegerLiteralType(getASTContext()),
             integerLiteral->getRawValue()));
     CanType ty = integerManaged.getType().getASTType();
-    builtinLiteralArgs = RValue(*this, {integerManaged}, ty);
+    builtinLiteralArgs.emplace(AnyFunctionType::Param(ty), /*scalar*/ false);
+    builtinLiteralArgs.add(literal, RValue(*this, {integerManaged}, ty));
     builtinInit = integerLiteral->getBuiltinInitializer();
     init = integerLiteral->getInitializer();
   } else if (auto floatLiteral = dyn_cast<FloatLiteralExpr>(literal)) {
@@ -5559,7 +5563,8 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
         floatLiteral->getValue()));
 
     CanType ty = floatManaged.getType().getASTType();
-    builtinLiteralArgs = RValue(*this, {floatManaged}, ty);
+    builtinLiteralArgs.emplace(AnyFunctionType::Param(ty), /*scalar*/ false);
+    builtinLiteralArgs.add(literal, RValue(*this, {floatManaged}, ty));
     builtinInit = floatLiteral->getBuiltinInitializer();
     init = floatLiteral->getInitializer();
   } else {
@@ -5600,10 +5605,12 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
                     : ctx.SourceMgr.getLineAndColumn(Loc).second;
       }
 
-      auto Ty = SILType::getBuiltinIntegerLiteralType(ctx);
-      SILValue V = B.createIntegerLiteral(literal, Ty, Value);
-      builtinLiteralArgs = RValue(*this, {ManagedValue::forUnmanaged(V)},
-                                  Ty.getASTType()->getCanonicalType());
+      auto silTy = SILType::getBuiltinIntegerLiteralType(ctx);
+      auto ty = silTy.getASTType();
+      SILValue integer = B.createIntegerLiteral(literal, silTy, Value);
+      ManagedValue integerManaged = ManagedValue::forUnmanaged(integer);
+      builtinLiteralArgs.emplace(AnyFunctionType::Param(ty), /*scalar*/ false);
+      builtinLiteralArgs.add(literal, RValue(*this, {integerManaged}, ty));
       builtinInit = magicLiteral->getBuiltinInitializer();
       init = magicLiteral->getInitializer();
       break;
@@ -5624,8 +5631,12 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
   if (!init) return builtinLiteral;
 
   // Otherwise, perform the second initialization step.
+  auto ty = builtinLiteral.getType();
+  PreparedArguments args(AnyFunctionType::Param(ty), /*scalar*/ false);
+  args.add(literal, std::move(builtinLiteral));
+
   RValue result = emitApplyAllocatingInitializer(literal, init,
-                                                 std::move(builtinLiteral),
+                                                 std::move(args),
                                                  literal->getType(), C);
   return result;
 }

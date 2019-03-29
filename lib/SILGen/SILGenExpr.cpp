@@ -1858,26 +1858,34 @@ visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
                                     trueCount, falseCount);
 }
 
-RValue RValueEmitter::visitIsExpr(IsExpr *E, SGFContext C) {
-  SILValue isa = emitIsa(SGF, E, E->getSubExpr(),
-                         E->getCastTypeLoc().getType(), E->getCastKind());
-
+static RValue emitBoolLiteral(SILGenFunction &SGF, SILLocation loc,
+                              SILValue builtinBool,
+                              SGFContext C) {
   // Call the Bool(_builtinBooleanLiteral:) initializer
   ASTContext &ctx = SGF.getASTContext();
   auto init = ctx.getBoolBuiltinInitDecl();
-  Type builtinArgType = BuiltinIntegerType::get(1, ctx);
-  RValue builtinArg(SGF, ManagedValue::forUnmanaged(isa),
-                    builtinArgType->getCanonicalType());
+  auto builtinArgType = CanType(BuiltinIntegerType::get(1, ctx));
+  RValue builtinArg(SGF, ManagedValue::forUnmanaged(builtinBool),
+                    builtinArgType);
+
+  PreparedArguments builtinArgs(AnyFunctionType::Param(builtinArgType),
+                                /*scalar*/ false);
+  builtinArgs.add(loc, std::move(builtinArg));
+
   auto result =
-    SGF.emitApplyAllocatingInitializer(E, ConcreteDeclRef(init),
-                                       std::move(builtinArg), Type(),
+    SGF.emitApplyAllocatingInitializer(loc, ConcreteDeclRef(init),
+                                       std::move(builtinArgs), Type(),
                                        C);
   return result;
+}
+RValue RValueEmitter::visitIsExpr(IsExpr *E, SGFContext C) {
+  SILValue isa = emitIsa(SGF, E, E->getSubExpr(),
+                         E->getCastTypeLoc().getType(), E->getCastKind());
+  return emitBoolLiteral(SGF, E, isa, C);
 }
 
 RValue RValueEmitter::visitEnumIsCaseExpr(EnumIsCaseExpr *E,
                                           SGFContext C) {
-  ASTContext &ctx = SGF.getASTContext();
   // Get the enum value.
   auto subExpr = SGF.emitRValueAsSingleValue(E->getSubExpr(),
                                 SGFContext(SGFContext::AllowImmediatePlusZero));
@@ -1895,16 +1903,7 @@ RValue RValueEmitter::visitEnumIsCaseExpr(EnumIsCaseExpr *E,
                                       {{E->getEnumElement(), t}});
   }
   
-  // Call the Bool(_builtinBooleanLiteral:) initializer
-  auto init = ctx.getBoolBuiltinInitDecl();
-  Type builtinArgType = BuiltinIntegerType::get(1, ctx);
-  RValue builtinArg(SGF, ManagedValue::forUnmanaged(selected),
-                    builtinArgType->getCanonicalType());
-  auto result =
-    SGF.emitApplyAllocatingInitializer(E, ConcreteDeclRef(init),
-                                       std::move(builtinArg), Type(),
-                                       C);
-  return result;
+  return emitBoolLiteral(SGF, E, selected, C);
 }
 
 RValue RValueEmitter::visitCoerceExpr(CoerceExpr *E, SGFContext C) {
@@ -3639,19 +3638,23 @@ RValue RValueEmitter::visitArrayExpr(ArrayExpr *E, SGFContext C) {
   for (auto destCleanup : cleanups)
     SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dead);
 
-  RValue arg(SGF, loc, arrayType,
+  RValue array(SGF, loc, arrayType,
              emitEndVarargs(SGF, loc, std::move(varargsInfo)));
 
-  arg = scope.popPreservingValue(std::move(arg));
+  array = scope.popPreservingValue(std::move(array));
 
   // If we're building an array, we don't have to call the initializer;
   // we've already built one.
   if (arrayType->isEqual(E->getType()))
-    return arg;
+    return array;
 
   // Call the builtin initializer.
+  PreparedArguments args(AnyFunctionType::Param(E->getType()),
+                         /*scalar*/ false);
+  args.add(E, std::move(array));
+
   return SGF.emitApplyAllocatingInitializer(
-      loc, E->getInitializer(), std::move(arg), E->getType(), C);
+      loc, E->getInitializer(), std::move(args), E->getType(), C);
 }
 
 RValue RValueEmitter::visitDictionaryExpr(DictionaryExpr *E, SGFContext C) {
