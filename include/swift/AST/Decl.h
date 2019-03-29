@@ -3631,6 +3631,19 @@ public:
     Bits.ClassDecl.Circularity = static_cast<unsigned>(circularity);
   }
 
+  /// Walk this class and all of the superclasses of this class, transitively,
+  /// invoking the callback function for each class.
+  ///
+  /// \param fn The callback function that will be invoked for each superclass.
+  /// It can return \c Continue to continue the traversal. Returning
+  /// \c SkipChildren halts the search and returns \c false, while returning
+  /// \c Stop halts the search and returns \c true.
+  ///
+  /// \returns \c true if \c fn returned \c Stop for any class, \c false
+  /// otherwise.
+  bool walkSuperclasses(
+      llvm::function_ref<TypeWalker::Action(ClassDecl *)> fn) const;
+
   //// Whether this class requires all of its stored properties to
   //// have initializers in the class definition.
   bool requiresStoredPropertyInits() const { 
@@ -3956,8 +3969,8 @@ public:
   /// a protocol having nested types (ObjC protocols).
   llvm::TinyPtrVector<AssociatedTypeDecl *> getAssociatedTypeMembers() const;
 
-  /// Walk all of the protocols inherited by this protocol, transitively,
-  /// invoking the callback function for each protocol.
+  /// Walk this protocol and all of the protocols inherited by this protocol,
+  /// transitively, invoking the callback function for each protocol.
   ///
   /// \param fn The callback function that will be invoked for each inherited
   /// protocol. It can return \c Continue to continue the traversal,
