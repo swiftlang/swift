@@ -31,7 +31,7 @@ func testTribool() {
 func testAnonEnum() {
   var a = AnonConst1
   a = AnonConst2
-#if arch(i386) || arch(arm)
+#if arch(i386) || arch(arm) || os(Windows)
   _ = a as CUnsignedLongLong
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   _ = a as CUnsignedLong
