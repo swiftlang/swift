@@ -474,8 +474,8 @@ enum SinglePayloadNoXI2 {
   case u
 }
 
-// CHECK-32: define swiftcc i1 @select_enum([[WORD:i32]], i8)
-// CHECK-64: define swiftcc i1 @select_enum([[WORD:i64]], i8)
+// CHECK-32: define{{( dllexport)?}}{{( protected)?}} swiftcc i1 @select_enum([[WORD:i32]], i8)
+// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc i1 @select_enum([[WORD:i64]], i8)
 // CHECK: entry:
 // CHECK:   [[TAG:%.*]] = trunc i8 %1 to i1
 // CHECK:   [[PAYLOAD:%.*]] = icmp eq [[WORD]] %0, 1
