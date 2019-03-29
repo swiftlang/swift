@@ -1088,6 +1088,10 @@ public:
   size_t numTrailingObjects(OverloadToken<FallthroughStmt *>) const {
     return hasFallthroughDest() ? 1 : 0;
   }
+
+  LLVM_ATTRIBUTE_DEPRECATED(void dumpVarDeclState(const char *prefix = "")
+                                const LLVM_ATTRIBUTE_USED,
+                            "Only for use in the debugger");
 };
 
 /// Switch statement.
@@ -1159,6 +1163,9 @@ public:
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::Switch;
   }
+
+  LLVM_ATTRIBUTE_DEPRECATED(void dumpVarDeclState() const LLVM_ATTRIBUTE_USED,
+                            "Only for use in the debugger");
 };
 
 /// BreakStmt - The "break" and "break label" statement.

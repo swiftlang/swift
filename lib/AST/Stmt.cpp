@@ -456,6 +456,46 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
   return theSwitch;
 }
 
+void CaseStmt::dumpVarDeclState(const char *prefix) const {
+#ifndef NDEBUG
+  printf("%sCaseStmt: %p\n", prefix, this);
+  printf("%s  HasFallthroughDest: %s\n", prefix,
+         hasFallthroughDest() ? "true" : "false");
+  for (const auto &caseLabelItem : getCaseLabelItems()) {
+    printf("%s  CaseLabel: %p\n", prefix, &caseLabelItem);
+    caseLabelItem.getPattern()->forEachVariable([&](VarDecl *vd) {
+      printf("%s    VarDecl: %p\n", prefix, vd);
+      printf("%s      Corresponding Canonical Var Decl: %p\n", prefix,
+             vd->getCanonicalVarDecl());
+      printf("%s      Corresponding First Case Label Item Var Decl: %p\n",
+             prefix,
+             vd->getCorrespondingFirstCaseLabelItemVarDecl().getPtrOrNull());
+      printf("%s      Corresponding Case Body Var: %p\n", prefix,
+             vd->getCorrespondingCaseBodyVariable().getPtrOrNull());
+    });
+  }
+  printf("%s  CaseBodyVariables\n", prefix);
+  for (auto *vd : getCaseBodyVariablesOrEmptyArray()) {
+    printf("%s    VarDecl: %p\n", prefix, vd);
+    printf("%s      Corresponding Canonical Var Decl: %p\n", prefix,
+           vd->getCanonicalVarDecl());
+    printf("%s      Corresponding First Case Label Item Var Decl: %p\n", prefix,
+           vd->getCorrespondingFirstCaseLabelItemVarDecl().getPtrOrNull());
+    printf("%s      Corresponding Case Body Var: %p\n", prefix,
+           vd->getCorrespondingCaseBodyVariable().getPtrOrNull());
+  }
+#endif
+}
+
+void SwitchStmt::dumpVarDeclState() const {
+#ifndef NDEBUG
+  printf("VarDeclState Of SwitchStmt: %p\n", this);
+  for (auto *caseStmt : getCases()) {
+    caseStmt->dumpVarDeclState("  ");
+  }
+#endif
+}
+
 // See swift/Basic/Statistic.h for declaration: this enables tracing Stmts, is
 // defined here to avoid too much layering violation / circular linkage
 // dependency.
