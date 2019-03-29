@@ -39,7 +39,6 @@
 // CHECK-OTHERMODULE: {{MODULE_NAME.*blob data = 'OtherModule'}}
 // CHECK-OTHERMODULE: {{FILE_DEPENDENCY.*Swift.swiftmodule([/\\].+[.]swiftmodule)?'}}
 // CHECK-OTHERMODULE: {{FILE_DEPENDENCY.*LeafModule.swiftinterface'}}
-// CHECK-OTHERMODULE: {{FILE_DEPENDENCY.*LeafModule-.*.swiftmodule'}}
 // CHECK-OTHERMODULE: {{FILE_DEPENDENCY.*OtherModule.swiftinterface'}}
 // CHECK-OTHERMODULE: FUNC_DECL
 //
