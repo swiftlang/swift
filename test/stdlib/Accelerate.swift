@@ -103,7 +103,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                    &legacyResult, 1,
                    vDSP_Length(n))
         
+        let returnedResult = vDSP.linearInterpolate(a, b,
+                                                    using: interpolationConstant)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests.test("vDSP/SinglePrecisionInterpolateBetweenNeighbours") {
@@ -135,7 +139,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                    vDSP_Length(n),
                    vDSP_Length(shortSignal.count))
         
+        let returnedResult = vDSP.linearInterpolate(elementsOf: shortSignal,
+                                                    using: controlVector)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests.test("vDSP/DoublePrecisionInterpolateBetweenVectors") {
@@ -162,7 +170,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                     &legacyResult, 1,
                     vDSP_Length(n))
         
+        let returnedResult = vDSP.linearInterpolate(a, b,
+                                                    using: interpolationConstant)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests.test("vDSP/DoublePrecisionInterpolateBetweenNeighbours") {
@@ -194,7 +206,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                     vDSP_Length(n),
                     vDSP_Length(shortSignal.count))
         
+        let returnedResult = vDSP.linearInterpolate(elementsOf: shortSignal,
+                                                    using: controlVector)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
 }
 

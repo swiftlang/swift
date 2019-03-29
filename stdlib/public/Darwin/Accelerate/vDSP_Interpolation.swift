@@ -19,13 +19,43 @@ extension vDSP {
     /// - Parameter vectorA: The `A` in `D[n] = A[n] + C * (B[n] - A[n])`.
     /// - Parameter vectorB: The `B` in `D[n] = A[n] + C * (B[n] - A[n])`.
     /// - Parameter interpolationConstant: The `C` in `D[n] = A[n] + C * (B[n] - A[n])`.
+    /// - Returns: The `D` in `D[n] = A[n] + C * (B[n] - A[n])`.
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    @inline(__always)
+    public static func linearInterpolate<T, U>(_ vectorA: T,
+                                               _ vectorB: U,
+                                               using interpolationConstant: Float) -> [Float]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Float, U.Element == Float{
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vectorA.count) {
+                buffer, initializedCount in
+                
+                linearInterpolate(vectorA,
+                                  vectorB,
+                                  using: interpolationConstant,
+                                  result: &buffer)
+                
+                initializedCount = vectorA.count
+            }
+            
+            return result
+    }
+    
+    /// Vector linear interpolation between vectors; single-precision.
+    ///
+    /// - Parameter vectorA: The `A` in `D[n] = A[n] + C * (B[n] - A[n])`.
+    /// - Parameter vectorB: The `B` in `D[n] = A[n] + C * (B[n] - A[n])`.
+    /// - Parameter interpolationConstant: The `C` in `D[n] = A[n] + C * (B[n] - A[n])`.
     /// - Parameter result: The `D` in `D[n] = A[n] + C * (B[n] - A[n])`.
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     @inline(__always)
     public static func linearInterpolate<T, U, V>(_ vectorA: T,
-                                           _ vectorB: U,
-                                           using interpolationConstant: Float,
-                                           result: inout V)
+                                                  _ vectorB: U,
+                                                  using interpolationConstant: Float,
+                                                  result: inout V)
         where
         T: _ContiguousCollection,
         U: _ContiguousCollection,
@@ -55,13 +85,43 @@ extension vDSP {
     /// - Parameter vectorA: The `A` in `D[n] = A[n] + C * (B[n] - A[n])`.
     /// - Parameter vectorB: The `B` in `D[n] = A[n] + C * (B[n] - A[n])`.
     /// - Parameter interpolationConstant: The `C` in `D[n] = A[n] + C * (B[n] - A[n])`.
+    /// - Returns: The `D` in `D[n] = A[n] + C * (B[n] - A[n])`.
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    @inline(__always)
+    public static func linearInterpolate<T, U>(_ vectorA: T,
+                                               _ vectorB: U,
+                                               using interpolationConstant: Double) -> [Double]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Double, U.Element == Double{
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vectorA.count) {
+                buffer, initializedCount in
+                
+                linearInterpolate(vectorA,
+                                  vectorB,
+                                  using: interpolationConstant,
+                                  result: &buffer)
+                
+                initializedCount = vectorA.count
+            }
+            
+            return result
+    }
+    
+    /// Vector linear interpolation between vectors; double-precision.
+    ///
+    /// - Parameter vectorA: The `A` in `D[n] = A[n] + C * (B[n] - A[n])`.
+    /// - Parameter vectorB: The `B` in `D[n] = A[n] + C * (B[n] - A[n])`.
+    /// - Parameter interpolationConstant: The `C` in `D[n] = A[n] + C * (B[n] - A[n])`.
     /// - Parameter result: The `D` in `D[n] = A[n] + C * (B[n] - A[n])`.
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     @inline(__always)
     public static func linearInterpolate<T, U, V>(_ vectorA: T,
-                                           _ vectorB: U,
-                                           using interpolationConstant: Double,
-                                           result: inout V)
+                                                  _ vectorB: U,
+                                                  using interpolationConstant: Double,
+                                                  result: inout V)
         where
         T: _ContiguousCollection,
         U: _ContiguousCollection,
@@ -101,12 +161,50 @@ extension vDSP {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter controlVector: Vector that controls interpolation.
+    /// - Returns: Output values.
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    @inline(__always)
+    public static func linearInterpolate<T, U>(elementsOf vector: T,
+                                               using controlVector: U) -> [Float]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Float, U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: controlVector.count) {
+                buffer, initializedCount in
+                
+                linearInterpolate(elementsOf: vector,
+                                  using: controlVector,
+                                  result: &buffer)
+                
+                initializedCount = controlVector.count
+            }
+            
+            return result
+    }
+    
+    /// Vector linear interpolation between neighboring elements; single-precision.
+    ///
+    /// This function interpolates between the elements of `vector` using the following:
+    ///
+    ///        for (n = 0; n < N; ++n) {
+    ///            b = trunc(B[n]);
+    ///            a = B[n] - b;
+    ///            C[n] = A[b] + a * (A[b+1] - A[b]);
+    ///        }
+    ///
+    /// Where `A` is the input vector, `B` is the control vector, and
+    /// `C` is the output vector.
+    ///
+    /// - Parameter vector: Input values.
+    /// - Parameter controlVector: Vector that controls interpolation.
     /// - Parameter result: Output values.
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     @inline(__always)
     public static func linearInterpolate<T, U, V>(elementsOf vector: T,
-                                           using controlVector: U,
-                                           result: inout V)
+                                                  using controlVector: U,
+                                                  result: inout V)
         where
         T: _ContiguousCollection,
         U: _ContiguousCollection,
@@ -145,12 +243,50 @@ extension vDSP {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter controlVector: Vector that controls interpolation.
+    /// - Returns: Output values.
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    @inline(__always)
+    public static func linearInterpolate<T, U>(elementsOf vector: T,
+                                               using controlVector: U) -> [Double]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Double, U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: controlVector.count) {
+                buffer, initializedCount in
+                
+                linearInterpolate(elementsOf: vector,
+                                  using: controlVector,
+                                  result: &buffer)
+                
+                initializedCount = controlVector.count
+            }
+            
+            return result
+    }
+    
+    /// Vector linear interpolation between neighboring elements; double-precision.
+    ///
+    /// This function interpolates between the elements of `vector` using the following:
+    ///
+    ///        for (n = 0; n < N; ++n) {
+    ///            b = trunc(B[n]);
+    ///            a = B[n] - b;
+    ///            C[n] = A[b] + a * (A[b+1] - A[b]);
+    ///        }
+    ///
+    /// Where `A` is the input vector, `B` is the control vector, and
+    /// `C` is the output vector.
+    ///
+    /// - Parameter vector: Input values.
+    /// - Parameter controlVector: Vector that controls interpolation.
     /// - Parameter result: Output values.
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     @inline(__always)
     public static func linearInterpolate<T, U, V>(elementsOf vector: T,
-                                           using controlVector: U,
-                                           result: inout V)
+                                                  using controlVector: U,
+                                                  result: inout V)
         where
         T: _ContiguousCollection,
         U: _ContiguousCollection,
