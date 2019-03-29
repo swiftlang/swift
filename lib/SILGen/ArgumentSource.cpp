@@ -251,10 +251,7 @@ void ArgumentSource::dump(raw_ostream &out, unsigned indent) const {
 PreparedArguments::PreparedArguments(
     ArrayRef<AnyFunctionType::Param> params,
     Expr *arg) : PreparedArguments(params) {
-  if (isa<ArgumentShuffleExpr>(arg)) {
-    IsScalar = true;
-    addArbitrary(arg);
-  } else if (auto *PE = dyn_cast<ParenExpr>(arg))
+  if (auto *PE = dyn_cast<ParenExpr>(arg))
     addArbitrary(PE->getSubExpr());
   else if (auto *TE = dyn_cast<TupleExpr>(arg)) {
     for (auto *elt : TE->getElements())
@@ -271,7 +268,6 @@ PreparedArguments::copy(SILGenFunction &SGF, SILLocation loc) const {
 
   assert(isValid());
   PreparedArguments result(getParams());
-  result.IsScalar = isScalar();
   for (auto &elt : Arguments) {
     assert(elt.isRValue());
     result.add(elt.getKnownRValueLocation(),
@@ -320,7 +316,6 @@ PreparedArguments PreparedArguments::copyForDiagnostics() const {
 
   assert(isValid());
   PreparedArguments result(getParams());
-  result.IsScalar = isScalar();
   for (auto &arg : Arguments) {
     result.Arguments.push_back(arg.copyForDiagnostics());
   }

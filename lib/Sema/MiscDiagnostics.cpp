@@ -146,11 +146,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       if (isa<TypeExpr>(Base))
         checkUseOfMetaTypeName(Base);
 
-      if (auto *ASE = dyn_cast<ArgumentShuffleExpr>(E)) {
-        if (CallArgs.count(ASE))
-          CallArgs.insert(ASE->getSubExpr());
-      }
-
       if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
         CallArgs.insert(SE->getIndex());
 
@@ -330,11 +325,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     static void argExprVisitArguments(Expr* arg,
                                       llvm::function_ref
                                         <void(unsigned, Expr*)> fn) {
-      // The argument could be shuffled if it includes default arguments,
-      // label differences, or other exciting things like that.
-      if (auto *ASE = dyn_cast<ArgumentShuffleExpr>(arg))
-        arg = ASE->getSubExpr();
-
       // The argument is either a ParenExpr or TupleExpr.
       if (auto *TE = dyn_cast<TupleExpr>(arg)) {
         auto elts = TE->getElements();
@@ -2912,8 +2902,6 @@ void swift::fixItEncloseTrailingClosure(TypeChecker &TC,
                                         const CallExpr *call,
                                         Identifier closureLabel) {
   auto argsExpr = call->getArg();
-  if (auto ASE = dyn_cast<ArgumentShuffleExpr>(argsExpr))
-    argsExpr = ASE->getSubExpr();
 
   SmallString<32> replacement;
   SourceLoc lastLoc;
@@ -2966,9 +2954,6 @@ static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
       auto argsTy = argsExpr->getType();
       // Ignore invalid argument type. Some diagnostics are already emitted.
       if (!argsTy || argsTy->hasError()) return;
-
-      if (auto ASE = dyn_cast<ArgumentShuffleExpr>(argsExpr))
-        argsExpr = ASE->getSubExpr();
 
       SourceLoc closureLoc;
       if (auto PE = dyn_cast<ParenExpr>(argsExpr))

@@ -2601,89 +2601,7 @@ Expr *ArgumentSource::findStorageReferenceExprForBorrow() && {
 
 namespace {
 
-/// A destination for an argument other than just "onto to the end
-/// of the arguments lists".
-///
-/// This allows us to re-use the argument expression emitter for
-/// some weird cases, like a shuffled tuple where some of the
-/// arguments are going into a varargs array.
-struct ArgSpecialDest {
-  VarargsInfo *SharedInfo;
-  unsigned Index : 32;
-  CleanupHandle Cleanup;
-
-  ArgSpecialDest() : SharedInfo(nullptr) {}
-  explicit ArgSpecialDest(VarargsInfo &info, unsigned index)
-    : SharedInfo(&info), Index(index) {}
-
-  // Reference semantics: need to preserve the cleanup handle.
-  ArgSpecialDest(const ArgSpecialDest &) = delete;
-  ArgSpecialDest &operator=(const ArgSpecialDest &) = delete;
-  ArgSpecialDest(ArgSpecialDest &&other)
-    : SharedInfo(other.SharedInfo), Index(other.Index),
-      Cleanup(other.Cleanup) {
-    other.SharedInfo = nullptr;
-  }
-  ArgSpecialDest &operator=(ArgSpecialDest &&other) {
-    assert(!isValid() && "overwriting valid special destination!");
-    SharedInfo = other.SharedInfo;
-    Index = other.Index;
-    Cleanup = other.Cleanup;
-    other.SharedInfo = nullptr;
-    return *this;
-  }
-
-  ~ArgSpecialDest() {
-    assert(!isValid() && "failed to deactivate special dest");
-  }
-
-  /// Is this a valid special destination?
-  bool isValid() const { return SharedInfo != nullptr; }
-
-  /// Fill this special destination with a value.
-  void fill(SILGenFunction &SGF, ArgumentSource &&arg,
-            AbstractionPattern _unused_origType,
-            SILType loweredSubstParamType) {
-    assert(isValid() && "filling an invalid destination");
-
-    SILLocation loc = arg.getLocation();
-    auto destAddr = SharedInfo->getBaseAddress();
-    if (Index != 0) {
-      SILValue index = SGF.B.createIntegerLiteral(loc,
-                  SILType::getBuiltinWordType(SGF.getASTContext()), Index);
-      destAddr = SGF.B.createIndexAddr(loc, destAddr, index);
-    }
-
-    assert(destAddr->getType() == loweredSubstParamType.getAddressType());
-
-    auto &destTL = SharedInfo->getBaseTypeLowering();
-    Cleanup =
-        SGF.enterDormantFormalAccessTemporaryCleanup(destAddr, loc, destTL);
-
-    TemporaryInitialization init(destAddr, Cleanup);
-    std::move(arg).forwardInto(SGF, SharedInfo->getBaseAbstractionPattern(),
-                               &init, destTL);
-  }
-
-  /// Deactivate this special destination.  Must always be called
-  /// before destruction.
-  void deactivate(SILGenFunction &SGF) {
-    assert(isValid() && "deactivating an invalid destination");
-    if (Cleanup.isValid())
-      SGF.Cleanups.forwardCleanup(Cleanup);
-    SharedInfo = nullptr;
-  }
-};
-
-using ArgSpecialDestArray = MutableArrayRef<ArgSpecialDest>;
-
-class ArgumentShuffleEmitter;
-
 class ArgEmitter {
-  // TODO: Refactor out the parts of ArgEmitter needed by ArgumentShuffleEmitter
-  // into its own "context struct".
-  friend class ArgumentShuffleEmitter;
-
   SILGenFunction &SGF;
   SILFunctionTypeRepresentation Rep;
   bool IsYield;
@@ -2697,21 +2615,16 @@ class ArgEmitter {
   /// in order to a "hole" (a null value) in Args.
   SmallVectorImpl<DelayedArgument> &DelayedArguments;
 
-  Optional<ArgSpecialDestArray> SpecialDests;
 public:
   ArgEmitter(SILGenFunction &SGF, SILFunctionTypeRepresentation Rep,
              bool isYield, bool isForCoroutine, ClaimedParamsRef paramInfos,
              SmallVectorImpl<ManagedValue> &args,
              SmallVectorImpl<DelayedArgument> &delayedArgs,
              const Optional<ForeignErrorConvention> &foreignError,
-             ImportAsMemberStatus foreignSelf,
-             Optional<ArgSpecialDestArray> specialDests = None)
+             ImportAsMemberStatus foreignSelf)
       : SGF(SGF), Rep(Rep), IsYield(isYield), IsForCoroutine(isForCoroutine),
         ForeignError(foreignError), ForeignSelf(foreignSelf),
-        ParamInfos(paramInfos), Args(args), DelayedArguments(delayedArgs),
-        SpecialDests(specialDests) {
-    assert(!specialDests || specialDests->size() == paramInfos.size());
-  }
+        ParamInfos(paramInfos), Args(args), DelayedArguments(delayedArgs) {}
 
   // origParamType is a parameter type.
   void emitSingleArg(ArgumentSource &&arg, AbstractionPattern origParamType) {
@@ -2745,26 +2658,10 @@ public:
     assert(args.isValid());
     auto argSources = std::move(args).getSources();
 
-    if (args.isScalar()) {
-      assert(argSources.size() == 1);
-      auto arg = std::move(argSources[0]);
-      auto *shuffle = cast<ArgumentShuffleExpr>(std::move(arg).asKnownExpr());
-      
-      SmallVector<AbstractionPattern, 8> origParamTypes;
-      for (unsigned i = 0, e = origFormalType.getNumFunctionParams(); i < e; ++i) {
-        origParamTypes.push_back(origFormalType.getFunctionParamType(i));
-      }
-
-      auto origParamType = AbstractionPattern::getTuple(origParamTypes);
-
-      emitShuffle(shuffle, origParamType);
-      maybeEmitForeignErrorArgument();
-    } else {
-      maybeEmitForeignErrorArgument();
-      for (auto i : indices(argSources)) {
-        emitSingleArg(std::move(argSources[i]),
-                      origFormalType.getFunctionParamType(i));
-      }
+    maybeEmitForeignErrorArgument();
+    for (auto i : indices(argSources)) {
+      emitSingleArg(std::move(argSources[i]),
+                    origFormalType.getFunctionParamType(i));
     }
   }
 
@@ -2796,7 +2693,6 @@ private:
     // substituted argument type by abstraction and/or bridging.
     auto paramSlice = claimNextParameters(1);
     SILParameterInfo param = paramSlice.front();
-    ArgSpecialDest *specialDest = claimNextSpecialDest();
 
     assert(arg.hasLValueType() == param.isIndirectInOut());
 
@@ -2816,7 +2712,6 @@ private:
     // If the caller takes the argument indirectly, the argument has an
     // inout type.
     if (param.isIndirectInOut()) {
-      assert(!specialDest);
       emitInOut(std::move(arg), loweredSubstArgType, loweredSubstParamType,
                 origParamType, substArgType);
       return;
@@ -2824,24 +2719,9 @@ private:
 
     // If this is a yield, and the yield is borrowed, emit a borrowed r-value.
     if (IsYield && param.isGuaranteed()) {
-      assert(!specialDest);
       if (tryEmitBorrowed(std::move(arg), loweredSubstArgType,
                           loweredSubstParamType, origParamType, paramSlice))
         return;
-    }
-
-    // If the original type is passed indirectly, copy to memory if
-    // it's not already there.  (Note that this potentially includes
-    // conventions which pass indirectly without transferring
-    // ownership, like Itanium C++.)
-    if (specialDest) {
-      assert(param.isFormalIndirect() &&
-             "SpecialDest should imply indirect parameter");
-      // TODO: Change the way we initialize array storage in opaque mode
-      emitIndirectInto(std::move(arg), origParamType, loweredSubstParamType,
-                       *specialDest);
-      Args.push_back(ManagedValue::forInContext());
-      return;
     }
 
      if (SGF.silConv.isSILIndirect(param)) {
@@ -2859,16 +2739,6 @@ private:
     auto slice = ParamInfos.slice(0, count);
     ParamInfos = ParamInfos.slice(count);
     return slice;
-  }
-
-  /// Claim the next destination, returning a null pointer if there
-  /// is no special destination.
-  ArgSpecialDest *claimNextSpecialDest() {
-    if (!SpecialDests) return nullptr;
-    assert(!SpecialDests->empty());
-    auto dest = &SpecialDests->front();
-    SpecialDests = SpecialDests->slice(1);
-    return (dest->isValid() ? dest : nullptr);
   }
 
   /// Emit an argument as an expanded tuple.
@@ -2928,8 +2798,6 @@ private:
     emitExpanded({ e, SGF.emitRValue(e) }, origParamType);
   }
 
-  void emitShuffle(ArgumentShuffleExpr *shuffle, AbstractionPattern origType);
-
   void emitIndirect(ArgumentSource &&arg,
                     SILType loweredSubstArgType,
                     AbstractionPattern origParamType,
@@ -2967,13 +2835,6 @@ private:
     }
 
     Args.push_back(result);
-  }
-
-  void emitIndirectInto(ArgumentSource &&arg,
-                        AbstractionPattern origType,
-                        SILType loweredSubstParamType,
-                        ArgSpecialDest &dest) {
-    dest.fill(SGF, std::move(arg), origType, loweredSubstParamType);
   }
 
   void emitInOut(ArgumentSource &&arg,
@@ -3289,11 +3150,8 @@ private:
       return;
 
     SILParameterInfo param = claimNextParameters(1).front();
-    ArgSpecialDest *specialDest = claimNextSpecialDest();
-
     assert(param.getConvention() == ParameterConvention::Direct_Unowned);
-    assert(!specialDest && "special dest for error argument?");
-    (void) param; (void) specialDest;
+    (void) param;
 
     // Leave a placeholder in the position.
     Args.push_back(ManagedValue::forInContext());
@@ -3453,406 +3311,7 @@ void DelayedArgument::emitBorrowedLValue(SILGenFunction &SGF,
   // That should drain all the parameters.
   assert(params.empty());
 }
-
-struct ElementExtent {
-  /// The parameters which go into this tuple element.
-  /// This is set in the first pass.
-  ClaimedParamsRef Params;
-  /// The destination index, if any.
-  /// This is set in the first pass.
-  unsigned DestIndex : 30;
-  unsigned HasDestIndex : 1;
-#ifndef NDEBUG
-  unsigned Used : 1;
-#endif
-  /// The arguments which feed this tuple element.
-  /// This is set in the second pass.
-  ArrayRef<ManagedValue> Args;
-  /// The inout arguments which feed this tuple element.
-  /// This is set in the second pass.
-  MutableArrayRef<DelayedArgument> DelayedArgs;
-
-  ElementExtent()
-      : HasDestIndex(false)
-#ifndef NDEBUG
-        ,
-        Used(false)
-#endif
-  {
-  }
-};
-
-class ArgumentShuffleEmitter {
-  Expr *inner;
-  Expr *outer;
-  ArrayRef<TupleTypeElt> innerElts;
-  ConcreteDeclRef defaultArgsOwner;
-  ArrayRef<Expr *> callerDefaultArgs;
-  ArrayRef<int> elementMapping;
-  ArrayRef<unsigned> variadicArgs;
-  Type varargsArrayType;
-  AbstractionPattern origParamType;
-  bool isResultScalar;
-
-  TupleTypeElt singleOuterElement;
-  ArrayRef<TupleTypeElt> outerElements;
-  CanType canVarargsArrayType;
-
-  /// The original parameter type.
-  SmallVector<AbstractionPattern, 8> origInnerElts;
-  AbstractionPattern innerOrigParamType;
-  /// Flattened inner parameter sequence.
-  SmallVector<SILParameterInfo, 8> innerParams;
-  /// Extents of the inner elements.
-  SmallVector<ElementExtent, 8> innerExtents;
-  Optional<VarargsInfo> varargsInfo;
-  SILParameterInfo variadicParamInfo; // innerExtents will point at this
-  Optional<SmallVector<ArgSpecialDest, 8>> innerSpecialDests;
-
-  // Used by flattenPatternFromInnerExtendIntoInnerParams and
-  // splitInnerArgumentsCorrectly.
-  SmallVector<ManagedValue, 8> innerArgs;
-  SmallVector<DelayedArgument, 2> innerDelayedArgs;
-
-public:
-  ArgumentShuffleEmitter(ArgumentShuffleExpr *e, ArrayRef<TupleTypeElt> innerElts,
-                         AbstractionPattern origParamType)
-      : inner(e->getSubExpr()), outer(e), innerElts(innerElts),
-        defaultArgsOwner(e->getDefaultArgsOwner()),
-        callerDefaultArgs(e->getCallerDefaultArgs()),
-        elementMapping(e->getElementMapping()),
-        variadicArgs(e->getVariadicArgs()),
-        varargsArrayType(e->getVarargsArrayTypeOrNull()),
-        origParamType(origParamType), isResultScalar(e->isResultScalar()),
-        canVarargsArrayType(),
-        origInnerElts(innerElts.size(), AbstractionPattern::getInvalid()),
-        innerOrigParamType(AbstractionPattern::getInvalid()), innerParams(),
-        innerExtents(innerElts.size()), varargsInfo(), variadicParamInfo(),
-        innerSpecialDests() {
-
-    // Decompose the shuffle result.
-    CanType resultType = e->getType()->getCanonicalType();
-    if (isResultScalar) {
-      singleOuterElement = TupleTypeElt(resultType);
-      outerElements = singleOuterElement;
-    } else {
-      outerElements = cast<TupleType>(resultType)->getElements();
-    }
-
-    if (varargsArrayType)
-      canVarargsArrayType = varargsArrayType->getCanonicalType();
-  }
-
-  ArgumentShuffleEmitter(const ArgumentShuffleEmitter &) = delete;
-  ArgumentShuffleEmitter &operator=(const ArgumentShuffleEmitter &) = delete;
-  ArgumentShuffleEmitter(ArgumentShuffleEmitter &&) = delete;
-  ArgumentShuffleEmitter &operator=(ArgumentShuffleEmitter &&) = delete;
-
-  void emit(ArgEmitter &parent);
-
-private:
-  void constructInnerTupleTypeInfo(ArgEmitter &parent);
-  void flattenPatternFromInnerExtendIntoInnerParams(ArgEmitter &parent);
-  void splitInnerArgumentsCorrectly(ArgEmitter &parent);
-  void emitDefaultArgsAndFinalize(ArgEmitter &parent);
-
-  AbstractionPattern getOutputOrigElementType(unsigned index) {
-    assert(!isResultScalar || index == 0);
-    return origParamType.getTupleElementType(index);
-  }
-};
-
 } // end anonymous namespace
-
-void ArgumentShuffleEmitter::constructInnerTupleTypeInfo(ArgEmitter &parent) {
-  unsigned nextParamIndex = 0;
-  for (unsigned outerIndex : indices(outerElements)) {
-    CanType substEltType =
-        outerElements[outerIndex].getType()->getCanonicalType();
-    AbstractionPattern origEltType =
-        getOutputOrigElementType(outerIndex);
-    unsigned numParams =
-        getFlattenedValueCount(origEltType, substEltType, parent.ForeignSelf);
-
-    // Skip the foreign-error parameter.
-    assert((!parent.ForeignError ||
-            parent.ForeignError->getErrorParameterIndex() <= nextParamIndex ||
-            parent.ForeignError->getErrorParameterIndex() >=
-                nextParamIndex + numParams) &&
-           "error parameter falls within shuffled range?");
-    if (numParams && // Don't skip it twice if there's an empty tuple.
-        parent.ForeignError &&
-        parent.ForeignError->getErrorParameterIndex() == nextParamIndex) {
-      nextParamIndex++;
-    }
-
-    // Grab the parameter infos corresponding to this tuple element
-    // (but don't drop them from ParamInfos yet).
-    auto eltParams = parent.ParamInfos.slice(nextParamIndex, numParams);
-    nextParamIndex += numParams;
-
-    int innerIndex = elementMapping[outerIndex];
-    if (innerIndex >= 0) {
-#ifndef NDEBUG
-      assert(!innerExtents[innerIndex].Used && "using element twice");
-      innerExtents[innerIndex].Used = true;
-#endif
-      innerExtents[innerIndex].Params = eltParams;
-      origInnerElts[innerIndex] = origEltType;
-    } else if (innerIndex == ArgumentShuffleExpr::Variadic) {
-      auto &varargsField = outerElements[outerIndex];
-      assert(varargsField.isVararg());
-      assert(!varargsInfo.hasValue() && "already had varargs entry?");
-
-      CanType varargsEltType = CanType(varargsField.getVarargBaseTy());
-      unsigned numVarargs = variadicArgs.size();
-      assert(canVarargsArrayType == substEltType);
-
-      // If we don't have any vararg expansions, eagerly emit into
-      // the array value.
-      varargsInfo.emplace(emitBeginVarargs(parent.SGF, outer, varargsEltType,
-                                           canVarargsArrayType, numVarargs));
-
-      // If we have any varargs, we'll need to actually initialize
-      // the array buffer.
-      if (numVarargs) {
-        // For this, we'll need special destinations.
-        assert(!innerSpecialDests);
-        innerSpecialDests.emplace();
-
-        // Prepare the variadic "arguments" as single +1 indirect parameters
-        // with the array's desired abstraction pattern.  The vararg element
-        // type should be materializable, and the abstraction pattern should be
-        // opaque, so ArgEmitter's lowering should always generate exactly one
-        // "argument" per element even if the substituted element type is a
-        // tuple.
-        variadicParamInfo =
-          SILParameterInfo(varargsInfo->getBaseTypeLowering()
-                           .getLoweredType().getASTType(),
-                           ParameterConvention::Indirect_In);
-
-        unsigned i = 0;
-        for (unsigned innerIndex : variadicArgs) {
-          // Find out where the next varargs element is coming from.
-          assert(innerIndex >= 0 && "special source for varargs element??");
-#ifndef NDEBUG
-          assert(!innerExtents[innerIndex].Used && "using element twice");
-          innerExtents[innerIndex].Used = true;
-#endif
-
-          // Set the destination index.
-          innerExtents[innerIndex].HasDestIndex = true;
-          innerExtents[innerIndex].DestIndex = i++;
-
-          // Use the singleton param info we prepared before.
-          innerExtents[innerIndex].Params =
-            ClaimedParamsRef(variadicParamInfo);
-
-          // Propagate the element abstraction pattern.
-          origInnerElts[innerIndex] =
-            varargsInfo->getBaseAbstractionPattern();
-        }
-      }
-    }
-  }
-}
-
-void ArgumentShuffleEmitter::flattenPatternFromInnerExtendIntoInnerParams(
-    ArgEmitter &parent) {
-  for (auto &extent : innerExtents) {
-    assert(extent.Used && "didn't use all the inner tuple elements!");
-
-    for (auto param : extent.Params) {
-      innerParams.push_back(param);
-    }
-
-    // Fill in the special destinations array.
-    if (innerSpecialDests) {
-      // Use the saved index if applicable.
-      if (extent.HasDestIndex) {
-        assert(extent.Params.size() == 1);
-        innerSpecialDests->push_back(
-            ArgSpecialDest(*varargsInfo, extent.DestIndex));
-
-        // Otherwise, fill in with the appropriate number of invalid
-        // special dests.
-      } else {
-        // ArgSpecialDest isn't copyable, so we can't just use append.
-        for (auto &p : extent.Params) {
-          (void)p;
-          innerSpecialDests->push_back(ArgSpecialDest());
-        }
-      }
-    }
-  }
-}
-
-void ArgumentShuffleEmitter::splitInnerArgumentsCorrectly(ArgEmitter &parent) {
-  ArrayRef<ManagedValue> nextArgs = innerArgs;
-  MutableArrayRef<DelayedArgument> nextDelayedArgs = innerDelayedArgs;
-  for (auto &extent : innerExtents) {
-    auto length = extent.Params.size();
-
-    // Claim the next N inner args for this inner argument.
-    extent.Args = nextArgs.slice(0, length);
-    nextArgs = nextArgs.slice(length);
-
-    // Claim the correct number of inout arguments as well.
-    size_t numDelayed = 0;
-    for (auto arg : extent.Args) {
-      assert(!arg.isInContext() || extent.HasDestIndex);
-      if (!arg)
-        numDelayed++;
-    }
-    extent.DelayedArgs = nextDelayedArgs.slice(0, numDelayed);
-    nextDelayedArgs = nextDelayedArgs.slice(numDelayed);
-  }
-
-  assert(nextArgs.empty() && "didn't claim all args");
-  assert(nextDelayedArgs.empty() && "didn't claim all inout args");
-}
-
-void ArgumentShuffleEmitter::emitDefaultArgsAndFinalize(ArgEmitter &parent) {
-  unsigned nextCallerDefaultArg = 0;
-  for (unsigned outerIndex = 0, e = outerElements.size();
-         outerIndex != e; ++outerIndex) {
-    // If this comes from an inner element, move the appropriate
-    // inner element values over.
-    int innerIndex = elementMapping[outerIndex];
-    if (innerIndex >= 0) {
-      auto &extent = innerExtents[innerIndex];
-      auto numArgs = extent.Args.size();
-
-      parent.maybeEmitForeignErrorArgument();
-
-      // Drop N parameters off of ParamInfos.
-      parent.ParamInfos = parent.ParamInfos.slice(numArgs);
-
-      // Move the appropriate inner arguments over as outer arguments.
-      parent.Args.append(extent.Args.begin(), extent.Args.end());
-      for (auto &delayedArg : extent.DelayedArgs)
-        parent.DelayedArguments.push_back(std::move(delayedArg));
-      continue;
-    }
-
-    // If this is default initialization, prepare to emit the default argument
-    // generator later.
-    if (innerIndex == ArgumentShuffleExpr::DefaultInitialize) {
-      // Otherwise, emit the default initializer, then map that as a
-      // default argument.
-      CanType eltType = outerElements[outerIndex].getType()->getCanonicalType();
-      auto origType = getOutputOrigElementType(outerIndex);
-      
-      auto numParams = getFlattenedValueCount(origType, eltType,
-                                              ImportAsMemberStatus());
-
-      parent.DelayedArguments.emplace_back(outer, defaultArgsOwner,
-                                         outerIndex, eltType, origType,
-                                         parent.claimNextParameters(numParams),
-                                         parent.Rep);
-      parent.Args.push_back(ManagedValue());
-      continue;
-    }
-
-    // If this is caller default initialization, generate the
-    // appropriate value.
-    if (innerIndex == ArgumentShuffleExpr::CallerDefaultInitialize) {
-      auto arg = callerDefaultArgs[nextCallerDefaultArg++];
-      parent.emit(ArgumentSource(arg),
-                  getOutputOrigElementType(outerIndex));
-      continue;
-    }
-
-    // If we're supposed to create a varargs array with the rest, do so.
-    if (innerIndex == ArgumentShuffleExpr::Variadic) {
-      auto &varargsField = outerElements[outerIndex];
-      assert(varargsField.isVararg() &&
-             "Cannot initialize nonvariadic element");
-      assert(varargsInfo.hasValue());
-      (void) varargsField;
-
-      // We've successfully built the varargs array; deactivate all
-      // the special destinations.
-      if (innerSpecialDests) {
-        for (auto &dest : *innerSpecialDests) {
-          if (dest.isValid())
-            dest.deactivate(parent.SGF);
-        }
-      }
-
-      CanType eltType = outerElements[outerIndex].getType()->getCanonicalType();
-      ManagedValue varargs =
-          emitEndVarargs(parent.SGF, outer, std::move(*varargsInfo));
-      parent.emit(
-          ArgumentSource(outer, RValue(parent.SGF, outer, eltType, varargs)),
-          getOutputOrigElementType(outerIndex));
-      continue;
-    }
-
-    // That's the last special case defined so far.
-    llvm_unreachable("unexpected special case in tuple shuffle!");
-  }
-}
-
-void ArgumentShuffleEmitter::emit(ArgEmitter &parent) {
-  // We could support dest addrs here, but it can't actually happen
-  // with the current limitations on default arguments in tuples.
-  assert(!parent.SpecialDests && "shuffle nested within varargs expansion?");
-
-  // First, construct an abstraction pattern and parameter sequence
-  // which we can use to emit the inner tuple.
-  constructInnerTupleTypeInfo(parent);
-
-  // The inner abstraction pattern is opaque if we started with an
-  // opaque pattern; otherwise, it's a tuple of the de-shuffled
-  // tuple elements.
-  innerOrigParamType = origParamType;
-
-  // That "tuple" might not actually be a tuple.
-  if (innerElts.size() == 1 && !innerElts[0].hasName()) {
-    innerOrigParamType = origInnerElts[0];
-  } else {
-    innerOrigParamType = AbstractionPattern::getTuple(origInnerElts);
-  }
-
-  flattenPatternFromInnerExtendIntoInnerParams(parent);
-
-  // Emit the inner expression.
-  if (!innerParams.empty()) {
-    ArgEmitter(parent.SGF, parent.Rep, parent.IsYield, parent.IsForCoroutine,
-               ClaimedParamsRef(innerParams), innerArgs, innerDelayedArgs,
-               /*foreign error*/ None, /*foreign self*/ ImportAsMemberStatus(),
-               (innerSpecialDests ? ArgSpecialDestArray(*innerSpecialDests)
-                                  : Optional<ArgSpecialDestArray>()))
-        .emitSingleArg(ArgumentSource(inner), innerOrigParamType);
-  }
-
-  // Make a second pass to split the inner arguments correctly.
-  splitInnerArgumentsCorrectly(parent);
-
-  // Make a final pass to emit default arguments and move things into
-  // the outer arguments lists.
-  emitDefaultArgsAndFinalize(parent);
-}
-
-void ArgEmitter::emitShuffle(ArgumentShuffleExpr *E,
-                             AbstractionPattern origParamType) {
-  ArrayRef<TupleTypeElt> srcElts;
-  TupleTypeElt singletonSrcElt;
-  auto srcEltTy = E->getSubExpr()->getType()->getCanonicalType();
-  if (E->isSourceScalar()) {
-    ParameterTypeFlags flags;
-    if (E->getSubExpr()->isSemanticallyInOutExpr()) {
-      flags = flags.withInOut(true);
-    }
-    singletonSrcElt = {srcEltTy->getInOutObjectType(), Identifier(), flags};
-    srcElts = singletonSrcElt;
-  } else {
-    srcElts = cast<TupleType>(srcEltTy)->getElements();
-  }
-
-  ArgumentShuffleEmitter(E, srcElts, origParamType).emit(*this);
-}
 
 namespace {
 /// Cleanup to destroy an uninitialized box.

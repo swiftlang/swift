@@ -6842,9 +6842,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
           return nullptr;
         }
 
-        if (auto shuffle = dyn_cast<ArgumentShuffleExpr>(arg))
-          arg = shuffle->getSubExpr();
-
         if (auto tuple = dyn_cast<TupleExpr>(arg))
           arg = tuple->getElements()[0];
 
@@ -7045,8 +7042,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
     // Extract all arguments.
     auto *CEA = arg;
-    if (auto *ASE = dyn_cast<ArgumentShuffleExpr>(CEA))
-      CEA = ASE->getSubExpr();
+
     // The argument is either a ParenExpr or TupleExpr.
     ArrayRef<Expr *> arguments;
 
