@@ -118,7 +118,7 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
   P.addSplitNonCondBrCriticalEdges();
 
   // SWIFT_ENABLE_TENSORFLOW
-  P.addTFDeabstraction();
+  P.addTFDeabstractionMandatory();
 }
 
 SILPassPipelinePlan
@@ -394,6 +394,7 @@ static void addMidModulePassesStackPromotePassPipeline(SILPassPipelinePlan &P) {
 
 static void addMidLevelPassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("MidLevel");
+  P.addTFDeabstractionOpt();
   addSSAPasses(P, OptimizationLevelKind::MidLevel);
 
   // Specialize partially applied functions with dead arguments as a preparation
@@ -620,6 +621,8 @@ SILPassPipelinePlan SILPassPipelinePlan::getOnonePassPipeline() {
 
   P.startPipeline("Rest of Onone");
 
+  P.addTFPartitionMandatory();
+
   // Has only an effect if the -assume-single-thread option is specified.
   P.addAssumeSingleThreaded();
 
@@ -637,7 +640,7 @@ SILPassPipelinePlan SILPassPipelinePlan::getOnonePassPipeline() {
 SILPassPipelinePlan SILPassPipelinePlan::getTFPartitionPassPipeline() {
   SILPassPipelinePlan P;
   P.startPipeline("TensorFlow Partitioning");
-  P.addTFPartition();
+  P.addTFPartitionOpt();
   return P;
 }
 /// SWIFT_ENABLE_TENSORFLOW End

@@ -2589,10 +2589,16 @@ void TFDeabstraction::doIt() {
 
 
 namespace {
-  struct TFDeabstractionPass : public SILModuleTransform {
+  class TFDeabstractionPass : public SILModuleTransform {
+  public:
+    TFDeabstractionPass(TFPassKind kind) : passKind(kind) {}
+
     /// The entry point to the transformation, runs deabstraction on an entire
     /// module.
     void run() override;
+
+  private:
+    TFPassKind passKind;
   };
 }  // end anonymous namespace
 
@@ -2621,14 +2627,26 @@ void TFDeabstractionPass::run() {
   TensorFunctionClassifier tfc;
   ConstExprEvaluator constantEvaluator(*module);
 
+  // Returns true if this functions should be processed now.
+  auto shouldProcessFunction = [this](const SILFunction &fn) {
+    if (passKind == TFPassKind::Mandatory) {
+      return isAcceleratorOnly(fn);
+    }
+    if (passKind == TFPassKind::Opt) {
+      // In dynamic compilation mode, we only deabstract accelerator-only functions.
+      return !llvm::TFDynamicCompilation && !isAcceleratorOnly(fn);
+    }
+    // Process all functions in a test pass.
+    return true;
+  };
+
   SmallPtrSet<SILFunction*, 16> partitionedFunctions;
 
   // Loop over all of the functions in the current module processing them -
   // iff they look like they could be the top level of a deabstraction
   // context.
   for (auto &fn : *module) {
-    // In dynamic compilation mode, only deabstract accelerator-only functions.
-    if (llvm::TFDynamicCompilation && !isAcceleratorOnly(fn))
+    if (!shouldProcessFunction(fn))
       continue;
 
     // If this function is a building block of larger tensor programs (e.g.
@@ -2677,8 +2695,7 @@ void TFDeabstractionPass::run() {
   // of the functions would be dead after the first round, but some stragglers
   // remain as in the example above.
   for (auto &fn : *module) {
-    // In dynamic compilation mode, only deabstract accelerator-only functions.
-    if (llvm::TFDynamicCompilation && !isAcceleratorOnly(fn))
+    if (!shouldProcessFunction(fn))
       continue;
 
     // Skip if it is already partitioned, or if it was ignored only because it
@@ -2690,6 +2707,10 @@ void TFDeabstractionPass::run() {
   }
 }
 
-SILTransform *swift::createTFDeabstraction() {
-  return new TFDeabstractionPass();
+SILTransform *swift::createTFDeabstractionMandatory() {
+  return new TFDeabstractionPass(TFPassKind::Mandatory);
+}
+
+SILTransform *swift::createTFDeabstractionOpt() {
+  return new TFDeabstractionPass(TFPassKind::Opt);
 }
