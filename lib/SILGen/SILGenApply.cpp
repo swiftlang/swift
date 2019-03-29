@@ -4095,9 +4095,8 @@ public:
   }
 
   /// Take the arguments for special processing, in place of the above.
-  ArgumentSource &&forward() && {
-    assert(Args.isScalar());
-    return std::move(std::move(Args).getSources()[0]);
+  PreparedArguments &&forward() && {
+    return std::move(Args);
   }
 };
 
@@ -4483,6 +4482,12 @@ CallEmission::applyNormalCall(SGFContext C) {
   return firstLevelResult;
 }
 
+static void emitPseudoFunctionArguments(SILGenFunction &SGF,
+                                        AbstractionPattern origFnType,
+                                        CanFunctionType substFnType,
+                                        SmallVectorImpl<ManagedValue> &outVals,
+                                        PreparedArguments &&args);
+
 CallEmission::FirstLevelApplicationResult
 CallEmission::applyEnumElementConstructor(SGFContext C) {
   FirstLevelApplicationResult firstLevelResult;
@@ -4507,9 +4512,15 @@ CallEmission::applyEnumElementConstructor(SGFContext C) {
   CanType formalResultType = firstLevelResult.formalType.getResult();
 
   // Ignore metatype argument
+  SmallVector<ManagedValue, 0> metatypeVal;
+  emitPseudoFunctionArguments(SGF,
+                              AbstractionPattern(firstLevelResult.formalType),
+                              firstLevelResult.formalType, metatypeVal,
+                              std::move(uncurriedSites[0]).forward());
+  assert(metatypeVal.size() == 1);
+
   origFormalType = origFormalType.getFunctionResultType();
   claimNextParamClause(firstLevelResult.formalType);
-  std::move(uncurriedSites[0]).forward().getAsSingleValue(SGF);
 
   // Get the payload argument.
   ArgumentSource payload;
@@ -4517,8 +4528,16 @@ CallEmission::applyEnumElementConstructor(SGFContext C) {
     assert(uncurriedSites.size() == 2);
     SmallVector<ManagedValue, 4> argVals;
     auto resultFnType = cast<FunctionType>(formalResultType);
-    auto arg = SGF.prepareEnumPayload(element, resultFnType,
-                                      std::move(uncurriedSites[1]).forward());
+
+    emitPseudoFunctionArguments(SGF,
+                                AbstractionPattern(resultFnType),
+                                resultFnType, argVals,
+                                std::move(uncurriedSites[1]).forward());
+
+    auto payloadTy = AnyFunctionType::composeInput(SGF.getASTContext(),
+                                                  resultFnType.getParams(),
+                                                  /*canonicalVararg*/ true);
+    auto arg = RValue(SGF, argVals, payloadTy->getCanonicalType());
     payload = ArgumentSource(element, std::move(arg));
     formalResultType = firstLevelResult.formalType.getResult();
     origFormalType = origFormalType.getFunctionResultType();
@@ -4640,7 +4659,10 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
 
     // We should be able to enforce that these arguments are
     // always still expressions.
-    Expr *argument = std::move(uncurriedSites[0]).forward().asKnownExpr();
+    PreparedArguments args = std::move(uncurriedSites[0]).forward();
+    assert(args.isScalar());
+    Expr *argument = std::move(std::move(args).getSources()[0]).asKnownExpr();
+
     ManagedValue resultMV =
         emitter(SGF, uncurriedLoc, callee.getSubstitutions(),
                 argument, uncurriedContext);
@@ -5982,9 +6004,10 @@ static void collectFakeIndexParameters(SILGenFunction &SGF,
 }
 
 static void emitPseudoFunctionArguments(SILGenFunction &SGF,
+                                        AbstractionPattern origFnType,
                                         CanFunctionType substFnType,
                                         SmallVectorImpl<ManagedValue> &outVals,
-                                        ArgumentSource &&source) {
+                                        PreparedArguments &&args) {
   auto substParams = substFnType->getParams();
 
   SmallVector<SILParameterInfo, 4> substParamTys;
@@ -6002,7 +6025,7 @@ static void emitPseudoFunctionArguments(SILGenFunction &SGF,
                      argValues, delayedArgs,
                      /*foreign error*/ None, ImportAsMemberStatus());
 
-  emitter.emitTopLevel(std::move(source), AbstractionPattern(substFnType));
+  emitter.emitPreparedArgs(std::move(args), origFnType);
 
   // TODO: do something to preserve LValues in the delayed arguments?
   if (!delayedArgs.empty())
@@ -6034,11 +6057,22 @@ SILGenFunction::prepareSubscriptIndices(SubscriptDecl *subscript,
     substFnType = cast<FunctionType>(interfaceType
                                        ->getCanonicalType());
 
+
+  AbstractionPattern origFnType(substFnType);
+
+  // Prepare the unevaluated index expression.
   auto substParams = substFnType->getParams();
+  PreparedArguments args(substParams, /*isScalar=*/true);
+  args.addArbitrary(indexExpr);
 
+  // Now, force it to be evaluated.
   SmallVector<ManagedValue, 4> argValues;
-  emitPseudoFunctionArguments(*this, substFnType, argValues, indexExpr);
+  emitPseudoFunctionArguments(*this, origFnType, substFnType,
+                              argValues, std::move(args));
 
+  // Finally, prepare the evaluated index expression. We might be calling
+  // the getter and setter, and it is important to only evaluate the
+  // index expression once.
   PreparedArguments result(substParams, /*isScalar=*/false);
 
   ArrayRef<ManagedValue> remainingArgs = argValues;
@@ -6053,19 +6087,6 @@ SILGenFunction::prepareSubscriptIndices(SubscriptDecl *subscript,
 
   assert(result.isValid());
   return result;
-}
-
-RValue
-SILGenFunction::prepareEnumPayload(EnumElementDecl *element,
-                                   CanFunctionType substFnType,
-                                   ArgumentSource &&args) {
-  SmallVector<ManagedValue, 4> argValues;
-  emitPseudoFunctionArguments(*this, substFnType, argValues, std::move(args));
-
-  auto payloadTy = AnyFunctionType::composeInput(getASTContext(),
-                                                 substFnType.getParams(),
-                                                 /*canonicalVararg*/ true);
-  return RValue(*this, argValues, payloadTy->getCanonicalType());
 }
 
 SILDeclRef SILGenModule::getAccessorDeclRef(AccessorDecl *accessor) {

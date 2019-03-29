@@ -1210,10 +1210,6 @@ public:
                                             AccessStrategy strategy,
                                             Expr *indices);
 
-  RValue prepareEnumPayload(EnumElementDecl *element,
-                            CanFunctionType substFnType,
-                            ArgumentSource &&indexExpr);
-
   ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
                                         CanType baseFormalType,
                                         SILDeclRef accessor);
