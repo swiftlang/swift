@@ -637,6 +637,8 @@ private:
     if (Val != DIModuleCache.end())
       return cast<llvm::DIModule>(Val->second);
 
+    std::string RemappedIncludePath = DebugPrefixMap.remapPath(IncludePath);
+
     // For Clang modules / PCH, create a Skeleton CU pointing to the PCM/PCH.
     bool CreateSkeletonCU = !ASTFile.empty();
     bool IsRootModule = !Parent;
@@ -644,7 +646,7 @@ private:
       llvm::DIBuilder DIB(M);
       DIB.createCompileUnit(IGM.ObjCInterop ? llvm::dwarf::DW_LANG_ObjC
                                             : llvm::dwarf::DW_LANG_C99,
-                            DIB.createFile(Name, IncludePath),
+                            DIB.createFile(Name, RemappedIncludePath),
                             TheCU->getProducer(), true, StringRef(), 0, ASTFile,
                             llvm::DICompileUnit::FullDebug, Signature);
       DIB.finalize();
@@ -652,7 +654,8 @@ private:
 
     StringRef Sysroot = IGM.Context.SearchPathOpts.SDKPath;
     llvm::DIModule *M =
-        DBuilder.createModule(Parent, Name, ConfigMacros, IncludePath, Sysroot);
+        DBuilder.createModule(Parent, Name, ConfigMacros, RemappedIncludePath,
+                              Sysroot);
     DIModuleCache.insert({Key, llvm::TrackingMDNodeRef(M)});
     return M;
   }
