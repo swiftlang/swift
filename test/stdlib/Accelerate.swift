@@ -82,9 +82,13 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         var destination = [Float](repeating: .nan, count: 6)
         
         vDSP.slidingWindowSum(source,
-                                    usingWindowLength: 3,
-                                    result: &destination)
+                              usingWindowLength: 3,
+                              result: &destination)
         
+        let returnedResult = vDSP.slidingWindowSum(source,
+                                                   usingWindowLength: 3)
+        
+        expectTrue(destination.elementsEqual(returnedResult))
         expectTrue(destination.map{ Int($0) }.elementsEqual([23, 31, 24, 19, 12, 15]))
     }
     
@@ -93,11 +97,17 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         var destination = [Double](repeating: .nan, count: 6)
         
         vDSP.slidingWindowSum(source,
-                                    usingWindowLength: 3,
-                                    result: &destination)
+                              usingWindowLength: 3,
+                              result: &destination)
+        
+        let returnedResult = vDSP.slidingWindowSum(source,
+                                                   usingWindowLength: 3)
+        
+        expectTrue(destination.elementsEqual(returnedResult))
         
         expectTrue(destination.map{ Int($0) }.elementsEqual([23, 31, 24, 19, 12, 15]))
     }
+
 }
 
 runAllTests()

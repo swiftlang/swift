@@ -18,6 +18,34 @@ extension vDSP {
     ///
     /// - Parameter source: Single-precision input vector.
     /// - Parameter windowLength: The number of consecutive elements to sum.
+    /// - Returns: Single-precision output vector.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func slidingWindowSum<U>(_ vector: U,
+                                           usingWindowLength windowLength: Int) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let n = vector.count - windowLength + 1
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: n) {
+                buffer, initializedCount in
+                
+                slidingWindowSum(vector,
+                                 usingWindowLength: windowLength,
+                                 result: &buffer)
+                
+                initializedCount = n
+            }
+            
+            return result
+    }
+    
+    /// Vector sliding window sum; single-precision.
+    ///
+    /// - Parameter source: Single-precision input vector.
+    /// - Parameter windowLength: The number of consecutive elements to sum.
     /// - Parameter result: Single-precision output vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
@@ -42,6 +70,34 @@ extension vDSP {
                 }
             }
             
+    }
+    
+    /// Vector sliding window sum; double-precision.
+    ///
+    /// - Parameter source: Single-precision input vector.
+    /// - Parameter windowLength: The number of consecutive elements to sum.
+    /// - Returns: Single-precision output vector.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func slidingWindowSum<U>(_ vector: U,
+                                           usingWindowLength windowLength: Int) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let n = vector.count - windowLength + 1
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: n) {
+                buffer, initializedCount in
+                
+                slidingWindowSum(vector,
+                                 usingWindowLength: windowLength,
+                                 result: &buffer)
+                
+                initializedCount = n
+            }
+            
+            return result
     }
     
     /// Vector sliding window sum; double-precision.
