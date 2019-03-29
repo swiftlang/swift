@@ -1413,7 +1413,7 @@ public:
   // Helpers for emitting ApplyExpr chains.
   //
 
-  RValue emitApplyExpr(Expr *e, SGFContext c);
+  RValue emitApplyExpr(ApplyExpr *e, SGFContext c);
 
   /// Emit a function application, assuming that the arguments have been
   /// lowered appropriately for the abstraction level but that the
