@@ -2068,6 +2068,8 @@ public:
   }
   void visitArrayExpr(ArrayExpr *E) {
     printCommon(E, "array_expr");
+    PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
+    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
     for (auto elt : E->getElements()) {
       OS << '\n';
       printRec(elt);
@@ -2138,15 +2140,20 @@ public:
     printRec(E->getBase());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-  void visitTupleShuffleExpr(TupleShuffleExpr *E) {
-    printCommon(E, "tuple_shuffle_expr");
-    OS << " elements=[";
-    for (unsigned i = 0, e = E->getElementMapping().size(); i != e; ++i) {
-      if (i) OS << ", ";
-      OS << E->getElementMapping()[i];
+  void visitDestructureTupleExpr(DestructureTupleExpr *E) {
+    printCommon(E, "destructure_tuple_expr");
+    OS << " destructured=";
+    PrintWithColorRAII(OS, ParenthesisColor) << '(';
+    Indent += 2;
+    for (auto *elt : E->getDestructuredElements()) {
+      OS << "\n";
+      printRec(elt);
     }
-    OS << "]\n";
+    Indent -= 2;
+    PrintWithColorRAII(OS, ParenthesisColor) << ")\n";
     printRec(E->getSubExpr());
+    OS << "\n";
+    printRec(E->getResultExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitArgumentShuffleExpr(ArgumentShuffleExpr *E) {

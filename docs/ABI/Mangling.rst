@@ -112,6 +112,8 @@ Globals
   global ::= nominal-type 'Mn'           // nominal type descriptor
   global ::= nominal-type 'Mu'           // class method lookup function
   global ::= nominal-type 'MU'           // ObjC metadata update callback function
+  global ::= nominal-type 'Ms'           // ObjC resilient class stub
+  global ::= nominal-type 'Mt'           // Full ObjC resilient class stub (private)
   global ::= module 'MXM'                // module descriptor
   global ::= context 'MXE'               // extension descriptor
   global ::= context 'MXX'               // anonymous context descriptor

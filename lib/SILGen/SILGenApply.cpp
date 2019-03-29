@@ -5635,20 +5635,7 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
     }
   }
 
-  // Helper routine to add an argument label if we need one.
-  auto relabelArgument = [&](ConcreteDeclRef callee, RValue &arg) {
-    auto name = callee.getDecl()->getFullName();
-    auto argLabels = name.getArgumentNames();
-    if (argLabels.size() == 1 && !argLabels[0].empty() &&
-        !isa<TupleType>(arg.getType())) {
-      Type newType = TupleType::get({TupleTypeElt(arg.getType(), argLabels[0])},
-                                    getASTContext());
-      arg.rewriteType(newType->getCanonicalType());
-    }
-  };
-
   // Call the builtin initializer.
-  relabelArgument(builtinInit, builtinLiteralArgs);
   RValue builtinLiteral =
     emitApplyAllocatingInitializer(literal, builtinInit,
                                    std::move(builtinLiteralArgs),
@@ -5659,7 +5646,6 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
   if (!init) return builtinLiteral;
 
   // Otherwise, perform the second initialization step.
-  relabelArgument(init, builtinLiteral);
   RValue result = emitApplyAllocatingInitializer(literal, init,
                                                  std::move(builtinLiteral),
                                                  literal->getType(), C);
@@ -6189,14 +6175,9 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
   values.addArbitrary(std::move(setValue));
 
   if (!subscriptIndices.isNull()) {
-    unsigned paramIndex = 1;
     for (auto &component : std::move(subscriptIndices).getSources()) {
-      auto param = accessType.getParams()[paramIndex++];
-      auto paramType = param.getParameterType();
-
       auto argLoc = component.getKnownRValueLocation();
       RValue &&arg = std::move(component).asKnownRValue(*this);
-      arg.rewriteType(paramType);
       values.add(argLoc, std::move(arg));
     }
   }

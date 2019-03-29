@@ -3,6 +3,8 @@ include("../../../../cmake/modules/StandaloneOverlay.cmake")
 
 add_swift_target_library(swiftsimd ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
 
+  "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
+
   GYB_SOURCES
     simd.swift.gyb
     Quaternion.swift.gyb
