@@ -1898,12 +1898,16 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
 // We expect the gradient of that to be `[1, 1, 1]`. That is what we get, if we 
 // define the pullback of array subscripting as follows:
 // ```
-// func vjpSubscript(index) {
+// @differentiating(subscript, wrt: self)
+// @inlinable
+// func _vjpSubscript(
+//   _ index: Int
+// ) -> (Element, (Element.CotangentVector) -> CotangentVector) {
 //   let result = self[index]
 //   let pullback = { v in
-//     var pb = Array(repeating: zero, count: index + 1)
+//     var pb = Array(repeating: Element.CotangentVector.zero, count: index + 1)
 //     pb[index] = v
-//     return pb
+//     return CotangentVector(elements: pb)
 //   }
 //   return (result, pullback)
 // }
@@ -2109,3 +2113,19 @@ internal func _lazyZipLongestForArrayTangent<S: Sequence>(
     return (element1 ?? defaultValue, element2 ?? defaultValue)
   }.lazy
 }
+
+// extension Array where Element : Differentiable {
+//   @differentiating(subscript, wrt: self)
+//   @inlinable
+//   func _vjpSubscript(
+//     _ index: Int
+//   ) -> (Element, (Element.CotangentVector) -> CotangentVector) {
+//     let result = self[index]
+//     let pullback = { v in
+//       var pb = Array(repeating: Element.CotangentVector.zero, count: index + 1)
+//       pb[index] = v
+//       return CotangentVector(elements: pb)
+//     }
+//     return (result, pullback)
+//   }
+// }
