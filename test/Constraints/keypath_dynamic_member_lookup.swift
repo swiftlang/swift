@@ -137,3 +137,45 @@ func keypath_with_subscripts(_ arr: SubscriptLens<[Int]>,
   // CHECK: keypath $WritableKeyPath<Dictionary<String, Int>, Optional<Int>>, (root $Dictionary<String, Int>; settable_property $Optional<Int>,  id @$sSDyq_Sgxcig : {{.*}})
   dict["ultimate question"] = 42
 }
+
+struct DotStruct {
+  var x, y: Int
+}
+
+class DotClass {
+  var x, y: Int
+
+  init(x: Int, y: Int) {
+    self.x = x
+    self.y = y
+  }
+}
+
+@dynamicMemberLookup
+struct DotLens<T> {
+  var value: T
+
+  subscript<U>(dynamicMember member: WritableKeyPath<T, U>) -> U {
+    get { return value[keyPath: member] }
+    set { value[keyPath: member] = newValue }
+  }
+
+  subscript<U>(dynamicMember member: ReferenceWritableKeyPath<T, U>) -> U {
+    get { return value[keyPath: member] }
+    set { value[keyPath: member] = newValue }
+  }
+}
+
+func dot_struct_test(_ lens: inout DotLens<DotStruct>) {
+  // CHECK: keypath $WritableKeyPath<DotStruct, Int>, (root $DotStruct; stored_property #DotStruct.x : $Int)
+  lens.x = 1
+  // CHECK: keypath $WritableKeyPath<DotStruct, Int>, (root $DotStruct; stored_property #DotStruct.y : $Int)
+  let _ = lens.y
+}
+
+func dot_class_test(_ lens: inout DotLens<DotClass>) {
+  // CHECK: keypath $ReferenceWritableKeyPath<DotClass, Int>, (root $DotClass; settable_property $Int,  id #DotClass.x!getter.1 : (DotClass) -> () -> Int, getter @$s29keypath_dynamic_member_lookup8DotClassC1xSivpACTK : {{.*}})
+  lens.x = 1
+  // CHECK: keypath $ReferenceWritableKeyPath<DotClass, Int>, (root $DotClass; settable_property $Int,  id #DotClass.y!getter.1 : (DotClass) -> () -> Int, getter @$s29keypath_dynamic_member_lookup8DotClassC1ySivpACTK : {{.*}})
+  let _ = lens.y
+}

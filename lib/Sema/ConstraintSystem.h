@@ -882,6 +882,11 @@ struct MemberLookupResult {
     /// because it's not known upfront what access capability would the
     /// member have.
     UR_WritableKeyPathOnReadOnlyMember,
+    /// This is a `ReferenceWritableKeyPath` being used to look up mutating
+    /// member, used in situations involving dynamic member lookup via keypath,
+    /// because it's not known upfront what access capability would the
+    /// member have.
+    UR_ReferenceWritableKeyPathOnMutatingMember,
   };
 
   /// This is a list of considered (but rejected) candidates, along with a

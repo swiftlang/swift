@@ -3853,6 +3853,17 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
               MemberLookupResult::UR_WritableKeyPathOnReadOnlyMember);
           return;
         }
+
+        // A nonmutating setter indicates a reference-writable base,
+        // on the other hand if setter is mutating there is no point
+        // of attempting `ReferenceWritableKeyPath` overload.
+        if (storage->isSetterMutating() &&
+            keyPath == getASTContext().getReferenceWritableKeyPathDecl()) {
+          result.addUnviable(
+              candidate,
+              MemberLookupResult::UR_ReferenceWritableKeyPathOnMutatingMember);
+          return;
+        }
       }
     }
 
@@ -4245,10 +4256,11 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
     case MemberLookupResult::UR_LabelMismatch:
     case MemberLookupResult::UR_UnavailableInExistential:
     // TODO(diagnostics): Add a new fix that is suggests to
-    // add `subscript(dynamicMember: KeyPath<T, U>)`
+    // add `subscript(dynamicMember: {Writable}KeyPath<T, U>)`
     // overload here, that would help if such subscript has
     // not been provided.
     case MemberLookupResult::UR_WritableKeyPathOnReadOnlyMember:
+    case MemberLookupResult::UR_ReferenceWritableKeyPathOnMutatingMember:
       break;
     }
   }

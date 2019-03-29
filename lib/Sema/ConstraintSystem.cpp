@@ -1894,10 +1894,12 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       refType = fnType->getResult();
 
       auto *keyPathDecl = keyPathTy->getAnyNominal();
-      assert(keyPathDecl &&
-             (keyPathDecl == getASTContext().getKeyPathDecl() ||
-              keyPathDecl == getASTContext().getWritableKeyPathDecl()) &&
-             "parameter is supposed to be a keypath");
+      assert(
+          keyPathDecl &&
+          (keyPathDecl == getASTContext().getKeyPathDecl() ||
+           keyPathDecl == getASTContext().getWritableKeyPathDecl() ||
+           keyPathDecl == getASTContext().getReferenceWritableKeyPathDecl()) &&
+          "parameter is supposed to be a keypath");
 
       auto *keyPathLoc = getConstraintLocator(
           locator, LocatorPathElt::getKeyPathDynamicMember(keyPathDecl));
@@ -1965,7 +1967,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         // form additional `applicable fn` constraint here and bind it to a
         // function type, but it would create inconsistency with how properties
         // are handled, which means more special handling in CSApply.
-        if (keyPathDecl == getASTContext().getWritableKeyPathDecl())
+        if (keyPathDecl == getASTContext().getWritableKeyPathDecl() ||
+            keyPathDecl == getASTContext().getReferenceWritableKeyPathDecl())
           dynamicResultTy->getImpl().setCanBindToLValue(getSavedBindings(),
                                                         /*enabled=*/true);
 
