@@ -93,3 +93,22 @@ entry(%0 : $Subclass, %1 : $NSDictionary):
 // CHECK:         [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$sSo12GenericClassCMa"([[INT]] 255)
 // CHECK:         [[CLASS:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK:         call swiftcc %swift.metadata_response @swift_getTupleTypeMetadata2([[INT]] %0, %swift.type* [[CLASS]], %swift.type* @"$sSiN", i8* null,
+
+class K<T> {}
+
+sil @$useMeta : $@convention(thin) <P> () -> ()
+
+// CHECK-LABEL: define void @an_objc_method(i8*, i8*)
+// CHECK:   [[C:%.*]] = bitcast i8* %0 to %objc_class*
+// CHECK:   [[M:%.*]] = call %swift.type* @swift_getObjCClassMetadata(%objc_class* [[C]])
+// CHECK:   [[M2:%.*]] = bitcast %swift.type* [[M]] to %swift.type**
+// CHECK:   [[P:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[M2]]
+// CHECK:   [[P2:%.*]] = load %swift.type*, %swift.type** [[P]]
+// CHECK:   call swiftcc void @"$useMeta"(%swift.type* [[P2]])
+// CHECK:   ret void
+sil @an_objc_method : $@convention(objc_method) <P> (@objc_metatype K<P>.Type) -> () {
+bb0(%0 :  $@objc_metatype K<P>.Type):
+  %2 = function_ref @$useMeta : $@convention(thin) <τ_0_0> () -> ()
+  %3 = apply %2<P>() : $@convention(thin) <τ_0_0 > () -> ()
+  return undef : $()
+}
