@@ -104,7 +104,15 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                    &legacyResult, 1,
                    vDSP_Length(n-2))
         
+        let returnedResult = vDSP.twoPoleTwoZeroFilter(source,
+                                                       coefficients: (coefficients[0],
+                                                                      coefficients[1],
+                                                                      coefficients[2],
+                                                                      coefficients[3],
+                                                                      coefficients[4]))
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests.test("vDSP/DifferenceEquationDoublePrecision") {
@@ -134,7 +142,15 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                     &legacyResult, 1,
                     vDSP_Length(n-2))
         
+        let returnedResult = vDSP.twoPoleTwoZeroFilter(source,
+                                                       coefficients: (coefficients[0],
+                                                                      coefficients[1],
+                                                                      coefficients[2],
+                                                                      coefficients[3],
+                                                                      coefficients[4]))
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
 }
 
@@ -163,7 +179,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         
         
         vDSP.downsample(originalSignal,
-                        decimationFaction: decimationFactor,
+                        decimationFactor: decimationFactor,
                         filter: filter,
                         result: &result)
         
@@ -177,7 +193,12 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                     n,
                     filterLength)
         
+        let returnedResult = vDSP.downsample(originalSignal,
+                                             decimationFactor: decimationFactor,
+                                             filter: filter)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests.test("vDSP/DownsampleDoublePrecision") {
@@ -198,7 +219,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         
         
         vDSP.downsample(originalSignal,
-                        decimationFaction: decimationFactor,
+                        decimationFactor: decimationFactor,
                         filter: filter,
                         result: &result)
         
@@ -212,7 +233,12 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                      n,
                      filterLength)
         
+        let returnedResult = vDSP.downsample(originalSignal,
+                                             decimationFactor: decimationFactor,
+                                             filter: filter)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
 }
 

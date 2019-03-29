@@ -13,12 +13,54 @@
 import Accelerate
 
 extension vDSP {
+
+    /// Performs two-pole two-zero recursive filtering; single-precision.
+    ///
+    /// - Parameter source: Single-precision input vector.
+    /// - Parameter coefficients: Filter coefficients.
+    /// - Returns: Single-precision output vector.
+    ///
+    /// This function performs the following calculation:
+    ///
+    ///                for (n = 2; n < N+2; ++n)
+    ///                    C[n] =
+    ///                        + A[n-0]*B[0]
+    ///                        + A[n-1]*B[1]
+    ///                        + A[n-2]*B[2]
+    ///                        - C[n-1]*B[3]
+    ///                        - C[n-2]*B[4];
+    ///
+    /// Where `A` is the input vector, `B` is the filter coefficients, and `C`
+    /// is the output vector. Note that outputs start with C[2].
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func twoPoleTwoZeroFilter<U>(_ source: U,
+                                                  coefficients: (Float, Float, Float, Float, Float)) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: source.count) {
+                buffer, initializedCount in
+                
+                buffer[0] = 0
+                buffer[1] = 0
+                
+                twoPoleTwoZeroFilter(source,
+                                     coefficients: coefficients,
+                                     result: &buffer)
+                
+                initializedCount = source.count
+            }
+            
+            return result
+    }
     
     /// Performs two-pole two-zero recursive filtering; single-precision.
     ///
-    /// - Parameter source: single-precision input vector.
+    /// - Parameter source: Single-precision input vector.
     /// - Parameter coefficients: Filter coefficients.
-    /// - Parameter result: single-precision output vector.
+    /// - Parameter result: Single-precision output vector.
     ///
     /// This function performs the following calculation:
     ///
@@ -57,6 +99,48 @@ extension vDSP {
                                n)
                 }
             }
+    }
+    
+    /// Performs two-pole two-zero recursive filtering; double-precision.
+    ///
+    /// - Parameter source: Double-precision input vector.
+    /// - Parameter coefficients: Filter coefficients.
+    /// - Returns: Double-precision output vector.
+    ///
+    /// This function performs the following calculation:
+    ///
+    ///                for (n = 2; n < N+2; ++n)
+    ///                    C[n] =
+    ///                        + A[n-0]*B[0]
+    ///                        + A[n-1]*B[1]
+    ///                        + A[n-2]*B[2]
+    ///                        - C[n-1]*B[3]
+    ///                        - C[n-2]*B[4];
+    ///
+    /// Where `A` is the input vector, `B` is the filter coefficients, and `C`
+    /// is the output vector. Note that outputs start with C[2].
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func twoPoleTwoZeroFilter<U>(_ source: U,
+                                                  coefficients: (Double, Double, Double, Double, Double)) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: source.count) {
+                buffer, initializedCount in
+                
+                buffer[0] = 0
+                buffer[1] = 0
+                
+                twoPoleTwoZeroFilter(source,
+                                     coefficients: coefficients,
+                                     result: &buffer)
+                
+                initializedCount = source.count
+            }
+            
+            return result
     }
     
     /// Performs two-pole two-zero recursive filtering; double-precision.
