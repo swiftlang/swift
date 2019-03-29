@@ -22,11 +22,38 @@ extension vDSP {
     
     // MARK: Elementwise minimum
     
+    /// Returns an array containing the lesser of the corresponding values in `vectorA` and `vectorB`, single-precision.
+    ///
+    /// - Parameter vectorA: the `a` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    /// - Returns: the `c` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func minimum<U>(_ vectorA: U,
+                                  _ vectorB: U) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            precondition(vectorA.count == vectorB.count)
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vectorA.count) {
+                buffer, initializedCount in
+                
+                minimum(vectorA,
+                        vectorB,
+                        result: &buffer)
+                
+                initializedCount = vectorA.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the lesser of the corresponding values in `vectorA` and `vectorB`, single-precision.
     ///
     /// - Parameter vectorA: the `a` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
-    /// - Parameter vectorB: the `b` in `c[i] = a[i] < b[i] ? a[i] : b[i]
-    /// - Parameter result: the `c` in `c[i] = a[i] < b[i] ? a[i] : b[i]
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    /// - Parameter result: the `c` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func minimum<U, V>(_ vectorA: U,
@@ -53,11 +80,38 @@ extension vDSP {
             }
     }
     
+    /// Returns an array containing the lesser of the corresponding values in `vectorA` and `vectorB`, double-precision.
+    ///
+    /// - Parameter vectorA: the `a` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    /// - Returns: the `c` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func minimum<U>(_ vectorA: U,
+                                  _ vectorB: U) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            precondition(vectorA.count == vectorB.count)
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vectorA.count) {
+                buffer, initializedCount in
+                
+                minimum(vectorA,
+                        vectorB,
+                        result: &buffer)
+                
+                initializedCount = vectorA.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the lesser of the corresponding values in `vectorA` and `vectorB`, double-precision.
     ///
     /// - Parameter vectorA: the `a` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
-    /// - Parameter vectorB: the `b` in `c[i] = a[i] < b[i] ? a[i] : b[i]
-    /// - Parameter result: the `c` in `c[i] = a[i] < b[i] ? a[i] : b[i]
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    /// - Parameter result: the `c` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func minimum<U, V>(_ vectorA: U,
@@ -86,11 +140,38 @@ extension vDSP {
     
     // MARK: Elementwise maximum
     
+    /// Returns an array containing the greater of the corresponding values in `vectorA` and `vectorB`, single-precision.
+    ///
+    /// - Parameter vectorA: the `a` in `c[i] = a[i] > b[i] ? a[i] : b[i]`
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] > b[i] ? a[i] : b[i]`
+    /// - Returns: the `c` in `c[i] = a[i] > b[i] ? a[i] : b[i]`
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func maximum<U>(_ vectorA: U,
+                                  _ vectorB: U) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            precondition(vectorA.count == vectorB.count)
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vectorA.count) {
+                buffer, initializedCount in
+                
+                maximum(vectorA,
+                        vectorB,
+                        result: &buffer)
+                
+                initializedCount = vectorA.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the greater of the corresponding values in `vectorA` and `vectorB`, single-precision.
     ///
     /// - Parameter vectorA: the `a` in `c[i] = a[i] > b[i] ? a[i] : b[i]`
-    /// - Parameter vectorB: the `b` in `c[i] = a[i] > b[i] ? a[i] : b[i]
-    /// - Parameter result: the `c` in `c[i] = a[i] > b[i] ? a[i] : b[i]
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] > b[i] ? a[i] : b[i]`
+    /// - Parameter result: the `c` in `c[i] = a[i] > b[i] ? a[i] : b[i]`
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func maximum<U, V>(_ vectorA: U,
@@ -117,11 +198,38 @@ extension vDSP {
             }
     }
     
+    /// Returns an array containing the greater of the corresponding values in `vectorA` and `vectorB`, double-precision.
+    ///
+    /// - Parameter vectorA: the `a` in `c[i] = a[i] > b[i] ? a[i] : b[i]`
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] > b[i] ? a[i] : b[i]`
+    /// - Returns: the `c` in `c[i] = `c[i] = a[i] > b[i] ? a[i] : b[i]`
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func maximum<U>(_ vectorA: U,
+                                  _ vectorB: U) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            precondition(vectorA.count == vectorB.count)
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vectorA.count) {
+                buffer, initializedCount in
+                
+                maximum(vectorA,
+                        vectorB,
+                        result: &buffer)
+                
+                initializedCount = vectorA.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the greater of the corresponding values in `vectorA` and `vectorB`, double-precision.
     ///
     /// - Parameter vectorA: the `a` in `c[i] = a[i] > b[i] ? a[i] : b[i]`
-    /// - Parameter vectorB: the `b` in `c[i] = a[i] > b[i] ? a[i] : b[i]
-    /// - Parameter result: the `c` in `c[i] = a[i] > b[i] ? a[i] : b[i]
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] > b[i] ? a[i] : b[i]`
+    /// - Parameter result: the `c` in `c[i] = a[i] > b[i] ? a[i] : b[i]`
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func maximum<U, V>(_ vectorA: U,
@@ -157,6 +265,30 @@ extension vDSP {
 
 extension vDSP {
     
+    /// Returns an array containing the absolute values of `vector`,
+    /// single-precision.
+    ///
+    /// - Parameter vector: The input vector.
+    /// - Parameter result: The output vector.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func absolute<U>(_ vector: U) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                absolute(vector,
+                         result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the absolute values of `vector`,
     /// single-precision.
     ///
@@ -181,6 +313,30 @@ extension vDSP {
                 }
             }
             
+    }
+    
+    /// Returns an array containing the absolute values of `vector`,
+    /// double-precision.
+    ///
+    /// - Parameter vector: The input vector.
+    /// - Parameter result: The output vector.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func absolute<U>(_ vector: U) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                absolute(vector,
+                         result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Populates `result` with the absolute values of `vector`,
@@ -208,6 +364,30 @@ extension vDSP {
             }
     }
     
+    /// Returns an array containing the negative absolute values of `vector`,
+    /// single-precision.
+    ///
+    /// - Parameter vector: The input vector.
+    /// - Parameter result: The output vector.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func negativeAbsolute<U>(_ vector: U) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                negativeAbsolute(vector,
+                                 result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the negative absolute values of `vector`,
     /// single-precision.
     ///
@@ -231,6 +411,30 @@ extension vDSP {
                                vDSP_Length(n))
                 }
             }
+    }
+    
+    /// Returns an array containing the negative absolute values of `vector`,
+    /// double-precision.
+    ///
+    /// - Parameter vector: The input vector.
+    /// - Parameter result: The output vector.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func negativeAbsolute<U>(_ vector: U) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                negativeAbsolute(vector,
+                                 result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Populates `result` with the negative absolute values of `vector`,
@@ -258,6 +462,30 @@ extension vDSP {
             }
     }
     
+    /// Returns an array containing the negative values of `vector`,
+    /// single-precision.
+    ///
+    /// - Parameter vector: The input vector.
+    /// - Parameter result: The output vector.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func negative<U>(_ vector: U) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                negative(vector,
+                         result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the negative values of `vector`,
     /// single-precision.
     ///
@@ -281,6 +509,30 @@ extension vDSP {
                               vDSP_Length(n))
                 }
             }
+    }
+    
+    /// Returns an array containing the negative values of `vector`,
+    /// double-precision.
+    ///
+    /// - Parameter vector: The input vector.
+    /// - Parameter result: The output vector.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func negative<U>(_ vector: U) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                negative(vector,
+                         result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Populates `result` with the negative values of `vector`,
@@ -465,6 +717,30 @@ extension vDSP {
     
     // MARK: Square
     
+    /// Returns an array containing the square of each element in `vector`, single-precision.
+    ///
+    /// - Parameter vectorA: the `a` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    /// - Returns: the `c` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func square<U>(_ vector: U) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                square(vector,
+                       result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the square of each element in `vector`, writing the result to `result`; single-precision.
     ///
     /// - Parameter _ vector: Input values.
@@ -489,6 +765,30 @@ extension vDSP {
                              n)
                 }
             }
+    }
+    
+    /// Returns an array containing the square of each element in `vector`, double-precision.
+    ///
+    /// - Parameter vectorA: the `a` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    /// - Returns: the `c` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func square<U>(_ vector: U) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                square(vector,
+                       result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates the square of each element in `vector`, writing the result to `result`; double-precision.
@@ -519,6 +819,30 @@ extension vDSP {
     
     // MARK: Signed Square
     
+    /// Returns an array containing the signed square of each element in `vector`, single-precision.
+    ///
+    /// - Parameter vectorA: the `a` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    /// - Returns: the `c` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func signedSquare<U>(_ vector: U) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                signedSquare(vector,
+                             result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Calculates the signed square of each element in `vector`, writing the result to `result`; single-precision.
     ///
     /// - Parameter _ vector: Input values.
@@ -543,6 +867,30 @@ extension vDSP {
                               n)
                 }
             }
+    }
+    
+    /// Returns an array containing the signed square of each element in `vector`, double-precision.
+    ///
+    /// - Parameter vectorA: the `a` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    /// - Returns: the `c` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func signedSquare<U>(_ vector: U) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                signedSquare(vector,
+                             result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Calculates the signed square of each element in `vector`, writing the result to `result`; double-precision.
@@ -573,6 +921,30 @@ extension vDSP {
     
     // MARK: Truncate to Fraction
     
+    /// Returns an array containing each element in `vector` truncated to fraction, single-precision.
+    ///
+    /// - Parameter vectorA: the `a` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    /// - Returns: the `c` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func trunc<U>(_ vector: U) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                trunc(vector,
+                      result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Truncates to fraction each element in `vector`, writing the result to `result`; single-precision.
     ///
     /// - Parameter _ vector: Input values.
@@ -597,6 +969,30 @@ extension vDSP {
                                n)
                 }
             }
+    }
+    
+    /// Returns an array containing each element in `vector` truncated to fraction, double-precision.
+    ///
+    /// - Parameter vectorA: the `a` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    /// - Returns: the `c` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func trunc<U>(_ vector: U) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                trunc(vector,
+                      result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Truncates to fraction each element in `vector`, writing the result to `result`; double-precision.

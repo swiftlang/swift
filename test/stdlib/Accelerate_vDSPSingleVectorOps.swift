@@ -44,7 +44,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                   &legacyResult, 1,
                   n)
         
+        let returnedResult = vDSP.minimum(a,
+                                          b)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPSingleVectorOpsTests.test("vDSP/SinglePrecisionMax") {
@@ -63,7 +67,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                   &legacyResult, 1,
                   n)
         
+        let returnedResult = vDSP.maximum(a,
+                                          b)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPSingleVectorOpsTests.test("vDSP/SinglePrecisionAbsolute") {
@@ -79,7 +87,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                   &legacyResult, 1,
                   n)
         
+        let returnedResult = vDSP.absolute(a)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPSingleVectorOpsTests.test("vDSP/SinglePrecisionNegativeAbsolute") {
@@ -95,7 +106,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                    &legacyResult, 1,
                    n)
         
+        let returnedResult = vDSP.negativeAbsolute(a)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPSingleVectorOpsTests.test("vDSP/SinglePrecisionNegative") {
@@ -111,7 +125,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                   &legacyResult, 1,
                   n)
         
+        let returnedResult = vDSP.negative(a)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPSingleVectorOpsTests.test("vDSP/SinglePrecisionReverse") {
@@ -160,7 +177,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                  &legacyResult, 1,
                  n)
         
+        let returnedResult = vDSP.square(a)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPSingleVectorOpsTests.test("vDSP/SinglePrecisionSignedSquare") {
@@ -174,7 +194,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                   &legacyResult, 1,
                   n)
         
+        let returnedResult = vDSP.signedSquare(a)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPSingleVectorOpsTests.test("vDSP/SinglePrecisionTruncateToFraction") {
@@ -188,7 +211,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                    &legacyResult, 1,
                    n)
         
+        let returnedResult = vDSP.trunc(a)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPSingleVectorOpsTests.test("vDSP/SinglePrecisionZeroCrossing") {
@@ -243,7 +269,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                    &legacyResult, 1,
                    n)
         
+        let returnedResult = vDSP.minimum(a,
+                                          b)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPSingleVectorOpsTests.test("vDSP/DoublePrecisionMax") {
@@ -262,7 +292,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                    &legacyResult, 1,
                    n)
         
+        let returnedResult = vDSP.maximum(a,
+                                          b)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPSingleVectorOpsTests.test("vDSP/DoublePrecisionAbsolute") {
@@ -278,7 +312,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                    &legacyResult, 1,
                    n)
         
+        let returnedResult = vDSP.absolute(a)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPSingleVectorOpsTests.test("vDSP/DoublePrecisionNegativeAbsolute") {
@@ -294,7 +331,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                     &legacyResult, 1,
                     n)
         
+        let returnedResult = vDSP.negativeAbsolute(a)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPSingleVectorOpsTests.test("vDSP/DoublePrecisionNegative") {
@@ -310,7 +350,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                    &legacyResult, 1,
                    n)
         
+        let returnedResult = vDSP.negative(a)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPSingleVectorOpsTests.test("vDSP/DoublePrecisionReverse") {
@@ -359,7 +402,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                   &legacyResult, 1,
                   n)
         
+        let returnedResult = vDSP.square(a)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPSingleVectorOpsTests.test("vDSP/DoublePrecisionSignedSquare") {
@@ -373,7 +419,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                    &legacyResult, 1,
                    n)
         
+        let returnedResult = vDSP.signedSquare(a)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPSingleVectorOpsTests.test("vDSP/DoublePrecisionTruncateToFraction") {
@@ -387,7 +436,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                     &legacyResult, 1,
                     n)
         
+        let returnedResult = vDSP.trunc(a)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPSingleVectorOpsTests.test("vDSP/DoublePrecisionZeroCrossing") {
