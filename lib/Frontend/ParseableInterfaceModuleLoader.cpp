@@ -359,9 +359,6 @@ class swift::ParseableInterfaceBuilder {
   /// Determines if the dependency with the provided path is a swiftmodule in
   /// either the module cache or prebuilt module cache
   bool isCachedModule(StringRef DepName) const {
-    if (moduleCachePath.empty() && prebuiltCachePath.empty())
-      return false;
-
     auto Ext = llvm::sys::path::extension(DepName);
     auto Ty = file_types::lookupTypeForExtension(Ext);
 

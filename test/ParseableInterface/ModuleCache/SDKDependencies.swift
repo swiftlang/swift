@@ -7,6 +7,24 @@
 // RUN: %target-swift-frontend -build-module-from-parseable-interface -serialize-parseable-module-interface-dependency-hashes -sdk %t/my-sdk -prebuilt-module-cache-path %t/prebuilt-cache -I %t/my-sdk -module-cache-path %t/MCP -o %t/prebuilt-cache/ExportedLib.swiftmodule -track-system-dependencies -module-name ExportedLib %t/my-sdk/ExportedLib.swiftinterface
 // RUN: %target-swift-frontend -build-module-from-parseable-interface -serialize-parseable-module-interface-dependency-hashes -sdk %t/my-sdk -prebuilt-module-cache-path %t/prebuilt-cache -I %t/my-sdk -module-cache-path %t/MCP -o %t/prebuilt-cache/SdkLib.swiftmodule -track-system-dependencies -module-name SdkLib %t/my-sdk/SdkLib.swiftinterface
 //
+// Check the prebuilt modules don't contain dependencies in the module cache or prebuilt cache
+// RUN: llvm-bcanalyzer -dump %t/prebuilt-cache/ExportedLib.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
+// RUN: llvm-bcanalyzer -dump %t/prebuilt-cache/SdkLib.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
+//
+// PREBUILT: MODULE_BLOCK
+// PREBUILT-NOT: FILE_DEPENDENCY {{.*}}/MCP/{{.*}}
+// PREBUILT-NOT: FILE_DEPENDENCY {{.*}}/prebuilt-cache/{{.*}}
+//
+// Re-build them in the opposite order
+// RUN: %empty-directory(%t/prebuilt-cache)
+// RUN: %empty-directory(%t/MCP)
+// RUN: %target-swift-frontend -build-module-from-parseable-interface -serialize-parseable-module-interface-dependency-hashes -sdk %t/my-sdk -prebuilt-module-cache-path %t/prebuilt-cache -I %t/my-sdk -module-cache-path %t/MCP -o %t/prebuilt-cache/SdkLib.swiftmodule -track-system-dependencies -module-name SdkLib %t/my-sdk/SdkLib.swiftinterface
+// RUN: %target-swift-frontend -build-module-from-parseable-interface -serialize-parseable-module-interface-dependency-hashes -sdk %t/my-sdk -prebuilt-module-cache-path %t/prebuilt-cache -I %t/my-sdk -module-cache-path %t/MCP -o %t/prebuilt-cache/ExportedLib.swiftmodule -track-system-dependencies -module-name ExportedLib %t/my-sdk/ExportedLib.swiftinterface
+//
+// Check they still don't contain dependencies in the module cache or prebuilt cache
+// RUN: llvm-bcanalyzer -dump %t/prebuilt-cache/ExportedLib.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
+// RUN: llvm-bcanalyzer -dump %t/prebuilt-cache/SdkLib.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
+//
 // RUN: %empty-directory(%t/MCP)
 // RUN: echo '1: PASSED'
 
@@ -20,8 +38,12 @@
 // RUN: test -f %t/MCP/SdkLib-*.swiftmodule
 //
 // Check they are *not* forwarding modules
-// RUN: head -n 1 %t/MCP/SdkLib-*.swiftmodule | not grep -e '---'
-// RUN: head -n 1 %t/MCP/ExportedLib-*.swiftmodule | not grep -e '---'
+// RUN: not %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
+// RUN: not %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
+//
+// Check they don't contain dependencies in the module cache (..or prebuilt cache)
+// RUN: llvm-bcanalyzer -dump %t/MCP/SdkLib-*.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
+// RUN: llvm-bcanalyzer -dump %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
 //
 // RUN: %empty-directory(%t/MCP)
 // RUN: echo '2: PASSED'
@@ -36,8 +58,8 @@
 // RUN: test -f %t/MCP/ExportedLib-*.swiftmodule
 //
 // Check they *are* forwarding modules
-// RUN: head -n 1 %t/MCP/SdkLib-*.swiftmodule | grep -e '---'
-// RUN: head -n 1 %t/MCP/ExportedLib-*.swiftmodule | grep -e '---'
+// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
+// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
 //
 // Check they contain the expected dependencies
 // RUN: cat %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=EXLIB
@@ -49,6 +71,17 @@
 // EXLIB-DAG: /my-sdk/ExportedLib.swiftinterface
 // SDKLIB-DAG: /my-sdk/SdkLib.swiftinterface
 //
+// Check they don't contain any dependencies from either cache other than themselves
+// RUN: cat %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=NOCACHE -DLIB_NAME=ExportedLib
+// RUN: cat %t/MCP/SdkLib-*.swiftmodule | %FileCheck %s -check-prefix=NOCACHE -DLIB_NAME=SdkLib
+//
+// NOCACHE: dependencies:
+// NOCACHE-NOT: /prebuilt-cache/
+// NOCACHE-NOT: /MCP/
+// NOCACHE: /prebuilt-cache/[[LIB_NAME]].swiftmodule
+// NOCACHE-NOT: /prebuilt-cache/
+// NOCACHE-NOT: /MCP/
+//
 // RUN: %empty-directory(%t/MCP)
 // RUN: echo '3: PASSED'
 
@@ -56,16 +89,17 @@
 // 4) Move the SDK without changing its contents
 //
 // RUN: mv %t/my-sdk %t/my-new-sdk
-// RUN: mv %t/prebuilt-cache %t/new-prebuilt-cache
-// RUN: %target-swift-frontend -typecheck -I %t/my-new-sdk -sdk %t/my-new-sdk -prebuilt-module-cache-path %t/new-prebuilt-cache -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies %s
+// RUN: mkdir %t/new-dir
+// RUN: mv %t/prebuilt-cache %t/new-dir/
+// RUN: %target-swift-frontend -typecheck -I %t/my-new-sdk -sdk %t/my-new-sdk -prebuilt-module-cache-path %t/new-dir/prebuilt-cache -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies %s
 //
 // Check SdkLib and ExportedLib are in the module cache
 // RUN: test -f %t/MCP/SdkLib-*.swiftmodule
 // RUN: test -f %t/MCP/ExportedLib-*.swiftmodule
 //
 // Check they are still both forwarding modules
-// RUN: head -n 1 %t/MCP/SdkLib-*.swiftmodule | grep -e '---'
-// RUN: head -n 1 %t/MCP/ExportedLib-*.swiftmodule | grep -e '---'
+// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
+// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
 //
 // Check they contain the expected dependencies
 // RUN: cat %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=NEW-EXLIB
@@ -76,6 +110,11 @@
 // NEW-EXLIB-DAG: /my-new-sdk/ExportedLib.swiftinterface
 // NEW-SDKLIB-DAG: /my-new-sdk/SdkLib.swiftinterface
 //
+// Check they don't contain dependencies from the module cache, old prebuilt
+// cache, or new prebuilt cache
+// RUN: cat %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=NOCACHE -DLIB_NAME=ExportedLib
+// RUN: cat %t/MCP/SdkLib-*.swiftmodule | %FileCheck %s -check-prefix=NOCACHE -DLIB_NAME=SdkLib
+//
 // RUN: %empty-directory(%t/MCP)
 // RUN: echo '4: PASSED'
 
@@ -83,18 +122,22 @@
 // 5) Now change the SDK's content and check it no longer uses the prebuilt modules
 //
 // RUN: echo "// size change" >> %t/my-new-sdk/SdkLib.swiftinterface
-// RUN: %target-swift-frontend -typecheck -I %t/my-new-sdk -sdk %t/my-new-sdk -prebuilt-module-cache-path %t/new-prebuilt-cache -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies %s
+// RUN: %target-swift-frontend -typecheck -I %t/my-new-sdk -sdk %t/my-new-sdk -prebuilt-module-cache-path %t/new-dir/prebuilt-cache -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies %s
 //
 // Check SDKLib and ExportedLib are in the module cache
 // RUN: test -f %t/MCP/SdkLib-*.swiftmodule
 // RUN: test -f %t/MCP/ExportedLib-*.swiftmodule
 //
 // Check ExportedLib is still a forwarding module and SdkLib is not
-// RUN: head -n 1 %t/MCP/ExportedLib-*.swiftmodule | grep -e '---'
-// RUN: head -n 1 %t/MCP/SdkLib-*.swiftmodule | not grep -e '---'
+// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
+// RUN: not %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
 //
 // Check ExportedLib still contains the same dependencies
 // RUN: cat %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=NEW-EXLIB
+// RUN: cat %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=NOCACHE -DLIB_NAME=ExportedLib
+//
+// Check SdkLib doesn't contain dependencies in the module cache or prebuilt cache
+// RUN: llvm-bcanalyzer -dump %t/MCP/SdkLib-*.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
 //
 // RUN: %empty-directory(%t/MCP)
 //
@@ -106,8 +149,12 @@
 // RUN: test -f %t/MCP/ExportedLib-*.swiftmodule
 //
 // Check neither are forwarding modules
-// RUN: head -n 1 %t/MCP/SdkLib-*.swiftmodule | not grep -e '---'
-// RUN: head -n 1 %t/MCP/ExportedLib-*.swiftmodule | not grep -e '---'
+// RUN: not %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
+// RUN: not %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
+//
+// Check neither contains dependencies in the module cache or prebuilt cache
+// RUN: llvm-bcanalyzer -dump %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
+// RUN: llvm-bcanalyzer -dump %t/MCP/SdkLib-*.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
 //
 // RUN: echo '5: PASSED'
 
