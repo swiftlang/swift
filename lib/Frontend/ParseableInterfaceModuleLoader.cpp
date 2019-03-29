@@ -261,6 +261,7 @@ class swift::ParseableInterfaceBuilder {
   const StringRef moduleCachePath;
   const StringRef prebuiltCachePath;
   const bool serializeDependencyHashes;
+  const bool trackSystemDependencies;
   const SourceLoc diagnosticLoc;
   DependencyTracker *const dependencyTracker;
   CompilerInvocation subInvocation;
@@ -295,6 +296,7 @@ class swift::ParseableInterfaceBuilder {
     subInvocation.setClangModuleCachePath(moduleCachePath);
     subInvocation.getFrontendOptions().PrebuiltModuleCachePath =
       prebuiltCachePath;
+    subInvocation.getFrontendOptions().TrackSystemDeps = trackSystemDependencies;
 
     // Respect the detailed-record preprocessor setting of the parent context.
     // This, and the "raw" clang module format it implicitly enables, are
@@ -449,12 +451,14 @@ public:
                             StringRef moduleCachePath,
                             StringRef prebuiltCachePath,
                             bool serializeDependencyHashes = false,
+                            bool trackSystemDependencies = false,
                             SourceLoc diagnosticLoc = SourceLoc(),
                             DependencyTracker *tracker = nullptr)
   : ctx(ctx), fs(*ctx.SourceMgr.getFileSystem()), diags(ctx.Diags),
   interfacePath(interfacePath), moduleName(moduleName),
   moduleCachePath(moduleCachePath), prebuiltCachePath(prebuiltCachePath),
   serializeDependencyHashes(serializeDependencyHashes),
+  trackSystemDependencies(trackSystemDependencies),
   diagnosticLoc(diagnosticLoc), dependencyTracker(tracker) {
     configureSubInvocation();
   }
@@ -532,7 +536,8 @@ public:
       ForwardingDiagnosticConsumer FDC(diags);
       SubInstance.addDiagnosticConsumer(&FDC);
 
-      SubInstance.createDependencyTracker(/*TrackSystemDeps=*/true);
+      SubInstance.createDependencyTracker(FEOpts.TrackSystemDeps);
+
       if (SubInstance.setup(subInvocation)) {
         SubError = true;
         return;
@@ -655,6 +660,10 @@ class ParseableInterfaceModuleLoaderImpl {
     // The SDK path is going to affect how this module is imported, so include
     // it.
     H = hash_combine(H, SubInvocation.getSDKPath());
+
+    // Whether or not we're tracking system dependencies affects the
+    // invalidation behavior of this cache item.
+    H = hash_combine(H, SubInvocation.getFrontendOptions().TrackSystemDeps);
 
     return llvm::APInt(64, H).toString(36, /*Signed=*/false);
   }
@@ -928,12 +937,21 @@ class ParseableInterfaceModuleLoaderImpl {
   /// loading strategy.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
   findOrBuildLoadableModule() {
+    // Track system dependencies if the parent tracker is set to do so.
+    // FIXME: This means -track-system-dependencies isn't honored when the
+    // top-level invocation isn't tracking dependencies
+    bool trackSystemDependencies = false;
+    if (dependencyTracker) {
+      auto ClangDependencyTracker = dependencyTracker->getClangCollector();
+      trackSystemDependencies = ClangDependencyTracker->needSystemDependencies();
+    }
 
     // Set up a builder if we need to build the module. It'll also set up
     // the subinvocation we'll need to use to compute the cache paths.
     ParseableInterfaceBuilder builder(
       ctx, interfacePath, moduleName, cacheDir, prebuiltCacheDir,
-      /*serializeDependencyHashes*/false, diagnosticLoc, dependencyTracker);
+      /*serializeDependencyHashes*/false, trackSystemDependencies,
+      diagnosticLoc, dependencyTracker);
     auto &subInvocation = builder.getSubInvocation();
 
     // Compute the output path if we're loading or emitting a cached module.
@@ -1036,7 +1054,7 @@ std::error_code ParseableInterfaceModuleLoader::findModuleFilesInDirectory(
 bool ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
   ASTContext &Ctx, StringRef CacheDir, StringRef PrebuiltCacheDir,
   StringRef ModuleName, StringRef InPath, StringRef OutPath,
-  bool SerializeDependencyHashes) {
+  bool SerializeDependencyHashes, bool TrackSystemDependencies) {
   ParseableInterfaceBuilder builder(Ctx, InPath, ModuleName,
                                     CacheDir, PrebuiltCacheDir,
                                     SerializeDependencyHashes);
