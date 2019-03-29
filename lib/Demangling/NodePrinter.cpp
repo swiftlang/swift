@@ -353,6 +353,7 @@ private:
     case Node::Kind::Extension:
     case Node::Kind::EnumCase:
     case Node::Kind::FieldOffset:
+    case Node::Kind::FullObjCResilientClassStub:
     case Node::Kind::FullTypeMetadata:
     case Node::Kind::Function:
     case Node::Kind::FunctionSignatureSpecialization:
@@ -411,6 +412,7 @@ private:
     case Node::Kind::ObjCAttribute:
     case Node::Kind::ObjCBlock:
     case Node::Kind::ObjCMetadataUpdateFunction:
+    case Node::Kind::ObjCResilientClassStub:
     case Node::Kind::Owned:
     case Node::Kind::OwningAddressor:
     case Node::Kind::OwningMutableAddressor:
@@ -979,6 +981,14 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::ObjCMetadataUpdateFunction:
     Printer << "ObjC metadata update function for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::ObjCResilientClassStub:
+    Printer << "ObjC resilient class stub for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::FullObjCResilientClassStub:
+    Printer << "full ObjC resilient class stub for ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::OutlinedBridgedMethod:

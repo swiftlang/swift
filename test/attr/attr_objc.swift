@@ -193,9 +193,9 @@ extension subject_genericClass where T : Hashable {
 }
 
 extension subject_genericClass {
-  @objc var extProp: Int { return 0 } // expected-error{{members of extensions of generic classes cannot be declared @objc}}
+  @objc var extProp: Int { return 0 } // expected-error{{extensions of generic classes cannot contain '@objc' members}}
   
-  @objc func extFoo() {} // expected-error{{members of extensions of generic classes cannot be declared @objc}}
+  @objc func extFoo() {} // expected-error{{extensions of generic classes cannot contain '@objc' members}}
 }
 
 @objc
