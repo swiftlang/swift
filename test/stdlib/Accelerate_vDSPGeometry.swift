@@ -80,7 +80,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                    &legacyDistResult, 1,
                    vDSP_Length(legacyDistResult.count))
         
+        let returnedResult = vDSP.hypot(x, y)
+        
         expectTrue(distResult.elementsEqual(legacyDistResult))
+        expectTrue(distResult.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPGeometryTests.test("vDSP/SinglePrecisionPyth") {
@@ -102,7 +105,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                     &legacyPythgResult, 1,
                     vDSP_Length(legacyPythgResult.count))
         
+        let returnedResult = vDSP.hypot(x0: x0, x1: x1,
+                                        y0: y0, y1: y1)
+        
         expectTrue(pythgResult.elementsEqual(legacyPythgResult))
+        expectTrue(pythgResult.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPGeometryTests.test("vDSP/DoublePrecisionDist") {
@@ -121,7 +128,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                     &legacyDistResult, 1,
                     vDSP_Length(legacyDistResult.count))
         
+        let returnedResult = vDSP.hypot(x, y)
+        
         expectTrue(distResult.elementsEqual(legacyDistResult))
+        expectTrue(distResult.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPGeometryTests.test("vDSP/DoublePrecisionPyth") {
@@ -143,7 +153,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                      &legacyPythgResult, 1,
                      vDSP_Length(legacyPythgResult.count))
         
+        let returnedResult = vDSP.hypot(x0: x0, x1: x1,
+                                        y0: y0, y1: y1)
+        
         expectTrue(pythgResult.elementsEqual(legacyPythgResult))
+        expectTrue(pythgResult.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPGeometryTests.test("vDSP/SinglePrecisionDistanceSquared") {

@@ -88,6 +88,35 @@ extension vDSP {
     /// - Parameter result: The `z` in `z[i] = sqrt(x[i]² + y[i]²)`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func hypot<U, V>(_ x: U,
+                                   _ y: V) -> [Float]
+        where
+        U: _ContiguousCollection,
+        V: _ContiguousCollection,
+        U.Element == Float, V.Element == Float {
+            
+            precondition(x.count == y.count)
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: x.count) {
+                buffer, initializedCount in
+                
+                hypot(x, y,
+                     result: &buffer)
+                
+                initializedCount = x.count
+            }
+            
+            return result
+    }
+    
+    /// Calculates the hypotenuse of right-angled triangles with sides that are the lengths of
+    /// corresponding elements in vectors `x` and `y`; single-precision.
+    ///
+    /// - Parameter x: The `x` in `z[i] = sqrt(x[i]² + y[i]²)`.
+    /// - Parameter y: The `y` in `z[i] = sqrt(x[i]² + y[i]²)`.
+    /// - Parameter result: The `z` in `z[i] = sqrt(x[i]² + y[i]²)`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func hypot<T, U, V>(_ x: T,
                                       _ y: U,
                                       result: inout V)
@@ -113,6 +142,35 @@ extension vDSP {
     }
     
     /// Returns the hypotenuse of right-angled triangles with sides that are the lengths of
+    /// corresponding elements in vectors `x` and `y`; double-precision.
+    ///
+    /// - Parameter x: The `x` in `z[i] = sqrt(x[i]² + y[i]²)`.
+    /// - Parameter y: The `y` in `z[i] = sqrt(x[i]² + y[i]²)`.
+    /// - Parameter result: The `z` in `z[i] = sqrt(x[i]² + y[i]²)`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func hypot<U, V>(_ x: U,
+                                   _ y: V) -> [Double]
+        where
+        U: _ContiguousCollection,
+        V: _ContiguousCollection,
+        U.Element == Double, V.Element == Double {
+            
+            precondition(x.count == y.count)
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: x.count) {
+                buffer, initializedCount in
+                
+                hypot(x, y,
+                      result: &buffer)
+                
+                initializedCount = x.count
+            }
+            
+            return result
+    }
+    
+    /// Calculates the hypotenuse of right-angled triangles with sides that are the lengths of
     /// corresponding elements in vectors `x` and `y`; double-precision.
     ///
     /// - Parameter x: The `x` in `z[i] = sqrt(x[i]² + y[i]²)`.
@@ -147,6 +205,43 @@ extension vDSP {
     // MARK: Pythagoras
     
     /// Returns the hypotenuse of right-angled triangles with sides that are the differences of
+    /// corresponding values in x0 and x1, and y0 and y1. Single-precision.
+    ///
+    /// - Parameter x0: The `x0` in `z[i] = sqrt( (x0[i] - x1[i])² + (y0[i] - y1[i])² )`.
+    /// - Parameter x1: The `x1` in `z[i] = sqrt( (x0[i] - x1[i])² + (y0[i] - y1[i])² )`.
+    /// - Parameter y0: The `y0` in `z[i] = sqrt( (x0[i] - x1[i])² + (y0[i] - y1[i])² )`.
+    /// - Parameter y1: The `y1` in `z[i] = sqrt( (x0[i] - x1[i])² + (y0[i] - y1[i])² )`.
+    /// - Parameter result: The `z` in `z[i] = sqrt( (x0[i] - x1[i])² + (y0[i] - y1[i])² )`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func hypot<R, S, T, U>(x0: R, x1: S,
+                                            y0: T, y1: U) -> [Float]
+        where
+        R: _ContiguousCollection,
+        S: _ContiguousCollection,
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        R.Element == Float, S.Element == Float,
+        T.Element == Float, U.Element == Float {
+            
+            precondition(x0.count == x1.count)
+            precondition(y0.count == y1.count)
+            precondition(x0.count == y0.count)
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: x0.count) {
+                buffer, initializedCount in
+                
+                hypot(x0: x0, x1: x1,
+                      y0: y0, y1: y1,
+                      result: &buffer)
+                
+                initializedCount = x0.count
+            }
+            
+            return result
+    }
+    
+    /// Calculates the hypotenuse of right-angled triangles with sides that are the differences of
     /// corresponding values in x0 and x1, and y0 and y1. Single-precision.
     ///
     /// - Parameter x0: The `x0` in `z[i] = sqrt( (x0[i] - x1[i])² + (y0[i] - y1[i])² )`.
@@ -193,6 +288,43 @@ extension vDSP {
     }
     
     /// Returns the hypotenuse of right-angled triangles with sides that are the differences of
+    /// corresponding values in x0 and x1, and y0 and y1. Double-precision.
+    ///
+    /// - Parameter x0: The `x0` in `z[i] = sqrt( (x0[i] - x1[i])² + (y0[i] - y1[i])² )`.
+    /// - Parameter x1: The `x1` in `z[i] = sqrt( (x0[i] - x1[i])² + (y0[i] - y1[i])² )`.
+    /// - Parameter y0: The `y0` in `z[i] = sqrt( (x0[i] - x1[i])² + (y0[i] - y1[i])² )`.
+    /// - Parameter y1: The `y1` in `z[i] = sqrt( (x0[i] - x1[i])² + (y0[i] - y1[i])² )`.
+    /// - Parameter result: The `z` in `z[i] = sqrt( (x0[i] - x1[i])² + (y0[i] - y1[i])² )`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func hypot<R, S, T, U>(x0: R, x1: S,
+                                            y0: T, y1: U) -> [Double]
+        where
+        R: _ContiguousCollection,
+        S: _ContiguousCollection,
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        R.Element == Double, S.Element == Double,
+        T.Element == Double, U.Element == Double {
+            
+            precondition(x0.count == x1.count)
+            precondition(y0.count == y1.count)
+            precondition(x0.count == y0.count)
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: x0.count) {
+                buffer, initializedCount in
+                
+                hypot(x0: x0, x1: x1,
+                      y0: y0, y1: y1,
+                      result: &buffer)
+                
+                initializedCount = x0.count
+            }
+            
+            return result
+    }
+    
+    /// Calculates the hypotenuse of right-angled triangles with sides that are the differences of
     /// corresponding values in x0 and x1, and y0 and y1. Double-precision.
     ///
     /// - Parameter x0: The `x0` in `z[i] = sqrt( (x0[i] - x1[i])² + (y0[i] - y1[i])² )`.
