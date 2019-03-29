@@ -2457,14 +2457,10 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       // Only diagnose VarDecls from the first CaseLabelItem in CaseStmts, as
       // the remaining items must match it anyway.
       auto CaseItems = CS->getCaseLabelItems();
-      if (!CaseItems.empty()) {
-        bool InFirstCaseLabelItem = false;
-        CaseItems.front().getPattern()->forEachVariable([&](VarDecl *D) {
-          InFirstCaseLabelItem |= var == D;
-        });
-        if (!InFirstCaseLabelItem)
-          continue;
-      }
+      assert(!CaseItems.empty() &&
+             "If we have any case stmt var decls, we should have a case item");
+      if (!CaseItems.front().getPattern()->containsVarDecl(var))
+        continue;
     }
 
     // If this is a 'let' value, any stores to it are actually initializations,

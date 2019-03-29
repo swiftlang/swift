@@ -1297,14 +1297,14 @@ unsigned PatternBindingDecl::getPatternEntryIndexForVarDecl(const VarDecl *VD) c
   
   auto List = getPatternList();
   if (List.size() == 1) {
-    assert(patternContainsVarDeclBinding(List[0].getPattern(), VD) &&
+    assert(List[0].getPattern()->containsVarDecl(VD) &&
            "Single entry PatternBindingDecl is set up wrong");
     return 0;
   }
   
   unsigned Result = 0;
   for (auto entry : List) {
-    if (patternContainsVarDeclBinding(entry.getPattern(), VD))
+    if (entry.getPattern()->containsVarDecl(VD))
       return Result;
     ++Result;
   }
@@ -4872,12 +4872,6 @@ SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
   return SourceRange();
 }
 
-static bool isVarInPattern(const VarDecl *vd, Pattern *p) {
-  bool foundIt = false;
-  p->forEachVariable([&](VarDecl *foundFD) { foundIt |= foundFD == vd; });
-  return foundIt;
-}
-
 static Optional<std::pair<CaseStmt *, Pattern *>>
 findParentPatternCaseStmtAndPattern(const VarDecl *inputVD) {
   auto getMatchingPattern = [&](CaseStmt *cs) -> Pattern * {
@@ -4891,7 +4885,7 @@ findParentPatternCaseStmtAndPattern(const VarDecl *inputVD) {
 
     // Then check the rest of our case label items.
     for (auto &item : cs->getMutableCaseLabelItems()) {
-      if (isVarInPattern(inputVD, item.getPattern())) {
+      if (item.getPattern()->containsVarDecl(inputVD)) {
         return item.getPattern();
       }
     }
@@ -4984,7 +4978,7 @@ Pattern *VarDecl::getParentPattern() const {
       // In a case statement, search for the pattern that contains it.  This is
       // a bit silly, because you can't have something like "case x, y:" anyway.
       for (auto items : cs->getCaseLabelItems()) {
-        if (isVarInPattern(this, items.getPattern()))
+        if (items.getPattern()->containsVarDecl(this))
           return items.getPattern();
       }
     }
@@ -4992,7 +4986,7 @@ Pattern *VarDecl::getParentPattern() const {
     if (auto *LCS = dyn_cast<LabeledConditionalStmt>(stmt)) {
       for (auto &elt : LCS->getCond())
         if (auto pat = elt.getPatternOrNull())
-          if (isVarInPattern(this, pat))
+          if (pat->containsVarDecl(this))
             return pat;
     }
 
