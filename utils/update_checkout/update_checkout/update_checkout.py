@@ -218,29 +218,37 @@ def obtain_additional_swift_sources(pool_args):
     (args, repo_name, repo_info, repo_branch, remote, with_ssh, scheme_name,
      skip_history, skip_repository_list) = pool_args
 
+    env = dict(os.environ)
+    env.update({'GIT_TERMINAL_PROMPT': 0})
+
     with shell.pushd(SWIFT_SOURCE_ROOT, dry_run=False, echo=False):
 
         print("Cloning '" + repo_name + "'")
 
         if skip_history:
-            shell.run(['env', 'GIT_TERMINAL_PROMPT=0', 'git', 'clone',
+            shell.run(['git', 'clone',
                        '--recursive', '--depth', '1', '--branch',
                        repo_branch, remote, repo_name],
+                      env=env,
                       echo=True)
         else:
-            shell.run(['env', 'GIT_TERMINAL_PROMPT=0', 'git', 'clone',
+            shell.run(['git', 'clone',
                        '--recursive', remote, repo_name],
+                      env=env,
                       echo=True)
         if scheme_name:
             src_path = os.path.join(SWIFT_SOURCE_ROOT, repo_name, ".git")
-            shell.run(['env', 'GIT_TERMINAL_PROMPT=0', 'git', '--git-dir',
+            shell.run(['git', '--git-dir',
                        src_path, '--work-tree',
                        os.path.join(SWIFT_SOURCE_ROOT, repo_name),
-                       'checkout', repo_branch], echo=False)
+                       'checkout', repo_branch],
+                      env=env,
+                      echo=False)
     with shell.pushd(os.path.join(SWIFT_SOURCE_ROOT, repo_name),
                      dry_run=False, echo=False):
-        shell.run(['env', 'GIT_TERMINAL_PROMPT=0', "git", "submodule",
+        shell.run(["git", "submodule",
                    "update", "--recursive"],
+                  env=env,
                   echo=False)
 
 
