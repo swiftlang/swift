@@ -1076,6 +1076,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
                         dep.getSize(),
                         getRawModTimeOrHash(dep),
                         dep.isHashBased(),
+                        dep.isSDKRelative(),
                         dep.getPath());
   }
 
