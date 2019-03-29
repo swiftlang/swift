@@ -366,7 +366,7 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
     ModuleDecl &M, Optional<SourceLoc> diagLoc,
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
-    bool isFramework) {
+    bool isFramework, bool treatAsPartialModule) {
   assert(moduleInputBuffer);
 
   StringRef moduleBufferID = moduleInputBuffer->getBufferIdentifier();
@@ -402,7 +402,8 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
 
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
     loadInfo.status =
-        loadedModuleFile->associateWithFileContext(fileUnit, diagLocOrInvalid);
+        loadedModuleFile->associateWithFileContext(fileUnit, diagLocOrInvalid,
+                                                   treatAsPartialModule);
     if (loadInfo.status == serialization::Status::Valid) {
       Ctx.bumpGeneration();
       LoadedModuleFiles.emplace_back(std::move(loadedModuleFile),
@@ -487,8 +488,10 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
         loadedModuleFile->getDependencies().begin(),
         loadedModuleFile->getDependencies().end(), std::back_inserter(missing),
         [&duplicates](const ModuleFile::Dependency &dependency) -> bool {
-          if (dependency.isLoaded() || dependency.isHeader())
+          if (dependency.isLoaded() || dependency.isHeader() ||
+              dependency.isImplementationOnly()) {
             return false;
+          }
           return duplicates.insert(dependency.RawPath).second;
         });
 
@@ -654,7 +657,8 @@ ModuleDecl *SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
   SWIFT_DEFER { M->setHasResolvedImports(); };
 
   if (!loadAST(*M, moduleID.second, std::move(moduleInputBuffer),
-               std::move(moduleDocInputBuffer), isFramework)) {
+               std::move(moduleDocInputBuffer), isFramework,
+               /*treatAsPartialModule*/false)) {
     M->setFailedToLoad();
   }
 
@@ -703,8 +707,12 @@ void SerializedASTFile::getImportedModules(
 
 void SerializedASTFile::collectLinkLibrariesFromImports(
     ModuleDecl::LinkLibraryCallback callback) const {
+  ModuleDecl::ImportFilter ImportFilter;
+  ImportFilter |= ModuleDecl::ImportFilterKind::Public;
+  ImportFilter |= ModuleDecl::ImportFilterKind::Private;
+
   llvm::SmallVector<ModuleDecl::ImportedModule, 8> Imports;
-  File.getImportedModules(Imports, ModuleDecl::ImportFilter::All);
+  File.getImportedModules(Imports, ImportFilter);
 
   for (auto Import : Imports)
     Import.second->collectLinkLibraries(callback);
