@@ -1884,15 +1884,9 @@ void IRGenSILFunction::visitAllocGlobalInst(AllocGlobalInst *i) {
 
   auto expansion = IGM.getResilienceExpansionForLayout(var);
 
-  // FIXME: Remove this once LLDB has proper support for resilience.
-  bool isREPLVar = false;
-  if (auto *decl = var->getDecl())
-    if (decl->isREPLVar())
-      isREPLVar = true;
-
   // If the global is fixed-size in all resilience domains that can see it,
   // we allocated storage for it statically, and there's nothing to do.
-  if (isREPLVar || ti.isFixedSize(expansion))
+  if (ti.isFixedSize(expansion))
     return;
 
   // Otherwise, the static storage for the global consists of a fixed-size
@@ -1920,15 +1914,9 @@ void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
   Address addr = IGM.getAddrOfSILGlobalVariable(var, ti,
                                                 NotForDefinition);
 
-  // FIXME: Remove this once LLDB has proper support for resilience.
-  bool isREPLVar = false;
-  if (auto *decl = var->getDecl())
-    if (decl->isREPLVar())
-      isREPLVar = true;
-
   // If the global is fixed-size in all resilience domains that can see it,
   // we allocated storage for it statically, and there's nothing to do.
-  if (isREPLVar || ti.isFixedSize(expansion)) {
+  if (ti.isFixedSize(expansion)) {
     setLoweredAddress(i, addr);
     return;
   }

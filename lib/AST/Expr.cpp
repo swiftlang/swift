@@ -322,7 +322,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
 
   PASS_THROUGH_REFERENCE(ConstructorRefCall, getFn);
   PASS_THROUGH_REFERENCE(Load, getSubExpr);
-  NO_REFERENCE(TupleShuffle);
+  NO_REFERENCE(DestructureTuple);
   NO_REFERENCE(ArgumentShuffle);
   NO_REFERENCE(UnresolvedTypeConversion);
   PASS_THROUGH_REFERENCE(FunctionConversion, getSubExpr);
@@ -637,7 +637,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
     return false;
 
   case ExprKind::Load:
-  case ExprKind::TupleShuffle:
+  case ExprKind::DestructureTuple:
   case ExprKind::ArgumentShuffle:
   case ExprKind::UnresolvedTypeConversion:
   case ExprKind::FunctionConversion:
@@ -1333,13 +1333,14 @@ CaptureListExpr *CaptureListExpr::create(ASTContext &ctx,
   return ::new(mem) CaptureListExpr(captureList, closureBody);
 }
 
-TupleShuffleExpr *TupleShuffleExpr::create(ASTContext &ctx,
-                                           Expr *subExpr,
-                                           ArrayRef<unsigned> elementMapping,
-                                           Type ty) {
-  auto size = totalSizeToAlloc<unsigned>(elementMapping.size());
-  auto mem = ctx.Allocate(size, alignof(TupleShuffleExpr));
-  return ::new(mem) TupleShuffleExpr(subExpr, elementMapping, ty);
+DestructureTupleExpr *
+DestructureTupleExpr::create(ASTContext &ctx,
+                             ArrayRef<OpaqueValueExpr *> destructuredElements,
+                             Expr *srcExpr, Expr *dstExpr, Type ty) {
+  auto size = totalSizeToAlloc<OpaqueValueExpr *>(destructuredElements.size());
+  auto mem = ctx.Allocate(size, alignof(DestructureTupleExpr));
+  return ::new(mem) DestructureTupleExpr(destructuredElements,
+                                         srcExpr, dstExpr, ty);
 }
 
 ArgumentShuffleExpr *ArgumentShuffleExpr::create(ASTContext &ctx,
@@ -1486,6 +1487,19 @@ ArrayExpr *ArrayExpr::create(ASTContext &C, SourceLoc LBracketLoc,
                                                   CommaLocs.size());
   auto Mem = C.Allocate(Size, alignof(ArrayExpr));
   return new (Mem) ArrayExpr(LBracketLoc, Elements, CommaLocs, RBracketLoc, Ty);
+}
+
+Type ArrayExpr::getElementType() {
+  auto init = getInitializer();
+  if (!init)
+    return Type();
+
+  auto *decl = cast<ConstructorDecl>(init.getDecl());
+  return decl->getMethodInterfaceType()
+      ->getAs<AnyFunctionType>()
+      ->getParams()[0]
+      .getPlainType()
+      .subst(init.getSubstitutions());
 }
 
 DictionaryExpr *DictionaryExpr::create(ASTContext &C, SourceLoc LBracketLoc,

@@ -322,14 +322,22 @@ private:
   void visitClassDecl(ClassDecl *CD) {
     printDocumentationComment(CD);
 
+    bool hasResilientAncestry =
+      CD->checkAncestry().contains(AncestryFlags::ResilientOther);
+    if (hasResilientAncestry) {
+      os << "SWIFT_RESILIENT_CLASS";
+    } else {
+      os << "SWIFT_CLASS";
+    }
+
     StringRef customName = getNameForObjC(CD, CustomNamesOnly);
     if (customName.empty()) {
       llvm::SmallString<32> scratch;
-      os << "SWIFT_CLASS(\"" << CD->getObjCRuntimeName(scratch) << "\")";
+      os << "(\"" << CD->getObjCRuntimeName(scratch) << "\")";
       printAvailability(CD);
       os << "\n@interface " << CD->getName();
     } else {
-      os << "SWIFT_CLASS_NAMED(\"" << CD->getName() << "\")";
+      os << "_NAMED(\"" << CD->getName() << "\")";
       printAvailability(CD);
       os << "\n@interface " << customName;
     }
@@ -2638,6 +2646,20 @@ public:
            "#  define SWIFT_CLASS_NAMED(SWIFT_NAME) "
              "SWIFT_COMPILE_NAME(SWIFT_NAME) "
              "SWIFT_CLASS_EXTRA\n"
+           "# endif\n"
+           "#endif\n"
+           "#if !defined(SWIFT_RESILIENT_CLASS)\n"
+           "# if __has_attribute(objc_class_stub)\n"
+           "#  define SWIFT_RESILIENT_CLASS(SWIFT_NAME) SWIFT_CLASS(SWIFT_NAME) "
+             "__attribute__((objc_class_stub))\n"
+           "#  define SWIFT_RESILIENT_CLASS_NAMED(SWIFT_NAME) "
+             "__attribute__((objc_class_stub)) "
+             "SWIFT_CLASS_NAMED(SWIFT_NAME)\n"
+           "# else\n"
+           "#  define SWIFT_RESILIENT_CLASS(SWIFT_NAME) "
+             "SWIFT_CLASS(SWIFT_NAME)\n"
+           "#  define SWIFT_RESILIENT_CLASS_NAMED(SWIFT_NAME) "
+             "SWIFT_CLASS_NAMED(SWIFT_NAME)\n"
            "# endif\n"
            "#endif\n"
            "\n"
