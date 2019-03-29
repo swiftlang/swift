@@ -326,6 +326,11 @@ PythonRuntimeTestSuite.testWithLeakChecking("SR-9230") {
   expectEqual(2, Python.len(Python.dict(a: "a", b: "b")))
 }
 
+PythonRuntimeTestSuite.testWithLeakChecking("ArrayOpsForLeakChecking") {
+  expectEqual([1, 2], PythonObject([1]) + PythonObject([2]))
+  expectTrue(PythonObject([1]) != PythonObject([2]))
+}
+
 // TF-78: isType() consumed refcount for type objects like `PyBool_Type`.
 PythonRuntimeTestSuite.testWithLeakChecking("PythonRefCount") {
   let b: PythonObject = true
