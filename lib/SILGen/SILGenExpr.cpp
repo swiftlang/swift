@@ -2415,7 +2415,7 @@ loadIndexValuesForKeyPathComponent(SILGenFunction &SGF, SILLocation loc,
     indexParams.emplace_back(SGF.F.mapTypeIntoContext(elt.first));
   }
   
-  PreparedArguments indexValues(indexParams, /*scalar*/ indexes.size() == 1);
+  PreparedArguments indexValues(indexParams, /*scalar*/ false);
   if (indexes.empty()) {
     assert(indexValues.isValid());
     return indexValues;

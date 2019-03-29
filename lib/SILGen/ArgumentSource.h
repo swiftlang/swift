@@ -273,6 +273,9 @@ public:
     emplace(params, isScalar);
   }
 
+  // Decompse an argument list expression.
+  PreparedArguments(ArrayRef<AnyFunctionType::Param> params, Expr *arg);
+
   // Move-only.
   PreparedArguments(const PreparedArguments &) = delete;
   PreparedArguments &operator=(const PreparedArguments &) = delete;

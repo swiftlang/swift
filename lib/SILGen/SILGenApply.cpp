@@ -2774,6 +2774,7 @@ public:
       assert(argSources.size() == 1);
       emitTopLevel(std::move(argSources[0]), origFormalType);
     } else {
+      maybeEmitForeignErrorArgument();
       for (auto i : indices(argSources)) {
         emitSingleArg(std::move(argSources[i]),
                       origFormalType.getFunctionParamType(i));
@@ -4643,12 +4644,9 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
     // We should be able to enforce that these arguments are
     // always still expressions.
     PreparedArguments args = std::move(uncurriedSites[0]).forward();
-    assert(args.isScalar());
-    Expr *argument = std::move(std::move(args).getSources()[0]).asKnownExpr();
-
     ManagedValue resultMV =
         emitter(SGF, uncurriedLoc, callee.getSubstitutions(),
-                argument, uncurriedContext);
+                std::move(args), uncurriedContext);
     firstLevelResult.value =
         RValue(SGF, uncurriedLoc, formalResultType, resultMV);
     return firstLevelResult;
@@ -4875,10 +4873,7 @@ CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, ApplyExpr *e) {
     SmallVector<AnyFunctionType::Param, 8> params;
     AnyFunctionType::decomposeInput(arg->getType(), params);
 
-    // FIXME: Split up the argument expression here instead of passing
-    // scalar=true.
-    PreparedArguments preparedArgs(params, /*scalar*/true);
-    preparedArgs.addArbitrary(arg);
+    PreparedArguments preparedArgs(params, arg);
 
     emission.addCallSite(apply, std::move(preparedArgs),
                          apply->getType()->getCanonicalType(),
@@ -6069,8 +6064,7 @@ SILGenFunction::prepareSubscriptIndices(SubscriptDecl *subscript,
 
   // Prepare the unevaluated index expression.
   auto substParams = substFnType->getParams();
-  PreparedArguments args(substParams, /*isScalar=*/true);
-  args.addArbitrary(indexExpr);
+  PreparedArguments args(substParams, indexExpr);
 
   // Now, force it to be evaluated.
   SmallVector<ManagedValue, 4> argValues;

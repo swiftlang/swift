@@ -261,6 +261,22 @@ void ArgumentSource::dump(raw_ostream &out, unsigned indent) const {
   llvm_unreachable("bad kind");
 }
 
+PreparedArguments::PreparedArguments(
+    ArrayRef<AnyFunctionType::Param> params,
+    Expr *arg) : PreparedArguments(params, /*scalar*/ isa<ArgumentShuffleExpr>(arg)) {
+  if (isa<ArgumentShuffleExpr>(arg))
+    addArbitrary(arg);
+  else if (auto *PE = dyn_cast<ParenExpr>(arg))
+    addArbitrary(PE->getSubExpr());
+  else if (auto *TE = dyn_cast<TupleExpr>(arg)) {
+    for (auto *elt : TE->getElements())
+      addArbitrary(elt);
+  } else {
+    // FIXME: All ApplyExprs should have a ParenExpr or TupleExpr as their argument
+    addArbitrary(arg);
+  }
+}
+
 void PreparedArguments::emplaceEmptyArgumentList(SILGenFunction &SGF) {
   emplace({}, /*scalar*/ false);
   assert(isValid());
