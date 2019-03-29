@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 477; // Last change: prebuilt module cache
+const uint16_t SWIFTMODULE_VERSION_MINOR = 478; // SDK-relative dependencies flag
 
 using DeclIDField = BCFixed<31>;
 
@@ -674,6 +674,7 @@ namespace input_block {
     FileSizeField,                 // file size (for validation)
     FileModTimeOrContentHashField, // mtime or content hash (for validation)
     BCFixed<1>,                    // are we reading mtime (0) or hash (1)?
+    BCFixed<1>,                    // SDK-relative?
     BCBlob                         // path
   >;
 }
