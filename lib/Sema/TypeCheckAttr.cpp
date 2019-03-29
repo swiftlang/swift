@@ -87,6 +87,7 @@ public:
   IGNORED_ATTR(ForbidSerializingReference)
   IGNORED_ATTR(Frozen)
   IGNORED_ATTR(HasStorage)
+  IGNORED_ATTR(ImplementationOnly)
   IGNORED_ATTR(Implements)
   IGNORED_ATTR(ImplicitlyUnwrappedOptional)
   IGNORED_ATTR(Infix)
@@ -747,6 +748,7 @@ public:
     IGNORED_ATTR(Consuming)
     IGNORED_ATTR(Convenience)
     IGNORED_ATTR(Dynamic)
+    IGNORED_ATTR(DynamicReplacement)
     IGNORED_ATTR(Effects)
     IGNORED_ATTR(Exported)
     IGNORED_ATTR(ForbidSerializingReference)
@@ -755,6 +757,7 @@ public:
     IGNORED_ATTR(IBDesignable)
     IGNORED_ATTR(IBInspectable)
     IGNORED_ATTR(IBOutlet) // checked early.
+    IGNORED_ATTR(ImplementationOnly)
     IGNORED_ATTR(ImplicitlyUnwrappedOptional)
     IGNORED_ATTR(Indirect)
     IGNORED_ATTR(Inline)
@@ -771,6 +774,7 @@ public:
     IGNORED_ATTR(ObjCRuntimeName)
     IGNORED_ATTR(Optional)
     IGNORED_ATTR(Override)
+    IGNORED_ATTR(PrivateImport)
     IGNORED_ATTR(RawDocComment)
     IGNORED_ATTR(ReferenceOwnership)
     IGNORED_ATTR(RequiresStoredPropertyInits)
@@ -784,8 +788,6 @@ public:
     IGNORED_ATTR(Transparent)
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(WeakLinked)
-    IGNORED_ATTR(DynamicReplacement)
-    IGNORED_ATTR(PrivateImport)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
