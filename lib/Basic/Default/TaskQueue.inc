@@ -29,6 +29,12 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Signals.h"
 
+#if defined(_WIN32)
+#define NOMINMAX
+#include <Windows.h>
+#include <psapi.h>
+#endif
+
 using namespace llvm::sys;
 
 namespace swift {
@@ -150,15 +156,35 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
     // This isn't a true signal on Windows, but we'll treat it as such so that
     // we clean up after it properly
     bool crashed = ReturnCode & 0xC0000000;
+
+    FILETIME creationTime;
+    FILETIME exitTime;
+    FILETIME utimeTicks;
+    FILETIME stimeTicks;
+    PROCESS_MEMORY_COUNTERS counters = {};
+    GetProcessTimes(PI.Process, &creationTime, &exitTime, &stimeTicks,
+                    &utimeTicks);
+    // Each tick is 100ns
+    uint64_t utime =
+        ((uint64_t)utimeTicks.dwHighDateTime << 32 | utimeTicks.dwLowDateTime) /
+        10;
+    uint64_t stime =
+        ((uint64_t)stimeTicks.dwHighDateTime << 32 | stimeTicks.dwLowDateTime) /
+        10;
+    GetProcessMemoryInfo(PI.Process, &counters, sizeof(counters));
+
+    TaskProcessInformation tpi(PI.Pid, utime, stime,
+                               counters.PeakWorkingSetSize);
 #else
       // Wait() returning a return code of -2 indicates the process received
       // a signal during execution.
     bool crashed = ReturnCode == -2;
+    TaskProcessInformation tpi(PI.Pid);
 #endif
     if (crashed) {
       if (Signalled) {
         TaskFinishedResponse Response =
-            Signalled(PI.Pid, ErrMsg, stdoutContents, stderrContents, T->Context, ReturnCode, TaskProcessInformation(PI.Pid));
+            Signalled(PI.Pid, ErrMsg, stdoutContents, stderrContents, T->Context, ReturnCode, tpi);
         ContinueExecution = Response != TaskFinishedResponse::StopExecution;
       } else {
         // If we don't have a Signalled callback, unconditionally stop.
@@ -169,7 +195,7 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
       // finished.
       if (Finished) {
         TaskFinishedResponse Response = Finished(PI.Pid, PI.ReturnCode,
-        stdoutContents, stderrContents, TaskProcessInformation(PI.Pid), T->Context);
+        stdoutContents, stderrContents, tpi, T->Context);
         ContinueExecution = Response != TaskFinishedResponse::StopExecution;
       } else if (PI.ReturnCode != 0) {
         ContinueExecution = false;

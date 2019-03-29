@@ -603,6 +603,10 @@ namespace driver {
         }
       }
 
+      if (Comp.getStatsReporter() && ProcInfo.getResourceUsage().hasValue())
+        Comp.getStatsReporter()->recordJobMaxRSS(
+            ProcInfo.getResourceUsage()->Maxrss);
+
       if (isBatchJob(FinishedCmd)) {
         return unpackAndFinishBatch(ReturnCode, Output, Errors,
                                     static_cast<const BatchJob *>(FinishedCmd));
@@ -684,6 +688,11 @@ namespace driver {
         if (TaskQueue::supportsBufferingOutput())
           llvm::errs() << Output;
       }
+
+      if (Comp.getStatsReporter() && ProcInfo.getResourceUsage().hasValue())
+        Comp.getStatsReporter()->recordJobMaxRSS(
+            ProcInfo.getResourceUsage()->Maxrss);
+
       if (!ErrorMsg.empty())
         Comp.getDiags().diagnose(SourceLoc(),
                                  diag::error_unable_to_execute_command,
