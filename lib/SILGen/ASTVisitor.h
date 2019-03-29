@@ -57,7 +57,8 @@ public:
   }
 
   ExprRetTy visitVarargExpansionExpr(VarargExpansionExpr *E, Args... AA) {
-    llvm_unreachable("vararg expansion should not appear in this position");
+    return static_cast<ImplClass*>(this)->visit(E->getSubExpr(),
+                                                std::forward<Args>(AA)...);
   }
 
   ExprRetTy visitIdentityExpr(IdentityExpr *E, Args...AA) {

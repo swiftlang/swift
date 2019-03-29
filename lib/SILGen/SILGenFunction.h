@@ -1210,10 +1210,6 @@ public:
                                             AccessStrategy strategy,
                                             Expr *indices);
 
-  RValue prepareEnumPayload(EnumElementDecl *element,
-                            CanFunctionType substFnType,
-                            ArgumentSource &&indexExpr);
-
   ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
                                         CanType baseFormalType,
                                         SILDeclRef accessor);
@@ -1417,7 +1413,7 @@ public:
   // Helpers for emitting ApplyExpr chains.
   //
 
-  RValue emitApplyExpr(Expr *e, SGFContext c);
+  RValue emitApplyExpr(ApplyExpr *e, SGFContext c);
 
   /// Emit a function application, assuming that the arguments have been
   /// lowered appropriately for the abstraction level but that the
@@ -1463,7 +1459,7 @@ public:
                                      SGFContext ctx);
 
   RValue emitApplyAllocatingInitializer(SILLocation loc, ConcreteDeclRef init,
-                                        RValue &&args, Type overriddenSelfType,
+                                        PreparedArguments &&args, Type overriddenSelfType,
                                         SGFContext ctx);
 
   CleanupHandle emitBeginApply(SILLocation loc, ManagedValue fn,

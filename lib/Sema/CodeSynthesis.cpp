@@ -457,7 +457,8 @@ static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
   }
   
   // A single unlabeled value is not a tuple.
-  if (args.size() == 1 && labels[0].empty()) {
+  if (args.size() == 1 && labels[0].empty() &&
+      !isa<VarargExpansionExpr>(args[0])) {
     return new (ctx) ParenExpr(SourceLoc(), args[0], SourceLoc(),
                                /*hasTrailingClosure=*/false);
   }
