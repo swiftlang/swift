@@ -12,6 +12,7 @@
 //
 //  This file implements basic setup and teardown for the class which
 //  performs IR generation for function bodies.
+//  Build a toolchain.
 //
 //===----------------------------------------------------------------------===//
 
