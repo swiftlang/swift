@@ -7,10 +7,18 @@ enum Tribool {
   True, False, Indeterminate
 };
 
-enum {
+// This is explicitly sized on Windows since we do not use the type to infer the
+// type that we are importing it as as this is known to be explicitly different
+// in that environment.
+enum
+#if defined(_WIN32)
+: unsigned long long
+#endif
+{
   AnonConst1 = 0x700000000,
   AnonConst2
 };
+_Static_assert(sizeof(AnonConst1) == 8);
 
 enum {
   AnonConstSmall1 = 16,

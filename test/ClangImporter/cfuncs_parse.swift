@@ -9,7 +9,12 @@ func test_cfunc1(_ i: Int) {
 }
 
 func test_cfunc2(_ i: Int) {
+#if os(Windows) && (arch(arm64) || arch(x86_64))
+  // LLP64 targets will import `long` as `Int32`
+  let f = cfunc2(Int32(i), 17)
+#else
   let f = cfunc2(i, 17)
+#endif
   _ = f as Float
   cfunc2(b:17, a:i) // expected-error{{extraneous argument labels 'b:a:' in call}}
   cfunc2(17, i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'Int32'}}
