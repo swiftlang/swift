@@ -4903,9 +4903,7 @@ public:
   }
 
   /// Whether this variable has a property delegate attached.
-  bool hasPropertyDelegate() const {
-    return Bits.VarDecl.HasPropertyDelegate;
-  }
+  bool hasPropertyDelegate() const;
 
   /// For a property delegate, retrieve the source location for the
   /// 'by' keyword.

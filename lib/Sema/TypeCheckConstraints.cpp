@@ -2593,8 +2593,8 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
         // Call the property delegate initializer as spelled in the
         // parenthesized initializer.
         initializer = CallExpr::create(
-            ctx, typeExpr, initializer, { }, { }, /*hasTrailingClosure=*/false,
-            /*implicit=*/true);
+            ctx, typeExpr, initializer, { }, { },
+            /*hasTrailingClosure=*/false, /*implicit=*/true);
       } else {
         // Form a call to the init(initialValue:) initializer of the property
         // delegate type.

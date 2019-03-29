@@ -2094,6 +2094,31 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
 }
 
 llvm::Expected<NominalTypeDecl *>
+CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
+                                   CustomAttr *attr, DeclContext *dc) const {
+  // Find the types referenced by the custom attribute.
+  auto &ctx = dc->getASTContext();
+  TypeLoc &typeLoc = attr->getTypeLoc();
+  DirectlyReferencedTypeDecls decls;
+  if (auto typeRepr = typeLoc.getTypeRepr()) {
+    decls = directReferencesForTypeRepr(
+        evaluator, ctx, typeRepr, dc);
+  } else if (Type type = typeLoc.getType()) {
+    decls = directReferencesForType(type);
+  }
+
+  // Dig out the nominal type declarations.
+  SmallVector<ModuleDecl *, 2> modulesFound;
+  bool anyObject = false;
+  auto nominals = resolveTypeDeclsToNominal(evaluator, ctx, decls,
+                                            modulesFound, anyObject);
+  if (nominals.size() == 1 && !isa<ProtocolDecl>(nominals.front()))
+    return nominals.front();
+
+  return nullptr;
+}
+
+llvm::Expected<NominalTypeDecl *>
 AttachedPropertyDelegateDeclRequest::evaluate(Evaluator &evaluator,
                                               VarDecl *property) const {
   if (!property->hasPropertyDelegate())

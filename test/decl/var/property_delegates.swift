@@ -548,3 +548,16 @@ func testMutatingness() {
   _ = nonmutable.y // expected-error{{cannot use mutating getter on immutable value: 'nonmutable' is a 'let' constant}}
   nonmutable.y = 42 // expected-error{{cannot use mutating getter on immutable value: 'nonmutable' is a 'let' constant}}
 }
+
+// ---------------------------------------------------------------------------
+// Custom attribute syntax
+// ---------------------------------------------------------------------------
+struct TestAttributeSyntax {
+  @Wrapper var x: Int
+  @Wrapper(value: 17) var y
+  @WrapperWithInitialValue var z = 17
+
+  @Bad var bad1: Int // expected-error{{unknown attribute 'Bad'}}
+  @Int var bad2: Int // expected-error{{struct 'Int' cannot be used as an attribute}}
+  @Swift.Float var bad3: Int // expected-error{{struct 'Float' cannot be used as an attribute}}
+}

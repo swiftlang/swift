@@ -1108,6 +1108,9 @@ ERROR(attribute_requires_operator_identifier,none,
 ERROR(attribute_requires_single_argument,none,
       "'%0' requires a function with one argument", (StringRef))
 
+ERROR(nominal_type_not_attribute,none,
+      "%0 %1 cannot be used as an attribute", (DescriptiveDeclKind, DeclName))
+
 ERROR(mutating_invalid_global_scope,none, "%0 is only valid on methods",
       (SelfAccessKind))
 ERROR(mutating_invalid_classes,none, "%0 isn't valid on methods in "
@@ -4272,6 +4275,9 @@ WARNING(hashvalue_implementation,none,
 //------------------------------------------------------------------------------
 // MARK: property delegate diagnostics
 //------------------------------------------------------------------------------
+ERROR(property_delegate_attribute_not_on_var, none,
+      "property delegate attribute %0 can only be applied to a 'var'",
+      (DeclName))
 ERROR(property_delegate_not_unbound, none,
       "property delegate type %0 must not provide generic arguments", (Type))
 ERROR(property_delegate_by_not_delegate, none,

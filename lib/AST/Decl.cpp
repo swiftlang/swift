@@ -5182,6 +5182,55 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
   }
 }
 
+bool VarDecl::hasPropertyDelegate() const {
+  if (Bits.VarDecl.HasPropertyDelegate)
+    return true;
+
+  auto mutableThis = const_cast<VarDecl *>(this);
+  ASTContext &ctx = getASTContext();
+  auto dc = getInnermostDeclContext();
+  for (auto custom : mutableThis->getAttrs().getAttributes<CustomAttr>()) {
+    auto mutableCustom = const_cast<CustomAttr *>(custom);
+    auto nominal = evaluateOrDefault(
+        ctx.evaluator, CustomAttrNominalRequest{mutableCustom, dc}, nullptr);
+    if (!nominal)
+      continue;
+
+    auto propertyDelegateAttr =
+      nominal->getAttrs().getAttribute<PropertyDelegateAttr>();
+    if (!propertyDelegateAttr)
+      continue;
+
+    // Take the custom attribute and turn it into a property delegate on
+    // the variable.
+    // FIXME: This is a hack.
+    mutableThis->addPropertyDelegate(custom->getLocation(),
+                                     AccessLevel::Internal,
+                                     SourceLoc(),
+                                     custom->getTypeLoc());
+
+    // If there is an initializer, take that too.
+    if (auto init = custom->getArg()) {
+      if (auto binding = getParentPatternBinding()) {
+        unsigned index = binding->getPatternEntryIndexForVarDecl(this);
+        binding->setInit(index, init);
+        auto &entry =
+            const_cast<PatternBindingEntry&>(binding->getPatternList()[index]);
+
+        entry.setIsPropertyDelegateInit(true);
+        if (auto initContext = custom->getInitContext()) {
+          entry.setInitContext(initContext);
+          initContext->setBinding(binding, index);
+        }
+      }
+    }
+
+    return true;
+  }
+
+  return false;
+}
+
 ParamDecl::ParamDecl(Specifier specifier,
                      SourceLoc specifierLoc, SourceLoc argumentNameLoc,
                      Identifier argumentName, SourceLoc parameterNameLoc,

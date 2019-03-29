@@ -240,6 +240,33 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
+/// Request the nominal type declaration to which the given custom attribute
+/// refers.
+class CustomAttrNominalRequest :
+    public SimpleRequest<CustomAttrNominalRequest,
+                         CacheKind::Cached,
+                         NominalTypeDecl *,
+                         CustomAttr *,
+                         DeclContext *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<NominalTypeDecl *>
+  evaluate(Evaluator &evaluator, CustomAttr *attr, DeclContext *dc) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
 /// Request the property delegate declaration for the given property, if it
 /// has one.
 class AttachedPropertyDelegateDeclRequest :

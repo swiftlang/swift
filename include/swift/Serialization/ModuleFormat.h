@@ -1601,6 +1601,12 @@ namespace decls_block {
     BCArray<IdentifierIDField>
   >;
 
+  using CustomDeclAttrLayout = BCRecordLayout<
+    Custom_DECL_ATTR,
+    BCFixed<1>,  // implicit flag
+    TypeIDField // type referenced by this custom attribute
+  >;
+
 }
 
 /// Returns the encoding kind for the given decl.

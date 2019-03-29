@@ -5091,7 +5091,7 @@ void VarDecl::addPropertyDelegate(SourceLoc byLoc,
                                   AccessLevel access,
                                   SourceLoc accessLoc,
                                   TypeLoc typeLoc) {
-  assert(!hasPropertyDelegate());
+  assert(!Bits.VarDecl.HasPropertyDelegate);
   Bits.VarDecl.HasPropertyDelegate = true;
 
   ASTContext &ctx = getASTContext();
