@@ -1,6 +1,3 @@
-// swift-interface-format-version: 1.0
-// swift-module-flags: -module-name SDKDependencies
-
 // RUN: %empty-directory(%t)
 
 // 1) Build a prebuilt cache for our SDK
@@ -46,11 +43,10 @@
 // RUN: cat %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=EXLIB
 // RUN: cat %t/MCP/SdkLib-*.swiftmodule | %FileCheck %s -check-prefixes=EXLIB,SDKLIB
 //
-// EXLIB-DAG: /prebuilt-cache/ExportedLib.swiftmodule
+// EXLIB: dependencies:
 // EXLIB-DAG: /my-sdk/usr/include/module.modulemap
 // EXLIB-DAG: /my-sdk/usr/include/SomeCModule.h
 // EXLIB-DAG: /my-sdk/ExportedLib.swiftinterface
-// SDKLIB-DAG: /prebuilt-cache/SdkLib.swiftmodule
 // SDKLIB-DAG: /my-sdk/SdkLib.swiftinterface
 //
 // RUN: %empty-directory(%t/MCP)
@@ -60,7 +56,8 @@
 // 4) Move the SDK without changing its contents
 //
 // RUN: mv %t/my-sdk %t/my-new-sdk
-// RUN: %target-swift-frontend -typecheck -I %t/my-new-sdk -sdk %t/my-new-sdk -prebuilt-module-cache-path %t/prebuilt-cache -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies %s
+// RUN: mv %t/prebuilt-cache %t/new-prebuilt-cache
+// RUN: %target-swift-frontend -typecheck -I %t/my-new-sdk -sdk %t/my-new-sdk -prebuilt-module-cache-path %t/new-prebuilt-cache -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies %s
 //
 // Check SdkLib and ExportedLib are in the module cache
 // RUN: test -f %t/MCP/SdkLib-*.swiftmodule
@@ -74,11 +71,9 @@
 // RUN: cat %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=NEW-EXLIB
 // RUN: cat %t/MCP/SdkLib-*.swiftmodule | %FileCheck %s -check-prefixes=NEW-EXLIB,NEW-SDKLIB
 //
-// NEW-EXLIB-DAG: /prebuilt-cache/ExportedLib.swiftmodule
 // NEW-EXLIB-DAG: /my-new-sdk/usr/include/module.modulemap
 // NEW-EXLIB-DAG: /my-new-sdk/usr/include/SomeCModule.h
 // NEW-EXLIB-DAG: /my-new-sdk/ExportedLib.swiftinterface
-// NEW-SDKLIB-DAG: /prebuilt-cache/SdkLib.swiftmodule
 // NEW-SDKLIB-DAG: /my-new-sdk/SdkLib.swiftinterface
 //
 // RUN: %empty-directory(%t/MCP)
@@ -88,7 +83,7 @@
 // 5) Now change the SDK's content and check it no longer uses the prebuilt modules
 //
 // RUN: echo "// size change" >> %t/my-new-sdk/SdkLib.swiftinterface
-// RUN: %target-swift-frontend -typecheck -I %t/my-new-sdk -sdk %t/my-new-sdk -prebuilt-module-cache-path %t/prebuilt-cache -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies %s
+// RUN: %target-swift-frontend -typecheck -I %t/my-new-sdk -sdk %t/my-new-sdk -prebuilt-module-cache-path %t/new-prebuilt-cache -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies %s
 //
 // Check SDKLib and ExportedLib are in the module cache
 // RUN: test -f %t/MCP/SdkLib-*.swiftmodule
@@ -104,7 +99,7 @@
 // RUN: %empty-directory(%t/MCP)
 //
 // RUN: echo "// size change" >> %t/my-new-sdk/usr/include/SomeCModule.h
-// RUN: %target-swift-frontend -typecheck -I %t/my-new-sdk -sdk %t/my-new-sdk -prebuilt-module-cache-path %t/prebuilt-cache -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies %s
+// RUN: %target-swift-frontend -typecheck -I %t/my-new-sdk -sdk %t/my-new-sdk -prebuilt-module-cache-path %t/new-prebuilt-cache -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies %s
 //
 // Check SDKLib and ExportLib are in the module cache
 // RUN: test -f %t/MCP/SdkLib-*.swiftmodule

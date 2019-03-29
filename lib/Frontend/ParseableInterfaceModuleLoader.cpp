@@ -356,48 +356,39 @@ class swift::ParseableInterfaceBuilder {
     return false;
   }
 
-  /// Populate the provided \p Deps with \c FileDependency entries including:
-  ///
-  ///    - All the dependencies mentioned by \p SubInstance's DependencyTracker,
-  ///      that were read while compiling the module.
-  ///
-  ///    - For any file in the latter set that is itself a .swiftmodule
-  ///      living in \p cachePath, all of _its_ dependencies, copied
-  ///      out to avoid having to do recursive scanning when rechecking this
-  ///      dependency in the future.
+  /// Determines if the dependency with the provided path is a swiftmodule in
+  /// either the module cache or prebuilt module cache
+  bool isCachedModule(StringRef DepName) const {
+    if (moduleCachePath.empty() && prebuiltCachePath.empty())
+      return false;
+
+    auto Ext = llvm::sys::path::extension(DepName);
+    auto Ty = file_types::lookupTypeForExtension(Ext);
+
+    if (Ty != file_types::TY_SwiftModuleFile)
+      return false;
+    if (!moduleCachePath.empty() && DepName.startswith(moduleCachePath))
+      return true;
+    return !prebuiltCachePath.empty() && DepName.startswith(prebuiltCachePath);
+  }
+
+  /// Populate the provided \p Deps with \c FileDependency entries for all
+  /// dependencies \p SubInstance's DependencyTracker recorded while compiling
+  /// the module, excepting .swiftmodules in \p moduleCachePath or
+  /// \p prebuiltCachePath. Those have _their_ dependencies added instead, both
+  /// to avoid having to do recursive scanning when rechecking this dependency
+  /// in future and to make the module caches relocatable.
   bool collectDepsForSerialization(CompilerInstance &SubInstance,
                                    SmallVectorImpl<FileDependency> &Deps,
                                    bool IsHashBased) {
     StringRef SDKPath = SubInstance.getASTContext().SearchPathOpts.SDKPath;
-
     auto DTDeps = SubInstance.getDependencyTracker()->getDependencies();
     SmallVector<StringRef, 16> InitialDepNames(DTDeps.begin(), DTDeps.end());
     InitialDepNames.push_back(interfacePath);
     llvm::StringSet<> AllDepNames;
+
     for (auto const &DepName : InitialDepNames) {
-      if (AllDepNames.insert(DepName).second && dependencyTracker) {
-        dependencyTracker->addDependency(DepName, /*isSystem*/false);
-      }
-
-      /// Lazily load the dependency buffer if we need it. If we're not
-      /// dealing with a hash-based dependencies, and if the dependency is
-      /// not a .swiftmodule, we can avoid opening the buffer.
-      std::unique_ptr<llvm::MemoryBuffer> DepBuf = nullptr;
-      auto getDepBuf = [&]() -> llvm::MemoryBuffer * {
-        if (DepBuf) return DepBuf.get();
-        if (auto Buf = getBufferOfDependency(fs, DepName, interfacePath,
-                                             diags, diagnosticLoc)) {
-          DepBuf = std::move(Buf);
-          return DepBuf.get();
-        }
-        return nullptr;
-      };
-
-      auto Status = getStatusOfDependency(fs, DepName, interfacePath,
-                                          diags, diagnosticLoc);
-      if (!Status)
-        return true;
-
+      // Adjust the paths of dependences in the SDK to be relative to it
       bool IsSDKRelative = false;
       StringRef DepNameToStore = DepName;
       if (SDKPath.size() > 1 && DepName.startswith(SDKPath)) {
@@ -418,32 +409,29 @@ class swift::ParseableInterfaceBuilder {
         }
       }
 
-      if (IsHashBased) {
-        auto buf = getDepBuf();
-        if (!buf) return true;
-        uint64_t hash = xxHash64(buf->getBuffer());
-        Deps.push_back(
-          FileDependency::hashBased(DepNameToStore, IsSDKRelative,
-                                    Status->getSize(), hash));
-      } else {
-        uint64_t mtime =
-          Status->getLastModificationTime().time_since_epoch().count();
-        Deps.push_back(
-          FileDependency::modTimeBased(DepNameToStore, IsSDKRelative,
-                                       Status->getSize(), mtime));
+      if (AllDepNames.insert(DepName).second && dependencyTracker) {
+        dependencyTracker->addDependency(DepName, /*isSystem*/IsSDKRelative);
       }
 
-      if (moduleCachePath.empty())
-        continue;
+      /// Lazily load the dependency buffer if we need it. If we're not
+      /// dealing with a hash-based dependencies, and if the dependency is
+      /// not a .swiftmodule, we can avoid opening the buffer.
+      std::unique_ptr<llvm::MemoryBuffer> DepBuf = nullptr;
+      auto getDepBuf = [&]() -> llvm::MemoryBuffer * {
+        if (DepBuf) return DepBuf.get();
+        if (auto Buf = getBufferOfDependency(fs, DepName, interfacePath,
+                                             diags, diagnosticLoc)) {
+          DepBuf = std::move(Buf);
+          return DepBuf.get();
+        }
+        return nullptr;
+      };
 
-      // If Dep is itself a .swiftmodule in the cache dir, pull out its deps
-      // and include them in our own, so we have a single-file view of
-      // transitive deps: removes redundancies, and avoids opening and reading
-      // multiple swiftmodules during future loads.
-      auto Ext = llvm::sys::path::extension(DepName);
-      auto Ty = file_types::lookupTypeForExtension(Ext);
-      if (Ty == file_types::TY_SwiftModuleFile &&
-          DepName.startswith(moduleCachePath)) {
+      // If Dep is itself a cached .swiftmodule, pull out its deps and include
+      // them in our own, so we have a single-file view of transitive deps:
+      // removes redundancies, makes the cache more relocatable, and avoids
+      // opening and reading multiple swiftmodules during future loads.
+      if (isCachedModule(DepName)) {
         auto buf = getDepBuf();
         if (!buf) return true;
         SmallVector<FileDependency, 16> SubDeps;
@@ -459,10 +447,32 @@ class swift::ParseableInterfaceBuilder {
           if (AllDepNames.insert(SubDep.getPath()).second) {
             Deps.push_back(SubDep);
             if (dependencyTracker)
-              dependencyTracker->addDependency(SubDep.getPath(),
-                                               /*IsSystem=*/false);
+              dependencyTracker->addDependency(
+                  SubDep.getPath(), /*IsSystem=*/SubDep.isSDKRelative());
           }
         }
+        continue;
+      }
+
+      // Otherwise, include this dependency directly
+      auto Status = getStatusOfDependency(fs, DepName, interfacePath,
+                                          diags, diagnosticLoc);
+      if (!Status)
+        return true;
+
+      if (IsHashBased) {
+        auto buf = getDepBuf();
+        if (!buf) return true;
+        uint64_t hash = xxHash64(buf->getBuffer());
+        Deps.push_back(
+          FileDependency::hashBased(DepNameToStore, IsSDKRelative,
+                                    Status->getSize(), hash));
+      } else {
+        uint64_t mtime =
+          Status->getLastModificationTime().time_since_epoch().count();
+        Deps.push_back(
+          FileDependency::modTimeBased(DepNameToStore, IsSDKRelative,
+                                       Status->getSize(), mtime));
       }
     }
     return false;
