@@ -692,7 +692,7 @@ internal extension Tensor where Scalar : TensorFlowFloatingPoint {
   @inlinable @inline(__always)
   func _vjpConcatenated(with other: Tensor, alongAxis axis: Int32)
     -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
-    let idx = axis >= 0 ? axis : rank - axis
+    let idx = axis < 0 ? axis + rank : axis
     let splits = Tensor<Int32>([shapeTensor[idx], other.shapeTensor[idx]])
     return (Raw.concatV2([self, other], axis: Tensor<Int32>(axis)), { result in
       let ret: (TensorHandle<Scalar>, TensorHandle<Scalar>) = #tfop("SplitV",
