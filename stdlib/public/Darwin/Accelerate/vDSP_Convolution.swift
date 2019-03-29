@@ -16,6 +16,35 @@ extension vDSP {
     
     // MARK: One-dimensional convolution
     
+    /// Returns one-dimensional convolution, single-precision.
+    ///
+    /// - Parameter vector: The vector to convolve.
+    /// - Parameter kernel: Single-precision convolution kernel.
+    /// - Returns: Convolution result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func convolve<T, U>(_ vector: T,
+                                      withKernel kernel: U) -> [Float]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Float, U.Element == Float {
+            
+            let n = vector.count - kernel.count
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: n) {
+                buffer, initializedCount in
+                
+                convolve(vector,
+                         withKernel: kernel,
+                         result: &buffer)
+                
+                initializedCount = n
+            }
+            
+            return result
+    }
+    
     /// One-dimensional convolution, single-precision.
     ///
     /// - Parameter vector: The vector to convolve.
@@ -48,6 +77,35 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Returns one-dimensional convolution, double-precision.
+    ///
+    /// - Parameter vector: The vector to convolve.
+    /// - Parameter kernel: Double-precision convolution kernel.
+    /// - Returns: Convolution result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func convolve<T, U>(_ vector: T,
+                                      withKernel kernel: U) -> [Double]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Double, U.Element == Double {
+            
+            let n = vector.count - kernel.count
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: n) {
+                buffer, initializedCount in
+                
+                convolve(vector,
+                         withKernel: kernel,
+                         result: &buffer)
+                
+                initializedCount = n
+            }
+            
+            return result
     }
     
     /// One-dimensional convolution, double-precision.
@@ -86,9 +144,38 @@ extension vDSP {
     
     // MARK: One-dimensional correlation
     
+    /// Returns one-dimensional correlation, single-precision.
+    ///
+    /// - Parameter vector: The vector to correlate.
+    /// - Parameter kernel: Single-precision convolution kernel.
+    /// - Returns: Correlation result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func correlate<T, U>(_ vector: T,
+                                       withKernel kernel: U) -> [Float]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Float, U.Element == Float {
+            
+            let n = vector.count - kernel.count
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: n) {
+                buffer, initializedCount in
+                
+                correlate(vector,
+                          withKernel: kernel,
+                          result: &buffer)
+                
+                initializedCount = n
+            }
+            
+            return result
+    }
+    
     /// One-dimensional correlation, single-precision.
     ///
-    /// - Parameter vector: The vector to convolve.
+    /// - Parameter vector: The vector to correlate.
     /// - Parameter kernel: Single-precision convolution kernel.
     /// - Parameter result: Destination vector.
     
@@ -120,9 +207,38 @@ extension vDSP {
             }
     }
     
+    /// Returns one-dimensional correlation, double-precision.
+    ///
+    /// - Parameter vector: The vector to correlate.
+    /// - Parameter kernel: Single-precision convolution kernel.
+    /// - Returns: Correlation result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func correlate<T, U>(_ vector: T,
+                                       withKernel kernel: U) -> [Double]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Double, U.Element == Double {
+            
+            let n = vector.count - kernel.count
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: n) {
+                buffer, initializedCount in
+                
+                correlate(vector,
+                          withKernel: kernel,
+                          result: &buffer)
+                
+                initializedCount = n
+            }
+            
+            return result
+    }
+    
     /// One-dimensional correlation, double-precision.
     ///
-    /// - Parameter vector: The vector to convolve.
+    /// - Parameter vector: The vector to correlate.
     /// - Parameter kernel: Single-precision convolution kernel.
     /// - Parameter result: Destination vector.
     
@@ -160,6 +276,37 @@ extension vDSP {
 extension vDSP {
     
     // MARK: Two-dimensional convolution
+    
+    /// Returns two-dimensional convolution with a 3 x 3 kernel; single-precision.
+    ///
+    /// - Parameter vector: The vector to convolve.
+    /// - Parameter rowCount: The number of rows in the input vector.
+    /// - Parameter columnCount: The number of columns in the input vector.
+    /// - Parameter kernel: Single-precision 3x3 convolution kernel.
+    /// - Returns: Convolution result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func convolve<T, U>(_ vector: T,
+                                      rowCount: Int, columnCount: Int,
+                                      with3x3Kernel kernel: U) -> [Float]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Float, U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                convolve(vector,
+                         rowCount: rowCount, columnCount: columnCount,
+                         with3x3Kernel: kernel,
+                         result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
     
     /// Two-dimensional convolution with a 3 x 3 kernel; single-precision.
     ///
@@ -203,6 +350,37 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Returns two-dimensional convolution with a 3 x 3 kernel; double-precision.
+    ///
+    /// - Parameter vector: The vector to convolve.
+    /// - Parameter rowCount: The number of rows in the input vector.
+    /// - Parameter columnCount: The number of columns in the input vector.
+    /// - Parameter kernel: Double-precision 3x3 convolution kernel.
+    /// - Returns: Convolution result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func convolve<T, U>(_ vector: T,
+                                      rowCount: Int, columnCount: Int,
+                                      with3x3Kernel kernel: U) -> [Double]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Double, U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                convolve(vector,
+                         rowCount: rowCount, columnCount: columnCount,
+                         with3x3Kernel: kernel,
+                         result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Two-dimensional convolution with a 3 x 3 kernel; double-precision.
@@ -249,6 +427,37 @@ extension vDSP {
             }
     }
     
+    /// Returns two-dimensional convolution with a 5 x 5 kernel; single-precision.
+    ///
+    /// - Parameter vector: The vector to convolve.
+    /// - Parameter rowCount: The number of rows in the input vector.
+    /// - Parameter columnCount: The number of columns in the input vector.
+    /// - Parameter kernel: Single-precision 5x5 convolution kernel.
+    /// - Returns: Convolution result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func convolve<T, U>(_ vector: T,
+                                      rowCount: Int, columnCount: Int,
+                                      with5x5Kernel kernel: U) -> [Float]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Float, U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                convolve(vector,
+                         rowCount: rowCount, columnCount: columnCount,
+                         with5x5Kernel: kernel,
+                         result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Two-dimensional convolution with a 5 x 5 kernel; single-precision.
     ///
     /// - Parameter vector: The vector to convolve.
@@ -291,6 +500,37 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Returns two-dimensional convolution with a 5 x 5 kernel; double-precision.
+    ///
+    /// - Parameter vector: The vector to convolve.
+    /// - Parameter rowCount: The number of rows in the input vector.
+    /// - Parameter columnCount: The number of columns in the input vector.
+    /// - Parameter kernel: Double-precision 3x3 convolution kernel.
+    /// - Returns: Convolution result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func convolve<T, U>(_ vector: T,
+                                      rowCount: Int, columnCount: Int,
+                                      with5x5Kernel kernel: U) -> [Double]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Double, U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                convolve(vector,
+                         rowCount: rowCount, columnCount: columnCount,
+                         with5x5Kernel: kernel,
+                         result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Two-dimensional convolution with a 5 x 5 kernel; double-precision.
@@ -337,6 +577,41 @@ extension vDSP {
             }
     }
     
+    /// Returns two-dimensional convolution with arbitrarily sized kernel; single-precision.
+    ///
+    /// - Parameter vector: The vector to convolve.
+    /// - Parameter rowCount: The number of rows in the input vector.
+    /// - Parameter columnCount: The number of columns in the input vector.
+    /// - Parameter kernel: Single-precision convolution kernel.
+    /// - Parameter kernelRowCount: The number of rows in the kernel.
+    /// - Parameter kernelColumnCount: The number of columns in the kernel.
+    /// - Returns: Convolution result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func convolve<T, U>(_ vector: T,
+                                      rowCount: Int, columnCount: Int,
+                                      withKernel kernel: U,
+                                      kernelRowCount: Int, kernelColumnCount: Int) -> [Float]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Float, U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                convolve(vector,
+                         rowCount: rowCount, columnCount: columnCount,
+                         withKernel: kernel,
+                         kernelRowCount: kernelRowCount, kernelColumnCount: kernelColumnCount,
+                         result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Two-dimensional convolution with arbitrarily sized kernel; single-precision.
     ///
     /// - Parameter vector: The vector to convolve.
@@ -346,7 +621,6 @@ extension vDSP {
     /// - Parameter kernelRowCount: The number of rows in the kernel.
     /// - Parameter kernelColumnCount: The number of columns in the kernel.
     /// - Parameter result: Destination vector.
-    
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func convolve<T, U, V>(_ vector: T,
@@ -386,6 +660,41 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Returns two-dimensional convolution with arbitrarily sized kernel; double-precision.
+    ///
+    /// - Parameter vector: The vector to convolve.
+    /// - Parameter rowCount: The number of rows in the input vector.
+    /// - Parameter columnCount: The number of columns in the input vector.
+    /// - Parameter kernel: Single-precision convolution kernel.
+    /// - Parameter kernelRowCount: The number of rows in the kernel.
+    /// - Parameter kernelColumnCount: The number of columns in the kernel.
+    /// - Returns: Convolution result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func convolve<T, U>(_ vector: T,
+                                      rowCount: Int, columnCount: Int,
+                                      withKernel kernel: U,
+                                      kernelRowCount: Int, kernelColumnCount: Int) -> [Double]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Double, U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                convolve(vector,
+                         rowCount: rowCount, columnCount: columnCount,
+                         withKernel: kernel,
+                         kernelRowCount: kernelRowCount, kernelColumnCount: kernelColumnCount,
+                         result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Two-dimensional convolution with arbitrarily sized kernel; double-precision.

@@ -45,7 +45,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                   n,
                   vDSP_Length(kernel.count))
         
+        let returnedResult = vDSP.convolve(signal,
+                                           withKernel: kernel)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPConvolutionTests.test("vDSP/SinglePrecisionCorrelate") {
@@ -64,7 +68,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                   n,
                   vDSP_Length(kernel.count))
         
+        let returnedResult = vDSP.correlate(signal,
+                                           withKernel: kernel)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
 }
 
@@ -103,7 +111,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                    n,
                    vDSP_Length(kernel.count))
         
+        let returnedResult = vDSP.convolve(signal,
+                                           withKernel: kernel)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPConvolutionTests.test("vDSP/DoublePrecisionCorrelate") {
@@ -122,7 +134,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                    n,
                    vDSP_Length(kernel.count))
         
+        let returnedResult = vDSP.correlate(signal,
+                                            withKernel: kernel)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
 }
 
@@ -163,7 +179,12 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                   kernel3x3,
                   &legacyResult)
         
+        let returnedResult = vDSP.convolve(pixels,
+                                           rowCount: height, columnCount: width,
+                                           with3x3Kernel: kernel3x3)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPConvolutionTests.test("vDSP/SinglePrecision5x5") {
@@ -185,10 +206,15 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                   kernel5x5,
                   &legacyResult)
         
+        let returnedResult = vDSP.convolve(pixels,
+                                           rowCount: height, columnCount: width,
+                                           with5x5Kernel: kernel5x5)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
-    Accelerate_vDSPConvolutionTests.test("vDSP/SinglePrecision5x5") {
+    Accelerate_vDSPConvolutionTests.test("vDSP/SinglePrecision7x3") {
         let kernel7x3 = [Float](repeating: 1.0 / (7 * 3), count: 7 * 3)
         
         var result = [Float](repeating: .nan,
@@ -209,7 +235,13 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                     &legacyResult,
                     7, 3)
         
+        let returnedResult = vDSP.convolve(pixels,
+                                           rowCount: height, columnCount: width,
+                                           withKernel: kernel7x3,
+                                           kernelRowCount: 7, kernelColumnCount: 3)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
 }
 
@@ -250,7 +282,12 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                    kernel3x3,
                    &legacyResult)
         
+        let returnedResult = vDSP.convolve(pixels,
+                                           rowCount: height, columnCount: width,
+                                           with3x3Kernel: kernel3x3)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     Accelerate_vDSPConvolutionTests.test("vDSP/DoublePrecision5x5") {
@@ -272,10 +309,15 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                    kernel5x5,
                    &legacyResult)
         
+        let returnedResult = vDSP.convolve(pixels,
+                                           rowCount: height, columnCount: width,
+                                           with5x5Kernel: kernel5x5)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
-    Accelerate_vDSPConvolutionTests.test("vDSP/DoublePrecision5x5") {
+    Accelerate_vDSPConvolutionTests.test("vDSP/DoublePrecision7x3") {
         let kernel7x3 = [Double](repeating: 1.0 / (7 * 3), count: 7 * 3)
         
         var result = [Double](repeating: .nan,
@@ -296,7 +338,13 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                      &legacyResult,
                      7, 3)
         
-        expectTrue(result.elementsEqual(legacyResult))
+        let returnedResult = vDSP.convolve(pixels,
+                                           rowCount: height, columnCount: width,
+                                           withKernel: kernel7x3,
+                                           kernelRowCount: 7, kernelColumnCount: 3)
+            
+            expectTrue(result.elementsEqual(legacyResult))
+            expectTrue(result.elementsEqual(returnedResult))
     }
 }
 
