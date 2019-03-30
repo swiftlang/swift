@@ -3203,71 +3203,43 @@ ModuleDecl *ClangModuleUnit::getAdapterModule() const {
 void ClangModuleUnit::getImportedModules(
     SmallVectorImpl<ModuleDecl::ImportedModule> &imports,
     ModuleDecl::ImportFilter filter) const {
-  switch (filter) {
-  case ModuleDecl::ImportFilter::All:
-  case ModuleDecl::ImportFilter::Private:
+  // Bail out if we /only/ want ImplementationOnly imports; Clang modules never
+  // have any of these.
+  if (filter.containsOnly(ModuleDecl::ImportFilterKind::ImplementationOnly))
+    return;
+
+  if (filter.contains(ModuleDecl::ImportFilterKind::Private))
     if (auto stdlib = owner.getStdlibModule())
       imports.push_back({ModuleDecl::AccessPathTy(), stdlib});
-    break;
-  case ModuleDecl::ImportFilter::Public:
-    break;
-  }
 
   SmallVector<clang::Module *, 8> imported;
   if (!clangModule) {
     // This is the special "imported headers" module.
-    switch (filter) {
-    case ModuleDecl::ImportFilter::All:
-    case ModuleDecl::ImportFilter::Public:
+    if (filter.contains(ModuleDecl::ImportFilterKind::Public)) {
       imported.append(owner.ImportedHeaderExports.begin(),
                       owner.ImportedHeaderExports.end());
-      break;
-
-    case ModuleDecl::ImportFilter::Private:
-      break;
     }
 
   } else {
     clangModule->getExportedModules(imported);
 
-    switch (filter) {
-    case ModuleDecl::ImportFilter::All: {
-      llvm::SmallPtrSet<clang::Module *, 8> knownModules;
-      imported.append(clangModule->Imports.begin(), clangModule->Imports.end());
-      imported.erase(std::remove_if(imported.begin(), imported.end(),
-                                    [&](clang::Module *mod) -> bool {
-                                      return !knownModules.insert(mod).second;
-                                    }),
-                     imported.end());
-
-      // FIXME: The parent module isn't exactly a private import, but it is
-      // needed for link dependencies.
-      if (clangModule->Parent)
-        imported.push_back(clangModule->Parent);
-
-      break;
-    }
-
-    case ModuleDecl::ImportFilter::Private: {
+    if (filter.contains(ModuleDecl::ImportFilterKind::Private)) {
+      // Copy in any modules that are imported but not exported.
       llvm::SmallPtrSet<clang::Module *, 8> knownModules(imported.begin(),
                                                          imported.end());
-      SmallVector<clang::Module *, 8> privateImports;
-      std::copy_if(clangModule->Imports.begin(), clangModule->Imports.end(),
-                   std::back_inserter(privateImports), [&](clang::Module *mod) {
-                     return knownModules.count(mod) == 0;
-                   });
-      imported.swap(privateImports);
+      if (!filter.contains(ModuleDecl::ImportFilterKind::Public)) {
+        // Remove the exported ones now that we're done with them.
+        imported.clear();
+      }
+      llvm::copy_if(clangModule->Imports, std::back_inserter(imported),
+                    [&](clang::Module *mod) {
+                     return !knownModules.insert(mod).second;
+                    });
 
       // FIXME: The parent module isn't exactly a private import, but it is
       // needed for link dependencies.
       if (clangModule->Parent)
         imported.push_back(clangModule->Parent);
-
-      break;
-    }
-
-    case ModuleDecl::ImportFilter::Public:
-      break;
     }
   }
 

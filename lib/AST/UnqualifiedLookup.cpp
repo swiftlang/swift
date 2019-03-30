@@ -1044,8 +1044,12 @@ void UnqualifiedLookupFactory::recordDependencyOnTopLevelName(
 void UnqualifiedLookupFactory::addImportedResults(DeclContext *const dc) {
   // Add private imports to the extra search list.
   SmallVector<ModuleDecl::ImportedModule, 8> extraImports;
-  if (auto FU = dyn_cast<FileUnit>(dc))
-    FU->getImportedModules(extraImports, ModuleDecl::ImportFilter::Private);
+  if (auto FU = dyn_cast<FileUnit>(dc)) {
+    ModuleDecl::ImportFilter importFilter;
+    importFilter |= ModuleDecl::ImportFilterKind::Private;
+    importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+    FU->getImportedModules(extraImports, importFilter);
+  }
 
   using namespace namelookup;
   SmallVector<ValueDecl *, 8> CurModuleResults;

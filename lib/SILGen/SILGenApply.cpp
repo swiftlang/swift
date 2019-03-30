@@ -1668,7 +1668,7 @@ static PreparedArguments emitStringLiteral(SILGenFunction &SGF, Expr *E,
                                    unicode::extractFirstUnicodeScalar(Str));
 
     AnyFunctionType::Param param(Int32Ty.getASTType());
-    PreparedArguments args({param});
+    PreparedArguments args(llvm::ArrayRef<AnyFunctionType::Param>{param});
     args.add(E, RValue(SGF, E, Int32Ty.getASTType(),
                        ManagedValue::forUnmanaged(UnicodeScalarValue)));
     return args;
@@ -4104,7 +4104,7 @@ public:
                     ArgumentSource &&selfArg,
                     AnyFunctionType::Param selfParam,
                     CanType methodType) {
-    PreparedArguments preparedSelf({selfParam});
+    PreparedArguments preparedSelf(llvm::ArrayRef<AnyFunctionType::Param>{selfParam});
     preparedSelf.addArbitrary(std::move(selfArg));
 
     addCallSite(loc, std::move(preparedSelf), methodType,

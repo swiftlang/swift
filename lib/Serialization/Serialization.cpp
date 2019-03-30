@@ -1040,6 +1040,17 @@ uint64_t getRawModTimeOrHash(const SerializationOptions::FileDependency &dep) {
   return dep.getModificationTime();
 }
 
+using ImportSet = llvm::SmallSet<ModuleDecl::ImportedModule, 8,
+                                 ModuleDecl::OrderImportedModules>;
+static ImportSet getImportsAsSet(const ModuleDecl *M,
+                                 ModuleDecl::ImportFilter filter) {
+  SmallVector<ModuleDecl::ImportedModule, 8> imports;
+  M->getImportedModules(imports, filter);
+  ImportSet importSet;
+  importSet.insert(imports.begin(), imports.end());
+  return importSet;
+}
+
 void Serializer::writeInputBlock(const SerializationOptions &options) {
   BCBlockRAII restoreBlock(Out, INPUT_BLOCK_ID, 4);
   input_block::ImportedModuleLayout ImportedModule(Out);
@@ -1068,17 +1079,20 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
                         dep.getPath());
   }
 
+  ModuleDecl::ImportFilter allImportFilter;
+  allImportFilter |= ModuleDecl::ImportFilterKind::Public;
+  allImportFilter |= ModuleDecl::ImportFilterKind::Private;
+  allImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
   SmallVector<ModuleDecl::ImportedModule, 8> allImports;
-  M->getImportedModules(allImports, ModuleDecl::ImportFilter::All);
+  M->getImportedModules(allImports, allImportFilter);
   ModuleDecl::removeDuplicateImports(allImports);
 
-  // Collect the public imports as a subset so that we can mark them with an
-  // extra flag.
-  SmallVector<ModuleDecl::ImportedModule, 8> publicImports;
-  M->getImportedModules(publicImports, ModuleDecl::ImportFilter::Public);
-  llvm::SmallSet<ModuleDecl::ImportedModule, 8,
-                 ModuleDecl::OrderImportedModules> publicImportSet;
-  publicImportSet.insert(publicImports.begin(), publicImports.end());
+  // Collect the public and private imports as a subset so that we can
+  // distinguish them.
+  ImportSet publicImportSet =
+      getImportsAsSet(M, ModuleDecl::ImportFilterKind::Public);
+  ImportSet privateImportSet =
+      getImportsAsSet(M, ModuleDecl::ImportFilterKind::Private);
 
   auto clangImporter =
     static_cast<ClangImporter *>(M->getASTContext().getClangModuleLoader());
@@ -1116,7 +1130,20 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
 
     ImportPathBlob importPath;
     flattenImportPath(import, importPath);
-    ImportedModule.emit(ScratchRecord, publicImportSet.count(import),
+
+    serialization::ImportControl stableImportControl;
+    // The order of checks here is important, since a module can be imported
+    // differently in different files, and we need to record the "most visible"
+    // form here.
+    if (publicImportSet.count(import))
+      stableImportControl = ImportControl::Exported;
+    else if (privateImportSet.count(import))
+      stableImportControl = ImportControl::Normal;
+    else
+      stableImportControl = ImportControl::ImplementationOnly;
+
+    ImportedModule.emit(ScratchRecord,
+                        static_cast<uint8_t>(stableImportControl),
                         !import.first.empty(), importPath);
   }
 
@@ -2380,6 +2407,15 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
         addDeclRef(theAttr->getReplacedFunction()), pieces.size(), pieces);
     return;
   }
+
+    case DAK_Custom: {
+      auto abbrCode = DeclTypeAbbrCodes[CustomDeclAttrLayout::Code];
+      auto theAttr = cast<CustomAttr>(DA);
+      CustomDeclAttrLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, theAttr->isImplicit(),
+        addTypeRef(theAttr->getTypeLoc().getType()));
+      return;
+    }
   }
 }
 
