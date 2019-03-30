@@ -1645,9 +1645,13 @@ extension PartialRangeThrough : TensorSliceIndexProtocol where Bound == Int {
 
 public extension Tensor {
   struct IndexPath {
+    @usableFromInline
     let begin, end, strides: Tensor<Int32>
+
+    @usableFromInline
     let beginMask, endMask, ellipsisMask, newAxisMask, squeezeAxisMask: Int64
 
+    @usableFromInline
     init(_ indices: [TensorSliceIndex]) {
       precondition(!indices.isEmpty, "The index path cannot be empty.")
       precondition(indices.count(where: {
