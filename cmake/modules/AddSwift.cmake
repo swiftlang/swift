@@ -1007,14 +1007,12 @@ function(_add_swift_library_single target name)
     endforeach()
   endif()
 
-  if(${SWIFTLIB_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
+  if(SWIFTLIB_SINGLE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
     set(install_name_dir "@rpath")
 
-    if(SWIFTLIB_SINGLE_IS_STDLIB)
-      # Always use @rpath for XCTest.
-      if(NOT "${module_name}" STREQUAL "XCTest")
-        set(install_name_dir "${SWIFT_DARWIN_STDLIB_INSTALL_NAME_DIR}")
-      endif()
+    # Always use @rpath for XCTest
+    if(module_name STREQUAL "XCTest")
+      set(install_name_dir "@rpath")
     endif()
 
     set_target_properties("${target}"
