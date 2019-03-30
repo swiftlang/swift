@@ -975,13 +975,17 @@ visitDynamicCallableAttr(DynamicCallableAttr *attr) {
   }
 }
 
-static bool hasSingleNonVariadicParam(SubscriptDecl *decl) {
+static bool hasSingleNonVariadicParam(SubscriptDecl *decl,
+                                      Identifier expectedLabel) {
   auto *indices = decl->getIndices();
   if (decl->isInvalid() || indices->size() != 1)
     return false;
 
   auto *index = indices->get(0);
-  return !index->isVariadic() && index->hasValidSignature();
+  if (index->isVariadic() || !index->hasValidSignature())
+    return false;
+
+  return index->getArgumentName() == expectedLabel;
 }
 
 /// Returns true if the given subscript method is an valid implementation of
@@ -1004,7 +1008,7 @@ bool swift::isValidStringDynamicMemberLookup(SubscriptDecl *decl,
   // There are two requirements:
   // - The subscript method has exactly one, non-variadic parameter.
   // - The parameter type conforms to `ExpressibleByStringLiteral`.
-  if (!hasSingleNonVariadicParam(decl))
+  if (!hasSingleNonVariadicParam(decl, TC.Context.Id_dynamicMember))
     return false;
 
   const auto *param = decl->getIndices()->get(0);
@@ -1020,7 +1024,7 @@ bool swift::isValidStringDynamicMemberLookup(SubscriptDecl *decl,
 
 bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
                                               TypeChecker &TC) {
-  if (!hasSingleNonVariadicParam(decl))
+  if (!hasSingleNonVariadicParam(decl, TC.Context.Id_dynamicMember))
     return false;
 
   const auto *param = decl->getIndices()->get(0);

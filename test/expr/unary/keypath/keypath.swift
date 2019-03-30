@@ -350,9 +350,9 @@ func testKeyPathSubscript(readonly: ZwithSubscript, writable: inout ZwithSubscri
   sink = writable[keyPath: wkp]
   sink = readonly[keyPath: rkp]
   sink = writable[keyPath: rkp]
-  readonly[keyPath: kp] = sink  // expected-error {{cannot assign through subscript: 'kp' is a read-only key path}}
-  writable[keyPath: kp] = sink  // expected-error {{cannot assign through subscript: 'kp' is a read-only key path}}
-  readonly[keyPath: wkp] = sink // expected-error {{cannot assign through subscript: 'readonly' is a 'let' constant}}
+  readonly[keyPath: kp] = sink  // expected-error {{cannot assign through subscript: subscript is get-only}}
+  writable[keyPath: kp] = sink  // expected-error {{cannot assign through subscript: subscript is get-only}}
+  readonly[keyPath: wkp] = sink // expected-error {{cannot assign through subscript: subscript is get-only}}
   // FIXME: silently falls back to keypath application, which seems inconsistent
   writable[keyPath: wkp] = sink
   // FIXME: silently falls back to keypath application, which seems inconsistent

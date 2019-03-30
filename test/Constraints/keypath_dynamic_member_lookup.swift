@@ -179,3 +179,30 @@ func dot_class_test(_ lens: inout DotLens<DotClass>) {
   // CHECK: keypath $ReferenceWritableKeyPath<DotClass, Int>, (root $DotClass; settable_property $Int,  id #DotClass.y!getter.1 : (DotClass) -> () -> Int, getter @$s29keypath_dynamic_member_lookup8DotClassC1ySivpACTK : {{.*}})
   let _ = lens.y
 }
+
+@dynamicMemberLookup
+struct OverloadedLens<T> {
+  var value: T
+
+  subscript<U>(keyPath: KeyPath<T, U>) -> U {
+    get { return value[keyPath: keyPath] }
+  }
+
+  subscript<U>(dynamicMember keyPath: KeyPath<T, U>) -> U {
+    get { return value[keyPath: keyPath] }
+  }
+}
+
+// Make sure if there is a subscript which accepts key path,
+// existing dynamic member overloads wouldn't interfere.
+func test_direct_subscript_ref(_ lens: OverloadedLens<Point>) {
+  // CHECK: function_ref @$s29keypath_dynamic_member_lookup14OverloadedLensVyqd__s7KeyPathCyxqd__Gcluig
+  _ = lens[\.x]
+  // CHECK: function_ref @$s29keypath_dynamic_member_lookup14OverloadedLensVyqd__s7KeyPathCyxqd__Gcluig
+  _ = lens[\.y]
+
+  // CHECK: function_ref @$s29keypath_dynamic_member_lookup14OverloadedLensV0B6Memberqd__s7KeyPathCyxqd__G_tcluig
+  _ = lens.x
+  // CHECK: function_ref @$s29keypath_dynamic_member_lookup14OverloadedLensV0B6Memberqd__s7KeyPathCyxqd__G_tcluig
+  _ = lens.y
+}

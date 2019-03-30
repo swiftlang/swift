@@ -576,7 +576,7 @@ func keypath_with_subscripts(_ arr: SubscriptLens<[Int]>,
   _ = arr["hello"]  // Ok
   _ = dict["hello"] // Ok
 
-  _ = arr["hello"] = 42 // expected-error {{cannot assign through subscript: 'arr' is a 'let' constant}}
+  _ = arr["hello"] = 42 // expected-error {{cannot assign through subscript: subscript is get-only}}
   _ = dict["hello"] = 0 // Ok
 
   _ = arr[0] = 42 // expected-error {{cannot assign through subscript: 'arr' is a 'let' constant}}
