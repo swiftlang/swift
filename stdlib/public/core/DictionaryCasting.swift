@@ -21,12 +21,18 @@
 public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
     _ source: Dictionary<DerivedKey, DerivedValue>
 ) -> Dictionary<BaseKey, BaseValue> {
-  var builder = _DictionaryBuilder<BaseKey, BaseValue>(count: source.count)
-
+  // String and NSString have different concepts of equality, so
+  // NSString-keyed Dictionaries may generate key collisions when "upcasted"
+  // to String. See rdar://problem/35995647
+  let allowDuplicates = (BaseKey.self == String.self)
+  var builder = _NativeDictionary<BaseKey, BaseValue>(capacity: source.count)
   for (k, v) in source {
-    builder.add(key:k as! BaseKey, value: v as! BaseValue)
+    builder.insertWithGuaranteedCapacity(
+      key: k as! BaseKey,
+      value: v as! BaseValue,
+      allowingDuplicates: allowDuplicates)
   }
-  return builder.take()
+  return Dictionary(_native: builder)
 }
 
 /// Called by the casting machinery.
@@ -66,7 +72,24 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
       _immutableCocoaDictionary: source._variant.asNative.bridged())
   }
 #endif
-  return _dictionaryDownCastConditional(source)!
+
+  // Note: We can't delegate this call to _dictionaryDownCastConditional,
+  // because we rely on as! to generate nice runtime errors when the downcast
+  // fails.
+
+  // String and NSString have different concepts of equality, so
+  // NSString-keyed Dictionaries may generate key collisions when downcasted
+  // to String. See rdar://problem/35995647
+  let allowDuplicates = (DerivedKey.self == String.self)
+  var builder = _NativeDictionary<DerivedKey, DerivedValue>(
+    capacity: source.count)
+  for (k, v) in source {
+    builder.insertWithGuaranteedCapacity(
+      key: k as! DerivedKey,
+      value: v as! DerivedValue,
+      allowingDuplicates: allowDuplicates)
+  }
+  return Dictionary(_native: builder)
 }
 
 /// Called by the casting machinery.
@@ -98,11 +121,20 @@ public func _dictionaryDownCastConditional<
   _ source: Dictionary<BaseKey, BaseValue>
 ) -> Dictionary<DerivedKey, DerivedValue>? {
 
-  var builder = _DictionaryBuilder<DerivedKey, DerivedValue>(count: source.count)
+  // String and NSString have different concepts of equality, so
+  // NSString-keyed Dictionaries may generate key collisions when downcasted
+  // to String. See rdar://problem/35995647
+  let allowDuplicates = (DerivedKey.self == String.self)
+
+  var builder = _NativeDictionary<DerivedKey, DerivedValue>(
+    capacity: source.count)
   for (k, v) in source {
     guard let k1 = k as? DerivedKey, let v1 = v as? DerivedValue
     else { return nil }
-    builder.add(key: k1, value: v1)
+    builder.insertWithGuaranteedCapacity(
+      key: k1,
+      value: v1,
+      allowingDuplicates: allowDuplicates)
   }
-  return builder.take()
+  return Dictionary(_native: builder)
 }
