@@ -4714,4 +4714,116 @@ SetTestSuite.test("ForcedVerbatimBridge.Trap.NSNumber")
 }
 #endif
 
+#if _runtime(_ObjC)
+SetTestSuite.test("ForcedVerbatimDowncast.Trap.String")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type")
+  .code {
+  let s1: Set<NSObject> = [
+    "Gordon" as NSString,
+    "William" as NSString,
+    "Katherine" as NSString,
+    "Lynn" as NSString,
+    "Brian" as NSString,
+    1756 as NSNumber]
+  // With the ObjC runtime, the verbatim downcast is O(1); it performs no
+  // runtime checks.
+  let s2 = s1 as! Set<NSString>
+  // Element access goes through the bridged path and performs forced downcasts.
+  // This is where the odd numeric value is caught.
+  expectCrashLater()
+  for string in s2 {
+    _ = string
+  }
+}
+#endif
+
+#if _runtime(_ObjC)
+SetTestSuite.test("ForcedVerbatimDowncast.Trap.Int")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type")
+  .code {
+  let s1: Set<NSObject> = [
+    4 as NSNumber,
+    8 as NSNumber,
+    15 as NSNumber,
+    16 as NSNumber,
+    23 as NSNumber,
+    42 as NSNumber,
+    "John" as NSString]
+  // With the ObjC runtime, the verbatim downcast is O(1); it performs no
+  // runtime checks.
+  let s2 = s1 as! Set<NSNumber>
+  expectCrashLater()
+  // Element access goes through the bridged path and performs forced downcasts.
+  // This is where the odd string value is caught.
+  for string in s2 {
+    _ = string
+  }
+}
+#endif
+
+#if _runtime(_ObjC)
+SetTestSuite.test("ForcedBridgingNonverbatimDowncast.Trap.String")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type")
+  .code {
+  let s1: Set<NSObject> = [
+    "Gordon" as NSString,
+    "William" as NSString,
+    "Katherine" as NSString,
+    "Lynn" as NSString,
+    "Brian" as NSString,
+    1756 as NSNumber]
+  expectCrashLater()
+  // Nonverbatim downcasts are greedy and they trap immediately.
+  let s2 = s1 as! Set<String>
+  _ = s2.contains("Gordon")
+}
+#endif
+
+#if _runtime(_ObjC)
+SetTestSuite.test("ForcedBridgingNonverbatimDowncast.Trap.Int")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type")
+  .code {
+  let s1: Set<NSObject> = [
+    4 as NSNumber,
+    8 as NSNumber,
+    15 as NSNumber,
+    16 as NSNumber,
+    23 as NSNumber,
+    42 as NSNumber,
+    "John" as NSString]
+  expectCrashLater()
+  // Nonverbatim downcasts are greedy and they trap immediately.
+  let s2 = s1 as! Set<Int>
+  _ = s2.contains(23)
+}
+#endif
+
+#if _runtime(_ObjC)
+SetTestSuite.test("Upcast.StringEqualityMismatch") {
+  // Upcasting from NSString to String keys changes their concept of equality,
+  // resulting in two equal keys, one of which should be discarded by the
+  // downcast. (Along with its associated value.)
+  // rdar://problem/35995647
+  let s: Set<NSString> = [
+    "cafe\u{301}",
+    "café"
+  ]
+  expectEqual(s.count, 2)
+  let s2 = s as Set<String>
+  expectEqual(s2.count, 1)
+}
+#endif
+
 runAllTests()
