@@ -765,6 +765,9 @@ ERROR(module_not_testable,Fatal,
 ERROR(module_not_compiled_for_private_import,none,
       "module %0 was not compiled for private import", (Identifier))
 
+ERROR(import_implementation_cannot_be_exported,none,
+      "module %0 cannot be both exported and implementation-only", (Identifier))
+
 
 // Operator decls
 ERROR(ambiguous_operator_decls,none,
