@@ -1,4 +1,4 @@
-//===--- NameLookupTypeIDZone.def -------------------------------*- C++ -*-===//
+//===--- ASTTypeIDZone.def - Define the AST TypeID Zone ---------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,14 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This definition file describes the types in the name-lookup
-//  TypeID zone, for use with the TypeID template.
+//  This definition file describes the types in the "AST" TypeID zone,
+//  for use with the TypeID template.
 //
 //===----------------------------------------------------------------------===//
-SWIFT_TYPEID(InheritedDeclsReferencedRequest)
-SWIFT_TYPEID(UnderlyingTypeDeclsReferencedRequest)
-SWIFT_TYPEID(SuperclassDeclRequest)
-SWIFT_TYPEID(ExtendedNominalRequest)
-SWIFT_TYPEID(SelfBoundsFromWhereClauseRequest)
-SWIFT_TYPEID(TypeDeclsFromWhereClauseRequest)
-SWIFT_TYPEID(CustomAttrNominalRequest)
+SWIFT_TYPEID_NAMED(NominalTypeDecl *, NominalTypeDecl)
+SWIFT_TYPEID_NAMED(VarDecl *, VarDecl)
+SWIFT_TYPEID(PropertyBehaviorTypeInfo)
