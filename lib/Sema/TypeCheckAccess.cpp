@@ -171,8 +171,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
   AccessScope problematicAccessScope = AccessScope::getPublic();
   if (type) {
     Optional<AccessScope> typeAccessScope =
-        TypeAccessScopeChecker::getAccessScope(type, useDC,
-                                               checkUsableFromInline);
+      AccessScopeChecker::getAccessScope(type, useDC, checkUsableFromInline);
 
     // Note: This means that the type itself is invalid for this particular
     // context, because it references declarations from two incompatible scopes.
@@ -193,8 +192,8 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
       return;
 
     Optional<AccessScope> typeReprAccessScope =
-        TypeReprAccessScopeChecker::getAccessScope(typeRepr, useDC,
-                                                   checkUsableFromInline);
+        AccessScopeChecker::getAccessScope(typeRepr, useDC,
+                                           checkUsableFromInline);
     if (!typeReprAccessScope.hasValue())
       return;
 
@@ -221,8 +220,8 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
       //
       // Downgrade the error to a warning in this case for source compatibility.
       Optional<AccessScope> typeReprAccessScope =
-          TypeReprAccessScopeChecker::getAccessScope(typeRepr, useDC,
-                                                     checkUsableFromInline);
+          AccessScopeChecker::getAccessScope(typeRepr, useDC,
+                                             checkUsableFromInline);
       assert(typeReprAccessScope && "valid Type but not valid TypeRepr?");
       if (contextAccessScope.hasEqualDeclContextWith(*typeReprAccessScope) ||
           contextAccessScope.isChildOf(*typeReprAccessScope)) {

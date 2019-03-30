@@ -2523,8 +2523,8 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
         // when the underlying type has sufficient access, but only in
         // non-resilient modules.
         Optional<AccessScope> underlyingTypeScope =
-            TypeAccessScopeChecker::getAccessScope(type, DC,
-                                                   /*usableFromInline*/false);
+            AccessScopeChecker::getAccessScope(type, DC,
+                                               /*usableFromInline*/false);
         assert(underlyingTypeScope.hasValue() &&
                "the type is already invalid and we shouldn't have gotten here");
 
