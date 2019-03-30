@@ -19,11 +19,18 @@
 @inlinable
 public func _setUpCast<DerivedValue, BaseValue>(_ source: Set<DerivedValue>)
   -> Set<BaseValue> {
-  var builder = _SetBuilder<BaseValue>(count: source.count)
-  for x in source {
-    builder.add(member: x as! BaseValue)
+  // String and NSString have different concepts of equality, so Set<NSString>
+  // may generate key collisions when "upcasted" to Set<String>.
+  // See rdar://problem/35995647
+  let allowDuplicates = (BaseValue.self == String.self)
+
+  var builder = _NativeSet<BaseValue>(capacity: source.count)
+  for member in source {
+    _ = builder.insertWithGuaranteedCapacity(
+      member as! BaseValue,
+      allowingDuplicates: allowDuplicates)
   }
-  return builder.take()
+  return Set(_native: builder)
 }
 
 /// Called by the casting machinery.
@@ -54,7 +61,21 @@ public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
     return Set(_immutableCocoaSet: source._variant.asNative.bridged())
   }
 #endif
-  return _setDownCastConditional(source)!
+  // We can't just delegate to _setDownCastConditional here because we rely on
+  // `as!` to generate nice runtime errors when the downcast fails.
+
+  // String and NSString have different concepts of equality, so
+  // NSString-keyed Sets may generate key collisions when downcasted
+  // to String. See rdar://problem/35995647
+  let allowDuplicates = (DerivedValue.self == String.self)
+
+  var builder = _NativeSet<DerivedValue>(capacity: source.count)
+  for member in source {
+    builder.insertWithGuaranteedCapacity(
+      member as! DerivedValue,
+      allowingDuplicates: allowDuplicates)
+  }
+  return Set(_native: builder)
 }
 
 /// Called by the casting machinery.
@@ -81,13 +102,17 @@ internal func _setDownCastConditionalIndirect<SourceValue, TargetValue>(
 public func _setDownCastConditional<BaseValue, DerivedValue>(
   _ source: Set<BaseValue>
 ) -> Set<DerivedValue>? {
-  var result = Set<DerivedValue>(minimumCapacity: source.count)
+  // String and NSString have different concepts of equality, so
+  // NSString-keyed Sets may generate key collisions when downcasted
+  // to String. See rdar://problem/35995647
+  let allowDuplicates = (DerivedValue.self == String.self)
+
+  var builder = _NativeSet<DerivedValue>(capacity: source.count)
   for member in source {
-    if let derivedMember = member as? DerivedValue {
-      result.insert(derivedMember)
-      continue
-    }
-    return nil
+    guard let derivedMember = member as? DerivedValue else { return nil }
+    _ = builder.insertWithGuaranteedCapacity(
+      derivedMember,
+      allowingDuplicates: allowDuplicates)
   }
-  return result
+  return Set(_native: builder)
 }

@@ -460,6 +460,28 @@ internal func KEY_TYPE_OF_DICTIONARY_VIOLATES_HASHABLE_REQUIREMENTS(
 }
 
 extension _NativeDictionary { // Insertions
+  /// Insert a new element into uniquely held storage.  Storage must be uniquely
+  /// referenced with adequate capacity.  If `allowingDuplicates` is false,
+  /// `element` must not be already present in the dictionary.
+  @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
+  internal mutating func insertWithGuaranteedCapacity(
+    key: __owned Key,
+    value: __owned Value,
+    allowingDuplicates: Bool
+  ) {
+    _precondition(count < capacity)
+    if !allowingDuplicates {
+      _unsafeInsertNew(key: key, value: value)
+      return
+    }
+    let (bucket, found) = find(key)
+    if found {
+      (_values + bucket.offset).pointee = value
+    } else {
+      _insert(at: bucket, key: key, value: value)
+    }
+  }
+
   /// Insert a new element into uniquely held storage.
   /// Storage must be uniquely referenced with adequate capacity.
   /// The `key` must not be already present in the Dictionary.

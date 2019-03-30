@@ -117,9 +117,19 @@ extension _NativeSet { // Low-level unchecked operations
   @inline(__always)
   internal func uncheckedInitialize(
     at bucket: Bucket,
-    to element: __owned Element) {
+    to element: __owned Element
+  ) {
     _internalInvariant(hashTable.isValid(bucket))
     (_elements + bucket.offset).initialize(to: element)
+  }
+
+  @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
+  internal func uncheckedAssign(
+    at bucket: Bucket,
+    to element: __owned Element
+  ) {
+    _internalInvariant(hashTable.isOccupied(bucket))
+    (_elements + bucket.offset).pointee = element
   }
 }
 
@@ -346,6 +356,27 @@ internal func ELEMENT_TYPE_OF_SET_VIOLATES_HASHABLE_REQUIREMENTS(
 }
 
 extension _NativeSet { // Insertions
+  /// Insert a new element into uniquely held storage.  Storage must be uniquely
+  /// referenced with adequate capacity.  If `allowingDuplicates` is false,
+  /// `element` must not be already present in the set.
+  @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
+  internal mutating func insertWithGuaranteedCapacity(
+    _ element: __owned Element,
+    allowingDuplicates: Bool
+  ) {
+    _precondition(count < capacity)
+    if !allowingDuplicates {
+      _unsafeInsertNew(element)
+      return
+    }
+    let (bucket, found) = find(element)
+    if found {
+      uncheckedAssign(at: bucket, to: element)
+    } else {
+      _unsafeInsertNew(element, at: bucket)
+    }
+  }
+
   /// Insert a new element into uniquely held storage.
   /// Storage must be uniquely referenced with adequate capacity.
   /// The `element` must not be already present in the Set.
