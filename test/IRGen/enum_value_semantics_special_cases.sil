@@ -138,12 +138,12 @@ enum MultipleEmptyRefcounted {
 // CHECK-objc-simulator-false:     i64 2, label %5
 // CHECK-objc-simulator-true:     i64 1, label %5
 // CHECK:   ]
-// CHECK: ; <label>:3:                                      ; preds = %entry
+// CHECK: 3:                                      ; preds = %entry
 // CHECK:   %4 = bitcast %T34enum_value_semantics_special_cases23MultipleEmptyRefcountedO* %0 to %swift.refcounted**
 // CHECK:   %toDestroy = load %swift.refcounted*, %swift.refcounted** %4, align 8
 // CHECK:   call void @swift_release(%swift.refcounted* %toDestroy)
 // CHECK:   br label %5
-// CHECK: ; <label>:5:                                      ; preds = %3, %entry, %entry
+// CHECK: 5:                                      ; preds = %3, %entry, %entry
 // CHECK:   ret void
 // CHECK: }
 

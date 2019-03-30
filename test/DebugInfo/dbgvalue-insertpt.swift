@@ -9,10 +9,10 @@ for i in 0 ..< 3 {
   // CHECK: %[[LD:[0-9]+]] = load i{{32|64}}, i{{32|64}}*
   // CHECK: br i1 {{%.*}}, label %[[FAIL:.*]], label %[[SUCCESS:.*]],
   //
-  // CHECK: ; <label>:[[SUCCESS]]:
+  // CHECK: [[SUCCESS]]:
   // CHECK: br label %[[NEXT_BB:.*]],
   //
-  // CHECK: ; <label>:[[NEXT_BB]]:
+  // CHECK: [[NEXT_BB]]:
   // CHECK: %[[PHI_VAL:.*]] = phi i{{32|64}} [ %[[LD]], %[[SUCCESS]] ]
   // CHECK: store i{{32|64}} %[[PHI_VAL]], i{{32|64}}* %i.debug
   // CHECK: ![[I]] = !DILocalVariable(name: "i",
