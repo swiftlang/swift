@@ -1562,76 +1562,9 @@ extension PartialRangeThrough : TensorSliceIndexProtocol where Bound == Int {
 }
 
 public extension Tensor {
-  struct IndexPath {
-    @usableFromInline
-    let begin, end, strides: Tensor<Int32>
-
-    @usableFromInline
-    let beginMask, endMask, ellipsisMask, newAxisMask, squeezeAxisMask: Int64
-
-    @usableFromInline
-    init(_ indices: [TensorSliceIndex]) {
-      precondition(!indices.isEmpty, "The index path cannot be empty.")
-      precondition(indices.count(where: {
-        if case .ellipsis = $0 {
-          return true
-        } else {
-          return false
-        }
-      }) < 2, "Only one ellipsis is allowed per index path.")
-
-      var begin = [Int32](repeating: 0, count: indices.count)
-      var end = [Int32](repeating: 0, count: indices.count)
-      var strides = [Int32](repeating: 1, count: indices.count)
-      var beginMask: Int64 = 0
-      var endMask: Int64 = 0
-      var ellipsisMask: Int64 = 0
-      var newAxisMask: Int64 = 0
-      var squeezeAxisMask: Int64 = 0
-      for (i, index) in indices.enumerated() {
-        switch index {
-        case .ellipsis: ellipsisMask |= 1 << i
-        case .newAxis: newAxisMask |= 1 << i
-        case .squeezeAxis: squeezeAxisMask |= 1 << i
-        case .index(let idx):
-          begin[i] = idx
-          end[i] = idx + 1
-          squeezeAxisMask |= 1 << i
-        case .range(let range, let stride):
-          begin[i] = range.lowerBound
-          end[i] = range.upperBound
-          strides[i] = stride
-        case .closedRange(let range, let stride):
-          begin[i] = range.lowerBound
-          switch range.upperBound {
-          case -1: endMask |= 1 << i
-          case let u: end[i] = u + 1
-          }
-          strides[i] = stride
-        case .partialRangeFrom(let range, let stride):
-          begin[i] = range.lowerBound
-          strides[i] = stride
-          endMask |= 1 << i
-        case .partialRangeUpTo(let range, let stride):
-          end[i] = range.upperBound
-          strides[i] = stride
-          beginMask |= 1 << i
-        case .partialRangeThrough(let range, let stride):
-          end[i] = range.upperBound + 1
-          strides[i] = stride
-          beginMask |= 1 << i
-        }
-      }
-
-      self.begin = Tensor<Int32>(begin)
-      self.end = Tensor<Int32>(end)
-      self.strides = Tensor<Int32>(strides)
-      self.beginMask = beginMask
-      self.endMask = endMask
-      self.ellipsisMask = ellipsisMask
-      self.newAxisMask = newAxisMask
-      self.squeezeAxisMask = squeezeAxisMask
-    }
+  public struct IndexPath {
+    public let begin, end, strides: Tensor<Int32>
+    public let beginMask, endMask, ellipsisMask, newAxisMask, squeezeAxisMask: Int64
   }
 
   @inlinable @inline(__always)
@@ -1643,66 +1576,74 @@ public extension Tensor {
       shrinkAxisMask: indexPath.squeezeAxisMask)
   }
 
-  // @inlinable @inline(__always)
-  // subscript<I: TensorSliceIndexProtocol>(_ indices: I...) -> Tensor {
-  //   return self[IndexPath(indices.map { $0.sliceIndex })]
-  // }
-
   @inlinable @inline(__always)
-  subscript<I: TensorSliceIndexProtocol>(_ index: I) -> Tensor {
-    return self[IndexPath([index.sliceIndex])]
+  subscript(_ indices: TensorSliceIndexProtocol...) -> Tensor {
+    return self[IndexPath(indices.map { $0.sliceIndex })]
   }
+}
 
+public extension Tensor.IndexPath {
   @inlinable @inline(__always)
-  subscript<I1: TensorSliceIndexProtocol, I2: TensorSliceIndexProtocol>(
-    _ index1: I1, _ index2: I2) -> Tensor {
-    return self[IndexPath([index1.sliceIndex, index2.sliceIndex])]
-  }
+  init(_ indices: [TensorSliceIndex]) {
+    precondition(!indices.isEmpty, "The index path cannot be empty.")
+    precondition(indices.count(where: {
+      if case .ellipsis = $0 {
+        return true
+      } else {
+        return false
+      }
+    }) < 2, "Only one ellipsis is allowed per index path.")
 
-  @inlinable @inline(__always)
-  subscript<
-  I1: TensorSliceIndexProtocol, 
-  I2: TensorSliceIndexProtocol, 
-  I3: TensorSliceIndexProtocol>(
-    _ index1: I1, _ index2: I2, _ index3: I3) -> Tensor {
-    return self[IndexPath([index1.sliceIndex, index2.sliceIndex, index3.sliceIndex])]
-  }
+    var begin = [Int32](repeating: 0, count: indices.count)
+    var end = [Int32](repeating: 0, count: indices.count)
+    var strides = [Int32](repeating: 1, count: indices.count)
+    var beginMask: Int64 = 0
+    var endMask: Int64 = 0
+    var ellipsisMask: Int64 = 0
+    var newAxisMask: Int64 = 0
+    var squeezeAxisMask: Int64 = 0
+    for (i, index) in indices.enumerated() {
+      switch index {
+      case .ellipsis: ellipsisMask |= 1 << i
+      case .newAxis: newAxisMask |= 1 << i
+      case .squeezeAxis: squeezeAxisMask |= 1 << i
+      case .index(let idx):
+        begin[i] = idx
+        end[i] = idx + 1
+        squeezeAxisMask |= 1 << i
+      case .range(let range, let stride):
+        begin[i] = range.lowerBound
+        end[i] = range.upperBound
+        strides[i] = stride
+      case .closedRange(let range, let stride):
+        begin[i] = range.lowerBound
+        switch range.upperBound {
+        case -1: endMask |= 1 << i
+        case let u: end[i] = u + 1
+        }
+        strides[i] = stride
+      case .partialRangeFrom(let range, let stride):
+        begin[i] = range.lowerBound
+        strides[i] = stride
+        endMask |= 1 << i
+      case .partialRangeUpTo(let range, let stride):
+        end[i] = range.upperBound
+        strides[i] = stride
+        beginMask |= 1 << i
+      case .partialRangeThrough(let range, let stride):
+        end[i] = range.upperBound + 1
+        strides[i] = stride
+        beginMask |= 1 << i
+      }
+    }
 
-  @inlinable @inline(__always)
-  subscript<
-  I1: TensorSliceIndexProtocol, 
-  I2: TensorSliceIndexProtocol, 
-  I3: TensorSliceIndexProtocol,
-  I4: TensorSliceIndexProtocol>(
-    _ index1: I1, _ index2: I2, _ index3: I3, _ index4: I4) -> Tensor {
-    return self[IndexPath([
-      index1.sliceIndex, index2.sliceIndex, index3.sliceIndex, index4.sliceIndex])]
-  }
-
-  @inlinable @inline(__always)
-  subscript<
-  I1: TensorSliceIndexProtocol, 
-  I2: TensorSliceIndexProtocol, 
-  I3: TensorSliceIndexProtocol,
-  I4: TensorSliceIndexProtocol,
-  I5: TensorSliceIndexProtocol>(
-    _ index1: I1, _ index2: I2, _ index3: I3, _ index4: I4, _ index5: I5) -> Tensor {
-    return self[IndexPath([
-      index1.sliceIndex, index2.sliceIndex, index3.sliceIndex, index4.sliceIndex,
-      index5.sliceIndex])]
-  }
-
-  @inlinable @inline(__always)
-  subscript<
-  I1: TensorSliceIndexProtocol, 
-  I2: TensorSliceIndexProtocol, 
-  I3: TensorSliceIndexProtocol,
-  I4: TensorSliceIndexProtocol,
-  I5: TensorSliceIndexProtocol,
-  I6: TensorSliceIndexProtocol>(
-    _ index1: I1, _ index2: I2, _ index3: I3, _ index4: I4, _ index5: I5, _ index6: I6) -> Tensor {
-    return self[IndexPath([
-      index1.sliceIndex, index2.sliceIndex, index3.sliceIndex, index4.sliceIndex,
-      index5.sliceIndex, index6.sliceIndex])]
+    self.begin = Tensor<Int32>(begin)
+    self.end = Tensor<Int32>(end)
+    self.strides = Tensor<Int32>(strides)
+    self.beginMask = beginMask
+    self.endMask = endMask
+    self.ellipsisMask = ellipsisMask
+    self.newAxisMask = newAxisMask
+    self.squeezeAxisMask = squeezeAxisMask
   }
 }
