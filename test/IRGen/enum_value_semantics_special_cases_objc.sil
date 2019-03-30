@@ -87,16 +87,16 @@ enum MixedRefcountedWithIndirect {
 // CHECK:     i8 1, label %6
 // CHECK:   ]
 
-// CHECK: ; <label>:4:
+// CHECK: 4:
 // CHECK:   %5 = inttoptr i64 %0 to %swift.refcounted*
 // CHECK:   call void @swift_release(%swift.refcounted* %5) #1
 // CHECK:   br label %9
 
-// CHECK: ; <label>:6:
+// CHECK: 6:
 // CHECK:   %7 = and i64 %0, 4611686018427387903
 // CHECK:   %8 = inttoptr i64 %7 to %objc_object*
 // CHECK:   call void @swift_unknownObjectRelease(%objc_object* %8) #1
 // CHECK:   br label %9
 
-// CHECK: ; <label>:9:
+// CHECK: 9:
 // CHECK:   ret void

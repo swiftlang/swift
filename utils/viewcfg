@@ -97,7 +97,7 @@ def main():
     cur_block = None
     sil_block_pattern = re.compile(r'^(\S+)(\(.*\))?: *(\/\/ *Preds:(.*))?$')
     llvm_block_pattern1 = re.compile(r'^"?([^\s"]+)"?: *; *preds =(.*)?$')
-    llvm_block_pattern2 = re.compile(r'^; <label>:(\d+):? *; *preds =(.*)?$')
+    llvm_block_pattern2 = re.compile(r'^(\d+):? *; *preds =(.*)?$')
 
     # Scan the input file.
 

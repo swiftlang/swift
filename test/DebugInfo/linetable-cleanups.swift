@@ -19,7 +19,7 @@ func main() {
     markUsed("Done with the for loop")
 // CHECK: call {{.*}}void @"$s4main8markUsedyyxlF"
 // CHECK: br label
-// CHECK: <label>:
+// CHECK: {{[0-9]+}}:
 // CHECK: call %Ts16IndexingIteratorVySaySiGG* @"$ss16IndexingIteratorVySaySiGGWOh"(%Ts16IndexingIteratorVySaySiGG* %{{.*}}), !dbg ![[LOOPHEADER_LOC:.*]]
 // CHECK: call {{.*}}void @"$s4main8markUsedyyxlF"
 // The cleanups should share the line number with the ret stmt.
