@@ -646,7 +646,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
 
   auto decl = function.getAbstractFunctionDecl();
   auto *dc = decl->getInnermostDeclContext();
-  auto interfaceType = var->getInterfaceType();
+  auto interfaceType = var->getValueInterfaceType();
   emitProlog(/*paramList*/ nullptr, /*selfParam*/ nullptr, interfaceType, dc,
              false);
   prepareEpilog(var->getType(), false, CleanupLocation::get(loc));
