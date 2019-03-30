@@ -135,6 +135,29 @@ TensorTests.testAllBackends("ElementIndexing") {
   expectEqual([43], array0D.scalars)
 }
 
+TensorTests.testAllBackends("NestedElementIndexing") {
+  // NOTE: This tests the `subscript(indices:)` method, which is distinct from
+  // the `subscript(index:)` method.
+  // NOTE: This test could use a clearer name, along with other "indexing"
+  // tests. Note to update corresponding test names in other files
+  // (shaped_array.test) as well.
+  let tensor3D = Tensor<Float>(shape: [3, 4, 5],
+                               scalars: Array(stride(from: 0.0, to: 60, by: 1)))
+  let element1D = tensor3D[1, 3]
+  let element0D = tensor3D[2, 0, 3]
+
+  let array1D = element1D.array
+  let array0D = element0D.array
+
+  /// Test shapes
+  expectEqual([5], array1D.shape)
+  expectEqual([], array0D.shape)
+
+  /// Test scalars
+  expectEqual(Array(stride(from: 35.0, to: 40, by: 1)), array1D.scalars)
+  expectEqual([43], array0D.scalars)
+}
+
 TensorTests.testAllBackends("SliceIndexing") {
   // XLA compilation error under TPU.
   if _RuntimeConfig.executionMode.isTPU { return }
@@ -171,6 +194,23 @@ TensorTests.test("WholeTensorSlicing") {
   let slice2 = t.slice(lowerBounds: [1, 0, 0], upperBounds: [2, 1, 3])
   expectEqual(ShapedArray(shape: [1, 1, 3], scalars: [3, 3, 3]),
               slice2.array)
+}
+
+TensorTests.testAllBackends("AdvancedIndexing") {
+  // NOTE: cannot test multiple `Tensor.shape` or `Tensor.scalars` directly
+  // until send and receive are implemented (without writing a bunch of mini
+  // tests). Instead, `Tensor.array` is called to make a ShapedArray host copy
+  // and the ShapedArray is tested.
+  let tensor3D = Tensor<Float>(shape: [3, 4, 5],
+                               scalars: Array(stride(from: 0.0, to: 60, by: 1)))
+  let element2D = tensor3D[1 ..< 3, 0, 3...]
+  let array2D = element2D.array
+
+  // Test shape
+  expectEqual([2, 2], array2D.shape)
+
+  // Test scalars
+  expectEqual(Array([23.0, 24.0, 43.0, 44.0]), array2D.scalars)
 }
 
 TensorTests.testAllBackends("Reduction") {

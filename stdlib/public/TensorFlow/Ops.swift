@@ -1488,88 +1488,87 @@ public extension Tensor where Scalar : Numeric {
 //===----------------------------------------------------------------------===//
 
 public extension Tensor {
-  /// Access the element tensor specified by an index in the leading dimension.
-  /// - Parameter index: Index of the element tensor.
-  @inlinable
-  subscript(index: Int32) -> Tensor {
-    get {
-      // NOTE: Thought Gather exactly performs element indexing, it is an
-      // allocating operation. Slice is used here instead even though the
-      // implementation is more convoluted because it is non-allocating.
-      // Actual performance/memory tests should be done for some empirical
-      // comparison.
-      // Gather implementation is below:
-      // return #tfop("GatherV2", self, Tensor<Int32>(index), Tensor<Int32>(0),
-      //              Tindices: Int32.self)
-      let indexTensor = Tensor<Int32>(index).rankLifted()
-      let remainingZeros: Tensor<Int32> = Raw.fill(
-        dims: (rankTensor - 1).rankLifted(), value: Tensor<Int32>(0))
-      let startIndices = indexTensor.concatenated(with: remainingZeros)
+//   /// Access the element tensor specified by an index in the leading dimension.
+//   /// - Parameter index: Index of the element tensor.
+//   @inlinable
+//   subscript(index: Int32) -> Tensor {
+//     get {
+//       // NOTE: Though Gather exactly performs element indexing, it is an
+//       // allocating operation. Slice is used here instead even though the
+//       // implementation is more convoluted because it is non-allocating.
+//       // Actual performance/memory tests should be done for some empirical
+//       // comparison.
+//       // Gather implementation is below:
+//       // return #tfop("GatherV2", self, Tensor<Int32>(index), Tensor<Int32>(0),
+//       //              Tindices: Int32.self)
+//       let indexTensor = Tensor<Int32>(index).rankLifted()
+//       let remainingZeros: Tensor<Int32> = Raw.fill(
+//         dims: (rankTensor - 1).rankLifted(), value: Tensor<Int32>(0))
+//       let startIndices = indexTensor.concatenated(with: remainingZeros)
 
-      let firstDimension: Tensor<Float> = Raw.gatherV2(
-        params: Tensor<Float>(shapeTensor),
-        indices: Tensor<Int32>(0),
-        axis: Tensor<Int32>(0)
-      )
-      let boundSize = Tensor<Float>([1]) - firstDimension
-      let scatterIndices: Tensor<Int32> = [[0]]
-      let offset: Tensor<Int32> = Tensor<Int32>(
-        Raw.scatterNd(
-          indices: scatterIndices,
-          updates: boundSize,
-          shape: rankTensor.rankLifted()
-        )
-      )
-      let boundSizes: Tensor<Int32> = shapeTensor + offset
-      let slice: Tensor = Raw.slice(self, begin: startIndices, size: boundSizes)
-      return slice.squeezingShape(at: 0)
-    }
-    set {
-      let left = self[0..<index]
-      let right = self[index+1..<_TFGetScalarOrDie(shapeTensor[0].handle)]
-      self = Raw.concatV2([left, newValue.rankLifted(), right], axis: Tensor<Int32>(0))
-    }
-  }
+//       let firstDimension: Tensor<Float> = Raw.gatherV2(
+//         params: Tensor<Float>(shapeTensor),
+//         indices: Tensor<Int32>(0),
+//         axis: Tensor<Int32>(0)
+//       )
+//       let boundSize = Tensor<Float>([1]) - firstDimension
+//       let scatterIndices: Tensor<Int32> = [[0]]
+//       let offset: Tensor<Int32> = Tensor<Int32>(
+//         Raw.scatterNd(
+//           indices: scatterIndices,
+//           updates: boundSize,
+//           shape: rankTensor.rankLifted()
+//         )
+//       )
+//       let boundSizes: Tensor<Int32> = shapeTensor + offset
+//       let slice: Tensor = Raw.slice(self, begin: startIndices, size: boundSizes)
+//       return slice.squeezingShape(at: 0)
+//     }
+//     set {
+//       let left = self[0..<index]
+//       let right = self[index+1..<_TFGetScalarOrDie(shapeTensor[0].handle)]
+//       self = Raw.concatV2([left, newValue.rankLifted(), right], axis: Tensor<Int32>(0))
+//     }
+//   }
 
-  /// Access the subtensor specified by a contiguous range of indices.
-  /// - Parameter bounds: Contiguous range of indices.
-  @inlinable
-  subscript(bounds: Range<Int32>) -> Tensor {
-    // NOTE: Though `tf.slice` and `tf.strided_slice` are not easy to use
-    // because they require slice bounds for every dimension, they should be
-    // used because the are non-allocating. Other slice implementations (like
-    // combining Gather and Range) perform allocation and should not be used
-    // even though they are easier to write.
+//   /// Access the subdimensional tensor at the specified list of indices.
+//   /// - Parameter indices: List of indices.
+//   /// - Note: this function is more efficient than using `subscript(index:)`
+//   ///   multiple times because this produces a single GatherNd op (compared with
+//   ///   multiple Gather ops).
 
-    // Let (lo, hi) represent lower and upper bounds respectively.
-    // startIndices = [lo, 0, 0, ..., 0]
-    // boundSizes = [hi - lo, d1, d2, ..., dn] where di = shape[i]
-    // TODO: The horrendous mess of type-casting is necessary due to GPU ops
-    // (Gather, ScatterNd) not accepting Int32 for particular inputs. Refactor
-    // if possible.
-    let lowerBound = Tensor<Int32>(bounds.lowerBound).rankLifted()
-    let remainingZeros: Tensor<Int32> = Raw.fill(
-      dims: (rankTensor - 1).rankLifted(), value: Tensor<Int32>(0))
-    let startIndices = lowerBound.concatenated(with: remainingZeros)
+//   /// Access the subtensor specified by a contiguous range of indices.
+//   /// - Parameter bounds: Contiguous range of indices.
+//   @inlinable
+//   subscript(bounds: Range<Int32>) -> Tensor {
+//     // NOTE: Though `tf.slice` and `tf.strided_slice` are not easy to use
+//     // because they require slice bounds for every dimension, they should be
+//     // used because the are non-allocating. Other slice implementations (like
+//     // combining Gather and Range) perform allocation and should not be used
+//     // even though they are easier to write.
 
-    let boundSize = Tensor<Int32>(bounds.upperBound).rankLifted()
-      - lowerBound - Tensor<Int32>(Tensor<Float>(shapeTensor)[0])
-    let scatterIndices: Tensor<Int32> = [[0]]
-    let offset: Tensor<Int32> = Tensor<Int32>(
-      Raw.scatterNd(
-        indices: scatterIndices,
-        updates: Tensor<Float>(boundSize),
-        shape: rankTensor.rankLifted()
-      )
-    )
-    let boundSizes: Tensor<Int32> = shapeTensor + offset
-    return Raw.slice(self, begin: startIndices, size: boundSizes)
-  }
+//     // Let (lo, hi) represent lower and upper bounds respectively.
+//     // startIndices = [lo, 0, 0, ..., 0]
+//     // boundSizes = [hi - lo, d1, d2, ..., dn] where di = shape[i]
+//     // TODO: The horrendous mess of type-casting is necessary due to GPU ops
+//     // (Gather, ScatterNd) not accepting Int32 for particular inputs. Refactor
+//     // if possible.
+//     let lowerBound = Tensor<Int32>(bounds.lowerBound).rankLifted()
+//     let remainingZeros: Tensor<Int32> = Raw.fill(
+//       dims: (rankTensor - 1).rankLifted(), value: Tensor<Int32>(0))
+//     let startIndices = lowerBound.concatenated(with: remainingZeros)
 
-  // TODO(danielzheng): Add strided slices? (increment by something different
-  // than 1)
-  // Ideas for strided slice API: it could be another subscript method, or it
-  // be a top level `stride` function like Swift's `stride(from:to:by:)`.
+//     let boundSize = Tensor<Int32>(bounds.upperBound).rankLifted()
+//       - lowerBound - Tensor<Int32>(Tensor<Float>(shapeTensor)[0])
+//     let scatterIndices: Tensor<Int32> = [[0]]
+//     let offset: Tensor<Int32> = Tensor<Int32>(
+//       Raw.scatterNd(
+//         indices: scatterIndices,
+//         updates: Tensor<Float>(boundSize),
+//         shape: rankTensor.rankLifted()))
+//     let boundSizes: Tensor<Int32> = shapeTensor + offset
+//     return Raw.slice(self, begin: startIndices, size: boundSizes)
+//   }
 
   /// Extracts a slice from the tensor defined by lower and upper bounds for
   /// each dimension.
@@ -1585,5 +1584,203 @@ public extension Tensor {
       self,
       begin: lowerBoundsTensor,
       size: Tensor<Int32>(upperBounds) - lowerBoundsTensor)
+  }
+}
+
+public enum TensorSliceIndex : TensorSliceIndexProtocol {
+  case ellipsis
+  case newAxis
+  case squeezeAxis
+  case index(Int32)
+  case range(Range<Int32>, stride: Int32)
+  case closedRange(ClosedRange<Int32>, stride: Int32)
+  case partialRangeFrom(PartialRangeFrom<Int32>, stride: Int32)
+  case partialRangeUpTo(PartialRangeUpTo<Int32>, stride: Int32)
+  case partialRangeThrough(PartialRangeThrough<Int32>, stride: Int32)
+
+  public var sliceIndex: TensorSliceIndex { return self }
+}
+
+public protocol TensorSliceIndexProtocol {
+  var sliceIndex: TensorSliceIndex { get }
+}
+
+extension Int32 : TensorSliceIndexProtocol {
+  public var sliceIndex: TensorSliceIndex { return .index(self) }
+}
+
+extension Int : TensorSliceIndexProtocol {
+  public var sliceIndex: TensorSliceIndex { return .index(Int32(self)) }
+}
+
+extension Range : TensorSliceIndexProtocol where Bound == Int {
+  public var sliceIndex: TensorSliceIndex {
+    return .range(Int32(self.lowerBound)..<Int32(self.upperBound), stride: 1)
+  }
+}
+
+extension ClosedRange : TensorSliceIndexProtocol where Bound == Int {
+  public var sliceIndex: TensorSliceIndex {
+    return .closedRange(Int32(self.lowerBound)...Int32(self.upperBound), stride: 1)
+  }
+}
+
+extension PartialRangeFrom : TensorSliceIndexProtocol where Bound == Int {
+  public var sliceIndex: TensorSliceIndex {
+    return .partialRangeFrom(Int32(self.lowerBound)..., stride: 1)
+  }
+}
+
+extension PartialRangeUpTo : TensorSliceIndexProtocol where Bound == Int {
+  public var sliceIndex: TensorSliceIndex {
+    return .partialRangeUpTo(..<Int32(self.upperBound), stride: 1)
+  }
+}
+
+extension PartialRangeThrough : TensorSliceIndexProtocol where Bound == Int {
+  public var sliceIndex: TensorSliceIndex {
+    return .partialRangeThrough(...Int32(self.upperBound), stride: 1)
+  }
+}
+
+public extension Tensor {
+  struct IndexPath {
+    let begin, end, strides: Tensor<Int32>
+    let beginMask, endMask, ellipsisMask, newAxisMask, squeezeAxisMask: Int64
+
+    init(_ indices: [TensorSliceIndex]) {
+      precondition(!indices.isEmpty, "The index path cannot be empty.")
+      precondition(indices.count(where: {
+        if case .ellipsis = $0 {
+          return true
+        } else {
+          return false
+        }
+      }) < 2, "Only one ellipsis is allowed per index path.")
+
+      var begin = [Int32](repeating: 0, count: indices.count)
+      var end = [Int32](repeating: 0, count: indices.count)
+      var strides = [Int32](repeating: 1, count: indices.count)
+      var beginMask: Int64 = 0
+      var endMask: Int64 = 0
+      var ellipsisMask: Int64 = 0
+      var newAxisMask: Int64 = 0
+      var squeezeAxisMask: Int64 = 0
+      for (i, index) in indices.enumerated() {
+        switch index {
+        case .ellipsis: ellipsisMask |= 1 << i
+        case .newAxis: newAxisMask |= 1 << i
+        case .squeezeAxis: squeezeAxisMask |= 1 << i
+        case .index(let idx):
+          begin[i] = idx
+          end[i] = idx + 1
+          squeezeAxisMask |= 1 << i
+        case .range(let range, let stride):
+          begin[i] = range.lowerBound
+          end[i] = range.upperBound
+          strides[i] = stride
+        case .closedRange(let range, let stride):
+          begin[i] = range.lowerBound
+          switch range.upperBound {
+          case -1: endMask |= 1 << i
+          case let u: end[i] = u + 1
+          }
+          strides[i] = stride
+        case .partialRangeFrom(let range, let stride):
+          begin[i] = range.lowerBound
+          strides[i] = stride
+          endMask |= 1 << i
+        case .partialRangeUpTo(let range, let stride):
+          end[i] = range.upperBound
+          strides[i] = stride
+          beginMask |= 1 << i
+        case .partialRangeThrough(let range, let stride):
+          end[i] = range.upperBound + 1
+          strides[i] = stride
+          beginMask |= 1 << i
+        }
+      }
+
+      self.begin = Tensor<Int32>(begin)
+      self.end = Tensor<Int32>(end)
+      self.strides = Tensor<Int32>(strides)
+      self.beginMask = beginMask
+      self.endMask = endMask
+      self.ellipsisMask = ellipsisMask
+      self.newAxisMask = newAxisMask
+      self.squeezeAxisMask = squeezeAxisMask
+    }
+  }
+
+  @inlinable @inline(__always)
+  subscript(_ indexPath: IndexPath) -> Tensor {
+    return Raw.stridedSlice(
+      self, begin: indexPath.begin, end: indexPath.end, strides: indexPath.strides,
+      beginMask: indexPath.beginMask, endMask: indexPath.endMask, 
+      ellipsisMask: indexPath.ellipsisMask, newAxisMask: indexPath.newAxisMask, 
+      shrinkAxisMask: indexPath.squeezeAxisMask)
+  }
+
+  // @inlinable @inline(__always)
+  // subscript<I: TensorSliceIndexProtocol>(_ indices: I...) -> Tensor {
+  //   return self[IndexPath(indices.map { $0.sliceIndex })]
+  // }
+
+  @inlinable @inline(__always)
+  subscript<I: TensorSliceIndexProtocol>(_ index: I) -> Tensor {
+    return self[IndexPath([index.sliceIndex])]
+  }
+
+  @inlinable @inline(__always)
+  subscript<I1: TensorSliceIndexProtocol, I2: TensorSliceIndexProtocol>(
+    _ index1: I1, _ index2: I2) -> Tensor {
+    return self[IndexPath([index1.sliceIndex, index2.sliceIndex])]
+  }
+
+  @inlinable @inline(__always)
+  subscript<
+  I1: TensorSliceIndexProtocol, 
+  I2: TensorSliceIndexProtocol, 
+  I3: TensorSliceIndexProtocol>(
+    _ index1: I1, _ index2: I2, _ index3: I3) -> Tensor {
+    return self[IndexPath([index1.sliceIndex, index2.sliceIndex, index3.sliceIndex])]
+  }
+
+  @inlinable @inline(__always)
+  subscript<
+  I1: TensorSliceIndexProtocol, 
+  I2: TensorSliceIndexProtocol, 
+  I3: TensorSliceIndexProtocol,
+  I4: TensorSliceIndexProtocol>(
+    _ index1: I1, _ index2: I2, _ index3: I3, _ index4: I4) -> Tensor {
+    return self[IndexPath([
+      index1.sliceIndex, index2.sliceIndex, index3.sliceIndex, index4.sliceIndex])]
+  }
+
+  @inlinable @inline(__always)
+  subscript<
+  I1: TensorSliceIndexProtocol, 
+  I2: TensorSliceIndexProtocol, 
+  I3: TensorSliceIndexProtocol,
+  I4: TensorSliceIndexProtocol,
+  I5: TensorSliceIndexProtocol>(
+    _ index1: I1, _ index2: I2, _ index3: I3, _ index4: I4, _ index5: I5) -> Tensor {
+    return self[IndexPath([
+      index1.sliceIndex, index2.sliceIndex, index3.sliceIndex, index4.sliceIndex,
+      index5.sliceIndex])]
+  }
+
+  @inlinable @inline(__always)
+  subscript<
+  I1: TensorSliceIndexProtocol, 
+  I2: TensorSliceIndexProtocol, 
+  I3: TensorSliceIndexProtocol,
+  I4: TensorSliceIndexProtocol,
+  I5: TensorSliceIndexProtocol,
+  I6: TensorSliceIndexProtocol>(
+    _ index1: I1, _ index2: I2, _ index3: I3, _ index4: I4, _ index5: I5, _ index6: I6) -> Tensor {
+    return self[IndexPath([
+      index1.sliceIndex, index2.sliceIndex, index3.sliceIndex, index4.sliceIndex,
+      index5.sliceIndex, index6.sliceIndex])]
   }
 }
