@@ -39,6 +39,33 @@ enum class DowngradeToWarning: bool {
   Yes
 };
 
+/// Calls \p callback for each type in each requirement provided by
+/// \p source.
+static void forAllRequirementTypes(
+    WhereClauseOwner source,
+    llvm::function_ref<void(Type, TypeRepr *)> callback) {
+  RequirementRequest::visitRequirements(
+      source, TypeResolutionStage::Interface,
+      [&](const Requirement &req, RequirementRepr* reqRepr) {
+    switch (req.getKind()) {
+    case RequirementKind::Conformance:
+    case RequirementKind::SameType:
+    case RequirementKind::Superclass:
+      callback(req.getFirstType(),
+               RequirementRepr::getFirstTypeRepr(reqRepr));
+      callback(req.getSecondType(),
+               RequirementRepr::getSecondTypeRepr(reqRepr));
+      break;
+
+    case RequirementKind::Layout:
+      callback(req.getFirstType(),
+               RequirementRepr::getFirstTypeRepr(reqRepr));
+      break;
+    }
+    return false;
+  });
+}
+
 /// \see checkTypeAccess
 using CheckTypeAccessCallback =
     void(AccessScope, const TypeRepr *, DowngradeToWarning);
@@ -69,7 +96,12 @@ protected:
       WhereClauseOwner source,
       AccessScope accessScope,
       const DeclContext *useDC,
-      llvm::function_ref<CheckTypeAccessCallback> diagnose);
+      llvm::function_ref<CheckTypeAccessCallback> diagnose) {
+    forAllRequirementTypes(source, [&](Type type, TypeRepr *typeRepr) {
+      checkTypeAccessImpl(type, typeRepr, accessScope, useDC,
+                          /*mayBeInferred*/false, diagnose);
+    });
+  }
 
   AccessControlCheckerBase(TypeChecker &TC, bool checkUsableFromInline)
     : TC(TC), checkUsableFromInline(checkUsableFromInline) {}
@@ -278,39 +310,6 @@ static void highlightOffendingType(TypeChecker &TC, InFlightDiagnostic &diag,
     const ValueDecl *VD = CITR->getBoundDecl();
     TC.diagnose(VD, diag::kind_declared_here, DescriptiveDeclKind::Type);
   }
-}
-
-void AccessControlCheckerBase::checkRequirementAccess(
-    WhereClauseOwner source,
-    AccessScope accessScope,
-    const DeclContext *useDC,
-    llvm::function_ref<CheckTypeAccessCallback> diagnose) {
-  RequirementRequest::visitRequirements(
-      source, TypeResolutionStage::Interface,
-      [&](const Requirement &req, RequirementRepr* reqRepr) {
-        switch (req.getKind()) {
-        case RequirementKind::Conformance:
-        case RequirementKind::SameType:
-        case RequirementKind::Superclass:
-          checkTypeAccessImpl(req.getFirstType(),
-                              RequirementRepr::getFirstTypeRepr(reqRepr),
-                              accessScope, useDC, /*mayBeInferred*/false,
-                              diagnose);
-          checkTypeAccessImpl(req.getSecondType(),
-                              RequirementRepr::getSecondTypeRepr(reqRepr),
-                              accessScope, useDC, /*mayBeInferred*/false,
-                              diagnose);
-          break;
-
-        case RequirementKind::Layout:
-          checkTypeAccessImpl(req.getFirstType(),
-                              RequirementRepr::getFirstTypeRepr(reqRepr),
-                              accessScope, useDC, /*mayBeInferred*/false,
-                              diagnose);
-          break;
-        }
-        return false;
-      });
 }
 
 void AccessControlCheckerBase::checkGenericParamAccess(
