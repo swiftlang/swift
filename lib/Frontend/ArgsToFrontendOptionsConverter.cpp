@@ -96,6 +96,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   setUnsignedIntegerArgument(OPT_switch_checking_invocation_threshold_EQ, 10,
                              Opts.SwitchCheckingInvocationThreshold);
 
+  Opts.CheckOnoneSupportCompleteness = Args.hasArg(OPT_check_onone_completeness);
+
   Opts.DebuggerTestingTransform = Args.hasArg(OPT_debugger_testing_transform);
 
   computePlaygroundOptions();
