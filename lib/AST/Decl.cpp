@@ -35,6 +35,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PropertyDelegates.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/Stmt.h"
@@ -3322,6 +3323,14 @@ Optional<KeyPathTypeKind> NominalTypeDecl::getKeyPathTypeKind() const {
   CASE(PartialKeyPath)
 #undef CASE
   return None;
+}
+
+PropertyDelegateTypeInfo NominalTypeDecl::getPropertyDelegateTypeInfo() const {
+  ASTContext &ctx = getASTContext();
+  auto mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           PropertyDelegateTypeInfoRequest{mutableThis},
+                           PropertyDelegateTypeInfo());
 }
 
 GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,

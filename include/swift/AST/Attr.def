@@ -399,6 +399,9 @@ SIMPLE_DECL_ATTR(_implementationOnly, ImplementationOnly,
 DECL_ATTR(_custom, Custom,
   OnAnyDecl | UserInaccessible,
   85)
+SIMPLE_DECL_ATTR(propertyDelegate, PropertyDelegate,
+  OnStruct | OnClass | OnEnum,
+  86)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

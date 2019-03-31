@@ -4343,6 +4343,26 @@ WARNING(hashvalue_implementation,none,
         "conform type %0 to 'Hashable' by implementing 'hash(into:)' instead",
         (Type))
 
+//------------------------------------------------------------------------------
+// MARK: property delegate diagnostics
+//------------------------------------------------------------------------------
+ERROR(property_delegate_no_value_property, none,
+  "property delegate type %0 does not contain a non-static property "
+  "named 'value'", (Type))
+ERROR(property_delegate_ambiguous_value_property, none,
+  "property delegate type %0 has multiple non-static properties "
+  "named 'value'", (Type))
+ERROR(property_delegate_wrong_initial_value_init, none,
+      "'init(initialValue:)' parameter type (%0) must be the same as its "
+      "'value' property type (%1) or an @autoclosure thereof", (Type, Type))
+ERROR(property_delegate_ambiguous_initial_value_init, none,
+  "property delegate type %0 has multiple initial-value initializers", (Type))
+ERROR(property_delegate_type_requirement_not_accessible,none,
+      "%select{private|fileprivate|internal|public|open}0 %1 %2 cannot have "
+      "more restrictive access than its enclosing property delegate type %3 "
+      "(which is %select{private|fileprivate|internal|public|open}4)",
+      (AccessLevel, DescriptiveDeclKind, DeclName, Type, AccessLevel))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
