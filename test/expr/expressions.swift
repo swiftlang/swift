@@ -244,7 +244,7 @@ func test_lambda() {
   var a = { (value: Int) -> () in markUsed(value+1) }
 
   // A recursive lambda.
-	var fib: (Int) -> Int = { (n: Int) -> Int in
+  var fib: (Int) -> Int = { (n: Int) -> Int in
     if (n < 2) {
       return n
     }
