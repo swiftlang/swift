@@ -19,7 +19,7 @@ module WinSDK [system] [extern_c] {
 
   module core {
     module acl {
-      header "aclapi.h"
+      header "AclAPI.h"
       export *
     }
 
