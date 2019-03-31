@@ -311,7 +311,7 @@ public:
 };
 
 /// Collect function (or subscript) members with the given \p name on \p baseTy.
-void collectPossibleCalleesByQualifiedLookup(
+static void collectPossibleCalleesByQualifiedLookup(
     DeclContext &DC, Type baseTy, DeclBaseName name,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
 
@@ -358,7 +358,7 @@ void collectPossibleCalleesByQualifiedLookup(
 
 /// Collect function (or subscript) members with the given \p name on
 /// \p baseExpr expression.
-void collectPossibleCalleesByQualifiedLookup(
+static void collectPossibleCalleesByQualifiedLookup(
     DeclContext &DC, Expr *baseExpr, DeclBaseName name,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   ConcreteDeclRef ref = nullptr;
@@ -374,7 +374,7 @@ void collectPossibleCalleesByQualifiedLookup(
 }
 
 /// For the given \c callExpr, collect possible callee types and declarations.
-bool collectPossibleCalleesForApply(
+static bool collectPossibleCalleesForApply(
     DeclContext &DC, ApplyExpr *callExpr,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   auto *fnExpr = callExpr->getFn();
@@ -421,7 +421,7 @@ bool collectPossibleCalleesForApply(
 
 /// For the given \c subscriptExpr, collect possible callee types and
 /// declarations.
-bool collectPossibleCalleesForSubscript(
+static bool collectPossibleCalleesForSubscript(
     DeclContext &DC, SubscriptExpr *subscriptExpr,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   if (subscriptExpr->hasDecl()) {
@@ -441,8 +441,8 @@ bool collectPossibleCalleesForSubscript(
 /// Get index of \p CCExpr in \p Args. \p Args is usually a \c TupleExpr
 /// or \c ParenExpr.
 /// \returns \c true if success, \c false if \p CCExpr is not a part of \p Args.
-bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
-                       unsigned &Position, bool &HasName) {
+static bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
+                              unsigned &Position, bool &HasName) {
   if (isa<ParenExpr>(Args)) {
     HasName = false;
     Position = 0;
