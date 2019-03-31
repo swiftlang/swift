@@ -172,6 +172,25 @@ public:
   bool isRValue() const & { return StoredKind == Kind::RValue; }
   bool isLValue() const & { return StoredKind == Kind::LValue; }
 
+  bool isDefaultArg() const {
+    switch (StoredKind) {
+    case Kind::Invalid:
+      llvm_unreachable("argument source is invalid");
+    case Kind::RValue:
+    case Kind::LValue:
+      return false;
+    case Kind::Expr:
+      return isa<DefaultArgumentExpr>(asKnownExpr());
+    }
+    llvm_unreachable("bad kind");
+  }
+
+  /// Return the default argument owner and parameter index, consuming
+  /// the argument source. Will assert if this is not a default argument.
+  DefaultArgumentExpr *asKnownDefaultArg() && {
+    return cast<DefaultArgumentExpr>(std::move(*this).asKnownExpr());
+  }
+
   /// Given that this source is storing an RValue, extract and clear
   /// that value.
   RValue &&asKnownRValue(SILGenFunction &SGF) && {
@@ -261,12 +280,11 @@ private:
 class PreparedArguments {
   SmallVector<AnyFunctionType::Param, 8> Params;
   std::vector<ArgumentSource> Arguments;
-  unsigned IsScalar : 1;
   unsigned IsNull : 1;
 public:
-  PreparedArguments() : IsScalar(false), IsNull(true) {}
+  PreparedArguments() : IsNull(true) {}
   explicit PreparedArguments(ArrayRef<AnyFunctionType::Param> params)
-      : IsScalar(false), IsNull(true) {
+      : IsNull(true) {
     emplace(params);
   }
 
@@ -279,10 +297,9 @@ public:
 
   PreparedArguments(PreparedArguments &&other)
     : Params(std::move(other.Params)), Arguments(std::move(other.Arguments)),
-      IsScalar(other.IsScalar), IsNull(other.IsNull) {}
+      IsNull(other.IsNull) {}
   PreparedArguments &operator=(PreparedArguments &&other) {
     Params = std::move(other.Params);
-    IsScalar = other.IsScalar;
     Arguments = std::move(other.Arguments);
     IsNull = other.IsNull;
     other.IsNull = true;
@@ -297,8 +314,6 @@ public:
   /// Returns true if this is a non-null and completed argument list.
   bool isValid() const {
     assert(!isNull());
-    if (IsScalar)
-      return Arguments.size() == 1;
     return Arguments.size() == Params.size();
   }
 
@@ -306,12 +321,6 @@ public:
   ArrayRef<AnyFunctionType::Param> getParams() const {
     assert(!isNull());
     return Params;
-  }
-
-  /// Is this a single-argument list?  Note that the argument might be a tuple.
-  bool isScalar() const {
-    assert(!isNull());
-    return IsScalar;
   }
 
   MutableArrayRef<ArgumentSource> getSources() && {
@@ -323,7 +332,6 @@ public:
   void emplace(ArrayRef<AnyFunctionType::Param> params) {
     assert(isNull());
     Params.append(params.begin(), params.end());
-    IsScalar = false;
     IsNull = false;
   }
 

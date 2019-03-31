@@ -31,16 +31,6 @@
 using namespace swift;
 using namespace Lowering;
 
-static bool isTrivialShuffle(ArgumentShuffleExpr *shuffle) {
-  // Each element must be mapped to the corresponding element of the input.
-  auto mapping = shuffle->getElementMapping();
-  for (auto index : indices(mapping)) {
-    if (mapping[index] < 0 || unsigned(mapping[index]) != index)
-      return false;
-  }
-  return true;
-}
-
 /// Break down an expression that's the formal argument expression to
 /// a builtin function, returning its individualized arguments.
 ///
@@ -58,22 +48,6 @@ decomposeArguments(SILGenFunction &SGF,
     for (auto &&source : sources)
       result.push_back(std::move(source).asKnownExpr());
     return result;
-  } else if (sources.size() == 1) {
-    auto *arg = std::move(sources[0]).asKnownExpr();
-
-    // The use of owned parameters can trip up CSApply enough to introduce
-    // a trivial tuple shuffle here.
-    if (auto shuffle = dyn_cast<ArgumentShuffleExpr>(arg)) {
-      if (isTrivialShuffle(shuffle))
-        arg = shuffle->getSubExpr();
-    }
-
-    auto tuple = dyn_cast<TupleExpr>(arg);
-    if (tuple && tuple->getElements().size() == expectedCount) {
-      for (auto elt : tuple->getElements())
-        result.push_back(elt);
-      return result;
-    }
   }
 
   SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,

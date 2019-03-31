@@ -56,6 +56,15 @@ public:
     llvm_unreachable("expression kind should not survive to SILGen");
   }
 
+  ExprRetTy visitDefaultArgumentExpr(DefaultArgumentExpr *E, Args...AA) {
+    llvm_unreachable("DefaultArgumentExpr should not appear in this position");
+  }
+
+  ExprRetTy visitCallerDefaultArgumentExpr(CallerDefaultArgumentExpr *E, Args... AA) {
+    return static_cast<ImplClass*>(this)->visit(E->getSubExpr(),
+                                                std::forward<Args>(AA)...);
+  }
+
   ExprRetTy visitVarargExpansionExpr(VarargExpansionExpr *E, Args... AA) {
     return static_cast<ImplClass*>(this)->visit(E->getSubExpr(),
                                                 std::forward<Args>(AA)...);
