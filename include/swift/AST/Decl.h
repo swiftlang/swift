@@ -78,6 +78,7 @@ namespace swift {
   class ParameterTypeFlags;
   class Pattern;
   struct PrintOptions;
+  struct PropertyDelegateTypeInfo;
   class ProtocolDecl;
   class ProtocolType;
   struct RawComment;
@@ -3357,6 +3358,9 @@ public:
 
   /// Is this a key path type?
   Optional<KeyPathTypeKind> getKeyPathTypeKind() const;
+
+  /// Retrieve information about this type as a property delegate.
+  PropertyDelegateTypeInfo getPropertyDelegateTypeInfo() const;
 
 private:
   /// Predicate used to filter StoredPropertyRange.

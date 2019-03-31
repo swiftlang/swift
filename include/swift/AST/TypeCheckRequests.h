@@ -16,6 +16,7 @@
 #ifndef SWIFT_TYPE_CHECK_REQUESTS_H
 #define SWIFT_TYPE_CHECK_REQUESTS_H
 
+#include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/SimpleRequest.h"
@@ -413,6 +414,31 @@ private:
   TypeChecker &getTypeChecker() const;
   SourceFile *getSourceFile() const;
   Type &getCache() const;
+};
+
+/// Retrieve information about a property delegate type.
+class PropertyDelegateTypeInfoRequest
+  : public SimpleRequest<PropertyDelegateTypeInfoRequest,
+                         CacheKind::Cached,
+                         PropertyDelegateTypeInfo,
+                         NominalTypeDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<PropertyDelegateTypeInfo>
+      evaluate(Evaluator &eval, NominalTypeDecl *nominal) const;
+
+public:
+  // Caching
+  bool isCached() const;
+
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// The zone number for the type checker.

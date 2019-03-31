@@ -25,6 +25,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PropertyDelegates.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Parse/Lexer.h"
@@ -127,6 +128,7 @@ public:
   IGNORED_ATTR(DynamicReplacement)
   IGNORED_ATTR(PrivateImport)
   IGNORED_ATTR(Custom)
+  IGNORED_ATTR(PropertyDelegate)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -836,6 +838,7 @@ public:
 
   void visitNonOverrideAttr(NonOverrideAttr *attr);
   void visitCustomAttr(CustomAttr *attr);
+  void visitPropertyDelegateAttr(PropertyDelegateAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2491,10 +2494,20 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   attr->setInvalid();
 }
 
+
 void TypeChecker::checkParameterAttributes(ParameterList *params) {
   for (auto param: *params) {
     checkDeclAttributes(param);
   }
+}
+
+void AttributeChecker::visitPropertyDelegateAttr(PropertyDelegateAttr *attr) {
+  auto nominal = dyn_cast<NominalTypeDecl>(D);
+  if (!nominal)
+    return;
+
+  // Force checking of the property delegate type.
+  (void)nominal->getPropertyDelegateTypeInfo();
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {
