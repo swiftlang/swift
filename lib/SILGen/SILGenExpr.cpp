@@ -450,7 +450,6 @@ namespace {
     RValue visitDynamicSubscriptExpr(DynamicSubscriptExpr *E,
                                      SGFContext C);
     RValue visitDestructureTupleExpr(DestructureTupleExpr *E, SGFContext C);
-    RValue visitArgumentShuffleExpr(ArgumentShuffleExpr *E, SGFContext C);
     RValue visitDynamicTypeExpr(DynamicTypeExpr *E, SGFContext C);
     RValue visitCaptureListExpr(CaptureListExpr *E, SGFContext C);
     RValue visitAbstractClosureExpr(AbstractClosureExpr *E, SGFContext C);
@@ -2163,11 +2162,6 @@ RValue RValueEmitter::visitDestructureTupleExpr(DestructureTupleExpr *E,
   }
 
   return result;
-}
-
-RValue RValueEmitter::visitArgumentShuffleExpr(ArgumentShuffleExpr *E,
-                                               SGFContext C) {
-  llvm_unreachable("ArgumentShuffleExpr cannot appear in rvalue position");
 }
 
 static SILValue emitMetatypeOfDelegatingInitExclusivelyBorrowedSelf(

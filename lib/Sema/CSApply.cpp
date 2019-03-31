@@ -2963,6 +2963,14 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
 
+    Expr *visitDefaultArgumentExpr(DefaultArgumentExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+
+    Expr *visitCallerDefaultArgumentExpr(CallerDefaultArgumentExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+
     Expr *visitApplyExpr(ApplyExpr *expr) {
       return finishApply(expr, cs.getType(expr),
                          ConstraintLocatorBuilder(
@@ -5316,6 +5324,15 @@ Expr *ExprRewriter::coerceCallArguments(
   // FIXME: Eventually, we want to enforce that we have either argTuple or
   // argParen here.
 
+  SourceLoc lParenLoc, rParenLoc;
+  if (argTuple) {
+    lParenLoc = argTuple->getLParenLoc();
+    rParenLoc = argTuple->getRParenLoc();
+  } else if (argParen) {
+    lParenLoc = argParen->getLParenLoc();
+    rParenLoc = argParen->getRParenLoc();
+  }
+
   // Local function to extract the ith argument expression, which papers
   // over some of the weirdness with tuples vs. parentheses.
   auto getArg = [&](unsigned i) -> Expr * {
@@ -5329,97 +5346,118 @@ Expr *ExprRewriter::coerceCallArguments(
     return arg;
   };
 
-  // Local function to extract the ith argument label, which papers over some
-  // of the weirdness with tuples vs. parentheses.
-  auto getArgLabel = [&](unsigned i) -> Identifier {
+  auto getLabelLoc = [&](unsigned i) -> SourceLoc {
     if (argTuple)
-      return argTuple->getElementName(i);
+      return argTuple->getElementNameLoc(i);
 
     assert(i == 0 && "Scalar only has a single argument");
-    return Identifier();
+    return SourceLoc();
   };
 
-  SmallVector<TupleTypeElt, 4> toSugarFields;
-  SmallVector<TupleTypeElt, 4> fromTupleExprFields(
-                                 argTuple? argTuple->getNumElements() : 1);
-  SmallVector<Expr*, 4> fromTupleExpr(argTuple? argTuple->getNumElements() : 1);
-  SmallVector<unsigned, 4> variadicArgs;
-  SmallVector<Expr *, 2> callerDefaultArgs;
-  Type sliceType = nullptr;
-  SmallVector<int, 4> sources;
+  SmallVector<Expr *, 4> newArgs;
+  SmallVector<Identifier, 4> newLabels;
+  SmallVector<SourceLoc, 4> newLabelLocs;
+  SmallVector<AnyFunctionType::Param, 4> newParams;
+
   for (unsigned paramIdx = 0, numParams = parameterBindings.size();
        paramIdx != numParams; ++paramIdx) {
     // Extract the parameter.
     const auto &param = params[paramIdx];
+    newLabels.push_back(param.getLabel());
 
     // Handle variadic parameters.
     if (param.isVariadic()) {
-      // Find the appropriate injection function.
-      if (tc.requireArrayLiteralIntrinsics(arg->getStartLoc()))
-        return nullptr;
+      assert(!param.isInOut());
 
-      // Record this parameter.
-      auto paramBaseType = param.getOldType();
-      assert(sliceType.isNull() && "Multiple variadic parameters?");
-      sliceType = tc.getArraySliceType(arg->getLoc(), paramBaseType);
-      toSugarFields.push_back(
-          TupleTypeElt(sliceType, param.getLabel(), param.getParameterFlags()));
-      sources.push_back(ArgumentShuffleExpr::Variadic);
+      SmallVector<Expr *, 4> variadicArgs;
+
+      // The first argument of this vararg parameter may have had a label;
+      // save its location.
+      auto &varargIndices = parameterBindings[paramIdx];
+      if (!varargIndices.empty())
+        newLabelLocs.push_back(getLabelLoc(varargIndices[0]));
+      else
+        newLabelLocs.push_back(SourceLoc());
 
       // Convert the arguments.
-      for (auto argIdx : parameterBindings[paramIdx]) {
+      for (auto argIdx : varargIndices) {
         auto arg = getArg(argIdx);
         auto argType = cs.getType(arg);
-        variadicArgs.push_back(argIdx);
 
         // If the argument type exactly matches, this just works.
-        if (argType->isEqual(paramBaseType)) {
-          fromTupleExprFields[argIdx] = TupleTypeElt(argType,
-                                                     getArgLabel(argIdx));
-          fromTupleExpr[argIdx] = arg;
+        if (argType->isEqual(param.getPlainType())) {
+          variadicArgs.push_back(arg);
           continue;
         }
 
         // Convert the argument.
-        auto convertedArg = coerceToType(arg, paramBaseType,
+        auto convertedArg = coerceToType(arg, param.getPlainType(),
                                          getArgLocator(argIdx, paramIdx));
         if (!convertedArg)
           return nullptr;
 
         // Add the converted argument.
-        fromTupleExpr[argIdx] = convertedArg;
-        fromTupleExprFields[argIdx] = TupleTypeElt(cs.getType(convertedArg),
-                                                   getArgLabel(argIdx));
+        variadicArgs.push_back(convertedArg);
       }
 
+      SourceLoc start, end;
+      if (!variadicArgs.empty()) {
+        start = variadicArgs.front()->getStartLoc();
+        end = variadicArgs.back()->getEndLoc();
+      }
+
+      // Collect them into an ArrayExpr.
+      auto *arrayExpr = ArrayExpr::create(tc.Context,
+                                          start,
+                                          variadicArgs,
+                                          {}, end,
+                                          param.getParameterType());
+      arrayExpr->setImplicit();
+      cs.cacheType(arrayExpr);
+
+      // Wrap the ArrayExpr in a VarargExpansionExpr.
+      auto *varargExpansionExpr =
+        new (tc.Context) VarargExpansionExpr(arrayExpr,
+                                             /*implicit=*/true,
+                                             arrayExpr->getType());
+      cs.cacheType(varargExpansionExpr);
+
+      newArgs.push_back(varargExpansionExpr);
+      newParams.push_back(param);
       continue;
     }
 
-    // If we are using a default argument, handle it now.
+    // Handle default arguments.
     if (parameterBindings[paramIdx].empty()) {
-      // Create a caller-side default argument, if we need one.
       Expr *defArg;
       DefaultArgumentKind defArgKind;
       std::tie(defArg, defArgKind) = getCallerDefaultArg(cs, dc, arg->getLoc(),
                                                          callee, paramIdx);
 
-      // Note that we'll be doing a shuffle involving default arguments.
-      toSugarFields.push_back(TupleTypeElt(
-                                param.isVariadic()
-                                  ? tc.getArraySliceType(arg->getLoc(),
-                                                         param.getOldType())
-                                  : param.getOldType(),
-                                param.getLabel(),
-                                param.getParameterFlags()));
-
+      // If we have a caller-side default argument, just add the magic literal
+      // expression to our argument list.
       if (defArg) {
-        callerDefaultArgs.push_back(defArg);
-        sources.push_back(ArgumentShuffleExpr::CallerDefaultInitialize);
+        defArg =
+            new (tc.Context) CallerDefaultArgumentExpr(defArg,
+                                                       arg->getStartLoc(),
+                                                       param.getParameterType());
+
+      // Otherwise, create a call of the default argument generator.
       } else {
-        sources.push_back(ArgumentShuffleExpr::DefaultInitialize);
+        defArg =
+            new (tc.Context) DefaultArgumentExpr(callee, paramIdx,
+                                                 arg->getStartLoc(),
+                                                 param.getParameterType());
       }
+
+      cs.cacheType(defArg);
+      newArgs.push_back(defArg);
+      newParams.push_back(param);
+      newLabelLocs.push_back(SourceLoc());
       continue;
     }
+
+    // Otherwise, we have a plain old ordinary argument.
 
     // Extract the argument used to initialize this parameter.
     assert(parameterBindings[paramIdx].size() == 1);
@@ -5427,20 +5465,14 @@ Expr *ExprRewriter::coerceCallArguments(
     auto arg = getArg(argIdx);
     auto argType = cs.getType(arg);
 
-    // If the argument and parameter indices differ, or if the names differ,
-    // this is a shuffle.
-    sources.push_back(argIdx);
+    // Save the original label location.
+    newLabelLocs.push_back(getLabelLoc(argIdx));
 
     // If the types exactly match, this is easy.
     auto paramType = param.getOldType();
     if (argType->isEqual(paramType)) {
-      toSugarFields.push_back(
-          TupleTypeElt(param.getPlainType(), getArgLabel(argIdx),
-                       param.getParameterFlags()));
-      fromTupleExprFields[argIdx] =
-          TupleTypeElt(param.getPlainType(), getArgLabel(argIdx),
-                       param.getParameterFlags());
-      fromTupleExpr[argIdx] = arg;
+      newArgs.push_back(arg);
+      newParams.push_back(param);
       continue;
     }
 
@@ -5458,6 +5490,8 @@ Expr *ExprRewriter::coerceCallArguments(
     // a regular function coversion by `coerceToType`.
     if (param.isAutoClosure() && (!argType->is<FunctionType>() ||
                                   !isAutoClosureArg(arg))) {
+      assert(!param.isInOut());
+
       // If parameter is an autoclosure, we need to make sure that:
       //   - argument type is coerced to parameter result type
       //   - impilict autoclosure is created to wrap argument expression
@@ -5478,109 +5512,65 @@ Expr *ExprRewriter::coerceCallArguments(
     if (!convertedArg)
       return nullptr;
 
-    // Add the converted argument.
-    fromTupleExpr[argIdx] = convertedArg;
-    fromTupleExprFields[argIdx] = TupleTypeElt(
-        cs.getType(convertedArg)->getInOutObjectType(),
-        getArgLabel(argIdx), param.getParameterFlags());
-    toSugarFields.push_back(
-        TupleTypeElt(argType->getInOutObjectType(), param.getLabel(),
-                     param.getParameterFlags()));
+    newArgs.push_back(convertedArg);
+
+    // Make an effort to preserve the sugared type of the argument in the
+    // case where there was no conversion, instead of using the parameter
+    // type.
+    newParams.emplace_back(cs.getType(convertedArg)->getInOutObjectType(),
+                           param.getLabel(),
+                           param.getParameterFlags());
   }
 
-  Type argTupleType = TupleType::get(fromTupleExprFields, tc.Context);
+  assert(newArgs.size() == newParams.size());
+  assert(newArgs.size() == newLabels.size());
+  assert(newArgs.size() == newLabelLocs.size());
 
-  // Compute a new 'arg', from the bits we have.  We have three cases: the
-  // scalar case, the paren case, and the tuple literal case.
-  if (!argTuple && !argParen) {
-    assert(fromTupleExpr.size() == 1 && fromTupleExpr[0]);
-    arg = fromTupleExpr[0];
-  } else if (argParen) {
-    // If the element changed, rebuild a new ParenExpr.
-    assert(fromTupleExpr.size() == 1 && fromTupleExpr[0]);
-    if (fromTupleExpr[0] != argParen->getSubExpr()) {
-      bool argParenImplicit = argParen->isImplicit();
-      argParen =
-        cs.cacheType(new (tc.Context)
-                     ParenExpr(argParen->getLParenLoc(),
-                               fromTupleExpr[0],
-                               argParen->getRParenLoc(),
-                               argParen->hasTrailingClosure(),
-                               argTupleType));
-      if (argParenImplicit) {
-        argParen->setImplicit();
-      }
-      arg = argParen;
-    } else {
-      // coerceToType may have updated the element type of the ParenExpr in
-      // place.  If so, propagate the type out to the ParenExpr as well.
-      cs.setType(argParen, argTupleType);
-    }
-  } else {
-    assert(argTuple);
-
-    bool anyChanged = false;
-    for (unsigned i = 0, e = argTuple->getNumElements(); i != e; ++i)
-      if (fromTupleExpr[i] != argTuple->getElement(i)) {
-        anyChanged = true;
-        break;
-      }
-
-    // If anything about the TupleExpr changed, rebuild a new one.
-    Type argTupleType = TupleType::get(fromTupleExprFields, tc.Context);
-    assert(isa<TupleType>(argTupleType.getPointer()));
-
-    if (anyChanged || !cs.getType(argTuple)->isEqual(argTupleType)) {
-      auto EltNames = argTuple->getElementNames();
-      auto EltNameLocs = argTuple->getElementNameLocs();
-      argTuple =
-        cs.cacheType(TupleExpr::create(tc.Context, argTuple->getLParenLoc(),
-                                       fromTupleExpr, EltNames, EltNameLocs,
-                                       argTuple->getRParenLoc(),
-                                       argTuple->hasTrailingClosure(),
-                                       argTuple->isImplicit(),
-                                       argTupleType));
-      arg = argTuple;
-    }
+  // This is silly. SILGen gets confused if a 'self' parameter is wrapped
+  // in a ParenExpr sometimes.
+  if (!argTuple && !argParen &&
+      (params[0].getValueOwnership() == ValueOwnership::Default ||
+       params[0].getValueOwnership() == ValueOwnership::InOut)) {
+    assert(newArgs.size() == 1);
+    assert(!hasTrailingClosure);
+    return newArgs[0];
   }
 
-  // If we don't have to shuffle anything, we're done.
-  args.clear();
-  AnyFunctionType::decomposeInput(cs.getType(arg), args);
-  if (AnyFunctionType::equalParams(args, params))
-    return arg;
-
-  auto paramType = AnyFunctionType::composeInput(tc.Context, params,
+  // Rebuild the argument list, sharing as much structure as possible.
+  auto paramType = AnyFunctionType::composeInput(tc.Context, newParams,
                                                  /*canonicalVararg=*/false);
-
-  // If we came from a scalar, create a scalar-to-tuple conversion.
-  ArgumentShuffleExpr::TypeImpact typeImpact;
-  if (argTuple == nullptr) {
-    // Deal with a difference in only scalar ownership.
-    if (auto paramParenTy = dyn_cast<ParenType>(paramType.getPointer())) {
-      assert(paramParenTy->getUnderlyingType()
-              ->isEqual(cs.getType(arg)));
-      auto argParen = new (tc.Context) ParenExpr(arg->getStartLoc(),
-                                                 arg, arg->getEndLoc(), false,
-                                                 paramParenTy);
-      argParen->setImplicit();
-      return cs.cacheType(argParen);
+  if (isa<ParenType>(paramType.getPointer())) {
+    if (argParen) {
+      // We already had a ParenExpr, so replace it's sub-expression.
+      argParen->setSubExpr(newArgs[0]);
+    } else {
+      arg = new (tc.Context) ParenExpr(lParenLoc,
+                                       newArgs[0],
+                                       rParenLoc,
+                                       hasTrailingClosure);
+      arg->setImplicit();
     }
-
-    typeImpact = ArgumentShuffleExpr::ScalarToTuple;
-    assert(isa<TupleType>(paramType.getPointer()));
-  } else if (isa<TupleType>(paramType.getPointer())) {
-    typeImpact = ArgumentShuffleExpr::TupleToTuple;
   } else {
-    typeImpact = ArgumentShuffleExpr::TupleToScalar;
-    assert(isa<ParenType>(paramType.getPointer()));
+    assert(isa<TupleType>(paramType.getPointer()));
+
+    if (argTuple && newArgs.size() == argTuple->getNumElements()) {
+      // The existing TupleExpr has the right number of elements,
+      // replace them.
+      for (unsigned i = 0, e = newArgs.size(); i != e; ++i) {
+        argTuple->setElement(i, newArgs[i]);
+      }
+    } else {
+      // Build a new TupleExpr, re-using source location information.
+      arg = TupleExpr::create(tc.Context, lParenLoc,
+                              newArgs, newLabels, newLabelLocs,
+                              rParenLoc,
+                              hasTrailingClosure,
+                              /*implicit=*/true);
+    }
   }
 
-  // Create the argument shuffle.
-  return cs.cacheType(ArgumentShuffleExpr::create(tc.Context, arg, sources,
-                                                  typeImpact, callee, variadicArgs,
-                                                  sliceType, callerDefaultArgs,
-                                                  paramType));
+  arg->setType(paramType);
+  return cs.cacheType(arg);
 }
 
 static ClosureExpr *getClosureLiteralExpr(Expr *expr) {
@@ -6852,9 +6842,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
           return nullptr;
         }
 
-        if (auto shuffle = dyn_cast<ArgumentShuffleExpr>(arg))
-          arg = shuffle->getSubExpr();
-
         if (auto tuple = dyn_cast<TupleExpr>(arg))
           arg = tuple->getElements()[0];
 
@@ -7055,8 +7042,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
     // Extract all arguments.
     auto *CEA = arg;
-    if (auto *ASE = dyn_cast<ArgumentShuffleExpr>(CEA))
-      CEA = ASE->getSubExpr();
+
     // The argument is either a ParenExpr or TupleExpr.
     ArrayRef<Expr *> arguments;
 

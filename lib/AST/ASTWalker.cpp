@@ -443,6 +443,17 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
   Expr *visitOpaqueValueExpr(OpaqueValueExpr *E) { return E; }
 
+  Expr *visitDefaultArgumentExpr(DefaultArgumentExpr *E) { return E; }
+
+  Expr *visitCallerDefaultArgumentExpr(CallerDefaultArgumentExpr *E) {
+    if (auto subExpr = doIt(E->getSubExpr())) {
+      E->setSubExpr(subExpr);
+      return E;
+    }
+
+    return nullptr;
+  }
+
   Expr *visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
     HANDLE_SEMANTIC_EXPR(E);
 
@@ -650,23 +661,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       E->setResultExpr(dst);
     } else {
       return nullptr;
-    }
-
-    return E;
-  }
-
-  Expr *visitArgumentShuffleExpr(ArgumentShuffleExpr *E) {
-    if (Expr *E2 = doIt(E->getSubExpr())) {
-      E->setSubExpr(E2);
-    } else {
-      return nullptr;
-    }
-
-    for (auto &defaultArg : E->getCallerDefaultArgs()) {
-      if (Expr *newDefaultArg = doIt(defaultArg))
-        defaultArg = newDefaultArg;
-      else
-        return nullptr;
     }
 
     return E;

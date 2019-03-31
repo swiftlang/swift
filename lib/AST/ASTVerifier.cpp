@@ -1729,12 +1729,6 @@ public:
         }
       };
 
-      // If we have an argument shuffle, strip it off. We want to visit the
-      // underlying paren or tuple expr.
-      if (auto *ArgShuffle = dyn_cast<ArgumentShuffleExpr>(Arg)) {
-        Arg = ArgShuffle->getSubExpr();
-      }
-
       if (auto *ParentExprArg = dyn_cast<ParenExpr>(Arg)) {
         return handleSubExpr(ParentExprArg->getSubExpr());
       }
@@ -2039,66 +2033,7 @@ public:
 
       verifyCheckedBase(E);
     }
-    
-    void verifyChecked(ArgumentShuffleExpr *E) {
-      PrettyStackTraceExpr debugStack(Ctx, "verifying ArgumentShuffleExpr", E);
 
-      auto getSubElementType = [&](unsigned i) {
-        if (E->isSourceScalar()) {
-          assert(i == 0);
-          return E->getSubExpr()->getType();
-        } else {
-          return (E->getSubExpr()->getType()->castTo<TupleType>()
-                   ->getElementType(i));
-        }
-      };
-
-      /// Retrieve the ith element type from the resulting tuple type.
-      auto getOuterElementType = [&](unsigned i) -> Type {
-        if (E->isResultScalar()) {
-          assert(i == 0);
-          return E->getType()->getWithoutParens();
-        } else {
-          return E->getType()->castTo<TupleType>()->getElementType(i);
-        }
-      };
-
-      Type varargsType;
-      unsigned callerDefaultArgIndex = 0;
-      for (unsigned i = 0, e = E->getElementMapping().size(); i != e; ++i) {
-        int subElem = E->getElementMapping()[i];
-        if (subElem == ArgumentShuffleExpr::DefaultInitialize)
-          continue;
-        if (subElem == ArgumentShuffleExpr::Variadic) {
-          varargsType = (E->getType()->castTo<TupleType>()
-                          ->getElement(i).getVarargBaseTy());
-          break;
-        }
-        if (subElem == ArgumentShuffleExpr::CallerDefaultInitialize) {
-          auto init = E->getCallerDefaultArgs()[callerDefaultArgIndex++];
-          if (!getOuterElementType(i)->isEqual(init->getType())) {
-            Out << "Type mismatch in ArgumentShuffleExpr\n";
-            abort();
-          }
-          continue;
-        }
-        if (!getOuterElementType(i)->isEqual(getSubElementType(subElem))) {
-          Out << "Type mismatch in ArgumentShuffleExpr\n";
-          abort();
-        }
-      }
-      if (varargsType) {
-        for (auto sourceIdx : E->getVariadicArgs()) {
-          if (!getSubElementType(sourceIdx)->isEqual(varargsType)) {
-            Out << "Vararg type mismatch in ArgumentShuffleExpr\n";
-            abort();
-          }
-        }
-      }
-
-      verifyCheckedBase(E);
-    }
-    
     void verifyChecked(DynamicTypeExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying DynamicTypeExpr", E);
 
