@@ -2226,6 +2226,10 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
                                      bool isMethod,
                                      bool isInitializer,
                                      unsigned curryLevels) {
+  if (type->hasError()) {
+    return type;
+  }
+
   if (curryLevels == 0) {
     // In an initializer, ignore optionality.
     if (isInitializer) {
@@ -2316,7 +2320,12 @@ CanType ValueDecl::getOverloadSignatureType() const {
     if (isa<VarDecl>(this)) {
       defaultSignatureType = TupleType::getEmpty(getASTContext());
     } else {
-      defaultSignatureType = getInterfaceType()->getCanonicalType();
+      defaultSignatureType = mapSignatureFunctionType(
+          getASTContext(), getInterfaceType(),
+          /*topLevelFunction=*/true,
+          /*isMethod=*/false,
+          /*isInitializer=*/false,
+          1)->getCanonicalType();
     }
 
     // We want to curry the default signature type with the 'self' type of the
