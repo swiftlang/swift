@@ -16,7 +16,7 @@ import SwiftShims
 // want.
 #if _runtime(_ObjC)
 
-internal protocol _AbstractStringStorage : _NSCopying {
+internal protocol _AbstractStringStorage : class, _NSCopying {
   var asString: String { get }
   var count: Int { get }
   var isASCII: Bool { get }
@@ -34,7 +34,7 @@ private func _isNSString(_ str:AnyObject) -> UInt8 {
 
 #else
 
-internal protocol _AbstractStringStorage {
+internal protocol _AbstractStringStorage: class {
   var asString: String { get }
   var count: Int { get }
   var isASCII: Bool { get }
