@@ -593,6 +593,49 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     return new (Context) ErrorExpr(UDRE->getSourceRange());
   }
 
+  // It is possible that we're trying to initialize a variable with itself.
+  if (Lookup.size() == 1) {
+    auto first = Lookup.front().getValueDecl();
+
+    if (first && isa<VarDecl>(first) && Name == first->getFullName()) {
+      auto var = cast<VarDecl>(first);
+      auto init = var->getParentInitializer();
+
+      bool foundSelfRef = false;
+
+      init->forEachChildExpr([&](Expr *subExpr) -> Expr * {
+        if (auto decl = dyn_cast_or_null<UnresolvedDeclRefExpr>(subExpr)) {
+          if (decl->getName() == Name) {
+            foundSelfRef = true;
+          }
+        }
+
+        return subExpr;
+      });
+
+      // It is also possible that we're calling a function with the same
+      // name as the variable - in this case, as long as we're not passing
+      // the variable itself as an argument to the function, it's ok.
+      if (auto CE = dyn_cast_or_null<CallExpr>(init)) {
+        if (auto TE = dyn_cast_or_null<TupleExpr>(CE->getArg())) {
+          for (auto elem : TE->getElements()) {
+            if (UDRE == elem) {
+              foundSelfRef = true;
+              break;
+            } else {
+              foundSelfRef = false;
+            }
+          }
+        }
+      }
+
+      if (foundSelfRef) {
+        diagnose(Loc, diag::var_init_self_referential);
+        return new (Context) ErrorExpr(UDRE->getSourceRange());
+      }
+    }
+  }
+
   // FIXME: Need to refactor the way we build an AST node from a lookup result!
 
   SmallVector<ValueDecl*, 4> ResultValues;
@@ -789,7 +832,61 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
         BaseExpr, SourceLoc(), Name, UDRE->getNameLoc(), UDRE->isImplicit(),
         Context.AllocateCopy(outerAlternatives));
   }
-  
+
+  // Let's handle a special case, where we might be trying to refer to
+  // a function which has the same name as the variable we're assigning the
+  // result to. An invalid reference would've already been handled earlier, but
+  // there are some cases where lookup won't produce the results we need, so
+  // they are handled here.
+
+  for (auto result : Lookup) {
+    auto decl = result.getValueDecl();
+
+    if (decl && isa<VarDecl>(decl)) {
+      auto VD = cast<VarDecl>(decl);
+      auto init = VD->getParentInitializer();
+
+      if (auto CE = dyn_cast_or_null<CallExpr>(init)) {
+        if (auto fnRef = dyn_cast_or_null<UnresolvedDeclRefExpr>(CE->getFn())) {
+          SmallVector<ValueDecl *, 4> results;
+          auto parentDC = DC->getParentForLookup();
+
+          if (!parentDC)
+            continue;
+
+          auto lookupResults =
+              lookupUnqualified(parentDC, fnRef->getName(), fnRef->getLoc());
+
+          for (auto result : lookupResults) {
+            auto resultVD = result.getValueDecl();
+
+            if (resultVD && isa<FuncDecl>(resultVD)) {
+              results.push_back(std::move(resultVD));
+            }
+          }
+
+          if (!results.empty()) {
+            return buildRefExpr(results, DC, fnRef->getNameLoc(),
+                                fnRef->isImplicit(),
+                                fnRef->getFunctionRefKind());
+          }
+
+          // Look into the Swift module as well. This is helpful when doing
+          // something like `var type = type(of: something)`.
+          SmallString<256> scratch;
+          fnRef->getName().getString(scratch);
+          Context.lookupInSwiftModule(scratch, results);
+
+          if (!results.empty()) {
+            return buildRefExpr(results, DC, fnRef->getNameLoc(),
+                                fnRef->isImplicit(),
+                                fnRef->getFunctionRefKind());
+          }
+        }
+      }
+    }
+  }
+
   // FIXME: If we reach this point, the program we're being handed is likely
   // very broken, but it's still conceivable that this may happen due to
   // invalid shadowed declarations.

@@ -115,8 +115,8 @@ assert(f0(1) == 1)
 
 
 var selfRef = { selfRef() } // expected-error {{variable used within its own initial value}}
-var nestedSelfRef = {
-  var recursive = { nestedSelfRef() } // expected-error {{variable used within its own initial value}}
+var nestedSelfRef = { // expected-note {{'nestedSelfRef' declared here}}
+  var recursive = { nestedSelfRef() } // expected-error {{ambiguous use of 'nestedSelfRef'}}
   recursive()
 }
 
