@@ -12,8 +12,99 @@
 
 import Accelerate
 
+extension vDSP {
+    
+    /// An enum that specifies which DCT variant to perform.
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public enum DCTTransformType: CaseIterable {
+        case II
+        case III
+        case IV
+        
+        public var dctType: vDSP_DCT_Type {
+            switch self {
+            case .II:
+                return .II
+            case .III:
+                return .III
+            case .IV:
+                return .IV
+            }
+        }
+    }
+    
+     /// A class that provides single-precision discrete cosine transform.
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public class DCT {
+        
+        fileprivate let dctSetup: vDSP_DFT_Setup
+        
+        /// Initializes a new discrete cosine transform instance.
+        ///
+        /// - Parameter previous: a previous vDSP_DCT instance to share data with.
+        /// - Parameter count: the number of real elements to be transformed.
+        /// - Parameter transformType: Specifies the transform type (type II for forward and type III for inverse).
+        public init?(previous: DCT? = nil,
+                     count: Int,
+                     transformType: DCTTransformType) {
+            
+            guard let setup = vDSP.VectorizableFloat.makeDCTSetup(previous: previous,
+                                                                  count: count,
+                                                                  transformType: transformType) else {
+                                                                    return nil
+            }
+            
+            dctSetup = setup
+        }
+        
+        /// Returns the single-precision real discrete cosine transform.
+        ///
+        /// - Parameter input: Real input vector.
+        /// - Returns: Real output vector.
+        @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+        @inline(__always)
+        public func transform<U>(_ vector: U) -> [Float]
+            where
+            U: _ContiguousCollection,
+            U.Element == Float {
+                
+                let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                    buffer, initializedCount in
+                    
+                    transform(vector,
+                              result: &buffer)
+                    
+                    initializedCount = vector.count
+                }
+                
+                return result
+        }
+        
+        /// Computes an out-of-place single-precision real discrete cosine transform.
+        ///
+        /// - Parameter input: Real input vector.
+        /// - Parameter output: Real output vector.
+        @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+        @inline(__always)
+        public func transform<U, V>(_ vector: U, result: inout V)
+            where
+            U: _ContiguousCollection,
+            V: _MutableContiguousCollection,
+            U.Element == Float, V.Element == Float {
+                
+                vDSP.VectorizableFloat.transform(dctSetup: dctSetup,
+                                                 source: vector,
+                                                 destination: &result)
+        }
+        
+        deinit {
+            vDSP_DFT_DestroySetup(dctSetup)
+        }
+    }
+}
+
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-protocol vDSP_FloatingPointDiscreteCosineTransformable: BinaryFloatingPoint {
+fileprivate protocol vDSP_FloatingPointDiscreteCosineTransformable: BinaryFloatingPoint {
     associatedtype DCTFunctions: vDSP_DCTFunctions where DCTFunctions.Scalar == Self
 }
 
@@ -23,7 +114,7 @@ extension Float: vDSP_FloatingPointDiscreteCosineTransformable {
 }
 
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-public protocol vDSP_DCTFunctions {
+fileprivate protocol vDSP_DCTFunctions {
     associatedtype Scalar
     
     @inline(__always)
@@ -45,7 +136,7 @@ extension vDSP.VectorizableFloat: vDSP_DCTFunctions {
     
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     @inline(__always)
-    public static func makeDCTSetup(previous: vDSP.DCT? = nil,
+    fileprivate static func makeDCTSetup(previous: vDSP.DCT? = nil,
                                     count: Int,
                                     transformType: vDSP.DCTTransformType) -> OpaquePointer? {
         
@@ -56,7 +147,7 @@ extension vDSP.VectorizableFloat: vDSP_DCTFunctions {
     
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     @inline(__always)
-    public static func transform<U, V>(dctSetup: OpaquePointer,
+    fileprivate static func transform<U, V>(dctSetup: OpaquePointer,
                                        source: U,
                                        destination: inout V)
         where
@@ -75,69 +166,4 @@ extension vDSP.VectorizableFloat: vDSP_DCTFunctions {
     }
 }
 
-extension vDSP {
-    
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public enum DCTTransformType: CaseIterable {
-        case II
-        case III
-        case IV
-        
-        public var dctType: vDSP_DCT_Type {
-            switch self {
-            case .II:
-                return .II
-            case .III:
-                return .III
-            case .IV:
-                return .IV
-            }
-        }
-    }
-    
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public class DCT {
-        
-        fileprivate let dctSetup: vDSP_DFT_Setup
-        
-        /// Initializes a new discrete cosine transform structure.
-        ///
-        /// - Parameter previous: a previous vDSP_DCT instance to share data with.
-        /// - Parameter count: the number of real elements to be transformed.
-        /// - Parameter transformType: Specifies the transform type (type II for forward and type III for inverse).
-        public init?(previous: DCT? = nil,
-              count: Int,
-              transformType: DCTTransformType) {
-            
-            guard let setup = vDSP.VectorizableFloat.makeDCTSetup(previous: previous,
-                                                                  count: count,
-                                                                  transformType: transformType) else {
-                                                                    return nil
-            }
-            
-            dctSetup = setup
-        }
-        
-        /// Computes an out-of-place single-precision real discrete cosine transform.
-        ///
-        /// - Parameter input: Real input vector.
-        /// - Parameter output: Real output vector.
-        @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-        @inline(__always)
-        public func transform<U, V>(input: U, output: inout V)
-            where
-            U: _ContiguousCollection,
-            V: _MutableContiguousCollection,
-            U.Element == Float, V.Element == Float {
-                
-                vDSP.VectorizableFloat.transform(dctSetup: dctSetup,
-                                                 source: input,
-                                                 destination: &output)
-        }
-        
-        deinit {
-            vDSP_DFT_DestroySetup(dctSetup)
-        }
-    }
-    
-}
+

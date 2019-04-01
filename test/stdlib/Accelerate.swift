@@ -92,8 +92,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
             var destination = [Float](repeating: 0,
                                       count: n)
             
-            dct?.transform(input: source,
-                           output: &destination)
+            dct?.transform(source,
+                           result: &destination)
+            
+            let returnedResult = dct!.transform(source)
             
             // Legacy API
             
@@ -109,6 +111,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                              &legacyDestination)
             
             expectTrue(destination.elementsEqual(legacyDestination))
+            expectTrue(destination.elementsEqual(returnedResult))
         }
     }
 }
