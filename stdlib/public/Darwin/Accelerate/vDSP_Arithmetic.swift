@@ -18,6 +18,33 @@ extension vDSP {
     
     // MARK: c[i] = a[i] + b                                vDSP_vsadd
     
+    /// Returns the elementwise sum of `vector` and `scalar`,
+    /// single-precision.
+    ///
+    /// - Parameter scalar: the `b` in `c[i] = a[i] + b`.
+    /// - Parameter vector: the `a` in `c[i] = a[i] + b`.
+    /// - Returns: The `c` in `c[i] = a[i] + b`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func add<U>(_ scalar: Float,
+                              _ vector: U) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                add(scalar,
+                    vector,
+                    result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the elementwise sum of `vector` and `scalar`,
     /// single-precision.
     ///
@@ -46,6 +73,33 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Returns the elementwise sum of `vector` and `scalar`,
+    /// double-precision.
+    ///
+    /// - Parameter scalar: the `b` in `c[i] = a[i] + b`.
+    /// - Parameter vector: the `a` in `c[i] = a[i] + b`.
+    /// - Returns: The `c` in `c[i] = a[i] + b`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func add<U>(_ scalar: Double,
+                              _ vector: U) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                add(scalar,
+                    vector,
+                    result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Populates `result` with the elementwise sum of `vector` and `scalar`,
@@ -80,6 +134,34 @@ extension vDSP {
     
     // MARK: c[i] = a[i] + b[i]                             vDSP_vadd
     
+    /// Returns the elementwise sum of `vectorA` and `vectorB`,
+    /// single-precision.
+    ///
+    /// - Parameter vectorA: the `a` in `c[i] = a[i] + b[i]`.
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] + b[i]`.
+    /// - Returns: The `c` in `c[i] = a[i] + b[i]`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func add<T, U>(_ vectorA: T,
+                                 _ vectorB: U) -> [Float]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Float, U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vectorA.count) {
+                buffer, initializedCount in
+                
+                add(vectorA,
+                    vectorB,
+                    result: &buffer)
+                
+                initializedCount = vectorA.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the elementwise sum of `vectorA` and `vectorB`,
     /// single-precision.
     ///
@@ -110,6 +192,34 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Returns the elementwise sum of `vectorA` and `vectorB`,
+    /// double-precision.
+    ///
+    /// - Parameter vectorA: the `a` in `c[i] = a[i] + b[i]`.
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] + b[i]`.
+    /// - Returns: The `c` in `c[i] = a[i] + b[i]`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func add<T, U>(_ vectorA: T,
+                                 _ vectorB: U) -> [Double]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Double, U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vectorA.count) {
+                buffer, initializedCount in
+                
+                add(vectorA,
+                    vectorB,
+                    result: &buffer)
+                
+                initializedCount = vectorA.count
+            }
+            
+            return result
     }
     
     /// Populates `result` with the elementwise sum of `vectorA` and `vectorB`,
@@ -146,7 +256,35 @@ extension vDSP {
     
     // MARK: c[i] = a[i] - b[i]                             vDSP_vsub
     
-    /// Populates `result` with the elementwise difference of `vector` and `fromVector`,
+    /// Returns the elementwise difference of `vectorA` and `vectorB`,
+    /// single-precision.
+    ///
+    /// - Parameter vectorA: the `a` in `c[i] = a[i] - b[i]`.
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] - b[i]`.
+    /// - Returns: The `c` in `c[i] = a[i] - b[i]`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func subtract<T, U>(_ vectorA: U,
+                                      _ vectorB: T) -> [Float]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Float, U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vectorA.count) {
+                buffer, initializedCount in
+                
+                subtract(vectorA,
+                         vectorB,
+                         result: &buffer)
+                
+                initializedCount = vectorA.count
+            }
+            
+            return result
+    }
+    
+    /// Populates `result` with the elementwise difference of `vectorA` and `vectorB`,
     /// single-precision.
     ///
     /// - Parameter vectorA: the `a` in `c[i] = a[i] - b[i]`.
@@ -178,7 +316,35 @@ extension vDSP {
             }
     }
     
-    /// Populates `result` with the elementwise difference of `vector` and `fromVector`,
+    /// Returns the elementwise difference of `vectorA` and `vectorB`,
+    /// double-precision.
+    ///
+    /// - Parameter vectorA: the `a` in `c[i] = a[i] - b[i]`.
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] - b[i]`.
+    /// - Returns: The `c` in `c[i] = a[i] - b[i]`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func subtract<T, U>(_ vectorA: U,
+                                      _ vectorB: T) -> [Double]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Double, U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vectorA.count) {
+                buffer, initializedCount in
+                
+                subtract(vectorA,
+                         vectorB,
+                         result: &buffer)
+                
+                initializedCount = vectorA.count
+            }
+            
+            return result
+    }
+    
+    /// Populates `result` with the elementwise difference of `vectorA` and `vectorB`,
     /// double-precision.
     ///
     /// - Parameter vectorA: the `a` in `c[i] = a[i] - b[i]`.
@@ -212,6 +378,33 @@ extension vDSP {
     
     // MARK: c[i] = a[i] * b                                vDSP_vsmul
     
+    /// Returns the elementwise product of `vector` and `scalar
+    /// single-precision.
+    ///
+    /// - Parameter vector: the `a` in `c[i] = a[i] * b`.
+    /// - Parameter scalar: the `b` in `c[i] = a[i] * b`.
+    /// - Returns: The `c` in `c[i] = a[i] * b`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func multiply<U>(_ scalar: Float,
+                                   _ vector: U) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                multiply(scalar,
+                         vector,
+                         result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the elementwise product of `vector` and `scalar
     /// single-precision.
     ///
@@ -240,6 +433,33 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Returns the elementwise product of `vector` and `scalar
+    /// double-precision.
+    ///
+    /// - Parameter vector: the `a` in `c[i] = a[i] * b`.
+    /// - Parameter scalar: the `b` in `c[i] = a[i] * b`.
+    /// - Returns: The `c` in `c[i] = a[i] * b`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func multiply<U>(_ scalar: Double,
+                                   _ vector: U) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                multiply(scalar,
+                         vector,
+                         result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Populates `result` with the elementwise product of `vector` and `scalar`,
@@ -274,6 +494,34 @@ extension vDSP {
     
     // MARK: c[i] = a[i] * b[i]                                 vDSP_vmul
     
+    /// Returns the elementwise product of `vectorA` and `vectorB`,
+    /// single-precision.
+    ///
+    /// - Parameter vectorA: the `a` in `c[i] = a[i] * b[i]`.
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] * b[i]`.
+    /// - Parameter result: The `c` in `c[i] = a[i] * b[i]`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func multiply<T, U>(_ vectorA: T,
+                                      _ vectorB: U) -> [Float]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Float, U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vectorA.count) {
+                buffer, initializedCount in
+                
+                multiply(vectorA,
+                         vectorB,
+                         result: &buffer)
+                
+                initializedCount = vectorA.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the elementwise product of `vectorA` and `vectorB`,
     /// single-precision.
     ///
@@ -303,6 +551,34 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Returns the elementwise product of `vectorA` and `vectorB`,
+    /// double-precision.
+    ///
+    /// - Parameter vectorA: the `a` in `c[i] = a[i] * b[i]`.
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] * b[i]`.
+    /// - Parameter result: The `c` in `c[i] = a[i] * b[i]`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func multiply<T, U>(_ vectorA: T,
+                                      _ vectorB: U) -> [Double]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Double, U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vectorA.count) {
+                buffer, initializedCount in
+                
+                multiply(vectorA,
+                         vectorB,
+                         result: &buffer)
+                
+                initializedCount = vectorA.count
+            }
+            
+            return result
     }
     
     /// Populates `result` with the elementwise product of `vectorA` and `vectorB`,
@@ -338,6 +614,33 @@ extension vDSP {
     
     // MARK: c[i] = a[i] / b                                vDSP_vsdiv
     
+    /// Returns the elementwise division of `vector` by `scalar`,
+    /// single-precision.
+    ///
+    /// - Parameter vector: the `a` in `c[i] = a[i] / b`.
+    /// - Parameter scalar: the `b` in `c[i] = a[i] / b`.
+    /// - Returns: The `c` in `c[i] = a[i] / b`
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func divide<U>(_ vector: U,
+                                 _ scalar: Float) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                divide(vector,
+                       scalar,
+                       result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the elementwise division of `vector` by `scalar`,
     /// single-precision.
     ///
@@ -366,6 +669,33 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Returns the elementwise division of `vector` by `scalar`,
+    /// double-precision.
+    ///
+    /// - Parameter vector: the `a` in `c[i] = a[i] / b`.
+    /// - Parameter scalar: the `b` in `c[i] = a[i] / b`.
+    /// - Returns: The `c` in `c[i] = a[i] / b`
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func divide<U>(_ vector: U,
+                                 _ scalar: Double) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                divide(vector,
+                       scalar,
+                       result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Populates `result` with the elementwise division of `vector` by `scalar`,
@@ -400,6 +730,33 @@ extension vDSP {
     
     // MARK: c[i] = a / b[i]                                vDSP_svdiv
     
+    /// Returns the elementwise division of `scalar` by `vector`,
+    /// single-precision.
+    ///
+    /// - Parameter scalar: the `a` in `c[i] = a / b[i]`.
+    /// - Parameter vector: the `b` in `c[i] = a / b[i]`.
+    /// - Returns: The `c` in `c[i] = a / b[i]`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func divide<U>(_ scalar: Float,
+                                 _ vector: U) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                divide(scalar,
+                       vector,
+                       result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the elementwise division of `scalar` by `vector`,
     /// single-precision.
     ///
@@ -428,6 +785,33 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Returns the elementwise division of `scalar` by `vector`,
+    /// double-precision.
+    ///
+    /// - Parameter scalar: the `a` in `c[i] = a / b[i]`.
+    /// - Parameter vector: the `b` in `c[i] = a / b[i]`.
+    /// - Returns: The `c` in `c[i] = a / b[i]`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func divide<U>(_ scalar: Double,
+                                 _ vector: U) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                divide(scalar,
+                       vector,
+                       result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Populates `result` with the elementwise division of `scalar` by `vector`,
@@ -462,6 +846,34 @@ extension vDSP {
     
     // MARK: c[i] = a[i] / b[i]                             vDSP_vdiv
     
+    /// Returns the elementwise division of `vectorA` by `vectorB`,
+    /// single-precision.
+    ///
+    /// - Parameter vectorA: the `a` in `c[i] = a[i] / b[i]`.
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] / b[i]`.
+    /// - Returns: The `c` in `c[i] = a[i] / b[i]`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func divide<T, U>(_ vectorA: T,
+                                    _ vectorB: U) -> [Float]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Float, U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vectorA.count) {
+                buffer, initializedCount in
+                
+                divide(vectorA,
+                       vectorB,
+                       result: &buffer)
+                
+                initializedCount = vectorA.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the elementwise division of `vectorA` by `vectorB`,
     /// single-precision.
     ///
@@ -491,6 +903,34 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Returns the elementwise division of `vectorA` by `vectorB`,
+    /// double-precision.
+    ///
+    /// - Parameter vectorA: the `a` in `c[i] = a[i] / b[i]`.
+    /// - Parameter vectorB: the `b` in `c[i] = a[i] / b[i]`.
+    /// - Returns: The `c` in `c[i] = a[i] / b[i]`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func divide<T, U>(_ vectorA: T,
+                                    _ vectorB: U) -> [Double]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Double, U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vectorA.count) {
+                buffer, initializedCount in
+                
+                divide(vectorA,
+                       vectorB,
+                       result: &buffer)
+                
+                initializedCount = vectorA.count
+            }
+            
+            return result
     }
     
     /// Populates `result` with the elementwise division of `vectorA` by `vectorB`,
@@ -610,7 +1050,35 @@ extension vDSP {
     
     // MARK: d[i] = (a[i] + b[i]) * c                       vDSP_vasm
     
-    /// Populates `result` with the elementwise product of the sum of the vectors in `addition` and `byScalar`,
+    /// Returns the elementwise product of the sum of the vectors in `addition` and `scalar`,
+    /// single-precision.
+    ///
+    /// - Parameter addition: the `a` and `b` in `d[i] = (a[i] + b[i]) * c`.
+    /// - Parameter scalar: the `c` in `d[i] = `(a[i] + b[i]) * c`.
+    /// - Returns: The `d` in `d[i] = `(a[i] + b[i]) * c`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func multiply<T, U>(addition: (a: T, b: U),
+                                      _ scalar: Float) -> [Float]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Float, U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: addition.a.count) {
+                buffer, initializedCount in
+                
+                multiply(addition: addition,
+                         scalar,
+                         result: &buffer)
+                
+                initializedCount = addition.a.count
+            }
+            
+            return result
+    }
+    
+    /// Populates `result` with the elementwise product of the sum of the vectors in `addition` and `scalar`,
     /// single-precision.
     ///
     /// - Parameter addition: the `a` and `b` in `d[i] = (a[i] + b[i]) * c`.
@@ -646,7 +1114,35 @@ extension vDSP {
             }
     }
     
-    /// Populates `result` with the elementwise product of the sum of the vectors in `addition` and `byScalar`,
+    /// Returns the elementwise product of the sum of the vectors in `addition` and `scalar`,
+    /// double-precision.
+    ///
+    /// - Parameter addition: the `a` and `b` in `d[i] = (a[i] + b[i]) * c`.
+    /// - Parameter scalar: the `c` in `d[i] = `(a[i] + b[i]) * c`.
+    /// - Returns: The `d` in `d[i] = `(a[i] + b[i]) * c`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func multiply<T, U>(addition: (a: T, b: U),
+                                      _ scalar: Double) -> [Double]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Double, U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: addition.a.count) {
+                buffer, initializedCount in
+                
+                multiply(addition: addition,
+                         scalar,
+                         result: &buffer)
+                
+                initializedCount = addition.a.count
+            }
+            
+            return result
+    }
+    
+    /// Populates `result` with the elementwise product of the sum of the vectors in `addition` and `scalar`,
     /// double-precision.
     ///
     /// - Parameter addition: the `a` and `b` in `d[i] = (a[i] + b[i]) * c`.
@@ -684,6 +1180,36 @@ extension vDSP {
     
     // MARK: d[i] = (a[i] + b[i]) * c[i]                    vDSP_vam
     
+    /// Returns the elementwise product of the sum of the vectors in `addition` and `vector`,
+    /// single-precision.
+    ///
+    /// - Parameter addition: the `a` and `b` in `d[i] = (a[i] + b[i]) * c[i]`.
+    /// - Parameter vector: the `c` in `d[i] = (a[i] + b[i]) * c[i]`.
+    /// - Returns: The `d` in `d[i] = (a[i] + b[i]) * c[i]`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func multiply<S, T, U>(addition: (a: S, b: T),
+                                         _ vector: U) -> [Float]
+        where
+        S: _ContiguousCollection,
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        S.Element == Float, T.Element == Float,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                multiply(addition: addition,
+                         vector,
+                         result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the elementwise product of the sum of the vectors in `addition` and `vector`,
     /// single-precision.
     ///
@@ -720,6 +1246,36 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Returns the elementwise product of the sum of the vectors in `addition` and `vector`,
+    /// double-precision.
+    ///
+    /// - Parameter addition: the `a` and `b` in `d[i] = (a[i] + b[i]) * c[i]`.
+    /// - Parameter vector: the `c` in `d[i] = (a[i] + b[i]) * c[i]`.
+    /// - Returns: The `d` in `d[i] = (a[i] + b[i]) * c[i]`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func multiply<S, T, U>(addition: (a: S, b: T),
+                                         _ vector: U) -> [Double]
+        where
+        S: _ContiguousCollection,
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        S.Element == Double, T.Element == Double,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                multiply(addition: addition,
+                         vector,
+                         result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Populates `result` with the elementwise product of the sum of the vectors in `addition` and `vector`,
@@ -762,6 +1318,34 @@ extension vDSP {
     
     // MARK: d[i] = (a[i] - b[i]) * c                       vDSP_vsbsm
     
+    /// Returns the elementwise product of the difference of the vectors in `subtraction` and `scalar`,
+    /// single-precision.
+    ///
+    /// - Parameter subtraction: the `a` and `b` in `d[i] = (a[i] - b[i]) * c`.
+    /// - Parameter scalar: the `c` in `d[i] = `(a[i] - b[i]) * c`.
+    /// - Returns: The `d` in `d[i] = `(a[i] - b[i]) * c`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func multiply<T, U>(subtraction: (a: T, b: U),
+                                      _ scalar: Float) -> [Float]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Float, U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: subtraction.a.count) {
+                buffer, initializedCount in
+                
+                multiply(subtraction: subtraction,
+                         scalar,
+                         result: &buffer)
+                
+                initializedCount = subtraction.a.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the elementwise product of the difference of the vectors in `subtraction` and `scalar`,
     /// single-precision.
     ///
@@ -796,6 +1380,34 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Returns the elementwise product of the difference of the vectors in `subtraction` and `scalar`,
+    /// double-precision.
+    ///
+    /// - Parameter subtraction: the `a` and `b` in `d[i] = (a[i] - b[i]) * c`.
+    /// - Parameter scalar: the `c` in `d[i] = `(a[i] - b[i]) * c`.
+    /// - Returns: The `d` in `d[i] = `(a[i] - b[i]) * c`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func multiply<T, U>(subtraction: (a: T, b: U),
+                                      _ scalar: Double) -> [Double]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Double, U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: subtraction.a.count) {
+                buffer, initializedCount in
+                
+                multiply(subtraction: subtraction,
+                         scalar,
+                         result: &buffer)
+                
+                initializedCount = subtraction.a.count
+            }
+            
+            return result
     }
     
     /// Populates `result` with the elementwise product of the difference of the vectors in `subtraction` and `scalar`,
@@ -836,6 +1448,36 @@ extension vDSP {
     
     // MARK: d[i] = (a[i] - b[i]) * c[i]                    vDSP_vsbm
     
+    /// Returns the elementwise product of the difference of the vectors in `subtraction` and `vector`,
+    /// single-precision.
+    ///
+    /// - Parameter subtraction: the `a` and `b` in `d[i] = (a[i] - b[i]) * c[i]`.
+    /// - Parameter vector: the `c` in `d[i] = `(a[i] - b[i]) * c[i]`.
+    /// - Returns: The `d` in `d[i] = `(a[i] - b[i]) * c[i]`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func multiply<S, T, U>(subtraction: (a: S, b: T),
+                                         _ vector: U) -> [Float]
+        where
+        S: _ContiguousCollection,
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        S.Element == Float, T.Element == Float,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                multiply(subtraction: subtraction,
+                         vector,
+                         result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the elementwise product of the difference of the vectors in `subtraction` and `vector`,
     /// single-precision.
     ///
@@ -872,6 +1514,36 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Returns the elementwise product of the difference of the vectors in `subtraction` and `vector`,
+    /// double-precision.
+    ///
+    /// - Parameter subtraction: the `a` and `b` in `d[i] = (a[i] - b[i]) * c[i]`.
+    /// - Parameter vector: the `c` in `d[i] = `(a[i] - b[i]) * c[i]`.
+    /// - Returns: The `d` in `d[i] = `(a[i] - b[i]) * c[i]`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func multiply<S, T, U>(subtraction: (a: S, b: T),
+                                         _ vector: U) -> [Double]
+        where
+        S: _ContiguousCollection,
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        S.Element == Double, T.Element == Double,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                multiply(subtraction: subtraction,
+                         vector,
+                         result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Populates `result` with the elementwise product of the difference of the vectors in `subtraction` and `vector`,
@@ -914,6 +1586,35 @@ extension vDSP {
     
     // MARK: d[i] = a[i]*b[i] + c;                       vDSP_vmsa
     
+    /// Returns the elementwise sum of `scalar`
+    /// and the product of the two vectors in `multiplication`,
+    /// single-precision.
+    ///
+    /// - Parameter multiplication: the `a` and `b` in `d[i] = a[i]*b[i] + c`.
+    /// - Parameter scalar: the `c` in `d[i] = a[i]*b[i] + c`.
+    /// - Returns: the `d` in `d[i] = a[i]*b[i] + c`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func add<T, U>(multiplication: (a: T, b: U),
+                                 _ scalar: Float) -> [Float]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Float, U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: multiplication.a.count) {
+                buffer, initializedCount in
+                
+                add(multiplication: multiplication,
+                    scalar,
+                    result: &buffer)
+                
+                initializedCount = multiplication.a.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the elementwise sum of `scalar`
     /// and the product of the two vectors in `multiplication`,
     /// single-precision.
@@ -949,6 +1650,35 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Returns the elementwise sum of `scalar`
+    /// and the product of the two vectors in `multiplication`,
+    /// double-precision.
+    ///
+    /// - Parameter multiplication: the `a` and `b` in `d[i] = a[i]*b[i] + c`.
+    /// - Parameter scalar: the `c` in `d[i] = a[i]*b[i] + c`.
+    /// - Returns: the `d` in `d[i] = a[i]*b[i] + c`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func add<T, U>(multiplication: (a: T, b: U),
+                                 _ scalar: Double) -> [Double]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Double, U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: multiplication.a.count) {
+                buffer, initializedCount in
+                
+                add(multiplication: multiplication,
+                    scalar,
+                    result: &buffer)
+                
+                initializedCount = multiplication.a.count
+            }
+            
+            return result
     }
     
     /// Populates `result` with the elementwise sum of `scalar`
@@ -990,7 +1720,36 @@ extension vDSP {
     
     // MARK: d[i] = (a[i] * b) + c[i]                       vDSP_vsma
     
-    /// Populates `result` with the elementwise sum of `toVector`
+    /// Returns the elementwise sum of `vector`
+    /// and the product of the vector and scalar in `multiplication`,
+    /// single-precision.
+    ///
+    /// - Parameter multiplication: the `a` and `b` in `d[i] = (a[i] * b) + c[i]`.
+    /// - Parameter vector: the `c` in `d[i] = (a[i] * b) + c[i]`.
+    /// - Returns: the `d` in `d[i] = (a[i] * b) + c[i]`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func add<T, U>(multiplication: (a: T, b: Float),
+                                 _ vector: U) -> [Float]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Float, U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                add(multiplication: multiplication,
+                    vector,
+                    result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
+    /// Populates `result` with the elementwise sum of `vector`
     /// and the product of the vector and scalar in `multiplication`,
     /// single-precision.
     ///
@@ -1026,7 +1785,36 @@ extension vDSP {
             }
     }
     
-    /// Populates `result` with the elementwise sum of `toVector`
+    /// Returns the elementwise sum of `vector`
+    /// and the product of the vector and scalar in `multiplication`,
+    /// double-precision.
+    ///
+    /// - Parameter multiplication: the `a` and `b` in `d[i] = (a[i] * b) + c[i]`.
+    /// - Parameter vector: the `c` in `d[i] = (a[i] * b) + c[i]`.
+    /// - Returns: the `d` in `d[i] = (a[i] * b) + c[i]`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func add<T, U>(multiplication: (a: T, b: Double),
+                                 _ vector: U) -> [Double]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Double, U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                add(multiplication: multiplication,
+                    vector,
+                    result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
+    /// Populates `result` with the elementwise sum of `vector`
     /// and the product of the vector and scalar in `multiplication`,
     /// double-precision.
     ///
@@ -1063,6 +1851,37 @@ extension vDSP {
     }
     
     // MARK: d[i] = (a[i] * b[i]) + c[i]                    vDSP_vma
+    
+    /// Returns the elementwise sum of `vector`
+    /// and the product of the two vectors in `multiplication`,
+    /// single-precision.
+    ///
+    /// - Parameter multiplication: the `a` and `b` in `d[i] = (a[i] * b[i]) + c[i]`.
+    /// - Parameter vector: the `c` in `d[i] = (a[i] * b[i]) + c[i]`.
+    /// - Returns: the `d` in `d[i] = (a[i] * b[i]) + c[i]`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func add<S, T, U>(multiplication: (a: S, b: T),
+                                    _ vector: U) -> [Float]
+        where
+        S: _ContiguousCollection,
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        S.Element == Float, T.Element == Float,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                add(multiplication: multiplication,
+                    vector,
+                    result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
     
     /// Populates `result` with the elementwise sum of `vector`
     /// and the product of the two vectors in `multiplication`,
@@ -1101,6 +1920,37 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Returns the elementwise sum of `vector`
+    /// and the product of the two vectors in `multiplication`,
+    /// double-precision.
+    ///
+    /// - Parameter multiplication: the `a` and `b` in `d[i] = (a[i] * b[i]) + c[i]`.
+    /// - Parameter vector: the `c` in `d[i] = (a[i] * b[i]) + c[i]`.
+    /// - Returns: the `d` in `d[i] = (a[i] * b[i]) + c[i]`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func add<S, T, U>(multiplication: (a: S, b: T),
+                                    _ vector: U) -> [Double]
+        where
+        S: _ContiguousCollection,
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        S.Element == Double, T.Element == Double,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                add(multiplication: multiplication,
+                    vector,
+                    result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Populates `result` with the elementwise sum of `vector`
@@ -1144,6 +1994,37 @@ extension vDSP {
     
     // MARK: d[i] = (a[i] * b[i]) - c[i]             vDSP_vmsb
     
+    /// Returns the elementwise difference of `vector`
+    /// and the product of the two vectors in `multiplication`,
+    /// single-precision.
+    ///
+    /// - Parameter multiplication: the `a` and `b` in `d[i] = (a[i] * b[i]) - c[i]`.
+    /// - Parameter vector: the `c` in `d[i] = (a[i] * b[i]) - c[i]`.
+    /// - Returns: the `d` in `d[i] = (a[i] * b[i]) - c[i]`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func subtract<S, T, U>(multiplication: (a: T, b: U),
+                                         _ vector: S) -> [Float]
+        where
+        S: _ContiguousCollection,
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        S.Element == Float, T.Element == Float,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                subtract(multiplication: multiplication,
+                         vector,
+                         result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the elementwise difference of `vector`
     /// and the product of the two vectors in `multiplication`,
     /// single-precision.
@@ -1181,6 +2062,37 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Returns the elementwise difference of `vector`
+    /// and the product of the two vectors in `multiplication`,
+    /// double-precision.
+    ///
+    /// - Parameter multiplication: the `a` and `b` in `d[i] = (a[i] * b[i]) - c[i]`.
+    /// - Parameter vector: the `c` in `d[i] = (a[i] * b[i]) - c[i]`.
+    /// - Returns: the `d` in `d[i] = (a[i] * b[i]) - c[i]`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func subtract<S, T, U>(multiplication: (a: T, b: U),
+                                         _ vector: S) -> [Double]
+        where
+        S: _ContiguousCollection,
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        S.Element == Double, T.Element == Double,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                subtract(multiplication: multiplication,
+                         vector,
+                         result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
     }
     
     /// Populates `result` with the elementwise difference of `vector`
@@ -1224,6 +2136,34 @@ extension vDSP {
     
     // MARK: e[i] = (a[i] * b) + (c[i] * d)          vDSP_vsmsma
     
+    /// Returns the elementwise sum of two elementwise
+    /// vector-scalar products, single-precision.
+    ///
+    /// - Parameter multiplicationAB: the `a` and `b` in `e[i] = (a[i] * b) + (c[i] * d)`.
+    /// - Parameter multiplicationCD: the `c` and `d` in `e[i] = (a[i] * b) + (c[i] * d)`.
+    /// - Returns: the `e` in `e[i] = (a[i] * b) + (c[i] * d)`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func add<T, U>(multiplication multiplicationAB: (a: T, b: Float),
+                                 multiplication multiplicationCD: (c: U, d: Float)) -> [Float]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Float, U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: multiplicationAB.a.count) {
+                buffer, initializedCount in
+                
+                add(multiplication: multiplicationAB,
+                    multiplication: multiplicationCD,
+                    result: &buffer)
+                
+                initializedCount = multiplicationAB.a.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the elementwise sum of two elementwise
     /// vector-scalar products, single-precision.
     ///
@@ -1261,6 +2201,34 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Returns the elementwise sum of two elementwise
+    /// vector-scalar products, double-precision.
+    ///
+    /// - Parameter multiplicationAB: the `a` and `b` in `e[i] = (a[i] * b) + (c[i] * d)`.
+    /// - Parameter multiplicationCD: the `c` and `d` in `e[i] = (a[i] * b) + (c[i] * d)`.
+    /// - Returns: the `e` in `e[i] = (a[i] * b) + (c[i] * d)`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func add<T, U>(multiplication multiplicationAB: (a: T, b: Double),
+                                 multiplication multiplicationCD: (c: U, d: Double)) -> [Double]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Double, U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: multiplicationAB.a.count) {
+                buffer, initializedCount in
+                
+                add(multiplication: multiplicationAB,
+                    multiplication: multiplicationCD,
+                    result: &buffer)
+                
+                initializedCount = multiplicationAB.a.count
+            }
+            
+            return result
     }
     
     /// Populates `result` with the elementwise sum of two elementwise
@@ -1303,6 +2271,38 @@ extension vDSP {
     }
     
     // MARK: e[i] = (a[i] * b[i]) + (c[i] * d[i])          vDSP_vmma
+    
+    /// Returns the elementwise sum of two elementwise
+    /// vector-vector products, single-precision.
+    ///
+    /// - Parameter multiplicationAB: the `a` and `b` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
+    /// - Parameter multiplicationCD: the `c` and `d` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
+    /// - Returns: the `e` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func add<R, S, T, U>(multiplication multiplicationAB: (a: R, b: S),
+                                       multiplication multiplicationCD: (c: T, d: U)) -> [Float]
+        where
+        R: _ContiguousCollection,
+        S: _ContiguousCollection,
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        R.Element == Float,
+        S.Element == Float, T.Element == Float,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: multiplicationAB.a.count) {
+                buffer, initializedCount in
+                
+                add(multiplication: multiplicationAB,
+                    multiplication: multiplicationCD,
+                    result: &buffer)
+                
+                initializedCount = multiplicationAB.a.count
+            }
+            
+            return result
+    }
     
     /// Populates `result` with the elementwise sum of two elementwise
     /// vector-vector products, single-precision.
@@ -1347,6 +2347,38 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Returns the elementwise sum of two elementwise
+    /// vector-vector products, single-precision.
+    ///
+    /// - Parameter multiplicationAB: the `a` and `b` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
+    /// - Parameter multiplicationCD: the `c` and `d` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
+    /// - Returns: the `e` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func add<R, S, T, U>(multiplication multiplicationAB: (a: R, b: S),
+                                       multiplication multiplicationCD: (c: T, d: U)) -> [Double]
+        where
+        R: _ContiguousCollection,
+        S: _ContiguousCollection,
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        R.Element == Double,
+        S.Element == Double, T.Element == Double,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: multiplicationAB.a.count) {
+                buffer, initializedCount in
+                
+                add(multiplication: multiplicationAB,
+                    multiplication: multiplicationCD,
+                    result: &buffer)
+                
+                initializedCount = multiplicationAB.a.count
+            }
+            
+            return result
     }
     
     /// Populates `result` with the elementwise sum of two elementwise
@@ -1396,6 +2428,36 @@ extension vDSP {
     
     // MARK: e[i] = (a[i] + b[i]) * (c[i] + d[i])    vDSP_vaam
     
+    /// Returns the elementwise product of two elementwise
+    /// vector-vector sums, single-precision.
+    ///
+    /// - Parameter additionAB: the `a` and `b` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
+    /// - Parameter additionCD: the `c` and `d` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
+    /// - Returns: the `e` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func multiply<S, T, U>(addition additionAB: (a: S, b: T),
+                                         addition additionCD: (c: U, d: U)) -> [Float]
+        where
+        S: _ContiguousCollection,
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        S.Element == Float, T.Element == Float,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: additionAB.a.count) {
+                buffer, initializedCount in
+                
+                multiply(addition: additionAB,
+                         addition: additionCD,
+                         result: &buffer)
+                
+                initializedCount = additionAB.a.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the elementwise product of two elementwise
     /// vector-vector sums, single-precision.
     ///
@@ -1437,6 +2499,36 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Returns the elementwise product of two elementwise
+    /// vector-vector sums, double-precision.
+    ///
+    /// - Parameter additionAB: the `a` and `b` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
+    /// - Parameter additionCD: the `c` and `d` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
+    /// - Returns: the `e` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func multiply<S, T, U>(addition additionAB: (a: S, b: T),
+                                         addition additionCD: (c: U, d: U)) -> [Double]
+        where
+        S: _ContiguousCollection,
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        S.Element == Double, T.Element == Double,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: additionAB.a.count) {
+                buffer, initializedCount in
+                
+                multiply(addition: additionAB,
+                         addition: additionCD,
+                         result: &buffer)
+                
+                initializedCount = additionAB.a.count
+            }
+            
+            return result
     }
     
     /// Populates `result` with the elementwise product of two elementwise
@@ -1484,6 +2576,38 @@ extension vDSP {
     
     // MARK: e[i] = (a[i] * b[i]) - (c[i] * d[i])    vDSP_vmmsb
     
+    /// Returns the elementwise difference of two elementwise
+    /// vector-vector products, single-precision.
+    ///
+    /// - Parameter multiplicationAB: the `a` and `b` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
+    /// - Parameter multiplicationCD: the `c` and `d` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
+    /// - Returns: the `e` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func subtract<R, S, T, U>(multiplication multiplicationAB: (a: T, b: U),
+                                            multiplication multiplicationCD: (c: R, d: S)) -> [Float]
+        where
+        R: _ContiguousCollection,
+        S: _ContiguousCollection,
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        R.Element == Float,
+        S.Element == Float, T.Element == Float,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: multiplicationAB.a.count) {
+                buffer, initializedCount in
+                
+                subtract(multiplication: multiplicationAB,
+                         multiplication: multiplicationCD,
+                         result: &buffer)
+                
+                initializedCount = multiplicationAB.a.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the elementwise difference of two elementwise
     /// vector-vector products, single-precision.
     ///
@@ -1527,6 +2651,38 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Returns the elementwise difference of two elementwise
+    /// vector-vector products, double-precision.
+    ///
+    /// - Parameter multiplicationAB: the `a` and `b` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
+    /// - Parameter multiplicationCD: the `c` and `d` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
+    /// - Returns: the `e` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func subtract<R, S, T, U>(multiplication multiplicationAB: (a: T, b: U),
+                                            multiplication multiplicationCD: (c: R, d: S)) -> [Double]
+        where
+        R: _ContiguousCollection,
+        S: _ContiguousCollection,
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        R.Element == Double,
+        S.Element == Double, T.Element == Double,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: multiplicationAB.a.count) {
+                buffer, initializedCount in
+                
+                subtract(multiplication: multiplicationAB,
+                         multiplication: multiplicationCD,
+                         result: &buffer)
+                
+                initializedCount = multiplicationAB.a.count
+            }
+            
+            return result
     }
     
     /// Populates `result` with the elementwise difference of two elementwise
@@ -1576,6 +2732,38 @@ extension vDSP {
     
     // MARK: e[i] = (a[i] - b[i]) * (c[i] - d[i])    vDSP_vsbsbm
     
+    /// Returns the elementwise product of two elementwise
+    /// vector-vector differences, single-precision.
+    ///
+    /// - Parameter subtractionAB: the `a` and `b` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
+    /// - Parameter subtractionCD: the `c` and `d` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
+    /// - Returns: the `e` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func multiply<R, S, T, U>(subtraction subtractionAB: (a: R, b: S),
+                                            subtraction subtractionCD: (c: T, d: U)) -> [Float]
+        where
+        R: _ContiguousCollection,
+        S: _ContiguousCollection,
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        R.Element == Float,
+        S.Element == Float, T.Element == Float,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: subtractionAB.a.count) {
+                buffer, initializedCount in
+                
+                multiply(subtraction: subtractionAB,
+                         subtraction: subtractionCD,
+                         result: &buffer)
+                
+                initializedCount = subtractionAB.a.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the elementwise product of two elementwise
     /// vector-vector differences, single-precision.
     ///
@@ -1619,6 +2807,38 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Returns the elementwise product of two elementwise
+    /// vector-vector differences, double-precision.
+    ///
+    /// - Parameter subtractionAB: the `a` and `b` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
+    /// - Parameter subtractionCD: the `c` and `d` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
+    /// - Returns: the `e` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func multiply<R, S, T, U>(subtraction subtractionAB: (a: R, b: S),
+                                            subtraction subtractionCD: (c: T, d: U)) -> [Double]
+        where
+        R: _ContiguousCollection,
+        S: _ContiguousCollection,
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        R.Element == Double,
+        S.Element == Double, T.Element == Double,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: subtractionAB.a.count) {
+                buffer, initializedCount in
+                
+                multiply(subtraction: subtractionAB,
+                         subtraction: subtractionCD,
+                         result: &buffer)
+                
+                initializedCount = subtractionAB.a.count
+            }
+            
+            return result
     }
     
     /// Populates `result` with the elementwise product of two elementwise
@@ -1668,6 +2888,38 @@ extension vDSP {
     
     // MARK: e[i] = (a[i] + b[i]) * (c[i] - d[i])    vDSP_vasbm
     
+    /// Returns the elementwise product of an elementwise
+    /// vector-vector sum and an elementwise vector-vector sum, single-precision.
+    ///
+    /// - Parameter addition: the `a` and `b` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
+    /// - Parameter subtraction: the `c` and `d` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
+    /// - Returns: the `e` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func multiply<R, S, T, U>(addition: (a: R, b: S),
+                                            subtraction: (c: T, d: U)) -> [Float]
+        where
+        R: _ContiguousCollection,
+        S: _ContiguousCollection,
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        R.Element == Float,
+        S.Element == Float, T.Element == Float,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: addition.a.count) {
+                buffer, initializedCount in
+                
+                multiply(addition: addition,
+                         subtraction: subtraction,
+                         result: &buffer)
+                
+                initializedCount = addition.a.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the elementwise product of an elementwise
     /// vector-vector sum and an elementwise vector-vector sum, single-precision.
     ///
@@ -1711,6 +2963,38 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Returns the elementwise product of an elementwise
+    /// vector-vector sum and an elementwise vector-vector sum, double-precision.
+    ///
+    /// - Parameter addition: the `a` and `b` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
+    /// - Parameter subtraction: the `c` and `d` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
+    /// - Returns: the `e` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func multiply<R, S, T, U>(addition: (a: R, b: S),
+                                            subtraction: (c: T, d: U)) -> [Double]
+        where
+        R: _ContiguousCollection,
+        S: _ContiguousCollection,
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        R.Element == Double,
+        S.Element == Double, T.Element == Double,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: addition.a.count) {
+                buffer, initializedCount in
+                
+                multiply(addition: addition,
+                         subtraction: subtraction,
+                         result: &buffer)
+                
+                initializedCount = addition.a.count
+            }
+            
+            return result
     }
     
     /// Populates `result` with the elementwise product of an elementwise
@@ -1760,6 +3044,33 @@ extension vDSP {
     
     // MARK: d[n] = a[n]*b + c              vDSP_vsmsa
     
+    /// Returns the elementwise sum of an elementwise
+    /// vector-scalar product and aa scalar value, single-precision.
+    ///
+    /// - Parameter multiplication: the `a` and `b` in `d[n] = a[n]*b + c`.
+    /// - Parameter scalar: the `c` in `d[n] = a[n]*b + c`.
+    /// - Returns: the `e` in `d[n] = a[n]*b + c`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func add<U>(multiplication: (a: U, b: Float),
+                              _ scalar: Float) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: multiplication.a.count) {
+                buffer, initializedCount in
+                
+                add(multiplication: multiplication,
+                    scalar,
+                    result: &buffer)
+                
+                initializedCount =  multiplication.a.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the elementwise sum of an elementwise
     /// vector-scalar product and aa scalar value, single-precision.
     ///
@@ -1791,6 +3102,33 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Returns the elementwise sum of an elementwise
+    /// vector-scalar product and aa scalar value, double-precision.
+    ///
+    /// - Parameter multiplication: the `a` and `b` in `d[n] = a[n]*b + c`.
+    /// - Parameter scalar: the `c` in `d[n] = a[n]*b + c`.
+    /// - Returns: the `e` in `d[n] = a[n]*b + c`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func add<U>(multiplication: (a: U, b: Double),
+                              _ scalar: Double) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: multiplication.a.count) {
+                buffer, initializedCount in
+                
+                add(multiplication: multiplication,
+                    scalar,
+                    result: &buffer)
+                
+                initializedCount =  multiplication.a.count
+            }
+            
+            return result
     }
     
     /// Populates `result` with the elementwise sum of an elementwise
@@ -1827,6 +3165,36 @@ extension vDSP {
     }
     
     // MARK: D[n] = A[n]*B - C[n];       vDSP_vsmsb
+    
+    /// Returns the elementwise difference of `vector`
+    /// and the product of the vector and scalar in `multiplication`,
+    /// single-precision.
+    ///
+    /// - Parameter multiplication: the `a` and `b` in `D[n] = A[n]*B - C[n]`.
+    /// - Parameter vector: the `c` in `D[n] = A[n]*B - C[n]`.
+    /// - Returns: the `d` in `D[n] = A[n]*B - C[n]`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func subtract<T, U>(multiplication: (a: U, b: Float),
+                                      _ vector: T) -> [Float]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Float,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                subtract(multiplication: multiplication,
+                         vector,
+                         result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
     
     /// Populates `result` with the elementwise difference of `vector`
     /// and the product of the vector and scalar in `multiplication`,
@@ -1866,6 +3234,36 @@ extension vDSP {
             }
     }
     
+    /// Returns the elementwise difference of `vector`
+    /// and the product of the vector and scalar in `multiplication`,
+    /// double-precision.
+    ///
+    /// - Parameter multiplication: the `a` and `b` in `D[n] = A[n]*B - C[n]`.
+    /// - Parameter vector: the `c` in `D[n] = A[n]*B - C[n]`.
+    /// - Returns: the `d` in `D[n] = A[n]*B - C[n]`.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func subtract<T, U>(multiplication: (a: U, b: Double),
+                                      _ vector: T) -> [Double]
+        where
+        T: _ContiguousCollection,
+        U: _ContiguousCollection,
+        T.Element == Double,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                subtract(multiplication: multiplication,
+                         vector,
+                         result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Populates `result` with the elementwise difference of `vector`
     /// and the product of the vector and scalar in `multiplication`,
     /// double-precision.
@@ -1875,7 +3273,7 @@ extension vDSP {
     /// - Parameter result: the `d` in `D[n] = A[n]*B - C[n]`.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func subtract<T, U, V>(multiplication multiplication: (a: U, b: Double),
+    public static func subtract<T, U, V>(multiplication: (a: U, b: Double),
                                          _ vector: T,
                                          result: inout V)
         where
