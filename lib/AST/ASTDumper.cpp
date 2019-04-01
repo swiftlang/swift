@@ -2135,16 +2135,32 @@ public:
     printRec(E->getBase());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-  void visitTupleShuffleExpr(TupleShuffleExpr *E) {
-    printCommon(E, "tuple_shuffle_expr");
+  void visitDestructureTupleExpr(DestructureTupleExpr *E) {
+    printCommon(E, "destructure_tuple_expr");
+    OS << " destructured=";
+    PrintWithColorRAII(OS, ParenthesisColor) << '(';
+    Indent += 2;
+    for (auto *elt : E->getDestructuredElements()) {
+      OS << "\n";
+      printRec(elt);
+    }
+    Indent -= 2;
+    PrintWithColorRAII(OS, ParenthesisColor) << ")\n";
+    printRec(E->getSubExpr());
+    OS << "\n";
+    printRec(E->getResultExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+  void visitArgumentShuffleExpr(ArgumentShuffleExpr *E) {
+    printCommon(E, "argument_shuffle_expr");
     switch (E->getTypeImpact()) {
-    case TupleShuffleExpr::ScalarToTuple:
+    case ArgumentShuffleExpr::ScalarToTuple:
       OS << " scalar_to_tuple";
       break;
-    case TupleShuffleExpr::TupleToTuple:
+    case ArgumentShuffleExpr::TupleToTuple:
       OS << " tuple_to_tuple";
       break;
-    case TupleShuffleExpr::TupleToScalar:
+    case ArgumentShuffleExpr::TupleToScalar:
       OS << " tuple_to_scalar";
       break;
     }

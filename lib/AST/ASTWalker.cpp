@@ -37,7 +37,7 @@
 //      Note that semantic components will generally preserve the
 //      syntactic order of their children because doing something else
 //      could illegally change order of evaluation.  This is why, for
-//      example, shuffling a TupleExpr creates a TupleShuffleExpr
+//      example, shuffling a TupleExpr creates a DestructureTupleExpr
 //      instead of just making a new TupleExpr with the elements in
 //      different order.
 //
@@ -639,7 +639,23 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
   
-  Expr *visitTupleShuffleExpr(TupleShuffleExpr *E) {
+  Expr *visitDestructureTupleExpr(DestructureTupleExpr *E) {
+    if (auto *src = doIt(E->getSubExpr())) {
+      E->setSubExpr(src);
+    } else {
+      return nullptr;
+    }
+
+    if (auto *dst = doIt(E->getResultExpr())) {
+      E->setResultExpr(dst);
+    } else {
+      return nullptr;
+    }
+
+    return E;
+  }
+
+  Expr *visitArgumentShuffleExpr(ArgumentShuffleExpr *E) {
     if (Expr *E2 = doIt(E->getSubExpr())) {
       E->setSubExpr(E2);
     } else {

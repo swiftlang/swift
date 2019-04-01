@@ -819,13 +819,6 @@ NOTE(previous_precedence_group_decl,none,
      "previous precedence group declaration here", ())
 
 //------------------------------------------------------------------------------
-// MARK: Type Check Coercions
-//------------------------------------------------------------------------------
-
-ERROR(tuple_conversion_not_expressible,none,
-      "cannot express tuple conversion %0 to %1", (Type, Type))
-
-//------------------------------------------------------------------------------
 // MARK: Expression Type Checking Errors
 //------------------------------------------------------------------------------
 ERROR(types_not_convertible,none,
