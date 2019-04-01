@@ -529,6 +529,21 @@ void PropertyDelegateTypeInfoRequest::noteCycleStep(
   std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
 }
 
+bool AttachedPropertyDelegateRequest::isCached() const {
+  auto var = std::get<0>(getStorage());
+  return !var->getAttrs().isEmpty();
+}
+
+void AttachedPropertyDelegateRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference);
+}
+
+void AttachedPropertyDelegateRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
+}
+
 void swift::simple_display(
     llvm::raw_ostream &out, const PropertyDelegateTypeInfo &propertyDelegate) {
   out << "{ ";

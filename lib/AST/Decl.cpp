@@ -5239,6 +5239,14 @@ StaticSpellingKind AbstractStorageDecl::getCorrectStaticSpelling() const {
   return getCorrectStaticSpellingForDecl(this);
 }
 
+CustomAttr *VarDecl::getAttachedPropertyDelegate() const {
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<VarDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           AttachedPropertyDelegateRequest{mutableThis},
+                           nullptr);
+}
+
 Identifier VarDecl::getObjCPropertyName() const {
   if (auto attr = getAttrs().getAttribute<ObjCAttr>()) {
     if (auto name = attr->getName())

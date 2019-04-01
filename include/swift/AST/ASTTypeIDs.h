@@ -20,6 +20,7 @@
 #include "swift/Basic/TypeID.h"
 namespace swift {
 
+class CustomAttr;
 class NominalTypeDecl;
 struct PropertyDelegateTypeInfo;
 class VarDecl;

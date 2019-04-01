@@ -5037,6 +5037,10 @@ public:
     Bits.VarDecl.IsREPLVar = IsREPLVar;
   }
 
+  /// Retrieve the custom attribute that attaches a property delegate to this
+  /// property.
+  CustomAttr *getAttachedPropertyDelegate() const;
+
   /// Return the Objective-C runtime name for this property.
   Identifier getObjCPropertyName() const;
 
