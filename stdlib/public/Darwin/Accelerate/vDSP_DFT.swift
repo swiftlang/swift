@@ -56,7 +56,54 @@ extension vDSP {
                                                             return nil
             }
             
+            self.transformType = transformType
+            
             dftSetup = setup
+        }
+        
+        /// The transform type of this DFT.
+        private let transformType: DFTTransformType
+        
+        /// Returns a single-precision real discrete Fourier transform.
+        ///
+        /// - Parameter inputReal: Input vector - real part.
+        /// - Parameter inputImaginary: Input vector - imaginary part.
+        /// - Returns: A tuple of two arrays representing the real and imaginary parts of the output.
+        ///
+        /// When the `transformType` is `complexComplex`, each input array (Ir, Ii)
+        /// must have `count` elements, and the returned arrays have `count` elements.
+        ///
+        /// When the `transformType` is `complexReal`, each input array (Ir, Ii)
+        /// must have `count` elements, and the returned arrays have `count / 2` elements.
+        public func transform<U>(inputReal: U,
+                                 inputImaginary: U) -> (real:[T], imaginary: [T])
+            where
+            U: _ContiguousCollection,
+            U.Element == T {
+                
+                let n = transformType == .complexReal ? inputReal.count / 2 : inputReal.count
+                
+                var imaginaryResult: Array<T>!
+                
+                let realResult = Array<T>(unsafeUninitializedCapacity: n) {
+                    realBuffer, realInitializedCount in
+                    
+                    imaginaryResult = Array<T>(unsafeUninitializedCapacity: n) {
+                        imaginaryBuffer, imaginaryInitializedCount in
+                        
+                        transform(inputReal: inputReal,
+                                  inputImaginary: inputImaginary,
+                                  outputReal: &realBuffer,
+                                  outputImaginary: &imaginaryBuffer)
+                        
+                        imaginaryInitializedCount = n
+                    }
+                    
+                    realInitializedCount = n
+                }
+                
+                return (real: realResult,
+                        imaginary: imaginaryResult)
         }
         
         /// Computes an out-of-place single-precision real discrete Fourier transform.

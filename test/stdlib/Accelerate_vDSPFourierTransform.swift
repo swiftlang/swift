@@ -17,7 +17,7 @@ var Accelerate_vDSPFourierTransformTests = TestSuite("Accelerate_vDSPFourierTran
 
 if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     
-     Accelerate_vDSPFourierTransformTests.test("vDSP/SinglePrecisionComplexConversions") {
+    Accelerate_vDSPFourierTransformTests.test("vDSP/SinglePrecisionComplexConversions") {
         func convert(splitComplexVector: DSPSplitComplex,
                      toInterleavedComplexVector interleavedComplexVector: inout [DSPComplex]) {
             
@@ -60,8 +60,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(realSrc.elementsEqual(realDest))
         expectTrue(imagSrc.elementsEqual(imagDest))
     }
- 
-     Accelerate_vDSPFourierTransformTests.test("vDSP/DoublePrecisionComplexConversions") {
+    
+    Accelerate_vDSPFourierTransformTests.test("vDSP/DoublePrecisionComplexConversions") {
         func convert(splitComplexVector: DSPDoubleSplitComplex,
                      toInterleavedComplexVector interleavedComplexVector: inout [DSPDoubleComplex]) {
             
@@ -105,7 +105,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(imagSrc.elementsEqual(imagDest))
     }
     
-     Accelerate_vDSPFourierTransformTests.test("vDSP/2DSinglePrecision") {
+    Accelerate_vDSPFourierTransformTests.test("vDSP/2DSinglePrecision") {
         let width = 256
         let height = 256
         let pixelCount = width * height
@@ -129,8 +129,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         
         // Create FFT2D object
         let fft2D = vDSP.FFT2D(width: 256,
-                                     height: 256,
-                                     ofType: DSPSplitComplex.self)!
+                               height: 256,
+                               ofType: DSPSplitComplex.self)!
         
         // New style transform
         var transformedImageReal = [Float](repeating: 0,
@@ -194,8 +194,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         
         // Create FFT2D object
         let fft2D = vDSP.FFT2D(width: width,
-                                     height: height,
-                                     ofType: DSPDoubleSplitComplex.self)!
+                               height: height,
+                               ofType: DSPDoubleSplitComplex.self)!
         
         // New style transform
         var transformedImageReal = [Double](repeating: 0,
@@ -269,10 +269,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                                     fatalError("Can't create FFT.")
         }
         
-        var forwardOutputReal = [Float](repeating: 0, count: halfN)
-        var forwardOutputImag = [Float](repeating: 0, count: halfN)
-        var forwardOutput = DSPSplitComplex(realp: &forwardOutputReal,
-                                            imagp: &forwardOutputImag)
+        var outputReal = [Float](repeating: 0, count: halfN)
+        var outputImag = [Float](repeating: 0, count: halfN)
+        var forwardOutput = DSPSplitComplex(realp: &outputReal,
+                                            imagp: &outputImag)
         
         fft.transform(input: forwardInput,
                       output: &forwardOutput,
@@ -283,10 +283,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let legacySetup = vDSP_create_fftsetup(log2n,
                                                FFTRadix(kFFTRadix2))!
         
-        var legacyForwardOutputReal = [Float](repeating: -1, count: halfN)
-        var legacyForwardOutputImag = [Float](repeating: -1, count: halfN)
-        var legacyForwardOutput = DSPSplitComplex(realp: &legacyForwardOutputReal,
-                                                  imagp: &legacyForwardOutputImag)
+        var legacyoutputReal = [Float](repeating: -1, count: halfN)
+        var legacyoutputImag = [Float](repeating: -1, count: halfN)
+        var legacyForwardOutput = DSPSplitComplex(realp: &legacyoutputReal,
+                                                  imagp: &legacyoutputImag)
         
         
         vDSP_fft_zrop(legacySetup,
@@ -295,8 +295,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                       log2n,
                       FFTDirection(kFFTDirection_Forward))
         
-        expectTrue(forwardOutputReal.elementsEqual(legacyForwardOutputReal))
-        expectTrue(forwardOutputImag.elementsEqual(legacyForwardOutputImag))
+        expectTrue(outputReal.elementsEqual(legacyoutputReal))
+        expectTrue(outputImag.elementsEqual(legacyoutputImag))
     }
     
     Accelerate_vDSPFourierTransformTests.test("vDSP/1DDoublePrecision") {
@@ -332,10 +332,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                                     fatalError("Can't create FFT.")
         }
         
-        var forwardOutputReal = [Double](repeating: 0, count: halfN)
-        var forwardOutputImag = [Double](repeating: 0, count: halfN)
-        var forwardOutput = DSPDoubleSplitComplex(realp: &forwardOutputReal,
-                                                  imagp: &forwardOutputImag)
+        var outputReal = [Double](repeating: 0, count: halfN)
+        var outputImag = [Double](repeating: 0, count: halfN)
+        var forwardOutput = DSPDoubleSplitComplex(realp: &outputReal,
+                                                  imagp: &outputImag)
         
         fft.transform(input: forwardInput,
                       output: &forwardOutput,
@@ -346,10 +346,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let legacySetup = vDSP_create_fftsetupD(log2n,
                                                 FFTRadix(kFFTRadix2))!
         
-        var legacyForwardOutputReal = [Double](repeating: 0, count: halfN)
-        var legacyForwardOutputImag = [Double](repeating: 0, count: halfN)
-        var legacyForwardOutput = DSPDoubleSplitComplex(realp: &legacyForwardOutputReal,
-                                                        imagp: &legacyForwardOutputImag)
+        var legacyoutputReal = [Double](repeating: 0, count: halfN)
+        var legacyoutputImag = [Double](repeating: 0, count: halfN)
+        var legacyForwardOutput = DSPDoubleSplitComplex(realp: &legacyoutputReal,
+                                                        imagp: &legacyoutputImag)
         
         
         vDSP_fft_zropD(legacySetup,
@@ -358,8 +358,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                        log2n,
                        FFTDirection(kFFTDirection_Forward))
         
-        expectTrue(forwardOutputReal.elementsEqual(legacyForwardOutputReal))
-        expectTrue(forwardOutputImag.elementsEqual(legacyForwardOutputImag))
+        expectTrue(outputReal.elementsEqual(legacyoutputReal))
+        expectTrue(outputImag.elementsEqual(legacyoutputImag))
     }
 }
 
@@ -377,14 +377,14 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     let frequencies: [Float] = [1, 5, 25, 30, 75, 100,
                                 300, 500, 512, 1023]
     
-    let inputReal: [Float] = (0 ... n).map { index in
+    let inputReal: [Float] = (0 ..< n).map { index in
         frequencies.reduce(0) { accumulator, frequency in
             let normalizedIndex = Float(index) / Float(n)
             return accumulator + sin(normalizedIndex * frequency * tau)
         }
     }
     
-    let inputImag: [Float] = (0 ... n).map { index in
+    let inputImag: [Float] = (0 ..< n).map { index in
         frequencies.reduce(0) { accumulator, frequency in
             let normalizedIndex = Float(index) / Float(n)
             return accumulator + sin(normalizedIndex * 1/frequency * tau)
@@ -397,13 +397,13 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                               transformType: .complexComplex,
                               ofType: Float.self)!
         
-        var forwardOutputReal = [Float](repeating: 0, count: n)
-        var forwardOutputImag = [Float](repeating: 0, count: n)
+        var outputReal = [Float](repeating: 0, count: n)
+        var outputImag = [Float](repeating: 0, count: n)
         
         fwdDFT.transform(inputReal: inputReal,
                          inputImaginary: inputImag,
-                         outputReal: &forwardOutputReal,
-                         outputImaginary: &forwardOutputImag)
+                         outputReal: &outputReal,
+                         outputImaginary: &outputImag)
         
         // legacy...
         
@@ -420,8 +420,14 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                          &legacyOutputReal,
                          &legacyOutputImag)
         
-        expectTrue(forwardOutputReal.elementsEqual(legacyOutputReal))
-        expectTrue(forwardOutputImag.elementsEqual(legacyOutputImag))
+        expectTrue(outputReal.elementsEqual(legacyOutputReal))
+        expectTrue(outputImag.elementsEqual(legacyOutputImag))
+        
+        let returnedResult = fwdDFT.transform(inputReal: inputReal,
+                                              inputImaginary: inputImag)
+        
+        expectTrue(outputReal.elementsEqual(returnedResult.real))
+        expectTrue(outputImag.elementsEqual(returnedResult.imaginary))
     }
     
     Accelerate_vDSPFourierTransformTests.test("vDSP/SinglePrecisionInverseComplexComplex") {
@@ -430,13 +436,13 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                               transformType: .complexComplex,
                               ofType: Float.self)!
         
-        var forwardOutputReal = [Float](repeating: 0, count: n)
-        var forwardOutputImag = [Float](repeating: 0, count: n)
+        var outputReal = [Float](repeating: 0, count: n)
+        var outputImag = [Float](repeating: 0, count: n)
         
         fwdDFT.transform(inputReal: inputReal,
                          inputImaginary: inputImag,
-                         outputReal: &forwardOutputReal,
-                         outputImaginary: &forwardOutputImag)
+                         outputReal: &outputReal,
+                         outputImaginary: &outputImag)
         
         // legacy...
         
@@ -453,8 +459,14 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                          &legacyOutputReal,
                          &legacyOutputImag)
         
-        expectTrue(forwardOutputReal.elementsEqual(legacyOutputReal))
-        expectTrue(forwardOutputImag.elementsEqual(legacyOutputImag))
+        expectTrue(outputReal.elementsEqual(legacyOutputReal))
+        expectTrue(outputImag.elementsEqual(legacyOutputImag))
+        
+        let returnedResult = fwdDFT.transform(inputReal: inputReal,
+                                              inputImaginary: inputImag)
+        
+        expectTrue(outputReal.elementsEqual(returnedResult.real))
+        expectTrue(outputImag.elementsEqual(returnedResult.imaginary))
     }
     
     Accelerate_vDSPFourierTransformTests.test("vDSP/SinglePrecisionForwardComplexReal") {
@@ -463,13 +475,13 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                               transformType: .complexReal,
                               ofType: Float.self)!
         
-        var forwardOutputReal = [Float](repeating: 0, count: n / 2)
-        var forwardOutputImag = [Float](repeating: 0, count: n / 2)
+        var outputReal = [Float](repeating: 0, count: n / 2)
+        var outputImag = [Float](repeating: 0, count: n / 2)
         
         fwdDFT.transform(inputReal: inputReal,
                          inputImaginary: inputImag,
-                         outputReal: &forwardOutputReal,
-                         outputImaginary: &forwardOutputImag)
+                         outputReal: &outputReal,
+                         outputImaginary: &outputImag)
         
         // legacy...
         
@@ -486,8 +498,14 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                          &legacyOutputReal,
                          &legacyOutputImag)
         
-        expectTrue(forwardOutputReal.elementsEqual(legacyOutputReal))
-        expectTrue(forwardOutputImag.elementsEqual(legacyOutputImag))
+        expectTrue(outputReal.elementsEqual(legacyOutputReal))
+        expectTrue(outputImag.elementsEqual(legacyOutputImag))
+        
+        let returnedResult = fwdDFT.transform(inputReal: inputReal,
+                                              inputImaginary: inputImag)
+        
+        expectTrue(outputReal.elementsEqual(returnedResult.real))
+        expectTrue(outputImag.elementsEqual(returnedResult.imaginary))
     }
     
     Accelerate_vDSPFourierTransformTests.test("vDSP/SinglePrecisionInverseComplexReal") {
@@ -496,13 +514,13 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                               transformType: .complexReal,
                               ofType: Float.self)!
         
-        var forwardOutputReal = [Float](repeating: 0, count: n / 2)
-        var forwardOutputImag = [Float](repeating: 0, count: n / 2)
+        var outputReal = [Float](repeating: 0, count: n / 2)
+        var outputImag = [Float](repeating: 0, count: n / 2)
         
         fwdDFT.transform(inputReal: inputReal,
                          inputImaginary: inputImag,
-                         outputReal: &forwardOutputReal,
-                         outputImaginary: &forwardOutputImag)
+                         outputReal: &outputReal,
+                         outputImaginary: &outputImag)
         
         // legacy...
         
@@ -519,8 +537,14 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                          &legacyOutputReal,
                          &legacyOutputImag)
         
-        expectTrue(forwardOutputReal.elementsEqual(legacyOutputReal))
-        expectTrue(forwardOutputImag.elementsEqual(legacyOutputImag))
+        expectTrue(outputReal.elementsEqual(legacyOutputReal))
+        expectTrue(outputImag.elementsEqual(legacyOutputImag))
+        
+        let returnedResult = fwdDFT.transform(inputReal: inputReal,
+                                              inputImaginary: inputImag)
+        
+        expectTrue(outputReal.elementsEqual(returnedResult.real))
+        expectTrue(outputImag.elementsEqual(returnedResult.imaginary))
     }
 }
 
@@ -539,14 +563,14 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     let frequencies: [Double] = [1, 5, 25, 30, 75, 100,
                                  300, 500, 512, 1023]
     
-    let inputReal: [Double] = (0 ... n).map { index in
+    let inputReal: [Double] = (0 ..< n).map { index in
         frequencies.reduce(0) { accumulator, frequency in
             let normalizedIndex = Double(index) / Double(n)
             return accumulator + sin(normalizedIndex * frequency * tau)
         }
     }
     
-    let inputImag: [Double] = (0 ... n).map { index in
+    let inputImag: [Double] = (0 ..< n).map { index in
         frequencies.reduce(0) { accumulator, frequency in
             let normalizedIndex = Double(index) / Double(n)
             return accumulator + sin(normalizedIndex * 1/frequency * tau)
@@ -559,31 +583,37 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                               transformType: .complexComplex,
                               ofType: Double.self)!
         
-        var forwardOutputReal = [Double](repeating: 0, count: n)
-        var forwardOutputImag = [Double](repeating: 0, count: n)
+        var outputReal = [Double](repeating: 0, count: n)
+        var outputImag = [Double](repeating: 0, count: n)
         
         fwdDFT.transform(inputReal: inputReal,
                          inputImaginary: inputImag,
-                         outputReal: &forwardOutputReal,
-                         outputImaginary: &forwardOutputImag)
+                         outputReal: &outputReal,
+                         outputImaginary: &outputImag)
         
         // legacy...
         
         let legacySetup = vDSP_DFT_zop_CreateSetupD(nil,
-                                                   vDSP_Length(n),
-                                                   .FORWARD)!
+                                                    vDSP_Length(n),
+                                                    .FORWARD)!
         
         var legacyOutputReal = [Double](repeating: -1, count: n)
         var legacyOutputImag = [Double](repeating: -1, count: n)
         
         vDSP_DFT_ExecuteD(legacySetup,
-                         inputReal,
-                         inputImag,
-                         &legacyOutputReal,
-                         &legacyOutputImag)
+                          inputReal,
+                          inputImag,
+                          &legacyOutputReal,
+                          &legacyOutputImag)
         
-        expectTrue(forwardOutputReal.elementsEqual(legacyOutputReal))
-        expectTrue(forwardOutputImag.elementsEqual(legacyOutputImag))
+        expectTrue(outputReal.elementsEqual(legacyOutputReal))
+        expectTrue(outputImag.elementsEqual(legacyOutputImag))
+        
+        let returnedResult = fwdDFT.transform(inputReal: inputReal,
+                                              inputImaginary: inputImag)
+        
+        expectTrue(outputReal.elementsEqual(returnedResult.real))
+        expectTrue(outputImag.elementsEqual(returnedResult.imaginary))
     }
     
     Accelerate_vDSPFourierTransformTests.test("vDSP/DoublePrecisionInverseComplexComplex") {
@@ -592,31 +622,37 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                               transformType: .complexComplex,
                               ofType: Double.self)!
         
-        var forwardOutputReal = [Double](repeating: 0, count: n)
-        var forwardOutputImag = [Double](repeating: 0, count: n)
+        var outputReal = [Double](repeating: 0, count: n)
+        var outputImag = [Double](repeating: 0, count: n)
         
         fwdDFT.transform(inputReal: inputReal,
                          inputImaginary: inputImag,
-                         outputReal: &forwardOutputReal,
-                         outputImaginary: &forwardOutputImag)
+                         outputReal: &outputReal,
+                         outputImaginary: &outputImag)
         
         // legacy...
         
         let legacySetup = vDSP_DFT_zop_CreateSetupD(nil,
-                                                   vDSP_Length(n),
-                                                   .INVERSE)!
+                                                    vDSP_Length(n),
+                                                    .INVERSE)!
         
         var legacyOutputReal = [Double](repeating: -1, count: n)
         var legacyOutputImag = [Double](repeating: -1, count: n)
         
         vDSP_DFT_ExecuteD(legacySetup,
-                         inputReal,
-                         inputImag,
-                         &legacyOutputReal,
-                         &legacyOutputImag)
+                          inputReal,
+                          inputImag,
+                          &legacyOutputReal,
+                          &legacyOutputImag)
         
-        expectTrue(forwardOutputReal.elementsEqual(legacyOutputReal))
-        expectTrue(forwardOutputImag.elementsEqual(legacyOutputImag))
+        expectTrue(outputReal.elementsEqual(legacyOutputReal))
+        expectTrue(outputImag.elementsEqual(legacyOutputImag))
+        
+        let returnedResult = fwdDFT.transform(inputReal: inputReal,
+                                              inputImaginary: inputImag)
+        
+        expectTrue(outputReal.elementsEqual(returnedResult.real))
+        expectTrue(outputImag.elementsEqual(returnedResult.imaginary))
     }
     
     Accelerate_vDSPFourierTransformTests.test("vDSP/DoublePrecisionForwardComplexReal") {
@@ -625,31 +661,37 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                               transformType: .complexReal,
                               ofType: Double.self)!
         
-        var forwardOutputReal = [Double](repeating: 0, count: n / 2)
-        var forwardOutputImag = [Double](repeating: 0, count: n / 2)
+        var outputReal = [Double](repeating: 0, count: n / 2)
+        var outputImag = [Double](repeating: 0, count: n / 2)
         
         fwdDFT.transform(inputReal: inputReal,
                          inputImaginary: inputImag,
-                         outputReal: &forwardOutputReal,
-                         outputImaginary: &forwardOutputImag)
+                         outputReal: &outputReal,
+                         outputImaginary: &outputImag)
         
         // legacy...
         
         let legacySetup = vDSP_DFT_zrop_CreateSetupD(nil,
-                                                    vDSP_Length(n),
-                                                    .FORWARD)!
+                                                     vDSP_Length(n),
+                                                     .FORWARD)!
         
         var legacyOutputReal = [Double](repeating: -1, count: n / 2)
         var legacyOutputImag = [Double](repeating: -1, count: n / 2)
         
         vDSP_DFT_ExecuteD(legacySetup,
-                         inputReal,
-                         inputImag,
-                         &legacyOutputReal,
-                         &legacyOutputImag)
+                          inputReal,
+                          inputImag,
+                          &legacyOutputReal,
+                          &legacyOutputImag)
         
-        expectTrue(forwardOutputReal.elementsEqual(legacyOutputReal))
-        expectTrue(forwardOutputImag.elementsEqual(legacyOutputImag))
+        expectTrue(outputReal.elementsEqual(legacyOutputReal))
+        expectTrue(outputImag.elementsEqual(legacyOutputImag))
+        
+        let returnedResult = fwdDFT.transform(inputReal: inputReal,
+                                              inputImaginary: inputImag)
+        
+        expectTrue(outputReal.elementsEqual(returnedResult.real))
+        expectTrue(outputImag.elementsEqual(returnedResult.imaginary))
     }
     
     Accelerate_vDSPFourierTransformTests.test("vDSP/DoublePrecisionInverseComplexReal") {
@@ -658,31 +700,37 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                               transformType: .complexReal,
                               ofType: Double.self)!
         
-        var forwardOutputReal = [Double](repeating: 0, count: n / 2)
-        var forwardOutputImag = [Double](repeating: 0, count: n / 2)
+        var outputReal = [Double](repeating: 0, count: n / 2)
+        var outputImag = [Double](repeating: 0, count: n / 2)
         
         fwdDFT.transform(inputReal: inputReal,
                          inputImaginary: inputImag,
-                         outputReal: &forwardOutputReal,
-                         outputImaginary: &forwardOutputImag)
+                         outputReal: &outputReal,
+                         outputImaginary: &outputImag)
         
         // legacy...
         
         let legacySetup = vDSP_DFT_zrop_CreateSetupD(nil,
-                                                    vDSP_Length(n),
-                                                    .INVERSE)!
+                                                     vDSP_Length(n),
+                                                     .INVERSE)!
         
         var legacyOutputReal = [Double](repeating: -1, count: n / 2)
         var legacyOutputImag = [Double](repeating: -1, count: n / 2)
         
         vDSP_DFT_ExecuteD(legacySetup,
-                         inputReal,
-                         inputImag,
-                         &legacyOutputReal,
-                         &legacyOutputImag)
+                          inputReal,
+                          inputImag,
+                          &legacyOutputReal,
+                          &legacyOutputImag)
         
-        expectTrue(forwardOutputReal.elementsEqual(legacyOutputReal))
-        expectTrue(forwardOutputImag.elementsEqual(legacyOutputImag))
+        expectTrue(outputReal.elementsEqual(legacyOutputReal))
+        expectTrue(outputImag.elementsEqual(legacyOutputImag))
+        
+        let returnedResult = fwdDFT.transform(inputReal: inputReal,
+                                              inputImaginary: inputImag)
+        
+        expectTrue(outputReal.elementsEqual(returnedResult.real))
+        expectTrue(outputImag.elementsEqual(returnedResult.imaginary))
     }
 }
 
