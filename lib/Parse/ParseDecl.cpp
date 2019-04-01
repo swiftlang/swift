@@ -1894,6 +1894,7 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
       ParserStatus status = parseExprList(tok::l_paren, tok::r_paren,
                                           /*isPostfix=*/false,
                                           /*isExprBasic=*/true,
+                                          /*allowSepOmission=*/false,
                                           lParenLoc, args, argLabels,
                                           argLabelLocs,
                                           rParenLoc,
