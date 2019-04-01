@@ -207,7 +207,7 @@ extension _SmallString {
 
   // Overwrite stored code units, including uninitialized. `f` should return the
   // new count.
-  @inline(__always)
+  @inlinable @inline(__always)
   internal mutating func withMutableCapacity(
     _ f: (UnsafeMutableBufferPointer<UInt8>) throws -> Int
   ) rethrows {
@@ -260,6 +260,34 @@ extension _SmallString {
 
     self.init(leading: leading, trailing: trailing, count: count)
   }
+  
+  @inlinable @inline(__always)
+  internal init?(
+    initializingUTF8With initializer: (
+      _ buffer: UnsafeMutableBufferPointer<CChar>,
+      _ initializedCount: inout Int
+    ) throws -> Bool
+  ) rethrows {
+    self.init()
+    var success = false
+    try self.withMutableCapacity {
+      let raw = UnsafeMutableRawPointer($0.baseAddress
+        ._unsafelyUnwrappedUnchecked)
+      let base = raw.assumingMemoryBound(to: CChar.self)
+      let cbuf = UnsafeMutableBufferPointer(start: base,
+                                            count: _SmallString.capacity)
+      var count = 0
+      if try initializer(cbuf, &count) {
+        success = true
+        return count
+      }
+      return 0
+    }
+    if !success {
+      return nil
+    }
+    self._invariantCheck()
+  }
 
   @usableFromInline // @testable
   internal init?(_ base: _SmallString, appending other: _SmallString) {
@@ -281,10 +309,9 @@ extension _SmallString {
   }
 }
 
-#if _runtime(_ObjC)
+#if _runtime(_ObjC) && !(arch(i386) || arch(arm))
 // Cocoa interop
 extension _SmallString {
-  #if !(arch(i386) || arch(arm))
   // Resiliently create from a tagged cocoa string
   //
   @_effects(readonly) // @opaque
@@ -300,25 +327,6 @@ extension _SmallString {
     }
     self._invariantCheck()
   }
-  #endif
-  
-  @_effects(readonly)
-  @usableFromInline
-  internal init?(nonTaggedCocoa cocoa: AnyObject, length cfLength: Int) {
-    self.init()
-    var len = 0
-    self.withMutableCapacity {
-      len = _bridgeNonTagged(cocoa, length: cfLength, intoUTF8: $0) ?? 0
-      _internalInvariant(len == 0 || len <= _SmallString.capacity,
-        "Internal invariant violated: tried to small-bridge a large NSString")
-      return len
-    }
-    if len == 0 {
-      return nil
-    }
-    self._invariantCheck()
-  }
-
 }
 #endif
 

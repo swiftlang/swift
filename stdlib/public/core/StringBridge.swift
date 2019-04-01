@@ -125,7 +125,6 @@ private var kCFStringEncodingUTF8 : _swift_shims_CFStringEncoding {
   @inline(__always) get { return 0x8000100 }
 }
 
-#if !(arch(i386) || arch(arm))
 // Resiliently write a tagged _CocoaString's contents into a buffer.
 @_effects(releasenone) // @opaque
 internal func _bridgeTagged(
@@ -133,27 +132,7 @@ internal func _bridgeTagged(
   length: Int,
   intoUTF8 bufPtr: UnsafeMutableBufferPointer<UInt8>
 ) -> Int? {
-  _internalInvariant(_isObjCTaggedPointer(cocoa))
-  return _bridgeNonTagged(cocoa, length: length, intoUTF8: bufPtr)
-}
-#endif
-
-//In the future we may want to try CFStringGetCStringPtr and so on here,
-//or _bridgeTagged may want to use faster tagged-specific accessors than
-//CFStringGetCString, but for now they're the same
-@_effects(releasenone)
-internal func _bridgeNonTagged(
-  _ cocoa: _CocoaString,
-  length: Int,
-  intoUTF8 bufPtr: UnsafeMutableBufferPointer<UInt8>
-) -> Int? {
-  let ptr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
-  _internalInvariant(length <= _SmallString.capacity)
-  var count = 0
-  let numCharWritten = _swift_stdlib_CFStringGetBytes(
-    cocoa, _swift_shims_CFRange(location: 0, length: length),
-    kCFStringEncodingUTF8, 0, 0, ptr, bufPtr.count, &count)
-  return length == numCharWritten ? count : nil
+  fatalError("Obsolete") //TODO: reimplement
 }
 
 @_effects(releasenone) // @opaque
@@ -192,8 +171,19 @@ private func _getCocoaStringPointer(
 public //SPI(Foundation)
 func _bridgeCocoaStringLazily(
   _ cocoaString: AnyObject,
+  _ cls: AnyClass,
   _ length: Int
 ) -> String {
+  
+  if cls == __StringStorage.self {
+    return String(_unsafeUncheckedDowncast(
+      cocoaString, to: __StringStorage.self).asString._guts)
+  }
+  if cls == __SharedStringStorage.self {
+    return String(_unsafeUncheckedDowncast(
+      cocoaString, to: __SharedStringStorage.self).asString._guts)
+  }
+  
   let (fastUTF8, isASCII): (Bool, Bool)
   switch _getCocoaStringPointer(cocoaString) {
   case .ascii(_): (fastUTF8, isASCII) = (true, true)
@@ -207,48 +197,6 @@ func _bridgeCocoaStringLazily(
     isASCII: isASCII,
     length: length))
 }
-
-@_effects(releasenone)
-public //SPI(Foundation)
-func _bridgeCocoaStringEagerly(
-  _ cocoaString: AnyObject,
-  _ length: Int
-) -> String? {
-  //Currently we only try to eagerly bridge if we can bridge into a _SmallString
-  if length <= _SmallString.capacity,
-     let smol = _SmallString(nonTaggedCocoa: cocoaString, length: length) {
-    return String(_StringGuts(smol))
-  }
-  return nil
-}
-
-@_effects(releasenone)
-public //SPI(Foundation)
-func _rebridgeSwiftString(
-  _ cocoaString: AnyObject,
-  _ cls: AnyClass
-) -> String? {
-  if cls == __StringStorage.self {
-    return String(_unsafeUncheckedDowncast(
-      cocoaString, to: __StringStorage.self).asString._guts)
-  }
-  if cls == __SharedStringStorage.self {
-    return String(_unsafeUncheckedDowncast(
-      cocoaString, to: __SharedStringStorage.self).asString._guts)
-  }
-  return nil
-}
-
-#if !(arch(i386) || arch(arm))
-@_effects(releasenone)
-public //SPI(Foundation)
-func _bridgeTaggedCocoaString(_ cocoaString: AnyObject) -> String? {
-  if _isObjCTaggedPointer(cocoaString) {
-    return String(_StringGuts(_SmallString(taggedCocoa: cocoaString)))
-  }
-  return nil
-}
-#endif
 
 @usableFromInline
 @_effects(releasenone) // @opaque

@@ -60,6 +60,87 @@ extension String {
       UnsafeBufferPointer(start: cString, count: len)).0
   }
 
+  /// Creates a new String with the specified capacity in UTF-8 code units then
+  /// calls the given closure with a buffer covering the String's uninitialized
+  /// memory.
+  ///
+  /// The closure should return the number of code units that are initialized,
+  /// or nil if it was unable to initialize the buffer (for example if the
+  /// requested capacity ended up being too small for the data).
+  ///
+  /// This initializer does not try to repair ill-formed UTF-8 code unit
+  /// sequences. If any are found, the result of the initializer is `nil`.
+  ///
+  /// The following example uses this initializer with the contents of two
+  /// different `CChar` arrays---the first with well-formed UTF-8 code unit
+  /// sequences and the second with an ill-formed sequence at the end.
+  ///
+  ///     let validUTF8: [CChar] = [67, 97, 102, -61, -87, 0]
+  ///     let s = String(unsafeUninitializedCapacity: validUTF8.count,
+  ///                    initializingValidatingUTF8With: { (ptr, count) in
+  ///         ptr.initializeFrom(validUTF8)
+  ///         count = validUTF8.count
+  ///     })
+  ///     // Prints "Optional(Café)"
+  ///
+  ///     let invalidUTF8: [CChar] = [67, 97, 102, -61, 0]
+  ///     let s = String(unsafeUninitializedCapacity: invalidUTF8.count,
+  ///                    initializingValidatingUTF8With: { (ptr, count) in
+  ///         ptr.initializeFrom(invalidUTF8)
+  ///         count = invalidUTF8.count
+  ///     })
+  ///     // Prints "nil"
+  ///
+  /// - Parameters:
+  ///   - capacity: The number of UTF-8 code units worth of memory to allocate
+  ///       for the String.
+  ///   - initializer: A closure that initializes elements and sets the count of
+  ///       the new String
+  ///     - Parameters:
+  ///       - buffer: A buffer covering uninitialized memory with room for the
+  ///           specified number of UTF-8 code units.
+  ///       - initializedCount: Set this to the number of elements in `buffer`
+  ///           that were actually initialized by the `initializer`
+  @inlinable @inline(__always)
+  public init?(
+    unsafeUninitializedCapacity capacity: Int,
+    initializingValidatingUTF8With initializer: (
+      _ buffer: UnsafeMutableBufferPointer<CChar>,
+      _ initializedCount: inout Int
+    ) throws -> Bool
+  ) rethrows {
+    if capacity <= _SmallString.capacity {
+      if let smol = try _SmallString(initializingUTF8With: initializer) {
+        self = String(_StringGuts(smol))
+      } else {
+        return nil
+      }
+    } else {
+      try self.init(unsafeLargeUninitializedCapacity: capacity,
+                    initializingValidatingUTF8With: initializer)
+    }
+  }
+  
+  @_effects(readonly)
+  @usableFromInline
+  internal init?(
+    unsafeLargeUninitializedCapacity capacity: Int,
+    initializingValidatingUTF8With initializer: (
+      _ buffer: UnsafeMutableBufferPointer<CChar>,
+      _ initializedCount: inout Int
+    ) throws -> Bool
+  ) rethrows {
+    _internalInvariant(capacity > _SmallString.capacity)
+    guard let storage = try __StringStorage.create(
+      unsafeUninitializedCapacity: capacity,
+      initializingValidatingUTF8With: initializer
+    ) else {
+        return nil
+    }
+    
+    self = storage.asString
+  }
+  
   /// Creates a new string by copying and validating the null-terminated UTF-8
   /// data referenced by the given pointer.
   ///
@@ -91,7 +172,7 @@ extension String {
     guard let str = String._tryFromUTF8(
       UnsafeBufferPointer(start: cString._asUInt8, count: len))
     else { return nil }
-
+    
     self = str
   }
 

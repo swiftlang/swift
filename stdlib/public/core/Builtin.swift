@@ -402,12 +402,12 @@ internal func _nonPointerBits(_ x: Builtin.BridgeObject) -> UInt {
 
 @inlinable
 @inline(__always)
-internal func _isObjCTaggedPointer(_ x: AnyObject) -> Bool {
+public func _isObjCTaggedPointer(_ x: AnyObject) -> Bool {
   return (Builtin.reinterpretCast(x) & _objCTaggedPointerBits) != 0
 }
 @inlinable
 @inline(__always)
-internal func _isObjCTaggedPointer(_ x: UInt) -> Bool {
+public func _isObjCTaggedPointer(_ x: UInt) -> Bool {
   return (x & _objCTaggedPointerBits) != 0
 }
 
