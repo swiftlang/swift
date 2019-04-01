@@ -917,7 +917,7 @@ public:
         .fixItReplace(SourceRange(targetLoc),
                       corrections.begin()->Value->getLabelInfo().Name.str());
       tc.diagnose(corrections.begin()->Value->getLabelInfo().Loc,
-                  diag::identifier_declared_here,
+                  diag::decl_declared_here,
                   corrections.begin()->Value->getLabelInfo().Name);
     } else {
       // If we have multiple corrections or none, produce a generic diagnostic

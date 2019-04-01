@@ -1323,7 +1323,7 @@ IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
           proto->diagnose(diag::objc_protocol_inherits_non_objc_protocol,
                           proto->getDeclaredType(),
                           inherited->getDeclaredType());
-          inherited->diagnose(diag::kind_identifier_declared_here,
+          inherited->diagnose(diag::kind_declname_declared_here,
                               DescriptiveDeclKind::Protocol,
                               inherited->getName());
           isObjC = None;

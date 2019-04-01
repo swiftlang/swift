@@ -1670,7 +1670,7 @@ namespace {
                         false)
               .highlight(SourceRange(expr->getLAngleLoc(),
                                      expr->getRAngleLoc()));
-            tc.diagnose(bgt->getDecl(), diag::kind_identifier_declared_here,
+            tc.diagnose(bgt->getDecl(), diag::kind_declname_declared_here,
                         DescriptiveDeclKind::GenericType, bgt->getDecl()->getName());
             return Type();
           }
