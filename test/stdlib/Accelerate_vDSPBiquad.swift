@@ -44,15 +44,15 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
             return sin(Float(i) * 0.1) + sin(Float(i) * 0.01)
         }
         
-        guard var biquad = vDSP.Biquad(coefficients: [b0, b1, b2, a1, a2],
-                                       channelCount: sections,
-                                       sectionCount: channels,
-                                       ofType: Float.self) else {
-                                        expectationFailure("Failed to create single-precision Biquad.",
-                                                           trace: "",
-                                                           stackTrace: SourceLocStack())
-                                        return
-        }
+        var biquad = vDSP.Biquad(coefficients: [b0, b1, b2, a1, a2],
+                                 channelCount: sections,
+                                 sectionCount: channels,
+                                 ofType: Float.self)!
+        
+        var returningBiquad = vDSP.Biquad(coefficients: [b0, b1, b2, a1, a2],
+                                          channelCount: sections,
+                                          sectionCount: channels,
+                                          ofType: Float.self)!
         
         var output = [Float](repeating: 0,
                              count: n)
@@ -72,6 +72,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
             biquad.apply(input: signal,
                          output: &output)
             
+            let returnedOutput = returningBiquad.apply(input: signal)
+            
             vDSP_biquad(setup,
                         &delays,
                         signal, 1,
@@ -79,6 +81,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                         vDSP_Length(n))
             
             expectTrue(output.elementsEqual(legacyOutput))
+            expectTrue(output.elementsEqual(returnedOutput))
         }
     }
     
@@ -89,16 +92,17 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
             return sin(Float(i) * 0.1) + sin(Float(i) * 0.01)
         }
         
-        guard var biquad = vDSP.Biquad(coefficients: [b0, b1, b2, a1, a2,
-                                                      b0, b1, b2, a1, a2],
-                                       channelCount: channelCount,
-                                       sectionCount: sections,
-                                       ofType: Float.self) else {
-                                        expectationFailure("Failed to create single-precision Biquad (multi).",
-                                                           trace: "",
-                                                           stackTrace: SourceLocStack())
-                                        return
-        }
+        var biquad = vDSP.Biquad(coefficients: [b0, b1, b2, a1, a2,
+                                                b0, b1, b2, a1, a2],
+                                 channelCount: channelCount,
+                                 sectionCount: sections,
+                                 ofType: Float.self)!
+        
+        var returningBiquad = vDSP.Biquad(coefficients: [b0, b1, b2, a1, a2,
+                                                         b0, b1, b2, a1, a2],
+                                          channelCount: channelCount,
+                                          sectionCount: sections,
+                                          ofType: Float.self)!
         
         var output = [Float](repeating: 0,
                              count: n)
@@ -116,6 +120,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
             
             biquad.apply(input: signal,
                          output: &output)
+            
+            let returnedOutput = returningBiquad.apply(input: signal)
             
             signal.withUnsafeBufferPointer { inputBuffer in
                 let inputPointer = inputBuffer.baseAddress!
@@ -137,6 +143,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
             }
             
             expectTrue(output.elementsEqual(legacyOutput))
+            expectTrue(output.elementsEqual(returnedOutput))
         }
     }
     
@@ -147,15 +154,15 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
             return sin(Double(i) * 0.1) + sin(Double(i) * 0.01)
         }
         
-        guard var biquad = vDSP.Biquad(coefficients: [b0, b1, b2, a1, a2],
-                                       channelCount: sections,
-                                       sectionCount: channels,
-                                       ofType: Double.self) else {
-                                        expectationFailure("Failed to create double-precision Biquad.",
-                                                           trace: "",
-                                                           stackTrace: SourceLocStack())
-                                        return
-        }
+        var biquad = vDSP.Biquad(coefficients: [b0, b1, b2, a1, a2],
+                                 channelCount: sections,
+                                 sectionCount: channels,
+                                 ofType: Double.self)!
+        
+        var returningBiquad = vDSP.Biquad(coefficients: [b0, b1, b2, a1, a2],
+                                          channelCount: sections,
+                                          sectionCount: channels,
+                                          ofType: Double.self)!
         
         var output = [Double](repeating: 0,
                               count: n)
@@ -175,6 +182,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
             biquad.apply(input: signal,
                          output: &output)
             
+            let returnedOutput = returningBiquad.apply(input: signal)
+            
             vDSP_biquadD(setup,
                          &delays,
                          signal, 1,
@@ -182,6 +191,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                          vDSP_Length(n))
             
             expectTrue(output.elementsEqual(legacyOutput))
+            expectTrue(output.elementsEqual(returnedOutput))
         }
     }
     
@@ -192,16 +202,17 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
             return sin(Double(i) * 0.1) + sin(Double(i) * 0.01)
         }
         
-        guard var biquad = vDSP.Biquad(coefficients: [b0, b1, b2, a1, a2,
-                                                      b0, b1, b2, a1, a2],
-                                       channelCount: channelCount,
-                                       sectionCount: sections,
-                                       ofType: Double.self) else {
-                                        expectationFailure("Failed to create double-precision Biquad (multi).",
-                                                           trace: "",
-                                                           stackTrace: SourceLocStack())
-                                        return
-        }
+        var biquad = vDSP.Biquad(coefficients: [b0, b1, b2, a1, a2,
+                                                b0, b1, b2, a1, a2],
+                                 channelCount: channelCount,
+                                 sectionCount: sections,
+                                 ofType: Double.self)!
+        
+        var returningBiquad = vDSP.Biquad(coefficients: [b0, b1, b2, a1, a2,
+                                                         b0, b1, b2, a1, a2],
+                                          channelCount: channelCount,
+                                          sectionCount: sections,
+                                          ofType: Double.self)!
         
         var output = [Double](repeating: 0,
                               count: n)
@@ -219,6 +230,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
             
             biquad.apply(input: signal,
                          output: &output)
+            
+            let returnedOutput = returningBiquad.apply(input: signal)
             
             signal.withUnsafeBufferPointer { inputBuffer in
                 let inputPointer = inputBuffer.baseAddress!
@@ -240,6 +253,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
             }
             
             expectTrue(output.elementsEqual(legacyOutput))
+            expectTrue(output.elementsEqual(returnedOutput))
         }
     }
 }

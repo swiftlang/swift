@@ -13,6 +13,228 @@
 
 import Accelerate
 
+//===----------------------------------------------------------------------===//
+//
+//  Biquad Structure
+//
+//===----------------------------------------------------------------------===//
+
+extension vDSP {
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public struct Biquad <T: vDSP_FloatingPointBiquadFilterable> {
+        
+        private var biquadRef: BiquadRef<T>
+        
+        /// Initializes a new single or multichannel cascaded biquad IIR structure.
+        ///
+        /// - Parameter coefficients: Array of double-precision real coefficients. Its length should be 5 times the number of sections in the biquad filter.
+        /// - Parameter sectionCount: The number of sections in the biquad filter. The same number of sections is used for each channel, so only one value is specified.
+        /// - Parameter channelCount: The number of input/output channels.
+        /// - Parameter ofType: Specifies single- or double-precision.
+        public init?(coefficients: [Double],
+                     channelCount: vDSP_Length,
+                     sectionCount: vDSP_Length,
+                     ofType: T.Type) {
+            
+            if coefficients.count != 5 * channelCount * sectionCount {
+                return nil
+            }
+            
+            guard let ref = BiquadRef(coefficients: coefficients,
+                                      channelCount: channelCount,
+                                      sectionCount: sectionCount,
+                                      ofType: ofType) else {
+                                        return nil
+            }
+            
+            biquadRef = ref
+        }
+        
+        /// Applies a single- or double-precision single or multichannel biquad IIR filter, returning the filtered signal.
+        public mutating func apply<U>(input: U) -> [T]
+            where
+            U: _ContiguousCollection,
+            U.Element == T {
+                
+                let result = Array<T>(unsafeUninitializedCapacity: input.count) {
+                    buffer, initializedCount in
+                    
+                    apply(input: input,
+                          output: &buffer)
+                    
+                    initializedCount = input.count
+                }
+                
+                return result
+        }
+        
+        /// Applies a single- or double-precision single or multichannel biquad IIR filter, overwriting the supplied output.
+        public mutating func apply<U, V>(input: U, output: inout V)
+            where
+            U: _ContiguousCollection,
+            V: _MutableContiguousCollection,
+            U.Element == T, V.Element == T {
+                
+                // `apply(input:output:)` mutates `delays` and `setup`.
+                if !isKnownUniquelyReferenced(&biquadRef) {
+                    biquadRef = BiquadRef(coefficients: biquadRef.coefficients,
+                                          channelCount: biquadRef.channelCount,
+                                          sectionCount: biquadRef.sectionCount,
+                                          ofType: T.self)!
+                }
+                
+                biquadRef.apply(input: input,
+                                output: &output)
+        }
+        
+    }
+    
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    private class BiquadRef<T: vDSP_FloatingPointBiquadFilterable> {
+        
+        let coefficients: [Double]
+        let channelCount: vDSP_Length
+        let sectionCount: vDSP_Length
+        var delays: [T]
+        
+        private let biquadSetup: OpaquePointer
+        
+        /// Initializes a new single or multichannel cascaded biquad IIR instance.
+        ///
+        /// - Parameter coefficients: Array of double-precision real coefficients. Its length should be 5 times the number of sections in the biquad filter.
+        /// - Parameter sectionCount: The number of sections in the biquad filter. The same number of sections is used for each channel, so only one value is specified.
+        /// - Parameter channelCount: The number of input/output channels.
+        /// - Parameter ofType: Specifies single- or double-precision.
+        ///
+        /// For multiple channel signals, this class supports data in non-interleaved format. For example, when applying
+        /// a filter to a signal represented by an array of 100 elements, elements 0...49 contain the data for channel 0,
+        /// and elements 50...99 contain the data for channel 1.
+        
+        init?(coefficients: [Double],
+              channelCount: vDSP_Length,
+              sectionCount: vDSP_Length,
+              ofType: T.Type) {
+            
+            self.coefficients = coefficients
+            self.channelCount = channelCount
+            self.sectionCount = sectionCount
+            
+            delays = [T](repeating: 0.0,
+                         count: Int(2 * sectionCount) + 2)
+            
+            guard let setup = T.BiquadFunctions.makeBiquadSetup(channelCount: channelCount,
+                                                                coefficients: coefficients,
+                                                                sectionCount: sectionCount) else {
+                                                                    return nil
+            }
+            
+            biquadSetup = setup
+        }
+        
+        /// Applies a single- or double-precision single or multichannel biquad IIR filter, overwriting the supplied output.
+        func apply<U, V>(input: U, output: inout V)
+            where
+            U: _ContiguousCollection,
+            V: _MutableContiguousCollection,
+            U.Element == T, V.Element == T {
+                
+                let n = vDSP_Length(min(input.count, output.count))
+                
+                if channelCount == 1 {
+                    BiquadFunctions.applyBiquadSingle(source: input,
+                                                      destination: &output,
+                                                      delays: &delays,
+                                                      setup: biquadSetup,
+                                                      sectionCount: sectionCount,
+                                                      count: n)
+                } else  {
+                    BiquadFunctions.applyBiquadMulti(source: input,
+                                                     destination: &output,
+                                                     setup: biquadSetup,
+                                                     channelCount: channelCount,
+                                                     count: n)
+                }
+        }
+        
+        deinit {
+            BiquadFunctions.destroySetup(ofType: T.self,
+                                         channelCount: channelCount,
+                                         biquadSetup: biquadSetup)
+        }
+    }
+    
+    struct BiquadFunctions {
+        
+        @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+        @inline(__always)
+        static func applyBiquadSingle<U, V, Scalar>(source: U,
+                                                    destination: inout V,
+                                                    delays: inout [Scalar],
+                                                    setup: OpaquePointer,
+                                                    sectionCount: UInt,
+                                                    count: UInt)
+            where
+            Scalar: vDSP_FloatingPointBiquadFilterable,
+            U: _ContiguousCollection,
+            V: _MutableContiguousCollection,
+            U.Element == Scalar,
+            V.Element == Scalar {
+                
+                Scalar.BiquadFunctions.applySingle(source: source,
+                                                   destination: &destination,
+                                                   delays: &delays,
+                                                   setup: setup,
+                                                   sectionCount: sectionCount,
+                                                   count: count)
+        }
+        
+        @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+        @inline(__always)
+        static func applyBiquadMulti<U, V>(source: U,
+                                           destination: inout V,
+                                           setup: OpaquePointer,
+                                           channelCount: UInt,
+                                           count: UInt)
+            where
+            U: _ContiguousCollection,
+            V: _MutableContiguousCollection,
+            U.Element: vDSP_FloatingPointBiquadFilterable,
+            V.Element: vDSP_FloatingPointBiquadFilterable {
+                
+                source.withUnsafeBufferPointer { biquadInput in
+                    let inputPointer = biquadInput.baseAddress!
+                    destination.withUnsafeMutableBufferPointer { page in
+                        let outputPointer = page.baseAddress!
+                        
+                        let length = count / channelCount
+                        
+                        var inputs: [UnsafePointer<U.Element>] = (0 ..< channelCount).map { i in
+                            return inputPointer.advanced(by: Int(i * length))
+                        }
+                        
+                        var outputs: [UnsafeMutablePointer<U.Element>] = (0 ..< channelCount).map { i in
+                            return (outputPointer as! UnsafeMutablePointer<U.Element>).advanced(by: Int(i * length))
+                        }
+                        
+                        U.Element.BiquadFunctions.applyMulti(setup: setup,
+                                                             pInputs: &inputs,
+                                                             pOutputs: &outputs,
+                                                             count: count / channelCount)
+                    }
+                }
+        }
+        
+        @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+        static func destroySetup<T: vDSP_FloatingPointBiquadFilterable>(ofType: T.Type,
+                                                                        channelCount: UInt,
+                                                                        biquadSetup: OpaquePointer) {
+            T.BiquadFunctions.destroySetup(channelCount: channelCount,
+                                           biquadSetup: biquadSetup)
+        }
+    }
+    
+}
+
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 public protocol vDSP_FloatingPointBiquadFilterable: BinaryFloatingPoint {
     associatedtype BiquadFunctions: vDSP_BiquadFunctions where BiquadFunctions.Scalar == Self
@@ -194,208 +416,3 @@ extension vDSP.VectorizableDouble: vDSP_BiquadFunctions {
         }
     }
 }
-
-//===----------------------------------------------------------------------===//
-//
-//  Biquad Structure
-//
-//===----------------------------------------------------------------------===//
-
-extension vDSP {
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public struct Biquad <T: vDSP_FloatingPointBiquadFilterable> {
-        
-        private var biquadRef: BiquadRef<T>
-        
-        /// Initializes a new single or multichannel cascaded biquad IIR structure.
-        ///
-        /// - Parameter coefficients: Array of double-precision real coefficients. Its length should be 5 times the number of sections in the biquad filter.
-        /// - Parameter sectionCount: The number of sections in the biquad filter. The same number of sections is used for each channel, so only one value is specified.
-        /// - Parameter channelCount: The number of input/output channels.
-        /// - Parameter ofType: Specifies single- or double-precision.
-        public init?(coefficients: [Double],
-                     channelCount: vDSP_Length,
-                     sectionCount: vDSP_Length,
-                     ofType: T.Type) {
-            
-            if coefficients.count != 5 * channelCount * sectionCount {
-                return nil
-            }
-            
-            guard let ref = BiquadRef(coefficients: coefficients,
-                                      channelCount: channelCount,
-                                      sectionCount: sectionCount,
-                                      ofType: ofType) else {
-                                        return nil
-            }
-            
-            biquadRef = ref
-        }
-        
-        /// Applies a single- or double-precision single or multichannel biquad IIR filter, overwriting the supplied output.
-        public mutating func apply<U, V>(input: U, output: inout V)
-            where
-            U: _ContiguousCollection,
-            V: _MutableContiguousCollection,
-            U.Element == T, V.Element == T {
-                
-                // `apply(input:output:)` mutates `delays` and `setup`.
-                if !isKnownUniquelyReferenced(&biquadRef) {
-                    biquadRef = BiquadRef(coefficients: biquadRef.coefficients,
-                                          channelCount: biquadRef.channelCount,
-                                          sectionCount: biquadRef.sectionCount,
-                                          ofType: T.self)!
-                }
-                
-                biquadRef.apply(input: input,
-                                output: &output)
-        }
-        
-    }
-    
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    private class BiquadRef<T: vDSP_FloatingPointBiquadFilterable> {
-        
-        let coefficients: [Double]
-        let channelCount: vDSP_Length
-        let sectionCount: vDSP_Length
-        var delays: [T]
-        
-        private let biquadSetup: OpaquePointer
-        
-        /// Initializes a new single or multichannel cascaded biquad IIR instance.
-        ///
-        /// - Parameter coefficients: Array of double-precision real coefficients. Its length should be 5 times the number of sections in the biquad filter.
-        /// - Parameter sectionCount: The number of sections in the biquad filter. The same number of sections is used for each channel, so only one value is specified.
-        /// - Parameter channelCount: The number of input/output channels.
-        /// - Parameter ofType: Specifies single- or double-precision.
-        ///
-        /// For multiple channel signals, this class supports data in non-interleaved format. For example, when applying
-        /// a filter to a signal represented by an array of 100 elements, elements 0...49 contain the data for channel 0,
-        /// and elements 50...99 contain the data for channel 1.
-        
-        init?(coefficients: [Double],
-              channelCount: vDSP_Length,
-              sectionCount: vDSP_Length,
-              ofType: T.Type) {
-            
-            self.coefficients = coefficients
-            self.channelCount = channelCount
-            self.sectionCount = sectionCount
-            
-            delays = [T](repeating: 0.0,
-                         count: Int(2 * sectionCount) + 2)
-            
-            guard let setup = T.BiquadFunctions.makeBiquadSetup(channelCount: channelCount,
-                                                                coefficients: coefficients,
-                                                                sectionCount: sectionCount) else {
-                                                                    return nil
-            }
-            
-            biquadSetup = setup
-        }
-        
-        /// Applies a single- or double-precision single or multichannel biquad IIR filter, overwriting the supplied output.
-        func apply<U, V>(input: U, output: inout V)
-            where
-            U: _ContiguousCollection,
-            V: _MutableContiguousCollection,
-            U.Element == T, V.Element == T {
-                
-                let n = vDSP_Length(min(input.count, output.count))
-                
-                if channelCount == 1 {
-                    BiquadFunctions.applyBiquadSingle(source: input,
-                                                      destination: &output,
-                                                      delays: &delays,
-                                                      setup: biquadSetup,
-                                                      sectionCount: sectionCount,
-                                                      count: n)
-                } else  {
-                    BiquadFunctions.applyBiquadMulti(source: input,
-                                                     destination: &output,
-                                                     setup: biquadSetup,
-                                                     channelCount: channelCount,
-                                                     count: n)
-                }
-        }
-        
-        deinit {
-            BiquadFunctions.destroySetup(ofType: T.self,
-                                         channelCount: channelCount,
-                                         biquadSetup: biquadSetup)
-        }
-    }
-    
-    struct BiquadFunctions {
-        
-        @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-        @inline(__always)
-        static func applyBiquadSingle<U, V, Scalar>(source: U,
-                                                    destination: inout V,
-                                                    delays: inout [Scalar],
-                                                    setup: OpaquePointer,
-                                                    sectionCount: UInt,
-                                                    count: UInt)
-            where
-            Scalar: vDSP_FloatingPointBiquadFilterable,
-            U: _ContiguousCollection,
-            V: _MutableContiguousCollection,
-            U.Element == Scalar,
-            V.Element == Scalar {
-                
-                Scalar.BiquadFunctions.applySingle(source: source,
-                                                   destination: &destination,
-                                                   delays: &delays,
-                                                   setup: setup,
-                                                   sectionCount: sectionCount,
-                                                   count: count)
-        }
-        
-        @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-        @inline(__always)
-        static func applyBiquadMulti<U, V>(source: U,
-                                           destination: inout V,
-                                           setup: OpaquePointer,
-                                           channelCount: UInt,
-                                           count: UInt)
-            where
-            U: _ContiguousCollection,
-            V: _MutableContiguousCollection,
-            U.Element: vDSP_FloatingPointBiquadFilterable,
-            V.Element: vDSP_FloatingPointBiquadFilterable {
-                
-                source.withUnsafeBufferPointer { biquadInput in
-                    let inputPointer = biquadInput.baseAddress!
-                    destination.withUnsafeMutableBufferPointer { page in
-                        let outputPointer = page.baseAddress!
-                        
-                        let length = count / channelCount
-                        
-                        var inputs: [UnsafePointer<U.Element>] = (0 ..< channelCount).map { i in
-                            return inputPointer.advanced(by: Int(i * length))
-                        }
-                        
-                        var outputs: [UnsafeMutablePointer<U.Element>] = (0 ..< channelCount).map { i in
-                            return (outputPointer as! UnsafeMutablePointer<U.Element>).advanced(by: Int(i * length))
-                        }
-                        
-                        U.Element.BiquadFunctions.applyMulti(setup: setup,
-                                                             pInputs: &inputs,
-                                                             pOutputs: &outputs,
-                                                             count: count / channelCount)
-                    }
-                }
-        }
-        
-        @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-        static func destroySetup<T: vDSP_FloatingPointBiquadFilterable>(ofType: T.Type,
-                                                                        channelCount: UInt,
-                                                                        biquadSetup: OpaquePointer) {
-            T.BiquadFunctions.destroySetup(channelCount: channelCount,
-                                           biquadSetup: biquadSetup)
-        }
-    }
-    
-}
-
