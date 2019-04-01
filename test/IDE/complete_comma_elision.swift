@@ -213,9 +213,11 @@ func testArrayDotExpr(s: S, t: T) {
 
 // testArrayDotExpr: Begin completions
 // testArrayDotExpr-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: void()[#Void#];
-// testArrayDotExpr-DAG: Decl[InstanceMethod]/CurrNominal: t()[#T#];
-// FIXME: should have S context type.
+
+// FIXME: should have S context type, not T.
+// testArrayDotExpr-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: t()[#T#];
 // testArrayDotExpr-DAG: Decl[InstanceMethod]/CurrNominal: s()[#S#];
+
 // testArrayDotExpr: End completions
 }
 
@@ -233,7 +235,7 @@ func testArrayExprNewlineDot2(s: S, t: T) {
     .#^testArrayExprNewlineDot2^#
   ]
 }
- 
+
 // testArrayExprNewlineDot2: Begin completions
 // FIXME: this case should retun the following; it's not related to the commas though.
 // FIXME: Decl[InstanceMethod]/CurrNominal: t()[#T#];
