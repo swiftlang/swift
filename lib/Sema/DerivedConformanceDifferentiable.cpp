@@ -780,6 +780,12 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
           C, /*implicit*/ true, SourceLoc(), SourceLoc(), {}, None,
           None, nullptr);
       member->getAttrs().add(diffableAttr);
+      // If getter does not exist, trigger synthesis and compute type.
+      if (!member->getGetter())
+        addExpectedOpaqueAccessorsToStorage(TC, member);
+      if (!member->getGetter()->hasInterfaceType())
+        TC.resolveDeclSignature(member->getGetter());
+      // Compute getter parameter indices.
       auto *getterType =
           member->getGetter()->getInterfaceType()->castTo<AnyFunctionType>();
       AutoDiffParameterIndicesBuilder builder(getterType);
