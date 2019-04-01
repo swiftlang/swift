@@ -2456,14 +2456,188 @@ class IVMC11 : IB {
 
 /// Helpers
 
-func ff_contextualArgument_for(a: Int, b: Int, c: Int, for: Int, d: Int) {}
+func ff_contextualArgument_associatedtype(a: Int, b: Int, c: Int, associatedtype: Int, d: Int) {}
+func ff_contextualArgument_class(a: Int, b: Int, c: Int, class: Int, d: Int) {}
+func ff_contextualArgument_deinit(a: Int, b: Int, c: Int, deinit: Int, d: Int) {}
+func ff_contextualArgument_enum(a: Int, b: Int, c: Int, enum: Int, d: Int) {}
+func ff_contextualArgument_extension(a: Int, b: Int, c: Int, extension: Int, d: Int) {}
+func ff_contextualArgument_func(a: Int, b: Int, c: Int, func: Int, d: Int) {}
+func ff_contextualArgument_import(a: Int, b: Int, c: Int, import: Int, d: Int) {}
+func ff_contextualArgument_init(a: Int, b: Int, c: Int, init: Int, d: Int) {}
+func ff_contextualArgument_inout(a: Int, b: Int, c: Int, `inout`: Int, d: Int) {}
+func ff_contextualArgument_let(a: Int, b: Int, c: Int, `let`: Int, d: Int) {}
+func ff_contextualArgument_operator(a: Int, b: Int, c: Int, `operator`: Int, d: Int) {}
+func ff_contextualArgument_precedencegroup(a: Int, b: Int, c: Int, precedencegroup: Int, d: Int) {}
 func ff_contextualArgument_protocol(a: Int, b: Int, c: Int, protocol: Int, d: Int) {}
+func ff_contextualArgument_struct(a: Int, b: Int, c: Int, struct: Int, d: Int) {}
+func ff_contextualArgument_subscript(a: Int, b: Int, c: Int, subscript: Int, d: Int) {}
+func ff_contextualArgument_typealias(a: Int, b: Int, c: Int, typealias: Int, d: Int) {}
+func ff_contextualArgument_var(a: Int, b: Int, c: Int, `var`: Int, d: Int) {}
+func ff_contextualArgument_fileprivate(a: Int, b: Int, c: Int, fileprivate: Int, d: Int) {}
+func ff_contextualArgument_internal(a: Int, b: Int, c: Int, internal: Int, d: Int) {}
+func ff_contextualArgument_private(a: Int, b: Int, c: Int, private: Int, d: Int) {}
+func ff_contextualArgument_public(a: Int, b: Int, c: Int, public: Int, d: Int) {}
+func ff_contextualArgument_static(a: Int, b: Int, c: Int, static: Int, d: Int) {}
+func ff_contextualArgument_defer(a: Int, b: Int, c: Int, defer: Int, d: Int) {}
+func ff_contextualArgument_if(a: Int, b: Int, c: Int, if: Int, d: Int) {}
+func ff_contextualArgument_guard(a: Int, b: Int, c: Int, guard: Int, d: Int) {}
+func ff_contextualArgument_do(a: Int, b: Int, c: Int, do: Int, d: Int) {}
+func ff_contextualArgument_repeat(a: Int, b: Int, c: Int, repeat: Int, d: Int) {}
+func ff_contextualArgument_else(a: Int, b: Int, c: Int, else: Int, d: Int) {}
+func ff_contextualArgument_for(a: Int, b: Int, c: Int, for: Int, d: Int) {}
+func ff_contextualArgument_in(a: Int, b: Int, c: Int, in: Int, d: Int) {}
+func ff_contextualArgument_while(a: Int, b: Int, c: Int, while: Int, d: Int) {}
+func ff_contextualArgument_return(a: Int, b: Int, c: Int, return: Int, d: Int) {}
+func ff_contextualArgument_break(a: Int, b: Int, c: Int, break: Int, d: Int) {}
+func ff_contextualArgument_continue(a: Int, b: Int, c: Int, continue: Int, d: Int) {}
+func ff_contextualArgument_fallthrough(a: Int, b: Int, c: Int, fallthrough: Int, d: Int) {}
+func ff_contextualArgument_switch(a: Int, b: Int, c: Int, switch: Int, d: Int) {}
+func ff_contextualArgument_case(a: Int, b: Int, c: Int, case: Int, d: Int) {}
+func ff_contextualArgument_default(a: Int, b: Int, c: Int, default: Int, d: Int) {}
+func ff_contextualArgument_where(a: Int, b: Int, c: Int, where: Int, d: Int) {}
+func ff_contextualArgument_catch(a: Int, b: Int, c: Int, catch: Int, d: Int) {}
+func ff_contextualArgument_throw(a: Int, b: Int, c: Int, throw: Int, d: Int) {}
+func ff_contextualArgument_as(a: Int, b: Int, c: Int, as: Int, d: Int) {}
+func ff_contextualArgument_Any(a: Int, b: Int, c: Int, Any: Int, d: Int) {}
+func ff_contextualArgument_false(a: Int, b: Int, c: Int, false: Int, d: Int) {}
+func ff_contextualArgument_is(a: Int, b: Int, c: Int, is: Int, d: Int) {}
+func ff_contextualArgument_nil(a: Int, b: Int, c: Int, nil: Int, d: Int) {}
+func ff_contextualArgument_rethrows(a: Int, b: Int, c: Int, rethrows: Int, d: Int) {}
+func ff_contextualArgument_super(a: Int, b: Int, c: Int, super: Int, d: Int) {}
+func ff_contextualArgument_self(a: Int, b: Int, c: Int, self: Int, d: Int) {}
+func ff_contextualArgument_Self(a: Int, b: Int, c: Int, Self: Int, d: Int) {}
+func ff_contextualArgument_true(a: Int, b: Int, c: Int, true: Int, d: Int) {}
+func ff_contextualArgument_try(a: Int, b: Int, c: Int, try: Int, d: Int) {}
+func ff_contextualArgument_throws(a: Int, b: Int, c: Int, throws: Int, d: Int) {}
+func ff_contextualArgument___FILE__(a: Int, b: Int, c: Int, __FILE__: Int, d: Int) {}
+func ff_contextualArgument___LINE__(a: Int, b: Int, c: Int, __LINE__: Int, d: Int) {}
+func ff_contextualArgument___COLUMN__(a: Int, b: Int, c: Int, __COLUMN__: Int, d: Int) {}
+func ff_contextualArgument___FUNCTION__(a: Int, b: Int, c: Int, __FUNCTION__: Int, d: Int) {}
+func ff_contextualArgument___DSO_HANDLE__(a: Int, b: Int, c: Int, __DSO_HANDLE__: Int, d: Int) {}
+func ff_contextualArgument___(a: Int, b: Int, c: Int, __: Int, d: Int) {}
+func ff_contextualArgument_keyPath(a: Int, b: Int, c: Int, keyPath: Int, d: Int) {}
+func ff_contextualArgument_line(a: Int, b: Int, c: Int, line: Int, d: Int) {}
+func ff_contextualArgument_selector(a: Int, b: Int, c: Int, selector: Int, d: Int) {}
+func ff_contextualArgument_file(a: Int, b: Int, c: Int, file: Int, d: Int) {}
+func ff_contextualArgument_column(a: Int, b: Int, c: Int, column: Int, d: Int) {}
+func ff_contextualArgument_function(a: Int, b: Int, c: Int, function: Int, d: Int) {}
+func ff_contextualArgument_dsohandle(a: Int, b: Int, c: Int, dsohandle: Int, d: Int) {}
+func ff_contextualArgument_sourceLocation(a: Int, b: Int, c: Int, sourceLocation: Int, d: Int) {}
+func ff_contextualArgument_warning(a: Int, b: Int, c: Int, warning: Int, d: Int) {}
+func ff_contextualArgument_error(a: Int, b: Int, c: Int, error: Int, d: Int) {}
+func ff_contextualArgument_elseif(a: Int, b: Int, c: Int, elseif: Int, d: Int) {}
+func ff_contextualArgument_endif(a: Int, b: Int, c: Int, endif: Int, d: Int) {}
+func ff_contextualArgument_available(a: Int, b: Int, c: Int, available: Int, d: Int) {}
+func ff_contextualArgument_fileLiteral(a: Int, b: Int, c: Int, fileLiteral: Int, d: Int) {}
+func ff_contextualArgument_imageLiteral(a: Int, b: Int, c: Int, imageLiteral: Int, d: Int) {}
+func ff_contextualArgument_colorLiteral(a: Int, b: Int, c: Int, colorLiteral: Int, d: Int) {}
+func ff_contextualArgument_integer_literal(a: Int, b: Int, c: Int, integer_literal: Int, d: Int) {}
+func ff_contextualArgument_floating_literal(a: Int, b: Int, c: Int, floating_literal: Int, d: Int) {}
+func ff_contextualArgument_string_literal(a: Int, b: Int, c: Int, string_literal: Int, d: Int) {}
+func ff_contextualArgument_unknown(a: Int, b: Int, c: Int, unknown: Int, d: Int) {}
+func ff_contextualArgument_identifier(a: Int, b: Int, c: Int, identifier: Int, d: Int) {}
+func ff_contextualArgument_oper_binary_unspaced(a: Int, b: Int, c: Int, oper_binary_unspaced: Int, d: Int) {}
+func ff_contextualArgument_oper_binary_spaced(a: Int, b: Int, c: Int, oper_binary_spaced: Int, d: Int) {}
+func ff_contextualArgument_oper_prefix(a: Int, b: Int, c: Int, oper_prefix: Int, d: Int) {}
+func ff_contextualArgument_dollarident(a: Int, b: Int, c: Int, dollarident: Int, d: Int) {}
+func ff_contextualArgument_contextual_keyword(a: Int, b: Int, c: Int, contextual_keyword: Int, d: Int) {}
+func ff_contextualArgument_string_segment(a: Int, b: Int, c: Int, string_segment: Int, d: Int) {}
+func ff_contextualArgument_string_interpolation_anchor(a: Int, b: Int, c: Int, string_interpolation_anchor: Int, d: Int) {}
+func ff_contextualArgument_yield(a: Int, b: Int, c: Int, yield: Int, d: Int) {}
 
-ff_contextualArgument_for(
+ff_contextualArgument_associatedtype(
     a: 1
     b: 1
     c: 1
-    for: 1
+    associatedtype: 1
+    d: 1
+)
+
+ff_contextualArgument_class(
+    a: 1
+    b: 1
+    c: 1
+    class: 1
+    d: 1
+)
+
+ff_contextualArgument_deinit(
+    a: 1
+    b: 1
+    c: 1
+    deinit: 1
+    d: 1
+)
+
+ff_contextualArgument_enum(
+    a: 1
+    b: 1
+    c: 1
+    enum: 1
+    d: 1
+)
+
+ff_contextualArgument_extension(
+    a: 1
+    b: 1
+    c: 1
+    extension: 1
+    d: 1
+)
+
+ff_contextualArgument_func(
+    a: 1
+    b: 1
+    c: 1
+    func: 1
+    d: 1
+)
+
+ff_contextualArgument_import(
+    a: 1
+    b: 1
+    c: 1
+    import: 1
+    d: 1
+)
+
+ff_contextualArgument_init(
+    a: 1
+    b: 1
+    c: 1
+    init: 1
+    d: 1
+)
+
+ff_contextualArgument_inout(
+    a: 1
+    b: 1
+    c: 1
+    `inout`: 1
+    d: 1
+)
+
+ff_contextualArgument_let(
+    a: 1
+    b: 1
+    c: 1
+    `let`: 1
+    d: 1
+)
+
+ff_contextualArgument_operator(
+    a: 1
+    b: 1
+    c: 1
+    operator: 1
+    d: 1
+)
+
+ff_contextualArgument_precedencegroup(
+    a: 1
+    b: 1
+    c: 1
+    precedencegroup: 1
     d: 1
 )
 
@@ -2474,4 +2648,605 @@ ff_contextualArgument_protocol(
     protocol: 1
     d: 1
 )
+
+ff_contextualArgument_struct(
+    a: 1
+    b: 1
+    c: 1
+    struct: 1
+    d: 1
+)
+
+ff_contextualArgument_subscript(
+    a: 1
+    b: 1
+    c: 1
+    subscript: 1
+    d: 1
+)
+
+ff_contextualArgument_typealias(
+    a: 1
+    b: 1
+    c: 1
+    typealias: 1
+    d: 1
+)
+
+ff_contextualArgument_var(
+    a: 1
+    b: 1
+    c: 1
+    `var`: 1
+    d: 1
+)
+
+ff_contextualArgument_fileprivate(
+    a: 1
+    b: 1
+    c: 1
+    fileprivate: 1
+    d: 1
+)
+
+ff_contextualArgument_internal(
+    a: 1
+    b: 1
+    c: 1
+    internal: 1
+    d: 1
+)
+
+ff_contextualArgument_private(
+    a: 1
+    b: 1
+    c: 1
+    private: 1
+    d: 1
+)
+
+ff_contextualArgument_public(
+    a: 1
+    b: 1
+    c: 1
+    public: 1
+    d: 1
+)
+
+ff_contextualArgument_static(
+    a: 1
+    b: 1
+    c: 1
+    static: 1
+    d: 1
+)
+
+ff_contextualArgument_defer(
+    a: 1
+    b: 1
+    c: 1
+    defer: 1
+    d: 1
+)
+
+ff_contextualArgument_if(
+    a: 1
+    b: 1
+    c: 1
+    if: 1
+    d: 1
+)
+
+ff_contextualArgument_guard(
+    a: 1
+    b: 1
+    c: 1
+    guard: 1
+    d: 1
+)
+
+ff_contextualArgument_do(
+    a: 1
+    b: 1
+    c: 1
+    do: 1
+    d: 1
+)
+
+ff_contextualArgument_repeat(
+    a: 1
+    b: 1
+    c: 1
+    repeat: 1
+    d: 1
+)
+
+ff_contextualArgument_else(
+    a: 1
+    b: 1
+    c: 1
+    else: 1
+    d: 1
+)
+
+ff_contextualArgument_for(
+    a: 1
+    b: 1
+    c: 1
+    for: 1
+    d: 1
+)
+
+ff_contextualArgument_in(
+    a: 1
+    b: 1
+    c: 1
+    in: 1
+    d: 1
+)
+
+ff_contextualArgument_while(
+    a: 1
+    b: 1
+    c: 1
+    while: 1
+    d: 1
+)
+
+ff_contextualArgument_return(
+    a: 1
+    b: 1
+    c: 1
+    return: 1
+    d: 1
+)
+
+ff_contextualArgument_break(
+    a: 1
+    b: 1
+    c: 1
+    break: 1
+    d: 1
+)
+
+ff_contextualArgument_continue(
+    a: 1
+    b: 1
+    c: 1
+    continue: 1
+    d: 1
+)
+
+ff_contextualArgument_fallthrough(
+    a: 1
+    b: 1
+    c: 1
+    fallthrough: 1
+    d: 1
+)
+
+ff_contextualArgument_switch(
+    a: 1
+    b: 1
+    c: 1
+    switch: 1
+    d: 1
+)
+
+ff_contextualArgument_case(
+    a: 1
+    b: 1
+    c: 1
+    case: 1
+    d: 1
+)
+
+ff_contextualArgument_default(
+    a: 1
+    b: 1
+    c: 1
+    default: 1
+    d: 1
+)
+
+ff_contextualArgument_where(
+    a: 1
+    b: 1
+    c: 1
+    where: 1
+    d: 1
+)
+
+ff_contextualArgument_catch(
+    a: 1
+    b: 1
+    c: 1
+    catch: 1
+    d: 1
+)
+
+ff_contextualArgument_throw(
+    a: 1
+    b: 1
+    c: 1
+    throw: 1
+    d: 1
+)
+
+ff_contextualArgument_as(
+    a: 1
+    b: 1
+    c: 1
+    as: 1
+    d: 1
+)
+
+ff_contextualArgument_Any(
+    a: 1
+    b: 1
+    c: 1
+    Any: 1
+    d: 1
+)
+
+ff_contextualArgument_false(
+    a: 1
+    b: 1
+    c: 1
+    false: 1
+    d: 1
+)
+
+ff_contextualArgument_is(
+    a: 1
+    b: 1
+    c: 1
+    is: 1
+    d: 1
+)
+
+ff_contextualArgument_nil(
+    a: 1
+    b: 1
+    c: 1
+    nil: 1
+    d: 1
+)
+
+ff_contextualArgument_rethrows(
+    a: 1
+    b: 1
+    c: 1
+    rethrows: 1
+    d: 1
+)
+
+ff_contextualArgument_super(
+    a: 1
+    b: 1
+    c: 1
+    super: 1
+    d: 1
+)
+
+ff_contextualArgument_self(
+    a: 1
+    b: 1
+    c: 1
+    self: 1
+    d: 1
+)
+
+ff_contextualArgument_Self(
+    a: 1
+    b: 1
+    c: 1
+    Self: 1
+    d: 1
+)
+
+ff_contextualArgument_true(
+    a: 1
+    b: 1
+    c: 1
+    true: 1
+    d: 1
+)
+
+ff_contextualArgument_try(
+    a: 1
+    b: 1
+    c: 1
+    try: 1
+    d: 1
+)
+
+ff_contextualArgument_throws(
+    a: 1
+    b: 1
+    c: 1
+    throws: 1
+    d: 1
+)
+
+ff_contextualArgument___FILE__(
+    a: 1
+    b: 1
+    c: 1
+    __FILE__: 1
+    d: 1
+)
+
+ff_contextualArgument___LINE__(
+    a: 1
+    b: 1
+    c: 1
+    __LINE__: 1
+    d: 1
+)
+
+ff_contextualArgument___COLUMN__(
+    a: 1
+    b: 1
+    c: 1
+    __COLUMN__: 1
+    d: 1
+)
+
+ff_contextualArgument___FUNCTION__(
+    a: 1
+    b: 1
+    c: 1
+    __FUNCTION__: 1
+    d: 1
+)
+
+ff_contextualArgument___DSO_HANDLE__(
+    a: 1
+    b: 1
+    c: 1
+    __DSO_HANDLE__: 1
+    d: 1
+)
+
+ff_contextualArgument___(
+    a: 1
+    b: 1
+    c: 1
+    __: 1
+    d: 1
+)
+
+ff_contextualArgument_keyPath(
+    a: 1
+    b: 1
+    c: 1
+    keyPath: 1
+    d: 1
+)
+
+ff_contextualArgument_line(
+    a: 1
+    b: 1
+    c: 1
+    line: 1
+    d: 1
+)
+
+ff_contextualArgument_selector(
+    a: 1
+    b: 1
+    c: 1
+    selector: 1
+    d: 1
+)
+
+ff_contextualArgument_file(
+    a: 1
+    b: 1
+    c: 1
+    file: 1
+    d: 1
+)
+
+ff_contextualArgument_column(
+    a: 1
+    b: 1
+    c: 1
+    column: 1
+    d: 1
+)
+
+ff_contextualArgument_function(
+    a: 1
+    b: 1
+    c: 1
+    function: 1
+    d: 1
+)
+
+ff_contextualArgument_dsohandle(
+    a: 1
+    b: 1
+    c: 1
+    dsohandle: 1
+    d: 1
+)
+
+ff_contextualArgument_sourceLocation(
+    a: 1
+    b: 1
+    c: 1
+    sourceLocation: 1
+    d: 1
+)
+
+ff_contextualArgument_warning(
+    a: 1
+    b: 1
+    c: 1
+    warning: 1
+    d: 1
+)
+
+ff_contextualArgument_error(
+    a: 1
+    b: 1
+    c: 1
+    error: 1
+    d: 1
+)
+
+ff_contextualArgument_elseif(
+    a: 1
+    b: 1
+    c: 1
+    elseif: 1
+    d: 1
+)
+
+ff_contextualArgument_endif(
+    a: 1
+    b: 1
+    c: 1
+    endif: 1
+    d: 1
+)
+
+ff_contextualArgument_available(
+    a: 1
+    b: 1
+    c: 1
+    available: 1
+    d: 1
+)
+
+ff_contextualArgument_fileLiteral(
+    a: 1
+    b: 1
+    c: 1
+    fileLiteral: 1
+    d: 1
+)
+
+ff_contextualArgument_imageLiteral(
+    a: 1
+    b: 1
+    c: 1
+    imageLiteral: 1
+    d: 1
+)
+
+ff_contextualArgument_colorLiteral(
+    a: 1
+    b: 1
+    c: 1
+    colorLiteral: 1
+    d: 1
+)
+
+ff_contextualArgument_integer_literal(
+    a: 1
+    b: 1
+    c: 1
+    integer_literal: 1
+    d: 1
+)
+
+ff_contextualArgument_floating_literal(
+    a: 1
+    b: 1
+    c: 1
+    floating_literal: 1
+    d: 1
+)
+
+ff_contextualArgument_string_literal(
+    a: 1
+    b: 1
+    c: 1
+    string_literal: 1
+    d: 1
+)
+
+ff_contextualArgument_unknown(
+    a: 1
+    b: 1
+    c: 1
+    unknown: 1
+    d: 1
+)
+
+ff_contextualArgument_identifier(
+    a: 1
+    b: 1
+    c: 1
+    identifier: 1
+    d: 1
+)
+
+ff_contextualArgument_oper_binary_unspaced(
+    a: 1
+    b: 1
+    c: 1
+    oper_binary_unspaced: 1
+    d: 1
+)
+
+ff_contextualArgument_oper_binary_spaced(
+    a: 1
+    b: 1
+    c: 1
+    oper_binary_spaced: 1
+    d: 1
+)
+
+ff_contextualArgument_oper_prefix(
+    a: 1
+    b: 1
+    c: 1
+    oper_prefix: 1
+    d: 1
+)
+
+ff_contextualArgument_dollarident(
+    a: 1
+    b: 1
+    c: 1
+    dollarident: 1
+    d: 1
+)
+
+ff_contextualArgument_contextual_keyword(
+    a: 1
+    b: 1
+    c: 1
+    contextual_keyword: 1
+    d: 1
+)
+
+ff_contextualArgument_string_segment(
+    a: 1
+    b: 1
+    c: 1
+    string_segment: 1
+    d: 1
+)
+
+ff_contextualArgument_string_interpolation_anchor(
+    a: 1
+    b: 1
+    c: 1
+    string_interpolation_anchor: 1
+    d: 1
+)
+
+ff_contextualArgument_yield(
+    a: 1
+    b: 1
+    c: 1
+    yield: 1
+    d: 1
+)
+
 

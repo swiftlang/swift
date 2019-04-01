@@ -203,6 +203,10 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
       break;
     
 parse_operator:
+    if (peekToken().is(tok::colon))
+      // If we're about to hit a colon, we aren't parsing a binary operator, so 
+      // we're done.
+      goto done;
     switch (Tok.getKind()) {
     case tok::oper_binary_spaced:
     case tok::oper_binary_unspaced: {
