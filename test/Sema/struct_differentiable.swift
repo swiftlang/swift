@@ -251,6 +251,26 @@ struct TF_260<T : Differentiable> : Differentiable & AdditiveArithmetic {
   var x: T.CotangentVector
 }
 
+// TF-269: Test crash when differentiation properties have no getter.
+// Related to access levels and associated type inference.
+public protocol TF_269_Layer: Differentiable & KeyPathIterable
+  where AllDifferentiableVariables: KeyPathIterable {
+
+  associatedtype Input: Differentiable
+  associatedtype Output: Differentiable
+  func applied(to input: Input) -> Output
+}
+
+public struct TF_269 : TF_269_Layer {
+  public var filter: Float
+  public typealias Activation = @differentiable (Output) -> Output
+  @noDerivative public let activation: Activation
+
+  public func applied(to input: Float) -> Float {
+    return input
+  }
+}
+
 // Test errors.
 
 // Test manually customizing vector space types.
