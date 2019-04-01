@@ -1922,6 +1922,10 @@ public:
 
   Pattern *getPattern() const { return PatternAndFlags.getPointer(); }
   void setPattern(Pattern *P) { PatternAndFlags.setPointer(P); }
+
+  /// Whether the given pattern binding entry is initialized.
+  bool isInitialized() const;
+
   Expr *getInit() const {
     if (PatternAndFlags.getInt().contains(Flags::Removed) ||
         InitContextAndIsText.getInt())
@@ -2067,6 +2071,11 @@ public:
 
   void setInitStringRepresentation(unsigned i, StringRef str) {
     getMutablePatternList()[i].setInitStringRepresentation(str);
+  }
+
+  /// Whether the given pattern entry is initialized.
+  bool isInitialized(unsigned i) const {
+    return getPatternList()[i].isInitialized();
   }
 
   Expr *getInit(unsigned i) const {
@@ -5024,6 +5033,15 @@ public:
   /// Retrieve the custom attribute that attaches a property delegate to this
   /// property.
   CustomAttr *getAttachedPropertyDelegate() const;
+
+  /// Retrieve the type of the attached property delegate as a contextual
+  /// type.
+  ///
+  /// \returns a NULL type for properties without attached delegates,
+  /// an error type when the property delegate type itself is erroneous,
+  /// or the delegate type itself, which may involve unbound generic
+  /// types.
+  Type getAttachedPropertyDelegateType() const;
 
   /// Return the Objective-C runtime name for this property.
   Identifier getObjCPropertyName() const;
