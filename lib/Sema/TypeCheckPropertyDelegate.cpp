@@ -277,3 +277,35 @@ AttachedPropertyDelegateRequest::evaluate(Evaluator &evaluator,
   return nullptr;
 }
     
+llvm::Expected<Type>
+AttachedPropertyDelegateTypeRequest::evaluate(Evaluator &evaluator,
+                                              VarDecl *var) const {
+  // Find the custom attribute for the attached property delegate.
+  llvm::Expected<CustomAttr *> customAttrVal =
+    evaluator(AttachedPropertyDelegateRequest{var});
+  if (!customAttrVal)
+    return customAttrVal.takeError();
+
+  // If there isn't an attached property delegate, we're done.
+  auto customAttr = *customAttrVal;
+  if (!customAttr)
+    return Type();
+
+  auto resolution =
+    TypeResolution::forContextual(var->getDeclContext());
+  TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
+  options |= TypeResolutionFlags::AllowUnboundGenerics;
+
+  ASTContext &ctx = var->getASTContext();
+  auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
+  if (tc.validateType(customAttr->getTypeLoc(), resolution, options))
+    return ErrorType::get(ctx);
+
+  Type customAttrType = customAttr->getTypeLoc().getType();
+  if (!customAttrType->getAnyNominal()) {
+    assert(ctx.Diags.hadAnyError());
+    return ErrorType::get(ctx);
+  }
+
+  return customAttrType;
+}

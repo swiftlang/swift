@@ -441,6 +441,32 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
+/// Request the nominal type declaration to which the given custom attribute
+/// refers.
+class AttachedPropertyDelegateRequest :
+    public SimpleRequest<AttachedPropertyDelegateRequest,
+                         CacheKind::Cached,
+                         CustomAttr *,
+                         VarDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<CustomAttr *>
+  evaluate(Evaluator &evaluator, VarDecl *) const;
+
+public:
+  // Caching
+  bool isCached() const;
+
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
 /// The zone number for the type checker.
 #define SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE 10
 

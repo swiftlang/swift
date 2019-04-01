@@ -4331,6 +4331,33 @@ ERROR(property_delegate_type_requirement_not_accessible,none,
       "more restrictive access than its enclosing property delegate type %3 "
       "(which is %select{private|fileprivate|internal|public|open}4)",
       (AccessLevel, DescriptiveDeclKind, DeclName, Type, AccessLevel))
+ERROR(property_delegate_reserved_name,none,
+      "property delegate type name must start with an uppercase letter", ())
+
+ERROR(property_delegate_attribute_not_on_property, none,
+      "property delegate attribute %0 can only be applied to a property",
+      (DeclName))
+
+ERROR(property_delegate_multiple,none,
+      "only one property delegate can be attached to a given property", ())
+NOTE(previous_property_delegate_here,none,
+      "previous property delegate specified here", ())
+
+ERROR(property_delegate_local,none,
+      "property delegates are not yet supported on local properties", ())
+ERROR(property_with_delegate_conflict_attribute,none,
+      "property %0 with a delegate cannot also be "
+      "%select{lazy|@NSCopying|@NSManaged|weak|unowned|unmanaged}1",
+      (DeclName, int))
+ERROR(property_delegate_not_single_var, none,
+      "property delegate can only apply to a single variable", ())
+ERROR(property_with_delegate_in_bad_context,none,
+      "%select{|non-static |non-static }1property %0 declared inside "
+      "%select{a protocol|an extension|an enum}1 cannot have a delegate",
+      (DeclName, int))
+ERROR(property_with_delegate_overrides,none,
+      "property %0 with attached delegate cannot override another property",
+      (DeclName))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
