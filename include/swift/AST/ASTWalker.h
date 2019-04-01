@@ -211,6 +211,14 @@ public:
   /// However, ASTWalker does not walk into LazyInitializerExprs on its own.
   virtual bool shouldWalkIntoLazyInitializers() { return true; }
 
+  /// This method configures whether the walker should visit the body of a
+  /// non-single expression closure.
+  ///
+  /// For work that is performed for every top-level expression, this should
+  /// be overridden to return false, to avoid duplicating work or visiting
+  /// bodies of closures that have not yet been type checked.
+  virtual bool shouldWalkIntoNonSingleExpressionClosure() { return true; }
+
   /// walkToParameterListPre - This method is called when first visiting a
   /// ParameterList, before walking into its parameters.  If it returns false,
   /// the subtree is skipped.
