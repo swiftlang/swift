@@ -147,8 +147,7 @@ static void maybeMarkAsInlinable(DerivedConformance &derived,
                                  AbstractFunctionDecl *afd) {
   ASTContext &C = derived.TC.Context;
   auto parentDC = derived.getConformanceContext();
-  if (parentDC->getParentModule()->getResilienceStrategy() !=
-      ResilienceStrategy::Resilient) {
+  if (!parentDC->getParentModule()->isResilient()) {
     AccessScope access =
         afd->getFormalAccessScope(nullptr,
                                   /*treatUsableFromInlineAsPublic*/true);

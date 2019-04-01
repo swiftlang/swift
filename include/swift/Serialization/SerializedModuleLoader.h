@@ -94,7 +94,7 @@ public:
   FileUnit *loadAST(ModuleDecl &M, Optional<SourceLoc> diagLoc,
                     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
                     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
-                    bool isFramework = false);
+                    bool isFramework, bool treatAsPartialModule);
 
   /// Check whether the module with a given name can be imported without
   /// importing it.

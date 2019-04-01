@@ -79,6 +79,63 @@ static SubstitutionMap lookupBridgeToObjCProtocolSubs(SILModule &mod,
 /// _conditionallyBridgeFromObjectiveC_bridgeable which converts an ObjC
 /// instance into a corresponding Swift type, conforming to
 /// _ObjectiveCBridgeable.
+///
+/// Control Flow Modification Model
+/// ===============================
+///
+/// NOTE: In the following we assume that our src type is not address only. We
+/// do not support optimizing such source types today.
+///
+/// Unconditional Casts
+/// -------------------
+///
+/// In the case of unconditional casts, we do not touch the CFG at all. We
+/// perform the following optimizations:
+///
+/// 1. If the bridged type and the src type equal, we replace the cast with the
+///    apply.
+///
+/// 2. If src is an address and bridged type has the matching object type to
+///    src, just load the value and again replace the cast with the apply.
+///
+/// 3. If src is an address and after loading still doesn't match bridged type,
+///    insert an unconditional_checked_cast before calling the apply.
+///
+/// Conditional Casts
+/// -----------------
+///
+/// In the case of a conditional const (i.e. checked_cast_addr_br), we transform
+/// the following CFG:
+///
+/// ```
+///    InstBlock (checked_cast_addr_br) -> FailureBB -> FailureSucc
+///        \
+///         \----------------------------> SuccessBB -> SuccessSucc
+/// ```
+///
+/// to a CFG of the following form:
+///
+/// ```
+///   InstBlock (checked_cast_br) -> CastFailBB -> FailureBB -> FailureSucc
+///        |                                          ^
+///        \-> CastSuccessBB (bridge call + switch) --|
+///                 |
+///                 \-> BridgeSuccessBB -> SuccessBB -> SuccessSucc
+/// ```
+///
+/// NOTE: That if the underlying src type matches the type of the underlying
+/// bridge source object, we can omit the initial checked_cast_br and just load
+/// the value + branch to the CastSuccessBB. This results instead in the
+/// following CFG:
+///
+/// ```
+///   InstBlock (br)                             FailureBB -> FailureSucc
+///        |                                          ^
+///        \-> CastSuccessBB (bridge call + switch) --|
+///                 |
+///                 \-> BridgeSuccessBB -> SuccessBB -> SuccessSucc
+/// ```
+///
 SILInstruction *
 CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   auto kind = dynamicCast.getKind();
@@ -99,6 +156,7 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   }
 
   SILValue src = dynamicCast.getSource();
+
   // Check if we have a source type that is address only. We do not support that
   // today.
   if (src->getType().isAddressOnly(mod)) {
@@ -134,11 +192,12 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   SILBuilderWithScope Builder(Inst, BuilderContext);
 
   // If this is a conditional cast:
+  //
   // We need a new fail BB in order to add a dealloc_stack to it
-  SILBasicBlock *ConvFailBB = nullptr;
+  SILBasicBlock *CastFailBB = nullptr;
   if (isConditional) {
     auto CurrInsPoint = Builder.getInsertionPoint();
-    ConvFailBB = splitBasicBlockAndBranch(Builder, &(*FailureBB->begin()),
+    CastFailBB = splitBasicBlockAndBranch(Builder, &(*FailureBB->begin()),
                                           nullptr, nullptr);
     Builder.setInsertionPoint(CurrInsPoint);
   }
@@ -176,8 +235,8 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
       SILBasicBlock *castSuccessBB = F->createBasicBlock();
       castSuccessBB->createPhiArgument(silBridgedTy, ValueOwnershipKind::Owned);
       auto *ccbi = Builder.createCheckedCastBranch(
-          Loc, false, load, silBridgedTy, castSuccessBB, ConvFailBB);
-      splitEdge(ccbi, /* EdgeIdx to ConvFailBB */ 1);
+          Loc, false, load, silBridgedTy, castSuccessBB, CastFailBB);
+      splitEdge(ccbi, /* EdgeIdx to CastFailBB */ 1);
       Builder.setInsertionPoint(castSuccessBB);
       return {castSuccessBB->getArgument(0), ccbi};
     }
@@ -257,17 +316,17 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
     // Load from the optional.
     auto *SomeDecl = Builder.getASTContext().getOptionalSomeDecl();
 
-    SILBasicBlock *ConvSuccessBB = Inst->getFunction()->createBasicBlock();
-    SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> CaseBBs;
-    CaseBBs.push_back(
-        std::make_pair(mod.getASTContext().getOptionalNoneDecl(), FailureBB));
-    Builder.createSwitchEnumAddr(Loc, InOutOptionalParam, ConvSuccessBB,
+    SILBasicBlock *BridgeSuccessBB = Inst->getFunction()->createBasicBlock();
+    SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 2> CaseBBs;
+    CaseBBs.emplace_back(mod.getASTContext().getOptionalNoneDecl(), FailureBB);
+
+    Builder.createSwitchEnumAddr(Loc, InOutOptionalParam, BridgeSuccessBB,
                                  CaseBBs);
 
     Builder.setInsertionPoint(FailureBB->begin());
     Builder.createDeallocStack(Loc, Tmp);
 
-    Builder.setInsertionPoint(ConvSuccessBB);
+    Builder.setInsertionPoint(BridgeSuccessBB);
     auto Addr = Builder.createUncheckedTakeEnumDataAddr(Loc, InOutOptionalParam,
                                                         SomeDecl);
 

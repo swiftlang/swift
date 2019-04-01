@@ -258,6 +258,16 @@ struct Subscript3 {
   subscript(x x: Int) -> String { return "" }
 }
 
+struct Subscript4 {
+    subscript(f: @escaping (Int) -> Int) -> Int { // expected-note{{previously declared here}}
+        get { return f(0) }
+    }
+
+    subscript(f: (Int) -> Int) -> Int { // expected-error{{invalid redeclaration of 'subscript(_:)'}}
+        get { return f(0) }
+    }
+}
+
 struct GenericSubscripts {
   subscript<T>(x: T) -> Int { return 0 } // expected-note{{previously declared here}}
 }
