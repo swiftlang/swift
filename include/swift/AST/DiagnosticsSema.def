@@ -39,12 +39,8 @@
 
 NOTE(kind_declname_declared_here,none,
      "%0 %1 declared here", (DescriptiveDeclKind, DeclName))
-NOTE(kind_identifier_declared_here,none,
-     "%0 %1 declared here", (DescriptiveDeclKind, Identifier))
 NOTE(decl_declared_here,none,
      "%0 declared here", (DeclName))
-NOTE(identifier_declared_here,none,
-     "%0 declared here", (Identifier))
 NOTE(kind_declared_here,none,
      "%0 declared here", (DescriptiveDeclKind))
 NOTE(implicit_member_declared_here,none,
