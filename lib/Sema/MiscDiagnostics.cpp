@@ -584,7 +584,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     void checkNoEscapeParameterUse(DeclRefExpr *DRE, Expr *parent,
                                    OperandKind useKind) {
       // This only cares about declarations of noescape function type.
-      auto AFT = DRE->getDecl()->getInterfaceType()->getAs<AnyFunctionType>();
+      auto AFT = DRE->getType()->getAs<FunctionType>();
       if (!AFT || !AFT->isNoEscape())
         return;
 
