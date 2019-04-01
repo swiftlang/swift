@@ -1370,6 +1370,22 @@ SourceRange PatternBindingEntry::getOrigInitRange() const {
   return Init ? Init->getSourceRange() : SourceRange();
 }
 
+bool PatternBindingEntry::isInitialized() const {
+  // Directly initialized.
+  if (getInit())
+    return true;
+
+  // Initialized via a property delegate.
+  if (auto var = getPattern()->getSingleVar()) {
+    if (auto customAttr = var->getAttachedPropertyDelegate()) {
+      if (customAttr->getArg() != nullptr)
+        return true;
+    }
+  }
+
+  return false;
+}
+
 void PatternBindingEntry::setInit(Expr *E) {
   auto F = PatternAndFlags.getInt();
   if (E) {
@@ -5245,6 +5261,14 @@ CustomAttr *VarDecl::getAttachedPropertyDelegate() const {
   return evaluateOrDefault(ctx.evaluator,
                            AttachedPropertyDelegateRequest{mutableThis},
                            nullptr);
+}
+
+Type VarDecl::getAttachedPropertyDelegateType() const {
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<VarDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           AttachedPropertyDelegateTypeRequest{mutableThis},
+                           Type());
 }
 
 Identifier VarDecl::getObjCPropertyName() const {

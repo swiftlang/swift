@@ -21,6 +21,7 @@
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/AST/TypeResolutionStage.h"
+#include "swift/Basic/AnyValue.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
@@ -440,6 +441,40 @@ public:
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
+
+/// Request the nominal type declaration to which the given custom attribute
+/// refers.
+class AttachedPropertyDelegateTypeRequest :
+    public SimpleRequest<AttachedPropertyDelegateTypeRequest,
+                         CacheKind::Cached,
+                         Type,
+                         VarDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Type>
+  evaluate(Evaluator &evaluator, VarDecl *var) const;
+
+public:
+  // Caching
+  bool isCached() const;
+
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+// Allow AnyValue to compare two Type values, even though Type doesn't
+// support ==.
+template<>
+bool AnyValue::Holder<Type>::equals(const HolderBase &other) const;
+
+void simple_display(llvm::raw_ostream &out, const Type &type);
+
 
 /// The zone number for the type checker.
 #define SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE 10

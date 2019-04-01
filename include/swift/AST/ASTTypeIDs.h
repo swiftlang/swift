@@ -23,6 +23,7 @@ namespace swift {
 class CustomAttr;
 class NominalTypeDecl;
 struct PropertyDelegateTypeInfo;
+class Type;
 class VarDecl;
 
 #define SWIFT_AST_TYPEID_ZONE 1

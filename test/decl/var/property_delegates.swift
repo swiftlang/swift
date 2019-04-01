@@ -114,7 +114,7 @@ enum SomeEnum {
   // expected-error@-1{{enums must not contain stored properties}}
 
   @Wrapper(value: 17)
-  static var x: Int = 17 // okay
+  static var x: Int
 }
 
 protocol SomeProtocol {
@@ -135,14 +135,12 @@ extension HasDelegate {
   // expected-error@-1{{extensions must not contain stored properties}}
 
   @Wrapper(value: 17)
-  static var x: Int = 17 // okay
+  static var x: Int
 }
 
 class ClassWithDelegates {
   @Wrapper(value: 17)
-  var x: Int = 42
-
-  
+  var x: Int
 }
 
 class Superclass {
@@ -172,4 +170,35 @@ struct MultipleDelegates {
 
   @WrapperWithInitialValue // expected-error 2{{property delegate can only apply to a single variable}}
   var (y, z) = (1, 2)
+}
+
+// ---------------------------------------------------------------------------
+// Initialization
+// ---------------------------------------------------------------------------
+
+struct Initialization {
+  @Wrapper(value: 17)
+  var x: Int
+
+  @Wrapper(value: 17)
+  var x2: Double
+
+  @Wrapper(value: 17)
+  var x3 = 42 // expected-error{{property 'x3' with attached delegate cannot initialize both the delegate type and the property}}
+
+  @Wrapper(value: 17)
+  var x4
+
+  @WrapperWithInitialValue
+  var y = true
+
+  // FIXME: It would be nice if we had a more detailed diagnostic here.
+  @WrapperWithInitialValue<Int>
+  var y2 = true // expected-error{{'Bool' is not convertible to 'Int'}}
+
+  mutating func checkTypes(s: String) {
+    x2 = s // expected-error{{cannot assign value of type 'String' to type 'Double'}}
+    x4 = s // expected-error{{cannot assign value of type 'String' to type 'Int'}}
+    y = s // expected-error{{cannot assign value of type 'String' to type 'Bool'}}
+  }
 }

@@ -2069,9 +2069,12 @@ namespace {
         // will avoid exponential typecheck behavior in the case of
         // tuples, nested arrays, and dictionary literals.
         //
+        // FIXME: This should be handled in the solver, not here.
+        //
         // Otherwise, create a new type variable.
         auto ty = Type();
-        if (!var->hasNonPatternBindingInit()) {
+        if (!var->hasNonPatternBindingInit() &&
+            !var->getAttachedPropertyDelegate()) {
           if (auto boundExpr = locator.trySimplifyToExpr()) {
             if (!boundExpr->isSemanticallyInOutExpr())
               ty = CS.getType(boundExpr)->getRValueType();

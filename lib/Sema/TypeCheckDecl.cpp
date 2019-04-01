@@ -33,6 +33,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/PropertyDelegates.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeWalker.h"
@@ -970,11 +971,12 @@ static void validatePatternBindingEntry(TypeChecker &tc,
   // even though the PBD is inside a TopLevelCodeDecl.
   TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
 
-  if (binding->getInit(entryNumber)) {
+  if (binding->isInitialized(entryNumber)) {
     // If we have an initializer, we can also have unknown types.
     options |= TypeResolutionFlags::AllowUnspecifiedTypes;
     options |= TypeResolutionFlags::AllowUnboundGenerics;
   }
+
   if (tc.typeCheckPattern(pattern, binding->getDeclContext(), options)) {
     setBoundVarsTypeError(pattern, tc.Context);
     binding->setInvalid();
@@ -2220,7 +2222,7 @@ public:
       // If we have a type but no initializer, check whether the type is
       // default-initializable. If so, do it.
       if (PBD->getPattern(i)->hasType() &&
-          !PBD->getInit(i) &&
+          !PBD->isInitialized(i) &&
           PBD->getPattern(i)->hasStorage() &&
           !PBD->getPattern(i)->getType()->hasError()) {
 
@@ -2253,7 +2255,7 @@ public:
         }
       }
 
-      if (PBD->getInit(i)) {
+      if (PBD->isInitialized(i)) {
         // Add the attribute that preserves the "has an initializer" value across
         // module generation, as required for TBDGen.
         PBD->getPattern(i)->forEachVariable([&](VarDecl *VD) {
@@ -2277,7 +2279,7 @@ public:
     for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
       auto entry = PBD->getPatternList()[i];
     
-      if (entry.getInit() || isInSILMode) continue;
+      if (entry.isInitialized() || isInSILMode) continue;
       
       entry.getPattern()->forEachVariable([&](VarDecl *var) {
         // If the variable has no storage, it never needs an initializer.
@@ -2348,7 +2350,7 @@ public:
 
     // If the initializers in the PBD aren't checked yet, do so now.
     for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
-      if (!PBD->getInit(i))
+      if (!PBD->isInitialized(i))
         continue;
 
       if (!PBD->isInitializerChecked(i))
