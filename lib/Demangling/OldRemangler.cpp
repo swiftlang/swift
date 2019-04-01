@@ -1807,6 +1807,14 @@ void Remangler::mangleObjCMetadataUpdateFunction(Node *node) {
   Buffer << "<objc-metadata-update-function>";
 }
 
+void Remangler::mangleObjCResilientClassStub(Node *node) {
+  Buffer << "<objc-resilient-class-stub>";
+}
+
+void Remangler::mangleFullObjCResilientClassStub(Node *node) {
+  Buffer << "<full-objc-resilient-class-stub>";
+}
+
 void Remangler::mangleEmptyList(Node *node) {
   Buffer << "<empty>";
 }

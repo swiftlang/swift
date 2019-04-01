@@ -25,6 +25,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -144,11 +145,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       }
       if (isa<TypeExpr>(Base))
         checkUseOfMetaTypeName(Base);
-
-      if (auto *ASE = dyn_cast<ArgumentShuffleExpr>(E)) {
-        if (CallArgs.count(ASE))
-          CallArgs.insert(ASE->getSubExpr());
-      }
 
       if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
         CallArgs.insert(SE->getIndex());
@@ -329,11 +325,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     static void argExprVisitArguments(Expr* arg,
                                       llvm::function_ref
                                         <void(unsigned, Expr*)> fn) {
-      // The argument could be shuffled if it includes default arguments,
-      // label differences, or other exciting things like that.
-      if (auto *ASE = dyn_cast<ArgumentShuffleExpr>(arg))
-        arg = ASE->getSubExpr();
-
       // The argument is either a ParenExpr or TupleExpr.
       if (auto *TE = dyn_cast<TupleExpr>(arg)) {
         auto elts = TE->getElements();
@@ -1688,7 +1679,7 @@ bool TypeChecker::getDefaultGenericArgumentsString(
 /// Diagnose an argument labeling issue, returning true if we successfully
 /// diagnosed the issue.
 bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
-                                       const Expr *expr,
+                                       Expr *expr,
                                        ArrayRef<Identifier> newNames,
                                        bool isSubscript,
                                        InFlightDiagnostic *existingDiag) {
@@ -1700,56 +1691,26 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
   };
 
   auto &diags = ctx.Diags;
-  auto tuple = dyn_cast<TupleExpr>(expr);
-  if (!tuple) {
-    if (newNames[0].empty()) {
-      // We don't know what to do with this.
-      return false;
-    }
 
-    llvm::SmallString<16> str;
-    // If the diagnostic is local, flush it before returning.
-    // This makes sure it's emitted before 'str' is destroyed.
-    SWIFT_DEFER { diagOpt.reset(); };
-
-    // This is a scalar-to-tuple conversion. Add the name. We "know"
-    // that we're inside a ParenExpr, because ParenExprs are required
-    // by the syntax and locator resolution looks through on level of
-    // them.
-
-    // Look through the paren expression, if there is one.
-    if (auto parenExpr = dyn_cast<ParenExpr>(expr))
-      expr = parenExpr->getSubExpr();
-
-    str += newNames[0].str();
-    str += ": ";
-    if (!existingDiag) {
-      diagOpt.emplace(diags.diagnose(expr->getStartLoc(),
-                                     diag::missing_argument_labels,
-                                     false, str.str().drop_back(),
-                                     isSubscript));
-    }
-    getDiag().fixItInsert(expr->getStartLoc(), str);
-    return true;
-  }
+  OriginalArgumentList argList = getOriginalArgumentList(expr);
 
   // Figure out how many extraneous, missing, and wrong labels are in
   // the call.
   unsigned numExtra = 0, numMissing = 0, numWrong = 0;
-  unsigned n = std::max(tuple->getNumElements(), (unsigned)newNames.size());
+  unsigned n = std::max(argList.args.size(), newNames.size());
 
   llvm::SmallString<16> missingBuffer;
   llvm::SmallString<16> extraBuffer;
   for (unsigned i = 0; i != n; ++i) {
     Identifier oldName;
-    if (i < tuple->getNumElements())
-      oldName = tuple->getElementName(i);
+    if (i < argList.args.size())
+      oldName = argList.labels[i];
     Identifier newName;
     if (i < newNames.size())
       newName = newNames[i];
 
     if (oldName == newName ||
-        (tuple->hasTrailingClosure() && i == tuple->getNumElements()-1))
+        (argList.hasTrailingClosure && i == argList.args.size()-1))
       continue;
 
     if (oldName.empty()) {
@@ -1774,8 +1735,8 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
   if (!existingDiag) {
     bool plural = (numMissing + numExtra + numWrong) > 1;
     if (numWrong > 0 || (numMissing > 0 && numExtra > 0)) {
-      for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
-        auto haveName = tuple->getElementName(i);
+      for (unsigned i = 0, n = argList.args.size(); i != n; ++i) {
+        auto haveName = argList.labels[i];
         if (haveName.empty())
           haveBuffer += '_';
         else
@@ -1813,19 +1774,19 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
 
   // Emit Fix-Its to correct the names.
   auto &diag = getDiag();
-  for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
-    Identifier oldName = tuple->getElementName(i);
+  for (unsigned i = 0, n = argList.args.size(); i != n; ++i) {
+    Identifier oldName = argList.labels[i];
     Identifier newName;
     if (i < newNames.size())
       newName = newNames[i];
 
-    if (oldName == newName || (i == n-1 && tuple->hasTrailingClosure()))
+    if (oldName == newName || (i == n-1 && argList.hasTrailingClosure))
       continue;
 
     if (newName.empty()) {
       // Delete the old name.
-      diag.fixItRemoveChars(tuple->getElementNameLocs()[i],
-                            tuple->getElement(i)->getStartLoc());
+      diag.fixItRemoveChars(argList.labelLocs[i],
+                            argList.args[i]->getStartLoc());
       continue;
     }
 
@@ -1840,12 +1801,12 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
     if (oldName.empty()) {
       // Insert the name.
       newStr += ": ";
-      diag.fixItInsert(tuple->getElement(i)->getStartLoc(), newStr);
+      diag.fixItInsert(argList.args[i]->getStartLoc(), newStr);
       continue;
     }
 
     // Change the name.
-    diag.fixItReplace(tuple->getElementNameLocs()[i], newStr);
+    diag.fixItReplace(argList.labelLocs[i], newStr);
   }
 
   // If the diagnostic is local, flush it before returning.
@@ -1860,8 +1821,8 @@ static const Expr *lookThroughExprsToImmediateDeallocation(const Expr *E) {
   while (true) {
     E = E->getValueProvidingExpr();
 
-    // We don't currently deal with tuple shuffles.
-    if (isa<TupleShuffleExpr>(E))
+    // We don't currently deal with tuple destructuring.
+    if (isa<DestructureTupleExpr>(E))
       return E;
 
     // If we have a TupleElementExpr with a child TupleExpr, dig into that
@@ -2941,32 +2902,29 @@ void swift::fixItEncloseTrailingClosure(TypeChecker &TC,
                                         const CallExpr *call,
                                         Identifier closureLabel) {
   auto argsExpr = call->getArg();
-  if (auto ASE = dyn_cast<ArgumentShuffleExpr>(argsExpr))
-    argsExpr = ASE->getSubExpr();
 
   SmallString<32> replacement;
   SourceLoc lastLoc;
   SourceRange closureRange;
-  if (auto PE = dyn_cast<ParenExpr>(argsExpr)) {
-    assert(PE->hasTrailingClosure() && "must have trailing closure");
-    closureRange = PE->getSubExpr()->getSourceRange();
-    lastLoc = PE->getLParenLoc(); // e.g funcName() { 1 }
+
+  auto argList = getOriginalArgumentList(argsExpr);
+
+  assert(argList.args.size() >= 1 && "must have at least one argument");
+
+  if (argList.args.size() == 1) {
+    closureRange = argList.args[0]->getSourceRange();
+    lastLoc = argList.lParenLoc; // e.g funcName() { 1 }
     if (!lastLoc.isValid()) {
       // Bare trailing closure: e.g. funcName { 1 }
       replacement = "(";
       lastLoc = call->getFn()->getEndLoc();
     }
-  } else if (auto TE = dyn_cast<TupleExpr>(argsExpr)) {
-    // Tuple + trailing closure: e.g. funcName(x: 1) { 1 }
-    assert(TE->hasTrailingClosure() && "must have trailing closure");
-    auto numElements = TE->getNumElements();
-    assert(numElements >= 2 && "Unexpected num of elements in TupleExpr");
-    closureRange = TE->getElement(numElements - 1)->getSourceRange();
-    lastLoc = TE->getElement(numElements - 2)->getEndLoc();
-    replacement = ", ";
   } else {
-    // Can't be here.
-    return;
+    // Tuple + trailing closure: e.g. funcName(x: 1) { 1 }
+    auto numElements = argList.args.size();
+    closureRange = argList.args[numElements - 1]->getSourceRange();
+    lastLoc = argList.args[numElements - 2]->getEndLoc();
+    replacement = ", ";
   }
 
   // Add argument label of the closure.
@@ -2996,9 +2954,6 @@ static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
       auto argsTy = argsExpr->getType();
       // Ignore invalid argument type. Some diagnostics are already emitted.
       if (!argsTy || argsTy->hasError()) return;
-
-      if (auto ASE = dyn_cast<ArgumentShuffleExpr>(argsExpr))
-        argsExpr = ASE->getSubExpr();
 
       SourceLoc closureLoc;
       if (auto PE = dyn_cast<ParenExpr>(argsExpr))
@@ -3335,13 +3290,8 @@ public:
 
       // If the best method was from a subclass of the place where
       // this method was declared, we have a new best.
-      while (auto superclassDecl = bestClassDecl->getSuperclassDecl()) {
-        if (classDecl == superclassDecl) {
-          bestMethod = method;
-          break;
-        }
-
-        bestClassDecl = superclassDecl;
+      if (classDecl->isSuperclassOf(bestClassDecl)) {
+        bestMethod = method;
       }
     }
 

@@ -20,8 +20,10 @@
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
@@ -87,6 +89,7 @@ public:
   IGNORED_ATTR(ForbidSerializingReference)
   IGNORED_ATTR(Frozen)
   IGNORED_ATTR(HasStorage)
+  IGNORED_ATTR(ImplementationOnly)
   IGNORED_ATTR(Implements)
   IGNORED_ATTR(ImplicitlyUnwrappedOptional)
   IGNORED_ATTR(Infix)
@@ -122,6 +125,7 @@ public:
   IGNORED_ATTR(WeakLinked)
   IGNORED_ATTR(DynamicReplacement)
   IGNORED_ATTR(PrivateImport)
+  IGNORED_ATTR(Custom)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -744,6 +748,7 @@ public:
     IGNORED_ATTR(Consuming)
     IGNORED_ATTR(Convenience)
     IGNORED_ATTR(Dynamic)
+    IGNORED_ATTR(DynamicReplacement)
     IGNORED_ATTR(Effects)
     IGNORED_ATTR(Exported)
     IGNORED_ATTR(ForbidSerializingReference)
@@ -752,6 +757,7 @@ public:
     IGNORED_ATTR(IBDesignable)
     IGNORED_ATTR(IBInspectable)
     IGNORED_ATTR(IBOutlet) // checked early.
+    IGNORED_ATTR(ImplementationOnly)
     IGNORED_ATTR(ImplicitlyUnwrappedOptional)
     IGNORED_ATTR(Indirect)
     IGNORED_ATTR(Inline)
@@ -768,6 +774,7 @@ public:
     IGNORED_ATTR(ObjCRuntimeName)
     IGNORED_ATTR(Optional)
     IGNORED_ATTR(Override)
+    IGNORED_ATTR(PrivateImport)
     IGNORED_ATTR(RawDocComment)
     IGNORED_ATTR(ReferenceOwnership)
     IGNORED_ATTR(RequiresStoredPropertyInits)
@@ -781,8 +788,6 @@ public:
     IGNORED_ATTR(Transparent)
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(WeakLinked)
-    IGNORED_ATTR(DynamicReplacement)
-    IGNORED_ATTR(PrivateImport)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
@@ -833,6 +838,7 @@ public:
   void visitFrozenAttr(FrozenAttr *attr);
 
   void visitNonOverrideAttr(NonOverrideAttr *attr);
+  void visitCustomAttr(CustomAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2380,12 +2386,9 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
   auto *ED = cast<EnumDecl>(D);
 
-  switch (ED->getModuleContext()->getResilienceStrategy()) {
-  case ResilienceStrategy::Default:
+  if (!ED->getModuleContext()->isResilient()) {
     diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonresilient, attr);
     return;
-  case ResilienceStrategy::Resilient:
-    break;
   }
 
   if (ED->getFormalAccess() < AccessLevel::Public &&
@@ -2398,6 +2401,36 @@ void AttributeChecker::visitNonOverrideAttr(NonOverrideAttr *attr) {
   if (auto overrideAttr = D->getAttrs().getAttribute<OverrideAttr>()) {
     diagnoseAndRemoveAttr(overrideAttr, diag::nonoverride_and_override_attr);
   }
+}
+
+void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
+  auto dc = D->getInnermostDeclContext();
+
+  // Figure out which nominal declaration this custom attribute refers to.
+  auto nominal = evaluateOrDefault(
+    TC.Context.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
+
+  // If there is no nominal type with this name, complain about this being
+  // an unknown attribute.
+  if (!nominal) {
+    std::string typeName;
+    if (auto typeRepr = attr->getTypeLoc().getTypeRepr()) {
+      llvm::raw_string_ostream out(typeName);
+      typeRepr->print(out);
+    } else {
+      typeName = attr->getTypeLoc().getType().getString();
+    }
+
+    TC.diagnose(attr->getLocation(), diag::unknown_attribute,
+                typeName);
+    attr->setInvalid();
+    return;
+  }
+
+  TC.diagnose(attr->getLocation(), diag::nominal_type_not_attribute,
+              nominal->getDescriptiveKind(), nominal->getFullName());
+  nominal->diagnose(diag::decl_declared_here, nominal->getFullName());
+  attr->setInvalid();
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {

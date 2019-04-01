@@ -3110,9 +3110,7 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
 #ifndef NDEBUG
   auto *currentClass = getConcreteTypeForSuperclassTraversing(this)
       ->getClassOrBoundGenericClass();
-  while (currentClass && currentClass != baseClass)
-    currentClass = currentClass->getSuperclassDecl();
-  assert(currentClass == baseClass &&
+  assert(baseClass->isSuperclassOf(currentClass) &&
          "no inheritance relationship between given classes");
 #endif
 
@@ -3950,13 +3948,9 @@ bool UnownedStorageType::isLoadable(ResilienceExpansion resilience) const {
 }
 
 static ReferenceCounting getClassReferenceCounting(ClassDecl *theClass) {
-  while (auto superclass = theClass->getSuperclassDecl()) {
-    theClass = superclass;
-  }
-
-  return theClass->hasClangNode()
-           ? ReferenceCounting::ObjC
-           : ReferenceCounting::Native;
+  return (theClass->checkAncestry(AncestryFlags::ClangImported)
+          ? ReferenceCounting::ObjC
+          : ReferenceCounting::Native);
 }
 
 ReferenceCounting TypeBase::getReferenceCounting() {

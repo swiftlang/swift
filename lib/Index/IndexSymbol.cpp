@@ -28,12 +28,13 @@ static NominalTypeDecl *getNominalParent(const ValueDecl *D) {
 static bool isUnitTestCase(const ClassDecl *D) {
   if (!D)
     return false;
-  while (auto *SuperD = D->getSuperclassDecl()) {
-    if (SuperD->getNameStr() == "XCTestCase")
-      return true;
-    D = SuperD;
-  }
-  return false;
+
+  return D->walkSuperclasses([D](ClassDecl *SuperD) {
+    if (SuperD != D && // Do not treate XCTestCase itself as a test.
+        SuperD->getNameStr() == "XCTestCase")
+      return TypeWalker::Action::Stop; // Found test; stop and return true.
+    return TypeWalker::Action::Continue;
+  });
 }
 
 static bool isUnitTest(const ValueDecl *D) {

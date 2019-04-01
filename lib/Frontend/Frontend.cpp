@@ -868,7 +868,8 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
   for (auto &PM : PartialModules) {
     assert(PM.ModuleBuffer);
     if (!SML->loadAST(*MainModule, SourceLoc(), std::move(PM.ModuleBuffer),
-                      std::move(PM.ModuleDocBuffer)))
+                      std::move(PM.ModuleDocBuffer), /*isFramework*/false,
+                      /*treatAsPartialModule*/true))
       hadLoadError = true;
   }
 
