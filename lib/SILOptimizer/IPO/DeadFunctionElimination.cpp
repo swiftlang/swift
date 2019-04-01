@@ -255,18 +255,6 @@ protected:
     makeAlive(WT);
   }
 
-  /// Returns true if \a Derived is the same as \p Base or derived from it.
-  static bool isDerivedOrEqual(ClassDecl *Derived, ClassDecl *Base) {
-    for (;;) {
-      if (Derived == Base)
-        return true;
-      if (!Derived->hasSuperclass())
-        break;
-      Derived = Derived->getSuperclassDecl();
-    }
-    return false;
-  }
-
   /// Returns true if the implementation of method \p FD in class \p ImplCl
   /// may be called when the type of the class_method's operand is \p MethodCl.
   /// Both, \p MethodCl and \p ImplCl, may by null if not known or if it's a
@@ -277,7 +265,7 @@ protected:
       return true;
 
     // All implementations of derived classes may be called.
-    if (isDerivedOrEqual(ImplCl, MethodCl))
+    if (MethodCl->isSuperclassOf(ImplCl))
       return true;
 
     // Check if the method implementation is the same in a super class, i.e.

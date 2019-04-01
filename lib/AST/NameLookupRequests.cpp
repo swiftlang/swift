@@ -12,6 +12,7 @@
 
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/Subsystems.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
@@ -174,6 +175,20 @@ void TypeDeclsFromWhereClauseRequest::noteCycleStep(
   auto ext = std::get<0>(getStorage());
   // FIXME: Customize this further.
   diags.diagnose(ext, diag::circular_reference_through);
+}
+
+void CustomAttrNominalRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  auto attr = std::get<0>(getStorage());
+  ASTContext &ctx = std::get<1>(getStorage())->getASTContext();
+  ctx.Diags.diagnose(attr->getLocation(), diag::circular_reference);
+}
+
+void CustomAttrNominalRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  auto attr = std::get<0>(getStorage());
+  ASTContext &ctx = std::get<1>(getStorage())->getASTContext();
+  ctx.Diags.diagnose(attr->getLocation(), diag::circular_reference_through);
 }
 
 // Define request evaluation functions for each of the name lookup requests.
