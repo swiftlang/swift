@@ -292,8 +292,8 @@ func testInfix16<T: P where T.T == S2>() {
 }
 
 // INFIX_16: Begin completions, 2 items
-// INFIX_16-NEXT: Pattern/CurrModule:               ({#(self): T#})[#() -> S2#]; name=(self: T)
-// INFIX_16-NEXT: Keyword[self]/CurrNominal:         .self[#(T) -> () -> S2#]; name=self
+// INFIX_16-NEXT: Decl[InstanceMethod]/CurrNominal: ({#(self): P#})[#() -> S2#]; name=(self: P)
+// INFIX_16-NEXT: Keyword[self]/CurrNominal:        .self[#(T) -> () -> S2#]; name=self
 // INFIX_16: End completions
 
 func testInfix17(x: Void) {

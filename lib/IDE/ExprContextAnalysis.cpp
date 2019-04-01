@@ -16,6 +16,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
@@ -241,7 +242,7 @@ namespace {
 class ExprParentFinder : public ASTWalker {
   friend class ExprContextAnalyzer;
   Expr *ChildExpr;
-  llvm::function_ref<bool(ParentTy, ParentTy)> Predicate;
+  std::function<bool(ParentTy, ParentTy)> Predicate;
 
   bool arePositionsSame(Expr *E1, Expr *E2) {
     return E1->getSourceRange().Start == E2->getSourceRange().Start &&
@@ -251,7 +252,7 @@ class ExprParentFinder : public ASTWalker {
 public:
   llvm::SmallVector<ParentTy, 5> Ancestors;
   ExprParentFinder(Expr *ChildExpr,
-                   llvm::function_ref<bool(ParentTy, ParentTy)> Predicate)
+                   std::function<bool(ParentTy, ParentTy)> Predicate)
       : ChildExpr(ChildExpr), Predicate(Predicate) {}
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -318,7 +319,8 @@ void collectPossibleCalleesByQualifiedLookup(
   SmallVector<ValueDecl *, 2> decls;
   auto resolver = DC.getASTContext().getLazyResolver();
   if (!DC.lookupQualified(baseTy->getMetatypeInstanceType(), name,
-                          NL_QualifiedDefault, resolver, decls))
+                          NL_QualifiedDefault | NL_ProtocolMembers, resolver,
+                          decls))
     return;
 
   for (auto *VD : decls) {
@@ -350,8 +352,19 @@ void collectPossibleCalleesByQualifiedLookup(
 
     if (!fnType)
       continue;
-    if (auto *AFT = fnType->getAs<AnyFunctionType>()) {
-      candidates.emplace_back(AFT, VD);
+
+    if (fnType->is<AnyFunctionType>()) {
+      auto baseInstanceTy = baseTy->getMetatypeInstanceType();
+      // If we are calling to typealias type, 
+      if (isa<SugarType>(baseInstanceTy.getPointer())) {
+        auto canBaseTy = baseInstanceTy->getCanonicalType();
+        fnType = fnType.transform([&](Type t) -> Type {
+          if (t->getCanonicalType()->isEqual(canBaseTy))
+            return baseInstanceTy;
+          return t;
+        });
+      }
+      candidates.emplace_back(fnType->castTo<AnyFunctionType>(), VD);
     }
   }
 }
@@ -735,15 +748,23 @@ public:
     if (!ParsedExpr)
       return;
 
-    ExprParentFinder Finder(ParsedExpr, [](ASTWalker::ParentTy Node,
-                                           ASTWalker::ParentTy Parent) {
+    ExprParentFinder Finder(ParsedExpr, [&](ASTWalker::ParentTy Node,
+                                            ASTWalker::ParentTy Parent) {
       if (auto E = Node.getAsExpr()) {
         switch (E->getKind()) {
-        case ExprKind::Call:
+        case ExprKind::Call: {
+          // Iff the cursor is in argument position.
+          auto argsRange = cast<CallExpr>(E)->getArg()->getSourceRange();
+          return SM.rangeContains(argsRange, ParsedExpr->getSourceRange());
+        }
+        case ExprKind::Subscript: {
+          // Iff the cursor is in index position.
+          auto argsRange = cast<SubscriptExpr>(E)->getIndex()->getSourceRange();
+          return SM.rangeContains(argsRange, ParsedExpr->getSourceRange());
+        }
         case ExprKind::Binary:
         case ExprKind::PrefixUnary:
         case ExprKind::Assign:
-        case ExprKind::Subscript:
           return true;
         case ExprKind::Tuple: {
           auto ParentE = Parent.getAsExpr();
