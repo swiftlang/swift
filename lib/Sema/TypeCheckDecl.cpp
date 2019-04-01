@@ -597,7 +597,7 @@ static void checkCircularity(TypeChecker &tc, T *decl,
     tc.diagnose(decl->getLoc(), circularDiag,
                 (*cycleStart)->getName());
     for (auto i = cycleStart + 1, iEnd = path.end(); i != iEnd; ++i) {
-      tc.diagnose(*i, diag::kind_identifier_declared_here,
+      tc.diagnose(*i, diag::kind_declname_declared_here,
                   declKind, (*i)->getName());
     }
 
