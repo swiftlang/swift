@@ -179,3 +179,32 @@ func checkReferenceTypes() {
 // CHECK-NEXT: [[U2:%.*]] = apply [[U2_REF]]({{.*}}, {{.*}}, [[W1]], {{.*}}) : $@convention(method) (@owned Optional<T>, @owned T, @thin U.Type) -> @out U
   let y = U(v: T())
 }
+
+// CHECK: default argument 0 of AA.init(ab:)
+// CHECK-NEXT: sil hidden [ossa] @$s27stored_property_default_arg2AAV2abAcA1ZCSg2ac_AG2adt_tcfcfA_ : $@convention(thin) () -> (@owned Optional<Z>, @owned Optional<Z>) {
+// CHECK-NEXT: bb0:
+// CHECK-NEXT:   function_ref variable initialization expression of AA.ab
+// CHECK-NEXT:   [[AA_AB_REF:%.*]] = function_ref @$s27stored_property_default_arg2AAV2abAA1ZCSg2ac_AG2adtvpfi : $@convention(thin) () -> (@owned Optional<Z>, @owned Optional<Z>)
+// CHECK-NEXT:   [[AA_AB:%.*]] = apply [[AA_AB_REF]]() : $@convention(thin) () -> (@owned Optional<Z>, @owned Optional<Z>)
+// CHECK-NEXT:   ([[ELT0:%.*]], [[ELT1:%.*]]) = destructure_tuple [[AA_AB]] : $(Optional<Z>, Optional<Z>)
+// CHECK-NEXT:   [[RETURN:%.*]] = tuple ([[ELT0]] : $Optional<Z>, [[ELT1]] : $Optional<Z>)
+// CHECK-NEXT:   return [[RETURN]] : $(Optional<Z>, Optional<Z>)
+// CHECK-NEXT: }
+
+class Z {}
+
+struct AA {
+  var ab: (ac: Z?, ad: Z?) = (ac: Z(), ad: Z())
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s27stored_property_default_arg19checkReferenceTupleyyF : $@convention(thin) () -> () {
+func checkReferenceTuple() {
+// CHECK: function_ref default argument 0 of AA.init(ab:)
+// CHECK-NEXT: [[AB1_REF:%.*]] = function_ref @$s27stored_property_default_arg2AAV2abAcA1ZCSg2ac_AG2adt_tcfcfA_ : $@convention(thin) () -> (@owned Optional<Z>, @owned Optional<Z>)
+// CHECK-NEXT: [[AB1:%.*]] = apply [[AB1_REF]]() : $@convention(thin) () -> (@owned Optional<Z>, @owned Optional<Z>)
+// CHECK-NEXT: ([[ELT0:%.*]], [[ELT1:%.*]]) = destructure_tuple [[AB1]] : $(Optional<Z>, Optional<Z>)
+// CHECK-NEXT: function_ref AA.init(ab:)
+// CHECK-NEXT: [[AA1_REF:%.*]] = function_ref @$s27stored_property_default_arg2AAV2abAcA1ZCSg2ac_AG2adt_tcfC : $@convention(method) (@owned Optional<Z>, @owned Optional<Z>, @thin AA.Type) -> @owned AA
+// CHECK-NEXT: [[AA1:%.*]] = apply [[AA1_REF]]([[ELT0]], [[ELT1]], {{.*}}) : $@convention(method) (@owned Optional<Z>, @owned Optional<Z>, @thin AA.Type) -> @owned AA
+  let ae = AA.init(ab:)()
+}

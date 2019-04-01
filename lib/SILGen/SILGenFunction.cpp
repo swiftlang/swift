@@ -657,10 +657,11 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
   auto resultType = decl->mapTypeIntoContext(interfaceType)->getCanonicalType();
   auto origResultType = AbstractionPattern(resultType);
 
+  SmallVector<SILValue, 4> directResults;
+
   if (F.getConventions().hasIndirectSILResults()) {
     Scope scope(Cleanups, CleanupLocation(var));
 
-    SmallVector<SILValue, 4> directResults;
     SmallVector<CleanupHandle, 4> cleanups;
     auto init = prepareIndirectResultInit(resultType, directResults, cleanups);
 
@@ -671,18 +672,19 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
     for (auto cleanup : cleanups) {
       Cleanups.forwardCleanup(cleanup);
     }
-
-    Cleanups.emitBranchAndCleanups(ReturnDest, loc, directResults);
   } else {
+    Scope scope(Cleanups, CleanupLocation(var));
+
     // If we have no indirect results, just return the result.
     auto result = emitApplyOfStoredPropertyInitializer(loc, entry, subs,
                                                        resultType,
                                                        origResultType,
                                                        SGFContext())
-                    .getAsSingleValue(*this, loc);
-    B.createReturn(loc, result);
+                    .ensurePlusOne(*this, loc);
+    std::move(result).forwardAll(*this, directResults);
   }
 
+  Cleanups.emitBranchAndCleanups(ReturnDest, loc, directResults);
   emitEpilog(loc);
 }
 
