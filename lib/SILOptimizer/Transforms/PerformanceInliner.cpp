@@ -353,9 +353,11 @@ bool SILPerformanceInliner::isProfitableToInline(
       if (FullApplySite FAI = FullApplySite::isa(&I)) {
         // Call sites into semantic calls need to be inlined into the parent
         // scope for optimization based on those semantics to kick in. This may
-        // mean the call can be hoisted out of a loop for example.
-        SILFunction *Callee = AI.getReferencedFunction();
-        if (Callee && Callee->hasSemanticsAttrs()) {
+        // mean the call can be hoisted out of a loop for example. Do this only
+        // after the top-level scope is fully specialized, otherwise it could
+        // actually prevent inlining of callers.
+        SILFunction *Callee = FAI.getReferencedFunctionOrNull();
+        if (!IsGeneric && Callee && Callee->hasSemanticsAttrs()) {
           BlockW.updateBenefit(Benefit, SemanticCallBenefit);
         }
 
