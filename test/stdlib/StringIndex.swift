@@ -202,6 +202,7 @@ StringIndexTests.test("Scalar Align UTF-8 indices") {
   expectEqual(roundedIdx, roundedIdx3)
 }
 
+#if _runtime(_ObjC)
 import Foundation
 StringIndexTests.test("String.Index(_:within) / Range<String.Index>(_:in:)") {
   guard #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) else {
@@ -246,5 +247,6 @@ StringIndexTests.test("String.Index(_:within) / Range<String.Index>(_:in:)") {
     }
   }
 }
+#endif // _runtime(_ObjC)
 
 runAllTests()
