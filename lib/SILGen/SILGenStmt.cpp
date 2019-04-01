@@ -562,14 +562,16 @@ namespace {
   class DeferCleanup : public Cleanup {
     SourceLoc deferLoc;
     Expr *call;
+    bool isNegated;
   public:
-    DeferCleanup(SourceLoc deferLoc, Expr *call)
-      : deferLoc(deferLoc), call(call) {}
+    DeferCleanup(SourceLoc deferLoc, Expr *call, bool isNegated)
+      : deferLoc(deferLoc), call(call), isNegated(isNegated) {}
     void emit(SILGenFunction &SGF, CleanupLocation l, ForUnwind_t forUnwind) override {
       SGF.Cleanups.pushCleanup<DeferEscapeCheckerCleanup>(deferLoc);
       auto TheCleanup = SGF.Cleanups.getTopCleanup();
 
-      SGF.emitIgnoredExpr(call);
+      if (!isNegated)
+        SGF.emitIgnoredExpr(call);
       
       if (SGF.B.hasValidInsertionPoint())
         SGF.Cleanups.setCleanupState(TheCleanup, CleanupState::Dead);
@@ -598,8 +600,10 @@ void StmtEmitter::visitDeferStmt(DeferStmt *S) {
   }
   SGF.visitFuncDecl(deferDecl);
 
-  // Register a cleanup to invoke the closure on any exit paths.
-  SGF.Cleanups.pushCleanup<DeferCleanup>(S->getDeferLoc(), S->getCallExpr());
+  // Register a cleanup to invoke the closure on any exit paths, unless it was
+  // negated.
+  SGF.Cleanups.pushCleanup<DeferCleanup>(S->getDeferLoc(), S->getCallExpr(),
+                                         S->isNegated());
 }
 
 void StmtEmitter::visitIfStmt(IfStmt *S) {
@@ -631,7 +635,7 @@ void StmtEmitter::visitIfStmt(IfStmt *S) {
     auto NumFalseTaken = SGF.loadProfilerCount(S->getElseStmt());
 
     SGF.emitStmtCondition(S->getCond(), falseDest, S, NumTrueTaken,
-                          NumFalseTaken);
+                          NumFalseTaken, S->isNegated());
 
     // In the success path, emit the 'then' part if the if.
     SGF.emitProfilerIncrement(S->getThenStmt());
@@ -694,7 +698,7 @@ void StmtEmitter::visitGuardStmt(GuardStmt *S) {
   // we didn't push a scope, the bound variables are live after this statement.
   auto NumFalseTaken = SGF.loadProfilerCount(S->getBody());
   auto NumNonTaken = SGF.loadProfilerCount(S);
-  SGF.emitStmtCondition(S->getCond(), bodyBB, S, NumNonTaken, NumFalseTaken);
+  SGF.emitStmtCondition(S->getCond(), bodyBB, S, NumNonTaken, NumFalseTaken, S->isNegated());
 }
 
 void StmtEmitter::visitWhileStmt(WhileStmt *S) {
@@ -720,7 +724,8 @@ void StmtEmitter::visitWhileStmt(WhileStmt *S) {
 
     auto NumTrueTaken = SGF.loadProfilerCount(S->getBody());
     auto NumFalseTaken = SGF.loadProfilerCount(S);
-    SGF.emitStmtCondition(S->getCond(), breakDest, S, NumTrueTaken, NumFalseTaken);
+    SGF.emitStmtCondition(S->getCond(), breakDest, S, NumTrueTaken,
+                          NumFalseTaken, S->isNegated());
     
     // In the success path, emit the body of the while.
     SGF.emitProfilerIncrement(S->getBody());
@@ -752,15 +757,20 @@ void StmtEmitter::visitDoStmt(DoStmt *S) {
   // Otherwise, assume we might break or continue.
   bool hasLabel = (bool) S->getLabelInfo();
 
-  JumpDest endDest = JumpDest::invalid();
-  if (hasLabel) {
-    // Create the end dest first so that the loop dest comes in-between.
-    endDest = createJumpDest(S->getBody());
+  JumpDest endDest = createJumpDest(S->getBody());
 
-    // Create a new basic block and jump into it.
-    JumpDest loopDest = createJumpDest(S->getBody());
+  // Create a new basic block and jump into it.
+  JumpDest loopDest = createJumpDest(S->getBody());
+  if (S->isNegated()) {
+    // Branch directly to the end dest, and skip over this block.
+    // But still emit it.
+    SGF.B.createBranch(CleanupLocation(S), endDest.getBlock());
+    SGF.B.setInsertionPoint(loopDest.getBlock());
+  } else {
     SGF.B.emitBlock(loopDest.getBlock(), S);
+  }
 
+  if (hasLabel) {
     // Set the destinations for 'break' and 'continue'.
     SGF.BreakContinueDestStack.push_back({S, endDest, loopDest});
   }
@@ -770,8 +780,9 @@ void StmtEmitter::visitDoStmt(DoStmt *S) {
 
   if (hasLabel) {
     SGF.BreakContinueDestStack.pop_back();
-    emitOrDeleteBlock(SGF, endDest, CleanupLocation(S));
   }
+
+  emitOrDeleteBlock(SGF, endDest, CleanupLocation(S));
 }
 
 void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {

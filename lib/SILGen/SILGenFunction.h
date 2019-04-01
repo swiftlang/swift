@@ -1050,7 +1050,8 @@ public:
   SILValue emitOSVersionRangeCheck(SILLocation loc, const VersionRange &range);
   void emitStmtCondition(StmtCondition Cond, JumpDest FalseDest, SILLocation loc,
                          ProfileCounter NumTrueTaken = ProfileCounter(),
-                         ProfileCounter NumFalseTaken = ProfileCounter());
+                         ProfileCounter NumFalseTaken = ProfileCounter(),
+                         bool isNegated = false);
 
   void emitConditionalPBD(PatternBindingDecl *PBD, SILBasicBlock *FailBB);
 

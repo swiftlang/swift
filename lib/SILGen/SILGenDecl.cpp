@@ -1248,7 +1248,8 @@ SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
 void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
                                        SILLocation loc,
                                        ProfileCounter NumTrueTaken,
-                                       ProfileCounter NumFalseTaken) {
+                                       ProfileCounter NumFalseTaken,
+                                       bool isNegated) {
 
   assert(B.hasValidInsertionPoint() &&
          "emitting condition at unreachable point");
@@ -1299,6 +1300,17 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
     assert(booleanTestValue->getType().
            castTo<BuiltinIntegerType>()->isFixedWidth(1) &&
            "Sema forces conditions to have Builtin.i1 type");
+
+    if (isNegated) {
+      auto one = B.createIntegerLiteral(
+          booleanTestLoc, booleanTestValue->getType(), 1);
+      booleanTestValue =
+        B.createBuiltinBinaryFunction(
+          booleanTestLoc, "xor",
+          booleanTestValue->getType(),
+          booleanTestValue->getType(),
+          {booleanTestValue, one});
+    }
     
     // Just branch on the condition.  On failure, we unwind any active cleanups,
     // on success we fall through to a new block.

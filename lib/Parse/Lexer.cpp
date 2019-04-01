@@ -604,7 +604,6 @@ static bool advanceIf(char const *&ptr, char const *end,
     return true;
   }
   return false;
-
 }
 
 static bool advanceIfValidStartOfIdentifier(char const *&ptr,
@@ -647,6 +646,14 @@ bool Lexer::isOperator(StringRef string) {
   return p == end;
 }
 
+static bool advanceIfNegation(const char *&ptr) {
+  if (!ptr[0] || !ptr[1]) return false;
+  if (ptr[0] == '\'' && ptr[1] == 't') {
+    ptr += 2;
+    return true;
+  }
+  return false;
+}
 
 tok Lexer::kindOfIdentifier(StringRef Str, bool InSILMode) {
 #define SIL_KEYWORD(kw)
@@ -672,8 +679,19 @@ void Lexer::lexIdentifier() {
   // Lex [a-zA-Z_$0-9[[:XID_Continue:]]]*
   while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
 
-  tok Kind = kindOfIdentifier(StringRef(TokStart, CurPtr-TokStart),
-                              LexMode == LexerMode::SIL);
+  StringRef str = StringRef(TokStart, CurPtr-TokStart);
+  tok Kind = kindOfIdentifier(str, LexMode == LexerMode::SIL);
+
+#define NEGATION(text) \
+  if (str == #text "n" && advanceIfNegation(CurPtr)) \
+Kind = tok::kw_##text##nt;
+  NEGATION(if)
+  NEGATION(guard)
+  NEGATION(while)
+  NEGATION(do)
+  NEGATION(defer)
+#undef NEGATION
+
   return formToken(Kind, TokStart);
 }
 

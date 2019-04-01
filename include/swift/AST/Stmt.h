@@ -285,13 +285,17 @@ class DeferStmt : public Stmt {
   /// This is the invocation of the closure, which is to be emitted on any error
   /// paths.
   Expr *callExpr;
+
+  /// Whether this is a `defern't` statement.
+  bool IsNegated;
   
 public:
   DeferStmt(SourceLoc DeferLoc,
-            FuncDecl *tempDecl, Expr *callExpr)
+            FuncDecl *tempDecl, Expr *callExpr,
+            bool isNegated = false)
     : Stmt(StmtKind::Defer, /*implicit*/false),
       DeferLoc(DeferLoc), tempDecl(tempDecl),
-      callExpr(callExpr) {}
+      callExpr(callExpr), IsNegated(isNegated) {}
   
   SourceLoc getDeferLoc() const { return DeferLoc; }
   
@@ -304,6 +308,9 @@ public:
 
   /// Dig the original user's body of the defer out for AST fidelity.
   BraceStmt *getBodyAsWritten() const;
+
+  bool isNegated() const { return IsNegated; }
+  void setIsNegated(bool isNegated = true) { IsNegated = isNegated; }
   
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Defer; }
 };
@@ -515,13 +522,15 @@ public:
 class DoStmt : public LabeledStmt {
   SourceLoc DoLoc;
   Stmt *Body;
+  bool IsNegated;
   
 public:
   DoStmt(LabeledStmtInfo labelInfo, SourceLoc doLoc,
-         Stmt *body, Optional<bool> implicit = None)
+         Stmt *body, Optional<bool> implicit = None,
+         bool isNegated = false)
     : LabeledStmt(StmtKind::Do, getDefaultImplicitFlag(implicit, doLoc),
                   labelInfo),
-      DoLoc(doLoc), Body(body) {}
+      DoLoc(doLoc), Body(body), IsNegated(isNegated) {}
 
   SourceLoc getDoLoc() const { return DoLoc; }
   
@@ -530,6 +539,9 @@ public:
   
   Stmt *getBody() const { return Body; }
   void setBody(Stmt *s) { Body = s; }
+
+  bool isNegated() const { return IsNegated; }
+  void setIsNegated(bool isNegated = true) { IsNegated = isNegated; }
 
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Do; }
 };
@@ -666,15 +678,17 @@ class IfStmt : public LabeledConditionalStmt {
   SourceLoc ElseLoc;
   Stmt *Then;
   Stmt *Else;
+  bool IsNegated;
   
 public:
   IfStmt(LabeledStmtInfo LabelInfo, SourceLoc IfLoc, StmtCondition Cond,
          Stmt *Then, SourceLoc ElseLoc, Stmt *Else,
-         Optional<bool> implicit = None)
+         Optional<bool> implicit = None, bool isNegated = false)
   : LabeledConditionalStmt(StmtKind::If,
                            getDefaultImplicitFlag(implicit, IfLoc),
                            LabelInfo, Cond),
-    IfLoc(IfLoc), ElseLoc(ElseLoc), Then(Then), Else(Else) {}
+    IfLoc(IfLoc), ElseLoc(ElseLoc), Then(Then), Else(Else),
+    IsNegated(isNegated) {}
 
   IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
          Stmt *Else, Optional<bool> implicit, ASTContext &Ctx);
@@ -694,6 +708,9 @@ public:
 
   Stmt *getElseStmt() const { return Else; }
   void setElseStmt(Stmt *s) { Else = s; }
+
+  bool isNegated() const { return IsNegated; }
+  void setIsNegated(bool isNegated) { IsNegated = isNegated; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::If; }
@@ -706,14 +723,16 @@ public:
 class GuardStmt : public LabeledConditionalStmt {
   SourceLoc GuardLoc;
   Stmt *Body;
+  bool IsNegated;
   
 public:
   GuardStmt(SourceLoc GuardLoc, StmtCondition Cond,
-            Stmt *Body, Optional<bool> implicit = None)
+            Stmt *Body, Optional<bool> implicit = None,
+            bool isNegated = false)
   : LabeledConditionalStmt(StmtKind::Guard,
                            getDefaultImplicitFlag(implicit, GuardLoc),
                            LabeledStmtInfo(), Cond),
-    GuardLoc(GuardLoc), Body(Body) {}
+    GuardLoc(GuardLoc), Body(Body), IsNegated(isNegated) {}
   
   GuardStmt(SourceLoc GuardLoc, Expr *Cond, Stmt *Body,
             Optional<bool> implicit, ASTContext &Ctx);
@@ -729,6 +748,9 @@ public:
   
   Stmt *getBody() const { return Body; }
   void setBody(Stmt *s) { Body = s; }
+
+  bool isNegated() const { return IsNegated; }
+  void setIsNegated(bool isNegated) { IsNegated = isNegated; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Guard; }
@@ -740,20 +762,25 @@ class WhileStmt : public LabeledConditionalStmt {
   SourceLoc WhileLoc;
   StmtCondition Cond;
   Stmt *Body;
+  bool IsNegated;
   
 public:
   WhileStmt(LabeledStmtInfo LabelInfo, SourceLoc WhileLoc, StmtCondition Cond,
-            Stmt *Body, Optional<bool> implicit = None)
+            Stmt *Body, Optional<bool> implicit = None,
+            bool isNegated = false)
   : LabeledConditionalStmt(StmtKind::While,
                            getDefaultImplicitFlag(implicit, WhileLoc),
                            LabelInfo, Cond),
-    WhileLoc(WhileLoc), Body(Body) {}
+    WhileLoc(WhileLoc), Body(Body), IsNegated(isNegated) {}
 
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(WhileLoc); }
   SourceLoc getEndLoc() const { return Body->getEndLoc(); }
 
   Stmt *getBody() const { return Body; }
   void setBody(Stmt *s) { Body = s; }
+
+  bool isNegated() const { return IsNegated; }
+  void setIsNegated(bool isNegated) { IsNegated = isNegated; }
   
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::While; }
 };
@@ -764,14 +791,16 @@ class RepeatWhileStmt : public LabeledStmt {
   SourceLoc RepeatLoc, WhileLoc;
   Stmt *Body;
   Expr *Cond;
+  bool IsNegated;
   
 public:
   RepeatWhileStmt(LabeledStmtInfo LabelInfo, SourceLoc RepeatLoc, Expr *Cond,
-              SourceLoc WhileLoc, Stmt *Body, Optional<bool> implicit = None)
+              SourceLoc WhileLoc, Stmt *Body, Optional<bool> implicit = None, bool isNegated = false)
     : LabeledStmt(StmtKind::RepeatWhile,
                   getDefaultImplicitFlag(implicit, RepeatLoc),
                   LabelInfo),
-      RepeatLoc(RepeatLoc), WhileLoc(WhileLoc), Body(Body), Cond(Cond) {}
+      RepeatLoc(RepeatLoc), WhileLoc(WhileLoc), Body(Body), Cond(Cond),
+      IsNegated(isNegated) {}
   
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(RepeatLoc); }
   SourceLoc getEndLoc() const;
@@ -781,6 +810,9 @@ public:
 
   Expr *getCond() const { return Cond; }
   void setCond(Expr *e) { Cond = e; }
+
+  bool isNegated() const { return IsNegated; }
+  void setIsNegated(bool isNegated) { IsNegated = isNegated; }
   
   static bool classof(const Stmt *S) {return S->getKind() == StmtKind::RepeatWhile;}
 };

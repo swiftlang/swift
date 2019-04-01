@@ -48,6 +48,11 @@ bool Parser::isStartOfStmt() {
   case tok::kw_guard:
   case tok::kw_while:
   case tok::kw_do:
+  case tok::kw_defernt:
+  case tok::kw_ifnt:
+  case tok::kw_guardnt:
+  case tok::kw_whilent:
+  case tok::kw_dont:
   case tok::kw_repeat:
   case tok::kw_for:
   case tok::kw_break:
@@ -626,23 +631,28 @@ ParserResult<Stmt> Parser::parseStmt() {
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     return parseStmtThrow(tryLoc);
   case tok::kw_defer:
+  case tok::kw_defernt:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseStmtDefer();
   case tok::kw_if:
+  case tok::kw_ifnt:
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseStmtIf(LabelInfo);
   case tok::kw_guard:
+  case tok::kw_guardnt:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseStmtGuard();
   case tok::kw_while:
+  case tok::kw_whilent:
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseStmtWhile(LabelInfo);
   case tok::kw_repeat:
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseStmtRepeat(LabelInfo);
   case tok::kw_do:
+  case tok::kw_dont:
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseStmtDo(LabelInfo);
   case tok::kw_for:
@@ -941,10 +951,13 @@ ParserResult<Stmt> Parser::parseStmtThrow(SourceLoc tryLoc) {
 ///
 ///   stmt-defer:
 ///     'defer' brace-stmt
+///     'defern't' brace-stmt
 ///
 ParserResult<Stmt> Parser::parseStmtDefer() {
   SyntaxContext->setCreateSyntax(SyntaxKind::DeferStmt);
-  SourceLoc DeferLoc = consumeToken(tok::kw_defer);
+  bool isNegated = Tok.is(tok::kw_defernt);
+  SourceLoc DeferLoc =
+    isNegated ? consumeToken(tok::kw_defernt) : consumeToken(tok::kw_defer);
   
   // Macro expand out the defer into a closure and call, which we can typecheck
   // and emit where needed.
@@ -997,7 +1010,7 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
                                        AccessSemantics::DirectToStorage);
   auto call = CallExpr::createImplicit(Context, DRE, { }, { });
   
-  auto DS = new (Context) DeferStmt(DeferLoc, tempDecl, call);
+  auto DS = new (Context) DeferStmt(DeferLoc, tempDecl, call, isNegated);
   return makeParserResult(Status, DS);
 }
 
@@ -1624,6 +1637,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
 /// 
 ///   stmt-if:
 ///     'if' condition stmt-brace stmt-if-else?
+///     "ifn't" condition stmt-brace stmt-if-else?
 ///   stmt-if-else:
 ///    'else' stmt-brace
 ///    'else' stmt-if
@@ -1631,12 +1645,15 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo,
                                        bool IfWasImplicitlyInserted) {
   SyntaxContext->setCreateSyntax(SyntaxKind::IfStmt);
   SourceLoc IfLoc;
+  bool IsNegated = Tok.is(tok::kw_ifnt);
   if (IfWasImplicitlyInserted) {
     // The code was invalid due to a missing 'if' (e.g. 'else x < y {') and a
     // fixit implicitly inserted it.
     IfLoc = Tok.getLoc();
   } else {
-    IfLoc = consumeToken(tok::kw_if);
+    IfLoc = IsNegated ?
+      consumeToken(tok::kw_ifnt) :
+      consumeToken(tok::kw_if);
   }
 
   ParserStatus Status;
@@ -1676,6 +1693,12 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo,
                                    StmtKind::If);
       if (Status.isError() || Status.hasCodeCompletion())
         return recoverWithCond(Status, Condition);
+      if (IsNegated) {
+        for (auto elt : Condition) {
+          if (elt.getKind() != StmtConditionElement::CK_Boolean)
+            diagnose(elt.getStartLoc(), diag::ifnt_let_unsupported);
+        }
+      }
     }
 
     if (Tok.is(tok::kw_else)) {
@@ -1733,15 +1756,20 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo,
   return makeParserResult(
       Status, new (Context) IfStmt(LabelInfo,
                                    IfLoc, Condition, NormalBody.get(),
-                                   ElseLoc, ElseBody.getPtrOrNull()));
+                                   ElseLoc, ElseBody.getPtrOrNull(),
+                                   None, IsNegated));
 }
 
 ///   stmt-guard:
 ///     'guard' condition 'else' stmt-brace
+///     "guardn't" condition 'else' stmt-brace
 ///
 ParserResult<Stmt> Parser::parseStmtGuard() {
   SyntaxContext->setCreateSyntax(SyntaxKind::GuardStmt);
-  SourceLoc GuardLoc = consumeToken(tok::kw_guard);
+  bool IsNegated = Tok.is(tok::kw_guardnt);
+  SourceLoc GuardLoc = IsNegated ?
+    consumeToken(tok::kw_guardnt) :
+    consumeToken(tok::kw_guard);
   
   ParserStatus Status;
   StmtCondition Condition;
@@ -1776,6 +1804,13 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
       // FIXME: better recovery
       return recoverWithCond(Status, Condition);
     }
+
+    if (IsNegated) {
+      for (auto elt : Condition) {
+        if (elt.getKind() != StmtConditionElement::CK_Boolean)
+          diagnose(elt.getStartLoc(), diag::guardnt_let_unsupported);
+      }
+    }
   }
 
   // Parse the 'else'.  If it is missing, and if the following token isn't a {
@@ -1809,15 +1844,20 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
   Status |= Body;
   
   return makeParserResult(Status,
-              new (Context) GuardStmt(GuardLoc, Condition, Body.get()));
+              new (Context) GuardStmt(GuardLoc, Condition, Body.get(),
+                                      None, IsNegated));
 }
 
 /// 
 ///   stmt-while:
 ///     (identifier ':')? 'while' expr-basic stmt-brace
+///     (identifier ':')? 'whilen't' expr-basic stmt-brace
 ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
   SyntaxContext->setCreateSyntax(SyntaxKind::WhileStmt);
-  SourceLoc WhileLoc = consumeToken(tok::kw_while);
+  bool isNegated = Tok.is(tok::kw_whilent);
+  SourceLoc WhileLoc = isNegated ?
+    consumeToken(tok::kw_whilent) :
+    consumeToken(tok::kw_while);
 
   Scope S(this, ScopeKind::WhileVars);
   
@@ -1836,7 +1876,8 @@ ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
         Status,
         new (Context) WhileStmt(
             LabelInfo, WhileLoc, Condition,
-            BraceStmt::create(Context, EndLoc, {}, EndLoc, /*implicit=*/true)));
+            BraceStmt::create(Context, EndLoc, {}, EndLoc, /*implicit=*/true),
+                              None, isNegated));
   };
 
   if (Tok.is(tok::l_brace)) {
@@ -1851,6 +1892,13 @@ ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
                                  StmtKind::While);
     if (Status.isError() || Status.hasCodeCompletion())
       return recoverWithCond(Status, Condition);
+
+    if (isNegated) {
+      for (auto elt : Condition) {
+        if (elt.getKind() != StmtConditionElement::CK_Boolean)
+          diagnose(elt.getStartLoc(), diag::guardnt_let_unsupported);
+      }
+    }
   }
 
   ParserResult<BraceStmt> Body =
@@ -1861,7 +1909,7 @@ ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
 
   return makeParserResult(
       Status, new (Context) WhileStmt(LabelInfo, WhileLoc, Condition,
-                                      Body.get()));
+                                      Body.get(), None, isNegated));
 }
 
 ///
@@ -1910,10 +1958,13 @@ ParserResult<Stmt> Parser::parseStmtRepeat(LabeledStmtInfo labelInfo) {
 /// 
 ///   stmt-do:
 ///     (identifier ':')? 'do' stmt-brace
+///     (identifier ':')? 'don't' stmt-brace
 ///     (identifier ':')? 'do' stmt-brace stmt-catch+
 ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
   SyntaxContext->setCreateSyntax(SyntaxKind::DoStmt);
-  SourceLoc doLoc = consumeToken(tok::kw_do);
+  bool isNegated = Tok.is(tok::kw_dont);
+  SourceLoc doLoc =
+    isNegated ? consumeToken(tok::kw_dont) : consumeToken(tok::kw_do);
 
   ParserStatus status;
 
@@ -1946,7 +1997,8 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
     if (allClauses.empty()) {
       assert(status.isError());
       return makeParserResult(status,
-                        new (Context) DoStmt(labelInfo, doLoc, body.get()));
+                        new (Context) DoStmt(labelInfo, doLoc, body.get(),
+                                             None, isNegated));
     }
 
     return makeParserResult(status,
@@ -1959,7 +2011,8 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
   // statement.
   if (!consumeIf(tok::kw_while, whileLoc)) {
     return makeParserResult(status,
-                         new (Context) DoStmt(labelInfo, doLoc, body.get()));
+                         new (Context) DoStmt(labelInfo, doLoc, body.get(),
+                                              None, isNegated));
   }
 
   // But if we do, advise the programmer that it's 'repeat' now.

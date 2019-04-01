@@ -34,9 +34,10 @@ class Keyword(Token):
     """
 
     def __init__(self, name, text, serialization_code,
-                 classification='Keyword'):
-        Token.__init__(self, name, 'kw_' + text, serialization_code,
-                       unprefixed_kind=text, text=text,
+                 classification='Keyword', case_name=None):
+        case_name = case_name or text
+        Token.__init__(self, name, 'kw_' + case_name, serialization_code,
+                       unprefixed_kind=case_name, text=text,
                        classification=classification, is_keyword=True)
 
     def macro_name(self):
@@ -182,6 +183,11 @@ SYNTAX_TOKENS = [
     StmtKeyword('Where', 'where', serialization_code=39),
     StmtKeyword('Catch', 'catch', serialization_code=40),
     StmtKeyword('Throw', 'throw', serialization_code=50),
+    StmtKeyword('Ifnt', "ifn't", serialization_code=200, case_name='ifnt'),
+    StmtKeyword('Guardnt',  "guardn't", serialization_code=201, case_name='guardnt'),
+    StmtKeyword('Dont', "don't", serialization_code=202, case_name='dont'),
+    StmtKeyword('Whilent', "whilen't", serialization_code=203, case_name='whilent'),
+    StmtKeyword('Defernt', "defern't", serialization_code=204, case_name='defernt'),
 
     # Expression keywords
     ExprKeyword('As', 'as', serialization_code=41),

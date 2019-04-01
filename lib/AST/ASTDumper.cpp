@@ -1522,7 +1522,10 @@ public:
   }
 
   void visitIfStmt(IfStmt *S) {
-    printCommon(S, "if_stmt") << '\n';
+    printCommon(S, "if_stmt");
+    if (S->isNegated())
+      OS << " negated";
+    OS << '\n';
     for (auto elt : S->getCond())
       printRec(elt);
     OS << '\n';

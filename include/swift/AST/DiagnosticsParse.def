@@ -982,6 +982,9 @@ ERROR(unexpected_else_after_if,none,
 NOTE(suggest_removing_else,none,
      "remove 'else' to execute the braced block of statements when the condition is true", ())
 
+ERROR(ifnt_let_unsupported,none,
+     "only boolean conditions are supported in 'ifn't' statements", ())
+
 // Guard Statement
 ERROR(expected_condition_guard,PointsToFirstBadToken,
       "expected expression, var, let or case in 'guard' condition", ())
@@ -994,6 +997,9 @@ ERROR(expected_lbrace_after_guard,PointsToFirstBadToken,
 ERROR(bound_var_guard_body,none,
       "variable declared in 'guard' condition is not usable in its body", ())
 
+ERROR(guardnt_let_unsupported,none,
+      "only boolean conditions are supported in 'guardn't' statements", ())
+
 // While Statement
 ERROR(expected_condition_while,PointsToFirstBadToken,
       "expected expression, var, or let in 'while' condition", ())
@@ -1001,6 +1007,9 @@ ERROR(missing_condition_after_while,none,
       "missing condition in a 'while' statement", ())
 ERROR(expected_lbrace_after_while,PointsToFirstBadToken,
       "expected '{' after 'while' condition", ())
+
+ERROR(whilent_let_unsupported,none,
+      "only boolean conditions are supported in 'whilen't' statements", ())
 
 // Repeat/While Statement
 ERROR(expected_lbrace_after_repeat,PointsToFirstBadToken,
