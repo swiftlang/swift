@@ -35,23 +35,12 @@ class VarargsInfo {
   SILValue BaseAddress;
   AbstractionPattern BasePattern;
   const TypeLowering &BaseTL;
-  bool IsExpansionPeephole = false;
 public:
   VarargsInfo(ManagedValue array, CleanupHandle abortCleanup,
               SILValue baseAddress, const TypeLowering &baseTL,
-              AbstractionPattern basePattern, bool isExpansionPeephole)
+              AbstractionPattern basePattern)
     : Array(array), AbortCleanup(abortCleanup),
-      BaseAddress(baseAddress), BasePattern(basePattern), BaseTL(baseTL),
-      IsExpansionPeephole(isExpansionPeephole) {}
-
-  void setExpansion(unsigned index, ManagedValue expansion) {
-    assert(IsExpansionPeephole);
-    assert(index == 0 && "non-initial index for peephole?");
-    assert(!Array && "array already filled");
-    Array = expansion;
-  }
-
-  bool isExpansionPeephole() const { return IsExpansionPeephole; }
+      BaseAddress(baseAddress), BasePattern(basePattern), BaseTL(baseTL) {}
 
   /// Return the array value.  emitEndVarargs() is really the only
   /// function that should be accessing this directly.
@@ -75,8 +64,7 @@ public:
 /// Begin a varargs emission sequence.
 VarargsInfo emitBeginVarargs(SILGenFunction &SGF, SILLocation loc,
                              CanType baseTy, CanType arrayTy,
-                             unsigned numElements,
-                             ArrayRef<unsigned> expansions);
+                             unsigned numElements);
 
 /// Successfully end a varargs emission sequence.
 ManagedValue emitEndVarargs(SILGenFunction &SGF, SILLocation loc,

@@ -1066,6 +1066,20 @@ private:
         llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
   }
 
+  llvm::DIType *createFixedValueBufferStruct(llvm::DIType *PointeeTy) {
+    unsigned Line = 0;
+    unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+    llvm::DINode::DIFlags Flags = llvm::DINode::FlagArtificial;
+    llvm::DIFile *File = MainFile;
+    llvm::DIScope *Scope = TheCU;
+    llvm::Metadata *Elements[] = {DBuilder.createMemberType(
+        Scope, "contents", File, 0, PtrSize, 0, 0, Flags, PointeeTy)};
+    return DBuilder.createStructType(
+        Scope, "$swift.fixedbuffer", File, Line, 3 * PtrSize, 0, Flags,
+        /* DerivedFrom */ nullptr, DBuilder.getOrCreateArray(Elements),
+        llvm::dwarf::DW_LANG_Swift, nullptr);
+  }
+
   llvm::DIType *createFunctionPointer(DebugTypeInfo DbgTy, llvm::DIScope *Scope,
                                       unsigned SizeInBits, unsigned AlignInBits,
                                       llvm::DINode::DIFlags Flags,
@@ -1727,9 +1741,12 @@ void IRGenDebugInfoImpl::finalize() {
 
   // Get the list of imported modules (which may actually be different
   // from all ImportDecls).
+  ModuleDecl::ImportFilter ImportFilter;
+  ImportFilter |= ModuleDecl::ImportFilterKind::Public;
+  ImportFilter |= ModuleDecl::ImportFilterKind::Private;
+  ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
   SmallVector<ModuleDecl::ImportedModule, 8> ModuleWideImports;
-  IGM.getSwiftModule()->getImportedModules(ModuleWideImports,
-                                           ModuleDecl::ImportFilter::All);
+  IGM.getSwiftModule()->getImportedModules(ModuleWideImports, ImportFilter);
   for (auto M : ModuleWideImports)
     if (!ImportedModules.count(M.second))
       DBuilder.createImportedModule(MainFile, getOrCreateModule(M), MainFile,
@@ -2227,7 +2244,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
 
 void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
     llvm::GlobalVariable *Var, StringRef Name, StringRef LinkageName,
-    DebugTypeInfo DbgTy, bool IsLocalToUnit, bool Indirect,
+    DebugTypeInfo DbgTy, bool IsLocalToUnit, bool InFixedBuffer,
     Optional<SILLocation> Loc) {
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
     return;
@@ -2240,6 +2257,9 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
     // would confuse both the user and LLDB.
     return;
 
+  if (InFixedBuffer)
+    Ty = createFixedValueBufferStruct(Ty);
+
   auto L = getStartLocation(Loc);
   auto File = getOrCreateFile(L.Filename);
 
@@ -2247,9 +2267,6 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
   llvm::DIExpression *Expr = nullptr;
   if (!Var)
     Expr = DBuilder.createConstantValueExpression(0);
-  else if (Indirect)
-    Expr =
-        DBuilder.createExpression(ArrayRef<uint64_t>(llvm::dwarf::DW_OP_deref));
   auto *GV = DBuilder.createGlobalVariableExpression(
       MainModule, Name, LinkageName, File, L.Line, Ty, IsLocalToUnit, Expr);
   if (Var)
@@ -2388,10 +2405,10 @@ void IRGenDebugInfo::emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
 
 void IRGenDebugInfo::emitGlobalVariableDeclaration(
     llvm::GlobalVariable *Storage, StringRef Name, StringRef LinkageName,
-    DebugTypeInfo DebugType, bool IsLocalToUnit, bool Indirect,
+    DebugTypeInfo DebugType, bool IsLocalToUnit, bool InFixedBuffer,
     Optional<SILLocation> Loc) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitGlobalVariableDeclaration(
-      Storage, Name, LinkageName, DebugType, IsLocalToUnit, Indirect, Loc);
+      Storage, Name, LinkageName, DebugType, IsLocalToUnit, InFixedBuffer, Loc);
 }
 
 void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,

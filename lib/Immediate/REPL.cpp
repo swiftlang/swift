@@ -176,7 +176,7 @@ typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
 
   SmallVector<ModuleDecl::ImportedModule, 8> Imports;
   MostRecentModule->getImportedModules(Imports,
-                                       ModuleDecl::ImportFilter::Private);
+                                       ModuleDecl::ImportFilterKind::Private);
   if (!Imports.empty()) {
     SmallVector<SourceFile::ImportedModuleDesc, 8> ImportsWithOptions;
     for (auto Import : Imports) {

@@ -6,7 +6,7 @@
 
 typealias MyInt = Int
 // CHECK: TypeAliasDecl '''MyInt''' MyInt.Type{{$}}
-// FULL:  TypeAliasDecl '''MyInt''' MyInt.Type{{$}}
+// FULL:  TypeAliasDecl '''MyInt''' swift_ide_test.MyInt.Type{{$}}
 
 func testVariableTypes(_ param: Int, param2: inout Double) {
 // CHECK: FuncDecl '''testVariableTypes''' (Int, inout Double) -> (){{$}}
@@ -52,7 +52,7 @@ func testVariableTypes(_ param: Int, param2: inout Double) {
   var typealias1 : MyInt = 42
 // CHECK: VarDecl '''typealias1''' MyInt{{$}}
 // CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int{{$}}
-// FULL:  VarDecl '''typealias1''' MyInt{{$}}
+// FULL:  VarDecl '''typealias1''' swift_ide_test.MyInt{{$}}
 // FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Swift.Int{{$}}
   _ = typealias1 ; typealias1 = 1
 
@@ -77,11 +77,11 @@ func testFuncType2() -> () {}
 
 func testFuncType3() -> Void {}
 // CHECK: FuncDecl '''testFuncType3''' () -> Void{{$}}
-// FULL:  FuncDecl '''testFuncType3''' () -> Void{{$}}
+// FULL:  FuncDecl '''testFuncType3''' () -> Swift.Void{{$}}
 
 func testFuncType4() -> MyInt {}
 // CHECK: FuncDecl '''testFuncType4''' () -> MyInt{{$}}
-// FULL:  FuncDecl '''testFuncType4''' () -> MyInt{{$}}
+// FULL:  FuncDecl '''testFuncType4''' () -> swift_ide_test.MyInt{{$}}
 
 func testFuncType5() -> (Int) {}
 // CHECK: FuncDecl '''testFuncType5''' () -> (Int){{$}}
@@ -111,7 +111,7 @@ struct GenericStruct<A, B : FooProtocol> {}
 
 func testInGenericFunc1<A, B : FooProtocol, C : FooProtocol & BarProtocol>(_ a: A, b: B, c: C) {
 // CHECK: FuncDecl '''testInGenericFunc1''' <A, B, C where B : FooProtocol, C : BarProtocol, C : FooProtocol> (A, b: B, c: C) -> (){{$}}
-// FULL:  FuncDecl '''testInGenericFunc1''' <A, B, C where B : FooProtocol, C : BarProtocol, C : FooProtocol> (A, b: B, c: C) -> (){{$}}
+// FULL:  FuncDecl '''testInGenericFunc1''' <A, B, C where B : swift_ide_test.FooProtocol, C : swift_ide_test.BarProtocol, C : swift_ide_test.FooProtocol> (A, b: B, c: C) -> (){{$}}
 
   var a1 = a
   _ = a1; a1 = a
@@ -136,5 +136,5 @@ func testInGenericFunc1<A, B : FooProtocol, C : FooProtocol & BarProtocol>(_ a: 
 
 func testInGenericFunc2<T : QuxProtocol, U : QuxProtocol>(_: T, _: U) where T.Qux == U.Qux {}
 // CHECK: FuncDecl '''testInGenericFunc2''' <T, U where T : QuxProtocol, U : QuxProtocol, T.Qux == U.Qux> (T, U) -> (){{$}}
-// FULL:  FuncDecl '''testInGenericFunc2''' <T, U where T : QuxProtocol, U : QuxProtocol, T.Qux == U.Qux> (T, U) -> (){{$}}
+// FULL:  FuncDecl '''testInGenericFunc2''' <T, U where T : swift_ide_test.QuxProtocol, U : swift_ide_test.QuxProtocol, T.Qux == U.Qux> (T, U) -> (){{$}}
 
