@@ -558,7 +558,6 @@ func rdar_48114578() {
   func foo(_ a: [String], _ b: Int) -> S<A> {
     let v = (a, b)
     return .valueOf(v)
-    // expected-error@-1 {{cannot express tuple conversion '([String], Int)' to '(a: [String]?, b: Int)'}}
   }
 
   func bar(_ a: [String], _ b: Int) -> S<A> {

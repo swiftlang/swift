@@ -820,6 +820,26 @@ public:
       OpaqueValues.erase(expr->getOpaqueValue());
     }
 
+    // Register the OVEs in a DestructureTupleExpr.
+    bool shouldVerify(DestructureTupleExpr *expr) {
+      if (!shouldVerify(cast<Expr>(expr)))
+        return false;
+
+      for (auto *opaqueElt : expr->getDestructuredElements()) {
+        assert(!OpaqueValues.count(opaqueElt));
+        OpaqueValues[opaqueElt] = 0;
+      }
+
+      return true;
+    }
+
+    void cleanup(DestructureTupleExpr *expr) {
+      for (auto *opaqueElt : expr->getDestructuredElements()) {
+        assert(OpaqueValues.count(opaqueElt));
+        OpaqueValues.erase(opaqueElt);
+      }
+    }
+
     // Keep a stack of the currently-live optional evaluations.
     bool shouldVerify(OptionalEvaluationExpr *expr) {
       if (!shouldVerify(cast<Expr>(expr)))
@@ -1709,12 +1729,6 @@ public:
         }
       };
 
-      // If we have an argument shuffle, strip it off. We want to visit the
-      // underlying paren or tuple expr.
-      if (auto *ArgShuffle = dyn_cast<ArgumentShuffleExpr>(Arg)) {
-        Arg = ArgShuffle->getSubExpr();
-      }
-
       if (auto *ParentExprArg = dyn_cast<ParenExpr>(Arg)) {
         return handleSubExpr(ParentExprArg->getSubExpr());
       }
@@ -1988,89 +2002,38 @@ public:
       verifyCheckedBase(E);
     }
 
-    void verifyChecked(TupleShuffleExpr *E) {
-      PrettyStackTraceExpr debugStack(Ctx, "verifying TupleShuffleExpr", E);
+    void verifyChecked(DestructureTupleExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying DestructureTupleExpr", E);
 
-      auto getSubElementType = [&](unsigned i) {
+      auto getInputElementType = [&](unsigned i) {
         return (E->getSubExpr()->getType()->castTo<TupleType>()
                  ->getElementType(i));
       };
 
-      /// Retrieve the ith element type from the resulting tuple type.
-      auto getOuterElementType = [&](unsigned i) -> Type {
-        return E->getType()->castTo<TupleType>()->getElementType(i);
+      auto getOpaqueElementType = [&](unsigned i) -> Type {
+        return E->getDestructuredElements()[i]->getType();
       };
 
-      for (unsigned i = 0, e = E->getElementMapping().size(); i != e; ++i) {
-        int subElem = E->getElementMapping()[i];
-        if (!getOuterElementType(i)->isEqual(getSubElementType(subElem))) {
-          Out << "Type mismatch in TupleShuffleExpr\n";
+      for (unsigned i = 0, e = E->getDestructuredElements().size(); i != e; ++i) {
+        Type inputType = getInputElementType(i);
+        Type opaqueType = getOpaqueElementType(i);
+        if (!inputType->isEqual(opaqueType)) {
+          Out << "Input type mismatch in DestructureTupleExpr\n";
+          inputType->dump(Out);
+          opaqueType->dump(Out);
           abort();
         }
       }
 
-      verifyCheckedBase(E);
-    }
-    
-    void verifyChecked(ArgumentShuffleExpr *E) {
-      PrettyStackTraceExpr debugStack(Ctx, "verifying ArgumentShuffleExpr", E);
-
-      auto getSubElementType = [&](unsigned i) {
-        if (E->isSourceScalar()) {
-          assert(i == 0);
-          return E->getSubExpr()->getType();
-        } else {
-          return (E->getSubExpr()->getType()->castTo<TupleType>()
-                   ->getElementType(i));
-        }
-      };
-
-      /// Retrieve the ith element type from the resulting tuple type.
-      auto getOuterElementType = [&](unsigned i) -> Type {
-        if (E->isResultScalar()) {
-          assert(i == 0);
-          return E->getType()->getWithoutParens();
-        } else {
-          return E->getType()->castTo<TupleType>()->getElementType(i);
-        }
-      };
-
-      Type varargsType;
-      unsigned callerDefaultArgIndex = 0;
-      for (unsigned i = 0, e = E->getElementMapping().size(); i != e; ++i) {
-        int subElem = E->getElementMapping()[i];
-        if (subElem == ArgumentShuffleExpr::DefaultInitialize)
-          continue;
-        if (subElem == ArgumentShuffleExpr::Variadic) {
-          varargsType = (E->getType()->castTo<TupleType>()
-                          ->getElement(i).getVarargBaseTy());
-          break;
-        }
-        if (subElem == ArgumentShuffleExpr::CallerDefaultInitialize) {
-          auto init = E->getCallerDefaultArgs()[callerDefaultArgIndex++];
-          if (!getOuterElementType(i)->isEqual(init->getType())) {
-            Out << "Type mismatch in ArgumentShuffleExpr\n";
-            abort();
-          }
-          continue;
-        }
-        if (!getOuterElementType(i)->isEqual(getSubElementType(subElem))) {
-          Out << "Type mismatch in ArgumentShuffleExpr\n";
-          abort();
-        }
-      }
-      if (varargsType) {
-        for (auto sourceIdx : E->getVariadicArgs()) {
-          if (!getSubElementType(sourceIdx)->isEqual(varargsType)) {
-            Out << "Vararg type mismatch in ArgumentShuffleExpr\n";
-            abort();
-          }
-        }
+      if (!E->getResultExpr()->getType()->isEqual(E->getType())) {
+        Out << "Result type mismatch in DestructureTupleExpr\n";
+        E->getResultExpr()->getType()->dump(Out);
+        E->getType()->dump(Out);
       }
 
       verifyCheckedBase(E);
     }
-    
+
     void verifyChecked(DynamicTypeExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying DynamicTypeExpr", E);
 

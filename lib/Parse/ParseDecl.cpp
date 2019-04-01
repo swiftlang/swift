@@ -929,6 +929,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   case DAK_RestatedObjCConformance:
   case DAK_SynthesizedProtocol:
   case DAK_ClangImporterSynthesizedType:
+  case DAK_Custom:
     llvm_unreachable("virtual attributes should not be parsed "
                      "by attribute parsing code");
   case DAK_SetterAccess:
@@ -1852,8 +1853,66 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
 
   if (TypeAttributes::getAttrKindFromString(Tok.getText()) != TAK_Count)
     diagnose(Tok, diag::type_attribute_applied_to_decl);
-  else
-    diagnose(Tok, diag::unknown_attribute, Tok.getText());
+  else if (Tok.isContextualKeyword("unknown")) {
+    diagnose(Tok, diag::unknown_attribute, "unknown");
+  } else {
+    // Parse a custom attribute.
+    auto type = parseType(diag::expected_type);
+    if (type.hasCodeCompletion() || type.isNull()) {
+      if (Tok.is(tok::l_paren))
+        skipSingle();
+
+      return true;
+    }
+
+    // Parse the optional arguments.
+    SourceLoc lParenLoc, rParenLoc;
+    SmallVector<Expr *, 2> args;
+    SmallVector<Identifier, 2> argLabels;
+    SmallVector<SourceLoc, 2> argLabelLocs;
+    Expr *trailingClosure = nullptr;
+    bool hasInitializer = false;
+
+    // If we're not in a local context, we'll need a context to parse
+    // initializers into (should we have one).  This happens for properties
+    // and global variables in libraries.
+    PatternBindingInitializer *initContext = nullptr;
+
+    if (Tok.isFollowingLParen()) {
+      SyntaxParsingContext InitCtx(SyntaxContext,
+                                   SyntaxKind::InitializerClause);
+
+      // If we have no local context to parse the initial value into, create one
+      // for the PBD we'll eventually create.  This allows us to have reasonable
+      // DeclContexts for any closures that may live inside of initializers.
+      Optional<ParseFunctionBody> initParser;
+      if (!CurDeclContext->isLocalContext()) {
+        initContext = new (Context) PatternBindingInitializer(CurDeclContext);
+        initParser.emplace(*this, initContext);
+      }
+
+      ParserStatus status = parseExprList(tok::l_paren, tok::r_paren,
+                                          /*isPostfix=*/false,
+                                          /*isExprBasic=*/true,
+                                          lParenLoc, args, argLabels,
+                                          argLabelLocs,
+                                          rParenLoc,
+                                          trailingClosure,
+                                          SyntaxKind::FunctionCallArgumentList);
+      if (status.hasCodeCompletion())
+        return true;
+
+      assert(!trailingClosure && "Cannot parse a trailing closure here");
+      hasInitializer = true;
+    }
+
+    // Form the attribute.
+    auto attr = CustomAttr::create(Context, AtLoc, type.get(), hasInitializer,
+                                   initContext, lParenLoc, args, argLabels,
+                                   argLabelLocs, rParenLoc);
+    Attributes.add(attr);
+    return false;
+  }
 
   // Recover by eating @foo(...) when foo is not known.
   consumeToken();
