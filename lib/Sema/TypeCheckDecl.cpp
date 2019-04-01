@@ -5048,13 +5048,26 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     }
   }
 
-  // Bail out if we're validating one of our constructors already; we'll
-  // revisit the issue later.
+  // Bail out if we're validating one of our constructors or stored properties
+  // already; we'll revisit the issue later.
   if (isa<ClassDecl>(decl)) {
     for (auto member : decl->getMembers()) {
       if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
         validateDecl(ctor);
         if (!ctor->hasValidSignature())
+          return;
+      }
+    }
+  }
+
+  if (isa<StructDecl>(decl)) {
+    for (auto member : decl->getMembers()) {
+      if (auto var = dyn_cast<VarDecl>(member)) {
+        if (!isMemberwiseInitialized(var))
+          continue;
+
+        validateDecl(var);
+        if (!var->hasValidSignature())
           return;
       }
     }
@@ -5066,7 +5079,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // variable.
   bool FoundMemberwiseInitializedProperty = false;
   bool SuppressDefaultInitializer = false;
-  bool SuppressMemberwiseInitializer = false;
   bool FoundDesignatedInit = false;
 
   SmallVector<std::pair<ValueDecl *, Type>, 4> declaredInitializers;
@@ -5110,7 +5122,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       }
 
       if (auto var = dyn_cast<VarDecl>(member)) {
-        if (var->hasStorage() && !var->isStatic() && !var->isInvalid()) {
+        if (isMemberwiseInitialized(var)) {
           // Initialized 'let' properties have storage, but don't get an argument
           // to the memberwise initializer since they already have an initial
           // value that cannot be overridden.
@@ -5165,7 +5177,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     assert(!structDecl->hasUnreferenceableStorage() &&
            "User-defined structs cannot have unreferenceable storage");
 
-    if (!FoundDesignatedInit && !SuppressMemberwiseInitializer) {
+    if (!FoundDesignatedInit) {
       // For a struct with memberwise initialized properties, we add a
       // memberwise init.
       if (FoundMemberwiseInitializedProperty) {
