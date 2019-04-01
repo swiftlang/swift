@@ -184,10 +184,8 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
   auto *getterParams = buildIndexForwardingParamList(storage, {}, ctx);
 
   SourceLoc staticLoc;
-  if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (var->isStatic())
-      staticLoc = var->getLoc();
-  }
+  if (storage->isStatic())
+    staticLoc = storage->getLoc();
 
   auto storageInterfaceType = storage->getValueInterfaceType();
 

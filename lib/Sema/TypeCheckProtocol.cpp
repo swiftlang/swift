@@ -490,12 +490,10 @@ swift::matchWitness(
   } else if (auto *witnessASD = dyn_cast<AbstractStorageDecl>(witness)) {
     auto *reqASD = cast<AbstractStorageDecl>(req);
     
-    // If this is a property requirement, check that the static-ness matches.
-    if (auto *vdWitness = dyn_cast<VarDecl>(witness)) {
-      if (cast<VarDecl>(req)->isStatic() != vdWitness->isStatic())
-        return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
-    }
-    
+    // Check that the static-ness matches.
+    if (reqASD->isStatic() != witnessASD->isStatic())
+      return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
+
     // If the requirement is settable and the witness is not, reject it.
     if (req->isSettable(req->getDeclContext()) &&
         !witness->isSettable(witness->getDeclContext()))
