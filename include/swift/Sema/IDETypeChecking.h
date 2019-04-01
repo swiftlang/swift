@@ -65,10 +65,16 @@ namespace swift {
 
   struct ResolvedMemberResult {
     struct Implementation;
-    Implementation &Impl;
+    Implementation *Impl;
 
     ResolvedMemberResult();
     ~ResolvedMemberResult();
+    ResolvedMemberResult(const ResolvedMemberResult &) = delete;
+    ResolvedMemberResult & operator=(ResolvedMemberResult &) = delete;
+    ResolvedMemberResult(ResolvedMemberResult &&other) {
+      Impl = other.Impl;
+      other.Impl = nullptr;
+    }
     operator bool() const;
     bool hasBestOverload() const;
     ValueDecl* getBestOverload() const;

@@ -3773,28 +3773,28 @@ struct ResolvedMemberResult::Implementation {
   Optional<unsigned> BestIdx;
 };
 
-ResolvedMemberResult::ResolvedMemberResult(): Impl(*new Implementation()) {};
+ResolvedMemberResult::ResolvedMemberResult(): Impl(new Implementation()) {};
 
-ResolvedMemberResult::~ResolvedMemberResult() { delete &Impl; };
+ResolvedMemberResult::~ResolvedMemberResult() { delete Impl; };
 
 ResolvedMemberResult::operator bool() const {
-  return !Impl.AllDecls.empty();
+  return !Impl->AllDecls.empty();
 }
 
 bool ResolvedMemberResult::
-hasBestOverload() const { return Impl.BestIdx.hasValue(); }
+hasBestOverload() const { return Impl->BestIdx.hasValue(); }
 
 ValueDecl* ResolvedMemberResult::
-getBestOverload() const { return Impl.AllDecls[Impl.BestIdx.getValue()]; }
+getBestOverload() const { return Impl->AllDecls[Impl->BestIdx.getValue()]; }
 
 ArrayRef<ValueDecl*> ResolvedMemberResult::
 getMemberDecls(InterestedMemberKind Kind) {
-  auto Result = llvm::makeArrayRef(Impl.AllDecls);
+  auto Result = llvm::makeArrayRef(Impl->AllDecls);
   switch (Kind) {
   case InterestedMemberKind::Viable:
-    return Result.slice(Impl.ViableStartIdx);
+    return Result.slice(Impl->ViableStartIdx);
   case InterestedMemberKind::Unviable:
-    return Result.slice(0, Impl.ViableStartIdx);
+    return Result.slice(0, Impl->ViableStartIdx);
   case InterestedMemberKind::All:
     return Result;
   }
@@ -3816,10 +3816,10 @@ swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
 
   // Keep track of all the unviable members.
   for (auto Can : LookupResult.UnviableCandidates)
-    Result.Impl.AllDecls.push_back(Can.getDecl());
+    Result.Impl->AllDecls.push_back(Can.getDecl());
 
   // Keep track of the start of viable choices.
-  Result.Impl.ViableStartIdx = Result.Impl.AllDecls.size();
+  Result.Impl->ViableStartIdx = Result.Impl->AllDecls.size();
 
   // If no viable members, we are done.
   if (LookupResult.ViableCandidates.empty())
@@ -3839,8 +3839,8 @@ swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
 
     // If this VD is the best overload, keep track of its index.
     if (VD == Selected)
-      Result.Impl.BestIdx = Result.Impl.AllDecls.size();
-    Result.Impl.AllDecls.push_back(VD);
+      Result.Impl->BestIdx = Result.Impl->AllDecls.size();
+    Result.Impl->AllDecls.push_back(VD);
   }
   return Result;
 }
