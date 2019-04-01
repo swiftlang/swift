@@ -949,6 +949,12 @@ public protocol UnkeyedDecodingContainer {
   ///   not an unkeyed container.
   mutating func nestedUnkeyedContainer() throws -> UnkeyedDecodingContainer
 
+  /// Skips the current value
+  ///
+  /// - throws: `DecodingError.valueNotFound` if `self` is already at the end and
+  /// there is no next value to skip to
+  mutating  func skip() throws  
+
   /// Decodes a nested container and returns a `Decoder` instance for decoding
   /// `super` from that container.
   ///
@@ -2061,6 +2067,15 @@ extension UnkeyedDecodingContainer {
   {
     guard try !self.isAtEnd && !self.decodeNil() else { return nil }
     return try self.decode(T.self)
+  }
+}
+
+// Default implementation of skip() in terms of decoding an empty struct
+struct Empty: Decodable { }
+
+extension UnkeyedDecodingContainer {
+  public mutating func skip() throws {
+    _ = try decode(Empty.self)
   }
 }
 
