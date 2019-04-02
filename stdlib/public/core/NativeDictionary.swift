@@ -460,28 +460,6 @@ internal func KEY_TYPE_OF_DICTIONARY_VIOLATES_HASHABLE_REQUIREMENTS(
 }
 
 extension _NativeDictionary { // Insertions
-  /// Insert a new element into uniquely held storage.  Storage must be uniquely
-  /// referenced with adequate capacity.  If `allowingDuplicates` is false,
-  /// `element` must not be already present in the dictionary.
-  @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
-  internal mutating func insertWithGuaranteedCapacity(
-    key: __owned Key,
-    value: __owned Value,
-    allowingDuplicates: Bool
-  ) {
-    _precondition(count < capacity)
-    if !allowingDuplicates {
-      _unsafeInsertNew(key: key, value: value)
-      return
-    }
-    let (bucket, found) = find(key)
-    if found {
-      (_values + bucket.offset).pointee = value
-    } else {
-      _insert(at: bucket, key: key, value: value)
-    }
-  }
-
   /// Insert a new element into uniquely held storage.
   /// Storage must be uniquely referenced with adequate capacity.
   /// The `key` must not be already present in the Dictionary.
@@ -505,6 +483,28 @@ extension _NativeDictionary { // Insertions
       uncheckedInitialize(at: bucket, toKey: key, value: value)
     }
     _storage._count &+= 1
+  }
+
+  /// Insert a new element into uniquely held storage, replacing an existing
+  /// value (if any).  Storage must be uniquely referenced with adequate
+  /// capacity.
+  @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
+  internal mutating func _unsafeUpdate(
+    key: __owned Key,
+    value: __owned Value
+  ) {
+    let (bucket, found) = find(key)
+    if found {
+      // Note that we also update the key here. This method is used to handle
+      // collisions arising from equality transitions during bridging, and in
+      // that case it is desirable to keep values paired with their original
+      // keys. This is not how `updateValue(_:, forKey:)` works.
+      (_keys + bucket.offset).pointee = key
+      (_values + bucket.offset).pointee = value
+    } else {
+      _precondition(count < capacity)
+      _insert(at: bucket, key: key, value: value)
+    }
   }
 
   /// Insert a new entry into uniquely held storage.
