@@ -17,6 +17,32 @@ extension vDSP {
     /// Converts power to decibels, single-precision.
     ///
     /// - Parameter power: Source vector.
+    /// - Parameter zeroReference: Zero reference.
+    /// - Returns: `power` converted to decibels.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func powerToDecibels<U>(_ power: U,
+                                          zeroReference: Float) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: power.count) {
+                buffer, initializedCount in
+                
+                convert(power: power,
+                        toDecibels: &buffer,
+                        zeroReference: zeroReference)
+                
+                initializedCount = power.count
+            }
+            
+            return result
+    }
+    
+    /// Converts power to decibels, single-precision.
+    ///
+    /// - Parameter power: Source vector.
     /// - Parameter decibels: Destination vector.
     /// - Parameter zeroReference: Zero reference.
     @inline(__always)
@@ -43,6 +69,32 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Converts power to decibels, double-precision.
+    ///
+    /// - Parameter power: Source vector.
+    /// - Parameter zeroReference: Zero reference.
+    /// - Returns: `power` converted to decibels.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func powerToDecibels<U>(_ power: U,
+                                          zeroReference: Double) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: power.count) {
+                buffer, initializedCount in
+                
+                convert(power: power,
+                        toDecibels: &buffer,
+                        zeroReference: zeroReference)
+                
+                initializedCount = power.count
+            }
+            
+            return result
     }
     
     /// Converts power to decibels, double-precision.
@@ -79,6 +131,32 @@ extension vDSP {
     /// Converts amplitude to decibels, single-precision.
     ///
     /// - Parameter amplitude: Source vector.
+    /// - Parameter zeroReference: Zero reference.
+    /// - Returns: `amplitude` converted to decibels.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func amplitudeToDecibels<U>(_ amplitude: U,
+                                              zeroReference: Float) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: amplitude.count) {
+                buffer, initializedCount in
+                
+                convert(amplitude: amplitude,
+                        toDecibels: &buffer,
+                        zeroReference: zeroReference)
+                
+                initializedCount = amplitude.count
+            }
+            
+            return result
+    }
+    
+    /// Converts amplitude to decibels, single-precision.
+    ///
+    /// - Parameter amplitude: Source vector.
     /// - Parameter decibels: Destination vector.
     /// - Parameter zeroReference: Zero reference.
     @inline(__always)
@@ -105,6 +183,32 @@ extension vDSP {
                     }
                 }
             }
+    }
+    
+    /// Converts amplitude to decibels, double-precision.
+    ///
+    /// - Parameter amplitude: Source vector.
+    /// - Parameter zeroReference: Zero reference.
+    /// - Returns: `amplitude` converted to decibels.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func amplitudeToDecibels<U>(_ amplitude: U,
+                                              zeroReference: Double) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: amplitude.count) {
+                buffer, initializedCount in
+                
+                convert(amplitude: amplitude,
+                        toDecibels: &buffer,
+                        zeroReference: zeroReference)
+                
+                initializedCount = amplitude.count
+            }
+            
+            return result
     }
     
     /// Converts amplitude to decibels, double-precision.

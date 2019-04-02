@@ -38,7 +38,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                    &legacyResult, 2,
                    n / 2)
         
+        let returnedResult = vDSP.rectangularToPolar(source)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/SinglePrecisionPolarToRect") {
@@ -61,7 +64,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                   &legacyResult, 2,
                   n / 2)
         
+        let returnedResult = vDSP.polarToRectangular(source)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/DoublePrecisionRectToPolar") {
@@ -84,7 +90,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                     &legacyResult, 2,
                     n / 2)
         
+        let returnedResult = vDSP.rectangularToPolar(source)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/DoublePrecisionRectToPolar") {
@@ -107,7 +116,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                    &legacyResult, 2,
                    n / 2)
         
+        let returnedResult = vDSP.polarToRectangular(source)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
 }
 
@@ -141,7 +153,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                     vDSP_Length(n),
                     0)
         
+        let returnedResult = vDSP.powerToDecibels(source,
+                                                  zeroReference: zeroReference)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/AmplitudeToDecibelsSinglePrecision") {
@@ -166,7 +182,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                     vDSP_Length(n),
                     1)
         
+        let returnedResult = vDSP.amplitudeToDecibels(source,
+                                                      zeroReference: zeroReference)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/PowerToDecibelsDoublePrecision") {
@@ -191,7 +211,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                      vDSP_Length(n),
                      0)
         
+        let returnedResult = vDSP.powerToDecibels(source,
+                                                  zeroReference: zeroReference)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/AmplitudeToDecibelsDoublePrecision") {
@@ -216,7 +240,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                      vDSP_Length(n),
                      1)
         
+        let returnedResult = vDSP.amplitudeToDecibels(source,
+                                                      zeroReference: zeroReference)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
 }
 

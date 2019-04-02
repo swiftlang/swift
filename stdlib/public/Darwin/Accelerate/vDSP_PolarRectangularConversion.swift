@@ -18,6 +18,29 @@ extension vDSP {
     /// Rectangular to polar conversion, single-precision.
     ///
     /// - Parameter rectangularCoordinates: Source vector, represented as consecutive x, y pairs.
+    /// - Returns: Polar coordinates, represented as consecutive rho, (radius) theta (angle in radians) pairs.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func rectangularToPolar<U>(_ rectangularCoordinates: U) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: rectangularCoordinates.count) {
+                buffer, initializedCount in
+                
+                convert(rectangularCoordinates: rectangularCoordinates,
+                        toPolarCoordinates: &buffer)
+                
+                initializedCount = rectangularCoordinates.count
+            }
+            
+            return result
+    }
+    
+    /// Rectangular to polar conversion, single-precision.
+    ///
+    /// - Parameter rectangularCoordinates: Source vector, represented as consecutive x, y pairs.
     /// - Parameter polarCoordinates: Destination vector, represented as consecutive rho, (radius) theta (angle in radians) pairs.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
@@ -39,6 +62,29 @@ extension vDSP {
                                vDSP_Length(n / 2))
                 }
             }
+    }
+    
+    /// Rectangular to polar conversion, double-precision.
+    ///
+    /// - Parameter rectangularCoordinates: Source vector, represented as consecutive x, y pairs.
+    /// - Returns: Polar coordinates, represented as consecutive rho, (radius) theta (angle in radians) pairs.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func rectangularToPolar<U>(_ rectangularCoordinates: U) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: rectangularCoordinates.count) {
+                buffer, initializedCount in
+                
+                convert(rectangularCoordinates: rectangularCoordinates,
+                        toPolarCoordinates: &buffer)
+                
+                initializedCount = rectangularCoordinates.count
+            }
+            
+            return result
     }
     
     /// Rectangular to polar conversion, double-precision.
@@ -70,6 +116,29 @@ extension vDSP {
     /// Polar to rectangular conversion, single-precision.
     ///
     /// - Parameter polarCoordinates: Source vector, represented as consecutive rho, (radius) theta (angle in radians) pairs.
+    /// - Returns: Rectangular coordinates, represented as consecutive x, y pairs.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func polarToRectangular<U>(_ polarCoordinates: U) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: polarCoordinates.count) {
+                buffer, initializedCount in
+                
+                convert(polarCoordinates: polarCoordinates,
+                        toRectangularCoordinates: &buffer)
+                
+                initializedCount = polarCoordinates.count
+            }
+            
+            return result
+    }
+    
+    /// Polar to rectangular conversion, single-precision.
+    ///
+    /// - Parameter polarCoordinates: Source vector, represented as consecutive rho, (radius) theta (angle in radians) pairs.
     /// - Parameter rectangularCoordinates: Destination vector, represented as consecutive x, y pairs.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
@@ -91,6 +160,29 @@ extension vDSP {
                               vDSP_Length(n / 2))
                 }
             }
+    }
+    
+    /// Polar to rectangular conversion, double-precision.
+    ///
+    /// - Parameter polarCoordinates: Source vector, represented as consecutive rho, (radius) theta (angle in radians) pairs.
+    /// - Returns: Rectangular coordinates, represented as consecutive x, y pairs.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func polarToRectangular<U>(_ polarCoordinates: U) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: polarCoordinates.count) {
+                buffer, initializedCount in
+                
+                convert(polarCoordinates: polarCoordinates,
+                        toRectangularCoordinates: &buffer)
+                
+                initializedCount = polarCoordinates.count
+            }
+            
+            return result
     }
     
     /// Polar to rectangular conversion, double-precision.
