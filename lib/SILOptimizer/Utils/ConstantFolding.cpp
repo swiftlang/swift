@@ -278,42 +278,38 @@ constantFoldBinaryWithOverflow(BuiltinInst *BI, BuiltinValueKind ID,
            ResultsInError);
 }
 
-static SILValue countZeros(BuiltinInst *BI, llvm::Intrinsic::ID ID) {
-  assert(BI->getArguments().size() == 2 && "Ctlz should have 2 args.");
-  OperandValueArrayRef Args = BI->getArguments();
+/// Constant fold a cttz or ctlz builtin inst of an integer literal.
+/// If \p countLeadingZeros is set to true, then we assume \p bi must be ctlz.
+/// If false, \p bi must be cttz.
+///
+/// NOTE: We assert that \p bi is either cttz or ctlz.
+static SILValue
+constantFoldCountLeadingOrTrialingZeroIntrinsic(BuiltinInst *bi,
+                                                bool countLeadingZeros) {
+  assert(bi->getIntrinsicID() == llvm::Intrinsic::ctlz ||
+         bi->getIntrinsicID() == llvm::Intrinsic::cttz &&
+             "Invalid Intrinsic - expected Ctlz/Cllz");
+  OperandValueArrayRef args = bi->getArguments();
 
   // Fold for integer constant arguments.
-  auto *LHS = dyn_cast<IntegerLiteralInst>(Args[0]);
-  if (!LHS) {
+  auto *lhs = dyn_cast<IntegerLiteralInst>(args[0]);
+  if (!lhs) {
     return nullptr;
   }
-  APInt LHSI = LHS->getValue();
-  unsigned LZ = 0;
-  // Check corner-case of source == zero
-  if (LHSI == 0) {
-    auto *RHS = dyn_cast<IntegerLiteralInst>(Args[1]);
-    if (!RHS || RHS->getValue() != 0) {
-      // Undefined
-      return nullptr;
+  APInt lhsi = lhs->getValue();
+  unsigned lz = [&] {
+    if (lhsi == 0) {
+      // Check corner-case of source == zero
+      return lhsi.getBitWidth();
     }
-    LZ = LHSI.getBitWidth();
-  } else {
-    switch (ID) {
-    default:
-      return nullptr;
-    case llvm::Intrinsic::ctlz: {
-      LZ = LHSI.countLeadingZeros();
-      break;
+    if (countLeadingZeros) {
+      return lhsi.countLeadingZeros();
     }
-    case llvm::Intrinsic::cttz: {
-      LZ = LHSI.countTrailingZeros();
-      break;
-    }
-    }
-  }
-  APInt LZAsAPInt = APInt(LHSI.getBitWidth(), LZ);
-  SILBuilderWithScope B(BI);
-  return B.createIntegerLiteral(BI->getLoc(), LHS->getType(), LZAsAPInt);
+    return lhsi.countTrailingZeros();
+  }();
+  APInt lzAsAPInt = APInt(lhsi.getBitWidth(), lz);
+  SILBuilderWithScope builder(bi);
+  return builder.createIntegerLiteral(bi->getLoc(), lhs->getType(), lzAsAPInt);
 }
 
 static SILValue constantFoldIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID,
@@ -329,9 +325,13 @@ static SILValue constantFoldIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID,
     return Op1;
   }
 
-  case llvm::Intrinsic::ctlz:
+  case llvm::Intrinsic::ctlz: {
+    return constantFoldCountLeadingOrTrialingZeroIntrinsic(
+        BI, true /*countLeadingZeros*/);
+  }
   case llvm::Intrinsic::cttz: {
-    return countZeros(BI, ID);
+    return constantFoldCountLeadingOrTrialingZeroIntrinsic(
+        BI, false /*countLeadingZeros*/);
   }
 
   case llvm::Intrinsic::sadd_with_overflow:
