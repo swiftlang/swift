@@ -11,6 +11,8 @@ import Builtin
 sil @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 sil @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
 
+protocol Error {}
+
 struct NativeObjectPair {
   var obj1 : Builtin.NativeObject
   var obj2 : Builtin.NativeObject
@@ -394,4 +396,223 @@ bb0(%0 : @guaranteed $(Klass, MyInt)):
   %4 = struct_extract %3 : $MyInt, #MyInt.value
   destroy_value %2 : $Klass
   return %4 : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil [ossa] @eliminate_unneeded_copy_from_begin_borrow : $@convention(thin) (@owned NativeObjectPair) -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'eliminate_unneeded_copy_from_begin_borrow'
+sil [ossa] @eliminate_unneeded_copy_from_begin_borrow : $@convention(thin) (@owned NativeObjectPair) -> () {
+bb0(%0 : @owned $NativeObjectPair):
+  %1 = begin_borrow %0 : $NativeObjectPair
+  %2 = struct_extract %1 : $NativeObjectPair, #NativeObjectPair.obj1
+  %3 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %4 = copy_value %2 : $Builtin.NativeObject
+  %5 = apply %3(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %4 : $Builtin.NativeObject
+  end_borrow %1 : $NativeObjectPair
+  destroy_value %0 : $NativeObjectPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @donot_eliminate_unneeded_copy_from_begin_borrow : $@convention(thin) (@owned NativeObjectPair) -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'donot_eliminate_unneeded_copy_from_begin_borrow'
+sil [ossa] @donot_eliminate_unneeded_copy_from_begin_borrow : $@convention(thin) (@owned NativeObjectPair) -> () {
+bb0(%0 : @owned $NativeObjectPair):
+  %1 = begin_borrow %0 : $NativeObjectPair
+  %2 = struct_extract %1 : $NativeObjectPair, #NativeObjectPair.obj1
+  %3 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %4 = copy_value %2 : $Builtin.NativeObject
+  end_borrow %1 : $NativeObjectPair
+  %5 = apply %3(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %4 : $Builtin.NativeObject
+  destroy_value %0 : $NativeObjectPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @eliminate_unneeded_copy_from_load_borrow : $@convention(thin) (@in NativeObjectPair) -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'eliminate_unneeded_copy_from_load_borrow'
+sil [ossa] @eliminate_unneeded_copy_from_load_borrow : $@convention(thin) (@in NativeObjectPair) -> () {
+bb0(%0 : $*NativeObjectPair):
+  %1 = load_borrow %0 : $*NativeObjectPair
+  %2 = struct_extract %1 : $NativeObjectPair, #NativeObjectPair.obj1
+  %3 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %4 = copy_value %2 : $Builtin.NativeObject
+  %5 = apply %3(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %4 : $Builtin.NativeObject
+  end_borrow %1 : $NativeObjectPair
+  destroy_addr %0 : $*NativeObjectPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @donot_eliminate_unneeded_copy_from_load_borrow : $@convention(thin) (@in NativeObjectPair) -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'donot_eliminate_unneeded_copy_from_load_borrow'
+sil [ossa] @donot_eliminate_unneeded_copy_from_load_borrow : $@convention(thin) (@in NativeObjectPair) -> () {
+bb0(%0 : $*NativeObjectPair):
+  %1 = load_borrow %0 : $*NativeObjectPair
+  %2 = struct_extract %1 : $NativeObjectPair, #NativeObjectPair.obj1
+  %3 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %4 = copy_value %2 : $Builtin.NativeObject
+  end_borrow %1 : $NativeObjectPair
+  %5 = apply %3(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %4 : $Builtin.NativeObject
+  destroy_addr %0 : $*NativeObjectPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_borrow_introducers_do_eliminate_copy : $@convention(thin) (@guaranteed Builtin.NativeObject, @owned Builtin.NativeObject, @in Builtin.NativeObject) -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'multiple_borrow_introducers_do_eliminate_copy'
+sil [ossa] @multiple_borrow_introducers_do_eliminate_copy : $@convention(thin) (@guaranteed Builtin.NativeObject, @owned Builtin.NativeObject, @in Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject, %2 : $*Builtin.NativeObject):
+  %3 = begin_borrow %1 : $Builtin.NativeObject
+  %4 = load_borrow %2 : $*Builtin.NativeObject
+
+  %5 = tuple(%0 : $Builtin.NativeObject, %3 : $Builtin.NativeObject, %4 : $Builtin.NativeObject)
+  %6 = copy_value %5 : $(Builtin.NativeObject, Builtin.NativeObject, Builtin.NativeObject)
+  (%7, %8, %9) = destructure_tuple %6 : $(Builtin.NativeObject, Builtin.NativeObject, Builtin.NativeObject)
+
+  %10 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %10(%7) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %10(%8) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %10(%9) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+
+
+  destroy_value %7 : $Builtin.NativeObject
+  destroy_value %8 : $Builtin.NativeObject
+  destroy_value %9 : $Builtin.NativeObject
+
+  end_borrow %3 : $Builtin.NativeObject
+  end_borrow %4 : $Builtin.NativeObject
+  destroy_value %1 : $Builtin.NativeObject
+  destroy_addr %2 : $*Builtin.NativeObject
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_borrow_introducers_donot_eliminate_copy : $@convention(thin) (@guaranteed Builtin.NativeObject, @owned Builtin.NativeObject, @in Builtin.NativeObject) -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'multiple_borrow_introducers_donot_eliminate_copy'
+sil [ossa] @multiple_borrow_introducers_donot_eliminate_copy : $@convention(thin) (@guaranteed Builtin.NativeObject, @owned Builtin.NativeObject, @in Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject, %2 : $*Builtin.NativeObject):
+  %3 = begin_borrow %1 : $Builtin.NativeObject
+  %4 = load_borrow %2 : $*Builtin.NativeObject
+
+  %5 = tuple(%0 : $Builtin.NativeObject, %3 : $Builtin.NativeObject, %4 : $Builtin.NativeObject)
+  %6 = copy_value %5 : $(Builtin.NativeObject, Builtin.NativeObject, Builtin.NativeObject)
+  (%7, %8, %9) = destructure_tuple %6 : $(Builtin.NativeObject, Builtin.NativeObject, Builtin.NativeObject)
+
+  %10 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %10(%7) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %10(%8) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %10(%9) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+
+  end_borrow %4 : $Builtin.NativeObject
+
+  destroy_value %7 : $Builtin.NativeObject
+  destroy_value %8 : $Builtin.NativeObject
+  destroy_value %9 : $Builtin.NativeObject
+
+  end_borrow %3 : $Builtin.NativeObject
+  destroy_value %1 : $Builtin.NativeObject
+  destroy_addr %2 : $*Builtin.NativeObject
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// TODO: It would be great if we could handle this case by moving the
+// destructure_tuple and then copying the individual values instead. Then we
+// could eliminate a copy.
+//
+// CHECK-LABEL: sil [ossa] @multiple_borrow_introducers_donot_eliminate_copy_2 : $@convention(thin) (@guaranteed Builtin.NativeObject, @owned Builtin.NativeObject, @in Builtin.NativeObject) -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'multiple_borrow_introducers_donot_eliminate_copy_2'
+sil [ossa] @multiple_borrow_introducers_donot_eliminate_copy_2 : $@convention(thin) (@guaranteed Builtin.NativeObject, @owned Builtin.NativeObject, @in Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject, %2 : $*Builtin.NativeObject):
+  %3 = begin_borrow %1 : $Builtin.NativeObject
+  %4 = load_borrow %2 : $*Builtin.NativeObject
+
+  %5 = tuple(%0 : $Builtin.NativeObject, %3 : $Builtin.NativeObject, %4 : $Builtin.NativeObject)
+  %6 = copy_value %5 : $(Builtin.NativeObject, Builtin.NativeObject, Builtin.NativeObject)
+  (%7, %8, %9) = destructure_tuple %6 : $(Builtin.NativeObject, Builtin.NativeObject, Builtin.NativeObject)
+
+  %10 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %11 = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+
+  apply %10(%7) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %11(%8) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %10(%9) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+
+  destroy_value %7 : $Builtin.NativeObject
+  destroy_value %9 : $Builtin.NativeObject
+
+  end_borrow %3 : $Builtin.NativeObject
+  end_borrow %4 : $Builtin.NativeObject
+  destroy_value %1 : $Builtin.NativeObject
+  destroy_addr %2 : $*Builtin.NativeObject
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @eliminate_copy_try_apply_callee : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error {
+entry(%0 : @guaranteed $Builtin.NativeObject):
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @eliminate_copy_try_apply_caller : $@convention(thin) (@owned NativeObjectPair) -> @error Error {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'eliminate_copy_try_apply_caller'
+sil [ossa] @eliminate_copy_try_apply_caller : $@convention(thin) (@owned NativeObjectPair) -> @error Error {
+bb0(%0 : @owned $NativeObjectPair):
+  %1 = begin_borrow %0 : $NativeObjectPair
+  %2 = struct_extract %1 : $NativeObjectPair, #NativeObjectPair.obj1
+  %3 = copy_value %2 : $Builtin.NativeObject
+  %4 = function_ref @eliminate_copy_try_apply_callee : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error
+  try_apply %4(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error, normal bb1, error bb2
+
+bb1(%errorEmptyTup: $()):
+  destroy_value %3 : $Builtin.NativeObject
+  end_borrow %1 : $NativeObjectPair
+  destroy_value %0 : $NativeObjectPair
+  %9999 = tuple()
+  return %9999 : $()
+
+bb2(%error : @owned $Error):
+  destroy_value %3 : $Builtin.NativeObject
+  end_borrow %1 : $NativeObjectPair
+  destroy_value %0 : $NativeObjectPair
+  throw %error : $Error
+}
+
+// CHECK-LABEL: sil [ossa] @donot_eliminate_copy_try_apply_caller : $@convention(thin) (@owned NativeObjectPair) -> @error Error {
+// CHECK: copy_value
+// CHECK: } // end sil function 'donot_eliminate_copy_try_apply_caller'
+sil [ossa] @donot_eliminate_copy_try_apply_caller : $@convention(thin) (@owned NativeObjectPair) -> @error Error {
+bb0(%0 : @owned $NativeObjectPair):
+  %1 = begin_borrow %0 : $NativeObjectPair
+  %2 = struct_extract %1 : $NativeObjectPair, #NativeObjectPair.obj1
+  %3 = copy_value %2 : $Builtin.NativeObject
+  end_borrow %1 : $NativeObjectPair
+  destroy_value %0 : $NativeObjectPair
+  %4 = function_ref @eliminate_copy_try_apply_callee : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error
+  try_apply %4(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error, normal bb1, error bb2
+
+bb1(%errorEmptyTup: $()):
+  destroy_value %3 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+
+bb2(%error : @owned $Error):
+  destroy_value %3 : $Builtin.NativeObject
+  throw %error : $Error
 }

@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-semantic-arc-opts"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/BranchPropagatedUser.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -117,8 +118,13 @@ static bool isConsumed(
 
 namespace {
 
-struct SemanticARCOptVisitor
-    : SILInstructionVisitor<SemanticARCOptVisitor, bool> {
+struct SemanticARCOptsVisitor
+    : SILInstructionVisitor<SemanticARCOptsVisitor, bool> {
+
+  DeadEndBlocks deadEndBlocks;
+
+  SemanticARCOptsVisitor(SILFunction &f) : deadEndBlocks(&f) {}
+
   bool visitSILInstruction(SILInstruction *i) { return false; }
   bool visitCopyValueInst(CopyValueInst *cvi);
   bool visitBeginBorrowInst(BeginBorrowInst *bbi);
@@ -127,7 +133,7 @@ struct SemanticARCOptVisitor
 
 } // end anonymous namespace
 
-bool SemanticARCOptVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
+bool SemanticARCOptsVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
   auto kind = bbi->getOperand().getOwnershipKind();
   SmallVector<EndBorrowInst *, 16> endBorrows;
   for (auto *op : bbi->getUses()) {
@@ -159,12 +165,25 @@ bool SemanticARCOptVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
   return true;
 }
 
-static bool canHandleOperand(SILValue operand, SmallVectorImpl<SILValue> &out) {
-  if (!getUnderlyingBorrowIntroducers(operand, out))
-    return false;
+static bool destroysContainedWithinBorrowScope(
+    SILValue v, SmallVectorImpl<DestroyValueInst *> &destroys,
+    SmallVectorImpl<BranchPropagatedUser> &consumingUses,
+    SmallVectorImpl<BranchPropagatedUser> &nonConsumingUses,
+    SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
+    DeadEndBlocks &deadEndBlocks) {
+  consumingUses.clear();
+  nonConsumingUses.clear();
+  visitedBlocks.clear();
 
-  /// TODO: Add support for begin_borrow, load_borrow.
-  return all_of(out, [](SILValue v) { return isa<SILFunctionArgument>(v); });
+  transform(makeEndBorrowRange(v), std::back_inserter(consumingUses),
+            [&](SILInstruction *i) { return BranchPropagatedUser(i); });
+  transform(destroys, std::back_inserter(nonConsumingUses),
+            [&](SILInstruction *i) { return BranchPropagatedUser(i); });
+
+  auto result = valueHasLinearLifetime(
+      v, consumingUses, nonConsumingUses, visitedBlocks, deadEndBlocks,
+      ownership::ErrorBehaviorKind::ReturnFalse);
+  return !result.getFoundError();
 }
 
 // Eliminate a copy of a borrowed value, if:
@@ -199,13 +218,23 @@ static bool canHandleOperand(SILValue operand, SmallVectorImpl<SILValue> &out) {
 // are within the borrow scope.
 //
 // TODO: This needs a better name.
-static bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi) {
+static bool
+performGuaranteedCopyValueOptimization(CopyValueInst *cvi,
+                                       DeadEndBlocks &deadEndBlocks) {
   SmallVector<SILValue, 16> borrowIntroducers;
 
   // Whitelist the operands that we know how to support and make sure
   // our operand is actually guaranteed.
-  if (!canHandleOperand(cvi->getOperand(), borrowIntroducers))
+  if (!getUnderlyingBorrowIntroducers(cvi->getOperand(), borrowIntroducers))
     return false;
+
+  assert(llvm::all_of(borrowIntroducers,
+                      [&](SILValue v) {
+                        return isa<SILFunctionArgument>(v) ||
+                               isa<BeginBorrowInst>(v) ||
+                               isa<LoadBorrowInst>(v);
+                      }) &&
+         "Unsupported borrow introducer?!");
 
   // Then go over all of our uses. Find our destroying instructions (ignoring
   // forwarding instructions that can forward both owned and guaranteed) and
@@ -223,11 +252,20 @@ static bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi) {
   // post-dominated by the end_borrow set. If they do not, then the
   // copy_value is lifetime extending the guaranteed value, we can not
   // eliminate it.
-  //
-  // TODO: When we support begin_borrow/load_borrow a linear linfetime
-  // check will be needed here.
-  assert(all_of(borrowIntroducers,
-                [](SILValue v) { return isa<SILFunctionArgument>(v); }));
+  {
+    SmallVector<BranchPropagatedUser, 8> consumingUses;
+    SmallVector<BranchPropagatedUser, 8> nonConsumingUses;
+    SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
+
+    if (llvm::any_of(borrowIntroducers, [&](SILValue v) {
+          if (isa<SILFunctionArgument>(v))
+            return false;
+          return !destroysContainedWithinBorrowScope(
+              v, destroys, consumingUses, nonConsumingUses, visitedBlocks,
+              deadEndBlocks);
+        }))
+      return false;
+  }
 
   // Otherwise, we know that our copy_value/destroy_values are all completely
   // within the guaranteed value scope. First delete the destroys/copies.
@@ -322,14 +360,14 @@ static bool eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi) {
   return true;
 }
 
-bool SemanticARCOptVisitor::visitCopyValueInst(CopyValueInst *cvi) {
+bool SemanticARCOptsVisitor::visitCopyValueInst(CopyValueInst *cvi) {
   // If our copy value inst has only destroy_value users, it is a dead live
   // range. Try to eliminate them.
   if (eliminateDeadLiveRangeCopyValue(cvi))
     return true;
 
   // Then try to perform the guaranteed copy value optimization.
-  if (performGuaranteedCopyValueOptimization(cvi))
+  if (performGuaranteedCopyValueOptimization(cvi, deadEndBlocks))
     return true;
 
   return false;
@@ -407,7 +445,7 @@ static bool isWrittenTo(SILFunction &f, SILValue value) {
 
 // Convert a load [copy] from unique storage [read] that has all uses that can
 // accept a guaranteed parameter to a load_borrow.
-bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
+bool SemanticARCOptsVisitor::visitLoadInst(LoadInst *li) {
   if (li->getOwnershipQualifier() != LoadOwnershipQualifier::Copy)
     return false;
 
@@ -468,6 +506,8 @@ struct SemanticARCOpts : SILFunctionTransform {
            "Can not perform semantic arc optimization unless ownership "
            "verification is enabled");
 
+    SemanticARCOptsVisitor visitor(f);
+
     // Iterate over all of the arguments, performing small peephole
     // ARC optimizations.
     //
@@ -493,7 +533,7 @@ struct SemanticARCOpts : SILFunctionTransform {
         // ii. Move ii from the next value back onto the instruction
         // after ii's old value in the block instruction list and then
         // process that.
-        if (SemanticARCOptVisitor().visit(&*ii)) {
+        if (visitor.visit(&*ii)) {
           madeChange = true;
           ii = std::prev(tmp);
           continue;
@@ -504,7 +544,7 @@ struct SemanticARCOpts : SILFunctionTransform {
       }
 
       // Finally visit the first instruction of the block.
-      madeChange |= SemanticARCOptVisitor().visit(&*ii);
+      madeChange |= visitor.visit(&*ii);
     }
 
     if (madeChange) {
