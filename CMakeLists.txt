@@ -477,12 +477,6 @@ if(NOT SWIFT_LIPO)
   find_toolchain_tool(SWIFT_LIPO "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" lipo)
 endif()
 
-if("${SWIFT_NATIVE_LLVM_TOOLS_PATH}" STREQUAL "")
-  set(SWIFT_CROSS_COMPILING FALSE)
-else()
-  set(SWIFT_CROSS_COMPILING TRUE)
-endif()
-
 # Reset CMAKE_SYSTEM_PROCESSOR if not cross-compiling.
 # CMake refuses to use `uname -m` on OS X
 # http://public.kitware.com/Bug/view.php?id=10326
