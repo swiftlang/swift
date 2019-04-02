@@ -425,22 +425,22 @@ prepareIndirectResultInit(SILGenFunction &SGF, CanType resultType,
 ///   components of the result
 /// \param cleanups - will be filled (after initialization completes)
 ///   with all the active cleanups managing the result values
-static std::unique_ptr<Initialization>
-prepareIndirectResultInit(SILGenFunction &SGF, CanType formalResultType,
-                          SmallVectorImpl<SILValue> &directResultsBuffer,
-                          SmallVectorImpl<CleanupHandle> &cleanups) {
-  auto fnConv = SGF.F.getConventions();
+std::unique_ptr<Initialization>
+SILGenFunction::prepareIndirectResultInit(CanType formalResultType,
+                                 SmallVectorImpl<SILValue> &directResultsBuffer,
+                                 SmallVectorImpl<CleanupHandle> &cleanups) {
+  auto fnConv = F.getConventions();
 
   // Make space in the direct-results array for all the entries we need.
   directResultsBuffer.append(fnConv.getNumDirectSILResults(), SILValue());
 
   ArrayRef<SILResultInfo> allResults = fnConv.funcTy->getResults();
   MutableArrayRef<SILValue> directResults = directResultsBuffer;
-  ArrayRef<SILArgument*> indirectResultAddrs = SGF.F.getIndirectResults();
+  ArrayRef<SILArgument*> indirectResultAddrs = F.getIndirectResults();
 
-  auto init = prepareIndirectResultInit(SGF, formalResultType, allResults,
-                                        directResults, indirectResultAddrs,
-                                        cleanups);
+  auto init = ::prepareIndirectResultInit(*this, formalResultType, allResults,
+                                          directResults, indirectResultAddrs,
+                                          cleanups);
 
   assert(allResults.empty());
   assert(directResults.empty());
@@ -460,7 +460,7 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
     // Build an initialization which recursively destructures the tuple.
     SmallVector<CleanupHandle, 4> resultCleanups;
     InitializationPtr resultInit =
-      prepareIndirectResultInit(*this, ret->getType()->getCanonicalType(),
+      prepareIndirectResultInit(ret->getType()->getCanonicalType(),
                                 directResults, resultCleanups);
 
     // Emit the result expression into the initialization.
