@@ -567,9 +567,11 @@ private:
     if (Val != DIModuleCache.end())
       return cast<llvm::DIModule>(Val->second);
 
+    std::string RemappedIncludePath = DebugPrefixMap.remapPath(IncludePath);
     StringRef Sysroot = IGM.Context.SearchPathOpts.SDKPath;
     llvm::DIModule *M =
-        DBuilder.createModule(Parent, Name, ConfigMacros, IncludePath, Sysroot);
+        DBuilder.createModule(Parent, Name, ConfigMacros, RemappedIncludePath,
+                              Sysroot);
     DIModuleCache.insert({Key, llvm::TrackingMDNodeRef(M)});
     return M;
   }
