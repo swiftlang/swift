@@ -36,8 +36,7 @@ public:
     Stream(stream) { }
 
   virtual void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                                DiagnosticKind Kind,
-                                StringRef FormatString,
+                                DiagnosticKind Kind, StringRef FormatString,
                                 ArrayRef<DiagnosticArgument> FormatArgs,
                                 const DiagnosticInfo &Info,
                                 StringRef currentPrimaryInput) override;

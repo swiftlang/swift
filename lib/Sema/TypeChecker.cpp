@@ -449,7 +449,6 @@ void swift::typeCheckExternalDefinitions(SourceFile &SF) {
   typeCheckFunctionsAndExternalDecls(SF, createTypeChecker(Ctx));
 }
 
-
 void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                                 OptionSet<TypeCheckingFlags> Options,
                                 unsigned StartElem,

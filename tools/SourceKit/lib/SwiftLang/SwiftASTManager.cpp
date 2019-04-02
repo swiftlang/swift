@@ -46,8 +46,7 @@ class StreamDiagConsumer : public DiagnosticConsumer {
 public:
   StreamDiagConsumer(llvm::raw_ostream &OS) : OS(OS) {}
 
-  void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                        DiagnosticKind Kind,
+  void handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info,

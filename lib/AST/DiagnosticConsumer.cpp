@@ -171,15 +171,17 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
 
   auto subconsumer = findSubconsumerAndRememberItForNotes(SM, Loc, Kind);
   if (subconsumer.hasValue() && !(*subconsumer)->getConsumer())
-    subconsumer = findSubconsumerForPrimaryCausingErrorInNonprimary(SM, Kind, currentPrimaryInput);
+    subconsumer = findSubconsumerForPrimaryCausingErrorInNonprimary(
+        SM, Kind, currentPrimaryInput);
   if (subconsumer) {
-    subconsumer.getValue()->handleDiagnostic(SM, Loc, Kind, FormatString,
-                                             FormatArgs, Info, currentPrimaryInput);
+    subconsumer.getValue()->handleDiagnostic(
+        SM, Loc, Kind, FormatString, FormatArgs, Info, currentPrimaryInput);
     return;
   }
   // Last resort: spray it everywhere
   for (auto &subconsumer : Subconsumers)
-    subconsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info, currentPrimaryInput);
+    subconsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info,
+                                 currentPrimaryInput);
 }
 
 Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
@@ -200,9 +202,8 @@ FileSpecificDiagnosticConsumer::findSubconsumerAndRememberItForNotes(
 
 Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
 FileSpecificDiagnosticConsumer::
-    findSubconsumerForPrimaryCausingErrorInNonprimary(SourceManager &SM,
-                                                      DiagnosticKind Kind,
-                                                      StringRef currentPrimaryInput) {
+    findSubconsumerForPrimaryCausingErrorInNonprimary(
+        SourceManager &SM, DiagnosticKind Kind, StringRef currentPrimaryInput) {
   if (currentPrimaryInput.empty())
     return None;
   auto id = SM.getIDForBufferIdentifier(currentPrimaryInput);
@@ -259,6 +260,7 @@ void ForwardingDiagnosticConsumer::handleDiagnostic(
     llvm::dbgs() << "\n";
   });
   for (auto *C : TargetEngine.getConsumers()) {
-    C->handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info, currentPrimaryInput);
+    C->handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info,
+                        currentPrimaryInput);
   }
 }

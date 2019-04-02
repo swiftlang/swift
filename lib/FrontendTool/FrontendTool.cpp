@@ -406,8 +406,7 @@ public:
       FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {}
 
 private:
-  void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                        DiagnosticKind Kind,
+  void handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info,
@@ -1218,8 +1217,9 @@ static bool performCompileStepsPostSILGen(
   ASTContext &Context = Instance.getASTContext();
   SILOptions &SILOpts = Invocation.getSILOptions();
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
-  
-  CurrentPrimaryInputRAII cpi(Context.Diags, PSPs.MainInputFilenameForDebugInfo);
+
+  CurrentPrimaryInputRAII cpi(Context.Diags,
+                              PSPs.MainInputFilenameForDebugInfo);
 
   if (Stats)
     countStatsPostSILGen(*Stats, *SM);
@@ -1630,10 +1630,9 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
     PDC.handleDiagnostic(dummyMgr, SourceLoc(), DiagnosticKind::Error,
                          "fatal error encountered during compilation; please "
-                           "file a bug report with your project and the crash "
-                           "log", {},
-                         DiagnosticInfo(),
-                         "");
+                         "file a bug report with your project and the crash "
+                         "log",
+                         {}, DiagnosticInfo(), "");
     PDC.handleDiagnostic(dummyMgr, SourceLoc(), DiagnosticKind::Note, reason,
                          {}, DiagnosticInfo(), "");
     if (shouldCrash)

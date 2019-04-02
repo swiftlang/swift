@@ -247,8 +247,7 @@ public:
   void accept(swift::SourceManager &SM, swift::ide::RegionType RegionType,
               ArrayRef<swift::ide::Replacement> Replacements) override;
   void handleDiagnostic(swift::SourceManager &SM, swift::SourceLoc Loc,
-                        swift::DiagnosticKind Kind,
-                        StringRef FormatString,
+                        swift::DiagnosticKind Kind, StringRef FormatString,
                         ArrayRef<swift::DiagnosticArgument> FormatArgs,
                         const swift::DiagnosticInfo &Info,
                         StringRef currentPrimaryInput) override;
@@ -265,8 +264,7 @@ public:
   void accept(swift::SourceManager &SM, swift::ide::RegionType RegionType,
               ArrayRef<swift::ide::RenameRangeDetail> Ranges) override;
   void handleDiagnostic(swift::SourceManager &SM, swift::SourceLoc Loc,
-                        swift::DiagnosticKind Kind,
-                        StringRef FormatString,
+                        swift::DiagnosticKind Kind, StringRef FormatString,
                         ArrayRef<swift::DiagnosticArgument> FormatArgs,
                         const swift::DiagnosticInfo &Info,
                         StringRef currentPrimaryInput) override;

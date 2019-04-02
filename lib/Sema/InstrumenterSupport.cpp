@@ -33,8 +33,7 @@ public:
     diags.addConsumer(*this);
   }
   ~ErrorGatherer() override { diags.takeConsumers(); }
-  void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                        DiagnosticKind Kind,
+  void handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info,

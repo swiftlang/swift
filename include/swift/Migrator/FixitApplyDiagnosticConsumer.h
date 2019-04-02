@@ -62,8 +62,7 @@ public:
   /// output stream.
   void printResult(llvm::raw_ostream &OS) const;
 
-  void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                        DiagnosticKind Kind,
+  void handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info,

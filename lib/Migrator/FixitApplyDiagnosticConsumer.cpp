@@ -31,13 +31,10 @@ void FixitApplyDiagnosticConsumer::printResult(llvm::raw_ostream &OS) const {
   RewriteBuf.write(OS);
 }
 
-void FixitApplyDiagnosticConsumer::
-handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                 DiagnosticKind Kind,
-                 StringRef FormatString,
-                 ArrayRef<DiagnosticArgument> FormatArgs,
-                 const DiagnosticInfo &Info,
-                 StringRef currentPrimaryInput) {
+void FixitApplyDiagnosticConsumer::handleDiagnostic(
+    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
+    const DiagnosticInfo &Info, StringRef currentPrimaryInput) {
   if (Loc.isInvalid()) {
     return;
   }

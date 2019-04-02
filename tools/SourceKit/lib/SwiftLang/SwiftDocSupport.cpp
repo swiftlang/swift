@@ -1180,12 +1180,10 @@ accept(SourceManager &SM, RegionType RegionType,
   Impl.accept(SM, RegionType, Replacements);
 }
 
-void RequestRefactoringEditConsumer::
-handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                 StringRef FormatString,
-                 ArrayRef<DiagnosticArgument> FormatArgs,
-                 const DiagnosticInfo &Info,
-                 StringRef currentPrimaryInput) {
+void RequestRefactoringEditConsumer::handleDiagnostic(
+    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
+    const DiagnosticInfo &Info, StringRef currentPrimaryInput) {
   Impl.DiagConsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
                                      Info, currentPrimaryInput);
 }
@@ -1241,14 +1239,10 @@ void RequestRenameRangeConsumer::accept(
   Impl.accept(SM, RegionType, Ranges);
 }
 
-void RequestRenameRangeConsumer::
-handleDiagnostic(SourceManager &SM,
-                 SourceLoc Loc,
-                 DiagnosticKind Kind,
-                 StringRef FormatString,
-                 ArrayRef<DiagnosticArgument> FormatArgs,
-                 const DiagnosticInfo &Info,
-                 StringRef currentPrimaryInput) {
+void RequestRenameRangeConsumer::handleDiagnostic(
+    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
+    const DiagnosticInfo &Info, StringRef currentPrimaryInput) {
   Impl.DiagConsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
                                      Info, currentPrimaryInput);
 }

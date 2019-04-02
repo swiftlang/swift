@@ -67,8 +67,7 @@ public:
   bool hadAnyError() const { return HadAnyError; }
 
   void handleDiagnostic(swift::SourceManager &SM, swift::SourceLoc Loc,
-                        swift::DiagnosticKind Kind,
-                        StringRef FormatString,
+                        swift::DiagnosticKind Kind, StringRef FormatString,
                         ArrayRef<swift::DiagnosticArgument> FormatArgs,
                         const swift::DiagnosticInfo &Info,
                         StringRef currentPrimaryInput) override;

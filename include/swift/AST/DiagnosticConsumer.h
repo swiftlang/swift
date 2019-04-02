@@ -95,8 +95,7 @@ public:
   ///
   /// \param Info Extra information associated with the diagnostic.
   virtual void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                                DiagnosticKind Kind,
-                                StringRef FormatString,
+                                DiagnosticKind Kind, StringRef FormatString,
                                 ArrayRef<DiagnosticArgument> FormatArgs,
                                 const DiagnosticInfo &Info,
                                 StringRef currentPrimaryInput) = 0;
@@ -117,8 +116,7 @@ public:
 /// DiagnosticConsumer that discards all diagnostics.
 class NullDiagnosticConsumer : public DiagnosticConsumer {
 public:
-  void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                        DiagnosticKind Kind,
+  void handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info,
@@ -131,8 +129,7 @@ class ForwardingDiagnosticConsumer : public DiagnosticConsumer {
   DiagnosticEngine &TargetEngine;
 public:
   ForwardingDiagnosticConsumer(DiagnosticEngine &Target);
-  void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                        DiagnosticKind Kind,
+  void handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info,
@@ -194,8 +191,7 @@ public:
                 std::unique_ptr<DiagnosticConsumer> consumer)
         : inputFileName(inputFileName), consumer(std::move(consumer)) {}
 
-    void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                          DiagnosticKind Kind,
+    void handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
                           StringRef FormatString,
                           ArrayRef<DiagnosticArgument> FormatArgs,
                           const DiagnosticInfo &Info,
@@ -291,8 +287,7 @@ private:
       SmallVectorImpl<Subconsumer> &consumers);
 
 public:
-  void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                        DiagnosticKind Kind,
+  void handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info,
@@ -320,9 +315,8 @@ private:
                                        DiagnosticKind Kind);
 
   Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
-  findSubconsumerForPrimaryCausingErrorInNonprimary(SourceManager &SM,
-                                                    DiagnosticKind Kind,
-                                                    StringRef currentPrimaryInput);
+  findSubconsumerForPrimaryCausingErrorInNonprimary(
+      SourceManager &SM, DiagnosticKind Kind, StringRef currentPrimaryInput);
 };
   
 } // end namespace swift

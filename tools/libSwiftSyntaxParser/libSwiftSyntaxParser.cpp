@@ -229,8 +229,7 @@ struct SynParserDiagConsumer: public DiagnosticConsumer {
   const unsigned BufferID;
   SynParserDiagConsumer(SynParser &Parser, unsigned BufferID):
     Parser(Parser), BufferID(BufferID) {}
-  void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                        DiagnosticKind Kind,
+  void handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info,

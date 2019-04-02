@@ -191,12 +191,11 @@ public:
     CompilationWasComplete = false;
   }
 
-  void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                                DiagnosticKind Kind,
-                                StringRef FormatString,
-                                ArrayRef<DiagnosticArgument> FormatArgs,
-                                const DiagnosticInfo &Info,
-                                StringRef currentPrimaryInput) override;
+  void handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+                        StringRef FormatString,
+                        ArrayRef<DiagnosticArgument> FormatArgs,
+                        const DiagnosticInfo &Info,
+                        StringRef currentPrimaryInput) override;
 
   /// The version of the diagnostics file.
   enum { Version = 1 };
@@ -546,8 +545,7 @@ emitDiagnosticMessage(SourceManager &SM,
 void SerializedDiagnosticConsumer::handleDiagnostic(
     SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info,
-    StringRef currentPrimaryInput) {
+    const DiagnosticInfo &Info, StringRef currentPrimaryInput) {
 
   // Enter the block for a non-note diagnostic immediately, rather
   // than waiting for beginDiagnostic, in case associated notes
