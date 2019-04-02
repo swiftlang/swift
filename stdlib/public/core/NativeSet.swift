@@ -362,7 +362,7 @@ extension _NativeSet { // Insertions
   /// The `element` must not be already present in the Set.
   @inlinable
   internal func _unsafeInsertNew(_ element: __owned Element) {
-    _precondition(count < capacity)
+    _internalInvariant(count + 1 <= capacity)
     let hashValue = self.hashValue(for: element)
     if _isDebugAssertConfiguration() {
       // In debug builds, perform a full lookup and trap if we detect duplicate
