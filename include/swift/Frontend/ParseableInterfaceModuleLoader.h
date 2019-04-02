@@ -139,6 +139,8 @@ class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) override;
 
+  bool isCached(StringRef DepPath) override;
+
 public:
   static std::unique_ptr<ParseableInterfaceModuleLoader>
   create(ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
