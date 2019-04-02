@@ -124,6 +124,7 @@ extension _NativeSet { // Low-level unchecked operations
   }
 
   @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
+  @inline(__always)
   internal func uncheckedAssign(
     at bucket: Bucket,
     to element: __owned Element
@@ -356,33 +357,12 @@ internal func ELEMENT_TYPE_OF_SET_VIOLATES_HASHABLE_REQUIREMENTS(
 }
 
 extension _NativeSet { // Insertions
-  /// Insert a new element into uniquely held storage.  Storage must be uniquely
-  /// referenced with adequate capacity.  If `allowingDuplicates` is false,
-  /// `element` must not be already present in the set.
-  @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
-  internal mutating func insertWithGuaranteedCapacity(
-    _ element: __owned Element,
-    allowingDuplicates: Bool
-  ) {
-    _precondition(count < capacity)
-    if !allowingDuplicates {
-      _unsafeInsertNew(element)
-      return
-    }
-    let (bucket, found) = find(element)
-    if found {
-      uncheckedAssign(at: bucket, to: element)
-    } else {
-      _unsafeInsertNew(element, at: bucket)
-    }
-  }
-
   /// Insert a new element into uniquely held storage.
   /// Storage must be uniquely referenced with adequate capacity.
   /// The `element` must not be already present in the Set.
   @inlinable
   internal func _unsafeInsertNew(_ element: __owned Element) {
-    _internalInvariant(count + 1 <= capacity)
+    _precondition(count < capacity)
     let hashValue = self.hashValue(for: element)
     if _isDebugAssertConfiguration() {
       // In debug builds, perform a full lookup and trap if we detect duplicate
@@ -460,6 +440,21 @@ extension _NativeSet { // Insertions
     }
     _unsafeInsertNew(element, at: bucket)
     return nil
+  }
+
+  /// Insert an element into uniquely held storage, replacing an existing value
+  /// (if any).  Storage must be uniquely referenced with adequate capacity.
+  @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
+  internal mutating func _unsafeUpdate(
+    with element: __owned Element
+  ) {
+    let (bucket, found) = find(element)
+    if found {
+      uncheckedAssign(at: bucket, to: element)
+    } else {
+      _precondition(count < capacity)
+      _unsafeInsertNew(element, at: bucket)
+    }
   }
 }
 

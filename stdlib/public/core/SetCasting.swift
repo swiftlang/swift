@@ -12,25 +12,47 @@
 
 //===--- Compiler conversion/casting entry points for Set<Element> --------===//
 
+extension Set {
+  @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
+  @inline(__always)
+  internal init?<C: Collection>(
+    _mapping source: C,
+    allowingDuplicates: Bool,
+    transform: (C.Element) -> Element?
+  ) {
+    var target = _NativeSet<Element>(capacity: source.count)
+    if allowingDuplicates {
+      for m in source {
+        guard let member = transform(m) else { return nil }
+        target._unsafeUpdate(with: member)
+      }
+    } else {
+      for m in source {
+        guard let member = transform(m) else { return nil }
+        target._unsafeInsertNew(member)
+      }
+    }
+    self.init(_native: target)
+  }
+}
+
 /// Perform a non-bridged upcast that always succeeds.
 ///
 /// - Precondition: `BaseValue` is a base class or base `@objc`
 ///   protocol (such as `AnyObject`) of `DerivedValue`.
 @inlinable
-public func _setUpCast<DerivedValue, BaseValue>(_ source: Set<DerivedValue>)
-  -> Set<BaseValue> {
-  // String and NSString have different concepts of equality, so Set<NSString>
-  // may generate key collisions when "upcasted" to Set<String>.
-  // See rdar://problem/35995647
-  let allowDuplicates = (BaseValue.self == String.self)
-
-  var builder = _NativeSet<BaseValue>(capacity: source.count)
-  for member in source {
-    _ = builder.insertWithGuaranteedCapacity(
-      member as! BaseValue,
-      allowingDuplicates: allowDuplicates)
-  }
-  return Set(_native: builder)
+public func _setUpCast<DerivedValue, BaseValue>(
+  _ source: Set<DerivedValue>
+) -> Set<BaseValue> {
+  return Set(
+    _mapping: source,
+    // String and NSString have different concepts of equality, so Set<NSString>
+    // may generate key collisions when "upcasted" to Set<String>.
+    // See rdar://problem/35995647
+    allowingDuplicates: (BaseValue.self == String.self)
+  ) { member in
+    (member as! BaseValue)
+  }!
 }
 
 /// Called by the casting machinery.
@@ -64,18 +86,15 @@ public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
   // We can't just delegate to _setDownCastConditional here because we rely on
   // `as!` to generate nice runtime errors when the downcast fails.
 
-  // String and NSString have different concepts of equality, so
-  // NSString-keyed Sets may generate key collisions when downcasted
-  // to String. See rdar://problem/35995647
-  let allowDuplicates = (DerivedValue.self == String.self)
-
-  var builder = _NativeSet<DerivedValue>(capacity: source.count)
-  for member in source {
-    builder.insertWithGuaranteedCapacity(
-      member as! DerivedValue,
-      allowingDuplicates: allowDuplicates)
-  }
-  return Set(_native: builder)
+  return Set(
+    _mapping: source,
+    // String and NSString have different concepts of equality, so
+    // NSString-keyed Sets may generate key collisions when downcasted
+    // to String. See rdar://problem/35995647
+    allowingDuplicates: (DerivedValue.self == String.self)
+  ) { member in
+    (member as! DerivedValue)
+  }!
 }
 
 /// Called by the casting machinery.
@@ -102,17 +121,13 @@ internal func _setDownCastConditionalIndirect<SourceValue, TargetValue>(
 public func _setDownCastConditional<BaseValue, DerivedValue>(
   _ source: Set<BaseValue>
 ) -> Set<DerivedValue>? {
-  // String and NSString have different concepts of equality, so
-  // NSString-keyed Sets may generate key collisions when downcasted
-  // to String. See rdar://problem/35995647
-  let allowDuplicates = (DerivedValue.self == String.self)
-
-  var builder = _NativeSet<DerivedValue>(capacity: source.count)
-  for member in source {
-    guard let derivedMember = member as? DerivedValue else { return nil }
-    _ = builder.insertWithGuaranteedCapacity(
-      derivedMember,
-      allowingDuplicates: allowDuplicates)
+  return Set(
+    _mapping: source,
+    // String and NSString have different concepts of equality, so
+    // NSString-keyed Sets may generate key collisions when downcasted
+    // to String. See rdar://problem/35995647
+    allowingDuplicates: (DerivedValue.self == String.self)
+  ) { member in
+    member as? DerivedValue
   }
-  return Set(_native: builder)
 }
