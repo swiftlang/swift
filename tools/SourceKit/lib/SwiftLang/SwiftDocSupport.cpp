@@ -1184,9 +1184,10 @@ void RequestRefactoringEditConsumer::
 handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
                  StringRef FormatString,
                  ArrayRef<DiagnosticArgument> FormatArgs,
-                 const DiagnosticInfo &Info) {
+                 const DiagnosticInfo &Info,
+                 StringRef currentPrimaryInput) {
   Impl.DiagConsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
-                                     Info);
+                                     Info, currentPrimaryInput);
 }
 
 class RequestRenameRangeConsumer::Implementation {
@@ -1246,9 +1247,10 @@ handleDiagnostic(SourceManager &SM,
                  DiagnosticKind Kind,
                  StringRef FormatString,
                  ArrayRef<DiagnosticArgument> FormatArgs,
-                 const DiagnosticInfo &Info) {
+                 const DiagnosticInfo &Info,
+                 StringRef currentPrimaryInput) {
   Impl.DiagConsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
-                                     Info);
+                                     Info, currentPrimaryInput);
 }
 
 static NameUsage getNameUsage(RenameType Type) {

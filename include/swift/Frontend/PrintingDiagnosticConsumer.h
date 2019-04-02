@@ -39,7 +39,8 @@ public:
                                 DiagnosticKind Kind,
                                 StringRef FormatString,
                                 ArrayRef<DiagnosticArgument> FormatArgs,
-                                const DiagnosticInfo &Info) override;
+                                const DiagnosticInfo &Info,
+                                StringRef currentPrimaryInput) override;
 
   void forceColors() {
     ForceColors = true;

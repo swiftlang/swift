@@ -410,7 +410,8 @@ private:
                         DiagnosticKind Kind,
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
-                        const DiagnosticInfo &Info) override {
+                        const DiagnosticInfo &Info,
+                        StringRef currentPrimaryInput) override {
     if (!(FixitAll || shouldTakeFixit(Kind, Info)))
       return;
     for (const auto &Fix : Info.FixIts) {
@@ -1217,6 +1218,8 @@ static bool performCompileStepsPostSILGen(
   ASTContext &Context = Instance.getASTContext();
   SILOptions &SILOpts = Invocation.getSILOptions();
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
+  
+  CurrentPrimaryInputRAII cpi(Context.Diags, PSPs.MainInputFilenameForDebugInfo);
 
   if (Stats)
     countStatsPostSILGen(*Stats, *SM);
@@ -1629,9 +1632,10 @@ int swift::performFrontend(ArrayRef<const char *> Args,
                          "fatal error encountered during compilation; please "
                            "file a bug report with your project and the crash "
                            "log", {},
-                         DiagnosticInfo());
+                         DiagnosticInfo(),
+                         "");
     PDC.handleDiagnostic(dummyMgr, SourceLoc(), DiagnosticKind::Note, reason,
-                         {}, DiagnosticInfo());
+                         {}, DiagnosticInfo(), "");
     if (shouldCrash)
       abort();
   };

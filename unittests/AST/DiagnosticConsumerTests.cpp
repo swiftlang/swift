@@ -37,7 +37,8 @@ namespace {
     void handleDiagnostic(SourceManager &SM, SourceLoc loc, DiagnosticKind kind,
                           StringRef formatString,
                           ArrayRef<DiagnosticArgument> formatArgs,
-                          const DiagnosticInfo &info) override {
+                          const DiagnosticInfo &info,
+                          StringRef currentPrimaryInput) override {
       ASSERT_FALSE(expected.empty());
       EXPECT_EQ(std::make_pair(loc, formatString), expected.front());
       expected.erase(expected.begin());
@@ -90,7 +91,7 @@ TEST(FileSpecificDiagnosticConsumer, InvalidLocDiagsGoToEveryConsumer) {
   auto topConsumer =
       FileSpecificDiagnosticConsumer::consolidateSubconsumers(consumers);
   topConsumer->handleDiagnostic(sourceMgr, SourceLoc(), DiagnosticKind::Error,
-                                "dummy", {}, DiagnosticInfo());
+                                "dummy", {}, DiagnosticInfo(), "");
   topConsumer->finishProcessing();
 }
 
@@ -131,17 +132,17 @@ TEST(FileSpecificDiagnosticConsumer, ErrorsWithLocationsGoToExpectedConsumers) {
   auto topConsumer =
       FileSpecificDiagnosticConsumer::consolidateSubconsumers(consumers);
   topConsumer->handleDiagnostic(sourceMgr, frontOfA, DiagnosticKind::Error,
-                                "front", {}, DiagnosticInfo());
+                                "front", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, frontOfB, DiagnosticKind::Error,
-                                "front", {}, DiagnosticInfo());
+                                "front", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, middleOfA, DiagnosticKind::Error,
-                                "middle", {}, DiagnosticInfo());
+                                "middle", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, middleOfB, DiagnosticKind::Error,
-                                "middle", {}, DiagnosticInfo());
+                                "middle", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, backOfA, DiagnosticKind::Error,
-                                "back", {}, DiagnosticInfo());
+                                "back", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, backOfB, DiagnosticKind::Error,
-                                "back", {}, DiagnosticInfo());
+                                "back", {}, DiagnosticInfo(), "");
   topConsumer->finishProcessing();
 }
 
@@ -186,17 +187,17 @@ TEST(FileSpecificDiagnosticConsumer,
   auto topConsumer =
       FileSpecificDiagnosticConsumer::consolidateSubconsumers(consumers);
   topConsumer->handleDiagnostic(sourceMgr, frontOfA, DiagnosticKind::Error,
-                                "front", {}, DiagnosticInfo());
+                                "front", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, frontOfB, DiagnosticKind::Error,
-                                "front", {}, DiagnosticInfo());
+                                "front", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, middleOfA, DiagnosticKind::Error,
-                                "middle", {}, DiagnosticInfo());
+                                "middle", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, middleOfB, DiagnosticKind::Error,
-                                "middle", {}, DiagnosticInfo());
+                                "middle", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, backOfA, DiagnosticKind::Error,
-                                "back", {}, DiagnosticInfo());
+                                "back", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, backOfB, DiagnosticKind::Error,
-                                "back", {}, DiagnosticInfo());
+                                "back", {}, DiagnosticInfo(), "");
   topConsumer->finishProcessing();
 }
 
@@ -232,13 +233,13 @@ TEST(FileSpecificDiagnosticConsumer, WarningsAndRemarksAreTreatedLikeErrors) {
   auto topConsumer =
       FileSpecificDiagnosticConsumer::consolidateSubconsumers(consumers);
   topConsumer->handleDiagnostic(sourceMgr, frontOfA, DiagnosticKind::Warning,
-                                "warning", {}, DiagnosticInfo());
+                                "warning", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, frontOfB, DiagnosticKind::Warning,
-                                "warning", {}, DiagnosticInfo());
+                                "warning", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, frontOfA, DiagnosticKind::Remark,
-                                "remark", {}, DiagnosticInfo());
+                                "remark", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, frontOfB, DiagnosticKind::Remark,
-                                "remark", {}, DiagnosticInfo());
+                                "remark", {}, DiagnosticInfo(), "");
   topConsumer->finishProcessing();
 }
 
@@ -285,23 +286,23 @@ TEST(FileSpecificDiagnosticConsumer, NotesAreAttachedToErrors) {
   auto topConsumer =
       FileSpecificDiagnosticConsumer::consolidateSubconsumers(consumers);
   topConsumer->handleDiagnostic(sourceMgr, frontOfA, DiagnosticKind::Error,
-                                "error", {}, DiagnosticInfo());
+                                "error", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, middleOfA, DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, backOfA, DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, frontOfB, DiagnosticKind::Error,
-                                "error", {}, DiagnosticInfo());
+                                "error", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, middleOfB, DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, backOfB, DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, frontOfA, DiagnosticKind::Error,
-                                "error", {}, DiagnosticInfo());
+                                "error", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, middleOfA, DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, backOfA, DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->finishProcessing();
 }
 
@@ -348,23 +349,23 @@ TEST(FileSpecificDiagnosticConsumer, NotesAreAttachedToWarningsAndRemarks) {
   auto topConsumer =
       FileSpecificDiagnosticConsumer::consolidateSubconsumers(consumers);
   topConsumer->handleDiagnostic(sourceMgr, frontOfA, DiagnosticKind::Warning,
-                                "warning", {}, DiagnosticInfo());
+                                "warning", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, middleOfA, DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, backOfA, DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, frontOfB, DiagnosticKind::Warning,
-                                "warning", {}, DiagnosticInfo());
+                                "warning", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, middleOfB, DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, backOfB, DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, frontOfA, DiagnosticKind::Remark,
-                                "remark", {}, DiagnosticInfo());
+                                "remark", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, middleOfA, DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, backOfA, DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->finishProcessing();
 }
 
@@ -408,23 +409,23 @@ TEST(FileSpecificDiagnosticConsumer, NotesAreAttachedToErrorsEvenAcrossFiles) {
   auto topConsumer =
       FileSpecificDiagnosticConsumer::consolidateSubconsumers(consumers);
   topConsumer->handleDiagnostic(sourceMgr, frontOfA, DiagnosticKind::Error,
-                                "error", {}, DiagnosticInfo());
+                                "error", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, middleOfB, DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, backOfA, DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, frontOfB, DiagnosticKind::Error,
-                                "error", {}, DiagnosticInfo());
+                                "error", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, middleOfA, DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, backOfB, DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, frontOfA, DiagnosticKind::Error,
-                                "error", {}, DiagnosticInfo());
+                                "error", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, middleOfB, DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, backOfA, DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->finishProcessing();
 }
 
@@ -472,23 +473,23 @@ TEST(FileSpecificDiagnosticConsumer,
   auto topConsumer =
       FileSpecificDiagnosticConsumer::consolidateSubconsumers(consumers);
   topConsumer->handleDiagnostic(sourceMgr, frontOfA, DiagnosticKind::Error,
-                                "error", {}, DiagnosticInfo());
+                                "error", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, middleOfB, DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, backOfA, DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, frontOfB, DiagnosticKind::Error,
-                                "error", {}, DiagnosticInfo());
+                                "error", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, middleOfA, DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, backOfB, DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, frontOfA, DiagnosticKind::Error,
-                                "error", {}, DiagnosticInfo());
+                                "error", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, middleOfB, DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, backOfA, DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->finishProcessing();
 }
 
@@ -528,16 +529,16 @@ TEST(FileSpecificDiagnosticConsumer,
   auto topConsumer =
       FileSpecificDiagnosticConsumer::consolidateSubconsumers(consumers);
   topConsumer->handleDiagnostic(sourceMgr, frontOfA, DiagnosticKind::Error,
-                                "error", {}, DiagnosticInfo());
+                                "error", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, SourceLoc(), DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, frontOfB, DiagnosticKind::Error,
-                                "error", {}, DiagnosticInfo());
+                                "error", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, SourceLoc(), DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, frontOfA, DiagnosticKind::Error,
-                                "error", {}, DiagnosticInfo());
+                                "error", {}, DiagnosticInfo(), "");
   topConsumer->handleDiagnostic(sourceMgr, SourceLoc(), DiagnosticKind::Note,
-                                "note", {}, DiagnosticInfo());
+                                "note", {}, DiagnosticInfo(), "");
   topConsumer->finishProcessing();
 }

@@ -94,11 +94,12 @@ ModuleDifferDiagsConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                         DiagnosticKind Kind,
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
-                        const DiagnosticInfo &Info) {
+                        const DiagnosticInfo &Info,
+                        StringRef currentPrimaryInput) {
   auto Category = getCategoryName((uint32_t)Info.ID);
   if (Category.empty()) {
     PrintingDiagnosticConsumer::handleDiagnostic(SM, Loc, Kind, FormatString,
-      FormatArgs, Info);
+      FormatArgs, Info, currentPrimaryInput);
     return;
   }
   if (!DiagnoseModuleDiff)

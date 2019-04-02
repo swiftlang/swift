@@ -560,6 +560,10 @@ namespace swift {
     /// The number of open diagnostic transactions. Diagnostics are only
     /// emitted once all transactions have closed.
     unsigned TransactionCount = 0;
+    
+    /// For batch mode, use this to know where to output a diagnostic
+    /// from a non-primary file.
+    std::string CurrentPrimaryInput;
 
     friend class InFlightDiagnostic;
     friend class DiagnosticTransaction;
@@ -799,7 +803,23 @@ namespace swift {
 
   public:
     static const char *diagnosticStringFor(const DiagID id);
+    
+    StringRef getCurrentPrimaryInput() const { return CurrentPrimaryInput; }
+    void setCurrentPrimaryInput(std::string s) { CurrentPrimaryInput = s; }
   };
+  
+  class CurrentPrimaryInputRAII {
+  private:
+    DiagnosticEngine &Diags;
+    
+  public:
+    CurrentPrimaryInputRAII(DiagnosticEngine &Diags, StringRef currentPrimaryInput)
+    : Diags(Diags) {
+      Diags.setCurrentPrimaryInput( currentPrimaryInput );
+    }
+    ~CurrentPrimaryInputRAII() { Diags.setCurrentPrimaryInput(""); }
+  };
+
 
   /// Represents a diagnostic transaction. While a transaction is
   /// open, all recorded diagnostics are saved until the transaction commits,

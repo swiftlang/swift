@@ -195,7 +195,8 @@ public:
                                 DiagnosticKind Kind,
                                 StringRef FormatString,
                                 ArrayRef<DiagnosticArgument> FormatArgs,
-                                const DiagnosticInfo &Info) override;
+                                const DiagnosticInfo &Info,
+                                StringRef currentPrimaryInput) override;
 
   /// The version of the diagnostics file.
   enum { Version = 1 };
@@ -545,7 +546,8 @@ emitDiagnosticMessage(SourceManager &SM,
 void SerializedDiagnosticConsumer::handleDiagnostic(
     SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info) {
+    const DiagnosticInfo &Info,
+    StringRef currentPrimaryInput) {
 
   // Enter the block for a non-note diagnostic immediately, rather
   // than waiting for beginDiagnostic, in case associated notes

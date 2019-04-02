@@ -165,29 +165,51 @@ FileSpecificDiagnosticConsumer::subconsumerForLocation(SourceManager &SM,
 void FileSpecificDiagnosticConsumer::handleDiagnostic(
     SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info) {
+    const DiagnosticInfo &Info, StringRef currentPrimaryInput) {
 
   HasAnErrorBeenConsumed |= Kind == DiagnosticKind::Error;
 
-  Optional<FileSpecificDiagnosticConsumer::Subconsumer *> subconsumer;
+  auto subconsumer = findSubconsumerAndRememberItForNotes(SM, Loc, Kind);
+  if (subconsumer.hasValue() && !(*subconsumer)->getConsumer())
+    subconsumer = findSubconsumerForPrimaryCausingErrorInNonprimary(SM, Kind, currentPrimaryInput);
+  if (subconsumer) {
+    subconsumer.getValue()->handleDiagnostic(SM, Loc, Kind, FormatString,
+                                             FormatArgs, Info, currentPrimaryInput);
+    return;
+  }
+  // Last resort: spray it everywhere
+  for (auto &subconsumer : Subconsumers)
+    subconsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info, currentPrimaryInput);
+}
+
+Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
+FileSpecificDiagnosticConsumer::findSubconsumerAndRememberItForNotes(
+    SourceManager &SM, SourceLoc loc, DiagnosticKind Kind) {
   switch (Kind) {
   case DiagnosticKind::Error:
   case DiagnosticKind::Warning:
-  case DiagnosticKind::Remark:
-    subconsumer = subconsumerForLocation(SM, Loc);
+  case DiagnosticKind::Remark: {
+    auto subconsumer = subconsumerForLocation(SM, loc);
     SubconsumerForSubsequentNotes = subconsumer;
-    break;
+    return subconsumer;
+  }
   case DiagnosticKind::Note:
-    subconsumer = SubconsumerForSubsequentNotes;
-    break;
+    return SubconsumerForSubsequentNotes;
   }
-  if (subconsumer.hasValue()) {
-    subconsumer.getValue()->handleDiagnostic(SM, Loc, Kind, FormatString,
-                                             FormatArgs, Info);
-    return;
-  }
-  for (auto &subconsumer : Subconsumers)
-    subconsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info);
+}
+
+Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
+FileSpecificDiagnosticConsumer::
+    findSubconsumerForPrimaryCausingErrorInNonprimary(SourceManager &SM,
+                                                      DiagnosticKind Kind,
+                                                      StringRef currentPrimaryInput) {
+  if (currentPrimaryInput.empty())
+    return None;
+  auto id = SM.getIDForBufferIdentifier(currentPrimaryInput);
+  if (!id)
+    return None;
+  auto loc = SM.getLocForBufferStart(*id);
+  return findSubconsumerAndRememberItForNotes(SM, loc, Kind);
 }
 
 bool FileSpecificDiagnosticConsumer::finishProcessing() {
@@ -214,7 +236,7 @@ void FileSpecificDiagnosticConsumer::
 void NullDiagnosticConsumer::handleDiagnostic(
     SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info) {
+    const DiagnosticInfo &Info, StringRef) {
   LLVM_DEBUG({
     llvm::dbgs() << "NullDiagnosticConsumer received diagnostic: ";
     DiagnosticEngine::formatDiagnosticText(llvm::dbgs(), FormatString,
@@ -229,7 +251,7 @@ ForwardingDiagnosticConsumer::ForwardingDiagnosticConsumer(DiagnosticEngine &Tar
 void ForwardingDiagnosticConsumer::handleDiagnostic(
     SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info) {
+    const DiagnosticInfo &Info, StringRef currentPrimaryInput) {
   LLVM_DEBUG({
     llvm::dbgs() << "ForwardingDiagnosticConsumer received diagnostic: ";
     DiagnosticEngine::formatDiagnosticText(llvm::dbgs(), FormatString,
@@ -237,6 +259,6 @@ void ForwardingDiagnosticConsumer::handleDiagnostic(
     llvm::dbgs() << "\n";
   });
   for (auto *C : TargetEngine.getConsumers()) {
-    C->handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info);
+    C->handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info, currentPrimaryInput);
   }
 }

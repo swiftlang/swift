@@ -66,7 +66,8 @@ namespace {
 void PrintingDiagnosticConsumer::handleDiagnostic(
     SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info) {
+    const DiagnosticInfo &Info,
+    StringRef currentPrimaryInput) {
   // Determine what kind of diagnostic we're emitting.
   llvm::SourceMgr::DiagKind SMKind;
   switch (Kind) {

@@ -70,7 +70,8 @@ public:
                         swift::DiagnosticKind Kind,
                         StringRef FormatString,
                         ArrayRef<swift::DiagnosticArgument> FormatArgs,
-                        const swift::DiagnosticInfo &Info) override;
+                        const swift::DiagnosticInfo &Info,
+                        StringRef currentPrimaryInput) override;
 };
 
 } // namespace SourceKit

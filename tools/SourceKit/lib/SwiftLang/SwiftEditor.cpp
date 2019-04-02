@@ -77,7 +77,7 @@ void EditorDiagConsumer::getAllDiagnostics(
 void EditorDiagConsumer::handleDiagnostic(
     SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info) {
+    const DiagnosticInfo &Info, StringRef currentPrimaryInput) {
 
   if (Kind == DiagnosticKind::Error) {
     HadAnyError = true;

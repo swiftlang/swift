@@ -37,7 +37,8 @@ public:
                         DiagnosticKind Kind,
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
-                        const DiagnosticInfo &Info) override {
+                        const DiagnosticInfo &Info,
+                        StringRef currentPrimaryInput) override {
     if (Kind == swift::DiagnosticKind::Error) {
       error = true;
     }

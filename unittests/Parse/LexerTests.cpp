@@ -750,7 +750,8 @@ public:
   virtual void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                                 DiagnosticKind Kind, StringRef FormatString,
                                 ArrayRef<DiagnosticArgument> FormatArgs,
-                                const swift::DiagnosticInfo &Info) override {
+                                const swift::DiagnosticInfo &Info,
+                                StringRef currentPrimaryInput) override {
     std::string DiagMsg;
     llvm::raw_string_ostream DiagOS(DiagMsg);
     DiagnosticEngine::formatDiagnosticText(DiagOS, FormatString, FormatArgs);

@@ -233,7 +233,8 @@ struct SynParserDiagConsumer: public DiagnosticConsumer {
                         DiagnosticKind Kind,
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
-                        const DiagnosticInfo &Info) override {
+                        const DiagnosticInfo &Info,
+                        StringRef currentPrimaryInput) override {
     assert(Kind != DiagnosticKind::Remark && "Shouldn't see this in parser.");
     // The buffer where all char* will point into.
     llvm::SmallString<256> Buffer;

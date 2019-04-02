@@ -838,7 +838,8 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
   for (auto &Consumer : Consumers) {
     Consumer->handleDiagnostic(SourceMgr, loc, toDiagnosticKind(behavior),
                                diagnosticStringFor(Info.ID),
-                               diagnostic.getArgs(), Info);
+                               diagnostic.getArgs(), Info,
+                               getCurrentPrimaryInput());
   }
 }
 
