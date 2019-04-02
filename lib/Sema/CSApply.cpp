@@ -1555,15 +1555,6 @@ namespace {
           LocatorPathElt::getKeyPathDynamicMember(keyPathTy->getAnyNominal()));
       auto overload = solution.getOverloadChoice(componentLoc);
 
-      auto buildSubscriptComponent = [&](SourceLoc loc, Expr *indexExpr,
-                                         ArrayRef<Identifier> labels) {
-        // Save a reference to the component so we can do a post-pass to check
-        // the Hashable conformance of the indexes.
-        KeyPathSubscriptComponents.push_back({keyPath, 0});
-        return buildKeyPathSubscriptComponent(overload, loc, indexExpr, labels,
-                                              componentLoc);
-      };
-
       auto getKeyPathComponentIndex =
           [](ConstraintLocator *locator) -> unsigned {
         for (const auto &elt : locator->getPath()) {
@@ -1577,9 +1568,10 @@ namespace {
       // calls necessary to resolve a member reference.
       if (overload.choice.getKind() ==
           OverloadChoiceKind::KeyPathDynamicMemberLookup) {
-        keyPath->resolveComponents(
-            ctx, buildSubscriptComponent(dotLoc, /*indexExpr=*/nullptr,
-                                         ctx.Id_dynamicMember));
+        keyPath->resolveComponents(ctx,
+                                   buildKeyPathSubscriptComponent(
+                                       overload, dotLoc, /*indexExpr=*/nullptr,
+                                       ctx.Id_dynamicMember, componentLoc));
         return keyPath;
       }
 
@@ -1657,8 +1649,9 @@ namespace {
               /*implicit=*/true, SE->getAccessSemantics());
         }
 
-        component = buildSubscriptComponent(SE->getLoc(), SE->getIndex(),
-                                            SE->getArgumentLabels());
+        component = buildKeyPathSubscriptComponent(
+            overload, SE->getLoc(), SE->getIndex(), SE->getArgumentLabels(),
+            componentLoc);
       } else {
         return nullptr;
       }
@@ -4336,12 +4329,7 @@ namespace {
       E->setMethod(method);
       return E;
     }
-    
-  private:
-    // Key path components we need to
-    SmallVector<std::pair<KeyPathExpr *, unsigned>, 4>
-      KeyPathSubscriptComponents;
-  public:
+
     Expr *visitKeyPathExpr(KeyPathExpr *E) {
       if (E->isObjC()) {
         cs.setType(E, cs.getType(E->getObjCStringLiteralExpr()));
@@ -4473,10 +4461,6 @@ namespace {
           component = buildKeyPathSubscriptComponent(
               *foundDecl, origComponent.getLoc(), origComponent.getIndexExpr(),
               subscriptLabels, locator);
-
-          // Save a reference to the component so we can do a post-pass to check
-          // the Hashable conformance of the indexes.
-          KeyPathSubscriptComponents.push_back({E, resolvedComponents.size()});
 
           baseTy = component.getComponentType();
           resolvedComponents.push_back(component);
@@ -4653,10 +4637,13 @@ namespace {
       // through the subscript(dynamicMember:) member, restore the
       // openedType and origComponent to its full reference as if the user
       // wrote out the subscript manually.
-      if (overload.choice.getKind() ==
+      bool forDynamicLookup =
+          overload.choice.getKind() ==
               OverloadChoiceKind::DynamicMemberLookup ||
           overload.choice.getKind() ==
-              OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+              OverloadChoiceKind::KeyPathDynamicMemberLookup;
+
+      if (forDynamicLookup) {
         overload.openedType =
             overload.openedFullType->castTo<AnyFunctionType>()->getResult();
 
@@ -4693,8 +4680,48 @@ namespace {
                               /*applyExpr*/ nullptr, labels,
                               /*hasTrailingClosure*/ false, locator);
 
-      return KeyPathExpr::Component::forSubscriptWithPrebuiltIndexExpr(
+      auto component = KeyPathExpr::Component::forSubscriptWithPrebuiltIndexExpr(
           ref, newIndexExpr, labels, resolvedTy, componentLoc, {});
+
+      // We need to be able to hash the captured index values in order for
+      // KeyPath itself to be hashable, so check that all of the subscript
+      // index components are hashable and collect their conformances here.
+      SmallVector<ProtocolConformanceRef, 4> conformances;
+
+      auto hashable =
+          cs.getASTContext().getProtocol(KnownProtocolKind::Hashable);
+
+      auto equatable =
+          cs.getASTContext().getProtocol(KnownProtocolKind::Equatable);
+
+      auto &TC = cs.getTypeChecker();
+      auto fnType = overload.openedType->castTo<FunctionType>();
+      for (const auto &param : fnType->getParams()) {
+        auto indexType = simplifyType(param.getPlainType());
+        // index conformance to the Hashable protocol has been verified
+        // by the solver, we just need to get it again with all of the
+        // generic parameters resolved.
+        auto hashableConformance =
+            TC.conformsToProtocol(indexType, hashable, cs.DC,
+                                  (ConformanceCheckFlags::Used |
+                                   ConformanceCheckFlags::InExpression));
+        assert(hashableConformance.hasValue());
+
+        // FIXME: Hashable implies Equatable, but we need to make sure the
+        // Equatable conformance is forced into existence during type
+        // checking so that it's available for SILGen.
+        auto eqConformance =
+            TC.conformsToProtocol(simplifyType(indexType), equatable, cs.DC,
+                                  (ConformanceCheckFlags::Used |
+                                   ConformanceCheckFlags::InExpression));
+        assert(eqConformance.hasValue());
+        (void)eqConformance;
+
+        conformances.push_back(*hashableConformance);
+      }
+
+      component.setSubscriptIndexHashableConformances(conformances);
+      return component;
     }
 
     Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) {
@@ -4763,61 +4790,6 @@ namespace {
           .fixItInsertAfter(cast->getEndLoc(), ")");
       }
       
-      // Look at key path subscript components to verify that they're hashable.
-      for (auto componentRef : KeyPathSubscriptComponents) {
-        auto &component = componentRef.first
-                                  ->getMutableComponents()[componentRef.second];
-        // We need to be able to hash the captured index values in order for
-        // KeyPath itself to be hashable, so check that all of the subscript
-        // index components are hashable and collect their conformances here.
-        SmallVector<ProtocolConformanceRef, 2> hashables;
-        bool allIndexesHashable = true;
-        ArrayRef<TupleTypeElt> indexTypes;
-        TupleTypeElt singleIndexTypeBuf;
-        if (auto tup = cs.getType(component.getIndexExpr())
-                                               ->getAs<TupleType>()) {
-          indexTypes = tup->getElements();
-        } else {
-          singleIndexTypeBuf = cs.getType(component.getIndexExpr());
-          indexTypes = singleIndexTypeBuf;
-        }
-      
-        auto hashable =
-          cs.getASTContext().getProtocol(KnownProtocolKind::Hashable);
-        auto equatable =
-          cs.getASTContext().getProtocol(KnownProtocolKind::Equatable);
-        for (auto indexType : indexTypes) {
-          auto conformance =
-            cs.TC.conformsToProtocol(indexType.getType(), hashable,
-                                     cs.DC,
-                                     (ConformanceCheckFlags::Used|
-                                      ConformanceCheckFlags::InExpression));
-          if (!conformance) {
-            cs.TC.diagnose(component.getIndexExpr()->getLoc(),
-                           diag::expr_keypath_subscript_index_not_hashable,
-                           indexType.getType());
-            allIndexesHashable = false;
-            continue;
-          }
-          hashables.push_back(*conformance);
-          
-          // FIXME: Hashable implies Equatable, but we need to make sure the
-          // Equatable conformance is forced into existence during type checking
-          // so that it's available for SILGen.
-          auto eqConformance =
-            cs.TC.conformsToProtocol(indexType.getType(), equatable,
-                                     cs.DC,
-                                     (ConformanceCheckFlags::Used|
-                                      ConformanceCheckFlags::InExpression));
-          assert(eqConformance.hasValue());
-          (void)eqConformance;
-        }
-
-        if (allIndexesHashable) {
-          component.setSubscriptIndexHashableConformances(hashables);
-        }
-      }
-
       // Set the final types on the expression.
       cs.setExprTypes(result);
     }

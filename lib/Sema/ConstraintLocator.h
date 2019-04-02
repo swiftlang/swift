@@ -486,6 +486,10 @@ public:
     bool isKeyPathDynamicMember() const {
       return getKind() == PathElementKind::KeyPathDynamicMember;
     }
+
+    bool isKeyPathComponent() const {
+      return getKind() == PathElementKind::KeyPathComponent;
+    }
   };
 
   /// Return the summary flags for an entire path.
