@@ -47,10 +47,16 @@
 // RUN: llvm-bcanalyzer -dump %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
 //
 // Check we didn't emit anything from the cache in the .d file either
+// RUN: cat %t/dummy.d | %FileCheck %s -check-prefix=DEPFILE-NEGATIVE
 // RUN: cat %t/dummy.d | %FileCheck %s -check-prefix=DEPFILE
 //
-// DEPFILE-NOT: /MCP/
-// DEPFILE-NOT: /prebuilt-cache/
+// DEPFILE-NEGATIVE-NOT: /MCP/
+// DEPFILE-NEGATIVE-NOT: /prebuilt-cache/
+//
+// DEPFILE-DAG: SomeCModule.h
+// DEPFILE-DAG: SdkLib.swiftinterface
+// DEPFILE-DAG: ExportedLib.swiftinterface
+// DEPFILE-DAG: SDKDependencies.swift
 //
 // RUN: %empty-directory(%t/MCP)
 // RUN: echo '2: PASSED'
@@ -90,6 +96,7 @@
 // NOCACHE-NOT: /MCP/
 //
 // Check we didn't emit anything from the cache in the .d file either
+// RUN: cat %t/dummy.d | %FileCheck %s -check-prefix=DEPFILE-NEGATIVE
 // RUN: cat %t/dummy.d | %FileCheck %s -check-prefix=DEPFILE
 //
 // RUN: %empty-directory(%t/MCP)
@@ -126,6 +133,7 @@
 // RUN: cat %t/MCP/SdkLib-*.swiftmodule | %FileCheck %s -check-prefix=NOCACHE -DLIB_NAME=SdkLib
 //
 // Check we didn't emit anything from the cache in the .d file either
+// RUN: cat %t/dummy.d | %FileCheck %s -check-prefix=DEPFILE-NEGATIVE
 // RUN: cat %t/dummy.d | %FileCheck %s -check-prefix=DEPFILE
 //
 // RUN: %empty-directory(%t/MCP)
@@ -170,9 +178,28 @@
 // RUN: llvm-bcanalyzer -dump %t/MCP/SdkLib-*.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
 //
 // Check we didn't emit anything from the cache in the .d file either
+// RUN: cat %t/dummy.d | %FileCheck %s -check-prefix=DEPFILE-NEGATIVE
 // RUN: cat %t/dummy.d | %FileCheck %s -check-prefix=DEPFILE
 //
 // RUN: echo '5: PASSED'
+
+
+// 6) Keeping the existing cache, update ExportedLib to no longer depend on SomeCModule
+//
+// RUN: grep -v import %t/my-new-sdk/ExportedLib.swiftinterface > %t/my-new-sdk/ExportedLib.swiftinterface.updated
+// RUN: mv %t/my-new-sdk/ExportedLib.swiftinterface.updated %t/my-new-sdk/ExportedLib.swiftinterface
+//
+// RUN: sed -e 's/x > 3/5 > 3/g' %s | %target-swift-frontend -typecheck -I %t/my-new-sdk -sdk %t/my-new-sdk -prebuilt-module-cache-path %t/new-dir/prebuilt-cache -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies -
+//
+// Check we don't have SomeCModule listed in dependencies
+// RUN: cat %t/dummy.d | %FileCheck %s -check-prefixes=DEPFILE-NEGATIVE,DEPCHANGE-NEGATIVE
+// RUN: cat %t/dummy.d | %FileCheck %s -check-prefix=DEPCHANGE
+//
+// DEPCHANGE-NEGATIVE-NOT: SomeCModule.h
+//
+// DEPCHANGE-DAG: SdkLib.swiftinterface
+// DEPCHANGE-DAG: ExportedLib.swiftinterface
+// DEPCHANGE-DAG: SDKDependencies.swift
 
 import SdkLib
 

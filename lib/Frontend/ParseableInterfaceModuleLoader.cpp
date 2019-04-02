@@ -726,8 +726,6 @@ class ParseableInterfaceModuleLoaderImpl {
     SmallString<128> SDKRelativeBuffer;
     for (auto &in : deps) {
       StringRef fullPath = getFullDependencyPath(in, SDKRelativeBuffer);
-      if (dependencyTracker)
-        dependencyTracker->addDependency(fullPath, /*isSystem*/in.isSDKRelative());
       if (!dependencyIsUpToDate(in, fullPath)) {
         LLVM_DEBUG(llvm::dbgs() << "Dep " << fullPath
                    << " is directly out of date\n");
@@ -950,7 +948,9 @@ class ParseableInterfaceModuleLoaderImpl {
   }
 
   /// Looks up the best module to load for a given interface, and returns a
-  /// buffer of the module's contents.  See the main comment in
+  /// buffer of the module's contents. Also reports the module's dependencies
+  /// to the parent \c dependencyTracker if it came from the cache, or was built
+  /// from the given interface. See the main comment in
   /// \c ParseableInterfaceModuleLoader.h for an explanation of the module
   /// loading strategy.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
@@ -997,6 +997,15 @@ class ParseableInterfaceModuleLoaderImpl {
       if (module.isPrebuilt())
         if (writeForwardingModule(module, cachedOutputPath, allDeps))
           return std::make_error_code(std::errc::not_supported);
+
+      // Report the module's dependencies to the dependencyTracker
+      if (dependencyTracker) {
+        SmallString<128> SDKRelativeBuffer;
+        for (auto &dep: allDeps) {
+          StringRef fullPath = getFullDependencyPath(dep, SDKRelativeBuffer);
+          dependencyTracker->addDependency(fullPath, dep.isSDKRelative());
+        }
+      }
 
       return std::move(module.moduleBuffer);
     }
