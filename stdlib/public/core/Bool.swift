@@ -170,6 +170,11 @@ extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLitera
   }
 }
 
+@available(swift, obsoleted: 5.0)
+@usableFromInline
+internal // used to be COMPILER_INTRINSIC, now just ABI cruft
+func _getBool(_ v: Builtin.Int1) -> Bool { return Bool(v) }		
+
 extension Bool : CustomStringConvertible {
   /// A textual representation of the Boolean value.
   @inlinable
