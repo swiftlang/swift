@@ -45,6 +45,11 @@
 #ifdef HAVE_MALLOC_MALLOC_H
 #include <malloc/malloc.h>
 #endif
+#if defined(_WIN32)
+#define NOMINMAX
+#include "Windows.h"
+#include "psapi.h"
+#endif
 
 namespace swift {
 using namespace llvm;
@@ -54,26 +59,6 @@ bool environmentVariableRequestedMaximumDeterminism() {
   if (const char *S = ::getenv("SWIFTC_MAXIMUM_DETERMINISM"))
     return (S[0] != '\0');
   return false;
-}
-
-static int64_t
-getChildrenMaxResidentSetSize() {
-#if defined(HAVE_GETRUSAGE) && !defined(__HAIKU__)
-  struct rusage RU;
-  ::getrusage(RUSAGE_CHILDREN, &RU);
-  int64_t M = static_cast<int64_t>(RU.ru_maxrss);
-  if (M < 0) {
-    M = std::numeric_limits<int64_t>::max();
-  } else {
-#ifndef __APPLE__
-    // Apple systems report bytes; everything else appears to report KB.
-    M <<= 10;
-#endif
-  }
-  return M;
-#else
-  return 0;
-#endif
 }
 
 static std::string
@@ -378,6 +363,29 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
     EventProfilers = make_unique<StatsProfilers>();
   if (ProfileEntities)
     EntityProfilers = make_unique<StatsProfilers>();
+}
+
+void UnifiedStatsReporter::recordJobMaxRSS(long rss) {
+  maxChildRSS = std::max(maxChildRSS, rss);
+}
+
+int64_t UnifiedStatsReporter::getChildrenMaxResidentSetSize() {
+#if defined(HAVE_GETRUSAGE) && !defined(__HAIKU__)
+  struct rusage RU;
+  ::getrusage(RUSAGE_CHILDREN, &RU);
+  int64_t M = static_cast<int64_t>(RU.ru_maxrss);
+  if (M < 0) {
+    M = std::numeric_limits<int64_t>::max();
+  } else {
+#ifndef __APPLE__
+    // Apple systems report bytes; everything else appears to report KB.
+    M <<= 10;
+#endif
+  }
+  return M;
+#else
+  return maxChildRSS;
+#endif
 }
 
 UnifiedStatsReporter::AlwaysOnDriverCounters &

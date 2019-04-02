@@ -38,6 +38,7 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/DiagnosticsModuleDiffer.h"
 #include "swift/Basic/ColorUtils.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/LLVMInitialize.h"
@@ -195,6 +196,7 @@ public:
   bool shouldIgnore(Decl *D, const Decl* Parent = nullptr) const;
   ArrayRef<BreakingAttributeInfo> getBreakingAttributeInfo() const { return BreakingAttrs; }
   Optional<uint8_t> getFixedBinaryOrder(ValueDecl *VD) const;
+
   template<class YAMLNodeTy, typename ...ArgTypes>
   void diagnose(YAMLNodeTy node, Diag<ArgTypes...> ID,
                 typename detail::PassArgument<ArgTypes>::type... args) {
@@ -336,6 +338,19 @@ public:
   uint8_t getFixedBinaryOrder() const { return *FixedBinaryOrder; }
   virtual void jsonize(json::Output &Out) override;
   virtual void diagnose(SDKNode *Right) override;
+
+  // The first argument of the diag is always screening info.
+  template<typename ...ArgTypes>
+  void emitDiag(Diag<StringRef, ArgTypes...> ID,
+                typename detail::PassArgument<ArgTypes>::type... Args) const {
+    // Don't emit objc decls if we care about swift exclusively
+    if (Ctx.getOpts().SwiftOnly) {
+      if (isObjc())
+        return;
+    }
+    Ctx.getDiags().diagnose(SourceLoc(), ID, getScreenInfo(),
+                            std::move(Args)...);
+  }
 };
 
 class SDKNodeRoot: public SDKNode {

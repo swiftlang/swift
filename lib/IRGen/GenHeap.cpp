@@ -1883,14 +1883,6 @@ llvm::Value *irgen::emitDynamicTypeOfHeapObject(IRGenFunction &IGF,
   llvm_unreachable("unhandled ISA encoding");
 }
 
-static ClassDecl *getRootClass(ClassDecl *theClass) {
-  while (theClass->hasSuperclass()) {
-    theClass = theClass->getSuperclassDecl();
-    assert(theClass && "base type of class not a class?");
-  }
-  return theClass;
-}
-
 /// What isa encoding mechanism does a type have?
 IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
                                          CanType type) {
@@ -1900,7 +1892,7 @@ IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
 
   if (auto theClass = type->getClassOrBoundGenericClass()) {
     // We can access the isas of pure Swift classes directly.
-    if (getRootClass(theClass)->hasKnownSwiftImplementation())
+    if (!theClass->checkAncestry(AncestryFlags::ClangImported))
       return IsaEncoding::Pointer;
     // For ObjC or mixed classes, we need to use object_getClass.
     return IsaEncoding::ObjC;

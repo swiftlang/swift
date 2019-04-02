@@ -311,7 +311,7 @@ public:
 };
 
 /// Collect function (or subscript) members with the given \p name on \p baseTy.
-void collectPossibleCalleesByQualifiedLookup(
+static void collectPossibleCalleesByQualifiedLookup(
     DeclContext &DC, Type baseTy, DeclBaseName name,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
 
@@ -358,7 +358,7 @@ void collectPossibleCalleesByQualifiedLookup(
 
 /// Collect function (or subscript) members with the given \p name on
 /// \p baseExpr expression.
-void collectPossibleCalleesByQualifiedLookup(
+static void collectPossibleCalleesByQualifiedLookup(
     DeclContext &DC, Expr *baseExpr, DeclBaseName name,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   ConcreteDeclRef ref = nullptr;
@@ -374,7 +374,7 @@ void collectPossibleCalleesByQualifiedLookup(
 }
 
 /// For the given \c callExpr, collect possible callee types and declarations.
-bool collectPossibleCalleesForApply(
+static bool collectPossibleCalleesForApply(
     DeclContext &DC, ApplyExpr *callExpr,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   auto *fnExpr = callExpr->getFn();
@@ -421,7 +421,7 @@ bool collectPossibleCalleesForApply(
 
 /// For the given \c subscriptExpr, collect possible callee types and
 /// declarations.
-bool collectPossibleCalleesForSubscript(
+static bool collectPossibleCalleesForSubscript(
     DeclContext &DC, SubscriptExpr *subscriptExpr,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   if (subscriptExpr->hasDecl()) {
@@ -438,14 +438,11 @@ bool collectPossibleCalleesForSubscript(
   return !candidates.empty();
 }
 
-/// Get index of \p CCExpr in \p Args. \p Args is usually a \c TupleExpr,
-/// \c ParenExpr, or a \c ArgumentShuffleExpr.
+/// Get index of \p CCExpr in \p Args. \p Args is usually a \c TupleExpr
+/// or \c ParenExpr.
 /// \returns \c true if success, \c false if \p CCExpr is not a part of \p Args.
-bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
-                       unsigned &Position, bool &HasName) {
-  if (auto ASE = dyn_cast<ArgumentShuffleExpr>(Args))
-    Args = ASE->getSubExpr();
-
+static bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
+                              unsigned &Position, bool &HasName) {
   if (isa<ParenExpr>(Args)) {
     HasName = false;
     Position = 0;
@@ -465,38 +462,6 @@ bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
     Position = i;
     return true;
   }
-  return false;
-}
-
-/// Translate argument index in \p Args to parameter index.
-/// Does nothing unless \p Args is \c ArgumentShuffleExpr.
-bool translateArgIndexToParamIndex(Expr *Args, unsigned &Position,
-                                   bool &HasName) {
-  auto ASE = dyn_cast<ArgumentShuffleExpr>(Args);
-  if (!ASE)
-    return true;
-
-  auto mapping = ASE->getElementMapping();
-  for (unsigned destIdx = 0, e = mapping.size(); destIdx != e; ++destIdx) {
-    auto srcIdx = mapping[destIdx];
-    if (srcIdx == (signed)Position) {
-      Position = destIdx;
-      return true;
-    }
-    if (srcIdx == ArgumentShuffleExpr::Variadic &&
-        llvm::is_contained(ASE->getVariadicArgs(), Position)) {
-      // The arg is a part of variadic args.
-      Position = destIdx;
-      HasName = false;
-      if (auto Args = dyn_cast<TupleExpr>(ASE->getSubExpr())) {
-        // Check if the first variadiac argument has the label.
-        auto firstVarArgIdx = ASE->getVariadicArgs().front();
-        HasName = Args->getElementNameLoc(firstVarArgIdx).isValid();
-      }
-      return true;
-    }
-  }
-
   return false;
 }
 
@@ -546,8 +511,6 @@ class ExprContextAnalyzer {
     bool HasName;
     if (!getPositionInArgs(*DC, Arg, ParsedExpr, Position, HasName))
       return false;
-    if (!translateArgIndexToParamIndex(Arg, Position, HasName))
-      return false;
 
     // Collect possible types (or labels) at the position.
     {
@@ -586,6 +549,12 @@ class ExprContextAnalyzer {
     case ExprKind::Binary:
     case ExprKind::PrefixUnary: {
       analyzeApplyExpr(Parent);
+      break;
+    }
+    case ExprKind::Array: {
+      if (auto type = ParsedExpr->getType()) {
+        recordPossibleType(type);
+      }
       break;
     }
     case ExprKind::Assign: {
@@ -744,12 +713,13 @@ public:
         case ExprKind::PrefixUnary:
         case ExprKind::Assign:
         case ExprKind::Subscript:
+        case ExprKind::Array:
           return true;
         case ExprKind::Tuple: {
           auto ParentE = Parent.getAsExpr();
           return !ParentE ||
                  (!isa<CallExpr>(ParentE) && !isa<SubscriptExpr>(ParentE) &&
-                  !isa<BinaryExpr>(ParentE) && !isa<ArgumentShuffleExpr>(ParentE));
+                  !isa<BinaryExpr>(ParentE));
         }
         case ExprKind::Closure: {
           // Note: we cannot use hasSingleExpressionBody, because we explicitly
