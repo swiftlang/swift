@@ -195,6 +195,29 @@ foreach(SDK ${SWIFT_SDKS})
 
     set(test_dependencies)
     get_test_dependencies("${SDK}" test_dependencies)
+
+    # NOTE create a stub BlocksRuntime library that can be used for the
+    # reflection tests
+    file(WRITE ${test_bin_dir}/BlocksRuntime.c
+      "void
+#if defined(_WIN32)
+__declspec(dllexport)
+#endif
+_Block_release(void) { }\n")
+    add_library(BlocksRuntimeStub-${SDK}-${ARCH} SHARED
+      ${test_bin_dir}/BlocksRuntime.c)
+    if(CMAKE_C_COMPILER_ID STREQUAL Clang AND
+        NOT CMAKE_C_COMPILER_SIMULATE_ID STREQUAL MSVC)
+      target_compile_options(BlocksRuntimeStub-${SDK}-${ARCH} PRIVATE
+        -target;${SWIFT_SDK_${SDK}_ARCH_${ARCH}_TRIPLE})
+    endif()
+    set_target_properties(BlocksRuntimeStub-${SDK}-${ARCH} PROPERTIES
+      ARCHIVE_OUTPUT_DIRECTORY ${test_bin_dir}
+      LIBRARY_OUTPUT_DIRECTORY ${test_bin_dir}
+      RUNTIME_OUTPUT_DIRECTORY ${test_bin_dir}
+      OUTPUT_NAME BlocksRuntime)
+    list(APPEND test_dependencies BlocksRuntimeStub-${SDK}-${ARCH})
+
     list(APPEND test_dependencies
         "swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
 
