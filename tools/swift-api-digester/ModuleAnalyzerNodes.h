@@ -300,6 +300,7 @@ class SDKNodeDecl: public SDKNode {
   bool IsOverriding;
   bool IsOpen;
   bool IsInternal;
+  bool IsABIPlaceholder;
   uint8_t ReferenceOwnership;
   StringRef GenericSig;
   Optional<uint8_t> FixedBinaryOrder;
@@ -332,6 +333,7 @@ public:
   bool isOptional() const { return hasDeclAttribute(DeclAttrKind::DAK_Optional); }
   bool isOpen() const { return IsOpen; }
   bool isInternal() const { return IsInternal; }
+  bool isABIPlaceholder() const { return IsABIPlaceholder; }
   StringRef getGenericSignature() const { return GenericSig; }
   StringRef getScreenInfo() const;
   bool hasFixedBinaryOrder() const { return FixedBinaryOrder.hasValue(); }
@@ -499,10 +501,13 @@ public:
 class SDKNodeConformance: public SDKNode {
   SDKNodeDeclType *TypeDecl;
   friend class SDKNodeDeclType;
+  bool IsABIPlaceholder;
 public:
   SDKNodeConformance(SDKNodeInitInfo Info);
   ArrayRef<SDKNode*> getTypeWitnesses() const { return Children; }
   SDKNodeDeclType *getNominalTypeDecl() const { return TypeDecl; }
+  bool isABIPlaceholder() const { return IsABIPlaceholder; }
+  void jsonize(json::Output &out) override;
   static bool classof(const SDKNode *N);
 };
 
