@@ -517,9 +517,6 @@ def prebuilt_module_cache_path_EQ :
   Joined<["-"], "prebuilt-module-cache-path=">,
   Alias<prebuilt_module_cache_path>;
 
-def enable_resilience_bypass : Flag<["-"], "enable-resilience-bypass">,
-   HelpText<"Completely bypass resilience when accessing types in resilient frameworks">;
-
 def force_public_linkage : Flag<["-"], "force-public-linkage">,
    HelpText<"Force public linkage for private symbols. Used by LLDB.">;
 
