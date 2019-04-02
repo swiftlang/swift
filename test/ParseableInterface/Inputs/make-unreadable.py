@@ -21,10 +21,16 @@ if platform.system() == 'Windows':
     buffer = ctypes.create_unicode_buffer(UNLEN + 1)
     size = ctypes.c_uint(len(buffer))
     GetUserNameW(buffer, ctypes.byref(size))
+    # For NetworkService, Host$ is returned, so we choose have to turn it back
+    # into something that icacls understands.
+    if not buffer.value.endswith('$'):
+        user_name = buffer.value
+    else:
+        user_name = 'NT AUTHORITY\\NetworkService'
 
     for path in sys.argv[1:]:
         subprocess.call(['icacls', path, '/deny',
-                         '{}:(R)'.format(buffer.value)])
+                         '{}:(R)'.format(user_name)])
 else:
     for path in sys.argv[1:]:
         subprocess.call(['chmod', 'a-r', path])
