@@ -1304,8 +1304,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
       return std::make_pair(ParsedExpr->getType(), refDecl);
     }
 
-    prepareForRetypechecking(ParsedExpr);
-
     ConcreteDeclRef ReferencedDecl = nullptr;
     Expr *ModifiedExpr = ParsedExpr;
     if (auto T = getTypeOfCompletionContextExpr(P.Context, CurDeclContext,
@@ -3340,7 +3338,6 @@ public:
     if (expr->getType() && !expr->getType()->hasError())
       return expr;
 
-    prepareForRetypechecking(expr);
     if (!typeCheckExpression(const_cast<DeclContext *>(CurrDeclContext), expr))
       return expr;
     return LHS;
