@@ -83,6 +83,7 @@ set(SWIFTLIB_ESSENTIAL
   KeyValuePairs.swift
   LazyCollection.swift
   LazySequence.swift
+  LegacyABI.swift
   LifetimeManager.swift
   ManagedBuffer.swift
   Map.swift

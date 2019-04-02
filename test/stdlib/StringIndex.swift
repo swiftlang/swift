@@ -202,6 +202,51 @@ StringIndexTests.test("Scalar Align UTF-8 indices") {
   expectEqual(roundedIdx, roundedIdx3)
 }
 
+#if _runtime(_ObjC)
+import Foundation
+StringIndexTests.test("String.Index(_:within) / Range<String.Index>(_:in:)") {
+  guard #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) else {
+    return
+  }
 
+  let str = simpleStrings.joined()
+  let substr = str[...]
+  for idx in str.utf8.indices {
+    expectEqual(
+      String.Index(idx, within: str), String.Index(idx, within: substr))
+  }
+
+  expectNil(String.Index(str.startIndex, within: str.dropFirst()))
+  expectNil(String.Index(str.endIndex, within: str.dropLast()))
+  expectNotNil(String.Index(str.startIndex, within: str))
+  expectNotNil(String.Index(str.endIndex, within: str))
+
+  let utf16Count = str.utf16.count
+  let utf16Indices = Array(str.utf16.indices) + [str.utf16.endIndex]
+  for location in 0..<utf16Count {
+    for length in 0...(utf16Count - location) {
+      let strLB = String.Index(utf16Indices[location], within: str)
+      let substrLB = String.Index(utf16Indices[location], within: substr)
+      let strUB = String.Index(utf16Indices[location+length], within: str)
+      let substrUB = String.Index(utf16Indices[location+length], within: substr)
+      expectEqual(strLB, substrLB)
+      expectEqual(strUB, substrUB)
+
+      if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+        let nsRange = NSRange(location: location, length: length)
+        let strRange = Range<String.Index>(nsRange, in: str)
+        let substrRange = Range<String.Index>(nsRange, in: substr)
+
+        expectEqual(strRange, substrRange)
+        guard strLB != nil && strUB != nil else {
+          expectNil(strRange)
+          continue
+        }
+        expectEqual(strRange, Range(uncheckedBounds: (strLB!, strUB!)))
+      }
+    }
+  }
+}
+#endif // _runtime(_ObjC)
 
 runAllTests()
