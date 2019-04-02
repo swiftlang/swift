@@ -28,7 +28,7 @@ AccessScopeChecker::AccessScopeChecker(const DeclContext *useDC,
 
 bool
 AccessScopeChecker::visitDecl(const ValueDecl *VD) {
-  if (!VD || isa<GenericTypeParamDecl>(VD))
+  if (isa<GenericTypeParamDecl>(VD))
     return true;
 
   auto AS = VD->getFormalAccessScope(File, TreatUsableFromInlineAsPublic);
