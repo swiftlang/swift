@@ -289,8 +289,8 @@ PASS(UnsafeGuaranteedPeephole, "unsafe-guaranteed-peephole",
      "SIL retain/release Peephole Removal for Builtin.unsafeGuaranteed")
 PASS(UsePrespecialized, "use-prespecialized",
      "Use Pre-Specialized Functions")
-PASS(ValueOwnershipKindDumper, "value-ownership-kind-dumper",
-     "Print Value Ownership Kind for Testing")
+PASS(OwnershipDumper, "ownership-dumper",
+     "Print Ownership information for Testing")
 PASS(SemanticARCOpts, "semantic-arc-opts",
      "Semantic ARC Optimization")
 PASS(MarkUninitializedFixup, "mark-uninitialized-fixup",
