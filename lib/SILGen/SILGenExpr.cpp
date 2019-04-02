@@ -450,7 +450,6 @@ namespace {
     RValue visitDynamicSubscriptExpr(DynamicSubscriptExpr *E,
                                      SGFContext C);
     RValue visitDestructureTupleExpr(DestructureTupleExpr *E, SGFContext C);
-    RValue visitArgumentShuffleExpr(ArgumentShuffleExpr *E, SGFContext C);
     RValue visitDynamicTypeExpr(DynamicTypeExpr *E, SGFContext C);
     RValue visitCaptureListExpr(CaptureListExpr *E, SGFContext C);
     RValue visitAbstractClosureExpr(AbstractClosureExpr *E, SGFContext C);
@@ -1858,26 +1857,33 @@ visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
                                     trueCount, falseCount);
 }
 
-RValue RValueEmitter::visitIsExpr(IsExpr *E, SGFContext C) {
-  SILValue isa = emitIsa(SGF, E, E->getSubExpr(),
-                         E->getCastTypeLoc().getType(), E->getCastKind());
-
+static RValue emitBoolLiteral(SILGenFunction &SGF, SILLocation loc,
+                              SILValue builtinBool,
+                              SGFContext C) {
   // Call the Bool(_builtinBooleanLiteral:) initializer
   ASTContext &ctx = SGF.getASTContext();
   auto init = ctx.getBoolBuiltinInitDecl();
-  Type builtinArgType = BuiltinIntegerType::get(1, ctx);
-  RValue builtinArg(SGF, ManagedValue::forUnmanaged(isa),
-                    builtinArgType->getCanonicalType());
+  auto builtinArgType = CanType(BuiltinIntegerType::get(1, ctx));
+  RValue builtinArg(SGF, ManagedValue::forUnmanaged(builtinBool),
+                    builtinArgType);
+
+  PreparedArguments builtinArgs((AnyFunctionType::Param(builtinArgType)));
+  builtinArgs.add(loc, std::move(builtinArg));
+
   auto result =
-    SGF.emitApplyAllocatingInitializer(E, ConcreteDeclRef(init),
-                                       std::move(builtinArg), Type(),
+    SGF.emitApplyAllocatingInitializer(loc, ConcreteDeclRef(init),
+                                       std::move(builtinArgs), Type(),
                                        C);
   return result;
+}
+RValue RValueEmitter::visitIsExpr(IsExpr *E, SGFContext C) {
+  SILValue isa = emitIsa(SGF, E, E->getSubExpr(),
+                         E->getCastTypeLoc().getType(), E->getCastKind());
+  return emitBoolLiteral(SGF, E, isa, C);
 }
 
 RValue RValueEmitter::visitEnumIsCaseExpr(EnumIsCaseExpr *E,
                                           SGFContext C) {
-  ASTContext &ctx = SGF.getASTContext();
   // Get the enum value.
   auto subExpr = SGF.emitRValueAsSingleValue(E->getSubExpr(),
                                 SGFContext(SGFContext::AllowImmediatePlusZero));
@@ -1895,16 +1901,7 @@ RValue RValueEmitter::visitEnumIsCaseExpr(EnumIsCaseExpr *E,
                                       {{E->getEnumElement(), t}});
   }
   
-  // Call the Bool(_builtinBooleanLiteral:) initializer
-  auto init = ctx.getBoolBuiltinInitDecl();
-  Type builtinArgType = BuiltinIntegerType::get(1, ctx);
-  RValue builtinArg(SGF, ManagedValue::forUnmanaged(selected),
-                    builtinArgType->getCanonicalType());
-  auto result =
-    SGF.emitApplyAllocatingInitializer(E, ConcreteDeclRef(init),
-                                       std::move(builtinArg), Type(),
-                                       C);
-  return result;
+  return emitBoolLiteral(SGF, E, selected, C);
 }
 
 RValue RValueEmitter::visitCoerceExpr(CoerceExpr *E, SGFContext C) {
@@ -1916,19 +1913,10 @@ RValue RValueEmitter::visitCoerceExpr(CoerceExpr *E, SGFContext C) {
 
 VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &SGF, SILLocation loc,
                                        CanType baseTy, CanType arrayTy,
-                                       unsigned numElements,
-                                       ArrayRef<unsigned> expansionIndices) {
+                                       unsigned numElements) {
   // Reabstract the base type against the array element type.
   auto baseAbstraction = AbstractionPattern::getOpaque();
   auto &baseTL = SGF.getTypeLowering(baseAbstraction, baseTy);
-
-  if (!expansionIndices.empty()) {
-    // An assertion is okay here for now because this is only in generated code.
-    assert(numElements == 1 &&
-           "expansion that is not the only variadic argument is unsupported");
-    return VarargsInfo(ManagedValue(), CleanupHandle::invalid(), SILValue(),
-                       baseTL, baseAbstraction, /*expansion peephole*/ true);
-  }
 
   // Allocate the array.
   SILValue numEltsVal = SGF.B.createIntegerLiteral(loc,
@@ -1955,18 +1943,11 @@ VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &SGF, SILLocation loc,
     /*isStrict*/ true,
     /*isInvariant*/ false);
 
-  return VarargsInfo(array, abortCleanup, basePtr, baseTL, baseAbstraction,
-                     /*expansion peephole*/ false);
+  return VarargsInfo(array, abortCleanup, basePtr, baseTL, baseAbstraction);
 }
 
 ManagedValue Lowering::emitEndVarargs(SILGenFunction &SGF, SILLocation loc,
                                       VarargsInfo &&varargs) {
-  if (varargs.isExpansionPeephole()) {
-    auto result = varargs.getArray();
-    assert(result);
-    return result;
-  }
-
   // Kill the abort cleanup.
   SGF.Cleanups.setCleanupState(varargs.getAbortCleanup(), CleanupState::Dead);
 
@@ -2181,11 +2162,6 @@ RValue RValueEmitter::visitDestructureTupleExpr(DestructureTupleExpr *E,
   }
 
   return result;
-}
-
-RValue RValueEmitter::visitArgumentShuffleExpr(ArgumentShuffleExpr *E,
-                                               SGFContext C) {
-  llvm_unreachable("ArgumentShuffleExpr cannot appear in rvalue position");
 }
 
 static SILValue emitMetatypeOfDelegatingInitExclusivelyBorrowedSelf(
@@ -2432,7 +2408,7 @@ loadIndexValuesForKeyPathComponent(SILGenFunction &SGF, SILLocation loc,
     indexParams.emplace_back(SGF.F.mapTypeIntoContext(elt.first));
   }
   
-  PreparedArguments indexValues(indexParams, /*scalar*/ indexes.size() == 1);
+  PreparedArguments indexValues(indexParams);
   if (indexes.empty()) {
     assert(indexValues.isValid());
     return indexValues;
@@ -3606,11 +3582,22 @@ RValue RValueEmitter::visitArrayExpr(ArrayExpr *E, SGFContext C) {
   auto loc = SILLocation(E);
   ArgumentScope scope(SGF, loc);
 
-  CanType elementType = E->getElementType()->getCanonicalType();
-  CanType arrayTy = ArraySliceType::get(elementType)->getCanonicalType();
+  // CSApply builds ArrayExprs without an initializer for the trivial case
+  // of emitting varargs.
+  CanType arrayType, elementType;
+  if (E->getInitializer()) {
+    elementType = E->getElementType()->getCanonicalType();
+    arrayType = ArraySliceType::get(elementType)->getCanonicalType();
+  } else {
+    arrayType = E->getType()->getCanonicalType();
+    auto genericType = cast<BoundGenericStructType>(arrayType);
+    assert(genericType->getDecl() == SGF.getASTContext().getArrayDecl());
+    elementType = genericType.getGenericArgs()[0];
+  }
+
   VarargsInfo varargsInfo =
-      emitBeginVarargs(SGF, loc, elementType, arrayTy,
-                       E->getNumElements(), {});
+      emitBeginVarargs(SGF, loc, elementType, arrayType,
+                       E->getNumElements());
 
   // Cleanups for any elements that have been initialized so far.
   SmallVector<CleanupHandle, 8> cleanups;
@@ -3644,19 +3631,22 @@ RValue RValueEmitter::visitArrayExpr(ArrayExpr *E, SGFContext C) {
   for (auto destCleanup : cleanups)
     SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dead);
 
-  RValue arg(SGF, loc, arrayTy,
+  RValue array(SGF, loc, arrayType,
              emitEndVarargs(SGF, loc, std::move(varargsInfo)));
 
-  arg = scope.popPreservingValue(std::move(arg));
+  array = scope.popPreservingValue(std::move(array));
 
   // If we're building an array, we don't have to call the initializer;
   // we've already built one.
-  if (arrayTy->isEqual(E->getType()))
-    return arg;
+  if (arrayType->isEqual(E->getType()))
+    return array;
 
   // Call the builtin initializer.
+  PreparedArguments args(AnyFunctionType::Param(E->getType()));
+  args.add(E, std::move(array));
+
   return SGF.emitApplyAllocatingInitializer(
-      loc, E->getInitializer(), std::move(arg), E->getType(), C);
+      loc, E->getInitializer(), std::move(args), E->getType(), C);
 }
 
 RValue RValueEmitter::visitDictionaryExpr(DictionaryExpr *E, SGFContext C) {

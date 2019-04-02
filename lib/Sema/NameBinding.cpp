@@ -252,6 +252,18 @@ void NameBinder::addImport(
   if (privateImportAttr)
     options |= SourceFile::ImportFlags::PrivateImport;
 
+  auto *implementationOnlyAttr =
+      ID->getAttrs().getAttribute<ImplementationOnlyAttr>();
+  if (implementationOnlyAttr) {
+    if (options.contains(SourceFile::ImportFlags::Exported)) {
+      diagnose(ID, diag::import_implementation_cannot_be_exported,
+               topLevelModule->getName())
+        .fixItRemove(implementationOnlyAttr->getRangeWithAt());
+    } else {
+      options |= SourceFile::ImportFlags::ImplementationOnly;
+    }
+  }
+
   imports.push_back(SourceFile::ImportedModuleDesc(
       {ID->getDeclPath(), M}, options, privateImportFileName));
 
