@@ -118,12 +118,12 @@ bool CursorInfoResolver::tryResolve(Stmt *St) {
   return false;
 }
 
-bool CursorInfoResolver::visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
-                                                 Optional<AccessKind> AccKind,
+bool CursorInfoResolver::visitSubscriptReference(ValueDecl *D,
+                                                 CharSourceRange Range,
+                                                 ReferenceMetaData Data,
                                                  bool IsOpenBracket) {
   // We should treat both open and close brackets equally
-  return visitDeclReference(D, Range, nullptr, nullptr, Type(),
-                    ReferenceMetaData(SemaReferenceKind::SubscriptRef, AccKind));
+  return visitDeclReference(D, Range, nullptr, nullptr, Type(), Data);
 }
 
 ResolvedCursorInfo CursorInfoResolver::resolve(SourceLoc Loc) {
