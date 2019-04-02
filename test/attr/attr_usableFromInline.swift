@@ -152,3 +152,6 @@ public struct TestGenericSubscripts {
   @usableFromInline subscript<T: InternalProtocol>(_: T) -> Int { return 0 } // expected-warning {{type referenced from a generic parameter of a '@usableFromInline' subscript should be '@usableFromInline' or public}}
   @usableFromInline subscript<T>(where _: T) -> Int where T: InternalProtocol { return 0 } // expected-warning {{type referenced from a generic requirement of a '@usableFromInline' subscript should be '@usableFromInline' or public}}
 }
+
+@usableFromInline typealias TestGenericAlias<T: InternalProtocol> = T // expected-warning {{type referenced from a generic parameter of a '@usableFromInline' type alias should be '@usableFromInline' or public}}
+@usableFromInline typealias TestGenericAliasWhereClause<T> = T where T: InternalProtocol // expected-warning {{type referenced from a generic requirement of a '@usableFromInline' type alias should be '@usableFromInline' or public}}
