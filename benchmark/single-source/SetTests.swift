@@ -114,20 +114,20 @@ public let SetTests = [
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setAB, setCD]) }),
   BenchmarkInfo(
-    // name: "SetIsStrictSubsetBox0",
-    // runFunction: { n in run_SetIsStrictSubsetInt(setOAB, setOCD, false, 5000 * n) },
-    // tags: [.validation, .api, .Set],
-    // setUpFunction: { blackHole([setOAB, setOCD]) }),
+    name: "SetIsStrictSubsetBox0",
+    runFunction: { n in run_SetIsStrictSubsetBox(setOAB, setOCD, false, 5000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOAB, setOCD]) }),
   BenchmarkInfo(
     name: "SetIsStrictSubsetInt25",
     runFunction: { n in run_SetIsStrictSubsetInt(setB, setAB, true, 50 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setB, setAB]) }),
-  // BenchmarkInfo(
-  //   name: "SetIsStrictSubsetBox25",
-  //   runFunction: { n in run_SetIsStrictSubsetInt(setOB, setOAB, true, 50 * n) },
-  //   tags: [.validation, .api, .Set],
-  //   setUpFunction: { blackHole([setOB, setOAB]) }),
+  BenchmarkInfo(
+    name: "SetIsStrictSubsetBox25",
+    runFunction: { n in run_SetIsStrictSubsetBox(setOB, setOAB, true, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOB, setOAB]) }),
   BenchmarkInfo(
     name: "SetIsStrictSubsetInt50",
     runFunction: { n in run_SetIsStrictSubsetInt(setY, setXY, true, 50 * n) },
@@ -471,6 +471,18 @@ func run_SetIsSubsetBox(
   for _ in 0 ..< n {
     let isSubset = a.isSubset(of: identity(b))
     CheckResults(isSubset == r)
+  }
+}
+
+@inline(never)
+func run_SetIsStrictSubsetBox(
+  _ a: Set<Box<Int>>,
+  _ b: Set<Box<Int>>,
+  _ r: Bool,
+  _ n: Int) {
+  for _ in 0 ..< n {
+    let isStrictSubset = a.isStrictSubset(of: identity(b))
+    CheckResults(isStrictSubset == r)
   }
 }
 
