@@ -103,29 +103,10 @@ static unsigned recomputeSummaryFlags(ConstraintLocator *oldLocator,
 
 ConstraintLocator *
 constraints::simplifyLocator(ConstraintSystem &cs, ConstraintLocator *locator,
-                             SourceRange &range,
-                             ConstraintLocator **targetLocator) {
-  // Clear out the target locator result.
-  if (targetLocator)
-    *targetLocator = nullptr;
-
-  // The path to be tacked on to the target locator to identify the specific
-  // target.
-  Expr *targetAnchor;
-  SmallVector<LocatorPathElt, 4> targetPath;
-
+                             SourceRange &range) {
   auto path = locator->getPath();
   auto anchor = locator->getAnchor();
-  simplifyLocator(anchor, path, targetAnchor, targetPath, range);
-
-
-  // If we have a target anchor, build and simplify the target locator.
-  if (targetLocator && targetAnchor) {
-    SourceRange targetRange;
-    unsigned targetFlags = recomputeSummaryFlags(locator, targetPath);
-    auto loc = cs.getConstraintLocator(targetAnchor, targetPath, targetFlags);
-    *targetLocator = simplifyLocator(cs, loc, targetRange);
-  }
+  simplifyLocator(anchor, path, range);
 
   // If we didn't simplify anything, just return the input.
   if (anchor == locator->getAnchor() &&
@@ -141,52 +122,32 @@ constraints::simplifyLocator(ConstraintSystem &cs, ConstraintLocator *locator,
 
 void constraints::simplifyLocator(Expr *&anchor,
                                   ArrayRef<LocatorPathElt> &path,
-                                  Expr *&targetAnchor,
-                                  SmallVectorImpl<LocatorPathElt> &targetPath,
                                   SourceRange &range) {
   range = SourceRange();
-  targetAnchor = nullptr;
 
   while (!path.empty()) {
     switch (path[0].getKind()) {
     case ConstraintLocator::ApplyArgument: {
       // Extract application argument.
       if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
-        // The target anchor is the function being called.
-        targetAnchor = applyExpr->getFn();
-        targetPath.push_back(path[0]);
-
         anchor = applyExpr->getArg();
         path = path.slice(1);
         continue;
       }
 
       if (auto subscriptExpr = dyn_cast<SubscriptExpr>(anchor)) {
-        // The target anchor is the subscript.
-        targetAnchor = subscriptExpr;
-        targetPath.clear();
-
         anchor = subscriptExpr->getIndex();
         path = path.slice(1);
         continue;
       }
 
       if (auto objectLiteralExpr = dyn_cast<ObjectLiteralExpr>(anchor)) {
-        targetAnchor = nullptr;
-        targetPath.clear();
-
         anchor = objectLiteralExpr->getArg();
         path = path.slice(1);
         continue;
       }
 
       if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
-        // The target anchor is the method being called,
-        // no additional information could be retrieved
-        // about this call.
-        targetAnchor = nullptr;
-        targetPath.clear();
-
         anchor = UME->getArgument();
         path = path.slice(1);
         continue;
@@ -197,10 +158,6 @@ void constraints::simplifyLocator(Expr *&anchor,
     case ConstraintLocator::ApplyFunction:
       // Extract application function.
       if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
-        // No additional target locator information.
-        targetAnchor = nullptr;
-        targetPath.clear();
-
         anchor = applyExpr->getFn();
         path = path.slice(1);
         continue;
@@ -208,10 +165,6 @@ void constraints::simplifyLocator(Expr *&anchor,
 
       // The subscript itself is the function.
       if (auto subscriptExpr = dyn_cast<SubscriptExpr>(anchor)) {
-        // No additional target locator information.
-        targetAnchor = nullptr;
-        targetPath.clear();
-
         anchor = subscriptExpr;
         path = path.slice(1);
         continue;
@@ -220,10 +173,6 @@ void constraints::simplifyLocator(Expr *&anchor,
       // The unresolved member itself is the function.
       if (auto unresolvedMember = dyn_cast<UnresolvedMemberExpr>(anchor)) {
         if (unresolvedMember->getArgument()) {
-          // No additional target locator information.
-          targetAnchor = nullptr;
-          targetPath.clear();
-
           anchor = unresolvedMember;
           path = path.slice(1);
           continue;
@@ -248,11 +197,6 @@ void constraints::simplifyLocator(Expr *&anchor,
       if (auto tupleExpr = dyn_cast<TupleExpr>(anchor)) {
         unsigned index = path[0].getValue();
         if (index < tupleExpr->getNumElements()) {
-          // Append this extraction to the target locator path.
-          if (targetAnchor) {
-            targetPath.push_back(path[0]);
-          }
-
           anchor = tupleExpr->getElement(index);
           path = path.slice(1);
           continue;
@@ -265,11 +209,6 @@ void constraints::simplifyLocator(Expr *&anchor,
       if (auto tupleExpr = dyn_cast<TupleExpr>(anchor)) {
         unsigned index = path[0].getValue();
         if (index < tupleExpr->getNumElements()) {
-          // Append this extraction to the target locator path.
-          if (targetAnchor) {
-            targetPath.push_back(path[0]);
-          }
-
           anchor = tupleExpr->getElement(index);
           path = path.slice(1);
           continue;
@@ -279,11 +218,6 @@ void constraints::simplifyLocator(Expr *&anchor,
       // Extract subexpression in parentheses.
       if (auto parenExpr = dyn_cast<ParenExpr>(anchor)) {
         assert(path[0].getValue() == 0);
-
-        // Append this extraction to the target locator path.
-        if (targetAnchor) {
-          targetPath.push_back(path[0]);
-        }
 
         anchor = parenExpr->getSubExpr();
         path = path.slice(1);
@@ -295,8 +229,6 @@ void constraints::simplifyLocator(Expr *&anchor,
       if (auto typeExpr = dyn_cast<TypeExpr>(anchor)) {
         // This is really an implicit 'init' MemberRef, so point at the base,
         // i.e. the TypeExpr.
-        targetAnchor = nullptr;
-        targetPath.clear();
         range = SourceRange();
         anchor = typeExpr;
         path = path.slice(1);
@@ -307,10 +239,6 @@ void constraints::simplifyLocator(Expr *&anchor,
     case ConstraintLocator::Member:
     case ConstraintLocator::MemberRefBase:
       if (auto UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
-        // No additional target locator information.
-        targetAnchor = nullptr;
-        targetPath.clear();
-        
         range = UDE->getNameLoc().getSourceRange();
         anchor = UDE->getBase();
         path = path.slice(1);
@@ -320,8 +248,6 @@ void constraints::simplifyLocator(Expr *&anchor,
 
     case ConstraintLocator::SubscriptMember:
       if (isa<SubscriptExpr>(anchor)) {
-        targetAnchor = nullptr;
-        targetPath.clear();
         path = path.slice(1);
         continue;
       }
@@ -330,8 +256,6 @@ void constraints::simplifyLocator(Expr *&anchor,
     case ConstraintLocator::ClosureResult:
       if (auto CE = dyn_cast<ClosureExpr>(anchor)) {
         if (CE->hasSingleExpressionBody()) {
-          targetAnchor = nullptr;
-          targetPath.clear();
           anchor = CE->getSingleExpressionBody();
           path = path.slice(1);
           continue;
