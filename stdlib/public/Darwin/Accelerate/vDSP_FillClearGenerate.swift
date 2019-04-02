@@ -11,6 +11,13 @@
 //===----------------------------------------------------------------------===//
 import Accelerate
 
+/// Types that support vectorized window generation.
+@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+public protocol vDSP_FloatingPointGeneratable: BinaryFloatingPoint {
+}
+extension Float: vDSP_FloatingPointGeneratable {}
+extension Double: vDSP_FloatingPointGeneratable {}
+
 extension vDSP {
     
     /// Fill vector with specified scalar value, single-precision.
@@ -93,30 +100,85 @@ extension vDSP {
             }
     }
     
-    public enum windowType {
+    /// Enum specifying window sequence.
+    public enum WindowSequence {
+        /// Creates a normalized Hanning window.
         case hanningNormalized
+        
+        /// Creates a denormalized Hanning window.
         case hanningDenormalized
+        
+        /// Creates a Hamming window.
         case hamming
+        
+        /// Creates a Blackman window.
         case blackman
+    }
+    
+    /// Creates an array containing the specified window.
+    ///
+    /// - Parameter ofType: Specifies single- or double-precision.
+    /// - Parameter sequence: Specifies the window sequence.
+    /// - Parameter count: The number of elements in the array.
+    /// - Parameter isHalfWindow: When true, creates a window with only the first `(N+1)/2` points.
+    /// - Returns: An array containing the specified window.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func window<T: vDSP_FloatingPointGeneratable>(ofType: T.Type,
+                                                                usingSequence sequence: WindowSequence,
+                                                                count: Int,
+                                                                isHalfWindow: Bool) -> [T] {
+        
+        precondition(count > 0)
+        
+        if T.self == Float.self {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: count) {
+                buffer, initializedCount in
+                
+                formWindow(usingSequence: sequence,
+                           result: &buffer,
+                           isHalfWindow: isHalfWindow)
+                
+                initializedCount = count
+            }
+            return result as! [T]
+            
+        } else if T.self == Double.self {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: count) {
+                buffer, initializedCount in
+                
+                formWindow(usingSequence: sequence,
+                           result: &buffer,
+                           isHalfWindow: isHalfWindow)
+                
+                initializedCount = count
+            }
+            return result as! [T]
+            
+        } else {
+            fatalError("This operation only supports `Float` and `Double` types.")
+        }
     }
     
     /// Fills a supplied array with the specified window, single-precision.
     ///
-    /// - Parameter type: Specifies the window type.
+    /// - Parameter sequence: Specifies the window sequence.
     /// - Parameter result: Output values.
     /// - Parameter isHalfWindow: When true, creates a window with only the first `(N+1)/2` points.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func generateWindow<V>(ofType type: windowType,
-                                         result: inout V,
-                                         isHalfWindow: Bool)
+    public static func formWindow<V>(usingSequence sequence: WindowSequence,
+                                     result: inout V,
+                                     isHalfWindow: Bool)
         where V: _MutableContiguousCollection,
         V.Element == Float {
             
             let n = vDSP_Length(result.count)
             
             result.withUnsafeMutableBufferPointer { v in
-                switch type {
+                switch sequence {
                 case .hanningNormalized:
                     vDSP_hann_window(v.baseAddress!,
                                      n,
@@ -141,21 +203,21 @@ extension vDSP {
     
     /// Fills a supplied array with the specified window, double-precision.
     ///
-    /// - Parameter type: Specifies the window type.
+    /// - Parameter sequence: Specifies the window sequence.
     /// - Parameter result: Output values.
     /// - Parameter isHalfWindow: When true, creates a window with only the first `(N+1)/2` points.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func generateWindow<V>(ofType type: windowType,
-                                         result: inout V,
-                                         isHalfWindow: Bool)
+    public static func formWindow<V>(usingSequence sequence: WindowSequence,
+                                     result: inout V,
+                                     isHalfWindow: Bool)
         where V: _MutableContiguousCollection,
         V.Element == Double {
             
             let n = vDSP_Length(result.count)
             
             result.withUnsafeMutableBufferPointer { v in
-                switch type {
+                switch sequence {
                 case .hanningNormalized:
                     vDSP_hann_windowD(v.baseAddress!,
                                       n,
@@ -180,6 +242,37 @@ extension vDSP {
     
     // MARK: Ramps
     
+    //===----------------------------------------------------------------------===//
+    //  withInitialValue and increment
+    //===----------------------------------------------------------------------===//
+    
+    /// Returns an array containing monotonically incrementing or decrementing values, single-precision.
+    ///
+    /// - Parameter initialValue: Specifies the initial value.
+    /// - Parameter increment: The increment (or decrement if negative) between consecutive elements.
+    /// - Parameter count: The number of elements in the array.
+    /// - Returns: An array containing the specified ramp.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func ramp(withInitialValue initialValue: Float,
+                            increment: Float,
+                            count: Int) -> [Float] {
+        
+        precondition(count > 0)
+        
+        let result = Array<Float>(unsafeUninitializedCapacity: count) {
+            buffer, initializedCount in
+            
+            formRamp(withInitialValue: initialValue,
+                     increment: increment,
+                     result: &buffer)
+            
+            initializedCount = count
+        }
+        
+        return result
+    }
+    
     /// Fills a supplied array with monotonically incrementing or decrementing values, single-precision.
     ///
     /// - Parameter initialValue: Specifies the initial value.
@@ -187,9 +280,9 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func generateRamp<V>(withInitialValue initialValue: Float,
-                                       increment: Float,
-                                       result: inout V)
+    public static func formRamp<V>(withInitialValue initialValue: Float,
+                                   increment: Float,
+                                   result: inout V)
         where V: _MutableContiguousCollection,
         V.Element == Float {
             
@@ -207,6 +300,33 @@ extension vDSP {
             }
     }
     
+    /// Returns an array containing monotonically incrementing or decrementing values, double-precision.
+    ///
+    /// - Parameter initialValue: Specifies the initial value.
+    /// - Parameter increment: The increment (or decrement if negative) between consecutive elements.
+    /// - Parameter count: The number of elements in the array.
+    /// - Returns: An array containing the specified ramp.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func ramp(withInitialValue initialValue: Double,
+                            increment: Double,
+                            count: Int) -> [Double] {
+        
+        precondition(count > 0)
+        
+        let result = Array<Double>(unsafeUninitializedCapacity: count) {
+            buffer, initializedCount in
+            
+            formRamp(withInitialValue: initialValue,
+                     increment: increment,
+                     result: &buffer)
+            
+            initializedCount = count
+        }
+        
+        return result
+    }
+    
     /// Fills a supplied array with monotonically incrementing or decrementing values, double-precision.
     ///
     /// - Parameter initialValue: Specifies the initial value.
@@ -214,9 +334,9 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func generateRamp<V>(withInitialValue initialValue: Double,
-                                       increment: Double,
-                                       result: inout V)
+    public static func formRamp<V>(withInitialValue initialValue: Double,
+                                   increment: Double,
+                                   result: inout V)
         where V: _MutableContiguousCollection,
         V.Element == Double {
             
@@ -234,14 +354,42 @@ extension vDSP {
             }
     }
     
+    //===----------------------------------------------------------------------===//
+    //  range
+    //===----------------------------------------------------------------------===//
+    
+    /// Returns an array containing monotonically incrementing or decrementing values within a specified range, single-precision.
+    ///
+    /// - Parameter range: Specifies range of the ramp..
+    /// - Parameter count: The number of elements in the array.
+    /// - Returns: An array containing the specified ramp.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func ramp(in range: ClosedRange<Float>,
+                            count: Int) -> [Float] {
+        
+        precondition(count > 0)
+        
+        let result = Array<Float>(unsafeUninitializedCapacity: count) {
+            buffer, initializedCount in
+            
+            formRamp(in: range,
+                     result: &buffer)
+            
+            initializedCount = count
+        }
+        
+        return result
+    }
+    
     /// Fills a supplied array with monotonically incrementing or decrementing values within a specified range, single-precision.
     ///
     /// - Parameter range: Specifies range of the ramp.
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func generateRamp<V>(in range: ClosedRange<Float>,
-                                       result: inout V)
+    public static func formRamp<V>(in range: ClosedRange<Float>,
+                                   result: inout V)
         where V: _MutableContiguousCollection,
         V.Element == Float {
             
@@ -259,14 +407,38 @@ extension vDSP {
             }
     }
     
+    /// Returns an array containing monotonically incrementing or decrementing values within a specified range, double-precision.
+    ///
+    /// - Parameter range: Specifies range of the ramp..
+    /// - Parameter count: The number of elements in the array.
+    /// - Returns: An array containing the specified ramp.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func ramp(in range: ClosedRange<Double>,
+                            count: Int) -> [Double] {
+        
+        precondition(count > 0)
+        
+        let result = Array<Double>(unsafeUninitializedCapacity: count) {
+            buffer, initializedCount in
+            
+            formRamp(in: range,
+                     result: &buffer)
+            
+            initializedCount = count
+        }
+        
+        return result
+    }
+    
     /// Fills a supplied array with monotonically incrementing or decrementing values within a specified range, double-precision.
     ///
     /// - Parameter range: Specifies range of the ramp.
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func generateRamp<V>(in range: ClosedRange<Double>,
-                                       result: inout V)
+    public static func formRamp<V>(in range: ClosedRange<Double>,
+                                   result: inout V)
         where V: _MutableContiguousCollection,
         V.Element == Double {
             
@@ -284,6 +456,40 @@ extension vDSP {
             }
     }
     
+    //===----------------------------------------------------------------------===//
+    //  initialValue, multiplyingBy, and increment
+    //===----------------------------------------------------------------------===//
+    
+    /// Returns an array containing monotonically incrementing or decrementing values, multiplying by a source vector, single-precision.
+    ///
+    /// - Parameter initialValue: Specifies the initial value. Modified on return to hold the next value (including accumulated errors) so that the ramp function can be continued smoothly.
+    /// - Parameter multiplyingBy: Input values multiplied by the ramp function.
+    /// - Parameter increment: The increment (or decrement if negative) between consecutive elements
+    /// - Parameter count: The number of elements in the array.
+    /// - Returns: An array containing the specified ramp.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func ramp<U>(withInitialValue initialValue: inout Float,
+                               multiplyingBy vector: U,
+                               increment: Float) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                formRamp(withInitialValue: &initialValue,
+                         multiplyingBy: vector,
+                         increment: increment,
+                         result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Fills a supplied array with monotonically incrementing or decrementing values, multiplying by a source vector, single-precision.
     ///
     /// - Parameter initialValue: Specifies the initial value. Modified on return to hold the next value (including accumulated errors) so that the ramp function can be continued smoothly.
@@ -292,10 +498,10 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func generateRamp<U,V>(withInitialValue initialValue: inout Float,
-                                         multiplyingBy vector: U,
-                                         increment: Float,
-                                         result: inout V)
+    public static func formRamp<U,V>(withInitialValue initialValue: inout Float,
+                                     multiplyingBy vector: U,
+                                     increment: Float,
+                                     result: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -317,6 +523,36 @@ extension vDSP {
             }
     }
     
+    /// Returns an array containing monotonically incrementing or decrementing values, multiplying by a source vector, double-precision.
+    ///
+    /// - Parameter initialValue: Specifies the initial value. Modified on return to hold the next value (including accumulated errors) so that the ramp function can be continued smoothly.
+    /// - Parameter multiplyingBy: Input values multiplied by the ramp function.
+    /// - Parameter increment: The increment (or decrement if negative) between consecutive elements
+    /// - Parameter count: The number of elements in the array.
+    /// - Returns: An array containing the specified ramp.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func ramp<U>(withInitialValue initialValue: inout Double,
+                               multiplyingBy vector: U,
+                               increment: Double) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                buffer, initializedCount in
+                
+                formRamp(withInitialValue: &initialValue,
+                         multiplyingBy: vector,
+                         increment: increment,
+                         result: &buffer)
+                
+                initializedCount = vector.count
+            }
+            
+            return result
+    }
+    
     /// Fills a supplied array with monotonically incrementing or decrementing values, multiplying by a source vector, double-precision.
     ///
     /// - Parameter initialValue: Specifies the initial value. Modified on return to hold the next value (including accumulated errors) so that the ramp function can be continued smoothly.
@@ -325,10 +561,10 @@ extension vDSP {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func generateRamp<U,V>(withInitialValue initialValue: inout Double,
-                                         multiplyingBy vector: U,
-                                         increment: Double,
-                                         result: inout V)
+    public static func formRamp<U,V>(withInitialValue initialValue: inout Double,
+                                     multiplyingBy vector: U,
+                                     increment: Double,
+                                     result: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -350,6 +586,51 @@ extension vDSP {
             }
     }
     
+    //===----------------------------------------------------------------------===//
+    //  stereo
+    //===----------------------------------------------------------------------===//
+    
+    /// Returns two arraya containing monotonically monotonically incrementing or decrementing values, multiplying by a source vector, stereo, single-precision.
+    ///
+    /// - Parameter initialValue: Specifies the initial value. Modified on return to hold the next value (including accumulated errors) so that the ramp function can be continued smoothly.
+    /// - Parameter multiplierOne: Input values multiplied by the ramp function.
+    /// - Parameter multiplierTwo: Input values multiplied by the ramp function.
+    /// - Parameter increment: The increment (or decrement if negative) between consecutive elements.
+    /// - Returns: A tuple of two arrays containing the specified ramps.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func stereoRamp<U>(withInitialValue initialValue: inout Float,
+                                     multiplyingBy multiplierOne: U, _ multiplierTwo: U,
+                                     increment: Float) -> (firstOutput:[Float], secondOutput: [Float])
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            
+            let n = multiplierOne.count
+            
+            var firstOutput: Array<Float>!
+            
+            let secondOutput = Array<Float>(unsafeUninitializedCapacity: n) {
+                secondBuffer, secondInitializedCount in
+                
+                firstOutput = Array<Float>(unsafeUninitializedCapacity: n) {
+                    firstBuffer, firstInitializedCount in
+                    
+                    formStereoRamp(withInitialValue: &initialValue,
+                                   multiplyingBy: multiplierOne, multiplierTwo,
+                                   increment: increment,
+                                   results: &firstBuffer, &secondBuffer)
+                    
+                    firstInitializedCount = n
+                }
+                
+                secondInitializedCount = n
+            }
+            
+            return (firstOutput: firstOutput,
+                    secondOutput: secondOutput)
+    }
+    
     /// Fills a supplied array with monotonically incrementing or decrementing values, multiplying by a source vector, stereo, single-precision.
     ///
     /// - Parameter initialValue: Specifies the initial value. Modified on return to hold the next value (including accumulated errors) so that the ramp function can be continued smoothly.
@@ -360,10 +641,10 @@ extension vDSP {
     /// - Parameter resultTwo: Output values.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func generateStereoRamp<U,V>(withInitialValue initialValue: inout Float,
-                                               multiplyingBy multiplierOne: U, _ multiplierTwo: U,
-                                               increment: Float,
-                                               results resultOne: inout V, _ resultTwo: inout V)
+    public static func formStereoRamp<U,V>(withInitialValue initialValue: inout Float,
+                                           multiplyingBy multiplierOne: U, _ multiplierTwo: U,
+                                           increment: Float,
+                                           results resultOne: inout V, _ resultTwo: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -393,6 +674,47 @@ extension vDSP {
             }
     }
     
+    /// Returns two arraya containing monotonically monotonically incrementing or decrementing values, multiplying by a source vector, stereo, double-precision.
+    ///
+    /// - Parameter initialValue: Specifies the initial value. Modified on return to hold the next value (including accumulated errors) so that the ramp function can be continued smoothly.
+    /// - Parameter multiplierOne: Input values multiplied by the ramp function.
+    /// - Parameter multiplierTwo: Input values multiplied by the ramp function.
+    /// - Parameter increment: The increment (or decrement if negative) between consecutive elements.
+    /// - Returns: A tuple of two arrays containing the specified ramps.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func stereoRamp<U>(withInitialValue initialValue: inout Double,
+                                     multiplyingBy multiplierOne: U, _ multiplierTwo: U,
+                                     increment: Double) -> (firstOutput:[Double], secondOutput: [Double])
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            
+            let n = multiplierOne.count
+            
+            var firstOutput: Array<Double>!
+            
+            let secondOutput = Array<Double>(unsafeUninitializedCapacity: n) {
+                secondBuffer, secondInitializedCount in
+                
+                firstOutput = Array<Double>(unsafeUninitializedCapacity: n) {
+                    firstBuffer, firstInitializedCount in
+                    
+                    formStereoRamp(withInitialValue: &initialValue,
+                                   multiplyingBy: multiplierOne, multiplierTwo,
+                                   increment: increment,
+                                   results: &firstBuffer, &secondBuffer)
+                    
+                    firstInitializedCount = n
+                }
+                
+                secondInitializedCount = n
+            }
+            
+            return (firstOutput: firstOutput,
+                    secondOutput: secondOutput)
+    }
+    
     /// Fills a supplied array with monotonically incrementing or decrementing values, multiplying by a source vector, stereo, double-precision.
     ///
     /// - Parameter initialValue: Specifies the initial value. Modified on return to hold the next value (including accumulated errors) so that the ramp function can be continued smoothly.
@@ -403,10 +725,10 @@ extension vDSP {
     /// - Parameter resultTwo: Output values.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func generateStereoRamp<U,V>(withInitialValue initialValue: inout Double,
-                                               multiplyingBy multiplierOne: U, _ multiplierTwo: U,
-                                               increment: Double,
-                                               results resultOne: inout V, _ resultTwo: inout V)
+    public static func formStereoRamp<U,V>(withInitialValue initialValue: inout Double,
+                                           multiplyingBy multiplierOne: U, _ multiplierTwo: U,
+                                           increment: Double,
+                                           results resultOne: inout V, _ resultTwo: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
