@@ -365,9 +365,16 @@ void AccessControlCheckerBase::checkGenericParamAccess(
   if (minAccessScope.isPublic())
     return;
 
+  // FIXME: Promote this to an error in the next -swift-version break.
+  if (isa<SubscriptDecl>(owner))
+    downgradeToWarning = DowngradeToWarning::Yes;
+
   if (checkUsableFromInline) {
-    auto diagID = diag::generic_param_usable_from_inline;
     if (!TC.Context.isSwiftVersionAtLeast(5))
+      downgradeToWarning = DowngradeToWarning::Yes;
+
+    auto diagID = diag::generic_param_usable_from_inline;
+    if (downgradeToWarning == DowngradeToWarning::Yes)
       diagID = diag::generic_param_usable_from_inline_warn;
     auto diag = TC.diagnose(owner,
                             diagID,
@@ -802,6 +809,8 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
+    checkGenericParamAccess(SD->getGenericParams(), SD);
+
     auto minAccessScope = AccessScope::getPublic();
     const TypeRepr *complainRepr = nullptr;
     auto downgradeToWarning = DowngradeToWarning::No;
@@ -1294,6 +1303,8 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
+    checkGenericParamAccess(SD->getGenericParams(), SD);
+
     for (auto &P : *SD->getIndices()) {
       checkTypeAccess(P->getTypeLoc(), SD, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
