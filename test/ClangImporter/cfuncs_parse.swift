@@ -9,7 +9,12 @@ func test_cfunc1(_ i: Int) {
 }
 
 func test_cfunc2(_ i: Int) {
+#if os(Windows) && (arch(arm64) || arch(x86_64))
+  // LLP64 targets will import `long` as `Int32`
+  let f = cfunc2(Int32(i), 17)
+#else
   let f = cfunc2(i, 17)
+#endif
   _ = f as Float
   cfunc2(b:17, a:i) // expected-error{{extraneous argument labels 'b:a:' in call}}
   cfunc2(17, i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'Int32'}}
@@ -58,9 +63,13 @@ func test_pow() {
   pow(1.5, 2.5)
 }
 
+#if !((os(Android) || os(Linux)) && arch(arm64))
+// long doubles in AAPCS64 are 128 bits, which is not supported by
+// Swift, so don't test this. SR-9072.
 func test_powl() {
   powl(1.5, 2.5)
 }
+#endif
 
 func test_puts(_ s: String) {
   _ = s.withCString { puts($0) + 32 };

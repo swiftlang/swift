@@ -1718,7 +1718,9 @@ namespace {
       for (unsigned i = 0, n = expr->getNumElements(); i != n; ++i) {
         auto *elt = expr->getElement(i);
         auto ty = CS.getType(elt);
-        auto flags = ParameterTypeFlags().withInOut(elt->isSemanticallyInOutExpr());
+        auto flags = ParameterTypeFlags()
+            .withInOut(elt->isSemanticallyInOutExpr())
+            .withVariadic(isa<VarargExpansionExpr>(elt));
         elements.push_back(TupleTypeElt(ty->getInOutObjectType(),
                                         expr->getElementName(i), flags));
       }
@@ -2438,12 +2440,7 @@ namespace {
       CS.addConstraint(ConstraintKind::Conversion,
                        CS.getType(expr->getSubExpr()), array,
                        CS.getConstraintLocator(expr));
-
-      // The apparent type of the expression is the element type, as far as
-      // the type-checker is concerned.  When this becomes a real feature,
-      // we should syntactically restrict these expressions to only appear
-      // in specific positions.
-      return element;
+      return array;
     }
 
     Type visitDynamicTypeExpr(DynamicTypeExpr *expr) {
@@ -2455,7 +2452,15 @@ namespace {
     }
 
     Type visitOpaqueValueExpr(OpaqueValueExpr *expr) {
-      return expr->getType();
+      llvm_unreachable("Already type checked");
+    }
+
+    Type visitDefaultArgumentExpr(DefaultArgumentExpr *expr) {
+      llvm_unreachable("Already type checked");
+    }
+
+    Type visitCallerDefaultArgumentExpr(CallerDefaultArgumentExpr *expr) {
+      llvm_unreachable("Already type checked");
     }
 
     Type visitApplyExpr(ApplyExpr *expr) {
@@ -3178,6 +3183,9 @@ namespace {
   /// This is necessary because Sema fills in too much type information before
   /// the type-checker runs, causing redundant work, and for expression that
   /// have already been typechecked and may contain unhandled AST nodes.
+  ///
+  /// FIXME: Remove this one we no longer re-type check expressions during
+  /// diagnostics and code completion.
   class SanitizeExpr : public ASTWalker {
     ConstraintSystem &CS;
     TypeChecker &TC;
@@ -3259,9 +3267,68 @@ namespace {
           EPE->setSemanticExpr(nullptr);
         }
 
+        // Strip default arguments and varargs from type-checked call
+        // argument lists.
+        if (isa<ParenExpr>(expr) || isa<TupleExpr>(expr)) {
+          if (shouldSanitizeArgumentList(expr))
+            expr = sanitizeArgumentList(expr);
+        }
+
         // Now, we're ready to walk into sub expressions.
         return {true, expr};
       }
+    }
+
+    bool isSyntheticArgumentExpr(const Expr *expr) {
+      if (isa<DefaultArgumentExpr>(expr) ||
+          isa<CallerDefaultArgumentExpr>(expr))
+        return true;
+
+      if (auto *varargExpr = dyn_cast<VarargExpansionExpr>(expr))
+        if (isa<ArrayExpr>(varargExpr->getSubExpr()))
+          return true;
+
+      return false;
+    }
+
+    bool shouldSanitizeArgumentList(const Expr *expr) {
+      if (auto *parenExpr = dyn_cast<ParenExpr>(expr)) {
+        return isSyntheticArgumentExpr(parenExpr->getSubExpr());
+      } else if (auto *tupleExpr = dyn_cast<TupleExpr>(expr)) {
+        for (auto *arg : tupleExpr->getElements()) {
+          if (isSyntheticArgumentExpr(arg))
+            return true;
+        }
+
+        return false;
+      } else {
+        return isSyntheticArgumentExpr(expr);
+      }
+    }
+
+    Expr *sanitizeArgumentList(Expr *original) {
+      auto argList = getOriginalArgumentList(original);
+
+      if (argList.args.size() == 1 &&
+          argList.labels[0].empty() &&
+          !isa<VarargExpansionExpr>(argList.args[0])) {
+        auto *result =
+          new (TC.Context) ParenExpr(argList.lParenLoc,
+                                     argList.args[0],
+                                     argList.rParenLoc,
+                                     argList.hasTrailingClosure);
+        result->setImplicit();
+        return result;
+      }
+
+      return TupleExpr::create(TC.Context,
+                               argList.lParenLoc,
+                               argList.args,
+                               argList.labels,
+                               argList.labelLocs,
+                               argList.rParenLoc,
+                               argList.hasTrailingClosure,
+                               /*implicit=*/true);
     }
 
     Expr *walkToExprPost(Expr *expr) override {
@@ -3776,4 +3843,59 @@ swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
     Result.Impl.AllDecls.push_back(VD);
   }
   return Result;
+}
+
+OriginalArgumentList
+swift::getOriginalArgumentList(Expr *expr) {
+  OriginalArgumentList result;
+
+  auto add = [&](Expr *arg, Identifier label, SourceLoc labelLoc) {
+    if (isa<DefaultArgumentExpr>(arg) ||
+        isa<CallerDefaultArgumentExpr>(arg)) {
+      return;
+    }
+
+    if (auto *varargExpr = dyn_cast<VarargExpansionExpr>(arg)) {
+      if (auto *arrayExpr = dyn_cast<ArrayExpr>(varargExpr->getSubExpr())) {
+        for (auto *elt : arrayExpr->getElements()) {
+          result.args.push_back(elt);
+          result.labels.push_back(label);
+          result.labelLocs.push_back(labelLoc);
+
+          label = Identifier();
+          labelLoc = SourceLoc();
+        }
+
+        return;
+      }
+    }
+
+    result.args.push_back(arg);
+    result.labels.push_back(label);
+    result.labelLocs.push_back(labelLoc);
+  };
+
+  if (auto *parenExpr = dyn_cast<ParenExpr>(expr)) {
+    result.lParenLoc = parenExpr->getLParenLoc();
+    result.rParenLoc = parenExpr->getRParenLoc();
+    result.hasTrailingClosure = parenExpr->hasTrailingClosure();
+    add(parenExpr->getSubExpr(), Identifier(), SourceLoc());
+  } else if (auto *tupleExpr = dyn_cast<TupleExpr>(expr)) {
+    result.lParenLoc = tupleExpr->getLParenLoc();
+    result.rParenLoc = tupleExpr->getRParenLoc();
+    result.hasTrailingClosure = tupleExpr->hasTrailingClosure();
+
+    auto args = tupleExpr->getElements();
+    auto labels = tupleExpr->getElementNames();
+    auto labelLocs = tupleExpr->getElementNameLocs();
+    for (unsigned i = 0, e = args.size(); i != e; ++i) {
+      // Implicit TupleExprs don't always store label locations.
+      add(args[i], labels[i],
+          labelLocs.empty() ? SourceLoc() : labelLocs[i]);
+    }
+  } else {
+    add(expr, Identifier(), SourceLoc());
+  }
+
+  return result;
 }

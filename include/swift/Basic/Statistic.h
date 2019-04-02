@@ -140,6 +140,7 @@ public:
 private:
   bool currentProcessExitStatusSet;
   int currentProcessExitStatus;
+  long maxChildRSS = 0;
   SmallString<128> StatsFilename;
   SmallString<128> TraceFilename;
   SmallString<128> ProfileDirname;
@@ -192,6 +193,8 @@ public:
   void flushTracesAndProfiles();
   void noteCurrentProcessExitStatus(int);
   void saveAnyFrontendStatsEvents(FrontendStatsTracer const &T, bool IsEntry);
+  void recordJobMaxRSS(long rss);
+  int64_t getChildrenMaxResidentSetSize();
 };
 
 // This is a non-nested type just to make it less work to write at call sites.
