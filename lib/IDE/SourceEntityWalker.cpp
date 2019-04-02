@@ -265,6 +265,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       !isa<MakeTemporarilyEscapableExpr>(E) &&
       !isa<CollectionUpcastConversionExpr>(E) &&
       !isa<OpaqueValueExpr>(E) &&
+      !isa<KeyPathExpr>(E) &&
       E->isImplicit())
     return { true, E };
 
