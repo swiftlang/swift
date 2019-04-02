@@ -113,11 +113,11 @@ public:
   ///
   /// \param D the referenced decl.
   /// \param Range the source range of the source reference.
-  /// \param AccKind whether this is a read, write or read/write access.
+  /// \param Data whether this is a read, write or read/write access, etc.
   /// \param IsOpenBracket this is \c true when the method is called on an
   /// open bracket.
   virtual bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
-                                       Optional<AccessKind> AccKind,
+                                       ReferenceMetaData Data,
                                        bool IsOpenBracket);
 
   /// This method is called for each keyword argument in a call expression.
