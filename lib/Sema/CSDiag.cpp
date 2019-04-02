@@ -161,6 +161,16 @@ void constraints::simplifyLocator(Expr *&anchor,
         continue;
       }
 
+      if (auto subscriptExpr = dyn_cast<SubscriptExpr>(anchor)) {
+        // The target anchor is the subscript.
+        targetAnchor = subscriptExpr;
+        targetPath.clear();
+
+        anchor = subscriptExpr->getIndex();
+        path = path.slice(1);
+        continue;
+      }
+
       if (auto objectLiteralExpr = dyn_cast<ObjectLiteralExpr>(anchor)) {
         targetAnchor = nullptr;
         targetPath.clear();
@@ -192,6 +202,17 @@ void constraints::simplifyLocator(Expr *&anchor,
         targetPath.clear();
 
         anchor = applyExpr->getFn();
+        path = path.slice(1);
+        continue;
+      }
+
+      // The subscript itself is the function.
+      if (auto subscriptExpr = dyn_cast<SubscriptExpr>(anchor)) {
+        // No additional target locator information.
+        targetAnchor = nullptr;
+        targetPath.clear();
+
+        anchor = subscriptExpr;
         path = path.slice(1);
         continue;
       }

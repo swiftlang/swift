@@ -5290,8 +5290,7 @@ Expr *ExprRewriter::coerceCallArguments(
     findCalleeDeclRef(cs, solution, cs.getConstraintLocator(locator));
 
   // Determine whether this application has curried self.
-  bool skipCurriedSelf = apply ? hasCurriedSelf(cs, callee, apply) : false;
-
+  bool skipCurriedSelf = apply ? hasCurriedSelf(cs, callee, apply) : true;
   // Determine the parameter bindings.
   SmallBitVector defaultMap
     = computeDefaultMap(params, callee.getDecl(), skipCurriedSelf);

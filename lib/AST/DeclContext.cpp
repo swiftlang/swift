@@ -318,8 +318,10 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
       const ValueDecl *VD;
       if (auto *FD = dyn_cast<AbstractFunctionDecl>(dc)) {
         VD = FD;
+      } else if (auto *EED = dyn_cast<EnumElementDecl>(dc)) {
+        VD = EED;
       } else {
-        VD = cast<EnumElementDecl>(dc);
+        VD = cast<SubscriptDecl>(dc);
       }
 
       auto access =

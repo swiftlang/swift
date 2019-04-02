@@ -2,13 +2,13 @@
 // RUN: %target-typecheck-verify-swift -swift-version 4 -enable-testing
 
 private func privateFunction() {}
-// expected-note@-1 2{{global function 'privateFunction()' is not public}}
+// expected-note@-1 4{{global function 'privateFunction()' is not public}}
 fileprivate func fileprivateFunction() {}
-// expected-note@-1 2{{global function 'fileprivateFunction()' is not public}}
+// expected-note@-1 4{{global function 'fileprivateFunction()' is not public}}
 func internalFunction() {}
-// expected-note@-1 2{{global function 'internalFunction()' is not public}}
+// expected-note@-1 4{{global function 'internalFunction()' is not public}}
 @usableFromInline func versionedFunction() {}
-// expected-note@-1 5{{global function 'versionedFunction()' is not public}}
+// expected-note@-1 7{{global function 'versionedFunction()' is not public}}
 public func publicFunction() {}
 
 func internalIntFunction() -> Int {}
@@ -111,3 +111,37 @@ public func evilCode(
     }
     return 0
   }()) {}
+
+private func privateIntFunction() -> Int {} // expected-note {{global function 'privateIntFunction()' is not public}}
+
+public struct HasSubscript {
+  public subscript(x: Int = {
+    struct Nested {}
+    // expected-error@-1 {{type 'Nested' cannot be nested inside a default argument value}}
+
+    publicFunction()
+
+    versionedFunction()
+    // expected-error@-1 2{{global function 'versionedFunction()' is internal and cannot be referenced from a default argument value}}
+
+    internalFunction()
+    // expected-error@-1 2{{global function 'internalFunction()' is internal and cannot be referenced from a default argument value}}
+
+    fileprivateFunction()
+    // expected-error@-1 2{{global function 'fileprivateFunction()' is fileprivate and cannot be referenced from a default argument value}}
+
+    privateFunction()
+    // expected-error@-1 2{{global function 'privateFunction()' is private and cannot be referenced from a default argument value}}
+
+    return 0
+  }()) -> Int {
+    get {}
+    set {}
+  }
+
+  public subscript(y y: Int = privateIntFunction()) -> Int {
+    // expected-error@-1 {{global function 'privateIntFunction()' is private and cannot be referenced from a default argument value}}
+    get {}
+    set {}
+  }
+}

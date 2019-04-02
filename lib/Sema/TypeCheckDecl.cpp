@@ -2416,6 +2416,8 @@ public:
     if (SD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
       TC.checkDynamicReplacementAttribute(SD);
     }
+
+    TC.checkDefaultArguments(SD->getIndices(), SD);
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
