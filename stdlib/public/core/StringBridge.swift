@@ -125,11 +125,6 @@ private var kCFStringEncodingUTF8 : _swift_shims_CFStringEncoding {
   @inline(__always) get { return 0x8000100 }
 }
 
-@_effects(readonly)
-private func _unsafeAddressOfCocoaStringClass(_ str: _CocoaString) -> UInt {
-  return _swift_stdlib_unsafeAddressOfClass(str)
-}
-
 internal enum _KnownCocoaString {
   case storage
   case shared
@@ -148,7 +143,7 @@ internal enum _KnownCocoaString {
     }
 #endif
     
-    switch _unsafeAddressOfCocoaStringClass(str) {
+    switch unsafeBitCast(_swift_classOfObjCHeapObject(str), to: UInt.self) {
     case unsafeBitCast(__StringStorage.self, to: UInt.self):
       self = .storage
     case unsafeBitCast(__SharedStringStorage.self, to: UInt.self):
