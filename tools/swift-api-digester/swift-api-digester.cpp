@@ -198,6 +198,22 @@ bool contains(ArrayRef<T> container, T instance) {
   return std::find(container.begin(), container.end(), instance) != container.end();
 }
 
+static
+void singleMatch(SDKNode* Left, SDKNode *Right, MatchedNodeListener &Listener) {
+
+  // Both null, be forgiving.
+  if (!Left && !Right)
+    return;
+  // If both are valid and identical to each other, we don't need to match them.
+  if (Left && Right && *Left == *Right)
+    return;
+  if (!Left || !Right)
+    Listener.foundMatch(Left, Right,
+                        Left ? NodeMatchReason::Removed : NodeMatchReason::Added);
+  else
+    Listener.foundMatch(Left, Right, NodeMatchReason::Sequential);
+}
+
 // Given two NodeVector, this matches SDKNode by the order of their appearance
 // in the respective NodeVector. We use this in the order-sensitive cases, such
 // as parameters in a function decl.
@@ -215,16 +231,11 @@ public:
     for (unsigned long i = 0; i < std::max(Left.size(), Right.size()); i ++) {
       auto L = i < Left.size() ? Left[i] : nullptr;
       auto R = i < Right.size() ? Right[i] : nullptr;
-      if (L && R && *L == *R)
-        continue;
-      if (!L || !R)
-        Listener.foundMatch(L, R,
-          L ? NodeMatchReason::Removed : NodeMatchReason::Added);
-      else
-        Listener.foundMatch(L, R, NodeMatchReason::Sequential);
+      singleMatch(L, R, Listener);
     }
   }
 };
+
 struct NodeMatch {
   NodePtr Left;
   NodePtr Right;
@@ -713,6 +724,11 @@ void swift::ide::api::SDKNodeDeclAbstractFunc::diagnose(SDKNode *Right) {
   if (!isThrowing() && R->isThrowing()) {
     emitDiag(diag::decl_new_attr, Ctx.buffer("throwing"));
   }
+  if (Ctx.checkingABI()) {
+    if (reqNewWitnessTableEntry() != R->reqNewWitnessTableEntry()) {
+      emitDiag(diag::decl_new_witness_table_entry, reqNewWitnessTableEntry());
+    }
+  }
 }
 
 void swift::ide::api::SDKNodeDeclFunction::diagnose(SDKNode *Right) {
@@ -1069,12 +1085,15 @@ public:
       SNMatcher.match();
       break;
     }
-
     case SDKNodeKind::DeclVar: {
-      auto &LC = *Left->getAs<SDKNodeDeclVar>()->getType();
-      auto &RC = *Right->getAs<SDKNodeDeclVar>()->getType();
-      if (LC != RC)
-        foundMatch(&LC, &RC, NodeMatchReason::Sequential);
+      auto *LVar = dyn_cast<SDKNodeDeclVar>(Left);
+      auto *RVar = dyn_cast<SDKNodeDeclVar>(Right);
+      // Match property type.
+      singleMatch(LVar->getType(), RVar->getType(), *this);
+      // Match property getter function.
+      singleMatch(LVar->getGetter(), RVar->getGetter(), *this);
+      // Match property setter function.
+      singleMatch(LVar->getSetter(), RVar->getSetter(), *this);
       break;
     }
     }
