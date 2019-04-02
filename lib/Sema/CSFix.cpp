@@ -399,7 +399,9 @@ AllowInaccessibleMember::create(ConstraintSystem &cs, ValueDecl *member,
 
 bool TreatKeyPathSubscriptIndexAsHashable::diagnose(Expr *root,
                                                     bool asNote) const {
-  return false;
+  KeyPathSubscriptIndexHashableFailure failure(root, getConstraintSystem(),
+                                               NonConformingType, getLocator());
+  return failure.diagnose(asNote);
 }
 
 TreatKeyPathSubscriptIndexAsHashable *

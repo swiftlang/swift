@@ -2398,3 +2398,15 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
   emitDiagnostic(Member, diag::decl_declared_here, Member->getFullName());
   return true;
 }
+
+bool KeyPathSubscriptIndexHashableFailure::diagnoseAsError() {
+  auto *anchor = cast<KeyPathExpr>(getRawAnchor());
+  auto path = getLocator()->getPath();
+  const auto &componentIndex = path.back().getValue();
+
+  auto *indexExpr = anchor->getComponents()[componentIndex].getIndexExpr();
+  emitDiagnostic(indexExpr->getLoc(),
+                 diag::expr_keypath_subscript_index_not_hashable,
+                 resolveType(NonConformingType));
+  return true;
+}
