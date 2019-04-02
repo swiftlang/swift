@@ -901,7 +901,7 @@ extension ShapedArraySlice : RandomAccessCollection, MutableCollection {
                    "ShapeArraySlice index is out of range (before startIndex)")
       return ShapedArraySlice(base: base,
                               baseIndices: baseIndices + [index],
-                              bounds: bounds)
+                              bounds: nil)
     }
     set {
       precondition(!isScalar,
