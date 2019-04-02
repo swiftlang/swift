@@ -313,11 +313,23 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
     // Default argument initializer contexts have their resilience expansion
     // set when they're type checked.
     if (isa<DefaultArgumentInitializer>(dc)) {
-      if (auto *EED = dyn_cast<EnumElementDecl>(dc->getParent())) {
-        return EED->getDefaultArgumentResilienceExpansion();
+      dc = dc->getParent();
+
+      const ValueDecl *VD;
+      if (auto *FD = dyn_cast<AbstractFunctionDecl>(dc)) {
+        VD = FD;
+      } else {
+        VD = cast<EnumElementDecl>(dc);
       }
-      return cast<AbstractFunctionDecl>(dc->getParent())
-          ->getDefaultArgumentResilienceExpansion();
+
+      auto access =
+        VD->getFormalAccessScope(/*useDC=*/nullptr,
+                                 /*treatUsableFromInlineAsPublic=*/true);
+
+      if (access.isPublic())
+        return ResilienceExpansion::Minimal;
+
+      return ResilienceExpansion::Maximal;
     }
 
     // Stored property initializer contexts use minimal resilience expansion

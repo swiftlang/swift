@@ -476,19 +476,13 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   // Default argument generators are serialized if the containing
   // declaration is public.
   if (isDefaultArgGenerator()) {
-    ResilienceExpansion expansion;
-    if (auto *EED = dyn_cast<EnumElementDecl>(d)) {
-      expansion = EED->getDefaultArgumentResilienceExpansion();
-    } else {
-      expansion = cast<AbstractFunctionDecl>(d)
-                    ->getDefaultArgumentResilienceExpansion();
-    }
-    switch (expansion) {
-    case ResilienceExpansion::Minimal:
+    auto scope =
+      d->getFormalAccessScope(/*useDC=*/nullptr,
+                              /*treatUsableFromInlineAsPublic=*/true);
+
+    if (scope.isPublic())
       return IsSerialized;
-    case ResilienceExpansion::Maximal:
-      return IsNotSerialized;
-    }
+    return IsNotSerialized;
   }
 
   // Stored property initializers are inlinable if the type is explicitly

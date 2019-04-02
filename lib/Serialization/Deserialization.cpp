@@ -2064,17 +2064,6 @@ getActualSelfAccessKind(uint8_t raw) {
   return None;
 }
 
-static
-Optional<swift::ResilienceExpansion> getActualResilienceExpansion(uint8_t raw) {
-  switch (serialization::ResilienceExpansion(raw)) {
-  case serialization::ResilienceExpansion::Minimal:
-    return swift::ResilienceExpansion::Minimal;
-  case serialization::ResilienceExpansion::Maximal:
-    return swift::ResilienceExpansion::Maximal;
-  }
-  return None;
-}
-
 /// Translate from the serialization VarDeclSpecifier enumerators, which are
 /// guaranteed to be stable, to the AST ones.
 static Optional<swift::VarDecl::Specifier>
@@ -2512,7 +2501,6 @@ public:
     uint8_t storedInitKind, rawAccessLevel;
     DeclID overriddenID;
     bool needsNewVTableEntry, firstTimeRequired;
-    uint8_t rawDefaultArgumentResilienceExpansion;
     unsigned numArgNames;
     ArrayRef<uint64_t> argNameAndDependencyIDs;
 
@@ -2524,7 +2512,6 @@ public:
                                                overriddenID,
                                                rawAccessLevel,
                                                needsNewVTableEntry,
-                                               rawDefaultArgumentResilienceExpansion,
                                                firstTimeRequired,
                                                numArgNames,
                                                argNameAndDependencyIDs);
@@ -2615,15 +2602,6 @@ public:
           !overridden->isRequired()) {
         AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
       }
-    }
-
-    if (auto defaultArgumentResilienceExpansion = getActualResilienceExpansion(
-            rawDefaultArgumentResilienceExpansion)) {
-      ctor->setDefaultArgumentResilienceExpansion(
-          *defaultArgumentResilienceExpansion);
-    } else {
-      MF.error();
-      return nullptr;
     }
 
     ctor->computeType();
@@ -2831,7 +2809,6 @@ public:
     DeclID overriddenID;
     DeclID accessorStorageDeclID;
     bool needsNewVTableEntry;
-    uint8_t rawDefaultArgumentResilienceExpansion;
     ArrayRef<uint64_t> nameAndDependencyIDs;
 
     if (!isAccessor) {
@@ -2845,7 +2822,6 @@ public:
                                           numNameComponentsBiased,
                                           rawAccessLevel,
                                           needsNewVTableEntry,
-                                          rawDefaultArgumentResilienceExpansion,
                                           nameAndDependencyIDs);
     } else {
       decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
@@ -2859,7 +2835,6 @@ public:
                                           rawAccessorKind,
                                           rawAccessLevel,
                                           needsNewVTableEntry,
-                                          rawDefaultArgumentResilienceExpansion,
                                           nameAndDependencyIDs);
     }
 
@@ -3021,15 +2996,6 @@ public:
     fn->setForcedStaticDispatch(hasForcedStaticDispatch);
     fn->setNeedsNewVTableEntry(needsNewVTableEntry);
 
-    if (auto defaultArgumentResilienceExpansion = getActualResilienceExpansion(
-            rawDefaultArgumentResilienceExpansion)) {
-      fn->setDefaultArgumentResilienceExpansion(
-          *defaultArgumentResilienceExpansion);
-    } else {
-      MF.error();
-      return nullptr;
-    }
-    
     // Set the interface type.
     fn->computeType();
 
@@ -3451,7 +3417,6 @@ public:
     bool isImplicit; bool hasPayload; bool isNegative;
     unsigned rawValueKindID;
     IdentifierID rawValueData;
-    uint8_t rawResilienceExpansion;
     unsigned numArgNames;
     ArrayRef<uint64_t> argNameAndDependencyIDs;
 
@@ -3459,7 +3424,6 @@ public:
                                                isImplicit, hasPayload,
                                                rawValueKindID, isNegative,
                                                rawValueData,
-                                               rawResilienceExpansion,
                                                numArgNames,
                                                argNameAndDependencyIDs);
 
@@ -3518,13 +3482,6 @@ public:
     elem->setAccess(std::max(cast<EnumDecl>(DC)->getFormalAccess(),
                              AccessLevel::Internal));
 
-    if (auto resilienceExpansion = getActualResilienceExpansion(
-                                       rawResilienceExpansion)) {
-      elem->setDefaultArgumentResilienceExpansion(*resilienceExpansion);
-    } else {
-      MF.error();
-      return nullptr;
-    }
     return elem;
   }
 

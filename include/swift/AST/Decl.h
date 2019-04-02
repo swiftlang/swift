@@ -393,16 +393,11 @@ protected:
     /// Information about a symbolic default argument, like #file.
     defaultArgumentKind : NumDefaultArgumentKindBits
   );
-  
+
   SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2,
     StaticSpelling : 2
   );
 
-  SWIFT_INLINE_BITFIELD(EnumElementDecl, ValueDecl, 1,
-    /// The ResilienceExpansion to use for default arguments.
-    DefaultArgumentResilienceExpansion : 1
-  );
-  
   SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
@@ -424,9 +419,6 @@ protected:
 
     /// Whether NeedsNewVTableEntry is valid.
     HasComputedNeedsNewVTableEntry : 1,
-
-    /// The ResilienceExpansion to use for default arguments.
-    DefaultArgumentResilienceExpansion : 1,
 
     /// Whether this member was synthesized as part of a derived
     /// protocol conformance.
@@ -5307,8 +5299,6 @@ protected:
     Bits.AbstractFunctionDecl.Throws = Throws;
     Bits.AbstractFunctionDecl.NeedsNewVTableEntry = false;
     Bits.AbstractFunctionDecl.HasComputedNeedsNewVTableEntry = false;
-    Bits.AbstractFunctionDecl.DefaultArgumentResilienceExpansion =
-        unsigned(ResilienceExpansion::Maximal);
     Bits.AbstractFunctionDecl.Synthesized = false;
   }
 
@@ -5555,21 +5545,6 @@ public:
   ///
   /// Resolved during type checking
   void setIsOverridden() { Bits.AbstractFunctionDecl.Overridden = true; }
-
-  /// The ResilienceExpansion for default arguments.
-  ///
-  /// In Swift 4 mode, default argument expressions are serialized, and must
-  /// obey the restrictions imposed upon inlinable function bodies.
-  ResilienceExpansion getDefaultArgumentResilienceExpansion() const {
-    return ResilienceExpansion(
-        Bits.AbstractFunctionDecl.DefaultArgumentResilienceExpansion);
-  }
-
-  /// Set the ResilienceExpansion for default arguments.
-  void setDefaultArgumentResilienceExpansion(ResilienceExpansion expansion) {
-    Bits.AbstractFunctionDecl.DefaultArgumentResilienceExpansion =
-        unsigned(expansion);
-  }
 
   /// Set information about the foreign error convention used by this
   /// declaration.
@@ -6025,10 +6000,7 @@ public:
     Params(Params),
     EqualsLoc(EqualsLoc),
     RawValueExpr(RawValueExpr)
-  {
-    Bits.EnumElementDecl.DefaultArgumentResilienceExpansion =
-        static_cast<unsigned>(ResilienceExpansion::Maximal);
-  }
+  {}
 
   Identifier getName() const { return getFullName().getBaseIdentifier(); }
 
@@ -6057,21 +6029,6 @@ public:
     TypeCheckedRawValueExpr = e;
   }
 
-  /// The ResilienceExpansion for default arguments.
-  ///
-  /// In Swift 4 mode, default argument expressions are serialized, and must
-  /// obey the restrictions imposed upon inlinable function bodies.
-  ResilienceExpansion getDefaultArgumentResilienceExpansion() const {
-    return ResilienceExpansion(
-        Bits.EnumElementDecl.DefaultArgumentResilienceExpansion);
-  }
-
-  /// Set the ResilienceExpansion for default arguments.
-  void setDefaultArgumentResilienceExpansion(ResilienceExpansion expansion) {
-    Bits.EnumElementDecl.DefaultArgumentResilienceExpansion =
-        unsigned(expansion);
-  }
-  
   /// Return the containing EnumDecl.
   EnumDecl *getParentEnum() const {
     return cast<EnumDecl>(getDeclContext());
