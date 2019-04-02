@@ -87,7 +87,7 @@ SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
         IsProtocolReq(Info.IsProtocolReq),
         IsOverriding(Info.IsOverriding),
         IsOpen(Info.IsOpen),
-        IsInternal(Info.IsInternal),
+        IsInternal(Info.IsInternal), IsABIPlaceholder(Info.IsABIPlaceholder),
         ReferenceOwnership(uint8_t(Info.ReferenceOwnership)),
         GenericSig(Info.GenericSig), FixedBinaryOrder(Info.FixedBinaryOrder) {}
 
@@ -111,7 +111,8 @@ SDKNodeDeclType::SDKNodeDeclType(SDKNodeInitInfo Info):
   EnumRawTypeName(Info.EnumRawTypeName) {}
 
 SDKNodeConformance::SDKNodeConformance(SDKNodeInitInfo Info):
-  SDKNode(Info, SDKNodeKind::Conformance) {}
+  SDKNode(Info, SDKNodeKind::Conformance),
+  IsABIPlaceholder(Info.IsABIPlaceholder) {}
 
 SDKNodeTypeWitness::SDKNodeTypeWitness(SDKNodeInitInfo Info):
   SDKNode(Info, SDKNodeKind::TypeWitness) {}
@@ -1102,6 +1103,28 @@ Optional<uint8_t> SDKContext::getFixedBinaryOrder(ValueDecl *VD) const {
   }
 }
 
+// check for if it has @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+static bool isABIPlaceHolder(Decl *D) {
+  llvm::SmallSet<PlatformKind, 4> Platforms;
+  for (auto *ATT: D->getAttrs()) {
+    if (auto *AVA = dyn_cast<AvailableAttr>(ATT)) {
+      if (AVA->Platform != PlatformKind::none && AVA->Introduced &&
+          AVA->Introduced->getMajor() == 9999) {
+        Platforms.insert(AVA->Platform);
+      }
+    }
+  }
+  return Platforms.size() == 4;
+}
+
+static bool isABIPlaceholderRecursive(Decl *D) {
+  for (auto *CD = D; CD; CD = CD->getDeclContext()->getAsDecl()) {
+    if (isABIPlaceHolder(CD))
+      return true;
+  }
+  return false;
+}
+
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info) :
     Ctx(Ctx), Name(getTypeName(Ctx, Ty, Info.IsImplicitlyUnwrappedOptional)),
     PrintedName(getPrintedName(Ctx, Ty, Info.IsImplicitlyUnwrappedOptional)),
@@ -1121,7 +1144,8 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       ModuleName(D->getModuleContext()->getName().str()),
       GenericSig(printGenericSignature(Ctx, D)),
       IsImplicit(D->isImplicit()),
-      IsDeprecated(D->getAttrs().getDeprecated(D->getASTContext())) {
+      IsDeprecated(D->getAttrs().getDeprecated(D->getASTContext())),
+      IsABIPlaceholder(isABIPlaceholderRecursive(D)) {
   // Capture all attributes.
   auto AllAttrs = D->getAttrs();
   std::transform(AllAttrs.begin(), AllAttrs.end(), std::back_inserter(DeclAttrs),
@@ -1132,6 +1156,15 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, OperatorDecl *OD):
     SDKNodeInitInfo(Ctx, cast<Decl>(OD)) {
   Name = OD->getName().str();
   PrintedName = OD->getName().str();
+}
+
+
+SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ProtocolConformance *Conform):
+    SDKNodeInitInfo(Ctx, Conform->getProtocol()) {
+  // Whether this conformance is ABI placeholder depends on the decl context
+  // of this conformance.
+  IsABIPlaceholder = isABIPlaceholderRecursive(Conform->getDeclContext()->
+                                               getAsDecl());
 }
 
 static bool isProtocolRequirement(ValueDecl *VD) {
@@ -1517,7 +1550,7 @@ SwiftDeclCollector::constructConformanceNode(ProtocolConformance *Conform) {
   if (Ctx.checkingABI())
     Conform = Conform->getCanonicalConformance();
   auto ConfNode = cast<SDKNodeConformance>(SDKNodeInitInfo(Ctx,
-    Conform->getProtocol()).createSDKNode(SDKNodeKind::Conformance));
+    Conform).createSDKNode(SDKNodeKind::Conformance));
   Conform->forEachTypeWitness(nullptr,
     [&](AssociatedTypeDecl *assoc, Type ty, TypeDecl *typeDecl) -> bool {
       ConfNode->addChild(constructTypeWitnessNode(assoc, ty));
@@ -1643,6 +1676,11 @@ void SDKNode::jsonize(json::Output &out) {
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_children).data(), Children);
 }
 
+void SDKNodeConformance::jsonize(json::Output &out) {
+  SDKNode::jsonize(out);
+  output(out, KeyKind::KK_isABIPlaceholder, IsABIPlaceholder);
+}
+
 void SDKNodeDecl::jsonize(json::Output &out) {
   SDKNode::jsonize(out);
   out.mapRequired(getKeyContent(Ctx, KeyKind::KK_declKind).data(), DKind);
@@ -1657,6 +1695,7 @@ void SDKNodeDecl::jsonize(json::Output &out) {
   output(out, KeyKind::KK_implicit, IsImplicit);
   output(out, KeyKind::KK_isOpen, IsOpen);
   output(out, KeyKind::KK_isInternal, IsInternal);
+  output(out, KeyKind::KK_isABIPlaceholder, IsABIPlaceholder);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_declAttributes).data(), DeclAttributes);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_fixedbinaryorder).data(), FixedBinaryOrder);
   // Strong reference is implied, no need for serialization.
