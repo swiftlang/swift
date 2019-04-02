@@ -215,7 +215,6 @@ static void validateAttributes(TypeChecker &TC, Decl *D);
 /// file.
 static void checkInheritanceClause(
                     llvm::PointerUnion<TypeDecl *, ExtensionDecl *> declUnion) {
-  TypeResolutionOptions options = None;
   DeclContext *DC;
   MutableArrayRef<TypeLoc> inheritedClause;
   ExtensionDecl *ext = nullptr;
@@ -224,7 +223,6 @@ static void checkInheritanceClause(
   if ((ext = declUnion.dyn_cast<ExtensionDecl *>())) {
     decl = ext;
     DC = ext;
-    options |= TypeResolutionFlags::AllowUnavailableProtocol;
 
     inheritedClause = ext->getInherited();
 
@@ -243,13 +241,16 @@ static void checkInheritanceClause(
     decl = typeDecl;
     if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
       DC = nominal;
-      options |= TypeResolutionFlags::AllowUnavailableProtocol;
     } else {
       DC = typeDecl->getDeclContext();
     }
 
     inheritedClause = typeDecl->getInherited();
   }
+
+  bool canHaveSuperclass = (isa<ClassDecl>(decl) ||
+                            (isa<ProtocolDecl>(decl) &&
+                             !cast<ProtocolDecl>(decl)->isObjC()));
 
   ASTContext &ctx = decl->getASTContext();
   auto &diags = ctx.Diags;
@@ -258,13 +259,6 @@ static void checkInheritanceClause(
   auto getStartLocOfInheritanceClause = [&] {
     if (ext)
       return ext->getSourceRange().End;
-
-    if (auto genericTypeDecl = dyn_cast<GenericTypeDecl>(typeDecl)) {
-      if (auto genericParams = genericTypeDecl->getGenericParams())
-        return genericParams->getSourceRange().End;
-
-      return genericTypeDecl->getNameLoc();
-    }
 
     return typeDecl->getNameLoc();
   };
@@ -316,6 +310,12 @@ static void checkInheritanceClause(
     if (!inheritedTy || inheritedTy->hasError())
       continue;
 
+    // For generic parameters and associated types, the GSB checks constraints;
+    // however, we still want to fire off the requests to produce diagnostics
+    // in some circular validation cases.
+    if (isa<AbstractTypeParamDecl>(decl))
+      continue;
+
     // Check whether we inherited from 'AnyObject' twice.
     // Other redundant-inheritance scenarios are checked below, the
     // GenericSignatureBuilder (for protocol inheritance) or the
@@ -351,41 +351,36 @@ static void checkInheritanceClause(
     if (inheritedTy->isExistentialType()) {
       auto layout = inheritedTy->getExistentialLayout();
 
-      // @objc protocols cannot have superclass constraints.
+      // Inheritance from protocol compositions that do not contain classes
+      // or AnyObject is always OK.
+      if (!layout.hasExplicitAnyObject &&
+          !layout.explicitSuperclass)
+        continue;
+
+      // Protocols can inherit from AnyObject.
+      if (layout.hasExplicitAnyObject &&
+          isa<ProtocolDecl>(decl))
+        continue;
+
+      // Class-constrained protocol compositions are not allowed except in
+      // special cases.
       if (layout.explicitSuperclass) {
-        if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
-          if (protoDecl->isObjC()) {
-            protoDecl->diagnose(diag::objc_protocol_with_superclass,
-                                protoDecl->getName());
-            continue;
-          }
+        if (!canHaveSuperclass) {
+          decl->diagnose(diag::inheritance_from_protocol_with_superclass,
+                         inheritedTy);
+          continue;
+        }
+
+        // Classes can inherit from protocol compositions that contain a
+        // superclass, but not AnyObject.
+        if (isa<ClassDecl>(decl) &&
+            !layout.hasExplicitAnyObject) {
+          // Superclass inheritance is handled below.
+          inheritedTy = layout.explicitSuperclass;
         }
       }
-
-      // Protocols, generic parameters and associated types can inherit
-      // from subclass existentials, which are "exploded" into their
-      // corresponding requirements.
-      //
-      // Extensions, structs and enums can only inherit from protocol
-      // compositions that do not contain AnyObject or class members.
-      if (isa<ProtocolDecl>(decl) ||
-          isa<AbstractTypeParamDecl>(decl) ||
-          (!layout.hasExplicitAnyObject &&
-           !layout.explicitSuperclass)) {
-        continue;
-      }
-
-      // Classes can inherit from subclass existentials as long as they
-      // do not contain an explicit AnyObject member.
-      if (isa<ClassDecl>(decl) &&
-          !layout.hasExplicitAnyObject) {
-        // Superclass inheritance is handled below.
-        inheritedTy = layout.explicitSuperclass;
-        if (!inheritedTy)
-          continue;
-      }
     }
-    
+
     // If this is an enum inheritance clause, check for a raw type.
     if (isa<EnumDecl>(decl)) {
       // Check if we already had a raw type.
@@ -445,29 +440,6 @@ static void checkInheritanceClause(
         continue;
       }
 
-      // @objc protocols cannot have superclass constraints.
-      if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
-        if (protoDecl->isObjC()) {
-          protoDecl->diagnose(diag::objc_protocol_with_superclass,
-                              protoDecl->getName());
-          continue;
-        }
-      }
-
-      // If the declaration we're looking at doesn't allow a superclass,
-      // complain.
-      if (isa<StructDecl>(decl) || isa<ExtensionDecl>(decl)) {
-        decl->diagnose(isa<ExtensionDecl>(decl)
-                         ? diag::extension_class_inheritance
-                         : diag::non_class_inheritance,
-                       isa<ExtensionDecl>(decl)
-                         ? cast<ExtensionDecl>(decl)->getDeclaredInterfaceType()
-                         : cast<TypeDecl>(decl)->getDeclaredInterfaceType(),
-                       inheritedTy)
-          .highlight(inherited.getSourceRange());
-        continue;
-      }
-
       // If this is not the first entry in the inheritance clause, complain.
       if (isa<ClassDecl>(decl) && i > 0) {
         auto removeRange = getRemovalRange(i);
@@ -480,21 +452,18 @@ static void checkInheritanceClause(
         // Fall through to record the superclass.
       }
 
-      // Record the superclass.
-      superclassTy = inheritedTy;
-      superclassRange = inherited.getSourceRange();
-      continue;
+      if (canHaveSuperclass) {
+        // Record the superclass.
+        superclassTy = inheritedTy;
+        superclassRange = inherited.getSourceRange();
+        continue;
+      }
     }
 
-    // The GenericSignatureBuilder diagnoses problems with generic type
-    // parameters.
-    if (isa<GenericTypeParamDecl>(decl))
-      continue;
-
     // We can't inherit from a non-class, non-protocol type.
-    decl->diagnose((isa<StructDecl>(decl) || isa<ExtensionDecl>(decl))
-                     ? diag::inheritance_from_non_protocol
-                     : diag::inheritance_from_non_protocol_or_class,
+    decl->diagnose(canHaveSuperclass
+                   ? diag::inheritance_from_non_protocol_or_class
+                   : diag::inheritance_from_non_protocol,
                    inheritedTy);
     // FIXME: Note pointing to the declaration 'inheritedTy' references?
   }
