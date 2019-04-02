@@ -7,13 +7,14 @@
 // RUN: %target-swift-frontend -build-module-from-parseable-interface -serialize-parseable-module-interface-dependency-hashes -sdk %t/my-sdk -prebuilt-module-cache-path %t/prebuilt-cache -I %t/my-sdk -module-cache-path %t/MCP -o %t/prebuilt-cache/ExportedLib.swiftmodule -track-system-dependencies -module-name ExportedLib %t/my-sdk/ExportedLib.swiftinterface
 // RUN: %target-swift-frontend -build-module-from-parseable-interface -serialize-parseable-module-interface-dependency-hashes -sdk %t/my-sdk -prebuilt-module-cache-path %t/prebuilt-cache -I %t/my-sdk -module-cache-path %t/MCP -o %t/prebuilt-cache/SdkLib.swiftmodule -track-system-dependencies -module-name SdkLib %t/my-sdk/SdkLib.swiftinterface
 //
-// Check the prebuilt modules don't contain dependencies in the module cache or prebuilt cache
+// Check the prebuilt modules don't contain dependencies in the module cache, prebuilt cache, or resource dir
 // RUN: llvm-bcanalyzer -dump %t/prebuilt-cache/ExportedLib.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
 // RUN: llvm-bcanalyzer -dump %t/prebuilt-cache/SdkLib.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
 //
 // PREBUILT: MODULE_BLOCK
 // PREBUILT-NOT: FILE_DEPENDENCY {{.*}}/MCP/{{.*}}
 // PREBUILT-NOT: FILE_DEPENDENCY {{.*}}/prebuilt-cache/{{.*}}
+// PREBUILD-NOT: FILE_DEPENDENCY {{.*}}/lib/swift/{{.*}}
 //
 // Re-build them in the opposite order
 // RUN: %empty-directory(%t/prebuilt-cache)
@@ -44,6 +45,12 @@
 // Check they don't contain dependencies in the module cache (..or prebuilt cache)
 // RUN: llvm-bcanalyzer -dump %t/MCP/SdkLib-*.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
 // RUN: llvm-bcanalyzer -dump %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
+//
+// Check we didn't emit anything from the cache in the .d file either
+// RUN: cat %t/dummy.d | %FileCheck %s -check-prefix=DEPFILE
+//
+// DEPFILE-NOT: /MCP/
+// DEPFILE-NOT: /prebuilt-cache/
 //
 // RUN: %empty-directory(%t/MCP)
 // RUN: echo '2: PASSED'
@@ -82,6 +89,9 @@
 // NOCACHE-NOT: /prebuilt-cache/
 // NOCACHE-NOT: /MCP/
 //
+// Check we didn't emit anything from the cache in the .d file either
+// RUN: cat %t/dummy.d | %FileCheck %s -check-prefix=DEPFILE
+//
 // RUN: %empty-directory(%t/MCP)
 // RUN: echo '3: PASSED'
 
@@ -114,6 +124,9 @@
 // cache, or new prebuilt cache
 // RUN: cat %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=NOCACHE -DLIB_NAME=ExportedLib
 // RUN: cat %t/MCP/SdkLib-*.swiftmodule | %FileCheck %s -check-prefix=NOCACHE -DLIB_NAME=SdkLib
+//
+// Check we didn't emit anything from the cache in the .d file either
+// RUN: cat %t/dummy.d | %FileCheck %s -check-prefix=DEPFILE
 //
 // RUN: %empty-directory(%t/MCP)
 // RUN: echo '4: PASSED'
@@ -155,6 +168,9 @@
 // Check neither contains dependencies in the module cache or prebuilt cache
 // RUN: llvm-bcanalyzer -dump %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
 // RUN: llvm-bcanalyzer -dump %t/MCP/SdkLib-*.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
+//
+// Check we didn't emit anything from the cache in the .d file either
+// RUN: cat %t/dummy.d | %FileCheck %s -check-prefix=DEPFILE
 //
 // RUN: echo '5: PASSED'
 
