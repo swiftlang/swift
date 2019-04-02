@@ -226,8 +226,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -254,8 +254,8 @@
             },
             {
               "kind": "Setter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Set",
+              "printedName": "Set()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -310,8 +310,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -330,8 +330,8 @@
             },
             {
               "kind": "Setter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Set",
+              "printedName": "Set()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -522,8 +522,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -638,8 +638,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -658,8 +658,8 @@
             },
             {
               "kind": "Setter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Set",
+              "printedName": "Set()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -705,8 +705,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -751,8 +751,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -795,8 +795,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -895,8 +895,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -1009,6 +1009,7 @@
           "moduleName": "cake",
           "genericSig": "<τ_0_0 where τ_0_0 : PSuper>",
           "protocolReq": true,
+          "reqNewWitnessTableEntry": true,
           "funcSelfKind": "NonMutating"
         }
       ],
@@ -1116,8 +1117,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
