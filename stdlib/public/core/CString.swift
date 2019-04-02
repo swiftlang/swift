@@ -121,7 +121,7 @@ extension String {
     }
   }
   
-  @_effects(readonly)
+  @_effects(releasenone)
   @usableFromInline
   internal init?(
     unsafeLargeUninitializedCapacity capacity: Int,

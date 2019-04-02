@@ -26,22 +26,22 @@ extension String {
   }
 }
 
-@_effects(readonly)
+@_effects(releasenone)
 private func _getClass(_ obj: NSString) -> AnyClass {
   return object_getClass(obj)!
 }
 
-@_effects(readonly)
+@_effects(releasenone)
 private func _length(_ obj: NSString) -> Int {
   return CFStringGetLength(obj as CFString)
 }
 
-@_effects(readonly)
+@_effects(releasenone)
 private func _copyString(_ obj: NSString) -> NSString {
   return CFStringCreateCopy(kCFAllocatorSystemDefault, obj as CFString)
 }
 
-@_effects(readonly)
+@_effects(releasenone)
 private func _getBytes(_ theString: NSString,
                        _ range: CFRange,
                        _ encoding: CFStringEncoding,
@@ -103,7 +103,7 @@ extension String : _ObjectiveCBridgeable {
     return result != nil
   }
   
-  @_effects(readonly)
+  @_effects(releasenone)
   @inline(__always)
   private static func _bridgeToSmall(
     _ source: NSString,
@@ -124,7 +124,7 @@ extension String : _ObjectiveCBridgeable {
     }
   }
   
-  @_effects(readonly)
+  @_effects(releasenone)
   @inline(__always)
   private static func _bridgeTagged(_ source: NSString) -> String? {
       if _isObjCTaggedPointer(source) {
@@ -133,7 +133,7 @@ extension String : _ObjectiveCBridgeable {
       return nil
   }
   
-  @_effects(readonly)
+  @_effects(releasenone)
   private static func _unconditionallyBridgeFromObjectiveC_nonTagged(
     _ source: NSString
     ) -> String {
@@ -148,7 +148,7 @@ extension String : _ObjectiveCBridgeable {
       len <= 15,
       let eager = _bridgeToSmall(source, len, CFStringBuiltInEncodings.UTF8) {
       return eager
-    }
+    } 
     
     let immutableCopy = (sourceClass == nscfConstantClass) ?
       source :
@@ -162,7 +162,7 @@ extension String : _ObjectiveCBridgeable {
     return _bridgeCocoaStringLazily(immutableCopy, sourceClass, len)
   }
 
-  @_effects(readonly)
+  @_effects(releasenone)
   public static func _unconditionallyBridgeFromObjectiveC(
     _ source: NSString?
   ) -> String {
@@ -203,7 +203,7 @@ extension Substring : _ObjectiveCBridgeable {
     return result != nil
   }
 
-  @_effects(readonly)
+  @_effects(releasenone)
   public static func _unconditionallyBridgeFromObjectiveC(
     _ source: NSString?
   ) -> Substring {
