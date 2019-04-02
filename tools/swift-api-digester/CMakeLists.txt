@@ -8,4 +8,5 @@ add_swift_host_tool(swift-api-digester
 target_link_libraries(swift-api-digester
                       PRIVATE
                         swiftFrontend
+                        swiftSIL
                         swiftIDE)
