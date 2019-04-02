@@ -74,4 +74,44 @@ AnyDerivativeTests.test("Casting") {
   expectEqual(nil, zero.base as? Generic<Float>.TangentVector)
 }
 
+AnyDerivativeTests.test("Derivatives") {
+  func tripleSum(_ x: AnyDerivative, _ y: AnyDerivative) -> AnyDerivative {
+    let sum = x + y
+    return sum + sum + sum
+  }
+
+  do {
+    let x = AnyDerivative(Float(4))
+    let y = AnyDerivative(Float(-2))
+    let v = AnyDerivative(Float(1))
+    let expectedVJP: Float = 3
+
+    let (𝛁x, 𝛁y) = pullback(at: x, y, in: tripleSum)(v)
+    expectEqual(expectedVJP, 𝛁x.base as? Float)
+    expectEqual(expectedVJP, 𝛁y.base as? Float)
+  }
+
+  do {
+    let x = AnyDerivative(Vector.TangentVector(x: 4, y: 5))
+    let y = AnyDerivative(Vector.TangentVector(x: -2, y: -1))
+    let v = AnyDerivative(Vector.CotangentVector(x: 1, y: 1))
+    let expectedVJP = Vector.CotangentVector(x: 3, y: 3)
+
+    let (𝛁x, 𝛁y) = pullback(at: x, y, in: tripleSum)(v)
+    expectEqual(expectedVJP, 𝛁x.base as? Vector.CotangentVector)
+    expectEqual(expectedVJP, 𝛁y.base as? Vector.CotangentVector)
+  }
+
+  do {
+    let x = AnyDerivative(Generic<Double>.TangentVector(x: 4))
+    let y = AnyDerivative(Generic<Double>.TangentVector(x: -2))
+    let v = AnyDerivative(Generic<Double>.CotangentVector(x: 1))
+    let expectedVJP = Generic<Double>.CotangentVector(x: 3)
+
+    let (𝛁x, 𝛁y) = pullback(at: x, y, in: tripleSum)(v)
+    expectEqual(expectedVJP, 𝛁x.base as? Generic<Double>.CotangentVector)
+    expectEqual(expectedVJP, 𝛁y.base as? Generic<Double>.CotangentVector)
+  }
+}
+
 runAllTests()

@@ -711,15 +711,33 @@ public struct AnyDerivative : Differentiable & AdditiveArithmetic {
     return AnyDerivative(
       _box: _ConcreteDerivativeBox<OpaqueZero>(OpaqueZero.zero))
   }
+
   public static func + (
     lhs: AnyDerivative, rhs: AnyDerivative
   ) -> AnyDerivative {
     return AnyDerivative(_box: lhs._box._adding(rhs._box))
   }
+
+  @differentiating(+)
+  @usableFromInline internal static func _vjpAdd(
+    lhs: AnyDerivative, rhs: AnyDerivative
+  ) -> (value: AnyDerivative,
+        pullback: (AnyDerivative) -> (AnyDerivative, AnyDerivative)) {
+    return (lhs + rhs, { v in (v, v) })
+  }
+
   public static func - (
     lhs: AnyDerivative, rhs: AnyDerivative
   ) -> AnyDerivative {
     return AnyDerivative(_box: lhs._box._subtracting(rhs._box))
+  }
+
+  @differentiating(-)
+  @usableFromInline internal static func _vjpSubtract(
+    lhs: AnyDerivative, rhs: AnyDerivative
+  ) -> (value: AnyDerivative,
+        pullback: (AnyDerivative) -> (AnyDerivative, AnyDerivative)) {
+    return (lhs - rhs, { v in (v, .zero - v) })
   }
 
   // `Differentiable` requirements.
