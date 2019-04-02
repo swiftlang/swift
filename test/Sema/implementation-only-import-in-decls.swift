@@ -115,3 +115,36 @@ precedencegroup TestLowerThan {
 precedencegroup TestHigherThan {
   higherThan: BadPrecedence // expected-error {{cannot use 'BadPrecedence' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
 }
+
+public struct PublicStructStoredProperties {
+  public var publiclyBad: BadStruct? // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+  internal var internallyBad: BadStruct? // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+  private var privatelyBad: BadStruct? // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+  private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+
+  private var computedIsOkay: BadStruct? { return nil } // okay
+  private static var staticIsOkay: BadStruct? // okay
+  @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+}
+
+@usableFromInline internal struct UFIStructStoredProperties {
+  @usableFromInline var publiclyBad: BadStruct? // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+  internal var internallyBad: BadStruct? // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+  private var privatelyBad: BadStruct? // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+  private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+
+  private var computedIsOkay: BadStruct? { return nil } // okay
+  private static var staticIsOkay: BadStruct? // okay
+  @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+}
+
+public class PublicClassStoredProperties {
+  public var publiclyBad: BadStruct? // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+  internal var internallyBad: BadStruct? // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+  private var privatelyBad: BadStruct? // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+  private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+
+  private var computedIsOkay: BadStruct? { return nil } // okay
+  private static var staticIsOkay: BadStruct? // okay
+  @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+}

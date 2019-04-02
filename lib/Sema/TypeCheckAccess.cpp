@@ -1517,10 +1517,10 @@ public:
 
     // Is this a stored property in a non-resilient struct or class?
     auto *property = dyn_cast<VarDecl>(VD);
-    if (!property || !property->hasStorage())
+    if (!property || !property->hasStorage() || property->isStatic())
       return true;
     auto *parentNominal = dyn_cast<NominalTypeDecl>(property->getDeclContext());
-    if (!parentNominal || !parentNominal->isResilient())
+    if (!parentNominal || parentNominal->isResilient())
       return true;
 
     // Is that struct or class part of the module's API or ABI?
