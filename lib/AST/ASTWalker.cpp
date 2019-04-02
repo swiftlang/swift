@@ -755,6 +755,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       return nullptr;
     }
 
+    if (!Walker.shouldWalkIntoNonSingleExpressionClosure())
+      return expr;
+
     // Handle other closures.
     if (BraceStmt *body = cast_or_null<BraceStmt>(doIt(expr->getBody()))) {
       expr->setBody(body, false);
@@ -1065,11 +1068,13 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     if (auto oldSubExpr = E->getSubExpr()) {
       if (auto subExpr = doIt(oldSubExpr)) {
         E->setSubExpr(subExpr);
-      }
-      else {
+      } else {
         return nullptr;
       }
     }
+
+    if (!Walker.shouldWalkIntoNonSingleExpressionClosure())
+      return E;
 
     if (auto oldBody = E->getBody()) {
       if (auto body = doIt(oldBody)) {

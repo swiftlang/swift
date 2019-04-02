@@ -105,9 +105,8 @@ func takeP5<T: P5>(_ t: T) {
 
 protocol P7 {
 	associatedtype Assoc: A, Other 
-	// FIXME: expected-error@-1{{multiple inheritance from classes 'A' and 'Other'}}
-	// expected-note@-2{{superclass constraint 'Self.Assoc' : 'A' written here}}
-	// expected-error@-3{{'Self.Assoc' cannot be a subclass of both 'Other' and 'A'}}
+	// expected-note@-1{{superclass constraint 'Self.Assoc' : 'A' written here}}
+	// expected-error@-2{{'Self.Assoc' cannot be a subclass of both 'Other' and 'A'}}
 }
 
 // CHECK: superclassConformance4
