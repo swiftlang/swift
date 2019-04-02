@@ -565,6 +565,7 @@ public:
 
 class SDKNodeDeclAbstractFunc : public SDKNodeDecl {
   bool IsThrowing;
+  bool ReqNewWitnessTableEntry;
   Optional<uint8_t> SelfIndex;
 
 protected:
@@ -572,6 +573,7 @@ protected:
   virtual ~SDKNodeDeclAbstractFunc() = default;
 public:
   bool isThrowing() const { return IsThrowing; }
+  bool reqNewWitnessTableEntry() const { return ReqNewWitnessTableEntry; }
   uint8_t getSelfIndex() const { return SelfIndex.getValue(); }
   Optional<uint8_t> getSelfIndexOptional() const { return SelfIndex; }
   bool hasSelfIndex() const { return SelfIndex.hasValue(); }

@@ -34,6 +34,7 @@
           "declAttributes": [
             "ObjC"
           ],
+          "reqNewWitnessTableEntry": true,
           "funcSelfKind": "NonMutating"
         }
       ],
@@ -154,6 +155,7 @@
           "declAttributes": [
             "ObjC"
           ],
+          "reqNewWitnessTableEntry": true,
           "funcSelfKind": "NonMutating"
         }
       ],

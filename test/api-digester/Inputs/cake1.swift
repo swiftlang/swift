@@ -158,3 +158,13 @@ public protocol AssociatedTypesProtocol {
 public class TChangesFromIntToString: AssociatedTypesProtocol {
   public typealias T = Int
 }
+
+public protocol HasMutatingMethod {
+  mutating func foo()
+  var bar: Int { mutating get }
+}
+
+public protocol HasMutatingMethodClone: HasMutatingMethod {
+  mutating func foo()
+  var bar: Int { mutating get }
+}

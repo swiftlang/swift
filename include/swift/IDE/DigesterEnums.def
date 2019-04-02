@@ -133,6 +133,7 @@ KEY_BOOL(IsInternal, isInternal)
 KEY_BOOL(HasStorage, hasStorage)
 KEY_BOOL(HasDidset, hasDidset)
 KEY_BOOL(HasWillset, hasWillset)
+KEY_BOOL(ReqNewWitnessTableEntry, reqNewWitnessTableEntry)
 
 KEY(kind)
 
