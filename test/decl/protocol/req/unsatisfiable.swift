@@ -37,14 +37,9 @@ protocol Base {
   associatedtype Assoc
 }
 
-// FIXME: The first error is redundant and isn't correct in what it states.
-// FIXME: This used to /not/ error in Swift 3. It didn't impose any statically-
-// enforced requirements, but the compiler crashed if you used anything but the
-// same type.
 protocol Sub1: Base {
   associatedtype SubAssoc: Assoc
   // expected-error@-1 {{type 'Self.SubAssoc' constrained to non-protocol, non-class type 'Self.Assoc'}}
-  // expected-error@-2 {{inheritance from non-protocol, non-class type 'Self.Assoc'}}
 }
 
 // FIXME: This error is incorrect in what it states.
@@ -58,7 +53,6 @@ struct S {}
 protocol P4 {
   associatedtype X : S
   // expected-error@-1 {{type 'Self.X' constrained to non-protocol, non-class type 'S'}}
-  // expected-error@-2 {{inheritance from non-protocol, non-class type 'S'}}
 }
 
 protocol P5 {

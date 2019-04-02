@@ -1690,6 +1690,25 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
   arg->setDefaultArgumentKind(DefaultArgumentKind::StoredProperty);
 }
 
+bool swift::isMemberwiseInitialized(VarDecl *var) {
+  // Implicit, computed, and static properties are not initialized.
+  // The exception is lazy properties, which due to batch mode we may or
+  // may not have yet finalized, so they may currently be "stored" or
+  // "computed" in the current AST state.
+  if (var->isImplicit() || var->isStatic())
+    return false;
+
+  if (!var->hasStorage() && !var->getAttrs().hasAttribute<LazyAttr>())
+    return false;
+
+  // Initialized 'let' properties have storage, but don't get an argument
+  // to the memberwise initializer since they already have an initial
+  // value that cannot be overridden.
+  if (var->isLet() && var->getParentInitializer())
+    return false;
+
+  return true;
+}
 /// Create an implicit struct or class constructor.
 ///
 /// \param decl The struct or class for which a constructor will be created.
@@ -1716,23 +1735,10 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       auto var = dyn_cast<VarDecl>(member);
       if (!var)
         continue;
-      
-      // Implicit, computed, and static properties are not initialized.
-      // The exception is lazy properties, which due to batch mode we may or
-      // may not have yet finalized, so they may currently be "stored" or
-      // "computed" in the current AST state.
-      if (var->isImplicit() || var->isStatic())
+
+      if (!isMemberwiseInitialized(var))
         continue;
 
-      if (!var->hasStorage() && !var->getAttrs().hasAttribute<LazyAttr>())
-        continue;
-
-      // Initialized 'let' properties have storage, but don't get an argument
-      // to the memberwise initializer since they already have an initial
-      // value that cannot be overridden.
-      if (var->isLet() && var->getParentInitializer())
-        continue;
-      
       accessLevel = std::min(accessLevel, var->getFormalAccess());
 
       tc.validateDecl(var);
@@ -1765,9 +1771,9 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   DeclName name(ctx, DeclBaseName::createConstructor(), paramList);
   auto *ctor =
     new (ctx) ConstructorDecl(name, Loc,
-                                  OTK_None, /*FailabilityLoc=*/SourceLoc(),
-                                  /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                                  paramList, /*GenericParams=*/nullptr, decl);
+                              OTK_None, /*FailabilityLoc=*/SourceLoc(),
+                              /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                              paramList, /*GenericParams=*/nullptr, decl);
 
   // Mark implicit.
   ctor->setImplicit();

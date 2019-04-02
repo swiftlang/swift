@@ -111,6 +111,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     bool walkToDeclPre(Decl *D) override { return false; }
     bool walkToTypeReprPre(TypeRepr *T) override { return true; }
 
+    bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
+
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       // See through implicit conversions of the expression.  We want to be able
       // to associate the parent of this expression with the ultimate callee.
@@ -582,7 +584,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     void checkNoEscapeParameterUse(DeclRefExpr *DRE, Expr *parent,
                                    OperandKind useKind) {
       // This only cares about declarations of noescape function type.
-      auto AFT = DRE->getDecl()->getInterfaceType()->getAs<AnyFunctionType>();
+      auto AFT = DRE->getType()->getAs<FunctionType>();
       if (!AFT || !AFT->isNoEscape())
         return;
 
@@ -1399,6 +1401,8 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
              cast<VarDecl>(DRE->getDecl())->isSelfParameter();
     }
 
+    bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
+
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       Expr *subExpr;
       bool isStore = false;
@@ -1547,11 +1551,10 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
       return false;
     }
 
+    bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
+
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
-        if (!CE->hasSingleExpressionBody())
-          return { false, E };
-
         // If this is a potentially-escaping closure expression, start looking
         // for references to self if we aren't already.
         if (isClosureRequiringSelfQualification(CE))
@@ -2348,7 +2351,7 @@ public:
     // other things going on in the initializer expressions.
     return true;
   }
-  
+
   /// The heavy lifting happens when visiting expressions.
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override;
 
@@ -2733,8 +2736,6 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
   E->walk(*this);
 }
 
-   
-
 /// The heavy lifting happens when visiting expressions.
 std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
   // Sema leaves some subexpressions null, which seems really unfortunate.  It
@@ -2975,6 +2976,8 @@ static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
   public:
     DiagnoseWalker(TypeChecker &tc) : TC(tc) { }
 
+    bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
+
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       // Dig into implicit expression.
       if (E->isImplicit()) return { true, E };
@@ -3105,6 +3108,8 @@ class ObjCSelectorWalker : public ASTWalker {
 public:
   ObjCSelectorWalker(TypeChecker &tc, const DeclContext *dc, Type selectorTy)
     : TC(tc), DC(dc), SelectorTy(selectorTy) { }
+
+  bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
     auto *stringLiteral = dyn_cast<StringLiteralExpr>(expr);
@@ -3777,13 +3782,11 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
       }
     }
 
+    bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
+
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return { false, E };
-
-      if (auto *CE = dyn_cast<AbstractClosureExpr>(E))
-        if (!CE->hasSingleExpressionBody())
-          return { false, E };
 
       if (IgnoredExprs.count(E))
         return { true, E };
@@ -3850,6 +3853,8 @@ static void diagnoseDeprecatedWritableKeyPath(TypeChecker &TC, const Expr *E,
         }
       }
     }
+
+    bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())

@@ -560,25 +560,37 @@ static bool parameterTypesMatch(const ValueDecl *derivedDecl,
                                                         /*derivedSubs=*/None);
 
   for (auto i : indices(baseParams->getArray())) {
-    auto baseItfTy = baseParams->get(i)->getInterfaceType();
-    auto baseParamTy =
-        baseDecl->getAsGenericContext()->mapTypeIntoContext(baseItfTy);
+    auto *baseParam = baseParams->get(i);
+    auto *derivedParam = derivedParams->get(i);
+
+    // Make sure inout-ness and varargs match.
+    if (baseParam->isInOut() != derivedParam->isInOut() ||
+        baseParam->isVariadic() != derivedParam->isVariadic()) {
+      return false;
+    }
+
+    auto baseParamTy = baseParam->getInterfaceType();
     baseParamTy = baseParamTy.subst(subs);
-    auto derivedParamTy = derivedParams->get(i)->getInterfaceType();
+    auto derivedParamTy = derivedParam->getInterfaceType();
 
-    // Attempt contravariant match.
-    if (baseParamTy->matchesParameter(derivedParamTy, matchMode))
-      continue;
-
-    // Try once more for a match, using the underlying type of an
-    // IUO if we're allowing that.
-    if (baseParams->get(i)
-            ->getAttrs()
-            .hasAttribute<ImplicitlyUnwrappedOptionalAttr>() &&
-        matchMode.contains(TypeMatchFlags::AllowNonOptionalForIUOParam)) {
-      baseParamTy = baseParamTy->getOptionalObjectType();
-      if (baseParamTy->matches(derivedParamTy, matchMode))
+    if (baseParam->isInOut() || baseParam->isVariadic()) {
+      // Inout and vararg parameters must match exactly.
+      if (baseParamTy->isEqual(derivedParamTy))
         continue;
+    } else {
+      // Attempt contravariant match.
+      if (baseParamTy->matchesParameter(derivedParamTy, matchMode))
+        continue;
+
+      // Try once more for a match, using the underlying type of an
+      // IUO if we're allowing that.
+      if (baseParam->getAttrs()
+              .hasAttribute<ImplicitlyUnwrappedOptionalAttr>() &&
+          matchMode.contains(TypeMatchFlags::AllowNonOptionalForIUOParam)) {
+        baseParamTy = baseParamTy->getOptionalObjectType();
+        if (baseParamTy->matches(derivedParamTy, matchMode))
+          continue;
+      }
     }
 
     // If there is no match, then we're done.
