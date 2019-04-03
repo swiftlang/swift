@@ -34,8 +34,8 @@ extension vImage_Buffer {
     
     //===----------------------------------------------------------------------===//
     
-    /// Initializes a vImage buffer of a specified size without memory allocation,
-    /// reporting the preferred alignment.
+    /// Returns the preferred alignment and row bytes for a specified buffer
+    /// size and bits-per-pixel.
     ///
     /// - Parameter width: The width of the buffer.
     /// - Parameter height: The height of the buffer.
@@ -43,18 +43,17 @@ extension vImage_Buffer {
     /// - Parameter alignment: The preferred alignment is written to this parameter.
     ///
     /// - Returns: An initialized vImage buffer.
-    public init?(width: Int,
-                 height: Int,
-                 bitsPerPixel: UInt32,
-                 alignment: inout Int) {
+    public static func preferredAlignmentAndRowBytes(width: Int,
+                                                     height: Int,
+                                                     bitsPerPixel: UInt32) -> (alignment: Int, rowBytes: Int)? {
         
         if width < 0 || height < 0 {
             return nil
         }
         
-        self.init()
-
-        let error = vImageBuffer_Init(&self,
+        var buffer = vImage_Buffer()
+        
+        let error = vImageBuffer_Init(&buffer,
                                       vImagePixelCount(height),
                                       vImagePixelCount(width),
                                       bitsPerPixel,
@@ -63,10 +62,17 @@ extension vImage_Buffer {
         if error < kvImageNoError {
             return nil
         } else {
-            alignment = error
+            return(alignment: error,
+                   rowBytes: buffer.rowBytes)
         }
     }
-    
+
+    //===----------------------------------------------------------------------===//
+    //
+    //  Initializers.
+    //
+    //===----------------------------------------------------------------------===//
+
     /// Initializes a vImage buffer of a specified size, reporting any errors.
     ///
     /// - Parameter width: The width of the buffer.

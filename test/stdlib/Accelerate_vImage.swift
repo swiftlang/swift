@@ -334,11 +334,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     Accelerate_vImageTests.test("vImage/Alignment") {
         // New API
         
-        var alignment = 0
-        
-        _ = vImage_Buffer(width: widthi, height: heighti,
-                          bitsPerPixel: 32,
-                          alignment: &alignment)
+        var alignment = vImage_Buffer.preferredAlignmentAndRowBytes(width: widthi,
+                                                                    height: heighti,
+                                                                    bitsPerPixel: 32)!
         
         // Legacy API
         
@@ -348,7 +346,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                                                 32,
                                                 vImage_Flags(kvImageNoAllocate))
         
-        expectEqual(alignment, legacyAlignment)
+        expectEqual(alignment.alignment, legacyAlignment)
+        expectEqual(alignment.rowBytes, legacyBuffer.rowBytes)
         
         legacyBuffer.free()
     }
