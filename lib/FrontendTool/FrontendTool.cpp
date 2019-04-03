@@ -1539,24 +1539,12 @@ createDispatchingDiagnosticConsumerIfNeeded(
 
   inputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &input) -> bool {
-        if (auto consumer = maybeCreateConsumerForDiagnosticsFrom(input))
+        if (auto consumer = maybeCreateConsumerForDiagnosticsFrom(input)) {
+          assert(consumer && "Consumer should always be non-null");
           subconsumers.emplace_back(input.file(), std::move(consumer));
+        }
         return false;
       });
-  // For batch mode, the compiler must swallow diagnostics pertaining to
-  // non-primary files in order to avoid Xcode showing the same diagnostic
-  // multiple times. So, create a diagnostic "eater" for those non-primary
-  // files.
-  // To avoid introducing bugs into WMO or single-file modes, test for multiple
-  // primaries.
-  if (inputsAndOutputs.hasMultiplePrimaryInputs()) {
-    inputsAndOutputs.forEachNonPrimaryInput(
-        [&](const InputFile &input) -> bool {
-          subconsumers.emplace_back(input.file(), nullptr);
-          return false;
-        });
-  }
-
   return FileSpecificDiagnosticConsumer::consolidateSubconsumers(subconsumers);
 }
 

@@ -186,6 +186,7 @@ Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
 FileSpecificDiagnosticConsumer::findSubconsumer(
     SourceManager &SM, SourceLoc loc, DiagnosticKind Kind,
     SourceLoc defaultDiagnosticLoc) {
+  // Ensure that a note goes to the same place as the preceeding non-note.
   switch (Kind) {
   case DiagnosticKind::Error:
   case DiagnosticKind::Warning:
@@ -203,19 +204,13 @@ Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
 FileSpecificDiagnosticConsumer::findSubconsumerForNonNote(
     SourceManager &SM, const SourceLoc loc,
     const SourceLoc defaultDiagnosticLoc) {
-  const auto subconsumer = subconsumerForLocation(SM, loc);
-  if (!subconsumer)
-    return None; // No place to put it
-  if ((*subconsumer)->getConsumer())
+  if (auto subconsumer = subconsumerForLocation(SM, loc))
     return subconsumer; // A primary file with a .dia file
-  if (defaultDiagnosticLoc.isInvalid())
-    return None;
-  const auto currentPrimarySubconsumer =
-      subconsumerForLocation(SM, defaultDiagnosticLoc);
-  assert(currentPrimarySubconsumer &&
-         (*currentPrimarySubconsumer)->getConsumer() &&
-         "current primary must have a .dia file");
-  return currentPrimarySubconsumer;
+  // The diagnostic is located in a non-primary.
+  // Try to put it in the current primary file's .dia file.
+  if (defaultDiagnosticLoc.isValid())
+    return subconsumerForLocation(SM, defaultDiagnosticLoc);
+  return None;
 }
 
 bool FileSpecificDiagnosticConsumer::finishProcessing() {
