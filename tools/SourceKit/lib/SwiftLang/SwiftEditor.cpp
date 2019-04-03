@@ -905,8 +905,11 @@ public:
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
                           ReferenceMetaData Data) override {
-      if (isa<VarDecl>(D) && D->hasName() &&
-          D->getFullName() == D->getASTContext().Id_self)
+    if (Data.isImplicit)
+      return true;
+
+    if (isa<VarDecl>(D) && D->hasName() &&
+        D->getFullName() == D->getASTContext().Id_self)
       return true;
 
     // Do not annotate references to unavailable decls.
