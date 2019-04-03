@@ -311,7 +311,7 @@ private:
   subconsumerForLocation(SourceManager &SM, SourceLoc loc);
 
   Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
-  findSubconsumerForAnyKind(SourceManager &SM, SourceLoc loc,
+  findSubconsumer(SourceManager &SM, SourceLoc loc,
                             DiagnosticKind Kind,
                             SourceLoc defaultDiagnosticLoc);
 

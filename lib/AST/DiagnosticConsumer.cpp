@@ -170,7 +170,7 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
   HasAnErrorBeenConsumed |= Kind == DiagnosticKind::Error;
 
   auto subconsumer =
-      findSubconsumerForAnyKind(SM, Loc, Kind, defaultDiagnosticLoc);
+      findSubconsumer(SM, Loc, Kind, defaultDiagnosticLoc);
   if (subconsumer) {
     subconsumer.getValue()->handleDiagnostic(
         SM, Loc, Kind, FormatString, FormatArgs, Info, defaultDiagnosticLoc);
@@ -183,7 +183,7 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
 }
 
 Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
-FileSpecificDiagnosticConsumer::findSubconsumerForAnyKind(
+FileSpecificDiagnosticConsumer::findSubconsumer(
     SourceManager &SM, SourceLoc loc, DiagnosticKind Kind,
     SourceLoc defaultDiagnosticLoc) {
   switch (Kind) {
