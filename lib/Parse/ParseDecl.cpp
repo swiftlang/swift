@@ -2137,6 +2137,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   case TAK_callee_owned:
   case TAK_callee_guaranteed:
   case TAK_objc_metatype:
+  case TAK_pseudogeneric:
     if (!isInSILMode()) {
       diagnose(Loc, diag::only_allowed_in_sil, Text);
       return false;
