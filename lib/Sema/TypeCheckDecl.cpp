@@ -2017,6 +2017,21 @@ static bool computeIsGetterMutating(TypeChecker &TC,
            !storage->isStatic();
   }
 
+  // If we have an attached property delegate, the getter is mutating if
+  // the "value" property of the delegate type is mutating and we're in
+  // a context that has value semantics.
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    if (auto delegateInfo = var->getAttachedPropertyDelegateTypeInfo()) {
+      if (delegateInfo.valueVar &&
+          (!storage->getGetter() || storage->getGetter()->isImplicit())) {
+        TC.validateDecl(delegateInfo.valueVar);
+        return delegateInfo.valueVar->isGetterMutating() &&
+            var->isInstanceMember() &&
+            doesContextHaveValueSemantics(var->getDeclContext());
+      }
+    }
+  }
+
   switch (storage->getReadImpl()) {
   case ReadImplKind::Stored:
     return false;
@@ -2037,6 +2052,21 @@ static bool computeIsGetterMutating(TypeChecker &TC,
 
 static bool computeIsSetterMutating(TypeChecker &TC,
                                     AbstractStorageDecl *storage) {
+  // If we have an attached property delegate, the setter is mutating if
+  // the "value" property of the delegate type is mutating and we're in
+  // a context that has value semantics.
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    if (auto delegateInfo = var->getAttachedPropertyDelegateTypeInfo()) {
+      if (delegateInfo.valueVar &&
+          (!storage->getSetter() || storage->getSetter()->isImplicit())) {
+        TC.validateDecl(delegateInfo.valueVar);
+        return delegateInfo.valueVar->isSetterMutating() &&
+            var->isInstanceMember() &&
+            doesContextHaveValueSemantics(var->getDeclContext());
+      }
+    }
+  }
+
   auto impl = storage->getImplInfo();
   switch (impl.getWriteImpl()) {
   case WriteImplKind::Immutable:
@@ -2246,12 +2276,12 @@ public:
       // Static stored properties are allowed, with restrictions
       // enforced below.
       if (isa<EnumDecl>(VD->getDeclContext()) &&
-          !VD->isStatic()) {
+          !VD->isStatic() && !VD->isInvalid()) {
         // Enums can only have computed properties.
         TC.diagnose(VD->getLoc(), diag::enum_stored_property);
         VD->markInvalid();
       } else if (isa<ExtensionDecl>(VD->getDeclContext()) &&
-                 !VD->isStatic() &&
+                 !VD->isStatic() && !VD->isInvalid() &&
                  !VD->getAttrs().getAttribute<DynamicReplacementAttr>()) {
         TC.diagnose(VD->getLoc(), diag::extension_stored_property);
         VD->markInvalid();
@@ -2501,7 +2531,12 @@ public:
 
         // If we entered an initializer context, contextualize any
         // auto-closures we might have created.
-        if (!DC->isLocalContext()) {
+        // Note that we don't contextualize the initializer for a property
+        // with a delegate, because the initializer will have been subsumed
+        // by the backing storage property.
+        if (!DC->isLocalContext() &&
+            !(PBD->getSingleVar() &&
+              PBD->getSingleVar()->getAttachedPropertyDelegate())) {
           auto *initContext = cast_or_null<PatternBindingInitializer>(
               entry.getInitContext());
           if (initContext) {
@@ -4339,7 +4374,8 @@ static bool shouldValidateMemberDuringFinalization(NominalTypeDecl *nominal,
       (isa<VarDecl>(VD) &&
        !cast<VarDecl>(VD)->isStatic() &&
        (cast<VarDecl>(VD)->hasStorage() ||
-        VD->getAttrs().hasAttribute<LazyAttr>())))
+        VD->getAttrs().hasAttribute<LazyAttr>() ||
+        cast<VarDecl>(VD)->getAttachedPropertyDelegate())))
     return true;
 
   // For classes, we need to validate properties and functions,
@@ -4434,6 +4470,12 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
         (!prop->getGetter() || !prop->getGetter()->hasBody())) {
       finalizeAbstractStorageDecl(TC, prop);
       completeLazyVarImplementation(prop);
+    }
+
+    // Ensure that we create the backing variable for a property delegate.
+    if (prop->getAttachedPropertyDelegate()) {
+      finalizeAbstractStorageDecl(TC, prop);
+      (void)prop->getPropertyDelegateBackingProperty();
     }
   }
 
@@ -5215,6 +5257,13 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       }
 
       if (auto var = dyn_cast<VarDecl>(member)) {
+        // If this variable has a property delegate, go validate it to ensure
+        // that we create the backing storage property.
+        if (var->getAttachedPropertyDelegate()) {
+          validateDecl(var);
+          maybeAddAccessorsToStorage(var);
+        }
+
         if (isMemberwiseInitialized(var)) {
           // Initialized 'let' properties have storage, but don't get an argument
           // to the memberwise initializer since they already have an initial
@@ -5244,7 +5293,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       // synthesize an initial value (e.g. for an optional) then we suppress
       // generation of the default initializer.
       if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
-        if (pbd->hasStorage() && !pbd->isStatic() && !pbd->isImplicit())
+        if (pbd->hasStorage() && !pbd->isStatic()) {
           for (auto entry : pbd->getPatternList()) {
             if (entry.getInit()) continue;
 
@@ -5261,6 +5310,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
             if (CheckDefaultInitializer && !pbd->isDefaultInitializable())
               SuppressDefaultInitializer = true;
           }
+        }
         continue;
       }
     }

@@ -468,8 +468,8 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
-/// Request the nominal type declaration to which the given custom attribute
-/// refers.
+/// Request the raw (possibly unbound generic) type of the property delegate
+/// that is attached to the given variable.
 class AttachedPropertyDelegateTypeRequest :
     public SimpleRequest<AttachedPropertyDelegateTypeRequest,
                          CacheKind::Cached,
@@ -494,13 +494,64 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
+/// Request the nominal type declaration to which the given custom attribute
+/// refers.
+class PropertyDelegateBackingPropertyTypeRequest :
+    public SimpleRequest<PropertyDelegateBackingPropertyTypeRequest,
+                         CacheKind::Cached,
+                         Type,
+                         VarDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Type>
+  evaluate(Evaluator &evaluator, VarDecl *var) const;
+
+public:
+  // Caching
+  bool isCached() const;
+
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+/// Request the nominal type declaration to which the given custom attribute
+/// refers.
+class PropertyDelegateBackingPropertyRequest :
+    public SimpleRequest<PropertyDelegateBackingPropertyRequest,
+                         CacheKind::Cached,
+                         VarDecl *,
+                         VarDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<VarDecl *>
+  evaluate(Evaluator &evaluator, VarDecl *var) const;
+
+public:
+  // Caching
+  bool isCached() const;
+
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
 bool AnyValue::Holder<Type>::equals(const HolderBase &other) const;
 
 void simple_display(llvm::raw_ostream &out, const Type &type);
-
 
 /// The zone number for the type checker.
 #define SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE 10

@@ -2550,6 +2550,15 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
       assert(solution.getConstraintSystem().getType(expr)->isEqual(initType));
 
+      // Record the property delegate type and note that the initializer has
+      // been subsumed by the backing property.
+      if (appliedPropertyDelegate) {
+        auto var = pattern->getSingleVar();
+        var->getParentPatternBinding()->setInitializerSubsumed(0);
+        tc.Context.setSideCachedPropertyDelegateBackingPropertyType(
+            var, initType->mapTypeOutOfContext());
+      }
+
       initializer = expr;
       return expr;
     }
