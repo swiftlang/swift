@@ -1,1 +1,51 @@
-
+Func _cos(_:) has been removed
+Func _cos(_:) has been renamed to Func cos(_:)
+Func _cos(_:) has generic signature change from to <τ_0_0 where τ_0_0 : ElementaryFunctions>
+Func _cos(_:) has generic signature change from to <τ_0_0 where τ_0_0 : SIMD, τ_0_0.Scalar : ElementaryFunctions>
+Func _cos(_:) has parameter 0 type change from Double to τ_0_0
+Func _cos(_:) has parameter 0 type change from Float to τ_0_0
+Func _cos(_:) has return type change from Double to τ_0_0
+Func _cos(_:) has return type change from Float to τ_0_0
+Func _exp(_:) has been removed
+Func _exp(_:) has been renamed to Func exp(_:)
+Func _exp(_:) has generic signature change from to <τ_0_0 where τ_0_0 : ElementaryFunctions>
+Func _exp(_:) has generic signature change from to <τ_0_0 where τ_0_0 : SIMD, τ_0_0.Scalar : ElementaryFunctions>
+Func _exp(_:) has parameter 0 type change from Double to τ_0_0
+Func _exp(_:) has parameter 0 type change from Float to τ_0_0
+Func _exp(_:) has return type change from Double to τ_0_0
+Func _exp(_:) has return type change from Float to τ_0_0
+Func _exp2(_:) has been removed
+Func _exp2(_:) has been renamed to Func exp2(_:)
+Func _exp2(_:) has generic signature change from to <τ_0_0 where τ_0_0 : ElementaryFunctions>
+Func _exp2(_:) has generic signature change from to <τ_0_0 where τ_0_0 : SIMD, τ_0_0.Scalar : ElementaryFunctions>
+Func _exp2(_:) has parameter 0 type change from Double to τ_0_0
+Func _exp2(_:) has parameter 0 type change from Float to τ_0_0
+Func _exp2(_:) has return type change from Double to τ_0_0
+Func _exp2(_:) has return type change from Float to τ_0_0
+Func _log(_:) has been removed
+Func _log10(_:) has been removed
+Func _log10(_:) has been renamed to Func log10(_:)
+Func _log10(_:) has generic signature change from to <τ_0_0 where τ_0_0 : ElementaryFunctions>
+Func _log10(_:) has generic signature change from to <τ_0_0 where τ_0_0 : SIMD, τ_0_0.Scalar : ElementaryFunctions>
+Func _log10(_:) has parameter 0 type change from Double to τ_0_0
+Func _log10(_:) has parameter 0 type change from Float to τ_0_0
+Func _log10(_:) has return type change from Double to τ_0_0
+Func _log10(_:) has return type change from Float to τ_0_0
+Func _log2(_:) has been removed
+Func _log2(_:) has been renamed to Func log2(_:)
+Func _log2(_:) has generic signature change from to <τ_0_0 where τ_0_0 : ElementaryFunctions>
+Func _log2(_:) has generic signature change from to <τ_0_0 where τ_0_0 : SIMD, τ_0_0.Scalar : ElementaryFunctions>
+Func _log2(_:) has parameter 0 type change from Double to τ_0_0
+Func _log2(_:) has parameter 0 type change from Float to τ_0_0
+Func _log2(_:) has return type change from Double to τ_0_0
+Func _log2(_:) has return type change from Float to τ_0_0
+Func _nearbyint(_:) has been removed
+Func _rint(_:) has been removed
+Func _sin(_:) has been removed
+Func _sin(_:) has been renamed to Func sin(_:)
+Func _sin(_:) has generic signature change from to <τ_0_0 where τ_0_0 : ElementaryFunctions>
+Func _sin(_:) has generic signature change from to <τ_0_0 where τ_0_0 : SIMD, τ_0_0.Scalar : ElementaryFunctions>
+Func _sin(_:) has parameter 0 type change from Double to τ_0_0
+Func _sin(_:) has parameter 0 type change from Float to τ_0_0
+Func _sin(_:) has return type change from Double to τ_0_0
+Func _sin(_:) has return type change from Float to τ_0_0

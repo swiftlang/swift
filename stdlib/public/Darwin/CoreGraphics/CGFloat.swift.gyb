@@ -513,18 +513,111 @@ public func %=(lhs: inout CGFloat, rhs: CGFloat) {
 // tgmath
 //===----------------------------------------------------------------------===//
 
+%from SwiftMathFunctions import *
+extension CGFloat: Real {
+% for func in ElementaryFunctions + RealFunctions:
+
+  @_alwaysEmitIntoClient
+  public static func ${func.decl("CGFloat")} {
+    return CGFloat(NativeType.${func.swiftName}(${func.params("", ".native")}))
+  }
+% end
+
+  @_alwaysEmitIntoClient
+  public static func pow(_ x: CGFloat, _ y: CGFloat) -> CGFloat {
+    return CGFloat(NativeType.pow(x.native, y.native))
+  }
+
+  @_alwaysEmitIntoClient
+  public static func pow(_ x: CGFloat, _ n: Int) -> CGFloat {
+    return CGFloat(NativeType.pow(x.native, n))
+  }
+
+  @_alwaysEmitIntoClient
+  public static func root(_ x: CGFloat, _ n: Int) -> CGFloat {
+    return CGFloat(NativeType.root(x.native, n))
+  }
+
+  @_alwaysEmitIntoClient
+  public static func atan2(y: CGFloat, x: CGFloat) -> CGFloat {
+    return CGFloat(NativeType.atan2(y: y.native, x: x.native))
+  }
+
+#if !os(Windows)
+  @_alwaysEmitIntoClient
+  public static func logGamma(_ x: CGFloat) -> CGFloat {
+    return CGFloat(NativeType.logGamma(x.native))
+  }
+#endif
+}
+
+@available(swift, deprecated: 5.1, message: "Use `root(x, 3)`.")
+@_transparent
+public func cbrt(_ x: CGFloat) -> CGFloat {
+  return CGFloat.root(x, 3)
+}
+
+@available(swift, deprecated: 5.1, message: "Use CGFloat.minimum( ) or Swift.min( )")
+@_transparent
+public func fmin(_ x: CGFloat, _ y: CGFloat) -> CGFloat {
+  return .minimum(x, y)
+}
+
+@available(swift, deprecated: 5.1, message: "Use CGFloat.maximum( ) or Swift.max( )")
+@_transparent
+public func fmax(_ x: CGFloat, _ y: CGFloat) -> CGFloat {
+  return .maximum(x, y)
+}
+
+#if !os(Windows)
+@available(swift, deprecated: 5.1, message: "Use (logGamma(x), signGamma(x)).")
+@_transparent
+public func lgamma(_ x: CGFloat) -> (CGFloat, Int) {
+  return (CGFloat.logGamma(x), CGFloat.signGamma(x) == .plus ? 1 : -1)
+}
+#endif
+
+@available(swift, deprecated: 5.1, message: "Use `x.exponent` or `floor(log2(x))`.")
+@_transparent
+public func logb(_ x: CGFloat) -> CGFloat {
+  return CGFloat.log2(x).rounded(.down)
+}
+
+@available(swift, deprecated: 5.1, message: "Swift does not model dynamic rounding modes, use x.rounded(.toNearestOrEven).")
+@_transparent
+public func nearbyint(_ x: CGFloat) -> CGFloat {
+  return x.rounded(.toNearestOrEven)
+}
+
+@available(swift, deprecated: 5.1, message: "Use the .nextUp or .nextDown property.")
+@_transparent
+public func nextafter(_ x: CGFloat, _ y: CGFloat) -> CGFloat {
+  return y > x ? x.nextUp : (y < x ? x.nextDown : y)
+}
+
+@available(swift, deprecated: 5.1, message: "Swift does not model dynamic rounding modes, use x.rounded(.toNearestOrEven).")
+@_transparent
+public func rint(_ x: CGFloat) -> CGFloat {
+  return x.rounded(.toNearestOrEven)
+}
+
+@available(swift, deprecated: 5.1, message: "Use `gamma(x)`.")
+@_transparent
+public func tgamma(_ x: CGFloat) -> CGFloat {
+  return CGFloat.gamma(x)
+}
+
 %{
 UnaryFunctions = [
   'acos', 'asin', 'atan', 'cos', 'sin', 'tan',
   'acosh', 'asinh', 'atanh', 'cosh', 'sinh', 'tanh',
   'exp', 'exp2', 'expm1',
-  'log', 'log10', 'log1p', 'log2', 'logb',
-  'cbrt', 'erf', 'erfc', 'tgamma',
-  'nearbyint', 'rint'
+  'log', 'log10', 'log1p', 'log2',
+  'erf', 'erfc',
 ]
 
 BinaryFunctions = [
-  'atan2', 'hypot', 'pow', 'copysign', 'nextafter', 'fdim', 'fmax', 'fmin'
+  'atan2', 'hypot', 'pow', 'copysign', 'fdim'
 ]
 }%
 
@@ -571,16 +664,10 @@ public func ldexp(_ x: CGFloat, _ n: Int) -> CGFloat {
   return CGFloat(ldexp(x.native, n))
 }
 
-@available(swift, deprecated: 4.2, message: "use the exponent property.")
+@available(swift, deprecated: 4.2, obsoleted: 5.1, message: "use the exponent property.")
 @_transparent
 public func ilogb(_ x: CGFloat) -> Int {
   return Int(x.exponent)
-}
-
-@_transparent
-public func lgamma(_ x: CGFloat) -> (CGFloat, Int) {
-  let (value, sign) = lgamma(x.native)
-  return (CGFloat(value), sign)
 }
 
 @_transparent
