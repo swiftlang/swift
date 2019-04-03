@@ -846,6 +846,13 @@ public:
                                               const IterableDeclContext *idc,
                                               LazyMemberLoader *lazyLoader);
 
+  /// Access the side cache for property delegate backing property types,
+  /// used because TypeChecker::typeCheckBinding() needs somewhere to stash
+  /// the backing property type.
+  Type getSideCachedPropertyDelegateBackingPropertyType(VarDecl *var) const;
+  void setSideCachedPropertyDelegateBackingPropertyType(VarDecl *var,
+                                                        Type type);
+  
   /// Returns memory usage of this ASTContext.
   size_t getTotalMemory() const;
   

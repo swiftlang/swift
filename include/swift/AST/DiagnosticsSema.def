@@ -4355,6 +4355,8 @@ ERROR(property_delegate_ambiguous_value_property, none,
 ERROR(property_delegate_wrong_initial_value_init, none,
       "'init(initialValue:)' parameter type (%0) must be the same as its "
       "'value' property type (%1) or an @autoclosure thereof", (Type, Type))
+ERROR(property_delegate_failable_initial_value_init, none,
+      "'init(initialValue:)' cannot be failable", ())
 ERROR(property_delegate_ambiguous_initial_value_init, none,
   "property delegate type %0 has multiple initial-value initializers", (Type))
 ERROR(property_delegate_type_requirement_not_accessible,none,
@@ -4399,6 +4401,10 @@ ERROR(property_delegate_init_without_initial_value, none,
 NOTE(property_delegate_direct_init,none,
      "initialize the property delegate type directly with "
      "'(...') on the attribute", ())
+
+ERROR(property_delegate_incompatible_unbound, none,
+      "property delegate type %0 must either specify all generic arguments "
+      "or require only a single generic argument", (Type))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

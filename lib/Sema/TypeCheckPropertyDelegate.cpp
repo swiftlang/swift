@@ -114,9 +114,9 @@ static ConstructorDecl *findInitialValueInit(ASTContext &ctx,
   auto init = initialValueInitializers.front();
   if (init->getFormalAccess() < nominal->getFormalAccess()) {
     init->diagnose(diag::property_delegate_type_requirement_not_accessible,
-                   init->getFormalAccess(), init->getDescriptiveKind(),
-                   init->getFullName(), nominal->getDeclaredType(),
-                   nominal->getFormalAccess());
+                     init->getFormalAccess(), init->getDescriptiveKind(),
+                     init->getFullName(), nominal->getDeclaredType(),
+                     nominal->getFormalAccess());
     return nullptr;
   }
 
@@ -130,9 +130,9 @@ static ConstructorDecl *findInitialValueInit(ASTContext &ctx,
     ctx.getLazyResolver()->resolveDeclSignature(init);
   Type paramType;
   if (auto *curriedInitType =
-      init->getInterfaceType()->getAs<AnyFunctionType>()) {
+          init->getInterfaceType()->getAs<AnyFunctionType>()) {
     if (auto *initType =
-        curriedInitType->getResult()->getAs<AnyFunctionType>()) {
+          curriedInitType->getResult()->getAs<AnyFunctionType>()) {
       if (initType->getParams().size() == 1) {
         const auto &param = initType->getParams()[0];
         if (!param.isInOut() && !param.isVariadic()) {
@@ -166,7 +166,7 @@ static ConstructorDecl *findInitialValueInit(ASTContext &ctx,
 
 llvm::Expected<PropertyDelegateTypeInfo>
 PropertyDelegateTypeInfoRequest::evaluate(
-                                          Evaluator &eval, NominalTypeDecl *nominal) const {
+    Evaluator &eval, NominalTypeDecl *nominal) const {
   // We must have the @propertyDelegate attribute to continue.
   if (!nominal->getAttrs().hasAttribute<PropertyDelegateAttr>()) {
     return PropertyDelegateTypeInfo();
@@ -195,7 +195,7 @@ AttachedPropertyDelegateRequest::evaluate(Evaluator &evaluator,
     auto mutableAttr = const_cast<CustomAttr *>(attr);
     // Figure out which nominal declaration this custom attribute refers to.
     auto nominal = evaluateOrDefault(
-                                     ctx.evaluator, CustomAttrNominalRequest{mutableAttr, dc}, nullptr);
+      ctx.evaluator, CustomAttrNominalRequest{mutableAttr, dc}, nullptr);
 
     // If we didn't find a nominal type with a @propertyDelegate attribute,
     // skip this custom attribute.
@@ -225,7 +225,7 @@ AttachedPropertyDelegateRequest::evaluate(Evaluator &evaluator,
         var->getAttrs().hasAttribute<NSManagedAttr>() ||
         (var->getAttrs().hasAttribute<ReferenceOwnershipAttr>() &&
          var->getAttrs().getAttribute<ReferenceOwnershipAttr>()->get() !=
-         ReferenceOwnership::Strong)) {
+             ReferenceOwnership::Strong)) {
       int whichKind;
       if (var->getAttrs().hasAttribute<LazyAttr>())
         whichKind = 0;
@@ -276,13 +276,13 @@ AttachedPropertyDelegateRequest::evaluate(Evaluator &evaluator,
 
   return nullptr;
 }
-    
+
 llvm::Expected<Type>
 AttachedPropertyDelegateTypeRequest::evaluate(Evaluator &evaluator,
                                               VarDecl *var) const {
   // Find the custom attribute for the attached property delegate.
   llvm::Expected<CustomAttr *> customAttrVal =
-    evaluator(AttachedPropertyDelegateRequest{var});
+      evaluator(AttachedPropertyDelegateRequest{var});
   if (!customAttrVal)
     return customAttrVal.takeError();
 
@@ -292,7 +292,7 @@ AttachedPropertyDelegateTypeRequest::evaluate(Evaluator &evaluator,
     return Type();
 
   auto resolution =
-    TypeResolution::forContextual(var->getDeclContext());
+      TypeResolution::forContextual(var->getDeclContext());
   TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
   options |= TypeResolutionFlags::AllowUnboundGenerics;
 
@@ -308,4 +308,78 @@ AttachedPropertyDelegateTypeRequest::evaluate(Evaluator &evaluator,
   }
 
   return customAttrType;
+}
+
+llvm::Expected<Type>
+PropertyDelegateBackingPropertyTypeRequest::evaluate(
+                                    Evaluator &evaluator, VarDecl *var) const {
+  llvm::Expected<Type> rawTypeResult =
+    evaluator(AttachedPropertyDelegateTypeRequest{var});
+  if (!rawTypeResult)
+    return rawTypeResult;
+
+  Type rawType = *rawTypeResult;
+  if (!rawType)
+    return Type();
+
+  if (!rawType->hasUnboundGenericType())
+    return rawType->mapTypeOutOfContext();
+
+  auto binding = var->getParentPatternBinding();
+  if (!binding)
+    return Type();
+
+  // If there's an initializer of some sort, checking it will determine the
+  // property delegate type.
+  unsigned index = binding->getPatternEntryIndexForVarDecl(var);
+  ASTContext &ctx = var->getASTContext();
+  TypeChecker &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
+  if (binding->isInitialized(index)) {
+    if (!binding->isInitializerChecked(index))
+      tc.typeCheckPatternBinding(binding, index);
+
+    Type type = ctx.getSideCachedPropertyDelegateBackingPropertyType(var);
+    assert(type || ctx.Diags.hadAnyError());
+    return type;
+  }
+
+  // Compose the type of property delegate with the type of the property.
+
+  // We expect an unbound generic type here that refers to a single-parameter
+  // generic type.
+  auto delegateAttr = var->getAttachedPropertyDelegate();
+  auto nominal = rawType->getAnyNominal();
+  auto unboundGeneric = rawType->getAs<UnboundGenericType>();
+  if (!unboundGeneric ||
+      unboundGeneric->getDecl() != nominal ||
+      !nominal->getGenericParams() ||
+      nominal->getGenericParams()->size() != 1) {
+    ctx.Diags.diagnose(delegateAttr->getLocation(),
+                       diag::property_delegate_incompatible_unbound,
+                       rawType)
+      .highlight(delegateAttr->getTypeLoc().getSourceRange());
+    return Type();
+  }
+
+  // Compute the type of the property to plug in to the delegate type.
+  tc.validateDecl(var);
+  Type propertyType = var->getType();
+
+  // Form the specialized type.
+  Type delegateType = tc.applyUnboundGenericArguments(
+      unboundGeneric, nominal, delegateAttr->getLocation(),
+      TypeResolution::forContextual(var->getDeclContext()), { propertyType });
+
+  // Make sure no unbound types remain; this could happen if there are outer
+  // unbound types that weren't resolved by the application of the property
+  // type.
+  if (delegateType->hasUnboundGenericType()) {
+    ctx.Diags.diagnose(delegateAttr->getLocation(),
+                       diag::property_delegate_incompatible_unbound,
+                       delegateType)
+      .highlight(delegateAttr->getTypeLoc().getSourceRange());
+    return Type();
+  }
+
+  return delegateType->mapTypeOutOfContext();
 }

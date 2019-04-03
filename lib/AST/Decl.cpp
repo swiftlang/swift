@@ -5263,12 +5263,43 @@ CustomAttr *VarDecl::getAttachedPropertyDelegate() const {
                            nullptr);
 }
 
+PropertyDelegateTypeInfo VarDecl::getAttachedPropertyDelegateTypeInfo() const {
+  auto attr = getAttachedPropertyDelegate();
+  if (!attr)
+    return PropertyDelegateTypeInfo();
+
+  auto dc = getDeclContext();
+  ASTContext &ctx = getASTContext();
+  auto nominal = evaluateOrDefault(
+      ctx.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
+  if (!nominal)
+    return PropertyDelegateTypeInfo();
+
+  return nominal->getPropertyDelegateTypeInfo();
+}
+
 Type VarDecl::getAttachedPropertyDelegateType() const {
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<VarDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
                            AttachedPropertyDelegateTypeRequest{mutableThis},
                            Type());
+}
+
+Type VarDecl::getPropertyDelegateBackingPropertyType() const {
+  ASTContext &ctx = getASTContext();
+  auto mutableThis = const_cast<VarDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator, PropertyDelegateBackingPropertyTypeRequest{mutableThis},
+      Type());
+}
+
+VarDecl *VarDecl::getPropertyDelegateBackingProperty() const {
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<VarDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           PropertyDelegateBackingPropertyRequest{mutableThis},
+                           nullptr);
 }
 
 Identifier VarDecl::getObjCPropertyName() const {

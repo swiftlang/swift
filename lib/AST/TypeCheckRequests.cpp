@@ -559,6 +559,35 @@ void AttachedPropertyDelegateTypeRequest::noteCycleStep(
   std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
 }
 
+bool PropertyDelegateBackingPropertyTypeRequest::isCached() const {
+  auto var = std::get<0>(getStorage());
+  return !var->getAttrs().isEmpty();
+}
+
+void PropertyDelegateBackingPropertyTypeRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference);
+}
+
+void PropertyDelegateBackingPropertyTypeRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
+}
+bool PropertyDelegateBackingPropertyRequest::isCached() const {
+  auto var = std::get<0>(getStorage());
+  return !var->getAttrs().isEmpty();
+}
+
+void PropertyDelegateBackingPropertyRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference);
+}
+
+void PropertyDelegateBackingPropertyRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
+}
+
 void swift::simple_display(
     llvm::raw_ostream &out, const PropertyDelegateTypeInfo &propertyDelegate) {
   out << "{ ";

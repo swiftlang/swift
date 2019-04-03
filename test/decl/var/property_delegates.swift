@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift
 
 // ---------------------------------------------------------------------------
 // Property delegate type definitions
@@ -79,6 +79,24 @@ struct MultipleInitialValues<Value> { // expected-error{{property delegate type 
   }
 
   init(initialValue: Double) { // expected-note{{initializer 'init(initialValue:)' declared here}}
+  }
+}
+
+@propertyDelegate
+struct InitialValueFailable<Value> {
+  var value: Value
+
+  init?(initialValue: Value) { // expected-error{{'init(initialValue:)' cannot be failable}}
+    return nil
+  }
+}
+
+@propertyDelegate
+struct InitialValueFailableIUO<Value> {
+  var value: Value
+
+  init!(initialValue: Value) {  // expected-error{{'init(initialValue:)' cannot be failable}}
+    return nil
   }
 }
 
@@ -201,4 +219,225 @@ struct Initialization {
     x4 = s // expected-error{{cannot assign value of type 'String' to type 'Int'}}
     y = s // expected-error{{cannot assign value of type 'String' to type 'Bool'}}
   }
+}
+
+// ---------------------------------------------------------------------------
+// Delegate type formation
+// ---------------------------------------------------------------------------
+@propertyDelegate
+struct IntWrapper {
+  var value: Int
+}
+
+@propertyDelegate
+struct WrapperForHashable<T: Hashable> {
+  var value: T
+}
+
+@propertyDelegate
+struct WrapperWithTwoParams<T, U> {
+  var value: (T, U)
+}
+
+struct NotHashable { }
+
+struct UseWrappersWithDifferentForm {
+  @IntWrapper
+  var x: Int
+
+  @WrapperForHashable // expected-error{{type 'NotHashable' does not conform to protocol 'Hashable'}}
+  var y: NotHashable
+
+  @WrapperForHashable
+  var yOkay: Int
+
+  @WrapperWithTwoParams // expected-error{{property delegate type 'WrapperWithTwoParams' must either specify all generic arguments or require only a single generic argument}}
+  var z: Int
+
+  @HasNestedDelegate.NestedDelegate // expected-error{{property delegate type 'HasNestedDelegate.NestedDelegate<Int>' must either specify all generic arguments or require only a single generic argument}}
+  var w: Int
+
+  @HasNestedDelegate<Double>.NestedDelegate
+  var wOkay: Int
+}
+
+
+// ---------------------------------------------------------------------------
+// Nested delegates
+// ---------------------------------------------------------------------------
+struct HasNestedDelegate<T> {
+  @propertyDelegate
+  struct NestedDelegate<U> {
+    var value: U
+    init(initialValue: U) {
+      self.value = initialValue
+    }
+  }
+
+  @NestedDelegate
+  var y: [T] = []
+}
+
+struct UsesNestedDelegate<V> {
+  @HasNestedDelegate<V>.NestedDelegate
+  var y: [V]
+}
+
+// ---------------------------------------------------------------------------
+// Referencing the backing store
+// ---------------------------------------------------------------------------
+struct BackingStore<T> {
+  @Wrapper
+  var x: T
+
+  @WrapperWithInitialValue
+  private var y = true  // expected-note{{'y' declared here}}
+
+  func getXStorage() -> Wrapper<T> {
+    return $x
+  }
+
+  func getYStorage() -> WrapperWithInitialValue<Bool> {
+    return self.$y
+  }
+}
+
+func testBackingStore<T>(bs: BackingStore<T>) {
+  _ = bs.x
+  _ = bs.y // expected-error{{'y' is inaccessible due to 'private' protection level}}
+}
+
+// ---------------------------------------------------------------------------
+// Explicitly-specified accessors
+// ---------------------------------------------------------------------------
+struct DelegateWithAccessors {
+  @Wrapper
+  var x: Int {
+    return $x.value * 2
+  }
+
+  @WrapperWithInitialValue
+  var y: Int {
+    get {
+      return $y.value
+    }
+
+    set {
+      $y.value = newValue / 2
+    }
+  }
+
+  mutating func test() {
+    x = y
+    y = x
+  }
+}
+
+struct UseWillSetDidSet {
+  @Wrapper
+  var x: Int {
+    willSet {
+      print(newValue)
+    }
+  }
+
+  @Wrapper
+  var y: Int {
+    didSet {
+      print(oldValue)
+    }
+  }
+
+  @Wrapper
+  var z: Int {
+    willSet {
+      print(newValue)
+    }
+
+    didSet {
+      print(oldValue)
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Mutating/nonmutating
+// ---------------------------------------------------------------------------
+@propertyDelegate
+struct DelegateWithNonMutatingSetter<Value> {
+  class Box {
+    var value: Value
+    init(value: Value) {
+      self.value = value
+    }
+  }
+
+  var box: Box
+
+  init(initialValue: Value) {
+    self.box = Box(value: initialValue)
+  }
+
+  var value: Value {
+    get { return box.value }
+    nonmutating set { box.value = newValue }
+  }
+}
+
+@propertyDelegate
+struct DelegateWithMutatingGetter<Value> {
+  var readCount = 0
+  var writeCount = 0
+  var stored: Value
+
+  init(initialValue: Value) {
+    self.stored = initialValue
+  }
+
+  var value: Value {
+    mutating get {
+      readCount += 1
+      return stored
+    }
+    set {
+      writeCount += 1
+      stored = newValue
+    }
+  }
+}
+
+struct UseMutatingnessDelegates {
+  @DelegateWithNonMutatingSetter
+  var x = true
+
+  @DelegateWithMutatingGetter
+  var y = 17
+
+  @DelegateWithNonMutatingSetter
+  let z = 3.14159 // expected-note 2{{change 'let' to 'var' to make it mutable}}
+}
+
+func testMutatingness() {
+  var mutable = UseMutatingnessDelegates()
+
+  _ = mutable.x
+  mutable.x = false
+
+  _ = mutable.y
+  mutable.y = 42
+
+  _ = mutable.z
+  mutable.z = 2.71828 // expected-error{{cannot assign to property: 'z' is a 'let' constant}}
+
+  let nonmutable = UseMutatingnessDelegates() // expected-note 2{{change 'let' to 'var' to make it mutable}}
+
+  // Okay due to nonmutating setter
+  _ = nonmutable.x
+  nonmutable.x = false
+
+  _ = nonmutable.y // expected-error{{cannot use mutating getter on immutable value: 'nonmutable' is a 'let' constant}}
+  nonmutable.y = 42 // expected-error{{cannot use mutating getter on immutable value: 'nonmutable' is a 'let' constant}}
+
+  _ = nonmutable.z
+  nonmutable.z = 2.71828 // expected-error{{cannot assign to property: 'z' is a 'let' constant}}
 }

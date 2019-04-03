@@ -5064,6 +5064,27 @@ public:
   /// types.
   Type getAttachedPropertyDelegateType() const;
 
+  /// Retrieve information about the attached property delegate type.
+  PropertyDelegateTypeInfo getAttachedPropertyDelegateTypeInfo() const;
+
+  /// Retrieve the fully resolved attached property delegate type.
+  ///
+  /// This type will be the fully-resolved form of
+  /// \c getAttachedPropertyDelegateType(), which will not contain any
+  /// unbound generic types. It will be the type of the backing property.
+  Type getPropertyDelegateBackingPropertyType() const;
+
+  /// Retrieve the backing storage property for a property that has an
+  /// attached property delegate.
+  ///
+  /// The backing storage property will be a stored property of the
+  /// delegate's type. This will be equivalent to
+  /// \c getAttachedPropertyDelegateType() when it is fully-specified;
+  /// if \c getAttachedPropertyDelegateType() involves an unbound
+  /// generic type, the backing storage property will be the appropriate
+  /// bound generic version.
+  VarDecl *getPropertyDelegateBackingProperty() const;
+
   /// Return the Objective-C runtime name for this property.
   Identifier getObjCPropertyName() const;
 

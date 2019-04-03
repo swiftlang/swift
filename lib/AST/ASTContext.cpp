@@ -284,6 +284,9 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   llvm::DenseMap<SourceFile *, std::array<Type, NumKnownProtocols>>
       DefaultTypeRequestCaches;
 
+  /// Mapping from property declarations to the backing variable types.
+  llvm::DenseMap<const VarDecl *, Type> PropertyDelegateBackingVarTypes;
+
   /// Structure that captures data that is segregated into different
   /// arenas.
   struct Arena {
@@ -5228,3 +5231,16 @@ Type &ASTContext::getDefaultTypeRequestCache(SourceFile *SF,
                                              KnownProtocolKind kind) {
   return getImpl().DefaultTypeRequestCaches[SF][size_t(kind)];
 }
+
+Type ASTContext::getSideCachedPropertyDelegateBackingPropertyType(
+    VarDecl *var) const {
+  return getImpl().PropertyDelegateBackingVarTypes[var];
+}
+
+void ASTContext::setSideCachedPropertyDelegateBackingPropertyType(
+    VarDecl *var, Type type) {
+  assert(!getImpl().PropertyDelegateBackingVarTypes[var] ||
+         getImpl().PropertyDelegateBackingVarTypes[var]->isEqual(type));
+  getImpl().PropertyDelegateBackingVarTypes[var] = type;
+}
+
