@@ -30,27 +30,12 @@ func takesNoEscapeClosure(_ fn : () -> Int) {
   // expected-note@-3{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
   // expected-note@-4{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
   // expected-note@-5{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
-  // expected-note@-6{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
-  // expected-note@-7{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
-  // expected-note@-8{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
   takesNoEscapeClosure { 4 }  // ok
 
   _ = fn()  // ok
 
-  var x = fn  // expected-error {{non-escaping parameter 'fn' may only be called}}
-
   // This is ok, because the closure itself is noescape.
   takesNoEscapeClosure { fn() }
-
-  // This is not ok, because it escapes the 'fn' closure.
-  doesEscape { fn() }   // expected-error {{closure use of non-escaping parameter 'fn' may allow it to escape}}
-
-  // This is not ok, because it escapes the 'fn' closure.
-  func nested_function() {
-    _ = fn()   // expected-error {{declaration closing over non-escaping parameter 'fn' may allow it to escape}}
-  }
-
-  takesNoEscapeClosure(fn)  // ok
 
   doesEscape(fn)                   // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
   takesGenericClosure(4, fn)       // ok
@@ -195,10 +180,9 @@ func takeNoEscapeTest2(_ fn : @noescape () -> ()) {  // expected-error{{@noescap
   takeNoEscapeAsObjCBlock(fn)
 }
 
-// Autoclosure implies noescape, but produce nice diagnostics so people know
-// why noescape problems happen.
+// Autoclosure implies noescape..
 func testAutoclosure(_ a : @autoclosure () -> Int) { // expected-note{{parameter 'a' is implicitly non-escaping}}
-  doesEscape { a() }  // expected-error {{closure use of non-escaping parameter 'a' may allow it to escape}}
+  doesEscape(a)  // expected-error {{passing non-escaping parameter 'a' to function expecting an @escaping closure}}
 }
 
 
@@ -304,19 +288,13 @@ typealias CompletionHandler = (_ success: Bool) -> ()
 var escape : CompletionHandlerNE
 var escapeOther : CompletionHandler
 func doThing1(_ completion: (_ success: Bool) -> ()) {
-  // expected-note@-1{{parameter 'completion' is implicitly non-escaping}}
-  // expected-error @+1 {{non-escaping parameter 'completion' may only be called}}
-  escape = completion // expected-error {{declaration closing over non-escaping parameter 'escape' may allow it to escape}}
+  escape = completion
 }
 func doThing2(_ completion: CompletionHandlerNE) {
-  // expected-note@-1{{parameter 'completion' is implicitly non-escaping}}
-  // expected-error @+1 {{non-escaping parameter 'completion' may only be called}}
-  escape = completion // expected-error {{declaration closing over non-escaping parameter 'escape' may allow it to escape}}
+  escape = completion
 }
 func doThing3(_ completion: CompletionHandler) {
-  // expected-note@-1{{parameter 'completion' is implicitly non-escaping}}
-  // expected-error @+1 {{non-escaping parameter 'completion' may only be called}}
-  escape = completion // expected-error {{declaration closing over non-escaping parameter 'escape' may allow it to escape}}
+  escape = completion
 }
 func doThing4(_ completion: @escaping CompletionHandler) {
   escapeOther = completion

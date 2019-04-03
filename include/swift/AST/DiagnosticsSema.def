@@ -2900,21 +2900,6 @@ NOTE(transitive_capture_through_here,none,
      "%0, declared here, captures %1",
      (Identifier, Identifier))
 
-ERROR(closure_implicit_capture_without_noescape,none,
-      "escaping closures can only capture inout parameters explicitly by value",
-      ())
-ERROR(closure_implicit_capture_mutating_self,none,
-      "escaping closure cannot capture a mutating self parameter",
-      ())
-NOTE(create_mutating_copy_or_capture_self,none,
-     "create a mutating copy of self, or explicitly capture self for immutability",
-     ())
-ERROR(nested_function_with_implicit_capture_argument,none,
-      "nested function with %select{an |}0implicitly captured inout "
-      "parameter%select{|s}0 can only be used as a non-escaping argument", (bool))
-ERROR(nested_function_escaping_inout_capture,none,
-      "nested function cannot capture inout parameter and escape", ())
-
 WARNING(recursive_accessor_reference,none,
         "attempting to %select{access|modify}1 %0 within its own "
         "%select{getter|setter}1", (Identifier, bool))
@@ -3039,19 +3024,10 @@ WARNING(debug_description_in_string_interpolation_segment,none,
 NOTE(silence_debug_description_in_interpolation_segment_call,none,
      "use 'String(describing:)' to silence this warning", ())
 
-ERROR(invalid_noescape_use,none,
-      "non-escaping %select{value|parameter}1 %0 may only be called",
-      (Identifier, bool))
 NOTE(noescape_parameter,none,
     "parameter %0 is implicitly non-escaping",
      (Identifier))
 
-ERROR(closure_noescape_use,none,
-      "closure use of non-escaping parameter %0 may allow it to escape",
-      (Identifier))
-ERROR(decl_closure_noescape_use,none,
-      "declaration closing over non-escaping parameter %0 may allow it to escape",
-      (Identifier))
 ERROR(passing_noescape_to_escaping,none,
       "passing non-escaping parameter %0 to function expecting an @escaping closure",
       (Identifier))
