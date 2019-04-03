@@ -1,4 +1,5 @@
-// Ensure that an error in a non-primary causes an error in the errorless primary.
+// Ensure that an error in a non-primary is reported in the causal primary's .dia file,
+// and that the other primary's .dia file is truncated to indicate a failed compilation.
 //
 // RUN: rm -f %t.*
 
