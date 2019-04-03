@@ -36,6 +36,43 @@ public struct TensorDataType {
   }
 }
 
+@usableFromInline
+internal func makeTensor(
+  dataType: TensorDataType,
+  owning pointer: CTensorHandle
+) -> AnyTensor {
+  switch dataType._cDataType {
+  case TF_BOOL:
+    return Tensor<Bool>(handle: TensorHandle(_owning: pointer))
+  case TF_INT8:
+    return Tensor<Int8>(handle: TensorHandle(_owning: pointer))
+  case TF_UINT8:
+    return Tensor<UInt8>(handle: TensorHandle(_owning: pointer))
+  case TF_INT16:
+    return Tensor<Int16>(handle: TensorHandle(_owning: pointer))
+  case TF_UINT16:
+    return Tensor<UInt16>(handle: TensorHandle(_owning: pointer))
+  case TF_INT32:
+    return Tensor<Int32>(handle: TensorHandle(_owning: pointer))
+  case TF_UINT32:
+    return Tensor<UInt32>(handle: TensorHandle(_owning: pointer))
+  case TF_INT64:
+    return Tensor<Int64>(handle: TensorHandle(_owning: pointer))
+  case TF_UINT64:
+    return Tensor<UInt64>(handle: TensorHandle(_owning: pointer))
+  case TF_BFLOAT16:
+    return Tensor<BFloat16>(handle: TensorHandle(_owning: pointer))
+  case TF_FLOAT:
+    return Tensor<Float>(handle: TensorHandle(_owning: pointer))
+  case TF_DOUBLE:
+    return Tensor<Double>(handle: TensorHandle(_owning: pointer))
+  case TF_STRING:
+    fatalError("StringTensor does not conform to AnyTensor")
+  default:
+    fatalError("Unhandled type: \(dataType)")
+  }
+}
+
 /// A data type compatible with TensorFlow.
 public protocol _TensorFlowDataTypeCompatible {
   /// The underlying TensorFlow data type.

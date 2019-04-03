@@ -1,0 +1,48 @@
+//===-- ExecuteOp.swift.gyb -----------------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file contains _TFCExecuteOp which allows dispatching an op and
+// returning an arbitrary set of tensor-groups.
+//
+// TODO: A nice wrapper for TFEOp could possibly make this simpler to use. This
+// may need to be extended in order to work with multiple tfops.
+//
+//===----------------------------------------------------------------------===//
+
+@usableFromInline
+func _TFCExecuteOp(_ op: CTFEOp, _ s: CTFStatus) {
+  var count: Int32 = 0
+  var unused: CTensorHandle?
+  _TFCEagerExecute(op, &unused, &count, s)
+  checkOk(s)
+}
+
+%for n in range(1, 11):
+// Calls _TFCEagerExecute under the hood and unpacks into TensorGroup conforming
+// types.
+@usableFromInline
+func _TFCExecuteOp<${", ".join(["T" + str(i) + " : TensorGroup" for i in range(n)])}>
+  (_ op: CTFEOp, _ s: CTFStatus)
+  -> (${", ".join(["T" + str(i) for i in range(n)])}) {
+
+  var count: Int32 = ${" + ".join(["T" + str(i) + "._tensorHandleCount" for i in range(n)])}
+  let buffer: UnsafeMutablePointer<CTensorHandle> =
+    UnsafeMutablePointer.allocate(capacity: Int(count))
+  defer { buffer.deallocate() }
+  _TFCEagerExecute(op, UnsafeMutablePointer<CTensorHandle?>(buffer), &count, s)
+  checkOk(s)
+%for i in range(n):
+let off${i}: Int32 = ${"0" if i == 0 else "off" + str(i - 1) + " + T" + str(i - 1) + "._tensorHandleCount"}
+%end
+  return (${", ".join(["T" + str(i) + ".init(_owning: buffer.advanced(by: Int(off" + str(i) + ")))" for i in range(n)])})
+}
+%end
