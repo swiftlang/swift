@@ -640,16 +640,19 @@ private:
     std::string RemappedIncludePath = DebugPrefixMap.remapPath(IncludePath);
 
     // For Clang modules / PCH, create a Skeleton CU pointing to the PCM/PCH.
-    bool CreateSkeletonCU = !ASTFile.empty();
-    bool IsRootModule = !Parent;
-    if (CreateSkeletonCU && IsRootModule) {
-      llvm::DIBuilder DIB(M);
-      DIB.createCompileUnit(IGM.ObjCInterop ? llvm::dwarf::DW_LANG_ObjC
-                                            : llvm::dwarf::DW_LANG_C99,
-                            DIB.createFile(Name, RemappedIncludePath),
-                            TheCU->getProducer(), true, StringRef(), 0, ASTFile,
-                            llvm::DICompileUnit::FullDebug, Signature);
-      DIB.finalize();
+    if (!Opts.DisableClangModuleSkeletonCUs) {
+      bool CreateSkeletonCU = !ASTFile.empty();
+      bool IsRootModule = !Parent;
+      if (CreateSkeletonCU && IsRootModule) {
+        llvm::DIBuilder DIB(M);
+        DIB.createCompileUnit(IGM.ObjCInterop ? llvm::dwarf::DW_LANG_ObjC
+                                              : llvm::dwarf::DW_LANG_C99,
+                              DIB.createFile(Name, RemappedIncludePath),
+                              TheCU->getProducer(), true, StringRef(), 0,
+                              ASTFile, llvm::DICompileUnit::FullDebug,
+                              Signature);
+        DIB.finalize();
+      }
     }
 
     StringRef Sysroot = IGM.Context.SearchPathOpts.SDKPath;
