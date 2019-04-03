@@ -67,7 +67,11 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                     &legacyResult, 1,
                     n)
         
+        let returnedResult = vDSP.integerToFloatingPoint(source,
+                                                         floatingPointType: Float.self)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/UInt8_to_Double") {
@@ -81,7 +85,11 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                      &legacyResult, 1,
                      n)
         
+        let returnedResult = vDSP.integerToFloatingPoint(source,
+                                                         floatingPointType: Double.self)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/UInt16_to_Float") {
@@ -95,7 +103,11 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                      &legacyResult, 1,
                      n)
         
+        let returnedResult = vDSP.integerToFloatingPoint(source,
+                                                         floatingPointType: Float.self)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/UInt16_to_Double") {
@@ -109,7 +121,11 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                       &legacyResult, 1,
                       n)
         
+        let returnedResult = vDSP.integerToFloatingPoint(source,
+                                                         floatingPointType: Double.self)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/UInt32_to_Float") {
@@ -123,7 +139,11 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                      &legacyResult, 1,
                      n)
         
+        let returnedResult = vDSP.integerToFloatingPoint(source,
+                                                         floatingPointType: Float.self)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/UInt32_to_Double") {
@@ -137,7 +157,11 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                       &legacyResult, 1,
                       n)
         
+        let returnedResult = vDSP.integerToFloatingPoint(source,
+                                                         floatingPointType: Double.self)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/Int8_to_Float") {
@@ -151,7 +175,11 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                    &legacyResult, 1,
                    n)
         
+        let returnedResult = vDSP.integerToFloatingPoint(source,
+                                                         floatingPointType: Float.self)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/Int8_to_Double") {
@@ -165,7 +193,11 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                     &legacyResult, 1,
                     n)
         
+        let returnedResult = vDSP.integerToFloatingPoint(source,
+                                                         floatingPointType: Double.self)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/Int16_to_Float") {
@@ -179,7 +211,11 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                     &legacyResult, 1,
                     n)
         
+        let returnedResult = vDSP.integerToFloatingPoint(source,
+                                                         floatingPointType: Float.self)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/Int16_to_Double") {
@@ -193,7 +229,11 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                      &legacyResult, 1,
                      n)
         
+        let returnedResult = vDSP.integerToFloatingPoint(source,
+                                                         floatingPointType: Double.self)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/Int32_to_Float") {
@@ -207,7 +247,11 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                     &legacyResult, 1,
                     n)
         
+        let returnedResult = vDSP.integerToFloatingPoint(source,
+                                                         floatingPointType: Float.self)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/Int32_to_Double") {
@@ -221,7 +265,11 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                      &legacyResult, 1,
                      n)
         
+        let returnedResult = vDSP.integerToFloatingPoint(source,
+                                                         floatingPointType: Double.self)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/FloatToInt32towardZero") {
@@ -235,7 +283,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                     &legacyResult, 1,
                     n)
         
+        let returnedResult = vDSP.floatingPointToInteger(source,
+                                                         integerType: Int32.self,
+                                                         rounding: .towardZero)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/FloatToInt32towardNearest") {
@@ -249,7 +302,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                      &legacyResult, 1,
                      n)
         
+        let returnedResult = vDSP.floatingPointToInteger(source,
+                                                         integerType: Int32.self,
+                                                         rounding: .towardNearestInteger)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/DoubleToInt32towardZero") {
@@ -263,7 +321,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                      &legacyResult, 1,
                      n)
         
+        let returnedResult = vDSP.floatingPointToInteger(source,
+                                                         integerType: Int32.self,
+                                                         rounding: .towardZero)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/DoubleToInt32towardNearest") {
@@ -277,7 +340,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                       &legacyResult, 1,
                       n)
         
+        let returnedResult = vDSP.floatingPointToInteger(source,
+                                                         integerType: Int32.self,
+                                                         rounding: .towardNearestInteger)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/FloatToUInt16towardZero") {
@@ -291,7 +359,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                      &legacyResult, 1,
                      n)
         
+        let returnedResult = vDSP.floatingPointToInteger(source,
+                                                         integerType: UInt16.self,
+                                                         rounding: .towardZero)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/FloatToUInt16towardNearest") {
@@ -305,7 +378,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                       &legacyResult, 1,
                       n)
         
+        let returnedResult = vDSP.floatingPointToInteger(source,
+                                                         integerType: UInt16.self,
+                                                         rounding: .towardNearestInteger)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/DoubleToUInt16towardZero") {
@@ -319,7 +397,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                       &legacyResult, 1,
                       n)
         
+        let returnedResult = vDSP.floatingPointToInteger(source,
+                                                         integerType: UInt16.self,
+                                                         rounding: .towardZero)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/DoubleToUInt16towardNearest") {
@@ -333,7 +416,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                        &legacyResult, 1,
                        n)
         
+        let returnedResult = vDSP.floatingPointToInteger(source,
+                                                         integerType: UInt16.self,
+                                                         rounding: .towardNearestInteger)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/FloatToUInt32towardZero") {
@@ -347,7 +435,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                      &legacyResult, 1,
                      n)
         
+        let returnedResult = vDSP.floatingPointToInteger(source,
+                                                         integerType: UInt32.self,
+                                                         rounding: .towardZero)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/FloatToUInt32towardNearest") {
@@ -361,7 +454,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                       &legacyResult, 1,
                       n)
         
+        let returnedResult = vDSP.floatingPointToInteger(source,
+                                                         integerType: UInt32.self,
+                                                         rounding: .towardNearestInteger)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/DoubleToUInt32towardZero") {
@@ -375,7 +473,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                       &legacyResult, 1,
                       n)
         
+        let returnedResult = vDSP.floatingPointToInteger(source,
+                                                         integerType: UInt32.self,
+                                                         rounding: .towardZero)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/DoubleToUInt32towardNearest") {
@@ -389,7 +492,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                        &legacyResult, 1,
                        n)
         
+        let returnedResult = vDSP.floatingPointToInteger(source,
+                                                         integerType: UInt32.self,
+                                                         rounding: .towardNearestInteger)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/FloatToInt16towardZero") {
@@ -403,7 +511,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                     &legacyResult, 1,
                     n)
         
+        let returnedResult = vDSP.floatingPointToInteger(source,
+                                                         integerType: Int16.self,
+                                                         rounding: .towardZero)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/FloatToInt16towardNearest") {
@@ -417,7 +530,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                      &legacyResult, 1,
                      n)
         
+        let returnedResult = vDSP.floatingPointToInteger(source,
+                                                         integerType: Int16.self,
+                                                         rounding: .towardNearestInteger)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/DoubleToInt16towardZero") {
@@ -431,7 +549,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                      &legacyResult, 1,
                      n)
         
+        let returnedResult = vDSP.floatingPointToInteger(source,
+                                                         integerType: Int16.self,
+                                                         rounding: .towardZero)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/DoubleToInt16towardNearest") {
@@ -445,7 +568,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                       &legacyResult, 1,
                       n)
         
+        let returnedResult = vDSP.floatingPointToInteger(source,
+                                                         integerType: Int16.self,
+                                                         rounding: .towardNearestInteger)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/FloatToInt8towardZero") {
@@ -459,7 +587,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                    &legacyResult, 1,
                    n)
         
+        let returnedResult = vDSP.floatingPointToInteger(source,
+                                                         integerType: Int8.self,
+                                                         rounding: .towardZero)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/FloatToInt8towardNearest") {
@@ -473,7 +606,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                     &legacyResult, 1,
                     n)
         
+        let returnedResult = vDSP.floatingPointToInteger(source,
+                                                         integerType: Int8.self,
+                                                         rounding: .towardNearestInteger)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/DoubleToInt8towardZero") {
@@ -487,7 +625,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                     &legacyResult, 1,
                     n)
         
+        let returnedResult = vDSP.floatingPointToInteger(source,
+                                                         integerType: Int8.self,
+                                                         rounding: .towardZero)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/DoubleToInt8towardNearest") {
@@ -501,7 +644,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                      &legacyResult, 1,
                      n)
         
+        let returnedResult = vDSP.floatingPointToInteger(source,
+                                                         integerType: Int8.self,
+                                                         rounding: .towardNearestInteger)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/FloatToUInt8towardZero") {
@@ -515,7 +663,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                     &legacyResult, 1,
                     n)
         
+        let returnedResult = vDSP.floatingPointToInteger(source,
+                                                         integerType: UInt8.self,
+                                                         rounding: .towardZero)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/FloatToUInt8towardNearest") {
@@ -529,7 +682,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                      &legacyResult, 1,
                      n)
         
+        let returnedResult = vDSP.floatingPointToInteger(source,
+                                                         integerType: UInt8.self,
+                                                         rounding: .towardNearestInteger)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/DoubleToUInt8towardZero") {
@@ -543,7 +701,12 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                      &legacyResult, 1,
                      n)
         
+        let returnedResult = vDSP.floatingPointToInteger(source,
+                                                         integerType: UInt8.self,
+                                                         rounding: .towardZero)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/DoubletoUInt8towardNearest") {
@@ -557,7 +720,16 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                       &legacyResult, 1,
                       n)
         
+        let returnedResult = vDSP.floatingPointToInteger(source,
+                                                         integerType: UInt8.self,
+                                                         rounding: .towardNearestInteger)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
+    }
+    
+     AccelerateTests_vDSPConversion.test("vDSP/SIMON_SIMON_SIMON_SIMON_SIMON_SIMON_SIMON") {
+        expectTrue(false)
     }
 }
 

@@ -794,3 +794,466 @@ extension vDSP {
             }
     }
 }
+
+//===----------------------------------------------------------------------===//
+//
+//  Conversion functions that return the result
+//
+//===----------------------------------------------------------------------===//
+
+@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+public protocol vDSP_IntegerConvertable {}
+extension UInt8: vDSP_IntegerConvertable {}
+extension UInt16: vDSP_IntegerConvertable {}
+extension UInt32: vDSP_IntegerConvertable {}
+extension Int8: vDSP_IntegerConvertable {}
+extension Int16: vDSP_IntegerConvertable {}
+extension Int32: vDSP_IntegerConvertable {}
+
+@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+public protocol vDSP_FloatingPointConvertable {}
+extension Float: vDSP_FloatingPointConvertable {}
+extension Double: vDSP_FloatingPointConvertable {}
+
+extension vDSP {
+    
+    // MARK: Integer to floating-point conversion
+    
+    /// Converts an array of unsigned 8-bit integers to floating-point values.
+    ///
+    /// - Parameter source: Source vector.
+    /// - Returns: Conversion result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func integerToFloatingPoint<T, U>(_ vector: T,
+                                                    floatingPointType: U.Type) -> [U]
+        where
+        T: _ContiguousCollection,
+        T.Element == UInt8,
+        U: vDSP_FloatingPointConvertable {
+            
+            switch floatingPointType {
+            case is Float.Type:
+                let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                    buffer, initializedCount in
+                    
+                    convert(vector,
+                            to: &buffer)
+                    
+                    initializedCount = vector.count
+                }
+                
+                return result as! [U]
+            case is Double.Type:
+                let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                    buffer, initializedCount in
+                    
+                    convert(vector,
+                            to: &buffer)
+                    
+                    initializedCount = vector.count
+                }
+                
+                return result as! [U]
+                
+            default:
+                fatalError("\(floatingPointType) not supported as a destination type.")
+            }
+    }
+    
+    /// Converts an array of unsigned 16-bit integers to floating-point values.
+    ///
+    /// - Parameter source: Source vector.
+    /// - Returns: Conversion result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func integerToFloatingPoint<T, U>(_ vector: T,
+                                                    floatingPointType: U.Type) -> [U]
+        where
+        T: _ContiguousCollection,
+        T.Element == UInt16,
+        U: vDSP_FloatingPointConvertable {
+            
+            switch floatingPointType {
+            case is Float.Type:
+                let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                    buffer, initializedCount in
+                    
+                    convert(vector,
+                            to: &buffer)
+                    
+                    initializedCount = vector.count
+                }
+                
+                return result as! [U]
+            case is Double.Type:
+                let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                    buffer, initializedCount in
+                    
+                    convert(vector,
+                            to: &buffer)
+                    
+                    initializedCount = vector.count
+                }
+                
+                return result as! [U]
+                
+            default:
+                fatalError("\(floatingPointType) not supported as a destination type.")
+            }
+    }
+    
+    /// Converts an array of unsigned 32-bit integers to floating-point values.
+    ///
+    /// - Parameter source: Source vector.
+    /// - Returns: Conversion result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func integerToFloatingPoint<T, U>(_ vector: T,
+                                                    floatingPointType: U.Type) -> [U]
+        where
+        T: _ContiguousCollection,
+        T.Element == UInt32,
+        U: vDSP_FloatingPointConvertable {
+            
+            switch floatingPointType {
+            case is Float.Type:
+                let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                    buffer, initializedCount in
+                    
+                    convert(vector,
+                            to: &buffer)
+                    
+                    initializedCount = vector.count
+                }
+                
+                return result as! [U]
+            case is Double.Type:
+                let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                    buffer, initializedCount in
+                    
+                    convert(vector,
+                            to: &buffer)
+                    
+                    initializedCount = vector.count
+                }
+                
+                return result as! [U]
+                
+            default:
+                fatalError("\(floatingPointType) not supported as a destination type.")
+            }
+    }
+    
+    /// Converts an array of signed 8-bit integers to floating-point values.
+    ///
+    /// - Parameter source: Source vector.
+    /// - Returns: Conversion result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func integerToFloatingPoint<T, U>(_ vector: T,
+                                                    floatingPointType: U.Type) -> [U]
+        where
+        T: _ContiguousCollection,
+        T.Element == Int8,
+        U: vDSP_FloatingPointConvertable {
+            
+            switch floatingPointType {
+            case is Float.Type:
+                let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                    buffer, initializedCount in
+                    
+                    convert(vector,
+                            to: &buffer)
+                    
+                    initializedCount = vector.count
+                }
+                
+                return result as! [U]
+            case is Double.Type:
+                let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                    buffer, initializedCount in
+                    
+                    convert(vector,
+                            to: &buffer)
+                    
+                    initializedCount = vector.count
+                }
+                
+                return result as! [U]
+                
+            default:
+                fatalError("\(floatingPointType) not supported as a destination type.")
+            }
+    }
+    
+    /// Converts an array of signed 16-bit integers to floating-point values.
+    ///
+    /// - Parameter source: Source vector.
+    /// - Returns: Conversion result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func integerToFloatingPoint<T, U>(_ vector: T,
+                                                    floatingPointType: U.Type) -> [U]
+        where
+        T: _ContiguousCollection,
+        T.Element == Int16,
+        U: vDSP_FloatingPointConvertable {
+            
+            switch floatingPointType {
+            case is Float.Type:
+                let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                    buffer, initializedCount in
+                    
+                    convert(vector,
+                            to: &buffer)
+                    
+                    initializedCount = vector.count
+                }
+                
+                return result as! [U]
+            case is Double.Type:
+                let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                    buffer, initializedCount in
+                    
+                    convert(vector,
+                            to: &buffer)
+                    
+                    initializedCount = vector.count
+                }
+                
+                return result as! [U]
+                
+            default:
+                fatalError("\(floatingPointType) not supported as a destination type.")
+            }
+    }
+    
+    /// Converts an array of signed 32-bit integers to floating-point values.
+    ///
+    /// - Parameter source: Source vector.
+    /// - Returns: Conversion result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func integerToFloatingPoint<T, U>(_ vector: T,
+                                                    floatingPointType: U.Type) -> [U]
+        where
+        T: _ContiguousCollection,
+        T.Element == Int32,
+        U: vDSP_FloatingPointConvertable {
+            
+            switch floatingPointType {
+            case is Float.Type:
+                let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
+                    buffer, initializedCount in
+                    
+                    convert(vector,
+                            to: &buffer)
+                    
+                    initializedCount = vector.count
+                }
+                
+                return result as! [U]
+            case is Double.Type:
+                let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
+                    buffer, initializedCount in
+                    
+                    convert(vector,
+                            to: &buffer)
+                    
+                    initializedCount = vector.count
+                }
+                
+                return result as! [U]
+                
+            default:
+                fatalError("\(floatingPointType) not supported as a destination type.")
+            }
+    }
+    
+    // MARK: Floating-point to integer conversion
+    
+    /// Converts an array of single-precision floating-point values to integer values using specified rounding.
+    ///
+    /// - Parameter source: Source vector.
+    /// - Returns: Conversion result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func floatingPointToInteger<T, U>(_ vector: T,
+                                                    integerType: U.Type,
+                                                    rounding: RoundingMode) -> [U]
+        where
+        T: _ContiguousCollection,
+        T.Element == Float,
+        U: vDSP_IntegerConvertable {
+            
+            switch integerType {
+            case is UInt8.Type:
+                let result = Array<UInt8>(unsafeUninitializedCapacity: vector.count) {
+                    buffer, initializedCount in
+                    
+                    convert(vector,
+                            to: &buffer,
+                            rounding: rounding)
+                    
+                    initializedCount = vector.count
+                }
+                
+                return result as! [U]
+            case is UInt16.Type:
+                let result = Array<UInt16>(unsafeUninitializedCapacity: vector.count) {
+                    buffer, initializedCount in
+                    
+                    convert(vector,
+                            to: &buffer,
+                            rounding: rounding)
+                    
+                    initializedCount = vector.count
+                }
+                
+                return result as! [U]
+            case is UInt32.Type:
+                let result = Array<UInt32>(unsafeUninitializedCapacity: vector.count) {
+                    buffer, initializedCount in
+                    
+                    convert(vector,
+                            to: &buffer,
+                            rounding: rounding)
+                    
+                    initializedCount = vector.count
+                }
+                
+                return result as! [U]
+            case is Int8.Type:
+                let result = Array<Int8>(unsafeUninitializedCapacity: vector.count) {
+                    buffer, initializedCount in
+                    
+                    convert(vector,
+                            to: &buffer,
+                            rounding: rounding)
+                    
+                    initializedCount = vector.count
+                }
+                
+                return result as! [U]
+            case is Int16.Type:
+                let result = Array<Int16>(unsafeUninitializedCapacity: vector.count) {
+                    buffer, initializedCount in
+                    
+                    convert(vector,
+                            to: &buffer,
+                            rounding: rounding)
+                    
+                    initializedCount = vector.count
+                }
+                
+                return result as! [U]
+            case is Int32.Type:
+                let result = Array<Int32>(unsafeUninitializedCapacity: vector.count) {
+                    buffer, initializedCount in
+                    
+                    convert(vector,
+                            to: &buffer,
+                            rounding: rounding)
+                    
+                    initializedCount = vector.count
+                }
+                
+                return result as! [U]
+            default:
+                fatalError("\(integerType) not supported as a destination type.")
+            }
+    }
+    
+    /// Converts an array of double-precision floating-point values to integer values using specified rounding.
+    ///
+    /// - Parameter source: Source vector.
+    /// - Returns: Conversion result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func floatingPointToInteger<T, U>(_ vector: T,
+                                                    integerType: U.Type,
+                                                    rounding: RoundingMode) -> [U]
+        where
+        T: _ContiguousCollection,
+        T.Element == Double,
+        U: vDSP_IntegerConvertable {
+            
+            switch integerType {
+            case is UInt8.Type:
+                let result = Array<UInt8>(unsafeUninitializedCapacity: vector.count) {
+                    buffer, initializedCount in
+                    
+                    convert(vector,
+                            to: &buffer,
+                            rounding: rounding)
+                    
+                    initializedCount = vector.count
+                }
+                
+                return result as! [U]
+            case is UInt16.Type:
+                let result = Array<UInt16>(unsafeUninitializedCapacity: vector.count) {
+                    buffer, initializedCount in
+                    
+                    convert(vector,
+                            to: &buffer,
+                            rounding: rounding)
+                    
+                    initializedCount = vector.count
+                }
+                
+                return result as! [U]
+            case is UInt32.Type:
+                let result = Array<UInt32>(unsafeUninitializedCapacity: vector.count) {
+                    buffer, initializedCount in
+                    
+                    convert(vector,
+                            to: &buffer,
+                            rounding: rounding)
+                    
+                    initializedCount = vector.count
+                }
+                
+                return result as! [U]
+            case is Int8.Type:
+                let result = Array<Int8>(unsafeUninitializedCapacity: vector.count) {
+                    buffer, initializedCount in
+                    
+                    convert(vector,
+                            to: &buffer,
+                            rounding: rounding)
+                    
+                    initializedCount = vector.count
+                }
+                
+                return result as! [U]
+            case is Int16.Type:
+                let result = Array<Int16>(unsafeUninitializedCapacity: vector.count) {
+                    buffer, initializedCount in
+                    
+                    convert(vector,
+                            to: &buffer,
+                            rounding: rounding)
+                    
+                    initializedCount = vector.count
+                }
+                
+                return result as! [U]
+            case is Int32.Type:
+                let result = Array<Int32>(unsafeUninitializedCapacity: vector.count) {
+                    buffer, initializedCount in
+                    
+                    convert(vector,
+                            to: &buffer,
+                            rounding: rounding)
+                    
+                    initializedCount = vector.count
+                }
+                
+                return result as! [U]
+            default:
+                fatalError("\(integerType) not supported as a destination type.")
+            }
+    }
+}
