@@ -218,6 +218,10 @@ extension _SmallString {
       return try f(UnsafeMutableBufferPointer(
         start: ptr, count: _SmallString.capacity))
     }
+    if len == 0 {
+      self = _SmallString()
+      return
+    }
     _internalInvariant(len <= _SmallString.capacity)
 
     let (leading, trailing) = self.zeroTerminatedRawCodeUnits

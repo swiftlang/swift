@@ -410,7 +410,7 @@ extension __StringStorage {
       _ buffer: UnsafeMutableBufferPointer<UInt8>,
       _ initializedCount: inout Int
     ) throws -> Void
-  ) rethrows -> __StringStorage? {
+  ) rethrows -> __StringStorage {
     let storage = __StringStorage.create(
       capacity: capacity,
       countAndFlags: CountAndFlags(mortalCount: 0, isASCII: false)
@@ -425,8 +425,9 @@ extension __StringStorage {
                                             isASCII: info.isASCII)
       storage._invariantCheck()
       return storage
+    } else {
+      return String._fromUTF8Repairing(UnsafeBufferPointer(buffer)).result._guts._object.nativeStorage
     }
-    return nil
   }
 
   @_effects(releasenone)

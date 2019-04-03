@@ -102,7 +102,7 @@ extension String {
   ///       - initializedCount: Set this to the number of elements in `buffer`
   ///           that were actually initialized by the `initializer`
   @inlinable @inline(__always)
-  public init?(
+  public init(
     unsafeUninitializedCapacity capacity: Int,
     initializingRepairingUTF8With initializer: (
       _ buffer: UnsafeMutableBufferPointer<UInt8>,
@@ -127,7 +127,7 @@ extension String {
 
   @_effects(releasenone)
   @usableFromInline
-  internal init?(
+  internal init(
     _unsafeLargeUninitializedCapacity capacity: Int,
     nonASCIISmallString: _SmallString?,
     initializingRepairingUTF8With initializer: (
@@ -141,12 +141,9 @@ extension String {
       return
     }
     _internalInvariant(capacity > _SmallString.capacity)
-    guard let storage = try __StringStorage.create(
+    let storage = try __StringStorage.create(
       unsafeUninitializedCapacity: capacity,
-      initializingRepairingUTF8With: initializer
-    ) else {
-      return nil
-    }
+      initializingRepairingUTF8With: initializer)
     
     self = storage.asString
   }

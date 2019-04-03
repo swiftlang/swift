@@ -42,22 +42,6 @@ private func _copyString(_ obj: NSString) -> NSString {
 }
 
 @_effects(releasenone)
-private func _cfStringUTF8Count(_ obj: NSString, _ len: Int) -> Int {
-  var count = 0
-  let _ = CFStringGetBytes(
-    obj as CFString,
-    CFRange(location: 0, length: len),
-    CFStringBuiltInEncodings.UTF8.rawValue,
-    0, //lossByte,
-    false, //isExternalRepresentation
-    nil,
-    15,
-    &count
-  )
-  return count
-}
-
-@_effects(releasenone)
 private func _getBytes(_ theString: NSString,
                        _ range: CFRange,
                        _ encoding: CFStringEncoding,
@@ -111,8 +95,9 @@ extension String : _ObjectiveCBridgeable {
     _ source: NSString,
     _ len: Int
   ) -> String? {
-    return String(unsafeUninitializedCapacity: 15) { (ptr, outCount) in
-      let _ = _getBytes(
+    assert(len != 0)
+    let result = String(unsafeUninitializedCapacity: 15) { (ptr, outCount) in
+      let converted = _getBytes(
         source,
         CFRange(location: 0, length: len),
         CFStringBuiltInEncodings.UTF8.rawValue,
@@ -121,7 +106,14 @@ extension String : _ObjectiveCBridgeable {
         15, //maxBufLen
         &outCount
       )
+      if converted != len {
+        outCount = 0 //truncated, so produce an empty String instead
+      }
     }
+    if result.isEmpty {
+      return nil
+    }
+    return result
   }
   
   @_effects(releasenone)
@@ -129,6 +121,9 @@ extension String : _ObjectiveCBridgeable {
     _ source: NSString
   ) -> String {
     let len = _length(source)
+    if len == 0 {
+      return String()
+    }
     let sourceClass:AnyClass = _getClass(source)
     
     // Only try regular CF-based NSStrings for now due to things like
@@ -137,7 +132,6 @@ extension String : _ObjectiveCBridgeable {
     // In the future we should do mutable __NSCFStrings of any length here.
     if sourceClass == nscfClass,
        len <= 15,
-       _cfStringUTF8Count(source, len) <= 15,
        let eager = _bridgeToSmall(source, len) {
       return eager
     } 
