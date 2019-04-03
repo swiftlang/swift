@@ -24,6 +24,7 @@
 #include "swift/Strings.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -2053,7 +2054,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
   auto checkUnsupportedAttr = [&](TypeAttrKind attr) {
     if (attrs.has(attr)) {
-      diagnose(attrs.getLoc(attr), diag::attribute_not_supported);
+      diagnose(attrs.getLoc(attr), diag::unknown_attribute,
+               TypeAttributes::getAttrName(attr));
       attrs.clearAttribute(attr);
     }
   };
@@ -2061,7 +2063,12 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // Some function representation attributes are not supported at source level;
   // only SIL knows how to handle them.  Reject them unless this is a SIL input.
   if (!(options & TypeResolutionFlags::SILType)) {
-    for (auto silOnlyAttr : {TAK_callee_owned, TAK_callee_guaranteed}) {
+    for (auto silOnlyAttr : {TAK_pseudogeneric,
+                             TAK_callee_owned,
+                             TAK_callee_guaranteed,
+                             TAK_noescape,
+                             TAK_yield_once,
+                             TAK_yield_many}) {
       checkUnsupportedAttr(silOnlyAttr);
     }
   }  
@@ -2181,7 +2188,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       }
 
       // Resolve the function type directly with these attributes.
-      FunctionType::ExtInfo extInfo(rep, attrs.has(TAK_noescape),
+      FunctionType::ExtInfo extInfo(rep, /*noescape=*/false,
                                     fnRepr->throws());
 
       ty = resolveASTFunctionType(fnRepr, options, extInfo);
@@ -2208,7 +2215,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   }
 
   // Handle @escaping
-  if (hasFunctionAttr && ty->is<FunctionType>()) {
+  if (ty->is<FunctionType>()) {
     if (attrs.has(TAK_escaping)) {
       // The attribute is meaningless except on non-variadic parameter types.
       if (!isParam || options.getBaseContext() == TypeResolverContext::EnumElementDecl) {
@@ -2233,9 +2240,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
   if (hasFunctionAttr && !fnRepr) {
     if (attrs.has(TAK_autoclosure)) {
-      // @autoclosure usually auto-implies @noescape,
-      // don't complain about both of them.
-      attrs.clearAttribute(TAK_noescape);
       // @autoclosure is going to be diagnosed when type of
       // the parameter is validated, because that attribute
       // applies to the declaration now.
