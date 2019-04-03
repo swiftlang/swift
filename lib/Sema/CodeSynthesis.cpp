@@ -322,7 +322,7 @@ static void maybeMarkTransparent(AccessorDecl *accessor, ASTContext &ctx) {
   // Accessors for classes with @objc ancestry are not @_transparent,
   // since they use a field offset variable which is not exported.
   if (auto *classDecl = dyn_cast<ClassDecl>(nominalDecl))
-    if (classDecl->checkObjCAncestry() != ObjCClassKind::NonObjC)
+    if (classDecl->checkAncestry(AncestryFlags::ObjC))
       return;
 
   // Accessors synthesized on-demand are never transaprent.

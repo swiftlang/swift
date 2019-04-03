@@ -3335,13 +3335,8 @@ public:
 
       // If the best method was from a subclass of the place where
       // this method was declared, we have a new best.
-      while (auto superclassDecl = bestClassDecl->getSuperclassDecl()) {
-        if (classDecl == superclassDecl) {
-          bestMethod = method;
-          break;
-        }
-
-        bestClassDecl = superclassDecl;
+      if (classDecl->isSuperclassOf(bestClassDecl)) {
+        bestMethod = method;
       }
     }
 

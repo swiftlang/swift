@@ -1480,7 +1480,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
     return error(Status::TargetIncompatible);
   }
   if (ctx.LangOpts.EnableTargetOSChecking &&
-      M->getResilienceStrategy() != ResilienceStrategy::Resilient &&
+      !M->isResilient() &&
       isTargetTooNew(moduleTarget, ctx.LangOpts.Target)) {
     return error(Status::TargetTooNew);
   }

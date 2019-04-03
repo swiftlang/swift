@@ -324,6 +324,10 @@ public:
     Bits.ModuleDecl.RawResilienceStrategy = unsigned(strategy);
   }
 
+  bool isResilient() const {
+    return getResilienceStrategy() != ResilienceStrategy::Default;
+  }
+
   /// Look up a (possibly overloaded) value set at top-level scope
   /// (but with the specified access path, which may come from an import decl)
   /// within the current module.
