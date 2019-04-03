@@ -21,7 +21,12 @@ import Accelerate
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 extension vImage_Buffer {
     
-    /// Returns the size, in pixels, of a vImage buffer.
+    /// The size of the vImage buffer.
+    ///
+    /// The `CGSize` is rounded down to the nearest representable `CGFloat` that
+    /// is less than or equal to the actual size of the image. In practice the
+    /// conversion will always be exact, except for really big images. In that
+    /// case, some part of the bottom or right edge might be truncated.
     public var size: CGSize {
         var mutableSelf = self
         return vImageBuffer_GetSize(&mutableSelf)
