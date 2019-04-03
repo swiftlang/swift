@@ -3545,6 +3545,19 @@ public:
     return false;
   }
 };
+  
+/// Instances of this structure represent elements of the capture list that can
+/// optionally occur in a capture expression.
+struct CaptureListEntry {
+  VarDecl *Var;
+  PatternBindingDecl *Init;
+  
+  CaptureListEntry(VarDecl *Var, PatternBindingDecl *Init)
+  : Var(Var), Init(Init) {
+  }
+  
+  bool isSimpleSelfCapture() const;
+};
 
 /// An explicit unnamed function expression, which can optionally have
 /// named arguments.
@@ -3574,6 +3587,9 @@ class ClosureExpr : public AbstractClosureExpr {
   /// was originally just a single expression.
   llvm::PointerIntPair<BraceStmt *, 1, bool> Body;
   
+  /// The list of VarDecls captured explicitly by this closure, nullptr
+  /// if there are no explicit captures.
+  ArrayRef<CaptureListEntry> CaptureList;
 public:
   ClosureExpr(ParameterList *params, SourceLoc throwsLoc, SourceLoc arrowLoc,
               SourceLoc inLoc, TypeLoc explicitResultType,
@@ -3582,7 +3598,8 @@ public:
                           discriminator, parent),
       ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc), InLoc(inLoc),
       ExplicitResultType(explicitResultType),
-      Body(nullptr) {
+      Body(nullptr),
+      CaptureList() {
     setParameterList(params);
     Bits.ClosureExpr.HasAnonymousClosureVars = false;
   }
@@ -3678,6 +3695,15 @@ public:
 
   /// Is this a completely empty closure?
   bool hasEmptyBody() const;
+  
+  ArrayRef<CaptureListEntry> getCaptureList() const { return CaptureList; }
+  void setCaptureList(ArrayRef<CaptureListEntry> list) {
+    CaptureList = list;
+  }
+  
+  bool hasSimplyCapturedSelfParam() const;
+  VarDecl *getSelfParamCaptureDecl() const;
+  PatternBindingDecl *getSelfParamCaptureInit() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Closure;
@@ -3734,17 +3760,6 @@ public:
   }
   static bool classof(const DeclContext *C) {
     return isa<AbstractClosureExpr>(C) && classof(cast<AbstractClosureExpr>(C));
-  }
-};
-
-/// Instances of this structure represent elements of the capture list that can
-/// optionally occur in a capture expression.
-struct CaptureListEntry {
-  VarDecl *Var;
-  PatternBindingDecl *Init;
-
-  CaptureListEntry(VarDecl *Var, PatternBindingDecl *Init)
-  : Var(Var), Init(Init) {
   }
 };
 

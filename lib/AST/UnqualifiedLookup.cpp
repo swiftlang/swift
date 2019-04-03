@@ -725,8 +725,27 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByPureFunction(
 
 void UnqualifiedLookupFactory::lookupNamesIntroducedByClosure(
     AbstractClosureExpr *ACE, Optional<bool> isCascadingUse) {
-  if (auto *CE = dyn_cast<ClosureExpr>(ACE))
+  if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
     lookForLocalVariablesIn(CE);
+    if (CE->hasSimplyCapturedSelfParam()) {
+      // If this closure has captured self, then we need to look for potential
+      // instance members in the type context of the self param.
+      ifNotDoneYet([&] {
+        assert(CE->getSelfParamCaptureInit()->getNumPatternEntries() == 1);
+        auto *selfDecl = CE->getSelfParamCaptureInit()
+                           ->getSingleInitializerVar();
+        DeclContext *const parentCtx = selfDecl->getDeclContext()->getParent();
+        finishLookingInContext(
+          AddGenericParameters::Yes,
+          CE->getParent(),
+          ResultFinderForTypeContext(CE, parentCtx),
+          resolveIsCascadingUse(ACE, isCascadingUse,
+                                /*onlyCareAboutFunctionBody=*/false));
+        // clang-format on
+      });
+      return;
+    }
+  }
   ifNotDoneYet([&] {
     // clang-format off
     finishLookingInContext(

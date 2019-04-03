@@ -2184,6 +2184,9 @@ public:
   /// When the pattern binding contains only a single variable with no
   /// destructuring, retrieve that variable.
   VarDecl *getSingleVar() const;
+      
+  /// When the initializer is a single DeclRefExpr, retrieve the referenced decl.
+  VarDecl *getSingleInitializerVar() const;
 
   bool isStatic() const { return Bits.PatternBindingDecl.IsStatic; }
   void setStatic(bool s) { Bits.PatternBindingDecl.IsStatic = s; }

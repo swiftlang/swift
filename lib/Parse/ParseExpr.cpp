@@ -2857,8 +2857,11 @@ ParserResult<Expr> Parser::parseExprClosure() {
 
   // If the closure includes a capture list, create an AST node for it as well.
   Expr *result = closure;
-  if (!captureList.empty())
-    result = CaptureListExpr::create(Context, captureList, closure);
+  if (!captureList.empty()) {
+    CaptureListExpr *CLE = CaptureListExpr::create(Context, captureList, closure);
+    closure->setCaptureList(CLE->getCaptureList());
+    result = CLE;
+  }
 
   return makeParserResult(Status, result);
 }
