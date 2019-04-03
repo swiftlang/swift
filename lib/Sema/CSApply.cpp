@@ -1376,6 +1376,12 @@ namespace {
 
       auto &tc = cs.getTypeChecker();
       auto baseTy = cs.getType(base)->getRValueType();
+      
+      bool baseIsInstance = true;
+      if (auto baseMeta = baseTy->getAs<AnyMetatypeType>()) {
+        baseIsInstance = false;
+        baseTy = baseMeta->getInstanceType();
+      }
 
       // Check whether the base is 'super'.
       bool isSuper = base->isSuperExpr();
@@ -1461,9 +1467,22 @@ namespace {
       auto openedBaseType =
           getBaseType(openedFullFnType, /*wantsRValue*/ false);
       auto containerTy = solution.simplifyType(openedBaseType);
-      base = coerceObjectArgumentToType(
-        base, containerTy, subscript, AccessSemantics::Ordinary,
-        locator.withPathElement(ConstraintLocator::MemberRefBase));
+      
+      if (baseIsInstance) {
+        base = coerceObjectArgumentToType(
+          base, containerTy, subscript, AccessSemantics::Ordinary,
+          locator.withPathElement(ConstraintLocator::MemberRefBase));
+      } else {
+        base = coerceToType(base,
+                            MetatypeType::get(containerTy),
+                            locator.withPathElement(
+                              ConstraintLocator::MemberRefBase));
+        
+        if (!base)
+          return nullptr;
+        
+        base = cs.coerceToRValue(base);
+      }
       if (!base)
         return nullptr;
 
