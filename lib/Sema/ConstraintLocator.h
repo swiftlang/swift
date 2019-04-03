@@ -514,6 +514,10 @@ public:
     return (getSummaryFlags() & IsFunctionConversion);
   }
 
+  /// Determine whether given locator points to the subscript reference
+  /// e.g. `foo[0]` or `\Foo.[0]`
+  bool isSubscriptMemberRef() const;
+
   /// Produce a profile of this locator, for use in a folding set.
   static void Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
                       ArrayRef<PathElement> path);

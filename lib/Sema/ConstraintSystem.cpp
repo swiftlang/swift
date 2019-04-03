@@ -1912,7 +1912,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       auto memberTy = createTypeVariable(keyPathLoc, TVO_CanBindToLValue);
       // Attempt to lookup a member with a give name in the root type and
       // assign result to the leaf type of the keypath.
-      bool isSubscriptRef = isa<SubscriptExpr>(locator->getAnchor());
+      bool isSubscriptRef = locator->isSubscriptMemberRef();
       DeclName memberName =
           isSubscriptRef ? DeclBaseName::createSubscript() : choice.getName();
 

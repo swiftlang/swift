@@ -404,7 +404,7 @@ struct Point {
   var x: Int
   let y: Int // expected-note 2 {{change 'let' to 'var' to make it mutable}}
 
-  private let z: Int = 0 // expected-note 7 {{declared here}}
+  private let z: Int = 0 // expected-note 9 {{declared here}}
 }
 
 struct Rectangle {
@@ -444,6 +444,16 @@ _ = lens.bottomRight
 _ = lens.bottomRight.x
 _ = lens.bottomRight.y
 _ = lens.bottomRight.z // expected-error {{'z' is inaccessible due to 'private' protection level}}
+
+_ = \Lens<Point>.x
+_ = \Lens<Point>.y
+_ = \Lens<Point>.z // expected-error {{'z' is inaccessible due to 'private' protection level}}
+_ = \Lens<Rectangle>.topLeft.x
+_ = \Lens<Rectangle>.topLeft.y
+_ = \Lens<Rectangle>.topLeft.z // expected-error {{'z' is inaccessible due to 'private' protection level}}
+_ = \Lens<[Int]>.count
+_ = \Lens<[Int]>.[0]
+_ = \Lens<[[Int]]>.[0].count
 
 lens.topLeft = Lens(Point(x: 1, y: 2)) // Ok
 lens.bottomRight.x = Lens(11)          // Ok

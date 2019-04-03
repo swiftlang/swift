@@ -1555,31 +1555,80 @@ namespace {
       // based diagnostics could hold the reference to original AST.
       Expr *componentExpr = nullptr;
       auto *dotExpr = new (ctx) KeyPathDotExpr(dotLoc);
+
+      // Determines whether this index is built to be used for
+      // one of the existing keypath components e.g. `\Lens<[Int]>.count`
+      // instead of a regular expression e.g. `lens[0]`.
+      bool forKeyPathComponent = false;
+      // Looks like keypath dynamic member lookup was used inside
+      // of a keypath expression e.g. `\Lens<[Int]>.count` where
+      // `count` is referenced using dynamic lookup.
+      if (auto *KPE = dyn_cast<KeyPathExpr>(anchor)) {
+        auto path = memberLoc->getPath();
+        if (memberLoc->isSubscriptMemberRef())
+          path = path.drop_back();
+
+        auto &componentIdx = path.back();
+        assert(componentIdx.getKind() == ConstraintLocator::KeyPathComponent);
+        auto &origComponent = KPE->getComponents()[componentIdx.getValue()];
+
+        using ComponentKind = KeyPathExpr::Component::Kind;
+        if (origComponent.getKind() == ComponentKind::UnresolvedProperty) {
+          anchor = new (ctx) UnresolvedDotExpr(
+              dotExpr, dotLoc, origComponent.getUnresolvedDeclName(),
+              DeclNameLoc(origComponent.getLoc()),
+              /*Implicit=*/true);
+        } else if (origComponent.getKind() ==
+                   ComponentKind::UnresolvedSubscript) {
+          anchor = SubscriptExpr::create(
+              ctx, dotExpr, origComponent.getIndexExpr(), ConcreteDeclRef(),
+              /*implicit=*/true, AccessSemantics::Ordinary,
+              [&](const Expr *expr) { return simplifyType(cs.getType(expr)); });
+        } else {
+          return nullptr;
+        }
+
+        anchor->setType(simplifyType(overload.openedType));
+        cs.cacheType(anchor);
+        forKeyPathComponent = true;
+      }
+
       if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
-        componentExpr = new (ctx) UnresolvedDotExpr(
-            dotExpr, dotLoc, UDE->getName(), UDE->getNameLoc(),
-            /*Implicit=*/true);
+        componentExpr =
+            forKeyPathComponent
+                ? UDE
+                : new (ctx) UnresolvedDotExpr(dotExpr, dotLoc, UDE->getName(),
+                                              UDE->getNameLoc(),
+                                              /*Implicit=*/true);
 
         component = buildKeyPathPropertyComponent(overload, UDE->getLoc(),
                                                   componentLoc);
       } else if (auto *SE = dyn_cast<SubscriptExpr>(anchor)) {
-        SmallVector<Expr *, 4> arguments;
-        if (auto *TE = dyn_cast<TupleExpr>(SE->getIndex())) {
-          auto args = TE->getElements();
-          arguments.append(args.begin(), args.end());
-        } else {
-          arguments.push_back(SE->getIndex()->getSemanticsProvidingExpr());
+        componentExpr = SE;
+        // If this is not for a keypath component, we have to copy
+        // original subscript expression because expression based
+        // diagnostics might have a reference to it, so it couldn't
+        // be modified.
+        if (!forKeyPathComponent) {
+          SmallVector<Expr *, 4> arguments;
+          if (auto *TE = dyn_cast<TupleExpr>(SE->getIndex())) {
+            auto args = TE->getElements();
+            arguments.append(args.begin(), args.end());
+          } else {
+            arguments.push_back(SE->getIndex()->getSemanticsProvidingExpr());
+          }
+
+          Expr *trailingClosure = nullptr;
+          if (SE->hasTrailingClosure())
+            trailingClosure = arguments.back();
+
+          componentExpr = SubscriptExpr::create(
+              ctx, dotExpr, SE->getStartLoc(), arguments,
+              SE->getArgumentLabels(), SE->getArgumentLabelLocs(),
+              SE->getEndLoc(), trailingClosure,
+              SE->hasDecl() ? SE->getDecl() : ConcreteDeclRef(),
+              /*implicit=*/true, SE->getAccessSemantics());
         }
-
-        Expr *trailingClosure = nullptr;
-        if (SE->hasTrailingClosure())
-          trailingClosure = arguments.back();
-
-        componentExpr = SubscriptExpr::create(
-            ctx, dotExpr, SE->getStartLoc(), arguments, SE->getArgumentLabels(),
-            SE->getArgumentLabelLocs(), SE->getEndLoc(), trailingClosure,
-            SE->hasDecl() ? SE->getDecl() : ConcreteDeclRef(),
-            /*implicit=*/true, SE->getAccessSemantics());
 
         component = buildKeyPathSubscriptComponent(
             overload, SE->getLoc(), SE->getIndex(), SE->getArgumentLabels(),
@@ -4300,16 +4349,22 @@ namespace {
                                     ConstraintLocator::SubscriptMember);
         }
 
+        bool isDynamicMember = false;
         // If this is an unresolved link, make sure we resolved it.
         if (kind == KeyPathExpr::Component::Kind::UnresolvedProperty ||
             kind == KeyPathExpr::Component::Kind::UnresolvedSubscript) {
           foundDecl = solution.getOverloadChoiceIfAvailable(locator);
           // Leave the component unresolved if the overload was not resolved.
           if (foundDecl) {
+            isDynamicMember =
+                foundDecl->choice.getKind() ==
+                    OverloadChoiceKind::DynamicMemberLookup ||
+                foundDecl->choice.getKind() ==
+                    OverloadChoiceKind::KeyPathDynamicMemberLookup;
+
             // If this was a @dynamicMemberLookup property, then we actually
             // form a subscript reference, so switch the kind.
-            if (foundDecl->choice.getKind() ==
-                OverloadChoiceKind::DynamicMemberLookup) {
+            if (isDynamicMember) {
               kind = KeyPathExpr::Component::Kind::UnresolvedSubscript;
             }
           }
@@ -4347,8 +4402,7 @@ namespace {
           }
 
           ArrayRef<Identifier> subscriptLabels;
-          if (foundDecl->choice.getKind() !=
-              OverloadChoiceKind::DynamicMemberLookup)
+          if (!isDynamicMember)
             subscriptLabels = origComponent.getSubscriptLabels();
 
           component = buildKeyPathSubscriptComponent(
@@ -4535,18 +4589,25 @@ namespace {
       // openedType and origComponent to its full reference as if the user
       // wrote out the subscript manually.
       if (overload.choice.getKind() ==
-          OverloadChoiceKind::DynamicMemberLookup) {
+              OverloadChoiceKind::DynamicMemberLookup ||
+          overload.choice.getKind() ==
+              OverloadChoiceKind::KeyPathDynamicMemberLookup) {
         overload.openedType =
             overload.openedFullType->castTo<AnyFunctionType>()->getResult();
 
-        auto &ctx = cs.TC.Context;
-        auto fieldName = overload.choice.getName().getBaseIdentifier().str();
+        labels = cs.getASTContext().Id_dynamicMember;
 
-        labels = ctx.Id_dynamicMember;
-        indexExpr = new (ctx) StringLiteralExpr(fieldName, componentLoc,
-                                                /*implicit*/ true);
-        (void)cs.TC.typeCheckExpression(indexExpr, dc);
-        cs.cacheExprTypes(indexExpr);
+        if (overload.choice.getKind() ==
+            OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+          auto fnType = overload.openedType->castTo<FunctionType>();
+          auto keyPathTy = simplifyType(fnType->getParams()[0].getPlainType());
+          indexExpr = buildKeyPathDynamicMemberIndexExpr(
+              keyPathTy->castTo<BoundGenericType>(), componentLoc, locator);
+        } else {
+          auto fieldName = overload.choice.getName().getBaseIdentifier().str();
+          indexExpr = buildDynamicMemberLookupIndexExpr(fieldName, componentLoc,
+                                                        dc, cs);
+        }
       }
 
       auto subscriptType =

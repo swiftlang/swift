@@ -206,3 +206,23 @@ func test_direct_subscript_ref(_ lens: OverloadedLens<Point>) {
   // CHECK: function_ref @$s29keypath_dynamic_member_lookup14OverloadedLensV0B6Memberqd__s7KeyPathCyxqd__G_tcluig
   _ = lens.y
 }
+
+func test_keypath_dynamic_lookup_inside_keypath() {
+  // CHECK: keypath $KeyPath<Point, Int>, (root $Point; stored_property #Point.x : $Int)
+  // CHECK-NEXT: keypath $KeyPath<Lens<Point>, Lens<Int>>, (root $Lens<Point>; gettable_property $Lens<Int>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig : {{.*}})
+  _ = \Lens<Point>.x
+  // CHECK: keypath $WritableKeyPath<Rectangle, Point>, (root $Rectangle; stored_property #Rectangle.topLeft : $Point)
+  // CHECK-NEXT: keypath $WritableKeyPath<Point, Int>, (root $Point; stored_property #Point.y : $Int)
+  // CHECK-NEXT: keypath $WritableKeyPath<Lens<Rectangle>, Lens<Int>>, (root $Lens<Rectangle>; settable_property $Lens<Point>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig : {{.*}})
+  _ = \Lens<Rectangle>.topLeft.y
+  // CHECK: keypath $KeyPath<Array<Int>, Int>, (root $Array<Int>; gettable_property $Int,  id @$sSa5countSivg : {{.*}})
+  // CHECK-NEXT: keypath $KeyPath<Lens<Array<Int>>, Lens<Int>>, (root $Lens<Array<Int>>; gettable_property $Lens<Int>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig : {{.*}})
+  _ = \Lens<[Int]>.count
+  // CHECK: keypath $WritableKeyPath<Array<Int>, Int>, (root $Array<Int>; settable_property $Int,  id @$sSayxSicig : {{.*}})
+  // CHECK-NEXT: keypath $WritableKeyPath<Lens<Array<Int>>, Lens<Int>>, (root $Lens<Array<Int>>; settable_property $Lens<Int>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig : {{.*}})
+  _ = \Lens<[Int]>.[0]
+  // CHECK: keypath $WritableKeyPath<Array<Array<Int>>, Array<Int>>, (root $Array<Array<Int>>; settable_property $Array<Int>,  id @$sSayxSicig : {{.*}})
+  // CHECK-NEXT: keypath $KeyPath<Array<Int>, Int>, (root $Array<Int>; gettable_property $Int,  id @$sSa5countSivg : {{.*}})
+  // CHECK-NEXT: keypath $KeyPath<Lens<Array<Array<Int>>>, Lens<Int>>, (root $Lens<Array<Array<Int>>>; settable_property $Lens<Array<Int>>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig : {{.*}})
+  _ = \Lens<[[Int]]>.[0].count
+}
