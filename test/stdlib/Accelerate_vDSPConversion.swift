@@ -39,10 +39,13 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                    &legacyResult, 1,
                    n)
         
+        let returnedResult = vDSP.floatToDouble(source)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
-    AccelerateTests_vDSPConversion.test("vDSP/FloatToDouble") {
+    AccelerateTests_vDSPConversion.test("vDSP/DoubleToFloat") {
         let source = floatingPointValuesD
         var result = [Float](repeating: 0, count: source.count)
         var legacyResult = [Float](repeating: -1, count: source.count)
@@ -53,7 +56,10 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
                    &legacyResult, 1,
                    n)
         
+        let returnedResult = vDSP.doubleToFloat(source)
+        
         expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/UInt8_to_Float") {

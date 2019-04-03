@@ -1256,4 +1256,50 @@ extension vDSP {
                 fatalError("\(integerType) not supported as a destination type.")
             }
     }
+    
+    // MARK: Floating-point to floating-point conversion
+    
+    /// Converts an array of single-precision floating-point values to double-precision floating-point values.
+    ///
+    /// - Parameter source: Source vector.
+    /// - Returns: Conversion result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func floatToDouble<U>(_ source: U) -> [Double]
+        where
+        U: _ContiguousCollection,
+        U.Element == Float {
+            let result = Array<Double>(unsafeUninitializedCapacity: source.count) {
+                buffer, initializedCount in
+                
+                convert(source,
+                        to: &buffer)
+                
+                initializedCount = source.count
+            }
+            
+            return result
+    }
+    
+    /// Converts an array of double-precision floating-point values to single-precision floating-point values.
+    ///
+    /// - Parameter source: Source vector.
+    /// - Returns: Conversion result.
+    @inline(__always)
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    public static func doubleToFloat<U>(_ source: U) -> [Float]
+        where
+        U: _ContiguousCollection,
+        U.Element == Double {
+            let result = Array<Float>(unsafeUninitializedCapacity: source.count) {
+                buffer, initializedCount in
+                
+                convert(source,
+                        to: &buffer)
+                
+                initializedCount = source.count
+            }
+            
+            return result
+    }
 }
