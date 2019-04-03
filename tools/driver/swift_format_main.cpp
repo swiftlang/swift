@@ -45,7 +45,7 @@ private:
                           StringRef FormatString,
                           ArrayRef<DiagnosticArgument> FormatArgs,
                           const swift::DiagnosticInfo &Info,
-                          const SourceLoc defaultDiagnosticLoc) override {
+                          const SourceLoc bufferIndirectlyCausingDiagnostic) override {
       llvm::errs() << "Parse error: ";
       DiagnosticEngine::formatDiagnosticText(llvm::errs(), FormatString,
                                              FormatArgs);

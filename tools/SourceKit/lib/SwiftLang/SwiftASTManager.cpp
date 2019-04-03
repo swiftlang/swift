@@ -50,7 +50,7 @@ public:
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info,
-                        const SourceLoc defaultDiagnosticLoc) override {
+                        const SourceLoc bufferIndirectlyCausingDiagnostic) override {
     // FIXME: Print location info if available.
     switch (Kind) {
       case DiagnosticKind::Error: OS << "error: "; break;

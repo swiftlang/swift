@@ -410,7 +410,7 @@ private:
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info,
-                        const SourceLoc defaultDiagnosticLoc) override {
+                        const SourceLoc bufferIndirectlyCausingDiagnostic) override {
     if (!(FixitAll || shouldTakeFixit(Kind, Info)))
       return;
     for (const auto &Fix : Info.FixIts) {
@@ -1218,7 +1218,7 @@ static bool performCompileStepsPostSILGen(
   SILOptions &SILOpts = Invocation.getSILOptions();
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
 
-  DefaultDiagnosticLocRAII cpi(Context.Diags,
+  BufferIndirectlyCausingDiagnosticRAII cpi(Context.Diags,
                                PSPs.MainInputFilenameForDebugInfo);
 
   if (Stats)

@@ -751,7 +751,7 @@ public:
                                 DiagnosticKind Kind, StringRef FormatString,
                                 ArrayRef<DiagnosticArgument> FormatArgs,
                                 const swift::DiagnosticInfo &Info,
-                                SourceLoc defaultDiagnosticLoc) override {
+                                SourceLoc bufferIndirectlyCausingDiagnostic) override {
     std::string DiagMsg;
     llvm::raw_string_ostream DiagOS(DiagMsg);
     DiagnosticEngine::formatDiagnosticText(DiagOS, FormatString, FormatArgs);

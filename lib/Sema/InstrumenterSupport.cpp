@@ -37,7 +37,7 @@ public:
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info,
-                        const SourceLoc defaultDiagnosticLoc) override {
+                        const SourceLoc bufferIndirectlyCausingDiagnostic) override {
     if (Kind == swift::DiagnosticKind::Error) {
       error = true;
     }

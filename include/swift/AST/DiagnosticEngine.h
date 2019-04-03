@@ -561,9 +561,11 @@ namespace swift {
     /// emitted once all transactions have closed.
     unsigned TransactionCount = 0;
 
-    /// For batch mode, use this to know where to output a diagnostic
-    /// from a non-primary file. May be invalid.
-    SourceLoc defaultDiagnosticLoc;
+    /// For batch mode, use this to know where to output a diagnostic from a
+    /// non-primary file. It's any location in the buffer of the current primary
+    /// input being compiled.
+    /// May be invalid.
+    SourceLoc bufferIndirectlyCausingDiagnostic;
 
     friend class InFlightDiagnostic;
     friend class DiagnosticTransaction;
@@ -809,22 +811,22 @@ namespace swift {
     /// In particular, in batch mode when a diagnostic is located in
     /// a non-primary file, use this affordance to place it in the .dia
     /// file for the primary that is currently being worked on.
-    void setDefaultDiagnosticLocToInput(StringRef defaultDiagnosticInputFile);
-    void resetDefaultDiagnosticLoc();
-    SourceLoc getDefaultDiagnostLoc() const { return defaultDiagnosticLoc; }
+    void setBufferIndirectlyCausingDiagnosticToInput(StringRef defaultDiagnosticInputFile);
+    void resetBufferIndirectlyCausingDiagnostic();
+    SourceLoc getDefaultDiagnostLoc() const { return bufferIndirectlyCausingDiagnostic; }
   };
 
-  class DefaultDiagnosticLocRAII {
+  class BufferIndirectlyCausingDiagnosticRAII {
   private:
     DiagnosticEngine &Diags;
 
   public:
-    DefaultDiagnosticLocRAII(DiagnosticEngine &Diags,
+    BufferIndirectlyCausingDiagnosticRAII(DiagnosticEngine &Diags,
                              StringRef defaultDiagnosticInputFile)
         : Diags(Diags) {
-      Diags.setDefaultDiagnosticLocToInput(defaultDiagnosticInputFile);
+      Diags.setBufferIndirectlyCausingDiagnosticToInput(defaultDiagnosticInputFile);
     }
-    ~DefaultDiagnosticLocRAII() { Diags.resetDefaultDiagnosticLoc(); }
+    ~BufferIndirectlyCausingDiagnosticRAII() { Diags.resetBufferIndirectlyCausingDiagnostic(); }
   };
 
   /// Represents a diagnostic transaction. While a transaction is

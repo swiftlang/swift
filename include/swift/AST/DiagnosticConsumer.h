@@ -98,7 +98,7 @@ public:
                                 DiagnosticKind Kind, StringRef FormatString,
                                 ArrayRef<DiagnosticArgument> FormatArgs,
                                 const DiagnosticInfo &Info,
-                                SourceLoc defaultDiagnosticLoc) = 0;
+                                SourceLoc bufferIndirectlyCausingDiagnostic) = 0;
 
   /// \returns true if an error occurred while finishing-up.
   virtual bool finishProcessing() { return false; }
@@ -120,7 +120,7 @@ public:
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info,
-                        SourceLoc defaultDiagnosticLoc) override;
+                        SourceLoc bufferIndirectlyCausingDiagnostic) override;
 };
 
 /// DiagnosticConsumer that forwards diagnostics to the consumers of
@@ -133,7 +133,7 @@ public:
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info,
-                        SourceLoc defaultDiagnosticLoc) override;
+                        SourceLoc bufferIndirectlyCausingDiagnostic) override;
 };
 
 /// DiagnosticConsumer that funnels diagnostics in certain files to
@@ -196,10 +196,10 @@ public:
                           StringRef FormatString,
                           ArrayRef<DiagnosticArgument> FormatArgs,
                           const DiagnosticInfo &Info,
-                          const SourceLoc defaultDiagnosticLoc) {
+                          const SourceLoc bufferIndirectlyCausingDiagnostic) {
       hasAnErrorBeenConsumed |= Kind == DiagnosticKind::Error;
       getConsumer()->handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
-                                      Info, defaultDiagnosticLoc);
+                                      Info, bufferIndirectlyCausingDiagnostic);
     }
     
     void informDriverOfIncompleteBatchModeCompilation() {
@@ -290,7 +290,7 @@ public:
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info,
-                        SourceLoc defaultDiagnosticLoc) override;
+                        SourceLoc bufferIndirectlyCausingDiagnostic) override;
 
   bool finishProcessing() override;
 
@@ -312,11 +312,11 @@ private:
   Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
   findSubconsumer(SourceManager &SM, SourceLoc loc,
                             DiagnosticKind Kind,
-                            SourceLoc defaultDiagnosticLoc);
+                            SourceLoc bufferIndirectlyCausingDiagnostic);
 
   Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
   findSubconsumerForNonNote(SourceManager &SM, SourceLoc loc,
-                            SourceLoc defaultDiagnosticLoc);
+                            SourceLoc bufferIndirectlyCausingDiagnostic);
 };
   
 } // end namespace swift

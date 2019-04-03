@@ -39,7 +39,7 @@ public:
                                 DiagnosticKind Kind, StringRef FormatString,
                                 ArrayRef<DiagnosticArgument> FormatArgs,
                                 const DiagnosticInfo &Info,
-                                SourceLoc defaultDiagnosticLoc) override;
+                                SourceLoc bufferIndirectlyCausingDiagnostic) override;
 
   void forceColors() {
     ForceColors = true;

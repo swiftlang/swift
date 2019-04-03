@@ -250,7 +250,7 @@ public:
                         swift::DiagnosticKind Kind, StringRef FormatString,
                         ArrayRef<swift::DiagnosticArgument> FormatArgs,
                         const swift::DiagnosticInfo &Info,
-                        swift::SourceLoc defaultDiagnosticLoc) override;
+                        swift::SourceLoc bufferIndirectlyCausingDiagnostic) override;
 };
 
 class RequestRenameRangeConsumer : public swift::ide::FindRenameRangesConsumer,
@@ -267,7 +267,7 @@ public:
                         swift::DiagnosticKind Kind, StringRef FormatString,
                         ArrayRef<swift::DiagnosticArgument> FormatArgs,
                         const swift::DiagnosticInfo &Info,
-                        swift::SourceLoc defaultDiagnosticLoc) override;
+                        swift::SourceLoc bufferIndirectlyCausingDiagnostic) override;
 };
 
 struct SwiftStatistics {

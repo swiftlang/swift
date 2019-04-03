@@ -847,20 +847,20 @@ const char *DiagnosticEngine::diagnosticStringFor(const DiagID id) {
   return diagnosticStrings[(unsigned)id];
 }
 
-void DiagnosticEngine::setDefaultDiagnosticLocToInput(StringRef input) {
+void DiagnosticEngine::setBufferIndirectlyCausingDiagnosticToInput(StringRef input) {
   if (input.empty()) {
-    resetDefaultDiagnosticLoc();
+    resetBufferIndirectlyCausingDiagnostic();
     return;
   }
   auto id = SourceMgr.getIDForBufferIdentifier(input);
   if (!id) {
-    resetDefaultDiagnosticLoc();
+    resetBufferIndirectlyCausingDiagnostic();
     return;
   }
-  defaultDiagnosticLoc = SourceMgr.getLocForBufferStart(*id);
+  bufferIndirectlyCausingDiagnostic = SourceMgr.getLocForBufferStart(*id);
 }
-void DiagnosticEngine::resetDefaultDiagnosticLoc() {
-  defaultDiagnosticLoc = SourceLoc();
+void DiagnosticEngine::resetBufferIndirectlyCausingDiagnostic() {
+  bufferIndirectlyCausingDiagnostic = SourceLoc();
 }
 
 DiagnosticSuppression::DiagnosticSuppression(DiagnosticEngine &diags)

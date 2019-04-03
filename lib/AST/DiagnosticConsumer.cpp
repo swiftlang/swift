@@ -165,33 +165,33 @@ FileSpecificDiagnosticConsumer::subconsumerForLocation(SourceManager &SM,
 void FileSpecificDiagnosticConsumer::handleDiagnostic(
     SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info, const SourceLoc defaultDiagnosticLoc) {
+    const DiagnosticInfo &Info, const SourceLoc bufferIndirectlyCausingDiagnostic) {
 
   HasAnErrorBeenConsumed |= Kind == DiagnosticKind::Error;
 
   auto subconsumer =
-      findSubconsumer(SM, Loc, Kind, defaultDiagnosticLoc);
+      findSubconsumer(SM, Loc, Kind, bufferIndirectlyCausingDiagnostic);
   if (subconsumer) {
     subconsumer.getValue()->handleDiagnostic(
-        SM, Loc, Kind, FormatString, FormatArgs, Info, defaultDiagnosticLoc);
+        SM, Loc, Kind, FormatString, FormatArgs, Info, bufferIndirectlyCausingDiagnostic);
     return;
   }
   // Last resort: spray it everywhere
   for (auto &subconsumer : Subconsumers)
     subconsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info,
-                                 defaultDiagnosticLoc);
+                                 bufferIndirectlyCausingDiagnostic);
 }
 
 Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
 FileSpecificDiagnosticConsumer::findSubconsumer(
     SourceManager &SM, SourceLoc loc, DiagnosticKind Kind,
-    SourceLoc defaultDiagnosticLoc) {
+    SourceLoc bufferIndirectlyCausingDiagnostic) {
   // Ensure that a note goes to the same place as the preceeding non-note.
   switch (Kind) {
   case DiagnosticKind::Error:
   case DiagnosticKind::Warning:
   case DiagnosticKind::Remark: {
-    auto subconsumer = findSubconsumerForNonNote(SM, loc, defaultDiagnosticLoc);
+    auto subconsumer = findSubconsumerForNonNote(SM, loc, bufferIndirectlyCausingDiagnostic);
     SubconsumerForSubsequentNotes = subconsumer;
     return subconsumer;
   }
@@ -203,13 +203,13 @@ FileSpecificDiagnosticConsumer::findSubconsumer(
 Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
 FileSpecificDiagnosticConsumer::findSubconsumerForNonNote(
     SourceManager &SM, const SourceLoc loc,
-    const SourceLoc defaultDiagnosticLoc) {
+    const SourceLoc bufferIndirectlyCausingDiagnostic) {
   if (auto subconsumer = subconsumerForLocation(SM, loc))
     return subconsumer; // A primary file with a .dia file
   // The diagnostic is located in a non-primary.
   // Try to put it in the current primary file's .dia file.
-  if (defaultDiagnosticLoc.isValid())
-    return subconsumerForLocation(SM, defaultDiagnosticLoc);
+  if (bufferIndirectlyCausingDiagnostic.isValid())
+    return subconsumerForLocation(SM, bufferIndirectlyCausingDiagnostic);
   return None;
 }
 
@@ -252,7 +252,7 @@ ForwardingDiagnosticConsumer::ForwardingDiagnosticConsumer(DiagnosticEngine &Tar
 void ForwardingDiagnosticConsumer::handleDiagnostic(
     SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info, const SourceLoc defaultDiagnosticLoc) {
+    const DiagnosticInfo &Info, const SourceLoc bufferIndirectlyCausingDiagnostic) {
   LLVM_DEBUG({
     llvm::dbgs() << "ForwardingDiagnosticConsumer received diagnostic: ";
     DiagnosticEngine::formatDiagnosticText(llvm::dbgs(), FormatString,
@@ -261,6 +261,6 @@ void ForwardingDiagnosticConsumer::handleDiagnostic(
   });
   for (auto *C : TargetEngine.getConsumers()) {
     C->handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info,
-                        defaultDiagnosticLoc);
+                        bufferIndirectlyCausingDiagnostic);
   }
 }
