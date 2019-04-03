@@ -467,12 +467,14 @@ function(_add_variant_link_flags)
   endif()
 
   if(NOT "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_UC}" STREQUAL "")
-    get_filename_component(SWIFT_${sdk}_${arch}_ICU_UC_LIBDIR "${SWIFT_${sdk}_${arch}_ICU_UC}" DIRECTORY)
-    list(APPEND library_search_directories "${SWIFT_${sdk}_${arch}_ICU_UC_LIBDIR}")
+    get_filename_component(SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_UC_LIBDIR
+      "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_UC}" DIRECTORY)
+    list(APPEND library_search_directories "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_UC_LIBDIR}")
   endif()
   if(NOT "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_I18N}" STREQUAL "")
-    get_filename_component(SWIFT_${sdk}_${arch}_ICU_I18N_LIBDIR "${SWIFT_${sdk}_${arch}_ICU_I18N}" DIRECTORY)
-    list(APPEND library_search_directories "${SWIFT_${sdk}_${arch}_ICU_I18N_LIBDIR}")
+    get_filename_component(SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_I18N_LIBDIR
+      "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_I18N}" DIRECTORY)
+    list(APPEND library_search_directories "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_I18N_LIBDIR}")
   endif()
 
   if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
