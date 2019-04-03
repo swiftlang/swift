@@ -491,7 +491,7 @@ public:
 
   void checkTypedPattern(const TypedPattern *TP, bool isTypeContext,
                          llvm::DenseSet<const VarDecl *> &seenVars) {
-    const VarDecl *anyVar = nullptr;
+    VarDecl *anyVar = nullptr;
     TP->forEachVariable([&](VarDecl *V) {
       seenVars.insert(V);
       anyVar = V;
@@ -521,6 +521,31 @@ public:
                               typeAccess);
       highlightOffendingType(TC, diag, complainRepr);
     });
+
+    // Check the property delegate type.
+    if (auto attr = anyVar->getAttachedPropertyDelegate()) {
+      checkTypeAccess(attr->getTypeLoc(), anyVar,
+                      /*mayBeInferred=*/false,
+                      [&](AccessScope typeAccessScope,
+                          const TypeRepr *complainRepr,
+                          DowngradeToWarning downgradeToWarning) {
+        auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
+        bool isExplicit =
+            anyVar->getAttrs().hasAttribute<AccessControlAttr>() ||
+            isa<ProtocolDecl>(anyVar->getDeclContext());
+        auto anyVarAccess =
+            isExplicit ? anyVar->getFormalAccess()
+                       : typeAccessScope.requiredAccessForDiagnostics();
+        auto diag = anyVar->diagnose(diag::property_delegate_type_access,
+                                     anyVar->isLet(),
+                                     isTypeContext,
+                                     isExplicit,
+                                     anyVarAccess,
+                                     isa<FileUnit>(anyVar->getDeclContext()),
+                                     typeAccess);
+        highlightOffendingType(TC, diag, complainRepr);
+      });
+    }
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
@@ -1081,7 +1106,7 @@ public:
     // FIXME: We need an access level to check against, so we pull one out
     // of some random VarDecl in the pattern. They're all going to be the
     // same, but still, ick.
-    const VarDecl *anyVar = nullptr;
+    VarDecl *anyVar = nullptr;
     TP->forEachVariable([&](VarDecl *V) {
       seenVars.insert(V);
       anyVar = V;
@@ -1107,6 +1132,21 @@ public:
                               isTypeContext);
       highlightOffendingType(TC, diag, complainRepr);
     });
+
+    if (auto attr = anyVar->getAttachedPropertyDelegate()) {
+      checkTypeAccess(attr->getTypeLoc(),
+                      fixedLayoutStructContext ? fixedLayoutStructContext
+                                               : anyVar,
+                      /*mayBeInferred*/false,
+                      [&](AccessScope typeAccessScope,
+                          const TypeRepr *complainRepr,
+                          DowngradeToWarning downgradeToWarning) {
+        auto diag = anyVar->diagnose(
+            diag::property_delegate_type_not_usable_from_inline,
+            anyVar->isLet(), isTypeContext);
+        highlightOffendingType(TC, diag, complainRepr);
+      });
+    }
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {

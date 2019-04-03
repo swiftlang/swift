@@ -1611,9 +1611,11 @@ static void maybeAddAccessorsForPropertyDelegate(VarDecl *var,
   auto valueVar = var->getAttachedPropertyDelegateTypeInfo().valueVar;
   assert(valueVar && "Cannot fail when the backing var is valid");
 
-  bool delegateSetterIsUsable = !var->isLet() &&
-      valueVar->isSettable(nullptr) &&
-      valueVar->isSetterAccessibleFrom(var->getInnermostDeclContext());
+  bool delegateSetterIsUsable =
+    var->getSetter() ||
+    (!var->isLet() &&
+       valueVar->isSettable(nullptr) &&
+       valueVar->isSetterAccessibleFrom(var->getInnermostDeclContext()));
 
   if (!var->getGetter()) {
     addGetterToStorage(var, ctx);

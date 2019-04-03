@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 5
 
 // ---------------------------------------------------------------------------
 // Property delegate type definitions
@@ -440,4 +440,73 @@ func testMutatingness() {
 
   _ = nonmutable.z
   nonmutable.z = 2.71828 // expected-error{{cannot assign to property: 'z' is a 'let' constant}}
+}
+
+// ---------------------------------------------------------------------------
+// Access control
+// ---------------------------------------------------------------------------
+struct HasPrivateDelegate<T> {
+  @propertyDelegate
+  private struct PrivateDelegate<U> { // expected-note{{type declared here}}
+    var value: U
+    init(initialValue: U) {
+      self.value = initialValue
+    }
+  }
+
+  @PrivateDelegate
+  var y: [T] = []
+  // expected-error@-1{{property must be declared private because its property delegate type uses a private type}}
+
+  // Okay to reference private entities from a private property
+  @PrivateDelegate
+  private var z: [T]
+}
+
+public struct HasUsableFromInlineDelegate<T> {
+  @propertyDelegate
+  struct InternalDelegate<U> { // expected-note{{type declared here}}
+    var value: U
+    init(initialValue: U) {
+      self.value = initialValue
+    }
+  }
+
+  @InternalDelegate
+  @usableFromInline
+  var y: [T] = []
+  // expected-error@-1{{property delegate type referenced from a '@usableFromInline' property must be '@usableFromInline' or public}}
+}
+
+@propertyDelegate
+class Box<Value> {
+  private(set) var value: Value
+
+  init(initialValue: Value) {
+    self.value = initialValue
+  }
+}
+
+struct UseBox {
+  @Box
+  var x = 17
+
+  @Box
+  var y: Int {
+    get { return $y.value }
+    set { }
+  }
+}
+
+func testBox(ub: UseBox) {
+  _ = ub.x
+  ub.x = 5 // expected-error{{cannot assign to property: 'x' is a get-only property}}
+
+  _ = ub.y
+  ub.y = 20 // expected-error{{cannot assign to property: 'ub' is a 'let' constant}}
+
+  var mutableUB = ub
+  _ = mutableUB.y
+  mutableUB.y = 20
+  mutableUB = ub
 }
