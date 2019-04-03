@@ -58,7 +58,7 @@ class A {
     }
   }
   
-  class subscript (i: String) -> String { // expected-note{{overridden declaration is here}} expected-note{{potential overridden subscript 'subscript(_:)' here}}
+  class subscript (i: String) -> String { // expected-note{{overridden declaration is here}} expected-note{{potential overridden class subscript 'subscript(_:)' here}}
     get {
       return "hello"
     }
@@ -67,7 +67,7 @@ class A {
     }
   }
   
-  class subscript (a: [Int]) -> String { // expected-note{{potential overridden subscript 'subscript(_:)' here}}
+  class subscript (a: [Int]) -> String { // expected-note{{potential overridden class subscript 'subscript(_:)' here}}
     get {
       return "hello"
     }

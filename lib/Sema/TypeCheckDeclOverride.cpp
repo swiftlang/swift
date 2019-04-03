@@ -1684,6 +1684,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     switch (baseKind) {
     case DescriptiveDeclKind::StaticProperty:
     case DescriptiveDeclKind::StaticMethod:
+    case DescriptiveDeclKind::StaticSubscript:
       override->diagnose(diag::override_static, baseKind);
       break;
     default:
