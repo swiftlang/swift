@@ -12,6 +12,7 @@
 
 import SwiftShims
 %from SwiftMathFunctions import *
+%from SwiftFloatingPointTypes import all_floating_point_types
 
 /// A type that has elementary functions available.
 ///
