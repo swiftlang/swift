@@ -117,6 +117,11 @@ FileSpecificDiagnosticConsumer::subconsumerForLocation(SourceManager &SM,
   // Diagnostics with invalid locations always go to every consumer.
   if (loc.isInvalid())
     return None;
+  
+  // What if a there's a consumer for fixits but there is no fixits output path?
+  // Subconsumers will be empty in that case.
+  if (Subconsumers.empty())
+    return None;
 
   // This map is generated on first use and cached, to allow the
   // FileSpecificDiagnosticConsumer to be set up before the source files are
@@ -207,13 +212,20 @@ Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
 FileSpecificDiagnosticConsumer::findSubconsumerForNonNote(
     SourceManager &SM, const SourceLoc loc,
     const SourceLoc bufferIndirectlyCausingDiagnostic) {
-  if (auto subconsumer = subconsumerForLocation(SM, loc))
+  const auto subconsumer = subconsumerForLocation(SM, loc);
+  if (!subconsumer)
+    return None; // No place to put it; might be in an imported module
+  if ((*subconsumer)->getConsumer())
     return subconsumer; // A primary file with a .dia file
-  // The diagnostic is located in a non-primary.
-  // Try to put it in the current primary file's .dia file.
-  if (bufferIndirectlyCausingDiagnostic.isValid())
-    return subconsumerForLocation(SM, bufferIndirectlyCausingDiagnostic);
-  return None;
+  // Try to put it in the responsible primary input
+  if (bufferIndirectlyCausingDiagnostic.isInvalid())
+    return None;
+  const auto currentPrimarySubconsumer =
+      subconsumerForLocation(SM, bufferIndirectlyCausingDiagnostic);
+  assert(!currentPrimarySubconsumer ||
+         (*currentPrimarySubconsumer)->getConsumer() &&
+         "current primary must have a .dia file");
+  return currentPrimarySubconsumer;
 }
 
 bool FileSpecificDiagnosticConsumer::finishProcessing() {

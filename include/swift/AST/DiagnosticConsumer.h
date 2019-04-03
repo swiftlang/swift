@@ -175,10 +175,13 @@ public:
     /// diagnostics that are not in any of the other consumers' files.
     std::string inputFileName;
 
-    /// The consumer for diagnostics associated with the inputFileName.
-    /// Should never be null, because diagnostics for non-primary files are
-    /// either emitted in the corresponding primary file's .dia or are
-    /// emitted to every .dia.
+    /// The consumer (if any) for diagnostics associated with the inputFileName.
+    /// A null pointer for the DiagnosticConsumer means that this file is a
+    /// non-primary one in batch mode and we have no .dia file for it.
+    /// If there is a responsible primary when the diagnostic is handled
+    /// it will be shunted to that primary's .dia file.
+    /// Otherwise it will be suppressed, assuming that the diagnostic will
+    /// surface in another frontend job that compiles that file as a primary.
     std::unique_ptr<DiagnosticConsumer> consumer;
 
     // Has this subconsumer ever handled a diagnostic that is an error?
@@ -198,6 +201,8 @@ public:
                           ArrayRef<DiagnosticArgument> FormatArgs,
                           const DiagnosticInfo &Info,
                           const SourceLoc bufferIndirectlyCausingDiagnostic) {
+      if (!getConsumer())
+        return;
       hasAnErrorBeenConsumed |= Kind == DiagnosticKind::Error;
       getConsumer()->handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
                                       Info, bufferIndirectlyCausingDiagnostic);
