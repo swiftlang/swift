@@ -562,8 +562,8 @@ namespace swift {
     unsigned TransactionCount = 0;
 
     /// For batch mode, use this to know where to output a diagnostic
-    /// from a non-primary file.
-    std::string CurrentPrimaryInput;
+    /// from a non-primary file. May be invalid.
+    SourceLoc defaultDiagnosticLoc;
 
     friend class InFlightDiagnostic;
     friend class DiagnosticTransaction;
@@ -804,21 +804,22 @@ namespace swift {
   public:
     static const char *diagnosticStringFor(const DiagID id);
 
-    StringRef getCurrentPrimaryInput() const { return CurrentPrimaryInput; }
-    void setCurrentPrimaryInput(std::string s) { CurrentPrimaryInput = s; }
+    SourceLoc getDefaultDiagnostLoc() const { return defaultDiagnosticLoc; }
+    void setDefaultDiagnostLocToInput(StringRef defaultDiagnosticInputFile);
+    void resetDefaultDiagnostLoc();
   };
 
-  class CurrentPrimaryInputRAII {
+  class DefaultDiagnosticLocRAII {
   private:
     DiagnosticEngine &Diags;
 
   public:
-    CurrentPrimaryInputRAII(DiagnosticEngine &Diags,
-                            StringRef currentPrimaryInput)
+    DefaultDiagnosticLocRAII(DiagnosticEngine &Diags,
+                            StringRef defaultDiagnosticInputFile)
         : Diags(Diags) {
-      Diags.setCurrentPrimaryInput(currentPrimaryInput);
+      Diags.setDefaultDiagnostLocToInput(defaultDiagnosticInputFile);
     }
-    ~CurrentPrimaryInputRAII() { Diags.setCurrentPrimaryInput(""); }
+    ~DefaultDiagnosticLocRAII() { Diags.resetDefaultDiagnostLoc(); }
   };
 
   /// Represents a diagnostic transaction. While a transaction is

@@ -460,7 +460,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     return;
 
   auto &Ctx = SF.getASTContext();
-  CurrentPrimaryInputRAII cpr(SF.getASTContext().Diags, SF.getFilename());
+  DefaultDiagnosticLocRAII cpr(SF.getASTContext().Diags, SF.getFilename());
 
   // Make sure we have a type checker.
   TypeChecker &TC = createTypeChecker(Ctx);

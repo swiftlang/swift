@@ -98,7 +98,7 @@ public:
                                 DiagnosticKind Kind, StringRef FormatString,
                                 ArrayRef<DiagnosticArgument> FormatArgs,
                                 const DiagnosticInfo &Info,
-                                StringRef currentPrimaryInput) = 0;
+                                SourceLoc defaultDiagnosticLoc) = 0;
 
   /// \returns true if an error occurred while finishing-up.
   virtual bool finishProcessing() { return false; }
@@ -120,7 +120,7 @@ public:
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info,
-                        StringRef currentPrimaryInput) override;
+                        SourceLoc defaultDiagnosticLoc) override;
 };
 
 /// DiagnosticConsumer that forwards diagnostics to the consumers of
@@ -133,7 +133,7 @@ public:
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info,
-                        StringRef currentPrimaryInput) override;
+                        SourceLoc defaultDiagnosticLoc) override;
 };
 
 /// DiagnosticConsumer that funnels diagnostics in certain files to
@@ -195,12 +195,12 @@ public:
                           StringRef FormatString,
                           ArrayRef<DiagnosticArgument> FormatArgs,
                           const DiagnosticInfo &Info,
-                          StringRef currentPrimaryInput) {
+                          const SourceLoc defaultDiagnosticLoc) {
       if (!getConsumer())
         return;
       hasAnErrorBeenConsumed |= Kind == DiagnosticKind::Error;
       getConsumer()->handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
-                                      Info, currentPrimaryInput);
+                                      Info, defaultDiagnosticLoc);
     }
     
     void informDriverOfIncompleteBatchModeCompilation() {
@@ -291,7 +291,7 @@ public:
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info,
-                        StringRef currentPrimaryInput) override;
+                        SourceLoc defaultDiagnosticLoc) override;
 
   bool finishProcessing() override;
 
@@ -312,14 +312,11 @@ private:
 
   Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
   findSubconsumerForAnyKind(SourceManager &SM, SourceLoc loc,
-                            DiagnosticKind Kind, StringRef currentPrimaryInput);
+                            DiagnosticKind Kind, SourceLoc defaultDiagnosticLoc);
 
   Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
   findSubconsumerForNonNote(SourceManager &SM, SourceLoc loc,
-                            StringRef currentPrimaryInput);
-
-  SourceLoc findLocationOfCurrentPrimaryFile(SourceManager &SM,
-                                             StringRef currentPrimaryInput);
+                            SourceLoc defaultDiagnosticLoc);
 };
   
 } // end namespace swift

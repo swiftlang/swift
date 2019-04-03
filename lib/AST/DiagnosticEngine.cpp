@@ -839,12 +839,28 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     Consumer->handleDiagnostic(SourceMgr, loc, toDiagnosticKind(behavior),
                                diagnosticStringFor(Info.ID),
                                diagnostic.getArgs(), Info,
-                               getCurrentPrimaryInput());
+                               getDefaultDiagnostLoc());
   }
 }
 
 const char *DiagnosticEngine::diagnosticStringFor(const DiagID id) {
   return diagnosticStrings[(unsigned)id];
+}
+
+void DiagnosticEngine::setDefaultDiagnostLocToInput(StringRef input) {
+  if (input.empty()) {
+    resetDefaultDiagnostLoc();
+    return;
+  }
+  auto id = SourceMgr.getIDForBufferIdentifier(input);
+  if (!id) {
+    resetDefaultDiagnostLoc();
+    return;
+  }
+  defaultDiagnosticLoc = SourceMgr.getLocForBufferStart(*id);
+}
+void DiagnosticEngine::resetDefaultDiagnostLoc() {
+  defaultDiagnosticLoc = SourceLoc();
 }
 
 DiagnosticSuppression::DiagnosticSuppression(DiagnosticEngine &diags)

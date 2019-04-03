@@ -165,32 +165,32 @@ FileSpecificDiagnosticConsumer::subconsumerForLocation(SourceManager &SM,
 void FileSpecificDiagnosticConsumer::handleDiagnostic(
     SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info, StringRef currentPrimaryInput) {
+    const DiagnosticInfo &Info, const SourceLoc defaultDiagnosticLoc) {
 
   HasAnErrorBeenConsumed |= Kind == DiagnosticKind::Error;
 
   auto subconsumer =
-      findSubconsumerForAnyKind(SM, Loc, Kind, currentPrimaryInput);
+      findSubconsumerForAnyKind(SM, Loc, Kind, defaultDiagnosticLoc);
   if (subconsumer) {
     subconsumer.getValue()->handleDiagnostic(
-        SM, Loc, Kind, FormatString, FormatArgs, Info, currentPrimaryInput);
+        SM, Loc, Kind, FormatString, FormatArgs, Info, defaultDiagnosticLoc);
     return;
   }
   // Last resort: spray it everywhere
   for (auto &subconsumer : Subconsumers)
     subconsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info,
-                                 currentPrimaryInput);
+                                 defaultDiagnosticLoc);
 }
 
 Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
 FileSpecificDiagnosticConsumer::findSubconsumerForAnyKind(
     SourceManager &SM, SourceLoc loc, DiagnosticKind Kind,
-    StringRef currentPrimaryInput) {
+    SourceLoc defaultDiagnosticLoc) {
   switch (Kind) {
   case DiagnosticKind::Error:
   case DiagnosticKind::Warning:
   case DiagnosticKind::Remark: {
-    auto subconsumer = findSubconsumerForNonNote(SM, loc, currentPrimaryInput);
+    auto subconsumer = findSubconsumerForNonNote(SM, loc, defaultDiagnosticLoc);
     SubconsumerForSubsequentNotes = subconsumer;
     return subconsumer;
   }
@@ -201,31 +201,19 @@ FileSpecificDiagnosticConsumer::findSubconsumerForAnyKind(
 
 Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
 FileSpecificDiagnosticConsumer::findSubconsumerForNonNote(
-    SourceManager &SM, const SourceLoc loc, StringRef currentPrimaryInput) {
+    SourceManager &SM, const SourceLoc loc, const SourceLoc defaultDiagnosticLoc) {
   const auto subconsumer = subconsumerForLocation(SM, loc);
   if (!subconsumer)
     return None; // No place to put it
   if ((*subconsumer)->getConsumer())
     return subconsumer; // A primary file with a .dia file
-  const auto locInPrimary =
-      findLocationOfCurrentPrimaryFile(SM, currentPrimaryInput);
-  if (locInPrimary.isInvalid())
+   if (defaultDiagnosticLoc.isInvalid())
     return None;
   const auto currentPrimarySubconsumer =
-      subconsumerForLocation(SM, locInPrimary);
+      subconsumerForLocation(SM, defaultDiagnosticLoc);
   assert(currentPrimarySubconsumer && (*subconsumer)->getConsumer() &&
          "current primary must have a .dia file");
   return currentPrimarySubconsumer;
-}
-
-SourceLoc FileSpecificDiagnosticConsumer::findLocationOfCurrentPrimaryFile(
-    SourceManager &SM, StringRef currentPrimaryInput) {
-  if (currentPrimaryInput.empty())
-    return SourceLoc();
-  auto id = SM.getIDForBufferIdentifier(currentPrimaryInput);
-  if (!id)
-    return SourceLoc();
-  return SM.getLocForBufferStart(*id);
 }
 
 bool FileSpecificDiagnosticConsumer::finishProcessing() {
@@ -252,7 +240,7 @@ void FileSpecificDiagnosticConsumer::
 void NullDiagnosticConsumer::handleDiagnostic(
     SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info, StringRef) {
+    const DiagnosticInfo &Info, const SourceLoc) {
   LLVM_DEBUG({
     llvm::dbgs() << "NullDiagnosticConsumer received diagnostic: ";
     DiagnosticEngine::formatDiagnosticText(llvm::dbgs(), FormatString,
@@ -267,7 +255,7 @@ ForwardingDiagnosticConsumer::ForwardingDiagnosticConsumer(DiagnosticEngine &Tar
 void ForwardingDiagnosticConsumer::handleDiagnostic(
     SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info, StringRef currentPrimaryInput) {
+    const DiagnosticInfo &Info, const SourceLoc defaultDiagnosticLoc) {
   LLVM_DEBUG({
     llvm::dbgs() << "ForwardingDiagnosticConsumer received diagnostic: ";
     DiagnosticEngine::formatDiagnosticText(llvm::dbgs(), FormatString,
@@ -276,6 +264,6 @@ void ForwardingDiagnosticConsumer::handleDiagnostic(
   });
   for (auto *C : TargetEngine.getConsumers()) {
     C->handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info,
-                        currentPrimaryInput);
+                        defaultDiagnosticLoc);
   }
 }

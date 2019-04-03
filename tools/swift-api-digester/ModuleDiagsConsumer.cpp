@@ -92,11 +92,11 @@ ModuleDifferDiagsConsumer::ModuleDifferDiagsConsumer(bool DiagnoseModuleDiff,
 void swift::ide::api::ModuleDifferDiagsConsumer::handleDiagnostic(
     SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info, StringRef currentPrimaryInput) {
+    const DiagnosticInfo &Info, const SourceLoc defaultDiagnosticLoc) {
   auto Category = getCategoryName((uint32_t)Info.ID);
   if (Category.empty()) {
     PrintingDiagnosticConsumer::handleDiagnostic(
-        SM, Loc, Kind, FormatString, FormatArgs, Info, currentPrimaryInput);
+        SM, Loc, Kind, FormatString, FormatArgs, Info, defaultDiagnosticLoc);
     return;
   }
   if (!DiagnoseModuleDiff)

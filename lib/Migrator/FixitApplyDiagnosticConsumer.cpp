@@ -34,7 +34,7 @@ void FixitApplyDiagnosticConsumer::printResult(llvm::raw_ostream &OS) const {
 void FixitApplyDiagnosticConsumer::handleDiagnostic(
     SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info, StringRef currentPrimaryInput) {
+    const DiagnosticInfo &Info, const SourceLoc defaultDiagnosticLoc) {
   if (Loc.isInvalid()) {
     return;
   }

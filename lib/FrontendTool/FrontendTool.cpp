@@ -410,7 +410,7 @@ private:
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info,
-                        StringRef currentPrimaryInput) override {
+                        const SourceLoc defaultDiagnosticLoc) override {
     if (!(FixitAll || shouldTakeFixit(Kind, Info)))
       return;
     for (const auto &Fix : Info.FixIts) {
@@ -1218,7 +1218,7 @@ static bool performCompileStepsPostSILGen(
   SILOptions &SILOpts = Invocation.getSILOptions();
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
 
-  CurrentPrimaryInputRAII cpi(Context.Diags,
+  DefaultDiagnosticLocRAII cpi(Context.Diags,
                               PSPs.MainInputFilenameForDebugInfo);
 
   if (Stats)
@@ -1632,9 +1632,9 @@ int swift::performFrontend(ArrayRef<const char *> Args,
                          "fatal error encountered during compilation; please "
                          "file a bug report with your project and the crash "
                          "log",
-                         {}, DiagnosticInfo(), "");
+                         {}, DiagnosticInfo(), SourceLoc());
     PDC.handleDiagnostic(dummyMgr, SourceLoc(), DiagnosticKind::Note, reason,
-                         {}, DiagnosticInfo(), "");
+                         {}, DiagnosticInfo(), SourceLoc());
     if (shouldCrash)
       abort();
   };

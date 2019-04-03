@@ -66,7 +66,7 @@ public:
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info,
-                        StringRef currentPrimaryInput) override;
+                        SourceLoc defaultDiagnosticLoc) override;
 
   unsigned getNumFixitsApplied() const {
     return NumFixitsApplied;
