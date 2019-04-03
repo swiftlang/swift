@@ -797,8 +797,6 @@ namespace {
 
     void visitVarDecl(VarDecl *VD) {
       printCommon(VD, "var_decl");
-      if (VD->isStatic())
-        PrintWithColorRAII(OS, DeclModifierColor) << " type";
       if (VD->isLet())
         PrintWithColorRAII(OS, DeclModifierColor) << " let";
       if (VD->hasNonPatternBindingInit())
@@ -811,6 +809,9 @@ namespace {
     }
 
     void printStorageImpl(AbstractStorageDecl *D) {
+      if (D->isStatic())
+        PrintWithColorRAII(OS, DeclModifierColor) << " type";
+
       auto impl = D->getImplInfo();
       PrintWithColorRAII(OS, DeclModifierColor)
         << " readImpl="
