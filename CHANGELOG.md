@@ -25,6 +25,22 @@ CHANGELOG
 Swift 5.1
 ---------
 
+* [SE-0242][]:
+
+  The memberwise initializer for structures now provide default values for variables that hold default expressions.
+
+  ```swift
+  struct Dog {
+    var name = "Generic dog name"
+    var age = 0
+
+    // The synthesized memberwise initializer
+    init(name: String = "Generic dog name", age: Int = 0)
+  }
+
+  let sparky = Dog(name: "Sparky") // Dog(name: "Sparky", age: 0)
+  ```
+
 * [SE-0068][]:
 
   `Self` can now be used inside member functions and for function arguments of structs and enums to refer to the containing type.
@@ -7511,6 +7527,7 @@ Swift 1.0
 [SE-0228]: <https://github.com/apple/swift-evolution/blob/master/proposals/0228-fix-expressiblebystringinterpolation.md>
 [SE-0230]: <https://github.com/apple/swift-evolution/blob/master/proposals/0230-flatten-optional-try.md>
 [SE-0235]: <https://github.com/apple/swift-evolution/blob/master/proposals/0235-add-result.md>
+[SE-0242]: <https://github.com/apple/swift-evolution/blob/master/proposals/0242-default-values-memberwise-md>
 [SE-0245]: <https://github.com/apple/swift-evolution/blob/master/proposals/0245-array-uninitialized-initializer.md>
 
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
