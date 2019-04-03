@@ -1595,10 +1595,10 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
     return appendEntity(eed);
   }
 
-  case DeclContextKind::SubscriptDecl:
-    // FIXME: We may need to do something here if subscripts contain any symbols
-    // exposed with linkage names, or if/when they get generic parameters.
-    return appendContext(ctx->getParent());
+  case DeclContextKind::SubscriptDecl: {
+    auto sd = cast<SubscriptDecl>(ctx);
+    return appendEntity(sd);
+  }
       
   case DeclContextKind::Initializer:
     switch (cast<Initializer>(ctx)->getInitializerKind()) {
