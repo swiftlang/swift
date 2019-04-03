@@ -761,6 +761,7 @@ public:
     FUNCTION_LIKE(DestructorDecl)
     FUNCTION_LIKE(FuncDecl)
     FUNCTION_LIKE(EnumElementDecl)
+    FUNCTION_LIKE(SubscriptDecl)
     SCOPE_LIKE(NominalTypeDecl)
     SCOPE_LIKE(ExtensionDecl)
 

@@ -6364,10 +6364,11 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
     return makeParserCodeCompletionStatus();
 
   // Parse the parameter list.
+  DefaultArgumentInfo DefaultArgs;
   SmallVector<Identifier, 4> argumentNames;
   ParserResult<ParameterList> Indices
     = parseSingleParameterClause(ParameterContextKind::Subscript,
-                                 &argumentNames);
+                                 &argumentNames, &DefaultArgs);
   Status |= Indices;
 
   SignatureHasCodeCompletion |= Indices.hasCodeCompletion();
@@ -6418,6 +6419,8 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
                                                 CurDeclContext,
                                                 nullptr);
   Subscript->getAttrs() = Attributes;
+
+  DefaultArgs.setFunctionContext(Subscript, Subscript->getIndices());
 
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {

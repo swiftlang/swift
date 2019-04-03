@@ -2267,6 +2267,10 @@ public:
         = TC.getFragileFunctionKind(DC);
   }
 
+  bool shouldWalkIntoNonSingleExpressionClosure() override {
+    return false;
+  }
+
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     ExprStack.push_back(E);
 
