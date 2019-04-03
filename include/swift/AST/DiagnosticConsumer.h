@@ -312,7 +312,8 @@ private:
 
   Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
   findSubconsumerForAnyKind(SourceManager &SM, SourceLoc loc,
-                            DiagnosticKind Kind, SourceLoc defaultDiagnosticLoc);
+                            DiagnosticKind Kind,
+                            SourceLoc defaultDiagnosticLoc);
 
   Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
   findSubconsumerForNonNote(SourceManager &SM, SourceLoc loc,

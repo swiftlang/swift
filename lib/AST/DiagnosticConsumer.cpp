@@ -201,13 +201,14 @@ FileSpecificDiagnosticConsumer::findSubconsumerForAnyKind(
 
 Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
 FileSpecificDiagnosticConsumer::findSubconsumerForNonNote(
-    SourceManager &SM, const SourceLoc loc, const SourceLoc defaultDiagnosticLoc) {
+    SourceManager &SM, const SourceLoc loc,
+    const SourceLoc defaultDiagnosticLoc) {
   const auto subconsumer = subconsumerForLocation(SM, loc);
   if (!subconsumer)
     return None; // No place to put it
   if ((*subconsumer)->getConsumer())
     return subconsumer; // A primary file with a .dia file
-   if (defaultDiagnosticLoc.isInvalid())
+  if (defaultDiagnosticLoc.isInvalid())
     return None;
   const auto currentPrimarySubconsumer =
       subconsumerForLocation(SM, defaultDiagnosticLoc);

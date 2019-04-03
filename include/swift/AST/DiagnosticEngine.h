@@ -815,7 +815,7 @@ namespace swift {
 
   public:
     DefaultDiagnosticLocRAII(DiagnosticEngine &Diags,
-                            StringRef defaultDiagnosticInputFile)
+                             StringRef defaultDiagnosticInputFile)
         : Diags(Diags) {
       Diags.setDefaultDiagnostLocToInput(defaultDiagnosticInputFile);
     }

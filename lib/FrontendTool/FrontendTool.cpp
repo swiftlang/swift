@@ -1219,7 +1219,7 @@ static bool performCompileStepsPostSILGen(
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
 
   DefaultDiagnosticLocRAII cpi(Context.Diags,
-                              PSPs.MainInputFilenameForDebugInfo);
+                               PSPs.MainInputFilenameForDebugInfo);
 
   if (Stats)
     countStatsPostSILGen(*Stats, *SM);
