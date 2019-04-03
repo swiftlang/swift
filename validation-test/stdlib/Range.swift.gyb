@@ -797,5 +797,42 @@ MiscTestSuite.test("Compatibility typealiases") {
   let _: CountableClosedRange = MinimalStrideableValue(3)...MinimalStrideableValue(3)
 }
 
+MiscTestSuite.test("relative(to:)/partialRangeFrom") {
+  let emptyCollection = [Int]()
+  let partialRangeFrom = 1...
+
+  var rangeFromPartialRangeFrom = partialRangeFrom.relative(to: emptyCollection)
+  expectType(Range<Int>.self, &rangeFromPartialRangeFrom)
+  expectEqual(0, rangeFromPartialRangeFrom.lowerBound)
+  expectEqual(0, rangeFromPartialRangeFrom.upperBound)
+  expectEqual(true, rangeFromPartialRangeFrom.isEmpty)
+}
+
+MiscTestSuite.test("relative(to:)/partialRangeUpTo") {
+  let nonEmptyCollection = (0..<20).map { $0 }
+  let arraySlice = nonEmptyCollection[5...]
+
+  let partialRangeUpTo = ..<1
+
+  var rangeFromPartialRangeUpTo = partialRangeUpTo.relative(to: arraySlice)
+  expectType(Range<Int>.self, &rangeFromPartialRangeUpTo)
+  expectEqual(5, rangeFromPartialRangeUpTo.lowerBound)
+  expectEqual(5, rangeFromPartialRangeUpTo.upperBound)
+  expectEqual(true, rangeFromPartialRangeUpTo.isEmpty)
+}
+
+MiscTestSuite.test("relative(to:)/partialRangeThrough") {
+  let nonEmptyCollection = (0..<20).map { $0 }
+  let arraySlice = nonEmptyCollection[5...]
+
+  let partialRangeThrough = ...1
+
+  var rangeFromPartialRangeThrough = partialRangeThrough.relative(to: arraySlice)
+  expectType(Range<Int>.self, &rangeFromPartialRangeThrough)
+  expectEqual(5, rangeFromPartialRangeThrough.lowerBound)
+  expectEqual(5, rangeFromPartialRangeThrough.upperBound)
+  expectEqual(true, rangeFromPartialRangeThrough.isEmpty)
+}
+
 runAllTests()
 
