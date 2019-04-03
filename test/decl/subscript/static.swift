@@ -31,4 +31,3 @@ class BadBase {
 class BadDerived: BadBase {
   override static subscript(_ i: Int) -> String { return "DerivedGood" } // expected-error{{cannot override static subscript}}
 }
-

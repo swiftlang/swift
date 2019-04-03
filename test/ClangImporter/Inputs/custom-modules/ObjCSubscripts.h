@@ -60,3 +60,10 @@
 @interface KeySubscriptReversedOverrideSetter : KeySubscriptReversedBase
 - (void)setObject:(id)object forKeyedSubscript:(NSString *)key;
 @end
+
+@interface NoClassSubscript : NSObject
++ (id)objectAtIndexedSubscript:(int)i;
++ (void)setObject:(id)obj atIndexedSubscript:(int)i;
++ (id)objectForKeyedSubscript:(NSString *)subscript;
++ (void)setObject:(id)object forKeyedSubscript:(NSString *)key;
+@end
