@@ -12,7 +12,8 @@ var Accelerate_vImageTests = TestSuite("Accelerate_vImage")
 if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     let width = UInt(48)
     let height = UInt(12)
-    let size = CGSize(width: 48, height: 12)
+    let widthi = 48
+    let heighti = 12
     
     //===----------------------------------------------------------------------===//
     //
@@ -52,8 +53,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                                       height: height)!
         
         let sourceCGBuffer = vImage_Buffer(cgImage: image)!
-        var intermediateCVBuffer = vImage_Buffer(size: size, bitsPerPixel: 32)!
-        var destinationCGBuffer = vImage_Buffer(size: size, bitsPerPixel: 32)!
+        var intermediateCVBuffer = vImage_Buffer(width: widthi, height: heighti, bitsPerPixel: 32)!
+        var destinationCGBuffer = vImage_Buffer(width: widthi, height: heighti, bitsPerPixel: 32)!
         
         coreGraphicsToCoreVideo?.convert(source: sourceCGBuffer,
                                          destination: &intermediateCVBuffer)
@@ -131,7 +132,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                                                      renderingIntent: .defaultIntent)
         
         let sourceBuffer = vImage_Buffer(cgImage: image)!
-        var destinationBuffer = vImage_Buffer(size: size,
+        var destinationBuffer = vImage_Buffer(width: widthi, height: heighti,
                                               bitsPerPixel: 32)!
         
         // New API
@@ -147,7 +148,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         
         // Legacy API
         
-        var legacyDestinationBuffer = vImage_Buffer(size: size,
+        var legacyDestinationBuffer = vImage_Buffer(width: widthi, height: heighti,
                                                     bitsPerPixel: 32)!
         
         var legacyConverter: vImageConverter?
@@ -209,7 +210,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     Accelerate_vImageTests.test("vImage/IllegalSize") {
         var error = kvImageNoError
         
-        let buffer = vImage_Buffer(size: CGSize(width: -1, height: -1),
+        let buffer = vImage_Buffer(width: -1, height: -1,
                                    bitsPerPixel: 32,
                                    error: &error)
         
@@ -220,7 +221,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     Accelerate_vImageTests.test("vImage/IllegalSize") {
         var error = kvImageNoError
         
-        let buffer = vImage_Buffer(size: CGSize(width: 99999999, height: 99999999),
+        let buffer = vImage_Buffer(width: 99999999, height: 99999999,
                                    bitsPerPixel: 99999999,
                                    error: &error,
                                    flags: .noFlags)
@@ -289,7 +290,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         
         let source = vImage_Buffer(cgImage: image)!
         
-        var destination = vImage_Buffer(size: size,
+        var destination = vImage_Buffer(width: widthi, height: heighti,
                                         bitsPerPixel: 32)!
         
         _ = source.copy(destinationBuffer: &destination)
@@ -335,7 +336,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         
         var alignment = 0
         
-        _ = vImage_Buffer(size: size,
+        _ = vImage_Buffer(width: widthi, height: heighti,
                           bitsPerPixel: 32,
                           alignment: &alignment)
         

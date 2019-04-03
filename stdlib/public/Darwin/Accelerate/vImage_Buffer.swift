@@ -32,27 +32,26 @@ extension vImage_Buffer {
     /// Initializes a vImage buffer of a specified size without memory allocation,
     /// reporting the preferred alignment.
     ///
-    /// - Parameter size: The size of the image.
+    /// - Parameter width: The width of the buffer.
+    /// - Parameter height: The height of the buffer.
     /// - Parameter bitsPerPixel: The number of bits in a pixel of image data.
     /// - Parameter alignment: The preferred alignment is written to this parameter.
     ///
     /// - Returns: An initialized vImage buffer.
-    public init?(size: CGSize,
+    public init?(width: Int,
+                 height: Int,
                  bitsPerPixel: UInt32,
                  alignment: inout Int) {
         
-        if size.width < 0 || size.height < 0 {
+        if width < 0 || height < 0 {
             return nil
         }
         
         self.init()
-        
-        let width = vImagePixelCount(size.width)
-        let height = vImagePixelCount(size.height)
-        
+
         let error = vImageBuffer_Init(&self,
-                                      height,
-                                      width,
+                                      vImagePixelCount(height),
+                                      vImagePixelCount(width),
                                       bitsPerPixel,
                                       vImage_Flags(kvImageNoAllocate))
         
@@ -65,29 +64,29 @@ extension vImage_Buffer {
     
     /// Initializes a vImage buffer of a specified size, reporting any errors.
     ///
-    /// - Parameter size: The size of the image.
+    /// - Parameter width: The width of the buffer.
+    /// - Parameter height: The height of the buffer.
     /// - Parameter bitsPerPixel: The number of bits in a pixel of image data.
     /// - Parameter error: Overwritten with the error code if the operation failed.
     /// - Parameter options: The options to use when performing this operation.
     ///
     /// - Returns: An initialized vImage buffer.
-    public init?(size: CGSize,
+    public init?(width: Int,
+                 height: Int,
                  bitsPerPixel: UInt32,
                  error: inout Int,
                  flags options: vImage.Options = .noFlags) {
         
-        self.init()
-        
-        if size.width < 0 || size.height < 0 {
+        if width < 0 || height < 0 {
             error = kvImageInvalidParameter
             return nil
         }
-        let width = vImagePixelCount(size.width)
-        let height = vImagePixelCount(size.height)
         
+        self.init()
+      
         error = vImageBuffer_Init(&self,
-                                  height,
-                                  width,
+                                  vImagePixelCount(height),
+                                  vImagePixelCount(width),
                                   bitsPerPixel,
                                   options.flags)
         
@@ -98,26 +97,26 @@ extension vImage_Buffer {
     
     /// Initializes a vImage buffer of a specified size.
     ///
-    /// - Parameter size: The size of the image.
+    /// - Parameter width: The width of the buffer.
+    /// - Parameter height: The height of the buffer.
     /// - Parameter bitsPerPixel: The number of bits in a pixel of image data.
     /// - Parameter options: The options to use when performing this operation.
     ///
     /// - Returns: An initialized vImage buffer.
-    public init?(size: CGSize,
+    public init?(width: Int,
+                 height: Int,
                  bitsPerPixel: UInt32,
                  flags options: vImage.Options = .noFlags) {
         
-        self.init()
-        
-        if size.width < 0 || size.height < 0 {
+        if width < 0 || height < 0 {
             return nil
         }
-        let width = vImagePixelCount(size.width)
-        let height = vImagePixelCount(size.height)
         
+        self.init()
+  
         let error = vImageBuffer_Init(&self,
-                                      height,
-                                      width,
+                                      vImagePixelCount(height),
+                                      vImagePixelCount(width),
                                       bitsPerPixel,
                                       options.flags)
         
