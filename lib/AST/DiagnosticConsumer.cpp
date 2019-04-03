@@ -169,10 +169,8 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
 
   HasAnErrorBeenConsumed |= Kind == DiagnosticKind::Error;
 
-  auto subconsumer = findSubconsumerAndRememberItForNotes(SM, Loc, Kind);
-  if (subconsumer.hasValue() && !(*subconsumer)->getConsumer())
-    subconsumer = findSubconsumerForPrimaryCausingErrorInNonprimary(
-        SM, Kind, currentPrimaryInput);
+  auto subconsumer =
+      findSubconsumerForAnyKind(SM, Loc, Kind, currentPrimaryInput);
   if (subconsumer) {
     subconsumer.getValue()->handleDiagnostic(
         SM, Loc, Kind, FormatString, FormatArgs, Info, currentPrimaryInput);
@@ -185,13 +183,14 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
 }
 
 Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
-FileSpecificDiagnosticConsumer::findSubconsumerAndRememberItForNotes(
-    SourceManager &SM, SourceLoc loc, DiagnosticKind Kind) {
+FileSpecificDiagnosticConsumer::findSubconsumerForAnyKind(
+    SourceManager &SM, SourceLoc loc, DiagnosticKind Kind,
+    StringRef currentPrimaryInput) {
   switch (Kind) {
   case DiagnosticKind::Error:
   case DiagnosticKind::Warning:
   case DiagnosticKind::Remark: {
-    auto subconsumer = subconsumerForLocation(SM, loc);
+    auto subconsumer = findSubconsumerForNonNote(SM, loc, currentPrimaryInput);
     SubconsumerForSubsequentNotes = subconsumer;
     return subconsumer;
   }
@@ -201,16 +200,32 @@ FileSpecificDiagnosticConsumer::findSubconsumerAndRememberItForNotes(
 }
 
 Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
-FileSpecificDiagnosticConsumer::
-    findSubconsumerForPrimaryCausingErrorInNonprimary(
-        SourceManager &SM, DiagnosticKind Kind, StringRef currentPrimaryInput) {
-  if (currentPrimaryInput.empty())
+FileSpecificDiagnosticConsumer::findSubconsumerForNonNote(
+    SourceManager &SM, const SourceLoc loc, StringRef currentPrimaryInput) {
+  const auto subconsumer = subconsumerForLocation(SM, loc);
+  if (!subconsumer)
+    return None; // No place to put it
+  if ((*subconsumer)->getConsumer())
+    return subconsumer; // A primary file with a .dia file
+  const auto locInPrimary =
+      findLocationOfCurrentPrimaryFile(SM, currentPrimaryInput);
+  if (locInPrimary.isInvalid())
     return None;
+  const auto currentPrimarySubconsumer =
+      subconsumerForLocation(SM, locInPrimary);
+  assert(currentPrimarySubconsumer && (*subconsumer)->getConsumer() &&
+         "current primary must have a .dia file");
+  return currentPrimarySubconsumer;
+}
+
+SourceLoc FileSpecificDiagnosticConsumer::findLocationOfCurrentPrimaryFile(
+    SourceManager &SM, StringRef currentPrimaryInput) {
+  if (currentPrimaryInput.empty())
+    return SourceLoc();
   auto id = SM.getIDForBufferIdentifier(currentPrimaryInput);
   if (!id)
-    return None;
-  auto loc = SM.getLocForBufferStart(*id);
-  return findSubconsumerAndRememberItForNotes(SM, loc, Kind);
+    return SourceLoc();
+  return SM.getLocForBufferStart(*id);
 }
 
 bool FileSpecificDiagnosticConsumer::finishProcessing() {

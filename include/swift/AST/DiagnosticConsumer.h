@@ -311,12 +311,15 @@ private:
   subconsumerForLocation(SourceManager &SM, SourceLoc loc);
 
   Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
-  findSubconsumerAndRememberItForNotes(SourceManager &SM, SourceLoc loc,
-                                       DiagnosticKind Kind);
+  findSubconsumerForAnyKind(SourceManager &SM, SourceLoc loc,
+                            DiagnosticKind Kind, StringRef currentPrimaryInput);
 
   Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
-  findSubconsumerForPrimaryCausingErrorInNonprimary(
-      SourceManager &SM, DiagnosticKind Kind, StringRef currentPrimaryInput);
+  findSubconsumerForNonNote(SourceManager &SM, SourceLoc loc,
+                            StringRef currentPrimaryInput);
+
+  SourceLoc findLocationOfCurrentPrimaryFile(SourceManager &SM,
+                                             StringRef currentPrimaryInput);
 };
   
 } // end namespace swift
