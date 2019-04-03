@@ -204,13 +204,16 @@ foreach(SDK ${SWIFT_SDKS})
 __declspec(dllexport)
 #endif
 _Block_release(void) { }\n")
-    add_library(BlocksRuntimeStub-${SDK}-${ARCH} SHARED
+    _add_swift_library_single(
+      BlocksRuntimeStub-${SDK}-${ARCH}
+      BlocksRuntimeStub
+      SHARED
+      DONT_EMBED_BITCODE
+      NOSWIFTRT
+      ARCHITECTURE ${ARCH}
+      SDK ${SDK}
+      INSTALL_IN_COMPONENT dev
       ${test_bin_dir}/BlocksRuntime.c)
-    if(CMAKE_C_COMPILER_ID STREQUAL Clang AND
-        NOT CMAKE_C_COMPILER_SIMULATE_ID STREQUAL MSVC)
-      target_compile_options(BlocksRuntimeStub-${SDK}-${ARCH} PRIVATE
-        -target;${SWIFT_SDK_${SDK}_ARCH_${ARCH}_TRIPLE})
-    endif()
     set_target_properties(BlocksRuntimeStub-${SDK}-${ARCH} PROPERTIES
       ARCHIVE_OUTPUT_DIRECTORY ${test_bin_dir}
       LIBRARY_OUTPUT_DIRECTORY ${test_bin_dir}
