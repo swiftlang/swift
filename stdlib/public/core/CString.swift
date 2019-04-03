@@ -104,38 +104,48 @@ extension String {
   @inlinable @inline(__always)
   public init?(
     unsafeUninitializedCapacity capacity: Int,
-    initializingValidatingUTF8With initializer: (
-      _ buffer: UnsafeMutableBufferPointer<CChar>,
+    initializingRepairingUTF8With initializer: (
+      _ buffer: UnsafeMutableBufferPointer<UInt8>,
       _ initializedCount: inout Int
-    ) throws -> Bool
+    ) throws -> Void
   ) rethrows {
+    var utf8Smol: _SmallString? = nil
     if capacity <= _SmallString.capacity {
-      if let smol = try _SmallString(initializingUTF8With: initializer) {
+      let smol = try _SmallString(initializingUTF8With: initializer)
+      // Fast case where we fit in a _SmallString and don't need UTF8 validation
+      if smol.isASCII {
         self = String(_StringGuts(smol))
-      } else {
-        return nil
+        return
       }
-    } else {
-      try self.init(unsafeLargeUninitializedCapacity: capacity,
-                    initializingValidatingUTF8With: initializer)
+      utf8Smol = smol
     }
+
+    try self.init(_unsafeLargeUninitializedCapacity: capacity,
+                  nonASCIISmallString: utf8Smol,
+                  initializingRepairingUTF8With: initializer)
   }
-  
+
   @_effects(releasenone)
   @usableFromInline
   internal init?(
-    unsafeLargeUninitializedCapacity capacity: Int,
-    initializingValidatingUTF8With initializer: (
-      _ buffer: UnsafeMutableBufferPointer<CChar>,
+    _unsafeLargeUninitializedCapacity capacity: Int,
+    nonASCIISmallString: _SmallString?,
+    initializingRepairingUTF8With initializer: (
+      _ buffer: UnsafeMutableBufferPointer<UInt8>,
       _ initializedCount: inout Int
-    ) throws -> Bool
+    ) throws -> Void
   ) rethrows {
+    if let smol = nonASCIISmallString {
+      //We succeeded in making a _SmallString, but may need repair UTF8
+      self = smol.withUTF8 { String._fromUTF8Repairing($0).result }
+      return
+    }
     _internalInvariant(capacity > _SmallString.capacity)
     guard let storage = try __StringStorage.create(
       unsafeUninitializedCapacity: capacity,
-      initializingValidatingUTF8With: initializer
+      initializingRepairingUTF8With: initializer
     ) else {
-        return nil
+      return nil
     }
     
     self = storage.asString
@@ -172,7 +182,7 @@ extension String {
     guard let str = String._tryFromUTF8(
       UnsafeBufferPointer(start: cString._asUInt8, count: len))
     else { return nil }
-    
+
     self = str
   }
 

@@ -262,29 +262,17 @@ extension _SmallString {
   }
   
   @inlinable @inline(__always)
-  internal init?(
+  internal init(
     initializingUTF8With initializer: (
-      _ buffer: UnsafeMutableBufferPointer<CChar>,
+      _ buffer: UnsafeMutableBufferPointer<UInt8>,
       _ initializedCount: inout Int
-    ) throws -> Bool
+    ) throws -> Void
   ) rethrows {
     self.init()
-    var success = false
     try self.withMutableCapacity {
-      let raw = UnsafeMutableRawPointer($0.baseAddress
-        ._unsafelyUnwrappedUnchecked)
-      let base = raw.assumingMemoryBound(to: CChar.self)
-      let cbuf = UnsafeMutableBufferPointer(start: base,
-                                            count: _SmallString.capacity)
       var count = 0
-      if try initializer(cbuf, &count) {
-        success = true
-        return count
-      }
-      return 0
-    }
-    if !success {
-      return nil
+      try initializer($0, &count)
+      return count
     }
     self._invariantCheck()
   }

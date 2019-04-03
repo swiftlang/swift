@@ -42,6 +42,22 @@ private func _copyString(_ obj: NSString) -> NSString {
 }
 
 @_effects(releasenone)
+private func _cfStringUTF8Count(_ obj: NSString, _ len: Int) -> Int {
+  var count = 0
+  let _ = CFStringGetBytes(
+    obj as CFString,
+    CFRange(location: 0, length: len),
+    CFStringBuiltInEncodings.UTF8.rawValue,
+    0, //lossByte,
+    false, //isExternalRepresentation
+    nil,
+    15,
+    &count
+  )
+  return count
+}
+
+@_effects(releasenone)
 private func _getBytes(_ theString: NSString,
                        _ range: CFRange,
                        _ encoding: CFStringEncoding,
@@ -52,7 +68,7 @@ private func _getBytes(_ theString: NSString,
   return CFStringGetBytes(
     theString as CFString,
     range,
-    encoding,
+    CFStringBuiltInEncodings.UTF8.rawValue,
     0, //lossByte,
     false, //isExternalRepresentation
     buffer,
@@ -64,20 +80,6 @@ private func _getBytes(_ theString: NSString,
 private let (nscfClass, nscfConstantClass): (AnyClass, AnyClass) =
   (objc_lookUpClass("__NSCFString")!,
    objc_lookUpClass("__NSCFConstantString")!)
-/*
-#if (arch(i386) || arch(arm))
-
-private func _isObjCTaggedPointer(_ obj: AnyObject) -> Bool {
-  return false
-}
-
-#else
-
-private func _isObjCTaggedPointer(_ obj: AnyObject) -> Bool {
-  return false //TODO: implement
-}
-
-#endif*/
 
 extension String : _ObjectiveCBridgeable {
   @_semantics("convertToObjectiveC")
@@ -107,46 +109,36 @@ extension String : _ObjectiveCBridgeable {
   @inline(__always)
   private static func _bridgeToSmall(
     _ source: NSString,
-    _ len: Int,
-    _ encoding: CFStringBuiltInEncodings) -> String? {
+    _ len: Int
+  ) -> String? {
     return String(unsafeUninitializedCapacity: 15) { (ptr, outCount) in
-      let converted = _getBytes(
+      let _ = _getBytes(
         source,
         CFRange(location: 0, length: len),
-        encoding.rawValue,
+        CFStringBuiltInEncodings.UTF8.rawValue,
         UnsafeMutableRawPointer(ptr.baseAddress!).assumingMemoryBound(to:
           UInt8.self),
         15, //maxBufLen
         &outCount
       )
-      
-      return converted == len
     }
-  }
-  
-  @_effects(releasenone)
-  @inline(__always)
-  private static func _bridgeTagged(_ source: NSString) -> String? {
-      if _isObjCTaggedPointer(source) {
-        return _bridgeToSmall(source, _length(source), CFStringBuiltInEncodings.ASCII)
-      }
-      return nil
   }
   
   @_effects(releasenone)
   private static func _unconditionallyBridgeFromObjectiveC_nonTagged(
     _ source: NSString
-    ) -> String {
+  ) -> String {
     let len = _length(source)
     let sourceClass:AnyClass = _getClass(source)
     
-    //Only try regular CF-based NSStrings for now due to things like
-    //NSLocalizedString assoc objects and NSAttributedString content proxies
-    //Also only try Strings we believe will fit into a SmallString for now
-    //In the future we should do mutable __NSCFStrings of any length here.
+    // Only try regular CF-based NSStrings for now due to things like
+    // NSLocalizedString assoc objects and NSAttributedString content proxies
+    // Also only try Strings we believe will fit into a SmallString for now
+    // In the future we should do mutable __NSCFStrings of any length here.
     if sourceClass == nscfClass,
-      len <= 15,
-      let eager = _bridgeToSmall(source, len, CFStringBuiltInEncodings.UTF8) {
+       len <= 15,
+       _cfStringUTF8Count(source, len) <= 15,
+       let eager = _bridgeToSmall(source, len) {
       return eager
     } 
     
@@ -154,9 +146,9 @@ extension String : _ObjectiveCBridgeable {
       source :
       _copyString(source)
     
-    //mutable->immutable might make it start being a tagged pointer
-    if let result = _bridgeTagged(immutableCopy) {
-      return result
+    // mutable->immutable might make it start being a tagged pointer
+    if _isObjCTaggedPointer(immutableCopy) {
+      return _bridgeToSmall(immutableCopy, len)!
     }
     
     return _bridgeCocoaStringLazily(immutableCopy, sourceClass, len)
@@ -172,9 +164,8 @@ extension String : _ObjectiveCBridgeable {
       return String()
     }
     
-    
-    if let result = _bridgeTagged(source) {
-      return result
+    if _fastPath(_isObjCTaggedPointer(source)) {
+      return _bridgeToSmall(source, _length(source))!
     }
     
     return _unconditionallyBridgeFromObjectiveC_nonTagged(source)

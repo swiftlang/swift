@@ -406,26 +406,21 @@ extension __StringStorage {
   @usableFromInline
   internal static func create(
     unsafeUninitializedCapacity capacity: Int,
-    initializingValidatingUTF8With initializer: (
-      _ buffer: UnsafeMutableBufferPointer<CChar>,
+    initializingRepairingUTF8With initializer: (
+      _ buffer: UnsafeMutableBufferPointer<UInt8>,
       _ initializedCount: inout Int
-    ) throws -> Bool
+    ) throws -> Void
   ) rethrows -> __StringStorage? {
     let storage = __StringStorage.create(
       capacity: capacity,
       countAndFlags: CountAndFlags(mortalCount: 0, isASCII: false)
     )
-    let s = UnsafeMutableRawPointer(
-      storage.mutableStart).assumingMemoryBound(to: CChar.self)
-    let buffer = UnsafeMutableBufferPointer(start: s,
+    let buffer = UnsafeMutableBufferPointer(start: storage.mutableStart,
                                             count: capacity)
     var count = 0
-    guard try initializer(buffer, &count) else {
-      return nil
-    }
-    let bufferToValidate = UnsafeBufferPointer(start: storage.start,
-                                               count: capacity)
-    if case .success(let info) = validateUTF8(bufferToValidate) {
+    try initializer(buffer, &count)
+    if case .success(let info) =
+      validateUTF8(UnsafeBufferPointer(buffer)) {
       storage._countAndFlags = CountAndFlags(mortalCount: count,
                                             isASCII: info.isASCII)
       storage._invariantCheck()
