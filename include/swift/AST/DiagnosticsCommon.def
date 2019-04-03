@@ -84,6 +84,9 @@ ERROR(class_func_not_in_class,none,
 ERROR(class_var_not_in_class,none,
       "class properties are only allowed within classes; "
       "use 'static' to declare a %select{static|requirement fulfilled by either a static or class}0 property", (bool))
+ERROR(class_subscript_not_in_class,none,
+      "class subscripts are only allowed within classes; "
+      "use 'static' to declare a %select{static|requirement fulfilled by either a static or class}0 subscript", (bool))
 
 // FIXME: Used by both the parser and the type-checker.
 ERROR(func_decl_without_brace,PointsToFirstBadToken,
