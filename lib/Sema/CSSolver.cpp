@@ -1348,12 +1348,26 @@ ConstraintSystem::filterDisjunction(
 
     // This can only happen when subscript syntax is used to lookup
     // something which doesn't exist in type marked with
-    // `@dynamicMemberLookup`. Early simplification of the key path
-    // dynamic member lookup choice is impossible because it requires
-    // constraints associated with subscript index expression to be present.
-    if (!solverState && choice->getOverloadChoice().getKind() ==
-                            OverloadChoiceKind::KeyPathDynamicMemberLookup)
-      return SolutionKind::Unsolved;
+    // `@dynamicMemberLookup`.
+    // Since filtering currently runs as part of the `applicable function`
+    // constraint processing, "keypath dynamic member lookup" choice can't
+    // be attempted in-place because that would also try to operate on that
+    // constraint, so instead let's keep the disjunction, but disable all
+    // unviable choices.
+    if (choice->getOverloadChoice().getKind() ==
+        OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+      // Early simplification of the "keypath dynamic member lookup" choice
+      // is impossible because it requires constraints associated with
+      // subscript index expression to be present.
+      if (!solverState)
+        return SolutionKind::Unsolved;
+
+      for (auto *currentChoice : disjunction->getNestedConstraints()) {
+        if (currentChoice != choice)
+          solverState->disableContraint(currentChoice);
+      }
+      return SolutionKind::Solved;
+    }
 
     // Retire the disjunction. It's been solved.
     retireConstraint(disjunction);

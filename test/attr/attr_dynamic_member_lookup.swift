@@ -633,3 +633,24 @@ func keypath_to_subscript_to_property(_ lens: inout Lens<Array<Rectangle>>) {
   _ = lens[0].topLeft.y = Lens(1)
   // expected-error@-1 {{cannot assign to property: 'y' is a 'let' constant}}
 }
+
+@dynamicMemberLookup
+struct SingleChoiceLens<T> {
+  var obj: T
+
+  init(_ obj: T) {
+    self.obj = obj
+  }
+
+  subscript<U>(dynamicMember member: WritableKeyPath<T, U>) -> U {
+    get { return obj[keyPath: member] }
+    set { obj[keyPath: member] = newValue }
+  }
+}
+
+// Make sure that disjunction filtering optimization doesn't
+// impede keypath dynamic member lookup by eagerly trying to
+// simplify disjunctions with a single viable choice.
+func test_lens_with_a_single_choice(a: inout SingleChoiceLens<[Int]>) {
+  a[0] = 1 // Ok
+}
