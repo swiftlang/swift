@@ -41,11 +41,12 @@ extension vImage_Buffer {
                  bitsPerPixel: UInt32,
                  alignment: inout Int) {
         
-        self.init()
-        
         if size.width < 0 || size.height < 0 {
             return nil
         }
+        
+        self.init()
+        
         let width = vImagePixelCount(size.width)
         let height = vImagePixelCount(size.height)
         
