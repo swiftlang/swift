@@ -221,7 +221,10 @@ final internal class __StringStorage
 #endif
 
   @inline(__always)
-  final internal var isASCII: Bool { return _countAndFlags.isASCII }
+  final internal var isASCII: Bool {
+    get { return _countAndFlags.isASCII }
+    set { _countAndFlags = CountAndFlags(mortalCount: count, isASCII: newValue)}
+  }
 
   final internal var asString: String {
     @_effects(readonly) @inline(__always) get {
@@ -403,10 +406,9 @@ extension __StringStorage {
   }
   
   @_effects(releasenone)
-  @usableFromInline
   internal static func create(
     unsafeUninitializedCapacity capacity: Int,
-    initializingRepairingUTF8With initializer: (
+    initializingUncheckedUTF8With initializer: (
       _ buffer: UnsafeMutableBufferPointer<UInt8>,
       _ initializedCount: inout Int
     ) throws -> Void
@@ -419,15 +421,8 @@ extension __StringStorage {
                                             count: capacity)
     var count = 0
     try initializer(buffer, &count)
-    if case .success(let info) =
-      validateUTF8(UnsafeBufferPointer(buffer)) {
-      storage._countAndFlags = CountAndFlags(mortalCount: count,
-                                            isASCII: info.isASCII)
-      storage._invariantCheck()
-      return storage
-    } else {
-      return String._fromUTF8Repairing(UnsafeBufferPointer(buffer)).result._guts._object.nativeStorage
-    }
+    storage._countAndFlags = CountAndFlags(mortalCount: count, isASCII: false)
+    return storage
   }
 
   @_effects(releasenone)
@@ -729,7 +724,10 @@ final internal class __SharedStringStorage
   }
 
   @inline(__always)
-  final internal var isASCII: Bool { return _countAndFlags.isASCII }
+  final internal var isASCII: Bool {
+    get { return _countAndFlags.isASCII }
+    set { _countAndFlags = CountAndFlags(mortalCount: count, isASCII: newValue)}
+  }
 
   final internal var asString: String {
     @_effects(readonly) @inline(__always) get {

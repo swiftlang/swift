@@ -89,6 +89,12 @@ extension String : _ObjectiveCBridgeable {
     return result != nil
   }
   
+  #if arch(i386) || arch(arm)
+  private static let _estimatedSmallCutoff = 10
+  #else
+  private static let _estimatedSmallCutoff = 15
+  #endif
+  
   @_effects(releasenone)
   @inline(__always)
   private static func _bridgeToSmall(
@@ -96,21 +102,23 @@ extension String : _ObjectiveCBridgeable {
     _ len: Int
   ) -> String? {
     assert(len != 0)
-    let result = String(unsafeUninitializedCapacity: 15) { (ptr, outCount) in
+    let result = String(
+      unsafeUninitializedCapacity: _estimatedSmallCutoff
+    ) { (ptr, outCount) in
       let converted = _getBytes(
         source,
         CFRange(location: 0, length: len),
         CFStringBuiltInEncodings.UTF8.rawValue,
         UnsafeMutableRawPointer(ptr.baseAddress!).assumingMemoryBound(to:
           UInt8.self),
-        15, //maxBufLen
+        _estimatedSmallCutoff, //maxBufLen
         &outCount
       )
-      if converted != len {
+      if _slowPath(converted != len) {
         outCount = 0 //truncated, so produce an empty String instead
       }
     }
-    if result.isEmpty {
+    if _slowPath(result.isEmpty) {
       return nil
     }
     return result

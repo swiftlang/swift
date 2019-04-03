@@ -79,11 +79,37 @@ extension String {
   ) -> (result: String, repairsMade: Bool) {
     switch validateUTF8(input) {
     case .success(let extraInfo):
-        return (String._uncheckedFromUTF8(
-          input, asciiPreScanResult: extraInfo.isASCII
-        ), false)
+      return (String._uncheckedFromUTF8(
+        input, asciiPreScanResult: extraInfo.isASCII
+      ), false)
     case .error(let initialRange):
         return (repairUTF8(input, firstKnownBrokenRange: initialRange), true)
+    }
+  }
+  
+  @_effects(releasenone)
+  @usableFromInline
+  internal static func _fromUTF8Repairing(
+    unsafeUninitializedCapacity capacity: Int,
+    initializingWith initializer: (
+      _ buffer: UnsafeMutableBufferPointer<UInt8>,
+      _ initializedCount: inout Int
+    ) throws -> Void
+  ) rethrows -> String {
+    let result = try __StringStorage.create(
+      unsafeUninitializedCapacity: capacity,
+      initializingUncheckedUTF8With: initializer)
+    
+    let contents = UnsafeBufferPointer(start: result.start, count: result.count)
+    
+    switch validateUTF8(contents) {
+    case .success(let info):
+      result.isASCII = info.isASCII
+      result._invariantCheck()
+      return result.asString
+    case .error(let initialRange):
+      //This could be optimized to use excess tail capacity
+      return repairUTF8(contents, firstKnownBrokenRange: initialRange)
     }
   }
 
