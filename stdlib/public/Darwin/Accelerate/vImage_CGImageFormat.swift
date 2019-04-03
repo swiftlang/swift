@@ -56,7 +56,7 @@ extension vImage_CGImageFormat {
     }
     
     /// The number of color channels.
-    public var componentCount: UInt32 {
+    public var componentCount: Int {
         var mutableSelf = self
         return Int(vImageCGImageFormat_GetComponentCount(&mutableSelf))
     }
