@@ -100,6 +100,9 @@ DeclName SILGenModule::getMagicFunctionName(DeclContext *dc) {
   if (auto EED = dyn_cast<EnumElementDecl>(dc)) {
     return EED->getFullName();
   }
+  if (auto SD = dyn_cast<SubscriptDecl>(dc)) {
+    return SD->getFullName();
+  }
   llvm_unreachable("unexpected #function context");
 }
 

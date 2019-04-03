@@ -3633,19 +3633,13 @@ bool areConservativelyCompatibleArgumentLabels(OverloadChoice choice,
 ///
 /// \param range Will be populated with an "interesting" range.
 ///
-/// \param targetLocator If non-null, will be set to a locator that describes
-/// the target of the input locator.
-///
 /// \return the simplified locator.
 ConstraintLocator *simplifyLocator(ConstraintSystem &cs,
                                    ConstraintLocator *locator,
-                                   SourceRange &range,
-                                   ConstraintLocator **targetLocator = nullptr);
+                                   SourceRange &range);
 
 void simplifyLocator(Expr *&anchor,
                      ArrayRef<LocatorPathElt> &path,
-                     Expr *&targetAnchor,
-                     SmallVectorImpl<LocatorPathElt> &targetPath,
                      SourceRange &range);
 
 /// Simplify the given locator down to a specific anchor expression,

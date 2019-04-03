@@ -2416,6 +2416,8 @@ public:
     if (SD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
       TC.checkDynamicReplacementAttribute(SD);
     }
+
+    TC.checkDefaultArguments(SD->getIndices(), SD);
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
@@ -2940,6 +2942,9 @@ public:
 
     TC.validateDecl(EED);
     TC.checkDeclAttributes(EED);
+
+    if (auto *PL = EED->getParameterList())
+      TC.checkDefaultArguments(PL, EED);
 
     checkAccessControl(TC, EED);
   }
@@ -4098,7 +4103,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
                                                     EED->getParentEnum(),
                                                     ED->getGenericSignature()),
                              TypeResolverContext::EnumElementDecl);
-      checkDefaultArguments(PL, EED);
     }
 
     // If we have a raw value, make sure there's a raw type as well.

@@ -1098,8 +1098,8 @@ public:
     /// all the arguments, not just those that have default arguments.
     unsigned claimNextIndex() { return NextIndex++; }
 
-    /// Set the parsed context for all the initializers to the given
-    /// function.
+    /// Set the parsed context of all default argument initializers to
+    /// the given function, enum case or subscript.
     void setFunctionContext(DeclContext *DC, ParameterList *paramList);
     
     DefaultArgumentInfo() {

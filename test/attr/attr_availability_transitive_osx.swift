@@ -49,9 +49,8 @@ var osx_extension_init_osx = osx() // expected-error {{'osx()' is unavailable}}
 @available(OSX, unavailable)
 var osx_inner_init_osx = { let inner_var = osx() } // OK
 
-// FIXME: I'm not sure why this produces two errors instead of just one.
 @available(OSXApplicationExtension, unavailable)
-var osx_extension_inner_init_osx = { let inner_var = osx() } // expected-error 2 {{'osx()' is unavailable}}
+var osx_extension_inner_init_osx = { let inner_var = osx() } // expected-error {{'osx()' is unavailable}}
 
 struct Outer {
   @available(OSX, unavailable)
@@ -93,9 +92,8 @@ struct Outer {
   @available(OSX, unavailable)
   var osx_inner_init_osx = { let inner_var = osx() } // OK
   
-  // FIXME: I'm not sure why this produces two errors instead of just one.
   @available(OSXApplicationExtension, unavailable)
-  var osx_extension_inner_init_osx = { let inner_var = osx() } // expected-error 2 {{'osx()' is unavailable}}
+  var osx_extension_inner_init_osx = { let inner_var = osx() } // expected-error {{'osx()' is unavailable}}
 }
 
 extension Outer {
