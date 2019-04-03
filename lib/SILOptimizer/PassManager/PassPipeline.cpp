@@ -621,13 +621,14 @@ SILPassPipelinePlan SILPassPipelinePlan::getOnonePassPipeline() {
 
   P.startPipeline("Rest of Onone");
 
-  P.addTFPartitionMandatory();
-
   // Has only an effect if the -assume-single-thread option is specified.
   P.addAssumeSingleThreaded();
 
   // Has only an effect if the -gsil option is specified.
   P.addSILDebugInfoGenerator();
+
+  // SWIFT_ENABLE_TENSORFLOW
+  P.addTFPartitionMandatory();
 
   return P;
 }
