@@ -727,10 +727,6 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
         expectTrue(result.elementsEqual(returnedResult))
     }
-    
-     AccelerateTests_vDSPConversion.test("vDSP/SIMON_SIMON_SIMON_SIMON_SIMON_SIMON_SIMON") {
-        expectTrue(false)
-    }
 }
 
 runAllTests()
