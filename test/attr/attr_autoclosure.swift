@@ -210,10 +210,9 @@ func rdar_20591571() {
   func same<T>(_: T, _: T) {}
 
   func takesAnAutoclosure(_ fn: @autoclosure () -> Int, _ efn: @escaping @autoclosure () -> Int) {
-  // expected-note@-1 2{{parameter 'fn' is implicitly non-escaping}}
-
-    var _ = fn // expected-error {{non-escaping parameter 'fn' may only be called}}
-    let _ = fn // expected-error {{non-escaping parameter 'fn' may only be called}}
+    // These are OK -- they count as non-escaping uses
+    var _ = fn
+    let _ = fn
 
     var _ = efn
     let _ = efn
