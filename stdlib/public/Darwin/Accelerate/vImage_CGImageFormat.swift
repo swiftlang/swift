@@ -39,15 +39,19 @@ extension vImage_CGImageFormat {
     }
     
     /// Initializes an image format.
-    public init(bitsPerComponent: UInt32,
-                bitsPerPixel: UInt32,
-                colorSpace: CGColorSpace,
-                bitmapInfo: CGBitmapInfo,
-                renderingIntent: CGColorRenderingIntent = .defaultIntent) {
+    public init?(bitsPerComponent: Int,
+                 bitsPerPixel: Int,
+                 colorSpace: CGColorSpace,
+                 bitmapInfo: CGBitmapInfo,
+                 renderingIntent: CGColorRenderingIntent = .defaultIntent) {
+        
+        if bitsPerComponent < 1 || bitsPerPixel < 0 {
+            return nil
+        }
         
         self = vImage_CGImageFormat(
-            bitsPerComponent: bitsPerComponent,
-            bitsPerPixel: bitsPerPixel,
+            bitsPerComponent: UInt32(bitsPerComponent),
+            bitsPerPixel: UInt32(bitsPerPixel),
             colorSpace: Unmanaged.passRetained(colorSpace),
             bitmapInfo: bitmapInfo,
             version: 0,

@@ -28,7 +28,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                                             bitsPerPixel: 32,
                                             colorSpace: colorSpace,
                                             bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.first.rawValue),
-                                            renderingIntent: .defaultIntent)
+                                            renderingIntent: .defaultIntent)!
         
         let cvFormat = vImageCVImageFormat.make(format: .format32ABGR,
                                                 matrix: kvImage_ARGBToYpCbCrMatrix_ITU_R_601_4.pointee,
@@ -79,13 +79,13 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                                                 bitsPerPixel: 32,
                                                 colorSpace: CGColorSpaceCreateDeviceCMYK(),
                                                 bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
-                                                renderingIntent: .defaultIntent)
+                                                renderingIntent: .defaultIntent)!
         
         let destinationFormat = vImage_CGImageFormat(bitsPerComponent: 8,
                                                      bitsPerPixel: 24,
                                                      colorSpace: CGColorSpace(name: CGColorSpace.genericLab)!,
                                                      bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
-                                                     renderingIntent: .defaultIntent)
+                                                     renderingIntent: .defaultIntent)!
         
         let converter = vImageConverter.make(sourceFormat: sourceFormat,
                                              destinationFormat: destinationFormat)
@@ -104,7 +104,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                                           bitsPerPixel: 32,
                                           colorSpace: CGColorSpaceCreateDeviceCMYK(),
                                           bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
-                                          renderingIntent: .defaultIntent)
+                                          renderingIntent: .defaultIntent)!
         
         _ = vImageConverter.make(sourceFormat: format,
                                  destinationFormat: format,
@@ -129,7 +129,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                                                      bitsPerPixel: 32,
                                                      colorSpace: CGColorSpaceCreateDeviceCMYK(),
                                                      bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
-                                                     renderingIntent: .defaultIntent)
+                                                     renderingIntent: .defaultIntent)!
         
         let sourceBuffer = vImage_Buffer(cgImage: image)!
         var destinationBuffer = vImage_Buffer(width: widthi, height: heighti,
@@ -242,7 +242,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let format = vImage_CGImageFormat(bitsPerComponent: 8,
                                           bitsPerPixel: 32,
                                           colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                          bitmapInfo: CGBitmapInfo(rawValue: 0))
+                                          bitmapInfo: CGBitmapInfo(rawValue: 0))!
         
         var error = kvImageNoError
         
@@ -488,6 +488,22 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     //
     //===----------------------------------------------------------------------===//
     
+    Accelerate_vImageTests.test("vImage/CGImageFormatIllegalValues") {
+        
+        let formatOne = vImage_CGImageFormat(bitsPerComponent: -1,
+                                          bitsPerPixel: 32,
+                                          colorSpace: CGColorSpaceCreateDeviceRGB(),
+                                          bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedFirst.rawValue))
+        
+        let formatTwo = vImage_CGImageFormat(bitsPerComponent: 8,
+                                             bitsPerPixel: -1,
+                                             colorSpace: CGColorSpaceCreateDeviceRGB(),
+                                             bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedFirst.rawValue))
+        
+        expectTrue(formatOne == nil)
+        expectTrue(formatTwo == nil)
+    }
+    
     Accelerate_vImageTests.test("vImage/CGImageFormatFromCGImage") {
         let pixels: [UInt8] = (0 ..< width * height).map { _ in
             return UInt8.random(in: 0 ..< 255)
@@ -518,7 +534,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let format = vImage_CGImageFormat(bitsPerComponent: 8,
                                           bitsPerPixel: 32,
                                           colorSpace: colorspace,
-                                          bitmapInfo: bitmapInfo)
+                                          bitmapInfo: bitmapInfo)!
         
         let legacyFormat = vImage_CGImageFormat(bitsPerComponent: 8,
                                                 bitsPerPixel: 32,
@@ -531,7 +547,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(format == legacyFormat)
         expectTrue(format.componentCount == 4)
     }
-    
+
     //===----------------------------------------------------------------------===//
     //
     //  MARK: Helper Functions
