@@ -40,7 +40,7 @@ class A {
   var v9: Int { return 5 } // expected-note{{attempt to override property here}}
   var v10: Int { return 5 } // expected-note{{attempt to override property here}}
 
-  subscript (i: Int) -> String { // expected-note{{potential overridden subscript 'subscript(_:)' here}} expected-note{{potential overridden subscript 'subscript(_:)' here}}
+  subscript (i: Int) -> String { // expected-note{{potential overridden subscript 'subscript(_:)' here}}
     get {
       return "hello"
     }
@@ -49,7 +49,7 @@ class A {
     }
   }
 
-  subscript (d: Double) -> String { // expected-note{{overridden declaration is here}} expected-note{{potential overridden subscript 'subscript(_:)' here}} expected-note{{potential overridden subscript 'subscript(_:)' here}}
+  subscript (d: Double) -> String { // expected-note{{overridden declaration is here}} expected-note{{potential overridden subscript 'subscript(_:)' here}}
     get {
       return "hello"
     }
@@ -58,7 +58,8 @@ class A {
     }
   }
   
-  class subscript (i: String) -> String { // expected-note{{overridden declaration is here}} expected-note{{potential overridden class subscript 'subscript(_:)' here}}
+  // FIXME(SR-10323): The second note is wrong; it should be "potential overridden class subscript 'subscript(_:)' here". This is a preexisting bug.
+  class subscript (i: String) -> String { // expected-note{{overridden declaration is here}} expected-note{{attempt to override subscript here}}
     get {
       return "hello"
     }
@@ -67,7 +68,7 @@ class A {
     }
   }
   
-  class subscript (a: [Int]) -> String { // expected-note{{potential overridden class subscript 'subscript(_:)' here}}
+  class subscript (typeInSuperclass a: [Int]) -> String {
     get {
       return "hello"
     }
@@ -76,15 +77,15 @@ class A {
     }
   }
 
-  subscript (i: Int8) -> A { // expected-note{{potential overridden subscript 'subscript(_:)' here}} expected-note{{potential overridden subscript 'subscript(_:)' here}}
+  subscript (i: Int8) -> A { // expected-note{{potential overridden subscript 'subscript(_:)' here}}
     get { return self }
   }
 
-  subscript (i: Int16) -> A { // expected-note{{attempt to override subscript here}} expected-note{{potential overridden subscript 'subscript(_:)' here}} expected-note{{potential overridden subscript 'subscript(_:)' here}}
+  subscript (i: Int16) -> A { // expected-note{{attempt to override subscript here}} expected-note{{potential overridden subscript 'subscript(_:)' here}}
     get { return self }
     set { }
   }
-  
+
   func overriddenInExtension() {} // expected-note {{overr}}
 }
 
@@ -142,7 +143,8 @@ class B : A {
     }
   }
   
-  override class subscript (i: Int) -> String { // expected-error{{subscript does not override any subscript from its superclass}}
+  // FIXME(SR-10323): This error is wrong; it should be "subscript does not override any subscript from its superclass". This is a preexisting bug.
+  override class subscript (i: Int) -> String { // expected-error{{cannot override mutable subscript of type '(Int) -> String' with covariant type '(String) -> String'}}
     get {
       return "hello"
     }
@@ -169,7 +171,7 @@ class B : A {
     }
   }
   
-  override class subscript (a: [Int]) -> String {
+  override class subscript (typeInSuperclass a: [Int]) -> String {
     get {
       return "hello"
     }
@@ -177,12 +179,12 @@ class B : A {
     set {
     }
   }
-  
-  override subscript (a: [Int]) -> String { // expected-error{{subscript does not override any subscript from its superclass}}
+
+  override subscript (typeInSuperclass a: [Int]) -> String { // expected-error{{subscript does not override any subscript from its superclass}}
     get {
       return "hello"
     }
-    
+
     set {
     }
   }

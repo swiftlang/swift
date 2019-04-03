@@ -33,6 +33,39 @@ func existentialSubscript(_ a: IntToStringSubscript) -> String {
   return a[17]
 }
 
+// Static of above:
+
+// Subscript of archetype.
+protocol IntToStringStaticSubscript {
+  static subscript (i : Int) -> String { get }
+}
+
+class LameStaticDictionary {
+  static subscript (i : Int) -> String {
+    get {
+      return String(i)
+    }
+  }
+}
+
+func archetypeStaticSubscript<
+  T : IntToStringStaticSubscript, U : LameStaticDictionary
+>(_ t: T.Type, u: U.Type) -> String {
+  // Subscript an archetype.
+  if false { return t[17] }
+  
+  // Subscript an archetype for which the subscript operator is in a base class.
+  return u[17]
+}
+
+// Subscript of existential type.
+func existentialStaticSubscript(
+  _ a: IntToStringStaticSubscript.Type
+) -> String {
+  return a[17]
+}
+
+
 class MyDictionary<Key, Value> {
   subscript (key : Key) -> Value {
     get {}
