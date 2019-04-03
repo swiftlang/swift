@@ -190,6 +190,8 @@ bool CursorInfoResolver::visitDeclReference(ValueDecl *D,
                                             ReferenceMetaData Data) {
   if (isDone())
     return false;
+  if (Data.isImplicit)
+    return true;
   return !tryResolve(D, CtorTyRef, ExtTyRef, Range.getStart(), /*IsRef=*/true, T);
 }
 
@@ -1423,7 +1425,7 @@ public:
     if (Data.Kind != SemaReferenceKind::DeclRef)
       return;
 
-    if (!isContainedInSelection(CharSourceRange(Start, 0)))
+    if (Data.isImplicit || !isContainedInSelection(CharSourceRange(Start, 0)))
       return;
 
     // If the VD is declared outside of current file, exclude such decl.

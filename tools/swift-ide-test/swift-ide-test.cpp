@@ -1434,7 +1434,8 @@ private:
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type Ty,
                           ReferenceMetaData Data) override {
-    annotateSourceEntity({ Range, D, CtorTyRef, /*IsRef=*/true });
+    if (!Data.isImplicit)
+      annotateSourceEntity({ Range, D, CtorTyRef, /*IsRef=*/true });
     return true;
   }
 

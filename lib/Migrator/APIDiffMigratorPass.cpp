@@ -484,6 +484,9 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
                           Type T, ReferenceMetaData Data) override {
+    if (Data.isImplicit)
+      return true;
+
     for (auto *Item: getRelatedDiffItems(CtorTyRef ? CtorTyRef: D)) {
       std::string RepText;
       if (isSimpleReplacement(Item, isDotMember(Range), RepText)) {
@@ -501,7 +504,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                             TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
                             Type T, ReferenceMetaData Data) override {
-      if (D == Target) {
+      if (D == Target && !Data.isImplicit) {
         Result = Range;
         return false;
       }
