@@ -3536,7 +3536,7 @@ public:
     TypeID elemInterfaceTypeID;
     ModuleFile::AccessorRecord accessors;
     DeclID overriddenID;
-    uint8_t rawAccessLevel, rawSetterAccessLevel;
+    uint8_t rawAccessLevel, rawSetterAccessLevel, rawStaticSpelling;
     uint8_t opaqueReadOwnership, readImpl, writeImpl, readWriteImpl;
     unsigned numArgNames, numAccessors;
     ArrayRef<uint64_t> argNameAndDependencyIDs;
@@ -3550,7 +3550,8 @@ public:
                                              genericEnvID,
                                              elemInterfaceTypeID,
                                              overriddenID, rawAccessLevel,
-                                             rawSetterAccessLevel, numArgNames,
+                                             rawSetterAccessLevel,
+                                             rawStaticSpelling, numArgNames,
                                              argNameAndDependencyIDs);
     // Resolve the name ids.
     SmallVector<Identifier, 2> argNames;
@@ -3586,8 +3587,16 @@ public:
     auto *genericParams = MF.maybeReadGenericParams(parent);
     if (declOrOffset.isComplete())
       return declOrOffset;
+    
+    auto staticSpelling = getActualStaticSpellingKind(rawStaticSpelling);
+    if (!staticSpelling.hasValue()) {
+      MF.error();
+      return nullptr;
+    }
 
-    auto subscript = MF.createDecl<SubscriptDecl>(name, SourceLoc(), nullptr,
+    auto subscript = MF.createDecl<SubscriptDecl>(name,
+                                                  SourceLoc(), *staticSpelling,
+                                                  SourceLoc(), nullptr,
                                                   SourceLoc(), TypeLoc(),
                                                   parent, genericParams);
     subscript->setIsGetterMutating(isGetterMutating);
