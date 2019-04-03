@@ -1060,19 +1060,41 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   }
 }
 
-void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg,
-                                           DefaultArgumentKind kind,
-                                           DeclContext *initDC) {
-  switch (kind) {
+void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
+                                           ParamDecl *param) {
+  auto initDC = param->getDefaultArgumentInitContext();
+
+  switch (param->getDefaultArgumentKind()) {
   case DefaultArgumentKind::None:
     llvm_unreachable("No default argument here?");
 
-  case DefaultArgumentKind::Normal:
-    break;
+  case DefaultArgumentKind::Normal: {
+    auto arg = param->getDefaultValue();
+    emitOrDelayFunction(*this, constant,
+        [this,constant,arg,initDC](SILFunction *f) {
+      preEmitFunction(constant, arg, f, arg);
+      PrettyStackTraceSILFunction X("silgen emitDefaultArgGenerator ", f);
+      SILGenFunction SGF(*this, *f, initDC);
+      SGF.emitGeneratorFunction(constant, arg);
+      postEmitFunction(constant, f);
+    });
+    return;
+  }
+
+  case DefaultArgumentKind::StoredProperty: {
+    auto arg = param->getStoredProperty();
+    emitOrDelayFunction(*this, constant,
+        [this,constant,arg,initDC](SILFunction *f) {
+      preEmitFunction(constant, arg, f, arg);
+      PrettyStackTraceSILFunction X("silgen emitDefaultArgGenerator ", f);
+      SILGenFunction SGF(*this, *f, initDC);
+      SGF.emitGeneratorFunction(constant, arg);
+      postEmitFunction(constant, f);
+    });
+    return;
+  }
 
   case DefaultArgumentKind::Inherited:
-    return;
-
   case DefaultArgumentKind::Column:
   case DefaultArgumentKind::File:
   case DefaultArgumentKind::Line:
@@ -1083,15 +1105,6 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg,
   case DefaultArgumentKind::EmptyDictionary:
     return;
   }
-
-  emitOrDelayFunction(*this, constant,
-      [this,constant,arg,initDC](SILFunction *f) {
-    preEmitFunction(constant, arg, f, arg);
-    PrettyStackTraceSILFunction X("silgen emitDefaultArgGenerator ", f);
-    SILGenFunction SGF(*this, *f, initDC);
-    SGF.emitGeneratorFunction(constant, arg);
-    postEmitFunction(constant, f);
-  });
 }
 
 void SILGenModule::
@@ -1160,10 +1173,9 @@ void SILGenModule::emitDefaultArgGenerators(SILDeclRef::Loc decl,
                                             ParameterList *paramList) {
   unsigned index = 0;
   for (auto param : *paramList) {
-    if (auto defaultArg = param->getDefaultValue())
+    if (param->isDefaultArgument())
       emitDefaultArgGenerator(SILDeclRef::getDefaultArgGenerator(decl, index),
-                              defaultArg, param->getDefaultArgumentKind(),
-                              param->getDefaultArgumentInitContext());
+                              param);
     ++index;
   }
 }

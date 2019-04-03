@@ -25,6 +25,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Module.h"
@@ -3345,7 +3346,7 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
                                                   info.destIndex,
                                                   info.resultType,
                                                   info.origResultType);
-  
+
   SmallVector<ManagedValue, 4> loweredArgs;
   SmallVector<DelayedArgument, 4> delayedArgs;
   Optional<ForeignErrorConvention> errorConvention = None;

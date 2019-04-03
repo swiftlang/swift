@@ -5262,6 +5262,17 @@ void ParamDecl::setDefaultValue(Expr *E) {
   DefaultValueAndFlags.getPointer()->DefaultArg = E;
 }
 
+void ParamDecl::setStoredProperty(VarDecl *var) {
+  if (!DefaultValueAndFlags.getPointer()) {
+    if (!var) return;
+
+    DefaultValueAndFlags.setPointer(
+      getASTContext().Allocate<StoredDefaultArgument>());
+  }
+
+  DefaultValueAndFlags.getPointer()->DefaultArg = var;
+}
+
 void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
   assert(DefaultValueAndFlags.getPointer());
   DefaultValueAndFlags.getPointer()->InitContext = initContext;
@@ -5290,6 +5301,17 @@ ParamDecl::getDefaultValueStringRepresentation(
     return extractInlinableText(getASTContext().SourceMgr, getDefaultValue(),
                                 scratch);
   }
+  case DefaultArgumentKind::StoredProperty: {
+    assert(DefaultValueAndFlags.getPointer() &&
+           "default value not provided yet");
+    auto existing = DefaultValueAndFlags.getPointer()->StringRepresentation;
+    if (!existing.empty())
+      return existing;
+    auto var = getStoredProperty();
+    return extractInlinableText(getASTContext().SourceMgr,
+                                var->getParentInitializer(),
+                                scratch);
+  }
   case DefaultArgumentKind::Inherited:
     // FIXME: This needs /some/ kind of textual representation, but this isn't
     // a great one.
@@ -5308,7 +5330,8 @@ ParamDecl::getDefaultValueStringRepresentation(
 
 void
 ParamDecl::setDefaultValueStringRepresentation(StringRef stringRepresentation) {
-  assert(getDefaultArgumentKind() == DefaultArgumentKind::Normal);
+  assert(getDefaultArgumentKind() == DefaultArgumentKind::Normal ||
+         getDefaultArgumentKind() == DefaultArgumentKind::StoredProperty);
   assert(!stringRepresentation.empty());
 
   if (!DefaultValueAndFlags.getPointer()) {
@@ -5327,7 +5350,7 @@ void DefaultArgumentInitializer::changeFunction(
   }
 
   auto param = paramList->get(getIndex());
-  if (param->getDefaultValue())
+  if (param->getDefaultValue() || param->getStoredProperty())
     param->setDefaultArgumentInitContext(this);
 }
 
