@@ -94,11 +94,12 @@ public:
   /// \param FormatArgs The diagnostic format string arguments.
   ///
   /// \param Info Extra information associated with the diagnostic.
-  virtual void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                                DiagnosticKind Kind, StringRef FormatString,
-                                ArrayRef<DiagnosticArgument> FormatArgs,
-                                const DiagnosticInfo &Info,
-                                SourceLoc bufferIndirectlyCausingDiagnostic) = 0;
+  virtual void
+  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+                   StringRef FormatString,
+                   ArrayRef<DiagnosticArgument> FormatArgs,
+                   const DiagnosticInfo &Info,
+                   SourceLoc bufferIndirectlyCausingDiagnostic) = 0;
 
   /// \returns true if an error occurred while finishing-up.
   virtual bool finishProcessing() { return false; }
@@ -310,9 +311,8 @@ private:
   subconsumerForLocation(SourceManager &SM, SourceLoc loc);
 
   Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
-  findSubconsumer(SourceManager &SM, SourceLoc loc,
-                            DiagnosticKind Kind,
-                            SourceLoc bufferIndirectlyCausingDiagnostic);
+  findSubconsumer(SourceManager &SM, SourceLoc loc, DiagnosticKind Kind,
+                  SourceLoc bufferIndirectlyCausingDiagnostic);
 
   Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
   findSubconsumerForNonNote(SourceManager &SM, SourceLoc loc,

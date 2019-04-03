@@ -1183,7 +1183,8 @@ accept(SourceManager &SM, RegionType RegionType,
 void RequestRefactoringEditConsumer::handleDiagnostic(
     SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info, const SourceLoc bufferIndirectlyCausingDiagnostic) {
+    const DiagnosticInfo &Info,
+    const SourceLoc bufferIndirectlyCausingDiagnostic) {
   Impl.DiagConsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
                                      Info, bufferIndirectlyCausingDiagnostic);
 }
@@ -1242,7 +1243,8 @@ void RequestRenameRangeConsumer::accept(
 void RequestRenameRangeConsumer::handleDiagnostic(
     SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info, const SourceLoc bufferIndirectlyCausingDiagnostic) {
+    const DiagnosticInfo &Info,
+    const SourceLoc bufferIndirectlyCausingDiagnostic) {
   Impl.DiagConsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
                                      Info, bufferIndirectlyCausingDiagnostic);
 }

@@ -406,11 +406,12 @@ public:
       FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {}
 
 private:
-  void handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                        StringRef FormatString,
-                        ArrayRef<DiagnosticArgument> FormatArgs,
-                        const DiagnosticInfo &Info,
-                        const SourceLoc bufferIndirectlyCausingDiagnostic) override {
+  void
+  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+                   StringRef FormatString,
+                   ArrayRef<DiagnosticArgument> FormatArgs,
+                   const DiagnosticInfo &Info,
+                   const SourceLoc bufferIndirectlyCausingDiagnostic) override {
     if (!(FixitAll || shouldTakeFixit(Kind, Info)))
       return;
     for (const auto &Fix : Info.FixIts) {
@@ -1219,7 +1220,7 @@ static bool performCompileStepsPostSILGen(
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
 
   BufferIndirectlyCausingDiagnosticRAII cpi(Context.Diags,
-                               PSPs.MainInputFilenameForDebugInfo);
+                                            PSPs.MainInputFilenameForDebugInfo);
 
   if (Stats)
     countStatsPostSILGen(*Stats, *SM);

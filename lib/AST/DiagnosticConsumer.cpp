@@ -165,15 +165,17 @@ FileSpecificDiagnosticConsumer::subconsumerForLocation(SourceManager &SM,
 void FileSpecificDiagnosticConsumer::handleDiagnostic(
     SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info, const SourceLoc bufferIndirectlyCausingDiagnostic) {
+    const DiagnosticInfo &Info,
+    const SourceLoc bufferIndirectlyCausingDiagnostic) {
 
   HasAnErrorBeenConsumed |= Kind == DiagnosticKind::Error;
 
   auto subconsumer =
       findSubconsumer(SM, Loc, Kind, bufferIndirectlyCausingDiagnostic);
   if (subconsumer) {
-    subconsumer.getValue()->handleDiagnostic(
-        SM, Loc, Kind, FormatString, FormatArgs, Info, bufferIndirectlyCausingDiagnostic);
+    subconsumer.getValue()->handleDiagnostic(SM, Loc, Kind, FormatString,
+                                             FormatArgs, Info,
+                                             bufferIndirectlyCausingDiagnostic);
     return;
   }
   // Last resort: spray it everywhere
@@ -191,7 +193,8 @@ FileSpecificDiagnosticConsumer::findSubconsumer(
   case DiagnosticKind::Error:
   case DiagnosticKind::Warning:
   case DiagnosticKind::Remark: {
-    auto subconsumer = findSubconsumerForNonNote(SM, loc, bufferIndirectlyCausingDiagnostic);
+    auto subconsumer =
+        findSubconsumerForNonNote(SM, loc, bufferIndirectlyCausingDiagnostic);
     SubconsumerForSubsequentNotes = subconsumer;
     return subconsumer;
   }
@@ -252,7 +255,8 @@ ForwardingDiagnosticConsumer::ForwardingDiagnosticConsumer(DiagnosticEngine &Tar
 void ForwardingDiagnosticConsumer::handleDiagnostic(
     SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info, const SourceLoc bufferIndirectlyCausingDiagnostic) {
+    const DiagnosticInfo &Info,
+    const SourceLoc bufferIndirectlyCausingDiagnostic) {
   LLVM_DEBUG({
     llvm::dbgs() << "ForwardingDiagnosticConsumer received diagnostic: ";
     DiagnosticEngine::formatDiagnosticText(llvm::dbgs(), FormatString,

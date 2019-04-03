@@ -811,9 +811,12 @@ namespace swift {
     /// In particular, in batch mode when a diagnostic is located in
     /// a non-primary file, use this affordance to place it in the .dia
     /// file for the primary that is currently being worked on.
-    void setBufferIndirectlyCausingDiagnosticToInput(StringRef defaultDiagnosticInputFile);
+    void setBufferIndirectlyCausingDiagnosticToInput(
+        StringRef defaultDiagnosticInputFile);
     void resetBufferIndirectlyCausingDiagnostic();
-    SourceLoc getDefaultDiagnostLoc() const { return bufferIndirectlyCausingDiagnostic; }
+    SourceLoc getDefaultDiagnostLoc() const {
+      return bufferIndirectlyCausingDiagnostic;
+    }
   };
 
   class BufferIndirectlyCausingDiagnosticRAII {
@@ -822,11 +825,14 @@ namespace swift {
 
   public:
     BufferIndirectlyCausingDiagnosticRAII(DiagnosticEngine &Diags,
-                             StringRef defaultDiagnosticInputFile)
+                                          StringRef defaultDiagnosticInputFile)
         : Diags(Diags) {
-      Diags.setBufferIndirectlyCausingDiagnosticToInput(defaultDiagnosticInputFile);
+      Diags.setBufferIndirectlyCausingDiagnosticToInput(
+          defaultDiagnosticInputFile);
     }
-    ~BufferIndirectlyCausingDiagnosticRAII() { Diags.resetBufferIndirectlyCausingDiagnostic(); }
+    ~BufferIndirectlyCausingDiagnosticRAII() {
+      Diags.resetBufferIndirectlyCausingDiagnostic();
+    }
   };
 
   /// Represents a diagnostic transaction. While a transaction is

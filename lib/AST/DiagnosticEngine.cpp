@@ -847,7 +847,8 @@ const char *DiagnosticEngine::diagnosticStringFor(const DiagID id) {
   return diagnosticStrings[(unsigned)id];
 }
 
-void DiagnosticEngine::setBufferIndirectlyCausingDiagnosticToInput(StringRef input) {
+void DiagnosticEngine::setBufferIndirectlyCausingDiagnosticToInput(
+    StringRef input) {
   if (input.empty()) {
     resetBufferIndirectlyCausingDiagnostic();
     return;

@@ -545,7 +545,8 @@ emitDiagnosticMessage(SourceManager &SM,
 void SerializedDiagnosticConsumer::handleDiagnostic(
     SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info, const SourceLoc bufferIndirectlyCausingDiagnostic) {
+    const DiagnosticInfo &Info,
+    const SourceLoc bufferIndirectlyCausingDiagnostic) {
 
   // Enter the block for a non-note diagnostic immediately, rather
   // than waiting for beginDiagnostic, in case associated notes

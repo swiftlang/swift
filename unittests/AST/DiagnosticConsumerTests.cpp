@@ -34,11 +34,11 @@ namespace {
       EXPECT_TRUE(expected.empty());
     }
 
-    void handleDiagnostic(SourceManager &SM, SourceLoc loc, DiagnosticKind kind,
-                          StringRef formatString,
-                          ArrayRef<DiagnosticArgument> formatArgs,
-                          const DiagnosticInfo &info,
-                          const SourceLoc bufferIndirectlyCausingDiagnostic) override {
+    void handleDiagnostic(
+        SourceManager &SM, SourceLoc loc, DiagnosticKind kind,
+        StringRef formatString, ArrayRef<DiagnosticArgument> formatArgs,
+        const DiagnosticInfo &info,
+        const SourceLoc bufferIndirectlyCausingDiagnostic) override {
       ASSERT_FALSE(expected.empty());
       EXPECT_EQ(std::make_pair(loc, formatString), expected.front());
       expected.erase(expected.begin());
