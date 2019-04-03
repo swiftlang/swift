@@ -645,9 +645,13 @@ ModuleDecl *SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
                     isFramework)) {
       return nullptr;
     }
-    if (dependencyTracker)
-      dependencyTracker->addDependency(moduleInputBuffer->getBufferIdentifier(),
-                                       /*isSystem=*/false);
+    if (dependencyTracker) {
+      // Don't record cached artifacts as dependencies.
+      StringRef DepPath = moduleInputBuffer->getBufferIdentifier();
+      if (!isCached(DepPath)) {
+        dependencyTracker->addDependency(DepPath, /*isSystem=*/false);
+      }
+    }
   }
 
   assert(moduleInputBuffer);

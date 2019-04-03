@@ -261,6 +261,7 @@ class swift::ParseableInterfaceBuilder {
   const StringRef moduleCachePath;
   const StringRef prebuiltCachePath;
   const bool serializeDependencyHashes;
+  const bool trackSystemDependencies;
   const SourceLoc diagnosticLoc;
   DependencyTracker *const dependencyTracker;
   CompilerInvocation subInvocation;
@@ -295,6 +296,7 @@ class swift::ParseableInterfaceBuilder {
     subInvocation.setClangModuleCachePath(moduleCachePath);
     subInvocation.getFrontendOptions().PrebuiltModuleCachePath =
       prebuiltCachePath;
+    subInvocation.getFrontendOptions().TrackSystemDeps = trackSystemDependencies;
 
     // Respect the detailed-record preprocessor setting of the parent context.
     // This, and the "raw" clang module format it implicitly enables, are
@@ -354,26 +356,26 @@ class swift::ParseableInterfaceBuilder {
     return false;
   }
 
-  /// Populate the provided \p Deps with \c FileDependency entries including:
-  ///
-  ///    - All the dependencies mentioned by \p SubInstance's DependencyTracker,
-  ///      that were read while compiling the module.
-  ///
-  ///    - For any file in the latter set that is itself a .swiftmodule
-  ///      living in \p cachePath, all of _its_ dependencies, copied
-  ///      out to avoid having to do recursive scanning when rechecking this
-  ///      dependency in the future.
+  /// Populate the provided \p Deps with \c FileDependency entries for all
+  /// dependencies \p SubInstance's DependencyTracker recorded while compiling
+  /// the module, excepting .swiftmodules in \p moduleCachePath or
+  /// \p prebuiltCachePath. Those have _their_ dependencies added instead, both
+  /// to avoid having to do recursive scanning when rechecking this dependency
+  /// in future and to make the module caches relocatable.
   bool collectDepsForSerialization(CompilerInstance &SubInstance,
                                    SmallVectorImpl<FileDependency> &Deps,
                                    bool IsHashBased) {
+    StringRef SDKPath = SubInstance.getASTContext().SearchPathOpts.SDKPath;
+    StringRef ResourcePath =
+        SubInstance.getASTContext().SearchPathOpts.RuntimeResourcePath;
     auto DTDeps = SubInstance.getDependencyTracker()->getDependencies();
     SmallVector<StringRef, 16> InitialDepNames(DTDeps.begin(), DTDeps.end());
     InitialDepNames.push_back(interfacePath);
     llvm::StringSet<> AllDepNames;
+
     for (auto const &DepName : InitialDepNames) {
-      if (AllDepNames.insert(DepName).second && dependencyTracker) {
-        dependencyTracker->addDependency(DepName, /*isSystem*/false);
-      }
+      assert(moduleCachePath.empty() || !DepName.startswith(moduleCachePath));
+      assert(prebuiltCachePath.empty() || !DepName.startswith(prebuiltCachePath));
 
       /// Lazily load the dependency buffer if we need it. If we're not
       /// dealing with a hash-based dependencies, and if the dependency is
@@ -389,6 +391,35 @@ class swift::ParseableInterfaceBuilder {
         return nullptr;
       };
 
+      // Adjust the paths of dependences in the SDK to be relative to it
+      bool IsSDKRelative = false;
+      StringRef DepNameToStore = DepName;
+      if (SDKPath.size() > 1 && DepName.startswith(SDKPath)) {
+        assert(DepName.size() > SDKPath.size() &&
+            "should never depend on a directory");
+        if (llvm::sys::path::is_separator(DepName[SDKPath.size()])) {
+          // Is the DepName something like ${SDKPath}/foo.h"?
+          DepNameToStore = DepName.substr(SDKPath.size() + 1);
+          IsSDKRelative = true;
+        } else if (llvm::sys::path::is_separator(SDKPath.back())) {
+          // Is the DepName something like "${SDKPath}foo.h", where SDKPath
+          // itself contains a trailing slash?
+          DepNameToStore = DepName.substr(SDKPath.size());
+          IsSDKRelative = true;
+        } else {
+          // We have something next to an SDK, like "Foo.sdk.h", that's somehow
+          // become a dependency.
+        }
+      }
+
+      if (AllDepNames.insert(DepName).second && dependencyTracker) {
+        dependencyTracker->addDependency(DepName, /*isSystem*/IsSDKRelative);
+      }
+
+      // Don't serialize compiler-relative deps so the cache is relocatable.
+      if (DepName.startswith(ResourcePath))
+        continue;
+
       auto Status = getStatusOfDependency(fs, DepName, interfacePath,
                                           diags, diagnosticLoc);
       if (!Status)
@@ -399,44 +430,14 @@ class swift::ParseableInterfaceBuilder {
         if (!buf) return true;
         uint64_t hash = xxHash64(buf->getBuffer());
         Deps.push_back(
-          FileDependency::hashBased(DepName, Status->getSize(), hash));
+          FileDependency::hashBased(DepNameToStore, IsSDKRelative,
+                                    Status->getSize(), hash));
       } else {
         uint64_t mtime =
           Status->getLastModificationTime().time_since_epoch().count();
         Deps.push_back(
-          FileDependency::modTimeBased(DepName, Status->getSize(), mtime));
-      }
-
-      if (moduleCachePath.empty())
-        continue;
-
-      // If Dep is itself a .swiftmodule in the cache dir, pull out its deps
-      // and include them in our own, so we have a single-file view of
-      // transitive deps: removes redundancies, and avoids opening and reading
-      // multiple swiftmodules during future loads.
-      auto Ext = llvm::sys::path::extension(DepName);
-      auto Ty = file_types::lookupTypeForExtension(Ext);
-      if (Ty == file_types::TY_SwiftModuleFile &&
-          DepName.startswith(moduleCachePath)) {
-        auto buf = getDepBuf();
-        if (!buf) return true;
-        SmallVector<FileDependency, 16> SubDeps;
-        auto VI = serialization::validateSerializedAST(buf->getBuffer(),
-          /*ExtendedValidationInfo=*/nullptr, &SubDeps);
-        if (VI.status != serialization::Status::Valid) {
-          diags.diagnose(diagnosticLoc,
-                         diag::error_extracting_dependencies_from_cached_module,
-                         DepName);
-          return true;
-        }
-        for (auto const &SubDep : SubDeps) {
-          if (AllDepNames.insert(SubDep.getPath()).second) {
-            Deps.push_back(SubDep);
-            if (dependencyTracker)
-              dependencyTracker->addDependency(SubDep.getPath(),
-                                               /*IsSystem=*/false);
-          }
-        }
+          FileDependency::modTimeBased(DepNameToStore, IsSDKRelative,
+                                       Status->getSize(), mtime));
       }
     }
     return false;
@@ -449,12 +450,14 @@ public:
                             StringRef moduleCachePath,
                             StringRef prebuiltCachePath,
                             bool serializeDependencyHashes = false,
+                            bool trackSystemDependencies = false,
                             SourceLoc diagnosticLoc = SourceLoc(),
                             DependencyTracker *tracker = nullptr)
   : ctx(ctx), fs(*ctx.SourceMgr.getFileSystem()), diags(ctx.Diags),
   interfacePath(interfacePath), moduleName(moduleName),
   moduleCachePath(moduleCachePath), prebuiltCachePath(prebuiltCachePath),
   serializeDependencyHashes(serializeDependencyHashes),
+  trackSystemDependencies(trackSystemDependencies),
   diagnosticLoc(diagnosticLoc), dependencyTracker(tracker) {
     configureSubInvocation();
   }
@@ -532,7 +535,8 @@ public:
       ForwardingDiagnosticConsumer FDC(diags);
       SubInstance.addDiagnosticConsumer(&FDC);
 
-      SubInstance.createDependencyTracker(/*TrackSystemDeps=*/true);
+      SubInstance.createDependencyTracker(FEOpts.TrackSystemDeps);
+
       if (SubInstance.setup(subInvocation)) {
         SubError = true;
         return;
@@ -656,6 +660,10 @@ class ParseableInterfaceModuleLoaderImpl {
     // it.
     H = hash_combine(H, SubInvocation.getSDKPath());
 
+    // Whether or not we're tracking system dependencies affects the
+    // invalidation behavior of this cache item.
+    H = hash_combine(H, SubInvocation.getFrontendOptions().TrackSystemDeps);
+
     return llvm::APInt(64, H).toString(36, /*Signed=*/false);
   }
 
@@ -672,10 +680,23 @@ class ParseableInterfaceModuleLoaderImpl {
     OutPath.append(OutExt);
   }
 
+  /// Constructs the full path of the dependency \p dep by prepending the SDK
+  /// path if necessary.
+  StringRef getFullDependencyPath(const FileDependency &dep,
+                                  SmallVectorImpl<char> &scratch) const {
+    if (!dep.isSDKRelative())
+      return dep.getPath();
+
+    StringRef SDKPath = ctx.SearchPathOpts.SDKPath;
+    scratch.assign(SDKPath.begin(), SDKPath.end());
+    llvm::sys::path::append(scratch, dep.getPath());
+    return StringRef(scratch.data(), scratch.size());
+  }
+
   // Checks that a dependency read from the cached module is up to date compared
   // to the interface file it represents.
-  bool dependencyIsUpToDate(const FileDependency &dep) {
-    auto status = getStatusOfDependency(fs, dep.getPath(), interfacePath,
+  bool dependencyIsUpToDate(const FileDependency &dep, StringRef fullPath) {
+    auto status = getStatusOfDependency(fs, fullPath, interfacePath,
                                         diags, diagnosticLoc);
     if (!status) return false;
 
@@ -692,7 +713,7 @@ class ParseableInterfaceModuleLoaderImpl {
 
     // Slow path: if the dependency is verified by content hash, check it vs.
     // the hash of the file.
-    auto buf = getBufferOfDependency(fs, dep.getPath(), interfacePath,
+    auto buf = getBufferOfDependency(fs, fullPath, interfacePath,
                                      diags, diagnosticLoc);
     if (!buf) return false;
 
@@ -702,15 +723,15 @@ class ParseableInterfaceModuleLoaderImpl {
   // Check if all the provided file dependencies are up-to-date compared to
   // what's currently on disk.
   bool dependenciesAreUpToDate(ArrayRef<FileDependency> deps) {
+    SmallString<128> SDKRelativeBuffer;
     for (auto &in : deps) {
-      if (dependencyTracker)
-        dependencyTracker->addDependency(in.getPath(), /*isSystem*/false);
-      if (!dependencyIsUpToDate(in)) {
-        LLVM_DEBUG(llvm::dbgs() << "Dep " << in.getPath()
+      StringRef fullPath = getFullDependencyPath(in, SDKRelativeBuffer);
+      if (!dependencyIsUpToDate(in, fullPath)) {
+        LLVM_DEBUG(llvm::dbgs() << "Dep " << fullPath
                    << " is directly out of date\n");
         return false;
       }
-      LLVM_DEBUG(llvm::dbgs() << "Dep " << in.getPath() << " is up to date\n");
+      LLVM_DEBUG(llvm::dbgs() << "Dep " << fullPath << " is up to date\n");
     }
     return true;
   }
@@ -754,9 +775,12 @@ class ParseableInterfaceModuleLoaderImpl {
 
     // Next, check the dependencies in the forwarding file.
     for (auto &dep : fwd.dependencies) {
+      // Forwarding modules expand SDKRelative paths when generated, so are
+      // guaranteed to be absolute.
       deps.push_back(
         FileDependency::modTimeBased(
-          dep.path, dep.size, dep.lastModificationTime));
+          dep.path, /*isSDKRelative=*/false, dep.size,
+          dep.lastModificationTime));
     }
     if (!dependenciesAreUpToDate(deps))
       return false;
@@ -910,8 +934,9 @@ class ParseableInterfaceModuleLoaderImpl {
     addDependency(fwd.underlyingModulePath);
 
     // Add all the dependencies from the prebuilt module.
+    SmallString<128> SDKRelativeBuffer;
     for (auto dep : deps) {
-      addDependency(dep.getPath());
+      addDependency(getFullDependencyPath(dep, SDKRelativeBuffer));
     }
 
     return withOutputFile(diags, outputPath,
@@ -923,17 +948,29 @@ class ParseableInterfaceModuleLoaderImpl {
   }
 
   /// Looks up the best module to load for a given interface, and returns a
-  /// buffer of the module's contents.  See the main comment in
+  /// buffer of the module's contents. Also reports the module's dependencies
+  /// to the parent \c dependencyTracker if it came from the cache, or was built
+  /// from the given interface. See the main comment in
   /// \c ParseableInterfaceModuleLoader.h for an explanation of the module
   /// loading strategy.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
   findOrBuildLoadableModule() {
 
+    // Track system dependencies if the parent tracker is set to do so.
+    // FIXME: This means -track-system-dependencies isn't honored when the
+    // top-level invocation isn't tracking dependencies
+    bool trackSystemDependencies = false;
+    if (dependencyTracker) {
+      auto ClangDependencyTracker = dependencyTracker->getClangCollector();
+      trackSystemDependencies = ClangDependencyTracker->needSystemDependencies();
+    }
+
     // Set up a builder if we need to build the module. It'll also set up
     // the subinvocation we'll need to use to compute the cache paths.
     ParseableInterfaceBuilder builder(
       ctx, interfacePath, moduleName, cacheDir, prebuiltCacheDir,
-      /*serializeDependencyHashes*/false, diagnosticLoc, dependencyTracker);
+      /*serializeDependencyHashes*/false, trackSystemDependencies,
+      diagnosticLoc, dependencyTracker);
     auto &subInvocation = builder.getSubInvocation();
 
     // Compute the output path if we're loading or emitting a cached module.
@@ -961,6 +998,15 @@ class ParseableInterfaceModuleLoaderImpl {
         if (writeForwardingModule(module, cachedOutputPath, allDeps))
           return std::make_error_code(std::errc::not_supported);
 
+      // Report the module's dependencies to the dependencyTracker
+      if (dependencyTracker) {
+        SmallString<128> SDKRelativeBuffer;
+        for (auto &dep: allDeps) {
+          StringRef fullPath = getFullDependencyPath(dep, SDKRelativeBuffer);
+          dependencyTracker->addDependency(fullPath, dep.isSDKRelative());
+        }
+      }
+
       return std::move(module.moduleBuffer);
     }
 
@@ -977,6 +1023,12 @@ class ParseableInterfaceModuleLoaderImpl {
 };
 
 } // end anonymous namespace
+
+bool ParseableInterfaceModuleLoader::isCached(StringRef DepPath) {
+  if (!CacheDir.empty() && DepPath.startswith(CacheDir))
+    return true;
+  return !PrebuiltCacheDir.empty() && DepPath.startswith(PrebuiltCacheDir);
+}
 
 /// Load a .swiftmodule associated with a .swiftinterface either from a
 /// cache or by converting it in a subordinate \c CompilerInstance, caching
@@ -1036,14 +1088,13 @@ std::error_code ParseableInterfaceModuleLoader::findModuleFilesInDirectory(
 bool ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
   ASTContext &Ctx, StringRef CacheDir, StringRef PrebuiltCacheDir,
   StringRef ModuleName, StringRef InPath, StringRef OutPath,
-  bool SerializeDependencyHashes) {
+  bool SerializeDependencyHashes, bool TrackSystemDependencies) {
   ParseableInterfaceBuilder builder(Ctx, InPath, ModuleName,
                                     CacheDir, PrebuiltCacheDir,
-                                    SerializeDependencyHashes);
-  // FIXME: We really only want to serialize 'important' dependencies here, and
-  //        make them relocatable (SDK-relative) if we want to ship the built
-  //        swiftmodules to another machine. Just track them as absolute paths
-  //        for now, so we can test the dependency tracking locally.
+                                    SerializeDependencyHashes,
+                                    TrackSystemDependencies);
+  // FIXME: We really only want to serialize 'important' dependencies here, if
+  //        we want to ship the built swiftmodules to another machine.
   return builder.buildSwiftModule(OutPath, /*shouldSerializeDeps*/true,
                                   /*ModuleBuffer*/nullptr);
 }
