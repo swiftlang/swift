@@ -2019,12 +2019,9 @@ bool ValueDecl::isInstanceMember() const {
     return false;
 
   case DeclKind::Subscript:
-    // Subscripts are always instance members.
-    return true;
-
   case DeclKind::Var:
-    // Non-static variables are instance members.
-    return !cast<VarDecl>(this)->isStatic();
+    // Non-static variables and subscripts are instance members.
+    return !cast<AbstractStorageDecl>(this)->isStatic();
 
   case DeclKind::Module:
     // Modules are never instance members.
@@ -5098,12 +5095,16 @@ bool VarDecl::isAnonClosureParam() const {
   return nameStr[0] == '$';
 }
 
-StaticSpellingKind VarDecl::getCorrectStaticSpelling() const {
+StaticSpellingKind AbstractStorageDecl::getCorrectStaticSpelling() const {
   if (!isStatic())
     return StaticSpellingKind::None;
-  if (auto *PBD = getParentPatternBinding()) {
-    if (PBD->getStaticSpelling() != StaticSpellingKind::None)
-      return PBD->getStaticSpelling();
+  if (auto *VD = dyn_cast<VarDecl>(this)) {
+    if (auto *PBD = VD->getParentPatternBinding()) {
+      if (PBD->getStaticSpelling() != StaticSpellingKind::None)
+        return PBD->getStaticSpelling();
+    }
+  } else if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
+    return SD->getStaticSpelling();
   }
 
   return getCorrectStaticSpellingForDecl(this);
