@@ -4375,6 +4375,21 @@ ERROR(property_delegate_incompatible_unbound, none,
       "property delegate type %0 must either specify all generic arguments "
       "or require only a single generic argument", (Type))
 
+ERROR(property_delegate_type_access,none,
+      "%select{%select{variable|constant}0|property}1 "
+      "%select{must be declared %select{"
+      "%select{private|fileprivate|internal|%error|%error}3|private or fileprivate}4"
+      "|cannot be declared "
+      "%select{in this context|fileprivate|internal|public|open}3}2 "
+      "because its property delegate type uses "
+      "%select{a private|a fileprivate|an internal|%error|%error}5 type",
+      (bool, bool, bool, AccessLevel, bool, AccessLevel))
+ERROR(property_delegate_type_not_usable_from_inline,none,
+      "property delegate type referenced from a '@usableFromInline' "
+      "%select{%select{variable|constant}0|property}1 "
+      "must be '@usableFromInline' or public",
+      (bool, bool))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
