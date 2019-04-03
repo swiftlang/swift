@@ -461,7 +461,7 @@ extension PartialRangeUpTo: RangeExpression {
   @_transparent
   public func relative<C: Collection>(to collection: C) -> Range<Bound>
   where C.Index == Bound {
-    return collection.startIndex..<self.upperBound
+    return collection.startIndex..<Swift.max(collection.startIndex, self.upperBound)
   }
   
   @_transparent
@@ -517,7 +517,7 @@ extension PartialRangeThrough: RangeExpression {
   @_transparent
   public func relative<C: Collection>(to collection: C) -> Range<Bound>
   where C.Index == Bound {
-    return collection.startIndex..<collection.index(after: self.upperBound)
+    return collection.startIndex..<Swift.max(collection.startIndex, collection.index(after: self.upperBound))
   }
   @_transparent
   public func contains(_ element: Bound) -> Bool {
@@ -633,7 +633,7 @@ extension PartialRangeFrom: RangeExpression {
   public func relative<C: Collection>(
     to collection: C
   ) -> Range<Bound> where C.Index == Bound {
-    return self.lowerBound..<collection.endIndex
+    return Swift.min(self.lowerBound, collection.endIndex)..<collection.endIndex
   }
   @inlinable // trivial-implementation
   public func contains(_ element: Bound) -> Bool {
