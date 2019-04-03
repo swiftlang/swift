@@ -1100,7 +1100,8 @@ public:
   llvm::Value *getTable(IRGenFunction &IGF,
                         llvm::Value **typeMetadataCache) const override {
     // If we're looking up a dependent type, we can't cache the result.
-    if (Conformance->getType()->hasArchetype()) {
+    if (Conformance->getType()->hasArchetype() ||
+        Conformance->getType()->hasDynamicSelfType()) {
       return emitWitnessTableAccessorCall(IGF, Conformance,
                                           typeMetadataCache);
     }

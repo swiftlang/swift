@@ -2273,14 +2273,10 @@ ERROR(duplicate_inheritance,none,
   "duplicate inheritance from %0", (Type))
 WARNING(duplicate_anyobject_class_inheritance,none,
   "redundant inheritance from 'AnyObject' and Swift 3 'class' keyword", ())
-ERROR(objc_protocol_with_superclass,none,
-  "protocol %0 is '@objc' and cannot have a superclass constraint", (Identifier))
+ERROR(inheritance_from_protocol_with_superclass,none,
+  "inheritance from class-constrained protocol composition type %0", (Type))
 ERROR(multiple_inheritance,none,
   "multiple inheritance from classes %0 and %1", (Type, Type))
-ERROR(non_class_inheritance,none,
-  "non-class type %0 cannot inherit from class %1", (Type, Type))
-ERROR(extension_class_inheritance,none,
-  "extension of type %0 cannot inherit from class %1", (Type, Type))
 ERROR(inheritance_from_non_protocol_or_class,none,
   "inheritance from non-protocol, non-class type %0", (Type))
 ERROR(inheritance_from_non_protocol,none,
