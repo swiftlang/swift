@@ -33,8 +33,7 @@ func useContainer() -> () {
   func exists() -> Bool { return true }
 }
 
-// expected-note @+2 {{did you mean 'test'?}}
-// expected-note @+1 {{'test' declared here}}
+// expected-note @+1 {{did you mean 'test'?}}
 func test(a: BadAttributes) -> () {
   _ = a.exists() // no-warning
 }
@@ -619,7 +618,7 @@ func foo1(bar!=baz) {} // expected-note {{did you mean 'foo1'?}}
 func foo2(bar! = baz) {}// expected-note {{did you mean 'foo2'?}}
 
 // rdar://19605567
-// expected-error@+1{{use of unresolved identifier 'esp'; did you mean 'test'?}}
+// expected-error@+1{{use of unresolved identifier 'esp'; did you mean 'exp'?}}
 switch esp {
 case let (jeb):
   // expected-error@+5{{top-level statement cannot begin with a closure expression}}
