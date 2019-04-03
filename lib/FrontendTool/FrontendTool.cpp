@@ -1544,8 +1544,8 @@ createDispatchingDiagnosticConsumerIfNeeded(
           subconsumers.emplace_back(input.file(), std::move(consumer));
         return false;
       });
-  // For batch mode, the compiler must sometimes swallow diagnostics pertaining to
-  // non-primary files in order to avoid Xcode showing the same diagnostic
+  // For batch mode, the compiler must sometimes swallow diagnostics pertaining
+  // to non-primary files in order to avoid Xcode showing the same diagnostic
   // multiple times. So, create a diagnostic "eater" for those non-primary
   // files.
   //

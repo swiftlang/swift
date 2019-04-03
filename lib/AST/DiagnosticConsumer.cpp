@@ -117,7 +117,7 @@ FileSpecificDiagnosticConsumer::subconsumerForLocation(SourceManager &SM,
   // Diagnostics with invalid locations always go to every consumer.
   if (loc.isInvalid())
     return None;
-  
+
   // What if a there's a consumer for fixits but there is no fixits output path?
   // Subconsumers will be empty in that case.
   if (Subconsumers.empty())
@@ -224,7 +224,7 @@ FileSpecificDiagnosticConsumer::findSubconsumerForNonNote(
       subconsumerForLocation(SM, bufferIndirectlyCausingDiagnostic);
   assert(!currentPrimarySubconsumer ||
          (*currentPrimarySubconsumer)->getConsumer() &&
-         "current primary must have a .dia file");
+             "current primary must have a .dia file");
   return currentPrimarySubconsumer;
 }
 
