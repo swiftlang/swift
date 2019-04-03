@@ -5,6 +5,7 @@
 
 import Python
 import StdlibUnittest
+import struct TensorFlow.TensorShape
 
 /// The gc module is an interface to the Python garbage collector.
 let gc = Python.import("gc")
@@ -258,6 +259,8 @@ PythonRuntimeTestSuite.testWithLeakChecking("ConvertibleFromPython") {
   let five: PythonObject = 5
   let half: PythonObject = 0.5
   let string: PythonObject = "abc"
+  let intArray: PythonObject = [2, 3]
+  let dict: PythonObject = ["abc": 97]
 
   expectEqual(-1, Int(minusOne))
   expectEqual(-1, Int8(minusOne))
@@ -285,6 +288,10 @@ PythonRuntimeTestSuite.testWithLeakChecking("ConvertibleFromPython") {
 
   expectEqual("abc", String(string))
 
+  expectEqual([2, 3], Array(intArray))
+  expectEqual(TensorShape(2, 3), TensorShape(intArray))
+  expectEqual(["abc": 97], Dictionary<String, Int32>(dict))
+
   expectNil(String(zero))
   expectNil(Int(string))
   expectNil(Double(string))
@@ -293,6 +300,8 @@ PythonRuntimeTestSuite.testWithLeakChecking("ConvertibleFromPython") {
 PythonRuntimeTestSuite.testWithLeakChecking("PythonConvertible") {
   let minusOne: PythonObject = -1
   let five: PythonObject = 5
+  let intArray: PythonObject = [2, 3]
+  let dict: PythonObject = ["abc": 7]
 
   expectEqual(minusOne, Int(-1).pythonObject)
   expectEqual(minusOne, Int8(-1).pythonObject)
@@ -309,6 +318,11 @@ PythonRuntimeTestSuite.testWithLeakChecking("PythonConvertible") {
   expectEqual(five, UInt64(5).pythonObject)
   expectEqual(five, Float(5).pythonObject)
   expectEqual(five, Double(5).pythonObject)
+
+  expectEqual(intArray, Array([2, 3]).pythonObject)
+  expectEqual(dict, Dictionary<String, Int32>(["abc": 7]).pythonObject)
+
+  expectEqual(intArray, TensorShape(2, 3).pythonObject)
 }
 
 PythonRuntimeTestSuite.testWithLeakChecking("Optional") {
