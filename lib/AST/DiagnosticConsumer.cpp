@@ -212,7 +212,8 @@ FileSpecificDiagnosticConsumer::findSubconsumerForNonNote(
     return None;
   const auto currentPrimarySubconsumer =
       subconsumerForLocation(SM, defaultDiagnosticLoc);
-  assert(currentPrimarySubconsumer && (*subconsumer)->getConsumer() &&
+  assert(currentPrimarySubconsumer &&
+         (*currentPrimarySubconsumer)->getConsumer() &&
          "current primary must have a .dia file");
   return currentPrimarySubconsumer;
 }

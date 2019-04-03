@@ -804,9 +804,14 @@ namespace swift {
   public:
     static const char *diagnosticStringFor(const DiagID id);
 
+    /// If there is no clear .dia file for a diagnostic, put it in the one
+    /// corresponding to the input file name given here.
+    /// In particular, in batch mode when a diagnostic is located in
+    /// a non-primary file, use this affordance to place it in the .dia
+    /// file for the primary that is currently being worked on.
+    void setDefaultDiagnosticLocToInput(StringRef defaultDiagnosticInputFile);
+    void resetDefaultDiagnosticLoc();
     SourceLoc getDefaultDiagnostLoc() const { return defaultDiagnosticLoc; }
-    void setDefaultDiagnostLocToInput(StringRef defaultDiagnosticInputFile);
-    void resetDefaultDiagnostLoc();
   };
 
   class DefaultDiagnosticLocRAII {
@@ -817,9 +822,9 @@ namespace swift {
     DefaultDiagnosticLocRAII(DiagnosticEngine &Diags,
                              StringRef defaultDiagnosticInputFile)
         : Diags(Diags) {
-      Diags.setDefaultDiagnostLocToInput(defaultDiagnosticInputFile);
+      Diags.setDefaultDiagnosticLocToInput(defaultDiagnosticInputFile);
     }
-    ~DefaultDiagnosticLocRAII() { Diags.resetDefaultDiagnostLoc(); }
+    ~DefaultDiagnosticLocRAII() { Diags.resetDefaultDiagnosticLoc(); }
   };
 
   /// Represents a diagnostic transaction. While a transaction is

@@ -847,19 +847,19 @@ const char *DiagnosticEngine::diagnosticStringFor(const DiagID id) {
   return diagnosticStrings[(unsigned)id];
 }
 
-void DiagnosticEngine::setDefaultDiagnostLocToInput(StringRef input) {
+void DiagnosticEngine::setDefaultDiagnosticLocToInput(StringRef input) {
   if (input.empty()) {
-    resetDefaultDiagnostLoc();
+    resetDefaultDiagnosticLoc();
     return;
   }
   auto id = SourceMgr.getIDForBufferIdentifier(input);
   if (!id) {
-    resetDefaultDiagnostLoc();
+    resetDefaultDiagnosticLoc();
     return;
   }
   defaultDiagnosticLoc = SourceMgr.getLocForBufferStart(*id);
 }
-void DiagnosticEngine::resetDefaultDiagnostLoc() {
+void DiagnosticEngine::resetDefaultDiagnosticLoc() {
   defaultDiagnosticLoc = SourceLoc();
 }
 
