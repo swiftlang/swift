@@ -41,7 +41,7 @@
 // watchOS: {{(bin/)?ld(.exe)?"? }}
 // watchOS: lib{{(\\\\|/)}}swift{{(\\\\|/)}}clang{{(\\\\|/)}}lib{{(\\\\|/)}}darwin{{(\\\\|/)}}libclang_rt.profile_watchos.a
 
-// watchOS_SIM: {{(bin/)?ld"? }}
+// watchOS_SIM: {{(bin/)?ld(.exe)?"? }}
 // watchOS_SIM: lib{{(\\\\|/)}}swift{{(\\\\|/)}}clang{{(\\\\|/)}}lib{{(\\\\|/)}}darwin{{(\\\\|/)}}libclang_rt.profile_watchossim.a
 
 // LINUX: clang++{{(\.exe)?"? }}
