@@ -652,7 +652,7 @@ extension SIMD where Scalar : FloatingPoint {
   }
   
   @_transparent
-  public func rounded(_ rule: FloatingPointRoundingRule = .toNearestOrEven) -> Self {
+  public func rounded(_ rule: FloatingPointRoundingRule) -> Self {
     var result = Self()
     for i in result.indices { result[i] = self[i].rounded(rule) }
     return result
