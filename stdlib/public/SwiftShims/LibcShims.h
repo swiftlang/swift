@@ -214,6 +214,7 @@ float _swift_stdlib_log1pf(float x) {
 static inline SWIFT_ALWAYS_INLINE
 float _swift_stdlib_hypotf(float x, float y) {
 #if defined(_WIN32)
+  extern float _hypotf(float, float);
   return _hypotf(x, y);
 #else
   return __builtin_hypotf(x, y);
