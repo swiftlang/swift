@@ -1989,7 +1989,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     @inlinable // This is @inlinable as a convenience initializer.
     public init(contentsOf url: __shared URL, options: Data.ReadingOptions = []) throws {
         let d = try NSData(contentsOf: url, options: ReadingOptions(rawValue: options.rawValue))
-        self.init(bytes: d.bytes, count: d.length)
+        self.init(referencing: d)
     }
     
     /// Initialize a `Data` from a Base-64 encoded String using the given options.
@@ -2000,7 +2000,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     @inlinable // This is @inlinable as a convenience initializer.
     public init?(base64Encoded base64String: __shared String, options: Data.Base64DecodingOptions = []) {
         if let d = NSData(base64Encoded: base64String, options: Base64DecodingOptions(rawValue: options.rawValue)) {
-            self.init(bytes: d.bytes, count: d.length)
+            self.init(referencing: d)
         } else {
             return nil
         }
@@ -2015,7 +2015,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     @inlinable // This is @inlinable as a convenience initializer.
     public init?(base64Encoded base64Data: __shared Data, options: Data.Base64DecodingOptions = []) {
         if let d = NSData(base64Encoded: base64Data, options: Base64DecodingOptions(rawValue: options.rawValue)) {
-            self.init(bytes: d.bytes, count: d.length)
+            self.init(referencing: d)
         } else {
             return nil
         }
