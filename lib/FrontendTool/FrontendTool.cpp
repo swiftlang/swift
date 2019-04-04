@@ -1219,10 +1219,9 @@ static bool performCompileStepsPostSILGen(
   SILOptions &SILOpts = Invocation.getSILOptions();
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
 
-  BufferIndirectlyCausingDiagnosticRAII ricd(
-      Context.Diags, MSF.is<SourceFile *>()
-                         ? MSF.dyn_cast<SourceFile *>()->getFilename()
-                         : "");
+  Optional<BufferIndirectlyCausingDiagnosticRAII> ricd;
+  if (auto *SF = MSF.dyn_cast<SourceFile *>())
+    ricd.emplace(Context.Diags, SF->getFilename());
 
   if (Stats)
     countStatsPostSILGen(*Stats, *SM);
