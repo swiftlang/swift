@@ -3795,7 +3795,7 @@ namespace {
       auto &tc = cs.getTypeChecker();
       auto &ctx = tc.Context;
       // Synthesize a call to _undefined() of appropriate type.
-      FuncDecl *undefinedDecl = ctx.getUndefinedDecl();
+      FuncDecl *undefinedDecl = ctx.getUndefined();
       if (!undefinedDecl) {
         tc.diagnose(E->getLoc(), diag::missing_undefined_runtime);
         return nullptr;

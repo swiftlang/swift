@@ -178,9 +178,6 @@ struct ASTContext::Implementation {
   
   /// The declaration of Swift.AutoreleasingUnsafeMutablePointer<T>.memory.
   VarDecl *AutoreleasingUnsafeMutablePointerMemoryDecl = nullptr;
-
-  /// The declaration of Swift.Void.
-  TypeAliasDecl *VoidDecl = nullptr;
   
   /// The declaration of ObjectiveC.ObjCBool.
   StructDecl *ObjCBoolDecl = nullptr;
@@ -209,12 +206,6 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
 
   /// func reserveCapacityForAppend(newElementsCount: Int)
   FuncDecl *ArrayReserveCapacityDecl = nullptr;
-
-  /// func _unimplementedInitializer(className: StaticString).
-  FuncDecl *UnimplementedInitializerDecl = nullptr;
-
-  /// func _undefined<T>(msg: StaticString, file: StaticString, line: UInt) -> T
-  FuncDecl *UndefinedDecl = nullptr;
 
   /// func _stdlib_isOSVersionAtLeast(Builtin.Word,Builtin.Word, Builtin.word)
   //    -> Builtin.Int1
@@ -820,24 +811,6 @@ CanType ASTContext::getNeverType() const {
   return neverDecl->getDeclaredType()->getCanonicalType();
 }
 
-TypeAliasDecl *ASTContext::getVoidDecl() const {
-  if (getImpl().VoidDecl) {
-    return getImpl().VoidDecl;
-  }
-
-  // Go find 'Void' in the Swift module.
-  SmallVector<ValueDecl *, 1> results;
-  lookupInSwiftModule("Void", results);
-  for (auto result : results) {
-    if (auto typeAlias = dyn_cast<TypeAliasDecl>(result)) {
-      getImpl().VoidDecl = typeAlias;
-      return typeAlias;
-    }
-  }
-
-  return getImpl().VoidDecl;
-}
-
 StructDecl *ASTContext::getObjCBoolDecl() const {
   if (!getImpl().ObjCBoolDecl) {
     SmallVector<ValueDecl *, 1> results;
@@ -1184,39 +1157,6 @@ FuncDecl *ASTContext::getArrayReserveCapacityDecl() const {
     }
   }
   return nullptr;
-}
-
-FuncDecl *
-ASTContext::getUnimplementedInitializerDecl() const {
-  if (getImpl().UnimplementedInitializerDecl)
-    return getImpl().UnimplementedInitializerDecl;
-
-  // Look for the function.
-  auto decl = findLibraryIntrinsic(*this, "_unimplementedInitializer");
-  if (!decl)
-    return nullptr;
-
-  if (!getIntrinsicCandidateType(decl, /*allowTypeMembers=*/false))
-    return nullptr;
-
-  // FIXME: Check inputs and outputs.
-
-  getImpl().UnimplementedInitializerDecl = decl;
-  return decl;
-}
-
-FuncDecl *
-ASTContext::getUndefinedDecl() const {
-  if (getImpl().UndefinedDecl)
-    return getImpl().UndefinedDecl;
-
-  // Look for the function.
-  auto decl = findLibraryIntrinsic(*this, "_undefined");
-  if (!decl)
-    return nullptr;
-
-  getImpl().UndefinedDecl = decl;
-  return decl;
 }
 
 FuncDecl *ASTContext::getIsOSVersionAtLeastDecl() const {
