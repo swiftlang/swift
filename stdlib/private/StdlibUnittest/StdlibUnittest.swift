@@ -2422,6 +2422,7 @@ internal func hash<H: Hashable>(_ value: H, seed: Int? = nil) -> Int {
 public func checkHashableGroups<Groups: Collection>(
   _ groups: Groups,
   _ message: @autoclosure () -> String = "",
+  allowIncompleteHashing: Bool = false,
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
@@ -2439,6 +2440,7 @@ public func checkHashableGroups<Groups: Collection>(
     equalityOracle: equalityOracle,
     hashEqualityOracle: equalityOracle,
     allowBrokenTransitivity: false,
+    allowIncompleteHashing: allowIncompleteHashing,
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line),
     showFrame: false)
 }
@@ -2450,6 +2452,7 @@ public func checkHashable<Instances: Collection>(
   _ instances: Instances,
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   allowBrokenTransitivity: Bool = false,
+  allowIncompleteHashing: Bool = false,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
@@ -2460,6 +2463,7 @@ public func checkHashable<Instances: Collection>(
     equalityOracle: equalityOracle,
     hashEqualityOracle: equalityOracle,
     allowBrokenTransitivity: allowBrokenTransitivity,
+    allowIncompleteHashing: allowIncompleteHashing,
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line),
     showFrame: false)
 }
@@ -2473,6 +2477,7 @@ public func checkHashable<Instances: Collection>(
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   hashEqualityOracle: (Instances.Index, Instances.Index) -> Bool,
   allowBrokenTransitivity: Bool = false,
+  allowIncompleteHashing: Bool = false,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
@@ -2530,7 +2535,7 @@ public func checkHashable<Instances: Collection>(
           rhs (at index \(j)): \(y)
           """,
           stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-      } else {
+      } else if !allowIncompleteHashing {
         // Try a few different seeds; at least one of them should discriminate
         // between the hashes. It is extremely unlikely this check will fail
         // all ten attempts, unless the type's hash encoding is not unique,
