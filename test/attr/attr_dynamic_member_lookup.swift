@@ -404,7 +404,7 @@ struct Point {
   var x: Int
   let y: Int // expected-note 2 {{change 'let' to 'var' to make it mutable}}
 
-  private let z: Int = 0 // expected-note 9 {{declared here}}
+  private let z: Int = 0 // expected-note 10 {{declared here}}
 }
 
 struct Rectangle {
@@ -653,4 +653,18 @@ struct SingleChoiceLens<T> {
 // simplify disjunctions with a single viable choice.
 func test_lens_with_a_single_choice(a: inout SingleChoiceLens<[Int]>) {
   a[0] = 1 // Ok
+}
+
+func test_chain_of_recursive_lookups(_ lens: Lens<Lens<Lens<Point>>>) {
+  _ = lens.x
+  _ = lens.y
+  _ = lens.z // expected-error {{'z' is inaccessible due to 'private' protection level}}
+  // Make sure that 'obj' field could be retrieved at any level
+  _ = lens.obj
+  _ = lens.obj.obj
+  _ = lens.obj.x
+  _ = lens.obj.obj.x
+
+  _ = \Lens<Lens<Point>>.x
+  _ = \Lens<Lens<Point>>.obj.x
 }

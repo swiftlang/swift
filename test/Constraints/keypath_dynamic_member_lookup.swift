@@ -226,3 +226,27 @@ func test_keypath_dynamic_lookup_inside_keypath() {
   // CHECK-NEXT: keypath $KeyPath<Lens<Array<Array<Int>>>, Lens<Int>>, (root $Lens<Array<Array<Int>>>; settable_property $Lens<Array<Int>>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig : {{.*}})
   _ = \Lens<[[Int]]>.[0].count
 }
+
+func test_recursive_dynamic_lookup(_ lens: Lens<Lens<Point>>) {
+  // CHECK: keypath $KeyPath<Point, Int>, (root $Point; stored_property #Point.x : $Int)
+  // CHECK-NEXT: keypath $KeyPath<Lens<Point>, Lens<Int>>, (root $Lens<Point>; gettable_property $Lens<Int>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig : {{.*}})
+  // CHECK: function_ref @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig
+  _ = lens.x
+  // CHECK: keypath $KeyPath<Point, Int>, (root $Point; stored_property #Point.x : $Int)
+  // CHECK: function_ref @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig
+  _ = lens.obj.x
+  // CHECK: [[FIRST_OBJ:%.*]] = struct_extract {{.*}} : $Lens<Lens<Point>>, #Lens.obj
+  // CHECK-NEXT: [[SECOND_OBJ:%.*]] = struct_extract [[FIRST_OBJ]] : $Lens<Point>, #Lens.obj
+  // CHECK-NEXT: struct_extract [[SECOND_OBJ]] : $Point, #Point.y
+  _ = lens.obj.obj.y
+  // CHECK: keypath $KeyPath<Point, Int>, (root $Point; stored_property #Point.x : $Int)
+  // CHECK-NEXT: keypath $KeyPath<Lens<Point>, Lens<Int>>, (root $Lens<Point>; gettable_property $Lens<Int>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig : {{.*}})
+  // CHECK-NEXT: keypath $KeyPath<Lens<Lens<Point>>, Lens<Lens<Int>>>, (root $Lens<Lens<Point>>; gettable_property $Lens<Lens<Int>>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig : {{.*}})
+  _ = \Lens<Lens<Point>>.x
+  // CHECK: keypath $WritableKeyPath<Rectangle, Point>, (root $Rectangle; stored_property #Rectangle.topLeft : $Point)
+  // CHECK-NEXT: keypath $WritableKeyPath<Lens<Rectangle>, Lens<Point>>, (root $Lens<Rectangle>; settable_property $Lens<Point>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig : {{.*}})
+  // CHECK-NEXT: keypath $KeyPath<Point, Int>, (root $Point; stored_property #Point.x : $Int)
+  // CHECK-NEXT: keypath $KeyPath<Lens<Point>, Lens<Int>>, (root $Lens<Point>; gettable_property $Lens<Int>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig : {{.*}})
+  // CHECK-NEXT: keypath $KeyPath<Lens<Lens<Rectangle>>, Lens<Lens<Int>>>, (root $Lens<Lens<Rectangle>>; settable_property $Lens<Lens<Point>>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig : {{.*}})
+  _ = \Lens<Lens<Rectangle>>.topLeft.x
+}
