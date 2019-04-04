@@ -374,6 +374,21 @@ SILValue swift::isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI) {
   return Arg;
 }
 
+bool swift::onlyUsedByAssignByDelegate(PartialApplyInst *PAI) {
+  bool usedByAssignByDelegate = false;
+  for (Operand *Op : PAI->getUses()) {
+    SILInstruction *User = Op->getUser();
+    if (isa<AssignByDelegateInst>(User) && Op->getOperandNumber() >= 2) {
+      usedByAssignByDelegate = true;
+      continue;
+    }
+    if (isa<DestroyValueInst>(User))
+      continue;
+    return false;
+  }
+  return usedByAssignByDelegate;
+}
+
 /// Given a block used as a noescape function argument, attempt to find all
 /// Swift closures that invoking the block will call. The StoredClosures may not
 /// actually be partial_apply instructions. They may be copied, block arguments,
