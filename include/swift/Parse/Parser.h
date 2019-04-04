@@ -689,11 +689,11 @@ public:
   swift::ScopeInfo &getScopeInfo() { return State->getScopeInfo(); }
 
   /// Add the given Decl to the current scope.
-  void addToScope(ValueDecl *D, bool diagnoseRedefinitions = true) {
+  void addToScope(ValueDecl *D) {
     if (Context.LangOpts.EnableASTScopeLookup)
       return;
 
-    getScopeInfo().addToScope(D, *this, diagnoseRedefinitions);
+    getScopeInfo().addToScope(D, *this);
   }
 
   ValueDecl *lookupInScope(DeclName Name) {

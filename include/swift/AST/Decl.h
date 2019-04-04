@@ -36,7 +36,6 @@
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/InlineBitfield.h"
-#include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/OptionalEnum.h"
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/DenseMap.h"
@@ -4748,31 +4747,7 @@ public:
   /// return this. Otherwise, this VarDecl must belong to a CaseStmt's
   /// CaseLabelItem. In that case, return the first case label item of the first
   /// case stmt in a sequence of case stmts that fallthrough into each other.
-  ///
-  /// NOTE: During type checking, we emit an error if we have a single case
-  /// label item with a pattern that has multiple var decls of the same
-  /// name. This means that during type checking and before type checking, we
-  /// may have a _malformed_ switch stmt var decl linked list since var decls in
-  /// the same case label item that have the same name will point at the same
-  /// canonical var decl, namely the first var decl with the name in the
-  /// canonical case label item's var decl list. This is ok, since we are going
-  /// to emit the error, but it requires us to be more careful/cautious before
-  /// type checking has been complete when relying on canonical var decls
-  /// matching up.
   VarDecl *getCanonicalVarDecl() const;
-
-  /// If this is a case stmt var decl, return the var decl that corresponds to
-  /// this var decl in the first case label item of the case stmt. Returns
-  /// nullptr if this isn't a VarDecl that is part of a case stmt.
-  NullablePtr<VarDecl> getCorrespondingFirstCaseLabelItemVarDecl() const;
-
-  /// If this is a case stmt var decl, return the case body var decl that this
-  /// var decl maps to.
-  NullablePtr<VarDecl> getCorrespondingCaseBodyVariable() const;
-
-  /// Return true if this var decl is an implicit var decl belonging to a case
-  /// stmt's body.
-  bool isCaseBodyVariable() const;
 
   /// True if the global stored property requires lazy initialization.
   bool isLazilyInitializedGlobal() const;

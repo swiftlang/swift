@@ -104,8 +104,7 @@ static bool checkValidOverload(const ValueDecl *D1, const ValueDecl *D2,
 
 /// addToScope - Register the specified decl as being in the current lexical
 /// scope.
-void ScopeInfo::addToScope(ValueDecl *D, Parser &TheParser,
-                           bool diagnoseRedefinitions) {
+void ScopeInfo::addToScope(ValueDecl *D, Parser &TheParser) {
   if (!CurScope->isResolvable())
     return;
 
@@ -122,13 +121,9 @@ void ScopeInfo::addToScope(ValueDecl *D, Parser &TheParser,
     
     // If this is in a resolvable scope, diagnose redefinitions.  Later
     // phases will handle scopes like module-scope, etc.
-    if (CurScope->getDepth() >= ResolvableDepth) {
-      if (diagnoseRedefinitions) {
-        return TheParser.diagnoseRedefinition(PrevDecl, D);
-      }
-      return;
-    }
-
+    if (CurScope->getDepth() >= ResolvableDepth)
+      return TheParser.diagnoseRedefinition(PrevDecl, D);
+    
     // If this is at top-level scope, validate that the members of the overload
     // set all agree.
     

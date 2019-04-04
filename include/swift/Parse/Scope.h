@@ -52,8 +52,7 @@ public:
 
   /// addToScope - Register the specified decl as being in the current lexical
   /// scope.
-  void addToScope(ValueDecl *D, Parser &TheParser,
-                  bool diagnoseRedefinitions = true);
+  void addToScope(ValueDecl *D, Parser &TheParser);
 
   bool isInactiveConfigBlock() const;
   
