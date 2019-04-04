@@ -510,3 +510,72 @@ func testBox(ub: UseBox) {
   mutableUB.y = 20
   mutableUB = ub
 }
+
+// ---------------------------------------------------------------------------
+// Memberwise initializers
+// ---------------------------------------------------------------------------
+struct MemberwiseInits<T> {
+  @Wrapper
+  var x: Bool
+
+  @WrapperWithInitialValue
+  var y: T
+}
+
+func testMemberwiseInits() {
+  // expected-error@+1{{type '(Wrapper<Bool>, Double) -> MemberwiseInits<Double>'}}
+  let _: Int = MemberwiseInits<Double>.init
+
+  _ = MemberwiseInits(x: Wrapper(value: true), y: 17)
+}
+
+struct DefaultedMemberwiseInits {
+  @Wrapper(value: true)
+  var x: Bool
+
+  @WrapperWithInitialValue
+  var y: Int = 17
+}
+
+func testDefaultedMemberwiseInits() {
+  _ = DefaultedMemberwiseInits()
+  _ = DefaultedMemberwiseInits(x: Wrapper(value: false), y: 42)
+
+  _ = DefaultedMemberwiseInits(y: 42)
+  _ = DefaultedMemberwiseInits(x: Wrapper(value: false))
+}
+
+// ---------------------------------------------------------------------------
+// Default initializers
+// ---------------------------------------------------------------------------
+struct DefaultInitializerStruct {
+  @Wrapper(value: true)
+  var x
+
+  @WrapperWithInitialValue
+  var y: Int = 10
+}
+
+struct NoDefaultInitializerStruct { // expected-note{{'init(x:)' declared here}}
+  @Wrapper
+  var x: Bool
+}
+
+class DefaultInitializerClass {
+  @Wrapper(value: true)
+  final var x
+
+  @WrapperWithInitialValue
+  final var y: Int = 10
+}
+
+class NoDefaultInitializerClass { // expected-error{{class 'NoDefaultInitializerClass' has no initializers}}
+  @Wrapper
+  final var x: Bool  // expected-note{{stored property 'x' without initial value prevents synthesized initializers}}
+}
+
+func testDefaultInitializers() {
+  _ = DefaultInitializerStruct()
+  _ = DefaultInitializerClass()
+  _ = NoDefaultInitializerStruct() // expected-error{{missing argument for parameter 'x' in call}}
+}
