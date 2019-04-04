@@ -632,25 +632,6 @@ void ASTContext::lookupInSwiftModule(
   M->lookupValue({ }, identifier, NLKind::UnqualifiedLookup, results);
 }
 
-/// Find the generic implementation declaration for the named syntactic-sugar
-/// type.
-static NominalTypeDecl *findStdlibType(const ASTContext &ctx, StringRef name,
-                                       unsigned genericParams) {
-  // Find all of the declarations with this name in the Swift module.
-  SmallVector<ValueDecl *, 1> results;
-  ctx.lookupInSwiftModule(name, results);
-  for (auto result : results) {
-    if (auto nominal = dyn_cast<NominalTypeDecl>(result)) {
-      auto params = nominal->getGenericParams();
-      if (genericParams == (params == nullptr ? 0 : params->size())) {
-        // We found it.
-        return nominal;
-      }
-    }
-  }
-  return nullptr;
-}
-
 FuncDecl *ASTContext::getPlusFunctionOnRangeReplaceableCollection() const {
   if (getImpl().PlusFunctionOnRangeReplaceableCollection) {
     return getImpl().PlusFunctionOnRangeReplaceableCollection;
@@ -707,10 +688,19 @@ FuncDecl *ASTContext::getPlusFunctionOnString() const {
 
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   DECL_CLASS *ASTContext::get##NAME##Decl() const { \
-    if (!getImpl().NAME##Decl) \
-      getImpl().NAME##Decl = dyn_cast_or_null<DECL_CLASS>( \
-        findStdlibType(*this, #NAME, NUM_GENERIC_PARAMS)); \
-    return getImpl().NAME##Decl; \
+    if (getImpl().NAME##Decl) \
+      return getImpl().NAME##Decl; \
+    SmallVector<ValueDecl *, 1> results; \
+    lookupInSwiftModule(#NAME, results); \
+    for (auto result : results) { \
+      if (auto type = dyn_cast<DECL_CLASS>(result)) { \
+        auto params = type->getGenericParams(); \
+        if (NUM_GENERIC_PARAMS == (params == nullptr ? 0 : params->size())) { \
+          return type; \
+        } \
+      } \
+    } \
+    return nullptr; \
   }
 #include "swift/AST/KnownStdlibTypes.def"
 
