@@ -144,16 +144,6 @@ extension String {
     return contents.withUnsafeBufferPointer { String._uncheckedFromUTF8($0) }
   }
 
-  internal func _withUnsafeBufferPointerToUTF8<R>(
-    _ body: (UnsafeBufferPointer<UTF8.CodeUnit>) throws -> R
-  ) rethrows -> R {
-    return try self.withUnsafeBytes { rawBufPtr in
-      return try body(UnsafeBufferPointer(
-        start: rawBufPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
-        count: rawBufPtr.count))
-    }
-  }
-
   @usableFromInline @inline(never) // slow-path
   internal static func _fromCodeUnits<
     Input: Collection,
@@ -218,4 +208,3 @@ extension String {
     }
   }
 }
-
