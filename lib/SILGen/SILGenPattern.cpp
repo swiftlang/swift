@@ -2622,7 +2622,8 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
           }
 
           // Ok, we found a match. Update the VarLocs for the case block.
-          SGF.VarLocs[expected] = SGF.VarLocs[vd];
+          auto v = SGF.VarLocs[vd];
+          SGF.VarLocs[expected] = v;
         }
       }
     }
