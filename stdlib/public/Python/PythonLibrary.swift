@@ -238,6 +238,12 @@ private extension PythonLibrary {
   }
 }
 
+public extension PythonLibrary {
+  static func isPythonLibraryLoadable() -> Bool {
+    return loadPythonLibrary() != nil
+  }
+}
+
 // Methods of `PythonLibrary` used for logging messages.
 private extension PythonLibrary {
   static func log(_ message: String) {

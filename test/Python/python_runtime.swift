@@ -1,21 +1,56 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-python2-interop-simple-swift
 // REQUIRES: executable_test
 //
 // Python runtime interop tests.
 
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif os(Windows)
+import MSVCRT
+import WinSDK
+#endif
+
 import Python
 import StdlibUnittest
 
-/// The gc module is an interface to the Python garbage collector.
-let gc = Python.import("gc")
-/// The tracemalloc module is a debug tool to trace memory blocks allocated by
-/// Python. It is optionally imported because it is available only in Python 3.
-let tracemalloc = try? Python.attemptImport("tracemalloc")
+let desiredPythonMajorVersion: Int = {
+    guard let pythonVersionPtr = getenv("PYTHON_VERSION") else {
+        return 2
+    }
+    
+    return Int(String(cString: pythonVersionPtr))!
+}()
+
+let isPythonLibraryLoadable = PythonLibrary.isPythonLibraryLoadable()
+
+var gc = PythonObject(Int(0))
+var tracemalloc: PythonObject? = nil
+
+if isPythonLibraryLoadable {
+  /// The gc module is an interface to the Python garbage collector.
+  gc = Python.import("gc")
+  /// The tracemalloc module is a debug tool to trace memory blocks allocated by
+  /// Python. It is optionally imported because it is available only in Python 3.
+  tracemalloc = try? Python.attemptImport("tracemalloc")
+}
 
 extension TestSuite {
+  /// Checks if Python Library was loaded and short circuits tests in case it was not.
+  func testWithLoadingChecking(_ name: String, body: @escaping () -> Void) {
+    if !isPythonLibraryLoadable {
+      return
+    }
+
+    test(name) {
+      body()
+    }
+  }
+
   /// Check that running `body` does not cause Python memory leaks.
   func testWithLeakChecking(_ name: String, body: @escaping () -> Void) {
-    test(name) {
+    testWithLoadingChecking(name) {
       if let tracemalloc = tracemalloc {
         tracemalloc.start()
       }
@@ -34,13 +69,11 @@ extension TestSuite {
 }
 
 var PythonRuntimeTestSuite = TestSuite("PythonRuntime")
-PythonLibrary.useVersion(2, 7)
 
 PythonRuntimeTestSuite.testWithLeakChecking("CheckVersion") {
-  expectEqual("2.7.", String(Python.version)!.prefix(4))
+  expectEqual("\(desiredPythonMajorVersion).", String(Python.version)!.prefix(2))
   let versionInfo = Python.versionInfo
   expectEqual(2, versionInfo.major)
-  expectEqual(7, versionInfo.minor)
 }
 
 // Python.repr() in lists produces some static values that stay referenced for
@@ -351,7 +384,7 @@ PythonRuntimeTestSuite.testWithLeakChecking("PythonRefCount") {
   }
 }
 
-PythonRuntimeTestSuite.test("ReferenceCounting") {
+PythonRuntimeTestSuite.testWithLoadingChecking("ReferenceCounting") {
   // Note: gc.get_objects() only counts objects that can be part of a cycle.
   // (Like arrays and general python-objects).
   let referencedObjectCount = Python.len(gc.get_objects())
@@ -359,7 +392,7 @@ PythonRuntimeTestSuite.test("ReferenceCounting") {
   expectEqual(1, Python.len(gc.get_objects()) - referencedObjectCount)
 }
 
-PythonRuntimeTestSuite.test("TraceMallocReferenceCounting") {
+PythonRuntimeTestSuite.testWithLoadingChecking("TraceMallocReferenceCounting") {
   guard let tracemalloc = tracemalloc else { return }
   tracemalloc.start()
   expectEqual(0, Int(tracemalloc.get_traced_memory().tuple2.0)!)
