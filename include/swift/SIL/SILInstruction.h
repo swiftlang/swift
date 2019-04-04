@@ -3723,19 +3723,17 @@ enum class AssignOwnershipQualifier {
 };
 static_assert(2 == SILNode::NumAssignOwnershipQualifierBits, "Size mismatch");
 
-/// AssignInst - Represents an abstract assignment to a memory location, which
-/// may either be an initialization or a store sequence.  This is only valid in
-/// Raw SIL.
-class AssignInst
-    : public InstructionBase<SILInstructionKind::AssignInst,
-                             NonValueInstruction> {
-  friend SILBuilder;
+template <SILInstructionKind Kind, int NumOps>
+class AssignInstBase
+    : public InstructionBase<Kind, NonValueInstruction> {
 
-  FixedOperandList<2> Operands;
+protected:
+  FixedOperandList<NumOps> Operands;
 
-  AssignInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest,
-             AssignOwnershipQualifier Qualifier =
-                AssignOwnershipQualifier::Unknown);
+  template <class... T>
+  AssignInstBase(SILDebugLocation DebugLoc, T&&...args) :
+      InstructionBase<Kind, NonValueInstruction>(DebugLoc),
+      Operands(this, std::forward<T>(args)...) { }
 
 public:
   enum {
@@ -3750,13 +3748,52 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+};
 
+/// AssignInst - Represents an abstract assignment to a memory location, which
+/// may either be an initialization or a store sequence.  This is only valid in
+/// Raw SIL.
+class AssignInst
+    : public AssignInstBase<SILInstructionKind::AssignInst, 2> {
+  friend SILBuilder;
+
+  AssignInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest,
+             AssignOwnershipQualifier Qualifier =
+             AssignOwnershipQualifier::Unknown);
+
+public:
   AssignOwnershipQualifier getOwnershipQualifier() const {
     return AssignOwnershipQualifier(
       SILInstruction::Bits.AssignInst.OwnershipQualifier);
   }
   void setOwnershipQualifier(AssignOwnershipQualifier qualifier) {
     SILInstruction::Bits.AssignInst.OwnershipQualifier = unsigned(qualifier);
+  }
+};
+
+/// AssignByDelegateInst - Represents an abstract assignment via a delegate,
+/// which may either be an initialization or a store sequence.  This is only
+/// valid in Raw SIL.
+class AssignByDelegateInst
+    : public AssignInstBase<SILInstructionKind::AssignByDelegateInst, 4> {
+  friend SILBuilder;
+
+  AssignByDelegateInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest,
+                       SILValue Initializer, SILValue Setter,
+                       AssignOwnershipQualifier Qualifier =
+                         AssignOwnershipQualifier::Unknown);
+
+public:
+
+  SILValue getInitializer() { return Operands[2].get(); }
+  SILValue getSetter() { return  Operands[3].get(); }
+
+  AssignOwnershipQualifier getOwnershipQualifier() const {
+    return AssignOwnershipQualifier(
+      SILInstruction::Bits.AssignByDelegateInst.OwnershipQualifier);
+  }
+  void setOwnershipQualifier(AssignOwnershipQualifier qualifier) {
+    SILInstruction::Bits.AssignByDelegateInst.OwnershipQualifier = unsigned(qualifier);
   }
 };
 

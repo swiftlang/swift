@@ -1852,6 +1852,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                     qualifier);
     break;
   }
+  case SILInstructionKind::AssignByDelegateInst:
+    llvm_unreachable("not supported");
   case SILInstructionKind::BindMemoryInst: {
     assert(RecordKind == SIL_ONE_TYPE_VALUES &&
            "Layout should be OneTypeValues.");
