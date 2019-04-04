@@ -432,32 +432,40 @@ extension String {
   /// calls the given closure with a buffer covering the String's uninitialized
   /// memory.
   ///
-  /// The closure should return the number of code units that are initialized,
-  /// or nil if it was unable to initialize the buffer (for example if the
-  /// requested capacity ended up being too small for the data).
+  /// The closure should set `initializedCount` to the number of
+  /// initialized code units, or 0 if it couldn't initialize the buffer
+  /// (for example if the requested capacity was too small).
   ///
-  /// This initializer does not try to repair ill-formed UTF-8 code unit
-  /// sequences. If any are found, the result of the initializer is `nil`.
+  /// This method replaces ill-formed UTF-8 sequences with the Unicode
+  /// replacement character (`"\u{FFFD}"`); This may require resizing
+  /// the buffer beyond its original capacity.
   ///
-  /// The following example uses this initializer with the contents of two
-  /// different `CChar` arrays---the first with well-formed UTF-8 code unit
+  /// The following examples use this initializer with the contents of two
+  /// different `UInt8` arrays---the first with well-formed UTF-8 code unit
   /// sequences and the second with an ill-formed sequence at the end.
   ///
-  ///     let validUTF8: [CChar] = [67, 97, 102, -61, -87, 0]
+  ///     let validUTF8: [UInt8] = [67, 97, 102, -61, -87, 0]
   ///     let s = String(unsafeUninitializedCapacity: validUTF8.count,
-  ///                    initializingValidatingUTF8With: { (ptr, count) in
+  ///                    initializingUTF8With: { (ptr, count) in
   ///         ptr.initializeFrom(validUTF8)
   ///         count = validUTF8.count
   ///     })
   ///     // Prints "Optional(Café)"
   ///
-  ///     let invalidUTF8: [CChar] = [67, 97, 102, -61, 0]
+  ///     let invalidUTF8: [UInt8] = [67, 97, 102, -61, 0]
   ///     let s = String(unsafeUninitializedCapacity: invalidUTF8.count,
-  ///                    initializingValidatingUTF8With: { (ptr, count) in
+  ///                    initializingUTF8With: { (ptr, count) in
   ///         ptr.initializeFrom(invalidUTF8)
   ///         count = invalidUTF8.count
   ///     })
-  ///     // Prints "nil"
+  ///     // Prints "Optional(Caf�)"
+  ///
+  ///     let s = String(unsafeUninitializedCapacity: invalidUTF8.count,
+  ///                    initializingUTF8With: { (ptr, count) in
+  ///         ptr.initializeFrom(invalidUTF8)
+  ///         count = 0
+  ///     })
+  ///     // Prints "Optional("")"
   ///
   /// - Parameters:
   ///   - capacity: The number of UTF-8 code units worth of memory to allocate
