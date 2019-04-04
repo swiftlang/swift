@@ -25,6 +25,21 @@ CHANGELOG
 Swift 5.1
 ---------
 
+* [SR-5872][]:
+
+  When key-value-observing a `RawRepresentable` property using the `KeyPath`-based APIs, the change notification will now have its `oldValue`/`newValue` set correctly (instead of always being nil).
+
+  ```swift
+  @objc enum State: Int { case a, b }
+  class Target: NSObject { @objc dynamic var state: State = .a }
+  let target = Target()
+  target.observe(\.state, options: [.old, .new]) { object, change in
+      change.oldValue // State.a
+      change.newValue // State.b
+  }
+  target.state = .b
+  ```
+
 * [SE-0068][]:
 
   `Self` can now be used inside member functions and for function arguments of structs and enums to refer to the containing type.
@@ -7529,6 +7544,7 @@ Swift 1.0
 [SR-4248]: <https://bugs.swift.org/browse/SR-4248>
 [SR-5581]: <https://bugs.swift.org/browse/SR-5581>
 [SR-5719]: <https://bugs.swift.org/browse/SR-5719>
+[SR-5872]: <https://bugs.swift.org/browse/SR-5872>
 [SR-7139]: <https://bugs.swift.org/browse/SR-7139>
 [SR-7251]: <https://bugs.swift.org/browse/SR-7251>
 [SR-7601]: <https://bugs.swift.org/browse/SR-7601>
