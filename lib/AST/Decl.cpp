@@ -1566,7 +1566,7 @@ bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
   const auto entry = getPatternList()[i];
 
   // If it has an initializer expression, this is trivially true.
-  if (entry.getInit())
+  if (entry.isInitialized())
     return true;
 
   if (entry.getPattern()->isNeverDefaultInitializable())
@@ -4961,7 +4961,7 @@ bool VarDecl::isSettable(const DeclContext *UseDC,
 
   // If the decl has an explicitly written initializer with a pattern binding,
   // then it isn't settable.
-  if (getParentInitializer() != nullptr)
+  if (isParentInitialized())
     return false;
 
   // Normal lets (e.g. globals) are only mutable in the context of the
@@ -5257,6 +5257,9 @@ StaticSpellingKind AbstractStorageDecl::getCorrectStaticSpelling() const {
 
 CustomAttr *VarDecl::getAttachedPropertyDelegate() const {
   auto &ctx = getASTContext();
+  if (!ctx.getLazyResolver())
+    return nullptr;
+
   auto mutableThis = const_cast<VarDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
                            AttachedPropertyDelegateRequest{mutableThis},
@@ -5280,6 +5283,9 @@ PropertyDelegateTypeInfo VarDecl::getAttachedPropertyDelegateTypeInfo() const {
 
 Type VarDecl::getAttachedPropertyDelegateType() const {
   auto &ctx = getASTContext();
+  if (!ctx.getLazyResolver())
+    return nullptr;
+
   auto mutableThis = const_cast<VarDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
                            AttachedPropertyDelegateTypeRequest{mutableThis},
@@ -5288,6 +5294,9 @@ Type VarDecl::getAttachedPropertyDelegateType() const {
 
 Type VarDecl::getPropertyDelegateBackingPropertyType() const {
   ASTContext &ctx = getASTContext();
+  if (!ctx.getLazyResolver())
+    return nullptr;
+
   auto mutableThis = const_cast<VarDecl *>(this);
   return evaluateOrDefault(
       ctx.evaluator, PropertyDelegateBackingPropertyTypeRequest{mutableThis},
@@ -5296,6 +5305,9 @@ Type VarDecl::getPropertyDelegateBackingPropertyType() const {
 
 VarDecl *VarDecl::getPropertyDelegateBackingProperty() const {
   auto &ctx = getASTContext();
+  if (!ctx.getLazyResolver())
+    return nullptr;
+
   auto mutableThis = const_cast<VarDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
                            PropertyDelegateBackingPropertyRequest{mutableThis},

@@ -1467,7 +1467,7 @@ PropertyDelegateBackingPropertyRequest::evaluate(Evaluator &evaluator,
   VarDecl *backingVar = new (ctx) VarDecl(/*IsStatic=*/var->isStatic(),
                                           VarDecl::Specifier::Var,
                                           /*IsCaptureList=*/false,
-                                          SourceLoc(),
+                                          var->getLoc(),
                                           name, dc);
   backingVar->setInterfaceType(storageInterfaceType);
   backingVar->setType(storageType);
@@ -1859,10 +1859,6 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
   if (!var->getParentPattern()->getSingleVar())
     return;
 
-  // If this property has a delegate, don't give it a default argument.
-  if (var->getAttachedPropertyDelegate())
-    return;
-
   // If we don't have an expression initializer or silgen can't assign a default
   // initializer, then we can't generate a default value. An example of where
   // silgen can assign a default is var x: Int? where the default is nil.
@@ -1885,7 +1881,7 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
   // the type will always be a sugared T? because we don't default init an
   // explicit Optional<T>.
   if ((isa<OptionalType>(var->getValueInterfaceType().getPointer()) &&
-      !var->getParentInitializer()) ||
+      !var->isParentInitialized()) ||
       var->getAttrs().hasAttribute<LazyAttr>()) {
     arg->setDefaultArgumentKind(DefaultArgumentKind::NilLiteral);
     return;
@@ -1912,7 +1908,7 @@ bool swift::isMemberwiseInitialized(VarDecl *var) {
   // Initialized 'let' properties have storage, but don't get an argument
   // to the memberwise initializer since they already have an initial
   // value that cannot be overridden.
-  if (var->isLet() && var->getParentInitializer())
+  if (var->isLet() && var->isParentInitialized())
     return false;
 
   return true;

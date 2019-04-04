@@ -4921,6 +4921,31 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
     }
   }
 
+  // Lazily construct a mapping from backing storage properties to the
+  // declared properties.
+  bool computedBackingToOriginalVars = false;
+  llvm::SmallDenseMap<VarDecl *, VarDecl *> backingToOriginalVars;
+  auto getOriginalVar = [&](VarDecl *var) -> VarDecl * {
+    // If we haven't computed the mapping yet, do so now.
+    if (!computedBackingToOriginalVars) {
+      for (auto member : classDecl->getMembers()) {
+        if (auto var = dyn_cast<VarDecl>(member)) {
+          if (auto backingVar = var->getPropertyDelegateBackingProperty()) {
+            backingToOriginalVars[backingVar] = var;
+          }
+        }
+      }
+
+      computedBackingToOriginalVars = true;
+    }
+
+    auto known = backingToOriginalVars.find(var);
+    if (known == backingToOriginalVars.end())
+      return nullptr;
+
+    return known->second;
+  };
+
   for (auto member : classDecl->getMembers()) {
     auto pbd = dyn_cast<PatternBindingDecl>(member);
     if (!pbd)
@@ -4931,11 +4956,18 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
       continue;
    
     for (auto entry : pbd->getPatternList()) {
-      if (entry.getInit()) continue;
+      if (entry.isInitialized()) continue;
       
       SmallVector<VarDecl *, 4> vars;
       entry.getPattern()->collectVariables(vars);
       if (vars.empty()) continue;
+
+      // Replace the variables we found with the originals for diagnostic
+      // purposes.
+      for (auto &var : vars) {
+        if (auto originalVar = getOriginalVar(var))
+          var = originalVar;
+      }
 
       auto varLoc = vars[0]->getLoc();
       
@@ -5166,6 +5198,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     }
 
   } else {
+    SmallPtrSet<VarDecl *, 4> backingStorageVars;
     for (auto member : decl->getMembers()) {
       if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
         // Initializers that were synthesized to fulfill derived conformances
@@ -5190,16 +5223,22 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       if (auto var = dyn_cast<VarDecl>(member)) {
         // If this variable has a property delegate, go validate it to ensure
         // that we create the backing storage property.
-        if (var->getAttachedPropertyDelegate()) {
+        if (auto backingVar = var->getPropertyDelegateBackingProperty()) {
           validateDecl(var);
           maybeAddAccessorsToStorage(var);
+
+          backingStorageVars.insert(backingVar);
         }
+
+        // Ignore the backing storage for properties with attached delegates.
+        if (backingStorageVars.count(var) > 0)
+          continue;
 
         if (isMemberwiseInitialized(var)) {
           // Initialized 'let' properties have storage, but don't get an argument
           // to the memberwise initializer since they already have an initial
           // value that cannot be overridden.
-          if (var->isLet() && var->getParentInitializer()) {
+          if (var->isLet() && var->isParentInitialized()) {
           
             // We cannot handle properties like:
             //   let (a,b) = (1,2)
@@ -5226,7 +5265,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
         if (pbd->hasStorage() && !pbd->isStatic()) {
           for (auto entry : pbd->getPatternList()) {
-            if (entry.getInit()) continue;
+            if (entry.isInitialized()) continue;
 
             // If one of the bound variables is @NSManaged, go ahead no matter
             // what.

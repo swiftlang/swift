@@ -2150,11 +2150,7 @@ public:
 
   /// Determines whether this binding either has an initializer expression, or is
   /// default initialized, without performing any type checking on it.
-  ///
-  /// This is only valid to check for bindings which have storage.
   bool isDefaultInitializable() const {
-    assert(hasStorage());
-
     for (unsigned i = 0, e = getNumPatternEntries(); i < e; ++i)
       if (!isDefaultInitializable(i))
         return false;
@@ -4930,12 +4926,19 @@ public:
     return nullptr;
   }
 
+  /// Whether there exists an initializer for this \c VarDecl.
+  bool isParentInitialized() const {
+    if (auto *PBD = getParentPatternBinding())
+      return PBD->getPatternEntryForVarDecl(this).isInitialized();
+    return false;
+  }
+
   // Return whether this VarDecl has an initial value, either by checking
   // if it has an initializer in its parent pattern binding or if it has
   // the @_hasInitialValue attribute.
   bool hasInitialValue() const {
     return getAttrs().hasAttribute<HasInitialValueAttr>() ||
-           getParentInitializer();
+           isParentInitialized();
   }
 
   VarDecl *getOverriddenDecl() const {
