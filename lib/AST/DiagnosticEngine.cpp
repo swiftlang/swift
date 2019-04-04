@@ -839,7 +839,7 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     Consumer->handleDiagnostic(SourceMgr, loc, toDiagnosticKind(behavior),
                                diagnosticStringFor(Info.ID),
                                diagnostic.getArgs(), Info,
-                               getDefaultDiagnostLoc());
+                               getDefaultDiagnosticLoc());
   }
 }
 

@@ -814,7 +814,7 @@ namespace swift {
     void setBufferIndirectlyCausingDiagnosticToInput(
         StringRef defaultDiagnosticInputFile);
     void resetBufferIndirectlyCausingDiagnostic();
-    SourceLoc getDefaultDiagnostLoc() const {
+    SourceLoc getDefaultDiagnosticLoc() const {
       return bufferIndirectlyCausingDiagnostic;
     }
   };
