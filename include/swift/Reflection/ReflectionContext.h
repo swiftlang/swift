@@ -331,7 +331,7 @@ public:
 
         // FIXME: This code needs to be cleaned up and updated
         // to make it work for 32 bit platforms.
-        if (SectionName != ".sw5cptr") {
+        if (SectionName != ".sw5cptr" && SectionName != ".sw5bltn") {
           Begin += 8;
           End -= 8;
         }
@@ -349,9 +349,8 @@ public:
         findCOFFSectionByName(".sw5flmd");
     std::pair<std::pair<const char *, const char *>, uint32_t> AssocTySec =
         findCOFFSectionByName(".sw5asty");
-    // FIXME: Use the section .sw5bltn instead.
     std::pair<std::pair<const char *, const char *>, uint32_t> BuiltinTySec =
-        {{nullptr, nullptr}, 0};
+        findCOFFSectionByName(".sw5bltn");
     std::pair<std::pair<const char *, const char *>, uint32_t> ReflStrMdSec =
         findCOFFSectionByName(".sw5rfst");
 
