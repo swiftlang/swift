@@ -3592,6 +3592,13 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
       auto srcType = subExpr->getType();
       auto destType = coercion.DestType;
 
+      // If we're implicitly unwrapping from T! to Any then there's nothing to
+      // diagnose.
+      if (srcType->getOptionalObjectType() &&
+          hasImplicitlyUnwrappedResult(subExpr)) {
+        return;
+      }
+
       size_t optionalityDifference = 0;
       if (!isOptionalToAnyCoercion(srcType, destType, optionalityDifference))
         return;
