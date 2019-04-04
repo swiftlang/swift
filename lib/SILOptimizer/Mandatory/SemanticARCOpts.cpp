@@ -461,6 +461,7 @@ namespace {
 // configuration.
 struct SemanticARCOpts : SILFunctionTransform {
   void run() override {
+    return;
     SILFunction &f = *getFunction();
 
     // Make sure we are running with ownership verification enabled.
