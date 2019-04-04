@@ -104,6 +104,8 @@ public:
   void visitDestructorDecl(DestructorDecl *DD);
 
   void visitExtensionDecl(ExtensionDecl *ED);
+  
+  void visitFuncDecl(FuncDecl *FD);
 
   void visitProtocolDecl(ProtocolDecl *PD);
 
