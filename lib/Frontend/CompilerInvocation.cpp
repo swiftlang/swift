@@ -1004,6 +1004,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   Opts.ModuleName = FrontendOpts.ModuleName;
 
+  if (Args.hasArg(OPT_no_clang_module_breadcrumbs))
+    Opts.DisableClangModuleSkeletonCUs = true;
+
   if (Args.hasArg(OPT_use_jit))
     Opts.UseJIT = true;
   
