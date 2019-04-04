@@ -2152,6 +2152,7 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
 //===----------------------------------------------------------------------===//
 
 namespace {
+
 class VarDeclUsageChecker : public ASTWalker {
   DiagnosticEngine &Diags;
   // Keep track of some information about a variable.
@@ -2204,9 +2205,12 @@ public:
 
   VarDeclUsageChecker(DiagnosticEngine &Diags) : Diags(Diags) {}
 
-  VarDeclUsageChecker(TypeChecker &TC, VarDecl *VD) : Diags(TC.Diags) {
+  VarDeclUsageChecker(TypeChecker &tc, VarDecl *vd) : Diags(tc.Diags) {
     // Track a specific VarDecl
-    VarDecls[VD] = 0;
+    VarDecls[vd] = 0;
+    if (auto *childVd = vd->getCorrespondingCaseBodyVariable().getPtrOrNull()) {
+      VarDecls[childVd] = 0;
+    }
   }
 
   void suppressDiagnostics() {
@@ -2288,16 +2292,30 @@ public:
       handleIfConfig(ICD);
       
     // If this is a VarDecl, then add it to our list of things to track.
-    if (auto *vd = dyn_cast<VarDecl>(D))
+    if (auto *vd = dyn_cast<VarDecl>(D)) {
       if (shouldTrackVarDecl(vd)) {
-        unsigned defaultFlags = 0;
-        // If this VarDecl is nested inside of a CaptureListExpr, remember that
-        // fact for better diagnostics.
-        auto parentAsExpr = Parent.getAsExpr();
-        if (parentAsExpr && isa<CaptureListExpr>(parentAsExpr))
-          defaultFlags = RK_CaptureList;
+        // Inline constructor.
+        auto defaultFlags = [&]() -> unsigned {
+          // If this VarDecl is nested inside of a CaptureListExpr, remember
+          // that fact for better diagnostics.
+          auto parentAsExpr = Parent.getAsExpr();
+          if (parentAsExpr && isa<CaptureListExpr>(parentAsExpr))
+            return RK_CaptureList;
+          // Otherwise, return none.
+          return 0;
+        }();
+
+        if (!vd->isImplicit()) {
+          if (auto *childVd =
+                  vd->getCorrespondingCaseBodyVariable().getPtrOrNull()) {
+            // Child vars are never in capture lists.
+            assert(defaultFlags == 0);
+            VarDecls[childVd] |= 0;
+          }
+        }
         VarDecls[vd] |= defaultFlags;
       }
+    }
 
     if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
       // If this is a nested function with a capture list, mark any captured
@@ -2393,11 +2411,20 @@ public:
         });
       }
     }
-      
+
+    // Make sure that we setup our case body variables.
+    if (auto *caseStmt = dyn_cast<CaseStmt>(S)) {
+      if (auto caseBoundDecls = caseStmt->getCaseBodyVariables()) {
+        for (auto *vd : *caseBoundDecls) {
+          VarDecls[vd] |= 0;
+        }
+      }
+    }
+
     return { true, S };
   }
-
 };
+
 } // end anonymous namespace
 
 
@@ -2409,23 +2436,24 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
   // lets let the bigger issues get resolved first.
   if (sawError)
     return;
-  
-  for (auto elt : VarDecls) {
-    auto *var = elt.first;
-    unsigned access = elt.second;
 
-    if (auto *CS = dyn_cast_or_null<CaseStmt>(var->getRecursiveParentPatternStmt())) {
+  for (auto p : VarDecls) {
+    VarDecl *var;
+    unsigned access;
+    std::tie(var, access) = p;
+
+    if (auto *caseStmt =
+            dyn_cast_or_null<CaseStmt>(var->getRecursiveParentPatternStmt())) {
       // Only diagnose VarDecls from the first CaseLabelItem in CaseStmts, as
       // the remaining items must match it anyway.
-      auto CaseItems = CS->getCaseLabelItems();
-      if (!CaseItems.empty()) {
-        bool InFirstCaseLabelItem = false;
-        CaseItems.front().getPattern()->forEachVariable([&](VarDecl *D) {
-          InFirstCaseLabelItem |= var == D;
-        });
-        if (!InFirstCaseLabelItem)
-          continue;
-      }
+      auto caseItems = caseStmt->getCaseLabelItems();
+      assert(!caseItems.empty() &&
+             "If we have any case stmt var decls, we should have a case item");
+      if (!caseItems.front().getPattern()->containsVarDecl(var))
+        continue;
+
+      auto *childVar = var->getCorrespondingCaseBodyVariable().get();
+      access |= VarDecls[childVar];
     }
 
     // If this is a 'let' value, any stores to it are actually initializations,
