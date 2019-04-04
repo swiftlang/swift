@@ -163,10 +163,13 @@ extension TensorShape : Codable {
 
 extension TensorShape: PythonConvertible {
   public var pythonObject: PythonObject {
-    return self.dimensions.pythonObject
+    return dimensions.pythonObject
   }
 
   public init?(_ pythonObject: PythonObject) {
-    self.init(Array<Int32>(pythonObject)!)
+    guard let array = [Int32](pythonObject) else {
+      return nil
+    }
+    self.init(array)
   }
 }
