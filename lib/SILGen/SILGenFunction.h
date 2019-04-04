@@ -1471,6 +1471,12 @@ public:
                                         PreparedArguments &&args, Type overriddenSelfType,
                                         SGFContext ctx);
 
+  RValue emitApplyPropertyDelegateAllocator(SILLocation loc,
+                                            SubstitutionMap subs,
+                                            SILDeclRef ctorRef,
+                                            Type delegateTy,
+                                            CanAnyFunctionType funcTy);
+
   CleanupHandle emitBeginApply(SILLocation loc, ManagedValue fn,
                                SubstitutionMap subs, ArrayRef<ManagedValue> args,
                                CanSILFunctionType substFnType,
