@@ -77,13 +77,11 @@ extension vImage_Buffer {
     /// - Parameter width: The width of the buffer.
     /// - Parameter height: The height of the buffer.
     /// - Parameter bitsPerPixel: The number of bits in a pixel of image data.
-    /// - Parameter options: The options to use when performing this operation.
     ///
     /// - Returns: An initialized vImage buffer.
     public init(width: Int,
                 height: Int,
-                bitsPerPixel: UInt32,
-                flags options: vImage.Options = .noFlags) throws {
+                bitsPerPixel: UInt32) throws {
         
         if width < 0 || height < 0 {
             throw vImage.Error.invalidParameter
@@ -95,7 +93,7 @@ extension vImage_Buffer {
                                       vImagePixelCount(height),
                                       vImagePixelCount(width),
                                       bitsPerPixel,
-                                      options.flags)
+                                      vImage_Flags(kvImageNoFlags))
         
         if error < kvImageNoError {
             throw vImage.Error(vImageError: error)

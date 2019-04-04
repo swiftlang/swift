@@ -214,8 +214,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     Accelerate_vImageTests.test("vImage/IllegalSize") {
         expectCrashLater()
         let buffer = try! vImage_Buffer(width: 99999999, height: 99999999,
-                                        bitsPerPixel: 99999999,
-                                        flags: .noFlags)
+                                        bitsPerPixel: 99999999)
     }
     
     Accelerate_vImageTests.test("vImage/InitWithInvalidImageFormat") {
