@@ -209,180 +209,105 @@ extension SIMD {
   
   /// Extracts the scalars at specified indices to form a SIMD2.
   ///
-  /// The low-order log2(scalarCount) bits of each element of the
-  /// `masking` index vector are used to index self. E.g.:
-  ///
-  ///   let x = SIMD4<Float>(0, 1, 2, 3)
-  ///   let y = x[SIMD2(5,2)] // (1, 2)
-  ///
-  /// In the case where self is SIMD3, it is first extended to a
-  /// SIMD4 by replicating the final element, and then the
-  /// subscript is applied to that to generate the result.
-  ///
-  /// Because of this, the index is always in-range and no trap
+  /// The elements of the index vector are wrapped modulo the count of elements
+  /// in this vector. Because of this, the index is always in-range and no trap
   /// can occur.
   @_alwaysEmitIntoClient
-  public subscript<Index>(masking: SIMD2<Index>) -> SIMD2<Scalar>
+  public subscript<Index>(index: SIMD2<Index>) -> SIMD2<Scalar>
   where Index: FixedWidthInteger {
-    guard scalarCount != 3 else {
-      return SIMD4(self[0], self[1], self[2], self[2])[masking]
-    }
-    // scalarCount is known to be a power of two.
     var result = SIMD2<Scalar>()
-    var masked = masking & Index(scalarCount - 1)
     for i in result.indices {
-      result[i] = self[Int(masked[i])]
+      result[i] = self[Int(index[i]) % scalarCount]
     }
     return result
   }
   
   /// Extracts the scalars at specified indices to form a SIMD3.
   ///
-  /// The low-order log2(scalarCount) bits of each element of the
-  /// `masking` index vector are used to index self.
-  ///
-  /// In the case where self is SIMD3, it is first extended to a
-  /// SIMD4 by replicating the final element, and then the
-  /// subscript is applied to that to generate the result.
-  ///
-  /// Because of this, the index is always in-range.
+  /// The elements of the index vector are wrapped modulo the count of elements
+  /// in this vector. Because of this, the index is always in-range and no trap
+  /// can occur.
   @_alwaysEmitIntoClient
-  public subscript<Index>(masking: SIMD3<Index>) -> SIMD3<Scalar>
+  public subscript<Index>(index: SIMD3<Index>) -> SIMD3<Scalar>
   where Index: FixedWidthInteger {
-    guard scalarCount != 3 else {
-      return SIMD4(self[0], self[1], self[2], self[2])[masking]
-    }
-    // scalarCount is known to be a power of two.
     var result = SIMD3<Scalar>()
-    var masked = masking & Index(scalarCount - 1)
     for i in result.indices {
-      result[i] = self[Int(masked[i])]
+      result[i] = self[Int(index[i]) % scalarCount]
     }
     return result
   }
   
   /// Extracts the scalars at specified indices to form a SIMD4.
   ///
-  /// The low-order log2(scalarCount) bits of each element of the
-  /// `masking` index vector are used to index self.
-  ///
-  /// In the case where self is SIMD3, it is first extended to a
-  /// SIMD4 by replicating the final element, and then the
-  /// subscript is applied to that to generate the result.
-  ///
-  /// Because of this, the index is always in-range.
+  /// The elements of the index vector are wrapped modulo the count of elements
+  /// in this vector. Because of this, the index is always in-range and no trap
+  /// can occur.
   @_alwaysEmitIntoClient
-  public subscript<Index>(masking: SIMD4<Index>) -> SIMD4<Scalar>
+  public subscript<Index>(index: SIMD4<Index>) -> SIMD4<Scalar>
   where Index: FixedWidthInteger {
-    guard scalarCount != 3 else {
-      return SIMD4(self[0], self[1], self[2], self[2])[masking]
-    }
-    // scalarCount is known to be a power of two.
     var result = SIMD4<Scalar>()
-    var masked = masking & Index(scalarCount - 1)
     for i in result.indices {
-      result[i] = self[Int(masked[i])]
+      result[i] = self[Int(index[i]) % scalarCount]
     }
     return result
   }
   
   /// Extracts the scalars at specified indices to form a SIMD8.
   ///
-  /// The low-order log2(scalarCount) bits of each element of the
-  /// `masking` index vector are used to index self.
-  ///
-  /// In the case where self is SIMD3, it is first extended to a
-  /// SIMD4 by replicating the final element, and then the
-  /// subscript is applied to that to generate the result.
-  ///
-  /// Because of this, the index is always in-range.
+  /// The elements of the index vector are wrapped modulo the count of elements
+  /// in this vector. Because of this, the index is always in-range and no trap
+  /// can occur.
   @_alwaysEmitIntoClient
-  public subscript<Index>(masking: SIMD8<Index>) -> SIMD8<Scalar>
+  public subscript<Index>(index: SIMD8<Index>) -> SIMD8<Scalar>
   where Index: FixedWidthInteger {
-    guard scalarCount != 3 else {
-      return SIMD4(self[0], self[1], self[2], self[2])[masking]
-    }
-    // scalarCount is known to be a power of two.
     var result = SIMD8<Scalar>()
-    var masked = masking & Index(scalarCount - 1)
     for i in result.indices {
-      result[i] = self[Int(masked[i])]
+      result[i] = self[Int(index[i]) % scalarCount]
     }
     return result
   }
   
   /// Extracts the scalars at specified indices to form a SIMD16.
   ///
-  /// The low-order log2(scalarCount) bits of each element of the
-  /// `masking` index vector are used to index self.
-  ///
-  /// In the case where self is SIMD3, it is first extended to a
-  /// SIMD4 by replicating the final element, and then the
-  /// subscript is applied to that to generate the result.
-  ///
-  /// Because of this, the index is always in-range.
+  /// The elements of the index vector are wrapped modulo the count of elements
+  /// in this vector. Because of this, the index is always in-range and no trap
+  /// can occur.
   @_alwaysEmitIntoClient
-  public subscript<Index>(masking: SIMD16<Index>) -> SIMD16<Scalar>
+  public subscript<Index>(index: SIMD16<Index>) -> SIMD16<Scalar>
   where Index: FixedWidthInteger {
-    guard scalarCount != 3 else {
-      return SIMD4(self[0], self[1], self[2], self[2])[masking]
-    }
-    // scalarCount is known to be a power of two.
     var result = SIMD16<Scalar>()
-    var masked = masking & Index(scalarCount - 1)
     for i in result.indices {
-      result[i] = self[Int(masked[i])]
+      result[i] = self[Int(index[i]) % scalarCount]
     }
     return result
   }
   
   /// Extracts the scalars at specified indices to form a SIMD32.
   ///
-  /// The low-order log2(scalarCount) bits of each element of the
-  /// `masking` index vector are used to index self.
-  ///
-  /// In the case where self is SIMD3, it is first extended to a
-  /// SIMD4 by replicating the final element, and then the
-  /// subscript is applied to that to generate the result.
-  ///
-  /// Because of this, the index is always in-range.
+  /// The elements of the index vector are wrapped modulo the count of elements
+  /// in this vector. Because of this, the index is always in-range and no trap
+  /// can occur.
   @_alwaysEmitIntoClient
-  public subscript<Index>(masking: SIMD32<Index>) -> SIMD32<Scalar>
+  public subscript<Index>(index: SIMD32<Index>) -> SIMD32<Scalar>
   where Index: FixedWidthInteger {
-    guard scalarCount != 3 else {
-      return SIMD4(self[0], self[1], self[2], self[2])[masking]
-    }
-    // scalarCount is known to be a power of two.
     var result = SIMD32<Scalar>()
-    var masked = masking & Index(scalarCount - 1)
     for i in result.indices {
-      result[i] = self[Int(masked[i])]
+      result[i] = self[Int(index[i]) % scalarCount]
     }
     return result
   }
   
   /// Extracts the scalars at specified indices to form a SIMD64.
   ///
-  /// The low-order log2(scalarCount) bits of each element of the
-  /// `masking` index vector are used to index self.
-  ///
-  /// In the case where self is SIMD3, it is first extended to a
-  /// SIMD4 by replicating the final element, and then the
-  /// subscript is applied to that to generate the result.
-  ///
-  /// Because of this, the index is always in-range and no trap
+  /// The elements of the index vector are wrapped modulo the count of elements
+  /// in this vector. Because of this, the index is always in-range and no trap
   /// can occur.
   @_alwaysEmitIntoClient
-  public subscript<Index>(masking: SIMD64<Index>) -> SIMD64<Scalar>
+  public subscript<Index>(index: SIMD64<Index>) -> SIMD64<Scalar>
   where Index: FixedWidthInteger {
-    guard scalarCount != 3 else {
-      return SIMD4(self[0], self[1], self[2], self[2])[masking]
-    }
-    // scalarCount is known to be a power of two.
     var result = SIMD64<Scalar>()
-    var masked = masking & Index(scalarCount - 1)
     for i in result.indices {
-      result[i] = self[Int(masked[i])]
+      result[i] = self[Int(index[i]) % scalarCount]
     }
     return result
   }
@@ -409,30 +334,16 @@ extension SIMD where Scalar: Comparable {
     return result
   }
   
-  /// The lanewise minimum of two vectors.
-  ///
-  /// Each element of the result is the minimum of the corresponding elements
-  /// of the inputs.
+  /// The least element in the vector.
   @_alwaysEmitIntoClient
-  public static func min(_ lhs: Self, _ rhs: Self) -> Self {
-    var result = Self()
-    for i in result.indices {
-      result[i] = Swift.min(lhs[i], rhs[i])
-    }
-    return result
+  public func min() -> Scalar {
+    return indices.reduce(into: self[0]) { $0 = Swift.min($0, self[$1]) }
   }
   
-  /// The lanewise maximum of two vectors.
-  ///
-  /// Each element of the result is the maximum of the corresponding elements
-  /// of the inputs.
+  /// The greatest element in the vector.
   @_alwaysEmitIntoClient
-  public static func max(_ lhs: Self, _ rhs: Self) -> Self {
-    var result = Self()
-    for i in result.indices {
-      result[i] = Swift.max(lhs[i], rhs[i])
-    }
-    return result
+  public func max() -> Scalar {
+    return indices.reduce(into: self[0]) { $0 = Swift.max($0, self[$1]) }
   }
 }
 
@@ -563,7 +474,7 @@ extension SIMD where Scalar: Comparable {
   
   @_alwaysEmitIntoClient
   public func clamped(lowerBound: Self, upperBound: Self) -> Self {
-    return Self.min(upperBound, Self.max(lowerBound, self))
+    return Swift.min(upperBound, Swift.max(lowerBound, self))
   }
 }
 
@@ -846,24 +757,12 @@ extension SIMD where Scalar: FixedWidthInteger {
     return result
   }
   
-  /// The least element in the vector.
-  @_alwaysEmitIntoClient
-  public var min: Scalar {
-    return indices.reduce(into: self[0]) { $0 = Swift.min($0, self[$1]) }
-  }
-  
-  /// The greatest element in the vector.
-  @_alwaysEmitIntoClient
-  public var max: Scalar {
-    return indices.reduce(into: self[0]) { $0 = Swift.max($0, self[$1]) }
-  }
-  
   /// Returns the sum of the scalars in the vector, computed with wrapping
   /// addition.
   ///
   /// Equivalent to indices.reduce(into: 0) { $0 &+= self[$1] }.
   @_alwaysEmitIntoClient
-  public var wrappedSum: Scalar {
+  public func wrappedSum() -> Scalar {
     return indices.reduce(into: 0) { $0 &+= self[$1] }
   }
 }
@@ -922,50 +821,24 @@ extension SIMD where Scalar: FloatingPoint {
   
   /// Returns the least scalar in the vector.
   @_alwaysEmitIntoClient
-  public var min: Scalar {
+  public func min() -> Scalar {
     return indices.reduce(into: self[0]) { $0 = Scalar.minimum($0, self[$1]) }
   }
   
   /// Returns the greatest scalar in the vector.
   @_alwaysEmitIntoClient
-  public var max: Scalar {
+  public func max() -> Scalar {
     return indices.reduce(into: self[0]) { $0 = Scalar.maximum($0, self[$1]) }
   }
   
   /// Returns the sum of the scalars in the vector.
   @_alwaysEmitIntoClient
-  public var sum: Scalar {
+  public func sum() -> Scalar {
     // Implementation note: this eventually be defined to lower to either
     // llvm.experimental.vector.reduce.fadd or an explicit tree-sum. Open-
     // coding the tree sum is problematic, we probably need to define a
     // Swift Builtin to support it.
     return indices.reduce(into: 0) { $0 += self[$1] }
-  }
-  
-  /// The lanewise minimum of two vectors.
-  ///
-  /// Each element of the result is the minimum of the corresponding elements
-  /// of the inputs.
-  @_alwaysEmitIntoClient
-  public static func min(_ lhs: Self, _ rhs: Self) -> Self {
-    var result = Self()
-    for i in result.indices {
-      result[i] = Scalar.minimum(lhs[i], rhs[i])
-    }
-    return result
-  }
-  
-  /// The lanewise maximum of two vectors.
-  ///
-  /// Each element of the result is the maximum of the corresponding elements
-  /// of the inputs.
-  @_alwaysEmitIntoClient
-  public static func max(_ lhs: Self, _ rhs: Self) -> Self {
-    var result = Self()
-    for i in result.indices {
-      result[i] = Scalar.maximum(lhs[i], rhs[i])
-    }
-    return result
   }
 }
 
@@ -1456,31 +1329,71 @@ extension SIMDMask {
   }
 }
 
+/// True if any lane of mask is true.
 @_alwaysEmitIntoClient
 public func any<Storage>(_ mask: SIMDMask<Storage>) -> Bool {
-  return mask._storage.min < 0
+  return mask._storage.min() < 0
 }
 
-
+/// True if every lane of mask is true.
 @_alwaysEmitIntoClient
 public func all<Storage>(_ mask: SIMDMask<Storage>) -> Bool {
-  return mask._storage.max < 0
+  return mask._storage.max() < 0
 }
 
-// These two functions will actually go into the Math module, assuming that
-// SE-0246 is approved.
+/// The lanewise minimum of two vectors.
+///
+/// Each element of the result is the minimum of the corresponding elements
+/// of the inputs.
 @_alwaysEmitIntoClient
-public func copysign<V>(_ magnitude: V, _ sign: V) -> V
-where V: SIMD, V.Scalar: FloatingPoint {
+public func min<V>(_ lhs: V, _ rhs: V) -> V
+where V: SIMD, V.Scalar: Comparable {
   var result = V()
   for i in result.indices {
-    result[i] = copysign(magnitude[i], sign[i])
+    result[i] = min(lhs[i], rhs[i])
   }
   return result
 }
 
+/// The lanewise maximum of two vectors.
+///
+/// Each element of the result is the maximum of the corresponding elements
+/// of the inputs.
 @_alwaysEmitIntoClient
-public func copysign<T>(_ magnitude: T, _ sign: T) -> T
-where T: FloatingPoint {
-  return T(signOf: sign, magnitudeOf: magnitude)
+public func max<V>(_ lhs: V, _ rhs: V) -> V
+where V: SIMD, V.Scalar: Comparable {
+  var result = V()
+  for i in result.indices {
+    result[i] = max(lhs[i], rhs[i])
+  }
+  return result
+}
+
+
+/// The lanewise minimum of two vectors.
+///
+/// Each element of the result is the minimum of the corresponding elements
+/// of the inputs.
+@_alwaysEmitIntoClient
+public func min<V>(_ lhs: V, _ rhs: V) -> V
+where V: SIMD, V.Scalar: FloatingPoint {
+  var result = V()
+  for i in result.indices {
+    result[i] = V.Scalar.minimum(lhs[i], rhs[i])
+  }
+  return result
+}
+
+/// The lanewise maximum of two vectors.
+///
+/// Each element of the result is the maximum of the corresponding elements
+/// of the inputs.
+@_alwaysEmitIntoClient
+public func max<V>(_ lhs: V, _ rhs: V) -> V
+where V: SIMD, V.Scalar: FloatingPoint {
+  var result = V()
+  for i in result.indices {
+    result[i] = V.Scalar.maximum(lhs[i], rhs[i])
+  }
+  return result
 }
