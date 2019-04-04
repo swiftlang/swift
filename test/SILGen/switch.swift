@@ -1500,3 +1500,86 @@ func nonTrivialLoadableFallthroughCallee2(_ e : MultipleNonTrivialCaseEnum) {
   }
 }
 
+// Make sure that we do not crash while emitting this code.
+//
+// DISCUSSION: The original crash was due to us performing an assignment/lookup
+// on the VarLocs DenseMap in the same statement. This was caught be an
+// asanified compiler. This test is just to make sure we do not regress.
+enum Storage {
+  case empty
+  case single(Int)
+  case pair(Int, Int)
+  case array([Int])
+
+  subscript(range: [Int]) -> Storage {
+    get {
+      return .empty
+    }
+    set {
+      switch self {
+      case .empty:
+        break
+      case .single(let index):
+        break
+      case .pair(let first, let second):
+        switch (range[0], range[1]) {
+        case (0, 0):
+          switch newValue {
+          case .empty:
+            break
+          case .single(let other):
+            break
+          case .pair(let otherFirst, let otherSecond):
+            break
+          case .array(let other):
+            break
+          }
+          break
+        case (0, 1):
+          switch newValue {
+          case .empty:
+            break
+          case .single(let other):
+            break
+          case .pair(let otherFirst, let otherSecond):
+            break
+          case .array(let other):
+            break
+          }
+          break
+        case (0, 2):
+          break
+        case (1, 2):
+          switch newValue {
+          case .empty:
+            break
+          case .single(let other):
+            break
+          case .pair(let otherFirst, let otherSecond):
+            break
+          case .array(let other):
+            self = .array([first] + other)
+          }
+          break
+        case (2, 2):
+          switch newValue {
+          case .empty:
+            break
+          case .single(let other):
+            break
+          case .pair(let otherFirst, let otherSecond):
+            break
+          case .array(let other):
+            self = .array([first, second] + other)
+          }
+          break
+        default:
+          let r = range
+        }
+      case .array(let indexes):
+        break
+      }
+    }
+  }
+}
+

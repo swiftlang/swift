@@ -2332,12 +2332,8 @@ void PatternMatchEmission::initSharedCaseBlockDest(CaseStmt *caseBlock,
   auto *block = SGF.createBasicBlock();
   result.first->second.first = block;
 
-  // Add args for any pattern variables
-  auto caseBodyVars = caseBlock->getCaseBodyVariables();
-  if (!caseBodyVars)
-    return;
-
-  for (auto *vd : *caseBodyVars) {
+  // Add args for any pattern variables if we have any.
+  for (auto *vd : caseBlock->getCaseBodyVariablesOrEmptyArray()) {
     if (!vd->hasName())
       continue;
 
@@ -2365,14 +2361,10 @@ void PatternMatchEmission::emitAddressOnlyAllocations() {
   for (auto &entry : SharedCases) {
     CaseStmt *caseBlock = entry.first;
 
-    auto caseBodyVars = caseBlock->getCaseBodyVariables();
-    if (!caseBodyVars)
-      continue;
-
     // If we have a shared case with bound decls, setup the arguments for the
     // shared block by emitting the temporary allocation used for the arguments
     // of the shared block.
-    for (auto *vd : *caseBodyVars) {
+    for (auto *vd : caseBlock->getCaseBodyVariablesOrEmptyArray()) {
       if (!vd->hasName())
         continue;
 
@@ -2436,8 +2428,7 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
     assert(SGF.getCleanupsDepth() == PatternMatchStmtDepth);
     SWIFT_DEFER { assert(SGF.getCleanupsDepth() == PatternMatchStmtDepth); };
 
-    auto caseBodyVars = caseBlock->getCaseBodyVariables();
-    if (!caseBodyVars) {
+    if (!caseBlock->hasCaseBodyVariables()) {
       emitCaseBody(caseBlock);
       continue;
     }
@@ -2448,7 +2439,7 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
     // args needing Cleanup will get that as well.
     Scope scope(SGF.Cleanups, CleanupLocation(caseBlock));
     unsigned argIndex = 0;
-    for (auto *vd : *caseBodyVars) {
+    for (auto *vd : caseBlock->getCaseBodyVariables()) {
       if (!vd->hasName())
         continue;
 
@@ -2606,14 +2597,14 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
   if (!row.hasFallthroughTo() && caseBlock->getCaseLabelItems().size() == 1) {
     // If we have case body vars, set them up to point at the matching var
     // decls.
-    if (auto caseBodyVars = caseBlock->getCaseBodyVariables()) {
+    if (caseBlock->hasCaseBodyVariables()) {
       // Since we know that we only have one case label item, grab its pattern
       // vars and use that to update expected with the right SILValue.
       //
       // TODO: Do we need a copy here?
       SmallVector<VarDecl *, 4> patternVars;
       row.getCasePattern()->collectVariables(patternVars);
-      for (auto *expected : *caseBodyVars) {
+      for (auto *expected : caseBlock->getCaseBodyVariables()) {
         if (!expected->hasName())
           continue;
         for (auto *vd : patternVars) {
@@ -2622,7 +2613,8 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
           }
 
           // Ok, we found a match. Update the VarLocs for the case block.
-          SGF.VarLocs[expected] = SGF.VarLocs[vd];
+          auto v = SGF.VarLocs[vd];
+          SGF.VarLocs[expected] = v;
         }
       }
     }
@@ -2639,8 +2631,7 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
 
   // If we do not have any bound decls, we do not need to setup any
   // variables. Just jump to the shared destination.
-  auto caseBodyVars = caseBlock->getCaseBodyVariables();
-  if (!caseBodyVars) {
+  if (!caseBlock->hasCaseBodyVariables()) {
     // Don't emit anything yet, we emit it at the cleanup level of the switch
     // statement.
     JumpDest sharedDest = emission.getSharedCaseBlockDest(caseBlock);
@@ -2657,7 +2648,7 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
   SILModule &M = SGF.F.getModule();
   SmallVector<VarDecl *, 4> patternVars;
   row.getCasePattern()->collectVariables(patternVars);
-  for (auto *expected : *caseBodyVars) {
+  for (auto *expected : caseBlock->getCaseBodyVariables()) {
     if (!expected->hasName())
       continue;
     for (auto *var : patternVars) {
@@ -2844,8 +2835,7 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
 
   // If our destination case doesn't have any bound decls, there is no rebinding
   // to do. Just jump to the shared dest.
-  auto destCaseBodyVars = destCaseStmt->getCaseBodyVariables();
-  if (!destCaseBodyVars) {
+  if (!destCaseStmt->hasCaseBodyVariables()) {
     Cleanups.emitBranchAndCleanups(sharedDest, S);
     return;
   }
@@ -2855,13 +2845,13 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
   SmallVector<SILValue, 4> args;
   CaseStmt *fallthroughSourceStmt = S->getFallthroughSource();
 
-  for (auto *expected : *destCaseBodyVars) {
+  for (auto *expected : destCaseStmt->getCaseBodyVariables()) {
     if (!expected->hasName())
       continue;
 
     // The type checker enforces that if our destination case has variables then
     // our fallthrough source must as well.
-    for (auto *var : *fallthroughSourceStmt->getCaseBodyVariables()) {
+    for (auto *var : fallthroughSourceStmt->getCaseBodyVariables()) {
       if (!var->hasName() || var->getName() != expected->getName()) {
         continue;
       }
