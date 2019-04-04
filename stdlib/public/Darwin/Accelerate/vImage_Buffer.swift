@@ -208,16 +208,13 @@ extension vImage_Buffer {
     ///
     /// - Parameter destinationBuffer: The destination vImage buffer.
     /// - Parameter options: The options to use when performing this operation.
-    ///
-    /// - Returns: `kvImageNoError`; otherwise, one of the error codes described
-    ///             in Data Types and Constants.
     public func copy(destinationBuffer: inout vImage_Buffer,
                      flags options: vImage.Options = .noFlags) throws {
         
         if Int(width) == 0 {
             throw vImage.Error(vImageError: kvImageInvalidParameter)
         }
-        
+
         var error = kvImageNoError
         
         _ = withUnsafePointer(to: self) {

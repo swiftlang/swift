@@ -261,6 +261,22 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         buffer.free()
     }
     
+    Accelerate_vImageTests.test("vImage/CopyBadWidth") {
+        var source = try! vImage_Buffer(width: 10, height: 100, bitsPerPixel: 32)
+        var destination = try! vImage_Buffer(width: 20, height: 20, bitsPerPixel: 32)
+        
+        expectCrashLater()
+        try! source.copy(destinationBuffer: &destination)
+    }
+
+    Accelerate_vImageTests.test("vImage/CopyBadHeight") {
+        var source = try! vImage_Buffer(width: 100, height: 10, bitsPerPixel: 32)
+        var destination = try! vImage_Buffer(width: 20, height: 20, bitsPerPixel: 32)
+        
+        expectCrashLater()
+        try! source.copy(destinationBuffer: &destination)
+    }
+    
     Accelerate_vImageTests.test("vImage/Copy") {
         let pixels: [UInt8] = (0 ..< width * height * 4).map { _ in
             return UInt8.random(in: 0 ..< 255)
@@ -275,7 +291,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         var destination = try! vImage_Buffer(width: widthi, height: heighti,
                                              bitsPerPixel: 32)
         
-        _ = try! source.copy(destinationBuffer: &destination)
+        try! source.copy(destinationBuffer: &destination)
         
         let sourcePixels: [UInt8] = arrayFromBuffer(buffer: source,
                                                     count: pixels.count)
