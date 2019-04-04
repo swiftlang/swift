@@ -1219,6 +1219,7 @@ static bool performCompileStepsPostSILGen(
   SILOptions &SILOpts = Invocation.getSILOptions();
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
 
+#error use ModuleOrSourceFile w/ unique pointer?
   BufferIndirectlyCausingDiagnosticRAII cpi(Context.Diags,
                                             PSPs.MainInputFilenameForDebugInfo);
 
@@ -1549,8 +1550,7 @@ createDispatchingDiagnosticConsumerIfNeeded(
   // multiple times. So, create a diagnostic "eater" for those non-primary
   // files.
   //
-  // This routine gets called for \c createJSONFixItDiagnosticConsumerIfNeeded
-  // in cases where no primary subconsumers are created.
+  // This routine gets called in cases where no primary subconsumers are created.
   // Don't bother to create non-primary subconsumers if there aren't any primary
   // ones.
   //
