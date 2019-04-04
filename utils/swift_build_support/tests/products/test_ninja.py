@@ -83,7 +83,7 @@ class NinjaTestCase(unittest.TestCase):
 
         self.assertEqual(ninja_build.ninja_bin_path,
                          os.path.join(
-                            self.workspace.build_dir(self.host.name, 'ninja'),
+                            self.workspace.build_dir('build', 'ninja'),
                             'ninja'))
 
     def test_do_build(self):
@@ -122,6 +122,6 @@ class NinjaTestCase(unittest.TestCase):
 + popd
 """.format(
             source_dir=self.workspace.source_dir('ninja'),
-            build_dir=self.workspace.build_dir(self.host.name, 'ninja'),
+            build_dir=self.workspace.build_dir('build', 'ninja'),
             expect_env=expect_env,
             python=sys.executable))
