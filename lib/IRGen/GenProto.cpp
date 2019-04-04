@@ -1528,19 +1528,8 @@ void WitnessTableBuilder::defineAssociatedTypeWitnessTableAccessFunction(
     }
   }
 
-  // If the associated type is opaque, use the runtime to fetch the conformance.
-  if (associatedRootOpaqueType) {
-    assert(associatedType == CanType(associatedRootOpaqueType)
-         && "associated type is nested type of opaque type?! not implemented");
-    auto wtable = emitOpaqueTypeWitnessTableRef(IGF,
-                        CanOpaqueTypeArchetypeType(associatedRootOpaqueType),
-                        associatedProtocol);
-    IGF.Builder.CreateRet(wtable);
-    return;
-  }
-  
   // If there are no archetypes, return a reference to the table.
-  if (!hasArchetype) {
+  if (!hasArchetype && !associatedRootOpaqueType) {
     auto wtable = conformanceI->getTable(IGF, &associatedTypeMetadata);
     IGF.Builder.CreateRet(wtable);
     return;
@@ -1577,6 +1566,17 @@ void WitnessTableBuilder::defineAssociatedTypeWitnessTableAccessFunction(
   IGF.bindLocalTypeDataFromTypeMetadata(ConcreteType, IsExact, self,
                                         MetadataState::Abstract);
 
+  // If the associated type is opaque, use the runtime to fetch the conformance.
+  if (associatedRootOpaqueType) {
+    assert(associatedType == CanType(associatedRootOpaqueType)
+           && "associated type is nested type of opaque type?! not implemented");
+    auto wtable = emitOpaqueTypeWitnessTableRef(IGF,
+                          CanOpaqueTypeArchetypeType(associatedRootOpaqueType),
+                          associatedProtocol);
+    IGF.Builder.CreateRet(wtable);
+    return;
+  }
+  
   // Find abstract conformances.
   // TODO: provide an API to find the best metadata path to the conformance
   // and decide whether it's expensive enough to be worth caching.
