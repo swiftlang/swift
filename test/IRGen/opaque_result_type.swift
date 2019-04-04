@@ -136,9 +136,32 @@ public func useFoo(x: String, y: C) {
 }
 
 // CHECK-LABEL: define {{.*}} @"$s18opaque_result_type3baz1zQrx_tAA1PRzAA1QRzlFQOyAA1CCQo_1BQaMa"
-// CHECK: call swiftcc i8** @swift_getOpaqueTypeConformance(i8* {{.*}}, %swift.type_descriptor*  {{.*}} [[DESCRIPTOR:@"\$s18opaque_result_type3baz1zQrx_tAA1PRzAA1QRzlFQOMQ"]] {{.*}}, i64 1)
-// CHECK: call swiftcc %swift.metadata_response @swift_getOpaqueTypeMetadata(i64 255, i8* {{.*}}, %swift.type_descriptor* {{.*}} [[DESCRIPTOR]] {{.*}})
+// CHECK: call swiftcc i8** @swift_getOpaqueTypeConformance(i8* {{.*}}, %swift.type_descriptor*  {{.*}} [[DESCRIPTOR:@"\$s18opaque_result_type3baz1zQrx_tAA1PRzAA1QRzlFQOMQ"]] {{.*}}, [[WORD:i32|i64]] 1)
+// CHECK: call swiftcc %swift.metadata_response @swift_getOpaqueTypeMetadata([[WORD]] 255, i8* {{.*}}, %swift.type_descriptor* {{.*}} [[DESCRIPTOR]] {{.*}})
 // CHECK: call swiftcc %swift.metadata_response @swift_getAssociatedTypeWitness
 
 // CHECK-LABEL: define {{.*}} @"$sSS18opaque_result_type1PAA1AAaBP_AA1OPWT"
-// CHECK: call swiftcc i8** @swift_getOpaqueTypeConformance(i8* {{.*}}, %swift.type_descriptor* {{.*}} [[DESCRIPTOR:@"\$sSS18opaque_result_typeE3pooQryFQOMQ"]] {{.*}}, i64 1)
+// CHECK: call swiftcc i8** @swift_getOpaqueTypeConformance(i8* {{.*}}, %swift.type_descriptor* {{.*}} [[DESCRIPTOR:@"\$sSS18opaque_result_typeE3pooQryFQOMQ"]] {{.*}}, [[WORD]] 1)
+
+// rdar://problem/49585457
+protocol R {
+  associatedtype A: R
+  func getA() -> A
+}
+
+struct Wrapper<T: R>: R {
+  var wrapped: T
+  
+  func getA() -> some R {
+    return wrapped.getA()
+  }
+}
+
+struct X<T: R, U: R>: R {
+  var t: T
+  var u: U
+
+  func getA() -> some R {
+    return Wrapper(wrapped: u)
+  }
+}
