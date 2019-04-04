@@ -79,7 +79,7 @@ protected:
 
 public:
   virtual ~DiagnosticConsumer();
-  
+
   /// Invoked whenever the frontend emits a diagnostic.
   ///
   /// \param SM The source manager associated with the source locations in
@@ -94,6 +94,14 @@ public:
   /// \param FormatArgs The diagnostic format string arguments.
   ///
   /// \param Info Extra information associated with the diagnostic.
+  ///
+  /// \param bufferIndirectlyCausingDiagnostic Only used when directing
+  /// diagnostics to different outputs.
+  /// In batch mode a diagnostic may be
+  /// located in a non-primary file, but there will be no .dia file for a
+  /// non-primary. If valid, this argument contains a location within a buffer
+  /// that corresponds to a primary input. The .dia file for that primary can be
+  /// used for the diagnostic, as if it had occurred at this location.
   virtual void
   handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
                    StringRef FormatString,
