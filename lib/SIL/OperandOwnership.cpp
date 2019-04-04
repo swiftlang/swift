@@ -841,6 +841,16 @@ OperandOwnershipKindClassifier::visitAssignInst(AssignInst *i) {
 }
 
 OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitAssignByDelegateInst(AssignByDelegateInst *i) {
+  if (getValue() != i->getSrc()) {
+    return Map::allLive();
+  }
+
+  return Map::compatibilityMap(ValueOwnershipKind::Owned,
+                               UseLifetimeConstraint::MustBeInvalidated);
+}
+
+OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitStoreInst(StoreInst *i) {
   if (getValue() != i->getSrc()) {
     return Map::allLive();

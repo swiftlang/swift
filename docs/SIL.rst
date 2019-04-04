@@ -2333,6 +2333,32 @@ with a sequence that also correctly destroys the current value.
 This instruction is only valid in Raw SIL and is rewritten as appropriate
 by the definitive initialization pass.
 
+assign_by_delegate
+``````````````````
+::
+
+  sil-instruction ::= 'assign_by_delegate' sil-operand 'to' sil-operand ',' 'init' sil-operand ',' 'set' sil-operand 
+
+  assign_by_delegate %0 : $S to %1 : $*T, init %2 : $F, set %3 : $G
+  // $S can be a value or address type
+  // $T must be the type of a property delegate.
+  // $F must be a function type, taking $S as a single argument and returning $T
+  // $G must be a function type, taking $S as a single argument and with not return value
+
+Similar to the ``assign`` instruction, but the assignment is done via a
+delegate.
+
+In case of an initialization, the function ``%2`` is called with ``%0`` as
+argument. The result is stored to ``%1``. In case ``%2`` is an address type,
+it is simply passed as a first out-argument to ``%2``.
+
+In case of a re-assignment, the function ``%3`` is called with ``%0`` as
+argument. As ``%3`` is a setter (e.g. for the property in the containing
+nominal type), the destination address ``%1`` is not used in this case.
+
+This instruction is only valid in Raw SIL and is rewritten as appropriate
+by the definitive initialization pass.
+
 mark_uninitialized
 ``````````````````
 ::
