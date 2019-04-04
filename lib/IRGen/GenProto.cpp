@@ -619,6 +619,12 @@ bindParameterSource(SILParameterInfo param, unsigned paramIndex,
       llvm::Value *metadata = getParameter(paramIndex);
       IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata,
                                             MetadataState::Complete);
+    } else if (metatype->getRepresentation() == MetatypeRepresentation::ObjC) {
+      paramType = metatype.getInstanceType();
+      llvm::Value *objcMetatype = getParameter(paramIndex);
+      auto *metadata = emitObjCMetadataRefForMetadata(IGF, objcMetatype);
+      IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata,
+                                            MetadataState::Complete);
     }
     return;
   }
