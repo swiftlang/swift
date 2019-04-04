@@ -696,6 +696,7 @@ FuncDecl *ASTContext::getPlusFunctionOnString() const {
       if (auto type = dyn_cast<DECL_CLASS>(result)) { \
         auto params = type->getGenericParams(); \
         if (NUM_GENERIC_PARAMS == (params == nullptr ? 0 : params->size())) { \
+          getImpl().NAME##Decl = type; \
           return type; \
         } \
       } \
