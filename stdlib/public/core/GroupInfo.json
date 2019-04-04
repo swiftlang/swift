@@ -158,7 +158,7 @@
   ],
   "Math": [
     "SetAlgebra.swift",
-    "MathFunctions.swift",
+    "BuiltinMath.swift",
     {
     "Integers": [
       "Integers.swift",
