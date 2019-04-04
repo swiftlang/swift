@@ -118,8 +118,9 @@ FileSpecificDiagnosticConsumer::subconsumerForLocation(SourceManager &SM,
   if (loc.isInvalid())
     return None;
 
-  // What if a there's a consumer for fixits but there is no fixits output path?
-  // Subconsumers will be empty in that case.
+  // What if a there's a FileSpecificDiagnosticConsumer but there are no
+  // subconsumers in it? (This situation obtains for the fix-its
+  // FileSpecificDiagnosticConsumer.) In such a case, bail out now.
   if (Subconsumers.empty())
     return None;
 
