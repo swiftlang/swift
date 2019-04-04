@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Accelerate
-
 //===----------------------------------------------------------------------===//
 //
 //  vImage_Error
@@ -21,6 +19,7 @@ import Accelerate
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 extension vImage {
     
+    /// Error codes returned by vImage operations.
     public enum Error: Int, Swift.Error {
         case noError                      =    0
         case roiLargerThanInputBuffer     =    -21766

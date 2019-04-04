@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Accelerate
-
 //===----------------------------------------------------------------------===//
 //
 //  vImage_CGImageFormat
@@ -22,6 +20,10 @@ import Accelerate
 extension vImage_CGImageFormat {
     
     /// Initializes an image format from a Core Graphics image.
+    ///
+    /// - Parameter cgImage: The image from which to derive the image format.
+    ///
+    /// - Returns: An initialized `vImage_CGImageFormat`.
     public init?(cgImage: CGImage) {
         guard
             let colorSpace = cgImage.colorSpace else {
@@ -39,6 +41,17 @@ extension vImage_CGImageFormat {
     }
     
     /// Initializes an image format.
+    ///
+    /// - Parameter bitsPerComponent: The number of bits needed to represent one
+    /// channel of data in one pixel.
+    /// - Parameter bitsPerPixel: The number of bits needed to represent one pixel.
+    /// - Parameter colorSpace: The color space for the format.
+    /// - Parameter bitmapInfo: The component information describing the color channels.
+    /// - Parameter renderingIntent: A rendering intent constant that specifies how
+    /// Core Graphics should handle colors that are not located within the gamut of the
+    /// destination color space of a graphics context.
+    ///
+    /// - Returns: An initialized `vImage_CGImageFormat`.
     public init?(bitsPerComponent: Int,
                  bitsPerPixel: Int,
                  colorSpace: CGColorSpace,
