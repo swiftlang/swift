@@ -91,12 +91,101 @@ static void lowerAssignInstruction(SILBuilderWithScope &b, AssignInst *inst) {
   inst->eraseFromParent();
 }
 
+static void lowerAssignByDelegateInstruction(SILBuilderWithScope &b,
+                                             AssignByDelegateInst *inst,
+                            SmallVectorImpl<BeginAccessInst *> &accessMarkers) {
+  LLVM_DEBUG(llvm::dbgs() << "  *** Lowering [isInit="
+             << unsigned(inst->getOwnershipQualifier())
+             << "]: " << *inst << "\n");
+
+  ++numAssignRewritten;
+
+  SILValue src = inst->getSrc();
+  SILValue dest = inst->getDest();
+  SILLocation loc = inst->getLoc();
+  SILArgumentConvention srcConvention(SILArgumentConvention::Indirect_Inout);
+
+  switch (inst->getOwnershipQualifier()) {
+    case AssignOwnershipQualifier::Init: {
+      SILValue initFn = inst->getInitializer();
+      CanSILFunctionType fTy = initFn->getType().castTo<SILFunctionType>();
+      SILFunctionConventions convention(fTy, inst->getModule());
+      if (convention.hasIndirectSILResults()) {
+        b.createApply(loc, initFn, { dest, src }, false);
+        srcConvention = convention.getSILArgumentConvention(1);
+      } else {
+        SILValue wrappedSrc = b.createApply(loc, initFn, { src }, false);
+        b.createTrivialStoreOr(loc, wrappedSrc, dest, StoreOwnershipQualifier::Init);
+        srcConvention = convention.getSILArgumentConvention(0);
+      }
+      // TODO: remove the unused setter function, which usually is a dead
+      // partial_apply.
+      break;
+    }
+    case AssignOwnershipQualifier::Unknown:
+    case AssignOwnershipQualifier::Reassign: {
+      SILValue setterFn = inst->getSetter();
+      CanSILFunctionType fTy = setterFn->getType().castTo<SILFunctionType>();
+      SILFunctionConventions convention(fTy, inst->getModule());
+      assert(!convention.hasIndirectSILResults());
+      srcConvention = convention.getSILArgumentConvention(0);
+      b.createApply(loc, setterFn, { src }, false);
+
+      // The destination address is not used. Remove it if it is a dead access
+      // marker. This is important, because also the setter function contains
+      // access marker. In case those markers are dynamic it would cause a
+      // nested access violation.
+      if (auto *BA = dyn_cast<BeginAccessInst>(dest))
+        accessMarkers.push_back(BA);
+      // TODO: remove the unused init function, which usually is a dead
+      // partial_apply.
+      break;
+    }
+    case AssignOwnershipQualifier::Reinit:
+      llvm_unreachable("wrong qualifier for assign_by_delegate");
+  }
+  switch (srcConvention) {
+    case SILArgumentConvention::Indirect_In_Guaranteed:
+      b.createDestroyAddr(loc, src);
+      break;
+    case SILArgumentConvention::Direct_Guaranteed:
+      b.createDestroyValue(loc, src);
+      break;
+    case SILArgumentConvention::Direct_Unowned:
+    case SILArgumentConvention::Indirect_In:
+    case SILArgumentConvention::Indirect_In_Constant:
+    case SILArgumentConvention::Direct_Owned:
+      break;
+    case SILArgumentConvention::Indirect_Inout:
+    case SILArgumentConvention::Indirect_InoutAliasable:
+    case SILArgumentConvention::Indirect_Out:
+    case SILArgumentConvention::Direct_Deallocating:
+      llvm_unreachable("wrong convention for setter/initializer src argument");
+  }
+  inst->eraseFromParent();
+}
+
+static void deleteDeadAccessMarker(BeginAccessInst *BA) {
+  for (Operand *Op : BA->getUses()) {
+    SILInstruction *User = Op->getUser();
+    if (!isa<EndAccessInst>(User))
+      return;
+  }
+  for (Operand *Op : BA->getUses()) {
+    Op->getUser()->eraseFromParent();
+  }
+  BA->eraseFromParent();
+}
+
 /// lowerRawSILOperations - There are a variety of raw-sil instructions like
 /// 'assign' that are only used by this pass.  Now that definite initialization
 /// checking is done, remove them.
 static bool lowerRawSILOperations(SILFunction &fn) {
   bool changed = false;
+
   for (auto &bb : fn) {
+    SmallVector<BeginAccessInst *, 8> accessMarkers;
+
     auto i = bb.begin(), e = bb.end();
     while (i != e) {
       SILInstruction *inst = &*i;
@@ -123,6 +212,13 @@ static bool lowerRawSILOperations(SILFunction &fn) {
         continue;
       }
 
+      if (auto *ai = dyn_cast<AssignByDelegateInst>(inst)) {
+        SILBuilderWithScope b(ai);
+        lowerAssignByDelegateInstruction(b, ai, accessMarkers);
+        changed = true;
+        continue;
+      }
+
       // mark_uninitialized just becomes a noop, resolving to its operand.
       if (auto *mui = dyn_cast<MarkUninitializedInst>(inst)) {
         mui->replaceAllUsesWith(mui->getOperand());
@@ -137,6 +233,9 @@ static bool lowerRawSILOperations(SILFunction &fn) {
         changed = true;
         continue;
       }
+    }
+    for (BeginAccessInst *BA : accessMarkers) {
+      deleteDeadAccessMarker(BA);
     }
   }
   return changed;
