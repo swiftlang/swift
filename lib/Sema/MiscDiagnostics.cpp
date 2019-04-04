@@ -2453,10 +2453,8 @@ public:
 
     // Make sure that we setup our case body variables.
     if (auto *caseStmt = dyn_cast<CaseStmt>(S)) {
-      if (auto caseBoundDecls = caseStmt->getCaseBodyVariables()) {
-        for (auto *vd : *caseBoundDecls) {
-          VarDecls[vd] |= 0;
-        }
+      for (auto *vd : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+        VarDecls[vd] |= 0;
       }
     }
 

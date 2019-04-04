@@ -1622,13 +1622,13 @@ public:
     if (S->hasUnknownAttr())
       OS << " @unknown";
 
-    if (auto caseBodyVars = S->getCaseBodyVariables()) {
+    if (S->hasCaseBodyVariables()) {
       OS << '\n';
       OS.indent(Indent + 2);
       PrintWithColorRAII(OS, ParenthesisColor) << '(';
       PrintWithColorRAII(OS, StmtColor) << "case_body_variables";
       OS << '\n';
-      for (auto *vd : *caseBodyVars) {
+      for (auto *vd : S->getCaseBodyVariables()) {
         OS.indent(2);
         // TODO: Printing a var decl does an Indent ... dump(vd) ... '\n'. We
         // should see if we can factor this dumping so that the caller of
