@@ -5490,6 +5490,30 @@ RValue SILGenFunction::emitApplyAllocatingInitializer(SILLocation loc,
   return result;
 }
 
+RValue SILGenFunction::emitApplyPropertyDelegateAllocator(SILLocation loc,
+                                                          SubstitutionMap subs,
+                                                          SILDeclRef ctorRef,
+                                                          Type delegateTy,
+                                                    CanAnyFunctionType funcTy) {
+  Callee callee = Callee::forDirect(*this, ctorRef, subs, loc);
+
+  MetatypeType *MTty = MetatypeType::get(delegateTy);
+  auto metatypeVal = B.createMetatype(loc, getLoweredType(MTty));
+  ManagedValue mtManagedVal = ManagedValue::forUnmanaged(metatypeVal);
+  RValue metatypeRVal(*this, loc, MTty->getCanonicalType(), mtManagedVal);
+
+  ArgumentSource ArgSrc(loc, std::move(metatypeRVal));
+  FormalEvaluationScope writebacks(*this);
+  CallEmission emission(*this, std::move(callee), std::move(writebacks));
+
+  AnyFunctionType::Param selfParam((Type(MTty)), Identifier(),
+                                   ParameterTypeFlags());
+  emission.addSelfParam(loc, std::move(ArgSrc), selfParam, funcTy.getResult());
+
+  RValue RV = emission.apply();
+  return RV;
+}
+
 /// Emit a literal that applies the various initializers.
 RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
   ConcreteDeclRef builtinInit;
