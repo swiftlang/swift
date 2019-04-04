@@ -63,50 +63,17 @@ extension vImageConverter {
     
     //===----------------------------------------------------------------------===//
     
-    /// Determines whether a converter is capable of operating in place, reporting any errors.
-    ///
-    /// - Parameter source: The source buffer.
-    /// - Parameter destination: The destination buffer.
-    /// - Parameter error: Overwritten with the error code if the operation failed.
-    /// - Parameter options: The options to use when performing this operation.
-    ///
-    /// - Returns: `true` if the conversion must operate out of place, `false`
-    /// if the operation will work in place, or `nil` if an error has occurred.
-    public func mustOperateOutOfPlace(source: vImage_Buffer,
-                                      destination: vImage_Buffer,
-                                      error: inout Int,
-                                      flags options: vImage.Options = .noFlags) -> Bool? {
-        
-        withUnsafePointer(to: source) { src in
-            withUnsafePointer(to: destination) { dest in
-                error = vImageConverter_MustOperateOutOfPlace(self,
-                                                              src,
-                                                              dest,
-                                                              vImage_Flags(options.rawValue))
-            }
-        }
-        
-        switch error {
-        case kvImageOutOfPlaceOperationRequired:
-            return true
-        case kvImageNoError:
-            return false
-        default:
-            return nil
-        }
-    }
-    
     /// Determines whether a converter is capable of operating in place.
     ///
     /// - Parameter source: The source buffer.
     /// - Parameter destination: The destination buffer.
     /// - Parameter options: The options to use when performing this operation.
     ///
-    /// - Returns: `true` if the conversion must operate out of place, `false`
-    /// if the operation will work in place, or `nil` if an error has occurred.
+    /// - Returns: `true` if the conversion must operate out of place or `false`
+    /// if the operation will work in place.
     public func mustOperateOutOfPlace(source: vImage_Buffer,
                                       destination: vImage_Buffer,
-                                      flags options: vImage.Options = .noFlags) -> Bool? {
+                                      flags options: vImage.Options = .noFlags) throws -> Bool {
         var error = kvImageNoError
         
         withUnsafePointer(to: source) { src in
@@ -124,30 +91,28 @@ extension vImageConverter {
         case kvImageNoError:
             return false
         default:
-            return nil
+            throw vImage.Error(vImageError: error)
         }
     }
-
+    
     //===----------------------------------------------------------------------===//
     //
-    //  MARK: CG -> CV
+    //  MARK: CG -> CG
     //
     //===----------------------------------------------------------------------===//
     
-    /// Creates a vImage converter to convert from one vImage Core Graphics image format to another,
-    /// reporting any errors.
+    /// Creates a vImage converter to convert from one vImage Core Graphics image format to another.
     ///
     /// - Parameter sourceFormat: A `vImage_CGImageFormat` structure describing the image format of the source image
     /// - Parameter destinationFormat: A `vImage_CGImageFormat` structure describing the image format of the destination image
-    /// - Parameter error: Overwritten with the error code if the operation failed.
     /// - Parameter options: The options to use when performing this operation.
     ///
     /// - Returns: a vImage converter to convert from one vImage Core Graphics image format to another.
     public static func make(sourceFormat: vImage_CGImageFormat,
                             destinationFormat: vImage_CGImageFormat,
-                            error: inout Int,
-                            flags options: vImage.Options = .noFlags) -> vImageConverter? {
+                            flags options: vImage.Options = .noFlags) throws -> vImageConverter {
         
+        var error = kvImageNoError
         var unmanagedConverter: Unmanaged<vImageConverter>?
         
         withUnsafePointer(to: destinationFormat) { dest in
@@ -161,34 +126,13 @@ extension vImageConverter {
             }
         }
         
-        return unmanagedConverter?.takeRetainedValue()
-    }
-    
-    /// Creates a vImage converter to convert from one vImage Core Graphics image format to another.
-    ///
-    /// - Parameter sourceFormat: A `vImage_CGImageFormat` structure describing the image format of the source image
-    /// - Parameter destinationFormat: A `vImage_CGImageFormat` structure describing the image format of the destination image
-    /// - Parameter options: The options to use when performing this operation.
-    ///
-    /// - Returns: a vImage converter to convert from one vImage Core Graphics image format to another.
-    public static func make(sourceFormat: vImage_CGImageFormat,
-                            destinationFormat: vImage_CGImageFormat,
-                            flags options: vImage.Options = .noFlags) -> vImageConverter? {
-        
-        var unmanagedConverter: Unmanaged<vImageConverter>?
-        
-        withUnsafePointer(to: destinationFormat) { dest in
-            withUnsafePointer(to: sourceFormat) { src in
-                unmanagedConverter = vImageConverter_CreateWithCGImageFormat(
-                    src,
-                    dest,
-                    nil,
-                    vImage_Flags(options.rawValue),
-                    nil)
-            }
+        if error != kvImageNoError {
+            throw vImage.Error(vImageError: error)
+        } else if unmanagedConverter == nil {
+            throw vImage.Error.internalError
         }
         
-        return unmanagedConverter?.takeRetainedValue()
+        return unmanagedConverter!.takeRetainedValue()
     }
     
     //===----------------------------------------------------------------------===//
@@ -196,34 +140,6 @@ extension vImageConverter {
     //  MARK: CG -> CV
     //
     //===----------------------------------------------------------------------===//
-    
-    /// Creates a vImage converter that converts a Core Graphics-formatted image to a Core Video-formatted image,
-    /// reporting any errors.
-    ///
-    /// - Parameter sourceFormat: A `vImage_CGImageFormat` structure describing the image format of the source image
-    /// - Parameter destinationFormat: A `vImageCVImageFormat` structure describing the image format of the destination image
-    /// - Parameter error: Overwritten with the error code if the operation failed.
-    /// - Parameter options: The options to use when performing this operation.
-    ///
-    /// - Returns: a vImage converter to convert a Core Graphics-formatted image to a Core Video-formatted image.
-    public static func make(sourceFormat: vImage_CGImageFormat,
-                            destinationFormat: vImageCVImageFormat,
-                            error: inout Int,
-                            flags options: vImage.Options = .noFlags) -> vImageConverter? {
-        
-        var unmanagedConverter: Unmanaged<vImageConverter>?
-        
-        withUnsafePointer(to: sourceFormat) { src in
-            unmanagedConverter = vImageConverter_CreateForCGToCVImageFormat(
-                src,
-                destinationFormat,
-                nil,
-                vImage_Flags(options.rawValue),
-                &error)
-        }
-        
-        return unmanagedConverter?.takeRetainedValue()
-    }
     
     /// Creates a vImage converter that converts a Core Graphics-formatted image to a Core Video-formatted image.
     ///
@@ -234,8 +150,9 @@ extension vImageConverter {
     /// - Returns: a vImage converter to convert a Core Graphics-formatted image to a Core Video-formatted image.
     public static func make(sourceFormat: vImage_CGImageFormat,
                             destinationFormat: vImageCVImageFormat,
-                            flags options: vImage.Options = .noFlags) -> vImageConverter? {
+                            flags options: vImage.Options = .noFlags) throws -> vImageConverter {
         
+        var error = kvImageNoError
         var unmanagedConverter: Unmanaged<vImageConverter>?
         
         withUnsafePointer(to: sourceFormat) { src in
@@ -244,10 +161,16 @@ extension vImageConverter {
                 destinationFormat,
                 nil,
                 vImage_Flags(options.rawValue),
-                nil)
+                &error)
         }
         
-        return unmanagedConverter?.takeRetainedValue()
+        if error != kvImageNoError {
+            throw vImage.Error(vImageError: error)
+        } else if unmanagedConverter == nil {
+            throw vImage.Error.internalError
+        }
+        
+        return unmanagedConverter!.takeRetainedValue()
     }
     
     //===----------------------------------------------------------------------===//
@@ -256,20 +179,18 @@ extension vImageConverter {
     //
     //===----------------------------------------------------------------------===//
     
-    /// Creates a vImage converter that converts a Core Video-formatted image to a Core Graphics-formatted image,
-    /// reporting any errors.
+    /// Creates a vImage converter that converts a Core Video-formatted image to a Core Graphics-formatted image.
     ///
     /// - Parameter sourceFormat: A `vImageCVImageFormat` structure describing the image format of the source image
     /// - Parameter destinationFormat: A `vImage_CGImageFormat` structure describing the image format of the destination image
-    /// - Parameter error: Overwritten with the error code if the operation failed.
     /// - Parameter options: The options to use when performing this operation.
     ///
     /// - Returns: a vImage converter to convert a Core Video-formatted image to a Core Graphics-formatted image.
     public static func make(sourceFormat: vImageCVImageFormat,
                             destinationFormat: vImage_CGImageFormat,
-                            error: inout Int,
-                            flags options: vImage.Options = .noFlags) -> vImageConverter? {
+                            flags options: vImage.Options = .noFlags) throws -> vImageConverter {
         
+        var error = kvImageInternalError
         var unmanagedConverter: Unmanaged<vImageConverter>?
         
         withUnsafePointer(to: destinationFormat) { dest in
@@ -281,32 +202,13 @@ extension vImageConverter {
                 &error)
         }
         
-        return unmanagedConverter?.takeRetainedValue()
-    }
-    
-    /// Creates a vImage converter that converts a Core Video-formatted image to a Core Graphics-formatted image.
-    ///
-    /// - Parameter sourceFormat: A `vImageCVImageFormat` structure describing the image format of the source image
-    /// - Parameter destinationFormat: A `vImage_CGImageFormat` structure describing the image format of the destination image
-    /// - Parameter options: The options to use when performing this operation.
-    ///
-    /// - Returns: a vImage converter to convert a Core Video-formatted image to a Core Graphics-formatted image.
-    public static func make(sourceFormat: vImageCVImageFormat,
-                            destinationFormat: vImage_CGImageFormat,
-                            flags options: vImage.Options = .noFlags) -> vImageConverter? {
-        
-        var unmanagedConverter: Unmanaged<vImageConverter>?
-        
-        withUnsafePointer(to: destinationFormat) { dest in
-            unmanagedConverter = vImageConverter_CreateForCVToCGImageFormat(
-                sourceFormat,
-                dest,
-                nil,
-                vImage_Flags(options.rawValue),
-                nil)
+        if error != kvImageNoError {
+            throw vImage.Error(vImageError: error)
+        } else if unmanagedConverter == nil {
+            throw vImage.Error.internalError
         }
         
-        return unmanagedConverter?.takeRetainedValue()
+        return unmanagedConverter!.takeRetainedValue()
     }
     
     //===----------------------------------------------------------------------===//
@@ -318,10 +220,9 @@ extension vImageConverter {
     /// - Parameter options: The options to use when performing this operation.
     ///
     /// - Returns: `kvImageNoError`; otherwise, one of the error codes described in _Data Types and Constants.
-    @discardableResult
     public func convert(source: vImage_Buffer,
                         destination: inout vImage_Buffer,
-                        flags options: vImage.Options = .noFlags) -> vImage_Error {
+                        flags options: vImage.Options = .noFlags) throws {
         
         var error = kvImageNoError
         
@@ -333,7 +234,9 @@ extension vImageConverter {
                                            vImage_Flags(options.rawValue))
         }
         
-        return error
+        if error != kvImageNoError {
+            throw vImage.Error(vImageError: error)
+        }
     }
 }
 

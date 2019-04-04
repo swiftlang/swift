@@ -36,13 +36,13 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                                                 colorSpace: colorSpace,
                                                 alphaIsOpaqueHint: false)!
         
-        let coreVideoToCoreGraphics = vImageConverter.make(sourceFormat: cvFormat,
-                                                           destinationFormat: cgFormat,
-                                                           flags: .printDiagnosticsToConsole)
+        let coreVideoToCoreGraphics = try! vImageConverter.make(sourceFormat: cvFormat,
+                                                                destinationFormat: cgFormat,
+                                                                flags: .printDiagnosticsToConsole)
         
-        let coreGraphicsToCoreVideo = vImageConverter.make(sourceFormat: cgFormat,
-                                                           destinationFormat: cvFormat,
-                                                           flags: .printDiagnosticsToConsole)
+        let coreGraphicsToCoreVideo = try! vImageConverter.make(sourceFormat: cgFormat,
+                                                                destinationFormat: cvFormat,
+                                                                flags: .printDiagnosticsToConsole)
         
         let pixels: [UInt8] = (0 ..< width * height * 4).map { _ in
             return UInt8.random(in: 0 ..< 255)
@@ -52,26 +52,26 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                                       width: width,
                                       height: height)!
         
-        let sourceCGBuffer = vImage_Buffer(cgImage: image)!
-        var intermediateCVBuffer = vImage_Buffer(width: widthi, height: heighti, bitsPerPixel: 32)!
-        var destinationCGBuffer = vImage_Buffer(width: widthi, height: heighti, bitsPerPixel: 32)!
+        let sourceCGBuffer = try! vImage_Buffer(cgImage: image)
+        var intermediateCVBuffer = try! vImage_Buffer(width: widthi, height: heighti, bitsPerPixel: 32)
+        var destinationCGBuffer = try! vImage_Buffer(width: widthi, height: heighti, bitsPerPixel: 32)
         
-        coreGraphicsToCoreVideo?.convert(source: sourceCGBuffer,
-                                         destination: &intermediateCVBuffer)
+        try! coreGraphicsToCoreVideo.convert(source: sourceCGBuffer,
+                                             destination: &intermediateCVBuffer)
         
-        coreVideoToCoreGraphics?.convert(source: intermediateCVBuffer,
-                                         destination: &destinationCGBuffer)
+        try! coreVideoToCoreGraphics.convert(source: intermediateCVBuffer,
+                                             destination: &destinationCGBuffer)
         
         let destinationPixels: [UInt8] = arrayFromBuffer(buffer: destinationCGBuffer,
                                                          count: pixels.count)
         
         expectEqual(destinationPixels, pixels)
         
-        expectEqual(coreVideoToCoreGraphics?.destinationBuffers(colorSpace: colorSpace),
-                    coreGraphicsToCoreVideo?.sourceBuffers(colorSpace: colorSpace))
+        expectEqual(coreVideoToCoreGraphics.destinationBuffers(colorSpace: colorSpace),
+                    coreGraphicsToCoreVideo.sourceBuffers(colorSpace: colorSpace))
         
-        expectEqual(coreVideoToCoreGraphics?.sourceBuffers(colorSpace: colorSpace),
-                    coreGraphicsToCoreVideo?.destinationBuffers(colorSpace: colorSpace))
+        expectEqual(coreVideoToCoreGraphics.sourceBuffers(colorSpace: colorSpace),
+                    coreGraphicsToCoreVideo.destinationBuffers(colorSpace: colorSpace))
     }
     
     Accelerate_vImageTests.test("vImage/BufferOrder") {
@@ -87,11 +87,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                                                      bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
                                                      renderingIntent: .defaultIntent)!
         
-        let converter = vImageConverter.make(sourceFormat: sourceFormat,
-                                             destinationFormat: destinationFormat)
+        let converter = try! vImageConverter.make(sourceFormat: sourceFormat,
+                                                  destinationFormat: destinationFormat)
         
-        let sBuffers = converter?.sourceBuffers(colorSpace: sourceFormat.colorSpace.takeRetainedValue())
-        let dBuffers = converter?.destinationBuffers(colorSpace: destinationFormat.colorSpace.takeRetainedValue())
+        let sBuffers = converter.sourceBuffers(colorSpace: sourceFormat.colorSpace.takeRetainedValue())
+        let dBuffers = converter.destinationBuffers(colorSpace: destinationFormat.colorSpace.takeRetainedValue())
         
         expectEqual(sBuffers, [.coreGraphics])
         expectEqual(dBuffers, [.coreGraphics])
@@ -106,12 +106,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                                           bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
                                           renderingIntent: .defaultIntent)!
         
-        _ = vImageConverter.make(sourceFormat: format,
-                                 destinationFormat: format,
-                                 error: &error,
-                                 flags: .imageExtend)
-        
-        expectEqual(error, kvImageUnknownFlagsBit)
+        expectCrashLater()
+        _ = try! vImageConverter.make(sourceFormat: format,
+                                      destinationFormat: format,
+                                      flags: .imageExtend)
     }
     
     Accelerate_vImageTests.test("vImage/AnyToAny") {
@@ -131,25 +129,25 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                                                      bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
                                                      renderingIntent: .defaultIntent)!
         
-        let sourceBuffer = vImage_Buffer(cgImage: image)!
-        var destinationBuffer = vImage_Buffer(width: widthi, height: heighti,
-                                              bitsPerPixel: 32)!
+        let sourceBuffer = try! vImage_Buffer(cgImage: image)
+        var destinationBuffer = try! vImage_Buffer(width: widthi, height: heighti,
+                                                   bitsPerPixel: 32)
         
         // New API
         
-        let converter = vImageConverter.make(sourceFormat: sourceFormat,
-                                             destinationFormat: destinationFormat)
+        let converter = try! vImageConverter.make(sourceFormat: sourceFormat,
+                                                  destinationFormat: destinationFormat)
         
-        converter?.convert(source: sourceBuffer,
-                           destination: &destinationBuffer)
+        try! converter.convert(source: sourceBuffer,
+                               destination: &destinationBuffer)
         
-        let mustOperateOutOfPlace = converter!.mustOperateOutOfPlace(source: sourceBuffer,
-                                                                     destination: destinationBuffer)
+        let mustOperateOutOfPlace = try! converter.mustOperateOutOfPlace(source: sourceBuffer,
+                                                                         destination: destinationBuffer)
         
         // Legacy API
         
-        var legacyDestinationBuffer = vImage_Buffer(width: widthi, height: heighti,
-                                                    bitsPerPixel: 32)!
+        var legacyDestinationBuffer = try! vImage_Buffer(width: widthi, height: heighti,
+                                                         bitsPerPixel: 32)
         
         var legacyConverter: vImageConverter?
         
@@ -192,8 +190,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         
         expectTrue(legacyDestinationPixels.elementsEqual(destinationPixels))
         
-        expectEqual(converter?.sourceBufferCount, 1)
-        expectEqual(converter?.destinationBufferCount, 1)
+        expectEqual(converter.sourceBufferCount, 1)
+        expectEqual(converter.destinationBufferCount, 1)
         expectEqual(legacyMustOperateOutOfPlace, mustOperateOutOfPlace)
         
         sourceBuffer.free()
@@ -208,26 +206,16 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     //===----------------------------------------------------------------------===//
     
     Accelerate_vImageTests.test("vImage/IllegalSize") {
-        var error = kvImageNoError
-        
-        let buffer = vImage_Buffer(width: -1, height: -1,
-                                   bitsPerPixel: 32,
-                                   error: &error)
-        
-        expectEqual(error, kvImageInvalidParameter)
-        expectTrue(buffer == nil)
+        expectCrashLater()
+        let buffer = try! vImage_Buffer(width: -1, height: -1,
+                                        bitsPerPixel: 32)
     }
     
     Accelerate_vImageTests.test("vImage/IllegalSize") {
-        var error = kvImageNoError
-        
-        let buffer = vImage_Buffer(width: 99999999, height: 99999999,
-                                   bitsPerPixel: 99999999,
-                                   error: &error,
-                                   flags: .noFlags)
-        
-        expectEqual(error, kvImageMemoryAllocationError)
-        expectTrue(buffer == nil)
+        expectCrashLater()
+        let buffer = try! vImage_Buffer(width: 99999999, height: 99999999,
+                                        bitsPerPixel: 99999999,
+                                        flags: .noFlags)
     }
     
     Accelerate_vImageTests.test("vImage/InitWithInvalidImageFormat") {
@@ -246,14 +234,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         
         var error = kvImageNoError
         
-        let buffer = vImage_Buffer(cgImage: image,
-                                   format: format,
-                                   error: &error)
-        
-        expectEqual(error, kvImageInvalidImageFormat)
-        expectTrue(buffer == nil)
-        
-        buffer?.free()
+        expectCrashLater()
+        let buffer = try! vImage_Buffer(cgImage: image,
+                                        format: format)
     }
     
     Accelerate_vImageTests.test("vImage/CreateCGImage") {
@@ -265,11 +248,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                                       width: width,
                                       height: height)!
         
-        let buffer = vImage_Buffer(cgImage: image)!
+        let buffer = try! vImage_Buffer(cgImage: image)
         
         let format = vImage_CGImageFormat(cgImage: image)!
         
-        let bufferImage = buffer.createCGImage(format: format)!
+        let bufferImage = try! buffer.createCGImage(format: format)
         
         let imagePixels = imageToPixels(image: image)
         let bufferImagePixels = imageToPixels(image: bufferImage)
@@ -288,12 +271,12 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                                       width: width,
                                       height: height)!
         
-        let source = vImage_Buffer(cgImage: image)!
+        let source = try! vImage_Buffer(cgImage: image)
         
-        var destination = vImage_Buffer(width: widthi, height: heighti,
-                                        bitsPerPixel: 32)!
+        var destination = try! vImage_Buffer(width: widthi, height: heighti,
+                                             bitsPerPixel: 32)
         
-        _ = source.copy(destinationBuffer: &destination)
+        _ = try! source.copy(destinationBuffer: &destination)
         
         let sourcePixels: [UInt8] = arrayFromBuffer(buffer: source,
                                                     count: pixels.count)
@@ -317,8 +300,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         
         let format = vImage_CGImageFormat(cgImage: image)!
         
-        let buffer = vImage_Buffer(cgImage: image,
-                                   format:  format)!
+        let buffer = try! vImage_Buffer(cgImage: image,
+                                        format:  format)
         
         let bufferPixels: [UInt8] = arrayFromBuffer(buffer: buffer,
                                                     count: pixels.count)
@@ -334,9 +317,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     Accelerate_vImageTests.test("vImage/Alignment") {
         // New API
         
-        var alignment = vImage_Buffer.preferredAlignmentAndRowBytes(width: widthi,
-                                                                    height: heighti,
-                                                                    bitsPerPixel: 32)!
+        var alignment = try! vImage_Buffer.preferredAlignmentAndRowBytes(width: widthi,
+                                                                         height: heighti,
+                                                                         bitsPerPixel: 32)
         
         // Legacy API
         
@@ -363,7 +346,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         
         // New API
         
-        let buffer = vImage_Buffer(cgImage: image)!
+        let buffer = try! vImage_Buffer(cgImage: image)
         
         // Legacy API
         
@@ -490,9 +473,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     Accelerate_vImageTests.test("vImage/CGImageFormatIllegalValues") {
         
         let formatOne = vImage_CGImageFormat(bitsPerComponent: -1,
-                                          bitsPerPixel: 32,
-                                          colorSpace: CGColorSpaceCreateDeviceRGB(),
-                                          bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedFirst.rawValue))
+                                             bitsPerPixel: 32,
+                                             colorSpace: CGColorSpaceCreateDeviceRGB(),
+                                             bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedFirst.rawValue))
         
         let formatTwo = vImage_CGImageFormat(bitsPerComponent: 8,
                                              bitsPerPixel: -1,
@@ -546,7 +529,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(format == legacyFormat)
         expectTrue(format.componentCount == 4)
     }
-
+    
     //===----------------------------------------------------------------------===//
     //
     //  MARK: Helper Functions

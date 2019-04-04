@@ -20,61 +20,32 @@ import Accelerate
 
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 extension vImage {
-    /// Returns the description of a vImage error code.
-    public static func errorDescription(_ error: vImage_Error) -> String {
-        switch error {
-        case kvImageNoError:
-            return "No Error."
-        case kvImageRoiLargerThanInputBuffer:
-            return "Roi Larger Than Input Buffer"
-        case kvImageInvalidKernelSize:
-            return "Invalid Kernel Size"
-        case kvImageInvalidEdgeStyle:
-            return "Invalid Edge Style"
-        case kvImageInvalidOffset_X:
-            return "Invalid Offset X"
-        case kvImageInvalidOffset_Y:
-            return "Invalid Offset Y"
-        case kvImageMemoryAllocationError:
-            return "Memory Allocation Error"
-        case kvImageNullPointerArgument:
-            return "Null Pointer Argument"
-        case kvImageInvalidParameter:
-            return "Invalid Parameter"
-        case kvImageBufferSizeMismatch:
-            return "Buffer Size Mismatch"
-        case kvImageUnknownFlagsBit:
-            return "Unknown Flags Bit"
-        case kvImageInternalError:
-            return "Internal Error"
-        case kvImageInvalidRowBytes:
-            return "Invalid Row Bytes"
-        case kvImageInvalidImageFormat:
-            return "Invalid Image Format"
-        case kvImageColorSyncIsAbsent:
-            return "Color Sync Is Absent"
-        case kvImageOutOfPlaceOperationRequired:
-            return "Out Of Place Operation Required"
-        case kvImageInvalidImageObject:
-            return "Invalid Image Object"
-        case kvImageInvalidCVImageFormat:
-            return "Invalid CVImage Format"
-        case kvImageUnsupportedConversion:
-            return "Unsupported Conversion"
-        case kvImageCoreVideoIsAbsent:
-            return "CoreVideo Is Absent"
-        case kvImageCVImageFormat_ConversionMatrix:
-            return "CVImageFormat Conversion Matrix"
-        case kvImageCVImageFormat_ChromaSiting:
-            return "CVImageFormat Chroma Siting"
-        case kvImageCVImageFormat_ColorSpace:
-            return "CVImageFormat Color Space"
-        case kvImageCVImageFormat_VideoChannelDescription:
-            return "CVImageFormat Video Channel Description"
-        case kvImageCVImageFormat_AlphaIsOneHint:
-            return "CVImageFormat Alpha Is One Hint"
-        default:
-            return "Unknown error."
+    
+    public enum Error: Int, Swift.Error {
+        case noError                      =    0
+        case roiLargerThanInputBuffer     =    -21766
+        case invalidKernelSize            =    -21767
+        case invalidEdgeStyle             =    -21768
+        case invalidOffset_X              =    -21769
+        case invalidOffset_Y              =    -21770
+        case memoryAllocationError        =    -21771
+        case nullPointerArgument          =    -21772
+        case invalidParameter             =    -21773
+        case bufferSizeMismatch           =    -21774
+        case unknownFlagsBit              =    -21775
+        case internalError                =    -21776
+        case invalidRowBytes              =    -21777
+        case invalidImageFormat           =    -21778
+        case colorSyncIsAbsent            =    -21779
+        case outOfPlaceOperationRequired  =    -21780
+        case invalidImageObject           =    -21781
+        case invalidCVImageFormat         =    -21782
+        case unsupportedConversion        =    -21783
+        case coreVideoIsAbsent            =    -21784
+        
+        public init(vImageError: vImage_Error) {
+            self = Error(rawValue: vImageError) ?? .internalError
         }
     }
+    
 }

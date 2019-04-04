@@ -40,15 +40,14 @@ extension vImage_Buffer {
     /// - Parameter width: The width of the buffer.
     /// - Parameter height: The height of the buffer.
     /// - Parameter bitsPerPixel: The number of bits in a pixel of image data.
-    /// - Parameter alignment: The preferred alignment is written to this parameter.
     ///
-    /// - Returns: An initialized vImage buffer.
+    /// - Returns: The preferred alignment and row bytes.
     public static func preferredAlignmentAndRowBytes(width: Int,
                                                      height: Int,
-                                                     bitsPerPixel: UInt32) -> (alignment: Int, rowBytes: Int)? {
+                                                     bitsPerPixel: UInt32) throws -> (alignment: Int, rowBytes: Int) {
         
         if width < 0 || height < 0 {
-            return nil
+            throw vImage.Error.invalidParameter
         }
         
         var buffer = vImage_Buffer()
@@ -60,51 +59,18 @@ extension vImage_Buffer {
                                       vImage_Flags(kvImageNoAllocate))
         
         if error < kvImageNoError {
-            return nil
+            throw vImage.Error(vImageError: error)
         } else {
             return(alignment: error,
                    rowBytes: buffer.rowBytes)
         }
     }
-
+    
     //===----------------------------------------------------------------------===//
     //
     //  Initializers.
     //
     //===----------------------------------------------------------------------===//
-
-    /// Initializes a vImage buffer of a specified size, reporting any errors.
-    ///
-    /// - Parameter width: The width of the buffer.
-    /// - Parameter height: The height of the buffer.
-    /// - Parameter bitsPerPixel: The number of bits in a pixel of image data.
-    /// - Parameter error: Overwritten with the error code if the operation failed.
-    /// - Parameter options: The options to use when performing this operation.
-    ///
-    /// - Returns: An initialized vImage buffer.
-    public init?(width: Int,
-                 height: Int,
-                 bitsPerPixel: UInt32,
-                 error: inout Int,
-                 flags options: vImage.Options = .noFlags) {
-        
-        if width < 0 || height < 0 {
-            error = kvImageInvalidParameter
-            return nil
-        }
-        
-        self.init()
-      
-        error = vImageBuffer_Init(&self,
-                                  vImagePixelCount(height),
-                                  vImagePixelCount(width),
-                                  bitsPerPixel,
-                                  options.flags)
-        
-        if error < kvImageNoError {
-            return nil
-        }
-    }
     
     /// Initializes a vImage buffer of a specified size.
     ///
@@ -114,17 +80,17 @@ extension vImage_Buffer {
     /// - Parameter options: The options to use when performing this operation.
     ///
     /// - Returns: An initialized vImage buffer.
-    public init?(width: Int,
-                 height: Int,
-                 bitsPerPixel: UInt32,
-                 flags options: vImage.Options = .noFlags) {
+    public init(width: Int,
+                height: Int,
+                bitsPerPixel: UInt32,
+                flags options: vImage.Options = .noFlags) throws {
         
         if width < 0 || height < 0 {
-            return nil
+            throw vImage.Error.invalidParameter
         }
         
         self.init()
-  
+        
         let error = vImageBuffer_Init(&self,
                                       vImagePixelCount(height),
                                       vImagePixelCount(width),
@@ -132,7 +98,7 @@ extension vImage_Buffer {
                                       options.flags)
         
         if error < kvImageNoError {
-            return nil
+            throw vImage.Error(vImageError: error)
         }
     }
     
@@ -146,37 +112,6 @@ extension vImage_Buffer {
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 extension vImage_Buffer {
     
-    /// Initialize a vImage buffer with the contents of a Core Graphics image, reporting any errors.
-    ///
-    /// - Parameter cgImage: A `CGImage` instance to be used as the source.
-    /// - Parameter error: Overwritten with the error code if the operation failed.
-    /// - Parameter options: The options to use when performing this operation.
-    ///
-    /// - Returns: An initialized vImage buffer.
-    ///
-    /// This function will instantiate and initialize a vImage buffer from a `CGImage` using a `CGImageFormat`
-    /// based on the provided image's properties.
-    public init?(cgImage: CGImage,
-                 error: inout Int,
-                 flags options: vImage.Options = .noFlags) {
-        
-        self.init()
-        
-        guard var format = vImage_CGImageFormat(cgImage: cgImage) else {
-            return nil
-        }
-        
-        error = vImageBuffer_InitWithCGImage(&self,
-                                             &format,
-                                             nil,
-                                             cgImage,
-                                             options.flags)
-        
-        if error != kvImageNoError {
-            return nil
-        }
-    }
-    
     /// Initialize a vImage buffer with the contents of a Core Graphics image.
     ///
     /// - Parameter cgImage: A `CGImage` instance to be used as the source.
@@ -185,13 +120,13 @@ extension vImage_Buffer {
     /// - Returns: An initialized vImage buffer.
     ///
     /// This function will instantiate and initialize a vImage buffer from a `CGImage` using a `CGImageFormat` based on the provided image's properties.
-    public init?(cgImage: CGImage,
-                 flags options: vImage.Options = .noFlags) {
+    public init(cgImage: CGImage,
+                flags options: vImage.Options = .noFlags) throws {
         
         self.init()
         
         guard var format = vImage_CGImageFormat(cgImage: cgImage) else {
-            return nil
+            throw vImage.Error.invalidImageFormat
         }
         
         let error = vImageBuffer_InitWithCGImage(&self,
@@ -201,41 +136,11 @@ extension vImage_Buffer {
                                                  options.flags)
         
         if error != kvImageNoError {
-            return nil
+            throw vImage.Error(vImageError: error)
         }
     }
     
     //===----------------------------------------------------------------------===//
-    
-    /// Initialize a vImage buffer with the contents of a Core Graphics image,
-    /// using a supplied format and reporting any errors.
-    ///
-    /// - Parameter cgImage: A `CGImage` instance to be used as the source.
-    /// - Parameter format: A `vImage_CGImageFormat` that describes the source image.
-    /// - Parameter error: Overwritten with the error code if the operation failed.
-    /// - Parameter options: The options to use when performing this operation.
-    ///
-    /// - Returns: An initialized vImage buffer.
-    ///
-    /// This function will instantiate and initialize a vImage buffer from a `CGImage` using a provided `CGImageFormat`.
-    public init?(cgImage: CGImage,
-                 format: vImage_CGImageFormat,
-                 error: inout Int,
-                 flags options: vImage.Options = .noFlags) {
-        
-        self.init()
-        
-        var format = format
-        error = vImageBuffer_InitWithCGImage(&self,
-                                             &format,
-                                             nil,
-                                             cgImage,
-                                             options.flags)
-        
-        if error != kvImageNoError {
-            return nil
-        }
-    }
     
     /// Initialize a vImage buffer with the contents of a Core Graphics image,
     /// using a supplied format.
@@ -247,9 +152,9 @@ extension vImage_Buffer {
     /// - Returns: An initialized vImage buffer.
     ///
     /// This function will instantiate and initialize a vImage buffer from a `CGImage` using a provided `CGImageFormat`.
-    public init?(cgImage: CGImage,
-                 format: vImage_CGImageFormat,
-                 flags options: vImage.Options = .noFlags) {
+    public init(cgImage: CGImage,
+                format: vImage_CGImageFormat,
+                flags options: vImage.Options = .noFlags) throws {
         
         self.init()
         
@@ -261,42 +166,11 @@ extension vImage_Buffer {
                                                  options.flags)
         
         if error != kvImageNoError {
-            return nil
+            throw vImage.Error(vImageError: error)
         }
     }
     
     //===----------------------------------------------------------------------===//
-    
-    /// Creates a `CGImage` instance from a vImage buffer, reporting any errors.
-    ///
-    /// - Parameter format: The image format of this vImage buffer.
-    /// - Parameter error: Overwritten with the error code if the operation failed.
-    /// - Parameter options: The options to use when performing this operation.
-    ///
-    /// - Returns: A Core Graphics image containing a representation of the vImage buffer.
-    public func createCGImage(format: vImage_CGImageFormat,
-                              error: inout Int,
-                              flags options: vImage.Options = .noFlags) -> CGImage? {
-        var format = format
-        
-        var cgImage: CGImage!
-        
-        withUnsafePointer(to: self) {
-            cgImage = vImageCreateCGImageFromBuffer(
-                $0,
-                &format,
-                nil,
-                nil,
-                options.flags,
-                &error).takeRetainedValue()
-        }
-        
-        if error != kvImageNoError {
-            return nil
-        }
-        
-        return cgImage
-    }
     
     /// Creates a `CGImage` instance from a vImage buffer
     ///
@@ -305,11 +179,11 @@ extension vImage_Buffer {
     ///
     /// - Returns: A Core Graphics image containing a representation of the vImage buffer.
     public func createCGImage(format: vImage_CGImageFormat,
-                              flags options: vImage.Options = .noFlags) -> CGImage? {
+                              flags options: vImage.Options = .noFlags) throws -> CGImage {
         var format = format
         var error = kvImageNoError
         
-        var cgImage: CGImage!
+        var cgImage: CGImage?
         
         withUnsafePointer(to: self) {
             cgImage = vImageCreateCGImageFromBuffer(
@@ -322,10 +196,12 @@ extension vImage_Buffer {
         }
         
         if error != kvImageNoError {
-            return nil
+            throw vImage.Error(vImageError: error)
+        } else if cgImage == nil {
+            throw vImage.Error.internalError
         }
         
-        return cgImage
+        return cgImage!
     }
     
     //===----------------------------------------------------------------------===//
@@ -338,10 +214,10 @@ extension vImage_Buffer {
     /// - Returns: `kvImageNoError`; otherwise, one of the error codes described
     ///             in Data Types and Constants.
     public func copy(destinationBuffer: inout vImage_Buffer,
-                     flags options: vImage.Options = .noFlags) -> vImage_Error? {
+                     flags options: vImage.Options = .noFlags) throws {
         
         if Int(width) == 0 {
-            return kvImageInvalidParameter
+            throw vImage.Error(vImageError: kvImageInvalidParameter)
         }
         
         var error = kvImageNoError
@@ -353,7 +229,9 @@ extension vImage_Buffer {
                                       options.flags)
         }
         
-        return error
+        if error != kvImageNoError {
+            throw vImage.Error(vImageError: error)
+        }
     }
     
 }

@@ -65,7 +65,7 @@ extension vImageCVImageFormat {
                                                          newValue ? 2 : 0)
             
             if error != kvImageNoError {
-                fatalError(vImage.errorDescription(error))
+                fatalError("Unable to set `alphaIsOpaqueHint`")
             }
         }
     }
@@ -109,7 +109,7 @@ extension vImageCVImageFormat {
                                                             newValue?.cfString)
             
             if error != kvImageNoError {
-                fatalError(vImage.errorDescription(error))
+                fatalError("Unable to set `chromaSiting`")
             }
         }
     }
@@ -124,7 +124,7 @@ extension vImageCVImageFormat {
                                                           newValue)
             
             if error != kvImageNoError {
-                fatalError(vImage.errorDescription(error))
+                fatalError("Unable to set `colorSpace`")
             }
         }
     }
