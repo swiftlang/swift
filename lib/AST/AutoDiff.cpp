@@ -356,69 +356,145 @@ NominalTypeDecl *VectorSpace::getNominal() const {
   return getVector()->getNominalOrBoundGenericNominal();
 }
 
-AutoDiffIndexSubset *
-AutoDiffIndexSubset::get(ASTContext &ctx, unsigned capacity, bool includeAll) {
-  auto *buf = reinterpret_cast<AutoDiffIndexSubset *>(
-      ctx.Allocate(sizeof(AutoDiffIndexSubset), alignof(AutoDiffIndexSubset)));
-  return new (buf) AutoDiffIndexSubset(SmallBitVector(capacity, includeAll));
+std::pair<unsigned, unsigned>
+AutoDiffIndexSubset::getBitWordIndexAndOffset(unsigned index) {
+  auto bitWordIndex = (index + 1) / sizeof(BitWord);
+  auto bitWordOffset = index - bitWordIndex * sizeof(BitWord);
+  return {bitWordIndex, bitWordOffset};
+}
+
+unsigned
+AutoDiffIndexSubset::getNumBitWordsNeededForCapacity(unsigned capacity) {
+  auto numBitWords = capacity / sizeof(BitWord);
+  if (capacity % sizeof(BitWord))
+    numBitWords += 1;
+  return numBitWords;
+}
+
+AutoDiffIndexSubset::AutoDiffIndexSubset(unsigned capacity,
+                                         unsigned numBitWords,
+                                         ArrayRef<unsigned> indices)
+    : capacity(capacity), numBitWords(numBitWords) {
+  std::uninitialized_fill_n(getBitWordsData(), numBitWords, 0);
+  for (auto i : indices) {
+    unsigned bitWordIndex, offset;
+    std::tie(bitWordIndex, offset) = getBitWordIndexAndOffset(i);
+    getBitWord(bitWordIndex) |= (1 << offset);
+  }
 }
 
 AutoDiffIndexSubset *
-AutoDiffIndexSubset::get(ASTContext &ctx, const SmallBitVector &rawIndices) {
-  auto *buf = reinterpret_cast<AutoDiffIndexSubset *>(
-      ctx.Allocate(sizeof(AutoDiffIndexSubset), alignof(AutoDiffIndexSubset)));
-  return new (buf) AutoDiffIndexSubset(std::move(rawIndices));
+AutoDiffIndexSubset::get(ASTContext &ctx, unsigned capacity, bool includeAll) {
+  return get(ctx, capacity,
+             SmallVector<unsigned, 8>(capacity, (unsigned)includeAll));
 }
 
 AutoDiffIndexSubset *AutoDiffIndexSubset::get(ASTContext &ctx,
                                               unsigned capacity,
                                               IntRange<> range) {
-  auto *subset = get(ctx, capacity);
-  subset->rawIndices.set(range.front(), range.back());
-  return subset;
+  return get(ctx, capacity,
+             SmallVector<unsigned, 8>(range.begin(), range.end()));
 }
 
-AutoDiffIndexSubset *AutoDiffIndexSubset::get(ASTContext &ctx,
-                                              unsigned capacity,
-                                              ArrayRef<unsigned> indices) {
-  auto *subset = get(ctx, capacity);
-  for (auto i : indices) {
-    assert(i < capacity && "Index must be smaller than capacity");
-    subset->rawIndices.set(i);
-  }
-  return subset;
+void AutoDiffIndexSubset::Profile(llvm::FoldingSetNodeID &id) const {
+  id.AddInteger(capacity);
+  for (auto index : getIndices())
+    id.AddInteger(index);
+}
+
+AutoDiffIndexSubset::iterator AutoDiffIndexSubset::begin() const {
+  return iterator(this);
+}
+
+AutoDiffIndexSubset::iterator AutoDiffIndexSubset::end() const {
+  return iterator(this, findLast() + 1);
+}
+
+iterator_range<AutoDiffIndexSubset::iterator>
+AutoDiffIndexSubset::getIndices() const {
+  return make_range(begin(), end());
+}
+
+unsigned AutoDiffIndexSubset::getNumIndices() const {
+  return accumulate(getIndices(), (unsigned)0,
+                    [](unsigned total, BitWord bitWord) {
+                      return total + llvm::countPopulation(bitWord);
+                    });
 }
 
 bool AutoDiffIndexSubset::equals(const AutoDiffIndexSubset *other) const {
-  return rawIndices == other->rawIndices;
+  return capacity == other->getCapacity() &&
+      getBitWords().equals(other->getBitWords());
 }
 
 bool AutoDiffIndexSubset::
-isProperSubsetOf(const AutoDiffIndexSubset *other) const {
-  return getSize() == other->getSize() && other->rawIndices.test(rawIndices);
+isSubsetOf(const AutoDiffIndexSubset *other) const {
+  assert(capacity == other->capacity);
+  for (auto index : range(numBitWords))
+    if (getBitWord(index) & ~other->getBitWord(index))
+      return false;
+  return true;
 }
 
 bool AutoDiffIndexSubset::
-isProperSupersetOf(const AutoDiffIndexSubset *other) const {
-  return getSize() == other->getSize() && rawIndices.test(other->rawIndices);
+isSupersetOf(const AutoDiffIndexSubset *other) const {
+  assert(capacity == other->capacity);
+  for (auto index : range(numBitWords))
+    if (~getBitWord(index) & other->getBitWord(index))
+      return false;
+  return true;
 }
 
 AutoDiffIndexSubset *
 AutoDiffIndexSubset::adding(unsigned index, ASTContext &ctx) const {
   assert(index < getCapacity());
-
+  SmallVector<unsigned, 8> newIndices(begin(), end());
+  newIndices.push_back(index);
+  llvm::sort(newIndices.begin(), newIndices.end());
+  return get(ctx, capacity, newIndices);
 }
 
-AutoDiffIndexSubset *
-AutoDiffIndexSubset::adding(AutoDiffIndexSubset *other, ASTContext &ctx) const {
-  return get(ctx, rawIndices | other->rawIndices);
+int AutoDiffIndexSubset::findNext(int startIndex) const {
+  if (numBitWords == 0)
+    return -1;
+  unsigned bitWordIndex = 0, offset = 0;
+  if (startIndex >= 0)
+    std::tie(bitWordIndex, offset) = getBitWordIndexAndOffset(startIndex);
+  for (; bitWordIndex < getNumBitWords(); ++bitWordIndex) {
+    auto bitWord = getBitWord(bitWordIndex);
+    if (!bitWord) {
+      ++bitWordIndex;
+      continue;
+    }
+    while (offset < sizeof(BitWord)) {
+      if (bitWord & (1 << offset))
+        return bitWordIndex * sizeof(BitWord) + offset;
+      ++offset;
+    }
+    offset = 0;
+  }
+  return -1;
 }
 
-void AutoDiffIndexSubset::Profile(llvm::FoldingSetNodeID &id,
-                                  const SmallBitVector &rawIndices) {
-  id.AddInteger(rawIndices.size());
-  for (auto i : rawIndices.set_bits())
-    id.AddInteger(i);
+int AutoDiffIndexSubset::findPrevious(int endIndex) const {
+  if (numBitWords == 0)
+    return -1;
+  unsigned bitWordIndex, offset;
+  std::tie(bitWordIndex, offset) = getBitWordIndexAndOffset(endIndex);
+  for (; bitWordIndex >= 0; --bitWordIndex) {
+    auto bitWord = getBitWord(bitWordIndex);
+    if (!bitWord) {
+      --bitWordIndex;
+      continue;
+    }
+    while (offset >= 0) {
+      if (bitWord & (1 << offset))
+        return bitWordIndex * sizeof(BitWord) + offset;
+      --offset;
+    }
+    offset = sizeof(BitWord) - 1;
+  }
+  return -1;
 }
 
 AutoDiffFunctionParameterSubset::

@@ -222,34 +222,44 @@ public:
 
 class AutoDiffIndexSubset : public llvm::FoldingSetNode {
 private:
-  using Byte = uint8_t;
+  using BitWord = uint64_t;
 
   unsigned capacity;
-  unsigned size;
-  unsigned numBytes;
+  unsigned numBitWords;
 
-  static unsigned getNumBytesNeeded(unsigned largest) {
-    return (largest + 1) / sizeof(Byte) + 1;
+  static std::pair<unsigned, unsigned> getBitWordIndexAndOffset(unsigned index);
+  static unsigned getNumBitWordsNeededForCapacity(unsigned capacity);
+
+  unsigned getNumBitWords() const {
+    return numBitWords;
   }
 
-  unsigned getNumBytes() const {
-    return numBytes;
+  BitWord *getBitWordsData() {
+    return reinterpret_cast<BitWord *>(this + 1);
   }
 
-  const Byte *getBytesData() const {
-    return reinterpret_cast<const Byte *>(this + 1);
+  const BitWord *getBitWordsData() const {
+    return reinterpret_cast<const BitWord *>(this + 1);
   }
 
-  ArrayRef<Byte> getBytes() const {
-    return {getBytesData(), getNumBytes()};
+  ArrayRef<BitWord> getBitWords() const {
+    return {getBitWordsData(), getNumBitWords()};
   }
 
-  MutableArrayRef<Byte> getMutableBytes() {
-    return {const_cast<Byte *>(getBytesData()), getNumBytes()};
+  BitWord getBitWord(unsigned i) const {
+    return getBitWordsData()[i];
   }
 
-  explicit AutoDiffIndexSubset(unsigned capacity, unsigned size,
-                               unsigned numBytes, ArrayRef<uint8_t> bytes);
+  BitWord &getBitWord(unsigned i) {
+    return getBitWordsData()[i];
+  }
+
+  MutableArrayRef<BitWord> getMutableBitWords() {
+    return {const_cast<BitWord *>(getBitWordsData()), getNumBitWords()};
+  }
+
+  explicit AutoDiffIndexSubset(unsigned capacity, unsigned numBitWords,
+                               ArrayRef<unsigned> indices);
 
 public:
   AutoDiffIndexSubset() = delete;
@@ -267,46 +277,104 @@ public:
     return capacity;
   }
 
-  unsigned getSize() const {
-    return size;
-  }
+  class iterator;
 
-  ArrayRef<unsigned> getIndices() const {
-    return indices;
-  }
+  iterator begin() const;
+  iterator end() const;
+  iterator_range<iterator> getIndices() const;
+  unsigned getNumIndices() const;
 
   bool contains(unsigned index) const {
-
+    unsigned bitWordIndex, offset;
+    std::tie(bitWordIndex, offset) = getBitWordIndexAndOffset(index);
+    return getBitWord(bitWordIndex) & (1 << offset);
   }
 
   bool equals(const AutoDiffIndexSubset *other) const;
-  bool isProperSubsetOf(const AutoDiffIndexSubset *other) const;
-  bool isProperSupersetOf(const AutoDiffIndexSubset *other) const;
+  bool isSubsetOf(const AutoDiffIndexSubset *other) const;
+  bool isSupersetOf(const AutoDiffIndexSubset *other) const;
 
   AutoDiffIndexSubset *adding(unsigned index, ASTContext &ctx) const;
-  AutoDiffIndexSubset *adding(AutoDiffIndexSubset *other,
-                              ASTContext &ctx) const;
 
-  static void Profile(llvm::FoldingSetNodeID &id,
-                      const SmallBitVector &rawIndices) const;
-  void Profile(llvm::FoldingSetNodeID &id) const {
-    Profile(id, rawIndices);
-  }
+  void Profile(llvm::FoldingSetNodeID &id) const;
+
+private:
+  int findNext(int startIndex) const;
+  int findFirst() const { return findNext(-1); }
+  int findPrevious(int endIndex) const;
+  int findLast() const { return findPrevious(capacity); }
+
+public:
+  class iterator {
+  typedef unsigned value_type;
+  typedef int difference_type;
+  typedef unsigned * pointer;
+  typedef unsigned & reference;
+  typedef std::forward_iterator_tag iterator_category;
+  private:
+    const AutoDiffIndexSubset *parent;
+    int current = 0;
+
+    void advance() {
+      assert(current != -1 && "Trying to advance past end.");
+      current = parent->findNext(current);
+    }
+
+  public:
+    iterator(const AutoDiffIndexSubset *parent, int current)
+        : parent(parent), current(current) {}
+    explicit iterator(const AutoDiffIndexSubset *parent)
+        : iterator(parent, parent->findFirst()) {}
+    iterator(const iterator &) = default;
+
+    iterator operator++(int) {
+      auto prev = *this;
+      advance();
+      return prev;
+    }
+
+    iterator &operator++() {
+      advance();
+      return *this;
+    }
+
+    unsigned operator*() const { return current; }
+
+    bool operator==(const iterator &other) const {
+      assert(&parent == &other.parent &&
+             "Comparing iterators from different BitVectors");
+      return current == other.current;
+    }
+
+    bool operator!=(const iterator &other) const {
+      assert(&parent == &other.parent &&
+             "Comparing iterators from different BitVectors");
+      return current != other.current;
+    }
+  };
 };
 
 class AutoDiffFunctionParameterSubset {
 private:
   AutoDiffIndexSubset *indexSubset;
-  bool isCurried;
+  bool curried;
 
 public:
   explicit AutoDiffFunctionParameterSubset(
       AutoDiffIndexSubset *indexSubset, bool isCurried)
-      : indexSubset(indexSubset), isCurried(isCurried) {}
+      : indexSubset(indexSubset), curried(isCurried) {}
 
   explicit AutoDiffFunctionParameterSubset(
       ASTContext &ctx, AutoDiffIndexSubset *parameterSubset,
       Optional<bool> isSelfIncluded);
+
+  AutoDiffIndexSubset *getIndexSubset() const {
+    return indexSubset;
+  }
+
+  bool isCurried() const {
+    return curried;
+  }
 };
 
 /// SIL-level automatic differentiation indices. Consists of a source index,
@@ -413,10 +481,6 @@ public:
   AutoDiffParameterIndices *getParameterIndices() const {
     return parameterIndices;
   }
-
-  static AutoDiffAssociatedFunctionIdentifier *get(
-      AutoDiffAssociatedFunctionKind kind, unsigned differentiationOrder,
-      AutoDiffParameterIndices *parameterIndices, ASTContext &C);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     ID.AddInteger(kind);
