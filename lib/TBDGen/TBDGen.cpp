@@ -230,6 +230,13 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   }
 }
 
+void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {
+  // If there's an opaque return type, its descriptor is exported.
+  if (auto opaqueResult = FD->getOpaqueResultTypeDecl())
+    addSymbol(LinkEntity::forOpaqueTypeDescriptor(opaqueResult));
+  visitAbstractFunctionDecl(FD);
+}
+
 void TBDGenVisitor::visitAccessorDecl(AccessorDecl *AD) {
   // Do nothing: accessors are always nested within the storage decl, but
   // sometimes appear outside it too. To avoid double-walking them, we
