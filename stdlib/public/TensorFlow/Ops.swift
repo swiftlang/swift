@@ -578,33 +578,36 @@ public extension Tensor where Scalar : FloatingPoint & Equatable {
 }
 
 public extension Tensor where Scalar : FloatingPoint {
-  // TODO: std() should handle non floating point Tensors.
+  // TODO: standardDeviation() should handle non floating point Tensors.
 
-  /// Returns the standard deviation along the specified axes. The reduced
-  /// dimensions are retained with value 1. Does not apply Bessel's correction.
+  /// Returns the standard deviation of the elements along the specified axes.
+  /// The reduced dimensions are retained with value 1. Does not apply Bessel's
+  /// correction.
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
-  func std() -> Tensor {
-    return std(alongAxes: Array(0..<shape.rank))  // Reduce along all dimensions
+  func standardDeviation() -> Tensor {
+    return standardDeviation(alongAxes: Array(0..<shape.rank))  // Reduce along all dimensions
   }
 
-  /// Returns the standard deviation along the specified axes. The reduced
-  /// dimensions are retained with value 1. Does not apply Bessel's correction.
+  /// Returns the standard deviation of the elements along the specified axes.
+  /// The reduced dimensions are retained with value 1. Does not apply Bessel's
+  /// correction.
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
-  func std(alongAxes axes: Int32...) -> Tensor {
-    return std(alongAxes: axes)
+  func standardDeviation(alongAxes axes: Int32...) -> Tensor {
+    return standardDeviation(alongAxes: axes)
   }
 
-  /// Returns the standard deviation along the specified axes. The reduced
-  /// dimensions are retained with value 1. Does not apply Bessel's correction.
+  /// Returns the standard deviation of the elements along the specified axes.
+  /// The reduced dimensions are retained with value 1. Does not apply Bessel's
+  /// correction.
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
   @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
-  func std(alongAxes axes: [Int32]) -> Tensor {
+  func standardDeviation(alongAxes axes: [Int32]) -> Tensor {
     return sqrt(variance(alongAxes: axes))
   }
 }

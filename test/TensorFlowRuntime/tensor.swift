@@ -277,19 +277,23 @@ TensorTests.testAllBackends("SimpleMath") {
 }
 
 TensorTests.testAllBackends("StandardDeviation") {
-  expectEqual(0, Tensor<Float>([1]).std().scalarized())
-  expectEqual(0.5, Tensor<Float>([0, 1]).std(alongAxes: 0).scalarized())
-  expectEqual(0.5, Tensor<Float>([0, 1]).std().scalarized())
-  expectNearlyEqual(2.87228132,
-                    Tensor<Float>(rangeFrom: 0, to: 10, stride: 1).std().scalarized(),
-                    byError: 0.001)
+  expectEqual(0, Tensor<Float>([1]).standardDeviation().scalarized())
+  expectEqual(
+      0.5,
+      Tensor<Float>([0, 1]).standardDeviation(alongAxes: 0).scalarized())
+  expectEqual(0.5, Tensor<Float>([0, 1]).standardDeviation().scalarized())
+  expectNearlyEqual(
+      2.87228132,
+      Tensor<Float>(rangeFrom: 0, to: 10, stride: 1).standardDeviation().scalarized(),
+      byError: 0.001)
   let matrix = Tensor<Float>(rangeFrom: 0, to: 10, stride: 1).reshaped(to: [2, 5])
   expectNearlyEqual(2.87228132,
-                    matrix.std().scalarized(),
+                    matrix.standardDeviation().scalarized(),
                     byError: 0.001)
-  expectPointwiseNearlyEqual([1.4142, 1.4142],
-                             matrix.std(alongAxes: 1).array.scalars,
-                             byError: 0.001)
+  expectPointwiseNearlyEqual(
+      [1.4142, 1.4142],
+      matrix.standardDeviation(alongAxes: 1).array.scalars,
+      byError: 0.001)
 }
 
 TensorTests.testAllBackends("ReductionToScalar") {
