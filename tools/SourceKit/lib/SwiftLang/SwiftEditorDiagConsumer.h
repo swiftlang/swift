@@ -70,7 +70,7 @@ public:
                         swift::DiagnosticKind Kind, StringRef FormatString,
                         ArrayRef<swift::DiagnosticArgument> FormatArgs,
                         const swift::DiagnosticInfo &Info,
-                        SourceLoc bufferIndirectlyCausingDiagnostic) override;
+                        swift::SourceLoc bufferIndirectlyCausingDiagnostic) override;
 };
 
 } // namespace SourceKit
