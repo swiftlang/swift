@@ -1219,9 +1219,10 @@ static bool performCompileStepsPostSILGen(
   SILOptions &SILOpts = Invocation.getSILOptions();
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
 
-#error use ModuleOrSourceFile w/ unique pointer?
-  BufferIndirectlyCausingDiagnosticRAII cpi(Context.Diags,
-                                            PSPs.MainInputFilenameForDebugInfo);
+  BufferIndirectlyCausingDiagnosticRAII ricd(
+      Context.Diags, MSF.is<SourceFile *>()
+                         ? MSF.dyn_cast<SourceFile *>()->getFilename()
+                         : "");
 
   if (Stats)
     countStatsPostSILGen(*Stats, *SM);
