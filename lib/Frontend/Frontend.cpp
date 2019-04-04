@@ -1112,9 +1112,12 @@ static void performSILOptimizations(CompilerInvocation &Invocation,
   } else {
     runSILOptimizationPasses(*SM);
   }
-  if (Invocation.getFrontendOptions().CheckOnoneSupportCompleteness &&
-      // TODO: handle non-ObjC based stdlib builds, e.g. on linux.
-      Invocation.getLangOptions().EnableObjCInterop) {
+  // When building SwiftOnoneSupport.o verify all expected ABI symbols.
+  if (Invocation.getFrontendOptions().CheckOnoneSupportCompleteness
+       // TODO: handle non-ObjC based stdlib builds, e.g. on linux.
+      && Invocation.getLangOptions().EnableObjCInterop
+      && Invocation.getFrontendOptions().RequestedAction
+             == FrontendOptions::ActionType::EmitObject) {
     checkCompletenessOfPrespecializations(*SM);
   }
 }
