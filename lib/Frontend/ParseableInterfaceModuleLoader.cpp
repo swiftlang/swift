@@ -520,10 +520,6 @@ public:
         return;
       }
 
-      // Optimize emitted modules. This has to happen after we parse arguments,
-      // because parseSILOpts would override the current optimization mode.
-      subInvocation.getSILOptions().OptMode = OptimizationMode::ForSpeed;
-
       // Build the .swiftmodule; this is a _very_ abridged version of the logic
       // in performCompile in libFrontendTool, specialized, to just the one
       // module-serialization task we're trying to do here.
