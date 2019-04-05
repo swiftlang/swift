@@ -1016,20 +1016,18 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       break;
     }
 
-    // If the next token is at the beginning of a new line, could be an argument
-    // label, is followed by a colon, and separator omission is permitted, 
-    // expect that we'll parse another list element which begins with that 
-    // argument label and continue parsing the list.
-    if (Tok.isAtStartOfLine() && AllowSepOmission && Tok.canBeArgumentLabel() 
-        && peekToken().is(tok::colon)) { 
-      continue;
-    }
-
-    // If we're in a comma-separated list, the next token is at the
-    // beginning of a new line and can never start an element, break.
-    if (Tok.isAtStartOfLine() &&
-        (Tok.is(tok::r_brace) || isStartOfDecl() || isStartOfStmt())) {
-      break;
+    if (Tok.isAtStartOfLine()) { 
+      if (AllowSepOmission && Tok.canBeArgumentLabel() 
+          && peekToken().is(tok::colon)) 
+        // If the next token is at the beginning of a new line, could be an
+        // argument label, is followed by a colon, and separator omission is
+        // permitted, expect that we'll parse another list element which begins
+        // with that argument label and continue parsing the list.
+        continue;
+      else if (Tok.is(tok::r_brace) || isStartOfDecl() || isStartOfStmt())
+        // If we're in a comma-separated list, the next token is at the
+        // beginning of a new line and can never start an element, break.
+        break;
     }
     // If we found EOF or such, bailout.
     if (Tok.isAny(tok::eof, tok::pound_endif)) {
