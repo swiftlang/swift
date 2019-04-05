@@ -56,21 +56,6 @@ def exit_rejecting_arguments(message, parser=None):
     sys.exit(2)  # 2 is the same as `argparse` error exit code.
 
 
-def call_without_sleeping(command, env=None, dry_run=False, echo=False):
-    """
-    Execute a command during which system sleep is disabled.
-
-    By default, this ignores the state of the `shell.dry_run` flag.
-    """
-
-    # Disable system sleep, if possible.
-    if platform.system() == 'Darwin':
-        # Don't mutate the caller's copy of the arguments.
-        command = ["caffeinate"] + list(command)
-
-    shell.call(command, env=env, dry_run=dry_run, echo=echo)
-
-
 class HostSpecificConfiguration(object):
 
     """Configuration information for an individual host."""
@@ -906,8 +891,8 @@ class BuildScriptInvocation(object):
         # `build-script-impl`.
         if self.args.legacy_impl:
             # Execute the underlying build script implementation.
-            call_without_sleeping([build_script_impl] + impl_args,
-                                  env=impl_env, echo=True)
+            shell.call_without_sleeping([build_script_impl] + impl_args,
+                                        env=impl_env, echo=True)
             return
 
         # Otherwise, we compute and execute the individual actions ourselves.
@@ -924,7 +909,7 @@ class BuildScriptInvocation(object):
                 assert name is not None, "invalid action"
                 action_name = "{}-{}-{}".format(
                     host.name, product_class.product_name(), name)
-            call_without_sleeping(
+            shell.call_without_sleeping(
                 [build_script_impl] + impl_args + [
                     "--only-execute", action_name],
                 env=impl_env, echo=self.args.verbose_build)
@@ -1143,7 +1128,7 @@ def main_preset():
     if args.expand_build_script_invocation:
         return 0
 
-    call_without_sleeping(build_script_args)
+    shell.call_without_sleeping(build_script_args)
     return 0
 
 
