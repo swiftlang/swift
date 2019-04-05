@@ -65,6 +65,18 @@ private let (nscfClass, nscfConstantClass): (AnyClass, AnyClass) =
   (objc_lookUpClass("__NSCFString")!,
    objc_lookUpClass("__NSCFConstantString")!)
 
+// This works around an ARC optimizer issue that inserts a retain-release pair
+// if you do the obvious thing and just use a static let constant
+@_transparent
+private func _estimatedSmallStringCutoff() -> Int {
+  #if arch(i386) || arch(arm)
+  return 10
+  #else
+  return 15
+  #endif
+}
+
+
 extension String : _ObjectiveCBridgeable {
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSString {
@@ -88,13 +100,7 @@ extension String : _ObjectiveCBridgeable {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return result != nil
   }
-  
-  #if arch(i386) || arch(arm)
-  private static let _estimatedSmallCutoff = 10
-  #else
-  private static let _estimatedSmallCutoff = 15
-  #endif
-  
+
   @_effects(releasenone)
   @inline(__always)
   private static func _bridgeToSmall(
@@ -103,7 +109,7 @@ extension String : _ObjectiveCBridgeable {
   ) -> String? {
     assert(len != 0)
     let result = String(
-      unsafeUninitializedCapacity: _estimatedSmallCutoff
+      unsafeUninitializedCapacity: _estimatedSmallStringCutoff()
     ) { (ptr, outCount) in
       let converted = _getBytes(
         source,
@@ -111,7 +117,7 @@ extension String : _ObjectiveCBridgeable {
         CFStringBuiltInEncodings.UTF8.rawValue,
         UnsafeMutableRawPointer(ptr.baseAddress!).assumingMemoryBound(to:
           UInt8.self),
-        _estimatedSmallCutoff, //maxBufLen
+        _estimatedSmallStringCutoff(), //maxBufLen
         &outCount
       )
       if _slowPath(converted != len) {

@@ -222,8 +222,11 @@ final internal class __StringStorage
 
   @inline(__always)
   final internal var isASCII: Bool {
-    get { return _countAndFlags.isASCII }
-    set { _countAndFlags = CountAndFlags(mortalCount: count, isASCII: newValue)}
+    return _countAndFlags.isASCII
+  }
+  
+  internal func forceSetIsASCII(_ value: Bool) {
+    _countAndFlags = CountAndFlags(mortalCount: count, isASCII: value)
   }
 
   final internal var asString: String {
@@ -405,6 +408,8 @@ extension __StringStorage {
       realCodeUnitCapacity: realCapacity, countAndFlags: countAndFlags)
   }
   
+  // The caller is expected to check UTF8 validity and ASCII-ness and update
+  // the resulting StringStorage accordingly
   @_effects(releasenone)
   internal static func create(
     unsafeUninitializedCapacity capacity: Int,
@@ -725,8 +730,7 @@ final internal class __SharedStringStorage
 
   @inline(__always)
   final internal var isASCII: Bool {
-    get { return _countAndFlags.isASCII }
-    set { _countAndFlags = CountAndFlags(mortalCount: count, isASCII: newValue)}
+    return _countAndFlags.isASCII
   }
 
   final internal var asString: String {

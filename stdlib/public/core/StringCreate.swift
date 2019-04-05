@@ -100,16 +100,14 @@ extension String {
       unsafeUninitializedCapacity: capacity,
       initializingUncheckedUTF8With: initializer)
     
-    let contents = UnsafeBufferPointer(start: result.start, count: result.count)
-    
-    switch validateUTF8(contents) {
+    switch validateUTF8(result.codeUnits) {
     case .success(let info):
-      result.isASCII = info.isASCII
+      result.forceSetIsASCII(info.isASCII)
       result._invariantCheck()
       return result.asString
     case .error(let initialRange):
       //This could be optimized to use excess tail capacity
-      return repairUTF8(contents, firstKnownBrokenRange: initialRange)
+      return repairUTF8(result.codeUnits, firstKnownBrokenRange: initialRange)
     }
   }
 
