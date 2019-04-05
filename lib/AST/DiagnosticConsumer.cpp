@@ -119,7 +119,7 @@ FileSpecificDiagnosticConsumer::subconsumerForLocation(SourceManager &SM,
     return None;
 
   // What if a there's a FileSpecificDiagnosticConsumer but there are no
-  // subconsumers in it? (This situation obtains for the fix-its
+  // subconsumers in it? (This situation occurs for the fix-its
   // FileSpecificDiagnosticConsumer.) In such a case, bail out now.
   if (Subconsumers.empty())
     return None;

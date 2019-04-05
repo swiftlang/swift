@@ -849,8 +849,16 @@ const char *DiagnosticEngine::diagnosticStringFor(const DiagID id) {
 
 void DiagnosticEngine::setBufferIndirectlyCausingDiagnosticToInput(
     SourceLoc loc) {
+  // If in the future, nested BufferIndirectlyCausingDiagnosticRAII need be
+  // supported, the compiler will need a stack for
+  // bufferIndirectlyCausingDiagnostic.
+  assert(bufferIndirectlyCausingDiagnostic.isInvalid() &&
+         "Buffer should not already be set.");
   bufferIndirectlyCausingDiagnostic = loc;
+  assert(bufferIndirectlyCausingDiagnostic.isValid() &&
+         "Buffer must be valid for previous assertion to work.");
 }
+
 void DiagnosticEngine::resetBufferIndirectlyCausingDiagnostic() {
   bufferIndirectlyCausingDiagnostic = SourceLoc();
 }
@@ -873,5 +881,6 @@ BufferIndirectlyCausingDiagnosticRAII::BufferIndirectlyCausingDiagnosticRAII(
   if (!id)
     return;
   auto loc = SF.getASTContext().SourceMgr.getLocForBufferStart(*id);
-  Diags.setBufferIndirectlyCausingDiagnosticToInput(loc);
+  if (loc.isValid())
+    Diags.setBufferIndirectlyCausingDiagnosticToInput(loc);
 }
