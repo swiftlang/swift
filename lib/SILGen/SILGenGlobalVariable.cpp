@@ -93,7 +93,7 @@ SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var) {
   // Global variables can be accessed directly with global_addr.  Emit this
   // instruction into the prolog of the function so we can memoize/CSE it in
   // VarLocs.
-  auto entryBB = getFunction().begin();
+  auto *entryBB = &*getFunction().begin();
   SILGenBuilder prologueB(*this, entryBB, entryBB->begin());
   prologueB.setTrackingList(B.getTrackingList());
 
