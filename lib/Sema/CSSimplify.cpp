@@ -4846,6 +4846,14 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
       return SolutionKind::Solved;
     };
 
+  // We do not allow KeyPaths to go through AnyObject
+  if (auto fixedRootTy =
+          getFixedTypeRecursive(rootTy, subflags, /*wantRValue=*/true)) {
+    if (fixedRootTy->isAnyObject()) {
+      return SolutionKind::Error;
+    }
+  }
+
   // If we're fixed to a bound generic type, trying harvesting context from it.
   // However, we don't want a solution that fixes the expression type to
   // PartialKeyPath; we'd rather that be represented using an upcast conversion.
