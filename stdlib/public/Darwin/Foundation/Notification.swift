@@ -39,10 +39,28 @@ public struct Notification : ReferenceConvertible, Equatable, Hashable {
         self.userInfo = userInfo
     }
 
-    public var hashValue: Int {
-        return name.rawValue.hash
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(name)
+        hasher.combine(ObjectIdentifier(object as AnyObject))
+        // `userInfo` is not directly hashable, but == compares it by bridging
+        // it to NSDictionary, so its contents should be hashed here.  However,
+        // to prevent potential issues with values fail to correctly implement
+        // `NSObject.hash`, we only hash the keys here.
+        //
+        // FIXME: This makes for weak hashes. We really should hash everything.
+        //
+        // The algorithm below is the same as the one used by Dictionary.
+        var commutativeKeyHash = 0
+        if let userInfo = userInfo {
+            for (k, _) in userInfo {
+                var nestedHasher = hasher
+                nestedHasher.combine(k)
+                commutativeKeyHash ^= nestedHasher.finalize()
+            }
+        }
+        hasher.combine(commutativeKeyHash)
     }
-    
+
     public var description: String {
         return "name = \(name.rawValue), object = \(String(describing: object)), userInfo = \(String(describing: userInfo))"
     }
