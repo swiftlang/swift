@@ -1816,15 +1816,6 @@ public:
         abort();
       }
       
-      // The base of a member reference cannot be an existential type.
-      if (E->getBase()->getType()->getWithoutSpecifierType()
-            ->isAnyExistentialType()) {
-        Out << "Member reference into an unopened existential type\n";
-        E->dump(Out);
-        Out << "\n";
-        abort();
-      }
-
       // The only time the base is allowed to be inout is if we are accessing
       // a computed property or if the base is a protocol or existential.
       if (auto *baseIOT = E->getBase()->getType()->getAs<InOutType>()) {
