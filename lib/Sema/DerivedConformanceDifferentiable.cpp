@@ -765,6 +765,11 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
     newMember->setType(parentDC->mapTypeIntoContext(memberAssocInterfaceType));
     structDecl->addMember(newMember);
     newMember->copyFormalAccessFrom(member, /*sourceIsParentContext*/ true);
+    // NOTE(TF-238): This is a REPL/Jupyter workaround.
+    // Derived properties are not rewritten by LLDB to be public, leading to
+    // cross-cell access level errors.
+    if (nominal->getParentModule()->getNameStr().startswith("__lldb_expr"))
+      newMember->setAccess(AccessLevel::Public);
     newMember->setValidationToChecked();
     newMember->setSetterAccess(member->getFormalAccess());
     C.addSynthesizedDecl(newMember);
