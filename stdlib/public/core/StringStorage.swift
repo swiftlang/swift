@@ -227,6 +227,7 @@ final internal class __StringStorage
   
   internal func forceSetIsASCII(_ value: Bool) {
     _countAndFlags = CountAndFlags(mortalCount: count, isASCII: value)
+    _invariantCheck()
   }
 
   final internal var asString: String {
