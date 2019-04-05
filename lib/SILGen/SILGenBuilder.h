@@ -45,23 +45,10 @@ class SILGenBuilder : public SILBuilder {
 
 public:
   SILGenBuilder(SILGenFunction &SGF);
-  SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB);
   SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB,
-                SmallVectorImpl<SILInstruction *> *insertedInsts);
+                SmallVectorImpl<SILInstruction *> *insertedInsts = nullptr);
   SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB,
                 SILBasicBlock::iterator insertInst);
-
-  SILGenBuilder(SILGenFunction &SGF, SILFunction::iterator insertBB)
-      : SILGenBuilder(SGF, &*insertBB) {}
-  SILGenBuilder(SILGenFunction &SGF, SILFunction::iterator insertBB,
-                SmallVectorImpl<SILInstruction *> *insertedInsts)
-      : SILGenBuilder(SGF, &*insertBB, insertedInsts) {}
-  SILGenBuilder(SILGenFunction &SGF, SILFunction::iterator insertBB,
-                SILInstruction *insertInst)
-      : SILGenBuilder(SGF, &*insertBB, insertInst->getIterator()) {}
-  SILGenBuilder(SILGenFunction &SGF, SILFunction::iterator insertBB,
-                SILBasicBlock::iterator insertInst)
-      : SILGenBuilder(SGF, &*insertBB, insertInst) {}
 
   // Create a new builder, inheriting the given builder's context and debug
   // scope.
