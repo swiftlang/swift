@@ -2391,6 +2391,10 @@ ERROR(decl_from_implementation_only_module,none,
       "cannot use %0 here; %1 has been imported as "
       "'@_implementationOnly'",
       (DeclName, Identifier))
+ERROR(conformance_from_implementation_only_module,none,
+      "cannot use conformance of %0 to %1 here; %2 has been imported as "
+      "'@_implementationOnly'",
+      (Type, DeclName, Identifier))
 
 // Derived conformances
 ERROR(cannot_synthesize_init_in_extension_of_nonfinal,none,

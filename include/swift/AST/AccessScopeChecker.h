@@ -54,13 +54,13 @@ class TypeDeclFinder : public TypeWalker {
   Action walkToTypePre(Type T) override;
 
 public:
-  virtual Action visitNominalType(const NominalType *ty) {
+  virtual Action visitNominalType(NominalType *ty) {
     return Action::Continue;
   }
-  virtual Action visitBoundGenericType(const BoundGenericType *ty) {
+  virtual Action visitBoundGenericType(BoundGenericType *ty) {
     return Action::Continue;
   }
-  virtual Action visitTypeAliasType(const TypeAliasType *ty) {
+  virtual Action visitTypeAliasType(TypeAliasType *ty) {
     return Action::Continue;
   }
 };
@@ -72,9 +72,9 @@ class SimpleTypeDeclFinder : public TypeDeclFinder {
   /// The function to call when a ComponentIdentTypeRepr is seen.
   llvm::function_ref<Action(const TypeDecl *)> Callback;
 
-  Action visitNominalType(const NominalType *ty) override;
-  Action visitBoundGenericType(const BoundGenericType *ty) override;
-  Action visitTypeAliasType(const TypeAliasType *ty) override;
+  Action visitNominalType(NominalType *ty) override;
+  Action visitBoundGenericType(BoundGenericType *ty) override;
+  Action visitTypeAliasType(TypeAliasType *ty) override;
 
 public:
   explicit SimpleTypeDeclFinder(

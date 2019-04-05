@@ -1,8 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o %t/BADLibrary.swiftmodule %S/Inputs/implementation-only-import-in-decls-helper.swift
+// RUN: %target-swift-frontend -emit-module -o %t/NormalLibrary.swiftmodule %S/Inputs/implementation-only-import-in-decls-public-helper.swift
+// RUN: %target-swift-frontend -emit-module -o %t/BADLibrary.swiftmodule %S/Inputs/implementation-only-import-in-decls-helper.swift -I %t
 
 // RUN: %target-typecheck-verify-swift -I %t
 
+import NormalLibrary
 @_implementationOnly import BADLibrary
 
 public struct TestConformance: BadProto {} // expected-error {{cannot use 'BadProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
@@ -148,3 +150,26 @@ public class PublicClassStoredProperties {
   private static var staticIsOkay: BadStruct? // okay
   @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
 }
+
+public typealias NormalProtoAssoc<T: NormalProto> = T.Assoc
+public func testConformanceInTypealias(_: NormalProtoAssoc<NormalStruct>) {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+
+public struct NormalProtoAssocHolder<T: NormalProto> {
+  public var value: T.Assoc
+}
+public func testConformanceInBoundGeneric(_: NormalProtoAssocHolder<NormalStruct>) {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+
+public class SubclassOfNormalClass: NormalClass {}
+
+public func testInheritedConformance(_: NormalProtoAssocHolder<SubclassOfNormalClass>) {} // expected-error {{cannot use conformance of 'NormalClass' to 'NormalProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+public func testSpecializedConformance(_: NormalProtoAssocHolder<GenericStruct<Int>>) {} // expected-error {{cannot use conformance of 'GenericStruct<T>' to 'NormalProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+
+extension Array where Element == NormalProtoAssocHolder<NormalStruct> { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+  public func testConstrainedExtensionUsingBadConformance() {}
+}
+
+public struct ConditionalGenericStruct<T> {}
+extension ConditionalGenericStruct: NormalProto where T: NormalProto {
+  public typealias Assoc = Int
+}
+public func testConditionalGeneric(_: NormalProtoAssocHolder<ConditionalGenericStruct<NormalStruct>>) {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
