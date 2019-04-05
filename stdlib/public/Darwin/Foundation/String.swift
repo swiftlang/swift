@@ -145,7 +145,7 @@ extension String : _ObjectiveCBridgeable {
     // Also only try Strings we believe will fit into a SmallString for now
     // In the future we should do mutable __NSCFStrings of any length here.
     if sourceClass == nscfClass,
-       len <= 15,
+       len <= _estimatedSmallStringCutoff(),
        let eager = _bridgeToSmall(source, len) {
       return eager
     } 
