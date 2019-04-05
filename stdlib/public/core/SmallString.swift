@@ -310,9 +310,8 @@ extension _SmallString {
   @usableFromInline // testable
   internal init(taggedCocoa cocoa: AnyObject) {
     self.init()
-    let length = _stdlib_binary_CFStringGetLength(cocoa)
     self.withMutableCapacity {
-      let len = _bridgeTagged(cocoa, length: length, intoUTF8: $0)
+      let len = _bridgeTagged(cocoa, intoUTF8: $0)
       _internalInvariant(len != nil && len! <= _SmallString.capacity,
         "Internal invariant violated: large tagged NSStrings")
       return len._unsafelyUnwrappedUnchecked

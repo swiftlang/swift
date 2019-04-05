@@ -125,15 +125,24 @@ private var kCFStringEncodingUTF8 : _swift_shims_CFStringEncoding {
   @inline(__always) get { return 0x8000100 }
 }
 
+#if !(arch(i386) || arch(arm))
 // Resiliently write a tagged _CocoaString's contents into a buffer.
 @_effects(releasenone) // @opaque
 internal func _bridgeTagged(
   _ cocoa: _CocoaString,
-  length: Int,
   intoUTF8 bufPtr: UnsafeMutableBufferPointer<UInt8>
 ) -> Int? {
-  fatalError("Obsolete") //TODO: reimplement
+  _internalInvariant(_isObjCTaggedPointer(cocoa))
+  let ptr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
+  let length = _stdlib_binary_CFStringGetLength(cocoa)
+  _internalInvariant(length <= _SmallString.capacity)
+  var count = 0
+  let numCharWritten = _swift_stdlib_CFStringGetBytes(
+    cocoa, _swift_shims_CFRange(location: 0, length: length),
+    kCFStringEncodingUTF8, 0, 0, ptr, bufPtr.count, &count)
+  return length == numCharWritten ? count : nil
 }
+#endif
 
 @_effects(releasenone) // @opaque
 internal func _cocoaUTF8Pointer(_ str: _CocoaString) -> UnsafePointer<UInt8>? {
