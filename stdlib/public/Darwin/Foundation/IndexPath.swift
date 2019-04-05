@@ -662,32 +662,9 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
         return .orderedSame
     }
     
-    public var hashValue: Int { // FIXME(hashValue): Remove
-        func hashIndexes(first: Int, last: Int, count: Int) -> Int {
-            let totalBits = MemoryLayout<Int>.size * 8
-            let lengthBits = 8
-            let firstIndexBits = (totalBits - lengthBits) / 2
-            return count &+ (first << lengthBits) &+ (last << (lengthBits + firstIndexBits))
-        }
-
-        switch _indexes {
-            case .empty: return 0
-            case .single(let index): return index.hashValue
-            case .pair(let first, let second):
-                return hashIndexes(first: first, last: second, count: 2)
-            default:
-                let cnt = _indexes.count
-                return hashIndexes(first: _indexes[0], last: _indexes[cnt - 1], count: cnt)
-        }
-    }
-
     public func hash(into hasher: inout Hasher) {
 	      // Note: We compare all indices in ==, so for proper hashing, we must
-	      // also feed them all to the hasher. (This is intentionally different
-	      // from `hashValue` above, which only depends on the first and last
-	      // index. `Set` and `Dictionary` relies on `hash(into:)` rather than
-	      // `hashValue` -- the latter definition is only kept for compatibility
-	      // with existing code that may depend on it.)
+	      // also feed them all to the hasher.
 	      //
 	      // To ensure we have unique hash encodings in nested hashing contexts,
 	      // we combine the count of indices as well as the indices themselves.
