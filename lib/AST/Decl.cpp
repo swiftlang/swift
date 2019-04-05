@@ -2384,6 +2384,12 @@ void ValueDecl::setIsObjC(bool value) {
   LazySemanticInfo.isObjC = value;
 }
 
+bool ValueDecl::isFinal() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           IsFinalRequest { const_cast<ValueDecl *>(this) },
+                           getAttrs().hasAttribute<FinalAttr>());
+}
+
 bool ValueDecl::isDynamic() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,

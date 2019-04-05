@@ -367,10 +367,6 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
   if (isStatic)
     accessor->setStatic();
 
-  // The accessor is final if the storage is.
-  if (storage->isFinal())
-    makeFinal(ctx, accessor);
-
   // If the storage does not provide this accessor as an opaque accessor,
   // we can't add a dynamically-dispatched method entry for the accessor,
   // so force it to be statically dispatched. ("final" would be inappropriate

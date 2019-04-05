@@ -221,6 +221,36 @@ void IsObjCRequest::cacheResult(bool value) const {
 }
 
 //----------------------------------------------------------------------------//
+// isFinal computation.
+//----------------------------------------------------------------------------//
+
+void IsFinalRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  // FIXME: Improve this diagnostic.
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_reference);
+}
+
+void IsFinalRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  // FIXME: Customize this further.
+  diags.diagnose(decl, diag::circular_reference_through);
+}
+
+Optional<bool> IsFinalRequest::getCachedResult() const {
+  auto decl = std::get<0>(getStorage());
+  if (decl->LazySemanticInfo.isFinalComputed)
+    return decl->LazySemanticInfo.isFinal;
+
+  return None;
+}
+
+void IsFinalRequest::cacheResult(bool value) const {
+  auto decl = std::get<0>(getStorage());
+  decl->LazySemanticInfo.isFinalComputed = true;
+  decl->LazySemanticInfo.isFinal = value;
+}
+
+//----------------------------------------------------------------------------//
 // isDynamic computation.
 //----------------------------------------------------------------------------//
 

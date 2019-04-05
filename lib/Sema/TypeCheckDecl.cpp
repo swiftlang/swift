@@ -1038,11 +1038,11 @@ enum class ImplicitlyFinalReason : unsigned {
 };
 }
 
-static void inferFinalAndDiagnoseIfNeeded(TypeChecker &TC, ValueDecl *D,
+static bool inferFinalAndDiagnoseIfNeeded(ValueDecl *D,
                                           StaticSpellingKind staticSpelling) {
   auto cls = D->getDeclContext()->getSelfClassDecl();
   if (!cls)
-    return;
+    return false;
 
   // Are there any reasons to infer 'final'? Prefer 'static' over the class
   // being final for the purposes of diagnostics.
@@ -1053,7 +1053,8 @@ static void inferFinalAndDiagnoseIfNeeded(TypeChecker &TC, ValueDecl *D,
     if (auto finalAttr = D->getAttrs().getAttribute<FinalAttr>()) {
       auto finalRange = finalAttr->getRange();
       if (finalRange.isValid()) {
-        TC.diagnose(finalRange.Start, diag::static_decl_already_final)
+        auto &context = D->getASTContext();
+        context.Diags.diagnose(finalRange.Start, diag::static_decl_already_final)
         .fixItRemove(finalRange);
       }
     }
@@ -1062,18 +1063,19 @@ static void inferFinalAndDiagnoseIfNeeded(TypeChecker &TC, ValueDecl *D,
   }
 
   if (!reason)
-    return;
+    return false;
 
   if (D->getFormalAccess() == AccessLevel::Open) {
+    auto &context = D->getASTContext();
     auto diagID = diag::implicitly_final_cannot_be_open;
-    if (!TC.Context.isSwiftVersionAtLeast(5))
+    if (!context.isSwiftVersionAtLeast(5))
       diagID = diag::implicitly_final_cannot_be_open_swift4;
-    auto inFlightDiag = TC.diagnose(D, diagID,
+    auto inFlightDiag = context.Diags.diagnose(D, diagID,
                                     static_cast<unsigned>(reason.getValue()));
     fixItAccess(inFlightDiag, D, AccessLevel::Public);
   }
 
-  makeFinal(TC.Context, D);
+  return true;
 }
 
 /// Try to make the given declaration 'dynamic', checking any semantic
@@ -1169,6 +1171,91 @@ doesAccessorNeedDynamicAttribute(AccessorDecl *accessor, Evaluator &evaluator) {
       return isStorageDynamic(evaluator, accessor);
     return false;
   }
+}
+
+llvm::Expected<bool>
+IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
+  switch (decl->getKind()) {
+    case DeclKind::Var: {
+      // Properties are final if they are declared 'static' or a 'let'
+      auto *VD = cast<VarDecl>(decl);
+      if (auto *nominalDecl = VD->getDeclContext()->getSelfClassDecl()) {
+        // If this variable is a class member, mark it final if the
+        // class is final, or if it was declared with 'let'.
+        auto *PBD = VD->getParentPatternBinding();
+        if (PBD && inferFinalAndDiagnoseIfNeeded(decl, PBD->getStaticSpelling()))
+          return true;
+
+        if (VD->isLet()) {
+          if (VD->getFormalAccess() == AccessLevel::Open) {
+            auto &context = decl->getASTContext();
+            auto diagID = diag::implicitly_final_cannot_be_open;
+            if (!context.isSwiftVersionAtLeast(5))
+              diagID = diag::implicitly_final_cannot_be_open_swift4;
+            auto inFlightDiag =
+              context.Diags.diagnose(decl, diagID,
+                                     static_cast<unsigned>(ImplicitlyFinalReason::Let));
+            fixItAccess(inFlightDiag, decl, AccessLevel::Public);
+          }
+
+          return true;
+        }
+      }
+
+      break;
+    }
+
+    case DeclKind::Func: {
+      // Methods declared 'static' are final.
+      auto staticSpelling = cast<FuncDecl>(decl)->getStaticSpelling();
+      if (inferFinalAndDiagnoseIfNeeded(decl, staticSpelling))
+        return true;
+      break;
+    }
+
+    case DeclKind::Accessor:
+      if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
+        switch (accessor->getAccessorKind()) {
+          case AccessorKind::DidSet:
+          case AccessorKind::WillSet:
+            // Observing accessors are marked final if in a class.
+            if (accessor->getDeclContext()->getSelfClassDecl())
+              return true;
+            break;
+
+          case AccessorKind::Read:
+          case AccessorKind::Modify:
+          case AccessorKind::Get:
+          case AccessorKind::Set: {
+            // Coroutines and accessors are final if their storage is.
+            auto storage = accessor->getStorage();
+            if (storage->isFinal())
+              return true;
+            break;
+          }
+
+          default:
+            break;
+        }
+      }
+      break;
+
+    case DeclKind::Subscript: {
+      // Member subscripts.
+      auto staticSpelling = cast<SubscriptDecl>(decl)->getStaticSpelling();
+      if (inferFinalAndDiagnoseIfNeeded(decl, staticSpelling))
+        return true;
+      break;
+    }
+
+    default:
+      break;
+  }
+
+  if (decl->getAttrs().hasAttribute<FinalAttr>())
+    return true;
+
+  return false;
 }
 
 llvm::Expected<bool>
@@ -3747,29 +3834,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     checkDeclAttributesEarly(VD);
     validateAttributes(*this, VD);
 
-    // Properties need some special validation logic.
-    if (auto *nominalDecl = VD->getDeclContext()->getSelfNominalTypeDecl()) {
-      // If this variable is a class member, mark it final if the
-      // class is final, or if it was declared with 'let'.
-      auto staticSpelling =
-          VD->getParentPatternBinding()->getStaticSpelling();
-      inferFinalAndDiagnoseIfNeeded(*this, VD, staticSpelling);
-
-      if (VD->isLet() && isa<ClassDecl>(nominalDecl)) {
-        makeFinal(Context, VD);
-
-        if (VD->getFormalAccess() == AccessLevel::Open) {
-          auto diagID = diag::implicitly_final_cannot_be_open;
-          if (!Context.isSwiftVersionAtLeast(5))
-            diagID = diag::implicitly_final_cannot_be_open_swift4;
-          auto inFlightDiag =
-              diagnose(D, diagID,
-                       static_cast<unsigned>(ImplicitlyFinalReason::Let));
-          fixItAccess(inFlightDiag, D, AccessLevel::Public);
-        }
-      }
-    }
-
     // Perform accessor-related validation.
     validateAbstractStorageDecl(*this, VD);
 
@@ -3863,13 +3927,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       // to the value type.
       case AccessorKind::DidSet:
       case AccessorKind::WillSet:
-        // Make sure that observing accessors are marked final if in a class.
-        if (!accessor->isFinal() &&
-            accessor->getDeclContext()->getSelfClassDecl()) {
-          makeFinal(Context, accessor);
-        }
-        LLVM_FALLTHROUGH;
-
       case AccessorKind::Set: {
         auto newValueParam = valueParams->get(0);
         newValueParam->setInterfaceType(valueIfaceTy);
@@ -3933,23 +3990,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
                  FD->getDeclContext()->getDeclaredInterfaceType(), isProtocol,
                  FD->getFullName());
       }
-
-      auto accessor = dyn_cast<AccessorDecl>(FD);
-
-      if (accessor && accessor->isGetterOrSetter()) {
-        // If the property decl is an instance property, its accessors will
-        // be instance methods and the above condition will mark them ObjC.
-        // The only additional condition we need to check is if the var decl
-        // had an @objc or @iboutlet property.
-
-        AbstractStorageDecl *storage = accessor->getStorage();
-
-        // If the storage is final, propagate to this accessor.
-        if (storage->isFinal())
-          makeFinal(Context, FD);
-      }
-
-      inferFinalAndDiagnoseIfNeeded(*this, FD, FD->getStaticSpelling());
     }
 
     // If the function is exported to C, it must be representable in (Obj-)C.
@@ -4076,12 +4116,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       auto &C = SD->getASTContext();
       SD->getAttrs().add(
           new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
-    }
-
-    // Member subscripts need some special validation logic.
-    if (SD->getDeclContext()->isTypeContext()) {
-      // If this is a class member, mark it final if the class is final.
-      inferFinalAndDiagnoseIfNeeded(*this, SD, SD->getStaticSpelling());
     }
 
     // Perform accessor-related validation.
