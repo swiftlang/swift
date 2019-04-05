@@ -2589,8 +2589,6 @@ bool Parser::isStartOfDecl() {
   // If this is obviously not the start of a decl, then we're done.
   if (!isKeywordPossibleDeclStart(Tok)) return false;
 
-  if (peekToken().is(tok::colon)) return false;
-
   // When 'init' appears inside another 'init', it's likely the user wants to
   // invoke an initializer but forgets to prefix it with 'self.' or 'super.'
   // Otherwise, expect 'init' to be the start of a declaration (and complain

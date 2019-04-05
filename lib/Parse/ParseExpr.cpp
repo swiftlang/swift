@@ -3466,7 +3466,7 @@ ParserResult<Expr> Parser::parseExprCollection() {
         break;
 
     if (Tok.isAtStartOfLine())
-        continue;
+      continue;
 
       diagnose(Tok, diag::expected_separator, ",")
           .fixItInsertAfter(PreviousLoc, ",");
