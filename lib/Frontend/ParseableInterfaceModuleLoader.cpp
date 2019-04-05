@@ -247,6 +247,32 @@ static Optional<llvm::vfs::Status> getStatusOfDependency(
   return status.get();
 }
 
+/// If the file dependency in \p FullDepPath is inside the \p Base directory,
+/// this returns its path relative to \p Base. Otherwise it returns None.
+static Optional<StringRef> getRelativeDepPath(StringRef DepPath,
+                                              StringRef Base) {
+  // If Base is the root directory, or DepPath does not start with Base, bail.
+  if (Base.size() <= 1 || !DepPath.startswith(Base)) {
+    return None;
+  }
+
+  assert(DepPath.size() > Base.size() &&
+      "should never depend on a directory");
+
+  // Is the DepName something like ${Base}/foo.h"?
+  if (path::is_separator(DepPath[Base.size()]))
+    return DepPath.substr(Base.size() + 1);
+
+  // Is the DepName something like "${Base}foo.h", where Base
+  // itself contains a trailing slash?
+  if (path::is_separator(Base.back()))
+    return DepPath.substr(Base.size());
+
+  // We have something next to Base, like "Base.h", that's somehow
+  // become a dependency.
+  return None;
+}
+
 #pragma mark - Module Building
 
 /// Builds a parseable module interface into a .swiftmodule at the provided
@@ -365,17 +391,42 @@ class swift::ParseableInterfaceBuilder {
   bool collectDepsForSerialization(CompilerInstance &SubInstance,
                                    SmallVectorImpl<FileDependency> &Deps,
                                    bool IsHashBased) {
-    StringRef SDKPath = SubInstance.getASTContext().SearchPathOpts.SDKPath;
-    StringRef ResourcePath =
-        SubInstance.getASTContext().SearchPathOpts.RuntimeResourcePath;
+    auto &Opts = SubInstance.getASTContext().SearchPathOpts;
+    SmallString<128> SDKPath(Opts.SDKPath);
+    path::native(SDKPath);
+    SmallString<128> ResourcePath(Opts.RuntimeResourcePath);
+    path::native(ResourcePath);
+
     auto DTDeps = SubInstance.getDependencyTracker()->getDependencies();
     SmallVector<StringRef, 16> InitialDepNames(DTDeps.begin(), DTDeps.end());
     InitialDepNames.push_back(interfacePath);
     llvm::StringSet<> AllDepNames;
+    SmallString<128> Scratch;
 
-    for (auto const &DepName : InitialDepNames) {
+    for (const auto &InitialDepName : InitialDepNames) {
+      path::native(InitialDepName, Scratch);
+      StringRef DepName = Scratch.str();
+
       assert(moduleCachePath.empty() || !DepName.startswith(moduleCachePath));
       assert(prebuiltCachePath.empty() || !DepName.startswith(prebuiltCachePath));
+
+      // Serialize the paths of dependencies in the SDK relative to it.
+      Optional<StringRef> SDKRelativePath = getRelativeDepPath(DepName, SDKPath);
+      StringRef DepNameToStore = SDKRelativePath.getValueOr(DepName);
+      bool IsSDKRelative = SDKRelativePath.hasValue();
+
+      if (AllDepNames.insert(DepName).second && dependencyTracker) {
+        dependencyTracker->addDependency(DepName, /*isSystem*/IsSDKRelative);
+      }
+
+      // Don't serialize compiler-relative deps so the cache is relocatable.
+      if (DepName.startswith(ResourcePath))
+        continue;
+
+      auto Status = getStatusOfDependency(fs, DepName, interfacePath,
+                                          diags, diagnosticLoc);
+      if (!Status)
+        return true;
 
       /// Lazily load the dependency buffer if we need it. If we're not
       /// dealing with a hash-based dependencies, and if the dependency is
@@ -390,40 +441,6 @@ class swift::ParseableInterfaceBuilder {
         }
         return nullptr;
       };
-
-      // Adjust the paths of dependences in the SDK to be relative to it
-      bool IsSDKRelative = false;
-      StringRef DepNameToStore = DepName;
-      if (SDKPath.size() > 1 && DepName.startswith(SDKPath)) {
-        assert(DepName.size() > SDKPath.size() &&
-            "should never depend on a directory");
-        if (llvm::sys::path::is_separator(DepName[SDKPath.size()])) {
-          // Is the DepName something like ${SDKPath}/foo.h"?
-          DepNameToStore = DepName.substr(SDKPath.size() + 1);
-          IsSDKRelative = true;
-        } else if (llvm::sys::path::is_separator(SDKPath.back())) {
-          // Is the DepName something like "${SDKPath}foo.h", where SDKPath
-          // itself contains a trailing slash?
-          DepNameToStore = DepName.substr(SDKPath.size());
-          IsSDKRelative = true;
-        } else {
-          // We have something next to an SDK, like "Foo.sdk.h", that's somehow
-          // become a dependency.
-        }
-      }
-
-      if (AllDepNames.insert(DepName).second && dependencyTracker) {
-        dependencyTracker->addDependency(DepName, /*isSystem*/IsSDKRelative);
-      }
-
-      // Don't serialize compiler-relative deps so the cache is relocatable.
-      if (DepName.startswith(ResourcePath))
-        continue;
-
-      auto Status = getStatusOfDependency(fs, DepName, interfacePath,
-                                          diags, diagnosticLoc);
-      if (!Status)
-        return true;
 
       if (IsHashBased) {
         auto buf = getDepBuf();
@@ -687,8 +704,7 @@ class ParseableInterfaceModuleLoaderImpl {
     if (!dep.isSDKRelative())
       return dep.getPath();
 
-    StringRef SDKPath = ctx.SearchPathOpts.SDKPath;
-    scratch.assign(SDKPath.begin(), SDKPath.end());
+    path::native(ctx.SearchPathOpts.SDKPath, scratch);
     llvm::sys::path::append(scratch, dep.getPath());
     return StringRef(scratch.data(), scratch.size());
   }
@@ -1031,7 +1047,8 @@ class ParseableInterfaceModuleLoaderImpl {
         SmallString<128> SDKRelativeBuffer;
         for (auto &dep: allDeps) {
           StringRef fullPath = getFullDependencyPath(dep, SDKRelativeBuffer);
-          dependencyTracker->addDependency(fullPath, dep.isSDKRelative());
+          dependencyTracker->addDependency(fullPath,
+                                           /*IsSystem=*/dep.isSDKRelative());
         }
       }
 
