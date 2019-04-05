@@ -136,6 +136,12 @@ NumpyConversionTests.test("tensor-round-trip") {
   let t3 = Tensor<Int32>(repeating: 30, shape: [8,5,4])
   expectEqual(t3, Tensor<Int32>(numpy: t3.makeNumpyArray())!)
 }
+
+NumpyConversionTests.test("tensor-shape") {
+  let pyArray = [2, 3].pythonObject
+  expectEqual(pyArray, TensorShape(2, 3).pythonObject)
+  expectEqual(TensorShape(2, 3), TensorShape(pyArray))
+}
 #endif
 
 runAllTests()

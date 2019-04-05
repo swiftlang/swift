@@ -5,7 +5,6 @@
 
 import Python
 import StdlibUnittest
-import struct TensorFlow.TensorShape
 
 /// The gc module is an interface to the Python garbage collector.
 let gc = Python.import("gc")
@@ -289,7 +288,6 @@ PythonRuntimeTestSuite.testWithLeakChecking("ConvertibleFromPython") {
   expectEqual("abc", String(string))
 
   expectEqual([2, 3], Array(intArray))
-  expectEqual(TensorShape(2, 3), TensorShape(intArray))
   expectEqual(["abc" : 97], Dictionary<String, Int32>(dict))
 
   expectNil(String(zero))
@@ -321,8 +319,6 @@ PythonRuntimeTestSuite.testWithLeakChecking("PythonConvertible") {
 
   expectEqual(intArray, [2, 3].pythonObject)
   expectEqual(dict, ["abc" : 7].pythonObject)
-
-  expectEqual(intArray, TensorShape(2, 3).pythonObject)
 }
 
 PythonRuntimeTestSuite.testWithLeakChecking("Optional") {
