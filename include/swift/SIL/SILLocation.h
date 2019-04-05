@@ -687,6 +687,8 @@ private:
       : SILLocation(D, MandatoryInlinedKind, F) {}
   MandatoryInlinedLocation(SourceLoc L, unsigned F)
       : SILLocation(L, MandatoryInlinedKind, F) {}
+  MandatoryInlinedLocation(DebugLoc L, unsigned F)
+      : SILLocation(L, MandatoryInlinedKind, F) {}
 };
 
 /// Used on the instruction performing auto-generated cleanup such as
