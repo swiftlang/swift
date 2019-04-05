@@ -307,19 +307,16 @@ func doThing1(_ completion: (_ success: Bool) -> ()) {
   // expected-note@-1{{parameter 'completion' is implicitly non-escaping}}
   // expected-error @+1 {{non-escaping parameter 'completion' may only be called}}
   escape = completion // expected-error {{declaration closing over non-escaping parameter 'escape' may allow it to escape}}
-  // expected-error @-1 {{non-escaping value 'escape' may only be called}}
 }
 func doThing2(_ completion: CompletionHandlerNE) {
   // expected-note@-1{{parameter 'completion' is implicitly non-escaping}}
   // expected-error @+1 {{non-escaping parameter 'completion' may only be called}}
   escape = completion // expected-error {{declaration closing over non-escaping parameter 'escape' may allow it to escape}}
-  // expected-error @-1 {{non-escaping value 'escape' may only be called}}
 }
 func doThing3(_ completion: CompletionHandler) {
   // expected-note@-1{{parameter 'completion' is implicitly non-escaping}}
   // expected-error @+1 {{non-escaping parameter 'completion' may only be called}}
   escape = completion // expected-error {{declaration closing over non-escaping parameter 'escape' may allow it to escape}}
-  // expected-error @-1 {{non-escaping value 'escape' may only be called}}
 }
 func doThing4(_ completion: @escaping CompletionHandler) {
   escapeOther = completion
