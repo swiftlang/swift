@@ -74,14 +74,12 @@ public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConv
         }
     }
     
-    public var hashValue: Int {
-        return withUnsafePointer(to: uuid) {
-              $0.withMemoryRebound(to: UInt8.self, capacity: 16) {
-                  return Int(bitPattern: CFHashBytes(UnsafeMutablePointer(mutating: $0), CFIndex(MemoryLayout<uuid_t>.size)))
-              }
+    public func hash(into hasher: inout Hasher) {
+        withUnsafeBytes(of: uuid) { buffer in
+            hasher.combine(bytes: buffer)
         }
     }
-    
+
     public var description: String {
         return uuidString
     }
