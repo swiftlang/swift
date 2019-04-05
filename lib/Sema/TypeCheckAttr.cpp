@@ -323,10 +323,6 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
 }
 
 void AttributeEarlyChecker::visitDynamicAttr(DynamicAttr *attr) {
-  // Members cannot be both dynamic and final.
-  if (D->getAttrs().hasAttribute<FinalAttr>())
-    diagnoseAndRemoveAttr(attr, diag::dynamic_with_final);
-
   // Members cannot be both dynamic and @nonobjc.
   if (D->getAttrs().hasAttribute<NonObjCAttr>())
     diagnoseAndRemoveAttr(attr, diag::dynamic_with_nonobjc);
@@ -2632,8 +2628,7 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
       isa<AccessorDecl>(D))
     return;
 
-  if (D->getAttrs().hasAttribute<FinalAttr>() ||
-      D->getAttrs().hasAttribute<NonObjCAttr>() ||
+  if (D->getAttrs().hasAttribute<NonObjCAttr>() ||
       D->getAttrs().hasAttribute<TransparentAttr>() ||
       D->getAttrs().hasAttribute<InlinableAttr>())
     return;
