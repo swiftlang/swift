@@ -315,8 +315,8 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
       if (!baseDC->isTypeContext()) {
         // If we found the result in a self capture, look through the
         if (auto *CE = dyn_cast<ClosureExpr>(baseDC)) {
-          baseDC = CE->getSelfParamCaptureInit()->getSingleInitializerVar()
-                                                ->getDeclContext();
+          baseDC = CE->getSelfParamCapture().Init->getSingleInitializerVar()
+                                                 ->getDeclContext();
         }
         baseDC = baseDC->getParent();
         assert(baseDC->isTypeContext());

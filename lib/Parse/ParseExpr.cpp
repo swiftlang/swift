@@ -2859,7 +2859,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   Expr *result = closure;
   if (!captureList.empty()) {
     CaptureListExpr *CLE = CaptureListExpr::create(Context, captureList, closure);
-    closure->setCaptureList(CLE->getCaptureList());
+    closure->setCaptureListExpr(CLE);
     result = CLE;
   }
 

@@ -1322,7 +1322,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
         : TC(TC), InClosure(isAlreadyInClosure) {}
 
     /// Return true if this is an implicit reference to self.
-    static bool isImplicitSelfUse(Expr *E) {
+    static bool isImplicitSelfParamUse(Expr *E) {
       auto *DRE = dyn_cast<DeclRefExpr>(E);
 
       if (!DRE || !DRE->isImplicit() || !isa<VarDecl>(DRE->getDecl()) ||
@@ -1376,7 +1376,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
       // do this in explicit closures, not autoclosures, because otherwise the
       // transparence of autoclosures is lost.
       if (auto *MRE = dyn_cast<MemberRefExpr>(E))
-        if (isImplicitSelfUse(MRE->getBase())) {
+        if (isImplicitSelfParamUse(MRE->getBase())) {
           TC.diagnose(MRE->getLoc(),
                       diag::property_use_in_closure_without_explicit_self,
                       MRE->getMember().getDecl()->getBaseName().getIdentifier())
@@ -1386,7 +1386,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
 
       // Handle method calls with a specific diagnostic + fixit.
       if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(E))
-        if (isImplicitSelfUse(DSCE->getBase()) &&
+        if (isImplicitSelfParamUse(DSCE->getBase()) &&
             isa<DeclRefExpr>(DSCE->getFn())) {
           auto MethodExpr = cast<DeclRefExpr>(DSCE->getFn());
           TC.diagnose(DSCE->getLoc(),
@@ -1397,7 +1397,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
         }
 
       // Catch any other implicit uses of self with a generic diagnostic.
-      if (isImplicitSelfUse(E))
+      if (isImplicitSelfParamUse(E))
         TC.diagnose(E->getLoc(), diag::implicit_use_of_self_in_closure);
 
       return { true, E };

@@ -55,9 +55,9 @@ ValueDecl *LookupResultEntry::getBaseDecl() const {
     assert(selfDecl);
     return selfDecl;
   }
-  
+
   if (auto *CE = dyn_cast<ClosureExpr>(BaseDC)) {
-    auto *selfDecl = CE->getSelfParamCaptureDecl();
+    auto *selfDecl = CE->getSelfParamCapture().Var;
     assert(selfDecl);
     return selfDecl;
   }

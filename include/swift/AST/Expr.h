@@ -61,6 +61,7 @@ namespace swift {
   class EnumElementDecl;
   class CallExpr;
   class KeyPathExpr;
+  class CaptureListExpr;
 
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -3545,19 +3546,6 @@ public:
     return false;
   }
 };
-  
-/// Instances of this structure represent elements of the capture list that can
-/// optionally occur in a capture expression.
-struct CaptureListEntry {
-  VarDecl *Var;
-  PatternBindingDecl *Init;
-  
-  CaptureListEntry(VarDecl *Var, PatternBindingDecl *Init)
-  : Var(Var), Init(Init) {
-  }
-  
-  bool isSimpleSelfCapture() const;
-};
 
 /// An explicit unnamed function expression, which can optionally have
 /// named arguments.
@@ -3587,9 +3575,9 @@ class ClosureExpr : public AbstractClosureExpr {
   /// was originally just a single expression.
   llvm::PointerIntPair<BraceStmt *, 1, bool> Body;
   
-  /// The list of VarDecls captured explicitly by this closure, nullptr
-  /// if there are no explicit captures.
-  ArrayRef<CaptureListEntry> CaptureList;
+  /// The (possibly null) expression of the list of VarDecls captured explicitly
+  /// by this closure.
+  CaptureListExpr *CLE;
 public:
   ClosureExpr(ParameterList *params, SourceLoc throwsLoc, SourceLoc arrowLoc,
               SourceLoc inLoc, TypeLoc explicitResultType,
@@ -3599,7 +3587,7 @@ public:
       ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc), InLoc(inLoc),
       ExplicitResultType(explicitResultType),
       Body(nullptr),
-      CaptureList() {
+      CLE(nullptr) {
     setParameterList(params);
     Bits.ClosureExpr.HasAnonymousClosureVars = false;
   }
@@ -3695,15 +3683,14 @@ public:
 
   /// Is this a completely empty closure?
   bool hasEmptyBody() const;
-  
-  ArrayRef<CaptureListEntry> getCaptureList() const { return CaptureList; }
-  void setCaptureList(ArrayRef<CaptureListEntry> list) {
-    CaptureList = list;
+
+  CaptureListExpr *getCaptureListExpr() const { return CLE; }
+  void setCaptureListExpr(CaptureListExpr *list) {
+    CLE = list;
   }
-  
-  bool hasSimplyCapturedSelfParam() const;
-  VarDecl *getSelfParamCaptureDecl() const;
-  PatternBindingDecl *getSelfParamCaptureInit() const;
+
+  bool hasSelfParamCapture() const;
+  CaptureListEntry getSelfParamCapture() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Closure;
@@ -3761,6 +3748,19 @@ public:
   static bool classof(const DeclContext *C) {
     return isa<AbstractClosureExpr>(C) && classof(cast<AbstractClosureExpr>(C));
   }
+};
+
+/// Instances of this structure represent elements of the capture list that can
+/// optionally occur in a capture expression.
+struct CaptureListEntry {
+  VarDecl *Var;
+  PatternBindingDecl *Init;
+
+  CaptureListEntry(VarDecl *Var, PatternBindingDecl *Init)
+  : Var(Var), Init(Init) {
+  }
+
+  bool isSimpleSelfCapture() const;
 };
 
 /// CaptureListExpr - This expression represents the capture list on an explicit

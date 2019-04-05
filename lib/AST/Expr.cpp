@@ -1232,8 +1232,11 @@ bool CaptureListEntry::isSimpleSelfCapture() const {
   if (Init->getPatternList().size() != 1)
     return false;
   if (auto *DRE = dyn_cast<DeclRefExpr>(Init->getInit(0)))
-    if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl()))
-      return VD->isSelfParameter() && VD->getName() == Var->getName();
+    if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+      auto *ownership = Var->getAttrs().getAttribute<ReferenceOwnershipAttr>();
+      return VD->isSelfParameter() && VD->getName() == Var->getName()
+          && (!ownership || ownership->get() == ReferenceOwnership::Strong);
+    }
   return false;
 }
 
@@ -1876,28 +1879,20 @@ bool ClosureExpr::hasEmptyBody() const {
   return getBody()->getNumElements() == 0;
 }
 
-bool ClosureExpr::hasSimplyCapturedSelfParam() const {
-  for (auto CLE : getCaptureList()) {
+bool ClosureExpr::hasSelfParamCapture() const {
+  for (auto CLE : getCaptureListExpr()->getCaptureList()) {
     if (CLE.isSimpleSelfCapture())
       return true;
   }
   return false;
 }
 
-VarDecl *ClosureExpr::getSelfParamCaptureDecl() const {
-  for (auto CLE : getCaptureList()) {
+CaptureListEntry ClosureExpr::getSelfParamCapture() const {
+  for (auto CLE : getCaptureListExpr()->getCaptureList()) {
     if (CLE.isSimpleSelfCapture())
-      return CLE.Var;
+      return CLE;
   }
-  return nullptr;
-}
-
-PatternBindingDecl *ClosureExpr::getSelfParamCaptureInit() const {
-  for (auto CLE : getCaptureList()) {
-    if (CLE.isSimpleSelfCapture())
-      return CLE.Init;
-  }
-  return nullptr;
+  return {nullptr, nullptr};
 }
 
 FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)
