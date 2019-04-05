@@ -959,6 +959,10 @@ private:
   /// May be -1, to indicate no association with a buffer.
   int BufferID;
 
+  /// Does this source file have any implementation-only imports?
+  /// If not, we can fast-path module checks.
+  bool HasImplementationOnlyImports = false;
+
   /// The list of protocol conformances that were "used" within this
   /// source file.
   llvm::SetVector<NormalProtocolConformance *> UsedConformances;
@@ -1046,6 +1050,12 @@ public:
   bool
   hasTestableOrPrivateImport(AccessLevel accessLevel, const ValueDecl *ofDecl,
                              ImportQueryKind kind = TestableAndPrivate) const;
+
+  bool hasImplementationOnlyImports() const {
+    return HasImplementationOnlyImports;
+  }
+
+  bool isImportedImplementationOnly(const ModuleDecl *module) const;
 
   void clearLookupCache();
 
