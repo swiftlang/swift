@@ -18,3 +18,13 @@ var test1 = Test1a.self
 test1 = Test1b.self
 var x = Test1b()
 test1 = type(of: x)
+
+// test associated type access through metatypes
+protocol P {
+  typealias E = Int
+}
+
+func foo(meta1: P.Protocol, meta2: P.Type) {
+  print(meta1.E.self)
+  print(meta2.E.self)
+}
