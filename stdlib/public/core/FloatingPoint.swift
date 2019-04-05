@@ -230,7 +230,6 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   ///     the initializer has the same magnitude as `magnitudeOf`.
   init(signOf: Self, magnitudeOf: Self)
   
-  
   /// Creates a new value, rounded to the closest possible representation.
   ///
   /// If two representable values are equally close, the result is the value
@@ -1899,10 +1898,6 @@ extension FloatingPoint {
   ///   other is NaN.
   @inlinable
   public static func minimum(_ x: Self, _ y: Self) -> Self {
-    if x.isSignalingNaN || y.isSignalingNaN {
-      //  Produce a quiet NaN matching platform arithmetic behavior.
-      return x + y
-    }
     if x <= y || y.isNaN { return x }
     return y
   }
@@ -1936,10 +1931,6 @@ extension FloatingPoint {
   ///   other is NaN.
   @inlinable
   public static func maximum(_ x: Self, _ y: Self) -> Self {
-    if x.isSignalingNaN || y.isSignalingNaN {
-      //  Produce a quiet NaN matching platform arithmetic behavior.
-      return x + y
-    }
     if x > y || y.isNaN { return x }
     return y
   }
@@ -1975,10 +1966,6 @@ extension FloatingPoint {
   ///   a number if the other is NaN.
   @inlinable
   public static func minimumMagnitude(_ x: Self, _ y: Self) -> Self {
-    if x.isSignalingNaN || y.isSignalingNaN {
-      //  Produce a quiet NaN matching platform arithmetic behavior.
-      return x + y
-    }
     if x.magnitude <= y.magnitude || y.isNaN { return x }
     return y
   }
@@ -2014,10 +2001,6 @@ extension FloatingPoint {
   ///   a number if the other is NaN.
   @inlinable
   public static func maximumMagnitude(_ x: Self, _ y: Self) -> Self {
-    if x.isSignalingNaN || y.isSignalingNaN {
-      //  Produce a quiet NaN matching platform arithmetic behavior.
-      return x + y
-    }
     if x.magnitude > y.magnitude || y.isNaN { return x }
     return y
   }

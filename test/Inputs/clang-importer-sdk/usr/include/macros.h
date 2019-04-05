@@ -25,6 +25,8 @@
 #define TRUE 1
 #define FALSE 0
 
+#define LL_TO_ULL 0x8000000000000000LL
+
 #define A_PI M_PI
 
 #define VERSION_STRING "Swift 1.0"

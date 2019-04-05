@@ -36,6 +36,7 @@
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/InlineBitfield.h"
+#include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/OptionalEnum.h"
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/DenseMap.h"
@@ -334,7 +335,7 @@ protected:
     IsUserAccessible : 1
   );
 
-  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1+1+2+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1+1+2+1+1+1,
     /// Whether the getter is mutating.
     IsGetterMutating : 1,
 
@@ -353,14 +354,14 @@ protected:
     /// Whether a keypath component can directly reference this storage,
     /// or if it must use the overridden declaration instead.
     HasComputedValidKeyPathComponent : 1,
-    ValidKeyPathComponent : 1
-  );
-
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+4+1+1+1+1,
+    ValidKeyPathComponent : 1,
+    
     /// Whether this property is a type property (currently unfortunately
     /// called 'static').
-    IsStatic : 1,
+    IsStatic : 1
+  );
 
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 4+1+1+1+1,
     /// The specifier associated with this variable or parameter.  This
     /// determines the storage semantics of the value e.g. mutability.
     Specifier : 4,
@@ -394,11 +395,10 @@ protected:
     defaultArgumentKind : NumDefaultArgumentKindBits
   );
 
-  SWIFT_INLINE_BITFIELD(EnumElementDecl, ValueDecl, 1,
-    /// The ResilienceExpansion to use for default arguments.
-    DefaultArgumentResilienceExpansion : 1
+  SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2,
+    StaticSpelling : 2
   );
-  
+
   SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
@@ -420,9 +420,6 @@ protected:
 
     /// Whether NeedsNewVTableEntry is valid.
     HasComputedNeedsNewVTableEntry : 1,
-
-    /// The ResilienceExpansion to use for default arguments.
-    DefaultArgumentResilienceExpansion : 1,
 
     /// Whether this member was synthesized as part of a derived
     /// protocol conformance.
@@ -4283,8 +4280,9 @@ private:
   }
 
 protected:
-  AbstractStorageDecl(DeclKind Kind, DeclContext *DC, DeclName Name,
-                      SourceLoc NameLoc, StorageIsMutable_t supportsMutation)
+  AbstractStorageDecl(DeclKind Kind, bool IsStatic, DeclContext *DC,
+                      DeclName Name, SourceLoc NameLoc,
+                      StorageIsMutable_t supportsMutation)
     : ValueDecl(Kind, DC, Name, NameLoc) {
     Bits.AbstractStorageDecl.HasStorage = true;
     Bits.AbstractStorageDecl.SupportsMutation = supportsMutation;
@@ -4292,6 +4290,7 @@ protected:
     Bits.AbstractStorageDecl.IsSetterMutating = true;
     Bits.AbstractStorageDecl.OpaqueReadOwnership =
       unsigned(OpaqueReadOwnership::Owned);
+    Bits.AbstractStorageDecl.IsStatic = IsStatic;
   }
 
   void setSupportsMutationIfStillStored(StorageIsMutable_t supportsMutation) {
@@ -4312,9 +4311,16 @@ public:
   /// attribute.
   bool isTransparent() const;
 
-  /// Determine whether this storage is a static member, if it
-  /// is a member.  Currently only variables can be static.
-  inline bool isStatic() const; // defined in this header
+  /// Is this a type ('static') variable?
+  bool isStatic() const {
+    return Bits.AbstractStorageDecl.IsStatic;
+  }
+  void setStatic(bool IsStatic) {
+    Bits.AbstractStorageDecl.IsStatic = IsStatic;
+  }
+
+  /// \returns the way 'static'/'class' should be spelled for this declaration.
+  StaticSpellingKind getCorrectStaticSpelling() const;
 
   /// Return the interface type of the stored value.
   Type getValueInterfaceType() const;
@@ -4612,10 +4618,9 @@ protected:
 
   VarDecl(DeclKind Kind, bool IsStatic, Specifier Sp, bool IsCaptureList,
           SourceLoc NameLoc, Identifier Name, DeclContext *DC)
-    : AbstractStorageDecl(Kind, DC, Name, NameLoc,
+    : AbstractStorageDecl(Kind, IsStatic, DC, Name, NameLoc,
                           StorageIsMutable_t(!isImmutableSpecifier(Sp)))
   {
-    Bits.VarDecl.IsStatic = IsStatic;
     Bits.VarDecl.Specifier = static_cast<unsigned>(Sp);
     Bits.VarDecl.IsCaptureList = IsCaptureList;
     Bits.VarDecl.IsDebuggerVar = false;
@@ -4743,7 +4748,31 @@ public:
   /// return this. Otherwise, this VarDecl must belong to a CaseStmt's
   /// CaseLabelItem. In that case, return the first case label item of the first
   /// case stmt in a sequence of case stmts that fallthrough into each other.
+  ///
+  /// NOTE: During type checking, we emit an error if we have a single case
+  /// label item with a pattern that has multiple var decls of the same
+  /// name. This means that during type checking and before type checking, we
+  /// may have a _malformed_ switch stmt var decl linked list since var decls in
+  /// the same case label item that have the same name will point at the same
+  /// canonical var decl, namely the first var decl with the name in the
+  /// canonical case label item's var decl list. This is ok, since we are going
+  /// to emit the error, but it requires us to be more careful/cautious before
+  /// type checking has been complete when relying on canonical var decls
+  /// matching up.
   VarDecl *getCanonicalVarDecl() const;
+
+  /// If this is a case stmt var decl, return the var decl that corresponds to
+  /// this var decl in the first case label item of the case stmt. Returns
+  /// nullptr if this isn't a VarDecl that is part of a case stmt.
+  NullablePtr<VarDecl> getCorrespondingFirstCaseLabelItemVarDecl() const;
+
+  /// If this is a case stmt var decl, return the case body var decl that this
+  /// var decl maps to.
+  NullablePtr<VarDecl> getCorrespondingCaseBodyVariable() const;
+
+  /// Return true if this var decl is an implicit var decl belonging to a case
+  /// stmt's body.
+  bool isCaseBodyVariable() const;
 
   /// True if the global stored property requires lazy initialization.
   bool isLazilyInitializedGlobal() const;
@@ -4794,14 +4823,6 @@ public:
     return getSpecifier() == Specifier::InOut;
   }
   
-  
-  /// Is this a type ('static') variable?
-  bool isStatic() const { return Bits.VarDecl.IsStatic; }
-  void setStatic(bool IsStatic) { Bits.VarDecl.IsStatic = IsStatic; }
-
-  /// \returns the way 'static'/'class' should be spelled for this declaration.
-  StaticSpellingKind getCorrectStaticSpelling() const;
-
   bool isImmutable() const {
     return isImmutableSpecifier(getSpecifier());
   }
@@ -5110,24 +5131,40 @@ enum class ObjCSubscriptKind {
 /// signatures (indices and element type) are distinct.
 ///
 class SubscriptDecl : public GenericContext, public AbstractStorageDecl {
+  SourceLoc StaticLoc;
   SourceLoc ArrowLoc;
   ParameterList *Indices;
   TypeLoc ElementTy;
 
 public:
-  SubscriptDecl(DeclName Name, SourceLoc SubscriptLoc, ParameterList *Indices,
+  SubscriptDecl(DeclName Name,
+                SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
+                SourceLoc SubscriptLoc, ParameterList *Indices,
                 SourceLoc ArrowLoc, TypeLoc ElementTy, DeclContext *Parent,
                 GenericParamList *GenericParams)
     : GenericContext(DeclContextKind::SubscriptDecl, Parent),
-      AbstractStorageDecl(DeclKind::Subscript, Parent, Name, SubscriptLoc,
+      AbstractStorageDecl(DeclKind::Subscript,
+                          StaticSpelling != StaticSpellingKind::None,
+                          Parent, Name, SubscriptLoc,
                           /*will be overwritten*/ StorageIsNotMutable),
-      ArrowLoc(ArrowLoc), Indices(nullptr), ElementTy(ElementTy) {
+      StaticLoc(StaticLoc), ArrowLoc(ArrowLoc),
+      Indices(nullptr), ElementTy(ElementTy) {
+    Bits.SubscriptDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     setIndices(Indices);
     setGenericParams(GenericParams);
   }
   
+  /// \returns the way 'static'/'class' was spelled in the source.
+  StaticSpellingKind getStaticSpelling() const {
+    return static_cast<StaticSpellingKind>(Bits.SubscriptDecl.StaticSpelling);
+  }
+  
+  SourceLoc getStaticLoc() const { return StaticLoc; }
   SourceLoc getSubscriptLoc() const { return getNameLoc(); }
-  SourceLoc getStartLoc() const { return getSubscriptLoc(); }
+  
+  SourceLoc getStartLoc() const {
+    return getStaticLoc().isValid() ? getStaticLoc() : getSubscriptLoc();
+  }
   SourceRange getSourceRange() const;
   SourceRange getSignatureSourceRange() const;
 
@@ -5287,8 +5324,6 @@ protected:
     Bits.AbstractFunctionDecl.Throws = Throws;
     Bits.AbstractFunctionDecl.NeedsNewVTableEntry = false;
     Bits.AbstractFunctionDecl.HasComputedNeedsNewVTableEntry = false;
-    Bits.AbstractFunctionDecl.DefaultArgumentResilienceExpansion =
-        unsigned(ResilienceExpansion::Maximal);
     Bits.AbstractFunctionDecl.Synthesized = false;
   }
 
@@ -5535,21 +5570,6 @@ public:
   ///
   /// Resolved during type checking
   void setIsOverridden() { Bits.AbstractFunctionDecl.Overridden = true; }
-
-  /// The ResilienceExpansion for default arguments.
-  ///
-  /// In Swift 4 mode, default argument expressions are serialized, and must
-  /// obey the restrictions imposed upon inlinable function bodies.
-  ResilienceExpansion getDefaultArgumentResilienceExpansion() const {
-    return ResilienceExpansion(
-        Bits.AbstractFunctionDecl.DefaultArgumentResilienceExpansion);
-  }
-
-  /// Set the ResilienceExpansion for default arguments.
-  void setDefaultArgumentResilienceExpansion(ResilienceExpansion expansion) {
-    Bits.AbstractFunctionDecl.DefaultArgumentResilienceExpansion =
-        unsigned(expansion);
-  }
 
   /// Set information about the foreign error convention used by this
   /// declaration.
@@ -6005,10 +6025,7 @@ public:
     Params(Params),
     EqualsLoc(EqualsLoc),
     RawValueExpr(RawValueExpr)
-  {
-    Bits.EnumElementDecl.DefaultArgumentResilienceExpansion =
-        static_cast<unsigned>(ResilienceExpansion::Maximal);
-  }
+  {}
 
   Identifier getName() const { return getFullName().getBaseIdentifier(); }
 
@@ -6037,21 +6054,6 @@ public:
     TypeCheckedRawValueExpr = e;
   }
 
-  /// The ResilienceExpansion for default arguments.
-  ///
-  /// In Swift 4 mode, default argument expressions are serialized, and must
-  /// obey the restrictions imposed upon inlinable function bodies.
-  ResilienceExpansion getDefaultArgumentResilienceExpansion() const {
-    return ResilienceExpansion(
-        Bits.EnumElementDecl.DefaultArgumentResilienceExpansion);
-  }
-
-  /// Set the ResilienceExpansion for default arguments.
-  void setDefaultArgumentResilienceExpansion(ResilienceExpansion expansion) {
-    Bits.EnumElementDecl.DefaultArgumentResilienceExpansion =
-        unsigned(expansion);
-  }
-  
   /// Return the containing EnumDecl.
   EnumDecl *getParentEnum() const {
     return cast<EnumDecl>(getDeclContext());
@@ -6823,15 +6825,6 @@ AbstractStorageDecl::overwriteSetterAccess(AccessLevel accessLevel) {
     modify->overwriteAccess(accessLevel);
   if (auto mutableAddressor = getMutableAddressor())
     mutableAddressor->overwriteAccess(accessLevel);
-}
-
-inline bool AbstractStorageDecl::isStatic() const {
-  if (auto var = dyn_cast<VarDecl>(this)) {
-    return var->isStatic();
-  }
-
-  // Currently, subscripts are never static.
-  return false;
 }
 
 /// Constructors and destructors always have a 'self' parameter,

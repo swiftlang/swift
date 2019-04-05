@@ -3255,31 +3255,7 @@ class BeginBorrowInst
   BeginBorrowInst(SILDebugLocation DebugLoc, SILValue LValue)
       : UnaryInstructionBase(DebugLoc, LValue,
                              LValue->getType().getObjectType()) {}
-
-private:
-  /// Predicate used to filer EndBorrowRange.
-  struct UseToEndBorrow;
-
-public:
-  using EndBorrowRange =
-      OptionalTransformRange<use_range, UseToEndBorrow, use_iterator>;
-
-  /// Find all associated end_borrow instructions for this begin_borrow.
-  EndBorrowRange getEndBorrows() const;
 };
-
-struct BeginBorrowInst::UseToEndBorrow {
-  Optional<EndBorrowInst *> operator()(Operand *use) const {
-    if (auto *ebi = dyn_cast<EndBorrowInst>(use->getUser())) {
-      return ebi;
-    }
-    return None;
-  }
-};
-
-inline auto BeginBorrowInst::getEndBorrows() const -> EndBorrowRange {
-  return EndBorrowRange(getUses(), UseToEndBorrow());
-}
 
 /// Represents a store of a borrowed value into an address. Returns the borrowed
 /// address. Must be paired with an end_borrow in its use-def list.

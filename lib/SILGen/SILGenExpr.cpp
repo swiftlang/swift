@@ -3217,8 +3217,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
                                 bool forPropertyDescriptor) {
   /// Returns true if a key path component for the given property or
   /// subscript should be externally referenced.
-  auto shouldUseExternalKeyPathComponent =
-    [&]() -> bool {
+  auto shouldUseExternalKeyPathComponent = [&]() -> bool {
     return (!forPropertyDescriptor &&
             (storage->getModuleContext() != SwiftModule ||
              storage->isResilient(SwiftModule, expansion)) &&
@@ -3227,11 +3226,15 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
             // Properties that only dispatch via ObjC lookup do not have nor
             // need property descriptors, since the selector identifies the
             // storage.
+            // Properties that are not public don't need property descriptors
+            // either.
             (!storage->hasAnyAccessors() ||
-             !getAccessorDeclRef(getRepresentativeAccessorForKeyPath(storage))
-             .isForeign));
-    };
-  
+             (!getAccessorDeclRef(getRepresentativeAccessorForKeyPath(storage))
+                   .isForeign &&
+              getAccessorDeclRef(getRepresentativeAccessorForKeyPath(storage))
+                      .getLinkage(ForDefinition) <= SILLinkage::PublicNonABI)));
+  };
+
   auto strategy = storage->getAccessStrategy(AccessSemantics::Ordinary,
                                              storage->supportsMutation()
                                                ? AccessKind::ReadWrite

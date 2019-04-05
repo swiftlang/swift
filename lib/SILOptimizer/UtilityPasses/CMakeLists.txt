@@ -27,5 +27,5 @@ silopt_register_sources(
   SideEffectsDumper.cpp
   SimplifyUnreachableContainingBlocks.cpp
   StripDebugInfo.cpp
-  ValueOwnershipKindDumper.cpp
+  OwnershipDumper.cpp
 )

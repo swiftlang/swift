@@ -224,7 +224,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   // call site.
   auto index = 0;
   for (auto *param : *AFD->getParameters()) {
-    if (param->getDefaultValue())
+    if (param->isDefaultArgument())
       addSymbol(SILDeclRef::getDefaultArgGenerator(AFD, index));
     index++;
   }

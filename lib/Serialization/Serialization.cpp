@@ -1076,6 +1076,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
                         dep.getSize(),
                         getRawModTimeOrHash(dep),
                         dep.isHashBased(),
+                        dep.isSDKRelative(),
                         dep.getPath());
   }
 
@@ -1192,16 +1193,6 @@ static uint8_t getRawStableMetatypeRepresentation(AnyMetatypeType *metatype) {
     return serialization::MetatypeRepresentation::MR_ObjC;
   }
   llvm_unreachable("bad representation");
-}
-
-static uint8_t getRawStableResilienceExpansion(swift::ResilienceExpansion e) {
-  switch (e) {
-  case swift::ResilienceExpansion::Minimal:
-    return uint8_t(serialization::ResilienceExpansion::Minimal);
-  case swift::ResilienceExpansion::Maximal:
-    return uint8_t(serialization::ResilienceExpansion::Maximal);
-  }
-  llvm_unreachable("unhandled expansion");
 }
 
 void Serializer::writeParameterList(const ParameterList *PL) {
@@ -3344,9 +3335,6 @@ void Serializer::writeDecl(const Decl *D) {
       nameComponentsAndDependencies.push_back(addDeclBaseNameRef(argName));
 
     uint8_t rawAccessLevel = getRawStableAccessLevel(fn->getFormalAccess());
-    uint8_t rawDefaultArgumentResilienceExpansion =
-      getRawStableResilienceExpansion(
-          fn->getDefaultArgumentResilienceExpansion());
 
     Type ty = fn->getInterfaceType();
     for (auto dependency : collectDependenciesFromType(ty->getCanonicalType()))
@@ -3373,7 +3361,6 @@ void Serializer::writeDecl(const Decl *D) {
                              fn->getFullName().isCompoundName(),
                            rawAccessLevel,
                            fn->needsNewVTableEntry(),
-                           rawDefaultArgumentResilienceExpansion,
                            nameComponentsAndDependencies);
 
     writeGenericParams(fn->getGenericParams());
@@ -3400,9 +3387,6 @@ void Serializer::writeDecl(const Decl *D) {
     uint8_t rawAccessLevel = getRawStableAccessLevel(fn->getFormalAccess());
     uint8_t rawAccessorKind =
       uint8_t(getStableAccessorKind(fn->getAccessorKind()));
-    uint8_t rawDefaultArgumentResilienceExpansion =
-      getRawStableResilienceExpansion(
-          fn->getDefaultArgumentResilienceExpansion());
 
     Type ty = fn->getInterfaceType();
     SmallVector<IdentifierID, 4> dependencies;
@@ -3429,7 +3413,6 @@ void Serializer::writeDecl(const Decl *D) {
                                rawAccessorKind,
                                rawAccessLevel,
                                fn->needsNewVTableEntry(),
-                               rawDefaultArgumentResilienceExpansion,
                                dependencies);
 
     writeGenericParams(fn->getGenericParams());
@@ -3471,9 +3454,6 @@ void Serializer::writeDecl(const Decl *D) {
       Negative = ILE->isNegative();
     }
 
-    uint8_t rawResilienceExpansion =
-        getRawStableResilienceExpansion(
-            elem->getDefaultArgumentResilienceExpansion());
     unsigned abbrCode = DeclTypeAbbrCodes[EnumElementLayout::Code];
     EnumElementLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                   contextID,
@@ -3482,7 +3462,6 @@ void Serializer::writeDecl(const Decl *D) {
                                   (unsigned)RawValueKind,
                                   Negative,
                                   addUniquedStringRef(RawValueText),
-                                  rawResilienceExpansion,
                                   elem->getFullName().getArgumentNames().size()+1,
                                   nameComponentsAndDependencies);
     if (auto *PL = elem->getParameterList())
@@ -3515,6 +3494,8 @@ void Serializer::writeDecl(const Decl *D) {
     if (subscript->isSettable())
       rawSetterAccessLevel =
         getRawStableAccessLevel(subscript->getSetterFormalAccess());
+    uint8_t rawStaticSpelling =
+      uint8_t(getStableStaticSpelling(subscript->getStaticSpelling()));
 
     unsigned abbrCode = DeclTypeAbbrCodes[SubscriptLayout::Code];
     SubscriptLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -3534,6 +3515,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 addDeclRef(subscript->getOverriddenDecl()),
                                 rawAccessLevel,
                                 rawSetterAccessLevel,
+                                rawStaticSpelling,
                                 subscript->
                                   getFullName().getArgumentNames().size(),
                                 nameComponentsAndDependencies);
@@ -3559,9 +3541,6 @@ void Serializer::writeDecl(const Decl *D) {
       nameComponentsAndDependencies.push_back(addTypeRef(dependency));
 
     uint8_t rawAccessLevel = getRawStableAccessLevel(ctor->getFormalAccess());
-    uint8_t rawDefaultArgumentResilienceExpansion =
-        getRawStableResilienceExpansion(
-            ctor->getDefaultArgumentResilienceExpansion());
 
     bool firstTimeRequired = ctor->isRequired();
     if (auto *overridden = ctor->getOverriddenDecl())
@@ -3584,7 +3563,6 @@ void Serializer::writeDecl(const Decl *D) {
                                   addDeclRef(ctor->getOverriddenDecl()),
                                   rawAccessLevel,
                                   ctor->needsNewVTableEntry(),
-                                  rawDefaultArgumentResilienceExpansion,
                                   firstTimeRequired,
                                   ctor->getFullName().getArgumentNames().size(),
                                   nameComponentsAndDependencies);

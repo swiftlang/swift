@@ -2347,8 +2347,14 @@ void FindLocalVal::visitCaseStmt(CaseStmt *S) {
       }
     }
   }
-  if (!inPatterns && !items.empty())
-    checkPattern(items[0].getPattern(), DeclVisibilityKind::LocalVariable);
+
+  if (!inPatterns && !items.empty()) {
+    if (auto caseBodyVars = S->getCaseBodyVariables()) {
+      for (auto *vd : *caseBodyVars) {
+        checkValueDecl(vd, DeclVisibilityKind::LocalVariable);
+      }
+    }
+  }
   visit(S->getBody());
 }
 

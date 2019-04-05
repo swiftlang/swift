@@ -1755,9 +1755,14 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
   }
 
   // Get the generic signature from the surrounding context.
-  auto funcInfo = TC.getConstantInfo(SILDeclRef(VD));
-  return CanAnyFunctionType::get(funcInfo.FormalType.getOptGenericSignature(),
-                                 {}, canResultTy);
+  CanGenericSignature sig;
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(VD)) {
+    auto funcInfo = TC.getConstantInfo(SILDeclRef(VD));
+    sig = funcInfo.FormalType.getOptGenericSignature();
+  } else {
+    sig = TC.getEffectiveGenericSignature(DC);
+  }
+  return CanAnyFunctionType::get(sig, {}, canResultTy);
 }
 
 /// Get the type of a stored property initializer, () -> T.
@@ -1940,7 +1945,8 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     return getGlobalAccessorType(var->getInterfaceType()->getCanonicalType());
   }
   case SILDeclRef::Kind::DefaultArgGenerator:
-    return getDefaultArgGeneratorInterfaceType(*this, vd, vd->getDeclContext(),
+    return getDefaultArgGeneratorInterfaceType(*this, vd,
+                                               vd->getInnermostDeclContext(),
                                                c.defaultArgIndex);
   case SILDeclRef::Kind::StoredPropertyInitializer:
     return getStoredPropertyInitializerInterfaceType(*this,
@@ -1995,7 +2001,10 @@ TypeConverter::getConstantGenericEnvironment(SILDeclRef c) {
     return cast<ClassDecl>(vd)->getGenericEnvironmentOfContext();
   case SILDeclRef::Kind::DefaultArgGenerator:
     // Use the generic environment of the original function.
-    return getConstantGenericEnvironment(SILDeclRef(c.getDecl()));
+    if (auto *afd = dyn_cast<AbstractFunctionDecl>(c.getDecl()))
+      return getConstantGenericEnvironment(SILDeclRef(c.getDecl()));
+    return c.getDecl()->getInnermostDeclContext()
+                      ->getGenericEnvironmentOfContext();
   case SILDeclRef::Kind::StoredPropertyInitializer:
     // Use the generic environment of the containing type.
     return c.getDecl()->getDeclContext()->getGenericEnvironmentOfContext();

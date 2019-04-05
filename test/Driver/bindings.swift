@@ -2,20 +2,20 @@
 
 // RUN: %swiftc_driver -driver-print-bindings -target x86_64-apple-macosx10.9 %/s 2>&1 | %FileCheck %s -check-prefix=BASIC
 // BASIC: # "x86_64-apple-macosx10.9" - "swift{{c?(\.EXE)?}}", inputs: ["{{.*}}bindings.swift"], output: {object: "[[OBJECT:.*\.o]]"}
-// BASIC: # "x86_64-apple-macosx10.9" - "ld", inputs: ["[[OBJECT]]"], output: {image: "bindings"}
+// BASIC: # "x86_64-apple-macosx10.9" - "ld{{(.exe)?}}", inputs: ["[[OBJECT]]"], output: {image: "bindings"}
 
 // RUN: %swiftc_driver -driver-print-bindings -target x86_64-apple-macosx10.9 - 2>&1 | %FileCheck %s -check-prefix=STDIN
 // STDIN: # "x86_64-apple-macosx10.9" - "swift{{c?(\.EXE)?}}", inputs: ["-"], output: {object: "[[OBJECT:.*\.o]]"}
-// STDIN: # "x86_64-apple-macosx10.9" - "ld", inputs: ["[[OBJECT]]"], output: {image: "main"}
+// STDIN: # "x86_64-apple-macosx10.9" - "ld{{(.exe)?}}", inputs: ["[[OBJECT]]"], output: {image: "main"}
 
 // RUN: %swiftc_driver -driver-print-bindings -target x86_64-apple-macosx10.9 %/S/Inputs/invalid-module-name.swift 2>&1 | %FileCheck %s -check-prefix=INVALID-NAME-SINGLE-FILE
 // INVALID-NAME-SINGLE-FILE: # "x86_64-apple-macosx10.9" - "swift{{c?(\.EXE)?}}", inputs: ["{{.*}}/Inputs/invalid-module-name.swift"], output: {object: "[[OBJECT:.*\.o]]"}
-// INVALID-NAME-SINGLE-FILE: # "x86_64-apple-macosx10.9" - "ld", inputs: ["[[OBJECT]]"], output: {image: "invalid-module-name"}
+// INVALID-NAME-SINGLE-FILE: # "x86_64-apple-macosx10.9" - "ld{{(.exe)?}}", inputs: ["[[OBJECT]]"], output: {image: "invalid-module-name"}
 
 // RUN: %swiftc_driver -driver-print-bindings -target x86_64-apple-macosx10.9 -o NamedOutput %/s 2>&1 | %FileCheck %s -check-prefix=NAMEDIMG
 // RUN: %swiftc_driver -driver-print-bindings -target x86_64-apple-macosx10.9 -module-name NamedOutput %/s 2>&1 | %FileCheck %s -check-prefix=NAMEDIMG
 // NAMEDIMG: # "x86_64-apple-macosx10.9" - "swift{{c?(\.EXE)?}}", inputs: ["{{.*}}bindings.swift"], output: {object: "[[OBJECT:.*\.o]]"}
-// NAMEDIMG: # "x86_64-apple-macosx10.9" - "ld", inputs: ["[[OBJECT]]"], output: {image: "NamedOutput"}
+// NAMEDIMG: # "x86_64-apple-macosx10.9" - "ld{{(.exe)?}}", inputs: ["[[OBJECT]]"], output: {image: "NamedOutput"}
 
 // RUN: %swiftc_driver -driver-print-bindings -target x86_64-apple-macosx10.9 -c %/s 2>&1 | %FileCheck %s -check-prefix=OBJ
 // OBJ: # "x86_64-apple-macosx10.9" - "swift{{c?(\.EXE)?}}", inputs: ["{{.*}}bindings.swift"], output: {object: "bindings.o"}
@@ -46,9 +46,9 @@
 // RUN: touch %t/a.o %t/b.o
 // RUN: %swiftc_driver -driver-print-bindings -target x86_64-apple-macosx10.9 %t/a.o %t/b.o -o main 2>&1 | %FileCheck %s -check-prefix=LINK-ONLY
 // RUN: %swiftc_driver -driver-print-bindings -target x86_64-apple-macosx10.9 -g %t/a.o %t/b.o -o main 2>&1 | %FileCheck %s -check-prefix=LINK-ONLY
-// LINK-ONLY: # "x86_64-apple-macosx10.9" - "ld", inputs: ["{{.*}}/a.o", "{{.*}}/b.o"], output: {image: "main"}
+// LINK-ONLY: # "x86_64-apple-macosx10.9" - "ld{{(.exe)?}}", inputs: ["{{.*}}/a.o", "{{.*}}/b.o"], output: {image: "main"}
 
 // RUN: touch %t/a.swiftmodule %t/b.swiftmodule
 // RUN: %swiftc_driver -driver-print-bindings -target x86_64-apple-macosx10.9 -g %t/a.o %t/b.o %t/a.swiftmodule %t/b.swiftmodule -o main 2>&1 | %FileCheck %s -check-prefix=DEBUG-LINK-ONLY
 // DEBUG-LINK-ONLY-NOT: "swift"
-// DEBUG-LINK-ONLY: # "x86_64-apple-macosx10.9" - "ld", inputs: ["{{.*}}/a.o", "{{.*}}/b.o", "{{.*}}/a.swiftmodule", "{{.*}}/b.swiftmodule"], output: {image: "main"}
+// DEBUG-LINK-ONLY: # "x86_64-apple-macosx10.9" - "ld{{(.exe)?}}", inputs: ["{{.*}}/a.o", "{{.*}}/b.o", "{{.*}}/a.swiftmodule", "{{.*}}/b.swiftmodule"], output: {image: "main"}

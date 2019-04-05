@@ -226,8 +226,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -254,8 +254,8 @@
             },
             {
               "kind": "Setter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Set",
+              "printedName": "Set()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -310,8 +310,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -330,8 +330,8 @@
             },
             {
               "kind": "Setter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Set",
+              "printedName": "Set()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -522,8 +522,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -638,8 +638,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -658,8 +658,8 @@
             },
             {
               "kind": "Setter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Set",
+              "printedName": "Set()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -705,8 +705,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -751,8 +751,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -795,8 +795,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -895,8 +895,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -1009,6 +1009,25 @@
           "moduleName": "cake",
           "genericSig": "<τ_0_0 where τ_0_0 : PSuper>",
           "protocolReq": true,
+          "reqNewWitnessTableEntry": true,
+          "funcSelfKind": "NonMutating"
+        },
+        {
+          "kind": "Function",
+          "name": "futureFoo",
+          "printedName": "futureFoo()",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            }
+          ],
+          "declKind": "Func",
+          "usr": "s:4cake6PSuperPAAE9futureFooyyF",
+          "moduleName": "cake",
+          "genericSig": "<τ_0_0 where τ_0_0 : PSuper>",
+          "isABIPlaceholder": true,
           "funcSelfKind": "NonMutating"
         }
       ],
@@ -1116,8 +1135,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -1154,6 +1173,71 @@
       "declAttributes": [
         "FixedLayout",
         "UsableFromInline"
+      ]
+    },
+    {
+      "kind": "TypeDecl",
+      "name": "FutureContainer",
+      "printedName": "FutureContainer",
+      "children": [
+        {
+          "kind": "Function",
+          "name": "futureFoo",
+          "printedName": "futureFoo()",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            }
+          ],
+          "declKind": "Func",
+          "usr": "s:4cake15FutureContainerC9futureFooyyF",
+          "moduleName": "cake",
+          "isABIPlaceholder": true,
+          "declAttributes": [
+            "Available",
+            "Available",
+            "Available",
+            "Available"
+          ],
+          "funcSelfKind": "NonMutating"
+        },
+        {
+          "kind": "Function",
+          "name": "NotfutureFoo",
+          "printedName": "NotfutureFoo()",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            }
+          ],
+          "declKind": "Func",
+          "usr": "s:4cake15FutureContainerC12NotfutureFooyyF",
+          "moduleName": "cake",
+          "declAttributes": [
+            "Available"
+          ],
+          "funcSelfKind": "NonMutating"
+        }
+      ],
+      "declKind": "Class",
+      "usr": "s:4cake15FutureContainerC",
+      "moduleName": "cake",
+      "conformances": [
+        {
+          "kind": "Conformance",
+          "name": "P1",
+          "printedName": "P1",
+          "isABIPlaceholder": true
+        },
+        {
+          "kind": "Conformance",
+          "name": "P2",
+          "printedName": "P2"
+        }
       ]
     },
     {

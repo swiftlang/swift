@@ -5290,8 +5290,7 @@ Expr *ExprRewriter::coerceCallArguments(
     findCalleeDeclRef(cs, solution, cs.getConstraintLocator(locator));
 
   // Determine whether this application has curried self.
-  bool skipCurriedSelf = apply ? hasCurriedSelf(cs, callee, apply) : false;
-
+  bool skipCurriedSelf = apply ? hasCurriedSelf(cs, callee, apply) : true;
   // Determine the parameter bindings.
   SmallBitVector defaultMap
     = computeDefaultMap(params, callee.getDecl(), skipCurriedSelf);
@@ -7321,8 +7320,7 @@ namespace {
         // Coerce the pattern, in case we resolved something.
         auto fnType = cs.getType(closure)->castTo<FunctionType>();
         auto *params = closure->getParameters();
-        if (tc.coerceParameterListToType(params, closure, fnType))
-          return { false, nullptr };
+        tc.coerceParameterListToType(params, closure, fnType);
 
         // Require layout of dependent types that could be used to materialize
         // metadata types/conformances during IRGen.
