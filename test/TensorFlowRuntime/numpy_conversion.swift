@@ -52,7 +52,7 @@ NumpyConversionTests.test("shaped-array-conversion") {
                 array)
   }
 
-  let reshaped = np.reshape(numpyArrayInt32, [2, 3])
+  let reshaped = np.reshape(numpyArrayInt32, [2, 3] as TensorShape)
   if let array = expectNotNil(ShapedArray<Int32>(numpy: reshaped)) {
     expectEqual(ShapedArray(shape: [2, 3], scalars: [1, 2, 3, 4, 5, 6]),
                 array)
@@ -101,7 +101,7 @@ NumpyConversionTests.test("tensor-conversion") {
                 tensor.array)
   }
 
-  let reshaped = np.reshape(numpyArrayInt32, [2, 3])
+  let reshaped = np.reshape(numpyArrayInt32, [2, 3] as TensorShape)
   if let tensor = expectNotNil(Tensor<Int32>(numpy: reshaped)) {
     expectEqual(ShapedArray(shape: [2, 3], scalars: [1, 2, 3, 4, 5, 6]),
                 tensor.array)
