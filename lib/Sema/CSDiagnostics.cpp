@@ -2357,9 +2357,11 @@ bool AnyObjectKeyPathRootFailure::diagnoseAsError() {
   // Diagnose use of AnyObject as root for a keypath
   if (auto KPE = dyn_cast<KeyPathExpr>(getAnchor())) {
     auto rootTyRepr = KPE->getRootType();
-    emitDiagnostic(rootTyRepr->getLoc(),
-                   diag::expr_swift_keypath_invalid_component)
-        .highlight(rootTyRepr->getSourceRange());
+    auto loc = rootTyRepr ? rootTyRepr->getLoc() : KPE->getLoc();
+    auto range =
+        rootTyRepr ? rootTyRepr->getSourceRange() : KPE->getSourceRange();
+    emitDiagnostic(loc, diag::expr_swift_keypath_invalid_component)
+        .highlight(range);
   }
 
   return true;

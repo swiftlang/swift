@@ -151,3 +151,16 @@ class SR_10146_1 {
 class SR_10146_2: SR_10146_1 {
   let a = \AnyObject.b // expected-error {{invalid component of Swift key path}}
 }
+
+class SR_10146_3 {
+  @objc let abc: Int = 1
+  
+  func doNotCrash() {
+    let _: KeyPath<AnyObject, Int> = \.abc // expected-error {{invalid component of Swift key path}}
+  }
+
+  func doNotCrash_1(_ obj: AnyObject, _ kp: KeyPath<AnyObject, Int>) {
+    let _ = obj[keyPath: \.abc] // expected-error {{invalid component of Swift key path}}
+    let _ = obj[keyPath: kp]
+  }
+}
