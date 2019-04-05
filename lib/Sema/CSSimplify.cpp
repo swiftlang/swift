@@ -4850,6 +4850,17 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
   // and allow that. This will get diagnosed later.
   if (auto fixedRootTy =
           getFixedTypeRecursive(rootTy, subflags, /*wantRValue=*/true)) {
+    if (fixedRootTy->isTypeVariableOrMember()) {
+      if (flags.contains(TMF_GenerateConstraints)) {
+        addUnsolvedConstraint(
+            Constraint::create(*this, ConstraintKind::KeyPath, keyPathTy,
+                               rootTy, valueTy, getConstraintLocator(locator)));
+        return SolutionKind::Solved;
+      }
+
+      return SolutionKind::Unsolved;
+    }
+
     if (fixedRootTy->isAnyObject()) {
       auto fix =
           AllowAnyObjectKeyPathRoot::create(*this, locator.getBaseLocator());
