@@ -3874,9 +3874,6 @@ ERROR(borrowed_on_objc_protocol_requirement,none,
 
 ERROR(dynamic_not_in_class,none,
       "only members of classes may be dynamic", ())
-ERROR(dynamic_with_final,none,
-      "a declaration cannot be both 'final' and 'dynamic'",
-      ())
 ERROR(dynamic_with_nonobjc,none,
       "a declaration cannot be both '@nonobjc' and 'dynamic'",
       ())

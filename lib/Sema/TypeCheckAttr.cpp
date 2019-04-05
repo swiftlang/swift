@@ -323,13 +323,6 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
 }
 
 void AttributeEarlyChecker::visitDynamicAttr(DynamicAttr *attr) {
-  // Members cannot be both dynamic and final.
-  // We do allow dynamic final members for dynamic replacement in
-  // swift-version 5.
-  if (D->getAttrs().hasAttribute<FinalAttr>() &&
-      !D->getASTContext().LangOpts.isSwiftVersionAtLeast(5))
-    diagnoseAndRemoveAttr(attr, diag::dynamic_with_final);
-
   // Members cannot be both dynamic and @nonobjc.
   if (D->getAttrs().hasAttribute<NonObjCAttr>())
     diagnoseAndRemoveAttr(attr, diag::dynamic_with_nonobjc);
@@ -2591,11 +2584,6 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
   // decl. Accessor decls should always infer the var/subscript's attribute.
   if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, D) ||
       isa<AccessorDecl>(D))
-    return;
-
-  // Don't add implicit dynamic to final functions before swift-version 5.
-  if (D->getAttrs().hasAttribute<FinalAttr>() &&
-      !D->getASTContext().LangOpts.isSwiftVersionAtLeast(5))
     return;
 
   if (D->getAttrs().hasAttribute<NonObjCAttr>() ||
