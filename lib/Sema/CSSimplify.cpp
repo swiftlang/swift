@@ -4846,6 +4846,26 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
       return SolutionKind::Solved;
     };
 
+  // If we're fixed to a bound generic type, trying harvesting context from it.
+  // However, we don't want a solution that fixes the expression type to
+  // PartialKeyPath; we'd rather that be represented using an upcast conversion.
+  auto keyPathBGT = keyPathTy->getAs<BoundGenericType>();
+  if (keyPathBGT) {
+    if (tryMatchRootAndValueFromKeyPathType(keyPathBGT, /*allowPartial*/false)
+          == SolutionKind::Error)
+      return SolutionKind::Error;
+  }
+
+  // If the expression has contextual type information, try using that too.
+  if (auto contextualTy = getContextualType(keyPath)) {
+    if (auto contextualBGT = contextualTy->getAs<BoundGenericType>()) {
+      if (tryMatchRootAndValueFromKeyPathType(contextualBGT,
+                                              /*allowPartial*/true)
+            == SolutionKind::Error)
+        return SolutionKind::Error;
+    }
+  }
+
   // We do not allow KeyPaths to go through AnyObject, so let's create a fix
   // and allow that. This will get diagnosed later.
   if (auto fixedRootTy =
@@ -4870,26 +4890,6 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
     }
   }
 
-  // If we're fixed to a bound generic type, trying harvesting context from it.
-  // However, we don't want a solution that fixes the expression type to
-  // PartialKeyPath; we'd rather that be represented using an upcast conversion.
-  auto keyPathBGT = keyPathTy->getAs<BoundGenericType>();
-  if (keyPathBGT) {
-    if (tryMatchRootAndValueFromKeyPathType(keyPathBGT, /*allowPartial*/false)
-          == SolutionKind::Error)
-      return SolutionKind::Error;
-  }
-
-  // If the expression has contextual type information, try using that too.
-  if (auto contextualTy = getContextualType(keyPath)) {
-    if (auto contextualBGT = contextualTy->getAs<BoundGenericType>()) {
-      if (tryMatchRootAndValueFromKeyPathType(contextualBGT,
-                                              /*allowPartial*/true)
-            == SolutionKind::Error)
-        return SolutionKind::Error;
-    }
-  }
-  
   // See if we resolved overloads for all the components involved.
   enum {
     ReadOnly,
