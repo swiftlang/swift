@@ -428,7 +428,7 @@ extension String {
     return
   }
   
-  /// Creates a new String with the specified capacity in UTF-8 code units then
+  /// Creates a new String with the specified capacity in UTF-8 code units, then
   /// calls the given closure with a buffer covering the String's uninitialized
   /// memory.
   ///
@@ -437,7 +437,7 @@ extension String {
   /// (for example if the requested capacity was too small).
   ///
   /// This method replaces ill-formed UTF-8 sequences with the Unicode
-  /// replacement character (`"\u{FFFD}"`); This may require resizing
+  /// replacement character (`"\u{FFFD}"`); this may require resizing
   /// the buffer beyond its original capacity.
   ///
   /// The following examples use this initializer with the contents of two
@@ -468,8 +468,7 @@ extension String {
   ///     // Prints "Optional("")"
   ///
   /// - Parameters:
-  ///   - capacity: The number of UTF-8 code units worth of memory to allocate
-  ///       for the String.
+  ///   - capacity: The amount of memory (in UTF-8 code units) to allocate
   ///   - initializer: A closure that initializes elements and sets the count of
   ///       the new String
   ///     - Parameters:
