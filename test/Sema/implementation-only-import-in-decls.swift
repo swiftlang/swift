@@ -173,3 +173,75 @@ extension ConditionalGenericStruct: NormalProto where T: NormalProto {
   public typealias Assoc = Int
 }
 public func testConditionalGeneric(_: NormalProtoAssocHolder<ConditionalGenericStruct<NormalStruct>>) {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+
+public protocol PublicInferredAssociatedType {
+  associatedtype Assoc: NormalProto
+  func takesAssoc(_: Assoc)
+}
+@usableFromInline protocol UFIInferredAssociatedType {
+  associatedtype Assoc: NormalProto
+  func takesAssoc(_: Assoc)
+}
+protocol InternalInferredAssociatedType {
+  associatedtype Assoc: NormalProto
+  func takesAssoc(_: Assoc)
+}
+
+public struct PublicInferredAssociatedTypeImpl {
+  public func takesAssoc(_: NormalStruct) {}
+}
+extension PublicInferredAssociatedTypeImpl: PublicInferredAssociatedType {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as '@_implementationOnly'}}
+extension PublicInferredAssociatedTypeImpl: UFIInferredAssociatedType {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as '@_implementationOnly'}}
+extension PublicInferredAssociatedTypeImpl: InternalInferredAssociatedType {} // okay
+
+@usableFromInline struct UFIInferredAssociatedTypeImpl {
+  public func takesAssoc(_: NormalStruct) {}
+}
+extension UFIInferredAssociatedTypeImpl: PublicInferredAssociatedType {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as '@_implementationOnly'}}
+extension UFIInferredAssociatedTypeImpl: UFIInferredAssociatedType {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as '@_implementationOnly'}}
+extension UFIInferredAssociatedTypeImpl: InternalInferredAssociatedType {} // okay
+
+struct InternalInferredAssociatedTypeImpl {
+  public func takesAssoc(_: NormalStruct) {}
+}
+extension InternalInferredAssociatedTypeImpl: PublicInferredAssociatedType {} // okay
+extension InternalInferredAssociatedTypeImpl: UFIInferredAssociatedType {} // okay
+extension InternalInferredAssociatedTypeImpl: InternalInferredAssociatedType {} // okay
+
+
+public protocol BaseProtoWithNoRequirement {
+  associatedtype Assoc
+  func takesAssoc(_: Assoc)
+}
+public protocol RefinedProto: BaseProtoWithNoRequirement where Assoc: NormalProto {
+}
+
+public struct RefinedProtoImpl: RefinedProto { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as '@_implementationOnly'}}
+  public func takesAssoc(_: NormalStruct) {}
+}
+
+public protocol RefinedSelfProto where Self: NormalProto {}
+extension NormalStruct: RefinedSelfProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+
+public protocol RefinedSelfProtoInheritance: NormalProto {}
+extension NormalStruct: RefinedSelfProtoInheritance {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+
+
+public protocol SlightlyMoreComplicatedRequirement {
+  associatedtype Assoc: Collection where Assoc.Element: NormalProto
+  func takesAssoc(_: Assoc)
+}
+public struct SlightlyMoreComplicatedRequirementImpl: SlightlyMoreComplicatedRequirement { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc.Element' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as '@_implementationOnly'}}
+  public func takesAssoc(_: [NormalStruct]) {}
+}
+public struct RequirementsHandleSubclassesToo: SlightlyMoreComplicatedRequirement { // expected-error {{cannot use conformance of 'NormalClass' to 'NormalProto' in associated type 'Self.Assoc.Element' (inferred as 'SubclassOfNormalClass'); 'BADLibrary' has been imported as '@_implementationOnly'}}
+  public func takesAssoc(_: [SubclassOfNormalClass]) {}
+}
+
+public struct RequirementsHandleSpecializationsToo: SlightlyMoreComplicatedRequirement { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc.Element' (inferred as 'ConditionalGenericStruct<NormalStruct>'); 'BADLibrary' has been imported as '@_implementationOnly'}}
+  public func takesAssoc(_: [ConditionalGenericStruct<NormalStruct>]) {}
+}
+
+public struct ClassConstrainedGenericArg<T: NormalClass>: PublicInferredAssociatedType { // expected-error {{cannot use conformance of 'NormalClass' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'T'); 'BADLibrary' has been imported as '@_implementationOnly'}}
+  public func takesAssoc(_: T) {}
+}

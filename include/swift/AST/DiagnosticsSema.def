@@ -2395,6 +2395,10 @@ ERROR(conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 here; %2 has been imported as "
       "'@_implementationOnly'",
       (Type, DeclName, Identifier))
+ERROR(assoc_conformance_from_implementation_only_module,none,
+      "cannot use conformance of %0 to %1 in associated type %3 (inferred as "
+      "%4); %2 has been imported as '@_implementationOnly'",
+      (Type, DeclName, Identifier, Type, Type))
 
 // Derived conformances
 ERROR(cannot_synthesize_init_in_extension_of_nonfinal,none,
