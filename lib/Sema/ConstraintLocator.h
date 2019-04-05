@@ -127,6 +127,8 @@ public:
     ContextualType,
     /// The missing argument synthesized by the solver.
     SynthesizedArgument,
+    /// The member looked up via keypath based dynamic lookup.
+    KeyPathDynamicMember,
   };
 
   /// Determine the number of numeric values used for the given path
@@ -165,6 +167,7 @@ public:
     case TupleElement:
     case KeyPathComponent:
     case SynthesizedArgument:
+    case KeyPathDynamicMember:
       return 1;
 
     case TypeParameterRequirement:
@@ -221,6 +224,7 @@ public:
     case DynamicLookupResult:
     case ContextualType:
     case SynthesizedArgument:
+    case KeyPathDynamicMember:
       return 0;
 
     case FunctionArgument:
@@ -241,6 +245,7 @@ public:
       StoredRequirement,
       StoredWitness,
       StoredGenericSignature,
+      StoredKeyPathDynamicMemberBase,
       StoredKindAndValue
     };
 
@@ -289,6 +294,10 @@ public:
     PathElement(GenericSignature *sig)
         : storage((reinterpret_cast<uintptr_t>(sig) >> 3)),
           storedKind(StoredGenericSignature) {}
+
+    PathElement(const NominalTypeDecl *keyPath)
+        : storage((reinterpret_cast<uintptr_t>(keyPath) >> 3)),
+          storedKind(StoredKeyPathDynamicMemberBase) {}
 
     friend class ConstraintLocator;
 
@@ -369,6 +378,10 @@ public:
       return PathElement(SynthesizedArgument, position);
     }
 
+    static PathElement getKeyPathDynamicMember(const NominalTypeDecl *base) {
+      return PathElement(base);
+    }
+
     /// Retrieve the kind of path element.
     PathElementKind getKind() const {
       switch (static_cast<StoredKind>(storedKind)) {
@@ -383,6 +396,9 @@ public:
 
       case StoredGenericSignature:
         return OpenedGeneric;
+
+      case StoredKeyPathDynamicMemberBase:
+        return KeyPathDynamicMember;
 
       case StoredKindAndValue:
         return decodeStorage(storage).first;
@@ -443,6 +459,13 @@ public:
       return reinterpret_cast<GenericSignature *>(storage << 3);
     }
 
+    NominalTypeDecl *getKeyPath() const {
+      assert((static_cast<StoredKind>(storedKind) ==
+              StoredKeyPathDynamicMemberBase) &&
+             "Is not a keypath dynamic member");
+      return reinterpret_cast<NominalTypeDecl *>(storage << 3);
+    }
+
     /// Return the summary flags for this particular element.
     unsigned getNewSummaryFlags() const {
       return getSummaryFlagsForPathElement(getKind());
@@ -458,6 +481,10 @@ public:
 
     bool isSynthesizedArgument() const {
       return getKind() == PathElementKind::SynthesizedArgument;
+    }
+
+    bool isKeyPathDynamicMember() const {
+      return getKind() == PathElementKind::KeyPathDynamicMember;
     }
   };
 
@@ -486,6 +513,10 @@ public:
   bool isFunctionConversion() const {
     return (getSummaryFlags() & IsFunctionConversion);
   }
+
+  /// Determine whether given locator points to the subscript reference
+  /// e.g. `foo[0]` or `\Foo.[0]`
+  bool isSubscriptMemberRef() const;
 
   /// Produce a profile of this locator, for use in a folding set.
   static void Profile(llvm::FoldingSetNodeID &id, Expr *anchor,

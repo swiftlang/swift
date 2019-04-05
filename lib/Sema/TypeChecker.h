@@ -2161,6 +2161,21 @@ bool isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
 bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl, DeclContext *DC,
                                          TypeChecker &TC);
 
+/// Returns true if the given subscript method is an valid implementation of
+/// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
+/// The method is given to be defined as `subscript(dynamicMember:)` which
+/// takes a single non-variadic parameter that conforms to
+/// `ExpressibleByStringLiteral` protocol.
+bool isValidStringDynamicMemberLookup(SubscriptDecl *decl, DeclContext *DC,
+                                      TypeChecker &TC);
+
+/// Returns true if the given subscript method is an valid implementation of
+/// the `subscript(dynamicMember: {Writable}KeyPath<...>)` requirement for
+/// @dynamicMemberLookup.
+/// The method is given to be defined as `subscript(dynamicMember:)` which
+/// takes a single non-variadic parameter of `{Writable}KeyPath<T, U>` type.
+bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl, TypeChecker &TC);
+
 /// Whether an overriding declaration requires the 'override' keyword.
 enum class OverrideRequiresKeyword {
   /// The keyword is never required.
