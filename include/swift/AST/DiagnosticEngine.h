@@ -28,7 +28,8 @@ namespace swift {
   class DiagnosticEngine;
   class SourceManager;
   class ValueDecl;
-  
+  class SourceFile;
+
   enum class PatternKind : uint8_t;
   enum class SelfAccessKind : uint8_t;
   enum class ReferenceOwnership : uint8_t;
@@ -807,12 +808,11 @@ namespace swift {
     static const char *diagnosticStringFor(const DiagID id);
 
     /// If there is no clear .dia file for a diagnostic, put it in the one
-    /// corresponding to the input buffer ID given here.
+    /// corresponding to the SourceLoc given here.
     /// In particular, in batch mode when a diagnostic is located in
     /// a non-primary file, use this affordance to place it in the .dia
     /// file for the primary that is currently being worked on.
-    void setBufferIndirectlyCausingDiagnosticToInput(
-        unsigned bufferIDE);
+    void setBufferIndirectlyCausingDiagnosticToInput(SourceLoc);
     void resetBufferIndirectlyCausingDiagnostic();
     SourceLoc getDefaultDiagnosticLoc() const {
       return bufferIndirectlyCausingDiagnostic;
@@ -822,14 +822,8 @@ namespace swift {
   class BufferIndirectlyCausingDiagnosticRAII {
   private:
     DiagnosticEngine &Diags;
-
   public:
-    BufferIndirectlyCausingDiagnosticRAII(DiagnosticEngine &Diags,
-                                          unsigned bufferID)
-        : Diags(Diags) {
-      Diags.setBufferIndirectlyCausingDiagnosticToInput(
-          bufferID);
-    }
+    BufferIndirectlyCausingDiagnosticRAII(const SourceFile &SF);
     ~BufferIndirectlyCausingDiagnosticRAII() {
       Diags.resetBufferIndirectlyCausingDiagnostic();
     }

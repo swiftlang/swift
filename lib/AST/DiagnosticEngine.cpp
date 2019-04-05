@@ -848,17 +848,8 @@ const char *DiagnosticEngine::diagnosticStringFor(const DiagID id) {
 }
 
 void DiagnosticEngine::setBufferIndirectlyCausingDiagnosticToInput(
-    StringRef input) {
-  if (input.empty()) {
-    resetBufferIndirectlyCausingDiagnostic();
-    return;
-  }
-  auto id = SourceMgr.getIDForBufferIdentifier(input);
-  if (!id) {
-    resetBufferIndirectlyCausingDiagnostic();
-    return;
-  }
-  bufferIndirectlyCausingDiagnostic = SourceMgr.getLocForBufferStart(*id);
+    SourceLoc loc) {
+  bufferIndirectlyCausingDiagnostic = loc;
 }
 void DiagnosticEngine::resetBufferIndirectlyCausingDiagnostic() {
   bufferIndirectlyCausingDiagnostic = SourceLoc();
@@ -873,4 +864,14 @@ DiagnosticSuppression::DiagnosticSuppression(DiagnosticEngine &diags)
 DiagnosticSuppression::~DiagnosticSuppression() {
   for (auto consumer : consumers)
     diags.addConsumer(*consumer);
+}
+
+BufferIndirectlyCausingDiagnosticRAII::BufferIndirectlyCausingDiagnosticRAII(
+    const SourceFile &SF)
+    : Diags(SF.getASTContext().Diags) {
+  auto id = SF.getBufferID();
+  if (!id)
+    return;
+  auto loc = SF.getASTContext().SourceMgr.getLocForBufferStart(*id);
+  Diags.setBufferIndirectlyCausingDiagnosticToInput(loc);
 }
