@@ -6453,6 +6453,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
     }
 
+    // Allows for same-type coercion with existential metatypes.
+    if (auto toMeta = toType->getAs<AnyMetatypeType>()) {
+      if (fromMeta->getInstanceType()->isEqual(toMeta->getInstanceType()))
+        return expr;
+    }
+
     break;
   }
 
