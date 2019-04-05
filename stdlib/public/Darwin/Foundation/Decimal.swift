@@ -177,8 +177,12 @@ extension Decimal : Hashable, Comparable {
         return _isNegative != 0 ? -d : d
     }
 
-    public var hashValue: Int {
-        return Int(bitPattern: __CFHashDouble(doubleValue))
+    public func hash(into hasher: inout Hasher) {
+        // FIXME: This is a weak hash.  We should rather normalize self to a
+        // canonical member of the exact same equivalence relation that
+        // NSDecimalCompare implements, then simply feed all components to the
+        // hasher.
+        hasher.combine(doubleValue)
     }
 
     public static func ==(lhs: Decimal, rhs: Decimal) -> Bool {
