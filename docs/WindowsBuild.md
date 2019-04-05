@@ -191,6 +191,8 @@ pushd "S:\b\lldb"
 cmake -G Ninja^
   -DCMAKE_BUILD_TYPE=RelWithDebInfo^
   -DLLDB_ALLOW_STATIC_BINDINGS=YES^
+  -DCMAKE_CXX_COMPILER="clang-cl"^
+  -DCMAKE_CXX_COMPILER="clang-cl"^
   -DLLDB_PATH_TO_CLANG_SOURCE="S:\clang"^
   -DLLDB_PATH_TO_SWIFT_SOURCE="S:\swift"^
   -DLLDB_PATH_TO_CLANG_BUILD="S:\b\llvm"^
