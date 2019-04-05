@@ -406,6 +406,15 @@ struct DelegateWithMutatingGetter<Value> {
   }
 }
 
+@propertyDelegate
+class ClassDelegate<Value> {
+  var value: Value
+
+  init(initialValue: Value) {
+    self.value = initialValue
+  }
+}
+
 struct UseMutatingnessDelegates {
   @DelegateWithNonMutatingSetter
   var x = true
@@ -415,6 +424,9 @@ struct UseMutatingnessDelegates {
 
   @DelegateWithNonMutatingSetter
   let z = 3.14159 // expected-note 2{{change 'let' to 'var' to make it mutable}}
+
+  @ClassDelegate
+  var w = "Hello"
 }
 
 func testMutatingness() {
@@ -429,6 +441,9 @@ func testMutatingness() {
   _ = mutable.z
   mutable.z = 2.71828 // expected-error{{cannot assign to property: 'z' is a 'let' constant}}
 
+  _ = mutable.w
+  mutable.w = "Goodbye"
+
   let nonmutable = UseMutatingnessDelegates() // expected-note 2{{change 'let' to 'var' to make it mutable}}
 
   // Okay due to nonmutating setter
@@ -440,6 +455,10 @@ func testMutatingness() {
 
   _ = nonmutable.z
   nonmutable.z = 2.71828 // expected-error{{cannot assign to property: 'z' is a 'let' constant}}
+
+  // Okay due to implicitly nonmutating setter
+  _ = nonmutable.w
+  nonmutable.w = "World"
 }
 
 // ---------------------------------------------------------------------------
