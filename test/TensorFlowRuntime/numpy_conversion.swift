@@ -52,6 +52,12 @@ NumpyConversionTests.test("shaped-array-conversion") {
                 array)
   }
 
+  let reshaped = np.reshape(numpyArrayInt32, [2, 3])
+  if let array = expectNotNil(ShapedArray<Int32>(numpy: reshaped)) {
+    expectEqual(ShapedArray(shape: [2, 3], scalars: [1, 2, 3, 4, 5, 6]),
+                array)
+  }
+
   let numpyArrayStrided = np.array([[1, 2], [1, 2]], dtype: np.int32)[
       Python.slice(Python.None), 1]
   // Assert that the array has a stride, so that we're certainly testing a
@@ -92,6 +98,12 @@ NumpyConversionTests.test("tensor-conversion") {
   expectNil(Tensor<UInt32>(numpy: numpyArrayInt32))
   if let tensor = expectNotNil(Tensor<Int32>(numpy: numpyArrayInt32)) {
     expectEqual(ShapedArray(shape: [1, 2, 3], scalars: [1, 2, 3, 4, 5, 6]),
+                tensor.array)
+  }
+
+  let reshaped = np.reshape(numpyArrayInt32, [2, 3])
+  if let tensor = expectNotNil(Tensor<Int32>(numpy: reshaped)) {
+    expectEqual(ShapedArray(shape: [2, 3], scalars: [1, 2, 3, 4, 5, 6]),
                 tensor.array)
   }
 
