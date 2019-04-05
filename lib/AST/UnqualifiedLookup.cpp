@@ -128,7 +128,7 @@ class UnqualifiedLookupFactory {
 public:
   using Flags = UnqualifiedLookup::Flags;
   using Options = UnqualifiedLookup::Options;
-  
+
 private:
   struct ContextAndResolvedIsCascadingUse {
     DeclContext *const DC;
@@ -901,6 +901,10 @@ void UnqualifiedLookupFactory::lookForLocalVariablesIn(
     return;
   }
 
+  if (options.contains(Flags::IgnoreLocalVariables)) {
+    return;
+  }
+
   namelookup::FindLocalVal localVal(SM, Loc, Consumer);
   localVal.visit(AFD->getBody());
 
@@ -916,6 +920,8 @@ void UnqualifiedLookupFactory::lookForLocalVariablesIn(ClosureExpr *CE) {
   // for us, but it can't do the right thing inside local types.
   if (Loc.isInvalid())
     return;
+  if (options.contains(Flags::IgnoreLocalVariables))
+    return;
   namelookup::FindLocalVal localVal(SM, Loc, Consumer);
   if (auto body = CE->getBody())
     localVal.visit(body);
@@ -927,6 +933,8 @@ void UnqualifiedLookupFactory::lookForLocalVariablesIn(ClosureExpr *CE) {
 
 void UnqualifiedLookupFactory::lookForLocalVariablesIn(SourceFile *SF) {
   if (Loc.isInvalid())
+    return;
+  if (options.contains(Flags::IgnoreLocalVariables))
     return;
   // Look for local variables in top-level code; normally, the parser
   // resolves these for us, but it can't do the right thing for

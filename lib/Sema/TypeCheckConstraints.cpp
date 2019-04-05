@@ -467,8 +467,8 @@ static bool shouldConsiderOuterResultsFor(DeclName name) {
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression. Context is the DeclContext used
 /// for the lookup.
-Expr *TypeChecker::
-resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
+Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
+                                      DeclContext *DC, bool ignoreLocalVars) {
   // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
   DeclName Name = UDRE->getName();
   SourceLoc Loc = UDRE->getLoc();
@@ -479,6 +479,9 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     lookupOptions |= NameLookupFlags::KnownPrivate;
   if (shouldConsiderOuterResultsFor(Name))
     lookupOptions |= NameLookupFlags::IncludeOuterResults;
+  if (ignoreLocalVars) {
+    lookupOptions |= NameLookupFlags::IgnoreLocalVariables;
+  }
 
   auto Lookup = lookupUnqualified(DC, Name, Loc, lookupOptions);
 
@@ -830,58 +833,34 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
         Context.AllocateCopy(outerAlternatives));
   }
 
-  // Let's handle a special case, where we might be trying to refer to
-  // a function which has the same name as the variable we're assigning the
-  // result to. An invalid reference would've already been handled earlier, but
-  // there are some cases where lookup won't produce the results we need, so
-  // they are handled here.
+  // Look into the Swift module as well. This is helpful when doing
+  // something like `var type = type(of: something)`.
+  SmallString<256> scratch;
+  SmallVector<ValueDecl *, 4> results;
+  UDRE->getName().getString(scratch);
+  Context.lookupInSwiftModule(scratch, results);
 
-  for (auto result : Lookup) {
-    auto decl = result.getValueDecl();
+  if (!results.empty()) {
+    return buildRefExpr(results, DC, UDRE->getNameLoc(), UDRE->isImplicit(),
+                        UDRE->getFunctionRefKind());
+  }
 
-    if (decl && isa<VarDecl>(decl)) {
-      auto VD = cast<VarDecl>(decl);
-      auto init = VD->getParentInitializer();
+  // Ignore local variables and try resolving again. This is to handle a
+  // special case where we might be trying to initialize a variable with a
+  // function which has the same name as the variable, for example:
+  // var foo = foo(bar: 1).
 
-      if (auto CE = dyn_cast_or_null<CallExpr>(init)) {
-        if (auto fnRef = dyn_cast_or_null<UnresolvedDeclRefExpr>(CE->getFn())) {
-          SmallVector<ValueDecl *, 4> results;
-          auto parentDC = DC->getParentForLookup();
+  // Recurse once only.
+  if (!ignoreLocalVars) {
+    auto expr = resolveDeclRefExpr(UDRE, DC, /*ignoreLocalVars=*/true);
 
-          if (!parentDC)
-            continue;
-
-          auto lookupResults =
-              lookupUnqualified(parentDC, fnRef->getName(), fnRef->getLoc());
-
-          for (auto result : lookupResults) {
-            auto resultVD = result.getValueDecl();
-
-            if (resultVD && isa<FuncDecl>(resultVD)) {
-              results.push_back(std::move(resultVD));
-            }
-          }
-
-          if (!results.empty()) {
-            return buildRefExpr(results, DC, fnRef->getNameLoc(),
-                                fnRef->isImplicit(),
-                                fnRef->getFunctionRefKind());
-          }
-
-          // Look into the Swift module as well. This is helpful when doing
-          // something like `var type = type(of: something)`.
-          SmallString<256> scratch;
-          fnRef->getName().getString(scratch);
-          Context.lookupInSwiftModule(scratch, results);
-
-          if (!results.empty()) {
-            return buildRefExpr(results, DC, fnRef->getNameLoc(),
-                                fnRef->isImplicit(),
-                                fnRef->getFunctionRefKind());
-          }
-        }
-      }
+    if (isa<DeclRefExpr>(expr) || isa<OverloadedDeclRefExpr>(expr) ||
+        isa<UnresolvedDotExpr>(expr)) {
+      return expr;
     }
+
+    // We couldn't find anything, so return an error.
+    return new (Context) ErrorExpr(UDRE->getSourceRange());
   }
 
   // FIXME: If we reach this point, the program we're being handed is likely

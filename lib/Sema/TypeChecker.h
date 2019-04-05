@@ -305,6 +305,9 @@ enum class NameLookupFlags {
   IncludeOuterResults = 0x20,
   /// Whether to consider synonyms declared through @_implements().
   IncludeAttributeImplements = 0x40,
+  /// Whether to ignore local variables inside bodies of functions, closures
+  /// and top level code.
+  IgnoreLocalVariables = 0x50,
 };
 
 /// A set of options that control name lookup.
@@ -838,7 +841,8 @@ public:
   /// Bind an UnresolvedDeclRefExpr by performing name lookup and
   /// returning the resultant expression.  Context is the DeclContext used
   /// for the lookup.
-  Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context);
+  Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
+                           bool ignoreLocalVars = false);
 
   /// Validate the given type.
   ///
