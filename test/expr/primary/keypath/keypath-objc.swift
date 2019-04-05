@@ -143,3 +143,11 @@ func testParseErrors() {
 func testTypoCorrection() {
   let _: String = #keyPath(A.proString) // expected-error {{type 'A' has no member 'proString'}}
 }
+
+class SR_10146_1 {
+  @objc let b = 1
+}
+
+class SR_10146_2: SR_10146_1 {
+  let a = \AnyObject.b // expected-error {{invalid component of Swift key path}}
+}

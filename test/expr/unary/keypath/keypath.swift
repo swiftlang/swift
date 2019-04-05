@@ -741,3 +741,17 @@ func testSyntaxErrors() { // expected-note{{}}
   _ = \A.a?;
   _ = \A.a!;
 } // expected-error@+1{{}}
+
+class SR_10146 {
+  let abc: Int = 1
+  
+  func doNotCrash() {
+    let _: KeyPath<AnyObject, Int> = \.1 // expected-error {{type 'AnyObject' has no member '1'}}
+    let _: KeyPath<AnyObject, Int> = \.abc // expected-error {{type 'AnyObject' has no member 'abc'}}
+  }
+
+  func doNotCrash_1(_ obj: AnyObject, _ kp: KeyPath<AnyObject, Int>) {
+    let _ = obj[keyPath: \.abc] // expected-error {{type of expression is ambiguous without more context}}
+    let _ = obj[keyPath: kp]
+  }
+}
