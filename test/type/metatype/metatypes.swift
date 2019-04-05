@@ -28,3 +28,13 @@ func foo(meta1: P.Protocol, meta2: P.Type) {
   print(meta1.E.self)
   print(meta2.E.self)
 }
+
+protocol P2 {
+  typealias E = Self
+  typealias F = Int
+}
+
+func foo(meta1: P.Protocol, meta2: P.Type) {
+  print(meta1.E.F.self)
+  print(meta2.E.F.self)
+}
