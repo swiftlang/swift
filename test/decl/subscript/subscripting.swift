@@ -304,10 +304,11 @@ func testSubscript1(_ s1 : SubscriptTest1) {
   // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}}
   _ = s1.subscript("hello"
   // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}}
+  // expected-note@-2 {{to match this opening '('}}
 
   let _ = s1["hello"]
   // expected-error@-1 {{ambiguous use of 'subscript(_:)'}}
-  // expected-error@-2 {{expected expression in list of expressions}}
+  // expected-error@-2 {{expected ')' in expression list}}
 }
 
 struct SubscriptTest2 {

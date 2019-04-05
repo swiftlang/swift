@@ -62,6 +62,7 @@ bool Parser::isStartOfStmt() {
   case tok::pound_warning:
   case tok::pound_error:
   case tok::pound_sourceLocation:
+    if (peekToken().is(tok::colon)) return false;
     return true;
 
   case tok::pound_line:
