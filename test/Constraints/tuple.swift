@@ -28,6 +28,35 @@ func f6(_: (i: Int, j: Int), k: Int = 15) {}
 // Conversions and shuffles
 //===----------------------------------------------------------------------===//
 
+func foo(a : [(some: Int, (key: Int, value: String))]) -> String {
+  for (i , (j, k)) in a {
+    if i == j { return k }
+  }
+}
+
+func rdar28207648() -> [(Int, CustomStringConvertible)] {
+  let v : [(Int, Int)] = []
+  return v as [(Int, CustomStringConvertible)]
+}
+
+class rdar28207648Base {}
+class rdar28207648Derived : rdar28207648Base {}
+
+func rdar28207648(x: (Int, rdar28207648Derived)) -> (Int, rdar28207648Base) {
+  return x as (Int, rdar28207648Base)
+}
+
+public typealias Success<T, V> = (response: T, data: V?)
+
+public enum Result {
+    case success(Success<Any, Any>)
+    case error(Error)
+}
+
+
+let a = Success<Int, Int>(response: 3, data: 3)
+let success: Result = .success(a)
+
 // Variadic functions.
 f4()
 f4(1)

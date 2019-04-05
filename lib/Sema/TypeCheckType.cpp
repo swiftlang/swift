@@ -708,7 +708,7 @@ Type TypeChecker::applyGenericArguments(Type type,
                      genericParams->size(), genericArgs.size(),
                      genericArgs.size() < genericParams->size())
           .highlight(generic->getAngleBrackets());
-      decl->diagnose(diag::kind_identifier_declared_here,
+      decl->diagnose(diag::kind_declname_declared_here,
                      DescriptiveDeclKind::GenericType, decl->getName());
     }
     return ErrorType::get(ctx);
@@ -898,7 +898,7 @@ static void diagnoseUnboundGenericType(Type ty, SourceLoc loc) {
         diag.fixItInsertAfter(loc, genericArgsToAdd);
     }
   }
-  unbound->getDecl()->diagnose(diag::kind_identifier_declared_here,
+  unbound->getDecl()->diagnose(diag::kind_declname_declared_here,
                                DescriptiveDeclKind::GenericType,
                                unbound->getDecl()->getName());
 }
@@ -1063,8 +1063,10 @@ static Type diagnoseUnknownType(TypeResolution resolution,
         AbstractFunctionDecl *methodDecl = dc->getInnermostMethodContext();
         bool declaringMethod = methodDecl &&
           methodDecl->getDeclContext() == dc->getParentForLookup();
+        bool isPropertyOfClass = insideClass &&
+          options.is(TypeResolverContext::PatternBindingDecl);
 
-        if (((!insideClass || !declaringMethod) &&
+        if (((!insideClass || !declaringMethod) && !isPropertyOfClass &&
              !options.is(TypeResolverContext::GenericRequirement)) ||
             options.is(TypeResolverContext::ExplicitCastExpr)) {
           Type SelfType = nominal->getSelfInterfaceType();

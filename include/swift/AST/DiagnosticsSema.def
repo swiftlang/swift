@@ -39,12 +39,8 @@
 
 NOTE(kind_declname_declared_here,none,
      "%0 %1 declared here", (DescriptiveDeclKind, DeclName))
-NOTE(kind_identifier_declared_here,none,
-     "%0 %1 declared here", (DescriptiveDeclKind, Identifier))
 NOTE(decl_declared_here,none,
      "%0 declared here", (DeclName))
-NOTE(identifier_declared_here,none,
-     "%0 declared here", (Identifier))
 NOTE(kind_declared_here,none,
      "%0 declared here", (DescriptiveDeclKind))
 NOTE(implicit_member_declared_here,none,
@@ -765,6 +761,9 @@ ERROR(module_not_testable,Fatal,
 ERROR(module_not_compiled_for_private_import,none,
       "module %0 was not compiled for private import", (Identifier))
 
+ERROR(import_implementation_cannot_be_exported,none,
+      "module %0 cannot be both exported and implementation-only", (Identifier))
+
 
 // Operator decls
 ERROR(ambiguous_operator_decls,none,
@@ -814,13 +813,6 @@ ERROR(precedence_group_redeclared,none,
       "precedence group redeclared", ())
 NOTE(previous_precedence_group_decl,none,
      "previous precedence group declaration here", ())
-
-//------------------------------------------------------------------------------
-// MARK: Type Check Coercions
-//------------------------------------------------------------------------------
-
-ERROR(tuple_conversion_not_expressible,none,
-      "cannot express tuple conversion %0 to %1", (Type, Type))
 
 //------------------------------------------------------------------------------
 // MARK: Expression Type Checking Errors
@@ -1107,6 +1099,9 @@ ERROR(attribute_requires_operator_identifier,none,
       "'%0' requires a function with an operator identifier", (StringRef))
 ERROR(attribute_requires_single_argument,none,
       "'%0' requires a function with one argument", (StringRef))
+
+ERROR(nominal_type_not_attribute,none,
+      "%0 %1 cannot be used as an attribute", (DescriptiveDeclKind, DeclName))
 
 ERROR(mutating_invalid_global_scope,none, "%0 is only valid on methods",
       (SelfAccessKind))
@@ -2273,14 +2268,10 @@ ERROR(duplicate_inheritance,none,
   "duplicate inheritance from %0", (Type))
 WARNING(duplicate_anyobject_class_inheritance,none,
   "redundant inheritance from 'AnyObject' and Swift 3 'class' keyword", ())
-ERROR(objc_protocol_with_superclass,none,
-  "protocol %0 is '@objc' and cannot have a superclass constraint", (Identifier))
+ERROR(inheritance_from_protocol_with_superclass,none,
+  "inheritance from class-constrained protocol composition type %0", (Type))
 ERROR(multiple_inheritance,none,
   "multiple inheritance from classes %0 and %1", (Type, Type))
-ERROR(non_class_inheritance,none,
-  "non-class type %0 cannot inherit from class %1", (Type, Type))
-ERROR(extension_class_inheritance,none,
-  "extension of type %0 cannot inherit from class %1", (Type, Type))
 ERROR(inheritance_from_non_protocol_or_class,none,
   "inheritance from non-protocol, non-class type %0", (Type))
 ERROR(inheritance_from_non_protocol,none,
@@ -3592,9 +3583,11 @@ ERROR(invalid_nonobjc_extension,none,
 ERROR(objc_in_extension_context,none,
       "members of constrained extensions cannot be declared @objc", ())
 ERROR(objc_in_generic_extension,none,
-      "members of extensions of "
-      "%select{classes from generic context|generic classes}0 "
-      "cannot be declared @objc", (bool))
+      "extensions of %select{classes from generic context|generic classes}0 "
+      "cannot contain '@objc' members", (bool))
+ERROR(objc_in_resilient_extension,none,
+      "extensions of classes built with library evolution support "
+      "cannot contain '@objc' members", ())
 ERROR(objc_operator, none,
       "operator methods cannot be declared @objc", ())
 ERROR(objc_operator_proto, none,
@@ -3615,6 +3608,10 @@ NOTE(objc_inference_swift3_addnonobjc,none,
 ERROR(objc_for_generic_class,none,
       "generic subclasses of '@objc' classes cannot have an explicit '@objc' "
       "because they are not directly visible from Objective-C", ())
+ERROR(objc_for_resilient_class,none,
+      "classes built with library evolution support cannot have explicit "
+      "'@objc' subclasses because they are not directly "
+      "visible from Objective-C", ())
 ERROR(objc_getter_for_nonobjc_property,none,
       "'@objc' getter for non-'@objc' property", ())
 ERROR(objc_getter_for_nonobjc_subscript,none,

@@ -96,6 +96,7 @@ public:
 #if defined(HAVE_GETRUSAGE) && !defined(__HAIKU__)
   TaskProcessInformation(ProcessId Pid, struct rusage Usage);
 #endif // defined(HAVE_GETRUSAGE) && !defined(__HAIKU__)
+  Optional<ResourceUsage> getResourceUsage() { return ProcessUsage; }
   virtual ~TaskProcessInformation() = default;
   virtual void provideMapping(json::Output &out);
 };

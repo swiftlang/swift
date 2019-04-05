@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
@@ -618,6 +619,16 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DAK_Custom: {
+    Printer.printAttrName("@");
+    const TypeLoc &typeLoc = cast<CustomAttr>(this)->getTypeLoc();
+    if (auto type = typeLoc.getType())
+      type->print(Printer, Options);
+    else
+      typeLoc.getTypeRepr()->print(Printer, Options);
+    break;
+  }
+
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
@@ -744,6 +755,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_implements";
   case DAK_ClangImporterSynthesizedType:
     return "_clangImporterSynthesizedType";
+  case DAK_Custom:
+    return "<<custom>>";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -1133,4 +1146,52 @@ TypeLoc ImplementsAttr::getProtocolType() const {
 
 TypeLoc &ImplementsAttr::getProtocolType() {
   return ProtocolType;
+}
+
+CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeLoc type,
+                       PatternBindingInitializer *initContext, Expr *arg,
+                       ArrayRef<Identifier> argLabels,
+                       ArrayRef<SourceLoc> argLabelLocs, bool implicit)
+    : DeclAttribute(DAK_Custom, atLoc, range, implicit),
+      type(type),
+      arg(arg),
+      initContext(initContext) {
+  hasArgLabelLocs = !argLabelLocs.empty();
+  numArgLabels = argLabels.size();
+  initializeCallArguments(argLabels, argLabelLocs,
+                          /*hasTrailingClosure=*/false);
+}
+
+CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeLoc type,
+                               bool hasInitializer,
+                               PatternBindingInitializer *initContext,
+                               SourceLoc lParenLoc,
+                               ArrayRef<Expr *> args,
+                               ArrayRef<Identifier> argLabels,
+                               ArrayRef<SourceLoc> argLabelLocs,
+                               SourceLoc rParenLoc,
+                               bool implicit) {
+  SmallVector<Identifier, 2> argLabelsScratch;
+  SmallVector<SourceLoc, 2> argLabelLocsScratch;
+  Expr *arg = nullptr;
+  if (hasInitializer) {
+    arg = packSingleArgument(ctx, lParenLoc, args, argLabels, argLabelLocs,
+                             rParenLoc, nullptr, implicit, argLabelsScratch,
+                             argLabelLocsScratch);
+  }
+
+  SourceRange range(atLoc, type.getSourceRange().End);
+  if (arg)
+    range.End = arg->getEndLoc();
+
+  size_t size = totalSizeToAlloc(argLabels, argLabelLocs,
+                                 /*hasTrailingClosure=*/false);
+  void *mem = ctx.Allocate(size, alignof(CustomAttr));
+  return new (mem) CustomAttr(atLoc, range, type, initContext, arg, argLabels,
+                              argLabelLocs, implicit);
+}
+
+void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {
+  if (attr)
+    attr->print(out);
 }

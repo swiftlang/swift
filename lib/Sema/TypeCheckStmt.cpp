@@ -923,7 +923,7 @@ public:
         .fixItReplace(SourceRange(targetLoc),
                       corrections.begin()->Value->getLabelInfo().Name.str());
       tc.diagnose(corrections.begin()->Value->getLabelInfo().Loc,
-                  diag::identifier_declared_here,
+                  diag::decl_declared_here,
                   corrections.begin()->Value->getLabelInfo().Name);
     } else {
       // If we have multiple corrections or none, produce a generic diagnostic
@@ -1744,27 +1744,6 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 /// Check the default arguments that occur within this pattern.
 void TypeChecker::checkDefaultArguments(ParameterList *params,
                                         ValueDecl *VD) {
-  auto access =
-    VD->getFormalAccessScope(/*useDC=*/nullptr,
-                             /*treatUsableFromInlineAsPublic=*/true);
-
-  // In Swift 4 mode, default argument bodies are inlined into the
-  // caller.
-  if (auto *func = dyn_cast<AbstractFunctionDecl>(VD)) {
-    auto expansion = func->getResilienceExpansion();
-    if (access.isPublic())
-      expansion = ResilienceExpansion::Minimal;
-
-    func->setDefaultArgumentResilienceExpansion(expansion);
-  } else {
-    auto *EED = cast<EnumElementDecl>(VD);
-    auto expansion = ResilienceExpansion::Maximal;
-    if (access.isPublic())
-      expansion = ResilienceExpansion::Minimal;
-
-    EED->setDefaultArgumentResilienceExpansion(expansion);
-  }
-
   for (auto *param : *params) {
     if (!param->getDefaultValue() ||
         !param->hasInterfaceType() ||

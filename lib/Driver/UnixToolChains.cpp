@@ -22,6 +22,7 @@
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Option/Options.h"
+#include "swift/Option/SanitizerOptions.h"
 #include "clang/Basic/Version.h"
 #include "clang/Driver/Util.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -36,27 +37,6 @@
 using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
-
-static void addLinkSanitizerLibArgsForLinux(const ArgList &Args,
-                                            ArgStringList &Arguments,
-                                            StringRef Sanitizer,
-                                            const ToolChain &TC) {
-  TC.addLinkRuntimeLib(Args, Arguments, TC.sanitizerRuntimeLibName(Sanitizer));
-
-  // Code taken from
-  // https://github.com/apple/swift-clang/blob/ab3cbe7/lib/Driver/Tools.cpp#L3264-L3276
-  // There's no libpthread or librt on RTEMS.
-  if (TC.getTriple().getOS() != llvm::Triple::RTEMS) {
-    Arguments.push_back("-lpthread");
-    Arguments.push_back("-lrt");
-  }
-  Arguments.push_back("-lm");
-
-  // There's no libdl on FreeBSD or RTEMS.
-  if (TC.getTriple().getOS() != llvm::Triple::FreeBSD &&
-      TC.getTriple().getOS() != llvm::Triple::RTEMS)
-    Arguments.push_back("-ldl");
-}
 
 std::string
 toolchains::GenericUnix::sanitizerRuntimeLibName(StringRef Sanitizer,
@@ -293,22 +273,16 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   Arguments.push_back(
       context.Args.MakeArgString("--target=" + getTriple().str()));
 
-  if (getTriple().getOS() == llvm::Triple::Linux) {
-    // Make sure we only add SanitizerLibs for executables
-    if (job.getKind() == LinkKind::Executable) {
-      if (context.OI.SelectedSanitizers & SanitizerKind::Address)
-        addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "asan", *this);
+  // Delegate to Clang for sanitizers. It will figure out the correct linker
+  // options.
+  if (job.getKind() == LinkKind::Executable && context.OI.SelectedSanitizers) {
+    Arguments.push_back(context.Args.MakeArgString(
+        "-fsanitize=" + getSanitizerList(context.OI.SelectedSanitizers)));
 
-      if (context.OI.SelectedSanitizers & SanitizerKind::Thread)
-        addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "tsan", *this);
-
-      if (context.OI.SelectedSanitizers & SanitizerKind::Undefined)
-        addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "ubsan", *this);
-
-      if (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer)
-        addLinkRuntimeLib(context.Args, Arguments,
-                          sanitizerRuntimeLibName("fuzzer"));
-
+    // The TSan runtime depends on the blocks runtime and libdispatch.
+    if (context.OI.SelectedSanitizers & SanitizerKind::Thread) {
+      Arguments.push_back("-lBlocksRuntime");
+      Arguments.push_back("-ldispatch");
     }
   }
 

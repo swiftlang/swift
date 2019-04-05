@@ -66,6 +66,7 @@ static StringRef getCategoryName(uint32_t ID) {
     return "/* Protocol Conformance Change */";
   case LocalDiagID::default_associated_type_removed:
   case LocalDiagID::protocol_req_added:
+  case LocalDiagID::decl_new_witness_table_entry:
     return "/* Protocol Requirement Change */";
   case LocalDiagID::super_class_removed:
   case LocalDiagID::super_class_changed:

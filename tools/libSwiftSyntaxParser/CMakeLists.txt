@@ -1,3 +1,6 @@
+include(SwiftWindowsSupport)
+swift_swap_compiler_if_needed("SwiftSyntaxParser")
+
 # Use an 'internal' name, this is primarily intended for SwiftSyntax to import.
 set(SYNTAX_PARSER_LIB_NAME "_InternalSwiftSyntaxParser")
 

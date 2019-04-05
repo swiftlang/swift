@@ -168,9 +168,10 @@ public:
   /// Emit mangled names of anonymous context descriptors.
   unsigned EnableAnonymousContextMangledNames : 1;
 
-  /// Bypass resilience when accessing resilient frameworks.
-  unsigned EnableResilienceBypass : 1;
-
+  /// Force public linkage for private symbols. Used only by the LLDB
+  /// expression evaluator.
+  unsigned ForcePublicLinkage : 1;
+  
   /// Force lazy initialization of class metadata
   /// Used on Windows to avoid cross-module references.
   unsigned LazyInitializeClassMetadata : 1;
@@ -226,20 +227,20 @@ public:
         Verify(true), OptMode(OptimizationMode::NotSet),
         Sanitizers(OptionSet<SanitizerKind>()),
         DebugInfoLevel(IRGenDebugInfoLevel::None),
-        DebugInfoFormat(IRGenDebugInfoFormat::None),
-        UseJIT(false), IntegratedREPL(false),
-        DisableLLVMOptzns(false), DisableSwiftSpecificLLVMOptzns(false),
-        DisableLLVMSLPVectorizer(false), DisableFPElim(true), Playground(false),
-        EmitStackPromotionChecks(false), PrintInlineTree(false),
-        EmbedMode(IRGenEmbedMode::None), HasValueNamesSetting(false),
-        ValueNames(false), EnableReflectionMetadata(true),
-        EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
-        EnableResilienceBypass(false), LazyInitializeClassMetadata(false),
+        DebugInfoFormat(IRGenDebugInfoFormat::None), UseJIT(false),
+        IntegratedREPL(false), DisableLLVMOptzns(false),
+        DisableSwiftSpecificLLVMOptzns(false), DisableLLVMSLPVectorizer(false),
+        DisableFPElim(true), Playground(false), EmitStackPromotionChecks(false),
+        PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
+        HasValueNamesSetting(false), ValueNames(false),
+        EnableReflectionMetadata(true), EnableReflectionNames(true),
+        EnableAnonymousContextMangledNames(false), ForcePublicLinkage(false),
+        LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false), DisableLegacyTypeInfo(false),
         UseIncrementalLLVMCodeGen(true), UseSwiftCall(false),
         GenerateProfile(false), EnableDynamicReplacementChaining(false),
-        DisableRoundTripDebugTypes(false),
-        CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
+        DisableRoundTripDebugTypes(false), CmdArgs(),
+        SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}
 
   // Get a hash of all options which influence the llvm compilation but are not

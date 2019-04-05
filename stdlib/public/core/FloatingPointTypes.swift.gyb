@@ -973,6 +973,15 @@ extension ${Self}: BinaryFloatingPoint {
 %end
   }
 
+  //  For core standard library floating-point types, LLVM can lower copysign
+  //  for us; this gets somewhat better codegen than the generic implementation,
+  //  but more importantly allows it to participate in other optimizations
+  //  at the LLVM level.
+  @_transparent
+  public init(signOf sign: ${Self}, magnitudeOf mag: ${Self}) {
+    _value = Builtin.int_copysign_FPIEEE${bits}(mag._value, sign._value)
+  }
+
   /// Rounds the value to an integral value using the specified rounding rule.
   ///
   /// The following example rounds a value using four different rounding rules:

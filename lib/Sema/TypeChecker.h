@@ -1501,10 +1501,7 @@ public:
 
   /// Coerce the specified parameter list of a ClosureExpr to the specified
   /// contextual type.
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  bool coerceParameterListToType(ParameterList *P, ClosureExpr *CE, AnyFunctionType *FN);
-
+  void coerceParameterListToType(ParameterList *P, ClosureExpr *CE, AnyFunctionType *FN);
   
   /// Type-check an initialized variable pattern declaration.
   bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC);

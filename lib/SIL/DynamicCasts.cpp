@@ -56,14 +56,14 @@ mustBridgeToSwiftValueBox(ModuleDecl *M, CanType T) {
   return !M->getASTContext().getBridgedToObjC(M, T);
 }
 
-static bool canClassOrSuperclassesHaveExtensions(ClassDecl *CD,
-                                                 bool isWholeModuleOpts) {
+static bool canClassOrSuperclassesHaveUnknownSubclasses(ClassDecl *CD,
+                                                      bool isWholeModuleOpts) {
   while (CD) {
-    // Open classes can always be extended
+    // Open classes can always have unknown subclasses.
     if (CD->getEffectiveAccess() == AccessLevel::Open)
       return true;
 
-    // Internal and public classes can be extended, if we are not in
+    // Internal and public classes may have unknown subclasses if we are not in
     // whole-module-optimization mode.
     if (CD->getEffectiveAccess() >= AccessLevel::Internal &&
         !isWholeModuleOpts)
@@ -110,11 +110,9 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
   }
 
   // If it is a class and it can be proven that this class and its
-  // superclasses cannot be extended, then it is safe to proceed.
-  // No need to check this for structs, as they do not have any
-  // superclasses.
+  // superclasses cannot have unknown subclasses, then it is safe to proceed.
   if (auto *CD = source.getClassOrBoundGenericClass()) {
-    if (canClassOrSuperclassesHaveExtensions(CD, isWholeModuleOpts))
+    if (canClassOrSuperclassesHaveUnknownSubclasses(CD, isWholeModuleOpts))
       return DynamicCastFeasibility::MaySucceed;
     // Derived types may conform to the protocol.
     if (!CD->isFinal()) {
@@ -555,22 +553,13 @@ swift::classifyDynamicCast(ModuleDecl *M,
         if (targetClass->usesObjCGenericsModel()) {
           // If both classes are ObjC generics, the cast may succeed if the
           // classes are related, irrespective of their generic parameters.
-          auto isDeclSuperclass = [&](ClassDecl *proposedSuper,
-                                      ClassDecl *proposedSub) -> bool {
-            do {
-              if (proposedSuper == proposedSub)
-                return true;
-            } while ((proposedSub = proposedSub->getSuperclassDecl()));
-            
-            return false;
-          };
-          
-          if (isDeclSuperclass(sourceClass, targetClass))
+
+          if (sourceClass->isSuperclassOf(targetClass))
             return DynamicCastFeasibility::MaySucceed;
           
-          if (isDeclSuperclass(targetClass, sourceClass)) {
+          if (targetClass->isSuperclassOf(sourceClass))
             return DynamicCastFeasibility::WillSucceed;
-          }          
+
           return DynamicCastFeasibility::WillFail;
         }
       }

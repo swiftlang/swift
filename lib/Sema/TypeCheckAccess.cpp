@@ -162,29 +162,30 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     llvm::function_ref<CheckTypeAccessCallback> diagnose) {
   if (TC.Context.isAccessControlDisabled())
     return;
-  if (!type)
-    return;
   // Don't spend time checking local declarations; this is always valid by the
   // time we get to this point.
   if (!contextAccessScope.isPublic() &&
       contextAccessScope.getDeclContext()->isLocalContext())
     return;
 
-  Optional<AccessScope> typeAccessScope =
-      TypeAccessScopeChecker::getAccessScope(type, useDC,
-                                             checkUsableFromInline);
+  AccessScope problematicAccessScope = AccessScope::getPublic();
+  if (type) {
+    Optional<AccessScope> typeAccessScope =
+        TypeAccessScopeChecker::getAccessScope(type, useDC,
+                                               checkUsableFromInline);
+
+    // Note: This means that the type itself is invalid for this particular
+    // context, because it references declarations from two incompatible scopes.
+    // In this case we should have diagnosed the bad reference already.
+    if (!typeAccessScope.hasValue())
+      return;
+    problematicAccessScope = *typeAccessScope;
+  }
+
   auto downgradeToWarning = DowngradeToWarning::No;
 
-  // Note: This means that the type itself is invalid for this particular
-  // context, because it references declarations from two incompatible scopes.
-  // In this case we should have diagnosed the bad reference already.
-  if (!typeAccessScope.hasValue())
-    return;
-
-  AccessScope problematicAccessScope = *typeAccessScope;
-
-  if (contextAccessScope.hasEqualDeclContextWith(*typeAccessScope) ||
-      contextAccessScope.isChildOf(*typeAccessScope)) {
+  if (contextAccessScope.hasEqualDeclContextWith(problematicAccessScope) ||
+      contextAccessScope.isChildOf(problematicAccessScope)) {
 
     // /Also/ check the TypeRepr, if present. This can be important when we're
     // unable to preserve typealias sugar that's present in the TypeRepr.
@@ -194,7 +195,9 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     Optional<AccessScope> typeReprAccessScope =
         TypeReprAccessScopeChecker::getAccessScope(typeRepr, useDC,
                                                    checkUsableFromInline);
-    assert(typeReprAccessScope && "valid Type but not valid TypeRepr?");
+    if (!typeReprAccessScope.hasValue())
+      return;
+
     if (contextAccessScope.hasEqualDeclContextWith(*typeReprAccessScope) ||
         contextAccessScope.isChildOf(*typeReprAccessScope)) {
       // Only if both the Type and the TypeRepr follow the access rules can
@@ -205,12 +208,11 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
 
   } else {
     // The type violates the rules of access control (with or without taking the
-    // TypeRepr into account).
+    // TypeRepr into account).
 
     if (typeRepr && mayBeInferred &&
         !TC.getLangOpts().isSwiftVersionAtLeast(5) &&
-        useDC->getParentModule()->getResilienceStrategy() !=
-          ResilienceStrategy::Resilient) {
+        !useDC->getParentModule()->isResilient()) {
       // Swift 4.2 and earlier didn't check the Type when a TypeRepr was
       // present. However, this is a major hole when generic parameters are
       // inferred:
@@ -366,9 +368,16 @@ void AccessControlCheckerBase::checkGenericParamAccess(
   if (minAccessScope.isPublic())
     return;
 
+  // FIXME: Promote these to an error in the next -swift-version break.
+  if (isa<SubscriptDecl>(owner) || isa<TypeAliasDecl>(owner))
+    downgradeToWarning = DowngradeToWarning::Yes;
+
   if (checkUsableFromInline) {
-    auto diagID = diag::generic_param_usable_from_inline;
     if (!TC.Context.isSwiftVersionAtLeast(5))
+      downgradeToWarning = DowngradeToWarning::Yes;
+
+    auto diagID = diag::generic_param_usable_from_inline;
+    if (downgradeToWarning == DowngradeToWarning::Yes)
       diagID = diag::generic_param_usable_from_inline_warn;
     auto diag = TC.diagnose(owner,
                             diagID,
@@ -536,6 +545,8 @@ public:
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
+    checkGenericParamAccess(TAD->getGenericParams(), TAD);
+
     checkTypeAccess(TAD->getUnderlyingTypeLoc(), TAD, /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
@@ -803,6 +814,8 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
+    checkGenericParamAccess(SD->getGenericParams(), SD);
+
     auto minAccessScope = AccessScope::getPublic();
     const TypeRepr *complainRepr = nullptr;
     auto downgradeToWarning = DowngradeToWarning::No;
@@ -1120,6 +1133,8 @@ public:
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
+    checkGenericParamAccess(TAD->getGenericParams(), TAD);
+
     checkTypeAccess(TAD->getUnderlyingTypeLoc(), TAD, /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
@@ -1295,6 +1310,8 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
+    checkGenericParamAccess(SD->getGenericParams(), SD);
+
     for (auto &P : *SD->getIndices()) {
       checkTypeAccess(P->getTypeLoc(), SD, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,

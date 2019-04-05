@@ -80,3 +80,28 @@ function(swift_windows_cache_VCVARS)
   set(UCRTVersion $ENV{UCRTVersion} CACHE STRING "")
 endfunction()
 
+# NOTE(compnerd) we use a macro here as this modifies global variables
+macro(swift_swap_compiler_if_needed target)
+  if(NOT CMAKE_C_COMPILER_ID MATCHES Clang)
+    if(CMAKE_SYSTEM_NAME STREQUAL CMAKE_HOST_SYSTEM_NAME)
+      get_target_property(CLANG_LOCATION clang LOCATION)
+      get_filename_component(CLANG_LOCATION ${CLANG_LOCATION} DIRECTORY)
+
+      if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC" OR
+          "${CMAKE_C_SIMULATE_ID}" STREQUAL "MSVC")
+        set(CMAKE_C_COMPILER
+          ${CLANG_LOCATION}/clang-cl${CMAKE_EXECUTABLE_SUFFIX})
+        set(CMAKE_CXX_COMPILER
+          ${CLANG_LOCATION}/clang-cl${CMAKE_EXECUTABLE_SUFFIX})
+      else()
+        set(CMAKE_C_COMPILER
+          ${CLANG_LOCATION}/clang${CMAKE_EXECUTABLE_SUFFIX})
+        set(CMAKE_CXX_COMPILER
+          ${CLANG_LOCATION}/clang++${CMAKE_EXECUTABLE_SUFFIX})
+      endif()
+    else()
+      message(SEND_ERROR "${target} requires a clang based compiler")
+    endif()
+  endif()
+endmacro()
+

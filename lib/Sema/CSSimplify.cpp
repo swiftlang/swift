@@ -127,7 +127,7 @@ bool constraints::areConservativelyCompatibleArgumentLabels(
   // we can get an unapplied declaration reference back.
   bool hasCurriedSelf;
   if (isa<SubscriptDecl>(decl)) {
-    hasCurriedSelf = false;
+    hasCurriedSelf = true;
   } else if (!baseType || baseType->is<ModuleType>()) {
     hasCurriedSelf = false;
   } else if (baseType->is<AnyMetatypeType>() && decl->isInstanceMember()) {
@@ -146,7 +146,6 @@ bool constraints::areConservativelyCompatibleArgumentLabels(
   if (auto fn = dyn_cast<AbstractFunctionDecl>(decl)) {
     fTy = fn->getInterfaceType()->castTo<AnyFunctionType>();
   } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
-    assert(!hasCurriedSelf && "Subscripts never have curried 'self'");
     fTy = subscript->getInterfaceType()->castTo<AnyFunctionType>();
   } else if (auto enumElement = dyn_cast<EnumElementDecl>(decl)) {
     fTy = enumElement->getInterfaceType()->castTo<AnyFunctionType>();
@@ -160,7 +159,7 @@ bool constraints::areConservativelyCompatibleArgumentLabels(
   }
 
   const AnyFunctionType *levelTy = fTy;
-  if (hasCurriedSelf) {
+  if (hasCurriedSelf && !isa<SubscriptDecl>(decl)) {
     levelTy = levelTy->getResult()->getAs<AnyFunctionType>();
     assert(levelTy && "Parameter list curry level does not match type");
   }
@@ -389,6 +388,13 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
 
       // Record the first argument for the variadic.
       parameterBindings[paramIdx].push_back(*claimed);
+
+      // If the argument is itself variadic, we're forwarding varargs
+      // with a VarargExpansionExpr; don't collect any more arguments.
+      if (args[*claimed].isVariadic()) {
+        skipClaimedArgs();
+        return;
+      }
 
       auto currentNextArgIdx = nextArgIdx;
       {
