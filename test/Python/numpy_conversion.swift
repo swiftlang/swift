@@ -4,7 +4,6 @@
 // `numpy.ndarray` conversion tests.
 
 import Python
-import struct TensorFlow.TensorShape
 import StdlibUnittest
 
 var NumpyConversionTests = TestSuite("NumpyConversion")
@@ -35,17 +34,6 @@ NumpyConversionTests.test("array-conversion") {
 
   let numpyArray2D = np.ones([2, 3])
   expectNil(Array<Float>(numpy: numpyArray2D))
-
-  let reshaped = np.reshape(numpyArray2D, 6)
-  if let array = expectNotNil(Array<Double>(numpy: reshaped)) {
-    expectEqual([1.0, 1.0, 1.0, 1.0, 1.0, 1.0], array)
-  }
-
-  let numpyArray1D = np.ones(28)
-  let reshaped3D = np.reshape(numpyArray1D, [2, 7, 2] as TensorShape)
-  expectEqual(TensorShape(reshaped3D.shape), [2, 7, 2])
-  let reshaped2D = np.reshape(reshaped3D, [14, 2] as TensorShape)
-  expectEqual(TensorShape(reshaped2D.shape), [14, 2])
 
   let numpyArrayStrided = np.array([[1, 2], [1, 2]], dtype: np.int32)[
       Python.slice(Python.None), 1]
