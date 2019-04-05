@@ -1336,19 +1336,6 @@ public extension Tensor where Scalar : Numeric {
   }
 
   /// Returns the arithmetic mean along the specified axes. The reduced
-  /// dimensions are retained with value 1.
-  /// - Parameter axes: The dimensions to reduce.
-  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
-  @inlinable @inline(__always)
-  @differentiable(
-    wrt: self, vjp: _vjpMean(alongAxes:)
-    where Scalar : TensorFlowFloatingPoint
-  )
-  func mean(alongAxes axes: Tensor<Int32>) -> Tensor {
-    return Raw.mean(self, reductionIndices: axes, keepDims: true)
-  }
-
-  /// Returns the arithmetic mean along the specified axes. The reduced
   /// dimensions are removed.
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
@@ -1443,8 +1430,21 @@ public extension Tensor where Scalar : Numeric {
     wrt: self, vjp: _vjpMean(alongAxes:)
     where Scalar : TensorFlowFloatingPoint
   )
+  func mean(alongAxes axes: Tensor<Int32>) -> Tensor {
+    return Raw.mean(self, reductionIndices: axes, keepDims: true)
+  }
+
+  /// Returns the arithmetic mean along the specified axes. The reduced
+  /// dimensions are retained with value 1.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  @differentiable(
+    wrt: self, vjp: _vjpMean(alongAxes:)
+    where Scalar : TensorFlowFloatingPoint
+  )
   func mean(alongAxes axes: [Int32]) -> Tensor {
-    return Raw.mean(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
+    return mean(alongAxes: Tensor<Int32>(axes))
   }
 
   /// Returns the arithmetic mean along the specified axes. The reduced
@@ -1487,24 +1487,6 @@ public extension Tensor where Scalar : Numeric {
   @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func variance(alongAxes axes: [Int32]) -> Tensor {
     return variance(alongAxes: Tensor<Int32>(axes))
-  }
-
-  /// Returns the product along the specified axes. The reduced dimensions are
-  /// retained with value 1.
-  /// - Parameter axes: The dimensions to reduce.
-  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
-  @inlinable @inline(__always)
-  func product(alongAxes axes: [Int32]) -> Tensor {
-    return Raw.prod(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
-  }
-
-  /// Returns the product along the specified axes. The reduced dimensions are
-  /// retained with value 1.
-  /// - Parameter axes: The dimensions to reduce.
-  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
-  @inlinable @inline(__always)
-  func product(alongAxes axes: Int32...) -> Tensor {
-    return product(alongAxes: axes)
   }
 }
 
