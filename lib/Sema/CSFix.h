@@ -136,6 +136,8 @@ enum class FixKind : uint8_t {
   /// If there is a matching inaccessible member - allow it as if there
   /// no access control.
   AllowInaccessibleMember,
+  /// Allow KeyPaths to use AnyObject as root type
+  AllowAnyObjectKeyPathRoot,
 };
 
 class ConstraintFix {
@@ -735,6 +737,22 @@ public:
   static AllowInaccessibleMember *create(ConstraintSystem &cs,
                                          ValueDecl *member,
                                          ConstraintLocator *locator);
+};
+
+class AllowAnyObjectKeyPathRoot final : public ConstraintFix {
+
+  AllowAnyObjectKeyPathRoot(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowAnyObjectKeyPathRoot, locator) {}
+
+public:
+  std::string getName() const override {
+    return "allow anyobject as root type for a keypath";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowAnyObjectKeyPathRoot *create(ConstraintSystem &cs,
+                                           ConstraintLocator *locator);
 };
 
 } // end namespace constraints

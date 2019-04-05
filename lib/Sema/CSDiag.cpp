@@ -7624,18 +7624,6 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
       return;
   }
 
-  // Diagnose use of AnyObject as root for a keypath
-  if (auto KPE = dyn_cast<KeyPathExpr>(E)) {
-    auto rootTyRepr = KPE->getRootType();
-    if (auto CITR = dyn_cast<ComponentIdentTypeRepr>(rootTyRepr)) {
-      if (CITR->getIdentifier().is("AnyObject"))
-        diagnose(rootTyRepr->getLoc(),
-                 diag::expr_swift_keypath_invalid_component)
-            .highlight(rootTyRepr->getSourceRange());
-      return;
-    }
-  }
-
   // If there are no posted constraints or failures, then there was
   // not enough contextual information available to infer a type for the
   // expression.

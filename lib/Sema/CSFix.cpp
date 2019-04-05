@@ -396,3 +396,15 @@ AllowInaccessibleMember::create(ConstraintSystem &cs, ValueDecl *member,
                                 ConstraintLocator *locator) {
   return new (cs.getAllocator()) AllowInaccessibleMember(cs, member, locator);
 }
+
+bool AllowAnyObjectKeyPathRoot::diagnose(Expr *root, bool asNote) const {
+  AnyObjectKeyPathRootFailure failure(root, getConstraintSystem(),
+                                      getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowAnyObjectKeyPathRoot *
+AllowAnyObjectKeyPathRoot::create(ConstraintSystem &cs,
+                                  ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowAnyObjectKeyPathRoot(cs, locator);
+}

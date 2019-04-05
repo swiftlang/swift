@@ -4846,11 +4846,16 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
       return SolutionKind::Solved;
     };
 
-  // We do not allow KeyPaths to go through AnyObject
+  // We do not allow KeyPaths to go through AnyObject, so let's create a fix
+  // and allow that. This will get diagnosed later.
   if (auto fixedRootTy =
           getFixedTypeRecursive(rootTy, subflags, /*wantRValue=*/true)) {
     if (fixedRootTy->isAnyObject()) {
-      return SolutionKind::Error;
+      auto fix =
+          AllowAnyObjectKeyPathRoot::create(*this, locator.getBaseLocator());
+
+      if (recordFix(fix))
+        return SolutionKind::Error;
     }
   }
 
@@ -6226,6 +6231,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowClosureParameterDestructuring:
   case FixKind::MoveOutOfOrderArgument:
   case FixKind::AllowInaccessibleMember:
+  case FixKind::AllowAnyObjectKeyPathRoot:
     llvm_unreachable("handled elsewhere");
   }
 

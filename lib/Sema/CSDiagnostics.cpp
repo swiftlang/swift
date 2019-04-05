@@ -2352,3 +2352,15 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
   emitDiagnostic(Member, diag::decl_declared_here, Member->getFullName());
   return true;
 }
+
+bool AnyObjectKeyPathRootFailure::diagnoseAsError() {
+  // Diagnose use of AnyObject as root for a keypath
+  if (auto KPE = dyn_cast<KeyPathExpr>(getAnchor())) {
+    auto rootTyRepr = KPE->getRootType();
+    emitDiagnostic(rootTyRepr->getLoc(),
+                   diag::expr_swift_keypath_invalid_component)
+        .highlight(rootTyRepr->getSourceRange());
+  }
+
+  return true;
+}

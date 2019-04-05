@@ -983,6 +983,21 @@ public:
   bool diagnoseAsError() override;
 };
 
+// Diagnose an attempt to use AnyObject as the root type of a KeyPath
+//
+// ```swift
+// let keyPath = \AnyObject.bar
+// ```
+class AnyObjectKeyPathRootFailure final : public FailureDiagnostic {
+
+public:
+  AnyObjectKeyPathRootFailure(Expr *root, ConstraintSystem &cs,
+                              ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 
