@@ -1221,7 +1221,7 @@ static bool performCompileStepsPostSILGen(
 
   Optional<BufferIndirectlyCausingDiagnosticRAII> ricd;
   if (auto *SF = MSF.dyn_cast<SourceFile *>())
-    ricd.emplace(Context.Diags, SF->getFilename());
+    ricd.emplace(Context.Diags, SF->getBufferID());
 
   if (Stats)
     countStatsPostSILGen(*Stats, *SM);

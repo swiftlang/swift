@@ -461,7 +461,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
   auto &Ctx = SF.getASTContext();
   BufferIndirectlyCausingDiagnosticRAII cpr(SF.getASTContext().Diags,
-                                            SF.getFilename());
+                                            SF.getBufferID());
 
   // Make sure we have a type checker.
   TypeChecker &TC = createTypeChecker(Ctx);

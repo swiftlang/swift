@@ -807,12 +807,12 @@ namespace swift {
     static const char *diagnosticStringFor(const DiagID id);
 
     /// If there is no clear .dia file for a diagnostic, put it in the one
-    /// corresponding to the input file name given here.
+    /// corresponding to the input buffer ID given here.
     /// In particular, in batch mode when a diagnostic is located in
     /// a non-primary file, use this affordance to place it in the .dia
     /// file for the primary that is currently being worked on.
     void setBufferIndirectlyCausingDiagnosticToInput(
-        StringRef defaultDiagnosticInputFile);
+        unsigned bufferIDE);
     void resetBufferIndirectlyCausingDiagnostic();
     SourceLoc getDefaultDiagnosticLoc() const {
       return bufferIndirectlyCausingDiagnostic;
@@ -825,10 +825,10 @@ namespace swift {
 
   public:
     BufferIndirectlyCausingDiagnosticRAII(DiagnosticEngine &Diags,
-                                          StringRef defaultDiagnosticInputFile)
+                                          unsigned bufferID)
         : Diags(Diags) {
       Diags.setBufferIndirectlyCausingDiagnosticToInput(
-          defaultDiagnosticInputFile);
+          bufferID);
     }
     ~BufferIndirectlyCausingDiagnosticRAII() {
       Diags.resetBufferIndirectlyCausingDiagnostic();
