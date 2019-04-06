@@ -1501,15 +1501,16 @@ public extension Tensor {
   @inlinable
   subscript(index: Int32) -> Tensor {
     get {
-      return Raw.stridedSlice(self,
-                              begin: Tensor<Int32>([index]),
-                              end: Tensor<Int32>([index + 1]),
-                              strides: Tensor<Int32>([1])).squeezingShape(at: 0)
+      let slice = Raw.stridedSlice(
+        self, begin: Tensor<Int32>([index]), end: Tensor<Int32>([index + 1]),
+        strides: Tensor<Int32>([1]))
+      return slice.squeezingShape(at: 0)
     }
     set {
-      let left = self[0..<index]
-      let right = self[index+1..<_TFGetScalarOrDie(shapeTensor[0].handle)]
-      self = Raw.concatV2([left, newValue.rankLifted(), right], axis: Tensor<Int32>(0))
+      let leftElements = self[0..<index]
+      let rightElements = self[index+1..<shape[0]]
+      self = Raw.concatV2([leftElements, newValue.rankLifted(), rightElements],
+                          axis: Tensor<Int32>(0))
     }
   }
 
@@ -1517,10 +1518,9 @@ public extension Tensor {
   /// - Parameter bounds: Contiguous range of indices.
   @inlinable
   subscript(bounds: Range<Int32>) -> Tensor {
-    return Raw.stridedSlice(self,
-                            begin: Tensor<Int32>([bounds.lowerBound]),
-                            end: Tensor<Int32>([bounds.upperBound]),
-                            strides: Tensor<Int32>([1]))
+    return Raw.stridedSlice(
+      self, begin: Tensor<Int32>([bounds.lowerBound]),
+      end: Tensor<Int32>([bounds.upperBound]), strides: Tensor<Int32>([1]))
   }
 
   // TODO(danielzheng): Add strided slices? (increment by something different
