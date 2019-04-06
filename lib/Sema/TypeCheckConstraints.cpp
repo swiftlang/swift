@@ -550,41 +550,45 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
         .highlight(UDRE->getSourceRange());
     };
 
-    if (!isConfused) {
-      if (Name == Context.Id_Self) {
-        if (DeclContext *typeContext = DC->getInnermostTypeContext()){
-          Type SelfType = typeContext->getSelfInterfaceType();
+    // Suppress diagnostics here because they will be incorrect when ignoring
+    // local variables
+    if (!ignoreLocalVars) {
 
-          if (typeContext->getSelfClassDecl())
-            SelfType = DynamicSelfType::get(SelfType, Context);
-          SelfType = DC->mapTypeIntoContext(SelfType);
-          return new (Context) TypeExpr(TypeLoc(new (Context)
-                                                FixedTypeRepr(SelfType, Loc)));
+      if (!isConfused) {
+        if (Name == Context.Id_Self) {
+          if (DeclContext *typeContext = DC->getInnermostTypeContext()) {
+            Type SelfType = typeContext->getSelfInterfaceType();
+
+            if (typeContext->getSelfClassDecl())
+              SelfType = DynamicSelfType::get(SelfType, Context);
+            SelfType = DC->mapTypeIntoContext(SelfType);
+            return new (Context)
+                TypeExpr(TypeLoc(new (Context) FixedTypeRepr(SelfType, Loc)));
+          }
         }
-      }
 
-      TypoCorrectionResults corrections(*this, Name, nameLoc);
-      performTypoCorrection(DC, UDRE->getRefKind(), Type(),
-                            lookupOptions, corrections);
+        TypoCorrectionResults corrections(*this, Name, nameLoc);
+        performTypoCorrection(DC, UDRE->getRefKind(), Type(), lookupOptions,
+                              corrections);
 
-      if (auto typo = corrections.claimUniqueCorrection()) {
-        auto diag = diagnose(Loc, diag::use_unresolved_identifier_corrected,
-                             Name, Name.isOperator(),
-                             typo->CorrectedName.getBaseIdentifier().str());
-        diag.highlight(UDRE->getSourceRange());
-        typo->addFixits(diag);
+        if (auto typo = corrections.claimUniqueCorrection()) {
+          auto diag = diagnose(Loc, diag::use_unresolved_identifier_corrected,
+                               Name, Name.isOperator(),
+                               typo->CorrectedName.getBaseIdentifier().str());
+          diag.highlight(UDRE->getSourceRange());
+          typo->addFixits(diag);
+        } else {
+          emitBasicError();
+        }
+
+        corrections.noteAllCandidates();
       } else {
         emitBasicError();
+
+        diagnose(Loc, diag::confusable_character, UDRE->getName().isOperator(),
+                 simpleName.str(), expectedIdentifier)
+            .fixItReplace(Loc, expectedIdentifier);
       }
-
-      corrections.noteAllCandidates();
-    } else {
-      emitBasicError();
-
-      diagnose(Loc, diag::confusable_character,
-               UDRE->getName().isOperator(), simpleName.str(),
-               expectedIdentifier)
-        .fixItReplace(Loc, expectedIdentifier);
     }
 
     // TODO: consider recovering from here.  We may want some way to suppress
@@ -603,7 +607,35 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
 
       bool foundSelfRef = false;
 
-      init->forEachChildExpr([&](Expr *subExpr) -> Expr * {
+      auto forEachChildExpr = [&](Expr *root,
+                                  llvm::function_ref<Expr *(Expr *)> callback) {
+        struct ChildWalker : ASTWalker {
+          llvm::function_ref<Expr *(Expr *)> callback;
+
+          ChildWalker(llvm::function_ref<Expr *(Expr *)> callback)
+              : callback(callback) {}
+
+          std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+            // Enumerate the node!
+            return {true, callback(E)};
+          }
+
+          std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+            return {true, S};
+          }
+
+          std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
+            return {true, P};
+          }
+          bool walkToDeclPre(Decl *D) override { return true; }
+          bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+          bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
+        };
+
+        root->walk(ChildWalker(callback));
+      };
+
+      forEachChildExpr(init, [&](Expr *subExpr) -> Expr * {
         if (auto decl = dyn_cast_or_null<UnresolvedDeclRefExpr>(subExpr)) {
           if (decl->getName() == Name) {
             foundSelfRef = true;
@@ -858,9 +890,6 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
         isa<UnresolvedDotExpr>(expr)) {
       return expr;
     }
-
-    // We couldn't find anything, so return an error.
-    return new (Context) ErrorExpr(UDRE->getSourceRange());
   }
 
   // FIXME: If we reach this point, the program we're being handed is likely
