@@ -31,11 +31,6 @@ class Product(object):
         return cls.product_name()
 
     @classmethod
-    def get_build_directory_name(cls, host_target):
-        return "{}-{}".format(cls.product_name(),
-                              host_target.name)
-
-    @classmethod
     def is_build_script_impl_product(cls):
         """is_build_script_impl_product -> bool
 
