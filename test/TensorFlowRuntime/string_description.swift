@@ -3,19 +3,24 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
 //
-// Tensor description (`CustomStringConvertible` conformance) tests.
+// `Tensor` string description tests.
 
 import TensorFlow
 import StdlibUnittest
 
-var DescriptionTests = TestSuite("DescriptionTests")
+// Note: Foundation is needed for `String.contains(_: String)`.
+#if canImport(Foundation)
+import Foundation
+#endif
 
-DescriptionTests.test("Empty") {
+var StringDescriptionTests = TestSuite("StringDescriptionTests")
+
+StringDescriptionTests.test("Empty") {
   let empty = Tensor<Float>([] as [Float])
   expectEqual("[]", empty.description)
 }
 
-DescriptionTests.test("Scalar") {
+StringDescriptionTests.test("Scalar") {
   do {
     let scalar = Tensor<Int32>(1)
     expectEqual("1", scalar.description)
@@ -27,7 +32,7 @@ DescriptionTests.test("Scalar") {
   }
 }
 
-DescriptionTests.test("Vector") {
+StringDescriptionTests.test("Vector") {
   do {
     let vector = Tensor<Int32>(ones: [4])
     expectEqual("[1, 1, 1, 1]", vector.description)
@@ -37,7 +42,6 @@ DescriptionTests.test("Vector") {
     var vector = Tensor<Float>([1, 2, 3, 4])
     expectEqual("[1.0, 2.0, 3.0, 4.0]", vector.description)
     vector[1] = Tensor<Float>(-2)
-    // vector = Tensor<Float>([1, -2, 3, 4])
     expectEqual("[ 1.0, -2.0,  3.0,  4.0]", vector.description)
   }
 
@@ -48,7 +52,7 @@ DescriptionTests.test("Vector") {
   }
 }
 
-DescriptionTests.test("Matrix") {
+StringDescriptionTests.test("Matrix") {
   do {
     var matrix = Tensor<Int32>(ones: [2, 2])
     expectEqual("""
@@ -80,7 +84,7 @@ DescriptionTests.test("Matrix") {
   }
 }
 
-DescriptionTests.test("HigherRankTensors") {
+StringDescriptionTests.test("HigherRankTensors") {
   do {
     let tensor = Tensor<Int32>(ones: [1, 1, 1, 1])
     expectEqual("[[[[1]]]]", tensor.description)
@@ -165,7 +169,7 @@ DescriptionTests.test("HigherRankTensors") {
 
 // Test example random initialization (longer scalars).
 // Hard-coded test tensors generated via `Tensor(randomNormal:)`.
-DescriptionTests.test("RandomScalars") {
+StringDescriptionTests.test("RandomScalars") {
   do {
     var matrix = Tensor<Float>(
       [[  1.1621541, -0.39326498],
@@ -203,7 +207,7 @@ DescriptionTests.test("RandomScalars") {
   }
 }
 
-DescriptionTests.test("DescriptionConfiguration") {
+StringDescriptionTests.test("DescriptionConfiguration") {
   // Test `lineWidth` configuration.
   let vector = Tensor<Float>(ones: [10])
   expectEqual("[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]",
@@ -217,9 +221,12 @@ DescriptionTests.test("DescriptionConfiguration") {
     """, vector.description(lineWidth: 6))
 
   // Test `summarize` configuration.
+  // NOTE: `String.contains(_ substring: String)` requires Foundation.
+#if canImport(Foundation)
   let longVector = Tensor<Float>(ones: [1001])
   expectTrue(longVector.description.contains("..."))
   expectFalse(longVector.description(summarize: false).contains("..."))
+#endif // canImport(Foundation)
 
   // Test `edgeElementCount` configuration.
   var tallMatrix = Tensor<Float>(ones: [50, 2])
@@ -241,7 +248,7 @@ DescriptionTests.test("DescriptionConfiguration") {
     tallMatrix.description(edgeElementCount: 1, summarize: true))
 }
 
-DescriptionTests.test("FullDescription") {
+StringDescriptionTests.test("FullDescription") {
   let vector = Tensor<Float>(ones: [2, 2, 2])
   expectEqual("[[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0], [1.0, 1.0]]]",
               vector.fullDescription)
