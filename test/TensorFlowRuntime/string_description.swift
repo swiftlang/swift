@@ -220,12 +220,12 @@ StringDescriptionTests.test("DescriptionConfiguration") {
      1.0, 1.0]
     """, vector.description(lineWidth: 6))
 
-  // Test `summarize` configuration.
+  // Test `summarizing` configuration.
   // NOTE: `String.contains(_ substring: String)` requires Foundation.
 #if canImport(Foundation)
   let longVector = Tensor<Float>(ones: [1001])
   expectTrue(longVector.description.contains("..."))
-  expectFalse(longVector.description(summarize: false).contains("..."))
+  expectFalse(longVector.description(summarizing: false).contains("..."))
 #endif // canImport(Foundation)
 
   // Test `edgeElementCount` configuration.
@@ -239,13 +239,13 @@ StringDescriptionTests.test("DescriptionConfiguration") {
      [1.0, 1.0],
      [1.0, 1.0]]
     """,
-    tallMatrix.description(summarize: true))
+    tallMatrix.description(summarizing: true))
   expectEqual("""
     [[1.0, 1.0],
      ...,
      [1.0, 1.0]]
     """,
-    tallMatrix.description(edgeElementCount: 1, summarize: true))
+    tallMatrix.description(edgeElementCount: 1, summarizing: true))
 }
 
 StringDescriptionTests.test("FullDescription") {

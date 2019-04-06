@@ -797,12 +797,12 @@ extension Tensor : Equatable where Scalar : Equatable {
 // Description and visualization
 //===----------------------------------------------------------------------===//
 
-/// String conversion.
+// String conversion.
 extension Tensor : CustomStringConvertible {
   /// A textual representation of the tensor.
   ///
-  /// - Note: use `fullDescription` for a non-pretty-printed representation
-  ///   showing all scalars.
+  /// - Note: use `fullDescription` for a non-pretty-printed description showing
+  ///   all scalars.
   public var description: String {
     return array.description
   }
@@ -816,16 +816,16 @@ public extension Tensor {
   /// - Parameters:
   ///   - lineWidth: The max line width for printing. Used to determine number
   ///     of scalars to print per line.
-  ///   - edgeElementCount: The maximum of elements to print before and after
-  ///     summarization via ellipses (`...`).
-  ///   - summarize: If true, summarize description if element count exceeds
+  ///   - edgeElementCount: The maximum number of elements to print before and
+  ///     after summarization via ellipses (`...`).
+  ///   - summarizing: If true, summarize description if element count exceeds
   ///     twice `edgeElementCount`.
   func description(
-    lineWidth: Int = 80, edgeElementCount: Int = 3, summarize: Bool = false
+    lineWidth: Int = 80, edgeElementCount: Int = 3, summarizing: Bool = false
   ) -> String {
     return array.description(
       lineWidth: lineWidth, edgeElementCount: edgeElementCount,
-      summarize: summarize)
+      summarizing: summarizing)
   }
 
   /// A full, non-pretty-printed textual representation of the tensor, showing
@@ -835,14 +835,14 @@ public extension Tensor {
   }
 }
 
-/// Xcode Playground display conversion.
+// Xcode Playground display conversion.
 extension Tensor : CustomPlaygroundDisplayConvertible {
   public var playgroundDescription: Any {
     return description
   }
 }
 
-/// Mirror representation, used by debugger/REPL.
+// Mirror representation, used by debugger/REPL.
 extension Tensor : CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(self, children: [], displayStyle: .struct)
