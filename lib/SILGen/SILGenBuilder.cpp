@@ -35,9 +35,6 @@ SILGenModule &SILGenBuilder::getSILGenModule() const { return SGF.SGM; }
 SILGenBuilder::SILGenBuilder(SILGenFunction &SGF)
     : SILBuilder(SGF.F), SGF(SGF) {}
 
-SILGenBuilder::SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB)
-    : SILBuilder(insertBB), SGF(SGF) {}
-
 SILGenBuilder::SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB,
                              SmallVectorImpl<SILInstruction *> *insertedInsts)
     : SILBuilder(insertBB, insertedInsts), SGF(SGF) {}

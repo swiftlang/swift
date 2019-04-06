@@ -229,11 +229,12 @@ struct SynParserDiagConsumer: public DiagnosticConsumer {
   const unsigned BufferID;
   SynParserDiagConsumer(SynParser &Parser, unsigned BufferID):
     Parser(Parser), BufferID(BufferID) {}
-  void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                        DiagnosticKind Kind,
-                        StringRef FormatString,
-                        ArrayRef<DiagnosticArgument> FormatArgs,
-                        const DiagnosticInfo &Info) override {
+  void
+  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+                   StringRef FormatString,
+                   ArrayRef<DiagnosticArgument> FormatArgs,
+                   const DiagnosticInfo &Info,
+                   const SourceLoc bufferIndirectlyCausingDiagnostic) override {
     assert(Kind != DiagnosticKind::Remark && "Shouldn't see this in parser.");
     // The buffer where all char* will point into.
     llvm::SmallString<256> Buffer;

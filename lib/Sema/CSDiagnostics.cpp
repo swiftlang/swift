@@ -776,7 +776,7 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
 bool RValueTreatedAsLValueFailure::diagnoseAsError() {
   Diag<StringRef> subElementDiagID;
   Diag<Type> rvalueDiagID = diag::assignment_lhs_not_lvalue;
-  Expr *diagExpr = getLocator()->getAnchor();
+  Expr *diagExpr = getRawAnchor();
   SourceLoc loc = diagExpr->getLoc();
 
   if (auto assignExpr = dyn_cast<AssignExpr>(diagExpr)) {
@@ -854,10 +854,18 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
       }
     }
 
-    if (auto resolvedOverload = getResolvedOverload(getLocator()))
+    if (auto resolvedOverload = getResolvedOverload(getLocator())) {
       if (resolvedOverload->Choice.getKind() ==
           OverloadChoiceKind::DynamicMemberLookup)
         subElementDiagID = diag::assignment_dynamic_property_has_immutable_base;
+
+      if (resolvedOverload->Choice.getKind() ==
+          OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+        if (!getType(member->getBase())->hasLValueType())
+          subElementDiagID =
+              diag::assignment_dynamic_property_has_immutable_base;
+      }
+    }
   } else if (auto sub = dyn_cast<SubscriptExpr>(diagExpr)) {
       subElementDiagID = diag::assignment_subscript_has_immutable_base;
   } else {
@@ -1202,7 +1210,7 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
     if (!member) {
       auto loc =
           cs.getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
-      member = dyn_cast_or_null<SubscriptDecl>(cs.findResolvedMemberRef(loc));
+      member = dyn_cast_or_null<SubscriptDecl>(getMemberRef(loc));
     }
 
     // If it isn't settable, return it.
@@ -1231,9 +1239,10 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
     // If we found a decl for the UDE, check it.
     auto loc = cs.getConstraintLocator(UDE, ConstraintLocator::Member);
 
+    auto *member = getMemberRef(loc);
     // If we can resolve a member, we can determine whether it is settable in
     // this context.
-    if (auto *member = cs.findResolvedMemberRef(loc)) {
+    if (member) {
       auto *memberVD = dyn_cast<VarDecl>(member);
 
       // If the member isn't a vardecl (e.g. its a funcdecl), or it isn't
@@ -1279,6 +1288,43 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
     return resolveImmutableBase(SAE->getFn());
 
   return {expr, nullptr};
+}
+
+ValueDecl *AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
+  auto member = getOverloadChoiceIfAvailable(locator);
+  if (!member || !member->choice.isDecl())
+    return nullptr;
+
+  auto *DC = getDC();
+  auto &TC = getTypeChecker();
+
+  auto *decl = member->choice.getDecl();
+  if (isa<SubscriptDecl>(decl) &&
+      isValidDynamicMemberLookupSubscript(cast<SubscriptDecl>(decl), DC, TC)) {
+    auto *subscript = cast<SubscriptDecl>(decl);
+    // If this is a keypath dynamic member lookup, we have to
+    // adjust the locator to find member referred by it.
+    if (isValidKeyPathDynamicMemberLookup(subscript, TC)) {
+      auto &cs = getConstraintSystem();
+      // Type has a following format:
+      // `(Self) -> (dynamicMember: {Writable}KeyPath<T, U>) -> U`
+      auto *fullType = member->openedFullType->castTo<FunctionType>();
+      auto *fnType = fullType->getResult()->castTo<FunctionType>();
+
+      auto paramTy = fnType->getParams()[0].getPlainType();
+      auto keyPath = paramTy->getAnyNominal();
+      auto memberLoc = cs.getConstraintLocator(
+          locator, LocatorPathElt::getKeyPathDynamicMember(keyPath));
+
+      auto memberRef = getOverloadChoiceIfAvailable(memberLoc);
+      return memberRef ? memberRef->choice.getDecl() : nullptr;
+    }
+
+    // If this is a string based dynamic lookup, there is no member declaration.
+    return nullptr;
+  }
+
+  return decl;
 }
 
 Diag<StringRef> AssignmentFailure::findDeclDiagonstic(ASTContext &ctx,

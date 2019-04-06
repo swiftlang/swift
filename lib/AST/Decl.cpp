@@ -5094,7 +5094,7 @@ NullablePtr<VarDecl> VarDecl::getCorrespondingCaseBodyVariable() const {
 
   // A var decl associated with a case stmt implies that the case stmt has body
   // var decls. So we can access the optional value here without worry.
-  auto caseBodyVars = *caseStmt->getCaseBodyVariables();
+  auto caseBodyVars = caseStmt->getCaseBodyVariables();
   auto result = llvm::find_if(caseBodyVars, [&](VarDecl *caseBodyVar) {
     return caseBodyVar->getName() == name;
   });

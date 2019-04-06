@@ -17,6 +17,9 @@ public class PublicClass {
   public dynamic func function() -> String {
     return "public_class_func"
   }
+  public dynamic final func finalFunction() -> String {
+    return "public_class_final_func"
+  }
   public dynamic func genericFunction<T>(_ t: T.Type) -> String {
     return "public_class_generic_func"
   }
@@ -84,6 +87,11 @@ public class PublicClass {
   public func function() -> String {
     return "public_class_func"
   }
+
+  public final func finalFunction() -> String {
+    return "public_class_final_func"
+  }
+
   public func genericFunction<T>(_ t: T.Type) -> String {
     return "public_class_generic_func"
   }
@@ -162,6 +170,10 @@ extension PublicClass {
   @_dynamicReplacement(for: function())
   public func replacement_function() -> String {
     return "replacement of " + function()
+  }
+  @_dynamicReplacement(for: finalFunction())
+  public func replacement_finalFunction() -> String {
+    return "replacement of " + finalFunction()
   }
   @_dynamicReplacement(for: genericFunction(_:))
   public func replacement_genericFunction<T>(_ t: T.Type) -> String {

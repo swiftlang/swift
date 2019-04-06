@@ -34,7 +34,7 @@ class Foo {
 
   func notDynamic() {}
 
-  @objc final dynamic func indecisive() {} // expected-error{{a declaration cannot be both 'final' and 'dynamic'}} {{15-23=}}
+  @objc final dynamic func indecisive() {}
 }
 
 struct Bar {

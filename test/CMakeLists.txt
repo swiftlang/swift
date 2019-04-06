@@ -205,7 +205,7 @@ __declspec(dllexport)
 #endif
 _Block_release(void) { }\n")
     _add_swift_library_single(
-      BlocksRuntimeStub-${SDK}-${ARCH}
+      BlocksRuntimeStub${VARIANT_SUFFIX}
       BlocksRuntimeStub
       SHARED
       DONT_EMBED_BITCODE
@@ -214,12 +214,12 @@ _Block_release(void) { }\n")
       SDK ${SDK}
       INSTALL_IN_COMPONENT dev
       ${test_bin_dir}/BlocksRuntime.c)
-    set_target_properties(BlocksRuntimeStub-${SDK}-${ARCH} PROPERTIES
+    set_target_properties(BlocksRuntimeStub${VARIANT_SUFFIX} PROPERTIES
       ARCHIVE_OUTPUT_DIRECTORY ${test_bin_dir}
       LIBRARY_OUTPUT_DIRECTORY ${test_bin_dir}
       RUNTIME_OUTPUT_DIRECTORY ${test_bin_dir}
       OUTPUT_NAME BlocksRuntime)
-    list(APPEND test_dependencies BlocksRuntimeStub-${SDK}-${ARCH})
+    list(APPEND test_dependencies BlocksRuntimeStub${VARIANT_SUFFIX})
 
     list(APPEND test_dependencies
         "swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
