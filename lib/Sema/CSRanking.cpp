@@ -151,6 +151,7 @@ static bool sameOverloadChoice(const OverloadChoice &x,
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
   case OverloadChoiceKind::DynamicMemberLookup:
+  case OverloadChoiceKind::KeyPathDynamicMemberLookup:
     return sameDecl(x.getDecl(), y.getDecl());
 
   case OverloadChoiceKind::TupleIndex:
@@ -875,6 +876,20 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         continue;
       }
 
+      // Dynamic member lookup through a keypath is better than one using string
+      // because it carries more type information.
+      if (choice1.getKind() == OverloadChoiceKind::KeyPathDynamicMemberLookup &&
+          choice2.getKind() == OverloadChoiceKind::DynamicMemberLookup) {
+        score1 += weight;
+        continue;
+      }
+
+      if (choice1.getKind() == OverloadChoiceKind::DynamicMemberLookup &&
+          choice2.getKind() == OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+        score2 += weight;
+        continue;
+      }
+
       continue;
     }
 
@@ -893,6 +908,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     case OverloadChoiceKind::DeclViaBridge:
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
     case OverloadChoiceKind::DynamicMemberLookup:
+    case OverloadChoiceKind::KeyPathDynamicMemberLookup:
       break;
     }
 

@@ -45,6 +45,10 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
       id.AddPointer(elt.getWitness());
       break;
 
+    case KeyPathDynamicMember:
+      id.AddPointer(elt.getKeyPath());
+      break;
+
     case ApplyArgument:
     case ApplyFunction:
     case FunctionArgument:
@@ -83,6 +87,18 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
       break;
     }
   }
+}
+
+/// Determine whether given locator points to the subscript reference
+/// e.g. `foo[0]` or `\Foo.[0]`
+bool ConstraintLocator::isSubscriptMemberRef() const {
+  auto *anchor = getAnchor();
+  auto path = getPath();
+
+  if (!anchor || path.empty())
+    return false;
+
+  return path.back().getKind() == ConstraintLocator::SubscriptMember;
 }
 
 void ConstraintLocator::dump(SourceManager *sm) {
@@ -265,6 +281,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case SynthesizedArgument:
       out << " synthesized argument #" << llvm::utostr(elt.getValue());
+      break;
+
+    case KeyPathDynamicMember:
+      out << " keypath dynamic member lookup";
       break;
     }
   }
