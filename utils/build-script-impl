@@ -3115,6 +3115,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --threads=$(sysctl hw.physicalcpu | awk '{ print $2 }')"
                 fi
 
+                # Record the times test took and report the slowest.
+                LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -v --time-tests"
                 if [[ "$using_xcodebuild" == "FALSE" ]] ; then
                     with_pushd ${lldb_build_dir} \
                         call ${NINJA_BIN} unittests/LLDBUnitTests
