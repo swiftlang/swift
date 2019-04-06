@@ -826,12 +826,29 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
   for (auto &Consumer : Consumers) {
     Consumer->handleDiagnostic(SourceMgr, loc, toDiagnosticKind(behavior),
                                diagnosticStringFor(Info.ID),
-                               diagnostic.getArgs(), Info);
+                               diagnostic.getArgs(), Info,
+                               getDefaultDiagnosticLoc());
   }
 }
 
 const char *DiagnosticEngine::diagnosticStringFor(const DiagID id) {
   return diagnosticStrings[(unsigned)id];
+}
+
+void DiagnosticEngine::setBufferIndirectlyCausingDiagnosticToInput(
+    SourceLoc loc) {
+  // If in the future, nested BufferIndirectlyCausingDiagnosticRAII need be
+  // supported, the compiler will need a stack for
+  // bufferIndirectlyCausingDiagnostic.
+  assert(bufferIndirectlyCausingDiagnostic.isInvalid() &&
+         "Buffer should not already be set.");
+  bufferIndirectlyCausingDiagnostic = loc;
+  assert(bufferIndirectlyCausingDiagnostic.isValid() &&
+         "Buffer must be valid for previous assertion to work.");
+}
+
+void DiagnosticEngine::resetBufferIndirectlyCausingDiagnostic() {
+  bufferIndirectlyCausingDiagnostic = SourceLoc();
 }
 
 DiagnosticSuppression::DiagnosticSuppression(DiagnosticEngine &diags)
@@ -843,4 +860,15 @@ DiagnosticSuppression::DiagnosticSuppression(DiagnosticEngine &diags)
 DiagnosticSuppression::~DiagnosticSuppression() {
   for (auto consumer : consumers)
     diags.addConsumer(*consumer);
+}
+
+BufferIndirectlyCausingDiagnosticRAII::BufferIndirectlyCausingDiagnosticRAII(
+    const SourceFile &SF)
+    : Diags(SF.getASTContext().Diags) {
+  auto id = SF.getBufferID();
+  if (!id)
+    return;
+  auto loc = SF.getASTContext().SourceMgr.getLocForBufferStart(*id);
+  if (loc.isValid())
+    Diags.setBufferIndirectlyCausingDiagnosticToInput(loc);
 }
