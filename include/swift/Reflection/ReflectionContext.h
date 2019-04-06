@@ -202,7 +202,7 @@ public:
                                                RangeEnd - RangeStart);
 
     auto findMachOSectionByName = [&](std::string Name)
-        -> std::pair<std::pair<const char *, const char *>, uint64_t> {
+        -> std::pair<const char *, const char *> {
       for (unsigned I = 0; I < NumSect; ++I) {
         auto S = reinterpret_cast<typename T::Section *>(
             SectionsBuf + (I * sizeof(typename T::Section)));
@@ -213,9 +213,9 @@ public:
         auto LocalSectStart =
             reinterpret_cast<const char *>(SectBufData + RemoteSecStart - RangeStart);
         auto LocalSectEnd = reinterpret_cast<const char *>(LocalSectStart + S->size);
-        return {{LocalSectStart, LocalSectEnd}, 0};
+        return {LocalSectStart, LocalSectEnd};
       }
-      return {{nullptr, nullptr}, 0};
+      return {nullptr, nullptr};
     };
 
     auto FieldMdSec = findMachOSectionByName("__swift5_fieldmd");
@@ -225,24 +225,24 @@ public:
     auto TypeRefMdSec = findMachOSectionByName("__swift5_typeref");
     auto ReflStrMdSec = findMachOSectionByName("__swift5_reflstr");
 
-    if (FieldMdSec.first.first == nullptr &&
-        AssocTySec.first.first == nullptr &&
-        BuiltinTySec.first.first == nullptr &&
-        CaptureSec.first.first == nullptr &&
-        TypeRefMdSec.first.first == nullptr &&
-        ReflStrMdSec.first.first == nullptr)
+    if (FieldMdSec.first == nullptr &&
+        AssocTySec.first == nullptr &&
+        BuiltinTySec.first == nullptr &&
+        CaptureSec.first == nullptr &&
+        TypeRefMdSec.first == nullptr &&
+        ReflStrMdSec.first == nullptr)
       return false;
 
     auto LocalStartAddress = reinterpret_cast<uint64_t>(SectBuf.get());
     auto RemoteStartAddress = static_cast<uint64_t>(RangeStart);
 
     ReflectionInfo info = {
-        {{FieldMdSec.first.first, FieldMdSec.first.second}, 0},
-        {{AssocTySec.first.first, AssocTySec.first.second}, 0},
-        {{BuiltinTySec.first.first, BuiltinTySec.first.second}, 0},
-        {{CaptureSec.first.first, CaptureSec.first.second}, 0},
-        {{TypeRefMdSec.first.first, TypeRefMdSec.first.second}, 0},
-        {{ReflStrMdSec.first.first, ReflStrMdSec.first.second}, 0},
+        {{FieldMdSec.first, FieldMdSec.second}, 0},
+        {{AssocTySec.first, AssocTySec.second}, 0},
+        {{BuiltinTySec.first, BuiltinTySec.second}, 0},
+        {{CaptureSec.first, CaptureSec.second}, 0},
+        {{TypeRefMdSec.first, TypeRefMdSec.second}, 0},
+        {{ReflStrMdSec.first, ReflStrMdSec.second}, 0},
         LocalStartAddress,
         RemoteStartAddress};
 
