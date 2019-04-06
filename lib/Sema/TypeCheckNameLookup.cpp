@@ -325,6 +325,14 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
       assert(foundInType && "bogus base declaration?");
     }
 
+    // This is a hack to filter out top level variables. If this flag is set
+    // then local variables are ignored, but for some reason, top level
+    // variables do not get ignored, so ignore them here.
+    if (options.contains(NameLookupFlags::IgnoreLocalVariables) &&
+        isa<VarDecl>(found.getValueDecl())) {
+      continue;
+    }
+
     builder.add(found.getValueDecl(), found.getDeclContext(), foundInType,
                 /*isOuter=*/idx >= lookup.IndexOfFirstOuterResult);
   }
