@@ -102,6 +102,8 @@ bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
                                            const DeclContext *DC,
                                            FragileFunctionKind Kind,
                                            bool TreatUsableFromInlineAsPublic) {
+  // Do some important fast-path checks that apply to all cases.
+
   // Local declarations are OK.
   if (D->getDeclContext()->isLocalContext())
     return false;
@@ -110,6 +112,23 @@ bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
   if (isa<AbstractTypeParamDecl>(D))
     return false;
 
+  // Check whether the declaration is accessible.
+  if (diagnoseInlinableDeclRefAccess(loc, D, DC, Kind,
+                                     TreatUsableFromInlineAsPublic))
+    return true;
+
+  // Check whether the declaration comes from a publically-imported module.
+  if (diagnoseDeclRefExportability(loc, D, DC))
+    return true;
+
+  return false;
+}
+
+bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
+                                           const ValueDecl *D,
+                                           const DeclContext *DC,
+                                           FragileFunctionKind Kind,
+                                           bool TreatUsableFromInlineAsPublic) {
   // Public declarations are OK.
   if (D->getFormalAccessScope(/*useDC=*/nullptr,
                               TreatUsableFromInlineAsPublic).isPublic())
@@ -178,3 +197,38 @@ bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
   return (downgradeToWarning == DowngradeToWarning::No);
 }
 
+bool TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
+                                               const ValueDecl *D,
+                                               const DeclContext *DC) {
+  // We're only interested in diagnosing uses from source files.
+  auto userSF = DC->getParentSourceFile();
+  if (!userSF)
+    return false;
+
+  // If the source file doesn't have any implementation-only imports,
+  // we can fast-path this.  In the current language design, we never
+  // need to consider the possibility of implementation-only imports
+  // from other source files in the module (or indirectly in other modules).
+  // TODO: maybe check whether D is from a bridging header?
+  if (!userSF->hasImplementationOnlyImports())
+    return false;
+
+  auto userModule = userSF->getParentModule();
+  auto definingModule = D->getModuleContext();
+
+  // Nothing to diagnose in the very common case of the same module.
+  if (userModule == definingModule)
+    return false;
+
+  // Nothing to diagnose in the very common case that the module is
+  // imported for use in signatures.
+  if (!userSF->isImportedImplementationOnly(definingModule))
+    return false;
+
+  // TODO: different diagnostics
+  diagnose(loc, diag::inlinable_decl_ref_implementation_only,
+           D->getDescriptiveKind(), D->getFullName());
+
+  // TODO: notes explaining why
+  return true;
+}

@@ -4099,6 +4099,11 @@ WARNING(resilience_decl_unavailable_warn,
         "should not be referenced from " FRAGILE_FUNC_KIND "3",
         (DescriptiveDeclKind, DeclName, AccessLevel, unsigned, bool))
 
+ERROR(inlinable_decl_ref_implementation_only,
+      none, "%0 %1 cannot be used in an inlinable "
+      "function because its module was imported implementation-only",
+      (DescriptiveDeclKind, DeclName))
+
 #undef FRAGILE_FUNC_KIND
 
 NOTE(resilience_decl_declared_here_public,
