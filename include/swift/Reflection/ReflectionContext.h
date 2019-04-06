@@ -310,7 +310,7 @@ public:
         sizeof(llvm::object::coff_section) * COFFFileHdr->NumberOfSections);
 
     auto findCOFFSectionByName = [&](llvm::StringRef Name)
-        -> std::pair<std::pair<const char *, const char *>, uint32_t> {
+        -> std::pair<const char *, const char *> {
       for (size_t i = 0; i < COFFFileHdr->NumberOfSections; ++i) {
         const llvm::object::coff_section *COFFSec =
             reinterpret_cast<const llvm::object::coff_section *>(
@@ -336,45 +336,43 @@ public:
           End -= 8;
         }
 
-        return {{Begin, End}, 0};
+        return {Begin, End};
       }
-      return {{nullptr, nullptr}, 0};
+      return {nullptr, nullptr};
     };
 
-    std::pair<std::pair<const char *, const char *>, uint32_t> CaptureSec =
+    std::pair<const char *, const char *> CaptureSec =
         findCOFFSectionByName(".sw5cptr");
-    std::pair<std::pair<const char *, const char *>, uint32_t> TypeRefMdSec =
+    std::pair<const char *, const char *> TypeRefMdSec =
         findCOFFSectionByName(".sw5tyrf");
-    std::pair<std::pair<const char *, const char *>, uint32_t> FieldMdSec =
+    std::pair<const char *, const char *> FieldMdSec =
         findCOFFSectionByName(".sw5flmd");
-    std::pair<std::pair<const char *, const char *>, uint32_t> AssocTySec =
+    std::pair<const char *, const char *> AssocTySec =
         findCOFFSectionByName(".sw5asty");
-    std::pair<std::pair<const char *, const char *>, uint32_t> BuiltinTySec =
+    std::pair<const char *, const char *> BuiltinTySec =
         findCOFFSectionByName(".sw5bltn");
-    std::pair<std::pair<const char *, const char *>, uint32_t> ReflStrMdSec =
+    std::pair<const char *, const char *> ReflStrMdSec =
         findCOFFSectionByName(".sw5rfst");
 
-    if (FieldMdSec.first.first == nullptr &&
-        AssocTySec.first.first == nullptr &&
-        BuiltinTySec.first.first == nullptr &&
-        CaptureSec.first.first == nullptr &&
-        TypeRefMdSec.first.first == nullptr &&
-        ReflStrMdSec.first.first == nullptr)
+    if (FieldMdSec.first == nullptr &&
+        AssocTySec.first == nullptr &&
+        BuiltinTySec.first == nullptr &&
+        CaptureSec.first == nullptr &&
+        TypeRefMdSec.first == nullptr &&
+        ReflStrMdSec.first == nullptr)
       return false;
+
     auto LocalStartAddress = reinterpret_cast<uintptr_t>(DOSHdrBuf.get());
     auto RemoteStartAddress =
         static_cast<uintptr_t>(ImageStart.getAddressData());
 
     ReflectionInfo Info = {
-        {{FieldMdSec.first.first, FieldMdSec.first.second}, FieldMdSec.second},
-        {{AssocTySec.first.first, AssocTySec.first.second}, AssocTySec.second},
-        {{BuiltinTySec.first.first, BuiltinTySec.first.second},
-         BuiltinTySec.second},
-        {{CaptureSec.first.first, CaptureSec.first.second}, CaptureSec.second},
-        {{TypeRefMdSec.first.first, TypeRefMdSec.first.second},
-         TypeRefMdSec.second},
-        {{ReflStrMdSec.first.first, ReflStrMdSec.first.second},
-         ReflStrMdSec.second},
+        {{FieldMdSec.first, FieldMdSec.second}, 0},
+        {{AssocTySec.first, AssocTySec.second}, 0},
+        {{BuiltinTySec.first, BuiltinTySec.second}, 0},
+        {{CaptureSec.first, CaptureSec.second}, 0},
+        {{TypeRefMdSec.first, TypeRefMdSec.second}, 0},
+        {{ReflStrMdSec.first, ReflStrMdSec.second}, 0},
         LocalStartAddress,
         RemoteStartAddress};
     this->addReflectionInfo(Info);
