@@ -94,11 +94,20 @@ public:
   /// \param FormatArgs The diagnostic format string arguments.
   ///
   /// \param Info Extra information associated with the diagnostic.
-  virtual void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                                DiagnosticKind Kind,
-                                StringRef FormatString,
-                                ArrayRef<DiagnosticArgument> FormatArgs,
-                                const DiagnosticInfo &Info) = 0;
+  ///
+  /// \param bufferIndirectlyCausingDiagnostic Only used when directing
+  /// diagnostics to different outputs.
+  /// In batch mode a diagnostic may be
+  /// located in a non-primary file, but there will be no .dia file for a
+  /// non-primary. If valid, this argument contains a location within a buffer
+  /// that corresponds to a primary input. The .dia file for that primary can be
+  /// used for the diagnostic, as if it had occurred at this location.
+  virtual void
+  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+                   StringRef FormatString,
+                   ArrayRef<DiagnosticArgument> FormatArgs,
+                   const DiagnosticInfo &Info,
+                   SourceLoc bufferIndirectlyCausingDiagnostic) = 0;
 
   /// \returns true if an error occurred while finishing-up.
   virtual bool finishProcessing() { return false; }
@@ -120,7 +129,8 @@ public:
                         DiagnosticKind Kind,
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
-                        const DiagnosticInfo &Info) override;
+                        const DiagnosticInfo &Info,
+                        SourceLoc bufferIndirectlyCausingDiagnostic) override;
 };
 
 /// \brief DiagnosticConsumer that forwards diagnostics to the consumers of
@@ -133,7 +143,8 @@ public:
                         DiagnosticKind Kind,
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
-                        const DiagnosticInfo &Info) override;
+                        const DiagnosticInfo &Info,
+                        SourceLoc bufferIndirectlyCausingDiagnostic) override;
 };
 
 /// \brief DiagnosticConsumer that funnels diagnostics in certain files to
@@ -175,8 +186,12 @@ public:
     std::string inputFileName;
 
     /// The consumer (if any) for diagnostics associated with the inputFileName.
-    /// A null pointer for the DiagnosticConsumer means that diagnostics for
-    /// this file should not be emitted.
+    /// A null pointer for the DiagnosticConsumer means that this file is a
+    /// non-primary one in batch mode and we have no .dia file for it.
+    /// If there is a responsible primary when the diagnostic is handled
+    /// it will be shunted to that primary's .dia file.
+    /// Otherwise it will be suppressed, assuming that the diagnostic will
+    /// surface in another frontend job that compiles that file as a primary.
     std::unique_ptr<DiagnosticConsumer> consumer;
 
     // Has this subconsumer ever handled a diagnostic that is an error?
@@ -195,12 +210,13 @@ public:
                           DiagnosticKind Kind,
                           StringRef FormatString,
                           ArrayRef<DiagnosticArgument> FormatArgs,
-                          const DiagnosticInfo &Info) {
+                          const DiagnosticInfo &Info,
+                          const SourceLoc bufferIndirectlyCausingDiagnostic) {
       if (!getConsumer())
         return;
       hasAnErrorBeenConsumed |= Kind == DiagnosticKind::Error;
       getConsumer()->handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
-                                      Info);
+                                      Info, bufferIndirectlyCausingDiagnostic);
     }
     
     void informDriverOfIncompleteBatchModeCompilation() {
@@ -291,7 +307,8 @@ public:
                         DiagnosticKind Kind,
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
-                        const DiagnosticInfo &Info) override;
+                        const DiagnosticInfo &Info,
+                        SourceLoc bufferIndirectlyCausingDiagnostic) override;
 
   bool finishProcessing() override;
 
@@ -309,6 +326,14 @@ private:
   /// a particular consumer if diagnostic goes there.
   Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
   subconsumerForLocation(SourceManager &SM, SourceLoc loc);
+
+  Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
+  findSubconsumer(SourceManager &SM, SourceLoc loc, DiagnosticKind Kind,
+                  SourceLoc bufferIndirectlyCausingDiagnostic);
+
+  Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
+  findSubconsumerForNonNote(SourceManager &SM, SourceLoc loc,
+                            SourceLoc bufferIndirectlyCausingDiagnostic);
 };
   
 } // end namespace swift

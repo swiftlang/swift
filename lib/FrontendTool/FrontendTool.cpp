@@ -388,11 +388,12 @@ public:
       FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {}
 
 private:
-  void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                        DiagnosticKind Kind,
-                        StringRef FormatString,
-                        ArrayRef<DiagnosticArgument> FormatArgs,
-                        const DiagnosticInfo &Info) override {
+  void
+  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+                   StringRef FormatString,
+                   ArrayRef<DiagnosticArgument> FormatArgs,
+                   const DiagnosticInfo &Info,
+                   const SourceLoc bufferIndirectlyCausingDiagnostic) override {
     if (!(FixitAll || shouldTakeFixit(Kind, Info)))
       return;
     for (const auto &Fix : Info.FixIts) {
@@ -1246,6 +1247,10 @@ static bool performCompileStepsPostSILGen(
   if (observer)
     observer->performedSILGeneration(*SM);
 
+Optional<BufferIndirectlyCausingDiagnosticRAII> ricd;
+  if (auto *SF = MSF.dyn_cast<SourceFile *>())
+    ricd.emplace(*SF);
+    
   if (Stats)
     countStatsPostSILGen(*Stats, *SM);
 
@@ -1589,13 +1594,18 @@ createDispatchingDiagnosticConsumerIfNeeded(
           subconsumers.emplace_back(input.file(), std::move(consumer));
         return false;
       });
-  // For batch mode, the compiler must swallow diagnostics pertaining to
-  // non-primary files in order to avoid Xcode showing the same diagnostic
+  // For batch mode, the compiler must sometimes swallow diagnostics pertaining
+  // to non-primary files in order to avoid Xcode showing the same diagnostic
   // multiple times. So, create a diagnostic "eater" for those non-primary
   // files.
+  //
+  // This routine gets called in cases where no primary subconsumers are created.
+  // Don't bother to create non-primary subconsumers if there aren't any primary
+  // ones.
+  //
   // To avoid introducing bugs into WMO or single-file modes, test for multiple
   // primaries.
-  if (inputsAndOutputs.hasMultiplePrimaryInputs()) {
+  if (!subconsumers.empty() && inputsAndOutputs.hasMultiplePrimaryInputs()) {
     inputsAndOutputs.forEachNonPrimaryInput(
         [&](const InputFile &input) -> bool {
           subconsumers.emplace_back(input.file(), nullptr);
@@ -1676,11 +1686,11 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
     PDC.handleDiagnostic(dummyMgr, SourceLoc(), DiagnosticKind::Error,
                          "fatal error encountered during compilation; please "
-                           "file a bug report with your project and the crash "
-                           "log", {},
-                         DiagnosticInfo());
+                         "file a bug report with your project and the crash "
+                         "log",
+                         {}, DiagnosticInfo(), SourceLoc());
     PDC.handleDiagnostic(dummyMgr, SourceLoc(), DiagnosticKind::Note, reason,
-                         {}, DiagnosticInfo());
+                         {}, DiagnosticInfo(), SourceLoc());
     if (shouldCrash)
       abort();
   };
