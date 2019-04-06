@@ -264,14 +264,174 @@ internal extension _ShapedArrayProtocol {
   }
 }
 
-/// Common public protocol implementations
+fileprivate extension String {
+  /// Returns a string of the specified length, padded with whitespace to the
+  /// left.
+  func leftPadded(toLength length: Int) -> String {
+    return repeatElement(" ", count: Swift.max(0, length - count)) + self
+  }
+}
+
+/// Common public protocol implementations.
+
 fileprivate extension _ShapedArrayProtocol
-  where Element : _ShapedArrayProtocol {
-  var _description: String {
+  where Element : _ShapedArrayProtocol, Element == Element.Element
+{
+  /// Returns the whitespace separator between elements, given the current
+  /// indent level.
+  func separator(indentLevel: Int) -> String {
+    if rank == 1 {
+      return ", "
+    }
+    return String(repeating: "\n", count: rank - 1) +
+           String(repeating: " ", count: indentLevel + 1)
+  }
+
+  /// A textual representation of the 1-D shaped array, starting at the given
+  /// indent level. Returns a summarized description if `summarize` is true and
+  /// the element count exceeds twice the `edgeElementCount`.
+  ///
+  /// - Parameters:
+  ///   - indentLevel: The indentation level.
+  ///   - edgeElementCount: The maximum of elements to print before and after
+  ///     summarization via ellipses (`...`).
+  ///   - maxScalarLength: The length of the longest scalar description in the
+  ///     entire original array-to-print.
+  ///   - scalarCountPerLine: The number of scalars to print per line, used when
+  ///     printing 1-D vectors.
+  ///   - summarize: If true, summarize description if element count exceeds
+  ///     twice `edgeElementCount`.
+  func vectorDescription(
+    indentLevel: Int, edgeElementCount: Int, maxScalarLength: Int,
+    scalarCountPerLine: Int, summarize: Bool
+  ) -> String {
+    // Get scalar descriptions.
+    func scalarDescription(_ element: Element) -> String {
+      let description = String(describing: element)
+      return description.leftPadded(toLength: maxScalarLength)
+    }
+    var scalarDescriptions: [String] = []
+    if summarize && count > 2 * edgeElementCount {
+      scalarDescriptions +=
+        prefix(edgeElementCount).map(scalarDescription)
+      scalarDescriptions += ["..."]
+      scalarDescriptions +=
+        suffix(edgeElementCount).map(scalarDescription)
+    } else {
+      scalarDescriptions += map(scalarDescription)
+    }
+
+    // Combine scalar descriptions into lines, based on the scalar count per
+    // line.
+    let lines = stride(
+      from: 0, to: scalarDescriptions.count, by: scalarCountPerLine
+    ).map { i -> ArraySlice<String> in
+      let upperBound = Swift.min(
+        i.advanced(by: scalarCountPerLine), scalarDescriptions.count)
+      return scalarDescriptions[i..<upperBound]
+    }
+
+    // Return lines joined with separators.
+    let lineSeparator = ",\n" + String(repeating: " ", count: indentLevel + 1)
+    return lines.enumerated().reduce(into: "[") { result, entry in
+      let (i, line) = entry
+      result += line.joined(separator: ", ")
+      result += i != lines.count - 1 ? lineSeparator : ""
+    } + "]"
+  }
+
+  /// A textual representation of the shaped array, starting at the given indent
+  /// level. Returns a summarized description if `summarize` is true and
+  /// the element count exceeds twice the `edgeElementCount`.
+  ///
+  /// - Parameters:
+  ///   - indentLevel: The indentation level.
+  ///   - edgeElementCount: The maximum of elements to print before and after
+  ///     summarization via ellipses (`...`).
+  ///   - maxScalarLength: The length of the longest scalar description in the
+  ///     entire original array-to-print.
+  ///   - scalarCountPerLine: The number of scalars to print per line, used when
+  ///     printing 1-D vectors.
+  ///   - summarize: If true, summarize description if element count exceeds
+  ///     twice `edgeElementCount`.
+  func description(
+    indentLevel: Int, edgeElementCount: Int, maxScalarLength: Int,
+    scalarCountPerLine: Int, summarize: Bool
+  ) -> String {
+    // Handle scalars.
     if let scalar = scalar {
       return String(describing: scalar)
     }
-    return "[\( map({"\($0)"}).joined(separator: ", ") )]"
+    // Handle vectors, which have special line-width-sensitive logic.
+    if rank == 1 {
+      return vectorDescription(
+        indentLevel: indentLevel, edgeElementCount: edgeElementCount,
+        maxScalarLength: maxScalarLength,
+        scalarCountPerLine: scalarCountPerLine, summarize: summarize)
+    }
+    // Handle higher-rank tensors.
+    func elementDescription(_ element: Element) -> String {
+      return element.description(
+        indentLevel: indentLevel + 1, edgeElementCount: edgeElementCount,
+        maxScalarLength: maxScalarLength,
+        scalarCountPerLine: scalarCountPerLine, summarize: summarize)
+    }
+    var elementDescriptions: [String] = []
+    if summarize && count > 2 * edgeElementCount {
+      elementDescriptions += prefix(edgeElementCount).map(elementDescription)
+      elementDescriptions += ["..."]
+      elementDescriptions += suffix(edgeElementCount).map(elementDescription)
+    } else {
+      elementDescriptions += map(elementDescription)
+    }
+
+    // Return lines joined with separators.
+    let lineSeparator = "," +
+      String(repeating: "\n", count: rank - 1) +
+      String(repeating: " ", count: indentLevel + 1)
+    return elementDescriptions.enumerated().reduce(into: "[") { result, entry in
+      let (i, elementDescription) = entry
+      result += elementDescription
+      result += i != elementDescriptions.count - 1 ? lineSeparator : ""
+    } + "]"
+  }
+}
+
+public extension _ShapedArrayProtocol
+  where Element : _ShapedArrayProtocol, Element == Element.Element
+{
+  /// A textual representation of the shaped array. Returns a summarized
+  /// description if `summarize` is true and the element count exceeds twice the
+  /// `edgeElementCount`.
+  ///
+  /// - Parameters:
+  ///   - lineWidth: The max line width for printing. Used to determine number
+  ///     of scalars to print per line.
+  ///   - edgeElementCount: The maximum of elements to print before and after
+  ///     summarization via ellipses (`...`).
+  ///   - summarize: If true, summarize description if element count exceeds
+  ///     twice `edgeElementCount`.
+  func description(
+    lineWidth: Int = 80, edgeElementCount: Int = 3, summarize: Bool = false
+  ) -> String {
+    // Compute number of scalars to print per line.
+    let maxScalarLength =
+      scalars.lazy.map { String(describing: $0).count }.max() ?? 3
+    let scalarCountPerLine = Swift.max(1, lineWidth / maxScalarLength)
+    // Call helper.
+    return description(
+      indentLevel: 0, edgeElementCount: edgeElementCount,
+      maxScalarLength: maxScalarLength, scalarCountPerLine: scalarCountPerLine,
+      summarize: summarize)
+  }
+
+  /// A full, non-pretty-printed textual representation of the shaped array,
+  /// showing all scalars.
+  var fullDescription: String {
+    if let scalar = scalar {
+      return String(describing: scalar)
+    }
+    return "[\( map({"\($0.fullDescription)"}).joined(separator: ", ") )]"
   }
 }
 
@@ -485,7 +645,8 @@ extension ShapedArray : RandomAccessCollection, MutableCollection {
       precondition(!isScalar,
                    "Scalar has no elements and cannot be subscripted.")
       precondition(
-        indices ~= bounds.lowerBound && indices ~= bounds.upperBound - 1,
+        bounds.lowerBound >= startIndex && bounds.lowerBound <= endIndex &&
+        bounds.upperBound >= startIndex && bounds.upperBound <= endIndex,
         "ShapedArray indices are out of range")
       return ShapedArraySlice(base: self, bounds: bounds)
     }
@@ -609,8 +770,13 @@ extension ShapedArray : Hashable where Scalar : Hashable {
 /// String conversion.
 extension ShapedArray : CustomStringConvertible {
   /// A textual representation of this `ShapedArray`.
+  ///
+  /// - Note: use `fullDescription` for a non-pretty-printed representation
+  ///   showing all scalars.
   public var description: String {
-    return _description
+    // Summarize if there are more than 1000 scalars.
+    let summarize = scalarCount > 1000
+    return description(summarize: summarize)
   }
 }
 
@@ -988,8 +1154,13 @@ extension ShapedArraySlice : Hashable where Scalar : Hashable {
 /// String conversion.
 extension ShapedArraySlice : CustomStringConvertible {
   /// A textual representation of this `ShapedArraySlice`.
+  ///
+  /// - Note: use `fullDescription` for a non-pretty-printed representation
+  ///   showing all scalars.
   public var description: String {
-    return _description
+    // Summarize if there are more than 1000 scalars.
+    let summarize = scalarCount > 1000
+    return description(summarize: summarize)
   }
 }
 

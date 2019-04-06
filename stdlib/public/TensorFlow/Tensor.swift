@@ -799,8 +799,39 @@ extension Tensor : Equatable where Scalar : Equatable {
 
 /// String conversion.
 extension Tensor : CustomStringConvertible {
+  /// A textual representation of the tensor.
+  ///
+  /// - Note: use `fullDescription` for a non-pretty-printed representation
+  ///   showing all scalars.
   public var description: String {
     return array.description
+  }
+}
+
+public extension Tensor {
+  /// A textual representation of the tensor. Returns a summarized description
+  /// if `summarize` is true and the element count exceeds twice the
+  /// `edgeElementCount`.
+  ///
+  /// - Parameters:
+  ///   - lineWidth: The max line width for printing. Used to determine number
+  ///     of scalars to print per line.
+  ///   - edgeElementCount: The maximum of elements to print before and after
+  ///     summarization via ellipses (`...`).
+  ///   - summarize: If true, summarize description if element count exceeds
+  ///     twice `edgeElementCount`.
+  func description(
+    lineWidth: Int = 80, edgeElementCount: Int = 3, summarize: Bool = false
+  ) -> String {
+    return array.description(
+      lineWidth: lineWidth, edgeElementCount: edgeElementCount,
+      summarize: summarize)
+  }
+
+  /// A full, non-pretty-printed textual representation of the tensor, showing
+  /// all scalars.
+  var fullDescription: String {
+    return array.fullDescription
   }
 }
 
