@@ -107,7 +107,10 @@ bool Parser::isStartOfStmt() {
   }
 }
 
+// Checks the parser status of AST Node and parse the statemtnt.
 ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
+  // The token is ';'
+  // Check for error in syntax.
   if (Tok.is(tok::semi)) {
     SyntaxParsingContext ErrorCtxt(SyntaxContext, SyntaxContextKind::Stmt);
     diagnose(Tok, diag::illegal_semi_stmt)
@@ -115,7 +118,7 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
     consumeToken();
     return makeParserError();
   }
-
+  // If the token '#' is at the start of line with a lead token 'code complition'.
   if (Tok.is(tok::pound) && Tok.isAtStartOfLine() &&
       peekToken().is(tok::code_complete)) {
     consumeToken();
