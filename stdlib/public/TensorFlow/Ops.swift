@@ -686,6 +686,14 @@ public extension Tensor {
   static func ++ (lhs: Tensor, rhs: Tensor) -> Tensor {
     return lhs.concatenated(with: rhs)
   }
+
+  /// Returns a concatenated tensor of the given tensors.
+  /// - Precondition: The tensors must have the same dimensions, except for the
+  ///   specified axis.
+  /// - Precondition: The axis must be in the range `-rank..<rank`.
+  init(concatenating tensors: [Tensor<Scalar>], alongAxis axis: Int32 = 0) {
+    self = Raw.concatV2(tensors, axis: Tensor<Int32>(axis))
+  }
 }
 
 internal extension Tensor where Scalar : TensorFlowFloatingPoint {
@@ -1493,36 +1501,10 @@ public extension Tensor {
   @inlinable
   subscript(index: Int32) -> Tensor {
     get {
-      // NOTE: Thought Gather exactly performs element indexing, it is an
-      // allocating operation. Slice is used here instead even though the
-      // implementation is more convoluted because it is non-allocating.
-      // Actual performance/memory tests should be done for some empirical
-      // comparison.
-      // Gather implementation is below:
-      // return #tfop("GatherV2", self, Tensor<Int32>(index), Tensor<Int32>(0),
-      //              Tindices: Int32.self)
-      let indexTensor = Tensor<Int32>(index).rankLifted()
-      let remainingZeros: Tensor<Int32> = Raw.fill(
-        dims: (rankTensor - 1).rankLifted(), value: Tensor<Int32>(0))
-      let startIndices = indexTensor.concatenated(with: remainingZeros)
-
-      let firstDimension: Tensor<Float> = Raw.gatherV2(
-        params: Tensor<Float>(shapeTensor),
-        indices: Tensor<Int32>(0),
-        axis: Tensor<Int32>(0)
-      )
-      let boundSize = Tensor<Float>([1]) - firstDimension
-      let scatterIndices: Tensor<Int32> = [[0]]
-      let offset: Tensor<Int32> = Tensor<Int32>(
-        Raw.scatterNd(
-          indices: scatterIndices,
-          updates: boundSize,
-          shape: rankTensor.rankLifted()
-        )
-      )
-      let boundSizes: Tensor<Int32> = shapeTensor + offset
-      let slice: Tensor = Raw.slice(self, begin: startIndices, size: boundSizes)
-      return slice.squeezingShape(at: 0)
+      return Raw.stridedSlice(self,
+                              begin: Tensor<Int32>([index]),
+                              end: Tensor<Int32>([index + 1]),
+                              strides: Tensor<Int32>([1])).squeezingShape(at: 0)
     }
     set {
       let left = self[0..<index]
@@ -1535,35 +1517,10 @@ public extension Tensor {
   /// - Parameter bounds: Contiguous range of indices.
   @inlinable
   subscript(bounds: Range<Int32>) -> Tensor {
-    // NOTE: Though `tf.slice` and `tf.strided_slice` are not easy to use
-    // because they require slice bounds for every dimension, they should be
-    // used because the are non-allocating. Other slice implementations (like
-    // combining Gather and Range) perform allocation and should not be used
-    // even though they are easier to write.
-
-    // Let (lo, hi) represent lower and upper bounds respectively.
-    // startIndices = [lo, 0, 0, ..., 0]
-    // boundSizes = [hi - lo, d1, d2, ..., dn] where di = shape[i]
-    // TODO: The horrendous mess of type-casting is necessary due to GPU ops
-    // (Gather, ScatterNd) not accepting Int32 for particular inputs. Refactor
-    // if possible.
-    let lowerBound = Tensor<Int32>(bounds.lowerBound).rankLifted()
-    let remainingZeros: Tensor<Int32> = Raw.fill(
-      dims: (rankTensor - 1).rankLifted(), value: Tensor<Int32>(0))
-    let startIndices = lowerBound.concatenated(with: remainingZeros)
-
-    let boundSize = Tensor<Int32>(bounds.upperBound).rankLifted()
-      - lowerBound - Tensor<Int32>(Tensor<Float>(shapeTensor)[0])
-    let scatterIndices: Tensor<Int32> = [[0]]
-    let offset: Tensor<Int32> = Tensor<Int32>(
-      Raw.scatterNd(
-        indices: scatterIndices,
-        updates: Tensor<Float>(boundSize),
-        shape: rankTensor.rankLifted()
-      )
-    )
-    let boundSizes: Tensor<Int32> = shapeTensor + offset
-    return Raw.slice(self, begin: startIndices, size: boundSizes)
+    return Raw.stridedSlice(self,
+                            begin: Tensor<Int32>([bounds.lowerBound]),
+                            end: Tensor<Int32>([bounds.upperBound]),
+                            strides: Tensor<Int32>([1]))
   }
 
   // TODO(danielzheng): Add strided slices? (increment by something different
