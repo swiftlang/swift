@@ -1936,6 +1936,19 @@ public:
                                 FragileFunctionKind Kind,
                                 bool TreatUsableFromInlineAsPublic);
 
+private:
+  bool diagnoseInlinableDeclRefAccess(SourceLoc loc, const ValueDecl *D,
+                                      const DeclContext *DC,
+                                      FragileFunctionKind Kind,
+                                      bool TreatUsableFromInlineAsPublic);
+
+public:
+  /// Given that a declaration is used from a particular context which
+  /// exposes it in the interface of the current module, diagnose if it cannot
+  /// reasonably be shared.
+  bool diagnoseDeclRefExportability(SourceLoc loc, const ValueDecl *D,
+                                    const DeclContext *DC);
+
   /// Given that \p DC is within a fragile context for some reason, describe
   /// why.
   ///
