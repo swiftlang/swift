@@ -902,7 +902,7 @@ namespace {
                  base, selfParamTy, member, semantics,
                  locator.withPathElement(ConstraintLocator::MemberRefBase));
       } else {
-        if (!isExistentialMetatype) {
+        if (!isExistentialMetatype || openedExistential) {
           // Convert the base to an rvalue of the appropriate metatype.
           base = coerceToType(base,
                               MetatypeType::get(
