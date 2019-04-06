@@ -103,7 +103,7 @@ public:
     IncludeOuterResults = 0x10,
     /// Whether to ignore local variables inside bodies of functions, closures
     /// and top level code.
-    IgnoreLocalVariables = 0x50,
+    IgnoreLocalVariables = 0x20,
   };
   using Options = OptionSet<Flags>;
 

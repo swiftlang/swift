@@ -307,7 +307,7 @@ enum class NameLookupFlags {
   IncludeAttributeImplements = 0x40,
   /// Whether to ignore local variables inside bodies of functions, closures
   /// and top level code.
-  IgnoreLocalVariables = 0x50,
+  IgnoreLocalVariables = 0x80,
 };
 
 /// A set of options that control name lookup.
