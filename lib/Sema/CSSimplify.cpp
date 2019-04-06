@@ -5040,18 +5040,6 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     return SolutionKind::Unsolved;
   };
 
-  if (auto fixedRootTy =
-          getFixedTypeRecursive(rootTy, subflags, /*wantRValue=*/true)) {
-
-    if (fixedRootTy->isAnyObject()) {
-      auto fix = AllowAnyObjectKeyPathRoot::create(
-          *this, getConstraintLocator(locator));
-
-      if (recordFix(fix))
-        return SolutionKind::Error;
-    }
-  }
-
   if (auto clas = keyPathTy->getAs<NominalType>()) {
     if (clas->getDecl() == getASTContext().getAnyKeyPathDecl()) {
       // Read-only keypath, whose projected value is upcast to `Any?`.
@@ -5070,6 +5058,19 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     
     // Try to match the root type.
     rootTy = getFixedTypeRecursive(rootTy, flags, /*wantRValue=*/false);
+
+    // We do not allow KeyPaths to go through AnyObject, so let's create a fix
+    // and allow that. This will get diagnosed later.
+    if (rootTy->isTypeVariableOrMember() &&
+        kpRootTy->isTypeVariableOrMember()) {
+      return unsolved();
+    } else if (rootTy->isAnyObject()) {
+      auto fix = AllowAnyObjectKeyPathRoot::create(
+          *this, getConstraintLocator(locator));
+
+      if (recordFix(fix))
+        return SolutionKind::Error;
+    }
 
     auto matchRoot = [&](ConstraintKind kind) -> bool {
       auto rootMatches = matchTypes(rootTy, kpRootTy, kind,
