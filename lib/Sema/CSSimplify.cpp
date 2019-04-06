@@ -4882,8 +4882,8 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
     }
 
     if (fixedRootTy->isAnyObject()) {
-      auto fix =
-          AllowAnyObjectKeyPathRoot::create(*this, locator.getBaseLocator());
+      auto fix = AllowAnyObjectKeyPathRoot::create(
+          *this, getConstraintLocator(locator));
 
       if (recordFix(fix))
         return SolutionKind::Error;
@@ -5039,7 +5039,19 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     }
     return SolutionKind::Unsolved;
   };
-  
+
+  if (auto fixedRootTy =
+          getFixedTypeRecursive(rootTy, subflags, /*wantRValue=*/true)) {
+
+    if (fixedRootTy->isAnyObject()) {
+      auto fix = AllowAnyObjectKeyPathRoot::create(
+          *this, getConstraintLocator(locator));
+
+      if (recordFix(fix))
+        return SolutionKind::Error;
+    }
+  }
+
   if (auto clas = keyPathTy->getAs<NominalType>()) {
     if (clas->getDecl() == getASTContext().getAnyKeyPathDecl()) {
       // Read-only keypath, whose projected value is upcast to `Any?`.
