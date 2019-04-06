@@ -448,7 +448,7 @@ public:
     auto StrTab = reinterpret_cast<const char *>(StrTabBuf.get());
 
     auto findELFSectionByName = [&](std::string Name)
-        -> std::pair<std::pair<const char *, const char *>, uint64_t> {
+        -> std::pair<const char *, const char *> {
       // Now for all the sections, find their name.
       for (const typename T::Section *Hdr : SecHdrVec) {
         uint32_t Offset = Hdr->sh_name;
@@ -460,9 +460,9 @@ public:
         auto SecSize = Hdr->sh_size;
         auto SecBuf = this->getReader().readBytes(SecStart, SecSize);
         auto SecContents = reinterpret_cast<const char *>(SecBuf.get());
-        return {{SecContents, SecContents + SecSize}, 0};
+        return {SecContents, SecContents + SecSize};
       }
-      return {{nullptr, nullptr}, 0};
+      return {nullptr, nullptr};
     };
 
     auto FieldMdSec = findELFSectionByName("swift5_fieldmd");
@@ -474,12 +474,12 @@ public:
 
     // We succeed if at least one of the sections is present in the
     // ELF executable.
-    if (FieldMdSec.first.first == nullptr &&
-        AssocTySec.first.first == nullptr &&
-        BuiltinTySec.first.first == nullptr &&
-        CaptureSec.first.first == nullptr &&
-        TypeRefMdSec.first.first == nullptr &&
-        ReflStrMdSec.first.first == nullptr)
+    if (FieldMdSec.first == nullptr &&
+        AssocTySec.first == nullptr &&
+        BuiltinTySec.first == nullptr &&
+        CaptureSec.first == nullptr &&
+        TypeRefMdSec.first == nullptr &&
+        ReflStrMdSec.first == nullptr)
       return false;
 
     auto LocalStartAddress = reinterpret_cast<uint64_t>(Buf.get());
@@ -487,15 +487,12 @@ public:
         static_cast<uint64_t>(ImageStart.getAddressData());
 
     ReflectionInfo info = {
-        {{FieldMdSec.first.first, FieldMdSec.first.second}, FieldMdSec.second},
-        {{AssocTySec.first.first, AssocTySec.first.second}, AssocTySec.second},
-        {{BuiltinTySec.first.first, BuiltinTySec.first.second},
-         BuiltinTySec.second},
-        {{CaptureSec.first.first, CaptureSec.first.second}, CaptureSec.second},
-        {{TypeRefMdSec.first.first, TypeRefMdSec.first.second},
-         TypeRefMdSec.second},
-        {{ReflStrMdSec.first.first, ReflStrMdSec.first.second},
-         ReflStrMdSec.second},
+        {{FieldMdSec.first, FieldMdSec.second}, 0},
+        {{AssocTySec.first, AssocTySec.second}, 0},
+        {{BuiltinTySec.first, BuiltinTySec.second}, 0},
+        {{CaptureSec.first, CaptureSec.second}, 0},
+        {{TypeRefMdSec.first, TypeRefMdSec.second}, 0},
+        {{ReflStrMdSec.first, ReflStrMdSec.second}, 0},
         LocalStartAddress,
         RemoteStartAddress};
 
