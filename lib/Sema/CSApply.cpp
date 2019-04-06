@@ -820,8 +820,10 @@ namespace {
       // Figure out the actual base type, and whether we have an instance of
       // that type or its metatype.
       bool baseIsInstance = true;
+      bool isExistentialMetatype = false;
       if (auto baseMeta = baseTy->getAs<AnyMetatypeType>()) {
         baseIsInstance = false;
+        isExistentialMetatype = baseMeta->is<ExistentialMetatypeType>();
         baseTy = baseMeta->getInstanceType();
       }
 
@@ -909,11 +911,15 @@ namespace {
                  base, selfParamTy, member, semantics,
                  locator.withPathElement(ConstraintLocator::MemberRefBase));
       } else {
-        // Convert the base to an rvalue of the appropriate metatype.
-        base = coerceToType(base,
-                            MetatypeType::get(isDynamic ? selfTy : containerTy),
-                            locator.withPathElement(
-                              ConstraintLocator::MemberRefBase));
+        if (!isExistentialMetatype) {
+          // Convert the base to an rvalue of the appropriate metatype.
+          base = coerceToType(base,
+                              MetatypeType::get(
+                                isDynamic ? selfTy : containerTy),
+                              locator.withPathElement(
+                                ConstraintLocator::MemberRefBase));
+        }
+
         if (!base)
           return nullptr;
 
@@ -6450,12 +6456,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         return cs.cacheType(
           new (tc.Context) ProtocolMetatypeToObjectExpr(expr, toType));
       }
-    }
-
-    // Allows for same-type coercion with existential metatypes.
-    if (auto toMeta = toType->getAs<AnyMetatypeType>()) {
-      if (fromMeta->getInstanceType()->isEqual(toMeta->getInstanceType()))
-        return expr;
     }
 
     break;
