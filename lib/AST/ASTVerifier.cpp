@@ -2500,6 +2500,20 @@ public:
         }
       }
 
+      if (auto *caseStmt =
+	    dyn_cast_or_null<CaseStmt>(var->getRecursiveParentPatternStmt())) {
+        // In a type checked AST, a case stmt that is a recursive parent pattern
+        // stmt of a var decl, must have bound decls. This is because we
+        // guarantee that all case label items bind corresponding patterns and
+        // the case body var decls of a case stmt are created from the var decls
+        // of the first case label items.
+        if (!caseStmt->hasBoundDecls()) {
+          Out << "parent CaseStmt of VarDecl does not have any case body "
+                 "decls?!\n";
+          abort();
+        }
+      }
+
       verifyCheckedBase(var);
     }
 

@@ -322,14 +322,21 @@ public:
                 : llvm::StringRef(COFFSec->Name, llvm::COFF::NameSize);
         if (SectionName != Name)
           continue;
-        auto Addr = ImageStart.getAddressData() + COFFSec->PointerToRawData;
+        auto Addr = ImageStart.getAddressData() + COFFSec->VirtualAddress;
         auto Buf = this->getReader().readBytes(RemoteAddress(Addr),
                                                COFFSec->VirtualSize);
         const char *Begin = reinterpret_cast<const char *>(Buf.get());
         const char *End = Begin + COFFSec->VirtualSize;
         savedBuffers.push_back(std::move(Buf));
-        return {{Begin, End},
-                COFFSec->VirtualAddress - COFFSec->PointerToRawData};
+
+        // FIXME: This code needs to be cleaned up and updated
+        // to make it work for 32 bit platforms.
+        if (SectionName != ".sw5cptr" && SectionName != ".sw5bltn") {
+          Begin += 8;
+          End -= 8;
+        }
+
+        return {{Begin, End}, 0};
       }
       return {{nullptr, nullptr}, 0};
     };
@@ -338,20 +345,14 @@ public:
         findCOFFSectionByName(".sw5cptr");
     std::pair<std::pair<const char *, const char *>, uint32_t> TypeRefMdSec =
         findCOFFSectionByName(".sw5tyrf");
-
-    // FIXME: Make use of .sw5flmd section (the section content appears to be
-    // incorrect on Windows at the moment).
-    std::pair<std::pair<const char *, const char *>, uint32_t> FieldMdSec = {
-        {nullptr, nullptr}, 0};
-    // FIXME: Make use of .sw5asty.
-    std::pair<std::pair<const char *, const char *>, uint32_t> AssocTySec = {
-        {nullptr, nullptr}, 0};
-    // FIXME: Make use of .sw5bltn.
-    std::pair<std::pair<const char *, const char *>, uint32_t> BuiltinTySec = {
-        {nullptr, nullptr}, 0};
-    // FIXME: Make use of .sw5repl.
-    std::pair<std::pair<const char *, const char *>, uint32_t> ReflStrMdSec = {
-        {nullptr, nullptr}, 0};
+    std::pair<std::pair<const char *, const char *>, uint32_t> FieldMdSec =
+        findCOFFSectionByName(".sw5flmd");
+    std::pair<std::pair<const char *, const char *>, uint32_t> AssocTySec =
+        findCOFFSectionByName(".sw5asty");
+    std::pair<std::pair<const char *, const char *>, uint32_t> BuiltinTySec =
+        findCOFFSectionByName(".sw5bltn");
+    std::pair<std::pair<const char *, const char *>, uint32_t> ReflStrMdSec =
+        findCOFFSectionByName(".sw5rfst");
 
     if (FieldMdSec.first.first == nullptr &&
         AssocTySec.first.first == nullptr &&
@@ -457,12 +458,11 @@ public:
         if (SecName != Name)
           continue;
         auto SecStart =
-            RemoteAddress(ImageStart.getAddressData() + Hdr->sh_offset);
+            RemoteAddress(ImageStart.getAddressData() + Hdr->sh_addr);
         auto SecSize = Hdr->sh_size;
         auto SecBuf = this->getReader().readBytes(SecStart, SecSize);
         auto SecContents = reinterpret_cast<const char *>(SecBuf.get());
-        return {{SecContents, SecContents + SecSize},
-                Hdr->sh_addr - Hdr->sh_offset};
+        return {{SecContents, SecContents + SecSize}, 0};
       }
       return {{nullptr, nullptr}, 0};
     };

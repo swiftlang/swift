@@ -1421,6 +1421,14 @@ void SourceFile::addImports(ArrayRef<ImportedModuleDesc> IM) {
   assert(iter == newBuf.end());
 
   Imports = newBuf;
+
+  // Update the HasImplementationOnlyImports flag.
+  if (!HasImplementationOnlyImports) {
+    for (auto &desc : IM) {
+      if (desc.importOptions.contains(ImportFlags::ImplementationOnly))
+        HasImplementationOnlyImports = true;
+    }
+  }
 }
 
 bool SourceFile::hasTestableOrPrivateImport(
@@ -1483,6 +1491,43 @@ bool SourceFile::hasTestableOrPrivateImport(
                                   ImportFlags::PrivateImport) &&
                               desc.filename == filename;
                      });
+}
+
+bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
+  // Implementation-only imports are (currently) always source-file-specific,
+  // so if we don't have any, we know the search is complete.
+  if (!hasImplementationOnlyImports())
+    return false;
+
+  auto isImportedBy = [](const ModuleDecl *dest, const ModuleDecl *src) {
+    // Fast path.
+    if (dest == src) return true;
+
+    // Walk the transitive imports, respecting visibility.
+    // This return true if the search *didn't* short-circuit, and it short
+    // circuits if we found `dest`, so we need to invert the sense before
+    // returning.
+    return !const_cast<ModuleDecl*>(src)
+              ->forAllVisibleModules({}, [dest](ModuleDecl::ImportedModule im) {
+      // Continue searching as long as we haven't found `dest` yet.
+      return im.second != dest;
+    });
+  };
+
+  // Look at the imports of this source file.
+  for (auto &desc : Imports) {
+    // Ignore implementation-only imports.
+    if (desc.importOptions.contains(ImportFlags::ImplementationOnly))
+      continue;
+
+    // If the module is imported this way, it's not imported
+    // implementation-only.
+    if (isImportedBy(module, desc.module.second))
+      return false;
+  }
+
+  // Now check this file's enclosing module in case there are re-exports.
+  return !isImportedBy(module, getParentModule());
 }
 
 void SourceFile::clearLookupCache() {

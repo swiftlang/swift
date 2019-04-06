@@ -647,6 +647,10 @@ private:
              isLoadedLValue(ifExpr->getElseExpr());
     return false;
   }
+
+  /// Retrive an member reference associated with given member
+  /// looking through dynamic member lookup on the way.
+  ValueDecl *getMemberRef(ConstraintLocator *locator) const;
 };
 
 /// Intended to diagnose any possible contextual failure

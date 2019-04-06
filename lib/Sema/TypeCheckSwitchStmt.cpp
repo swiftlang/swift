@@ -1380,6 +1380,7 @@ namespace {
         }
       }
       case PatternKind::Typed:
+        llvm_unreachable("cannot appear in case patterns");
       case PatternKind::Expr:
         return Space();
       case PatternKind::Var: {
@@ -1428,6 +1429,8 @@ namespace {
                                        conArgSpace);
         }
         case PatternKind::Paren: {
+          // If we've got an extra level of parens, we need to flatten that into
+          // the enum payload.
           auto *PP = dyn_cast<ParenPattern>(SP);
           auto *SP = PP->getSemanticsProvidingPattern();
 
@@ -1448,6 +1451,12 @@ namespace {
             }
           } else if (SP->getKind() == PatternKind::Tuple) {
             Space argTupleSpace = projectPattern(TC, SP);
+            // Tuples are modeled as if they are enums with a single, nameless
+            // case, which means argTupleSpace will either be a Constructor or
+            // Empty space. If it's empty (i.e. it contributes nothing to the
+            // overall exhaustiveness), the entire enum case space is empty.
+            if (argTupleSpace.isEmpty())
+              return Space();
             assert(argTupleSpace.getKind() == SpaceKind::Constructor);
             conArgSpace.insert(conArgSpace.end(),
                                argTupleSpace.getSpaces().begin(),

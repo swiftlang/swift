@@ -1055,8 +1055,8 @@ ERROR(missing_dynamic_callable_kwargs_method,none,
 
 ERROR(invalid_dynamic_member_lookup_type,none,
       "@dynamicMemberLookup attribute requires %0 to have a "
-      "'subscript(dynamicMember:)' method with an "
-      "'ExpressibleByStringLiteral' parameter", (Type))
+      "'subscript(dynamicMember:)' method that accepts either "
+      "'ExpressibleByStringLiteral' or a keypath", (Type))
 
 ERROR(string_index_not_integer,none,
       "String must not be indexed with %0, it has variable size elements",
@@ -3876,9 +3876,6 @@ ERROR(borrowed_on_objc_protocol_requirement,none,
 
 ERROR(dynamic_not_in_class,none,
       "only members of classes may be dynamic", ())
-ERROR(dynamic_with_final,none,
-      "a declaration cannot be both 'final' and 'dynamic'",
-      ())
 ERROR(dynamic_with_nonobjc,none,
       "a declaration cannot be both '@nonobjc' and 'dynamic'",
       ())
@@ -4103,6 +4100,11 @@ WARNING(resilience_decl_unavailable_warn,
         none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|%error|%error}2 and "
         "should not be referenced from " FRAGILE_FUNC_KIND "3",
         (DescriptiveDeclKind, DeclName, AccessLevel, unsigned, bool))
+
+ERROR(inlinable_decl_ref_implementation_only,
+      none, "%0 %1 cannot be used in an inlinable "
+      "function because its module was imported implementation-only",
+      (DescriptiveDeclKind, DeclName))
 
 #undef FRAGILE_FUNC_KIND
 

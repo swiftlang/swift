@@ -77,7 +77,7 @@ class D : C {
 
 // TEST_D_PAREN: Decl[Constructor]/CurrNominal:       ['(']{#d: D#}[')'][#D#]; name=d: D
 // TEST_D_PAREN-NEXT: Decl[Constructor]/CurrNominal:  ['(']{#int: Int#}[')'][#D#]; name=int: Int
-// TEST_D_PAREN-NEXT: Decl[Constructor]/Super:        ['(']{#c: C#}[')'][#C#]; name=c: C
+// TEST_D_PAREN-NEXT: Decl[Constructor]/Super:  ['(']{#c: C#}[')'][#C#]; name=c: C
 
 func testA() {
   A#^TEST_A^#

@@ -35,10 +35,12 @@
 
 // Check that it picked a different cache key.
 // RUN: %empty-directory(%t/MCP-combined)
-// RUN: cp -n %t/MCP/SystemDependencies*.swiftmodule %t/MCP-combined
-// RUN: cp -n %t/MCP-system/SystemDependencies*.swiftmodule %t/MCP-combined
+// RUN: cp %t/MCP/SystemDependencies*.swiftmodule %t/MCP-combined
+// RUN: cp %t/MCP-system/SystemDependencies*.swiftmodule %t/MCP-combined
+// RUN: ls -1 %t/MCP-combined | %FileCheck %s -check-prefix=MODULECACHE
 
 // NEGATIVE-NOT: SomeCModule.h
 // CHECK: SomeCModule.h
+// MODULECACHE-COUNT-2: SystemDependencies-{{[^ ]+}}.swiftmodule
 
 import SomeCModule
