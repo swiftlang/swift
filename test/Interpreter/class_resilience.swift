@@ -29,7 +29,6 @@
 // RUN: %target-run %t/main2 %t/%target-library-name(resilient_struct_wmo) %t/%target-library-name(resilient_class_wmo) %t/%target-library-name(fixed_layout_class_wmo)
 
 // REQUIRES: executable_test
-// REQUIRES: rdar49026933
 
 import StdlibUnittest
 
