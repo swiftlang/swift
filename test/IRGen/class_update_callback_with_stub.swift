@@ -3,7 +3,9 @@
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -I %t %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-module-path %t/resilient_class.swiftmodule -enable-library-evolution %S/../Inputs/resilient_class.swift
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-module-path %t/resilient_objc_class.swiftmodule -enable-library-evolution %S/../Inputs/resilient_objc_class.swift
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -I %t -emit-ir -enable-library-evolution -enable-resilient-objc-class-stubs %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -I %t -emit-ir -enable-library-evolution -enable-resilient-objc-class-stubs %s > %t/out
+// RUN: %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime -DINT=i%target-ptrsize < %t/out
+// RUN: %FileCheck %s --check-prefix=NEGATIVE < %t/out
 
 import Foundation
 import resilient_class
@@ -88,13 +90,9 @@ import resilient_objc_class
 // CHECK-SAME:  @"$s31class_update_callback_with_stub27FixedLayoutNSObjectSubclassCMs"
 
 
-// -- The NSObject-derived class appears on the class list
+// -- Class stubs do not appear in the class list
 
-// CHECK-LABEL: @objc_classes = internal global
-// CHECK-SAME: @"$s31class_update_callback_with_stub25ResilientNSObjectSubclassCMs"
-// CHECK-SAME: @"$s31class_update_callback_with_stub27FixedLayoutNSObjectSubclassCMs"
-// CHECK-SAME: , section "__DATA,__objc_classlist,regular,no_dead_strip"
-
+// NEGATIVE-NOT: @objc_classes =
 
 // -- The category list
 

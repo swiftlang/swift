@@ -3231,12 +3231,6 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
               classDecl, NotForDefinition,
               TypeMetadataAddress::AddressPoint);
           emitObjCClassSymbol(IGM, classDecl, stub);
-
-          // @_objc_non_lazy_realization is only for use by the standard
-          // library, and we cannot support it with Objective-C class
-          // stubs (which there are none of in the standard library).
-          assert(!classDecl->getAttrs().hasAttribute<ObjCNonLazyRealizationAttr>());
-          IGM.addObjCClass(stub, /*eagerInitialization=*/false);
         }
       }
       break;
