@@ -558,7 +558,7 @@ extension ShapedArray where Scalar : TensorFlowScalar {
       precondition(rank <= Int32.max, """
         Conversion to TensorHandle is undefined when rank exceeds Int32.max.
         """)
-      precondition(shape.forAll { $0 <= Int32.max }, """
+      precondition(shape.allSatisfy { $0 <= Int32.max }, """
         Conversion to TensorHandle is undefined when shape dimensions exceed \
         Int32.max.
         """)
@@ -718,7 +718,7 @@ public struct ShapedArraySlice<Scalar> : _ShapedArrayProtocol {
   ) {
     precondition(indices.count <= base.rank,
                  "Number of base indices exceeds base rank")
-    precondition(zip(base.shape, indices).forAll { $1 >= 0 && $1 < $0 },
+    precondition(zip(base.shape, indices).allSatisfy { $1 >= 0 && $1 < $0 },
                  "Base indices are out of range")
     self.base = base
     self.baseIndices = indices
