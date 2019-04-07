@@ -577,36 +577,37 @@ public extension Tensor where Scalar : FloatingPoint & Equatable {
   }
 }
 
-public extension Tensor where Scalar : FloatingPoint {
+public extension Tensor where Scalar : TensorFlowFloatingPoint {
   // TODO: standardDeviation() should handle non floating point Tensors.
 
   /// Returns the standard deviation of the elements along the specified axes.
-  /// The reduced dimensions are retained with value 1. Does not apply Bessel's
-  /// correction.
+  /// The reduced dimensions are retained with value `1`. Does not apply
+  /// Bessel's correction.
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
-  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
+  @differentiable(wrt: self)
   func standardDeviation() -> Tensor {
-    return standardDeviation(alongAxes: Array(0..<shape.rank))  // Reduce along all dimensions
+    // Reduce along all dimensions
+    return standardDeviation(alongAxes: Array(0..<shape.rank))
   }
 
   /// Returns the standard deviation of the elements along the specified axes.
-  /// The reduced dimensions are retained with value 1. Does not apply Bessel's
-  /// correction.
+  /// The reduced dimensions are retained with value `1`. Does not apply
+  /// Bessel's correction.
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
-  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
+  @differentiable(wrt: self)
   func standardDeviation(alongAxes axes: Int32...) -> Tensor {
     return standardDeviation(alongAxes: axes)
   }
 
   /// Returns the standard deviation of the elements along the specified axes.
-  /// The reduced dimensions are retained with value 1. Does not apply Bessel's
-  /// correction.
+  /// The reduced dimensions are retained with value `1`. Does not apply
+  /// Bessel's correction.
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
-  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
+  @differentiable(wrt: self)
   func standardDeviation(alongAxes axes: [Int32]) -> Tensor {
     return sqrt(variance(alongAxes: axes))
   }
