@@ -1324,38 +1324,14 @@ bool WitnessChecker::checkWitnessThrowingAccessor(ValueDecl *requirement,
 
   auto reqStorageDecl = cast<AbstractStorageDecl>(requirement);
   auto witnessStorageDecl = cast<AbstractStorageDecl>(witness);
-
-  auto requirementGetter = reqStorageDecl->getGetter();
-  auto witnessGetter = witnessStorageDecl->getGetter();
-
-  if (!requirementGetter->hasThrows() && witnessGetter->hasThrows()) {
+  
+  if (!reqStorageDecl->isGetterThrowing() && witnessStorageDecl->isGetterThrowing()) {
     shouldDiagnose = true;
   }
-
+  
   if (requirement->isSettable(DC)) {
-    auto requirementSetter = reqStorageDecl->getSetter();
-    auto witnessSetter = witnessStorageDecl->getSetter();
-
-    if (!requirementSetter->hasThrows() && witnessSetter->hasThrows()) {
+    if (!reqStorageDecl->isSetterThrowing() && witnessStorageDecl->isSetterThrowing()) {
       shouldDiagnose = true;
-    }
-  }
-
-  if (auto reqReadCoroutine = reqStorageDecl->getReadCoroutine()) {
-    if (auto witnessReadCoroutine = witnessStorageDecl->getReadCoroutine()) {
-      if (!reqReadCoroutine->hasThrows() && witnessReadCoroutine->hasThrows()) {
-        shouldDiagnose = true;
-      }
-    }
-  }
-
-  if (auto reqModifyCoroutine = reqStorageDecl->getModifyCoroutine()) {
-    if (auto witnessModifyCoroutine =
-            witnessStorageDecl->getModifyCoroutine()) {
-      if (!reqModifyCoroutine->hasThrows() &&
-          witnessModifyCoroutine->hasThrows()) {
-        shouldDiagnose = true;
-      }
     }
   }
 

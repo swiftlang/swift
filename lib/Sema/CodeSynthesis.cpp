@@ -828,12 +828,6 @@ static void synthesizeCoroutineAccessorBody(AccessorDecl *accessor,
                                             ASTContext &ctx) {
   assert(accessor->isCoroutine());
 
-  // FIXME: If we don't return here, then a throwing accessor can cause an
-  // infinite loop in SILGen
-  if (!accessor->getStorage()->hasStorage()) {
-    return;
-  }
-
   auto storage = accessor->getStorage();
   auto target = (accessor->hasForcedStaticDispatch()
                    ? TargetImpl::Ordinary
