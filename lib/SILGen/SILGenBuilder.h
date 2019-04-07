@@ -26,8 +26,8 @@
 #include "JumpDest.h"
 #include "ManagedValue.h"
 #include "RValue.h"
+#include "SILGenSILBuilder.h"
 #include "swift/Basic/ProfileCounter.h"
-#include "swift/SIL/SILBuilder.h"
 
 namespace swift {
 namespace Lowering {
@@ -40,7 +40,7 @@ class SGFContext;
 ///
 /// The goal is to make this eventually composed with SILBuilder so that all
 /// APIs only vend ManagedValues.
-class SILGenBuilder : public SILBuilder {
+class SILGenBuilder : public SILGenSILBuilder {
   SILGenFunction &SGF;
 
 public:
@@ -53,40 +53,25 @@ public:
   // Create a new builder, inheriting the given builder's context and debug
   // scope.
   SILGenBuilder(SILGenBuilder &builder, SILBasicBlock *insertBB)
-    : SILBuilder(insertBB, builder.getCurrentDebugScope(),
-                 builder.getBuilderContext()),
-      SGF(builder.SGF)
-  {}
+      : SILGenSILBuilder(builder.SGF, insertBB, builder.getCurrentDebugScope(),
+                         builder.getBuilderContext()),
+        SGF(builder.SGF) {}
 
   SILGenModule &getSILGenModule() const;
   SILGenFunction &getSILGenFunction() const { return SGF; }
 
-  // Metatype instructions use the conformances necessary to instantiate the
-  // type.
+  using SILGenSILBuilder::createInitExistentialValue;
+  ManagedValue
+  createInitExistentialValue(SILLocation loc, SILType existentialType,
+                             CanType formalConcreteType, ManagedValue concrete,
+                             ArrayRef<ProtocolConformanceRef> conformances);
+  using SILGenSILBuilder::createInitExistentialRef;
+  ManagedValue
+  createInitExistentialRef(SILLocation loc, SILType existentialType,
+                           CanType formalConcreteType, ManagedValue concrete,
+                           ArrayRef<ProtocolConformanceRef> conformances);
 
-  MetatypeInst *createMetatype(SILLocation loc, SILType metatype);
-
-  // Generic apply instructions use the conformances necessary to form the call.
-
-  using SILBuilder::createApply;
-
-  ApplyInst *createApply(SILLocation loc, SILValue fn, SILType SubstFnTy,
-                         SILType result, SubstitutionMap subs,
-                         ArrayRef<SILValue> args);
-
-  TryApplyInst *createTryApply(SILLocation loc, SILValue fn, SILType substFnTy,
-                               SubstitutionMap subs,
-                               ArrayRef<SILValue> args, SILBasicBlock *normalBB,
-                               SILBasicBlock *errorBB);
-
-  BeginApplyInst *createBeginApply(SILLocation loc, SILValue fn,
-                                   SubstitutionMap subs,
-                                   ArrayRef<SILValue> args);
-
-  PartialApplyInst *createPartialApply(SILLocation loc, SILValue fn,
-                                       SILType substFnTy, SubstitutionMap subs,
-                                       ArrayRef<SILValue> args,
-                                       SILType closureTy);
+  using SILGenSILBuilder::createPartialApply;
   ManagedValue createPartialApply(SILLocation loc, SILValue fn,
                                   SILType substFnTy, SubstitutionMap subs,
                                   ArrayRef<ManagedValue> args,
@@ -99,60 +84,15 @@ public:
                               closureTy);
   }
 
-  BuiltinInst *createBuiltin(SILLocation loc, Identifier name, SILType resultTy,
-                             SubstitutionMap subs, ArrayRef<SILValue> args);
-
-  // Existential containers use the conformances needed by the existential
-  // box.
-
-  InitExistentialAddrInst *
-  createInitExistentialAddr(SILLocation loc, SILValue existential,
-                            CanType formalConcreteType,
-                            SILType loweredConcreteType,
-                            ArrayRef<ProtocolConformanceRef> conformances);
-
-  InitExistentialValueInst *
-  createInitExistentialValue(SILLocation loc, SILType existentialType,
-                             CanType formalConcreteType, SILValue concrete,
-                             ArrayRef<ProtocolConformanceRef> conformances);
-  ManagedValue
-  createInitExistentialValue(SILLocation loc, SILType existentialType,
-                             CanType formalConcreteType, ManagedValue concrete,
-                             ArrayRef<ProtocolConformanceRef> conformances);
-
-  InitExistentialMetatypeInst *
-  createInitExistentialMetatype(SILLocation loc, SILValue metatype,
-                                SILType existentialType,
-                                ArrayRef<ProtocolConformanceRef> conformances);
-
-  InitExistentialRefInst *
-  createInitExistentialRef(SILLocation loc, SILType existentialType,
-                           CanType formalConcreteType, SILValue concreteValue,
-                           ArrayRef<ProtocolConformanceRef> conformances);
-
-  ManagedValue
-  createInitExistentialRef(SILLocation loc, SILType existentialType,
-                           CanType formalConcreteType, ManagedValue concrete,
-                           ArrayRef<ProtocolConformanceRef> conformances);
-
-  AllocExistentialBoxInst *
-  createAllocExistentialBox(SILLocation loc, SILType existentialType,
-                            CanType concreteType,
-                            ArrayRef<ProtocolConformanceRef> conformances);
-
-  //===---
-  // Ownership Endowed APIs
-  //
-
-  using SILBuilder::createStructExtract;
+  using SILGenSILBuilder::createStructExtract;
   ManagedValue createStructExtract(SILLocation loc, ManagedValue base,
                                    VarDecl *decl);
 
-  using SILBuilder::createRefElementAddr;
+  using SILGenSILBuilder::createRefElementAddr;
   ManagedValue createRefElementAddr(SILLocation loc, ManagedValue operand,
                                     VarDecl *field, SILType resultTy);
 
-  using SILBuilder::createCopyValue;
+  using SILGenSILBuilder::createCopyValue;
 
   /// Emit a +1 copy on \p originalValue that lives until the end of the current
   /// lexical scope.
@@ -177,9 +117,9 @@ public:
   ManagedValue createFormalAccessCopyValue(SILLocation loc,
                                            ManagedValue originalValue);
 
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  using SILBuilder::createCopy##Name##Value; \
-  ManagedValue createCopy##Name##Value(SILLocation loc, \
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  using SILGenSILBuilder::createCopy##Name##Value;                             \
+  ManagedValue createCopy##Name##Value(SILLocation loc,                        \
                                        ManagedValue originalValue);
 #define UNCHECKED_REF_STORAGE(Name, ...) \
   ManagedValue createUnsafeCopy##Name##Value(SILLocation loc, \
@@ -189,40 +129,40 @@ public:
   ManagedValue createOwnedPhiArgument(SILType type);
   ManagedValue createGuaranteedPhiArgument(SILType type);
 
-  using SILBuilder::createMarkUninitialized;
+  using SILGenSILBuilder::createMarkUninitialized;
   ManagedValue createMarkUninitialized(ValueDecl *decl, ManagedValue operand,
                                        MarkUninitializedInst::Kind muKind);
 
-  using SILBuilder::createAllocRef;
+  using SILGenSILBuilder::createAllocRef;
   ManagedValue createAllocRef(SILLocation loc, SILType refType, bool objc,
                               bool canAllocOnStack,
                               ArrayRef<SILType> elementTypes,
                               ArrayRef<ManagedValue> elementCountOperands);
-  using SILBuilder::createAllocRefDynamic;
+  using SILGenSILBuilder::createAllocRefDynamic;
   ManagedValue
   createAllocRefDynamic(SILLocation loc, ManagedValue operand, SILType refType,
                         bool objc, ArrayRef<SILType> elementTypes,
                         ArrayRef<ManagedValue> elementCountOperands);
 
-  using SILBuilder::createTuple;
+  using SILGenSILBuilder::createTuple;
   ManagedValue createTuple(SILLocation loc, SILType type,
                            ArrayRef<ManagedValue> elements);
-  using SILBuilder::createTupleExtract;
+  using SILGenSILBuilder::createTupleExtract;
   ManagedValue createTupleExtract(SILLocation loc, ManagedValue value,
                                   unsigned index, SILType type);
   ManagedValue createTupleExtract(SILLocation loc, ManagedValue value,
                                   unsigned index);
-  using SILBuilder::createTupleElementAddr;
+  using SILGenSILBuilder::createTupleElementAddr;
   ManagedValue createTupleElementAddr(SILLocation loc, ManagedValue addr,
                                       unsigned index, SILType type);
   ManagedValue createTupleElementAddr(SILLocation loc, ManagedValue addr,
                                       unsigned index);
 
-  using SILBuilder::createLoadBorrow;
+  using SILGenSILBuilder::createLoadBorrow;
   ManagedValue createLoadBorrow(SILLocation loc, ManagedValue base);
   ManagedValue createFormalAccessLoadBorrow(SILLocation loc, ManagedValue base);
 
-  using SILBuilder::createStoreBorrow;
+  using SILGenSILBuilder::createStoreBorrow;
   void createStoreBorrow(SILLocation loc, ManagedValue value, SILValue address);
 
   /// Create a store_borrow if we have a non-trivial value and a store [trivial]
@@ -241,11 +181,11 @@ public:
                              const TypeLowering &lowering, SGFContext context,
                              llvm::function_ref<void(SILValue)> rvalueEmitter);
 
-  using SILBuilder::createUncheckedEnumData;
+  using SILGenSILBuilder::createUncheckedEnumData;
   ManagedValue createUncheckedEnumData(SILLocation loc, ManagedValue operand,
                                        EnumElementDecl *element);
 
-  using SILBuilder::createUncheckedTakeEnumDataAddr;
+  using SILGenSILBuilder::createUncheckedTakeEnumDataAddr;
   ManagedValue createUncheckedTakeEnumDataAddr(SILLocation loc, ManagedValue operand,
                                                EnumElementDecl *element, SILType ty);
 
@@ -271,7 +211,7 @@ public:
   ManagedValue createInputFunctionArgument(SILType type,
                                            Optional<SILLocation> loc);
 
-  using SILBuilder::createEnum;
+  using SILGenSILBuilder::createEnum;
   ManagedValue createEnum(SILLocation loc, ManagedValue payload,
                           EnumElementDecl *decl, SILType type);
 
@@ -282,16 +222,16 @@ public:
                             const TypeLowering &lowering, SGFContext context,
                             llvm::function_ref<void(SILValue)> rvalueEmitter);
 
-  using SILBuilder::createUnconditionalCheckedCastValue;
+  using SILGenSILBuilder::createUnconditionalCheckedCastValue;
   ManagedValue
   createUnconditionalCheckedCastValue(SILLocation loc,
                                       ManagedValue operand, SILType type);
-  using SILBuilder::createUnconditionalCheckedCast;
+  using SILGenSILBuilder::createUnconditionalCheckedCast;
   ManagedValue createUnconditionalCheckedCast(SILLocation loc,
                                               ManagedValue operand,
                                               SILType type);
 
-  using SILBuilder::createCheckedCastBranch;
+  using SILGenSILBuilder::createCheckedCastBranch;
   void createCheckedCastBranch(SILLocation loc, bool isExact,
                                ManagedValue operand, SILType type,
                                SILBasicBlock *trueBlock,
@@ -299,49 +239,49 @@ public:
                                ProfileCounter Target1Count,
                                ProfileCounter Target2Count);
 
-  using SILBuilder::createCheckedCastValueBranch;
+  using SILGenSILBuilder::createCheckedCastValueBranch;
   void createCheckedCastValueBranch(SILLocation loc, ManagedValue operand,
                                     SILType type, SILBasicBlock *trueBlock,
                                     SILBasicBlock *falseBlock);
 
-  using SILBuilder::createUpcast;
+  using SILGenSILBuilder::createUpcast;
   ManagedValue createUpcast(SILLocation loc, ManagedValue original,
                             SILType type);
 
-  using SILBuilder::tryCreateUncheckedRefCast;
+  using SILGenSILBuilder::tryCreateUncheckedRefCast;
   ManagedValue tryCreateUncheckedRefCast(SILLocation loc, ManagedValue original,
                                          SILType type);
 
-  using SILBuilder::createUncheckedTrivialBitCast;
+  using SILGenSILBuilder::createUncheckedTrivialBitCast;
   ManagedValue createUncheckedTrivialBitCast(SILLocation loc,
                                              ManagedValue original,
                                              SILType type);
 
-  using SILBuilder::createUncheckedRefCast;
+  using SILGenSILBuilder::createUncheckedRefCast;
   ManagedValue createUncheckedRefCast(SILLocation loc, ManagedValue original,
                                       SILType type);
 
-  using SILBuilder::createUncheckedAddrCast;
+  using SILGenSILBuilder::createUncheckedAddrCast;
   ManagedValue createUncheckedAddrCast(SILLocation loc, ManagedValue op,
                                        SILType resultTy);
 
-  using SILBuilder::createUncheckedBitCast;
+  using SILGenSILBuilder::createUncheckedBitCast;
   ManagedValue createUncheckedBitCast(SILLocation loc, ManagedValue original,
                                       SILType type);
 
-  using SILBuilder::createOpenExistentialRef;
+  using SILGenSILBuilder::createOpenExistentialRef;
   ManagedValue createOpenExistentialRef(SILLocation loc, ManagedValue arg,
                                         SILType openedType);
 
-  using SILBuilder::createOpenExistentialValue;
+  using SILGenSILBuilder::createOpenExistentialValue;
   ManagedValue createOpenExistentialValue(SILLocation loc,
                                           ManagedValue original, SILType type);
 
-  using SILBuilder::createOpenExistentialBoxValue;
+  using SILGenSILBuilder::createOpenExistentialBoxValue;
   ManagedValue createOpenExistentialBoxValue(SILLocation loc,
                                           ManagedValue original, SILType type);
 
-  using SILBuilder::createOpenExistentialMetatype;
+  using SILGenSILBuilder::createOpenExistentialMetatype;
   ManagedValue createOpenExistentialMetatype(SILLocation loc,
                                              ManagedValue value,
                                              SILType openedType);
@@ -350,7 +290,7 @@ public:
   ManagedValue createBlockToAnyObject(SILLocation loc, ManagedValue block,
                                       SILType type);
 
-  using SILBuilder::createOptionalSome;
+  using SILGenSILBuilder::createOptionalSome;
   ManagedValue createOptionalSome(SILLocation Loc, ManagedValue Arg);
   ManagedValue createManagedOptionalNone(SILLocation Loc, SILType Type);
 
@@ -358,17 +298,17 @@ public:
   // are removed.
   ManagedValue createManagedFunctionRef(SILLocation loc, SILFunction *f);
 
-  using SILBuilder::createConvertFunction;
+  using SILGenSILBuilder::createConvertFunction;
   ManagedValue createConvertFunction(SILLocation loc, ManagedValue fn,
                                      SILType resultTy,
                                      bool WithoutActuallyEscaping = false);
 
-  using SILBuilder::createConvertEscapeToNoEscape;
+  using SILGenSILBuilder::createConvertEscapeToNoEscape;
   ManagedValue
   createConvertEscapeToNoEscape(SILLocation loc, ManagedValue fn,
                                 SILType resultTy);
 
-  using SILBuilder::createStore;
+  using SILGenSILBuilder::createStore;
   /// Forward \p value into \p address.
   ///
   /// This will forward value's cleanup (if it has one) into the equivalent
@@ -378,41 +318,41 @@ public:
   ManagedValue createStore(SILLocation loc, ManagedValue value,
                            SILValue address, StoreOwnershipQualifier qualifier);
 
-  using SILBuilder::createSuperMethod;
+  using SILGenSILBuilder::createSuperMethod;
   ManagedValue createSuperMethod(SILLocation loc, ManagedValue operand,
                                  SILDeclRef member, SILType methodTy);
 
-  using SILBuilder::createObjCSuperMethod;
+  using SILGenSILBuilder::createObjCSuperMethod;
   ManagedValue createObjCSuperMethod(SILLocation loc, ManagedValue operand,
                                      SILDeclRef member, SILType methodTy);
 
-  using SILBuilder::createValueMetatype;
+  using SILGenSILBuilder::createValueMetatype;
   ManagedValue createValueMetatype(SILLocation loc, SILType metatype,
                                    ManagedValue base);
 
-  using SILBuilder::createBridgeObjectToRef;
+  using SILGenSILBuilder::createBridgeObjectToRef;
   ManagedValue createBridgeObjectToRef(SILLocation loc, ManagedValue mv,
                                        SILType destType);
 
-  using SILBuilder::createRefToBridgeObject;
+  using SILGenSILBuilder::createRefToBridgeObject;
   ManagedValue createRefToBridgeObject(SILLocation loc, ManagedValue mv,
                                        SILValue bits);
 
-  using SILBuilder::createBranch;
+  using SILGenSILBuilder::createBranch;
   BranchInst *createBranch(SILLocation Loc, SILBasicBlock *TargetBlock,
                            ArrayRef<ManagedValue> Args);
 
-  using SILBuilder::createReturn;
+  using SILGenSILBuilder::createReturn;
   ReturnInst *createReturn(SILLocation Loc, ManagedValue ReturnValue);
 
-  using SILBuilder::emitDestructureValueOperation;
+  using SILGenSILBuilder::emitDestructureValueOperation;
   /// Perform either a tuple or struct destructure and then pass its components
   /// as managed value one by one with an index to the closure.
   void emitDestructureValueOperation(
       SILLocation loc, ManagedValue value,
       function_ref<void(unsigned, ManagedValue)> func);
 
-  using SILBuilder::createProjectBox;
+  using SILGenSILBuilder::createProjectBox;
   ManagedValue createProjectBox(SILLocation loc, ManagedValue mv,
                                 unsigned index);
 };
