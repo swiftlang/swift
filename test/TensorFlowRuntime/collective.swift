@@ -25,7 +25,8 @@ CollectiveTests.testAllBackends("ConfigTest") {
 CollectiveTests.testAllBackends("SingletonGroup") {
   let x = Tensor<Float>(1.0)
   let t = Raw.collectiveReduce(x, groupSize: 1, groupKey: 1, instanceKey: 1,
-                               mergeOp: .add, finalOp: .id, subdivOffsets: [0])
+                               mergeOp: .add, finalOp: .id, subdivOffsets: [0],
+                               waitFor: [])
   _hostOp(t)
   expectEqualWithScalarTensor(1, t)
 }
@@ -76,7 +77,7 @@ CollectiveTests.testAllBackends("GroupWithSize2_threads") {
   _runOnNDevices(2) { i in
     withDevice(.cpu, UInt(i)) {
       let t = Raw.collectiveReduce(x, groupSize: 2, groupKey: 3, instanceKey: 3,
-          mergeOp: .add, finalOp: .id, subdivOffsets: [0])
+          mergeOp: .add, finalOp: .id, subdivOffsets: [0], waitFor: [])
 
       _hostOp(t)
       expectEqualWithScalarTensor(2, t)
