@@ -23,6 +23,10 @@ extension Unicode.ASCII : Unicode.Encoding {
     return EncodedScalar(0x1a) // U+001A SUBSTITUTE; best we can do for ASCII
   }
 
+  /// Returns whether the given code unit represents an ASCII scalar
+  @_alwaysEmitIntoClient
+  public static func isASCII(_ x: CodeUnit) -> Bool { return UTF8.isASCII(x) }
+
   @inline(__always)
   @inlinable
   public static func _isScalar(_ x: CodeUnit) -> Bool {

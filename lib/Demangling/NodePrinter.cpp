@@ -50,8 +50,7 @@ DemanglerPrinter &DemanglerPrinter::operator<<(long long n) & {
   return *this;
 }
 
-std::string Demangle::archetypeName(Node::IndexType index,
-                                    Node::IndexType depth) {
+std::string Demangle::genericParameterName(uint64_t depth, uint64_t index) {
   DemanglerPrinter name;
   do {
     name << (char)('A' + (index % 26));
@@ -354,6 +353,7 @@ private:
     case Node::Kind::Extension:
     case Node::Kind::EnumCase:
     case Node::Kind::FieldOffset:
+    case Node::Kind::FullObjCResilientClassStub:
     case Node::Kind::FullTypeMetadata:
     case Node::Kind::Function:
     case Node::Kind::FunctionSignatureSpecialization:
@@ -412,6 +412,7 @@ private:
     case Node::Kind::ObjCAttribute:
     case Node::Kind::ObjCBlock:
     case Node::Kind::ObjCMetadataUpdateFunction:
+    case Node::Kind::ObjCResilientClassStub:
     case Node::Kind::Owned:
     case Node::Kind::OwningAddressor:
     case Node::Kind::OwningMutableAddressor:
@@ -980,6 +981,14 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::ObjCMetadataUpdateFunction:
     Printer << "ObjC metadata update function for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::ObjCResilientClassStub:
+    Printer << "ObjC resilient class stub for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::FullObjCResilientClassStub:
+    Printer << "full ObjC resilient class stub for ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::OutlinedBridgedMethod:
@@ -1959,7 +1968,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
         }
         // FIXME: Depth won't match when a generic signature applies to a
         // method in generic type context.
-        Printer << archetypeName(index, depth);
+        Printer << Options.GenericParameterName(depth, index);
       }
     }
     
@@ -2036,13 +2045,8 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   }
   case Node::Kind::DependentGenericParamType: {
     unsigned index = Node->getChild(1)->getIndex();
-    do {
-      Printer << (char)('A' + (index % 26));
-      index /= 26;
-    } while (index);
     unsigned depth = Node->getChild(0)->getIndex();
-    if (depth != 0)
-      Printer << depth;
+    Printer << Options.GenericParameterName(depth, index);
     return nullptr;
   }
   case Node::Kind::DependentGenericType: {

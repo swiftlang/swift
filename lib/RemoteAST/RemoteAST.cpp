@@ -224,7 +224,7 @@ private:
   getOffsetOfFieldFromIRGen(irgen::IRGenModule &IGM, Type type,
                             NominalTypeDecl *typeDecl,
                             RemoteAddress optMetadata, VarDecl *member) {
-    SILType loweredTy = IGM.getSILTypes().getLoweredType(type);
+    SILType loweredTy = IGM.getLoweredType(type);
 
     MemberAccessStrategy strategy =
       (isa<StructDecl>(typeDecl)
@@ -327,14 +327,20 @@ private:
       return fail<uint64_t>(Failure::TypeHasNoSuchMember, memberName);
 
     // Fast path: element 0 is always at offset 0.
-    if (targetIndex == 0) return uint64_t(0);
+    if (targetIndex == 0)
+      return uint64_t(0);
 
     // Create an IRGen instance.
     auto irgen = getIRGen();
-    if (!irgen) return Result<uint64_t>::emplaceFailure(Failure::Unknown);
+    if (!irgen)
+      return Result<uint64_t>::emplaceFailure(Failure::Unknown);
     auto &IGM = irgen->IGM;
+    SILType loweredTy = IGM.getLoweredType(type);
 
-    SILType loweredTy = IGM.getSILTypes().getLoweredType(type);
+    // Only the runtime metadata knows the offsets of resilient members.
+    auto &typeInfo = IGM.getTypeInfo(loweredTy);
+    if (!isa<irgen::FixedTypeInfo>(&typeInfo))
+      return Result<uint64_t>::emplaceFailure(Failure::NotFixedLayout);
 
     // If the type has a statically fixed offset, return that.
     if (auto offset =

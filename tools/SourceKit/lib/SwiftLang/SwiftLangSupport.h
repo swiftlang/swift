@@ -246,11 +246,12 @@ public:
   ~RequestRefactoringEditConsumer();
   void accept(swift::SourceManager &SM, swift::ide::RegionType RegionType,
               ArrayRef<swift::ide::Replacement> Replacements) override;
-  void handleDiagnostic(swift::SourceManager &SM, swift::SourceLoc Loc,
-                        swift::DiagnosticKind Kind,
-                        StringRef FormatString,
-                        ArrayRef<swift::DiagnosticArgument> FormatArgs,
-                        const swift::DiagnosticInfo &Info) override;
+  void
+  handleDiagnostic(swift::SourceManager &SM, swift::SourceLoc Loc,
+                   swift::DiagnosticKind Kind, StringRef FormatString,
+                   ArrayRef<swift::DiagnosticArgument> FormatArgs,
+                   const swift::DiagnosticInfo &Info,
+                   swift::SourceLoc bufferIndirectlyCausingDiagnostic) override;
 };
 
 class RequestRenameRangeConsumer : public swift::ide::FindRenameRangesConsumer,
@@ -263,11 +264,12 @@ public:
   ~RequestRenameRangeConsumer();
   void accept(swift::SourceManager &SM, swift::ide::RegionType RegionType,
               ArrayRef<swift::ide::RenameRangeDetail> Ranges) override;
-  void handleDiagnostic(swift::SourceManager &SM, swift::SourceLoc Loc,
-                        swift::DiagnosticKind Kind,
-                        StringRef FormatString,
-                        ArrayRef<swift::DiagnosticArgument> FormatArgs,
-                        const swift::DiagnosticInfo &Info) override;
+  void
+  handleDiagnostic(swift::SourceManager &SM, swift::SourceLoc Loc,
+                   swift::DiagnosticKind Kind, StringRef FormatString,
+                   ArrayRef<swift::DiagnosticArgument> FormatArgs,
+                   const swift::DiagnosticInfo &Info,
+                   swift::SourceLoc bufferIndirectlyCausingDiagnostic) override;
 };
 
 struct SwiftStatistics {
@@ -523,6 +525,7 @@ public:
                              CategorizedRenameRangesReceiver Receiver) override;
 
   void collectExpressionTypes(StringRef FileName, ArrayRef<const char *> Args,
+                              ArrayRef<const char *> ExpectedProtocols,
                               std::function<void(const ExpressionTypesInFile&)> Receiver) override;
 
   void semanticRefactoring(StringRef Filename, SemanticRefactoringInfo Info,

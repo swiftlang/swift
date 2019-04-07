@@ -25,6 +25,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -110,6 +111,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     bool walkToDeclPre(Decl *D) override { return false; }
     bool walkToTypeReprPre(TypeRepr *T) override { return true; }
 
+    bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
+
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       // See through implicit conversions of the expression.  We want to be able
       // to associate the parent of this expression with the ultimate callee.
@@ -144,11 +147,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       }
       if (isa<TypeExpr>(Base))
         checkUseOfMetaTypeName(Base);
-
-      if (auto *TSE = dyn_cast<TupleShuffleExpr>(E)) {
-        if (CallArgs.count(TSE))
-          CallArgs.insert(TSE->getSubExpr());
-      }
 
       if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
         CallArgs.insert(SE->getIndex());
@@ -329,11 +327,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     static void argExprVisitArguments(Expr* arg,
                                       llvm::function_ref
                                         <void(unsigned, Expr*)> fn) {
-      // The argument could be shuffled if it includes default arguments,
-      // label differences, or other exciting things like that.
-      if (auto *TSE = dyn_cast<TupleShuffleExpr>(arg))
-        arg = TSE->getSubExpr();
-
       // The argument is either a ParenExpr or TupleExpr.
       if (auto *TE = dyn_cast<TupleExpr>(arg)) {
         auto elts = TE->getElements();
@@ -591,7 +584,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     void checkNoEscapeParameterUse(DeclRefExpr *DRE, Expr *parent,
                                    OperandKind useKind) {
       // This only cares about declarations of noescape function type.
-      auto AFT = DRE->getDecl()->getInterfaceType()->getAs<AnyFunctionType>();
+      auto AFT = DRE->getType()->getAs<FunctionType>();
       if (!AFT || !AFT->isNoEscape())
         return;
 
@@ -1408,6 +1401,8 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
              cast<VarDecl>(DRE->getDecl())->isSelfParameter();
     }
 
+    bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
+
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       Expr *subExpr;
       bool isStore = false;
@@ -1556,11 +1551,10 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
       return false;
     }
 
+    bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
+
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
-        if (!CE->hasSingleExpressionBody())
-          return { false, E };
-
         // If this is a potentially-escaping closure expression, start looking
         // for references to self if we aren't already.
         if (isClosureRequiringSelfQualification(CE))
@@ -1688,7 +1682,7 @@ bool TypeChecker::getDefaultGenericArgumentsString(
 /// Diagnose an argument labeling issue, returning true if we successfully
 /// diagnosed the issue.
 bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
-                                       const Expr *expr,
+                                       Expr *expr,
                                        ArrayRef<Identifier> newNames,
                                        bool isSubscript,
                                        InFlightDiagnostic *existingDiag) {
@@ -1700,56 +1694,26 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
   };
 
   auto &diags = ctx.Diags;
-  auto tuple = dyn_cast<TupleExpr>(expr);
-  if (!tuple) {
-    if (newNames[0].empty()) {
-      // We don't know what to do with this.
-      return false;
-    }
 
-    llvm::SmallString<16> str;
-    // If the diagnostic is local, flush it before returning.
-    // This makes sure it's emitted before 'str' is destroyed.
-    SWIFT_DEFER { diagOpt.reset(); };
-
-    // This is a scalar-to-tuple conversion. Add the name. We "know"
-    // that we're inside a ParenExpr, because ParenExprs are required
-    // by the syntax and locator resolution looks through on level of
-    // them.
-
-    // Look through the paren expression, if there is one.
-    if (auto parenExpr = dyn_cast<ParenExpr>(expr))
-      expr = parenExpr->getSubExpr();
-
-    str += newNames[0].str();
-    str += ": ";
-    if (!existingDiag) {
-      diagOpt.emplace(diags.diagnose(expr->getStartLoc(),
-                                     diag::missing_argument_labels,
-                                     false, str.str().drop_back(),
-                                     isSubscript));
-    }
-    getDiag().fixItInsert(expr->getStartLoc(), str);
-    return true;
-  }
+  OriginalArgumentList argList = getOriginalArgumentList(expr);
 
   // Figure out how many extraneous, missing, and wrong labels are in
   // the call.
   unsigned numExtra = 0, numMissing = 0, numWrong = 0;
-  unsigned n = std::max(tuple->getNumElements(), (unsigned)newNames.size());
+  unsigned n = std::max(argList.args.size(), newNames.size());
 
   llvm::SmallString<16> missingBuffer;
   llvm::SmallString<16> extraBuffer;
   for (unsigned i = 0; i != n; ++i) {
     Identifier oldName;
-    if (i < tuple->getNumElements())
-      oldName = tuple->getElementName(i);
+    if (i < argList.args.size())
+      oldName = argList.labels[i];
     Identifier newName;
     if (i < newNames.size())
       newName = newNames[i];
 
     if (oldName == newName ||
-        (tuple->hasTrailingClosure() && i == tuple->getNumElements()-1))
+        (argList.hasTrailingClosure && i == argList.args.size()-1))
       continue;
 
     if (oldName.empty()) {
@@ -1774,8 +1738,8 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
   if (!existingDiag) {
     bool plural = (numMissing + numExtra + numWrong) > 1;
     if (numWrong > 0 || (numMissing > 0 && numExtra > 0)) {
-      for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
-        auto haveName = tuple->getElementName(i);
+      for (unsigned i = 0, n = argList.args.size(); i != n; ++i) {
+        auto haveName = argList.labels[i];
         if (haveName.empty())
           haveBuffer += '_';
         else
@@ -1813,19 +1777,19 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
 
   // Emit Fix-Its to correct the names.
   auto &diag = getDiag();
-  for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
-    Identifier oldName = tuple->getElementName(i);
+  for (unsigned i = 0, n = argList.args.size(); i != n; ++i) {
+    Identifier oldName = argList.labels[i];
     Identifier newName;
     if (i < newNames.size())
       newName = newNames[i];
 
-    if (oldName == newName || (i == n-1 && tuple->hasTrailingClosure()))
+    if (oldName == newName || (i == n-1 && argList.hasTrailingClosure))
       continue;
 
     if (newName.empty()) {
       // Delete the old name.
-      diag.fixItRemoveChars(tuple->getElementNameLocs()[i],
-                            tuple->getElement(i)->getStartLoc());
+      diag.fixItRemoveChars(argList.labelLocs[i],
+                            argList.args[i]->getStartLoc());
       continue;
     }
 
@@ -1840,12 +1804,12 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
     if (oldName.empty()) {
       // Insert the name.
       newStr += ": ";
-      diag.fixItInsert(tuple->getElement(i)->getStartLoc(), newStr);
+      diag.fixItInsert(argList.args[i]->getStartLoc(), newStr);
       continue;
     }
 
     // Change the name.
-    diag.fixItReplace(tuple->getElementNameLocs()[i], newStr);
+    diag.fixItReplace(argList.labelLocs[i], newStr);
   }
 
   // If the diagnostic is local, flush it before returning.
@@ -1860,8 +1824,8 @@ static const Expr *lookThroughExprsToImmediateDeallocation(const Expr *E) {
   while (true) {
     E = E->getValueProvidingExpr();
 
-    // We don't currently deal with tuple shuffles.
-    if (isa<TupleShuffleExpr>(E))
+    // We don't currently deal with tuple destructuring.
+    if (isa<DestructureTupleExpr>(E))
       return E;
 
     // If we have a TupleElementExpr with a child TupleExpr, dig into that
@@ -2188,6 +2152,7 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
 //===----------------------------------------------------------------------===//
 
 namespace {
+
 class VarDeclUsageChecker : public ASTWalker {
   DiagnosticEngine &Diags;
   // Keep track of some information about a variable.
@@ -2240,9 +2205,12 @@ public:
 
   VarDeclUsageChecker(DiagnosticEngine &Diags) : Diags(Diags) {}
 
-  VarDeclUsageChecker(TypeChecker &TC, VarDecl *VD) : Diags(TC.Diags) {
+  VarDeclUsageChecker(TypeChecker &tc, VarDecl *vd) : Diags(tc.Diags) {
     // Track a specific VarDecl
-    VarDecls[VD] = 0;
+    VarDecls[vd] = 0;
+    if (auto *childVd = vd->getCorrespondingCaseBodyVariable().getPtrOrNull()) {
+      VarDecls[childVd] = 0;
+    }
   }
 
   void suppressDiagnostics() {
@@ -2324,16 +2292,30 @@ public:
       handleIfConfig(ICD);
       
     // If this is a VarDecl, then add it to our list of things to track.
-    if (auto *vd = dyn_cast<VarDecl>(D))
+    if (auto *vd = dyn_cast<VarDecl>(D)) {
       if (shouldTrackVarDecl(vd)) {
-        unsigned defaultFlags = 0;
-        // If this VarDecl is nested inside of a CaptureListExpr, remember that
-        // fact for better diagnostics.
-        auto parentAsExpr = Parent.getAsExpr();
-        if (parentAsExpr && isa<CaptureListExpr>(parentAsExpr))
-          defaultFlags = RK_CaptureList;
+        // Inline constructor.
+        auto defaultFlags = [&]() -> unsigned {
+          // If this VarDecl is nested inside of a CaptureListExpr, remember
+          // that fact for better diagnostics.
+          auto parentAsExpr = Parent.getAsExpr();
+          if (parentAsExpr && isa<CaptureListExpr>(parentAsExpr))
+            return RK_CaptureList;
+          // Otherwise, return none.
+          return 0;
+        }();
+
+        if (!vd->isImplicit()) {
+          if (auto *childVd =
+                  vd->getCorrespondingCaseBodyVariable().getPtrOrNull()) {
+            // Child vars are never in capture lists.
+            assert(defaultFlags == 0);
+            VarDecls[childVd] |= 0;
+          }
+        }
         VarDecls[vd] |= defaultFlags;
       }
+    }
 
     if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
       // If this is a nested function with a capture list, mark any captured
@@ -2387,7 +2369,7 @@ public:
     // other things going on in the initializer expressions.
     return true;
   }
-  
+
   /// The heavy lifting happens when visiting expressions.
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override;
 
@@ -2429,11 +2411,18 @@ public:
         });
       }
     }
-      
+
+    // Make sure that we setup our case body variables.
+    if (auto *caseStmt = dyn_cast<CaseStmt>(S)) {
+      for (auto *vd : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+        VarDecls[vd] |= 0;
+      }
+    }
+
     return { true, S };
   }
-
 };
+
 } // end anonymous namespace
 
 
@@ -2445,10 +2434,25 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
   // lets let the bigger issues get resolved first.
   if (sawError)
     return;
-  
-  for (auto elt : VarDecls) {
-    auto *var = elt.first;
-    unsigned access = elt.second;
+
+  for (auto p : VarDecls) {
+    VarDecl *var;
+    unsigned access;
+    std::tie(var, access) = p;
+
+    if (auto *caseStmt =
+            dyn_cast_or_null<CaseStmt>(var->getRecursiveParentPatternStmt())) {
+      // Only diagnose VarDecls from the first CaseLabelItem in CaseStmts, as
+      // the remaining items must match it anyway.
+      auto caseItems = caseStmt->getCaseLabelItems();
+      assert(!caseItems.empty() &&
+             "If we have any case stmt var decls, we should have a case item");
+      if (!caseItems.front().getPattern()->containsVarDecl(var))
+        continue;
+
+      auto *childVar = var->getCorrespondingCaseBodyVariable().get();
+      access |= VarDecls[childVar];
+    }
 
     // If this is a 'let' value, any stores to it are actually initializations,
     // not mutations.
@@ -2623,7 +2627,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       }
       else {
         bool suggestLet = true;
-        if (auto *stmt = var->getParentPatternStmt()) {
+        if (auto *stmt = var->getRecursiveParentPatternStmt()) {
           // Don't try to suggest 'var' -> 'let' conversion
           // in case of 'for' loop because it's an implicitly
           // immutable context.
@@ -2757,8 +2761,6 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
   // and mark it as a read.
   E->walk(*this);
 }
-
-   
 
 /// The heavy lifting happens when visiting expressions.
 std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
@@ -2927,32 +2929,29 @@ void swift::fixItEncloseTrailingClosure(TypeChecker &TC,
                                         const CallExpr *call,
                                         Identifier closureLabel) {
   auto argsExpr = call->getArg();
-  if (auto TSE = dyn_cast<TupleShuffleExpr>(argsExpr))
-    argsExpr = TSE->getSubExpr();
 
   SmallString<32> replacement;
   SourceLoc lastLoc;
   SourceRange closureRange;
-  if (auto PE = dyn_cast<ParenExpr>(argsExpr)) {
-    assert(PE->hasTrailingClosure() && "must have trailing closure");
-    closureRange = PE->getSubExpr()->getSourceRange();
-    lastLoc = PE->getLParenLoc(); // e.g funcName() { 1 }
+
+  auto argList = getOriginalArgumentList(argsExpr);
+
+  assert(argList.args.size() >= 1 && "must have at least one argument");
+
+  if (argList.args.size() == 1) {
+    closureRange = argList.args[0]->getSourceRange();
+    lastLoc = argList.lParenLoc; // e.g funcName() { 1 }
     if (!lastLoc.isValid()) {
       // Bare trailing closure: e.g. funcName { 1 }
       replacement = "(";
       lastLoc = call->getFn()->getEndLoc();
     }
-  } else if (auto TE = dyn_cast<TupleExpr>(argsExpr)) {
-    // Tuple + trailing closure: e.g. funcName(x: 1) { 1 }
-    assert(TE->hasTrailingClosure() && "must have trailing closure");
-    auto numElements = TE->getNumElements();
-    assert(numElements >= 2 && "Unexpected num of elements in TupleExpr");
-    closureRange = TE->getElement(numElements - 1)->getSourceRange();
-    lastLoc = TE->getElement(numElements - 2)->getEndLoc();
-    replacement = ", ";
   } else {
-    // Can't be here.
-    return;
+    // Tuple + trailing closure: e.g. funcName(x: 1) { 1 }
+    auto numElements = argList.args.size();
+    closureRange = argList.args[numElements - 1]->getSourceRange();
+    lastLoc = argList.args[numElements - 2]->getEndLoc();
+    replacement = ", ";
   }
 
   // Add argument label of the closure.
@@ -2983,9 +2982,6 @@ static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
       // Ignore invalid argument type. Some diagnostics are already emitted.
       if (!argsTy || argsTy->hasError()) return;
 
-      if (auto TSE = dyn_cast<TupleShuffleExpr>(argsExpr))
-        argsExpr = TSE->getSubExpr();
-
       SourceLoc closureLoc;
       if (auto PE = dyn_cast<ParenExpr>(argsExpr))
         closureLoc = PE->getSubExpr()->getStartLoc();
@@ -3005,6 +3001,8 @@ static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
 
   public:
     DiagnoseWalker(TypeChecker &tc) : TC(tc) { }
+
+    bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       // Dig into implicit expression.
@@ -3136,6 +3134,8 @@ class ObjCSelectorWalker : public ASTWalker {
 public:
   ObjCSelectorWalker(TypeChecker &tc, const DeclContext *dc, Type selectorTy)
     : TC(tc), DC(dc), SelectorTy(selectorTy) { }
+
+  bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
     auto *stringLiteral = dyn_cast<StringLiteralExpr>(expr);
@@ -3321,13 +3321,8 @@ public:
 
       // If the best method was from a subclass of the place where
       // this method was declared, we have a new best.
-      while (auto superclassDecl = bestClassDecl->getSuperclassDecl()) {
-        if (classDecl == superclassDecl) {
-          bestMethod = method;
-          break;
-        }
-
-        bestClassDecl = superclassDecl;
+      if (classDecl->isSuperclassOf(bestClassDecl)) {
+        bestMethod = method;
       }
     }
 
@@ -3813,13 +3808,11 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
       }
     }
 
+    bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
+
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return { false, E };
-
-      if (auto *CE = dyn_cast<AbstractClosureExpr>(E))
-        if (!CE->hasSingleExpressionBody())
-          return { false, E };
 
       if (IgnoredExprs.count(E))
         return { true, E };
@@ -3886,6 +3879,8 @@ static void diagnoseDeprecatedWritableKeyPath(TypeChecker &TC, const Expr *E,
         }
       }
     }
+
+    bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())

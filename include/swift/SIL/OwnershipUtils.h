@@ -14,6 +14,8 @@
 #define SWIFT_SIL_OWNERSHIPUTILS_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -124,6 +126,27 @@ private:
   }
 };
 
+struct UseToEndBorrow {
+  Optional<EndBorrowInst *> operator()(Operand *use) const {
+    if (auto *ebi = dyn_cast<EndBorrowInst>(use->getUser())) {
+      return ebi;
+    }
+    return None;
+  }
+};
+
+using EndBorrowRange =
+    OptionalTransformRange<ValueBase::use_range, UseToEndBorrow,
+                           ValueBase::use_iterator>;
+
+/// Given a value \p v that is a "borrow" introducer, return its associated
+/// end_borrow users.
+inline auto makeEndBorrowRange(SILValue v) -> EndBorrowRange {
+  assert((isa<BeginBorrowInst>(v) || isa<LoadBorrowInst>(v)) &&
+         "Unhandled borrow introducer");
+  return EndBorrowRange(v->getUses(), UseToEndBorrow());
+}
+
 /// Returns true if:
 ///
 /// 1. No consuming uses are reachable from any other consuming use, from any
@@ -147,7 +170,7 @@ LinearLifetimeError valueHasLinearLifetime(
     SmallVectorImpl<SILBasicBlock *> *leakingBlocks = nullptr);
 
 /// Returns true if v is an address or trivial.
-bool isValueAddressOrTrivial(SILValue v, SILModule &m);
+bool isValueAddressOrTrivial(SILValue v);
 
 /// These operations forward both owned and guaranteed ownership.
 bool isOwnershipForwardingValueKind(SILNodeKind kind);

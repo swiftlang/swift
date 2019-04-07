@@ -166,10 +166,10 @@ Constraint::Constraint(ConstraintKind kind, Type first, Type second,
 }
 
 Constraint::Constraint(Type type, OverloadChoice choice, DeclContext *useDC,
-                       ConstraintLocator *locator,
+                       ConstraintFix *fix, ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
-    : Kind(ConstraintKind::BindOverload), HasRestriction(false),
-      IsActive(false), IsDisabled(false), RememberChoice(false),
+    : Kind(ConstraintKind::BindOverload), TheFix(fix), HasRestriction(false),
+      IsActive(false), IsDisabled(bool(fix)), RememberChoice(false),
       IsFavored(false),
       NumTypeVariables(typeVars.size()), Overload{type, choice, useDC},
       Locator(locator) {
@@ -356,6 +356,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
       printDecl();
       break;
     case OverloadChoiceKind::DynamicMemberLookup:
+    case OverloadChoiceKind::KeyPathDynamicMemberLookup:
       Out << "dynamic member lookup '" << overload.getName() << "'";
       break;
     case OverloadChoiceKind::BaseType:
@@ -639,18 +640,7 @@ Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type,
                                            OverloadChoice choice, 
                                            DeclContext *useDC,
                                            ConstraintLocator *locator) {
-  // Collect type variables.
-  SmallVector<TypeVariableType *, 4> typeVars;
-  if (type->hasTypeVariable())
-    type->getTypeVariables(typeVars);
-  if (auto baseType = choice.getBaseType()) {
-    baseType->getTypeVariables(typeVars);
-  }
-
-  // Create the constraint.
-  unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
-  void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  return new (mem) Constraint(type, choice, useDC, locator, typeVars);
+  return createFixedChoice(cs, type, choice, useDC, /*fix=*/nullptr, locator);
 }
 
 Constraint *Constraint::createRestricted(ConstraintSystem &cs, 
@@ -688,6 +678,25 @@ Constraint *Constraint::createFixed(ConstraintSystem &cs, ConstraintKind kind,
   unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(kind, fix, first, second, locator, typeVars);
+}
+
+Constraint *Constraint::createFixedChoice(ConstraintSystem &cs, Type type,
+                                          OverloadChoice choice,
+                                          DeclContext *useDC,
+                                          ConstraintFix *fix,
+                                          ConstraintLocator *locator) {
+  // Collect type variables.
+  SmallVector<TypeVariableType *, 4> typeVars;
+  if (type->hasTypeVariable())
+    type->getTypeVariables(typeVars);
+  if (auto baseType = choice.getBaseType()) {
+    baseType->getTypeVariables(typeVars);
+  }
+
+  // Create the constraint.
+  unsigned size = totalSizeToAlloc<TypeVariableType *>(typeVars.size());
+  void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
+  return new (mem) Constraint(type, choice, useDC, fix, locator, typeVars);
 }
 
 Constraint *Constraint::createDisjunction(ConstraintSystem &cs,

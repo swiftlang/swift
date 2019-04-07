@@ -56,21 +56,6 @@ def exit_rejecting_arguments(message, parser=None):
     sys.exit(2)  # 2 is the same as `argparse` error exit code.
 
 
-def call_without_sleeping(command, env=None, dry_run=False, echo=False):
-    """
-    Execute a command during which system sleep is disabled.
-
-    By default, this ignores the state of the `shell.dry_run` flag.
-    """
-
-    # Disable system sleep, if possible.
-    if platform.system() == 'Darwin':
-        # Don't mutate the caller's copy of the arguments.
-        command = ["caffeinate"] + list(command)
-
-    shell.call(command, env=env, dry_run=dry_run, echo=echo)
-
-
 class HostSpecificConfiguration(object):
 
     """Configuration information for an individual host."""
@@ -137,15 +122,10 @@ class HostSpecificConfiguration(object):
             # For platforms which normally require a connected device to
             # test, the default behavior is to run tests that only require
             # the host (i.e., they do not attempt to execute).
-            if deployment_platform.is_darwin and \
-               deployment_platform.is_embedded and \
-               not deployment_platform.is_simulator:
-                if deployment_platform not in \
-                        invocation.platforms_to_skip_test_host:
-                    test_host_only = True
-                    test = True
-                else:
-                    test = False
+            if deployment_platform.uses_host_tests and \
+                    deployment_platform not in \
+                    invocation.platforms_to_skip_test_host:
+                test_host_only = True
 
             name = deployment_target.name
 
@@ -181,7 +161,7 @@ class HostSpecificConfiguration(object):
                         "check-swift-benchmark-{}-external".format(name))
             if test:
                 if test_host_only:
-                    suffix = "-non-executable"
+                    suffix = "-only_non_executable"
                 else:
                     suffix = ""
                 subset_suffix = ""
@@ -206,6 +186,11 @@ class HostSpecificConfiguration(object):
                     self.swift_test_run_targets.append(
                         "check-swift{}-optimize_size-{}".format(
                             subset_suffix, name))
+                if args.test_optimize_none_implicit_dynamic and \
+                        not test_host_only:
+                    self.swift_test_run_targets.append(
+                        "check-swift{}-optimize_none_implicit_dynamic-{}"
+                        .format(subset_suffix, name))
 
 
 class BuildScriptInvocation(object):
@@ -402,11 +387,13 @@ class BuildScriptInvocation(object):
         if not args.test_watchos_simulator:
             self.platforms_to_skip_test.add(
                 StdlibDeploymentTarget.AppleWatchSimulator)
-
-        if not args.test_android_host:
+        if not args.test_android:
             self.platforms_to_skip_test.add(StdlibDeploymentTarget.Android)
 
         self.platforms_to_skip_test_host = set()
+        if not args.test_android_host:
+            self.platforms_to_skip_test_host.add(
+                StdlibDeploymentTarget.Android)
         if not args.test_ios_host:
             self.platforms_to_skip_test_host.add(StdlibDeploymentTarget.iOS)
         if not args.test_tvos_host:
@@ -704,6 +691,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-test-watchos-host"]
         if not args.test_watchos_simulator:
             impl_args += ["--skip-test-watchos-simulator"]
+        if not args.test_android:
+            impl_args += ["--skip-test-android"]
         if not args.test_android_host:
             impl_args += ["--skip-test-android-host"]
         if args.build_runtime_with_host_compiler:
@@ -720,6 +709,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-test-optimized"]
         if not args.test_optimize_for_size:
             impl_args += ["--skip-test-optimize-for-size"]
+        if not args.test_optimize_none_implicit_dynamic:
+            impl_args += ["--skip-test-optimize-none-implicit-dynamic"]
         if args.build_libparser_only:
             impl_args += ["--build-libparser-only"]
         if args.android:
@@ -757,8 +748,8 @@ class BuildScriptInvocation(object):
         # add them as one command.
         if args.extra_swift_args:
             impl_args += [
-                "--extra-swift-args",
-                ";".join(args.extra_swift_args)]
+                "--extra-swift-args=%s" % ';'.join(args.extra_swift_args)
+            ]
 
         # If we have extra_cmake_options, combine all of them together and then
         # add them as one command.
@@ -900,8 +891,8 @@ class BuildScriptInvocation(object):
         # `build-script-impl`.
         if self.args.legacy_impl:
             # Execute the underlying build script implementation.
-            call_without_sleeping([build_script_impl] + impl_args,
-                                  env=impl_env, echo=True)
+            shell.call_without_sleeping([build_script_impl] + impl_args,
+                                        env=impl_env, echo=True)
             return
 
         # Otherwise, we compute and execute the individual actions ourselves.
@@ -918,7 +909,7 @@ class BuildScriptInvocation(object):
                 assert name is not None, "invalid action"
                 action_name = "{}-{}-{}".format(
                     host.name, product_class.product_name(), name)
-            call_without_sleeping(
+            shell.call_without_sleeping(
                 [build_script_impl] + impl_args + [
                     "--only-execute", action_name],
                 env=impl_env, echo=self.args.verbose_build)
@@ -1137,7 +1128,7 @@ def main_preset():
     if args.expand_build_script_invocation:
         return 0
 
-    call_without_sleeping(build_script_args)
+    shell.call_without_sleeping(build_script_args)
     return 0
 
 

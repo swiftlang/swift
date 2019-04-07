@@ -4,6 +4,7 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %line-directive %t/FloatingPoint.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
+// REQUIRES: rdar49026133
 
 import Swift
 import StdlibUnittest
@@ -112,14 +113,6 @@ FloatingPoint.test("BinaryFloatingPoint/genericIntegerConversion") {
   expectEqual(Float._convert(from: Int64.max).value, Float(Int64.max))
   expectEqual(Float._convert(from: Int64.min).value, Float(Int64.min))
 
-// FIXME: DoubleWidth is no longer part of the standard library
-#if false
-  expectEqual(Float._convert(from: DoubleWidth<UInt64>.max).value, .infinity)
-  expectEqual(
-    Float._convert(from: DoubleWidth<DoubleWidth<Int64>>.max).value, .infinity)
-  expectEqual(
-    Float._convert(from: DoubleWidth<DoubleWidth<Int64>>.min).value, -.infinity)
-#endif
 }
 
 FloatingPoint.test("BinaryFloatingPoint/genericFloatingPointConversion") {

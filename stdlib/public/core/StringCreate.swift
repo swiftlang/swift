@@ -144,16 +144,6 @@ extension String {
     return contents.withUnsafeBufferPointer { String._uncheckedFromUTF8($0) }
   }
 
-  internal func _withUnsafeBufferPointerToUTF8<R>(
-    _ body: (UnsafeBufferPointer<UTF8.CodeUnit>) throws -> R
-  ) rethrows -> R {
-    return try self.withUnsafeBytes { rawBufPtr in
-      return try body(UnsafeBufferPointer(
-        start: rawBufPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
-        count: rawBufPtr.count))
-    }
-  }
-
   @usableFromInline @inline(never) // slow-path
   internal static func _fromCodeUnits<
     Input: Collection,
@@ -193,11 +183,28 @@ extension String {
   internal static func _fromSubstring(
     _ substring: __shared Substring
   ) -> String {
-    if substring._offsetRange == substring._wholeString._offsetRange {
-      return substring._wholeString
+    if substring._offsetRange == substring.base._offsetRange {
+      return substring.base
     }
 
-    return substring._withUTF8 { return String._uncheckedFromUTF8($0) }
+    return String._copying(substring)
+  }
+
+  @_alwaysEmitIntoClient
+  @inline(never) // slow-path
+  internal static func _copying(_ str: String) -> String {
+    return String._copying(str[...])
+  }
+  @_alwaysEmitIntoClient
+  @inline(never) // slow-path
+  internal static func _copying(_ str: Substring) -> String {
+    if _fastPath(str._wholeGuts.isFastUTF8) {
+      return str._wholeGuts.withFastUTF8(range: str._offsetRange) {
+        String._uncheckedFromUTF8($0)
+      }
+    }
+    return Array(str.utf8).withUnsafeBufferPointer {
+      String._uncheckedFromUTF8($0)
+    }
   }
 }
-

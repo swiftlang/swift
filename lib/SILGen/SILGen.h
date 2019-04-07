@@ -166,11 +166,6 @@ public:
 
   /// True if a function has been emitted for a given SILDeclRef.
   bool hasFunction(SILDeclRef constant);
-  
-  /// Get the lowered type for a Swift type.
-  SILType getLoweredType(Type t) {
-    return Types.getTypeLowering(t).getLoweredType();
-  }
 
   /// Get or create the declaration of a reabstraction thunk with the
   /// given signature.
@@ -245,8 +240,7 @@ public:
   void emitEnumConstructor(EnumElementDecl *decl);
 
   /// Emits the default argument generator with the given expression.
-  void emitDefaultArgGenerator(SILDeclRef constant, Expr *arg,
-                               DefaultArgumentKind kind, DeclContext *DC);
+  void emitDefaultArgGenerator(SILDeclRef constant, ParamDecl *param);
 
   /// Emits the stored property initializer for the given pattern.
   void emitStoredPropertyInitialization(PatternBindingDecl *pd, unsigned i);

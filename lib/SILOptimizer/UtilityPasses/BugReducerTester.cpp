@@ -114,7 +114,6 @@ class BugReducerTester : public SILFunctionTransform {
     if (FunctionTarget.empty() || CausedError)
       return;
     assert(TargetFailureKind != FailureKind::None);
-    SILModule &M = getFunction()->getModule();
     for (auto &BB : *getFunction()) {
       for (auto II = BB.begin(), IE = BB.end(); II != IE;) {
         // Skip try_apply. We do not support them for now.
@@ -148,7 +147,7 @@ class BugReducerTester : public SILFunctionTransform {
           // the next instruction and then replace its current value
           // with undef.
           auto *Inst = cast<SingleValueInstruction>(&*II);
-          Inst->replaceAllUsesWith(SILUndef::get(Inst->getType(), M));
+          Inst->replaceAllUsesWith(SILUndef::get(Inst->getType(), *getFunction()));
           Inst->eraseFromParent();
 
           // Mark that we found the miscompile and return so we do not try to
@@ -171,7 +170,7 @@ class BugReducerTester : public SILFunctionTransform {
 
         auto *Inst = cast<SingleValueInstruction>(&*II);
         ++II;
-        Inst->replaceAllUsesWith(SILUndef::get(Inst->getType(), M));
+        Inst->replaceAllUsesWith(SILUndef::get(Inst->getType(), *getFunction()));
         Inst->eraseFromParent();
 
         CausedError = true;

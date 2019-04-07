@@ -182,12 +182,6 @@ collectExistentialConformances(ModuleDecl *M, CanType fromType, CanType toType) 
   return M->getASTContext().AllocateCopy(conformances);
 }
 
-static ArchetypeType *getOpenedArchetype(CanType openedType) {
-  while (auto metatypeTy = dyn_cast<MetatypeType>(openedType))
-    openedType = metatypeTy.getInstanceType();
-  return cast<ArchetypeType>(openedType);
-}
-
 static ManagedValue emitTransformExistential(SILGenFunction &SGF,
                                              SILLocation loc,
                                              ManagedValue input,
@@ -198,17 +192,11 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
 
   FormalEvaluationScope scope(SGF);
 
-  SILGenFunction::OpaqueValueState state;
-  ArchetypeType *openedArchetype = nullptr;
-
   if (inputType->isAnyExistentialType()) {
     CanType openedType = OpenedArchetypeType::getAny(inputType);
     SILType loweredOpenedType = SGF.getLoweredType(openedType);
 
-    // Unwrap zero or more metatype levels
-    openedArchetype = getOpenedArchetype(openedType);
-
-    state = SGF.emitOpenExistential(loc, input, openedArchetype,
+    input = SGF.emitOpenExistential(loc, input,
                                     loweredOpenedType, AccessKind::Read);
     inputType = openedType;
   }
@@ -235,16 +223,12 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
   AbstractionPattern opaque = AbstractionPattern::getOpaque();
   const TypeLowering &concreteTL = SGF.getTypeLowering(opaque, inputType);
   const TypeLowering &expectedTL = SGF.getTypeLowering(outputType);
-  input = SGF.emitExistentialErasure(
+  return SGF.emitExistentialErasure(
                    loc, inputType, concreteTL, expectedTL,
                    conformances, ctxt,
                    [&](SGFContext C) -> ManagedValue {
-                     if (openedArchetype)
-                       return SGF.manageOpaqueValue(state, loc, C);
-                     return input;
+                     return SGF.manageOpaqueValue(input, loc, C);
                    });
-  
-  return input;
 }
 
 /// Apply this transformation to an arbitrary value.
@@ -589,15 +573,12 @@ ManagedValue Transform::transform(ManagedValue v,
       CanType openedType = OpenedArchetypeType::getAny(inputSubstType);
       SILType loweredOpenedType = SGF.getLoweredType(openedType);
 
-      // Unwrap zero or more metatype levels
-      auto openedArchetype = getOpenedArchetype(openedType);
-
       FormalEvaluationScope scope(SGF);
 
-      auto state = SGF.emitOpenExistential(Loc, v, openedArchetype,
-                                           loweredOpenedType,
-                                           AccessKind::Read);
-      auto payload = SGF.manageOpaqueValue(state, Loc, SGFContext());
+      auto payload = SGF.emitOpenExistential(Loc, v,
+                                             loweredOpenedType,
+                                             AccessKind::Read);
+      payload = payload.ensurePlusOne(SGF, Loc);
       return transform(payload,
                        AbstractionPattern::getOpaque(),
                        openedType,
@@ -3078,7 +3059,7 @@ CanSILFunctionType SILGenFunction::buildThunkType(
 
   // Add the function type as the parameter.
   auto contextConvention =
-      SILType::getPrimitiveObjectType(sourceType).isTrivial(this->getModule())
+      getTypeLowering(sourceType).isTrivial()
           ? ParameterConvention::Direct_Unowned
           : ParameterConvention::Direct_Guaranteed;
   SmallVector<SILParameterInfo, 4> params;
@@ -3323,8 +3304,11 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
 
   // Create it in our current function.
   auto thunkValue = B.createFunctionRefFor(loc, thunk);
+
+  // Create a copy for the noescape value, so we can mark_dependence upon the
+  // original value.
   SILValue noEscapeValue =
-      noEscapingFunctionValue.ensurePlusOne(*this, loc).forward(*this);
+      noEscapingFunctionValue.copy(*this, loc).forward(*this);
   SingleValueInstruction *thunkedFn = B.createPartialApply(
       loc, thunkValue,
       SILType::getPrimitiveObjectType(substFnTy),
@@ -3332,8 +3316,8 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
       noEscapeValue,
       SILType::getPrimitiveObjectType(escapingFnTy));
   // We need to ensure the 'lifetime' of the trivial values context captures. As
-  // long as we rerpresent these captures by the same value the following works.
-  thunkedFn = B.createMarkDependence(loc, thunkedFn, noEscapeValue);
+  // long as we represent these captures by the same value the following works.
+  thunkedFn = B.createMarkDependence(loc, thunkedFn, noEscapingFunctionValue.getValue());
 
   return emitManagedRValueWithCleanup(thunkedFn);
 }
@@ -3738,17 +3722,11 @@ emitOpenExistentialInSelfConformance(SILGenFunction &SGF, SILLocation loc,
                                      SILDeclRef witness,
                                      SubstitutionMap subs, ManagedValue value,
                                      SILParameterInfo destParameter) {
-  auto typeAndConf = getSelfTypeAndConformanceForWitness(witness, subs);
-  auto archetype = typeAndConf.first->castTo<ArchetypeType>();
-  assert(archetype->isOpenedExistential());
-
   auto openedTy = destParameter.getSILStorageType();
-  auto state = SGF.emitOpenExistential(loc, value, archetype, openedTy,
-                                       destParameter.isIndirectMutating()
-                                         ? AccessKind::ReadWrite
-                                         : AccessKind::Read);
-
-  return state.Value;
+  return SGF.emitOpenExistential(loc, value, openedTy,
+                                 destParameter.isIndirectMutating()
+                                   ? AccessKind::ReadWrite
+                                   : AccessKind::Read);
 }
 
 void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,

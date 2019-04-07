@@ -112,8 +112,11 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
     auto funcTy = SGM.Types.getConstantFunctionType(c);
     SILFunctionConventions fnConv(funcTy, SGM.M);
 
+    auto toSILType = [&SGM](Type ty) {
+      return SGM.Types.getLoweredType(ty, ResilienceExpansion::Minimal);
+    };
+
     if (inputTypes) {
-      auto toSILType = [&SGM](Type ty) { return SGM.getLoweredType(ty); };
       if (fnConv.hasIndirectSILResults()
           || funcTy->getNumParameters() != inputTypes->size()
           || !std::equal(
@@ -127,7 +130,7 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
     }
 
     if (outputType
-        && fnConv.getSingleSILResultType() != SGM.getLoweredType(*outputType)) {
+        && fnConv.getSingleSILResultType() != toSILType(*outputType)) {
       SGM.diagnose(fd->getLoc(), diag::bridging_function_not_correct_type,
                    moduleName.str(), functionName);
       llvm::report_fatal_error("unable to set up the ObjC bridge!");
@@ -953,7 +956,8 @@ bool SILGenModule::hasNonTrivialIVars(ClassDecl *cd) {
     auto *vd = dyn_cast<VarDecl>(member);
     if (!vd || !vd->hasStorage()) continue;
 
-    const TypeLowering &ti = Types.getTypeLowering(vd->getType());
+    auto &ti = Types.getTypeLowering(vd->getType(),
+                                     ResilienceExpansion::Maximal);
     if (!ti.isTrivial())
       return true;
   }
@@ -1056,19 +1060,41 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   }
 }
 
-void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg,
-                                           DefaultArgumentKind kind,
-                                           DeclContext *initDC) {
-  switch (kind) {
+void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
+                                           ParamDecl *param) {
+  auto initDC = param->getDefaultArgumentInitContext();
+
+  switch (param->getDefaultArgumentKind()) {
   case DefaultArgumentKind::None:
     llvm_unreachable("No default argument here?");
 
-  case DefaultArgumentKind::Normal:
-    break;
+  case DefaultArgumentKind::Normal: {
+    auto arg = param->getDefaultValue();
+    emitOrDelayFunction(*this, constant,
+        [this,constant,arg,initDC](SILFunction *f) {
+      preEmitFunction(constant, arg, f, arg);
+      PrettyStackTraceSILFunction X("silgen emitDefaultArgGenerator ", f);
+      SILGenFunction SGF(*this, *f, initDC);
+      SGF.emitGeneratorFunction(constant, arg);
+      postEmitFunction(constant, f);
+    });
+    return;
+  }
+
+  case DefaultArgumentKind::StoredProperty: {
+    auto arg = param->getStoredProperty();
+    emitOrDelayFunction(*this, constant,
+        [this,constant,arg,initDC](SILFunction *f) {
+      preEmitFunction(constant, arg, f, arg);
+      PrettyStackTraceSILFunction X("silgen emitDefaultArgGenerator ", f);
+      SILGenFunction SGF(*this, *f, initDC);
+      SGF.emitGeneratorFunction(constant, arg);
+      postEmitFunction(constant, f);
+    });
+    return;
+  }
 
   case DefaultArgumentKind::Inherited:
-    return;
-
   case DefaultArgumentKind::Column:
   case DefaultArgumentKind::File:
   case DefaultArgumentKind::Line:
@@ -1079,15 +1105,6 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg,
   case DefaultArgumentKind::EmptyDictionary:
     return;
   }
-
-  emitOrDelayFunction(*this, constant,
-      [this,constant,arg,initDC](SILFunction *f) {
-    preEmitFunction(constant, arg, f, arg);
-    PrettyStackTraceSILFunction X("silgen emitDefaultArgGenerator ", f);
-    SILGenFunction SGF(*this, *f, initDC);
-    SGF.emitGeneratorFunction(constant, arg);
-    postEmitFunction(constant, f);
-  });
 }
 
 void SILGenModule::
@@ -1123,7 +1140,8 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto *type = blockParam->getType()->castTo<FunctionType>();
   Type initType = FunctionType::get({}, TupleType::getEmpty(C),
                                     type->getExtInfo());
-  auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
+  auto initSILType = cast<SILFunctionType>(
+      Types.getLoweredRValueType(initType));
 
   SILGenFunctionBuilder builder(*this);
   auto *f = builder.createFunction(
@@ -1155,10 +1173,9 @@ void SILGenModule::emitDefaultArgGenerators(SILDeclRef::Loc decl,
                                             ParameterList *paramList) {
   unsigned index = 0;
   for (auto param : *paramList) {
-    if (auto defaultArg = param->getDefaultValue())
+    if (param->isDefaultArgument())
       emitDefaultArgGenerator(SILDeclRef::getDefaultArgGenerator(decl, index),
-                              defaultArg, param->getDefaultArgumentKind(),
-                              param->getDefaultArgumentInitContext());
+                              param);
     ++index;
   }
 }
@@ -1286,7 +1303,9 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
       auto impl = vd->getImplInfo();
       switch (kind) {
       case AccessorKind::Get:
-        return impl.getReadImpl() != ReadImplKind::Get;
+        return impl.getReadImpl() != ReadImplKind::Get &&
+               !(impl.getReadImpl() == ReadImplKind::Stored &&
+                 impl.getWriteImpl() == WriteImplKind::StoredWithObservers);
       case AccessorKind::Read:
         return impl.getReadImpl() != ReadImplKind::Read;
       case AccessorKind::Set:
@@ -1337,9 +1356,10 @@ SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
       componentObjTy = genericEnv->mapTypeIntoContext(componentObjTy);
     auto storageTy = M.Types.getSubstitutedStorageType(decl, componentObjTy);
     auto opaqueTy =
-      M.Types.getLoweredType(AbstractionPattern::getOpaque(), componentObjTy);
+      M.Types.getLoweredRValueType(AbstractionPattern::getOpaque(),
+                                   componentObjTy);
     
-    return storageTy.getAddressType() == opaqueTy.getAddressType();
+    return storageTy.getASTType() == opaqueTy;
   }
   case AccessStrategy::DirectToAccessor:
   case AccessStrategy::DispatchToAccessor:
@@ -1359,8 +1379,7 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
   // stored) and doesn't have a setter with less-than-public visibility.
   auto expansion = ResilienceExpansion::Maximal;
 
-  switch (SGM.M.getSwiftModule()->getResilienceStrategy()) {
-  case ResilienceStrategy::Default: {
+  if (!SGM.M.getSwiftModule()->isResilient()) {
     if (SGM.canStorageUseStoredKeyPathComponent(decl, expansion)) {
       // External modules can't directly access storage, unless this is a
       // property in a fixed-layout type.
@@ -1372,28 +1391,21 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
     auto setter = decl->getSetter();
     if (setter == nullptr)
       return true;
-    
-    auto setterLinkage = SILDeclRef(setter, SILDeclRef::Kind::Func)
-      .getLinkage(NotForDefinition);
-    
-    if (setterLinkage == SILLinkage::PublicExternal
-        || setterLinkage == SILLinkage::Public)
+
+    if (setter->getFormalAccessScope(nullptr, true).isPublic())
       return true;
-    
+
     return false;
   }
-  case ResilienceStrategy::Resilient: {
-    // A resilient module needs to handle binaries compiled against its older
-    // versions. This means we have to be a bit more conservative, since in
-    // earlier versions, a settable property may have withheld the setter,
-    // or a fixed-layout type may not have been.
-    // Without availability information, only get-only computed properties
-    // can resiliently use trivial descriptors.
-    return !SGM.canStorageUseStoredKeyPathComponent(decl, expansion)
-      && decl->getSetter() == nullptr;
-  }
-  }
-  llvm_unreachable("unhandled strategy");
+
+  // A resilient module needs to handle binaries compiled against its older
+  // versions. This means we have to be a bit more conservative, since in
+  // earlier versions, a settable property may have withheld the setter,
+  // or a fixed-layout type may not have been.
+  // Without availability information, only get-only computed properties
+  // can resiliently use trivial descriptors.
+  return !SGM.canStorageUseStoredKeyPathComponent(decl, expansion)
+    && decl->getSetter() == nullptr;
 }
 
 void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {

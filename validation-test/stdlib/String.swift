@@ -59,7 +59,7 @@ extension String {
 
 extension Substring {
   var bufferID: ObjectIdentifier? {
-    return _wholeString.bufferID
+    return base.bufferID
   }
 }
 

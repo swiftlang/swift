@@ -280,6 +280,14 @@ void ExistentialSpecializer::specializeExistentialArgsInAppliesWithinFunction(
 
       auto *Callee = Apply.getReferencedFunction();
 
+      /// Handle recursion! Do not modify F right now.
+      if (Callee == &F) {
+        LLVM_DEBUG(llvm::dbgs() << "ExistentialSpecializer Pass: Bail! Due to "
+                                   "recursion.\n";
+                  I->dump(););
+        continue;
+      }
+
       /// Determine the arguments that can be specialized.
       llvm::SmallDenseMap<int, ExistentialTransformArgumentDescriptor>
           ExistentialArgDescriptor;

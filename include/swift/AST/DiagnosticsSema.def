@@ -39,12 +39,8 @@
 
 NOTE(kind_declname_declared_here,none,
      "%0 %1 declared here", (DescriptiveDeclKind, DeclName))
-NOTE(kind_identifier_declared_here,none,
-     "%0 %1 declared here", (DescriptiveDeclKind, Identifier))
 NOTE(decl_declared_here,none,
      "%0 declared here", (DeclName))
-NOTE(identifier_declared_here,none,
-     "%0 declared here", (Identifier))
 NOTE(kind_declared_here,none,
      "%0 declared here", (DescriptiveDeclKind))
 NOTE(implicit_member_declared_here,none,
@@ -213,7 +209,7 @@ ERROR(cannot_apply_lvalue_binop_to_rvalue,none,
       "left side of mutating operator has immutable type %0", (Type))
 
 ERROR(cannot_subscript_with_index,none,
-      "cannot subscript a value of type %0 with an index of type %1",
+      "cannot subscript a value of type %0 with an argument of type %1",
       (Type, Type))
 
 ERROR(cannot_subscript_base,none,
@@ -238,6 +234,8 @@ NOTE(inout_change_var_type_if_possible,none,
 ERROR(cannot_pass_rvalue_inout,none,
       "cannot pass immutable value of type %0 as inout argument",
       (Type))
+ERROR(cannot_provide_default_value_inout,none,
+      "cannot provide default value to inout parameter %0", (Identifier))
 
 ERROR(cannot_assign_to_literal,none,
       "cannot assign to a literal value", ())
@@ -586,8 +584,8 @@ ERROR(cannot_return_value_from_void_func,none,
 
 ERROR(sema_no_import,Fatal,
       "no such module '%0'", (StringRef))
-ERROR(sema_no_import_arch,Fatal,
-      "could not find module '%0' for architecture '%1'; "
+ERROR(sema_no_import_target,Fatal,
+      "could not find module '%0' for target '%1'; "
       "found: %2", (StringRef, StringRef, StringRef))
 ERROR(sema_no_import_repl,none,
       "no such module '%0'", (StringRef))
@@ -763,6 +761,9 @@ ERROR(module_not_testable,Fatal,
 ERROR(module_not_compiled_for_private_import,none,
       "module %0 was not compiled for private import", (Identifier))
 
+ERROR(import_implementation_cannot_be_exported,none,
+      "module %0 cannot be both exported and implementation-only", (Identifier))
+
 
 // Operator decls
 ERROR(ambiguous_operator_decls,none,
@@ -812,13 +813,6 @@ ERROR(precedence_group_redeclared,none,
       "precedence group redeclared", ())
 NOTE(previous_precedence_group_decl,none,
      "previous precedence group declaration here", ())
-
-//------------------------------------------------------------------------------
-// MARK: Type Check Coercions
-//------------------------------------------------------------------------------
-
-ERROR(tuple_conversion_not_expressible,none,
-      "cannot express tuple conversion %0 to %1", (Type, Type))
 
 //------------------------------------------------------------------------------
 // MARK: Expression Type Checking Errors
@@ -901,6 +895,8 @@ WARNING(is_expr_same_type,none,
         "'!= nil'?", (Type, Type))
 WARNING(downcast_to_unrelated,none,
         "cast from %0 to unrelated type %1 always fails", (Type, Type))
+NOTE(downcast_to_unrelated_fixit,none,
+     "did you mean to call %0 with '()'?", (Identifier))
 ERROR(downcast_to_more_optional,none,
       "cannot downcast from %0 to a more optional type %1",
       (Type, Type))
@@ -1057,8 +1053,8 @@ ERROR(missing_dynamic_callable_kwargs_method,none,
 
 ERROR(invalid_dynamic_member_lookup_type,none,
       "@dynamicMemberLookup attribute requires %0 to have a "
-      "'subscript(dynamicMember:)' method with an "
-      "'ExpressibleByStringLiteral' parameter", (Type))
+      "'subscript(dynamicMember:)' method that accepts either "
+      "'ExpressibleByStringLiteral' or a keypath", (Type))
 
 ERROR(string_index_not_integer,none,
       "String must not be indexed with %0, it has variable size elements",
@@ -1104,24 +1100,23 @@ ERROR(attribute_requires_operator_identifier,none,
 ERROR(attribute_requires_single_argument,none,
       "'%0' requires a function with one argument", (StringRef))
 
-ERROR(mutating_invalid_global_scope,none,
-      "'%select{nonmutating|mutating|__consuming}0' is only valid on methods",
-      (unsigned))
-ERROR(mutating_invalid_classes,none,
-      "'%select{nonmutating|mutating|__consuming}0' isn't valid on methods in "
-      "classes or class-bound protocols", (bool))
+ERROR(nominal_type_not_attribute,none,
+      "%0 %1 cannot be used as an attribute", (DescriptiveDeclKind, DeclName))
+
+ERROR(mutating_invalid_global_scope,none, "%0 is only valid on methods",
+      (SelfAccessKind))
+ERROR(mutating_invalid_classes,none, "%0 isn't valid on methods in "
+      "classes or class-bound protocols", (SelfAccessKind))
 
 ERROR(functions_mutating_and_not,none,
-      "method must not be declared both "
-      "%select{nonmutating|mutating|__consuming}0 and "
-      "%select{nonmutating|mutating|__consuming}1",
-      (unsigned, unsigned))
+      "method must not be declared both %0 and %1",
+      (SelfAccessKind, SelfAccessKind))
 ERROR(static_functions_not_mutating,none,
       "static functions must not be declared mutating", ())
 
 ERROR(modify_mutatingness_differs_from_setter,none,
-      "'modify' accessor cannot be %select{nonmutating|mutating}0 "
-      "when the setter is %select{mutating|nonmutating}0", (bool))
+      "'modify' accessor cannot be %0 when the setter is %1",
+      (SelfAccessKind, SelfAccessKind))
 
 ERROR(transparent_in_protocols_not_supported,none,
       "'@_transparent' attribute is not supported on declarations within protocols", ())
@@ -1301,7 +1296,7 @@ ERROR(indirect_case_without_payload,none,
 ERROR(indirect_case_in_indirect_enum,none,
       "enum case in 'indirect' enum cannot also be 'indirect'", ())
 WARNING(enum_frozen_nonresilient,none,
-        "%0 has no effect without -enable-resilience", (DeclAttribute))
+        "%0 has no effect without -enable-library-evolution", (DeclAttribute))
 WARNING(enum_frozen_nonpublic,none,
         "%0 has no effect on non-public enums", (DeclAttribute))
 
@@ -1518,6 +1513,8 @@ ERROR(extension_specialization,none,
       "type %0 with constraints specified by a 'where' clause", (Identifier))
 ERROR(extension_stored_property,none,
       "extensions must not contain stored properties", ())
+NOTE(extension_stored_property_fixit,none,
+     "Remove '=' to make %0 a computed property", (Identifier))
 ERROR(extension_nongeneric_trailing_where,none,
       "trailing 'where' clause for extension of non-generic type %0",
       (DeclName))
@@ -1867,8 +1864,8 @@ NOTE(protocol_witness_prefix_postfix_conflict,none,
      "candidate is %select{|prefix, |postfix, }1not "
      "%select{prefix|postfix}0 as required", (bool, unsigned))
 NOTE(protocol_witness_mutation_modifier_conflict,none,
-     "candidate is marked '%select{nonmutating|mutating|__consuming}0' but "
-     "protocol does not allow it", (unsigned))
+     "candidate is marked %0 but protocol does not allow it",
+     (SelfAccessKind))
 NOTE(protocol_witness_settable_conflict,none,
      "candidate is not settable, but protocol requires it", ())
 NOTE(protocol_witness_rethrows_conflict,none,
@@ -2273,14 +2270,10 @@ ERROR(duplicate_inheritance,none,
   "duplicate inheritance from %0", (Type))
 WARNING(duplicate_anyobject_class_inheritance,none,
   "redundant inheritance from 'AnyObject' and Swift 3 'class' keyword", ())
-ERROR(objc_protocol_with_superclass,none,
-  "protocol %0 is '@objc' and cannot have a superclass constraint", (Identifier))
+ERROR(inheritance_from_protocol_with_superclass,none,
+  "inheritance from class-constrained protocol composition type %0", (Type))
 ERROR(multiple_inheritance,none,
   "multiple inheritance from classes %0 and %1", (Type, Type))
-ERROR(non_class_inheritance,none,
-  "non-class type %0 cannot inherit from class %1", (Type, Type))
-ERROR(extension_class_inheritance,none,
-  "extension of type %0 cannot inherit from class %1", (Type, Type))
 ERROR(inheritance_from_non_protocol_or_class,none,
   "inheritance from non-protocol, non-class type %0", (Type))
 ERROR(inheritance_from_non_protocol,none,
@@ -3592,9 +3585,11 @@ ERROR(invalid_nonobjc_extension,none,
 ERROR(objc_in_extension_context,none,
       "members of constrained extensions cannot be declared @objc", ())
 ERROR(objc_in_generic_extension,none,
-      "members of extensions of "
-      "%select{classes from generic context|generic classes}0 "
-      "cannot be declared @objc", (bool))
+      "extensions of %select{classes from generic context|generic classes}0 "
+      "cannot contain '@objc' members", (bool))
+ERROR(objc_in_resilient_extension,none,
+      "extensions of classes built with library evolution support "
+      "cannot contain '@objc' members", ())
 ERROR(objc_operator, none,
       "operator methods cannot be declared @objc", ())
 ERROR(objc_operator_proto, none,
@@ -3615,6 +3610,10 @@ NOTE(objc_inference_swift3_addnonobjc,none,
 ERROR(objc_for_generic_class,none,
       "generic subclasses of '@objc' classes cannot have an explicit '@objc' "
       "because they are not directly visible from Objective-C", ())
+ERROR(objc_for_resilient_class,none,
+      "classes built with library evolution support cannot have explicit "
+      "'@objc' subclasses because they are not directly "
+      "visible from Objective-C", ())
 ERROR(objc_getter_for_nonobjc_property,none,
       "'@objc' getter for non-'@objc' property", ())
 ERROR(objc_getter_for_nonobjc_subscript,none,
@@ -3877,9 +3876,6 @@ ERROR(borrowed_on_objc_protocol_requirement,none,
 
 ERROR(dynamic_not_in_class,none,
       "only members of classes may be dynamic", ())
-ERROR(dynamic_with_final,none,
-      "a declaration cannot be both 'final' and 'dynamic'",
-      ())
 ERROR(dynamic_with_nonobjc,none,
       "a declaration cannot be both '@nonobjc' and 'dynamic'",
       ())
@@ -4104,6 +4100,11 @@ WARNING(resilience_decl_unavailable_warn,
         none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|%error|%error}2 and "
         "should not be referenced from " FRAGILE_FUNC_KIND "3",
         (DescriptiveDeclKind, DeclName, AccessLevel, unsigned, bool))
+
+ERROR(inlinable_decl_ref_implementation_only,
+      none, "%0 %1 cannot be used in an inlinable "
+      "function because its module was imported implementation-only",
+      (DescriptiveDeclKind, DeclName))
 
 #undef FRAGILE_FUNC_KIND
 

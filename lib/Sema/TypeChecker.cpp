@@ -460,6 +460,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     return;
 
   auto &Ctx = SF.getASTContext();
+  BufferIndirectlyCausingDiagnosticRAII cpr(SF);
 
   // Make sure we have a type checker.
   TypeChecker &TC = createTypeChecker(Ctx);
@@ -643,6 +644,17 @@ void swift::typeCheckCompletionDecl(Decl *D) {
     TC.validateExtension(ext);
   else
     TC.validateDecl(cast<ValueDecl>(D));
+}
+
+void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
+                                    unsigned bindingIndex) {
+  assert(!PBD->isInitializerChecked(bindingIndex) &&
+         PBD->getInit(bindingIndex));
+
+  auto &Ctx = PBD->getASTContext();
+  DiagnosticSuppression suppression(Ctx.Diags);
+  TypeChecker &TC = createTypeChecker(Ctx);
+  TC.typeCheckPatternBinding(PBD, bindingIndex);
 }
 
 static Optional<Type> getTypeOfCompletionContextExpr(

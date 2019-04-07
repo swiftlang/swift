@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -enable-sil-ownership -semantic-arc-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -semantic-arc-opts %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -14,6 +14,28 @@ sil @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
 struct NativeObjectPair {
   var obj1 : Builtin.NativeObject
   var obj2 : Builtin.NativeObject
+}
+
+class Klass {}
+
+struct MyInt {
+  var value: Builtin.Int32
+}
+
+struct AnotherStruct {
+  var i : Builtin.Int32
+  var c : Klass
+}
+
+struct StructMemberTest {
+  var c : Klass
+  var s : AnotherStruct
+  var t : (Builtin.Int32, AnotherStruct)
+}
+
+enum FakeOptional<T> {
+case none
+case some(T)
 }
 
 ///////////
@@ -142,12 +164,10 @@ bb0(%0 : @guaranteed $NativeObjectPair):
   return %9999 : $()
 }
 
-// For now we do not support recreating forwarding instructions since we do not
-// dynamically recompute ownership.
-// CHECK-LABEL: sil [ossa] @do_not_process_forwarding_uses : $@convention(thin) (@guaranteed NativeObjectPair) -> () {
-// CHECK: copy_value
-// CHECK: } // end sil function 'do_not_process_forwarding_uses'
-sil [ossa] @do_not_process_forwarding_uses : $@convention(thin) (@guaranteed NativeObjectPair) -> () {
+// CHECK-LABEL: sil [ossa] @process_forwarding_uses : $@convention(thin) (@guaranteed NativeObjectPair) -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'process_forwarding_uses'
+sil [ossa] @process_forwarding_uses : $@convention(thin) (@guaranteed NativeObjectPair) -> () {
 bb0(%0 : @guaranteed $NativeObjectPair):
   %1 = copy_value %0 : $NativeObjectPair
   (%2, %3) = destructure_struct %1 : $NativeObjectPair
@@ -160,10 +180,10 @@ bb0(%0 : @guaranteed $NativeObjectPair):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @do_not_process_forwarding_uses_2 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
-// CHECK: copy_value
-// CHECK: } // end sil function 'do_not_process_forwarding_uses_2'
-sil [ossa] @do_not_process_forwarding_uses_2 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil [ossa] @process_forwarding_uses_2 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'process_forwarding_uses_2'
+sil [ossa] @process_forwarding_uses_2 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   %1 = copy_value %0 : $Builtin.NativeObject
   %2 = unchecked_ref_cast %1 : $Builtin.NativeObject to $Builtin.NativeObject
@@ -275,4 +295,103 @@ bb3:
   apply %4(%3) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
   %9999 = tuple()
   return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @destructure_test : $@convention(thin) (@guaranteed StructMemberTest) -> Builtin.Int32 {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $StructMemberTest):
+// CHECK:   [[EXT:%.*]] = struct_extract [[ARG]]
+// CHECK:   ([[DEST_1:%.*]], [[DEST_2:%.*]]) = destructure_tuple [[EXT]]
+// CHECK:   [[RESULT:%.*]] = struct_extract [[DEST_2]]
+// CHECK:   return [[RESULT]]
+// CHECK: } // end sil function 'destructure_test'
+sil [ossa] @destructure_test : $@convention(thin) (@guaranteed StructMemberTest) -> Builtin.Int32 {
+bb0(%0 : @guaranteed $StructMemberTest):
+  %2 = struct_extract %0 : $StructMemberTest, #StructMemberTest.t
+  %3 = copy_value %2 : $(Builtin.Int32, AnotherStruct)
+  (%4, %5) = destructure_tuple %3 : $(Builtin.Int32, AnotherStruct)
+  %6 = begin_borrow %5 : $AnotherStruct
+  %7 = struct_extract %6 : $AnotherStruct, #AnotherStruct.i
+  end_borrow %6 : $AnotherStruct
+  destroy_value %5 : $AnotherStruct
+  return %7 : $Builtin.Int32
+}
+
+// Make sure that in a case where we have multiple non-trivial values passed to
+// a forwarding instruction we do not optimize... but if we only have one (and
+// multiple trivial arguments), we can.
+//
+// CHECK-LABEL: sil [ossa] @multiple_arg_forwarding_inst_test : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject, Builtin.Int32) -> () {
+// CHECK: copy_value
+// CHECK: copy_value
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'multiple_arg_forwarding_inst_test'
+sil [ossa] @multiple_arg_forwarding_inst_test : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject, Builtin.Int32) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject, %1 : @guaranteed $Builtin.NativeObject, %1a : $Builtin.Int32):
+  %2 = copy_value %0 : $Builtin.NativeObject
+  %3 = copy_value %1 : $Builtin.NativeObject
+  %4 = tuple(%2 : $Builtin.NativeObject, %3 : $Builtin.NativeObject)
+  destroy_value %4 : $(Builtin.NativeObject, Builtin.NativeObject)
+
+  %5 = copy_value %0 : $Builtin.NativeObject
+  %6 = tuple(%5 : $Builtin.NativeObject, %1a : $Builtin.Int32)
+  destroy_value %6 : $(Builtin.NativeObject, Builtin.Int32)
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// TODO: We should be able to optimize these switch_enum. Make sure that today
+// we do not do so though.
+// CHECK-LABEL: sil [ossa] @switch_enum_test_no_default : $@convention(thin) (@guaranteed FakeOptional<Builtin.NativeObject>) -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'switch_enum_test_no_default'
+sil [ossa] @switch_enum_test_no_default : $@convention(thin) (@guaranteed FakeOptional<Builtin.NativeObject>) -> () {
+bb0(%0 : @guaranteed $FakeOptional<Builtin.NativeObject>):
+  %1 = copy_value %0 : $FakeOptional<Builtin.NativeObject>
+  switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%2 : @owned $Builtin.NativeObject):
+  destroy_value %2 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @switch_enum_test_with_default : $@convention(thin) (@guaranteed FakeOptional<Builtin.NativeObject>) -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'switch_enum_test_with_default'
+sil [ossa] @switch_enum_test_with_default : $@convention(thin) (@guaranteed FakeOptional<Builtin.NativeObject>) -> () {
+bb0(%0 : @guaranteed $FakeOptional<Builtin.NativeObject>):
+  %1 = copy_value %0 : $FakeOptional<Builtin.NativeObject>
+  switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt.1: bb1, default bb2
+
+bb1(%2 : @owned $Builtin.NativeObject):
+  destroy_value %2 : $Builtin.NativeObject
+  br bb3
+
+bb2(%3 : @owned $FakeOptional<Builtin.NativeObject>):
+  destroy_value %3 : $FakeOptional<Builtin.NativeObject>
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @do_not_add_trivial_users_of_owned_values_to_isconsumed_worklist : $@convention(thin) (@guaranteed (Klass, MyInt)) -> Builtin.Int32 {
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
+// CHECK: } // end sil function 'do_not_add_trivial_users_of_owned_values_to_isconsumed_worklist'
+sil [ossa] @do_not_add_trivial_users_of_owned_values_to_isconsumed_worklist : $@convention(thin) (@guaranteed (Klass, MyInt)) -> Builtin.Int32 {
+bb0(%0 : @guaranteed $(Klass, MyInt)):
+  %1 = copy_value %0 : $(Klass, MyInt)
+  (%2, %3) = destructure_tuple %1 : $(Klass, MyInt)
+  %4 = struct_extract %3 : $MyInt, #MyInt.value
+  destroy_value %2 : $Klass
+  return %4 : $Builtin.Int32
 }

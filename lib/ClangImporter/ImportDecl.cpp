@@ -1565,7 +1565,7 @@ buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
                      AccessorKind::Get,
                      subscript,
                      /*StaticLoc=*/SourceLoc(),
-                     StaticSpellingKind::None,
+                     subscript->getStaticSpelling(),
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr,
@@ -1621,7 +1621,7 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
                      AccessorKind::Set,
                      subscript,
                      /*StaticLoc=*/SourceLoc(),
-                     StaticSpellingKind::None,
+                     subscript->getStaticSpelling(),
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr,
@@ -5913,10 +5913,10 @@ SwiftDeclConverter::findLatestIntroduction(const clang::Decl *D) {
 
     // Does this availability attribute map to the platform we are
     // currently targeting?
-    if (!Impl.platformAvailability.filter ||
-        !Impl.platformAvailability.filter(attr->getPlatform()->getName()))
+    if (!Impl.platformAvailability.isPlatformRelevant(
+            attr->getPlatform()->getName())) {
       continue;
-
+    }
     // Take advantage of the empty version being 0.0.0.0.
     result = std::max(result, attr->getIntroduced());
   }
@@ -6570,6 +6570,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   DeclName name(C, DeclBaseName::createSubscript(), {Identifier()});
   auto subscript = Impl.createDeclWithClangNode<SubscriptDecl>(
       getter->getClangNode(), getOverridableAccessLevel(dc), name,
+      /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       decl->getLoc(), bodyParams, decl->getLoc(),
       TypeLoc::withoutLoc(elementTy), dc,
       /*GenericParams=*/nullptr);
@@ -7321,8 +7322,7 @@ void ClangImporter::Implementation::importAttributes(
 
       // Does this availability attribute map to the platform we are
       // currently targeting?
-      if (!platformAvailability.filter ||
-          !platformAvailability.filter(Platform))
+      if (!platformAvailability.isPlatformRelevant(Platform))
         continue;
 
       auto platformK =
@@ -7354,9 +7354,8 @@ void ClangImporter::Implementation::importAttributes(
       llvm::VersionTuple deprecated = avail->getDeprecated();
 
       if (!deprecated.empty()) {
-        if (platformAvailability.deprecatedAsUnavailableFilter &&
-            platformAvailability.deprecatedAsUnavailableFilter(
-                deprecated.getMajor(), deprecated.getMinor())) {
+        if (platformAvailability.treatDeprecatedAsUnavailable(ClangDecl,
+                                                              deprecated)) {
           AnyUnavailable = true;
           PlatformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
           if (message.empty())

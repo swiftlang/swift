@@ -305,6 +305,7 @@ static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
     case DefaultArgumentKind::EmptyArray: return "[]";
     case DefaultArgumentKind::EmptyDictionary: return "[:]";
     case DefaultArgumentKind::Normal: return "normal";
+    case DefaultArgumentKind::StoredProperty: return "stored property";
   }
 
   llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
@@ -796,8 +797,6 @@ namespace {
 
     void visitVarDecl(VarDecl *VD) {
       printCommon(VD, "var_decl");
-      if (VD->isStatic())
-        PrintWithColorRAII(OS, DeclModifierColor) << " type";
       if (VD->isLet())
         PrintWithColorRAII(OS, DeclModifierColor) << " let";
       if (VD->hasNonPatternBindingInit())
@@ -810,6 +809,9 @@ namespace {
     }
 
     void printStorageImpl(AbstractStorageDecl *D) {
+      if (D->isStatic())
+        PrintWithColorRAII(OS, DeclModifierColor) << " type";
+
       auto impl = D->getImplInfo();
       PrintWithColorRAII(OS, DeclModifierColor)
         << " readImpl="
@@ -1619,6 +1621,24 @@ public:
     printCommon(S, "case_stmt");
     if (S->hasUnknownAttr())
       OS << " @unknown";
+
+    if (S->hasCaseBodyVariables()) {
+      OS << '\n';
+      OS.indent(Indent + 2);
+      PrintWithColorRAII(OS, ParenthesisColor) << '(';
+      PrintWithColorRAII(OS, StmtColor) << "case_body_variables";
+      OS << '\n';
+      for (auto *vd : S->getCaseBodyVariables()) {
+        OS.indent(2);
+        // TODO: Printing a var decl does an Indent ... dump(vd) ... '\n'. We
+        // should see if we can factor this dumping so that the caller of
+        // printRec(VarDecl) has more control over the printing.
+        printRec(vd);
+      }
+      OS.indent(Indent + 2);
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
     for (const auto &LabelItem : S->getCaseLabelItems()) {
       OS << '\n';
       OS.indent(Indent + 2);
@@ -1829,8 +1849,20 @@ public:
   }
   void visitFloatLiteralExpr(FloatLiteralExpr *E) {
     printCommon(E, "float_literal_expr");
+    if (E->isNegative())
+      PrintWithColorRAII(OS, LiteralValueColor) << " negative";
     PrintWithColorRAII(OS, LiteralValueColor)
       << " value=" << E->getDigitsText();
+    PrintWithColorRAII(OS, LiteralValueColor) << " builtin_initializer=";
+    E->getBuiltinInitializer().dump(
+        PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
+    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    if (!E->getBuiltinType().isNull()) {
+      PrintWithColorRAII(OS, TypeColor) << " builtin_type='";
+      E->getBuiltinType().print(PrintWithColorRAII(OS, TypeColor).getOS());
+      PrintWithColorRAII(OS, TypeColor) << "'";
+    }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
@@ -2037,6 +2069,8 @@ public:
   }
   void visitArrayExpr(ArrayExpr *E) {
     printCommon(E, "array_expr");
+    PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
+    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
     for (auto elt : E->getElements()) {
       OS << '\n';
       printRec(elt);
@@ -2107,40 +2141,20 @@ public:
     printRec(E->getBase());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-  void visitTupleShuffleExpr(TupleShuffleExpr *E) {
-    printCommon(E, "tuple_shuffle_expr");
-    switch (E->getTypeImpact()) {
-    case TupleShuffleExpr::ScalarToTuple:
-      OS << " scalar_to_tuple";
-      break;
-    case TupleShuffleExpr::TupleToTuple:
-      OS << " tuple_to_tuple";
-      break;
-    case TupleShuffleExpr::TupleToScalar:
-      OS << " tuple_to_scalar";
-      break;
+  void visitDestructureTupleExpr(DestructureTupleExpr *E) {
+    printCommon(E, "destructure_tuple_expr");
+    OS << " destructured=";
+    PrintWithColorRAII(OS, ParenthesisColor) << '(';
+    Indent += 2;
+    for (auto *elt : E->getDestructuredElements()) {
+      OS << "\n";
+      printRec(elt);
     }
-    OS << " elements=[";
-    for (unsigned i = 0, e = E->getElementMapping().size(); i != e; ++i) {
-      if (i) OS << ", ";
-      OS << E->getElementMapping()[i];
-    }
-    OS << "]";
-    OS << " variadic_sources=[";
-    interleave(E->getVariadicArgs(),
-               [&](unsigned source) {
-                 OS << source;
-               },
-               [&] { OS << ", "; });
-    OS << "]";
-
-    if (auto defaultArgsOwner = E->getDefaultArgsOwner()) {
-      OS << " default_args_owner=";
-      defaultArgsOwner.dump(OS);
-    }
-
-    OS << "\n";
+    Indent -= 2;
+    PrintWithColorRAII(OS, ParenthesisColor) << ")\n";
     printRec(E->getSubExpr());
+    OS << "\n";
+    printRec(E->getResultExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitUnresolvedTypeConversionExpr(UnresolvedTypeConversionExpr *E) {
@@ -2402,6 +2416,20 @@ public:
 
   void visitOpaqueValueExpr(OpaqueValueExpr *E) {
     printCommon(E, "opaque_value_expr") << " @ " << (void*)E;
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitDefaultArgumentExpr(DefaultArgumentExpr *E) {
+    printCommon(E, "default_argument_expr");
+    OS << " default_args_owner=";
+    E->getDefaultArgsOwner().dump(OS);
+    OS << " param=" << E->getParamIndex();
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitCallerDefaultArgumentExpr(CallerDefaultArgumentExpr *E) {
+    printCommon(E, "caller_default_argument_expr");
+    printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 

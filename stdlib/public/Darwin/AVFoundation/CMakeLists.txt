@@ -8,7 +8,11 @@ add_swift_target_library(swiftAVFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYP
   AVCaptureVideoDataOutput.swift
   AVError.swift
   AVMetadataObject.swift
-  NSValue.swift.gyb
+
+  "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
+
+  GYB_SOURCES
+    NSValue.swift.gyb
 
   TARGET_SDKS OSX IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR
   SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"

@@ -25,7 +25,6 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangImporter.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Serialization/BCReadingExtras.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/ADT/StringExtras.h"
@@ -252,10 +251,21 @@ static bool validateInputBlock(
     StringRef blobData;
     unsigned kind = cursor.readRecord(entry.ID, scratch, &blobData);
     switch (kind) {
-    case input_block::FILE_DEPENDENCY:
-      dependencies.push_back(SerializationOptions::FileDependency{
-          scratch[0], scratch[1], blobData});
+    case input_block::FILE_DEPENDENCY: {
+      bool isHashBased = scratch[2] != 0;
+      bool isSDKRelative = scratch[3] != 0;
+
+      if (isHashBased) {
+        dependencies.push_back(
+          SerializationOptions::FileDependency::hashBased(
+            blobData, isSDKRelative, scratch[0], scratch[1]));
+      } else {
+        dependencies.push_back(
+          SerializationOptions::FileDependency::modTimeBased(
+            blobData, isSDKRelative, scratch[0], scratch[1]));
+      }
       break;
+    }
     default:
       // Unknown metadata record, possibly for use by a future version of the
       // module format.
@@ -1084,6 +1094,22 @@ static Optional<swift::LibraryKind> getActualLibraryKind(unsigned rawKind) {
   return None;
 }
 
+static Optional<ModuleDecl::ImportFilterKind>
+getActualImportControl(unsigned rawValue) {
+  // We switch on the raw value rather than the enum in order to handle future
+  // values.
+  switch (rawValue) {
+  case static_cast<unsigned>(serialization::ImportControl::Normal):
+    return ModuleDecl::ImportFilterKind::Private;
+  case static_cast<unsigned>(serialization::ImportControl::Exported):
+    return ModuleDecl::ImportFilterKind::Public;
+  case static_cast<unsigned>(serialization::ImportControl::ImplementationOnly):
+    return ModuleDecl::ImportFilterKind::ImplementationOnly;
+  default:
+    return None;
+  }
+}
+
 static bool areCompatibleArchitectures(const llvm::Triple &moduleTarget,
                                        const llvm::Triple &ctxTarget) {
   if (moduleTarget.getArch() == ctxTarget.getArch())
@@ -1258,10 +1284,18 @@ ModuleFile::ModuleFile(
         unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
         switch (kind) {
         case input_block::IMPORTED_MODULE: {
-          bool exported, scoped;
+          unsigned rawImportControl;
+          bool scoped;
           input_block::ImportedModuleLayout::readRecord(scratch,
-                                                        exported, scoped);
-          Dependencies.push_back({blobData, exported, scoped});
+                                                        rawImportControl,
+                                                        scoped);
+          auto importKind = getActualImportControl(rawImportControl);
+          if (!importKind) {
+            // We don't know how to import this dependency.
+            error();
+            return;
+          }
+          Dependencies.push_back({blobData, importKind.getValue(), scoped});
           break;
         }
         case input_block::LINK_LIBRARY: {
@@ -1428,7 +1462,8 @@ ModuleFile::ModuleFile(
 }
 
 Status ModuleFile::associateWithFileContext(FileUnit *file,
-                                            SourceLoc diagLoc) {
+                                            SourceLoc diagLoc,
+                                            bool treatAsPartialModule) {
   PrettyStackTraceModuleFile stackEntry(*this);
 
   assert(getStatus() == Status::Valid && "invalid module file");
@@ -1447,7 +1482,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
     return error(Status::TargetIncompatible);
   }
   if (ctx.LangOpts.EnableTargetOSChecking &&
-      M->getResilienceStrategy() != ResilienceStrategy::Resilient &&
+      !M->isResilient() &&
       isTargetTooNew(moduleTarget, ctx.LangOpts.Target)) {
     return error(Status::TargetTooNew);
   }
@@ -1481,6 +1516,17 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       continue;
     }
 
+    if (dependency.isImplementationOnly() &&
+        !(treatAsPartialModule || ctx.LangOpts.DebuggerSupport)) {
+      // When building normally (and not merging partial modules), we don't
+      // want to bring in the implementation-only module, because that might
+      // change the set of visible declarations. However, when debugging we
+      // want to allow getting at the internals of this module when possible,
+      // and so we'll try to reference the implementation-only module if it's
+      // available.
+      continue;
+    }
+
     StringRef modulePathStr = dependency.RawPath;
     StringRef scopePath;
     if (dependency.isScoped()) {
@@ -1508,7 +1554,8 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
 
       // Otherwise, continue trying to load dependencies, so that we can list
       // everything that's missing.
-      missingDependency = true;
+      if (!(dependency.isImplementationOnly() && ctx.LangOpts.DebuggerSupport))
+        missingDependency = true;
       continue;
     }
 
@@ -1687,24 +1734,22 @@ void ModuleFile::getImportedModules(
   PrettyStackTraceModuleFile stackEntry(*this);
 
   for (auto &dep : Dependencies) {
-    switch (filter) {
-    case ModuleDecl::ImportFilter::All:
-      // We're including all imports.
-      break;
-
-    case ModuleDecl::ImportFilter::Private:
-      // Skip @_exported imports.
-      if (dep.isExported())
+    if (dep.isExported()) {
+      if (!filter.contains(ModuleDecl::ImportFilterKind::Public))
         continue;
 
-      break;
-
-    case ModuleDecl::ImportFilter::Public:
-      // Only include @_exported imports.
-      if (!dep.isExported())
+    } else if (dep.isImplementationOnly()) {
+      if (!filter.contains(ModuleDecl::ImportFilterKind::ImplementationOnly))
         continue;
+      if (!dep.isLoaded()) {
+        // Pretend we didn't have this import if we weren't originally asked to
+        // load it.
+        continue;
+      }
 
-      break;
+    } else {
+      if (!filter.contains(ModuleDecl::ImportFilterKind::Private))
+        continue;
     }
 
     assert(dep.isLoaded());
@@ -1833,17 +1878,8 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
   }
 
   if (nominal->getParent()->isModuleScopeContext()) {
-    auto parentModule = nominal->getParentModule();
-    StringRef moduleName = parentModule->getName().str();
-
-    // If the originating module is a private module whose interface is
-    // re-exported via public module, check the name of the public module.
-    std::string exportedModuleName;
-    if (auto clangModuleUnit =
-            dyn_cast<ClangModuleUnit>(parentModule->getFiles().front())) {
-      exportedModuleName = clangModuleUnit->getExportedModuleName();
-      moduleName = exportedModuleName;
-    }
+    auto parentFile = cast<FileUnit>(nominal->getParent());
+    StringRef moduleName = parentFile->getExportedModuleName();
 
     for (auto item : *iter) {
       if (item.first != moduleName)

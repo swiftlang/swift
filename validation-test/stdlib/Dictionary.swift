@@ -5239,9 +5239,7 @@ DictionaryTestSuite.test("Values.MutationDoesNotInvalidateIndices.Native") {
 }
 
 #if _runtime(_ObjC)
-DictionaryTestSuite.test("Values.MutationDoesNotInvalidateIndices.Bridged")
-  .skip(.always("rdar://problem/47973577"))
-  .code {
+DictionaryTestSuite.test("Values.MutationDoesNotInvalidateIndices.Bridged") {
   let objects: [NSNumber] = [1, 2, 3, 4]
   let keys: [NSString] = ["Blanche", "Rose", "Dorothy", "Sophia"]
   let ns = NSDictionary(objects: objects, forKeys: keys)
@@ -5702,14 +5700,14 @@ DictionaryTestSuite.test("BulkLoadingInitializer.Unique") {
     let d1 = Dictionary<TestKeyTy, TestEquatableValueTy>(
       _unsafeUninitializedCapacity: c,
       allowingDuplicates: false
-    ) { keys, values, count in
+    ) { keys, values in
       let k = keys.baseAddress!
       let v = values.baseAddress!
       for i in 0 ..< c {
         (k + i).initialize(to: TestKeyTy(i))
         (v + i).initialize(to: TestEquatableValueTy(i))
-        count += 1
       }
+      return c
     }
 
     let d2 = Dictionary(
@@ -5729,14 +5727,14 @@ DictionaryTestSuite.test("BulkLoadingInitializer.Nonunique") {
     let d1 = Dictionary<TestKeyTy, TestEquatableValueTy>(
       _unsafeUninitializedCapacity: c,
       allowingDuplicates: true
-    ) { keys, values, count in
+    ) { keys, values in
       let k = keys.baseAddress!
       let v = values.baseAddress!
       for i in 0 ..< c {
         (k + i).initialize(to: TestKeyTy(i / 2))
         (v + i).initialize(to: TestEquatableValueTy(i / 2))
-        count += 1
       }
+      return c
     }
 
     let d2 = Dictionary(

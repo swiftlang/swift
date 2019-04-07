@@ -16,6 +16,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FileTypes.h"
+#include "swift/Basic/Platform.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
@@ -41,6 +42,29 @@ SerializedModuleLoaderBase::SerializedModuleLoaderBase(ASTContext &ctx,
 SerializedModuleLoaderBase::~SerializedModuleLoaderBase() = default;
 
 SerializedModuleLoader::~SerializedModuleLoader() = default;
+
+std::error_code SerializedModuleLoaderBase::openModuleDocFile(
+  AccessPathElem ModuleID, StringRef ModuleDocPath,
+  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) {
+
+  if (!ModuleDocBuffer)
+    return std::error_code();
+
+  llvm::vfs::FileSystem &FS = *Ctx.SourceMgr.getFileSystem();
+
+  // Try to open the module documentation file.  If it does not exist, ignore
+  // the error.  However, pass though all other errors.
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleDocOrErr =
+    FS.getBufferForFile(ModuleDocPath);
+  if (ModuleDocOrErr) {
+    *ModuleDocBuffer = std::move(*ModuleDocOrErr);
+  } else if (ModuleDocOrErr.getError() !=
+               std::errc::no_such_file_or_directory) {
+    return ModuleDocOrErr.getError();
+  }
+
+  return std::error_code();
+}
 
 std::error_code SerializedModuleLoaderBase::openModuleFiles(
     AccessPathElem ModuleID, StringRef ModulePath, StringRef ModuleDocPath,
@@ -73,18 +97,12 @@ std::error_code SerializedModuleLoaderBase::openModuleFiles(
   if (!ModuleOrErr)
     return ModuleOrErr.getError();
 
-  // Try to open the module documentation file.  If it does not exist, ignore
-  // the error.  However, pass though all other errors.
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleDocOrErr =
-      FS.getBufferForFile(ModuleDocPath);
-  if (!ModuleDocOrErr &&
-      ModuleDocOrErr.getError() != std::errc::no_such_file_or_directory) {
-    return ModuleDocOrErr.getError();
-  }
+  auto ModuleDocErr =
+    openModuleDocFile(ModuleID, ModuleDocPath, ModuleDocBuffer);
+  if (ModuleDocErr)
+    return ModuleDocErr;
 
   *ModuleBuffer = std::move(ModuleOrErr.get());
-  if (ModuleDocOrErr)
-    *ModuleDocBuffer = std::move(ModuleDocOrErr.get());
 
   return std::error_code();
 }
@@ -108,7 +126,7 @@ std::error_code SerializedModuleLoader::findModuleFilesInDirectory(
                                                      ModuleDocBuffer);
 }
 
-bool SerializedModuleLoader::maybeDiagnoseArchitectureMismatch(
+bool SerializedModuleLoader::maybeDiagnoseTargetMismatch(
     SourceLoc sourceLocation, StringRef moduleName, StringRef archName,
     StringRef directoryPath) {
   llvm::vfs::FileSystem &fs = *Ctx.SourceMgr.getFileSystem();
@@ -138,27 +156,25 @@ bool SerializedModuleLoader::maybeDiagnoseArchitectureMismatch(
     return false;
   }
 
-  Ctx.Diags.diagnose(sourceLocation, diag::sema_no_import_arch, moduleName,
+  Ctx.Diags.diagnose(sourceLocation, diag::sema_no_import_target, moduleName,
                      archName, foundArchs);
   return true;
 }
 
-static std::pair<llvm::SmallString<16>, llvm::SmallString<16>>
-getArchSpecificModuleFileNames(StringRef archName) {
-  llvm::SmallString<16> archFile, archDocFile;
+struct ModuleFilenamePair {
+  llvm::SmallString<64> module;
+  llvm::SmallString<64> moduleDoc;
 
-  if (!archName.empty()) {
-    archFile += archName;
-    archFile += '.';
-    archFile += file_types::getExtension(file_types::TY_SwiftModuleFile);
+  ModuleFilenamePair(StringRef baseName)
+    : module(baseName), moduleDoc(baseName)
+  {
+    module += '.';
+    module += file_types::getExtension(file_types::TY_SwiftModuleFile);
 
-    archDocFile += archName;
-    archDocFile += '.';
-    archDocFile += file_types::getExtension(file_types::TY_SwiftModuleDocFile);
+    moduleDoc += '.';
+    moduleDoc += file_types::getExtension(file_types::TY_SwiftModuleDocFile);
   }
-
-  return {archFile, archDocFile};
-}
+};
 
 bool
 SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
@@ -166,72 +182,76 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
            std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
            bool &isFramework) {
   llvm::SmallString<64> moduleName(moduleID.first.str());
-  llvm::SmallString<64> moduleFilename(moduleName);
-  moduleFilename += '.';
-  moduleFilename += file_types::getExtension(file_types::TY_SwiftModuleFile);
+  ModuleFilenamePair fileNames(moduleName);
 
-  llvm::SmallString<64> moduleDocFilename(moduleID.first.str());
-  moduleDocFilename += '.';
-  moduleDocFilename +=
-      file_types::getExtension(file_types::TY_SwiftModuleDocFile);
+  SmallVector<ModuleFilenamePair, 4> targetFileNamePairs;
 
-  StringRef archName = Ctx.LangOpts.Target.getArchName();
-  auto archFileNames = getArchSpecificModuleFileNames(archName);
+  auto normalizedTarget = getTargetSpecificModuleTriple(Ctx.LangOpts.Target);
+  targetFileNamePairs.push_back(ModuleFilenamePair(normalizedTarget.str()));
+
+  // Before this, we used the un-normalized architecture as a target-specific
+  // module name. Fall back to that behavior.
+  targetFileNamePairs.push_back(
+    ModuleFilenamePair(Ctx.LangOpts.Target.getArchName())
+  );
 
   // FIXME: We used to use "major architecture" names for these files---the
   // names checked in "#if arch(...)". Fall back to that name in the one case
   // where it's different from what Swift 4.2 supported: 32-bit ARM platforms.
   // We should be able to drop this once there's an Xcode that supports the
   // new names.
-  StringRef alternateArchName;
   if (Ctx.LangOpts.Target.getArch() == llvm::Triple::ArchType::arm)
-    alternateArchName = "arm";
-  auto alternateArchFileNames =
-      getArchSpecificModuleFileNames(alternateArchName);
+    targetFileNamePairs.push_back(ModuleFilenamePair("arm"));
 
   auto &fs = *Ctx.SourceMgr.getFileSystem();
   isFramework = false;
 
   llvm::SmallString<256> currPath;
-  for (auto path : Ctx.SearchPathOpts.ImportSearchPaths) {
-    std::error_code result;
 
+  /// Returns true if a target-specific module file was found, false if an error
+  /// was diagnosed, or None if neither one happened and the search should
+  /// continue.
+  auto findTargetSpecificModuleFiles = [&]() -> Optional<bool> {
+    for (const auto &targetFileNames : targetFileNamePairs) {
+      auto result = findModuleFilesInDirectory(moduleID, currPath,
+                        targetFileNames.module, targetFileNames.moduleDoc,
+                        moduleBuffer, moduleDocBuffer);
+      if (!result) {
+        return true;
+      } else if (result != std::errc::no_such_file_or_directory) {
+        return None;
+      }
+    }
+
+    // We can only get here if all targetFileNamePairs failed with
+    // 'std::errc::no_such_file_or_directory'.
+    if (maybeDiagnoseTargetMismatch(moduleID.second, moduleName,
+                                    normalizedTarget.str(), currPath)) {
+      return false;
+    } else {
+      return None;
+    }
+  };
+
+  for (auto path : Ctx.SearchPathOpts.ImportSearchPaths) {
     currPath = path;
-    llvm::sys::path::append(currPath, moduleFilename.str());
+    llvm::sys::path::append(currPath, fileNames.module.str());
     llvm::ErrorOr<llvm::vfs::Status> statResult = fs.status(currPath);
 
     if (statResult && statResult->isDirectory()) {
       // A .swiftmodule directory contains architecture-specific files.
-      result = findModuleFilesInDirectory(moduleID, currPath,
-                                          archFileNames.first,
-                                          archFileNames.second,
-                                          moduleBuffer, moduleDocBuffer);
-
-      if (result == std::errc::no_such_file_or_directory &&
-          !alternateArchName.empty()) {
-        result = findModuleFilesInDirectory(moduleID, currPath,
-                                            alternateArchFileNames.first,
-                                            alternateArchFileNames.second,
-                                            moduleBuffer, moduleDocBuffer);
-      }
-
-      if (result == std::errc::no_such_file_or_directory) {
-        if (maybeDiagnoseArchitectureMismatch(moduleID.second, moduleName,
-                                              archName, currPath)) {
-          return false;
-        }
-      }
-
+      if (auto outcome = findTargetSpecificModuleFiles())
+        return *outcome;
     } else {
       // We can't just return the error; the path we're looking for might not
       // be "Foo.swiftmodule".
-      result = findModuleFilesInDirectory(moduleID, path,
-                                          moduleFilename.str(),
-                                          moduleDocFilename.str(),
-                                          moduleBuffer, moduleDocBuffer);
+      auto result = findModuleFilesInDirectory(moduleID, path,
+                                               fileNames.module.str(),
+                                               fileNames.moduleDoc.str(),
+                                               moduleBuffer, moduleDocBuffer);
+      if (!result)
+        return true;
     }
-    if (!result)
-      return true;
   }
 
   {
@@ -250,28 +270,8 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
 
       // Frameworks always use architecture-specific files within a .swiftmodule
       // directory.
-      llvm::sys::path::append(currPath, "Modules", moduleFilename.str());
-      auto err = findModuleFilesInDirectory(moduleID, currPath,
-                                            archFileNames.first,
-                                            archFileNames.second,
-                                            moduleBuffer, moduleDocBuffer);
-
-      if (err == std::errc::no_such_file_or_directory &&
-          !alternateArchName.empty()) {
-        err = findModuleFilesInDirectory(moduleID, currPath,
-                                         alternateArchFileNames.first,
-                                         alternateArchFileNames.second,
-                                         moduleBuffer, moduleDocBuffer);
-      }
-
-      if (err == std::errc::no_such_file_or_directory) {
-        if (maybeDiagnoseArchitectureMismatch(moduleID.second, moduleName,
-                                              archName, currPath)) {
-          return false;
-        }
-      }
-
-      return !err;
+      llvm::sys::path::append(currPath, "Modules", fileNames.module.str());
+      return findTargetSpecificModuleFiles().getValueOr(false);
     };
 
     for (const auto &framepath : Ctx.SearchPathOpts.FrameworkSearchPaths) {
@@ -295,27 +295,35 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
     }
   }
 
-  // If we're not allowed to look in the runtime library import path, stop.
-  if (Ctx.SearchPathOpts.SkipRuntimeLibraryImportPath)
-    return false;
-
-  // Search the runtime import path.
+  // Search the runtime import paths.
   isFramework = false;
-  currPath = Ctx.SearchPathOpts.RuntimeLibraryImportPath;
-  if (Ctx.LangOpts.Target.isOSDarwin()) {
-    // Apple platforms always use architecture-specific files within a
-    // .swiftmodule directory for the stdlib.
-    llvm::sys::path::append(currPath, moduleFilename.str());
-    return !findModuleFilesInDirectory(moduleID, currPath,
-                                       archFileNames.first,
-                                       archFileNames.second,
-                                       moduleBuffer, moduleDocBuffer);
+
+  // Apple platforms always use target-specific files within a
+  // .swiftmodule directory for the stdlib; non-Apple platforms
+  // always use single-architecture swiftmodules.
+  // We could move the `if` outside of the `for` instead of inside,
+  // but I/O will be so slow that we won't notice the difference,
+  // so it's not worth the code duplication.
+  bool hasTargetSpecificRuntimeModules = Ctx.LangOpts.Target.isOSDarwin();
+
+  for (auto RuntimeLibraryImportPath :
+       Ctx.SearchPathOpts.RuntimeLibraryImportPaths) {
+    currPath = RuntimeLibraryImportPath;
+    if (hasTargetSpecificRuntimeModules) {
+      llvm::sys::path::append(currPath, fileNames.module.str());
+      if (auto outcome = findTargetSpecificModuleFiles())
+        return *outcome;
+    } else {
+      auto result = findModuleFilesInDirectory(moduleID, currPath,
+                                               fileNames.module.str(),
+                                               fileNames.moduleDoc.str(),
+                                               moduleBuffer, moduleDocBuffer);
+      if (!result)
+        return true;
+    }
   }
-  // Non-Apple platforms always use single-architecture swiftmodules.
-  return !findModuleFilesInDirectory(moduleID, currPath,
-                                     moduleFilename.str(),
-                                     moduleDocFilename.str(),
-                                     moduleBuffer, moduleDocBuffer);
+
+  return false;
 }
 
 static std::pair<StringRef, clang::VersionTuple>
@@ -358,7 +366,7 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
     ModuleDecl &M, Optional<SourceLoc> diagLoc,
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
-    bool isFramework) {
+    bool isFramework, bool treatAsPartialModule) {
   assert(moduleInputBuffer);
 
   StringRef moduleBufferID = moduleInputBuffer->getBufferIdentifier();
@@ -394,7 +402,8 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
 
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
     loadInfo.status =
-        loadedModuleFile->associateWithFileContext(fileUnit, diagLocOrInvalid);
+        loadedModuleFile->associateWithFileContext(fileUnit, diagLocOrInvalid,
+                                                   treatAsPartialModule);
     if (loadInfo.status == serialization::Status::Valid) {
       Ctx.bumpGeneration();
       LoadedModuleFiles.emplace_back(std::move(loadedModuleFile),
@@ -479,8 +488,10 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
         loadedModuleFile->getDependencies().begin(),
         loadedModuleFile->getDependencies().end(), std::back_inserter(missing),
         [&duplicates](const ModuleFile::Dependency &dependency) -> bool {
-          if (dependency.isLoaded() || dependency.isHeader())
+          if (dependency.isLoaded() || dependency.isHeader() ||
+              dependency.isImplementationOnly()) {
             return false;
+          }
           return duplicates.insert(dependency.RawPath).second;
         });
 
@@ -634,9 +645,13 @@ ModuleDecl *SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
                     isFramework)) {
       return nullptr;
     }
-    if (dependencyTracker)
-      dependencyTracker->addDependency(moduleInputBuffer->getBufferIdentifier(),
-                                       /*isSystem=*/false);
+    if (dependencyTracker) {
+      // Don't record cached artifacts as dependencies.
+      StringRef DepPath = moduleInputBuffer->getBufferIdentifier();
+      if (!isCached(DepPath)) {
+        dependencyTracker->addDependency(DepPath, /*isSystem=*/false);
+      }
+    }
   }
 
   assert(moduleInputBuffer);
@@ -646,7 +661,8 @@ ModuleDecl *SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
   SWIFT_DEFER { M->setHasResolvedImports(); };
 
   if (!loadAST(*M, moduleID.second, std::move(moduleInputBuffer),
-               std::move(moduleDocInputBuffer), isFramework)) {
+               std::move(moduleDocInputBuffer), isFramework,
+               /*treatAsPartialModule*/false)) {
     M->setFailedToLoad();
   }
 
@@ -695,8 +711,12 @@ void SerializedASTFile::getImportedModules(
 
 void SerializedASTFile::collectLinkLibrariesFromImports(
     ModuleDecl::LinkLibraryCallback callback) const {
+  ModuleDecl::ImportFilter ImportFilter;
+  ImportFilter |= ModuleDecl::ImportFilterKind::Public;
+  ImportFilter |= ModuleDecl::ImportFilterKind::Private;
+
   llvm::SmallVector<ModuleDecl::ImportedModule, 8> Imports;
-  File.getImportedModules(Imports, ModuleDecl::ImportFilter::All);
+  File.getImportedModules(Imports, ImportFilter);
 
   for (auto Import : Imports)
     Import.second->collectLinkLibraries(callback);

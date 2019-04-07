@@ -129,9 +129,9 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl,
     auto body = BraceStmt::create(C, SourceLoc(),
                                   ASTNode(returnStmt), SourceLoc());
 
-    cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
-                                     /*HasBoundDecls=*/false, SourceLoc(),
-                                     SourceLoc(), body));
+    cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, SourceLoc(),
+                                     SourceLoc(), body,
+                                     /*case body var decls*/ None));
   }
 
   auto selfRef = DerivedConformance::createSelfDeclRef(toRawDecl);
@@ -147,8 +147,7 @@ static void maybeMarkAsInlinable(DerivedConformance &derived,
                                  AbstractFunctionDecl *afd) {
   ASTContext &C = derived.TC.Context;
   auto parentDC = derived.getConformanceContext();
-  if (parentDC->getParentModule()->getResilienceStrategy() !=
-      ResilienceStrategy::Resilient) {
+  if (!parentDC->getParentModule()->isResilient()) {
     AccessScope access =
         afd->getFormalAccessScope(nullptr,
                                   /*treatUsableFromInlineAsPublic*/true);
@@ -368,8 +367,8 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
 
     // cases.append("case \(litPat): \(body)")
     cases.push_back(CaseStmt::create(C, SourceLoc(), CaseLabelItem(litPat),
-                                     /*HasBoundDecls=*/false, SourceLoc(),
-                                     SourceLoc(), body));
+                                     SourceLoc(), SourceLoc(), body,
+                                     /*case body var decls*/ None));
     Idx++;
   }
 
@@ -380,9 +379,9 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   auto dfltReturnStmt = new (C) FailStmt(SourceLoc(), SourceLoc());
   auto dfltBody = BraceStmt::create(C, SourceLoc(),
                                     ASTNode(dfltReturnStmt), SourceLoc());
-  cases.push_back(CaseStmt::create(C, SourceLoc(), dfltLabelItem,
-                                   /*HasBoundDecls=*/false, SourceLoc(),
-                                   SourceLoc(), dfltBody));
+  cases.push_back(CaseStmt::create(C, SourceLoc(), dfltLabelItem, SourceLoc(),
+                                   SourceLoc(), dfltBody,
+                                   /*case body var decls*/ None));
 
   auto rawDecl = initDecl->getParameters()->get(0);
   auto rawRef = new (C) DeclRefExpr(rawDecl, DeclNameLoc(), /*implicit*/true);
@@ -501,6 +500,11 @@ static bool canSynthesizeRawRepresentable(DerivedConformance &derived) {
   // - the enum elements all have the same type
   // - they all match the enum type
   for (auto elt : enumDecl->getAllElements()) {
+    // We cannot synthesize raw representable conformance for an enum with
+    // cases that have a payload.
+    if (elt->hasAssociatedValues())
+      return false;
+
     tc.validateDecl(elt);
     if (elt->isInvalid()) {
       return false;

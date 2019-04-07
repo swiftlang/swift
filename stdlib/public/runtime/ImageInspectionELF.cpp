@@ -134,7 +134,7 @@ int swift::lookupSymbol(const void *address, SymbolInfo *info) {
 
   info->fileName = dlinfo.dli_fname;
   info->baseAddress = dlinfo.dli_fbase;
-  info->symbolName = dlinfo.dli_sname;
+  info->symbolName.reset(dlinfo.dli_sname);
   info->symbolAddress = dlinfo.dli_saddr;
   return 1;
 }

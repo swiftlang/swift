@@ -1044,6 +1044,12 @@ public:
     visitAbstractStorageDecl(vd);
   }
 
+  void visitSubscriptDecl(SubscriptDecl *sd) {
+    SGM.emitDefaultArgGenerators(sd, sd->getIndices());
+
+    visitAbstractStorageDecl(sd);
+  }
+
   void visitAbstractStorageDecl(AbstractStorageDecl *asd) {
     // FIXME: Default implementations in protocols.
     if (asd->isObjC() && !isa<ProtocolDecl>(asd->getDeclContext()))
@@ -1097,6 +1103,28 @@ public:
     SILGenType(SGM, ntd).emitType();
   }
   void visitFuncDecl(FuncDecl *fd) {
+    // Don't emit other accessors for a dynamic replacement of didSet inside of
+    // an extension. We only allow such a construct to allow definition of a
+    // didSet/willSet dynamic replacement. Emitting other accessors is
+    // problematic because there is no storage.
+    //
+    // extension SomeStruct {
+    //   @_dynamicReplacement(for: someProperty)
+    //   var replacement : Int {
+    //     didSet {
+    //     }
+    //   }
+    // }
+    if (auto *accessor = dyn_cast<AccessorDecl>(fd)) {
+      auto *storage = accessor->getStorage();
+      bool hasDidSetOrWillSetDynamicReplacement =
+          storage->hasDidSetOrWillSetDynamicReplacement();
+
+      if (hasDidSetOrWillSetDynamicReplacement &&
+          isa<ExtensionDecl>(storage->getDeclContext()) &&
+          fd != storage->getDidSetFunc() && fd != storage->getWillSetFunc())
+        return;
+    }
     SGM.emitFunction(fd);
     if (SGM.requiresObjCMethodEntryPoint(fd))
       SGM.emitObjCMethodThunk(fd);
@@ -1122,10 +1150,19 @@ public:
 
   void visitVarDecl(VarDecl *vd) {
     if (vd->hasStorage()) {
-      assert(vd->isStatic() && "stored property in extension?!");
-      return emitTypeMemberGlobalVariable(SGM, vd);
+      bool hasDidSetOrWillSetDynamicReplacement =
+          vd->hasDidSetOrWillSetDynamicReplacement();
+      assert((vd->isStatic() || hasDidSetOrWillSetDynamicReplacement) &&
+             "stored property in extension?!");
+      if (!hasDidSetOrWillSetDynamicReplacement)
+        return emitTypeMemberGlobalVariable(SGM, vd);
     }
     visitAbstractStorageDecl(vd);
+  }
+
+  void visitSubscriptDecl(SubscriptDecl *sd) {
+    SGM.emitDefaultArgGenerators(sd, sd->getIndices());
+    visitAbstractStorageDecl(sd);
   }
 
   void visitEnumCaseDecl(EnumCaseDecl *ecd) {}

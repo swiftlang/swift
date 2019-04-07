@@ -248,14 +248,19 @@ enum class FactoryAsInitKind {
 
 namespace importer {
 struct PlatformAvailability {
-  /// A predicate that indicates if the given platform should be
-  /// considered for availability.
-  std::function<bool(StringRef PlatformName)> filter;
+private:
+  PlatformKind platformKind;
 
-  /// A predicate that indicates if the given platform version should
-  /// should be included in the cutoff of deprecated APIs marked unavailable.
-  std::function<bool(unsigned major, llvm::Optional<unsigned> minor)>
-      deprecatedAsUnavailableFilter;
+public:
+  /// Returns true when the given platform should be considered for
+  /// availabilityon imported declarations.
+  bool isPlatformRelevant(StringRef platform) const;
+
+  /// Returns true when the given declaration with the given deprecation
+  /// should be inlucded in the cutoff of imported deprecated APIs marked
+  /// unavailable.
+  bool treatDeprecatedAsUnavailable(const clang::Decl *clangDecl,
+                                    const llvm::VersionTuple &version) const;
 
   /// The message to embed for implicitly unavailability if a deprecated
   /// API is now unavailable.
@@ -882,12 +887,6 @@ public:
   /// After this has been called, the Foundation module will or won't be loaded
   /// into the ASTContext.
   ModuleDecl *tryLoadFoundationModule();
-
-  /// Returns the "SIMD" module, if it can be loaded.
-  ///
-  /// After this has been called, the SIMD module will or won't be loaded
-  /// into the ASTContext.
-  ModuleDecl *tryLoadSIMDModule();
 
   /// Retrieves the Swift wrapper for the given Clang module, creating
   /// it if necessary.

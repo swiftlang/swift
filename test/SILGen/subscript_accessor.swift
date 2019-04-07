@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -O -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil -primary-file %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden [transparent] @$s18subscript_accessor1XVxSgyciM
 // CHECK: [[SETTER:%.*]] = function_ref @$s18subscript_accessor1XVxSgycis

@@ -158,8 +158,8 @@ static void initialize(void) {
 
 bool CanTestOldABI() {
   // These tests don't work until the stable ABI is using its designed bit.
-  // This check can be removed after SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
-  // is set everywhere.
+  // This check can be removed after SWIFT_CLASS_IS_SWIFT_MASK is made
+  // static everywhere.
   Class cls = objc_getClass("_TtCs19__EmptyArrayStorage");
   if (!cls) abort();
   uintptr_t *words = (uintptr_t *)cls;

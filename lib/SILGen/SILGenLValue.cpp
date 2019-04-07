@@ -207,7 +207,7 @@ static LValueTypeData getAbstractedTypeData(SILGenModule &SGM,
     accessKind,
     origFormalType,
     substFormalType,
-    SGM.Types.getLoweredType(origFormalType, substFormalType).getObjectType()
+    SGM.Types.getLoweredRValueType(origFormalType, substFormalType)
   };
 }
 
@@ -455,13 +455,13 @@ static LValueTypeData getValueTypeData(SGFAccessKind accessKind,
     accessKind,
     AbstractionPattern(formalType),
     formalType,
-    value->getType().getObjectType()
+    value->getType().getASTType(),
   };
 }
 static LValueTypeData getValueTypeData(SILGenFunction &SGF,
                                        SGFAccessKind accessKind, Expr *e) {
   CanType formalType = getSubstFormalRValueType(e);
-  SILType loweredType = SGF.getLoweredType(formalType).getObjectType();
+  CanType loweredType = SGF.getLoweredType(formalType).getASTType();
 
   return {
     accessKind,
@@ -488,7 +488,8 @@ static ManagedValue getAddressOfOptionalValue(SILGenFunction &SGF,
   // embedded in the payload.
   SILValue valueAddr =
     SGF.B.createUncheckedTakeEnumDataAddr(loc, optAddr.forward(SGF), someDecl,
-                                  valueTypeData.TypeOfRValue.getAddressType());
+                                          SILType::getPrimitiveAddressType(
+                                            valueTypeData.TypeOfRValue));
 
   // Return the value as +1 if the optional was +1.
   if (hadCleanup) {
@@ -720,13 +721,16 @@ namespace {
 
     ManagedValue project(SILGenFunction &SGF, SILLocation loc,
                          ManagedValue base) && override {
-      assert(base.getType().isObject() &&
-             "base for ref element component must be an object");
       assert(base.getType().hasReferenceSemantics() &&
              "base for ref element component must be a reference type");
+
       // Borrow the ref element addr using formal access. If we need the ref
       // element addr, we will load it in this expression.
-      base = base.formalAccessBorrow(SGF, loc);
+      if (base.getType().isAddress()) {
+        base = SGF.B.createFormalAccessLoadBorrow(loc, base);
+      } else {
+        base = base.formalAccessBorrow(SGF, loc);
+      }
       SILValue result =
         SGF.B.createRefElementAddr(loc, base.getUnmanagedValue(),
                                    Field, SubstFieldType);
@@ -1700,7 +1704,7 @@ makeBaseConsumableMaterializedRValue(SILGenFunction &SGF,
   }
 
   bool isBorrowed = base.isPlusZeroRValueOrTrivial()
-    && !base.getType().isTrivial(SGF.SGM.M);
+    && !base.getType().isTrivial(SGF.F);
   if (!base.getType().isAddress() || isBorrowed) {
     auto tmp = SGF.emitTemporaryAllocation(loc, base.getType());
     if (isBorrowed)
@@ -1902,11 +1906,19 @@ namespace {
 RValue
 TranslationPathComponent::get(SILGenFunction &SGF, SILLocation loc,
                               ManagedValue base, SGFContext c) && {
-  // Load the original value.
-  RValue baseVal(SGF, loc, getSubstFormalType(),
-           SGF.emitLoad(loc, base.getValue(),
-                        SGF.getTypeLowering(base.getType()),
-                        SGFContext(), IsNotTake));
+  // Inline constructor.
+  RValue baseVal = [&]() -> RValue {
+    // If our base is an object, just put it into an RValue and return.
+    if (base.getType().isObject()) {
+      return RValue(SGF, loc, getSubstFormalType(), base);
+    }
+
+    // Otherwise, load the value and put it into an RValue.
+    return RValue(SGF, loc, getSubstFormalType(),
+                  SGF.emitLoad(loc, base.getValue(),
+                               SGF.getTypeLowering(base.getType()),
+                               SGFContext(), IsNotTake));
+  }();
 
   // Map the base value to its substituted representation.
   return std::move(*this).translate(SGF, loc, std::move(baseVal), c);
@@ -1915,6 +1927,8 @@ TranslationPathComponent::get(SILGenFunction &SGF, SILLocation loc,
 void TranslationPathComponent::set(SILGenFunction &SGF, SILLocation loc,
                                    ArgumentSource &&valueSource,
                                    ManagedValue base) && {
+  assert(base.getType().isAddress() &&
+         "Only support setting bases that have addresses");
   RValue value = std::move(valueSource).getAsRValue(SGF);
 
   // Map the value to the original pattern.
@@ -2080,7 +2094,7 @@ LValue LValue::forAddress(SGFAccessKind accessKind, ManagedValue address,
   assert(address.isLValue());
   LValueTypeData typeData = {
     accessKind, origFormalType, substFormalType,
-    address.getType().getObjectType()
+    address.getType().getASTType()
   };
 
   LValue lv;
@@ -2133,7 +2147,7 @@ void LValue::addOrigToSubstComponent(SILType loweredSubstType) {
     getAccessKind(),
     AbstractionPattern(substFormalType),
     substFormalType,
-    loweredSubstType
+    loweredSubstType.getASTType()
   };
   add<OrigToSubstComponent>(typeData, getOrigFormalType());
 }
@@ -2161,7 +2175,7 @@ void LValue::addSubstToOrigComponent(AbstractionPattern origType,
     getAccessKind(),
     origType,
     getSubstFormalType(),
-    loweredSubstType
+    loweredSubstType.getASTType()
   };
   add<SubstToOrigComponent>(typeData);
 }
@@ -2228,6 +2242,7 @@ static ManagedValue visitRecNonInOutBase(SILGenLValue &SGL, Expr *e,
   }
 
   // Ok, at this point we know that re-abstraction is not required.
+
   SGFContext ctx;
 
   if (auto *dre = dyn_cast<DeclRefExpr>(e)) {
@@ -2452,7 +2467,7 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
     void emitUsingAddressor(SILDeclRef addressor, bool isDirect,
                             LValueTypeData typeData) {
       SILType storageType =
-        SGF.SGM.Types.getLoweredType(Storage->getType()).getAddressType();
+        SGF.getLoweredType(Storage->getType()).getAddressType();
       LV.add<AddressorComponent>(Storage, addressor,
                                  /*isSuper=*/false, isDirect, getSubs(),
                                  CanType(), typeData, storageType, nullptr,
@@ -2674,7 +2689,9 @@ LValue SILGenLValue::visitDiscardAssignmentExpr(DiscardAssignmentExpr *e,
                                                 LValueOptions options) {
   LValueTypeData typeData = getValueTypeData(SGF, accessKind, e);
 
-  SILValue address = SGF.emitTemporaryAllocation(e, typeData.TypeOfRValue);
+  SILValue address = SGF.emitTemporaryAllocation(e,
+                                               SILType::getPrimitiveObjectType(
+                                                 typeData.TypeOfRValue));
   address = SGF.B.createMarkUninitialized(e, address,
                                           MarkUninitializedInst::Var);
   LValue lv;
@@ -2714,14 +2731,11 @@ LValue SILGenLValue::visitOpaqueValueExpr(OpaqueValueExpr *e,
   }
 
   assert(SGF.OpaqueValues.count(e) && "Didn't bind OpaqueValueExpr");
-
-  auto &entry = SGF.OpaqueValues.find(e)->second;
-  assert(!entry.HasBeenConsumed && "opaque value already consumed");
-  entry.HasBeenConsumed = true;
+  auto value = SGF.OpaqueValues[e];
 
   RegularLocation loc(e);
   LValue lv;
-  lv.add<ValueComponent>(entry.Value.formalAccessBorrow(SGF, loc), None,
+  lv.add<ValueComponent>(value.formalAccessBorrow(SGF, loc), None,
                          getValueTypeData(SGF, accessKind, e));
   return lv;
 }
@@ -3133,7 +3147,7 @@ LValue SILGenLValue::visitKeyPathApplicationExpr(KeyPathApplicationExpr *e,
 
     // Reabstract to the substituted abstraction level if necessary.
     auto substResultSILTy = SGF.getLoweredType(substFormalType);
-    if (typeData.TypeOfRValue != substResultSILTy.getObjectType()) {
+    if (typeData.TypeOfRValue != substResultSILTy.getASTType()) {
       lv.addOrigToSubstComponent(substResultSILTy);
     }
   }
@@ -3191,7 +3205,7 @@ LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e,
     accessKind,
     baseTypeData.OrigFormalType.getTupleElementType(index),
     cast<TupleType>(baseTypeData.SubstFormalType).getElementType(index),
-    baseTypeData.TypeOfRValue.getTupleElementType(index)
+    cast<TupleType>(baseTypeData.TypeOfRValue).getElementType(index)
   };
 
   lv.add<TupleElementComponent>(index, typeData);
@@ -3229,13 +3243,11 @@ LValue SILGenLValue::visitOpenExistentialExpr(OpenExistentialExpr *e,
 static LValueTypeData
 getOptionalObjectTypeData(SILGenFunction &SGF, SGFAccessKind accessKind,
                           const LValueTypeData &baseTypeData) {
-  EnumElementDecl *someDecl = SGF.getASTContext().getOptionalSomeDecl();
-
   return {
       accessKind,
       baseTypeData.OrigFormalType.getOptionalObjectType(),
       baseTypeData.SubstFormalType.getOptionalObjectType(),
-      baseTypeData.TypeOfRValue.getEnumElementType(someDecl, SGF.SGM.M),
+      baseTypeData.TypeOfRValue.getOptionalObjectType(),
   };
 }
 
@@ -4077,7 +4089,7 @@ SILGenFunction::emitOpenExistentialLValue(SILLocation loc,
   assert(!formalRValueType->hasLValueType());
   LValueTypeData typeData = {
     accessKind, AbstractionPattern::getOpaque(), formalRValueType,
-    getLoweredType(formalRValueType).getObjectType()
+    getLoweredType(formalRValueType).getASTType()
   };
 
   // Open up the existential.
@@ -4135,8 +4147,6 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc, RValue &&src,
 void SILGenFunction::emitAssignToLValue(SILLocation loc,
                                         ArgumentSource &&src,
                                         LValue &&dest) {
-  assert(dest.getAccessKind() == SGFAccessKind::Write);
-
   // Enter a FormalEvaluationScope so that formal access to independent LValue
   // components do not overlap. Furthermore, use an ArgumentScope to force
   // cleanup of materialized LValues immediately, before evaluating the next

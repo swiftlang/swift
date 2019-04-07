@@ -142,6 +142,7 @@ namespace irgen {
   struct SymbolicMangling;
   class TypeConverter;
   class TypeInfo;
+  enum class TypeMetadataAddress;
   enum class ValueWitness : unsigned;
   enum class ClassMetadataStrategy;
 
@@ -577,6 +578,9 @@ public:
   llvm::PointerType *ObjCSuperPtrTy;   /// %objc_super*
   llvm::StructType *ObjCBlockStructTy; /// %objc_block
   llvm::PointerType *ObjCBlockPtrTy;   /// %objc_block*
+  llvm::FunctionType *ObjCUpdateCallbackTy;
+  llvm::StructType *ObjCFullResilientClassStubTy;   /// %objc_full_class_stub
+  llvm::StructType *ObjCResilientClassStubTy;   /// %objc_class_stub
   llvm::StructType *ProtocolRecordTy;
   llvm::PointerType *ProtocolRecordPtrTy;
   llvm::StructType *ProtocolConformanceDescriptorTy;
@@ -747,8 +751,11 @@ public:
   getConformanceInfo(const ProtocolDecl *protocol,
                      const ProtocolConformance *conformance);
 
-  SILType getLoweredType(AbstractionPattern orig, Type subst);
-  SILType getLoweredType(Type subst);
+  SILType getLoweredType(AbstractionPattern orig, Type subst) const;
+  SILType getLoweredType(Type subst) const;
+  const Lowering::TypeLowering &getTypeLowering(SILType type) const;
+  bool isTypeABIAccessible(SILType type) const;
+
   const TypeInfo &getTypeInfoForUnlowered(AbstractionPattern orig,
                                           CanType subst);
   const TypeInfo &getTypeInfoForUnlowered(AbstractionPattern orig,
@@ -1327,6 +1334,10 @@ public:
 
   llvm::Function *getAddrOfObjCMetadataUpdateFunction(ClassDecl *D,
                                                       ForDefinition_t forDefinition);
+
+  llvm::Constant *getAddrOfObjCResilientClassStub(ClassDecl *D,
+                                                  ForDefinition_t forDefinition,
+                                                  TypeMetadataAddress addr);
 
   llvm::Function *
   getAddrOfSILFunction(SILFunction *f, ForDefinition_t forDefinition,

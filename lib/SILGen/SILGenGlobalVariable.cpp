@@ -54,7 +54,8 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
     return gv;
   }
 
-  SILType silTy = M.Types.getLoweredTypeOfGlobal(gDecl);
+  SILType silTy = SILType::getPrimitiveObjectType(
+    M.Types.getLoweredTypeOfGlobal(gDecl));
 
   auto *silGlobal = SILGlobalVariable::create(M, silLinkage, IsNotSerialized,
                                               mangledName, silTy,
@@ -92,7 +93,7 @@ SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var) {
   // Global variables can be accessed directly with global_addr.  Emit this
   // instruction into the prolog of the function so we can memoize/CSE it in
   // VarLocs.
-  auto entryBB = getFunction().begin();
+  auto *entryBB = &*getFunction().begin();
   SILGenBuilder prologueB(*this, entryBB, entryBB->begin());
   prologueB.setTrackingList(B.getTrackingList());
 

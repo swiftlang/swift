@@ -410,11 +410,15 @@ public:
     StoredPointer InstanceAddress =
         InstanceMetadataAddressAddress + 2 * sizeof(StoredPointer);
 
+    // When built with Objective-C interop, the runtime also stores a conformance
+    // to Hashable and the base type introducing the Hashable conformance.
+    if (isObjC)
+      InstanceAddress += 2 * sizeof(StoredPointer);
+
     // Round up to alignment, and we have the start address of the
     // instance payload.
     auto AlignmentMask = VWT->getAlignmentMask();
-    auto Offset = (sizeof(HeapObject) + AlignmentMask) & ~AlignmentMask;
-    InstanceAddress += Offset;
+    InstanceAddress = (InstanceAddress + AlignmentMask) & ~AlignmentMask;
 
     return RemoteExistential(
         RemoteAddress(*InstanceMetadataAddress),
@@ -2447,6 +2451,12 @@ private:
       tryFindSymbol(_address, symbolName);                   \
       tryReadSymbol(_address, dest);                         \
     } while (0)
+#   define tryFindAndReadSymbolWithDefault(dest, symbolName, default) do { \
+      dest = default;                                                      \
+      auto _address = Reader->getSymbolAddress(symbolName);                \
+      if (_address)                                                        \
+        tryReadSymbol(_address, dest);                                     \
+    } while (0)
 
     tryFindAndReadSymbol(TaggedPointerMask,
                          "objc_debug_taggedpointer_mask");
@@ -2459,30 +2469,34 @@ private:
     if (!TaggedPointerClassesAddr)
       finish(TaggedPointerEncodingKind::Error);
     TaggedPointerClasses = TaggedPointerClassesAddr.getAddressData();
-    tryFindAndReadSymbol(TaggedPointerExtendedMask,
-                         "objc_debug_taggedpointer_ext_mask");
-    tryFindAndReadSymbol(TaggedPointerExtendedSlotShift,
-                         "objc_debug_taggedpointer_ext_slot_shift");
-    tryFindAndReadSymbol(TaggedPointerExtendedSlotMask,
-                         "objc_debug_taggedpointer_ext_slot_mask");
-    tryFindSymbol(TaggedPointerExtendedClassesAddr,
-                  "objc_debug_taggedpointer_ext_classes");
-    if (!TaggedPointerExtendedClassesAddr)
-      finish(TaggedPointerEncodingKind::Error);
-    TaggedPointerExtendedClasses =
-        TaggedPointerExtendedClassesAddr.getAddressData();
+    
+    // Extended tagged pointers don't exist on older OSes. Handle those
+    // by setting the variables to zero.
+    tryFindAndReadSymbolWithDefault(TaggedPointerExtendedMask,
+                                    "objc_debug_taggedpointer_ext_mask",
+                                    0);
+    tryFindAndReadSymbolWithDefault(TaggedPointerExtendedSlotShift,
+                                    "objc_debug_taggedpointer_ext_slot_shift",
+                                    0);
+    tryFindAndReadSymbolWithDefault(TaggedPointerExtendedSlotMask,
+                                    "objc_debug_taggedpointer_ext_slot_mask",
+                                    0);
+    auto TaggedPointerExtendedClassesAddr =
+      Reader->getSymbolAddress("objc_debug_taggedpointer_ext_classes");
+    if (TaggedPointerExtendedClassesAddr)
+      TaggedPointerExtendedClasses =
+          TaggedPointerExtendedClassesAddr.getAddressData();
 
     // The tagged pointer obfuscator is not present on older OSes, in
     // which case we can treat it as zero.
-    TaggedPointerObfuscator = 0;
-    auto TaggedPointerObfuscatorAddr = Reader->getSymbolAddress(
-      "objc_debug_taggedpointer_obfuscator");
-    if (TaggedPointerObfuscatorAddr)
-      tryReadSymbol(TaggedPointerObfuscatorAddr, TaggedPointerObfuscator);
-
+    tryFindAndReadSymbolWithDefault(TaggedPointerObfuscator,
+                                    "objc_debug_taggedpointer_obfuscator",
+                                    0);
+    
 #   undef tryFindSymbol
 #   undef tryReadSymbol
 #   undef tryFindAndReadSymbol
+#   undef tryFindAndReadSymbolWithDefault
 
     return finish(TaggedPointerEncodingKind::Extended);
   }

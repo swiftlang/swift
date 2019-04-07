@@ -237,9 +237,8 @@ public:
   /// This is equivalent to, but possibly faster than, calling
   /// M.Types.getTypeLowering(type).isReturnedIndirectly().
   static bool isFormallyReturnedIndirectly(CanType type, SILModule &M,
-                                           CanGenericSignature Sig,
-                                           ResilienceExpansion Expansion) {
-    return isAddressOnly(type, M, Sig, Expansion);
+                                           CanGenericSignature Sig) {
+    return isAddressOnly(type, M, Sig, ResilienceExpansion::Minimal);
   }
 
   /// Return true if this type must be passed indirectly.
@@ -247,9 +246,8 @@ public:
   /// This is equivalent to, but possibly faster than, calling
   /// M.Types.getTypeLowering(type).isPassedIndirectly().
   static bool isFormallyPassedIndirectly(CanType type, SILModule &M,
-                                         CanGenericSignature Sig,
-                                         ResilienceExpansion Expansion) {
-    return isAddressOnly(type, M, Sig, Expansion);
+                                         CanGenericSignature Sig) {
+    return isAddressOnly(type, M, Sig, ResilienceExpansion::Minimal);
   }
 
   /// True if the type, or the referenced type of an address type, is loadable.
@@ -265,8 +263,8 @@ public:
   /// be loadable inside a resilient function in the module.
   /// In other words: isLoadable(SILModule) is the conservative default, whereas
   /// isLoadable(SILFunction) might give a more optimistic result.
-  bool isLoadable(SILFunction *inFunction) const {
-    return !isAddressOnly(inFunction);
+  bool isLoadable(const SILFunction &F) const {
+    return !isAddressOnly(F);
   }
 
   /// True if either:
@@ -275,19 +273,20 @@ public:
   bool isLoadableOrOpaque(SILModule &M) const;
 
   /// Like isLoadableOrOpaque(SILModule), but takes the resilience expansion of
-  /// \p inFunction into account (see isLoadable(SILFunction)).
-  bool isLoadableOrOpaque(SILFunction *inFunction) const;
+  /// \p F into account (see isLoadable(SILFunction)).
+  bool isLoadableOrOpaque(const SILFunction &F) const;
 
   /// True if the type, or the referenced type of an address type, is
   /// address-only. This is the opposite of isLoadable.
   bool isAddressOnly(SILModule &M) const;
 
   /// Like isAddressOnly(SILModule), but takes the resilience expansion of
-  /// \p inFunction into account (see isLoadable(SILFunction)).
-  bool isAddressOnly(SILFunction *inFunction) const;
+  /// \p F into account (see isLoadable(SILFunction)).
+  bool isAddressOnly(const SILFunction &F) const;
 
-  /// True if the type, or the referenced type of an address type, is trivial.
-  bool isTrivial(SILModule &M) const;
+  /// True if the type, or the referenced type of an address type, is trivial,
+  /// meaning it is loadable and can be trivially copied, moved or detroyed.
+  bool isTrivial(const SILFunction &F) const;
 
   /// True if the type, or the referenced type of an address type, is known to
   /// be a scalar reference-counted type. If this is false, then some part of
@@ -477,12 +476,6 @@ public:
   /// representation. Class existentials do not always qualify.
   bool isHeapObjectReferenceType() const;
 
-  /// Return the SILType corresponding to the underlying type of the given
-  /// metatype type.
-  ///
-  /// *NOTE* Only call on SILTypes for metatype types.
-  SILType getMetatypeInstanceType(SILModule& M) const;
-
   /// Returns true if this SILType is an aggregate that contains \p Ty
   bool aggregateContainsRecord(SILType Ty, SILModule &SILMod) const;
   
@@ -501,10 +494,6 @@ public:
 
   /// Returns true if this is the AnyObject SILType;
   bool isAnyObject() const { return getASTType()->isAnyObject(); }
-
-  /// Returns the underlying referent SILType of an @sil_unowned or @sil_weak
-  /// Type.
-  SILType getReferentType(SILModule &M) const;
   
   /// Returns a SILType with any archetypes mapped out of context.
   SILType mapTypeOutOfContext() const;

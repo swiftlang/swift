@@ -16,6 +16,7 @@
 
 #include "ConstraintSystem.h"
 #include "CSDiag.h"
+#include "CSDiagnostics.h"
 #include "CalleeCandidateInfo.h"
 #include "TypeCheckAvailability.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -346,8 +347,9 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
       result = CC_ArgumentLabelMismatch;
       return true;
     }
-    void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {
+    bool outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {
       result = CC_ArgumentLabelMismatch;
+      return true;
     }
     bool relabelArguments(ArrayRef<Identifier> newNames) override {
       result = CC_ArgumentLabelMismatch;
@@ -1107,18 +1109,17 @@ bool CalleeCandidateInfo::diagnoseSimpleErrors(const Expr *E) {
   if (closeness == CC_Inaccessible) {
     auto decl = candidates[0].getDecl();
     assert(decl && "Only decl-based candidates may be marked inaccessible");
-    if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
-      CS.TC.diagnose(loc, diag::init_candidate_inaccessible,
-                     CD->getResultInterfaceType(), decl->getFormalAccess());
-      
-    } else {
-      CS.TC.diagnose(loc, diag::candidate_inaccessible, decl->getBaseName(),
-                     decl->getFormalAccess());
-    }
+
+    InaccessibleMemberFailure failure(
+        nullptr, CS, decl, CS.getConstraintLocator(const_cast<Expr *>(E)));
+    auto diagnosed = failure.diagnoseAsError();
+    assert(diagnosed && "failed to produce expected diagnostic");
+
     for (auto cand : candidates) {
-      if (auto decl = cand.getDecl()) {
-        CS.TC.diagnose(decl, diag::decl_declared_here, decl->getFullName());
-      }
+      auto *candidate = cand.getDecl();
+      if (candidate && candidate != decl)
+        CS.TC.diagnose(candidate, diag::decl_declared_here,
+                       candidate->getFullName());
     }
     
     return true;

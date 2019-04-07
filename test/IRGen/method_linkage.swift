@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -enable-resilience | %FileCheck %s --check-prefix=RESILIENT
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -enable-library-evolution | %FileCheck %s --check-prefix=RESILIENT
 
 // Test if all methods which go into a vtable have at least the visibility of its class.
 // Reason: Derived classes from "outside" still have to put the less visible base members

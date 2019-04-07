@@ -65,7 +65,6 @@ import DictionaryOfAnyHashableStrings
 import DictionaryRemove
 import DictionarySubscriptDefault
 import DictionarySwap
-import DoubleWidthDivision
 import DropFirst
 import DropLast
 import DropWhile
@@ -93,7 +92,9 @@ import MonteCarloPi
 import NibbleSort
 import NSDictionaryCastToSwift
 import NSError
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 import NSStringConversion
+#endif
 import NopDeinit
 import ObjectAllocation
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
@@ -128,6 +129,7 @@ import RandomShuffle
 import RandomValues
 import RangeAssignment
 import RangeIteration
+import RangeOverlaps
 import RangeReplaceableCollectionPlusDefault
 import RecursiveOwnedParameter
 import ReduceInto
@@ -235,7 +237,6 @@ registerBenchmark(DictionaryOfAnyHashableStrings)
 registerBenchmark(DictionaryRemove)
 registerBenchmark(DictionarySubscriptDefault)
 registerBenchmark(DictionarySwap)
-registerBenchmark(DoubleWidthDivision)
 registerBenchmark(DropFirst)
 registerBenchmark(DropLast)
 registerBenchmark(DropWhile)
@@ -263,7 +264,9 @@ registerBenchmark(MonteCarloE)
 registerBenchmark(MonteCarloPi)
 registerBenchmark(NSDictionaryCastToSwift)
 registerBenchmark(NSErrorTest)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 registerBenchmark(NSStringConversion)
+#endif
 registerBenchmark(NibbleSort)
 registerBenchmark(NopDeinit)
 registerBenchmark(ObjectAllocation)
@@ -300,6 +303,7 @@ registerBenchmark(RandomShuffle)
 registerBenchmark(RandomValues)
 registerBenchmark(RangeAssignment)
 registerBenchmark(RangeIteration)
+registerBenchmark(RangeOverlaps)
 registerBenchmark(RangeReplaceableCollectionPlusDefault)
 registerBenchmark(RecursiveOwnedParameter)
 registerBenchmark(ReduceInto)

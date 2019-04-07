@@ -135,6 +135,7 @@ set(profdata_merge_worker
 
 set(TEST_MODES
     optimize_none optimize optimize_unchecked optimize_size
+    optimize_none_with_implicit_dynamic
     only_executable only_non_executable
 )
 set(TEST_SUBSETS
@@ -171,6 +172,12 @@ foreach(SDK ${SWIFT_SDKS})
     set(validation_test_bin_dir
         "${CMAKE_CURRENT_BINARY_DIR}/../validation-test${VARIANT_SUFFIX}")
 
+    if(LibXml2_FOUND)
+      set(SWIFT_HAVE_LIBXML2 TRUE)
+    else()
+      set(SWIFT_HAVE_LIBXML2 FALSE)
+    endif()
+
     swift_configure_lit_site_cfg(
         "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
         "${test_bin_dir}/lit.site.cfg"
@@ -188,6 +195,32 @@ foreach(SDK ${SWIFT_SDKS})
 
     set(test_dependencies)
     get_test_dependencies("${SDK}" test_dependencies)
+
+    # NOTE create a stub BlocksRuntime library that can be used for the
+    # reflection tests
+    file(WRITE ${test_bin_dir}/BlocksRuntime.c
+      "void
+#if defined(_WIN32)
+__declspec(dllexport)
+#endif
+_Block_release(void) { }\n")
+    _add_swift_library_single(
+      BlocksRuntimeStub${VARIANT_SUFFIX}
+      BlocksRuntimeStub
+      SHARED
+      DONT_EMBED_BITCODE
+      NOSWIFTRT
+      ARCHITECTURE ${ARCH}
+      SDK ${SDK}
+      INSTALL_IN_COMPONENT dev
+      ${test_bin_dir}/BlocksRuntime.c)
+    set_target_properties(BlocksRuntimeStub${VARIANT_SUFFIX} PROPERTIES
+      ARCHIVE_OUTPUT_DIRECTORY ${test_bin_dir}
+      LIBRARY_OUTPUT_DIRECTORY ${test_bin_dir}
+      RUNTIME_OUTPUT_DIRECTORY ${test_bin_dir}
+      OUTPUT_NAME BlocksRuntime)
+    list(APPEND test_dependencies BlocksRuntimeStub${VARIANT_SUFFIX})
+
     list(APPEND test_dependencies
         "swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
 
@@ -229,13 +262,15 @@ foreach(SDK ${SWIFT_SDKS})
               ${PYTHON_EXECUTABLE} "${SWIFT_SOURCE_DIR}/utils/android/adb_push_built_products.py"
               --ndk "${SWIFT_ANDROID_NDK_PATH}"
               --destination "${SWIFT_ANDROID_DEPLOY_DEVICE_PATH}"
+              --destination-arch "${ARCH}"
               # Build products like libswiftCore.so.
               "${SWIFTLIB_DIR}/android"
               # These two directories may contain the same libraries,
               # but upload both to device just in case. Duplicates will be
               # overwritten, and uploading doesn't take very long anyway.
               "${SWIFT_ANDROID_${ARCH}_ICU_UC}"
-              "${SWIFT_ANDROID_${ARCH}_ICU_I18N}")
+              "${SWIFT_ANDROID_${ARCH}_ICU_I18N}"
+              "${SWIFT_ANDROID_${ARCH}_ICU_DATA}")
     endif()
     add_custom_target("upload-stdlib${VARIANT_SUFFIX}"
         ${command_upload_stdlib}
@@ -296,10 +331,15 @@ foreach(SDK ${SWIFT_SDKS})
           set(test_mode_target_suffix "-${test_mode}")
         endif()
 
+        set(maybe_command_upload_stdlib)
+        if(NOT test_mode STREQUAL "only_non_executable")
+          set(maybe_command_upload_stdlib ${command_upload_stdlib})
+        endif()
+
         set(test_target_name
             "check-swift${test_subset_target_suffix}${test_mode_target_suffix}${VARIANT_SUFFIX}")
         add_custom_target("${test_target_name}"
-            ${command_upload_stdlib}
+            ${maybe_command_upload_stdlib}
             ${command_upload_swift_reflection_test}
             ${command_clean_test_results_dir}
             COMMAND

@@ -708,7 +708,7 @@ Type TypeChecker::applyGenericArguments(Type type,
                      genericParams->size(), genericArgs.size(),
                      genericArgs.size() < genericParams->size())
           .highlight(generic->getAngleBrackets());
-      decl->diagnose(diag::kind_identifier_declared_here,
+      decl->diagnose(diag::kind_declname_declared_here,
                      DescriptiveDeclKind::GenericType, decl->getName());
     }
     return ErrorType::get(ctx);
@@ -898,7 +898,7 @@ static void diagnoseUnboundGenericType(Type ty, SourceLoc loc) {
         diag.fixItInsertAfter(loc, genericArgsToAdd);
     }
   }
-  unbound->getDecl()->diagnose(diag::kind_identifier_declared_here,
+  unbound->getDecl()->diagnose(diag::kind_declname_declared_here,
                                DescriptiveDeclKind::GenericType,
                                unbound->getDecl()->getName());
 }
@@ -1057,10 +1057,25 @@ static Type diagnoseUnknownType(TypeResolution resolution,
       NominalTypeDecl *nominal = nullptr;
       if ((nominalDC = dc->getInnermostTypeContext()) &&
           (nominal = nominalDC->getSelfNominalTypeDecl())) {
-        // Attempt to refer to 'Self' within a non-protocol nominal
-        // type. Fix this by replacing 'Self' with the nominal type name.
         assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
 
+        bool insideClass = nominalDC->getSelfClassDecl() != nullptr;
+        AbstractFunctionDecl *methodDecl = dc->getInnermostMethodContext();
+        bool declaringMethod = methodDecl &&
+          methodDecl->getDeclContext() == dc->getParentForLookup();
+        bool isPropertyOfClass = insideClass &&
+          options.is(TypeResolverContext::PatternBindingDecl);
+
+        if (((!insideClass || !declaringMethod) && !isPropertyOfClass &&
+             !options.is(TypeResolverContext::GenericRequirement)) ||
+            options.is(TypeResolverContext::ExplicitCastExpr)) {
+          Type SelfType = nominal->getSelfInterfaceType();
+          if (insideClass)
+            SelfType = DynamicSelfType::get(SelfType, ctx);
+          return resolution.mapTypeIntoContext(SelfType);
+        }
+
+        // Attempt to refer to 'Self' within a non-protocol nominal type.
         // Produce a Fix-It replacing 'Self' with the nominal type name.
         auto name = getDeclNameFromContext(dc, nominal);
         diags.diagnose(comp->getIdLoc(), diag::self_in_nominal, name)
@@ -3045,14 +3060,19 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     complained = true;
   }
 
+  bool hadError = false;
   for (unsigned i = 0, end = repr->getNumElements(); i != end; ++i) {
     auto *tyR = repr->getElementType(i);
 
     Type ty = resolveType(tyR, elementOptions);
-    if (!ty || ty->hasError()) return ty;
+    if (!ty || ty->hasError())
+      hadError = true;
 
     elements.emplace_back(ty, repr->getElementName(i), ParameterTypeFlags());
   }
+
+  if (hadError)
+    return ErrorType::get(Context);
 
   // Single-element labeled tuples are not permitted outside of declarations
   // or SIL, either.

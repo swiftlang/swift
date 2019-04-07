@@ -77,7 +77,6 @@ set(SWIFT_BENCH_MODULES
     single-source/DictionaryRemove
     single-source/DictionarySubscriptDefault
     single-source/DictionarySwap
-    single-source/DoubleWidthDivision
     single-source/DropFirst
     single-source/DropLast
     single-source/DropWhile
@@ -135,6 +134,7 @@ set(SWIFT_BENCH_MODULES
     single-source/RandomValues
     single-source/RangeAssignment
     single-source/RangeIteration
+    single-source/RangeOverlaps
     single-source/RangeReplaceableCollectionPlusDefault
     single-source/RecursiveOwnedParameter
     single-source/ReduceInto

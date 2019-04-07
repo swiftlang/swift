@@ -105,7 +105,7 @@ enum class FixKind : uint8_t {
   /// fix this issue by pretending that member exists and matches
   /// given arguments/result types exactly.
   DefineMemberBasedOnUse,
-	
+
   /// Allow access to type member on instance or instance member on type
   AllowTypeOrInstanceMember,
 
@@ -126,6 +126,16 @@ enum class FixKind : uint8_t {
   /// If there are fewer arguments than parameters, let's fix that up
   /// by adding new arguments to the list represented as type variables.
   AddMissingArguments,
+
+  /// Allow single tuple closure parameter destructuring into N arguments.
+  AllowClosureParameterDestructuring,
+
+  /// If there is out-of-order argument, let's fix that by re-ordering.
+  MoveOutOfOrderArgument,
+
+  /// If there is a matching inaccessible member - allow it as if there
+  /// no access control.
+  AllowInaccessibleMember,
 };
 
 class ConstraintFix {
@@ -618,6 +628,27 @@ private:
                                      ConstraintLocator *locator);
 };
 
+class AllowClosureParamDestructuring final : public ConstraintFix {
+  FunctionType *ContextualType;
+
+  AllowClosureParamDestructuring(ConstraintSystem &cs,
+                                 FunctionType *contextualType,
+                                 ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowClosureParameterDestructuring, locator),
+        ContextualType(contextualType) {}
+
+public:
+  std::string getName() const override {
+    return "allow closure parameter destructuring";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowClosureParamDestructuring *create(ConstraintSystem &cs,
+                                                FunctionType *contextualType,
+                                                ConstraintLocator *locator);
+};
+
 class AddMissingArguments final
     : public ConstraintFix,
       private llvm::TrailingObjects<AddMissingArguments,
@@ -655,6 +686,55 @@ private:
   MutableArrayRef<Param> getSynthesizedArgumentsBuf() {
     return {getTrailingObjects<Param>(), NumSynthesized};
   }
+};
+
+class MoveOutOfOrderArgument final : public ConstraintFix {
+  using ParamBinding = SmallVector<unsigned, 1>;
+
+  unsigned ArgIdx;
+  unsigned PrevArgIdx;
+
+  SmallVector<ParamBinding, 4> Bindings;
+
+  MoveOutOfOrderArgument(ConstraintSystem &cs, unsigned argIdx,
+                         unsigned prevArgIdx, ArrayRef<ParamBinding> bindings,
+                         ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::MoveOutOfOrderArgument, locator),
+        ArgIdx(argIdx), PrevArgIdx(prevArgIdx),
+        Bindings(bindings.begin(), bindings.end()) {}
+
+public:
+  std::string getName() const override {
+    return "move out-of-order argument to correct position";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static MoveOutOfOrderArgument *create(ConstraintSystem &cs,
+                                        unsigned argIdx,
+                                        unsigned prevArgIdx,
+                                        ArrayRef<ParamBinding> bindings,
+                                        ConstraintLocator *locator);
+};
+
+class AllowInaccessibleMember final : public ConstraintFix {
+  ValueDecl *Member;
+
+  AllowInaccessibleMember(ConstraintSystem &cs, ValueDecl *member,
+                          ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowInaccessibleMember, locator),
+        Member(member) {}
+
+public:
+  std::string getName() const override {
+    return "allow inaccessible member reference";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowInaccessibleMember *create(ConstraintSystem &cs,
+                                         ValueDecl *member,
+                                         ConstraintLocator *locator);
 };
 
 } // end namespace constraints

@@ -1180,13 +1180,13 @@ accept(SourceManager &SM, RegionType RegionType,
   Impl.accept(SM, RegionType, Replacements);
 }
 
-void RequestRefactoringEditConsumer::
-handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                 StringRef FormatString,
-                 ArrayRef<DiagnosticArgument> FormatArgs,
-                 const DiagnosticInfo &Info) {
+void RequestRefactoringEditConsumer::handleDiagnostic(
+    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
+    const DiagnosticInfo &Info,
+    const SourceLoc bufferIndirectlyCausingDiagnostic) {
   Impl.DiagConsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
-                                     Info);
+                                     Info, bufferIndirectlyCausingDiagnostic);
 }
 
 class RequestRenameRangeConsumer::Implementation {
@@ -1240,15 +1240,13 @@ void RequestRenameRangeConsumer::accept(
   Impl.accept(SM, RegionType, Ranges);
 }
 
-void RequestRenameRangeConsumer::
-handleDiagnostic(SourceManager &SM,
-                 SourceLoc Loc,
-                 DiagnosticKind Kind,
-                 StringRef FormatString,
-                 ArrayRef<DiagnosticArgument> FormatArgs,
-                 const DiagnosticInfo &Info) {
+void RequestRenameRangeConsumer::handleDiagnostic(
+    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
+    const DiagnosticInfo &Info,
+    const SourceLoc bufferIndirectlyCausingDiagnostic) {
   Impl.DiagConsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
-                                     Info);
+                                     Info, bufferIndirectlyCausingDiagnostic);
 }
 
 static NameUsage getNameUsage(RenameType Type) {

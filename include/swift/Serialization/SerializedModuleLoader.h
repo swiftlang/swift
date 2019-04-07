@@ -63,15 +63,26 @@ protected:
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer);
 
+  std::error_code
+  openModuleDocFile(AccessPathElem ModuleID,
+                    StringRef ModuleDocPath,
+                    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer);
+
   /// If the module loader subclass knows that all options have been tried for
   /// loading an architecture-specific file out of a swiftmodule bundle, try
   /// to list the architectures that \e are present.
   ///
   /// \returns true if an error diagnostic was emitted
-  virtual bool maybeDiagnoseArchitectureMismatch(SourceLoc sourceLocation,
-                                                 StringRef moduleName,
-                                                 StringRef archName,
-                                                 StringRef directoryPath) {
+  virtual bool maybeDiagnoseTargetMismatch(SourceLoc sourceLocation,
+                                           StringRef moduleName,
+                                           StringRef archName,
+                                           StringRef directoryPath) {
+    return false;
+  }
+
+  /// Determines if the provided path is a cached artifact for dependency
+  /// tracking purposes.
+  virtual bool isCached(StringRef DepPath) {
     return false;
   }
 
@@ -89,7 +100,7 @@ public:
   FileUnit *loadAST(ModuleDecl &M, Optional<SourceLoc> diagLoc,
                     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
                     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
-                    bool isFramework = false);
+                    bool isFramework, bool treatAsPartialModule);
 
   /// Check whether the module with a given name can be imported without
   /// importing it.
@@ -139,10 +150,10 @@ class SerializedModuleLoader : public SerializedModuleLoaderBase {
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) override;
 
-  bool maybeDiagnoseArchitectureMismatch(SourceLoc sourceLocation,
-                                         StringRef moduleName,
-                                         StringRef archName,
-                                         StringRef directoryPath) override;
+  bool maybeDiagnoseTargetMismatch(SourceLoc sourceLocation,
+                                   StringRef moduleName,
+                                   StringRef archName,
+                                   StringRef directoryPath) override;
 
 public:
   virtual ~SerializedModuleLoader();

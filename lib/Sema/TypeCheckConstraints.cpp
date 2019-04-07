@@ -183,11 +183,8 @@ Expr *ConstraintLocatorBuilder::trySimplifyToExpr() const {
   Expr *anchor = getLocatorParts(pathBuffer);
   ArrayRef<LocatorPathElt> path = pathBuffer;
 
-  Expr *targetAnchor;
-  SmallVector<LocatorPathElt, 4> targetPathBuffer;
   SourceRange range;
-
-  simplifyLocator(anchor, path, targetAnchor, targetPathBuffer, range);
+  simplifyLocator(anchor, path, range);
   return (path.empty() ? anchor : nullptr);
 }
 
@@ -551,6 +548,18 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     };
 
     if (!isConfused) {
+      if (Name == Context.Id_Self) {
+        if (DeclContext *typeContext = DC->getInnermostTypeContext()){
+          Type SelfType = typeContext->getSelfInterfaceType();
+
+          if (typeContext->getSelfClassDecl())
+            SelfType = DynamicSelfType::get(SelfType, Context);
+          SelfType = DC->mapTypeIntoContext(SelfType);
+          return new (Context) TypeExpr(TypeLoc(new (Context)
+                                                FixedTypeRepr(SelfType, Loc)));
+        }
+      }
+
       TypoCorrectionResults corrections(*this, Name, nameLoc);
       performTypoCorrection(DC, UDRE->getRefKind(), Type(),
                             lookupOptions, corrections);
@@ -3122,15 +3131,11 @@ Expr *TypeChecker::coerceToRValue(Expr *expr,
     return FVE;
   }
 
-  // Load lvalues.
-  if (exprTy->is<LValueType>())
-    return addImplicitLoadExpr(expr, getType, setType);
-
   // Walk into parenthesized expressions to update the subexpression.
   if (auto paren = dyn_cast<IdentityExpr>(expr)) {
     auto sub =  coerceToRValue(paren->getSubExpr(), getType, setType);
     paren->setSubExpr(sub);
-    setType(paren, getType(sub));
+    setType(paren, ParenType::get(Context, getType(sub)));
     return paren;
   }
 
@@ -3173,6 +3178,10 @@ Expr *TypeChecker::coerceToRValue(Expr *expr,
 
     return tuple;
   }
+
+  // Load lvalues.
+  if (exprTy->is<LValueType>())
+    return addImplicitLoadExpr(expr, getType, setType);
 
   // Nothing to do.
   return expr;
@@ -3299,6 +3308,7 @@ void Solution::dump(raw_ostream &out) const {
       break;
 
     case OverloadChoiceKind::DynamicMemberLookup:
+    case OverloadChoiceKind::KeyPathDynamicMemberLookup:
       out << "dynamic member lookup root "
           << choice.getBaseType()->getString()
           << " name='" << choice.getName() << "'\n";
@@ -3492,6 +3502,7 @@ void ConstraintSystem::print(raw_ostream &out) {
         break;
 
       case OverloadChoiceKind::DynamicMemberLookup:
+      case OverloadChoiceKind::KeyPathDynamicMemberLookup:
         out << "dynamic member lookup:"
             << choice.getBaseType()->getString() << "  name="
             << choice.getName() << "\n";
@@ -3896,6 +3907,53 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     }
   }
 
+  assert(!toType->isAny() && "casts to 'Any' should've been handled above");
+  assert(!toType->isAnyObject() &&
+         "casts to 'AnyObject' should've been handled above");
+
+  // A cast from a function type to an existential type (except `Any`)
+  // or an archetype type (with constraints) cannot succeed
+  auto toArchetypeType = toType->is<ArchetypeType>();
+  auto fromFunctionType = fromType->is<FunctionType>();
+  auto toExistentialType = toType->isAnyExistentialType();
+
+  auto toConstrainedArchetype = false;
+  if (toArchetypeType) {
+    auto archetype = toType->castTo<ArchetypeType>();
+    toConstrainedArchetype = !archetype->getConformsTo().empty();
+  }
+
+  if (fromFunctionType &&
+      (toExistentialType || (toArchetypeType && toConstrainedArchetype))) {
+    switch (contextKind) {
+    case CheckedCastContextKind::ConditionalCast:
+    case CheckedCastContextKind::ForcedCast:
+      diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, origToType)
+          .highlight(diagFromRange)
+          .highlight(diagToRange);
+
+      // If we're referring to a function with a return value (not Void) then
+      // emit a fix-it suggesting to add `()` to call the function
+      if (auto DRE = dyn_cast<DeclRefExpr>(fromExpr)) {
+        if (auto FD = dyn_cast<FuncDecl>(DRE->getDecl())) {
+          if (!FD->getResultInterfaceType()->isVoid()) {
+            diagnose(diagLoc, diag::downcast_to_unrelated_fixit, FD->getName())
+                .fixItInsertAfter(fromExpr->getEndLoc(), "()");
+          }
+        }
+      }
+
+      return CheckedCastKind::ValueCast;
+      break;
+
+    case CheckedCastContextKind::IsPattern:
+    case CheckedCastContextKind::EnumElementPattern:
+    case CheckedCastContextKind::IsExpr:
+    case CheckedCastContextKind::None:
+      break;
+    }
+  }
+
   // If we can bridge through an Objective-C class, do so.
   if (Type bridgedToClass = getDynamicBridgedThroughObjCClass(dc, fromType,
                                                               toType)) {
@@ -3980,6 +4038,33 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     // Cast to and from AnyObject always succeed.
     if (toType->isAnyObject() || fromType->isAnyObject())
       return CheckedCastKind::ValueCast;
+
+    // A cast from an existential type to a concrete type does not succeed. For
+    // example:
+    //
+    // struct S {}
+    // enum FooError: Error { case bar }
+    //
+    // func foo() {
+    //   do {
+    //     throw FooError.bar
+    //   } catch is X { /* Will always fail */
+    //     print("Caught bar error")
+    //   }
+    // }
+    if (fromExistential) {
+      if (auto NTD = toType->getAnyNominal()) {
+        if (!isa<ProtocolDecl>(NTD)) {
+          auto protocolDecl =
+              dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal());
+          if (protocolDecl &&
+              !conformsToProtocol(toType, protocolDecl, dc,
+                                  ConformanceCheckFlags::InExpression)) {
+            return failed();
+          }
+        }
+      }
+    }
 
     bool toRequiresClass;
     if (toType->isExistentialType())

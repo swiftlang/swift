@@ -37,9 +37,27 @@ typedef swiftparse_trivia_piece_t CTriviaPiece;
 typedef swiftparse_syntax_kind_t CSyntaxKind;
 
 namespace {
+
+static unsigned getByteOffset(SourceLoc Loc, SourceManager &SM,
+                              unsigned BufferID) {
+  return Loc.isValid() ? SM.getLocOffsetInBuffer(Loc, BufferID) : 0;
+}
+
+static void initCRange(CRange &c_range, CharSourceRange range, SourceManager &SM,
+                       unsigned BufferID) {
+  if (range.isValid()) {
+    c_range.offset = getByteOffset(range.getStart(), SM, BufferID);
+    c_range.length = range.getByteLength();
+  } else {
+    c_range.offset = 0;
+    c_range.length = 0;
+  }
+}
+
 class SynParser {
   swiftparse_node_handler_t NodeHandler = nullptr;
   swiftparse_node_lookup_t NodeLookup = nullptr;
+  swiftparse_diagnostic_handler_t DiagHandler = nullptr;
 
 public:
   swiftparse_node_handler_t getNodeHandler() const {
@@ -48,6 +66,10 @@ public:
 
   swiftparse_node_lookup_t getNodeLookup() const {
     return NodeLookup;
+  }
+
+  swiftparse_diagnostic_handler_t getDiagnosticHandler() const {
+    return DiagHandler;
   }
 
   void setNodeHandler(swiftparse_node_handler_t hdl) {
@@ -62,9 +84,16 @@ public:
     Block_release(prevBlk);
   }
 
+  void setDiagnosticHandler(swiftparse_diagnostic_handler_t hdl) {
+    auto prevBlk = DiagHandler;
+    DiagHandler = Block_copy(hdl);
+    Block_release(prevBlk);
+  }
+
   ~SynParser() {
     setNodeHandler(nullptr);
     setNodeLookup(nullptr);
+    setDiagnosticHandler(nullptr);
   }
 
   swiftparse_client_node_t parse(const char *source);
@@ -102,13 +131,7 @@ private:
   }
 
   void makeCRange(CRange &c_range, CharSourceRange range) {
-    if (range.isValid()) {
-      c_range.offset = SM.getLocOffsetInBuffer(range.getStart(), BufferID);
-      c_range.length = range.getByteLength();
-    } else {
-      c_range.offset = 0;
-      c_range.length = 0;
-    }
+    return initCRange(c_range, range, SM, BufferID);
   }
 
   void makeCRawToken(CRawSyntaxNode &node,
@@ -179,7 +202,71 @@ private:
     return {result.length, result.node};
   }
 };
+
+static swiftparser_diagnostic_severity_t getSeverity(DiagnosticKind Kind) {
+  switch (Kind) {
+  case swift::DiagnosticKind::Error:
+    return SWIFTPARSER_DIAGNOSTIC_SEVERITY_ERROR;
+  case swift::DiagnosticKind::Warning:
+    return SWIFTPARSER_DIAGNOSTIC_SEVERITY_WARNING;
+  case swift::DiagnosticKind::Note:
+    return SWIFTPARSER_DIAGNOSTIC_SEVERITY_NOTE;
+  default:
+    llvm_unreachable("unrecognized diagnostic kind.");
+  }
 }
+
+struct DiagnosticDetail {
+  const char* Message;
+  unsigned Offset;
+  std::vector<CRange> CRanges;
+  swiftparser_diagnostic_severity_t Severity;
+  std::vector<swiftparse_diagnostic_fixit_t> AllFixits;
+};
+
+struct SynParserDiagConsumer: public DiagnosticConsumer {
+  SynParser &Parser;
+  const unsigned BufferID;
+  SynParserDiagConsumer(SynParser &Parser, unsigned BufferID):
+    Parser(Parser), BufferID(BufferID) {}
+  void
+  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+                   StringRef FormatString,
+                   ArrayRef<DiagnosticArgument> FormatArgs,
+                   const DiagnosticInfo &Info,
+                   const SourceLoc bufferIndirectlyCausingDiagnostic) override {
+    assert(Kind != DiagnosticKind::Remark && "Shouldn't see this in parser.");
+    // The buffer where all char* will point into.
+    llvm::SmallString<256> Buffer;
+    auto getCurrentText = [&]() -> const char* {
+      return Buffer.data() + Buffer.size();
+    };
+    DiagnosticDetail Result;
+    Result.Severity = getSeverity(Kind);
+    Result.Offset = getByteOffset(Loc, SM, BufferID);
+
+    // Terminate each printed text with 0 so the client-side can use char* directly.
+    char NullTerm = '\0';
+    {
+      // Print the error message to buffer and record it.
+      llvm::raw_svector_ostream OS(Buffer);
+      Result.Message = getCurrentText();
+      DiagnosticEngine::formatDiagnosticText(OS, FormatString, FormatArgs);
+      OS << NullTerm;
+    }
+    for (auto R: Info.Ranges) {
+      Result.CRanges.emplace_back();
+      initCRange(Result.CRanges.back(), R, SM, BufferID);
+    }
+    for (auto Fixit: Info.FixIts) {
+      Result.AllFixits.push_back({CRange(), getCurrentText()});
+      initCRange(Result.AllFixits.back().range, Fixit.getRange(), SM, BufferID);
+      llvm::raw_svector_ostream OS(Buffer);
+      OS << Fixit.getText() << NullTerm;
+    }
+    Parser.getDiagnosticHandler()(static_cast<void*>(&Result));
+  }
+};
 
 swiftparse_client_node_t SynParser::parse(const char *source) {
   SourceManager SM;
@@ -193,12 +280,21 @@ swiftparse_client_node_t SynParser::parse(const char *source) {
 
   auto parseActions =
     std::make_shared<CLibParseActions>(*this, SM, bufID);
-  ParserUnit PU(SM, SourceFileKind::Library, bufID, langOpts,
+  // We have to use SourceFileKind::Main to avoid diagnostics like
+  // illegal_top_level_expr
+  ParserUnit PU(SM, SourceFileKind::Main, bufID, langOpts,
                 "syntax_parse_module", std::move(parseActions),
                 /*SyntaxCache=*/nullptr);
+  // Evaluating pound conditions may lead to unknown syntax.
+  PU.getParser().State->PerformConditionEvaluation = false;
+  std::unique_ptr<SynParserDiagConsumer> pConsumer;
+  if (DiagHandler) {
+    pConsumer = llvm::make_unique<SynParserDiagConsumer>(*this, bufID);
+    PU.getDiagnosticEngine().addConsumer(*pConsumer);
+  }
   return PU.parse();
 }
-
+}
 //===--- C API ------------------------------------------------------------===//
 
 swiftparse_parser_t
@@ -234,4 +330,46 @@ swiftparse_parse_string(swiftparse_parser_t c_parser, const char *source) {
 
 const char* swiftparse_syntax_structure_versioning_identifier(void) {
   return getSyntaxStructureVersioningIdentifier();
+}
+
+//===--------------------- C API for diagnostics -------------------------====//
+
+void
+swiftparse_parser_set_diagnostic_handler(swiftparse_parser_t c_parser,
+                                         swiftparse_diagnostic_handler_t hdl) {
+  SynParser *parser = static_cast<SynParser*>(c_parser);
+  parser->setDiagnosticHandler(hdl);
+}
+
+const char* swiftparse_diagnostic_get_message(swiftparser_diagnostic_t diag) {
+  return static_cast<const DiagnosticDetail*>(diag)->Message;
+}
+
+unsigned swiftparse_diagnostic_get_fixit_count(swiftparser_diagnostic_t diag) {
+  return static_cast<const DiagnosticDetail*>(diag)->AllFixits.size();
+}
+
+swiftparse_diagnostic_fixit_t
+swiftparse_diagnostic_get_fixit(swiftparser_diagnostic_t diag, unsigned idx) {
+  auto allFixits = static_cast<const DiagnosticDetail*>(diag)->AllFixits;
+  assert(idx < allFixits.size());
+  return allFixits[idx];
+}
+
+unsigned swiftparse_diagnostic_get_range_count(swiftparser_diagnostic_t diag) {
+  return static_cast<const DiagnosticDetail*>(diag)->CRanges.size();
+}
+
+swiftparse_range_t
+swiftparse_diagnostic_get_range(swiftparser_diagnostic_t diag, unsigned idx) {
+  return static_cast<const DiagnosticDetail*>(diag)->CRanges[idx];
+}
+
+swiftparser_diagnostic_severity_t
+swiftparse_diagnostic_get_severity(swiftparser_diagnostic_t diag) {
+  return static_cast<const DiagnosticDetail*>(diag)->Severity;
+}
+
+unsigned swiftparse_diagnostic_get_source_loc(swiftparser_diagnostic_t diag) {
+  return static_cast<const DiagnosticDetail*>(diag)->Offset;
 }

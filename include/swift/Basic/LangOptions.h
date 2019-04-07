@@ -137,8 +137,10 @@ namespace swift {
     bool EnableObjCInterop = true;
 
     /// On Darwin platforms, use the pre-stable ABI's mark bit for Swift
-    /// classes instead of the stable ABI's bit.
-    bool UseDarwinPreStableABIBit = !bool(SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT);
+    /// classes instead of the stable ABI's bit. This is needed when
+    /// targeting OSes prior to macOS 10.14.4 and iOS 12.2, where
+    /// libobjc does not support the stable ABI's marker bit.
+    bool UseDarwinPreStableABIBit = false;
 
     /// Enables checking that uses of @objc require importing
     /// the Foundation module.
@@ -274,12 +276,6 @@ namespace swift {
     std::shared_ptr<llvm::Regex> OptimizationRemarkPassedPattern;
     std::shared_ptr<llvm::Regex> OptimizationRemarkMissedPattern;
 
-    /// When a conversion from String to Substring fails, emit a fix-it to append
-    /// the void subscript '[]'.
-    /// FIXME: Remove this flag when void subscripts are implemented.
-    /// This is used to guard preemptive testing for the fix-it.
-    bool FixStringToSubstringConversions = false;
-
     /// Whether collect tokens during parsing for syntax coloring.
     bool CollectParsedToken = false;
 
@@ -299,6 +295,11 @@ namespace swift {
     /// To experiment with including file-private and private dependency info,
     /// set to true.
     bool ExperimentalDependenciesIncludeIntrafileOnes = false;
+
+    /// Enable experimental support for emitting Objective-C resilient class
+    /// stubs. This is a language option since it also determines if we admit
+    /// @objc members in extensions of classes with resilient ancestry.
+    bool EnableObjCResilientClassStubs = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.

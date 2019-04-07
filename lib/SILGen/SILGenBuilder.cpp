@@ -35,9 +35,6 @@ SILGenModule &SILGenBuilder::getSILGenModule() const { return SGF.SGM; }
 SILGenBuilder::SILGenBuilder(SILGenFunction &SGF)
     : SILBuilder(SGF.F), SGF(SGF) {}
 
-SILGenBuilder::SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB)
-    : SILBuilder(insertBB), SGF(SGF) {}
-
 SILGenBuilder::SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB,
                              SmallVectorImpl<SILInstruction *> *insertedInsts)
     : SILBuilder(insertBB, insertedInsts), SGF(SGF) {}
@@ -807,9 +804,9 @@ ManagedValue SILGenBuilder::createOpenExistentialMetatype(SILLocation loc,
 ManagedValue SILGenBuilder::createStore(SILLocation loc, ManagedValue value,
                                         SILValue address,
                                         StoreOwnershipQualifier qualifier) {
-  SILModule &M = SGF.F.getModule();
   CleanupCloner cloner(*this, value);
-  if (value.getType().isTrivial(M) || value.getOwnershipKind() == ValueOwnershipKind::Any)
+  if (value.getType().isTrivial(SGF.F) ||
+      value.getOwnershipKind() == ValueOwnershipKind::Any)
     qualifier = StoreOwnershipQualifier::Trivial;
   createStore(loc, value.forward(SGF), address, qualifier);
   return cloner.clone(address);
@@ -909,7 +906,7 @@ ManagedValue SILGenBuilder::createTuple(SILLocation loc, SILType type,
   // We need to look for the first non-trivial value and use that as our cleanup
   // cloner value.
   auto iter = find_if(elements, [&](ManagedValue mv) -> bool {
-    return !mv.getType().isTrivial(getModule());
+    return !mv.getType().isTrivial(getFunction());
   });
 
   llvm::SmallVector<SILValue, 8> forwardedValues;

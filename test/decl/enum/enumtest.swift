@@ -436,3 +436,9 @@ let _: NestedBazEnumGeneric.Baz<Int> = .none // ok
 let _: NestedBazEnumGeneric.Baz<Int> = .one // ok
 let _: NestedBazEnumGeneric.Baz<Int>? = .one // ok
 let _: NestedBazEnumGeneric.Baz<Int>?? = .one // ok
+
+class C {}
+protocol P {}
+
+enum E : C & P {}
+// expected-error@-1 {{inheritance from class-constrained protocol composition type 'C & P'}}

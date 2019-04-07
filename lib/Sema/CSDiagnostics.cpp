@@ -22,10 +22,12 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Parse/Lexer.h"
@@ -83,6 +85,20 @@ FailureDiagnostic::emitDiagnostic(ArgTypes &&... Args) const {
 
 Expr *FailureDiagnostic::findParentExpr(Expr *subExpr) const {
   return E ? E->getParentMap()[subExpr] : nullptr;
+}
+
+Expr *FailureDiagnostic::getArgumentExprFor(Expr *anchor) const {
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
+    if (auto *call = dyn_cast_or_null<CallExpr>(findParentExpr(UDE)))
+      return call->getArg();
+  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
+    return UME->getArgument();
+  } else if (auto *call = dyn_cast<CallExpr>(anchor)) {
+    return call->getArg();
+  } else if (auto *SE = dyn_cast<SubscriptExpr>(anchor)) {
+    return SE->getIndex();
+  }
+  return nullptr;
 }
 
 Type RequirementFailure::getOwnerType() const {
@@ -368,18 +384,7 @@ bool LabelingFailure::diagnoseAsError() {
   auto &cs = getConstraintSystem();
   auto *anchor = getRawAnchor();
 
-  Expr *argExpr = nullptr;
-  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
-    if (auto *call = dyn_cast_or_null<CallExpr>(findParentExpr(UDE)))
-      argExpr = call->getArg();
-  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
-    argExpr = UME->getArgument();
-  } else if (auto *call = dyn_cast<CallExpr>(anchor)) {
-    argExpr = call->getArg();
-  } else if (auto *SE = dyn_cast<SubscriptExpr>(anchor)) {
-    argExpr = SE->getIndex();
-  }
-
+  auto *argExpr = getArgumentExprFor(anchor);
   if (!argExpr)
     return false;
 
@@ -545,16 +550,67 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
                                            resultIsOptional, SourceRange());
 }
 
-// Suggest a default value via ?? <default value>
-static void offerDefaultValueUnwrapFixit(TypeChecker &TC, DeclContext *DC, Expr *expr, Expr *rootExpr) {
-  auto diag =
-  TC.diagnose(expr->getLoc(), diag::unwrap_with_default_value);
+Optional<AnyFunctionType::Param>
+MissingOptionalUnwrapFailure::getOperatorParameterFor(Expr *expr) const {
+  auto *parentExpr = findParentExpr(expr);
+  if (!parentExpr)
+    return None;
 
+  auto getArgIdx = [](TupleExpr *tuple, Expr *argExpr) -> unsigned {
+    for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
+      if (tuple->getElement(i) == argExpr)
+        return i;
+    }
+    llvm_unreachable("argument is not in enclosing tuple?!");
+  };
+
+  auto *tupleExpr = dyn_cast<TupleExpr>(parentExpr);
+  if (!(tupleExpr && tupleExpr->isImplicit()))
+    return None;
+
+  parentExpr = findParentExpr(tupleExpr);
+  if (!(parentExpr && isa<ApplyExpr>(parentExpr)))
+    return None;
+
+  auto &cs = getConstraintSystem();
+  auto *fnExpr = cast<ApplyExpr>(parentExpr)->getFn();
+  if (auto overload =
+          getOverloadChoiceIfAvailable(cs.getConstraintLocator(fnExpr))) {
+    if (auto *decl = overload->choice.getDecl()) {
+      if (!decl->isOperator())
+        return None;
+
+      auto *fnType = overload->openedType->castTo<FunctionType>();
+      return fnType->getParams()[getArgIdx(tupleExpr, expr)];
+    }
+  }
+
+  return None;
+}
+
+void MissingOptionalUnwrapFailure::offerDefaultValueUnwrapFixIt(
+    DeclContext *DC, Expr *expr) const {
+  auto *anchor = getAnchor();
+
+  // If anchor is an explicit address-of, or expression which produces
+  // an l-value (e.g. first argument of `+=` operator), let's not
+  // suggest default value here because that would produce r-value type.
+  if (isa<InOutExpr>(anchor))
+    return;
+
+  if (auto param = getOperatorParameterFor(anchor)) {
+    if (param->isInOut())
+      return;
+  }
+
+  auto diag = emitDiagnostic(expr->getLoc(), diag::unwrap_with_default_value);
+
+  auto &TC = getTypeChecker();
   // Figure out what we need to parenthesize.
   bool needsParensInside =
-  exprNeedsParensBeforeAddingNilCoalescing(TC, DC, expr);
+      exprNeedsParensBeforeAddingNilCoalescing(TC, DC, expr);
   bool needsParensOutside =
-  exprNeedsParensAfterAddingNilCoalescing(TC, DC, expr, rootExpr);
+      exprNeedsParensAfterAddingNilCoalescing(TC, DC, expr, getParentExpr());
 
   llvm::SmallString<2> insertBefore;
   llvm::SmallString<32> insertAfter;
@@ -576,8 +632,8 @@ static void offerDefaultValueUnwrapFixit(TypeChecker &TC, DeclContext *DC, Expr 
 }
 
 // Suggest a force-unwrap.
-static void offerForceUnwrapFixit(ConstraintSystem &CS, Expr *expr) {
-  auto diag = CS.TC.diagnose(expr->getLoc(), diag::unwrap_with_force_value);
+void MissingOptionalUnwrapFailure::offerForceUnwrapFixIt(Expr *expr) const {
+  auto diag = emitDiagnostic(expr->getLoc(), diag::unwrap_with_force_value);
 
   // If expr is optional as the result of an optional chain and this last
   // dot isn't a member returning optional, then offer to force the last
@@ -586,7 +642,7 @@ static void offerForceUnwrapFixit(ConstraintSystem &CS, Expr *expr) {
     if (auto dotExpr =
         dyn_cast<UnresolvedDotExpr>(optionalChain->getSubExpr())) {
       auto bind = dyn_cast<BindOptionalExpr>(dotExpr->getBase());
-      if (bind && !CS.getType(dotExpr)->getOptionalObjectType()) {
+      if (bind && !getType(dotExpr)->getOptionalObjectType()) {
         diag.fixItReplace(SourceRange(bind->getLoc()), "!");
         return;
       }
@@ -597,7 +653,7 @@ static void offerForceUnwrapFixit(ConstraintSystem &CS, Expr *expr) {
     diag.fixItInsertAfter(expr->getEndLoc(), "!");
   } else {
     diag.fixItInsert(expr->getStartLoc(), "(")
-    .fixItInsertAfter(expr->getEndLoc(), ")!");
+        .fixItInsertAfter(expr->getEndLoc(), ")!");
   }
 }
 
@@ -618,8 +674,38 @@ public:
   int referencesCount() { return count; }
 };
 
-static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Expr *rootExpr, Type baseType,
-                           Type unwrappedType) {
+bool MissingOptionalUnwrapFailure::diagnoseAsError() {
+  if (hasComplexLocator())
+    return false;
+
+  auto *anchor = getAnchor();
+
+  if (auto assignExpr = dyn_cast<AssignExpr>(anchor))
+    anchor = assignExpr->getSrc();
+
+  auto *unwrappedExpr = anchor->getValueProvidingExpr();
+
+  if (auto *tryExpr = dyn_cast<OptionalTryExpr>(unwrappedExpr)) {
+    bool isSwift5OrGreater = getASTContext().isSwiftVersionAtLeast(5);
+    auto subExprType = getType(tryExpr->getSubExpr());
+    bool subExpressionIsOptional = (bool)subExprType->getOptionalObjectType();
+
+    if (isSwift5OrGreater && subExpressionIsOptional) {
+      // Using 'try!' won't change the type for a 'try?' with an optional
+      // sub-expr under Swift 5+, so just report that a missing unwrap can't be
+      // handled here.
+      return false;
+    }
+
+    emitDiagnostic(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try,
+                   getType(anchor)->getRValueType())
+        .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()},
+                      "try!");
+    return true;
+  }
+
+  auto baseType = getBaseType();
+  auto unwrappedType = getUnwrappedType();
 
   assert(!baseType->hasTypeVariable() &&
          "Base type must not be a type variable");
@@ -629,15 +715,14 @@ static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Expr *rootExpr, Typ
   if (!baseType->getOptionalObjectType())
     return false;
 
-  CS.TC.diagnose(expr->getLoc(), diag::optional_not_unwrapped, baseType,
-                 unwrappedType);
+  emitDiagnostic(unwrappedExpr->getLoc(), diag::optional_not_unwrapped,
+                 baseType, unwrappedType);
 
   // If the expression we're unwrapping is the only reference to a
   // local variable whose type isn't explicit in the source, then
   // offer unwrapping fixits on the initializer as well.
-  if (auto declRef = dyn_cast<DeclRefExpr>(expr)) {
+  if (auto declRef = dyn_cast<DeclRefExpr>(unwrappedExpr)) {
     if (auto varDecl = dyn_cast<VarDecl>(declRef->getDecl())) {
-
       bool singleUse = false;
       AbstractFunctionDecl *AFD = nullptr;
       if (auto contextDecl = varDecl->getDeclContext()->getAsDecl()) {
@@ -654,76 +739,44 @@ static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Expr *rootExpr, Typ
 
         Expr *initializer = varDecl->getParentInitializer();
         if (auto declRefExpr = dyn_cast<DeclRefExpr>(initializer)) {
-          if (declRefExpr->getDecl()->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
-            CS.TC.diagnose(declRefExpr->getLoc(), diag::unwrap_iuo_initializer,
+          if (declRefExpr->getDecl()
+                  ->getAttrs()
+                  .hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+            emitDiagnostic(declRefExpr->getLoc(), diag::unwrap_iuo_initializer,
                            baseType);
           }
         }
 
         auto fnTy = AFD->getInterfaceType()->castTo<AnyFunctionType>();
-        bool voidReturn = fnTy->getResult()->isEqual(TupleType::getEmpty(CS.DC->getASTContext()));
+        bool voidReturn =
+            fnTy->getResult()->isEqual(TupleType::getEmpty(getASTContext()));
 
-        auto diag = CS.TC.diagnose(varDecl->getLoc(), diag::unwrap_with_guard);
+        auto diag = emitDiagnostic(varDecl->getLoc(), diag::unwrap_with_guard);
         diag.fixItInsert(binding->getStartLoc(), "guard ");
         if (voidReturn) {
           diag.fixItInsertAfter(binding->getEndLoc(), " else { return }");
         } else {
           diag.fixItInsertAfter(binding->getEndLoc(), " else { return <"
-                                "#default value#" "> }");
+                                                      "#default value#"
+                                                      "> }");
         }
         diag.flush();
 
-        offerDefaultValueUnwrapFixit(CS.TC, varDecl->getDeclContext(), 
-                                     initializer, rootExpr);
-        offerForceUnwrapFixit(CS, initializer);
+        offerDefaultValueUnwrapFixIt(varDecl->getDeclContext(), initializer);
+        offerForceUnwrapFixIt(initializer);
       }
     }
   }
 
-  offerDefaultValueUnwrapFixit(CS.TC, CS.DC, expr, rootExpr);
-  offerForceUnwrapFixit(CS, expr);
-  return true;
-}
-
-bool MissingOptionalUnwrapFailure::diagnoseAsError() {
-  if (hasComplexLocator())
-    return false;
-
-  auto *anchor = getAnchor();
-  auto *rootExpr = getParentExpr();
-
-  if (auto assignExpr = dyn_cast<AssignExpr>(anchor))
-    anchor = assignExpr->getSrc();
-  
-  auto *unwrapped = anchor->getValueProvidingExpr();
-  auto type = getType(anchor)->getRValueType();
-
-  auto *tryExpr = dyn_cast<OptionalTryExpr>(unwrapped);
-  if (!tryExpr) {
-    return diagnoseUnwrap(getConstraintSystem(), unwrapped, rootExpr, getBaseType(),
-                          getUnwrappedType());
-  }
-
-  bool isSwift5OrGreater = getTypeChecker().getLangOpts().isSwiftVersionAtLeast(5);
-  auto subExprType = getType(tryExpr->getSubExpr());
-  bool subExpressionIsOptional = (bool)subExprType->getOptionalObjectType();
-  
-  
-  if (isSwift5OrGreater && subExpressionIsOptional) {
-    // Using 'try!' won't change the type for a 'try?' with an optional sub-expr
-    // under Swift 5+, so just report that a missing unwrap can't be handled here.
-    return false;
-  }
-
-  emitDiagnostic(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try, type)
-      .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()}, "try!");
+  offerDefaultValueUnwrapFixIt(getDC(), unwrappedExpr);
+  offerForceUnwrapFixIt(unwrappedExpr);
   return true;
 }
 
 bool RValueTreatedAsLValueFailure::diagnoseAsError() {
   Diag<StringRef> subElementDiagID;
   Diag<Type> rvalueDiagID = diag::assignment_lhs_not_lvalue;
-  Expr *diagExpr = getLocator()->getAnchor();
+  Expr *diagExpr = getRawAnchor();
   SourceLoc loc = diagExpr->getLoc();
 
   if (auto assignExpr = dyn_cast<AssignExpr>(diagExpr)) {
@@ -801,10 +854,18 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
       }
     }
 
-    if (auto resolvedOverload = getResolvedOverload(getLocator()))
+    if (auto resolvedOverload = getResolvedOverload(getLocator())) {
       if (resolvedOverload->Choice.getKind() ==
           OverloadChoiceKind::DynamicMemberLookup)
         subElementDiagID = diag::assignment_dynamic_property_has_immutable_base;
+
+      if (resolvedOverload->Choice.getKind() ==
+          OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+        if (!getType(member->getBase())->hasLValueType())
+          subElementDiagID =
+              diag::assignment_dynamic_property_has_immutable_base;
+      }
+    }
   } else if (auto sub = dyn_cast<SubscriptExpr>(diagExpr)) {
       subElementDiagID = diag::assignment_subscript_has_immutable_base;
   } else {
@@ -1149,7 +1210,7 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
     if (!member) {
       auto loc =
           cs.getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
-      member = dyn_cast_or_null<SubscriptDecl>(cs.findResolvedMemberRef(loc));
+      member = dyn_cast_or_null<SubscriptDecl>(getMemberRef(loc));
     }
 
     // If it isn't settable, return it.
@@ -1178,9 +1239,10 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
     // If we found a decl for the UDE, check it.
     auto loc = cs.getConstraintLocator(UDE, ConstraintLocator::Member);
 
+    auto *member = getMemberRef(loc);
     // If we can resolve a member, we can determine whether it is settable in
     // this context.
-    if (auto *member = cs.findResolvedMemberRef(loc)) {
+    if (member) {
       auto *memberVD = dyn_cast<VarDecl>(member);
 
       // If the member isn't a vardecl (e.g. its a funcdecl), or it isn't
@@ -1226,6 +1288,43 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
     return resolveImmutableBase(SAE->getFn());
 
   return {expr, nullptr};
+}
+
+ValueDecl *AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
+  auto member = getOverloadChoiceIfAvailable(locator);
+  if (!member || !member->choice.isDecl())
+    return nullptr;
+
+  auto *DC = getDC();
+  auto &TC = getTypeChecker();
+
+  auto *decl = member->choice.getDecl();
+  if (isa<SubscriptDecl>(decl) &&
+      isValidDynamicMemberLookupSubscript(cast<SubscriptDecl>(decl), DC, TC)) {
+    auto *subscript = cast<SubscriptDecl>(decl);
+    // If this is a keypath dynamic member lookup, we have to
+    // adjust the locator to find member referred by it.
+    if (isValidKeyPathDynamicMemberLookup(subscript, TC)) {
+      auto &cs = getConstraintSystem();
+      // Type has a following format:
+      // `(Self) -> (dynamicMember: {Writable}KeyPath<T, U>) -> U`
+      auto *fullType = member->openedFullType->castTo<FunctionType>();
+      auto *fnType = fullType->getResult()->castTo<FunctionType>();
+
+      auto paramTy = fnType->getParams()[0].getPlainType();
+      auto keyPath = paramTy->getAnyNominal();
+      auto memberLoc = cs.getConstraintLocator(
+          locator, LocatorPathElt::getKeyPathDynamicMember(keyPath));
+
+      auto memberRef = getOverloadChoiceIfAvailable(memberLoc);
+      return memberRef ? memberRef->choice.getDecl() : nullptr;
+    }
+
+    // If this is a string based dynamic lookup, there is no member declaration.
+    return nullptr;
+  }
+
+  return decl;
 }
 
 Diag<StringRef> AssignmentFailure::findDeclDiagonstic(ASTContext &ctx,
@@ -1296,6 +1395,9 @@ bool ContextualFailure::diagnoseMissingFunctionCall() const {
                  srcFT->getResult())
       .highlight(anchor->getSourceRange())
       .fixItInsertAfter(anchor->getEndLoc(), "()");
+
+  tryComputedPropertyFixIts(anchor);
+
   return true;
 }
 
@@ -1312,19 +1414,6 @@ bool ContextualFailure::trySequenceSubsequenceFixIts(InFlightDiagnostic &diag,
   if (!String || !Substring)
     return false;
 
-  /// FIXME: Remove this flag when void subscripts are implemented.
-  /// Make this unconditional and remove the if statement.
-  if (CS.TC.getLangOpts().FixStringToSubstringConversions) {
-    // String -> Substring conversion
-    // Add '[]' void subscript call to turn the whole String into a Substring
-    if (fromType->isEqual(String)) {
-      if (toType->isEqual(Substring)) {
-        diag.fixItInsertAfter(expr->getEndLoc(), "[]");
-        return true;
-      }
-    }
-  }
-
   // Substring -> String conversion
   // Wrap in String.init
   if (fromType->isEqual(Substring)) {
@@ -1337,6 +1426,53 @@ bool ContextualFailure::trySequenceSubsequenceFixIts(InFlightDiagnostic &diag,
   }
 
   return false;
+}
+
+void ContextualFailure::tryComputedPropertyFixIts(Expr *expr) const {
+  if (!isa<ClosureExpr>(expr))
+    return;
+
+  // It is possible that we're looking at a stored property being
+  // initialized with a closure. Something like:
+  //
+  // var foo: Int = { return 0 }
+  //
+  // Let's offer another fix-it to remove the '=' to turn the stored
+  // property into a computed property. If the variable is immutable, then
+  // replace the 'let' with a 'var'.
+
+  PatternBindingDecl *PBD = nullptr;
+
+  if (auto TLCD = dyn_cast<TopLevelCodeDecl>(getDC())) {
+    if (TLCD->getBody()->isImplicit()) {
+      if (auto decl = TLCD->getBody()->getElement(0).dyn_cast<Decl *>()) {
+        if (auto binding = dyn_cast<PatternBindingDecl>(decl)) {
+          PBD = binding;
+        }
+      }
+    }
+  } else if (auto PBI = dyn_cast<PatternBindingInitializer>(getDC())) {
+    PBD = PBI->getBinding();
+  }
+
+  if (PBD) {
+    if (auto VD = PBD->getSingleVar()) {
+      auto entry = PBD->getPatternEntryForVarDecl(VD);
+
+      if (!VD->isStatic() &&
+          !VD->getAttrs().getAttribute<DynamicReplacementAttr>() &&
+          entry.getInit() && isa<ClosureExpr>(entry.getInit())) {
+        auto diag = emitDiagnostic(expr->getLoc(),
+                                   diag::extension_stored_property_fixit,
+                                   VD->getName());
+        diag.fixItRemove(entry.getEqualLoc());
+
+        if (VD->isLet()) {
+          diag.fixItReplace(PBD->getStartLoc(), getTokenText(tok::kw_var));
+        }
+      }
+    }
+  }
 }
 
 bool AutoClosureForwardingFailure::diagnoseAsError() {
@@ -1937,7 +2073,8 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   auto path = locator->getPath();
 
   // TODO: Currently this is only intended to diagnose contextual failures.
-  if (!(path.back().getKind() == ConstraintLocator::ApplyArgToParam ||
+  if (path.empty() ||
+      !(path.back().getKind() == ConstraintLocator::ApplyArgToParam ||
         path.back().getKind() == ConstraintLocator::ContextualType))
     return false;
 
@@ -2007,5 +2144,257 @@ bool MissingArgumentsFailure::diagnoseTrailingClosure(ClosureExpr *closure) {
     diag.fixItInsertAfter(params->getEndLoc(), OS.str());
   }
 
+  return true;
+}
+
+bool ClosureParamDestructuringFailure::diagnoseAsError() {
+  auto *closure = cast<ClosureExpr>(getAnchor());
+  auto params = closure->getParameters();
+
+  // In case of implicit parameters e.g. $0, $1 we
+  // can't really provide good fix-it because
+  // structure of parameter type itself is unclear.
+  for (auto *param : params->getArray()) {
+    if (param->isImplicit()) {
+      emitDiagnostic(params->getStartLoc(),
+                     diag::closure_tuple_parameter_destructuring_implicit,
+                     getParameterType());
+      return true;
+    }
+  }
+
+  auto diag = emitDiagnostic(params->getStartLoc(),
+                             diag::closure_tuple_parameter_destructuring,
+                             getParameterType());
+
+  auto *closureBody = closure->getBody();
+  if (!closureBody)
+    return true;
+
+  auto &sourceMgr = getASTContext().SourceMgr;
+  auto bodyStmts = closureBody->getElements();
+
+  SourceLoc bodyLoc;
+  // If the body is empty let's put the cursor
+  // right after "in", otherwise make it start
+  // location of the first statement in the body.
+  if (bodyStmts.empty())
+    bodyLoc = Lexer::getLocForEndOfToken(sourceMgr, closure->getInLoc());
+  else
+    bodyLoc = bodyStmts.front().getStartLoc();
+
+  SmallString<64> fixIt;
+  llvm::raw_svector_ostream OS(fixIt);
+
+  // If this is multi-line closure we'd have to insert new lines
+  // in the suggested 'let' to keep the structure of the code intact,
+  // otherwise just use ';' to keep everything on the same line.
+  auto inLine = sourceMgr.getLineNumber(closure->getInLoc());
+  auto bodyLine = sourceMgr.getLineNumber(bodyLoc);
+  auto isMultiLineClosure = bodyLine > inLine;
+  auto indent =
+      bodyStmts.empty() ? "" : Lexer::getIndentationForLine(sourceMgr, bodyLoc);
+
+  SmallString<16> parameter;
+  llvm::raw_svector_ostream parameterOS(parameter);
+
+  parameterOS << "(";
+  interleave(
+      params->getArray(),
+      [&](const ParamDecl *param) { parameterOS << param->getNameStr(); },
+      [&] { parameterOS << ", "; });
+  parameterOS << ")";
+
+  // Check if there are any explicit types associated
+  // with parameters, if there are, we'll have to add
+  // type information to the replacement argument.
+  bool explicitTypes =
+      llvm::any_of(params->getArray(), [](const ParamDecl *param) {
+        return param->getTypeLoc().getTypeRepr();
+      });
+
+  if (isMultiLineClosure)
+    OS << '\n' << indent;
+
+  // Let's form 'let <name> : [<type>]? = arg' expression.
+  OS << "let " << parameterOS.str() << " = arg"
+     << (isMultiLineClosure ? "\n" + indent : "; ");
+
+  SmallString<64> argName;
+  llvm::raw_svector_ostream nameOS(argName);
+  if (explicitTypes) {
+    nameOS << "(arg: " << getParameterType()->getString() << ")";
+  } else {
+    nameOS << "(arg)";
+  }
+
+  if (closure->hasSingleExpressionBody()) {
+    // Let's see if we need to add result type to the argument/fix-it:
+    //  - if the there is a result type associated with the closure;
+    //  - and it's not a void type;
+    //  - and it hasn't been explicitly written.
+    auto resultType = resolveType(ContextualType->getResult());
+    auto hasResult = [](Type resultType) -> bool {
+      return resultType && !resultType->isVoid();
+    };
+
+    auto isValidType = [](Type resultType) -> bool {
+      return resultType && !resultType->hasUnresolvedType() &&
+             !resultType->hasTypeVariable();
+    };
+
+    // If there an expected result type but it hasn't been explicitly
+    // provided, let's add it to the argument.
+    if (hasResult(resultType) && !closure->hasExplicitResultType()) {
+      nameOS << " -> ";
+      if (isValidType(resultType))
+        nameOS << resultType->getString();
+      else
+        nameOS << "<#Result#>";
+    }
+
+    if (auto stmt = bodyStmts.front().get<Stmt *>()) {
+      // If the body is a single expression with implicit return.
+      if (isa<ReturnStmt>(stmt) && stmt->isImplicit()) {
+        // And there is non-void expected result type,
+        // because we add 'let' expression to the body
+        // we need to make such 'return' explicit.
+        if (hasResult(resultType))
+          OS << "return ";
+      }
+    }
+  }
+
+  diag.fixItReplace(params->getSourceRange(), nameOS.str())
+      .fixItInsert(bodyLoc, OS.str());
+  return true;
+}
+
+bool OutOfOrderArgumentFailure::diagnoseAsError() {
+  auto *anchor = getRawAnchor();
+  auto *argExpr = isa<TupleExpr>(anchor) ? anchor : getArgumentExprFor(anchor);
+  if (!argExpr)
+    return false;
+
+  auto *tuple = cast<TupleExpr>(argExpr);
+
+  Identifier first = tuple->getElementName(ArgIdx);
+  Identifier second = tuple->getElementName(PrevArgIdx);
+
+  // Build a mapping from arguments to parameters.
+  SmallVector<unsigned, 4> argBindings(tuple->getNumElements());
+  for (unsigned paramIdx = 0; paramIdx != Bindings.size(); ++paramIdx) {
+    for (auto argIdx : Bindings[paramIdx])
+      argBindings[argIdx] = paramIdx;
+  }
+
+  auto argRange = [&](unsigned argIdx, Identifier label) -> SourceRange {
+    auto range = tuple->getElement(argIdx)->getSourceRange();
+    if (!label.empty())
+      range.Start = tuple->getElementNameLoc(argIdx);
+
+    unsigned paramIdx = argBindings[argIdx];
+    if (Bindings[paramIdx].size() > 1)
+      range.End = tuple->getElement(Bindings[paramIdx].back())->getEndLoc();
+
+    return range;
+  };
+
+  auto firstRange = argRange(ArgIdx, first);
+  auto secondRange = argRange(PrevArgIdx, second);
+
+  SourceLoc diagLoc = firstRange.Start;
+
+  auto addFixIts = [&](InFlightDiagnostic diag) {
+    diag.highlight(firstRange).highlight(secondRange);
+
+    // Move the misplaced argument by removing it from one location and
+    // inserting it in another location. To maintain argument comma
+    // separation, since the argument is always moving to an earlier index
+    // the preceding comma and whitespace is removed and a new trailing
+    // comma and space is inserted with the moved argument.
+    auto &SM = getASTContext().SourceMgr;
+    auto text = SM.extractText(
+        Lexer::getCharSourceRangeFromSourceRange(SM, firstRange));
+
+    auto removalRange =
+        SourceRange(Lexer::getLocForEndOfToken(
+                        SM, tuple->getElement(ArgIdx - 1)->getEndLoc()),
+                    firstRange.End);
+    diag.fixItRemove(removalRange);
+    diag.fixItInsert(secondRange.Start, text.str() + ", ");
+  };
+
+  // There are 4 diagnostic messages variations depending on
+  // labeled/unlabeled arguments.
+  if (first.empty() && second.empty()) {
+    addFixIts(emitDiagnostic(diagLoc,
+                             diag::argument_out_of_order_unnamed_unnamed,
+                             ArgIdx + 1, PrevArgIdx + 1));
+  } else if (first.empty() && !second.empty()) {
+    addFixIts(emitDiagnostic(diagLoc, diag::argument_out_of_order_unnamed_named,
+                             ArgIdx + 1, second));
+  } else if (!first.empty() && second.empty()) {
+    addFixIts(emitDiagnostic(diagLoc, diag::argument_out_of_order_named_unnamed,
+                             first, PrevArgIdx + 1));
+  } else {
+    addFixIts(emitDiagnostic(diagLoc, diag::argument_out_of_order_named_named,
+                             first, second));
+  }
+
+  return true;
+}
+
+bool InaccessibleMemberFailure::diagnoseAsError() {
+  auto *anchor = getRawAnchor();
+  // Let's try to avoid over-diagnosing chains of inaccessible
+  // members e.g.:
+  //
+  // struct A {
+  //   struct B {
+  //     struct C {}
+  //   }
+  // }
+  //
+  // _ = A.B.C()
+  //
+  // We'll have a fix for each `B', `C` and `C.init` but it makes
+  // sense to diagnose only `B` and consider the rest hidden.
+  Expr *baseExpr = nullptr;
+  DeclNameLoc nameLoc;
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
+    baseExpr = UDE->getBase();
+    nameLoc = UDE->getNameLoc();
+  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
+    nameLoc = UME->getNameLoc();
+  } else if (auto *SE = dyn_cast<SubscriptExpr>(anchor)) {
+    baseExpr = SE->getBase();
+  } else if (auto *call = dyn_cast<CallExpr>(anchor)) {
+    baseExpr = call->getFn();
+  }
+
+  if (baseExpr) {
+    auto &cs = getConstraintSystem();
+    auto *locator =
+        cs.getConstraintLocator(baseExpr, ConstraintLocator::Member);
+    if (llvm::any_of(cs.getFixes(), [&](const ConstraintFix *fix) {
+          return fix->getLocator() == locator;
+        }))
+      return false;
+  }
+
+  auto loc = nameLoc.isValid() ? nameLoc.getStartLoc() : anchor->getLoc();
+  auto accessLevel = Member->getFormalAccessScope().accessLevelForDiagnostics();
+  if (auto *CD = dyn_cast<ConstructorDecl>(Member)) {
+    emitDiagnostic(loc, diag::init_candidate_inaccessible,
+                   CD->getResultInterfaceType(), accessLevel)
+        .highlight(nameLoc.getSourceRange());
+  } else {
+    emitDiagnostic(loc, diag::candidate_inaccessible, Member->getBaseName(),
+                   accessLevel)
+        .highlight(nameLoc.getSourceRange());
+  }
+
+  emitDiagnostic(Member, diag::decl_declared_here, Member->getFullName());
   return true;
 }

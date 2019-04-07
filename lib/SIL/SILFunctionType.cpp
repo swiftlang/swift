@@ -315,7 +315,8 @@ public:
       return;
     }
 
-    auto &substResultTL = M.Types.getTypeLowering(origType, substType);
+    auto &substResultTL = M.Types.getTypeLowering(origType, substType,
+                                                  ResilienceExpansion::Minimal);
 
     // Determine the result convention.
     ResultConvention convention;
@@ -369,10 +370,8 @@ public:
 
     // Otherwise, query specifically for the original type.
     } else {
-      // FIXME: Get expansion from SILDeclRef
       return SILType::isFormallyReturnedIndirectly(
-          origType.getType(), M, origType.getGenericSignature(),
-          ResilienceExpansion::Minimal);
+          origType.getType(), M, origType.getGenericSignature());
     }
   }
 };
@@ -452,10 +451,8 @@ static bool isFormallyPassedIndirectly(SILModule &M,
 
   // Otherwise, query specifically for the original type.
   } else {
-    // FIXME: Get expansion from SILDeclRef
     return SILType::isFormallyPassedIndirectly(
-        origType.getType(), M, origType.getGenericSignature(),
-        ResilienceExpansion::Minimal);
+        origType.getType(), M, origType.getGenericSignature());
   }
 }
 
@@ -590,7 +587,8 @@ private:
 
     unsigned origParamIndex = NextOrigParamIndex++;
 
-    auto &substTL = M.Types.getTypeLowering(origType, substType);
+    auto &substTL = M.Types.getTypeLowering(origType, substType,
+                                            ResilienceExpansion::Minimal);
     ParameterConvention convention;
     if (ownership == ValueOwnership::InOut) {
       convention = ParameterConvention::Indirect_Inout;
@@ -627,10 +625,10 @@ private:
       return false;
 
     auto foreignErrorTy =
-      M.Types.getLoweredType(Foreign.Error->getErrorParameterType());
+      M.Types.getLoweredRValueType(Foreign.Error->getErrorParameterType());
 
     // Assume the error parameter doesn't have interesting lowering.
-    Inputs.push_back(SILParameterInfo(foreignErrorTy.getASTType(),
+    Inputs.push_back(SILParameterInfo(foreignErrorTy,
                                       ParameterConvention::Direct_Unowned));
     NextOrigParamIndex++;
     return true;
@@ -716,6 +714,7 @@ static std::pair<AbstractionPattern, CanType> updateResultTypeForForeignError(
 static void
 lowerCaptureContextParameters(SILModule &M, AnyFunctionRef function,
                               CanGenericSignature genericSig,
+                              ResilienceExpansion expansion,
                               SmallVectorImpl<SILParameterInfo> &inputs) {
 
   // NB: The generic signature may be elided from the lowered function type
@@ -749,9 +748,10 @@ lowerCaptureContextParameters(SILModule &M, AnyFunctionRef function,
     auto canType = type->getCanonicalType(origGenericSig);
 
     auto &loweredTL =
-        Types.getTypeLowering(AbstractionPattern(genericSig, canType), canType);
+        Types.getTypeLowering(AbstractionPattern(genericSig, canType), canType,
+                              expansion);
     auto loweredTy = loweredTL.getLoweredType();
-    switch (Types.getDeclCaptureKind(capture)) {
+    switch (Types.getDeclCaptureKind(capture, expansion)) {
     case CaptureKind::None:
       break;
     case CaptureKind::Constant: {
@@ -806,7 +806,8 @@ static void destructureYieldsForReadAccessor(SILModule &M,
     return;
   }
 
-  auto &tl = M.Types.getTypeLowering(origType, valueType);
+  auto &tl = M.Types.getTypeLowering(origType, valueType,
+                                     ResilienceExpansion::Minimal);
   auto convention = [&] {
     if (isFormallyPassedIndirectly(M, origType, valueType, tl))
       return ParameterConvention::Indirect_In_Guaranteed;
@@ -857,8 +858,8 @@ static void destructureYieldsForCoroutine(SILModule &M,
 
   // 'modify' yields an inout of the target type.
   if (accessor->getAccessorKind() == AccessorKind::Modify) {
-    auto loweredValueTy = M.Types.getLoweredType(origType, canValueType);
-    yields.push_back(SILYieldInfo(loweredValueTy.getASTType(),
+    auto loweredValueTy = M.Types.getLoweredRValueType(origType, canValueType);
+    yields.push_back(SILYieldInfo(loweredValueTy,
                                   ParameterConvention::Indirect_Inout));
     return;
   }
@@ -983,7 +984,10 @@ static CanSILFunctionType getSILFunctionType(
   // from the function to which the argument is attached.
   if (constant && !constant->isDefaultArgGenerator()) {
     if (auto function = constant->getAnyFunctionRef()) {
-      lowerCaptureContextParameters(M, *function, genericSig, inputs);
+      // FIXME: Expansion
+      auto expansion = ResilienceExpansion::Minimal;
+      lowerCaptureContextParameters(M, *function, genericSig, expansion,
+                                    inputs);
     }
   }
   
@@ -2411,8 +2415,7 @@ public:
     }
 
     AbstractionPattern abstraction(Sig, origType);
-    return TheSILModule.Types.getLoweredType(abstraction, substType)
-             .getASTType();
+    return TheSILModule.Types.getLoweredRValueType(abstraction, substType);
   }
 };
 

@@ -99,6 +99,7 @@ PrintOptions PrintOptions::printParseableInterfaceFile() {
   result.TypeDefinitions = true;
   result.PrintIfConfig = false;
   result.FullyQualifiedTypes = true;
+  result.UseExportedModuleNames = true;
   result.AllowNullTypes = false;
   result.SkipImports = true;
   result.OmitNameOfInaccessibleProperties = true;
@@ -487,6 +488,24 @@ class PrintAST : public ASTVisitor<PrintAST> {
     Printer << Ctx.SourceMgr.extractText(Range);
   }
 
+  static std::string sanitizeClangDocCommentStyle(StringRef Line) {
+    static StringRef ClangStart = "/*!";
+    static StringRef SwiftStart = "/**";
+    auto Pos = Line.find(ClangStart);
+    if (Pos == StringRef::npos)
+      return Line.str();
+    StringRef Segment[2];
+    // The text before "/*!"
+    Segment[0] = Line.substr(0, Pos);
+    // The text after "/*!"
+    Segment[1] = Line.substr(Pos).substr(ClangStart.size());
+    // Only sanitize when "/*!" appears at the start of this line.
+    if (Segment[0].trim().empty()) {
+      return (llvm::Twine(Segment[0]) + SwiftStart + Segment[1]).str();
+    }
+    return Line.str();
+  }
+
   void printClangDocumentationComment(const clang::Decl *D) {
     const auto &ClangContext = D->getASTContext();
     const clang::RawComment *RC = ClangContext.getRawCommentForAnyRedecl(D);
@@ -507,10 +526,14 @@ class PrintAST : public ASTVisitor<PrintAST> {
     StringRef RawText =
         RC->getRawText(ClangContext.getSourceManager()).rtrim("\n\r");
     trimLeadingWhitespaceFromLines(RawText, WhitespaceToTrim, Lines);
-
+    bool FirstLine = true;
     for (auto Line : Lines) {
-      Printer << ASTPrinter::sanitizeUtf8(Line);
+      if (FirstLine)
+        Printer << sanitizeClangDocCommentStyle(ASTPrinter::sanitizeUtf8(Line));
+      else
+        Printer << ASTPrinter::sanitizeUtf8(Line);
       Printer.printNewline();
+      FirstLine = false;
     }
   }
 
@@ -871,8 +894,8 @@ public:
 } // unnamed namespace
 
 static StaticSpellingKind getCorrectStaticSpelling(const Decl *D) {
-  if (auto *VD = dyn_cast<VarDecl>(D)) {
-    return VD->getCorrectStaticSpelling();
+  if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
+    return ASD->getCorrectStaticSpelling();
   } else if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
     return PBD->getCorrectStaticSpelling();
   } else if (auto *FD = dyn_cast<FuncDecl>(D)) {
@@ -2767,8 +2790,13 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
                                       ->castTo<AnyFunctionType>()
                                       ->getParams();
     }
+
+    // @escaping is not valid in enum element position, even though the
+    // attribute is implicitly added. Ignore it when printing the parameters.
+    Options.ExcludeAttrList.push_back(TAK_escaping);
     printParameterList(PL, params,
                        /*isAPINameByDefault*/true);
+    Options.ExcludeAttrList.pop_back();
   }
 
   auto *raw = elt->getRawValueExpr();
@@ -3329,8 +3357,14 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
   template <typename T>
   void printModuleContext(T *Ty) {
-    ModuleDecl *Mod = Ty->getDecl()->getModuleContext();
-    Printer.printModuleRef(Mod, Mod->getName());
+    FileUnit *File = cast<FileUnit>(Ty->getDecl()->getModuleScopeContext());
+    ModuleDecl *Mod = File->getParentModule();
+
+    Identifier Name = Mod->getName();
+    if (Options.UseExportedModuleNames)
+      Name = Mod->getASTContext().getIdentifier(File->getExportedModuleName());
+
+    Printer.printModuleRef(Mod, Name);
     Printer << ".";
   }
 
@@ -3355,7 +3389,11 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     if (!Options.FullyQualifiedTypesIfAmbiguous)
       return false;
 
-    Decl *D = T->getAnyGeneric();
+    Decl *D;
+    if (auto *TAT = dyn_cast<TypeAliasType>(T))
+      D = TAT->getDecl();
+    else
+      D = T->getAnyGeneric();
 
     // If we cannot find the declaration, be extra careful and print
     // the type qualified.
@@ -3487,6 +3525,8 @@ public:
     if (auto parent = T->getParent()) {
       visit(parent);
       Printer << ".";
+    } else if (shouldPrintFullyQualified(T)) {
+      printModuleContext(T);
     }
 
     printTypeDeclName(T);
@@ -4004,6 +4044,10 @@ public:
   }
 
   void visitProtocolType(ProtocolType *T) {
+    if (shouldPrintFullyQualified(T)) {
+      printModuleContext(T);
+    }
+
     printTypeDeclName(T);
   }
 

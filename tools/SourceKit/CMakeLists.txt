@@ -4,6 +4,13 @@ include(CheckSymbolExists)
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+  message(SEND_ERROR "SourceKit cannot be built standalone")
+endif()
+
+include(SwiftWindowsSupport)
+swift_swap_compiler_if_needed("SourceKit")
+
 if (DARWIN_TOOLCHAIN_VERSION)
   set(SOURCEKIT_VERSION_STRING "${DARWIN_TOOLCHAIN_VERSION}")
 else()

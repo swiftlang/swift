@@ -1879,11 +1879,15 @@ namespace {
       // more no-payload case than extra inhabitants in the payload. This could
       // be slightly generalized to cases where there's multiple tag bits and
       // exactly one no-payload case in the highest used tag value.
+      unsigned extraInhabitantCount = getFixedExtraInhabitantCount(IGF.IGM);
       if (!tagBits ||
-        ElementsWithNoPayload.size() != getFixedExtraInhabitantCount(IGF.IGM)+1)
-          payloadResult = payload.emitCompare(IGF,
-                                        ti.getFixedExtraInhabitantMask(IGF.IGM),
-                                        payloadTag);
+          ElementsWithNoPayload.size() != extraInhabitantCount + 1) {
+        payloadResult = payload.emitCompare(
+            IGF,
+            extraInhabitantCount == 0 ? APInt::getAllOnesValue(PayloadBitCount)
+                                      : ti.getFixedExtraInhabitantMask(IGF.IGM),
+            payloadTag);
+      }
 
       // If any tag bits are present, they must match.
       llvm::Value *tagResult = nullptr;
@@ -4202,12 +4206,12 @@ namespace {
       } else if (!CommonSpareBits.empty()) {
         // Otherwise the payload is just the index.
         payload = EnumPayload::zero(IGM, PayloadSchema);
-#if defined(__BIG_ENDIAN__) && defined(__LP64__)
-        // Code produced above are of type IGM.Int32Ty
-        // However, payload is IGM.SizeTy in 64bit
-        if (numCaseBits >= 64)
-          tagIndex = IGF.Builder.CreateZExt(tagIndex, IGM.SizeTy);
-#endif
+        if (!IGF.IGM.Triple.isLittleEndian()) {
+          if (IGF.IGM.Triple.isArch64Bit() && numCaseBits >= 64) {
+            // Need to set the full 64-bit chunk on big-endian systems.
+            tagIndex = IGF.Builder.CreateZExt(tagIndex, IGM.SizeTy);
+          }
+	}
         // We know we won't use more than numCaseBits from tagIndex's value:
         // We made sure of this in the logic above.
         payload.insertValue(IGF, tagIndex, 0,
@@ -6202,8 +6206,7 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
     if (TIK <= Opaque) {
       auto alignment = eltTI.getBestKnownAlignment();
       applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/false, alignment);
-      auto enumAccessible =
-        IsABIAccessible_t(TC.IGM.getSILModule().isTypeABIAccessible(Type));
+      auto enumAccessible = IsABIAccessible_t(TC.IGM.isTypeABIAccessible(Type));
       return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
                              alignment,
                              eltTI.isPOD(ResilienceExpansion::Maximal),
@@ -6389,8 +6392,7 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeDynamicLayout(
   
   applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/false, alignment);
   
-  auto enumAccessible =
-    IsABIAccessible_t(TC.IGM.getSILModule().isTypeABIAccessible(Type));
+  auto enumAccessible = IsABIAccessible_t(TC.IGM.isTypeABIAccessible(Type));
 
   return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
          alignment,
@@ -6590,8 +6592,7 @@ TypeInfo *MultiPayloadEnumImplStrategy::completeDynamicLayout(
   
   applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/false, alignment);
 
-  auto enumAccessible =
-    IsABIAccessible_t(TC.IGM.getSILModule().isTypeABIAccessible(Type));
+  auto enumAccessible = IsABIAccessible_t(TC.IGM.isTypeABIAccessible(Type));
   
   return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
                                                        alignment, pod, bt,
@@ -6614,8 +6615,7 @@ ResilientEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                                                   SILType Type,
                                                   EnumDecl *theEnum,
                                                   llvm::StructType *enumTy) {
-  auto abiAccessible =
-    IsABIAccessible_t(TC.IGM.getSILModule().isTypeABIAccessible(Type));
+  auto abiAccessible = IsABIAccessible_t(TC.IGM.isTypeABIAccessible(Type));
   return registerEnumTypeInfo(
                        new ResilientEnumTypeInfo(*this, enumTy, abiAccessible));
 }

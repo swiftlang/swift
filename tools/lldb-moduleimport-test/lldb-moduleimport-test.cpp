@@ -25,6 +25,7 @@
 #include "swift/Basic/Dwarf.h"
 #include "llvm/Object/ELFObjectFile.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "llvm/Object/COFF.h"
 #include "llvm/Object/MachO.h"
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Support/CommandLine.h"
@@ -133,6 +134,7 @@ collectASTModules(llvm::cl::list<std::string> &InputNames,
     auto *Obj = OF->getBinary();
     auto *MachO = llvm::dyn_cast<llvm::object::MachOObjectFile>(Obj);
     auto *ELF = llvm::dyn_cast<llvm::object::ELFObjectFileBase>(Obj);
+    auto *COFF = llvm::dyn_cast<llvm::object::COFFObjectFile>(Obj);
 
     if (MachO) {
       for (auto &Symbol : Obj->symbols()) {
@@ -164,7 +166,8 @@ collectASTModules(llvm::cl::list<std::string> &InputNames,
       llvm::StringRef Name;
       Section.getName(Name);
       if ((MachO && Name == swift::MachOASTSectionName) ||
-          (ELF && Name == swift::ELFASTSectionName)) {
+          (ELF && Name == swift::ELFASTSectionName) ||
+          (COFF && Name == swift::COFFASTSectionName)) {
         uint64_t Size = Section.getSize();
         StringRef ContentsReference;
         Section.getContents(ContentsReference);

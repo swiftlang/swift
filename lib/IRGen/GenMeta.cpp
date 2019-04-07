@@ -205,18 +205,21 @@ static void emitMetadataCompletionFunction(IRGenModule &IGM,
   IGF.Builder.CreateRet(returnValue);
 }
 
-static bool needsForeignMetadataCompletionFunction(StructDecl *decl) {
+static bool needsForeignMetadataCompletionFunction(IRGenModule &IGM,
+                                                   StructDecl *decl) {
   // Currently, foreign structs never need a completion function.
   return false;
 }
 
-static bool needsForeignMetadataCompletionFunction(EnumDecl *decl) {
+static bool needsForeignMetadataCompletionFunction(IRGenModule &IGM,
+                                                   EnumDecl *decl) {
   // Currently, foreign enums never need a completion function.
   return false;
 }
 
-static bool needsForeignMetadataCompletionFunction(ClassDecl *decl) {
-  return decl->hasSuperclass();
+static bool needsForeignMetadataCompletionFunction(IRGenModule &IGM,
+                                                   ClassDecl *decl) {
+  return IGM.getOptions().LazyInitializeClassMetadata || decl->hasSuperclass();
 }
 
 /*****************************************************************************/
@@ -1171,7 +1174,7 @@ namespace {
     }
 
     bool needsForeignMetadataCompletionFunction() {
-      return ::needsForeignMetadataCompletionFunction(Type);
+      return ::needsForeignMetadataCompletionFunction(IGM, Type);
     }
 
     /// Add an SingletonMetadataInitialization structure to the descriptor.
@@ -1628,6 +1631,7 @@ namespace {
 
       // union {
       //   uint32_t MetadataPositiveSizeInWords;
+      //   ExtraClassContextFlags ExtraClassFlags;
       // };
       if (!MetadataLayout) {
         // FIXME: do something meaningful for foreign classes?
@@ -1636,7 +1640,10 @@ namespace {
         B.addInt32(MetadataLayout->getSize().getOffsetToEnd()
                      / IGM.getPointerSize());
       } else {
-        B.addInt32(0); // currently unused
+        ExtraClassDescriptorFlags flags;
+        if (hasObjCResilientClassStub(IGM, getType()))
+          flags.setObjCResilientClassStub(true);
+        B.addInt32(flags.getOpaqueValue());
       }
 
       // uint32_t NumImmediateMembers;
@@ -2408,12 +2415,6 @@ static void emitFieldOffsetGlobals(IRGenModule &IGM,
 static ClassFlags getClassFlags(ClassDecl *classDecl) {
   auto flags = ClassFlags();
 
-#if !SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
-  // FIXME: Remove this after enabling stable ABI.
-  // This bit is NOT conditioned on UseDarwinPreStableABIBit.
-  flags |= ClassFlags::IsSwiftPreStableABI;
-#endif
-
   // Set a flag if the class uses Swift refcounting.
   auto type = classDecl->getDeclaredType()->getCanonicalType();
   if (type->getReferenceCounting() == ReferenceCounting::Native) {
@@ -2484,7 +2485,8 @@ namespace {
       case ClassMetadataStrategy::Update:
       case ClassMetadataStrategy::FixedOrUpdate:
       case ClassMetadataStrategy::Fixed: {
-        auto type = (Target->checkObjCAncestry() != ObjCClassKind::NonObjC
+        // FIXME: Should this check HasImported instead?
+        auto type = (Target->checkAncestry(AncestryFlags::ObjC)
                     ? IGM.Context.TheUnknownObjectType
                     : IGM.Context.TheNativeObjectType);
         auto wtable = IGM.getAddrOfValueWitnessTable(type);
@@ -2554,7 +2556,8 @@ namespace {
       Type type = Target->mapTypeIntoContext(Target->getSuperclass());
       auto *metadata = tryEmitConstantHeapMetadataRef(
           IGM, type->getCanonicalType(),
-          /*allowUninit*/ false);
+          /*allowUninit*/ false,
+          /*allowStub*/ false);
       assert(metadata != nullptr);
       B.add(metadata);
     }
@@ -3046,23 +3049,17 @@ namespace {
 /// references, we emit the symbol as a global asm block.
 static void emitObjCClassSymbol(IRGenModule &IGM,
                                 ClassDecl *classDecl,
-                                llvm::GlobalValue *metadata) {
-  llvm::SmallString<32> classSymbol;
-  LinkEntity::forObjCClass(classDecl).mangle(classSymbol);
-  
-  // Create the alias.
-  auto *metadataTy = cast<llvm::PointerType>(metadata->getType());
+                                llvm::Constant *metadata) {
+  auto entity = LinkEntity::forObjCClass(classDecl);
+  LinkInfo link = LinkInfo::get(IGM, entity, ForDefinition);
 
   // Create the alias.
-  auto *alias = llvm::GlobalAlias::create(metadataTy->getElementType(),
-                                          metadataTy->getAddressSpace(),
-                                          metadata->getLinkage(),
-                                          classSymbol.str(), metadata,
-                                          IGM.getModule());
-  alias->setVisibility(metadata->getVisibility());
-
-  if (IGM.useDllStorage())
-    alias->setDLLStorageClass(metadata->getDLLStorageClass());
+  auto *ptrTy = cast<llvm::PointerType>(metadata->getType());
+  auto *alias = llvm::GlobalAlias::create(
+      ptrTy->getElementType(), ptrTy->getAddressSpace(), link.getLinkage(),
+      link.getName(), metadata, &IGM.Module);
+  ApplyIRLinkage({link.getLinkage(), link.getVisibility(), link.getDLLStorage()})
+      .to(alias);
 }
 
 /// Emit the type metadata or metadata template for a class.
@@ -3145,6 +3142,26 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
   if (IGM.ObjCInterop) {
     switch (strategy) {
     case ClassMetadataStrategy::Resilient:
+      // Even non-@objc classes can have Objective-C categories attached, so
+      // we always emit a resilient class stub as long as -enable-objc-interop
+      // is set.
+      if (hasObjCResilientClassStub(IGM, classDecl)) {
+        emitObjCResilientClassStub(IGM, classDecl);
+
+        if (classDecl->isObjC()) {
+          auto *stub = IGM.getAddrOfObjCResilientClassStub(
+              classDecl, NotForDefinition,
+              TypeMetadataAddress::AddressPoint);
+          emitObjCClassSymbol(IGM, classDecl, stub);
+
+          // @_objc_non_lazy_realization is only for use by the standard
+          // library, and we cannot support it with Objective-C class
+          // stubs (which there are none of in the standard library).
+          assert(!classDecl->getAttrs().hasAttribute<ObjCNonLazyRealizationAttr>());
+          IGM.addObjCClass(stub, /*eagerInitialization=*/false);
+        }
+      }
+      break;
     case ClassMetadataStrategy::Singleton:
       break;
     
@@ -3804,7 +3821,7 @@ namespace {
     }
 
     bool needsMetadataCompletionFunction() {
-      return needsForeignMetadataCompletionFunction(Target);
+      return needsForeignMetadataCompletionFunction(IGM, Target);
     }
 
     void createMetadataCompletionFunction() {
@@ -3837,10 +3854,19 @@ namespace {
   public:
     ForeignClassMetadataBuilder(IRGenModule &IGM, ClassDecl *target,
                                 ConstantStructBuilder &B)
-      : ForeignMetadataBuilderBase(IGM, target, B) {}
+        : ForeignMetadataBuilderBase(IGM, target, B) {
+      if (IGM.getOptions().LazyInitializeClassMetadata)
+        CanBeConstant = false;
+    }
 
     void emitInitializeMetadata(IRGenFunction &IGF, llvm::Value *metadata,
                                 MetadataDependencyCollector *collector) {
+      if (!Target->hasSuperclass()) {
+        assert(IGM.getOptions().LazyInitializeClassMetadata &&
+               "should have superclass if not lazy initializing class metadata");
+        return;
+      }
+
       // Emit a reference to the superclass.
       auto superclass = IGF.emitAbstractTypeMetadataRef(
                                    Target->getSuperclass()->getCanonicalType());
@@ -3858,6 +3884,24 @@ namespace {
     // Visitor methods.
 
     void addValueWitnessTable() {
+      // The runtime will fill in the default VWT during allocation for the
+      // foreign class metadata.
+      //
+      // As of Swift 5.1, the runtime will fill in a default VWT during
+      // allocation of foreign class metadata.  We rely on this for correctness
+      // on COFF, where we can't necessarily reference the stanard VWT from the
+      // metadata candidate, but it is a good optimization everywhere.
+      //
+      // The default VWT uses ObjC-compatible reference counting if ObjC interop
+      // is enabled and Swift-compatible reference counting otherwise.  That is
+      // currently always good enough for foreign classes, so we can
+      // unconditionally rely on the default VWT.
+      //
+      // FIXME: take advantage of this on other targets when targeting a
+      // sufficiently recent runtime.
+      if (IGM.getOptions().LazyInitializeClassMetadata)
+        return B.addNullPointer(IGM.WitnessTablePtrTy);
+
       // Without Objective-C interop, foreign classes must still use
       // Swift native reference counting.
       auto type = (IGM.ObjCInterop
@@ -4085,6 +4129,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Hashable:
   case KnownProtocolKind::CaseIterable:
   case KnownProtocolKind::Comparable:
+  case KnownProtocolKind::SIMDScalar:
   case KnownProtocolKind::ObjectiveCBridgeable:
   case KnownProtocolKind::DestructorSafeContainer:
   case KnownProtocolKind::SwiftNewtypeWrapper:

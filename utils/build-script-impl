@@ -166,6 +166,7 @@ KNOWN_SETTINGS=(
     skip-test-tvos-host         ""               "set to skip testing the host parts of the tvOS toolchain"
     skip-test-watchos-simulator  ""              "set to skip testing Swift stdlibs for Apple watchOS simulators (i.e. test devices only)"
     skip-test-watchos-host      ""               "set to skip testing the host parts of the watchOS toolchain"
+    skip-test-android           ""               "set to skip testing Swift stdlibs for Android"
     skip-test-android-host      ""               "set to skip testing the host parts of the Android toolchain"
     validation-test             "0"              "set to run the validation test suite"
     long-test                   "0"              "set to run the long test suite"
@@ -174,6 +175,7 @@ KNOWN_SETTINGS=(
     skip-test-benchmarks        ""               "set to skip running Swift Benchmark Suite"
     skip-test-optimized         ""               "set to skip testing the test suite in optimized mode"
     skip-test-optimize-for-size ""               "set to skip testing the test suite in optimize for size mode"
+    skip-test-optimize-none-implicit-dynamic ""  "set to skip testing the test suite in optimize none with implicit dynamic mode"
     skip-test-sourcekit         ""               "set to skip testing SourceKit"
     stress-test-sourcekit       ""               "set to run the stress-SourceKit target"
     workspace                   "${HOME}/src"    "source directory containing llvm, clang, swift"
@@ -1434,7 +1436,11 @@ function calculate_targets_for_host() {
             android-*)
                 swift_sdk="ANDROID"
                 build_for_this_target=$(not ${SKIP_BUILD_ANDROID})
-                test_this_target=$(not ${SKIP_TEST_ANDROID_HOST})
+                if [[ ! "${SKIP_TEST_ANDROID_HOST}" ]] ; then
+                    test_host_only=1
+                else
+                    test_this_target=$(not ${SKIP_TEST_ANDROID})
+                fi
                 ;;
             *)
                 echo "Unknown compiler deployment target: ${stdlib_deployment_target}"
@@ -1475,7 +1481,7 @@ function calculate_targets_for_host() {
         if [[ "${test_this_target}" ]] && [[ "${is_in_build_list}" ]]; then
             test_target_suffix=""
             if [[ -n "${test_host_only}" ]] ; then
-                test_target_suffix="-non-executable"
+                test_target_suffix="-only_non_executable"
             fi
 
             test_subset_target_suffix=""
@@ -1497,6 +1503,9 @@ function calculate_targets_for_host() {
             fi
             if [[ $(not ${SKIP_TEST_OPTIMIZE_FOR_SIZE}) && ! -n "${test_host_only}" ]] ; then
                 SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}-optimize_size-${stdlib_deployment_target}")
+            fi
+            if [[ $(not ${SKIP_TEST_OPTIMIZE_NONE_IMPLICIT_DYNAMIC}) && ! -n "${test_host_only}" ]] ; then
+                SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}-optimize_none_implicit_dynamic-${stdlib_deployment_target}")
             fi
         fi
     done
@@ -2169,6 +2178,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLLVM_TOOL_SWIFT_BUILD:BOOL=NO
                     -DLLVM_INCLUDE_DOCS:BOOL=TRUE
                     -DLLVM_ENABLE_LTO:STRING="${LLVM_ENABLE_LTO}"
+                    -DCOMPILER_RT_INTERCEPT_LIBDISPATCH=ON
                     "${llvm_cmake_options[@]}"
                 )
 
@@ -2613,7 +2623,8 @@ for host in "${ALL_HOSTS[@]}"; do
                 ;;
                 *)
                   # FIXME: Always re-build XCTest on non-darwin platforms.
-                  # Remove this when products build in the CMake system.
+                  # The Swift project might have been changed, but CMake might
+                  # not be aware and will not rebuild.
                   echo "Cleaning the XCTest build directory"
                   call rm -rf "${XCTEST_BUILD_DIR}"
 
@@ -2687,8 +2698,9 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBDISPATCH_BUILD_ARGS=( -DFOUNDATION_ENABLE_LIBDISPATCH=NO )
                 fi
 
-                # FIXME: Always re-build foundation on non-darwin platforms.
-                # Remove this when products build in the CMake system.
+                # FIXME: Always re-build XCTest on non-darwin platforms.
+                # The Swift project might have been changed, but CMake might
+                # not be aware and will not rebuild.
                 echo "Cleaning the Foundation build directory"
                 call rm -rf "${build_dir}"
 
@@ -2725,46 +2737,14 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 case "${host}" in
                 macosx-*)
-                  if [[ "${RECONFIGURE}" || ! -f "${LIBDISPATCH_BUILD_DIR}"/config.status ]]; then
-                      echo "Reconfiguring libdispatch"
-                      # First time building; need to run autotools and configure
-                      if [[ "$LIBDISPATCH_BUILD_TYPE" == "Release" ]] ; then
-                          dispatch_build_variant_arg="release"
-                      elif [[ "$LIBDISPATCH_BUILD_TYPE" == "RelWithDebInfo" ]]; then
-                          dispatch_build_variant_arg="releasedebuginfo"
-                      else
-                          dispatch_build_variant_arg="debug"
-                      fi
-
-                      if [ $(true_false "${BUILD_SWIFT_STATIC_STDLIB}") == "TRUE" ]; then
-                          libdispatch_enable_static="--enable-static=yes"
-                      else
-                          libdispatch_enable_static=""
-                      fi
-
-                      call mkdir -p "${LIBDISPATCH_BUILD_DIR}"
-                      with_pushd "${LIBDISPATCH_SOURCE_DIR}" \
-                          call autoreconf -fvi
-                      with_pushd "${LIBDISPATCH_BUILD_DIR}" \
-                          call env CC="${LLVM_BIN}/clang" CXX="${LLVM_BIN}/clang++" SWIFTC="${SWIFTC_BIN}" \
-                              "${LIBDISPATCH_SOURCE_DIR}"/configure --with-swift-toolchain="${SWIFT_BUILD_PATH}" \
-                              --with-build-variant=$dispatch_build_variant_arg \
-                              --prefix="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})" ${libdispatch_enable_static}
-                  else
-                      echo "Skipping reconfiguration of libdispatch"
-                  fi
-
-                  with_pushd "${LIBDISPATCH_BUILD_DIR}" \
-                      call make
-                  with_pushd "${LIBDISPATCH_BUILD_DIR}/tests" \
-                      call make build-tests
-
-                  # libdispatch builds itself and doesn't use cmake
-                  continue
+                  echo "Error: build-script does not support building libdispatch on macOS?!"
+                  usage 1>&2
+                  exit 1
                 ;;
                 *)
-                  # FIXME: Always re-build libdispatch on non-darwin platforms.
-                  # Remove this when products build in the CMake system.
+                  # FIXME: Always re-build XCTest on non-darwin platforms.
+                  # The Swift project might have been changed, but CMake might
+                  # not be aware and will not rebuild.
                   echo "Cleaning the libdispatch build directory"
                   call rm -rf "${LIBDISPATCH_BUILD_DIR}"
 
@@ -2826,16 +2806,16 @@ for host in "${ALL_HOSTS[@]}"; do
                 ICU_LIBDIR_STATIC="$(build_directory ${host} swift)/lib/swift_static/${SWIFT_HOST_VARIANT}"
                 ICU_LIBDIR_STATIC_ARCH="$(build_directory ${host} swift)/lib/swift_static/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
                 # Add in the ICU renaming config into uconfig.h
-                sed -e "/^#define __UCONFIG_H__/ r ${LIBICU_BUILD_DIR}/uconfig.h.prepend" -i ${ICU_TMPINSTALL}/include/unicode/uconfig.h
+                call sed -e "/^#define __UCONFIG_H__/ r ${LIBICU_BUILD_DIR}/uconfig.h.prepend" -i ${ICU_TMPINSTALL}/include/unicode/uconfig.h
 
                 if [ $(true_false "${BUILD_SWIFT_STATIC_STDLIB}") == "TRUE" ]; then
                     # Copy the static libs into the swift_static directory
-                    mkdir -p "${ICU_LIBDIR_STATIC_ARCH}"
+                    call mkdir -p "${ICU_LIBDIR_STATIC_ARCH}"
                     for l in uc i18n data
                     do
                         lib="${ICU_LIBDIR}/libicu${l}swift.a"
-                        cp "${lib}" "${ICU_LIBDIR_STATIC}"
-                        cp "${lib}" "${ICU_LIBDIR_STATIC_ARCH}"
+                        call cp "${lib}" "${ICU_LIBDIR_STATIC}"
+                        call cp "${lib}" "${ICU_LIBDIR_STATIC_ARCH}"
                     done
                 fi
 
@@ -3109,6 +3089,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
                     FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
                     DOTEST_EXTRA="-I${FOUNDATION_BUILD_DIR}"
+                    DOTEST_EXTRA="-Xcc -F${FOUNDATION_BUILD_DIR}"
                     DOTEST_EXTRA="-Xcc -F${FOUNDATION_BUILD_DIR}/CoreFoundation-prefix/System/Library/Frameworks"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -I${FOUNDATION_BUILD_DIR}/swift"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -I${LIBDISPATCH_SOURCE_DIR}"
@@ -3134,6 +3115,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --threads=$(sysctl hw.physicalcpu | awk '{ print $2 }')"
                 fi
 
+                # Record the times test took and report the slowest.
+                LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -v --time-tests"
                 if [[ "$using_xcodebuild" == "FALSE" ]] ; then
                     with_pushd ${lldb_build_dir} \
                         call ${NINJA_BIN} unittests/LLDBUnitTests
@@ -3707,31 +3690,31 @@ for host in "${ALL_HOSTS[@]}"; do
                 ICU_INSTALL_DIR="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})"
                 ICU_LIBDIR="$(build_directory ${host} swift)/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
                 LIBICU_DEST_DIR="${ICU_INSTALL_DIR}lib/swift/${SWIFT_HOST_VARIANT}"
-                mkdir -p ${LIBICU_DEST_DIR}
+                call mkdir -p ${LIBICU_DEST_DIR}
 
                 for l in uc i18n data
                 do
                     lib=${ICU_LIBDIR}/libicu${l}swift
                     echo "${lib} => ${LIBICU_DEST_DIR}"
-                    cp -d ${lib}.so ${lib}.so.* ${LIBICU_DEST_DIR}
+                    call cp -d ${lib}.so ${lib}.so.* ${LIBICU_DEST_DIR}
                 done
 
                 if [ $(true_false "${BUILD_SWIFT_STATIC_STDLIB}") == "TRUE" ]; then
                     LIBICU_DEST_DIR_STATIC="${ICU_INSTALL_DIR}lib/swift_static/${SWIFT_HOST_VARIANT}"
-                    mkdir -p ${LIBICU_DEST_DIR_STATIC}
+                    call mkdir -p ${LIBICU_DEST_DIR_STATIC}
                     for l in uc i18n data
                     do
                         lib=${ICU_LIBDIR}/libicu${l}swift
                         echo "${lib} => ${LIBICU_DEST_DIR_STATIC}"
-                        cp -d ${lib}.a ${LIBICU_DEST_DIR_STATIC}
+                        call cp -d ${lib}.a ${LIBICU_DEST_DIR_STATIC}
                     done
                 fi
 
                 ICU_TMP_INSTALL_DIR="${ICU_BUILD_DIR}/tmp_install"
-                mkdir -p  "${ICU_INSTALL_DIR}include"
-                cp -a "${ICU_TMP_INSTALL_DIR}/include/unicode" "${ICU_INSTALL_DIR}include"
-                mkdir -p "${ICU_INSTALL_DIR}share/icuswift"
-                cp -a "${ICU_TMP_INSTALL_DIR}/share/icuswift" "${ICU_INSTALL_DIR}share"
+                call mkdir -p  "${ICU_INSTALL_DIR}include"
+                call cp -a "${ICU_TMP_INSTALL_DIR}/include/unicode" "${ICU_INSTALL_DIR}include"
+                call mkdir -p "${ICU_INSTALL_DIR}share/icuswift"
+                call cp -a "${ICU_TMP_INSTALL_DIR}/share/icuswift" "${ICU_INSTALL_DIR}share"
                 continue
                 ;;
             playgroundsupport)

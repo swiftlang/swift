@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -35,6 +35,11 @@ namespace Demangle {
 
 enum class SymbolicReferenceKind : uint8_t;
 
+/// A simple default implementation that assigns letters to type parameters in
+/// alphabetic order.
+std::string genericParameterName(uint64_t depth, uint64_t index);
+
+/// Display style options for the demangler.
 struct DemangleOptions {
   bool SynthesizeSugarOnTypes = false;
   bool DisplayDebuggerGeneratedModule = true;
@@ -52,6 +57,8 @@ struct DemangleOptions {
   bool ShortenArchetype = false;
   bool ShowPrivateDiscriminators = true;
   bool ShowFunctionArgumentTypes = true;
+  std::function<std::string(uint64_t, uint64_t)> GenericParameterName =
+      genericParameterName;
 
   DemangleOptions() {}
 
@@ -214,7 +221,7 @@ public:
   // Only to be used by the demangler parsers.
   void addChild(NodePointer Child, NodeFactory &Factory);
   // Only to be used by the demangler parsers.
-  void removeChildAt(unsigned Pos, NodeFactory &factory);
+  void removeChildAt(unsigned Pos);
 
   // Reverses the order of children.
   void reverseChildren(size_t StartingAt = 0);
@@ -346,8 +353,9 @@ public:
   /// prefix: _T, _T0, $S, _$S.
   ///
   /// \returns The demangled string.
-  std::string demangleSymbolAsString(llvm::StringRef MangledName,
-                            const DemangleOptions &Options = DemangleOptions());
+  std::string demangleSymbolAsString(
+      llvm::StringRef MangledName,
+      const DemangleOptions &Options = DemangleOptions());
 
   /// Demangle the given type and return the readable name.
   ///
@@ -355,8 +363,9 @@ public:
   /// a mangling prefix.
   ///
   /// \returns The demangled string.
-  std::string demangleTypeAsString(llvm::StringRef MangledName,
-                            const DemangleOptions &Options = DemangleOptions());
+  std::string
+  demangleTypeAsString(llvm::StringRef MangledName,
+                       const DemangleOptions &Options = DemangleOptions());
 
   /// Returns true if the mangledName refers to a thunk function.
   ///
@@ -475,17 +484,8 @@ enum class OperatorKind {
   Infix,
 };
 
-/// Mangle an identifier using Swift's mangling rules.
-void mangleIdentifier(const char *data, size_t length,
-                      OperatorKind operatorKind, std::string &out,
-                      bool usePunycode = true);
-
 /// Remangle a demangled parse tree.
-///
-/// If \p BorrowFrom is specified, the initial bump pointer memory is
-/// borrowed from the free memory of BorrowFrom.
-std::string mangleNode(NodePointer root,
-                       NodeFactory *BorrowFrom = nullptr);
+std::string mangleNode(NodePointer root);
 
 using SymbolicResolver =
   llvm::function_ref<Demangle::NodePointer (SymbolicReferenceKind,
@@ -493,18 +493,33 @@ using SymbolicResolver =
 
 /// Remangle a demangled parse tree, using a callback to resolve
 /// symbolic references.
+std::string mangleNode(NodePointer root, SymbolicResolver resolver);
+
+/// Remangle a demangled parse tree, using a callback to resolve
+/// symbolic references.
 ///
-/// If \p BorrowFrom is specified, the initial bump pointer memory is
-/// borrowed from the free memory of BorrowFrom.
-std::string mangleNode(NodePointer root, SymbolicResolver resolver,
-                       NodeFactory *BorrowFrom = nullptr);
+/// The returned string is owned by \p Factory. This means \p Factory must stay
+/// alive as long as the returned string is used.
+llvm::StringRef mangleNode(NodePointer root, SymbolicResolver resolver,
+                           NodeFactory &Factory);
 
 /// Remangle in the old mangling scheme.
 ///
 /// This is only used for objc-runtime names.
-/// If \p BorrowFrom is specified, the initial bump pointer memory is
-/// borrowed from the free memory of BorrowFrom.
-std::string mangleNodeOld(NodePointer root, NodeFactory *BorrowFrom = nullptr);
+std::string mangleNodeOld(NodePointer root);
+
+/// Remangle in the old mangling scheme.
+///
+/// This is only used for objc-runtime names.
+/// The returned string is owned by \p Factory. This means \p Factory must stay
+/// alive as long as the returned string is used.
+llvm::StringRef mangleNodeOld(NodePointer node, NodeFactory &Factory);
+
+/// Remangle in the old mangling scheme and embed the name in "_Tt<name>_".
+///
+/// The returned string is null terminated and owned by \p Factory. This means
+/// \p Factory must stay alive as long as the returned string is used.
+const char *mangleNodeAsObjcCString(NodePointer node, NodeFactory &Factory);
 
 /// Transform the node structure to a string.
 ///
@@ -584,7 +599,6 @@ bool nodeConsumesGenericArgs(Node *node);
 bool isSpecialized(Node *node);
 
 NodePointer getUnspecialized(Node *node, NodeFactory &Factory);
-std::string archetypeName(Node::IndexType index, Node::IndexType depth);
 
 /// Returns true if the node \p kind refers to a context node, e.g. a nominal
 /// type or a function.
