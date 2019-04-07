@@ -51,6 +51,8 @@ import resilient_objc_class
 // CHECK-SAME: @"got.$s15resilient_class22ResilientOutsideParentCMn"
 // CHECK-SAME: @"got.$s15resilient_class22ResilientOutsideParentCACycfCTq"
 // CHECK-SAME: @"$s31class_update_callback_with_stub17ResilientSubclassCACycfC"
+// -- class stub
+// CHECK-SAME: @"$s31class_update_callback_with_stub17ResilientSubclassCMt"
 // CHECK-SAME: }>, section "__TEXT,__const", align 4
 
 

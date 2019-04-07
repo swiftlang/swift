@@ -1420,6 +1420,7 @@ namespace {
       super::layout();
       addVTable();
       addOverrideTable();
+      addObjCResilientClassStubInfo();
     }
 
     void addIncompleteMetadataOrRelocationFunction() {
@@ -1652,6 +1653,20 @@ namespace {
 
       // uint32_t FieldOffsetVectorOffset;
       B.addInt32(getFieldVectorOffset() / IGM.getPointerSize());
+    }
+
+    void addObjCResilientClassStubInfo() {
+      if (IGM.getClassMetadataStrategy(getType()) !=
+            ClassMetadataStrategy::Resilient)
+        return;
+
+      if (!hasObjCResilientClassStub(IGM, getType()))
+        return;
+
+      B.addRelativeAddress(
+        IGM.getAddrOfObjCResilientClassStub(
+          getType(), NotForDefinition,
+          TypeMetadataAddress::AddressPoint));
     }
   };
 } // end anonymous namespace
