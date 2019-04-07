@@ -27,6 +27,7 @@ import CTensorFlow
 
 public extension Sequence {
   /// Returns true if all elements satisfy the predicate.
+  @available(*, deprecated, renamed: "allSatisfy(_:)")
   func forAll(_ predicate: (Element) throws -> Bool) rethrows -> Bool {
     return try first(where: { try !predicate($0) }) == nil
   }
