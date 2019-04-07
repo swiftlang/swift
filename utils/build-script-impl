@@ -2534,6 +2534,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options+=(
                       -DLLDB_BUILD_FRAMEWORK:BOOL=TRUE
                       -DLLDB_CODESIGN_IDENTITY=""
+                      -DLLDB_USE_SYSTEM_DEBUGSERVER:BOOL=TRUE
+                      -DLLDB_FRAMEWORK_TOOLS="darwin-debug;lldb-argdumper;lldb-server;repl_swift"
                     )
                   fi
                 fi
