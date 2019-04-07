@@ -1879,16 +1879,16 @@ bool ClosureExpr::hasEmptyBody() const {
   return getBody()->getNumElements() == 0;
 }
 
-bool ClosureExpr::hasSelfParamCapture() const {
-  for (auto CLE : getCaptureListExpr()->getCaptureList()) {
+bool CaptureListExpr::hasSelfParamCapture() const {
+  for (auto CLE : const_cast<CaptureListExpr *>(this)->getCaptureList()) {
     if (CLE.isSimpleSelfCapture())
       return true;
   }
   return false;
 }
 
-CaptureListEntry ClosureExpr::getSelfParamCapture() const {
-  for (auto CLE : getCaptureListExpr()->getCaptureList()) {
+CaptureListEntry CaptureListExpr::getSelfParamCapture() const {
+  for (auto CLE : const_cast<CaptureListExpr *>(this)->getCaptureList()) {
     if (CLE.isSimpleSelfCapture())
       return CLE;
   }

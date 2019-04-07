@@ -727,13 +727,14 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByClosure(
     AbstractClosureExpr *ACE, Optional<bool> isCascadingUse) {
   if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
     lookForLocalVariablesIn(CE);
-    if (CE->hasSelfParamCapture()) {
+    auto *CLE = CE->getCaptureListExpr();
+    if (CLE && CLE->hasSelfParamCapture()) {
       // If this closure has captured self, then we need to look for potential
       // instance members in the type context of the self param.
       ifNotDoneYet([&] {
-        assert(CE->getSelfParamCapture().Init->getNumPatternEntries() == 1);
-        auto *selfDecl = CE->getSelfParamCapture().Init
-                           ->getSingleInitializerVar();
+        assert(CLE->getSelfParamCapture().Init->getNumPatternEntries() == 1);
+        auto *selfDecl = CLE->getSelfParamCapture().Init
+                            ->getSingleInitializerVar();
         DeclContext *const parentCtx = selfDecl->getDeclContext()->getParent();
         finishLookingInContext(
           AddGenericParameters::Yes,

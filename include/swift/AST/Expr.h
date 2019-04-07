@@ -3689,9 +3689,6 @@ public:
     CLE = list;
   }
 
-  bool hasSelfParamCapture() const;
-  CaptureListEntry getSelfParamCapture() const;
-
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Closure;
   }
@@ -3797,6 +3794,9 @@ public:
 
   void setClosureBody(ClosureExpr *body) { closureBody = body; }
 
+  bool hasSelfParamCapture() const;
+  CaptureListEntry getSelfParamCapture() const;
+      
   /// This is a bit weird, but the capture list is lexically contained within
   /// the closure, so the ClosureExpr has the full source range.
   SWIFT_FORWARD_SOURCE_LOCS_TO(closureBody)
