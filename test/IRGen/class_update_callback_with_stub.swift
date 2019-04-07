@@ -91,6 +91,11 @@ import resilient_objc_class
 // CHECK-LABEL: @"_CATEGORY__TtC31class_update_callback_with_stub27FixedLayoutNSObjectSubclass_$_class_update_callback_with_stub" = private constant
 // CHECK-SAME:  @"$s31class_update_callback_with_stub27FixedLayoutNSObjectSubclassCMs"
 
+// -- But not if the entire inheritance chain is in a single module
+
+// CHECK-LABEL: @"_CATEGORY__TtC15resilient_class22ResilientOutsideParent_$_class_update_callback_with_stub" = private constant
+// CHECK-SAME:  @"$s15resilient_class22ResilientOutsideParentCN"
+
 
 // -- Class stubs do not appear in the class list
 
@@ -102,6 +107,7 @@ import resilient_objc_class
 // CHECK-SAME: @"_CATEGORY__TtC31class_update_callback_with_stub17ResilientSubclass_$_class_update_callback_with_stub"
 // CHECK-SAME: @"_CATEGORY__TtC31class_update_callback_with_stub25ResilientNSObjectSubclass_$_class_update_callback_with_stub"
 // CHECK-SAME: @"_CATEGORY__TtC31class_update_callback_with_stub27FixedLayoutNSObjectSubclass_$_class_update_callback_with_stub"
+// CHECK-SAME: @"_CATEGORY__TtC15resilient_class22ResilientOutsideParent_$_class_update_callback_with_stub"
 // CHECK-SAME: , section "__DATA,__objc_catlist,regular,no_dead_strip"
 
 
@@ -152,4 +158,8 @@ extension ResilientNSObjectSubclass {
 
 extension FixedLayoutNSObjectSubclass {
   @objc public func objcMethod() {}
+}
+
+extension ResilientOutsideParent {
+  @objc public func anObjcMethod() {}
 }
