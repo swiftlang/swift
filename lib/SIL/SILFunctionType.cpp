@@ -832,7 +832,8 @@ private:
       auto flags = params[i].getParameterFlags();
 
       visit(flags.getValueOwnership(), /*forSelf=*/false,
-            eltPattern, ty, silRepresentation);
+            // SWIFT_ENABLE_TENSORFLOW
+            eltPattern, ty, silRepresentation, flags.isNonDifferentiable());
     }
 
     // Process the self parameter.  Note that we implicitly drop self
@@ -853,7 +854,9 @@ private:
 
   void visit(ValueOwnership ownership, bool forSelf,
              AbstractionPattern origType, CanType substType,
-             SILFunctionTypeRepresentation rep) {
+             // SWIFT_ENABLE_TENSORFLOW
+             SILFunctionTypeRepresentation rep,
+             bool isNonDifferentiable = false) {
     assert(!isa<InOutType>(substType));
 
     // Tuples get handled specially, in some cases:
@@ -902,7 +905,10 @@ private:
     }
     auto loweredType = substTL.getLoweredType().getASTType();
 
-    Inputs.push_back(SILParameterInfo(loweredType, convention));
+    // SWIFT_ENABLE_TENSORFLOW
+    Inputs.push_back(SILParameterInfo(loweredType, convention)
+        .getWithDifferentiability(
+            SILParameterDifferentiability::NotDifferentiable));
 
     maybeAddForeignParameters();
   }
