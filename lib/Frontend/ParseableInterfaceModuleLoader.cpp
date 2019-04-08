@@ -864,13 +864,25 @@ class ParseableInterfaceModuleLoaderImpl {
       if (isForwardingModule) {
         if (auto forwardingModule = ForwardingModule::load(*buf)) {
           std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
-          if (forwardingModuleIsUpToDate(*forwardingModule, deps, moduleBuffer))
+          if (forwardingModuleIsUpToDate(*forwardingModule, deps,
+                                         moduleBuffer)) {
+            LLVM_DEBUG(llvm::dbgs() << "Found up-to-date forwarding module at "
+                                    << cachedOutputPath << "\n");
             return DiscoveredModule::forwarded(
               forwardingModule->underlyingModulePath, std::move(moduleBuffer));
+          }
+
+          LLVM_DEBUG(llvm::dbgs() << "Found out-of-date forwarding module at "
+                     << cachedOutputPath << "\n");
         }
       // Otherwise, check if the AST buffer itself is up to date.
       } else if (serializedASTBufferIsUpToDate(*buf, deps)) {
+        LLVM_DEBUG(llvm::dbgs() << "Found up-to-date cached module at "
+                                << cachedOutputPath << "\n");
         return DiscoveredModule::normal(cachedOutputPath, std::move(buf));
+      } else {
+        LLVM_DEBUG(llvm::dbgs() << "Found out-of-date cached module at "
+                   << cachedOutputPath << "\n");
       }
     }
 
@@ -883,14 +895,23 @@ class ParseableInterfaceModuleLoaderImpl {
       llvm::SmallString<256> scratch;
       std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
       auto path = computePrebuiltModulePath(scratch);
-      if (path && swiftModuleIsUpToDate(*path, deps, moduleBuffer))
-        return DiscoveredModule::prebuilt(*path, std::move(moduleBuffer));
+      if (path) {
+        if (swiftModuleIsUpToDate(*path, deps, moduleBuffer)) {
+          LLVM_DEBUG(llvm::dbgs() << "Found up-to-date prebuilt module at "
+                                  << path->str() << "\n");
+          return DiscoveredModule::prebuilt(*path, std::move(moduleBuffer));
+        } else {
+          LLVM_DEBUG(llvm::dbgs() << "Found out-of-date prebuilt module at "
+                     << modulePath << "\n");
+        }
+      }
     }
 
     // Finally, if there's a module adjacent to the .swiftinterface that we can
     // _likely_ load (it validates OK and is up to date), bail early with
     // errc::not_supported, so the next (serialized) loader in the chain will
-    // load it. Alternately, if there's a .swiftmodule present but we can't even
+    // load it.
+    // Alternately, if there's a .swiftmodule present but we can't even
     // read it (for whatever reason), we should let the other module loader
     // diagnose it.
     if (!shouldLoadAdjacentModule)
@@ -898,8 +919,15 @@ class ParseableInterfaceModuleLoaderImpl {
 
     auto adjacentModuleBuffer = fs.getBufferForFile(modulePath);
     if (adjacentModuleBuffer) {
-      if (serializedASTBufferIsUpToDate(*adjacentModuleBuffer.get(), deps))
+      if (serializedASTBufferIsUpToDate(*adjacentModuleBuffer.get(), deps)) {
+        LLVM_DEBUG(llvm::dbgs() << "Found up-to-date module at "
+                                << modulePath
+                                << "; deferring to serialized module loader\n");
         return std::make_error_code(std::errc::not_supported);
+      } else {
+        LLVM_DEBUG(llvm::dbgs() << "Found out-of-date module at "
+                                << modulePath << "\n");
+      }
     } else if (adjacentModuleBuffer.getError() != notFoundError) {
       return std::make_error_code(std::errc::not_supported);
     }
@@ -1053,8 +1081,15 @@ std::error_code ParseableInterfaceModuleLoader::findModuleFilesInDirectory(
   auto Ext = file_types::getExtension(file_types::TY_SwiftParseableInterfaceFile);
   InPath = ModPath;
   path::replace_extension(InPath, Ext);
-  if (!fs.exists(InPath))
+  if (!fs.exists(InPath)) {
+    if (fs.exists(ModPath)) {
+      LLVM_DEBUG(llvm::dbgs()
+        << "No .swiftinterface file found adjacent to module file "
+        << ModPath.str() << "\n");
+      return std::make_error_code(std::errc::not_supported);
+    }
     return std::make_error_code(std::errc::no_such_file_or_directory);
+  }
 
   // Create an instance of the Impl to do the heavy lifting.
   ParseableInterfaceModuleLoaderImpl Impl(
