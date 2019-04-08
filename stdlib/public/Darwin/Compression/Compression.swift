@@ -105,7 +105,7 @@ public class OutputFilter {
   /// - bufferCapacity: capacity of the internal data buffer
   /// - writeFunc: called to write the processed data
   ///
-  /// - Throws: `FilterError.StreamInitError` if stream initialization failed
+  /// - Throws: `FilterError.filterInitError` if filter initialization failed
   public init(
     _ operation: FilterOperation,
     using algorithm: Algorithm,
@@ -151,7 +151,7 @@ public class OutputFilter {
   /// When all output has been sent, the writingTo closure is called one last time with nil data.
   /// Once the stream is finalized, writing non empty/nil data to the stream will throw an exception.
   ///
-  /// - Throws: `FilterError.StreamProcessError` if an error occurs during processing
+  /// - Throws: `FilterError.filterProcessError` if an error occurs during processing
   public func finalize() throws {
     // Do nothing if already finalized
     if _finalized { return }
