@@ -79,9 +79,9 @@ extension compression_stream {
   ///           by the Compression stream API
   ///
   internal init(operation: FilterOperation, algorithm: Algorithm) throws {
-    self.init(dst_ptr: UnsafeMutablePointer<UInt8>.allocate(capacity:0),
+    self.init(dst_ptr: UnsafeMutablePointer<UInt8>(bitPattern: -1)!,
               dst_size: 0,
-              src_ptr: UnsafeMutablePointer<UInt8>.allocate(capacity:0),
+              src_ptr: UnsafePointer<UInt8>(bitPattern: -1)!,
               src_size: 0,
               state: nil)
     let status = compression_stream_init(&self, operation.rawValue, algorithm.rawValue)
