@@ -367,10 +367,10 @@ void forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
         ->forAllVisibleModules(ModuleDecl::AccessPathTy(), fn);
 }
 
-/// Only name lookup has gathered a set of results, perform any necessary
+/// Once name lookup has gathered a set of results, perform any necessary
 /// steps to prune the result set before returning it to the caller.
-bool finishLookup(const DeclContext *dc, NLOptions options,
-                  SmallVectorImpl<ValueDecl *> &decls);
+void pruneLookupResultSet(const DeclContext *dc, NLOptions options,
+                          SmallVectorImpl<ValueDecl *> &decls);
 
 /// Do nothing if debugClient is null.
 template <typename Result>
