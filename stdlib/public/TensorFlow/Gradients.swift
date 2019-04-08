@@ -581,11 +581,11 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
   }
 
   @inlinable
-  func _vjpMean(alongAxes axes: [Int32]) -> (Tensor, (Tensor) -> Tensor) {
+  func _vjpMean(alongAxes axes: Tensor<Int32>) -> (Tensor, (Tensor) -> Tensor) {
     let value = mean(alongAxes: axes)
-    return (value, { [shape = shapeTensor,
-                      count = axes.map { shape[$0] }.reduce(1, *)] in
-      $0.broadcast(toShape: shape) / Tensor(Scalar(count))
+    let count = Raw.gather(params: shapeTensor, indices: axes).product()
+    return (value, { [shape = shapeTensor] in
+      $0.broadcast(toShape: shape) / Tensor(count)
     })
   }
 
