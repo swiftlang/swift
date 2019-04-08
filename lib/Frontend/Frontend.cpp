@@ -296,11 +296,13 @@ bool CompilerInstance::setUpModuleLoaders() {
   auto MLM = ModuleLoadingMode::PreferSerialized;
   if (auto forceModuleLoadingMode =
       llvm::sys::Process::GetEnv("SWIFT_FORCE_MODULE_LOADING")) {
-    if (*forceModuleLoadingMode == "prefer-parseable")
+    if (*forceModuleLoadingMode == "prefer-interface" ||
+        *forceModuleLoadingMode == "prefer-parseable")
       MLM = ModuleLoadingMode::PreferParseable;
     else if (*forceModuleLoadingMode == "prefer-serialized")
       MLM = ModuleLoadingMode::PreferSerialized;
-    else if (*forceModuleLoadingMode == "only-parseable")
+    else if (*forceModuleLoadingMode == "only-interface" ||
+             *forceModuleLoadingMode == "only-parseable")
       MLM = ModuleLoadingMode::OnlyParseable;
     else if (*forceModuleLoadingMode == "only-serialized")
       MLM = ModuleLoadingMode::OnlySerialized;
