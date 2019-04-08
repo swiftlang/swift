@@ -39,6 +39,33 @@ enum class DowngradeToWarning: bool {
   Yes
 };
 
+/// Calls \p callback for each type in each requirement provided by
+/// \p source.
+static void forAllRequirementTypes(
+    WhereClauseOwner source,
+    llvm::function_ref<void(Type, TypeRepr *)> callback) {
+  RequirementRequest::visitRequirements(
+      source, TypeResolutionStage::Interface,
+      [&](const Requirement &req, RequirementRepr* reqRepr) {
+    switch (req.getKind()) {
+    case RequirementKind::Conformance:
+    case RequirementKind::SameType:
+    case RequirementKind::Superclass:
+      callback(req.getFirstType(),
+               RequirementRepr::getFirstTypeRepr(reqRepr));
+      callback(req.getSecondType(),
+               RequirementRepr::getSecondTypeRepr(reqRepr));
+      break;
+
+    case RequirementKind::Layout:
+      callback(req.getFirstType(),
+               RequirementRepr::getFirstTypeRepr(reqRepr));
+      break;
+    }
+    return false;
+  });
+}
+
 /// \see checkTypeAccess
 using CheckTypeAccessCallback =
     void(AccessScope, const TypeRepr *, DowngradeToWarning);
@@ -69,7 +96,12 @@ protected:
       WhereClauseOwner source,
       AccessScope accessScope,
       const DeclContext *useDC,
-      llvm::function_ref<CheckTypeAccessCallback> diagnose);
+      llvm::function_ref<CheckTypeAccessCallback> diagnose) {
+    forAllRequirementTypes(source, [&](Type type, TypeRepr *typeRepr) {
+      checkTypeAccessImpl(type, typeRepr, accessScope, useDC,
+                          /*mayBeInferred*/false, diagnose);
+    });
+  }
 
   AccessControlCheckerBase(TypeChecker &TC, bool checkUsableFromInline)
     : TC(TC), checkUsableFromInline(checkUsableFromInline) {}
@@ -171,8 +203,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
   AccessScope problematicAccessScope = AccessScope::getPublic();
   if (type) {
     Optional<AccessScope> typeAccessScope =
-        TypeAccessScopeChecker::getAccessScope(type, useDC,
-                                               checkUsableFromInline);
+      AccessScopeChecker::getAccessScope(type, useDC, checkUsableFromInline);
 
     // Note: This means that the type itself is invalid for this particular
     // context, because it references declarations from two incompatible scopes.
@@ -193,8 +224,8 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
       return;
 
     Optional<AccessScope> typeReprAccessScope =
-        TypeReprAccessScopeChecker::getAccessScope(typeRepr, useDC,
-                                                   checkUsableFromInline);
+        AccessScopeChecker::getAccessScope(typeRepr, useDC,
+                                           checkUsableFromInline);
     if (!typeReprAccessScope.hasValue())
       return;
 
@@ -221,8 +252,8 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
       //
       // Downgrade the error to a warning in this case for source compatibility.
       Optional<AccessScope> typeReprAccessScope =
-          TypeReprAccessScopeChecker::getAccessScope(typeRepr, useDC,
-                                                     checkUsableFromInline);
+          AccessScopeChecker::getAccessScope(typeRepr, useDC,
+                                             checkUsableFromInline);
       assert(typeReprAccessScope && "valid Type but not valid TypeRepr?");
       if (contextAccessScope.hasEqualDeclContextWith(*typeReprAccessScope) ||
           contextAccessScope.isChildOf(*typeReprAccessScope)) {
@@ -279,39 +310,6 @@ static void highlightOffendingType(TypeChecker &TC, InFlightDiagnostic &diag,
     const ValueDecl *VD = CITR->getBoundDecl();
     TC.diagnose(VD, diag::kind_declared_here, DescriptiveDeclKind::Type);
   }
-}
-
-void AccessControlCheckerBase::checkRequirementAccess(
-    WhereClauseOwner source,
-    AccessScope accessScope,
-    const DeclContext *useDC,
-    llvm::function_ref<CheckTypeAccessCallback> diagnose) {
-  RequirementRequest::visitRequirements(
-      source, TypeResolutionStage::Interface,
-      [&](const Requirement &req, RequirementRepr* reqRepr) {
-        switch (req.getKind()) {
-        case RequirementKind::Conformance:
-        case RequirementKind::SameType:
-        case RequirementKind::Superclass:
-          checkTypeAccessImpl(req.getFirstType(),
-                              RequirementRepr::getFirstTypeRepr(reqRepr),
-                              accessScope, useDC, /*mayBeInferred*/false,
-                              diagnose);
-          checkTypeAccessImpl(req.getSecondType(),
-                              RequirementRepr::getSecondTypeRepr(reqRepr),
-                              accessScope, useDC, /*mayBeInferred*/false,
-                              diagnose);
-          break;
-
-        case RequirementKind::Layout:
-          checkTypeAccessImpl(req.getFirstType(),
-                              RequirementRepr::getFirstTypeRepr(reqRepr),
-                              accessScope, useDC, /*mayBeInferred*/false,
-                              diagnose);
-          break;
-        }
-        return false;
-      });
 }
 
 void AccessControlCheckerBase::checkGenericParamAccess(
@@ -441,6 +439,8 @@ public:
   UNREACHABLE(PrecedenceGroup, "cannot appear in a type context")
   UNREACHABLE(Module, "cannot appear in a type context")
 
+  UNREACHABLE(IfConfig, "does not have access control")
+  UNREACHABLE(PoundDiagnostic, "does not have access control")
   UNREACHABLE(Param, "does not have access control")
   UNREACHABLE(GenericTypeParam, "does not have access control")
   UNREACHABLE(MissingMember, "does not have access control")
@@ -449,8 +449,6 @@ public:
 #define UNINTERESTING(KIND) \
   void visit##KIND##Decl(KIND##Decl *D) {}
 
-  UNINTERESTING(IfConfig) // Does not have access control.
-  UNINTERESTING(PoundDiagnostic) // Does not have access control.
   UNINTERESTING(EnumCase) // Handled at the EnumElement level.
   UNINTERESTING(Var) // Handled at the PatternBinding level.
   UNINTERESTING(Destructor) // Always correct.
@@ -1401,16 +1399,382 @@ public:
     }
   }
 };
+
+class ImplementationOnlyImportChecker
+    : public DeclVisitor<ImplementationOnlyImportChecker> {
+  using CheckImplementationOnlyCallback =
+      llvm::function_ref<void(const TypeDecl *, const TypeRepr *)>;
+
+  TypeChecker &TC;
+
+  void checkTypeImpl(Type type, const TypeRepr *typeRepr, const SourceFile *SF,
+                     CheckImplementationOnlyCallback diagnose) {
+    // Don't bother checking errors.
+    if (type && type->hasError())
+      return;
+
+    bool foundAnyIssues = false;
+
+    // Check the TypeRepr first (if present), because that will give us a
+    // better diagonstic.
+    if (typeRepr) {
+      const_cast<TypeRepr *>(typeRepr)->walk(TypeReprIdentFinder(
+          [&](const ComponentIdentTypeRepr *component) {
+        ModuleDecl *M = component->getBoundDecl()->getModuleContext();
+        if (!SF->isImportedImplementationOnly(M))
+          return true;
+
+        diagnose(component->getBoundDecl(), component);
+        foundAnyIssues = true;
+        // We still continue even in the diagnostic case to report multiple
+        // violations.
+        return true;
+      }));
+    }
+
+    // FIXME: Are there places where we can be sure the TypeRepr fully accounts
+    // for the type, and therefore we could skip this extra work?
+    if (!foundAnyIssues && type) {
+      type.walk(SimpleTypeDeclFinder([&](const TypeDecl *typeDecl) {
+        ModuleDecl *M = typeDecl->getModuleContext();
+        if (!SF->isImportedImplementationOnly(M))
+          return TypeWalker::Action::Continue;
+
+        diagnose(typeDecl, /*typeRepr*/nullptr);
+        // We still continue even in the diagnostic case to report multiple
+        // violations.
+        return TypeWalker::Action::Continue;
+      }));
+    }
+  }
+
+  void checkType(Type type, const TypeRepr *typeRepr, const Decl *context,
+                 CheckImplementationOnlyCallback diagnose) {
+    auto *SF = context->getDeclContext()->getParentSourceFile();
+    assert(SF && "checking a non-source declaration?");
+    return checkTypeImpl(type, typeRepr, SF, diagnose);
+  }
+
+  void checkType(const TypeLoc &TL, const Decl *context,
+                 CheckImplementationOnlyCallback diagnose) {
+    checkType(TL.getType(), TL.getTypeRepr(), context, diagnose);
+  }
+
+  void checkGenericParams(const GenericParamList *params,
+                          const Decl *owner) {
+    if (!params)
+      return;
+
+    for (auto param : *params) {
+      if (param->getInherited().empty())
+        continue;
+      assert(param->getInherited().size() == 1);
+      checkType(param->getInherited().front(), owner,
+                getDiagnoseCallback(owner));
+    }
+
+    forAllRequirementTypes(WhereClauseOwner(
+                             owner->getInnermostDeclContext(),
+                             const_cast<GenericParamList *>(params)),
+                           [&](Type type, TypeRepr *typeRepr) {
+      checkType(type, typeRepr, owner, getDiagnoseCallback(owner));
+    });
+  }
+
+  class DiagnoseGenerically {
+    TypeChecker &TC;
+    const Decl *D;
+  public:
+    DiagnoseGenerically(TypeChecker &TC, const Decl *D) : TC(TC), D(D) {}
+
+    void operator()(const TypeDecl *offendingType,
+                    const TypeRepr *complainRepr) {
+      ModuleDecl *M = offendingType->getModuleContext();
+      auto diag = TC.diagnose(D, diag::decl_from_implementation_only_module,
+                              offendingType->getFullName(), M->getName());
+      highlightOffendingType(TC, diag, complainRepr);
+    }
+
+    static_assert(std::is_convertible<DiagnoseGenerically,
+                                      CheckImplementationOnlyCallback>::value,
+                  "DiagnoseGenerically has wrong call signature");
+  };
+
+  DiagnoseGenerically getDiagnoseCallback(const Decl *D) {
+    return DiagnoseGenerically(TC, D);
+  }
+
+public:
+  explicit ImplementationOnlyImportChecker(TypeChecker &TC) : TC(TC) {}
+
+  static bool shouldSkipChecking(const ValueDecl *VD) {
+    // Is this part of the module's API or ABI?
+    AccessScope accessScope =
+        VD->getFormalAccessScope(nullptr,
+                                 /*treatUsableFromInlineAsPublic*/true);
+    if (accessScope.isPublic())
+      return false;
+
+    // Is this a stored property in a non-resilient struct or class?
+    auto *property = dyn_cast<VarDecl>(VD);
+    if (!property || !property->hasStorage() || property->isStatic())
+      return true;
+    auto *parentNominal = dyn_cast<NominalTypeDecl>(property->getDeclContext());
+    if (!parentNominal || parentNominal->isResilient())
+      return true;
+
+    // Is that struct or class part of the module's API or ABI?
+    AccessScope parentAccessScope = parentNominal->getFormalAccessScope(
+        nullptr, /*treatUsableFromInlineAsPublic*/true);
+    if (parentAccessScope.isPublic())
+      return false;
+
+    return true;
+  }
+
+  void visit(Decl *D) {
+    if (D->isInvalid() || D->isImplicit())
+      return;
+
+    if (auto *VD = dyn_cast<ValueDecl>(D))
+      if (shouldSkipChecking(VD))
+        return;
+
+    DeclVisitor<ImplementationOnlyImportChecker>::visit(D);
+
+    if (auto *extension = dyn_cast<ExtensionDecl>(D->getDeclContext())) {
+      checkType(extension->getExtendedTypeLoc(), extension,
+                getDiagnoseCallback(extension));
+      checkConstrainedExtensionRequirements(extension);
+    }
+  }
+
+  // Force all kinds to be handled at a lower level.
+  void visitDecl(Decl *D) = delete;
+  void visitValueDecl(ValueDecl *D) = delete;
+
+#define UNREACHABLE(KIND, REASON) \
+  void visit##KIND##Decl(KIND##Decl *D) { \
+    llvm_unreachable(REASON); \
+  }
+  UNREACHABLE(Import, "not applicable")
+  UNREACHABLE(TopLevelCode, "not applicable")
+  UNREACHABLE(Module, "not applicable")
+
+  UNREACHABLE(Param, "handled by the enclosing declaration")
+  UNREACHABLE(GenericTypeParam, "handled by the enclosing declaration")
+  UNREACHABLE(MissingMember, "handled by the enclosing declaration")
+#undef UNREACHABLE
+
+#define UNINTERESTING(KIND) \
+  void visit##KIND##Decl(KIND##Decl *D) {}
+
+  UNINTERESTING(PrefixOperator) // Does not reference other decls.
+  UNINTERESTING(PostfixOperator) // Does not reference other decls.
+  UNINTERESTING(IfConfig) // Not applicable.
+  UNINTERESTING(PoundDiagnostic) // Not applicable.
+  UNINTERESTING(EnumCase) // Handled at the EnumElement level.
+  UNINTERESTING(Destructor) // Always correct.
+  UNINTERESTING(Accessor) // Handled by the Var or Subscript.
+
+  // Handled at the PatternBinding level; if the pattern has a simple
+  // "name: TheType" form, we can get better results by diagnosing the TypeRepr.
+  UNINTERESTING(Var)
+
+  /// \see visitPatternBindingDecl
+  void checkNamedPattern(const NamedPattern *NP,
+                         const llvm::DenseSet<const VarDecl *> &seenVars) {
+    const VarDecl *theVar = NP->getDecl();
+    if (shouldSkipChecking(theVar))
+      return;
+    // Only check individual variables if we didn't check an enclosing
+    // TypedPattern.
+    if (seenVars.count(theVar) || theVar->isInvalid())
+      return;
+
+    checkType(theVar->getInterfaceType(), /*typeRepr*/nullptr, theVar,
+              getDiagnoseCallback(theVar));
+  }
+
+  /// \see visitPatternBindingDecl
+  void checkTypedPattern(const TypedPattern *TP,
+                         llvm::DenseSet<const VarDecl *> &seenVars) {
+    // FIXME: We need to figure out if this is a stored or computed property,
+    // so we pull out some random VarDecl in the pattern. They're all going to
+    // be the same, but still, ick.
+    const VarDecl *anyVar = nullptr;
+    TP->forEachVariable([&](VarDecl *V) {
+      seenVars.insert(V);
+      anyVar = V;
+    });
+    if (!anyVar)
+      return;
+    if (shouldSkipChecking(anyVar))
+      return;
+
+    checkType(TP->getTypeLoc(), anyVar, getDiagnoseCallback(anyVar));
+  }
+
+  void visitPatternBindingDecl(PatternBindingDecl *PBD) {
+    llvm::DenseSet<const VarDecl *> seenVars;
+    for (auto entry : PBD->getPatternList()) {
+      entry.getPattern()->forEachNode([&](const Pattern *P) {
+        if (auto *NP = dyn_cast<NamedPattern>(P)) {
+          checkNamedPattern(NP, seenVars);
+          return;
+        }
+
+        auto *TP = dyn_cast<TypedPattern>(P);
+        if (!TP)
+          return;
+        checkTypedPattern(TP, seenVars);
+      });
+      seenVars.clear();
+    }
+  }
+
+  void visitTypeAliasDecl(TypeAliasDecl *TAD) {
+    checkGenericParams(TAD->getGenericParams(), TAD);
+    checkType(TAD->getUnderlyingTypeLoc(), TAD, getDiagnoseCallback(TAD));
+  }
+
+  void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
+    llvm::for_each(assocType->getInherited(),
+                   [&](TypeLoc requirement) {
+      checkType(requirement, assocType, getDiagnoseCallback(assocType));
+    });
+    checkType(assocType->getDefaultDefinitionLoc(), assocType,
+              getDiagnoseCallback(assocType));
+
+    if (assocType->getTrailingWhereClause()) {
+      forAllRequirementTypes(assocType,
+                             [&](Type type, TypeRepr *typeRepr) {
+        checkType(type, typeRepr, assocType, getDiagnoseCallback(assocType));
+      });
+    }
+  }
+
+  void visitNominalTypeDecl(const NominalTypeDecl *nominal) {
+    checkGenericParams(nominal->getGenericParams(), nominal);
+
+    llvm::for_each(nominal->getInherited(),
+                   [&](TypeLoc nextInherited) {
+      checkType(nextInherited, nominal, getDiagnoseCallback(nominal));
+    });
+  }
+
+  void visitProtocolDecl(ProtocolDecl *proto) {
+    llvm::for_each(proto->getInherited(),
+                  [&](TypeLoc requirement) {
+      checkType(requirement, proto, getDiagnoseCallback(proto));
+    });
+
+    if (proto->getTrailingWhereClause()) {
+      forAllRequirementTypes(proto, [&](Type type, TypeRepr *typeRepr) {
+        checkType(type, typeRepr, proto, getDiagnoseCallback(proto));
+      });
+    }
+  }
+
+  void visitSubscriptDecl(SubscriptDecl *SD) {
+    checkGenericParams(SD->getGenericParams(), SD);
+
+    for (auto &P : *SD->getIndices())
+      checkType(P->getTypeLoc(), SD, getDiagnoseCallback(SD));
+    checkType(SD->getElementTypeLoc(), SD, getDiagnoseCallback(SD));
+  }
+
+  void visitAbstractFunctionDecl(AbstractFunctionDecl *fn) {
+    checkGenericParams(fn->getGenericParams(), fn);
+
+    for (auto *P : *fn->getParameters())
+      checkType(P->getTypeLoc(), fn, getDiagnoseCallback(fn));
+  }
+
+  void visitFuncDecl(FuncDecl *FD) {
+    visitAbstractFunctionDecl(FD);
+    checkType(FD->getBodyResultTypeLoc(), FD, getDiagnoseCallback(FD));
+  }
+
+  void visitEnumElementDecl(EnumElementDecl *EED) {
+    if (!EED->hasAssociatedValues())
+      return;
+    for (auto &P : *EED->getParameterList())
+      checkType(P->getTypeLoc(), EED, getDiagnoseCallback(EED));
+  }
+
+  void checkConstrainedExtensionRequirements(ExtensionDecl *ED) {
+    if (!ED->getTrailingWhereClause())
+      return;
+    forAllRequirementTypes(ED, [&](Type type, TypeRepr *typeRepr) {
+      checkType(type, typeRepr, ED, getDiagnoseCallback(ED));
+    });
+  }
+
+  void visitExtensionDecl(ExtensionDecl *ED) {
+    if (shouldSkipChecking(ED->getExtendedNominal()))
+      return;
+
+    // FIXME: We should allow conforming to implementation-only protocols,
+    // but just hide that from interfaces.
+    llvm::for_each(ED->getInherited(),
+                   [&](TypeLoc nextInherited) {
+      checkType(nextInherited, ED, getDiagnoseCallback(ED));
+    });
+
+    if (!ED->getInherited().empty())
+      checkConstrainedExtensionRequirements(ED);
+  }
+
+  void checkPrecedenceGroup(const PrecedenceGroupDecl *PGD,
+                            const Decl *refDecl, SourceLoc diagLoc,
+                            SourceRange refRange) {
+    const SourceFile *SF = refDecl->getDeclContext()->getParentSourceFile();
+    ModuleDecl *M = PGD->getModuleContext();
+    if (!SF->isImportedImplementationOnly(M))
+      return;
+
+    auto diag = TC.diagnose(diagLoc, diag::decl_from_implementation_only_module,
+                            PGD->getName(), M->getName());
+    if (refRange.isValid())
+      diag.highlight(refRange);
+    diag.flush();
+    TC.diagnose(PGD, diag::decl_declared_here, PGD->getName());
+  }
+
+  void visitInfixOperatorDecl(InfixOperatorDecl *IOD) {
+    // FIXME: Handle operator designated types (which also applies to prefix
+    // and postfix operators).
+    if (auto *precedenceGroup = IOD->getPrecedenceGroup()) {
+      if (!IOD->getIdentifierLocs().empty()) {
+        checkPrecedenceGroup(precedenceGroup, IOD, IOD->getLoc(),
+                             IOD->getIdentifierLocs().front());
+      }
+    }
+  }
+
+  void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
+    llvm::for_each(PGD->getLowerThan(),
+                   [&](const PrecedenceGroupDecl::Relation &relation) {
+      checkPrecedenceGroup(relation.Group, PGD, PGD->getLowerThanLoc(),
+                           relation.NameLoc);
+    });
+    llvm::for_each(PGD->getHigherThan(),
+                   [&](const PrecedenceGroupDecl::Relation &relation) {
+      checkPrecedenceGroup(relation.Group, PGD, PGD->getHigherThanLoc(),
+                           relation.NameLoc);
+    });
+  }
+};
 } // end anonymous namespace
 
-void swift::checkAccessControl(TypeChecker &TC, Decl *D) {
-  AccessControlChecker(TC).visit(D);
-  UsableFromInlineChecker(TC).visit(D);
-}
+static void checkExtensionGenericParamAccess(TypeChecker &TC,
+                                             const ExtensionDecl *ED) {
+  auto *AA = ED->getAttrs().getAttribute<AccessControlAttr>();
+  if (!AA)
+    return;
+  AccessLevel userSpecifiedAccess = AA->getAccess();
 
-void swift::checkExtensionGenericParamAccess(TypeChecker &TC,
-                                             const ExtensionDecl *ED,
-                                             AccessLevel userSpecifiedAccess) {
   AccessScope desiredAccessScope = AccessScope::getPublic();
   switch (userSpecifiedAccess) {
   case AccessLevel::Private:
@@ -1435,4 +1799,15 @@ void swift::checkExtensionGenericParamAccess(TypeChecker &TC,
   AccessControlChecker(TC).checkGenericParamAccess(ED->getGenericParams(), ED,
                                                    desiredAccessScope,
                                                    userSpecifiedAccess);
+}
+
+void swift::checkAccessControl(TypeChecker &TC, Decl *D) {
+  if (isa<ValueDecl>(D) || isa<PatternBindingDecl>(D)) {
+    AccessControlChecker(TC).visit(D);
+    UsableFromInlineChecker(TC).visit(D);
+  } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    checkExtensionGenericParamAccess(TC, ED);
+  }
+
+  ImplementationOnlyImportChecker(TC).visit(D);
 }
