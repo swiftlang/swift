@@ -81,6 +81,7 @@ static void addDefiniteInitialization(SILPassPipelinePlan &P) {
 
 static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("Guaranteed Passes");
+  P.addDiagnoseInvalidEscapingCaptures();
   P.addDiagnoseStaticExclusivity();
   P.addCapturePromotion();
 
