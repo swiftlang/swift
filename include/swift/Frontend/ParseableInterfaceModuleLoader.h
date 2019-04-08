@@ -110,6 +110,10 @@ namespace clang {
   class CompilerInstance;
 }
 
+namespace unittest {
+  class ParseableInterfaceModuleLoaderTest;
+}
+
 namespace swift {
 
 /// A ModuleLoader that runs a subordinate \c CompilerInvocation and
@@ -117,6 +121,7 @@ namespace swift {
 /// files on the fly, caching the resulting .swiftmodules in the module cache
 /// directory, and loading the serialized .swiftmodules from there.
 class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
+  friend class unittest::ParseableInterfaceModuleLoaderTest;
   explicit ParseableInterfaceModuleLoader(ASTContext &ctx, StringRef cacheDir,
                                           StringRef prebuiltCacheDir,
                                           DependencyTracker *tracker,
@@ -134,6 +139,7 @@ class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) override;
 
+  bool isCached(StringRef DepPath) override;
 
 public:
   static std::unique_ptr<ParseableInterfaceModuleLoader>
@@ -152,7 +158,7 @@ public:
   static bool buildSwiftModuleFromSwiftInterface(
     ASTContext &Ctx, StringRef CacheDir, StringRef PrebuiltCacheDir,
     StringRef ModuleName, StringRef InPath, StringRef OutPath,
-    bool SerializeDependencyHashes);
+    bool SerializeDependencyHashes, bool TrackSystemDependencies);
 };
 
 /// Extract the specified-or-defaulted -module-cache-path that winds up in

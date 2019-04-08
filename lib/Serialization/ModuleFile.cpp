@@ -253,14 +253,16 @@ static bool validateInputBlock(
     switch (kind) {
     case input_block::FILE_DEPENDENCY: {
       bool isHashBased = scratch[2] != 0;
+      bool isSDKRelative = scratch[3] != 0;
+
       if (isHashBased) {
         dependencies.push_back(
           SerializationOptions::FileDependency::hashBased(
-            blobData, scratch[0], scratch[1]));
+            blobData, isSDKRelative, scratch[0], scratch[1]));
       } else {
         dependencies.push_back(
           SerializationOptions::FileDependency::modTimeBased(
-            blobData, scratch[0], scratch[1]));
+            blobData, isSDKRelative, scratch[0], scratch[1]));
       }
       break;
     }
