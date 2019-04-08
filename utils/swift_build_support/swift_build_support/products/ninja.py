@@ -32,7 +32,7 @@ class Ninja(product.Product):
     def ninja_bin_path(self):
         return os.path.join(self.build_dir, 'ninja')
 
-    def do_build(self):
+    def build(self):
         if os.path.exists(self.ninja_bin_path):
             return
 
