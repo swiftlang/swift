@@ -1695,36 +1695,6 @@ isInvalidPartialApplication(ConstraintSystem &cs, const ValueDecl *member,
   return {true, level};
 }
 
-static bool isResultOfKeyPathDynamicMemberLookup(ConstraintLocator *locator) {
-  auto path = locator->getPath();
-  return !path.empty() && path.back().isKeyPathDynamicMember();
-}
-
-/// If given anchor + path represents a key path with subscript
-/// component at some index.
-static bool isKeyPathSubscriptComponent(ConstraintLocator *locator) {
-  auto *anchor = locator->getAnchor();
-  auto *KPE = dyn_cast_or_null<KeyPathExpr>(anchor);
-  if (!KPE)
-    return false;
-
-  using ComponentKind = KeyPathExpr::Component::Kind;
-  auto path = locator->getPath();
-  while (!path.empty()) {
-    auto &last = path.back();
-    if (!last.isKeyPathComponent()) {
-      path = path.drop_back();
-      continue;
-    }
-
-    auto index = last.getValue();
-    auto &component = KPE->getComponents()[index];
-    return component.getKind() == ComponentKind::Subscript ||
-           component.getKind() == ComponentKind::UnresolvedSubscript;
-  }
-  return false;
-}
-
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                        Type boundType,
                                        OverloadChoice choice,
@@ -2122,8 +2092,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     }
 
     if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
-      if (isResultOfKeyPathDynamicMemberLookup(locator) ||
-          isKeyPathSubscriptComponent(locator)) {
+      if (locator->isResultOfKeyPathDynamicMemberLookup() ||
+          locator->isKeyPathSubscriptComponent()) {
         // Subscript type has a format of (Self[.Type) -> (Arg...) -> Result
         auto declTy = openedFullType->castTo<FunctionType>();
         auto subscriptTy = declTy->getResult()->castTo<FunctionType>();
