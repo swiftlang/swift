@@ -1376,15 +1376,8 @@ endfunction()
 #   add_swift_host_library(name
 #     [SHARED]
 #     [STATIC]
-#     [DEPENDS dep1 ...]
-#     [INTERFACE_LINK_LIBRARIES dep1 ...]
-#     [SWIFT_MODULE_DEPENDS dep1 ...]
 #     [LLVM_COMPONENT_DEPENDS comp1 ...]
 #     [FILE_DEPENDS target1 ...]
-#     [C_COMPILE_FLAGS flag1...]
-#     [LINK_FLAGS flag1...]
-#     [INSTALL]
-#     INSTALL_IN_COMPONENT comp
 #     source1 [source2 source3 ...])
 #
 # name
@@ -1396,23 +1389,11 @@ endfunction()
 # STATIC
 #   Build a static library.
 #
-# DEPENDS
-#   Targets that this library depends on.
-#
 # LLVM_COMPONENT_DEPENDS
 #   LLVM components this library depends on.
 #
 # FILE_DEPENDS
 #   Additional files this library depends on.
-#
-# C_COMPILE_FLAGS
-#   Extra compiler flags (C, C++, ObjC).
-#
-# LINK_FLAGS
-#   Extra linker flags.
-#
-# INSTALL_IN_COMPONENT comp
-#   The Swift installation component that this library belongs to.
 #
 # source1 ...
 #   Sources to add into this library.
@@ -1427,7 +1408,6 @@ function(add_swift_host_library name)
         DEPENDS
         FILE_DEPENDS
         INTERFACE_LINK_LIBRARIES
-        LINK_FLAGS
         LINK_LIBRARIES
         LLVM_COMPONENT_DEPENDS)
 
@@ -1438,6 +1418,15 @@ function(add_swift_host_library name)
                         ${ARGN})
   set(ASHL_SOURCES ${ASHL_UNPARSED_ARGUMENTS})
 
+  if(ASHL_C_COMPILE_FLAGS)
+    message(SEND_ERROR "library ${name} is using C_COMPILE_FLAGS parameter which is deprecated.  Please use target_compile_definitions, target_compile_options, or target_include_directories instead")
+  endif()
+  if(ASHL_DEPENDS)
+    message(SEND_ERROR "library ${name} is using DEPENDS parameter which is deprecated.  Please use add_dependencies instead")
+  endif()
+  if(ASHL_INTERFACE_LINK_LIBRARIES)
+    message(SEND_ERROR "library ${name} is using INTERFACE_LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead.")
+  endif()
   if(ASHL_LINK_LIBRARIES)
     message(SEND_ERROR "library ${name} is using LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead")
   endif()
@@ -1457,12 +1446,8 @@ function(add_swift_host_library name)
     ${ASHL_FORCE_BUILD_OPTIMIZED_keyword}
     SDK ${SWIFT_HOST_VARIANT_SDK}
     ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
-    DEPENDS ${ASHL_DEPENDS}
     LLVM_COMPONENT_DEPENDS ${ASHL_LLVM_COMPONENT_DEPENDS}
     FILE_DEPENDS ${ASHL_FILE_DEPENDS}
-    C_COMPILE_FLAGS ${ASHL_C_COMPILE_FLAGS}
-    LINK_FLAGS ${ASHL_LINK_FLAGS}
-    INTERFACE_LINK_LIBRARIES ${ASHL_INTERFACE_LINK_LIBRARIES}
     INSTALL_IN_COMPONENT "dev"
     )
 
