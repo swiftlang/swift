@@ -585,7 +585,7 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
     let value = mean(alongAxes: axes)
     let count = Raw.gather(params: shapeTensor, indices: axes).product()
     return (value, { [shape = shapeTensor] in
-       $0.broadcast(toShape: shape) / Tensor(count)
+      $0.broadcast(toShape: shape) / Tensor(count)
     })
   }
 
