@@ -827,7 +827,7 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   if (checkObjCInForeignClassContext(SD, Reason))
     return false;
 
-  // Obj-C doesn't support class subscripts.
+  // ObjC doesn't support class subscripts.
   if (!SD->isInstanceMember()) {
     if (Diagnose) {
       SD->diagnose(diag::objc_invalid_on_static_subscript,

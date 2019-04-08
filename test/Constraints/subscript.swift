@@ -11,7 +11,7 @@ protocol IntToStringSubscript {
   subscript (i : Int) -> String { get }
 }
 
-class LameDictionary {
+class FauxDictionary {
   subscript (i : Int) -> String {
     get {
       return String(i)
@@ -19,7 +19,7 @@ class LameDictionary {
   }
 }
 
-func archetypeSubscript<T : IntToStringSubscript, U : LameDictionary>(_ t: T, u: U)
+func archetypeSubscript<T : IntToStringSubscript, U : FauxDictionary>(_ t: T, u: U)
        -> String {
   // Subscript an archetype.
   if false { return t[17] }
@@ -40,7 +40,7 @@ protocol IntToStringStaticSubscript {
   static subscript (i : Int) -> String { get }
 }
 
-class LameStaticDictionary {
+class FauxStaticDictionary {
   static subscript (i : Int) -> String {
     get {
       return String(i)
@@ -49,7 +49,7 @@ class LameStaticDictionary {
 }
 
 func archetypeStaticSubscript<
-  T : IntToStringStaticSubscript, U : LameStaticDictionary
+  T : IntToStringStaticSubscript, U : FauxStaticDictionary
 >(_ t: T.Type, u: U.Type) -> String {
   // Subscript an archetype.
   if false { return t[17] }
