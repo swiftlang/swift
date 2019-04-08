@@ -46,6 +46,8 @@ final class FinalMario : Mario {
 // These references to Self are now possible (SE-0068)
 
 class A<T> {
+  typealias _Self = Self
+  // expected-error@-1 {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'A'?}}
   let b: Int
   required init(a: Int) {
     print("\(Self.self).\(#function)")
