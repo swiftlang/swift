@@ -129,7 +129,7 @@ static void validateBridgingHeaderArgs(DiagnosticEngine &diags,
 
   if (args.hasArgNoClaim(options::OPT_emit_module_interface,
                          options::OPT_emit_module_interface_path)) {
-    diags.diagnose({}, diag::error_bridging_header_parseable_interface);
+    diags.diagnose({}, diag::error_bridging_header_module_interface);
   }
 }
 
