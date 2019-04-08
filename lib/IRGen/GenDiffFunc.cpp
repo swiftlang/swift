@@ -67,7 +67,7 @@ public:
     auto differentiationOrder = std::get<1>(Index);
     auto kind = *std::get<0>(Index).getExtracteeAsAssociatedFunction();
     auto assocTy = origFnTy->getAutoDiffAssociatedFunctionType(
-        SmallBitVector(origFnTy->getNumParameters(), true), /*resultIndex*/ 0,
+        origFnTy->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
         differentiationOrder, kind, IGM.getSILModule(),
         LookUpConformanceInModule(IGM.getSwiftModule()));
     return SILType::getPrimitiveObjectType(assocTy);
@@ -159,7 +159,7 @@ public:
     auto differentiationOrder = std::get<1>(field);
     auto kind = *std::get<0>(field).getExtracteeAsAssociatedFunction();
     auto assocTy = origFnTy->getAutoDiffAssociatedFunctionType(
-        SmallBitVector(origFnTy->getNumParameters(), true), /*resultIndex*/ 0,
+        origFnTy->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
         differentiationOrder, kind, IGM.getSILModule(),
         LookUpConformanceInModule(IGM.getSwiftModule()));
     return SILType::getPrimitiveObjectType(assocTy);
