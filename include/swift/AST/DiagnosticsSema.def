@@ -2397,6 +2397,11 @@ NOTE(enum_raw_value_incrementing_from_zero,none,
 NOTE(construct_raw_representable_from_unwrapped_value,none,
      "construct %0 from unwrapped %1 value", (Type, Type))
 
+ERROR(decl_from_implementation_only_module,none,
+      "cannot use %0 here; %1 has been imported as "
+      "'@_implementationOnly'",
+      (DeclName, Identifier))
+
 // Derived conformances
 ERROR(cannot_synthesize_init_in_extension_of_nonfinal,none,
       "implementation of %0 for non-final class cannot be automatically "
