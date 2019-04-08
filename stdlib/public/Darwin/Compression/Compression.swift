@@ -44,11 +44,11 @@ public enum FilterError: Error {
   /// Filter failed to initialize,
   /// invalid internal state,
   /// invalid parameters
-  case state
+  case invalidState
 
   /// Invalid data in a call to compression_stream_process,
   /// non-empty write after an output filter has been finalized
-  case data
+  case invalidData
 }
 
 /// Compression filter direction of operation, compress/decompress
@@ -75,7 +75,7 @@ extension compression_stream {
   /// - Parameter operation: direction of operation
   /// - Parameter algorithm: compression algorithm
   ///
-  /// - Throws: `FilterError.state` if `algorithm` is not supported
+  /// - Throws: `FilterError.invalidState` if `algorithm` is not supported
   ///           by the Compression stream API
   ///
   internal init(operation: FilterOperation, algorithm: Algorithm) throws {
@@ -85,7 +85,7 @@ extension compression_stream {
               src_size: 0,
               state: nil)
     let status = compression_stream_init(&self, operation.rawValue, algorithm.rawValue)
-    guard status == COMPRESSION_STATUS_OK else { throw FilterError.state }
+    guard status == COMPRESSION_STATUS_OK else { throw FilterError.invalidState }
   }
 }
 
@@ -105,7 +105,7 @@ public class OutputFilter {
   /// - bufferCapacity: capacity of the internal data buffer
   /// - writeFunc: called to write the processed data
   ///
-  /// - Throws: `FilterError.state` if stream initialization failed
+  /// - Throws: `FilterError.invalidState` if stream initialization failed
   public init(
     _ operation: FilterOperation,
     using algorithm: Algorithm,
@@ -127,14 +127,14 @@ public class OutputFilter {
   /// - Parameter data: data to process
   ///
   /// - Throws:
-  /// `FilterError.data` if an error occurs during processing,
+  /// `FilterError.invalidData` if an error occurs during processing,
   /// or if `data` is not empty/nil, and the filter is the finalized state
   public func write<D : DataProtocol>(_ data: D?) throws {
     // Finalize if data is empty/nil
     if data == nil || data!.isEmpty { try finalize() ; return }
 
     // Fail if already finalized
-    if _finalized { throw FilterError.data }
+    if _finalized { throw FilterError.invalidData }
 
     // Process all incoming data
     for region in data!.regions {
@@ -152,7 +152,7 @@ public class OutputFilter {
   /// When all output has been sent, the writingTo closure is called one last time with nil data.
   /// Once the stream is finalized, writing non empty/nil data to the stream will throw an exception.
   ///
-  /// - Throws: `FilterError.data` if an error occurs during processing
+  /// - Throws: `FilterError.invalidData` if an error occurs during processing
   public func finalize() throws {
     // Do nothing if already finalized
     if _finalized { return }
@@ -187,7 +187,7 @@ public class OutputFilter {
     _stream.dst_size = _bufCapacity
 
     let status = compression_stream_process(&_stream, (finalize ? Int32(COMPRESSION_STREAM_FINALIZE.rawValue) : 0))
-    guard status != COMPRESSION_STATUS_ERROR else { throw FilterError.data }
+    guard status != COMPRESSION_STATUS_ERROR else { throw FilterError.invalidData }
 
     // Number of bytes written to buf
     let writtenBytes = _bufCapacity - _stream.dst_size
@@ -245,7 +245,7 @@ public class InputFilter<D: DataProtocol> {
     public func advance(by n: Int) throws {
 
       // Sanity checks
-      if n > _regionRemaining { throw FilterError.state } // invalid n
+      if n > _regionRemaining { throw FilterError.invalidState } // invalid n
 
       // Update counters
       _regionRemaining -= n
@@ -260,7 +260,7 @@ public class InputFilter<D: DataProtocol> {
       }
 
       // Sanity checks
-      if _remaining != 0 && _regionRemaining == 0 { throw FilterError.state }
+      if _remaining != 0 && _regionRemaining == 0 { throw FilterError.invalidState }
     }
   }
 
@@ -279,7 +279,7 @@ public class InputFilter<D: DataProtocol> {
   /// - bufferCapacity: capacity of the internal data buffer
   /// - readFunc: called to read the input data
   ///
-  /// - Throws: `FilterError.state` if filter initialization failed
+  /// - Throws: `FilterError.invalidState` if filter initialization failed
   public init(
     _ operation: FilterOperation,
     using algorithm: Algorithm,
@@ -303,7 +303,7 @@ public class InputFilter<D: DataProtocol> {
   /// - Returns: a new Data object containing at most `count` output bytes, or nil if no more data is available
   ///
   /// - Throws:
-  /// `FilterError.data` if an error occurs during processing
+  /// `FilterError.invalidData` if an error occurs during processing
   public func readData(ofLength count: Int) throws -> Data? {
     // Sanity check
     precondition(count > 0, "number of bytes to read can't be 0")
@@ -340,7 +340,7 @@ public class InputFilter<D: DataProtocol> {
             _stream.src_ptr = src_buf.baseAddress!.assumingMemoryBound(to: UInt8.self)
             _stream.src_size = src_buf.count
             let status = compression_stream_process(&_stream, (_eofReached ? Int32(COMPRESSION_STREAM_FINALIZE.rawValue) : 0))
-            guard status != COMPRESSION_STATUS_ERROR else { throw FilterError.data }
+            guard status != COMPRESSION_STATUS_ERROR else { throw FilterError.invalidData }
             if status == COMPRESSION_STATUS_END { _endReached = true }
             // Advance by the number of consumed bytes
             let consumed = src_buf.count - _stream.src_size
@@ -349,7 +349,7 @@ public class InputFilter<D: DataProtocol> {
         } else {
           // No data available, process until END reached
           let status = compression_stream_process(&_stream, (_eofReached ? Int32(COMPRESSION_STREAM_FINALIZE.rawValue) : 0))
-          guard status != COMPRESSION_STATUS_ERROR else { throw FilterError.data }
+          guard status != COMPRESSION_STATUS_ERROR else { throw FilterError.invalidData }
           if status == COMPRESSION_STATUS_END { _endReached = true }
         }
 
