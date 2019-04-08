@@ -82,6 +82,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case KeyPathRoot:
     case KeyPathValue:
     case KeyPathComponentResult:
+    case SingleExprFuncResultType:
       if (unsigned numValues = numNumericValuesInPathElement(elt.getKind())) {
         id.AddInteger(elt.getValue());
         if (numValues > 1)
@@ -351,8 +352,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
     case KeyPathComponentResult:
       out << "key path component result";
       break;
+    case SingleExprFuncResultType:
+      out << " expected result type of the function with a single expression";
+      break;
     }
   }
-
   out << ']';
 }

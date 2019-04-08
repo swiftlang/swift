@@ -135,6 +135,8 @@ public:
     KeyPathValue,
     /// The result type of a key path component. Not used for subscripts.
     KeyPathComponentResult,
+    /// The expected type of the function with a single expression body.
+    SingleExprFuncResultType,
   };
 
   /// Determine the number of numeric values used for the given path
@@ -168,6 +170,7 @@ public:
     case KeyPathRoot:
     case KeyPathValue:
     case KeyPathComponentResult:
+    case SingleExprFuncResultType:
       return 0;
 
     case OpenedGeneric:
@@ -237,6 +240,7 @@ public:
     case KeyPathRoot:
     case KeyPathValue:
     case KeyPathComponentResult:
+    case SingleExprFuncResultType:
       return 0;
 
     case FunctionArgument:
