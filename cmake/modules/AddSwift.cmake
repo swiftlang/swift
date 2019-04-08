@@ -1027,6 +1027,11 @@ function(_add_swift_library_single target name)
     set_target_properties("${target}" PROPERTIES
       LIBRARY_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}
       ARCHIVE_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR})
+    if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS AND SWIFTLIB_SINGLE_IS_STDLIB_CORE
+        AND libkind STREQUAL SHARED)
+      add_custom_command(TARGET ${target} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:${target}> ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR})
+    endif()
 
     foreach(config ${CMAKE_CONFIGURATION_TYPES})
       string(TOUPPER ${config} config_upper)
