@@ -1,9 +1,8 @@
-add_swift_host_library(swiftDemangle
-                  SHARED
-                    SwiftDemangle.cpp
-                    MangleHack.cpp
-                  C_COMPILE_FLAGS
-                    -DLLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1)
+add_swift_host_library(swiftDemangle SHARED
+  SwiftDemangle.cpp
+  MangleHack.cpp)
+target_compile_definitions(swiftDemangle PRIVATE
+  LLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1)
 target_link_libraries(swiftDemangle PRIVATE
   swiftDemangling)
 
