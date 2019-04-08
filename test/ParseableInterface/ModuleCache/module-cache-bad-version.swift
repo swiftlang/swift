@@ -21,7 +21,7 @@
 // RUN: test ! -f %t/TestModule.swiftmodule
 // RUN: test ! -f %t/modulecache/LeafModule-*.swiftmodule
 // RUN: %FileCheck %s -check-prefix=CHECK-ERR <%t/err.txt
-// CHECK-ERR: {{error: unsupported version of parseable module interface '.*[/\\]LeafModule.swiftinterface': '9999.999'}}
+// CHECK-ERR: {{error: unsupported version of module interface '.*[/\\]LeafModule.swiftinterface': '9999.999'}}
 // CHECK-ERR: error: no such module 'LeafModule
 
 import LeafModule
