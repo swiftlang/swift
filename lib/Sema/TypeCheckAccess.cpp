@@ -1494,11 +1494,11 @@ class ImplementationOnlyImportChecker
                               offendingType->getFullName(), M->getName());
       highlightOffendingType(TC, diag, complainRepr);
     }
-
-    static_assert(std::is_convertible<DiagnoseGenerically,
-                                      CheckImplementationOnlyCallback>::value,
-                  "DiagnoseGenerically has wrong call signature");
   };
+
+  static_assert(std::is_convertible<DiagnoseGenerically,
+                                    CheckImplementationOnlyCallback>::value,
+                "DiagnoseGenerically has wrong call signature");
 
   DiagnoseGenerically getDiagnoseCallback(const Decl *D) {
     return DiagnoseGenerically(TC, D);
