@@ -5370,10 +5370,10 @@ RValue RValueEmitter::visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
 RValue RValueEmitter::visitAutoDiffFunctionExpr(AutoDiffFunctionExpr *E,
                                                 SGFContext C) {
   auto orig = SGF.emitRValueAsSingleValue(E->getSubExpr());
-  auto origFnTy = orig.getType().castTo<SILFunctionType>();
+  auto destTy = SGF.getLoweredType(E->getType()).castTo<SILFunctionType>();
   // TODO(rxwei): Use the order specified in E's function type.
   auto *diffFunc = SGF.B.createAutoDiffFunction(
-      E, origFnTy->getDifferentiationParameterIndices(), /*order*/ 1,
+      E, destTy->getDifferentiationParameterIndices(), /*order*/ 1,
       orig.forward(SGF));
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(diffFunc));
 }
