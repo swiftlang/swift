@@ -49,6 +49,7 @@ func takesNoEscapeClosure(_ fn : () -> Int) {
   _ = "\(takesArray([fn]))" // expected-error {{using non-escaping parameter 'fn' in a context expecting an @escaping closure}}
 
   assignToGlobal(fn) // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
+  assignToGlobal((fn, fn)) // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
 }
 
 class SomeClass {
