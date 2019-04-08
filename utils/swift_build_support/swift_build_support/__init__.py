@@ -21,7 +21,6 @@ __all__ = [
     "cmake",
     "debug",
     "diagnostics",
-    "host_specific_configuration",
     "migration",
     "tar",
     "targets",
