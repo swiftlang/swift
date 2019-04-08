@@ -1294,27 +1294,19 @@ VarDecl *PatternBindingInitializer::getInitializedLazyVar() const {
   return nullptr;
 }
 
-static bool patternContainsVarDeclBinding(const Pattern *P, const VarDecl *VD) {
-  bool Result = false;
-  P->forEachVariable([&](VarDecl *FoundVD) {
-    Result |= FoundVD == VD;
-  });
-  return Result;
-}
-
 unsigned PatternBindingDecl::getPatternEntryIndexForVarDecl(const VarDecl *VD) const {
   assert(VD && "Cannot find a null VarDecl");
   
   auto List = getPatternList();
   if (List.size() == 1) {
-    assert(patternContainsVarDeclBinding(List[0].getPattern(), VD) &&
+    assert(List[0].getPattern()->containsVarDecl(VD) &&
            "Single entry PatternBindingDecl is set up wrong");
     return 0;
   }
   
   unsigned Result = 0;
   for (auto entry : List) {
-    if (patternContainsVarDeclBinding(entry.getPattern(), VD))
+    if (entry.getPattern()->containsVarDecl(VD))
       return Result;
     ++Result;
   }
@@ -4927,12 +4919,6 @@ SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
   return SourceRange();
 }
 
-static bool isVarInPattern(const VarDecl *vd, Pattern *p) {
-  bool foundIt = false;
-  p->forEachVariable([&](VarDecl *foundFD) { foundIt |= foundFD == vd; });
-  return foundIt;
-}
-
 static Optional<std::pair<CaseStmt *, Pattern *>>
 findParentPatternCaseStmtAndPattern(const VarDecl *inputVD) {
   auto getMatchingPattern = [&](CaseStmt *cs) -> Pattern * {
@@ -4946,7 +4932,7 @@ findParentPatternCaseStmtAndPattern(const VarDecl *inputVD) {
 
     // Then check the rest of our case label items.
     for (auto &item : cs->getMutableCaseLabelItems()) {
-      if (isVarInPattern(inputVD, item.getPattern())) {
+      if (item.getPattern()->containsVarDecl(inputVD)) {
         return item.getPattern();
       }
     }
@@ -5039,7 +5025,7 @@ Pattern *VarDecl::getParentPattern() const {
       // In a case statement, search for the pattern that contains it.  This is
       // a bit silly, because you can't have something like "case x, y:" anyway.
       for (auto items : cs->getCaseLabelItems()) {
-        if (isVarInPattern(this, items.getPattern()))
+        if (items.getPattern()->containsVarDecl(this))
           return items.getPattern();
       }
     }
@@ -5047,7 +5033,7 @@ Pattern *VarDecl::getParentPattern() const {
     if (auto *LCS = dyn_cast<LabeledConditionalStmt>(stmt)) {
       for (auto &elt : LCS->getCond())
         if (auto pat = elt.getPatternOrNull())
-          if (isVarInPattern(this, pat))
+          if (pat->containsVarDecl(this))
             return pat;
     }
 
@@ -5064,6 +5050,55 @@ Pattern *VarDecl::getParentPattern() const {
   // Otherwise, this is a case we do not know or understand. Return nullptr to
   // signal we do not have any information.
   return nullptr;
+}
+
+NullablePtr<VarDecl>
+VarDecl::getCorrespondingFirstCaseLabelItemVarDecl() const {
+  if (!hasName())
+    return nullptr;
+
+  auto *caseStmt = dyn_cast_or_null<CaseStmt>(getRecursiveParentPatternStmt());
+  if (!caseStmt)
+    return nullptr;
+
+  auto *pattern = caseStmt->getCaseLabelItems().front().getPattern();
+  SmallVector<VarDecl *, 8> vars;
+  pattern->collectVariables(vars);
+  for (auto *vd : vars) {
+    if (vd->hasName() && vd->getName() == getName())
+      return vd;
+  }
+  return nullptr;
+}
+
+bool VarDecl::isCaseBodyVariable() const {
+  auto *caseStmt = dyn_cast_or_null<CaseStmt>(getRecursiveParentPatternStmt());
+  if (!caseStmt)
+    return false;
+  return llvm::any_of(caseStmt->getCaseBodyVariablesOrEmptyArray(),
+                      [&](VarDecl *vd) { return vd == this; });
+}
+
+NullablePtr<VarDecl> VarDecl::getCorrespondingCaseBodyVariable() const {
+  // Only var decls associated with case statements can have child var decls.
+  auto *caseStmt = dyn_cast_or_null<CaseStmt>(getRecursiveParentPatternStmt());
+  if (!caseStmt)
+    return nullptr;
+
+  // If this var decl doesn't have a name, it can not have a corresponding case
+  // body variable.
+  if (!hasName())
+    return nullptr;
+
+  auto name = getName();
+
+  // A var decl associated with a case stmt implies that the case stmt has body
+  // var decls. So we can access the optional value here without worry.
+  auto caseBodyVars = caseStmt->getCaseBodyVariables();
+  auto result = llvm::find_if(caseBodyVars, [&](VarDecl *caseBodyVar) {
+    return caseBodyVar->getName() == name;
+  });
+  return (result != caseBodyVars.end()) ? *result : nullptr;
 }
 
 bool VarDecl::isSelfParameter() const {

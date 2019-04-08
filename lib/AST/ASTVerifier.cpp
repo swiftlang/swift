@@ -1819,7 +1819,7 @@ public:
       
       // The base of a member reference cannot be an existential type.
       if (E->getBase()->getType()->getWithoutSpecifierType()
-            ->isAnyExistentialType()) {
+            ->isExistentialType()) {
         Out << "Member reference into an unopened existential type\n";
         E->dump(Out);
         Out << "\n";
@@ -2496,6 +2496,20 @@ public:
         if (!varTy->getOptionalObjectType()) {
           Out << "implicitly unwrapped optional attribute should only be set on VarDecl "
                  "with optional type\n";
+          abort();
+        }
+      }
+
+      if (auto *caseStmt =
+	    dyn_cast_or_null<CaseStmt>(var->getRecursiveParentPatternStmt())) {
+        // In a type checked AST, a case stmt that is a recursive parent pattern
+        // stmt of a var decl, must have bound decls. This is because we
+        // guarantee that all case label items bind corresponding patterns and
+        // the case body var decls of a case stmt are created from the var decls
+        // of the first case label items.
+        if (!caseStmt->hasBoundDecls()) {
+          Out << "parent CaseStmt of VarDecl does not have any case body "
+                 "decls?!\n";
           abort();
         }
       }

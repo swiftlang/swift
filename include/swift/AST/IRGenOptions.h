@@ -104,14 +104,17 @@ public:
   /// Which sanitizer is turned on.
   OptionSet<SanitizerKind> Sanitizers;
 
+  /// Path prefixes that should be rewritten in debug info.
+  PathRemapper DebugPrefixMap;
+
   /// What level of debug info to generate.
   IRGenDebugInfoLevel DebugInfoLevel : 2;
 
   /// What type of debug info to generate.
   IRGenDebugInfoFormat DebugInfoFormat : 2;
 
-  /// Path prefixes that should be rewritten in debug info.
-  PathRemapper DebugPrefixMap;
+  /// Whether to leave DWARF breadcrumbs pointing to imported Clang modules.
+  unsigned DisableClangModuleSkeletonCUs : 1;
 
   /// Whether we're generating IR for the JIT.
   unsigned UseJIT : 1;
@@ -227,7 +230,9 @@ public:
         Verify(true), OptMode(OptimizationMode::NotSet),
         Sanitizers(OptionSet<SanitizerKind>()),
         DebugInfoLevel(IRGenDebugInfoLevel::None),
-        DebugInfoFormat(IRGenDebugInfoFormat::None), UseJIT(false),
+        DebugInfoFormat(IRGenDebugInfoFormat::None),
+        DisableClangModuleSkeletonCUs(false),
+        UseJIT(false),
         IntegratedREPL(false), DisableLLVMOptzns(false),
         DisableSwiftSpecificLLVMOptzns(false), DisableLLVMSLPVectorizer(false),
         DisableFPElim(true), Playground(false), EmitStackPromotionChecks(false),

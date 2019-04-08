@@ -67,3 +67,28 @@ internal func osLog(
   }
   bufferMemory.deallocate()
 }
+
+/// A test helper that constructs a byte buffer and a format string from an
+/// instance of `OSLogMessage` using the same logic as the function `osLog`,
+/// and applies a given `assertion` to the constructed format string and
+/// byte buffer. This function should be used only in tests.
+/// - Parameters:
+///   - message: An instance of `OSLogMessage` created from string interpolation
+///   - assertion: A closure that takes a format string and a pointer to a
+///     byte buffer and asserts a condition.
+public // @testable
+func _checkFormatStringAndBuffer(
+  _ message: OSLogMessage,
+  with assertion: (String, UnsafeBufferPointer<UInt8>) -> Void
+) {
+  let bufferSize = message.bufferSize
+  let bufferMemory = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+  var builder = OSLogByteBufferBuilder(bufferMemory)
+  message.serializeArguments(into: &builder)
+
+  assertion(
+    message.formatString,
+    UnsafeBufferPointer(start: UnsafePointer(bufferMemory), count: bufferSize))
+
+  bufferMemory.deallocate()
+}
