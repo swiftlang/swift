@@ -470,8 +470,6 @@ enum ScoreKind {
   SK_Fix,
   /// A reference to an @unavailable declaration.
   SK_Unavailable,
-  /// An implicit upcast from uninhabited to some type.
-  SK_UninhabitedUpcast,
   /// An implicit force of an implicitly unwrapped optional value.
   SK_ForceUnchecked,
   /// A user-defined conversion.
@@ -2653,12 +2651,6 @@ public:
   TypeMatchResult matchSuperclassTypes(Type type1, Type type2,
                                        TypeMatchOptions flags,
                                        ConstraintLocatorBuilder locator);
-  
-  /// Subroutine of \c matchTypes(), which matches up an uninhabited 
-  /// value to anything.
-  TypeMatchResult matchUninhabitedUpcastTypes(Type type1, Type type2,
-                                              TypeMatchOptions flags,
-                                              ConstraintLocatorBuilder locator);
 
   /// Subroutine of \c matchTypes(), which matches up two types that
   /// refer to the same declaration via their generic arguments.

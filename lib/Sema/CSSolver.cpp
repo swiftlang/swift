@@ -1558,8 +1558,7 @@ void ConstraintSystem::ArgumentInfoCollector::walk(Type argType) {
       case ConstraintKind::Conversion:
       case ConstraintKind::BridgingConversion:
       case ConstraintKind::BindParam:
-      case ConstraintKind::OpaqueUnderlyingType:
-      case ConstraintKind::SingleExpressionFunctionReturnConversion: {
+      case ConstraintKind::OpaqueUnderlyingType: {
         auto secondTy = constraint->getSecondType();
         if (secondTy->is<TypeVariableType>()) {
           auto otherRep =

@@ -2293,11 +2293,6 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-  void visitUninhabitedUpcastExpr(UninhabitedUpcastExpr *E) {
-    printCommon(E, "uninhabited_upcast_expr") << '\n';
-    printRec(E->getSubExpr());
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
   void visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E) {
     printCommon(E, "inject_into_optional") << '\n';
     printRec(E->getSubExpr());
