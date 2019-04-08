@@ -1377,9 +1377,7 @@ public extension Tensor where Scalar : Numeric {
   @inlinable @inline(__always)
   @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func variance(alongAxes axes: [Int32]) -> Tensor {
-    let mean = self.mean(alongAxes: axes)
-    let squaredDiff = (self - mean).squared()
-    return squaredDiff.mean(alongAxes: axes)
+    return variance(alongAxes: Tensor<Int32>(axes))
   }
 
   /// Returns the product along the specified axes. The reduced dimensions are
