@@ -1016,9 +1016,9 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       break;
     }
 
-    if (Tok.isAtStartOfLine()) { 
-      if (AllowSepOmission && Tok.canBeArgumentLabel() 
-          && peekToken().is(tok::colon)) 
+    if (Tok.isAtStartOfLine()) {
+      if (AllowSepOmission && Tok.canBeArgumentLabel() &&
+          peekToken().is(tok::colon))
         // If the next token is at the beginning of a new line, could be an
         // argument label, is followed by a colon, and separator omission is
         // permitted, expect that we'll parse another list element which begins
@@ -1036,7 +1036,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     }
 
     if (AllowSepOmission && Tok.isAtStartOfLine())
-        continue;
+      continue;
 
     diagnose(Tok, diag::expected_separator, ",")
       .fixItInsertAfter(PreviousLoc, ",");
