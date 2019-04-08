@@ -7696,10 +7696,18 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
     if (hadError)
       return nullptr;
   }
-  
+
+  // We are supposed to use contextual type only if it is present and
+  // this expression doesn't represent the implicit return of the single
+  // expression function which got deduced to be `Never`.
+  auto shouldCoerceToContextualType = [&]() {
+    return convertType && !(getType(result)->isUninhabited() &&
+                            getContextualTypePurpose() == CTP_ReturnSingleExpr);
+  };
+
   // If we're supposed to convert the expression to some particular type,
   // do so now.
-  if (convertType) {
+  if (shouldCoerceToContextualType()) {
     result = rewriter.coerceToType(result, convertType,
                                    getConstraintLocator(expr));
     if (!result)

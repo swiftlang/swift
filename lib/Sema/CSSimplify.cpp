@@ -2793,9 +2793,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   }
 
   // Allow '() -> T' to '() -> ()' and '() -> Never' to '() -> T' for closure
-  // literals.
+  // literals and expressions representing an implicit return type of the single
+  // expression functions.
   if (auto elt = locator.last()) {
-    if (elt->getKind() == ConstraintLocator::ClosureResult) {
+    if (elt->getKind() == ConstraintLocator::ClosureResult ||
+        elt->getKind() == ConstraintLocator::SingleExprFuncResultType) {
       if (kind >= ConstraintKind::Subtype &&
           (type1->isUninhabited() || type2->isVoid())) {
         increaseScore(SK_FunctionConversion);

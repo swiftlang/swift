@@ -493,7 +493,8 @@ public:
     }
 
     ContextualTypePurpose ctp = CTP_ReturnStmt;
-    if (auto func = dyn_cast_or_null<FuncDecl>(TheFunc->getAbstractFunctionDecl())) {
+    if (auto func =
+            dyn_cast_or_null<FuncDecl>(TheFunc->getAbstractFunctionDecl())) {
       if (func->hasSingleExpressionBody()) {
         ctp = CTP_ReturnSingleExpr;
       }
@@ -502,7 +503,6 @@ public:
     auto exprTy = TC.typeCheckExpression(E, DC, TypeLoc::withoutLoc(ResultTy),
                                          ctp,
                                          options);
-    
     RS->setResult(E);
 
     if (!exprTy) {
@@ -1921,7 +1921,7 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
       // The function returns void.  We don't need an explicit return, no matter
       // what the type of the expression is.  Take the inserted return back out.
       BS->setElement(0, E);
-      // Fall through to type-checking the body as if we were not a single 
+      // Fall through to type-checking the body as if we were not a single
       // expression function.
     }
   }
@@ -1929,6 +1929,22 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
   StmtChecker SC(*this, static_cast<AbstractFunctionDecl *>(FD));
   SC.EndTypeCheckLoc = EndTypeCheckLoc;
   bool HadError = SC.typeCheckBody(BS);
+
+  // If this was a function with a single expression body, let's see
+  // if implicit return statement came out to be `Never` which means
+  // that we have eagerly converted something like `{ fatalError() }`
+  // into `{ return fatalError() }` that has to be corrected here.
+  if (FD->hasSingleExpressionBody()) {
+    if (auto *stmt = BS->getElement(0).dyn_cast<Stmt *>()) {
+      if (auto *RS = dyn_cast<ReturnStmt>(stmt)) {
+        if (RS->isImplicit() && RS->hasResult()) {
+          auto returnType = RS->getResult()->getType();
+          if (returnType && returnType->isUninhabited())
+            BS->setElement(0, RS->getResult());
+        }
+      }
+    }
+  }
 
   FD->setBody(BS);
   return HadError;
