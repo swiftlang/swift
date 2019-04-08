@@ -651,11 +651,6 @@ public:
     return getRecursiveProperties().hasDependentMember();
   }
 
-  /// Check if this type is a valid type for the LHS of an assignment.
-  /// This mainly means hasLValueType(), but empty tuples and tuples of empty
-  /// tuples also qualify.
-  bool isAssignableType();
-
   /// isExistentialType - Determines whether this type is an existential type,
   /// whose real (runtime) type is unknown but which is known to conform to
   /// some set of protocols. Protocol and protocol-conformance types are

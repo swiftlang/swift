@@ -543,19 +543,6 @@ bool TypeBase::isBool() {
   return false;
 }
 
-
-bool TypeBase::isAssignableType() {
-  if (hasLValueType()) return true;
-  if (auto tuple = getAs<TupleType>()) {
-    for (auto eltType : tuple->getElementTypes()) {
-      if (!eltType->isAssignableType())
-        return false;
-    }
-    return true;
-  }
-  return false;
-}
-
 Type TypeBase::getRValueType() {
   // If the type is not an lvalue, this is a no-op.
   if (!hasLValueType())
