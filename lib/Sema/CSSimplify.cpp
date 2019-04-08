@@ -977,21 +977,6 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     const auto &param = params[paramIdx];
     auto paramTy = param.getOldType();
 
-    // Each of the index parameters has to conform to Hashable
-    // to be viable for use as a keypath subscript component.
-    if (keyPathSubscriptComponent) {
-      auto *hashable =
-          cs.getASTContext().getProtocol(KnownProtocolKind::Hashable);
-      // Standard library might be broken.
-      if (!hashable)
-        return cs.getTypeMatchFailure(locator);
-
-      cs.addConstraint(
-          ConstraintKind::ConformsTo, paramTy, hashable->getDeclaredType(),
-          cs.getConstraintLocator(keyPathSubscriptComponent,
-                                  LocatorPathElt::getTupleElement(paramIdx)));
-    }
-
     if (param.isAutoClosure())
       paramTy = paramTy->castTo<FunctionType>()->getResult();
 
@@ -3153,11 +3138,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // If this is an implicit Hashable conformance check generated for each
     // index argument of the keypath subscript component, we could just treat
     // it as though it conforms.
-    if (auto *component = getAsKeyPathSubscriptComponent(*this, anchor, path)) {
+    auto *loc = getConstraintLocator(locator);
+    if (loc->isResultOfKeyPathDynamicMemberLookup() ||
+        loc->isKeyPathSubscriptComponent()) {
       if (protocol ==
           getASTContext().getProtocol(KnownProtocolKind::Hashable)) {
-        auto *fix = TreatKeyPathSubscriptIndexAsHashable::create(*this, type,
-                                                                 component);
+        auto *fix =
+            TreatKeyPathSubscriptIndexAsHashable::create(*this, type, loc);
         if (!recordFix(fix))
           return SolutionKind::Solved;
       }
