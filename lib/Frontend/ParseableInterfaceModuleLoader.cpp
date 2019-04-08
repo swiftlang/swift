@@ -348,7 +348,7 @@ class swift::ParseableInterfaceBuilder {
 
     // Tell the subinvocation to serialize dependency hashes if asked to do so.
     auto &frontendOpts = subInvocation.getFrontendOptions();
-    frontendOpts.SerializeParseableModuleInterfaceDependencyHashes =
+    frontendOpts.SerializeModuleInterfaceDependencyHashes =
       serializeDependencyHashes;
   }
 
@@ -580,7 +580,7 @@ public:
       SerializationOpts.ModuleLinkName = FEOpts.ModuleLinkName;
       SmallVector<FileDependency, 16> Deps;
       if (collectDepsForSerialization(SubInstance, Deps,
-            FEOpts.SerializeParseableModuleInterfaceDependencyHashes)) {
+            FEOpts.SerializeModuleInterfaceDependencyHashes)) {
         SubError = true;
         return;
       }
