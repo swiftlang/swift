@@ -426,6 +426,110 @@ static llvm::Value *computeExtraTagBytes(IRGenFunction &IGF, IRBuilder &Builder,
   return phi;
 }
 
+/// Emit a specialized memory operation for a \p size of 0, 1, 2 or
+/// 4 bytes.
+/// \p emitMemOpFn will be called in a basic block where \p size is
+/// a known constant value passed as a parameter to the function.
+static void emitSpecializedMemOperation(
+    IRGenFunction &IGF,
+    llvm::function_ref<void(IRBuilder &, Size)> emitMemOpFn,
+    llvm::Value *size) {
+  auto &Ctx = IGF.IGM.getLLVMContext();
+  auto &Builder = IGF.Builder;
+
+  // Sizes to try. Tested in order.
+  const auto sizes = std::array<Size, 4>{
+    Size(0),
+    Size(1),
+    Size(2),
+    Size(4),
+  };
+
+  // Block to jump to after successful match.
+  auto *returnBB = llvm::BasicBlock::Create(Ctx);
+
+  // Test all the sizes in turn, generating code similar to:
+  //
+  //   if (size == 0) {
+  //     <op>
+  //   } else if (size == 1) {
+  //     <op>
+  //   } else if (size == 2) {
+  //     <op>
+  //   } else if (size == 4) {
+  //     <op>
+  //   } else {
+  //     <unreachable>
+  //   }
+  //
+  for (const Size &s : sizes) {
+    auto *matchBB = llvm::BasicBlock::Create(Ctx);
+    auto *nextBB = llvm::BasicBlock::Create(Ctx);
+
+    // Check if size matches.
+    auto *imm = Builder.getInt32(s.getValue());
+    auto *cmp = Builder.CreateICmpEQ(size, imm);
+    Builder.CreateCondBr(cmp, matchBB, nextBB);
+
+    // Size matches: execute sized operation.
+    Builder.emitBlock(matchBB);
+    emitMemOpFn(Builder, s);
+    Builder.CreateBr(returnBB);
+
+    // Size does not match: try next size.
+    Builder.emitBlock(nextBB);
+  }
+  // No size matched. Should never happen.
+  Builder.CreateUnreachable();
+
+  // Continue.
+  Builder.emitBlock(returnBB);
+}
+
+/// Emit a load of a \p size byte integer value zero extended to 4 bytes.
+/// \p size may be 0, 1, 2 or 4.
+static llvm::Value *emitGetTag(IRGenFunction &IGF,
+                               Address from,
+                               llvm::Value *size) {
+  auto *phi = llvm::PHINode::Create(IGF.IGM.Int32Ty, 4);
+  emitSpecializedMemOperation(IGF,
+      [=](IRBuilder &B, Size s) {
+        if (s == Size(0)) {
+          // If the size is 0 bytes return 0.
+          phi->addIncoming(B.getInt32(0), B.GetInsertBlock());
+          return;
+        }
+        // Generate a load of size bytes and zero-extend it to 32-bits.
+        auto *type = B.getIntNTy(s.getValueInBits());
+        Address addr = B.CreateBitCast(from, type->getPointerTo());
+        auto *val = B.CreateZExtOrTrunc(B.CreateLoad(addr), B.getInt32Ty());
+        phi->addIncoming(val, B.GetInsertBlock());
+      },
+      size);
+  IGF.Builder.Insert(phi);
+  return phi;
+}
+
+/// Emit a store of \p val truncated to \p size bytes.
+/// \p size may be 0, 1, 2 or 4.
+static void emitSetTag(IRGenFunction &IGF,
+                       Address to, llvm::Value *val,
+                       llvm::Value *size) {
+  emitSpecializedMemOperation(IGF,
+      [=](IRBuilder &B, Size s) {
+        if (s == Size(0)) {
+          // Nothing to store.
+          return;
+        }
+        // Store value truncated to size bytes.
+        auto *type = B.getIntNTy(s.getValueInBits());
+        auto *trunc = B.CreateZExtOrTrunc(val, type);
+        Address addr = B.CreateBitCast(to, type->getPointerTo());
+        B.CreateStore(trunc, addr);
+      },
+      size);
+}
+
 llvm::Value *FixedTypeInfo::getEnumTagSinglePayload(IRGenFunction &IGF,
                                                     llvm::Value *numEmptyCases,
                                                     Address enumAddr,
@@ -472,26 +576,21 @@ llvm::Value *irgen::getFixedTypeEnumTagSinglePayload(IRGenFunction &IGF,
 
   // There are extra tag bits to check.
   Builder.emitBlock(extraTagBitsBB);
-  Address extraTagBitsSlot = IGF.createAlloca(IGM.Int32Ty, Alignment(4));
-  Builder.CreateStore(zero, extraTagBitsSlot);
 
   // Compute the number of extra tag bytes.
   auto *emptyCases = Builder.CreateSub(numEmptyCases, numExtraInhabitants);
   auto *numExtraTagBytes =
       computeExtraTagBytes(IGF, Builder, fixedSize, emptyCases);
 
-  // Read the extra tag bytes.
+  // Read the value stored in the extra tag bytes.
   auto *valueAddr =
       Builder.CreateBitOrPointerCast(enumAddr.getAddress(), IGM.Int8PtrTy);
   auto *extraTagBitsAddr =
       Builder.CreateConstInBoundsGEP1_32(IGM.Int8Ty, valueAddr,
-                                         fixedSize.getValue());
-
-  // TODO: big endian.
-  Builder.CreateMemCpy(
-      Builder.CreateBitCast(extraTagBitsSlot, IGM.Int8PtrTy).getAddress(), 1,
-      extraTagBitsAddr, 1, numExtraTagBytes);
-  auto extraTagBits = Builder.CreateLoad(extraTagBitsSlot);
+          fixedSize.getValue());
+  auto *extraTagBits = emitGetTag(IGF,
+      Address(extraTagBitsAddr, Alignment(1)),
+      numExtraTagBytes);
 
   extraTagBitsBB = llvm::BasicBlock::Create(Ctx);
   Builder.CreateCondBr(Builder.CreateICmpEQ(extraTagBits, zero),
@@ -502,20 +601,25 @@ llvm::Value *irgen::getFixedTypeEnumTagSinglePayload(IRGenFunction &IGF,
   Builder.emitBlock(extraTagBitsBB);
 
   auto *truncSize = Builder.CreateZExtOrTrunc(size, IGM.Int32Ty);
-  Address caseIndexFromValueSlot = IGF.createAlloca(IGM.Int32Ty, Alignment(4));
-  Builder.CreateStore(zero, caseIndexFromValueSlot);
 
   auto *caseIndexFromExtraTagBits = Builder.CreateSelect(
       Builder.CreateICmpUGE(truncSize, four), zero,
       Builder.CreateShl(Builder.CreateSub(extraTagBits, one),
                         Builder.CreateMul(eight, truncSize)));
 
-  // TODO: big endian.
-  Builder.CreateMemCpy(
-      Builder.CreateBitCast(caseIndexFromValueSlot, IGM.Int8PtrTy),
-      Address(valueAddr, Alignment(1)),
-      std::min(Size(4U), fixedSize));
-  auto caseIndexFromValue = Builder.CreateLoad(caseIndexFromValueSlot);
+  llvm::Value *caseIndexFromValue = zero;
+  if (fixedSize > Size(0)) {
+    // Read up to one pointer-sized 'chunk' of the payload.
+    // The size of the chunk does not have to be a power of 2.
+    Size limit = IGM.getPointerSize();
+    auto *caseIndexType = llvm::IntegerType::get(Ctx,
+        std::min(limit, fixedSize).getValueInBits());
+    auto *caseIndexAddr = Builder.CreateBitCast(valueAddr,
+        caseIndexType->getPointerTo());
+    caseIndexFromValue = Builder.CreateZExtOrTrunc(
+        Builder.CreateLoad(Address(caseIndexAddr, Alignment(1))),
+        IGM.Int32Ty);
+  }
 
   auto *result1 = Builder.CreateAdd(
       numExtraInhabitants,
@@ -547,72 +651,6 @@ llvm::Value *irgen::getFixedTypeEnumTagSinglePayload(IRGenFunction &IGF,
   result->addIncoming(result2, singleCaseEnumBB);
 
   return Builder.CreateAdd(result, llvm::ConstantInt::get(IGM.Int32Ty, 1));
-}
-
-/// Emit a speciaize memory operation for a \p size of 0 to 4 bytes.
-static void emitSpecializedMemOperation(
-    IRGenFunction &IGF,
-    llvm::function_ref<void(IRBuilder &, Size)> emitMemOpFn,
-    llvm::Value *size) {
-  auto &IGM = IGF.IGM;
-  auto &Ctx = IGF.IGM.getLLVMContext();
-  auto &Builder = IGF.Builder;
-  auto *returnBB = llvm::BasicBlock::Create(Ctx);
-  auto *oneBB = llvm::BasicBlock::Create(Ctx);
-  auto *twoBB = llvm::BasicBlock::Create(Ctx);
-  auto *fourBB = llvm::BasicBlock::Create(Ctx);
-  auto *int32Ty = IGM.Int32Ty;
-  auto *zero = llvm::ConstantInt::get(int32Ty, 0U);
-  auto *one = llvm::ConstantInt::get(int32Ty, 1U);
-  auto *two = llvm::ConstantInt::get(int32Ty, 2U);
-
-  auto *continueBB = llvm::BasicBlock::Create(Ctx);
-  auto *isZero = Builder.CreateICmpEQ(size, zero);
-  Builder.CreateCondBr(isZero, returnBB, continueBB);
-
-  Builder.emitBlock(continueBB);
-  continueBB = llvm::BasicBlock::Create(Ctx);
-  auto *isOne = Builder.CreateICmpEQ(size, one);
-  Builder.CreateCondBr(isOne, oneBB, continueBB);
-
-  Builder.emitBlock(continueBB);
-  auto *isTwo = Builder.CreateICmpEQ(size, two);
-  Builder.CreateCondBr(isTwo, twoBB, fourBB);
-
-  Builder.emitBlock(oneBB);
-  emitMemOpFn(Builder, Size(1));
-  Builder.CreateBr(returnBB);
-
-  Builder.emitBlock(twoBB);
-  emitMemOpFn(Builder, Size(2));
-  Builder.CreateBr(returnBB);
-
-  Builder.emitBlock(fourBB);
-  emitMemOpFn(Builder, Size(4));
-  Builder.CreateBr(returnBB);
-
-  Builder.emitBlock(returnBB);
-}
-
-/// Emit a memset of zero operation for a \p size of 0 to 4 bytes.
-static void emitMemZero(IRGenFunction &IGF, Address addr,
-                        llvm::Value *size) {
-  auto *zeroByte = llvm::ConstantInt::get(IGF.IGM.Int8Ty, 0U);
-  emitSpecializedMemOperation(IGF,
-                              [=](IRBuilder &B, Size numBytes) {
-                                B.CreateMemSet(addr, zeroByte, numBytes);
-                              },
-                              size);
-}
-
-/// Emit a memcpy operation for a \p size of 0 to 4 bytes.
-static void emitMemCpy(IRGenFunction &IGF, Address to, Address from,
-                       llvm::Value *size) {
-  emitSpecializedMemOperation(IGF,
-                              [=](IRBuilder &B, Size numBytes) {
-                                B.CreateMemCpy(to, from, numBytes);
-                              },
-                              size);
 }
 
 void FixedTypeInfo::storeEnumTagSinglePayload(IRGenFunction &IGF,
@@ -684,7 +722,7 @@ void irgen::storeFixedTypeEnumTagSinglePayload(IRGenFunction &IGF,
   // We are the payload or fit within the extra inhabitants.
   Builder.emitBlock(isPayloadOrInhabitantCaseBB);
   // Zero the tag bits.
-  emitMemZero(IGF, extraTagBitsAddr, numExtraTagBytes);
+  emitSetTag(IGF, extraTagBitsAddr, zero, numExtraTagBytes);
   isPayloadOrInhabitantCaseBB = Builder.GetInsertBlock();
   auto *storeInhabitantBB = llvm::BasicBlock::Create(Ctx);
   auto *returnBB = llvm::BasicBlock::Create(Ctx);
@@ -734,21 +772,28 @@ void irgen::storeFixedTypeEnumTagSinglePayload(IRGenFunction &IGF,
   payloadIndex->addIncoming(caseIndex, payloadGE4BB);
   payloadIndex->addIncoming(payloadIndex0, payloadLT4BB);
 
-  Address payloadIndexAddr = IGF.createAlloca(int32Ty, Alignment(4));
-  Builder.CreateStore(payloadIndex, payloadIndexAddr);
-  Address extraTagIndexAddr = IGF.createAlloca(int32Ty, Alignment(4));
-  Builder.CreateStore(extraTagIndex, extraTagIndexAddr);
-  // TODO: big endian
-  Builder.CreateMemCpy(
-      valueAddr,
-      Builder.CreateBitCast(payloadIndexAddr, IGM.Int8PtrTy),
-      std::min(Size(4U), fixedSize));
-  Address extraZeroAddr = Builder.CreateConstByteArrayGEP(valueAddr, Size(4));
-  if (fixedSize > Size(4))
-    Builder.CreateMemSet(
-        extraZeroAddr, llvm::ConstantInt::get(IGM.Int8Ty, 0),
-        Builder.CreateSub(size, llvm::ConstantInt::get(size->getType(), 4)));
-  emitMemCpy(IGF, extraTagBitsAddr, extraTagIndexAddr, numExtraTagBytes);
+  if (fixedSize > Size(0)) {
+    // Write the value into the first pointer-sized (or smaller)
+    // 'chunk' of the payload.
+    // The size of the chunk does not have to be a power of 2.
+    Size limit = IGM.getPointerSize();
+    auto *chunkType = Builder.getIntNTy(
+        std::min(fixedSize, limit).getValueInBits());
+    Builder.CreateStore(
+        Builder.CreateZExtOrTrunc(payloadIndex, chunkType),
+        Builder.CreateBitCast(valueAddr, chunkType->getPointerTo()));
+
+    // Zero the remainder of the payload.
+    if (fixedSize > limit) {
+      auto zeroAddr = Builder.CreateConstByteArrayGEP(valueAddr, limit);
+      auto zeroSize = Builder.CreateSub(
+          size,
+          llvm::ConstantInt::get(size->getType(), limit.getValue()));
+      Builder.CreateMemSet(zeroAddr, Builder.getInt8(0), zeroSize);
+    }
+  }
+  // Write to the extra tag bytes, if any.
+  emitSetTag(IGF, extraTagBitsAddr, extraTagIndex, numExtraTagBytes);
   Builder.CreateBr(returnBB);
 
   Builder.emitBlock(returnBB);
