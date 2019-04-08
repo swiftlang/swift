@@ -81,6 +81,13 @@ class A<T> {
     let copy = Self.init(a: 11)
     return copy
   }
+  subscript (i: Int) -> Self { // expected-error {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'A'?}}
+    get {
+      return Self.init(a: i)
+    }
+    set(newValue) {
+    }
+  }
 }
 
 class B: A<Int> {
@@ -165,6 +172,13 @@ extension S2 {
     Self.x()
     return Self.init() as? Self
     // expected-warning@-1 {{conditional cast from 'S2' to 'S2' always succeeds}}
+  }
+  subscript (i: Int) -> Self {
+    get {
+      return Self.init()
+    }
+    set(newValue) {
+    }
   }
 }
 

@@ -1032,6 +1032,48 @@ static std::string getDeclNameFromContext(DeclContext *dc,
   }
 }
 
+static Type isSE0068(TypeResolution resolution, TypeResolutionOptions options) {
+  auto dc = resolution.getDeclContext();
+  ASTContext &ctx = dc->getASTContext();
+  DeclContext *nominalDC = nullptr;
+  NominalTypeDecl *nominal = nullptr;
+  if ((nominalDC = dc->getInnermostTypeContext()) &&
+      (nominal = nominalDC->getSelfNominalTypeDecl())) {
+    assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
+
+    bool insideClass = nominalDC->getSelfClassDecl() != nullptr;
+    AbstractFunctionDecl *methodDecl = dc->getInnermostMethodContext();
+    bool declaringMethod = methodDecl &&
+    methodDecl->getDeclContext() == dc->getParentForLookup();
+    bool isMutablePropertyOrSubscriptOfClass = insideClass &&
+      (options.is(TypeResolverContext::PatternBindingDecl) ||
+       options.is(TypeResolverContext::FunctionResult));
+    bool isTypeAliasInClass = insideClass &&
+      options.is(TypeResolverContext::TypeAliasDecl);
+
+//    printf("%d\n", options.getBaseContext());
+
+//    if (isMutablePropertyOrSubscriptOfClass) {
+//      if (auto prop = dyn_cast_or_null<ValueDecl>
+//          (dc->getInnermostDeclarationDeclContext()))
+//        if (!prop->isSettable(dc))
+//          isMutablePropertyOrSubscriptOfClass = false;
+//    }
+
+    if (((!insideClass || !declaringMethod) &&
+         !isMutablePropertyOrSubscriptOfClass && !isTypeAliasInClass &&
+         !options.is(TypeResolverContext::GenericRequirement)) ||
+        options.is(TypeResolverContext::ExplicitCastExpr)) {
+      Type SelfType = nominal->getSelfInterfaceType();
+      if (insideClass)
+        SelfType = DynamicSelfType::get(SelfType, ctx);
+      return resolution.mapTypeIntoContext(SelfType);
+    }
+  }
+
+  return Type();
+}
+
 /// Diagnose a reference to an unknown type.
 ///
 /// This routine diagnoses a reference to an unknown type, and
@@ -1059,24 +1101,8 @@ static Type diagnoseUnknownType(TypeResolution resolution,
           (nominal = nominalDC->getSelfNominalTypeDecl())) {
         assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
 
-        bool insideClass = nominalDC->getSelfClassDecl() != nullptr;
-        AbstractFunctionDecl *methodDecl = dc->getInnermostMethodContext();
-        bool declaringMethod = methodDecl &&
-          methodDecl->getDeclContext() == dc->getParentForLookup();
-        bool isPropertyOfClass = insideClass &&
-          options.is(TypeResolverContext::PatternBindingDecl);
-        bool isTypeAliasInClass = insideClass &&
-          options.is(TypeResolverContext::TypeAliasDecl);
-
-        if (((!insideClass || !declaringMethod) &&
-             !isPropertyOfClass && !isTypeAliasInClass &&
-             !options.is(TypeResolverContext::GenericRequirement)) ||
-            options.is(TypeResolverContext::ExplicitCastExpr)) {
-          Type SelfType = nominal->getSelfInterfaceType();
-          if (insideClass)
-            SelfType = DynamicSelfType::get(SelfType, ctx);
-          return resolution.mapTypeIntoContext(SelfType);
-        }
+        if (auto SelfType = isSE0068(resolution, options))
+          return SelfType;
 
         // Attempt to refer to 'Self' within a non-protocol nominal type.
         // Produce a Fix-It replacing 'Self' with the nominal type name.
@@ -1259,18 +1285,21 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
   DeclContext *lookupDC = DC;
 
   // Dynamic 'Self' in the result type of a function body.
-  if (options.getBaseContext() == TypeResolverContext::DynamicSelfResult &&
-      comp->getIdentifier() == ctx.Id_Self) {
-    auto func = cast<FuncDecl>(DC);
-    assert(func->hasDynamicSelf() && "Not marked as having dynamic Self?");
+  if (comp->getIdentifier() == ctx.Id_Self) {
+    if (options.getBaseContext() == TypeResolverContext::DynamicSelfResult) {
+      auto func = cast<FuncDecl>(DC);
+      assert(func->hasDynamicSelf() && "Not marked as having dynamic Self?");
 
-    // FIXME: The passed-in TypeRepr should get 'typechecked' as well.
-    // The issue is though that ComponentIdentTypeRepr only accepts a ValueDecl
-    // while the 'Self' type is more than just a reference to a TypeDecl.
+      // FIXME: The passed-in TypeRepr should get 'typechecked' as well.
+      // The issue is though that ComponentIdentTypeRepr only accepts a ValueDecl
+      // while the 'Self' type is more than just a reference to a TypeDecl.
 
-    auto selfType = resolution.mapTypeIntoContext(
-      func->getDeclContext()->getSelfInterfaceType());
-    return DynamicSelfType::get(selfType, ctx);
+      auto selfType = resolution.mapTypeIntoContext(
+        func->getDeclContext()->getSelfInterfaceType());
+      return DynamicSelfType::get(selfType, ctx);
+    }
+//    if (auto SelfType = isSE0068(resolution, options))
+//      return SelfType;
   }
 
   auto id = comp->getIdentifier();
