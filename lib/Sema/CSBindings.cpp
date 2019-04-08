@@ -416,8 +416,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
     case ConstraintKind::Conversion:
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::OperatorArgumentConversion:
-    case ConstraintKind::OptionalObject: 
-    case ConstraintKind::SingleExpressionFunctionReturnConversion: {
+    case ConstraintKind::OptionalObject: {
       // If there is a `bind param` constraint associated with
       // current type variable, result should be aware of that
       // fact. Binding set might be incomplete until

@@ -1073,7 +1073,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::Conversion:
-  case ConstraintKind::SingleExpressionFunctionReturnConversion:
     subKind = ConstraintKind::Conversion;
     break;
 
@@ -1165,7 +1164,6 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::ValueMember:
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
-  case ConstraintKind::SingleExpressionFunctionReturnConversion:
     return false;
   }
 
@@ -1311,7 +1309,6 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::OpaqueUnderlyingType:
-  case ConstraintKind::SingleExpressionFunctionReturnConversion:
     subKind = ConstraintKind::Subtype;
     break;
 
@@ -1583,18 +1580,6 @@ matchDeepTypeArguments(ConstraintSystem &cs,
   }
 
   return cs.getTypeMatchSuccess();
-}
-
-ConstraintSystem::TypeMatchResult
-ConstraintSystem::matchUninhabitedUpcastTypes(Type type1, Type type2,
-                                              TypeMatchOptions flags,
-                                              ConstraintLocatorBuilder locator) {
-  if (type1->isUninhabited()) {
-    increaseScore(SK_UninhabitedUpcast);
-    return getTypeMatchSuccess();
-  }
-
-  return getTypeMatchFailure(locator);
 }
 
 ConstraintSystem::TypeMatchResult
@@ -2235,7 +2220,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::Conversion:
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::OperatorArgumentConversion:
-    case ConstraintKind::SingleExpressionFunctionReturnConversion: 
       return formUnsolvedResult();
 
     case ConstraintKind::OpaqueUnderlyingType:
@@ -2489,12 +2473,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     if (type1->is<LValueType>() && !type2->is<InOutType>()) {
       return matchTypes(type1->getRValueType(), type2,
                         kind, subflags, locator);
-    }
-  }
-
-  if (kind == ConstraintKind::SingleExpressionFunctionReturnConversion) {
-    if (type1->isUninhabited()) {
-      conversionsOrFixes.push_back(ConversionRestrictionKind::UninhabitedUpcast);
     }
   }
 
@@ -6016,10 +5994,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     addContextualScore();
     return matchSuperclassTypes(type1, type2, subflags, locator);
 
-  case ConversionRestrictionKind::UninhabitedUpcast:
-    addContextualScore();
-    return matchUninhabitedUpcastTypes(type1, type2, subflags, locator);
-
   // for $< in { <, <c, <oc }:
   //   T $< U, U : P_i ===> T $< protocol<P_i...>
   case ConversionRestrictionKind::Existential:
@@ -6519,7 +6493,6 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::Conversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:
-  case ConstraintKind::SingleExpressionFunctionReturnConversion:
     return matchTypes(first, second, kind, subflags, locator);
 
   case ConstraintKind::OpaqueUnderlyingType:
@@ -6779,8 +6752,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::Conversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:
-  case ConstraintKind::OpaqueUnderlyingType:
-  case ConstraintKind::SingleExpressionFunctionReturnConversion: {
+  case ConstraintKind::OpaqueUnderlyingType: {
     // Relational constraints.
     auto matchKind = constraint.getKind();
 
