@@ -317,12 +317,17 @@ def dump_repo_hashes(config):
     new_config['branch-schemes'] = {branch_scheme_name: branch_scheme}
     for repo_name, repo_info in sorted(config['repos'].items(),
                                        key=lambda x: x[0]):
-        with shell.pushd(os.path.join(SWIFT_SOURCE_ROOT, repo_name),
-                         dry_run=False,
-                         echo=False):
-            h = shell.capture(["git", "rev-parse", "HEAD"],
-                              echo=False).strip()
-            repos[repo_name] = str(h)
+                                       
+        path = os.path.join(SWIFT_SOURCE_ROOT, repo_name)
+        if os.path.isdir(path):
+            with shell.pushd(path,
+                            dry_run=False,
+                            echo=False):
+                h = shell.capture(["git", "rev-parse", "HEAD"],
+                                echo=False).strip()
+                repos[repo_name] = str(h)
+        if not os.path.isdir(path):
+            repos[repo_name] = "dir not exist"
     json.dump(new_config, sys.stdout, indent=4)
 
 
