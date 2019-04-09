@@ -1288,10 +1288,9 @@ public extension Tensor where Scalar : Numeric {
   @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   @inlinable @inline(__always)
   func variance() -> Tensor {
-    let axes = Array(Int32(0)..<Int32(rank))
-    let mean = self.mean(squeezingAxes: axes)
+    let mean = self.mean()
     let squaredDiff = (self - mean).squared()
-    return squaredDiff.mean(squeezingAxes: axes)
+    return squaredDiff.mean()
   }
 
   /// Returns the sum along the specified axes. The reduced dimensions are

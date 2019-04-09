@@ -126,12 +126,10 @@ TensorADTests.testAllBackends("variance") {
   // let varianceGradSqueezingAxes = gradient { (a: Tensor<Float>) in a.variance(squeezingAxes: 0, 1) }
   let varianceGradAlongAxes = gradient { (a: Tensor<Float>) in a.variance(alongAxes: 0, 1) }
 
-  // TODO: Fix variance derivative calculation.
-  // PyTorch has: `expected == [[-0.75, -0.25], [ 0.25,  0.75]]`.
   let input: Tensor<Float> = [[1, 2], [3, 4]]
-  let expected = Tensor<Float>(repeating: -0.75, shape: [2, 2])
+  let expected: Tensor<Float> = [[-0.75, -0.25], [0.25, 0.75]]
   expectEqual(expected, varianceGradScalar(input))
-  // expectEqual(expected, meanGradSqueezingAxes(input))
+  // expectEqual(expected, varianceGradSqueezingAxes(input))
   expectEqual(expected, varianceGradAlongAxes(input))
 }
 
