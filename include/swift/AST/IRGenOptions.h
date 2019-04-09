@@ -162,9 +162,6 @@ public:
   unsigned HasValueNamesSetting : 1;
   unsigned ValueNames : 1;
 
-  /// Emit nominal type field metadata.
-  unsigned EnableReflectionMetadata : 1;
-
   /// Emit names of struct stored properties and enum cases.
   unsigned EnableReflectionNames : 1;
 
@@ -237,7 +234,7 @@ public:
         DisableLLVMSLPVectorizer(false), DisableFPElim(true), Playground(false),
         EmitStackPromotionChecks(false), PrintInlineTree(false),
         EmbedMode(IRGenEmbedMode::None), HasValueNamesSetting(false),
-        ValueNames(false), EnableReflectionMetadata(true),
+        ValueNames(false),
         EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
         ForcePublicLinkage(false), LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false), DisableLegacyTypeInfo(false),

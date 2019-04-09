@@ -1,6 +1,9 @@
 // RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
 // RUN: %target-swift-frontend -disable-reflection-names -emit-ir %s | %FileCheck %s --check-prefix=STRIP_REFLECTION_NAMES
-// RUN: %target-swift-frontend -disable-reflection-metadata -emit-ir %s | %FileCheck %s --check-prefix=STRIP_REFLECTION_METADATA
+// RUN: %target-swift-frontend -disable-reflection-metadata -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -disable-reflection-metadata -emit-ir %s 2>&1 | %FileCheck %s --check-prefix=WARNING
+
+// WARNING: warning: '-disable-reflection-metadata' is no longer supported and has no effects
 
 // STRIP_REFLECTION_NAMES_DAG: section "{{[^"]*swift5_reflect|.sw5rfst\$B}}
 // STRIP_REFLECTION_NAMES_DAG: section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
@@ -12,12 +15,6 @@
 
 // STRIP_REFLECTION_NAMES-DAG: @"$s19reflection_metadata10MyProtocol_pMF" = internal constant {{.*}}section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
 
-// STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_reflect|.sw5rfst\$B}}
-// STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
-// STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_assocty|.sw5asty\$B}}
-// STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_capture|.sw5cptr\$B}}
-// STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_reflstr|.sw5rfst\$B}}
-// STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_builtin|.sw5bltn\$B}}
 
 // CHECK-DAG: @__swift_reflection_version = linkonce_odr hidden constant i16 {{[0-9]+}}
 // CHECK-DAG: private constant [2 x i8] c"i\00", section "{{[^"]*swift5_reflstr|.sw5rfst\$B}}

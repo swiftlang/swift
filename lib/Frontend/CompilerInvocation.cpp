@@ -1075,10 +1075,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.SanitizeCoverage.CoverageType = llvm::SanitizerCoverageOptions::SCK_Edge;
   }
 
-  if (Args.hasArg(OPT_disable_reflection_metadata)) {
-    Opts.EnableReflectionMetadata = false;
-    Opts.EnableReflectionNames = false;
-  }
+  if (Args.hasArg(OPT_disable_reflection_metadata))
+    Diags.diagnose(SourceLoc(), diag::disable_reflection_metadata_unsupported);
 
   if (Args.hasArg(OPT_enable_anonymous_context_mangled_names))
     Opts.EnableAnonymousContextMangledNames = true;

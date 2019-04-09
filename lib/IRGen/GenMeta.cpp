@@ -1284,8 +1284,7 @@ namespace {
     void addReflectionFieldDescriptor() {
       // Structs are reflectable unless we emit them with opaque reflection
       // metadata.
-      if (!IGM.IRGen.Opts.EnableReflectionMetadata
-          || IGM.shouldEmitOpaqueTypeMetadataRecord(getType())) {
+      if (IGM.shouldEmitOpaqueTypeMetadataRecord(getType())) {
         B.addInt32(0);
         return;
       }
@@ -1358,13 +1357,12 @@ namespace {
     void addReflectionFieldDescriptor() {
       // Some enum layout strategies (viz. C compatible layout) aren't
       // supported by reflection.
-      if (!IGM.IRGen.Opts.EnableReflectionMetadata
-          || IGM.shouldEmitOpaqueTypeMetadataRecord(getType())
-          || !Strategy.isReflectable()) {
+      if (IGM.shouldEmitOpaqueTypeMetadataRecord(getType()) ||
+          !Strategy.isReflectable()) {
         B.addInt32(0);
         return;
       }
-    
+
       B.addRelativeAddress(IGM.getAddrOfReflectionFieldDescriptor(
         getType()->getDeclaredType()->getCanonicalType()));
     }
@@ -1477,13 +1475,12 @@ namespace {
     void addReflectionFieldDescriptor() {
       // Classes are always reflectable, unless reflection is disabled or this
       // is a foreign class.
-      if (!IGM.IRGen.Opts.EnableReflectionMetadata
-          || IGM.shouldEmitOpaqueTypeMetadataRecord(getType())
-          || getType()->isForeign()) {
+      if (IGM.shouldEmitOpaqueTypeMetadataRecord(getType()) ||
+          getType()->isForeign()) {
         B.addInt32(0);
         return;
       }
-    
+
       B.addRelativeAddress(IGM.getAddrOfReflectionFieldDescriptor(
         getType()->getDeclaredType()->getCanonicalType()));
     }

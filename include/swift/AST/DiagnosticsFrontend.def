@@ -278,6 +278,10 @@ ERROR(unknown_forced_module_loading_mode,none,
       "unknown value for SWIFT_FORCE_MODULE_LOADING variable: '%0'",
       (StringRef))
 
+WARNING(disable_reflection_metadata_unsupported, none,
+      "'-disable-reflection-metadata' is no longer supported "
+      "and has no effects", ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
