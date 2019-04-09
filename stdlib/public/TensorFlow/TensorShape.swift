@@ -161,15 +161,19 @@ extension TensorShape : Codable {
   }
 }
 
-extension TensorShape: PythonConvertible {
+extension TensorShape : PythonConvertible {
   public var pythonObject: PythonObject {
     return dimensions.pythonObject
   }
 
   public init?(_ pythonObject: PythonObject) {
-    guard let array = [Int32](pythonObject) else {
-      return nil
+    let hasLen = Bool(Python.hasattr(pythonObject, "__len__"))
+    if(hasLen == true) {
+      guard let array = [Int32](pythonObject) else { return nil }
+      self.init(array)
+    } else {
+      guard let num = Int32(pythonObject) else { return nil }
+      self.init(num)
     }
-    self.init(array)
   }
 }
