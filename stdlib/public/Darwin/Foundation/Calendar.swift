@@ -901,13 +901,13 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     
     public func hash(into hasher: inout Hasher) {
         // We need to make sure autoupdating calendars have the same hash
-	      if _autoupdating {
+        if _autoupdating {
             hasher.combine(false)
-	      } else {
+        } else {
             hasher.combine(true)
-	          hasher.combine(_handle.map { $0 })
-	      }
-	  }
+            hasher.combine(_handle.map { $0 })
+        }
+    }
 
     // MARK: -
     // MARK: Conversion Functions
