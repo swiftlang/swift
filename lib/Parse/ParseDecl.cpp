@@ -3530,7 +3530,7 @@ ParserStatus Parser::parseDeclItem(bool &PreviousHadSemi,
 
   ParserResult<Decl> Result;
   SyntaxParsingContext DeclContext(SyntaxContext,
-                                   SyntaxKind::MemberDeclListItem);
+                                   SyntaxKind::MemberDecl);
   if (loadCurrentSyntaxNodeFromCache()) {
     return ParserStatus();
   }

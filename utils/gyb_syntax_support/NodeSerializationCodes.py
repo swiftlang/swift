@@ -119,7 +119,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'InheritedType': 114,
     'TypeInheritanceClause': 115,
     'MemberDeclBlock': 116,
-    'MemberDeclListItem': 117,
+    'MemberDecl': 117,
     'SourceFile': 118,
     'InitializerClause': 119,
     'FunctionParameter': 120,
