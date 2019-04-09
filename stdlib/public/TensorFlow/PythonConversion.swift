@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines conversion initializers from `numpy.ndarray` to
-// `ShapedArray` and `Tensor`.
+// This file defines conversion logic between Python types & 
+// custom TensorFlow types
 //
 //===----------------------------------------------------------------------===//
 
@@ -162,6 +162,23 @@ extension Tensor where Scalar : NumpyScalarCompatible {
   ///
   /// - Precondition: The `numpy` Python package must be installed.
   public func makeNumpyArray() -> PythonObject { return array.makeNumpyArray() }
+}
+
+extension TensorShape : PythonConvertible {
+  public var pythonObject: PythonObject {
+    return dimensions.pythonObject
+  }
+
+  public init?(_ pythonObject: PythonObject) {
+    let hasLen = Bool(Python.hasattr(pythonObject, "__len__"))
+    if(hasLen == true) {
+      guard let array = [Int32](pythonObject) else { return nil }
+      self.init(array)
+    } else {
+      guard let num = Int32(pythonObject) else { return nil }
+      self.init(num)
+    }
+  }
 }
 
 #endif // canImport(Python)

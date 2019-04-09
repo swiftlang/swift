@@ -4,12 +4,12 @@
 // REQUIRES: swift_test_mode_optimize
 // REQUIRES: tensorflow
 //
-// `numpy.ndarray` conversion tests.
+// `numpy.ndarray` and Python conversion tests.
 
 import TensorFlow
 import StdlibUnittest
 
-var NumpyConversionTests = TestSuite("NumpyConversion")
+var PythonConversionTests = TestSuite("PythonConversion")
 
 // TODO: Add `python` as a lit feature so this test can use "REQUIRE: python"
 // instead of `#if canImport(Python)`.
