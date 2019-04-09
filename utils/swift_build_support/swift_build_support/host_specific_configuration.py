@@ -201,6 +201,8 @@ class HostSpecificConfiguration(object):
                 StdlibDeploymentTarget.AppleWatchSimulator)
         if not args.build_android:
             platforms_to_skip_build.add(StdlibDeploymentTarget.Android)
+        if not args.build_wasm:
+            platforms_to_skip_build.add(StdlibDeploymentTarget.Wasm)
         return platforms_to_skip_build
 
     def __platforms_to_skip_test(self, args):

@@ -1200,6 +1200,9 @@ function common_cross_c_flags() {
         watchos-*)
             echo -n " -arch ${arch}  -mwatchos-version-min=${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
             ;;
+        wasm-wasm32)
+            echo -n " -arch wasm32"
+            ;;
     esac
 
     local build_type=$2
