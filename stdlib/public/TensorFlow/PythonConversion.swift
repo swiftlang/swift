@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines conversion logic between Python types & 
+// This file defines conversions between Python types & 
 // custom TensorFlow types
 //
 //===----------------------------------------------------------------------===//

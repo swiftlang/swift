@@ -4,7 +4,7 @@
 // REQUIRES: swift_test_mode_optimize
 // REQUIRES: tensorflow
 //
-// `numpy.ndarray` and Python conversion tests.
+// Python conversion and `numpy.ndarray` tests.
 
 import TensorFlow
 import StdlibUnittest
@@ -20,7 +20,7 @@ import Python
 let numpyModule = try? Python.attemptImport("numpy")
 let ctypesModule = try? Python.attemptImport("ctypes")
 
-NumpyConversionTests.test("shaped-array-conversion") {
+PythonConversionTests.test("shaped-array-conversion") {
   guard let np = numpyModule else { return }
 
   let numpyArrayEmpty = np.array([[]] as [[Float]], dtype: np.float32)
@@ -75,7 +75,7 @@ NumpyConversionTests.test("shaped-array-conversion") {
   }
 }
 
-NumpyConversionTests.test("tensor-conversion") {
+PythonConversionTests.test("tensor-conversion") {
   guard let np = numpyModule else { return }
 
   let numpyArrayEmpty = np.array([[]] as [[Float]], dtype: np.float32)
@@ -123,7 +123,7 @@ NumpyConversionTests.test("tensor-conversion") {
   }
 }
 
-NumpyConversionTests.test("tensor-round-trip") {
+PythonConversionTests.test("tensor-round-trip") {
   guard numpyModule != nil else { return }
   guard ctypesModule != nil else { return }
 
@@ -137,7 +137,7 @@ NumpyConversionTests.test("tensor-round-trip") {
   expectEqual(t3, Tensor<Int32>(numpy: t3.makeNumpyArray())!)
 }
 
-NumpyConversionTests.test("tensor-shape") {
+PythonConversionTests.test("tensor-shape") {
   let pyArray = [2, 3].pythonObject
   expectEqual(pyArray, TensorShape(2, 3).pythonObject)
   expectEqual(TensorShape(2, 3), TensorShape(pyArray))
