@@ -1487,6 +1487,8 @@ public extension Tensor where Scalar : Numeric {
 // Indexing and slicing
 //===----------------------------------------------------------------------===//
 
+// TODO: Strided slices and negative indices.
+
 public extension Tensor {
   /// Extracts a slice from the tensor defined by lower and upper bounds for
   /// each dimension.
@@ -1522,6 +1524,11 @@ public enum TensorSliceIndex : TensorSliceIndexProtocol {
 public protocol TensorSliceIndexProtocol {
   var sliceIndex: TensorSliceIndex { get }
 }
+
+// TODO: Cannot extend non-nominal type 'UnboundedRange'.
+// extension UnboundedRange : TensorSliceIndexProtocol {
+//   public var sliceIndex: TensorSliceIndex { return .ellipsis }
+// }
 
 extension Int32 : TensorSliceIndexProtocol {
   public var sliceIndex: TensorSliceIndex { return .index(self) }
