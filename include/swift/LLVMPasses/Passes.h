@@ -31,7 +31,13 @@ namespace swift {
 
     using AAResultBase::getModRefInfo;
     llvm::ModRefInfo getModRefInfo(const llvm::CallBase *Call,
-                                   const llvm::MemoryLocation &Loc);
+                                   const llvm::MemoryLocation &Loc) {
+      llvm::AAQueryInfo AAQI;
+      return getModRefInfo(Call, Loc, AAQI);
+    }
+    llvm::ModRefInfo getModRefInfo(const llvm::CallBase *Call,
+                                   const llvm::MemoryLocation &Loc,
+                                   llvm::AAQueryInfo &AAQI);
   };
 
   class SwiftAAWrapperPass : public llvm::ImmutablePass {

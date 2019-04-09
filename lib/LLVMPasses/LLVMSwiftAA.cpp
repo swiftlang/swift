@@ -33,7 +33,8 @@ static ModRefInfo getConservativeModRefForKind(const llvm::Instruction &I) {
 }
 
 ModRefInfo SwiftAAResult::getModRefInfo(const llvm::CallBase *Call,
-                                        const llvm::MemoryLocation &Loc) {
+                                        const llvm::MemoryLocation &Loc,
+                                        llvm::AAQueryInfo &AAQI) {
   // We know at compile time that certain entry points do not modify any
   // compiler-visible state ever. Quickly check if we have one of those
   // instructions and return if so.
@@ -41,7 +42,6 @@ ModRefInfo SwiftAAResult::getModRefInfo(const llvm::CallBase *Call,
     return ModRefInfo::NoModRef;
 
   // Otherwise, delegate to the rest of the AA ModRefInfo machinery.
-  AAQueryInfo AAQI;
   return AAResultBase::getModRefInfo(Call, Loc, AAQI);
 }
 
