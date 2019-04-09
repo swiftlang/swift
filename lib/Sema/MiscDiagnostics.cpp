@@ -179,10 +179,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
         ConcreteDeclRef callee;
         if (auto *calleeDRE = dyn_cast<DeclRefExpr>(base)) {
-          // This only cares about declarations of noescape function type.
-          auto AFT = calleeDRE->getType()->getAs<FunctionType>();
-          if (AFT && AFT->isNoEscape())
-            checkNoEscapeParameterCall(Call);
           checkForSuspiciousBitCasts(calleeDRE, Call);
           callee = calleeDRE->getDeclRef();
 
@@ -414,104 +410,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       }
 
       TC.diagnose(E->getStartLoc(), diag::value_of_module_type);
-    }
-
-    class NoEscapeArgument {
-      llvm::PointerIntPair<ParamDecl*, 1, bool> ParamAndIsCapture;
-    public:
-      NoEscapeArgument() {}
-      NoEscapeArgument(ParamDecl *param, bool isCapture)
-          : ParamAndIsCapture(param, isCapture) {
-        assert(param);
-      }
-
-      explicit operator bool() const {
-        return ParamAndIsCapture.getPointer() != nullptr;
-      }
-
-      ParamDecl *getDecl() const { return ParamAndIsCapture.getPointer(); }
-      bool isDeclACapture() const { return ParamAndIsCapture.getInt(); }
-
-      static NoEscapeArgument find(TypeChecker &tc, ValueDecl *decl,
-                                   bool isCapture) {
-        if (auto param = dyn_cast<ParamDecl>(decl)) {
-          if (auto fnType =
-                param->getInterfaceType()->getAs<AnyFunctionType>()) {
-            if (fnType->isNoEscape())
-              return { param, isCapture };
-          }
-          return {};
-        }
-
-        if (auto fn = dyn_cast<AbstractFunctionDecl>(decl)) {
-          if (fn->getDeclContext()->isLocalContext()) {
-            return findInCaptures(tc, fn);
-          }
-          return {};
-        }
-
-        // FIXME: captures of computed local vars?  Can these be non-escaping?
-        return {};
-      }
-
-      static NoEscapeArgument findInCaptures(TypeChecker &tc,
-                                             AnyFunctionRef fn) {
-        // Ensure we have accurate capture information for the function.
-        tc.computeCaptures(fn);
-
-        for (const auto &capture : fn.getCaptureInfo().getCaptures()) {
-          if (capture.isDynamicSelfMetadata()) continue;
-          if (auto param = find(tc, capture.getDecl(), true))
-            return param;
-        }
-        return {};
-      }
-    };
-
-    /// Enforce the exclusivity rule against calling a non-escaping
-    /// function parameter with another non-escaping function parameter
-    /// as an argument.
-    void checkNoEscapeParameterCall(ApplyExpr *apply) {
-      NoEscapeArgument noescapeArgument;
-      Expr *problematicArg = nullptr;
-
-      visitArguments(apply, [&](unsigned argIndex, Expr *arg) {
-        // Just find the first problematic argument.
-        if (noescapeArgument) return;
-
-        // Remember the expression which used the argument.
-        problematicArg = arg;
-
-        // Look through the same set of nodes that we look through when
-        // checking for no-escape functions.
-        arg = lookThroughArgument(arg);
-
-        // If the argument isn't noescape, ignore it.
-        auto fnType = arg->getType()->getAs<AnyFunctionType>();
-        if (!fnType || !fnType->isNoEscape())
-          return;
-
-        // Okay, it should be a closure or a decl ref.
-        if (auto declRef = dyn_cast<DeclRefExpr>(arg)) {
-          noescapeArgument =
-            NoEscapeArgument::find(TC, declRef->getDecl(), false);
-        } else if (auto closure = dyn_cast<AbstractClosureExpr>(arg)) {
-          noescapeArgument =
-            NoEscapeArgument::findInCaptures(TC, closure);
-        } else {
-          // This can happen with withoutActuallyEscaping.
-          assert(isa<OpaqueValueExpr>(arg) &&
-                 "unexpected expression yielding noescape closure");
-        }
-      });
-
-      if (!noescapeArgument) return;
-
-      TC.diagnose(apply->getLoc(),
-                  diag::err_noescape_param_call,
-                  noescapeArgument.getDecl()->getName(),
-                  noescapeArgument.isDeclACapture())
-        .highlight(problematicArg->getSourceRange());
     }
 
     // Diagnose metatype values that don't appear as part of a property,

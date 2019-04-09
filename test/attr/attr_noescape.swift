@@ -303,7 +303,6 @@ func doThing4(_ completion: @escaping CompletionHandler) {
 func apply<T, U>(_ f: @noescape (T) -> U, g: @noescape (@noescape (T) -> U) -> U) -> U { 
   // expected-error@-1 6{{unknown attribute 'noescape'}}
   return g(f)
-  // expected-error@-1 {{passing a non-escaping function parameter 'f' to a call to a non-escaping function parameter can allow re-entrant modification of a variable}}
 }
 
 // <rdar://problem/19997577> @noescape cannot be applied to locals, leading to duplication of code
