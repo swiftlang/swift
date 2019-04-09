@@ -216,6 +216,9 @@ class BuildScriptInvocation(object):
             elif args.android_arch == "aarch64":
                 args.stdlib_deployment_targets.append(
                     StdlibDeploymentTarget.Android.aarch64.name)
+        if args.wasm:
+            args.stdlib_deployment_targets.append(
+                StdlibDeploymentTarget.Wasm.wasm32.name)
 
         # Infer platform flags from manually-specified configure targets.
         # This doesn't apply to Darwin platforms, as they are

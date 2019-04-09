@@ -260,10 +260,10 @@ set(SWIFT_ANDROID_DEPLOY_DEVICE_PATH "" CACHE STRING
   "Path on an Android device where build products will be pushed. These are used when running the test suite against the device")
 
 #
-# User-configurable ICU specific options for Android, FreeBSD, Linux and Haiku.
+# User-configurable ICU specific options for Android, FreeBSD, Linux, Haiku, and WebAssembly.
 #
 
-foreach(sdk ANDROID;FREEBSD;LINUX;WINDOWS;HAIKU)
+foreach(sdk ANDROID;FREEBSD;LINUX;WINDOWS;HAIKU;WASM)
   foreach(arch aarch64;armv6;armv7;i686;powerpc64;powerpc64le;s390x;wasm32;x86_64)
     set(SWIFT_${sdk}_${arch}_ICU_UC "" CACHE STRING
         "Path to a directory containing the icuuc library for ${sdk}")
@@ -779,6 +779,22 @@ if(swift_build_windows AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
     set(SWIFT_SDK_WINDOWS_ARCHITECTURES aarch64;armv7;i686;x86_64)
   endif()
   configure_sdk_windows("Windows" "msvc" "${SWIFT_SDK_WINDOWS_ARCHITECTURES}")
+endif()
+
+# Should we cross-compile the standard library for WebAssembly (Emscripten)?
+is_sdk_requested(WASM swift_build_wasm)
+if(swift_build_wasm AND NOT "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WASM")
+  #if ("${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
+  #  message(FATAL_ERROR "You must set SWIFT_ANDROID_NDK_PATH to cross-compile the Swift runtime for Android")
+  #endif()
+  #if (NOT ("${CMAKE_HOST_SYSTEM_NAME}" STREQUAL "Darwin" OR "${CMAKE_HOST_SYSTEM_NAME}" STREQUAL "Linux"))
+  #  message(FATAL_ERROR "A Darwin or Linux host is required to build the Swift runtime for Android")
+  #endif()
+
+  if("${SWIFT_SDK_WASM_ARCHITECTURES}" STREQUAL "")
+    set(SWIFT_SDK_WASM_ARCHITECTURES wasm32)
+  endif()
+  configure_sdk_unix("Wasm" "${SWIFT_SDK_WASM_ARCHITECTURES}")
 endif()
 
 if("${SWIFT_SDKS}" STREQUAL "")
