@@ -158,6 +158,8 @@ class StdlibDeploymentTarget(object):
 
     Haiku = Platform("haiku", archs=["x86_64"])
 
+    Wasm = Platform("wasm", archs=["wasm32"])
+
     # The list of known platforms.
     known_platforms = [
         OSX,
@@ -169,7 +171,8 @@ class StdlibDeploymentTarget(object):
         Cygwin,
         Android,
         Windows,
-        Haiku]
+        Haiku,
+        Wasm]
 
     # Cache of targets by name.
     _targets_by_name = dict((target.name, target)
@@ -232,6 +235,10 @@ class StdlibDeploymentTarget(object):
         elif system == 'Haiku':
             if machine == 'x86_64':
                 return StdlibDeploymentTarget.Haiku.x86_64
+
+        elif system == 'Wasm':
+            if machine == 'wasm32':
+                return StdlibDeploymentTarget.Wasm.wasm32
 
         raise NotImplementedError('System "%s" with architecture "%s" is not '
                                   'supported' % (system, machine))

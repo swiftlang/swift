@@ -141,6 +141,7 @@ def _apply_default_arguments(args):
         args.build_tvos = False
         args.build_watchos = False
         args.build_android = False
+        args.build_wasm = False
         args.build_benchmarks = False
         args.build_external_benchmarks = False
         args.build_lldb = False
@@ -169,6 +170,9 @@ def _apply_default_arguments(args):
 
     if not args.android or not args.build_android:
         args.build_android = False
+
+    if not args.wasm or not args.build_wasm:
+        args.build_wasm = False
 
     # --test-paths implies --test and/or --validation-test
     # depending on what directories/files have been specified.
@@ -206,6 +210,7 @@ def _apply_default_arguments(args):
         args.test_tvos = False
         args.test_watchos = False
         args.test_android = False
+        args.test_wasm = False
         args.test_swiftpm = False
         args.test_swiftsyntax = False
         args.test_indexstoredb = False
@@ -252,11 +257,19 @@ def _apply_default_arguments(args):
     if not args.test_android:
         args.test_android_host = False
 
+    if not args.build_wasm:
+        args.test_wasm = False
+        args.test_wasm_host = False
+
+    if not args.test_android:
+        args.test_android_host = False
+
     if not args.host_test:
         args.test_ios_host = False
         args.test_tvos_host = False
         args.test_watchos_host = False
         args.test_android_host = False
+        args.test_wasm_host = False
 
 
 def create_argument_parser():
@@ -344,6 +357,9 @@ def create_argument_parser():
 
     option('--android', toggle_true,
            help='also build for Android')
+
+    option('--wasm', toggle_true,
+           help='also build for WebAssembly')
 
     option('--swift-analyze-code-coverage', store,
            choices=['false', 'not-merged', 'merged'],
@@ -933,6 +949,9 @@ def create_argument_parser():
     option('--skip-build-android', toggle_false('build_android'),
            help='skip building Swift stdlibs for Android')
 
+    option('--skip-build-wasm', toggle_false('build_wasm'),
+           help='skip building Swift stdlibs for WebAssembly')
+
     option('--skip-build-benchmarks', toggle_false('build_benchmarks'),
            help='skip building Swift Benchmark Suite')
 
@@ -988,6 +1007,14 @@ def create_argument_parser():
            toggle_false('test_android_host'),
            help='skip testing Android device targets on the host machine (the '
                 'phone itself)')
+
+    option('--skip-test-wasm',
+           toggle_false('test_wasm'),
+           help='skip testing all WebAssembly targets.')
+    option('--skip-test-wasm-host',
+           toggle_false('test_wasm_host'),
+           help='skip testing WebAssembly device targets on the host machine (the '
+                'WebAssembly runtime)')
 
     option('--skip-test-swiftpm', toggle_false('test_swiftpm'),
            help='skip testing swiftpm')
