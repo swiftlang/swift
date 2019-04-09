@@ -481,7 +481,7 @@ enum E1 <TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>String </S
 }</MemberDeclBlock></EnumDecl><PrecedenceGroupDecl>
 
 precedencegroup FooPrecedence {<PrecedenceGroupRelation>
-  higherThan: <PrecedenceGroupNameElement>DefaultPrecedence, </PrecedenceGroupNameElement><PrecedenceGroupNameElement>UnknownPrecedence</PrecedenceGroupNameElement></PrecedenceGroupRelation><PrecedenceGroupAssignment>
+  higherThan: <PrecedenceGroupName>DefaultPrecedence, </PrecedenceGroupName><PrecedenceGroupName>UnknownPrecedence</PrecedenceGroupName></PrecedenceGroupRelation><PrecedenceGroupAssignment>
   assignment: false</PrecedenceGroupAssignment><PrecedenceGroupAssociativity>
   associativity: none</PrecedenceGroupAssociativity>
 }</PrecedenceGroupDecl><PrecedenceGroupDecl>
@@ -490,7 +490,7 @@ precedencegroup BazPrecedence {<PrecedenceGroupAssociativity>
   associativity: left</PrecedenceGroupAssociativity><PrecedenceGroupAssignment>
   assignment: true</PrecedenceGroupAssignment><PrecedenceGroupAssociativity>
   associativity: right</PrecedenceGroupAssociativity><PrecedenceGroupRelation>
-  lowerThan: <PrecedenceGroupNameElement>DefaultPrecedence</PrecedenceGroupNameElement></PrecedenceGroupRelation>
+  lowerThan: <PrecedenceGroupName>DefaultPrecedence</PrecedenceGroupName></PrecedenceGroupRelation>
 }</PrecedenceGroupDecl><OperatorDecl><DeclModifier>
 
 infix </DeclModifier>operator<++><OperatorPrecedenceAndTypes>:FooPrecedence</OperatorPrecedenceAndTypes></OperatorDecl><OperatorDecl><DeclModifier>

@@ -7029,7 +7029,7 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
 
       do {
         SyntaxParsingContext NameCtxt(SyntaxContext,
-                                      SyntaxKind::PrecedenceGroupNameElement);
+                                      SyntaxKind::PrecedenceGroupName);
         if (checkCodeCompletion(SyntaxKind::PrecedenceGroupRelation)) {
           return abortBody(/*hasCodeCompletion*/true);
         }

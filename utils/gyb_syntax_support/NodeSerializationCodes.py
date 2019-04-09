@@ -131,7 +131,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'EnumCaseElement': 126,
     'OperatorPrecedenceAndTypes': 127,
     'PrecedenceGroupRelation': 128,
-    'PrecedenceGroupNameElement': 129,
+    'PrecedenceGroupName': 129,
     'PrecedenceGroupAssignment': 130,
     'PrecedenceGroupAssociativity': 131,
     'Attribute': 132,

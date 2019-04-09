@@ -751,8 +751,8 @@ DECL_NODES = [
     # precedence-group-name-list ->
     #    identifier (',' identifier)*
     Node('PrecedenceGroupNameList', kind='SyntaxCollection',
-         element='PrecedenceGroupNameElement'),
-    Node('PrecedenceGroupNameElement', kind='Syntax',
+         element='PrecedenceGroupName'),
+    Node('PrecedenceGroupName', kind='Syntax',
          children=[
              Child('Name', kind='IdentifierToken'),
              Child('TrailingComma', kind='CommaToken',
