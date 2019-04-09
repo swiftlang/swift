@@ -254,7 +254,7 @@ public class InputFilter<D: DataProtocol> {
       // Move to next non-empty region if we are done with the current one
       let r = _data.regions
       while _regionRemaining == 0 {
-        _regionIndex = r.index(after: _regionIndex)
+        r.formIndex(after: &_regionIndex)
         if _regionIndex == r.endIndex { break }
         _regionRemaining = r[_regionIndex].count
       }
@@ -329,7 +329,7 @@ public class InputFilter<D: DataProtocol> {
             _eofReached = true
             _buf = nil
           } else {
-            _buf = try InputFilterBuffer<D>(data!)
+            _buf = try InputFilterBuffer(data!)
           }
         }
 
