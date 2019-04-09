@@ -64,6 +64,7 @@ public protocol TestAssocTypeWhereClause {
 
 public enum TestRawType: IntLike { // expected-error {{cannot use 'IntLike' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
   case x = 1
+  // FIXME: expected-error@-1 {{cannot use conformance of 'IntLike' to 'Equatable' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
 }
 
 public class TestSubclass: BadClass { // expected-error {{cannot use 'BadClass' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
@@ -245,3 +246,13 @@ public struct RequirementsHandleSpecializationsToo: SlightlyMoreComplicatedRequi
 public struct ClassConstrainedGenericArg<T: NormalClass>: PublicInferredAssociatedType { // expected-error {{cannot use conformance of 'NormalClass' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'T'); 'BADLibrary' has been imported as '@_implementationOnly'}}
   public func takesAssoc(_: T) {}
 }
+
+
+public protocol RecursiveRequirements {
+  associatedtype Other: RecursiveRequirements
+}
+extension GenericStruct: RecursiveRequirements {
+  public typealias Other = GenericStruct<T>
+}
+public struct RecursiveRequirementsHolder<T: RecursiveRequirements> {}
+public func makeSureRecursiveRequirementsDontBreakEverything(_: RecursiveRequirementsHolder<GenericStruct<Int>>) {}
