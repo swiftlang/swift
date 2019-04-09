@@ -663,29 +663,29 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
     }
     
     public func hash(into hasher: inout Hasher) {
-	      // Note: We compare all indices in ==, so for proper hashing, we must
-	      // also feed them all to the hasher.
-	      //
-	      // To ensure we have unique hash encodings in nested hashing contexts,
-	      // we combine the count of indices as well as the indices themselves.
-	      // (This matches what Array does.)
-	      switch _indexes {
-	      case .empty:
-	          hasher.combine(0)
-	      case let .single(index):
-	          hasher.combine(1)
-	          hasher.combine(index)
-	      case let .pair(first, second):
-	          hasher.combine(2)
-	          hasher.combine(first)
-	          hasher.combine(second)
-	      case let .array(indexes):
-	          hasher.combine(indexes.count)
-	          for index in indexes {
-	              hasher.combine(index)
-	          }
-	      }
-	  }
+        // Note: We compare all indices in ==, so for proper hashing, we must
+        // also feed them all to the hasher.
+        //
+        // To ensure we have unique hash encodings in nested hashing contexts,
+        // we combine the count of indices as well as the indices themselves.
+        // (This matches what Array does.)
+        switch _indexes {
+        case .empty:
+            hasher.combine(0)
+        case let .single(index):
+            hasher.combine(1)
+            hasher.combine(index)
+        case let .pair(first, second):
+            hasher.combine(2)
+            hasher.combine(first)
+            hasher.combine(second)
+        case let .array(indexes):
+            hasher.combine(indexes.count)
+            for index in indexes {
+                hasher.combine(index)
+            }
+        }
+    }
 
     // MARK: - Bridging Helpers
     
