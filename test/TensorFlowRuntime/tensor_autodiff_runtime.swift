@@ -121,6 +121,18 @@ TensorADTests.testAllBackends("mean") {
   expectEqual(expected, meanGradAlongAxes(input))
 }
 
+TensorADTests.testAllBackends("variance") {
+  let varianceGradScalar = gradient { (a: Tensor<Float>) in a.variance() }
+  // let varianceGradSqueezingAxes = gradient { (a: Tensor<Float>) in a.variance(squeezingAxes: 0, 1) }
+  let varianceGradAlongAxes = gradient { (a: Tensor<Float>) in a.variance(alongAxes: 0, 1) }
+
+  let input: Tensor<Float> = [[1, 2], [3, 4]]
+  let expected: Tensor<Float> = [[-0.75, -0.25], [0.25, 0.75]]
+  expectEqual(expected, varianceGradScalar(input))
+  // expectEqual(expected, varianceGradSqueezingAxes(input))
+  expectEqual(expected, varianceGradAlongAxes(input))
+}
+
 TensorADTests.testAllBackends("expandingShape") {
   let f1 = { (a: Tensor<Float>) in a.expandingShape(at: 0).squared() }
   let f2 = { (a: Tensor<Float>) in a.squared().expandingShape(at: 0) }

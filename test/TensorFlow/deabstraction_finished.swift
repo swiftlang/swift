@@ -134,7 +134,7 @@ public func testConvolution(x: Tensor<Float>, filter: Tensor<Float>) -> Tensor<F
 }
 
 /* CHECK-LABEL: ---- INPUT FUNCTION {{.*}}testConvolution
- * CHECK: graph_op "Conv2D"({{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>) {T$dtype: i32 1, strides: [$Int32: (i32 1), (i32 2), (i32 3), (i32 4)], use_cudnn_on_gpu: i1 -1, padding: "SAME", data_format: "NHWC", dilations: [$Int32: (i32 1), (i32 1), (i32 1), (i32 1)],
+ * CHECK: graph_op "Conv2D"({{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>) {T$dtype: i32 1, strides: [$Int32: (i32 1), (i32 2), (i32 3), (i32 4)], use_cudnn_on_gpu: i1 -1, padding: "SAME", explicit_paddings: [$Int32: ], data_format: "NHWC", dilations: [$Int32: (i32 1), (i32 1), (i32 1), (i32 1)],
  * CHECK-LABEL: ---- END OF
 */
 
