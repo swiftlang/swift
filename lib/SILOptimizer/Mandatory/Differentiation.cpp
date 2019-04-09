@@ -1793,13 +1793,6 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
     if (autodiffFnType->isDifferentiable()) {
       SILValue assocFn = builder.createAutoDiffFunctionExtract(
           original.getLoc(), kind, /*differentiationOrder*/ 1, functionSource);
-      if (autodiffFnType->getDifferentiationParameterIndices().test(
-              desiredIndices.parameters)) {
-        context.emitNondifferentiabilityError(
-            original, parentTask,
-            diag::autodiff_function_subset_indices_not_differentiable);
-        return None;
-      }
       SILAutoDiffIndices indices(0, desiredIndices.parameters);
       return std::make_pair(assocFn, indices);
     }
