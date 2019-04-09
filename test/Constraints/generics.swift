@@ -636,7 +636,6 @@ let _: () -> UInt8 = { .init("a" as Unicode.Scalar) } // expected-error {{initia
 func compare<C: Collection, Key: Hashable, Value: Equatable>(c: C)
   -> Bool where C.Element == (key: Key, value: Value)
 {
-  _ = 0
   _ = Dictionary(uniqueKeysWithValues: Array(c))
 }
 
