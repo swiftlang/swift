@@ -15,7 +15,8 @@ import Foundation
 @_exported import Compression
 
 /// Compression algorithms, wraps the C API constants.
-public enum Algorithm: CaseIterable {
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+public enum Algorithm: CaseIterable, RawRepresentable {
 
   /// LZFSE
   case lzfse
@@ -29,6 +30,16 @@ public enum Algorithm: CaseIterable {
   /// LZMA in a XZ container
   case lzma
 
+  public init?(rawValue: compression_algorithm) {
+    switch rawValue {
+    case COMPRESSION_LZFSE: self = .lzfse
+    case COMPRESSION_ZLIB: self = .zlib
+    case COMPRESSION_LZ4: self = .lz4
+    case COMPRESSION_LZMA: self = .lzma
+    default: return nil
+    }
+  }
+
   public var rawValue: compression_algorithm {
     switch self {
     case .lzfse: return COMPRESSION_LZFSE
@@ -39,25 +50,23 @@ public enum Algorithm: CaseIterable {
   }
 }
 
-/// Compression errors
-public enum FilterError: Error {
-  /// Filter failed to initialize,
-  /// invalid internal state,
-  /// invalid parameters
-  case invalidState
-
-  /// Invalid data in a call to compression_stream_process,
-  /// non-empty write after an output filter has been finalized
-  case invalidData
-}
-
 /// Compression filter direction of operation, compress/decompress
-public enum FilterOperation {
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+public enum FilterOperation: RawRepresentable {
+
   /// Compress raw data to a compressed payload
   case compress
 
   /// Decompress a compressed payload to raw data
   case decompress
+
+  public init?(rawValue: compression_stream_operation) {
+    switch rawValue {
+    case COMPRESSION_STREAM_ENCODE: self = .compress
+    case COMPRESSION_STREAM_DECODE: self = .decompress
+    default: return nil
+    }
+  }
 
   public var rawValue: compression_stream_operation {
     switch self {
@@ -65,6 +74,20 @@ public enum FilterOperation {
     case .decompress: return COMPRESSION_STREAM_DECODE
     }
   }
+}
+
+/// Compression errors
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+public enum FilterError: Error {
+
+  /// Filter failed to initialize,
+  /// or invalid internal state,
+  /// or invalid parameters
+  case invalidState
+
+  /// Invalid data in a call to compression_stream_process,
+  /// or non-empty write after an output filter has been finalized
+  case invalidData
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
@@ -94,7 +117,7 @@ public class OutputFilter {
   private var _stream: compression_stream
   private var _buf: UnsafeMutablePointer<UInt8>
   private let _bufCapacity: Int
-  private let _writeFunc: (Data?) throws -> ()
+  private let _writeFunc: (Data?) throws -> Void
   private var _finalized: Bool = false
 
   /// Initialize an output filter
@@ -110,7 +133,7 @@ public class OutputFilter {
     _ operation: FilterOperation,
     using algorithm: Algorithm,
     bufferCapacity: Int = 65536,
-    writingTo writeFunc: @escaping (Data?) throws -> ()
+    writingTo writeFunc: @escaping (Data?) throws -> Void
   ) throws {
     _stream = try compression_stream(operation: operation, algorithm: algorithm)
     _buf = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferCapacity)
@@ -141,7 +164,7 @@ public class OutputFilter {
       try region.withUnsafeBytes { (raw_src_ptr: UnsafeRawBufferPointer) in
         _stream.src_size = region.count
         _stream.src_ptr = raw_src_ptr.baseAddress!.assumingMemoryBound(to: UInt8.self)
-        while (_stream.src_size > 0) { _ = try process(finalizing: false) }
+        while (_stream.src_size > 0) { _ = try _process(finalizing: false) }
       }
     }
   }
@@ -160,7 +183,7 @@ public class OutputFilter {
     // Finalize stream
     _stream.src_size = 0
     var status = COMPRESSION_STATUS_OK
-    while (status != COMPRESSION_STATUS_END) { status = try process(finalizing: true) }
+    while (status != COMPRESSION_STATUS_END) { status = try _process(finalizing: true) }
 
     // Update state
     _finalized = true
@@ -181,7 +204,7 @@ public class OutputFilter {
 
   // Call compression_stream_process with current src, and dst set to _buf, then write output to the closure
   // Return status
-  private func process(finalizing finalize: Bool) throws -> compression_status {
+  private func _process(finalizing finalize: Bool) throws -> compression_status {
     // Process current input, and write to buf
     _stream.dst_ptr = _buf
     _stream.dst_size = _bufCapacity
@@ -212,6 +235,7 @@ public class InputFilter<D: DataProtocol> {
     private var _remaining: Int // total bytes remaining to process in _data
     private var _regionIndex: D.Regions.Index // region being read in _data
     private var _regionRemaining: Int // remaining bytes to read in region being read in _data
+
     public init(_ data: D) throws {
       _data = data
       _remaining = _data.count
