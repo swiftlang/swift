@@ -396,9 +396,6 @@ NOTE(autodiff_protocol_member_not_differentiable,none,
 NOTE(autodiff_protocol_member_subset_indices_not_differentiable,none,
      "member is differentiable only with respect to a smaller subset of "
      "arguments", ())
-NOTE(autodiff_function_subset_indices_not_differentiable,none,
-     "function is differentiable only with respect to a smaller subset of "
-     "arguments", ())
 NOTE(autodiff_function_assoc_func_requirements_unmet,none,
      "function call is not differentiable because generic requirements are not "
      "met", ())

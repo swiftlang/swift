@@ -308,4 +308,12 @@ SimpleMathTests.test("StructGeneric") {
   expectEqual(405, gradient(at: 3, in: fifthPower))
 }
 
+SimpleMathTests.test("SubsetIndices") {
+  func train(_ lossFunction: @differentiable (Float, Float) -> Float) {
+    let y = Float(0)
+    _ = gradient(at: 0) { x in lossFunction(x, y) }
+  }
+  train { x, y in x + y }
+}
+
 runAllTests()
