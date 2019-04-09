@@ -1921,8 +1921,6 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
       // The function returns void.  We don't need an explicit return, no matter
       // what the type of the expression is.  Take the inserted return back out.
       BS->setElement(0, E);
-      // Fall through to type-checking the body as if we were not a single
-      // expression function.
     }
   }
 
