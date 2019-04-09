@@ -1332,6 +1332,11 @@ ModuleFile::ModuleFile(
           SearchPaths.push_back({blobData, isFramework, isSystem});
           break;
         }
+        case input_block::PARSEABLE_INTERFACE_PATH: {
+          if (extInfo)
+            extInfo->setParseableInterface(blobData);
+          break;
+        }
         default:
           // Unknown input kind, possibly for use by a future version of the
           // module format.

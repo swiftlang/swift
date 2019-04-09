@@ -643,7 +643,8 @@ namespace input_block {
     IMPORTED_HEADER_CONTENTS,
     MODULE_FLAGS, // [unused]
     SEARCH_PATH,
-    FILE_DEPENDENCY
+    FILE_DEPENDENCY,
+    PARSEABLE_INTERFACE_PATH
   };
 
   using ImportedModuleLayout = BCRecordLayout<
@@ -690,6 +691,12 @@ namespace input_block {
     BCFixed<1>,                    // SDK-relative?
     BCBlob                         // path
   >;
+
+  using ParseableInterfaceLayout = BCRecordLayout<
+    PARSEABLE_INTERFACE_PATH,
+    BCBlob // file path
+  >;
+
 }
 
 /// The record types within the "decls-and-types" block.
