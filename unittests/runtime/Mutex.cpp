@@ -555,10 +555,12 @@ TEST(StaticReadWriteLockTest, ScopedWriteUnlockThreaded) {
 template <typename RW> void readLockWhileReadLockedThreaded(RW &lock) {
   lock.readLock();
 
-  std::vector<std::atomic<bool>> results(10);
+  const int threadCount = 10;
+
+  std::atomic<bool> results[threadCount] = {};
 
   std::atomic<bool> done(false);
-  threadedExecute(10,
+  threadedExecute(threadCount,
                   [&](int index) {
                     // Always perform at least one iteration of this loop to
                     // avoid spurious failures if this thread is slow to run.
@@ -596,10 +598,12 @@ TEST(StaticReadWriteLockTest, ReadLockWhileReadLockedThreaded) {
 template <typename RW> void readLockWhileWriteLockedThreaded(RW &lock) {
   lock.writeLock();
 
-  std::vector<std::atomic<int>> results(10);
+  const int threadCount = 10;
+
+  std::atomic<int> results[threadCount] = {};
 
   std::atomic<bool> done(false);
-  threadedExecute(10,
+  threadedExecute(threadCount,
                   [&](int index) {
                     // Always perform at least one iteration of this loop to
                     // avoid spurious failures if this thread is slow to run.
@@ -638,7 +642,7 @@ template <typename RW> void writeLockWhileReadLockedThreaded(RW &lock) {
 
   const int threadCount = 10;
 
-  std::vector<std::atomic<int>> results(threadCount);
+  std::atomic<int> results[threadCount] = {};
 
   std::atomic<bool> done(false);
   threadedExecute(threadCount,
@@ -680,7 +684,7 @@ template <typename RW> void writeLockWhileWriteLockedThreaded(RW &lock) {
 
   const int threadCount = 10;
 
-  std::vector<std::atomic<int>> results(threadCount);
+  std::atomic<int> results[threadCount] = {};
 
   std::atomic<bool> done(false);
   threadedExecute(threadCount,
@@ -753,7 +757,7 @@ template <typename RW> void tryReadLockWhileReadLockedThreaded(RW &lock) {
 
   const int threadCount = 10;
 
-  std::vector<std::atomic<bool>> results(threadCount);
+  std::atomic<bool> results[threadCount] = {};
 
   std::atomic<bool> done(false);
   threadedExecute(threadCount,
