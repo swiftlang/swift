@@ -5665,6 +5665,13 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
           }
         }
       } else if (auto *E = Element.dyn_cast<Expr *>()) {
+        if (auto SE = dyn_cast<SequenceExpr>(E->getSemanticsProvidingExpr())) {
+          if (SE->getNumElements() > 0 && isa<AssignExpr>(SE->getElement(1))) {
+            // This is an assignment.  We don't want to implicitly return 
+            // it.
+            return;
+          }
+        }
         if (auto F = dyn_cast<FuncDecl>(AFD)) {
           auto RS = new (Context) ReturnStmt(SourceLoc(), E);
           BS->setElement(0, RS); 

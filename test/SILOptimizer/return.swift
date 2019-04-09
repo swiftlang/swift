@@ -1,8 +1,8 @@
 // RUN: %target-swift-frontend %s -emit-sil -verify
 
-func singleBlock() -> () {
+func singleBlock() -> Int {
   _ = 0
-}
+} // expected-error {{missing return in a function expected to return 'Int'}}
 
 func singleBlock2() -> Int {
   var y = 0 

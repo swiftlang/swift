@@ -34,13 +34,11 @@ func transitiveForwardCapture() {
 
 func transitiveForwardCapture2() {
   func ping() -> Int {
-    _ = 0
     _ = pong() // expected-error{{cannot capture 'pong', which would use 'x' before it is declared}}
   }
   _ = ping()
   var x = 1 // expected-note{{'x' declared here}}
   func pong() -> Int { // expected-note{{'pong', declared here, captures 'pung'}}
-    _ = 0
     _ = pung()
   }
   func pung() -> Int { // expected-note{{'pung', declared here, captures 'x'}}
@@ -52,7 +50,6 @@ func transitiveForwardCapture2() {
 func transitiveForwardCapture3() {
   var y = 2
   func ping() -> Int {
-    _ = 0
     _ = pong() // expected-error{{cannot capture 'pong', which would use 'x' before it is declared}}
   }
   _ = ping()
