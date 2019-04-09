@@ -77,7 +77,7 @@ def _apply_default_arguments(args):
         args.lldb_build_variant = args.build_variant
 
     if args.lldb_build_with_xcode is None:
-        args.lldb_build_with_xcode = '1'
+        args.lldb_build_with_xcode = '0'
 
     if args.foundation_build_variant is None:
         args.foundation_build_variant = args.build_variant
@@ -629,11 +629,11 @@ def create_argument_parser():
            help='build the Debug variant of LLDB')
 
     option('--lldb-build-with-xcode', store('lldb_build_with_xcode'),
-           const='1',
+           const='0',
            help='build LLDB using xcodebuild, if possible')
 
     option('--lldb-build-with-cmake', store('lldb_build_with_xcode'),
-           const='0',
+           const='1',
            help='build LLDB using CMake')
 
     option('--debug-cmark', store('cmark_build_variant'),
