@@ -143,7 +143,7 @@ foreach(sdk ${SWIFT_SDKS})
         "swift-stdlib-${platform}-${arch}"
         "copy-legacy-layouts-${platform}-${arch}")
 
-      swift_install_in_component(stdlib
+      swift_install_in_component(compiler
           FILES ${input}
           DESTINATION "lib/swift/${platform}/")
     else()
