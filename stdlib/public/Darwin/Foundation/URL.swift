@@ -631,41 +631,8 @@ public struct URL : ReferenceConvertible, Equatable {
     public init(fileURLWithFileSystemRepresentation path: UnsafePointer<Int8>, isDirectory: Bool, relativeTo baseURL: __shared URL?) {
         _url = URL._converted(from: NSURL(fileURLWithFileSystemRepresentation: path, isDirectory: isDirectory, relativeTo: baseURL))
     }
-    
-    public var hashValue: Int { // FIXME(hashValue): This should be removed once URL implements Hashable.
-        return _url.hash
-    }
 
-    @_alwaysEmitIntoClient // Introduced in 5.1
     public func hash(into hasher: inout Hasher) {
-        // We expect this function to eventually satisfy the corresponding
-        // requirement when URL starts conforming to Hashable. However, in the
-        // meantime, it is useful to provide it so that user code can simply
-        // declare the conformance if desired, without implementing anything.
-        //
-        // We want this definition to be available to all clients, even those
-        // that get deployed with the 5.0 Foundation overlay where URL did not
-        // provide this method. The `@_alwaysEmitIntoClient` attribute above
-        // forces this function to get compiled into any user code that uses it.
-        if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
-            // When we're on recent enough ABI, we forward the call to the
-            // resilient implementation provided below. The availability check
-            // above guarantees that the entry point will exist in the library
-            // we link with.
-            _hash(into: &hasher)
-        } else {
-            // This is the hash encoding that gets used with the 5.0 ABI. It has
-            // to match the version of == implemented by 5.0, so it shouldn't
-            // ever be changed.
-            hasher.combine(_bridgeToObjectiveC())
-        }
-    }
-
-    @usableFromInline
-    @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
-    internal func _hash(into hasher: inout Hasher) {
-        // This code is beyond a resilience boundary. It has to be kept in
-        // sync with the definition of == implemented below.
         hasher.combine(_url)
     }
 
