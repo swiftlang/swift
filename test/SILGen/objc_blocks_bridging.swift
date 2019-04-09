@@ -74,7 +74,6 @@ import Foundation
   // CHECK:         end_borrow [[BORROWED_SELF_COPY]]
   // CHECK:         destroy_value [[SELF_COPY]]
   @objc dynamic func cFunctionPointer(_ fp: @convention(c) (Int) -> Int, x: Int) -> Int {
-    _ = 0
     _ = fp(x)
   }
 

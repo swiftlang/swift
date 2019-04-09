@@ -413,7 +413,7 @@ protocol Anyable {
 // Make sure we generate correct bridging thunks
 class SwiftIdLover : NSObject, Anyable {
 
-  @objc func methodReturningAny() -> Any { _ = 0; fatalError() }
+  @objc func methodReturningAny() -> Any { fatalError() }
   // SEMANTIC ARC TODO: This is another case of pattern matching the body of one
   // function in a different function... Just pattern match the unreachable case
   // to preserve behavior. We should check if it is correct.
