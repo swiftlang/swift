@@ -63,7 +63,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
                                          bool isExprStmt) {
   class DiagnoseWalker : public ASTWalker {
     SmallPtrSet<Expr*, 4> AlreadyDiagnosedMetatypes;
-    SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedNoEscapes;
     SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedBitCasts;
     
     // Keep track of acceptable DiscardAssignmentExpr's.
@@ -83,23 +82,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
     DiagnoseWalker(TypeChecker &TC, const DeclContext *DC, bool isExprStmt)
       : IsExprStmt(isExprStmt), TC(TC), DC(DC) {}
-
-    // Selector for the partial_application_of_function_invalid diagnostic
-    // message.
-    struct PartialApplication {
-      enum : unsigned {
-        MutatingMethod,
-        SuperInit,
-        SelfInit,
-      };
-      enum : unsigned {
-        Error,
-        CompatibilityWarning,
-      };
-      unsigned compatibilityWarning: 1;
-      unsigned kind : 2;
-      unsigned level : 29;
-    };
 
     // Not interested in going outside a basic expression.
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
@@ -129,9 +111,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
             checkUseOfMetaTypeName(Base);
         }
 
-        // Verify noescape parameter uses.
-        checkNoEscapeParameterUse(DRE, Parent.getAsExpr(), OperandKind::None);
-
         // Verify warn_unqualified_access uses.
         checkUnqualifiedAccessUse(DRE);
         
@@ -155,12 +134,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         if (auto *IOE = dyn_cast<InOutExpr>(SE->getBase()))
           if (IOE->isImplicit())
             AcceptableInOutExprs.insert(IOE);
-
-        visitIndices(SE, [&](unsigned argIndex, Expr *arg) {
-          arg = lookThroughArgument(arg);
-          if (auto *DRE = dyn_cast<DeclRefExpr>(arg))
-            checkNoEscapeParameterUse(DRE, SE, OperandKind::Argument);
-        });
       }
 
       if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
@@ -168,21 +141,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
           if (auto *Arg = Comp.getIndexExpr())
             CallArgs.insert(Arg);
         }
-      }
-
-      if (auto *AE = dyn_cast<CollectionExpr>(E)) {
-        visitCollectionElements(AE, [&](unsigned argIndex, Expr *arg) {
-          arg = lookThroughArgument(arg);
-          if (auto *DRE = dyn_cast<DeclRefExpr>(arg))
-            checkNoEscapeParameterUse(DRE, AE, OperandKind::Argument);
-        });
-      }
-
-      // Check decl refs in withoutActuallyEscaping blocks.
-      if (auto MakeEsc = dyn_cast<MakeTemporarilyEscapableExpr>(E)) {
-        if (auto DRE =
-              dyn_cast<DeclRefExpr>(MakeEsc->getNonescapingClosureValue()))
-          checkNoEscapeParameterUse(DRE, MakeEsc, OperandKind::MakeEscapable);
       }
 
       // Check function calls, looking through implicit conversions on the
@@ -221,7 +179,10 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
         ConcreteDeclRef callee;
         if (auto *calleeDRE = dyn_cast<DeclRefExpr>(base)) {
-          checkNoEscapeParameterUse(calleeDRE, Call, OperandKind::Callee);
+          // This only cares about declarations of noescape function type.
+          auto AFT = calleeDRE->getType()->getAs<FunctionType>();
+          if (AFT && AFT->isNoEscape())
+            checkNoEscapeParameterCall(Call);
           checkForSuspiciousBitCasts(calleeDRE, Call);
           callee = calleeDRE->getDeclRef();
 
@@ -267,12 +228,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
                                             unwrapped, operand);
             }
           }
-
-          // Also give special treatment to noescape function arguments.
-          arg = lookThroughArgument(arg);
-
-          if (auto *DRE = dyn_cast<DeclRefExpr>(arg))
-            checkNoEscapeParameterUse(DRE, Call, OperandKind::Argument);
         });
       }
       
@@ -339,23 +294,10 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       }
     }
 
-    static void visitIndices(SubscriptExpr *subscript,
-                             llvm::function_ref<void(unsigned, Expr*)> fn) {
-      auto *indexArgs = subscript->getIndex();
-      argExprVisitArguments(indexArgs, fn);
-    }
-
     static void visitArguments(ApplyExpr *apply,
                                llvm::function_ref<void(unsigned, Expr*)> fn) {
       auto *arg = apply->getArg();
       argExprVisitArguments(arg, fn);
-    }
-
-    static void visitCollectionElements(CollectionExpr *collection,
-                               llvm::function_ref<void(unsigned, Expr*)> fn) {
-      auto elts = collection->getElements();
-      for (auto i : indices(elts))
-        fn(i, elts[i]);
     }
 
     static Expr *lookThroughArgument(Expr *arg) {
@@ -570,61 +512,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
                   noescapeArgument.getDecl()->getName(),
                   noescapeArgument.isDeclACapture())
         .highlight(problematicArg->getSourceRange());
-    }
-
-    enum class OperandKind {
-      None,
-      Callee,
-      Argument,
-      MakeEscapable,
-    };
-
-    /// The DRE argument is a reference to a noescape parameter.  Verify that
-    /// its uses are ok.
-    void checkNoEscapeParameterUse(DeclRefExpr *DRE, Expr *parent,
-                                   OperandKind useKind) {
-      // This only cares about declarations of noescape function type.
-      auto AFT = DRE->getType()->getAs<FunctionType>();
-      if (!AFT || !AFT->isNoEscape())
-        return;
-
-      // Only diagnose this once.  If we check and accept this use higher up in
-      // the AST, don't recheck here.
-      if (!AlreadyDiagnosedNoEscapes.insert(DRE).second)
-        return;
-
-      // The only valid use of the noescape parameter is an immediate call,
-      // either as the callee or as an argument (in which case, the typechecker
-      // validates that the noescape bit didn't get stripped off), or as
-      // a special case, e.g. in the binding of a withoutActuallyEscaping block
-      // or the argument of a type(of: ...).
-      if (parent) {
-        if (auto apply = dyn_cast<ApplyExpr>(parent)) {
-          if (isa<ParamDecl>(DRE->getDecl()) && useKind == OperandKind::Callee)
-            checkNoEscapeParameterCall(apply);
-          return;
-        } else if (isa<SubscriptExpr>(parent)
-                   && useKind == OperandKind::Argument) {
-          return;
-        } else if (isa<MakeTemporarilyEscapableExpr>(parent)) {
-          return;
-        } else if (isa<DynamicTypeExpr>(parent)) {
-          return;
-        }
-      }
-
-      TC.diagnose(DRE->getStartLoc(), diag::invalid_noescape_use,
-                  cast<VarDecl>(DRE->getDecl())->getName(),
-                  isa<ParamDecl>(DRE->getDecl()));
-
-      // If we're a parameter, emit a helpful fixit to add @escaping
-      auto paramDecl = dyn_cast<ParamDecl>(DRE->getDecl());
-      if (paramDecl) {
-        TC.diagnose(paramDecl->getStartLoc(), diag::noescape_parameter,
-                    paramDecl->getName())
-            .fixItInsert(paramDecl->getTypeLoc().getSourceRange().Start,
-                         "@escaping ");
-      }
     }
 
     // Diagnose metatype values that don't appear as part of a property,
