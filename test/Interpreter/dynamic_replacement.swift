@@ -84,6 +84,8 @@ func checkExpectedResults(forOriginalLibrary useOrig: Bool) {
 
  expectTrue(PublicClass().function() ==
             expectedResult(useOrig, "public_class_func"))
+ expectTrue(PublicClass().finalFunction() ==
+            expectedResult(useOrig, "public_class_final_func"))
  expectTrue(PublicClass().genericFunction(Int.self) ==
             expectedResult(useOrig, "public_class_generic_func"))
 

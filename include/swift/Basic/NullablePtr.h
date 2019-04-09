@@ -61,9 +61,13 @@ public:
 
   explicit operator bool() const { return Ptr; }
 
-  bool operator==(NullablePtr<T> &&other) const { return other.Ptr == Ptr; }
+  bool operator==(const NullablePtr<T> &other) const {
+    return other.Ptr == Ptr;
+  }
 
-  bool operator!=(NullablePtr<T> &&other) const { return !(*this == other); }
+  bool operator!=(const NullablePtr<T> &other) const {
+    return !(*this == other);
+  }
 
   bool operator==(const T *other) const { return other == Ptr; }
 

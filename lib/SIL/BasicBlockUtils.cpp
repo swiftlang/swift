@@ -220,7 +220,7 @@ SILBasicBlock *swift::splitEdge(TermInst *T, unsigned edgeIdx,
   SmallVector<SILValue, 16> args;
   getEdgeArgs(T, edgeIdx, edgeBB, args);
 
-  SILBuilder(edgeBB).createBranch(T->getLoc(), destBB, args);
+  SILBuilderWithScope(edgeBB, T).createBranch(T->getLoc(), destBB, args);
 
   // Strip the arguments and rewire the branch in the source block.
   changeBranchTarget(T, edgeIdx, edgeBB, /*PreserveArgs=*/false);

@@ -45,6 +45,9 @@ extension K {
 
   @_dynamicReplacement(for: init(c:)) // expected-error{{replaced constructor 'init(c:)' is marked as convenience}})
   init(rc: Int) { }
+
+  @_dynamicReplacement(for:finalFunction())
+  func replacement_finalFunction() {}
 }
 
 extension undeclared { // expected-error{{use of undeclared type 'undeclared'}}

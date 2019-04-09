@@ -42,20 +42,6 @@ from swift_build_support.swift_build_support.toolchain import host_toolchain
 
 isMac = platform.system() == 'Darwin'
 
-def call_without_sleeping(command, env=None, dry_run=False, echo=False):
-    """
-    Execute a command during which system sleep is disabled.
-
-    By default, this ignores the state of the `shell.dry_run` flag.
-    """
-
-    # Disable system sleep, if possible.
-    if platform.system() == 'Darwin':
-        # Don't mutate the caller's copy of the arguments.
-        command = ["caffeinate"] + list(command)
-
-    shell.call(command, env=env, dry_run=dry_run, echo=echo)
-
 class Builder(object):
     def __init__(self, toolchain, args):
         self.toolchain = toolchain
@@ -76,7 +62,7 @@ class Builder(object):
 
     def call(self, command, env=None, without_sleeping=False):
         if without_sleeping:
-            call_without_sleeping(command, env=env, dry_run=self.dry_run, echo=self.verbose)
+            shell.call_without_sleeping(command, env=env, dry_run=self.dry_run, echo=self.verbose)
         else:
             shell.call(command, env=env, dry_run=self.dry_run, echo=self.verbose)
 

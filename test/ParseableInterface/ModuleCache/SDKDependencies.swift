@@ -12,9 +12,9 @@
 // RUN: llvm-bcanalyzer -dump %t/prebuilt-cache/SdkLib.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
 //
 // PREBUILT: MODULE_BLOCK
-// PREBUILT-NOT: FILE_DEPENDENCY {{.*}}/MCP/{{.*}}
-// PREBUILT-NOT: FILE_DEPENDENCY {{.*}}/prebuilt-cache/{{.*}}
-// PREBUILD-NOT: FILE_DEPENDENCY {{.*}}/lib/swift/{{.*}}
+// PREBUILT-NOT: FILE_DEPENDENCY {{.*[/\\]MCP[/\\]}}
+// PREBUILT-NOT: FILE_DEPENDENCY {{.*[/\\]prebuilt-cache[/\\]}}
+// PREBUILD-NOT: FILE_DEPENDENCY {{.*[/\\]lib[/\\]swift[/\\]}}
 //
 // Re-build them in the opposite order
 // RUN: %empty-directory(%t/prebuilt-cache)
@@ -50,8 +50,8 @@
 // RUN: cat %t/dummy.d | %FileCheck %s -check-prefix=DEPFILE-NEGATIVE
 // RUN: cat %t/dummy.d | %FileCheck %s -check-prefix=DEPFILE
 //
-// DEPFILE-NEGATIVE-NOT: /MCP/
-// DEPFILE-NEGATIVE-NOT: /prebuilt-cache/
+// DEPFILE-NEGATIVE-NOT: {{[/\\]MCP[/\\]}}
+// DEPFILE-NEGATIVE-NOT: {{[/\\]prebuilt-cache[/\\]}}
 //
 // DEPFILE-DAG: SomeCModule.h
 // DEPFILE-DAG: SdkLib.swiftinterface
@@ -79,21 +79,21 @@
 // RUN: cat %t/MCP/SdkLib-*.swiftmodule | %FileCheck %s -check-prefixes=EXLIB,SDKLIB
 //
 // EXLIB: dependencies:
-// EXLIB-DAG: /my-sdk/usr/include/module.modulemap
-// EXLIB-DAG: /my-sdk/usr/include/SomeCModule.h
-// EXLIB-DAG: /my-sdk/ExportedLib.swiftinterface
-// SDKLIB-DAG: /my-sdk/SdkLib.swiftinterface
+// EXLIB-DAG: {{[/\\]my-sdk[/\\]usr[/\\]include[/\\]}}module.modulemap
+// EXLIB-DAG: {{[/\\]my-sdk[/\\]usr[/\\]include[/\\]}}SomeCModule.h
+// EXLIB-DAG: {{[/\\]my-sdk[/\\]}}ExportedLib.swiftinterface
+// SDKLIB-DAG: {{[/\\]my-sdk[/\\]}}SdkLib.swiftinterface
 //
 // Check they don't contain any dependencies from either cache other than themselves
 // RUN: cat %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=NOCACHE -DLIB_NAME=ExportedLib
 // RUN: cat %t/MCP/SdkLib-*.swiftmodule | %FileCheck %s -check-prefix=NOCACHE -DLIB_NAME=SdkLib
 //
 // NOCACHE: dependencies:
-// NOCACHE-NOT: /prebuilt-cache/
-// NOCACHE-NOT: /MCP/
-// NOCACHE: /prebuilt-cache/[[LIB_NAME]].swiftmodule
-// NOCACHE-NOT: /prebuilt-cache/
-// NOCACHE-NOT: /MCP/
+// NOCACHE-NOT: {{[/\\]prebuilt-cache[/\\]}}
+// NOCACHE-NOT: {{[/\\]MCP[/\\]}}
+// NOCACHE: {{[/\\]prebuilt-cache[/\\]}}[[LIB_NAME]].swiftmodule
+// NOCACHE-NOT: {{[/\\]prebuilt-cache[/\\]}}
+// NOCACHE-NOT: {{[/\\]MCP[/\\]}}
 //
 // Check we didn't emit anything from the cache in the .d file either
 // RUN: cat %t/dummy.d | %FileCheck %s -check-prefix=DEPFILE-NEGATIVE
@@ -122,10 +122,10 @@
 // RUN: cat %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=NEW-EXLIB
 // RUN: cat %t/MCP/SdkLib-*.swiftmodule | %FileCheck %s -check-prefixes=NEW-EXLIB,NEW-SDKLIB
 //
-// NEW-EXLIB-DAG: /my-new-sdk/usr/include/module.modulemap
-// NEW-EXLIB-DAG: /my-new-sdk/usr/include/SomeCModule.h
-// NEW-EXLIB-DAG: /my-new-sdk/ExportedLib.swiftinterface
-// NEW-SDKLIB-DAG: /my-new-sdk/SdkLib.swiftinterface
+// NEW-EXLIB-DAG: {{[/\\]my-new-sdk[/\\]usr[/\\]include[/\\]}}module.modulemap
+// NEW-EXLIB-DAG: {{[/\\]my-new-sdk[/\\]usr[/\\]include[/\\]}}SomeCModule.h
+// NEW-EXLIB-DAG: {{[/\\]my-new-sdk[/\\]}}ExportedLib.swiftinterface
+// NEW-SDKLIB-DAG: {{[/\\]my-new-sdk[/\\]}}SdkLib.swiftinterface
 //
 // Check they don't contain dependencies from the module cache, old prebuilt
 // cache, or new prebuilt cache

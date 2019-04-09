@@ -239,18 +239,18 @@ static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
       auto *CondBr = cast<CondBranchInst>(
           Latch->getSinglePredecessorBlock()->getTerminator());
       if (CondBr->getTrueBB() != Latch)
-        SILBuilder(CondBr).createBranch(CondBr->getLoc(), CondBr->getTrueBB(),
-                                        CondBr->getTrueArgs());
+        SILBuilderWithScope(CondBr).createBranch(
+            CondBr->getLoc(), CondBr->getTrueBB(), CondBr->getTrueArgs());
       else
-        SILBuilder(CondBr).createBranch(CondBr->getLoc(), CondBr->getFalseBB(),
-                                        CondBr->getFalseArgs());
+        SILBuilderWithScope(CondBr).createBranch(
+            CondBr->getLoc(), CondBr->getFalseBB(), CondBr->getFalseArgs());
       CondBr->eraseFromParent();
       return;
     }
 
     // Otherwise, branch to the next iteration's header.
-    SILBuilder(Br).createBranch(Br->getLoc(), NextIterationsHeader,
-                                Br->getArgs());
+    SILBuilderWithScope(Br).createBranch(Br->getLoc(), NextIterationsHeader,
+                                         Br->getArgs());
     Br->eraseFromParent();
     return;
   }
@@ -261,12 +261,12 @@ static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
   // one.
   if (CurLoopIter == LastLoopIter) {
     if (CondBr->getTrueBB() == CurrentHeader) {
-      SILBuilder(CondBr).createBranch(CondBr->getLoc(), CondBr->getFalseBB(),
-                                      CondBr->getFalseArgs());
+      SILBuilderWithScope(CondBr).createBranch(
+          CondBr->getLoc(), CondBr->getFalseBB(), CondBr->getFalseArgs());
     } else {
       assert(CondBr->getFalseBB() == CurrentHeader);
-      SILBuilder(CondBr).createBranch(CondBr->getLoc(), CondBr->getTrueBB(),
-                                      CondBr->getTrueArgs());
+      SILBuilderWithScope(CondBr).createBranch(
+          CondBr->getLoc(), CondBr->getTrueBB(), CondBr->getTrueArgs());
     }
     CondBr->eraseFromParent();
     return;
@@ -274,12 +274,12 @@ static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
 
   // Otherwise, branch to the next iteration's header.
   if (CondBr->getTrueBB() == CurrentHeader) {
-    SILBuilder(CondBr).createCondBranch(
+    SILBuilderWithScope(CondBr).createCondBranch(
         CondBr->getLoc(), CondBr->getCondition(), NextIterationsHeader,
         CondBr->getTrueArgs(), CondBr->getFalseBB(), CondBr->getFalseArgs());
   } else {
     assert(CondBr->getFalseBB() == CurrentHeader);
-    SILBuilder(CondBr).createCondBranch(
+    SILBuilderWithScope(CondBr).createCondBranch(
         CondBr->getLoc(), CondBr->getCondition(), CondBr->getTrueBB(),
         CondBr->getTrueArgs(), NextIterationsHeader, CondBr->getFalseArgs());
   }

@@ -227,7 +227,7 @@ func testCompleteModuleQualifiedBar1() {
 func testCompleteFunctionCall1() {
   fooFunc1#^FUNCTION_CALL_1^#
 // FUNCTION_CALL_1: Begin completions
-// FUNCTION_CALL_1-NEXT: Pattern/CurrModule: ({#(a): Int32#})[#Int32#]{{; name=.+$}}
+// FUNCTION_CALL_1-NEXT: Decl[FreeFunction]/OtherModule[Foo]: ({#(a): Int32#})[#Int32#]{{; name=.+$}}
 // FUNCTION_CALL_1-NEXT: Keyword[self]/CurrNominal: .self[#(Int32) -> Int32#]; name=self
 // FUNCTION_CALL_1-NEXT: End completions
 }
@@ -235,7 +235,7 @@ func testCompleteFunctionCall1() {
 func testCompleteFunctionCall2() {
   fooFunc1AnonymousParam#^FUNCTION_CALL_2^#
 // FUNCTION_CALL_2: Begin completions
-// FUNCTION_CALL_2-NEXT: Pattern/CurrModule: ({#Int32#})[#Int32#]{{; name=.+$}}
+// FUNCTION_CALL_2-NEXT: Decl[FreeFunction]/OtherModule[Foo]: ({#Int32#})[#Int32#]{{; name=.+$}}
 // FUNCTION_CALL_2-NEXT: Keyword[self]/CurrNominal: .self[#(Int32) -> Int32#]; name=self
 // FUNCTION_CALL_2-NEXT: End completions
 }

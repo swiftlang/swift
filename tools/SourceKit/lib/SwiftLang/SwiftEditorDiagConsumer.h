@@ -67,10 +67,10 @@ public:
   bool hadAnyError() const { return HadAnyError; }
 
   void handleDiagnostic(swift::SourceManager &SM, swift::SourceLoc Loc,
-                        swift::DiagnosticKind Kind,
-                        StringRef FormatString,
+                        swift::DiagnosticKind Kind, StringRef FormatString,
                         ArrayRef<swift::DiagnosticArgument> FormatArgs,
-                        const swift::DiagnosticInfo &Info) override;
+                        const swift::DiagnosticInfo &Info,
+                        swift::SourceLoc bufferIndirectlyCausingDiagnostic) override;
 };
 
 } // namespace SourceKit

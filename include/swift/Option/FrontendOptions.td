@@ -432,6 +432,10 @@ def disable_playground_transform : Flag<["-"], "disable-playground-transform">,
 def pc_macro : Flag<["-"], "pc-macro">,
   HelpText<"Apply the 'program counter simulation' macro">;
 
+def no_clang_module_breadcrumbs : Flag<["-"], "no-clang-module-breadcrumbs">,
+  HelpText<"Don't emit DWARF skeleton CUs for imported Clang modules. "
+           "Use this when building a redistributable static archive.">;
+
 def use_jit : Flag<["-"], "use-jit">,
   HelpText<"Register Objective-C classes as if the JIT were in use">;
 

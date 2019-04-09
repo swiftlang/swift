@@ -3,7 +3,7 @@
 Visual Studio 2017 or newer is needed to build swift on Windows.
 
 ## 1. Install dependencies
-1. Latest version of [Visual Studio](https://www.visualstudio.com/downloads/)
+- Install the latest version of [Visual Studio](https://www.visualstudio.com/downloads/)
 - Make sure to include "Programming Languages|Visual C++" and "Windows and Web
   Development|Universal Windows App Development|Windows SDK" in your
   installation.
@@ -205,15 +205,10 @@ cmake --build S:\b\lldb
 
 ## 10. Running tests on Windows
 
-Running the testsuite on Windows has additional external dependencies.  You must have a subset of the GNUWin32 programs installed and available in your path.  The following packages are currently required:
-
-  1. coreutils
-  2. diffutils
-  3. grep
-  4. sed
+Running the testsuite on Windows has additional external dependencies.
 
 ```cmd
-path S:\thirdparty\icu4c-63_1-Win64-MSVC2017\bin64;S:\b\swift\bin;S:\b\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles(x86)%\GnuWin32\bin
+path S:\thirdparty\icu4c-63_1-Win64-MSVC2017\bin64;S:\b\swift\bin;S:\b\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
 ninja -C S:\b\swift check-swift
 ```
 
