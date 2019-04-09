@@ -927,9 +927,6 @@ llvm::Constant *IRGenModule::getAddrOfFieldName(StringRef Name) {
 
 llvm::Constant *
 IRGenModule::getAddrOfBoxDescriptor(CanType BoxedType) {
-  if (!IRGen.Opts.EnableReflectionMetadata)
-    return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
-
   BoxDescriptorBuilder builder(*this, BoxedType);
   auto var = builder.emit();
 
@@ -942,9 +939,6 @@ IRGenModule::getAddrOfCaptureDescriptor(SILFunction &Caller,
                                         CanSILFunctionType SubstCalleeType,
                                         SubstitutionMap Subs,
                                         const HeapLayout &Layout) {
-  if (!IRGen.Opts.EnableReflectionMetadata)
-    return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
-
   if (CaptureDescriptorBuilder::hasOpenedExistential(OrigCalleeType, Layout))
     return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
 
@@ -959,9 +953,6 @@ void IRGenModule::
 emitAssociatedTypeMetadataRecord(const RootProtocolConformance *conformance) {
   auto normalConf = dyn_cast<NormalProtocolConformance>(conformance);
   if (!normalConf)
-    return;
-
-  if (!IRGen.Opts.EnableReflectionMetadata)
     return;
 
   SmallVector<std::pair<StringRef, CanType>, 2> AssociatedTypes;
@@ -1026,9 +1017,6 @@ void IRGenerator::emitBuiltinReflectionMetadata() {
 }
 
 void IRGenModule::emitFieldMetadataRecord(const NominalTypeDecl *Decl) {
-  if (!IRGen.Opts.EnableReflectionMetadata)
-    return;
-
   // @objc enums never have generic parameters or payloads,
   // and lower as their raw type.
   if (auto *ED = dyn_cast<EnumDecl>(Decl))
