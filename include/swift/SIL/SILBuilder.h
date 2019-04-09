@@ -547,7 +547,6 @@ public:
         theFunction));
   }
 
-
   AutoDiffFunctionExtractInst *createAutoDiffFunctionExtractOriginal(
       SILLocation loc, SILValue theFunction) {
     return insert(new (getModule()) AutoDiffFunctionExtractInst(

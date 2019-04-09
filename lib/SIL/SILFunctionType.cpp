@@ -215,9 +215,12 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   // Calculate WRT parameter infos, in the order that they appear in the
   // AST-level parameter lists.
   SmallVector<SILParameterInfo, 4> wrtParams;
-  for (auto valueAndIndex : enumerate(getParameters()))
-    if (parameterIndices[valueAndIndex.index()])
+  for (auto valueAndIndex : enumerate(getParameters())) {
+    llvm::errs() << "Parameter " << valueAndIndex.value() << '\n';
+    if (valueAndIndex.index() < parameterIndices.size() &&
+        parameterIndices[valueAndIndex.index()])
       wrtParams.push_back(valueAndIndex.value());
+  }
 
   CanSILFunctionType closureType;
   switch (kind) {
@@ -819,7 +822,7 @@ private:
     // SWIFT_ENABLE_TENSORFLOW
     SILParameterInfo param(loweredType, convention);
     if (isNonDifferentiable)
-      param.getWithDifferentiability(
+      param = param.getWithDifferentiability(
           SILParameterDifferentiability::NotDifferentiable);
     Inputs.push_back(param);
 

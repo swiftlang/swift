@@ -678,19 +678,7 @@ getExtracteeType(SILValue function, Extractee extractee,
                  unsigned differentiationOrder, SILModule &module) {
   auto fnTy = function->getType().castTo<SILFunctionType>();
   assert(fnTy->getExtInfo().isDifferentiable());
-
-  auto originalFnExtInfo = fnTy->getExtInfo().withDifferentiable(false);
-  SmallVector<SILParameterInfo, 4> originalFnParameters;
-  for (auto &param : fnTy->getParameters())
-    originalFnParameters.push_back(SILParameterInfo(
-        param.getType(), param.getConvention(),
-        SILParameterDifferentiability::DifferentiableOrNotApplicable));
-  auto originalFnTy = SILFunctionType::get(
-      fnTy->getGenericSignature(), originalFnExtInfo, fnTy->getCoroutineKind(),
-      fnTy->getCalleeConvention(), originalFnParameters, fnTy->getYields(),
-      fnTy->getResults(), fnTy->getOptionalErrorResult(), fnTy->getASTContext(),
-      fnTy->getWitnessMethodConformanceOrNone());
-
+  auto originalFnTy = fnTy->getWithoutDifferentiability();
   auto kindOpt = extractee.getExtracteeAsAssociatedFunction();
   if (!kindOpt) {
     assert(extractee == Extractee::Original);

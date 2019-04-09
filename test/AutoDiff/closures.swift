@@ -36,4 +36,9 @@ struct TF30 : Differentiable {
   @noDerivative var y: @differentiable (Float) -> Float
 }
 // Make sure this passes SIL verification.
-let _: @autodiff (TF30) -> Float = { x in x.x }
+let _: @differentiable (TF30) -> Float = { x in x.x }
+
+// Make sure `@nondiff` gets propagated through SIL.
+let _: @differentiable (Float, @nondiff Float) -> Float = { x, y in x }
+// Make sure `@nondiff` with non-`Differentiable` also works.
+let _: @differentiable (Float, @nondiff Int) -> Float = { x, y in x }
