@@ -68,7 +68,7 @@ static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
 // ConstExprFunctionState implementation.
 //===----------------------------------------------------------------------===//
 
-namespace {
+namespace swift {
 /// This type represents the state of computed values within a function
 /// as evaluation happens.  A separate instance of this is made for each
 /// callee in a call chain to represent the constant values given the set of
@@ -109,6 +109,15 @@ public:
     calculatedValues.insert({value, symVal});
   }
 
+  /// Return the symbolic value for a SILValue if it is bound in the interpreter
+  /// state. If not, return None.
+  llvm::Optional<SymbolicValue> lookupValue(SILValue value) {
+    auto it = calculatedValues.find(value);
+    if (it != calculatedValues.end())
+      return it->second;
+    return None;
+  }
+
   /// Invariant: Before the call, `calculatedValues` must not contain `addr`
   /// as a key.
   SymbolicValue createMemoryObject(SILValue addr, SymbolicValue initialValue) {
@@ -130,6 +139,25 @@ public:
   /// statements.
   llvm::Optional<SymbolicValue> evaluateFlowSensitive(SILInstruction *inst);
 
+  /// Evaluate a branch or non-branch instruction and if the evaluation was
+  /// successful, return the next instruction from where the evaluation must
+  /// continue.
+  /// \param instI basic-block iterator pointing to the instruction to evaluate.
+  /// \param visitedBlocks basic blocks already visited during evaluation.
+  ///   This is used to detect loops.
+  /// \returns a pair where the first and second elements are defined as
+  /// follows:
+  ///   If the evaluation of the instruction is successful, the first element
+  ///   is the iterator to the next instruction from the where the evaluation
+  ///   must continue. Otherwise, it is None.
+  ///
+  ///   Second element is None, if the evaluation is successful.
+  ///   Otherwise, is an unknown symbolic value that contains the error.
+  std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
+  evaluateInstructionAndGetNext(
+      SILBasicBlock::iterator instI,
+      SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks);
+
   Type substituteGenericParamsAndSimpify(Type ty);
   CanType substituteGenericParamsAndSimpify(CanType ty) {
     return substituteGenericParamsAndSimpify(Type(ty))->getCanonicalType();
@@ -150,12 +178,11 @@ public:
   SymbolicValue loadAddrValue(SILValue addr, SymbolicValue addrVal);
   llvm::Optional<SymbolicValue> computeFSStore(SymbolicValue storedCst,
                                                SILValue dest);
-
 private:
   llvm::Optional<SymbolicValue>
   initializeAddressFromSingleWriter(SILValue addr);
 };
-} // end anonymous namespace
+} // namespace swift
 
 /// Simplify the specified type based on knowledge of substitutions if we have
 /// any.
@@ -1246,6 +1273,103 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
   return evaluator.getUnknown(inst, UnknownReason::Default);
 }
 
+std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
+ConstExprFunctionState::evaluateInstructionAndGetNext(
+    SILBasicBlock::iterator instI,
+    SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks) {
+
+  SILInstruction *inst = &*instI;
+  // If we can evaluate this flow sensitively, then return the next instruction.
+  if (!isa<TermInst>(inst)) {
+    auto fsResult = evaluateFlowSensitive(inst);
+    if (fsResult.hasValue())
+      return {None, fsResult};
+    return {++instI, None};
+  }
+
+  // If this is a branch instruction, evaluate and return the target basic block.
+  if (auto *br = dyn_cast<BranchInst>(inst)) {
+    auto destBB = br->getDestBB();
+
+    // If we've already visited this block then fail - we have a loop.
+    if (!visitedBlocks.insert(destBB).second)
+      return {None, evaluator.getUnknown(br, UnknownReason::Loop)};
+
+    // Set up basic block arguments.
+    for (unsigned i = 0, e = br->getNumArgs(); i != e; ++i) {
+      auto argument = getConstantValue(br->getArg(i));
+      if (!argument.isConstant())
+        return {None, argument};
+      setValue(destBB->getArgument(i), argument);
+    }
+    // Set the instruction pointer to the first instruction of the block.
+    return {destBB->begin(), None};
+  }
+
+  if (auto *cbr = dyn_cast<CondBranchInst>(inst)) {
+    auto val = getConstantValue(inst->getOperand(0));
+    if (!val.isConstant())
+      return {None, val};
+
+    SILBasicBlock *destBB;
+    if (!val.getIntegerValue())
+      destBB = cbr->getFalseBB();
+    else
+      destBB = cbr->getTrueBB();
+
+    // If we've already visited this block then fail - we have a loop.
+    if (!visitedBlocks.insert(destBB).second)
+      return {None, evaluator.getUnknown(cbr, UnknownReason::Loop)};
+
+    return {destBB->begin(), None};
+  }
+
+  if (isa<SwitchEnumAddrInst>(inst) || isa<SwitchEnumInst>(inst)) {
+    SymbolicValue value;
+    SwitchEnumInstBase *switchInst = dyn_cast<SwitchEnumInst>(inst);
+    if (switchInst) {
+      value = getConstantValue(switchInst->getOperand());
+    } else {
+      switchInst = cast<SwitchEnumAddrInst>(inst);
+      value = getConstAddrAndLoadResult(switchInst->getOperand());
+    }
+    if (!value.isConstant())
+      return {None, value};
+
+    assert(value.getKind() == SymbolicValue::Enum ||
+           value.getKind() == SymbolicValue::EnumWithPayload);
+
+    auto *caseBB = switchInst->getCaseDestination(value.getEnumValue());
+    // Set up the arguments.
+    if (caseBB->getParent()->hasOwnership() &&
+        switchInst->getDefaultBBOrNull() == caseBB) {
+      // If we are visiting the default block and we are in ossa, then we may
+      // have uses of the failure parameter. That means we need to map the
+      // original value to the argument.
+      setValue(caseBB->getArgument(0), value);
+      return {caseBB->begin(), None};
+    }
+
+    if (caseBB->getNumArguments() == 0)
+      return {caseBB->begin(), None};
+
+    assert(value.getKind() == SymbolicValue::EnumWithPayload);
+    // When there are multiple payload components, they form a single
+    // tuple-typed argument.
+    assert(caseBB->getNumArguments() == 1);
+    auto argument = value.getEnumPayloadValue();
+    assert(argument.isConstant());
+    setValue(caseBB->getArgument(0), argument);
+
+    return {caseBB->begin(), None};
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "ConstExpr: Unknown Branch Instruction: " << *inst
+                          << "\n");
+
+  return {None, evaluator.getUnknown(inst, UnknownReason::Default)};
+}
+
 /// Evaluate a call to the specified function as if it were a constant
 /// expression, returning None and filling in `results` on success, or
 /// returning an 'Unknown' SymbolicValue on failure carrying the error.
@@ -1284,7 +1408,7 @@ static llvm::Optional<SymbolicValue> evaluateAndCacheCall(
   visitedBlocks.insert(&fn.front());
 
   while (1) {
-    SILInstruction *inst = &*nextInst++;
+    SILInstruction *inst = &*nextInst;
     LLVM_DEBUG(llvm::dbgs() << "ConstExpr interpret: "; inst->dump());
 
     // Make sure we haven't exceeded our interpreter iteration cap.
@@ -1292,21 +1416,12 @@ static llvm::Optional<SymbolicValue> evaluateAndCacheCall(
       return SymbolicValue::getUnknown(inst, UnknownReason::TooManyInstructions,
                                        {}, evaluator.getAllocator());
 
-    // If we can evaluate this flow sensitively, then keep going.
-    if (!isa<TermInst>(inst)) {
-      auto fsResult = state.evaluateFlowSensitive(inst);
-      if (fsResult.hasValue())
-        return fsResult;
-      continue;
-    }
-
-    // Otherwise, we handle terminators here.
     if (isa<ReturnInst>(inst)) {
       auto val = state.getConstantValue(inst->getOperand(0));
       if (!val.isConstant())
         return val;
 
-      // If we got a constant value, then we're good.  Set up the normal result
+      // If we got a constant value, then we're good. Set up the normal result
       // values as well as any indirect results.
       auto numNormalResults = conventions.getNumDirectSILResults();
       if (numNormalResults == 1) {
@@ -1323,90 +1438,18 @@ static llvm::Optional<SymbolicValue> evaluateAndCacheCall(
       return None;
     }
 
-    if (auto *br = dyn_cast<BranchInst>(inst)) {
-      auto destBB = br->getDestBB();
+    // Handle other instructions here.
+    Optional<SILBasicBlock::iterator> nextInstOpt = None;
+    Optional<SymbolicValue> errorVal = None;
 
-      // If we've already visited this block then fail - we have a loop.
-      if (!visitedBlocks.insert(destBB).second)
-        return evaluator.getUnknown(br, UnknownReason::Loop);
+    std::tie(nextInstOpt, errorVal) =
+        state.evaluateInstructionAndGetNext(nextInst, visitedBlocks);
 
-      // Set up basic block arguments.
-      for (unsigned i = 0, e = br->getNumArgs(); i != e; ++i) {
-        auto argument = state.getConstantValue(br->getArg(i));
-        if (!argument.isConstant())
-          return argument;
-        state.setValue(destBB->getArgument(i), argument);
-      }
-      // Set the instruction pointer to the first instruction of the block.
-      nextInst = destBB->begin();
-      continue;
-    }
+    if (errorVal.hasValue())
+      return errorVal;
 
-    if (auto *cbr = dyn_cast<CondBranchInst>(inst)) {
-      auto val = state.getConstantValue(inst->getOperand(0));
-      if (!val.isConstant())
-        return val;
-
-      SILBasicBlock *destBB;
-      if (!val.getIntegerValue())
-        destBB = cbr->getFalseBB();
-      else
-        destBB = cbr->getTrueBB();
-
-      // If we've already visited this block then fail - we have a loop.
-      if (!visitedBlocks.insert(destBB).second)
-        return evaluator.getUnknown(cbr, UnknownReason::Loop);
-
-      nextInst = destBB->begin();
-      continue;
-    }
-
-    if (isa<SwitchEnumAddrInst>(inst) || isa<SwitchEnumInst>(inst)) {
-      SymbolicValue value;
-      SwitchEnumInstBase *switchInst = dyn_cast<SwitchEnumInst>(inst);
-      if (switchInst) {
-        value = state.getConstantValue(switchInst->getOperand());
-      } else {
-        switchInst = cast<SwitchEnumAddrInst>(inst);
-        value = state.getConstAddrAndLoadResult(switchInst->getOperand());
-      }
-      if (!value.isConstant())
-        return value;
-
-      assert(value.getKind() == SymbolicValue::Enum ||
-             value.getKind() == SymbolicValue::EnumWithPayload);
-
-      auto *caseBB = switchInst->getCaseDestination(value.getEnumValue());
-
-      // Prepare to subsequently visit the case blocks instructions.
-      nextInst = caseBB->begin();
-      // Then set up the arguments.
-      if (caseBB->getParent()->hasOwnership() &&
-          switchInst->getDefaultBBOrNull() == caseBB) {
-        // If we are visiting the default block and we are in ossa, then we may
-        // have uses of the failure parameter. That means we need to map the
-        // original value to the argument.
-        state.setValue(caseBB->getArgument(0), value);
-        continue;
-      }
-
-      if (caseBB->getNumArguments() == 0)
-        continue;
-
-      assert(value.getKind() == SymbolicValue::EnumWithPayload);
-      // When there are multiple payload components, they form a single
-      // tuple-typed argument.
-      assert(caseBB->getNumArguments() == 1);
-      auto argument = value.getEnumPayloadValue();
-      assert(argument.isConstant());
-      state.setValue(caseBB->getArgument(0), argument);
-      continue;
-    }
-
-    LLVM_DEBUG(llvm::dbgs()
-               << "ConstExpr: Unknown Terminator: " << *inst << "\n");
-
-    return evaluator.getUnknown(inst, UnknownReason::Default);
+    assert(nextInstOpt.hasValue());
+    nextInst = nextInstOpt.getValue();
   }
 }
 
