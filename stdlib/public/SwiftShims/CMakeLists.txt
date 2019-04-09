@@ -105,7 +105,7 @@ add_custom_command_target(unused_var
     COMMENT "Symlinking Clang resource headers into ${SWIFTLIB_DIR}/clang")
 add_dependencies(copy_shim_headers symlink_clang_headers)
 
-swift_install_in_component(compiler
+swift_install_in_component(stdlib
     FILES ${sources}
     DESTINATION "lib/swift/shims")
 
