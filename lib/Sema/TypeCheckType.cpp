@@ -1053,6 +1053,8 @@ static Type isSE0068(TypeResolution resolution, TypeResolutionOptions options) {
 
 //    printf("%d\n", options.getBaseContext());
 
+// Causes: Assertion failed: (hasSelfMetadataParam() && "This method can only be called if the " "SILFunction has a self-metadata parameter"), function getSelfMetadataArgument, file /Volumes/Elements/swift-self/swift/include/swift/SIL/SILFunction.h, line 955.
+
 //    if (isMutablePropertyOrSubscriptOfClass) {
 //      if (auto prop = dyn_cast_or_null<ValueDecl>
 //          (dc->getInnermostDeclarationDeclContext()))
@@ -1099,12 +1101,10 @@ static Type diagnoseUnknownType(TypeResolution resolution,
       NominalTypeDecl *nominal = nullptr;
       if ((nominalDC = dc->getInnermostTypeContext()) &&
           (nominal = nominalDC->getSelfNominalTypeDecl())) {
+        // Attempt to refer to 'Self' within a non-protocol nominal
+        // type. Fix this by replacing 'Self' with the nominal type name.
         assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
 
-        if (auto SelfType = isSE0068(resolution, options))
-          return SelfType;
-
-        // Attempt to refer to 'Self' within a non-protocol nominal type.
         // Produce a Fix-It replacing 'Self' with the nominal type name.
         auto name = getDeclNameFromContext(dc, nominal);
         diags.diagnose(comp->getIdLoc(), diag::self_in_nominal, name)
@@ -1285,21 +1285,18 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
   DeclContext *lookupDC = DC;
 
   // Dynamic 'Self' in the result type of a function body.
-  if (comp->getIdentifier() == ctx.Id_Self) {
-    if (options.getBaseContext() == TypeResolverContext::DynamicSelfResult) {
-      auto func = cast<FuncDecl>(DC);
-      assert(func->hasDynamicSelf() && "Not marked as having dynamic Self?");
+  if (options.getBaseContext() == TypeResolverContext::DynamicSelfResult &&
+      comp->getIdentifier() == ctx.Id_Self) {
+    auto func = cast<FuncDecl>(DC);
+    assert(func->hasDynamicSelf() && "Not marked as having dynamic Self?");
 
-      // FIXME: The passed-in TypeRepr should get 'typechecked' as well.
-      // The issue is though that ComponentIdentTypeRepr only accepts a ValueDecl
-      // while the 'Self' type is more than just a reference to a TypeDecl.
+    // FIXME: The passed-in TypeRepr should get 'typechecked' as well.
+    // The issue is though that ComponentIdentTypeRepr only accepts a ValueDecl
+    // while the 'Self' type is more than just a reference to a TypeDecl.
 
-      auto selfType = resolution.mapTypeIntoContext(
-        func->getDeclContext()->getSelfInterfaceType());
-      return DynamicSelfType::get(selfType, ctx);
-    }
-//    if (auto SelfType = isSE0068(resolution, options))
-//      return SelfType;
+    auto selfType = resolution.mapTypeIntoContext(
+      func->getDeclContext()->getSelfInterfaceType());
+    return DynamicSelfType::get(selfType, ctx);
   }
 
   auto id = comp->getIdentifier();
@@ -1371,6 +1368,10 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
     // source, bail out.
     if (options.contains(TypeResolutionFlags::SilenceErrors))
       return ErrorType::get(ctx);
+
+    if (id == ctx.Id_Self)
+      if (auto SelfType = isSE0068(resolution, options))
+        return SelfType;
 
     return diagnoseUnknownType(resolution, nullptr, SourceRange(), comp,
                                options, lookupOptions);
