@@ -974,59 +974,6 @@ class TestData : TestDataSuper {
         expectTrue(d.classForKeyedArchiver == expected)
     }
 
-    func test_Hashing() {
-        func bridgedData(_ bytes: [UInt8]) -> Data {
-            return bytes.withUnsafeBytes { buffer in
-                NSData(bytes: buffer.baseAddress, length: buffer.count) as Data
-            }
-        }
-
-    let simpleTests: [[Data]] = [
-            [
-                Data(),
-                bridgedData([]),
-            ],
-            [
-                Data([1]),
-                bridgedData([1]),
-            ],
-            [
-                Data([1, 2]),
-                bridgedData([1, 2]),
-            ],
-            [
-                Data([1, 2, 3]),
-                Data([1, 2, 3]),
-                bridgedData([1, 2, 3]),
-                bridgedData([1, 2, 3]),
-            ],
-            [
-                Data([2, 1, 3]),
-                bridgedData([2, 1, 3]),
-            ],
-        ]
-        checkHashableGroups(simpleTests)
-
-        // To ensure strong hashing, all bytes must be fed into the hasher.
-        let longTest: [Data] = [
-            Data([1]) + Data(UInt8.min ... UInt8.max),
-            Data([2]) + Data(UInt8.min ... UInt8.max),
-            Data(UInt8.min ... UInt8.max) + Data([1]),
-            Data(UInt8.min ... UInt8.max) + Data([2]),
-            Data(UInt8.min ..< 128) + Data([1]) + Data(128 ... UInt8.max),
-            Data(UInt8.min ..< 128) + Data([2]) + Data(128 ... UInt8.max),
-        ]
-        checkHashable(longTest, equalityOracle: { $0 == $1 })
-
-        let concatenationTest: [[Data]] = [
-            [Data([1, 2, 3]), Data()],
-            [Data([1, 2]), Data([3])],
-            [Data([1]), Data([2, 3])],
-            [Data(), Data([1, 2, 3])],
-        ]
-        checkHashable(concatenationTest, equalityOracle: { $0 == $1 })
-    }
-
     func test_AnyHashableContainingData() {
         let values: [Data] = [
             Data(base64Encoded: "AAAA")!,
@@ -3761,14 +3708,13 @@ class TestData : TestDataSuper {
         let base2 = Data(bytes: [0, 0xFF, 0xFF, 0])
         let base3 = Data(bytes: [0xFF, 0xFF, 0xFF, 0])
         let sliceEmulation = Data(bytes: [0xFF, 0xFF])
+        expectEqual(base1.hashValue, base2.hashValue)
         let slice1 = base1[base1.startIndex.advanced(by: 1)..<base1.endIndex.advanced(by: -1)]
         let slice2 = base2[base2.startIndex.advanced(by: 1)..<base2.endIndex.advanced(by: -1)]
         let slice3 = base3[base3.startIndex.advanced(by: 1)..<base3.endIndex.advanced(by: -1)]
-        checkHashableGroups([
-            [base1, base2],
-            [base3],
-            [sliceEmulation, slice1, slice2, slice3],
-        ])
+        expectEqual(slice1.hashValue, sliceEmulation.hashValue)
+        expectEqual(slice1.hashValue, slice2.hashValue)
+        expectEqual(slice2.hashValue, slice3.hashValue)
     }
 
     func test_slice_resize_growth() {
@@ -3779,10 +3725,16 @@ class TestData : TestDataSuper {
 
     func test_hashEmptyData() {
         let d1 = Data()
+        let h1 = d1.hashValue
+
         let d2 = NSData() as Data
+        let h2 = d2.hashValue
+        expectEqual(h1, h2)
+
         let data = Data(bytes: [0, 1, 2, 3, 4, 5, 6])
         let d3 = data[4..<4]
-        checkHashableGroups([[d1, d2, d3]])
+        let h3 = d3.hashValue
+        expectEqual(h1, h3)
     }
     
     func test_validateMutation_slice_withUnsafeMutableBytes_lengthLessThanLowerBound() {
@@ -3895,7 +3847,6 @@ DataTests.test("test_basicMutableDataMutation") { TestData().test_basicMutableDa
 DataTests.test("test_passing") { TestData().test_passing() }
 DataTests.test("test_bufferSizeCalculation") { TestData().test_bufferSizeCalculation() }
 DataTests.test("test_classForCoder") { TestData().test_classForCoder() }
-DataTests.test("test_Hashing") { TestData().test_Hashing() }
 DataTests.test("test_AnyHashableContainingData") { TestData().test_AnyHashableContainingData() }
 DataTests.test("test_AnyHashableCreatedFromNSData") { TestData().test_AnyHashableCreatedFromNSData() }
 DataTests.test("test_noCopyBehavior") { TestData().test_noCopyBehavior() }
