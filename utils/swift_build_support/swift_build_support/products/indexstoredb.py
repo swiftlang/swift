@@ -27,10 +27,10 @@ class IndexStoreDB(product.Product):
     def is_build_script_impl_product(cls):
         return False
 
-    def do_build(self, host_target):
+    def build(self, host_target):
         run_build_script_helper('build', host_target, self, self.args)
 
-    def do_test(self, host_target):
+    def test(self, host_target):
         if self.args.test and self.args.test_indexstoredb:
             run_build_script_helper('test', host_target, self, self.args)
 

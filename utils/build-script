@@ -440,7 +440,7 @@ class BuildScriptInvocation(object):
             toolchain=self.toolchain,
             source_dir=self.workspace.source_dir("ninja"),
             build_dir=self.workspace.build_dir("build", "ninja"))
-        ninja_build.do_build()
+        ninja_build.build()
         self.toolchain.ninja = ninja_build.ninja_bin_path
 
     def convert_to_impl_arguments(self):
@@ -980,8 +980,8 @@ class BuildScriptInvocation(object):
                     source_dir=self.workspace.source_dir(product_source),
                     build_dir=self.workspace.build_dir(
                         host_target, product_name))
-                product.do_build(host_target)
-                product.do_test(host_target)
+                product.build(host_target)
+                product.test(host_target)
 
         # Extract symbols...
         for host_target in all_hosts:
