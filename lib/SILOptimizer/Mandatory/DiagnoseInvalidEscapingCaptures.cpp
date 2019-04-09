@@ -329,11 +329,72 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
   }
 }
 
+static void checkApply(ASTContext &Context, FullApplySite site) {
+  auto isNoEscapeParam = [&](SILValue value) -> const ParamDecl * {
+    // If the value is an escaping, do not enforce any restrictions.
+    if (!value->getType().getASTType()->isNoEscape())
+      return nullptr;
+
+    // If the value is not a function parameter, do not enforce any restrictions.
+    return getParamDeclFromOperand(value);
+  };
+
+  // If the callee is not a no-escape parameter, there is nothing to check.
+  auto callee = site.getCalleeOrigin();
+  if (!isNoEscapeParam(callee))
+    return;
+
+  // See if any of our arguments are noescape parameters, or closures capturing
+  // noescape parameters.
+  SmallVector<std::pair<SILValue, bool>, 4> args;
+  llvm::SmallDenseSet<SILValue, 4> visited;
+  auto arglistInsert = [&](SILValue arg, bool capture) {
+    if (visited.insert(arg).second)
+      args.emplace_back(arg, capture);
+  };
+
+  for (auto arg : site.getArguments())
+    arglistInsert(arg, /*capture=*/false);
+
+  while (!args.empty()) {
+    auto pair = args.pop_back_val();
+    auto arg = pair.first;
+    bool capture = pair.second;
+
+    if (auto *CI = dyn_cast<ConversionInst>(arg)) {
+      arglistInsert(CI->getConverted(), /*capture=*/false);
+      continue;
+    }
+
+    // If one of our call arguments is a noescape parameter, diagnose the
+    // violation.
+    if (auto *param = isNoEscapeParam(arg)) {
+      diagnose(Context, site.getLoc(), diag::err_noescape_param_call,
+               param->getName(), capture);
+      return;
+    }
+
+    // If one of our call arguments is a closure, recursively visit all of
+    // the closure's captures.
+    if (auto *PAI = dyn_cast<PartialApplyInst>(arg)) {
+      ApplySite site(PAI);
+      for (auto arg : site.getArguments())
+        arglistInsert(arg, /*capture=*/true);
+      continue;
+    }
+  }
+}
+
 static void checkForViolationsAtInstruction(ASTContext &Context,
                                             DeclContext *DC,
                                             SILInstruction *I) {
   if (auto *PAI = dyn_cast<PartialApplyInst>(I))
     checkPartialApply(Context, DC, PAI);
+
+  if (isa<ApplyInst>(I) || isa<TryApplyInst>(I)) {
+    FullApplySite site(I);
+    checkApply(Context, site);
+  }
 }
 
 static void checkEscapingCaptures(SILFunction *F) {
