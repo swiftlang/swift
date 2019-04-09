@@ -99,10 +99,11 @@ enum class DowngradeToWarning: bool {
 };
 
 bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
-                                           const ValueDecl *D,
+                                           ConcreteDeclRef declRef,
                                            const DeclContext *DC,
                                            FragileFunctionKind Kind,
                                            bool TreatUsableFromInlineAsPublic) {
+  const ValueDecl *D = declRef.getDecl();
   // Do some important fast-path checks that apply to all cases.
 
   // Local declarations are OK.

@@ -1876,7 +1876,7 @@ public:
     PropertyInitializer
   };
 
-  bool diagnoseInlinableDeclRef(SourceLoc loc, const ValueDecl *D,
+  bool diagnoseInlinableDeclRef(SourceLoc loc, ConcreteDeclRef declRef,
                                 const DeclContext *DC,
                                 FragileFunctionKind Kind,
                                 bool TreatUsableFromInlineAsPublic);
