@@ -2164,11 +2164,10 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // Record this conformance descriptor.
   addProtocolConformance(std::move(description));
 
-  // Trigger the lazy emission of the foreign type metadata.
+  // Trigger lazy emission of the nominal type descriptor.
   CanType conformingType = conf->getType()->getCanonicalType();
-  if (requiresForeignTypeMetadata(conformingType)) {
-    (void)getAddrOfForeignTypeMetadataCandidate(conformingType);
-  }
+  IRGen.noteUseOfTypeContextDescriptor(conformingType->getAnyNominal(),
+                                       DontRequireMetadata);
 }
 
 /// True if a function's signature in LLVM carries polymorphic parameters.
