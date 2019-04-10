@@ -29,8 +29,12 @@ else()
     set(CMAKE_C_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang")
   endif()
 
-  set(CMAKE_C_COMPILER_LAUNCHER "")
-  set(CMAKE_CXX_COMPILER_LAUNCHER "")
+  if(CMAKE_C_COMPILER_LAUNCHER MATCHES ".*distcc")
+    set(CMAKE_C_COMPILER_LAUNCHER "")
+  endif()
+  if(CMAKE_CXX_COMPILER_LAUNCHER MATCHES ".*distcc")
+    set(CMAKE_CXX_COMPILER_LAUNCHER "")
+  endif()
 
   # The sanitizers require using the same version of the compiler for
   # everything and there are various places where we link runtime code with
