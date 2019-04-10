@@ -2315,7 +2315,8 @@ public:
       vdi->second |= Flag;
   }
   
-  void markBaseOfAbstractStorageDeclStore(Expr *E, ConcreteDeclRef decl);
+  void markBaseOfStorageUse(Expr *E, ConcreteDeclRef decl, unsigned flags);
+  void markBaseOfStorageUse(Expr *E, bool isMutating);
   
   void markStoredOrInOutExpr(Expr *E, unsigned Flags);
   
@@ -2694,29 +2695,57 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
   }
 }
 
-/// Handle a store to "x.y" where 'base' is the expression for x and 'decl' is
-/// the decl for 'y'.
-void VarDeclUsageChecker::
-markBaseOfAbstractStorageDeclStore(Expr *base, ConcreteDeclRef decl) {
-  // If the base is a class or an rvalue, then this store just loads the base.
-  if (base->getType()->isAnyClassReferenceType() ||
-      !(base->getType()->hasLValueType() || base->isSemanticallyInOutExpr())) {
+/// Handle a use of "x.y" or "x[0]" where 'base' is the expression for x and
+/// 'decl' is the property or subscript.
+///
+/// TODO: Rip this out and just rely on LValueAccessKind.
+void VarDeclUsageChecker::markBaseOfStorageUse(Expr *base, ConcreteDeclRef decl,
+                                               unsigned flags) {
+  // If the base is an rvalue, then we know that this is a non-mutating access.
+  // Note that we can have mutating accesses even when the base has class or
+  // metatype type due to protocols and protocol extensions.
+  if (!base->getType()->hasLValueType() &&
+      !base->isSemanticallyInOutExpr()) {
     base->walk(*this);
     return;
   }
 
-  // If the store is to a non-mutating member, then this is just a load, even
-  // if the base is an inout expr.
-  auto *ASD = cast<AbstractStorageDecl>(decl.getDecl());
-  if (ASD->isSettable(nullptr) && !ASD->isSetterMutating()) {
-    // Sema conservatively converts the base to inout expr when it is an lvalue.
-    // Look through it because we know it isn't actually doing a load/store.
-    if (auto *ioe = dyn_cast<InOutExpr>(base))
-      base = ioe->getSubExpr();
+  // Compute whether this access is to a mutating member.
+  auto *ASD = dyn_cast_or_null<AbstractStorageDecl>(decl.getDecl());
+  bool isMutating = false;
+  if (!ASD) {
+    // If there's no abstract storage declaration (which should hopefully
+    // only happen with invalid code), treat the base access as mutating if
+    // the subobject is being mutated and the base type is not a class
+    // or metatype.
+    if (flags & RK_Written) {
+      Type type = base->getType()->getRValueType()->getInOutObjectType();
+      if (!type->isAnyClassReferenceType() && !type->is<AnyMetatypeType>())
+        isMutating = true;
+    }
+  } else {
+    // Otherwise, consider whether the accessors are mutating.
+    if (flags & RK_Read)
+      isMutating |= ASD->isGetterMutating();
+    if (flags & RK_Written)
+      isMutating |= ASD->isSettable(nullptr) && ASD->isSetterMutating();
+  }
+
+  markBaseOfStorageUse(base, isMutating);
+}
+
+void VarDeclUsageChecker::markBaseOfStorageUse(Expr *base, bool isMutating) {
+  // CSApply sometimes wraps the base in an InOutExpr just because the
+  // base is an l-value; look through that so we can get more precise
+  // checking.
+  if (auto *ioe = dyn_cast<InOutExpr>(base))
+    base = ioe->getSubExpr();
+
+  if (!isMutating) {
     base->walk(*this);
     return;
   }
-  
+
   // Otherwise this is a read and write of the base.
   return markStoredOrInOutExpr(base, RK_Written|RK_Read);
 }
@@ -2751,25 +2780,22 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
   if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
     // The index of the subscript is evaluated as an rvalue.
     SE->getIndex()->walk(*this);
-    if (SE->hasDecl())
-      markBaseOfAbstractStorageDeclStore(SE->getBase(), SE->getDecl());
-    else  // FIXME: Should not be needed!
-      markStoredOrInOutExpr(SE->getBase(), RK_Written|RK_Read);
-    
+    markBaseOfStorageUse(SE->getBase(), SE->getDecl(), Flags);
     return;
   }
   
   // Likewise for key path applications. An application of a WritableKeyPath
-  // reads and writes its base.
+  // reads and writes its base; an application of a ReferenceWritableKeyPath
+  // only reads its base; the other KeyPath types cannot be written at all.
   if (auto *KPA = dyn_cast<KeyPathApplicationExpr>(E)) {
     auto &C = KPA->getType()->getASTContext();
     KPA->getKeyPath()->walk(*this);
-    if (KPA->getKeyPath()->getType()->getAnyNominal()
-          == C.getWritableKeyPathDecl())
-      markStoredOrInOutExpr(KPA->getBase(), RK_Written|RK_Read);
-    if (KPA->getKeyPath()->getType()->getAnyNominal()
-          == C.getReferenceWritableKeyPathDecl())
-      markStoredOrInOutExpr(KPA->getBase(), RK_Read);
+
+    bool isMutating =
+      (Flags & RK_Written) &&
+      KPA->getKeyPath()->getType()->getAnyNominal()
+        == C.getWritableKeyPathDecl();
+    markBaseOfStorageUse(KPA->getBase(), isMutating);
     return;
   }
   
@@ -2777,10 +2803,10 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
     return markStoredOrInOutExpr(ioe->getSubExpr(), RK_Written|RK_Read);
   
   if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
-    markBaseOfAbstractStorageDeclStore(MRE->getBase(), MRE->getMember());
+    markBaseOfStorageUse(MRE->getBase(), MRE->getMember(), Flags);
     return;
   }
-  
+
   if (auto *TEE = dyn_cast<TupleElementExpr>(E))
     return markStoredOrInOutExpr(TEE->getBase(), Flags);
   
@@ -2789,6 +2815,12 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
 
   if (auto *BOE = dyn_cast<BindOptionalExpr>(E))
     return markStoredOrInOutExpr(BOE->getSubExpr(), Flags);
+
+  // Bind existential expressions.
+  if (auto *OEE = dyn_cast<OpenExistentialExpr>(E)) {
+    OpaqueValueMap[OEE->getOpaqueValue()] = OEE->getExistentialValue();
+    return markStoredOrInOutExpr(OEE->getSubExpr(), Flags);
+  }
   
   // If this is an OpaqueValueExpr that we've seen a mapping for, jump to the
   // mapped value.
@@ -2827,8 +2859,16 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
     if (auto VD = dyn_cast<VarDecl>(MRE->getMember().getDecl())) {
       if (AssociatedGetter == VD && AssociatedGetterRefExpr == nullptr)
         AssociatedGetterRefExpr = MRE;
+      markBaseOfStorageUse(MRE->getBase(), MRE->getMember(), RK_Read);
+      return { false, E };
     }
   }
+  if (auto SE = dyn_cast<SubscriptExpr>(E)) {
+    SE->getIndex()->walk(*this);
+    markBaseOfStorageUse(SE->getBase(), SE->getDecl(), RK_Read);
+    return { false, E };
+  }
+
   // If this is an AssignExpr, see if we're mutating something that we know
   // about.
   if (auto *assign = dyn_cast<AssignExpr>(E)) {
@@ -2849,6 +2889,13 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
   // If we see an OpenExistentialExpr, remember the mapping for its OpaqueValue.
   if (auto *oee = dyn_cast<OpenExistentialExpr>(E))
     OpaqueValueMap[oee->getOpaqueValue()] = oee->getExistentialValue();
+
+  // Visit bindings.
+  if (auto ove = dyn_cast<OpaqueValueExpr>(E)) {
+    if (auto mapping = OpaqueValueMap.lookup(ove))
+      mapping->walk(*this);
+    return { false, E };
+  }
   
   // If we saw an ErrorExpr, take note of this.
   if (isa<ErrorExpr>(E))
