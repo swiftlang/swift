@@ -153,7 +153,6 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
     AutoDiffAssociatedFunctionKind kind, SILModule &module,
     LookupConformanceFn lookupConformance,
     GenericSignature *whereClauseGenSig) {
-
   // JVP: (T...) -> ((R...),
   //                 (T.TangentVector...) -> (R.TangentVector...))
   // VJP: (T...) -> ((R...),
